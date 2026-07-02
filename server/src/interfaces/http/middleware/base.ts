@@ -113,15 +113,20 @@ export function successResponse<T>(request: Request, type: string, payload: T): 
     timestamp: Date.now(),
     metadata: {
       requestId: request.id,
-      success: true
-    }
+      success: true,
+    },
   };
 }
 
 /**
  * Helper to create an error response
  */
-export function errorResponse(request: Request, code: string, message: string, details?: unknown): Response<null> {
+export function errorResponse(
+  request: Request,
+  code: string,
+  message: string,
+  details?: unknown
+): Response<null> {
   // Transform request type to response type
   // If type ends with .request, replace with .response
   // Otherwise, append .response
@@ -140,8 +145,8 @@ export function errorResponse(request: Request, code: string, message: string, d
       error: {
         code,
         message,
-        details
-      }
-    }
+        details,
+      },
+    },
   };
 }

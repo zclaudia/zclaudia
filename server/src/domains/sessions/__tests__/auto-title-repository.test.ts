@@ -28,7 +28,9 @@ function makeDb(): Database.Database {
 
 describe('auto-title repository support', () => {
   let db: Database.Database;
-  beforeEach(() => { db = makeDb(); });
+  beforeEach(() => {
+    db = makeDb();
+  });
 
   it('updateAutoTitle persists title + count without bumping updated_at', () => {
     const repo = new SessionRepository(db);

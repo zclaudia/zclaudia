@@ -16,11 +16,11 @@ import { useToastStore } from '../../stores/toastStore';
 
 function updateClaudiaTaskStatusBySessionId(
   sessionId: string | undefined,
-  status: ClaudiaTaskStatus,
+  status: ClaudiaTaskStatus
 ): void {
   if (!sessionId) return;
   const claudiaStore = useClaudiaStore.getState();
-  const task = claudiaStore.tasks.find((current) => current.sessionId === sessionId);
+  const task = claudiaStore.tasks.find(current => current.sessionId === sessionId);
   if (!task) return;
   claudiaStore.updateTask(task.id, { status, updatedAt: Date.now() });
 }
@@ -36,7 +36,9 @@ function buildAIReviewToastMessage(aiMsg: AIReviewCompletedMessage): string | un
   return `AI review used sanitized local payload; redactions ${redactions}; reviewed ${files} file${files === 1 ? '' : 's'}.`;
 }
 
-function buildAIReviewAutoResolveToastMessage(msg: PermissionAutoResolvedMessage): string | undefined {
+function buildAIReviewAutoResolveToastMessage(
+  msg: PermissionAutoResolvedMessage
+): string | undefined {
   const metadata = msg.metadata;
   if (metadata?.payloadDisposition === 'do_not_send') {
     return 'AI review skipped remote analysis because sensitive local material was detected.';
@@ -78,7 +80,9 @@ export function handlePermissionMessage(msg: ServerMessage, ctx: MessageHandlerC
         sessionId: permMsg.sessionId,
         serverId,
       });
-      useNotchPanelStore.getState().open({ auto: true, previewTitle: 'Permission required', tab: 'approvals' });
+      useNotchPanelStore
+        .getState()
+        .open({ auto: true, previewTitle: 'Permission required', tab: 'approvals' });
       return true;
     }
 

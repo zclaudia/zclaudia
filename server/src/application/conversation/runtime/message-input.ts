@@ -8,8 +8,12 @@ export interface ParsedMessageInput {
 function isMessageAttachment(value: unknown): value is MessageAttachment {
   if (!value || typeof value !== 'object') return false;
   const a = value as Record<string, unknown>;
-  return typeof a.fileId === 'string' && typeof a.name === 'string' && typeof a.mimeType === 'string'
-    && (a.type === 'image' || a.type === 'file');
+  return (
+    typeof a.fileId === 'string' &&
+    typeof a.name === 'string' &&
+    typeof a.mimeType === 'string' &&
+    (a.type === 'image' || a.type === 'file')
+  );
 }
 
 /**
@@ -21,7 +25,11 @@ function isMessageAttachment(value: unknown): value is MessageAttachment {
 export function parseMessageInput(raw: string): ParsedMessageInput {
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (parsed && typeof parsed === 'object' && typeof (parsed as Record<string, unknown>).text === 'string') {
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      typeof (parsed as Record<string, unknown>).text === 'string'
+    ) {
       const candidate = (parsed as Record<string, unknown>).attachments;
       const attachments = Array.isArray(candidate) ? candidate.filter(isMessageAttachment) : [];
       return { text: (parsed as Record<string, unknown>).text as string, attachments };

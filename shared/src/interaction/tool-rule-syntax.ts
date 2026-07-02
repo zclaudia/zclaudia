@@ -6,9 +6,7 @@ export interface ParsedToolRule {
   pattern?: string;
 }
 
-export type ToolRuleParseResult =
-  | { ok: true; rule: ParsedToolRule }
-  | { ok: false; error: string };
+export type ToolRuleParseResult = { ok: true; rule: ParsedToolRule } | { ok: false; error: string };
 
 /**
  * Compile a rule glob into an anchored regex source (matched case-insensitively
@@ -23,10 +21,7 @@ export function compileGlob(glob: string): string {
     body = body.slice(0, -2);
     suffix = '(\\s.*)?$';
   }
-  const escaped = body
-    .replace(REGEX_SPECIALS, '\\$&')
-    .replace(/\*/g, '.*')
-    .replace(/\?/g, '.');
+  const escaped = body.replace(REGEX_SPECIALS, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.');
   return `^${escaped}${suffix}`;
 }
 

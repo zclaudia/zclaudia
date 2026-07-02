@@ -106,9 +106,7 @@ describe('projects routes', () => {
 
   describe('POST /api/projects', () => {
     it('creates project with name only', async () => {
-      const res = await request(app)
-        .post('/api/projects')
-        .send({ name: 'My Project' });
+      const res = await request(app).post('/api/projects').send({ name: 'My Project' });
 
       expect(res.status).toBe(201);
       expect(res.body.success).toBe(true);
@@ -120,19 +118,25 @@ describe('projects routes', () => {
     });
 
     it('creates project with all fields', async () => {
-      const permissionPolicy = { allowedTools: ['Read'], disallowedTools: [], autoApprove: true, timeoutSeconds: 30 };
-      const agentPermissionOverride = { defaultDecision: 'deny', rules: [{ tool: 'Read', decision: 'allow' }] };
+      const permissionPolicy = {
+        allowedTools: ['Read'],
+        disallowedTools: [],
+        autoApprove: true,
+        timeoutSeconds: 30,
+      };
+      const agentPermissionOverride = {
+        defaultDecision: 'deny',
+        rules: [{ tool: 'Read', decision: 'allow' }],
+      };
 
-      const res = await request(app)
-        .post('/api/projects')
-        .send({
-          name: 'Full Project',
-          type: 'chat_only',
-          rootPath: '/home/user/project',
-          systemPrompt: 'You are a helpful assistant.',
-          permissionPolicy,
-          agentPermissionOverride,
-        });
+      const res = await request(app).post('/api/projects').send({
+        name: 'Full Project',
+        type: 'chat_only',
+        rootPath: '/home/user/project',
+        systemPrompt: 'You are a helpful assistant.',
+        permissionPolicy,
+        agentPermissionOverride,
+      });
 
       expect(res.status).toBe(201);
       expect(res.body.success).toBe(true);
@@ -145,9 +149,7 @@ describe('projects routes', () => {
     });
 
     it('returns 400 when name is missing', async () => {
-      const res = await request(app)
-        .post('/api/projects')
-        .send({});
+      const res = await request(app).post('/api/projects').send({});
 
       expect(res.status).toBe(400);
       expect(res.body.success).toBe(false);
@@ -166,9 +168,7 @@ describe('projects routes', () => {
     });
 
     it('stores project in database', async () => {
-      const res = await request(app)
-        .post('/api/projects')
-        .send({ name: 'DB Check' });
+      const res = await request(app).post('/api/projects').send({ name: 'DB Check' });
 
       expect(res.status).toBe(201);
 
@@ -187,7 +187,9 @@ describe('projects routes', () => {
 
       expect(res.status).toBe(201);
       expect(res.body.data.permissionWorkflowOverrideId).toBe('wf-user');
-      const row = db.prepare('SELECT permission_workflow_override_id FROM projects WHERE id = ?').get(res.body.data.id) as any;
+      const row = db
+        .prepare('SELECT permission_workflow_override_id FROM projects WHERE id = ?')
+        .get(res.body.data.id) as any;
       expect(row.permission_workflow_override_id).toBe('wf-user');
     });
 
@@ -213,37 +215,44 @@ describe('projects routes', () => {
 
     it('assigns new projects to the end of the current sort order', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, sort_order, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('p1', 'Existing 1', 'code', 0, now, now);
-      db.prepare(`
+      `
+      ).run('p1', 'Existing 1', 'code', 0, now, now);
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, sort_order, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('p2', 'Existing 2', 'code', 1, now, now);
+      `
+      ).run('p2', 'Existing 2', 'code', 1, now, now);
 
-      const res = await request(app)
-        .post('/api/projects')
-        .send({ name: 'Appended Project' });
+      const res = await request(app).post('/api/projects').send({ name: 'Appended Project' });
 
       expect(res.status).toBe(201);
       expect(res.body.data.sortOrder).toBe(2);
 
-      const row = db.prepare('SELECT sort_order FROM projects WHERE id = ?').get(res.body.data.id) as { sort_order: number };
+      const row = db
+        .prepare('SELECT sort_order FROM projects WHERE id = ?')
+        .get(res.body.data.id) as { sort_order: number };
       expect(row.sort_order).toBe(2);
     });
 
     it('defaults type to code when not specified', async () => {
-      const res = await request(app)
-        .post('/api/projects')
-        .send({ name: 'Default Type' });
+      const res = await request(app).post('/api/projects').send({ name: 'Default Type' });
 
       expect(res.status).toBe(201);
       expect(res.body.data.type).toBe('code');
     });
 
     it('stores permissionPolicy as JSON in database', async () => {
-      const permissionPolicy = { allowedTools: [], disallowedTools: [], autoApprove: false, timeoutSeconds: 60 };
+      const permissionPolicy = {
+        allowedTools: [],
+        disallowedTools: [],
+        autoApprove: false,
+        timeoutSeconds: 60,
+      };
 
       const res = await request(app)
         .post('/api/projects')
@@ -251,7 +260,9 @@ describe('projects routes', () => {
 
       expect(res.status).toBe(201);
 
-      const row = db.prepare('SELECT permission_policy FROM projects WHERE id = ?').get(res.body.data.id) as any;
+      const row = db
+        .prepare('SELECT permission_policy FROM projects WHERE id = ?')
+        .get(res.body.data.id) as any;
       expect(JSON.parse(row.permission_policy)).toEqual(permissionPolicy);
     });
 
@@ -311,9 +322,7 @@ describe('projects routes', () => {
     });
 
     it('returns 409 AGENT_NOT_READY when no usable agent exists', async () => {
-      const res = await request(gatedApp)
-        .post('/api/projects')
-        .send({ name: 'Blocked Project' });
+      const res = await request(gatedApp).post('/api/projects').send({ name: 'Blocked Project' });
 
       expect(res.status).toBe(409);
       expect(res.body.success).toBe(false);
@@ -323,18 +332,24 @@ describe('projects routes', () => {
 
     it('allows project creation when a usable agent exists', async () => {
       const now = Date.now();
-      gatedDb.prepare(`
+      gatedDb
+        .prepare(
+          `
         INSERT INTO llm_profiles (id, name, provider_type, api_key, is_default, created_at, updated_at)
         VALUES (?, ?, ?, ?, 1, ?, ?)
-      `).run('llm-default', 'Default LLM', 'anthropic', 'sk-test', now, now);
-      gatedDb.prepare(`
+      `
+        )
+        .run('llm-default', 'Default LLM', 'anthropic', 'sk-test', now, now);
+      gatedDb
+        .prepare(
+          `
         INSERT INTO agent_profiles (id, name, llm_profile_id, model, is_default, created_at, updated_at)
         VALUES (?, ?, ?, ?, 1, ?, ?)
-      `).run('agent-default', 'Default Agent', 'llm-default', 'claude-sonnet-4-6', now, now);
+      `
+        )
+        .run('agent-default', 'Default Agent', 'llm-default', 'claude-sonnet-4-6', now, now);
 
-      const res = await request(gatedApp)
-        .post('/api/projects')
-        .send({ name: 'Allowed Project' });
+      const res = await request(gatedApp).post('/api/projects').send({ name: 'Allowed Project' });
 
       expect(res.status).toBe(201);
       expect(res.body.success).toBe(true);
@@ -343,22 +358,39 @@ describe('projects routes', () => {
 
     it('rejects project creation when the default agent model is invalid even if another agent is usable', async () => {
       const now = Date.now();
-      gatedDb.prepare(`
+      gatedDb
+        .prepare(
+          `
         INSERT INTO llm_profiles (id, name, provider_type, api_key, is_default, created_at, updated_at)
         VALUES (?, ?, ?, ?, 1, ?, ?)
-      `).run('llm-default', 'Default LLM', 'anthropic', 'sk-test', now, now);
-      gatedDb.prepare(`
+      `
+        )
+        .run('llm-default', 'Default LLM', 'anthropic', 'sk-test', now, now);
+      gatedDb
+        .prepare(
+          `
         INSERT INTO agent_profiles (id, name, llm_profile_id, model, is_default, created_at, updated_at)
         VALUES (?, ?, ?, ?, 1, ?, ?)
-      `).run('agent-bad', 'Bad Default Agent', 'llm-default', 'totally-unregistered-model-id', now, now);
-      gatedDb.prepare(`
+      `
+        )
+        .run(
+          'agent-bad',
+          'Bad Default Agent',
+          'llm-default',
+          'totally-unregistered-model-id',
+          now,
+          now
+        );
+      gatedDb
+        .prepare(
+          `
         INSERT INTO agent_profiles (id, name, llm_profile_id, model, is_default, created_at, updated_at)
         VALUES (?, ?, ?, ?, 0, ?, ?)
-      `).run('agent-good', 'Good Agent', 'llm-default', 'claude-sonnet-4-6', now, now);
+      `
+        )
+        .run('agent-good', 'Good Agent', 'llm-default', 'claude-sonnet-4-6', now, now);
 
-      const res = await request(gatedApp)
-        .post('/api/projects')
-        .send({ name: 'Blocked Project' });
+      const res = await request(gatedApp).post('/api/projects').send({ name: 'Blocked Project' });
 
       expect(res.status).toBe(409);
       expect(res.body.success).toBe(false);
@@ -378,14 +410,18 @@ describe('projects routes', () => {
 
     it('returns all projects', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('p1', 'Project 1', 'code', now, now);
-      db.prepare(`
+      `
+      ).run('p1', 'Project 1', 'code', now, now);
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('p2', 'Project 2', 'chat_only', now + 1000, now + 1000);
+      `
+      ).run('p2', 'Project 2', 'chat_only', now + 1000, now + 1000);
 
       const res = await request(app).get('/api/projects');
 
@@ -396,14 +432,18 @@ describe('projects routes', () => {
 
     it('orders by updated_at DESC', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('p1', 'Older', 'code', now, now);
-      db.prepare(`
+      `
+      ).run('p1', 'Older', 'code', now, now);
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('p2', 'Newer', 'code', now, now + 1000);
+      `
+      ).run('p2', 'Newer', 'code', now, now + 1000);
 
       const res = await request(app).get('/api/projects');
 
@@ -414,14 +454,18 @@ describe('projects routes', () => {
 
     it('orders by sort_order before updated_at', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, sort_order, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('p1', 'Pinned Older', 'code', 0, now, now);
-      db.prepare(`
+      `
+      ).run('p1', 'Pinned Older', 'code', 0, now, now);
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, sort_order, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('p2', 'Newer But Later In Sort', 'code', 1, now, now + 1000);
+      `
+      ).run('p2', 'Newer But Later In Sort', 'code', 1, now, now + 1000);
 
       const res = await request(app).get('/api/projects');
 
@@ -432,14 +476,18 @@ describe('projects routes', () => {
 
     it('includes is_internal projects in listing', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, is_internal, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('p1', 'Regular Project', 'code', 0, now, now);
-      db.prepare(`
+      `
+      ).run('p1', 'Regular Project', 'code', 0, now, now);
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, is_internal, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('p2', '_Agent Assistant', 'code', 1, now, now);
+      `
+      ).run('p2', '_Agent Assistant', 'code', 1, now, now);
 
       const res = await request(app).get('/api/projects');
 
@@ -457,10 +505,20 @@ describe('projects routes', () => {
       const now = Date.now();
       const policy = { defaultDecision: 'allow', rules: [] };
       const override = { defaultDecision: 'deny', rules: [{ tool: 'Bash', decision: 'allow' }] };
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, permission_policy, agent_permission_override, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run('p1', 'Policy Project', 'code', JSON.stringify(policy), JSON.stringify(override), now, now);
+      `
+      ).run(
+        'p1',
+        'Policy Project',
+        'code',
+        JSON.stringify(policy),
+        JSON.stringify(override),
+        now,
+        now
+      );
 
       const res = await request(app).get('/api/projects');
 
@@ -471,10 +529,12 @@ describe('projects routes', () => {
 
     it('returns undefined for null permissionPolicy and agentPermissionOverride', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('p1', 'Simple Project', 'code', now, now);
+      `
+      ).run('p1', 'Simple Project', 'code', now, now);
 
       const res = await request(app).get('/api/projects');
 
@@ -487,10 +547,12 @@ describe('projects routes', () => {
   describe('GET /api/projects/:id', () => {
     it('returns project by id', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, root_path, system_prompt, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run('p1', 'Test Project', 'code', '/home/user/project', 'Be helpful', now, now);
+      `
+      ).run('p1', 'Test Project', 'code', '/home/user/project', 'Be helpful', now, now);
 
       const res = await request(app).get('/api/projects/p1');
 
@@ -517,10 +579,21 @@ describe('projects routes', () => {
       const now = Date.now();
       const policy = { defaultDecision: 'allow', rules: [] };
       const override = { defaultDecision: 'deny', rules: [] };
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, permission_policy, agent_permission_override, is_internal, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run('p1', 'Full Project', 'code', JSON.stringify(policy), JSON.stringify(override), 1, now, now);
+      `
+      ).run(
+        'p1',
+        'Full Project',
+        'code',
+        JSON.stringify(policy),
+        JSON.stringify(override),
+        1,
+        now,
+        now
+      );
 
       const res = await request(app).get('/api/projects/p1');
 
@@ -534,14 +607,14 @@ describe('projects routes', () => {
   describe('PUT /api/projects/:id', () => {
     it('updates project name', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('p1', 'Original', 'code', now, now);
+      `
+      ).run('p1', 'Original', 'code', now, now);
 
-      const res = await request(app)
-        .put('/api/projects/p1')
-        .send({ name: 'Updated' });
+      const res = await request(app).put('/api/projects/p1').send({ name: 'Updated' });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
@@ -553,24 +626,29 @@ describe('projects routes', () => {
 
     it('updates multiple fields', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('p1', 'Original', 'code', now, now);
+      `
+      ).run('p1', 'Original', 'code', now, now);
 
-      const permissionPolicy = { allowedTools: ['Write'], disallowedTools: ['Delete'], autoApprove: false, timeoutSeconds: 30 };
+      const permissionPolicy = {
+        allowedTools: ['Write'],
+        disallowedTools: ['Delete'],
+        autoApprove: false,
+        timeoutSeconds: 30,
+      };
       const agentPermissionOverride = { defaultDecision: 'allow', rules: [] };
 
-      const res = await request(app)
-        .put('/api/projects/p1')
-        .send({
-          name: 'Updated',
-          type: 'chat_only',
-          rootPath: '/new/path',
-          systemPrompt: 'Updated prompt',
-          permissionPolicy,
-          agentPermissionOverride,
-        });
+      const res = await request(app).put('/api/projects/p1').send({
+        name: 'Updated',
+        type: 'chat_only',
+        rootPath: '/new/path',
+        systemPrompt: 'Updated prompt',
+        permissionPolicy,
+        agentPermissionOverride,
+      });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
@@ -587,26 +665,24 @@ describe('projects routes', () => {
 
     it('updates updated_at timestamp', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('p1', 'Original', 'code', now, now);
+      `
+      ).run('p1', 'Original', 'code', now, now);
 
       // Wait to ensure timestamp difference
       await new Promise(resolve => setTimeout(resolve, 10));
 
-      await request(app)
-        .put('/api/projects/p1')
-        .send({ name: 'Updated' });
+      await request(app).put('/api/projects/p1').send({ name: 'Updated' });
 
       const row = db.prepare('SELECT updated_at FROM projects WHERE id = ?').get('p1') as any;
       expect(row.updated_at).toBeGreaterThan(now);
     });
 
     it('returns 404 for non-existent project', async () => {
-      const res = await request(app)
-        .put('/api/projects/nonexistent')
-        .send({ name: 'Updated' });
+      const res = await request(app).put('/api/projects/nonexistent').send({ name: 'Updated' });
 
       expect(res.status).toBe(404);
       expect(res.body.success).toBe(false);
@@ -616,14 +692,14 @@ describe('projects routes', () => {
 
     it('preserves name when not provided via COALESCE', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('p1', 'Original Name', 'code', now, now);
+      `
+      ).run('p1', 'Original Name', 'code', now, now);
 
-      const res = await request(app)
-        .put('/api/projects/p1')
-        .send({ rootPath: '/some/path' });
+      const res = await request(app).put('/api/projects/p1').send({ rootPath: '/some/path' });
 
       expect(res.status).toBe(200);
 
@@ -633,18 +709,20 @@ describe('projects routes', () => {
 
     it('preserves omitted fields when updating a single field', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, root_path, system_prompt, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run('p1', 'Original', 'code', '/existing/path', 'Keep me', now, now);
+      `
+      ).run('p1', 'Original', 'code', '/existing/path', 'Keep me', now, now);
 
-      const res = await request(app)
-        .put('/api/projects/p1')
-        .send({ name: 'Updated Only' });
+      const res = await request(app).put('/api/projects/p1').send({ name: 'Updated Only' });
 
       expect(res.status).toBe(200);
 
-      const row = db.prepare('SELECT name, root_path, system_prompt FROM projects WHERE id = ?').get('p1') as any;
+      const row = db
+        .prepare('SELECT name, root_path, system_prompt FROM projects WHERE id = ?')
+        .get('p1') as any;
       expect(row.name).toBe('Updated Only');
       expect(row.root_path).toBe('/existing/path');
       expect(row.system_prompt).toBe('Keep me');
@@ -653,10 +731,21 @@ describe('projects routes', () => {
     it('clears nullable fields only when explicitly set to null', async () => {
       const now = Date.now();
       const policy = { defaultDecision: 'allow', rules: [] };
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, root_path, system_prompt, permission_policy, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run('p1', 'Original', 'code', '/existing/path', 'Keep me', JSON.stringify(policy), now, now);
+      `
+      ).run(
+        'p1',
+        'Original',
+        'code',
+        '/existing/path',
+        'Keep me',
+        JSON.stringify(policy),
+        now,
+        now
+      );
 
       const res = await request(app)
         .put('/api/projects/p1')
@@ -664,7 +753,9 @@ describe('projects routes', () => {
 
       expect(res.status).toBe(200);
 
-      const row = db.prepare('SELECT root_path, system_prompt, permission_policy FROM projects WHERE id = ?').get('p1') as any;
+      const row = db
+        .prepare('SELECT root_path, system_prompt, permission_policy FROM projects WHERE id = ?')
+        .get('p1') as any;
       expect(row.root_path).toBeNull();
       expect(row.system_prompt).toBeNull();
       expect(row.permission_policy).toBeNull();
@@ -672,14 +763,14 @@ describe('projects routes', () => {
 
     it('rejects clearing name with null', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('p1', 'Original', 'code', now, now);
+      `
+      ).run('p1', 'Original', 'code', now, now);
 
-      const res = await request(app)
-        .put('/api/projects/p1')
-        .send({ name: null });
+      const res = await request(app).put('/api/projects/p1').send({ name: null });
 
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
@@ -688,14 +779,14 @@ describe('projects routes', () => {
 
     it('rejects clearing type with null', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('p1', 'Original', 'code', now, now);
+      `
+      ).run('p1', 'Original', 'code', now, now);
 
-      const res = await request(app)
-        .put('/api/projects/p1')
-        .send({ type: null });
+      const res = await request(app).put('/api/projects/p1').send({ type: null });
 
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
@@ -704,19 +795,19 @@ describe('projects routes', () => {
 
     it('emits project_upsert callback with updated project', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('p1', 'Original', 'code', now, now);
+      `
+      ).run('p1', 'Original', 'code', now, now);
 
       const onProjectChanged = vi.fn();
       const callbackApp = express();
       callbackApp.use(express.json());
       callbackApp.use('/api/projects', createProjectRoutes(db, onProjectChanged));
 
-      const res = await request(callbackApp)
-        .put('/api/projects/p1')
-        .send({ name: 'Updated' });
+      const res = await request(callbackApp).put('/api/projects/p1').send({ name: 'Updated' });
 
       expect(res.status).toBe(200);
       expect(onProjectChanged).toHaveBeenCalledWith({
@@ -732,10 +823,12 @@ describe('projects routes', () => {
   describe('DELETE /api/projects/:id', () => {
     it('deletes existing project', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('p1', 'To Delete', 'code', now, now);
+      `
+      ).run('p1', 'To Delete', 'code', now, now);
 
       const res = await request(app).delete('/api/projects/p1');
 
@@ -758,10 +851,12 @@ describe('projects routes', () => {
 
     it('project is removed from database after deletion', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('p1', 'Delete Me', 'code', now, now);
+      `
+      ).run('p1', 'Delete Me', 'code', now, now);
 
       // Confirm it exists before delete
       const before = db.prepare('SELECT id FROM projects WHERE id = ?').get('p1');
@@ -776,10 +871,12 @@ describe('projects routes', () => {
 
     it('emits project_remove callback with deleted project id', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('p1', 'Delete Me', 'code', now, now);
+      `
+      ).run('p1', 'Delete Me', 'code', now, now);
 
       const onProjectChanged = vi.fn();
       const callbackApp = express();
@@ -797,7 +894,7 @@ describe('projects routes', () => {
 
     it('bridges project CRUD callbacks into gateway project events', async () => {
       const broadcastProjectEvent = vi.fn();
-      const onProjectChanged = vi.fn((event) => {
+      const onProjectChanged = vi.fn(event => {
         if (event.type === 'project_upsert') {
           broadcastProjectEvent('updated', event.project);
         } else {
@@ -815,7 +912,7 @@ describe('projects routes', () => {
       expect(broadcastProjectEvent).toHaveBeenNthCalledWith(
         1,
         'updated',
-        expect.objectContaining({ id: created.body.data.id, name: 'Bridge Project' }),
+        expect.objectContaining({ id: created.body.data.id, name: 'Bridge Project' })
       );
 
       const updated = await request(callbackApp)
@@ -825,17 +922,14 @@ describe('projects routes', () => {
       expect(broadcastProjectEvent).toHaveBeenNthCalledWith(
         2,
         'updated',
-        expect.objectContaining({ id: created.body.data.id, name: 'Bridge Project Renamed' }),
+        expect.objectContaining({ id: created.body.data.id, name: 'Bridge Project Renamed' })
       );
 
-      const removed = await request(callbackApp)
-        .delete(`/api/projects/${created.body.data.id}`);
+      const removed = await request(callbackApp).delete(`/api/projects/${created.body.data.id}`);
       expect(removed.status).toBe(200);
-      expect(broadcastProjectEvent).toHaveBeenNthCalledWith(
-        3,
-        'deleted',
-        { id: created.body.data.id },
-      );
+      expect(broadcastProjectEvent).toHaveBeenNthCalledWith(3, 'deleted', {
+        id: created.body.data.id,
+      });
     });
   });
 
@@ -847,10 +941,12 @@ describe('projects routes', () => {
       ] as any);
 
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, root_path, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('p1', 'Project', 'code', '/repo', now, now);
+      `
+      ).run('p1', 'Project', 'code', '/repo', now, now);
 
       const res = await request(app).get('/api/projects/p1/worktrees');
       expect(res.status).toBe(200);
@@ -861,10 +957,12 @@ describe('projects routes', () => {
 
     it('returns empty array for project without root path', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('p1', 'No Root', 'code', now, now);
+      `
+      ).run('p1', 'No Root', 'code', now, now);
 
       const res = await request(app).get('/api/projects/p1/worktrees');
       expect(res.status).toBe(200);
@@ -878,13 +976,17 @@ describe('projects routes', () => {
 
     it('returns 500 when listGitWorktrees throws', async () => {
       const { listGitWorktrees } = await import('../../../utils/git-worktrees.js');
-      vi.mocked(listGitWorktrees).mockImplementation(() => { throw new Error('git error'); });
+      vi.mocked(listGitWorktrees).mockImplementation(() => {
+        throw new Error('git error');
+      });
 
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, root_path, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('p1', 'Project', 'code', '/repo', now, now);
+      `
+      ).run('p1', 'Project', 'code', '/repo', now, now);
 
       const res = await request(app).get('/api/projects/p1/worktrees');
       expect(res.status).toBe(500);
@@ -896,10 +998,12 @@ describe('projects routes', () => {
   describe('POST /api/projects/:id/worktrees', () => {
     it('creates worktree for project', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, root_path, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('p1', 'Project', 'code', '/repo', now, now);
+      `
+      ).run('p1', 'Project', 'code', '/repo', now, now);
 
       const res = await request(app)
         .post('/api/projects/p1/worktrees')
@@ -919,14 +1023,14 @@ describe('projects routes', () => {
 
     it('returns 400 for project without root path', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('p1', 'No Root', 'code', now, now);
+      `
+      ).run('p1', 'No Root', 'code', now, now);
 
-      const res = await request(app)
-        .post('/api/projects/p1/worktrees')
-        .send({ branch: 'test' });
+      const res = await request(app).post('/api/projects/p1/worktrees').send({ branch: 'test' });
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
     });
@@ -935,40 +1039,46 @@ describe('projects routes', () => {
       const { createGitWorktree } = await import('../../../utils/git-worktrees.js');
 
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, root_path, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('p1', 'Project', 'code', '/repo', now, now);
+      `
+      ).run('p1', 'Project', 'code', '/repo', now, now);
 
-      const res = await request(app)
-        .post('/api/projects/p1/worktrees')
-        .send({});
+      const res = await request(app).post('/api/projects/p1/worktrees').send({});
 
       expect(res.status).toBe(200);
       // Branch should be auto-generated with wt- prefix
       expect(createGitWorktree).toHaveBeenCalledWith(
         '/repo',
         expect.stringContaining('.worktrees/wt-'),
-        expect.stringContaining('wt-'),
+        expect.stringContaining('wt-')
       );
     });
 
     it('returns 500 when createGitWorktree throws', async () => {
       const { createGitWorktree } = await import('../../../utils/git-worktrees.js');
-      vi.mocked(createGitWorktree).mockImplementation(() => { throw new Error('git error'); });
+      vi.mocked(createGitWorktree).mockImplementation(() => {
+        throw new Error('git error');
+      });
 
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, root_path, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('p1', 'Project', 'code', '/repo', now, now);
+      `
+      ).run('p1', 'Project', 'code', '/repo', now, now);
 
-      const res = await request(app)
-        .post('/api/projects/p1/worktrees')
-        .send({ branch: 'test' });
+      const res = await request(app).post('/api/projects/p1/worktrees').send({ branch: 'test' });
       expect(res.status).toBe(500);
 
-      vi.mocked(createGitWorktree).mockReturnValue({ path: '/mock', branch: 'b', head: 'h' } as any);
+      vi.mocked(createGitWorktree).mockReturnValue({
+        path: '/mock',
+        branch: 'b',
+        head: 'h',
+      } as any);
     });
   });
 
@@ -976,10 +1086,12 @@ describe('projects routes', () => {
     it('returns 500 when database error occurs during delete', async () => {
       // Insert a project first
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('p-del-err', 'Project To Delete', 'code', now, now);
+      `
+      ).run('p-del-err', 'Project To Delete', 'code', now, now);
 
       // Close the db to simulate error
       const originalPrepare = db.prepare.bind(db);
@@ -1004,26 +1116,32 @@ describe('projects routes', () => {
   describe('PUT /api/projects/:id with reviewLlmProfileId', () => {
     it('updates reviewLlmProfileId', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('p1', 'Project', 'code', now, now);
+      `
+      ).run('p1', 'Project', 'code', now, now);
 
       const res = await request(app)
         .put('/api/projects/p1')
         .send({ reviewLlmProfileId: 'provider-1' });
 
       expect(res.status).toBe(200);
-      const row = db.prepare('SELECT review_llm_profile_id FROM projects WHERE id = ?').get('p1') as any;
+      const row = db
+        .prepare('SELECT review_llm_profile_id FROM projects WHERE id = ?')
+        .get('p1') as any;
       expect(row.review_llm_profile_id).toBe('provider-1');
     });
 
     it('rejects reviewLlmProfileId for chat_only project', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('p1', 'Project', 'chat_only', now, now);
+      `
+      ).run('p1', 'Project', 'chat_only', now, now);
 
       const res = await request(app)
         .put('/api/projects/p1')
@@ -1035,17 +1153,19 @@ describe('projects routes', () => {
 
     it('clears reviewLlmProfileId when set to null', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, review_llm_profile_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('p1', 'Project', 'code', 'old-provider', now, now);
+      `
+      ).run('p1', 'Project', 'code', 'old-provider', now, now);
 
-      const res = await request(app)
-        .put('/api/projects/p1')
-        .send({ reviewLlmProfileId: null });
+      const res = await request(app).put('/api/projects/p1').send({ reviewLlmProfileId: null });
 
       expect(res.status).toBe(200);
-      const row = db.prepare('SELECT review_llm_profile_id FROM projects WHERE id = ?').get('p1') as any;
+      const row = db
+        .prepare('SELECT review_llm_profile_id FROM projects WHERE id = ?')
+        .get('p1') as any;
       expect(row.review_llm_profile_id).toBeNull();
     });
   });
@@ -1054,26 +1174,32 @@ describe('projects routes', () => {
     it('updates permissionWorkflowOverrideId', async () => {
       const now = Date.now();
       db.prepare(`INSERT INTO workflows (id, is_system) VALUES (?, 0)`).run('wf-user');
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('p1', 'Project', 'code', now, now);
+      `
+      ).run('p1', 'Project', 'code', now, now);
 
       const res = await request(app)
         .put('/api/projects/p1')
         .send({ permissionWorkflowOverrideId: 'wf-user' });
 
       expect(res.status).toBe(200);
-      const row = db.prepare('SELECT permission_workflow_override_id FROM projects WHERE id = ?').get('p1') as any;
+      const row = db
+        .prepare('SELECT permission_workflow_override_id FROM projects WHERE id = ?')
+        .get('p1') as any;
       expect(row.permission_workflow_override_id).toBe('wf-user');
     });
 
     it('rejects unknown permissionWorkflowOverrideId', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('p1', 'Project', 'code', now, now);
+      `
+      ).run('p1', 'Project', 'code', now, now);
 
       const res = await request(app)
         .put('/api/projects/p1')
@@ -1086,10 +1212,12 @@ describe('projects routes', () => {
     it('rejects system fallback as project override', async () => {
       const now = Date.now();
       db.prepare(`INSERT INTO workflows (id, is_system) VALUES (?, 1)`).run('wf-system');
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('p1', 'Project', 'code', now, now);
+      `
+      ).run('p1', 'Project', 'code', now, now);
 
       const res = await request(app)
         .put('/api/projects/p1')
@@ -1102,17 +1230,21 @@ describe('projects routes', () => {
     it('clears permissionWorkflowOverrideId when set to null', async () => {
       const now = Date.now();
       db.prepare(`INSERT INTO workflows (id, is_system) VALUES (?, 0)`).run('wf-user');
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, permission_workflow_override_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('p1', 'Project', 'code', 'wf-user', now, now);
+      `
+      ).run('p1', 'Project', 'code', 'wf-user', now, now);
 
       const res = await request(app)
         .put('/api/projects/p1')
         .send({ permissionWorkflowOverrideId: null });
 
       expect(res.status).toBe(200);
-      const row = db.prepare('SELECT permission_workflow_override_id FROM projects WHERE id = ?').get('p1') as any;
+      const row = db
+        .prepare('SELECT permission_workflow_override_id FROM projects WHERE id = ?')
+        .get('p1') as any;
       expect(row.permission_workflow_override_id).toBeNull();
     });
   });
@@ -1120,10 +1252,12 @@ describe('projects routes', () => {
   describe('GET /api/projects/:id/memory-dir', () => {
     it('returns resolved memory dir for an existing project', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('p-mem', 'Memory Project', 'code', now, now);
+      `
+      ).run('p-mem', 'Memory Project', 'code', now, now);
 
       const res = await request(app).get('/api/projects/p-mem/memory-dir');
 
@@ -1145,16 +1279,22 @@ describe('projects routes', () => {
   describe('POST /api/projects/reorder', () => {
     it('updates sort_order without changing updated_at', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, sort_order, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('p1', 'Project 1', 'code', 0, now, now);
-      db.prepare(`
+      `
+      ).run('p1', 'Project 1', 'code', 0, now, now);
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, sort_order, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('p2', 'Project 2', 'code', 1, now, now + 1000);
+      `
+      ).run('p2', 'Project 2', 'code', 1, now, now + 1000);
 
-      const before = db.prepare('SELECT id, sort_order, updated_at FROM projects ORDER BY id').all() as Array<{ id: string; sort_order: number; updated_at: number }>;
+      const before = db
+        .prepare('SELECT id, sort_order, updated_at FROM projects ORDER BY id')
+        .all() as Array<{ id: string; sort_order: number; updated_at: number }>;
 
       const res = await request(app)
         .post('/api/projects/reorder')
@@ -1162,7 +1302,9 @@ describe('projects routes', () => {
 
       expect(res.status).toBe(200);
 
-      const after = db.prepare('SELECT id, sort_order, updated_at FROM projects ORDER BY id').all() as Array<{ id: string; sort_order: number; updated_at: number }>;
+      const after = db
+        .prepare('SELECT id, sort_order, updated_at FROM projects ORDER BY id')
+        .all() as Array<{ id: string; sort_order: number; updated_at: number }>;
       expect(after).toEqual([
         { id: 'p1', sort_order: 1, updated_at: before[0].updated_at },
         { id: 'p2', sort_order: 0, updated_at: before[1].updated_at },

@@ -76,7 +76,7 @@ describe('AnonymousManagementPanel', () => {
     } as never);
     const spy = vi
       .spyOn(api, 'transitionStatus')
-      .mockImplementation(async (id) => mkAnon({ id, status: 'cancelled' }));
+      .mockImplementation(async id => mkAnon({ id, status: 'cancelled' }));
     render(<AnonymousManagementPanel projectId="p1" />);
     fireEvent.click(screen.getByText(/Select all open/));
     fireEvent.click(screen.getByRole('button', { name: /Cancel selected/ }));

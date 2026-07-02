@@ -1,6 +1,10 @@
 import type { Model } from '@earendil-works/pi-ai';
 import type { LlmProfileConfig, LlmProfileModelEntry } from '@zclaudia/shared/core/llm-profile';
-import { tryGetRegistryModel, findInRegistryCrossProvider, type RegistryHit } from './registry-search.js';
+import {
+  tryGetRegistryModel,
+  findInRegistryCrossProvider,
+  type RegistryHit,
+} from './registry-search.js';
 import { refreshIfNeeded } from '../../../domains/llm-profiles/codex-oauth-service.js';
 import { getLlmProfileWriter } from '../../../domains/llm-profiles/repository-registry.js';
 import { resolveEnvModel } from './env-model.js';
@@ -30,7 +34,7 @@ const OPENAI_COMPAT_DEFAULT_MAX_TOKENS = 8_192;
 function applyModelEntryOverrides(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   model: Model<any>,
-  entry: LlmProfileModelEntry | undefined,
+  entry: LlmProfileModelEntry | undefined
 ): void {
   if (!entry) return;
   if (entry.contextWindow && entry.contextWindow > 0) {
@@ -73,7 +77,7 @@ function isThirdPartyOpenAiCompat(baseUrl: string | undefined): boolean {
 function buildOpenAiCompatLiteral(
   modelId: string,
   providerType: string,
-  profile: LlmProfileConfig | undefined,
+  profile: LlmProfileConfig | undefined
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Model<any> {
   // baseUrl resolution: profile.baseUrl wins, then OPENAI_BASE_URL env
@@ -115,8 +119,11 @@ function buildOpenAiCompatLiteral(
  * requests. The callback is only set when an explicit api key is available
  * (profile or env); otherwise pi falls back to its own resolution.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type BuiltModel = { model: Model<any>; getApiKey?: (provider: string) => Promise<string | undefined> | string | undefined };
+
+export type BuiltModel = {
+  model: Model<any>;
+  getApiKey?: (provider: string) => Promise<string | undefined> | string | undefined;
+};
 
 /**
  * Build a pi-ai `Model` literal from an optional {@link LlmProfileConfig} and
@@ -162,7 +169,7 @@ export type BuiltModel = { model: Model<any>; getApiKey?: (provider: string) => 
 export function buildModel(
   profile?: LlmProfileConfig,
   modelOverride?: string,
-  modelEntry?: LlmProfileModelEntry,
+  modelEntry?: LlmProfileModelEntry
 ): BuiltModel {
   // providerType resolution:
   //   1. profile.providerType (canonical surface — set by the LLM-profile editor)
@@ -172,9 +179,9 @@ export function buildModel(
   //      pointing at an openai-compat endpoint)
   //   4. DEFAULT_PROVIDER (`anthropic`)
   const providerType =
-    profile?.providerType
-    ?? process.env.PI_PROVIDER
-    ?? (process.env.OPENAI_BASE_URL ? 'openai' : DEFAULT_PROVIDER);
+    profile?.providerType ??
+    process.env.PI_PROVIDER ??
+    (process.env.OPENAI_BASE_URL ? 'openai' : DEFAULT_PROVIDER);
   // When no explicit override is supplied, fall back to the dev-time env knobs
   // (PI_MODEL wins, then the legacy OPENAI_MODEL, then the default). Shared with
   // the default-agent seed so a seeded agent's model matches what we request.
@@ -245,9 +252,9 @@ export function buildModel(
   // Registry entries that hard-code the flag (e.g. moonshotai) and canonical
   // api.openai.com are untouched; other registry compat fields are preserved.
   if (
-    model.api === 'openai-completions'
-    && isThirdPartyOpenAiCompat(model.baseUrl)
-    && profile?.compat?.supportsDeveloperRole === undefined
+    model.api === 'openai-completions' &&
+    isThirdPartyOpenAiCompat(model.baseUrl) &&
+    profile?.compat?.supportsDeveloperRole === undefined
   ) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (model as any).compat = { ...((model as any).compat ?? {}), supportsDeveloperRole: false };

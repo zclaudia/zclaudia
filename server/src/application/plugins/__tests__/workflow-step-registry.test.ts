@@ -101,26 +101,30 @@ describe('WorkflowStepRegistry', () => {
 
   describe('getAllMeta', () => {
     it('returns serializable metadata without handler', () => {
-      workflowStepRegistry.register(createStepMeta({
-        type: 'p1/step',
-        name: 'My Step',
-        description: 'desc',
-        category: 'cat',
-        icon: 'star',
-        configSchema: { type: 'object' },
-        pluginId: 'p1',
-      }));
+      workflowStepRegistry.register(
+        createStepMeta({
+          type: 'p1/step',
+          name: 'My Step',
+          description: 'desc',
+          category: 'cat',
+          icon: 'star',
+          configSchema: { type: 'object' },
+          pluginId: 'p1',
+        })
+      );
 
       const meta = workflowStepRegistry.getAllMeta();
-      expect(meta).toEqual([{
-        type: 'p1/step',
-        name: 'My Step',
-        description: 'desc',
-        category: 'cat',
-        icon: 'star',
-        configSchema: { type: 'object' },
-        source: 'p1',
-      }]);
+      expect(meta).toEqual([
+        {
+          type: 'p1/step',
+          name: 'My Step',
+          description: 'desc',
+          category: 'cat',
+          icon: 'star',
+          configSchema: { type: 'object' },
+          source: 'p1',
+        },
+      ]);
     });
 
     it('returns empty array when no steps', () => {
@@ -181,9 +185,15 @@ describe('WorkflowStepRegistry', () => {
     });
 
     it('returns failed for unknown step type', async () => {
-      const result = await workflowStepRegistry.execute('unknown/step', {}, {
-        projectId: 'p', stepRunId: 'sr', runId: 'r',
-      });
+      const result = await workflowStepRegistry.execute(
+        'unknown/step',
+        {},
+        {
+          projectId: 'p',
+          stepRunId: 'sr',
+          runId: 'r',
+        }
+      );
       expect(result.status).toBe('failed');
       expect(result.error).toContain('Unknown plugin step type');
     });
@@ -192,9 +202,15 @@ describe('WorkflowStepRegistry', () => {
       workflowStepRegistry.register(createStepMeta());
       vi.mocked(pluginLoader.checkPermissions).mockResolvedValue(false);
 
-      const result = await workflowStepRegistry.execute('plugin1/step1', {}, {
-        projectId: 'p', stepRunId: 'sr', runId: 'r',
-      });
+      const result = await workflowStepRegistry.execute(
+        'plugin1/step1',
+        {},
+        {
+          projectId: 'p',
+          stepRunId: 'sr',
+          runId: 'r',
+        }
+      );
       expect(result.status).toBe('failed');
       expect(result.error).toContain('permissions denied');
     });
@@ -204,9 +220,15 @@ describe('WorkflowStepRegistry', () => {
       workflowStepRegistry.register(createStepMeta({ handler }));
       vi.mocked(pluginLoader.checkPermissions).mockResolvedValue(true);
 
-      const result = await workflowStepRegistry.execute('plugin1/step1', {}, {
-        projectId: 'p', stepRunId: 'sr', runId: 'r',
-      });
+      const result = await workflowStepRegistry.execute(
+        'plugin1/step1',
+        {},
+        {
+          projectId: 'p',
+          stepRunId: 'sr',
+          runId: 'r',
+        }
+      );
       expect(result.status).toBe('failed');
       expect(result.error).toContain('Handler crashed');
     });
@@ -216,9 +238,15 @@ describe('WorkflowStepRegistry', () => {
       workflowStepRegistry.register(createStepMeta({ handler }));
       vi.mocked(pluginLoader.checkPermissions).mockResolvedValue(true);
 
-      const result = await workflowStepRegistry.execute('plugin1/step1', {}, {
-        projectId: 'p', stepRunId: 'sr', runId: 'r',
-      });
+      const result = await workflowStepRegistry.execute(
+        'plugin1/step1',
+        {},
+        {
+          projectId: 'p',
+          stepRunId: 'sr',
+          runId: 'r',
+        }
+      );
       expect(result.status).toBe('failed');
       expect(result.error).toContain('string error');
     });

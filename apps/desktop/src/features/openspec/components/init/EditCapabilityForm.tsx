@@ -10,7 +10,13 @@ interface Props {
 
 const KEBAB_RE = /^[a-z][a-z0-9-]*$/;
 
-export function EditCapabilityForm({ initialName, initialDescription, onSave, onCancel, allowNameEdit }: Props): React.ReactElement {
+export function EditCapabilityForm({
+  initialName,
+  initialDescription,
+  onSave,
+  onCancel,
+  allowNameEdit,
+}: Props): React.ReactElement {
   const [name, setName] = useState(initialName);
   const [description, setDescription] = useState(initialDescription);
   const [busy, setBusy] = useState(false);
@@ -40,10 +46,14 @@ export function EditCapabilityForm({ initialName, initialDescription, onSave, on
           <input
             className="block w-full text-xs px-2 py-1 border rounded bg-background"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={e => setName(e.target.value)}
             pattern="^[a-z][a-z0-9-]*$"
           />
-          {!nameValid && <div className="text-[10px] text-red-500">Must be kebab-case (a-z, 0-9, hyphens), ≤60 chars.</div>}
+          {!nameValid && (
+            <div className="text-[10px] text-red-500">
+              Must be kebab-case (a-z, 0-9, hyphens), ≤60 chars.
+            </div>
+          )}
         </div>
       )}
       <div>
@@ -52,14 +62,22 @@ export function EditCapabilityForm({ initialName, initialDescription, onSave, on
           className="block w-full text-xs px-2 py-1 border rounded bg-background"
           rows={2}
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          onChange={e => setDescription(e.target.value)}
         />
         {!descValid && <div className="text-[10px] text-red-500">Required, ≤200 chars.</div>}
       </div>
       {err && <div className="text-[10px] text-red-500">{err}</div>}
       <div className="flex gap-2">
-        <button className="px-2 py-0.5 text-xs rounded bg-muted/60 text-foreground disabled:opacity-50" disabled={!canSave} onClick={() => void save()}>Save</button>
-        <button className="px-2 py-0.5 text-xs rounded bg-secondary" onClick={onCancel}>Cancel</button>
+        <button
+          className="px-2 py-0.5 text-xs rounded bg-muted/60 text-foreground disabled:opacity-50"
+          disabled={!canSave}
+          onClick={() => void save()}
+        >
+          Save
+        </button>
+        <button className="px-2 py-0.5 text-xs rounded bg-secondary" onClick={onCancel}>
+          Cancel
+        </button>
       </div>
     </div>
   );

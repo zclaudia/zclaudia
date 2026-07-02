@@ -5,15 +5,25 @@
  * MCP servers configured here are injected into providers at run time.
  */
 
-import { Router, Request, Response } from 'express';
+import { Router, type Request, type Response } from 'express';
 import type Database from 'better-sqlite3';
-import type { McpOAuthCredentials, McpRiskAction, McpServerConfig, McpServerInventoryDetail, McpServerTrustPolicy } from '@zclaudia/shared/core/mcp';
+import type {
+  McpOAuthCredentials,
+  McpRiskAction,
+  McpServerConfig,
+  McpServerInventoryDetail,
+  McpServerTrustPolicy,
+} from '@zclaudia/shared/core/mcp';
 import { normalizeMcpServerTrustPolicy } from '@zclaudia/shared/core/mcp';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import type { ExternalToolRiskPolicy } from '@zclaudia/shared/core/tools';
 import { mcpClientManager } from '../../utils/mcp-client-manager.js';
 import { mcpInventoryCache } from '../../utils/mcp-inventory-cache.js';
-import { McpServerService, McpServerServiceError, type McpServerRow } from '../../infra/services/mcp-server-service.js';
+import {
+  McpServerService,
+  McpServerServiceError,
+  type McpServerRow,
+} from '../../infra/services/mcp-server-service.js';
 import { sendApiError } from './response.js';
 import { McpOAuthSessionManager } from '../../domains/mcp/mcp-oauth-session.js';
 
@@ -23,7 +33,8 @@ export function createMcpServerRoutes(db: Database.Database): Router {
   const router = Router();
   const mcpServerService = new McpServerService(db);
   const mcpOAuthSessions = new McpOAuthSessionManager({
-    updateOAuthCredentials: (serverName, credentials) => mcpServerService.updateOAuthCredentials(serverName, credentials),
+    updateOAuthCredentials: (serverName, credentials) =>
+      mcpServerService.updateOAuthCredentials(serverName, credentials),
   });
 
   function redactMcpServerForResponse(server: McpServerConfig): McpServerConfig {
@@ -57,7 +68,7 @@ export function createMcpServerRoutes(db: Database.Database): Router {
   router.get('/status', (_req: Request, res: Response) => {
     try {
       const servers = mcpServerService.listServers();
-      const data = servers.map((server) => {
+      const data = servers.map(server => {
         const status = statusWithInventory(server);
         return {
           ...status,
@@ -96,8 +107,10 @@ export function createMcpServerRoutes(db: Database.Database): Router {
    */
   router.put('/:id', (req: Request, res: Response) => {
     try {
-      const before = mcpServerService.listServers().find((server) => server.id === req.params.id);
-      const data = redactMcpServerForResponse(mcpServerService.updateServer(req.params.id, req.body ?? {}));
+      const before = mcpServerService.listServers().find(server => server.id === req.params.id);
+      const data = redactMcpServerForResponse(
+        mcpServerService.updateServer(req.params.id, req.body ?? {})
+      );
       if (before) void mcpClientManager.disconnect(before.name);
       res.json({ success: true, data } as ApiResponse<McpServerConfig>);
     } catch (error) {
@@ -116,7 +129,7 @@ export function createMcpServerRoutes(db: Database.Database): Router {
    */
   router.delete('/:id', (req: Request, res: Response) => {
     try {
-      const before = mcpServerService.listServers().find((server) => server.id === req.params.id);
+      const before = mcpServerService.listServers().find(server => server.id === req.params.id);
       mcpServerService.deleteServer(req.params.id);
       if (before) void mcpClientManager.disconnect(before.name);
       res.json({ success: true, data: null } as ApiResponse<null>);
@@ -163,7 +176,8 @@ export function createMcpServerRoutes(db: Database.Database): Router {
         headersHelper: server.headersHelper,
         oauthConfig: server.oauthConfig,
         oauthCredentials: server.oauthCredentials,
-        onOAuthCredentials: (credentials: McpOAuthCredentials | null) => mcpServerService.updateOAuthCredentials(server.name, credentials),
+        onOAuthCredentials: (credentials: McpOAuthCredentials | null) =>
+          mcpServerService.updateOAuthCredentials(server.name, credentials),
       } as const;
     }
     return {
@@ -184,35 +198,38 @@ export function createMcpServerRoutes(db: Database.Database): Router {
     };
   }
 
-  function inventoryDetailFor(inventory: {
-    tools: Array<{
-      name: string;
-      description?: string;
-      inputSchema?: Record<string, unknown>;
-      annotations?: Record<string, unknown>;
-    }>;
-    resources: Array<{ uri: string; name?: string; description?: string; mimeType?: string }>;
-    prompts: Array<{
-      name: string;
-      description?: string;
-      arguments?: Array<{ name: string; description?: string; required?: boolean }>;
-    }>;
-  }, trustPolicy?: McpServerTrustPolicy): McpServerInventoryDetail {
+  function inventoryDetailFor(
+    inventory: {
+      tools: Array<{
+        name: string;
+        description?: string;
+        inputSchema?: Record<string, unknown>;
+        annotations?: Record<string, unknown>;
+      }>;
+      resources: Array<{ uri: string; name?: string; description?: string; mimeType?: string }>;
+      prompts: Array<{
+        name: string;
+        description?: string;
+        arguments?: Array<{ name: string; description?: string; required?: boolean }>;
+      }>;
+    },
+    trustPolicy?: McpServerTrustPolicy
+  ): McpServerInventoryDetail {
     return {
-      tools: inventory.tools.map((tool) => ({
+      tools: inventory.tools.map(tool => ({
         name: tool.name,
         description: tool.description ?? '',
         inputSchema: tool.inputSchema ?? { type: 'object', properties: {} },
         annotations: tool.annotations,
         permissionSummary: inferMcpToolRisk(tool, trustPolicy),
       })),
-      resources: inventory.resources.map((resource) => ({
+      resources: inventory.resources.map(resource => ({
         uri: resource.uri,
         name: resource.name,
         description: resource.description,
         mimeType: resource.mimeType,
       })),
-      prompts: inventory.prompts.map((prompt) => ({
+      prompts: inventory.prompts.map(prompt => ({
         name: prompt.name,
         description: prompt.description,
         arguments: prompt.arguments ?? [],
@@ -220,17 +237,20 @@ export function createMcpServerRoutes(db: Database.Database): Router {
     };
   }
 
-  function inferMcpToolRisk(tool: {
-    annotations?: Record<string, unknown>;
-  }, trustPolicy?: McpServerTrustPolicy): ExternalToolRiskPolicy {
+  function inferMcpToolRisk(
+    tool: {
+      annotations?: Record<string, unknown>;
+    },
+    trustPolicy?: McpServerTrustPolicy
+  ): ExternalToolRiskPolicy {
     const annotations = tool.annotations ?? {};
     const declaredReadOnly = annotations.readOnlyHint === true || annotations.readOnly === true;
     const destructive = annotations.destructiveHint === true;
     const openWorld = annotations.openWorldHint !== false;
     const trustedReadOnly = !!(
-      declaredReadOnly
-      && trustPolicy?.trustReadOnlyHint
-      && (trustPolicy.trustLevel === 'trusted-readonly' || trustPolicy.trustLevel === 'trusted')
+      declaredReadOnly &&
+      trustPolicy?.trustReadOnlyHint &&
+      (trustPolicy.trustLevel === 'trusted-readonly' || trustPolicy.trustLevel === 'trusted')
     );
     const riskLevel = destructive || openWorld ? 'high' : declaredReadOnly ? 'medium' : 'high';
     return {
@@ -240,7 +260,10 @@ export function createMcpServerRoutes(db: Database.Database): Router {
       mutatesWorkspace: !declaredReadOnly || destructive,
       requiresNetwork: true,
       riskLevel,
-      providerTrust: trustPolicy?.trustLevel === 'trusted' || trustPolicy?.trustLevel === 'trusted-readonly' ? 'trusted' : 'untrusted',
+      providerTrust:
+        trustPolicy?.trustLevel === 'trusted' || trustPolicy?.trustLevel === 'trusted-readonly'
+          ? 'trusted'
+          : 'untrusted',
       policyDecision: evaluateMcpRiskDecision({ riskLevel, declaredReadOnly }, trustPolicy),
       advisory: trustedReadOnly
         ? 'MCP read-only annotations are trusted for this server by policy.'
@@ -256,15 +279,15 @@ export function createMcpServerRoutes(db: Database.Database): Router {
 
   function evaluateMcpRiskDecision(
     risk: { riskLevel: 'low' | 'medium' | 'high'; declaredReadOnly: boolean },
-    policy?: McpServerTrustPolicy,
+    policy?: McpServerTrustPolicy
   ): 'approve' | 'deny' | 'escalate' {
     const normalized = normalizeMcpServerTrustPolicy(policy);
     const explicit = normalized?.riskActions?.[risk.riskLevel];
     if (explicit) return riskActionToDecision(explicit);
     if (
-      risk.declaredReadOnly
-      && normalized?.trustReadOnlyHint
-      && (normalized.trustLevel === 'trusted-readonly' || normalized.trustLevel === 'trusted')
+      risk.declaredReadOnly &&
+      normalized?.trustReadOnlyHint &&
+      (normalized.trustLevel === 'trusted-readonly' || normalized.trustLevel === 'trusted')
     ) {
       return 'approve';
     }
@@ -274,7 +297,7 @@ export function createMcpServerRoutes(db: Database.Database): Router {
   async function handleLifecycle(
     req: Request,
     res: Response,
-    action: 'connect' | 'disconnect' | 'refresh',
+    action: 'connect' | 'disconnect' | 'refresh'
   ): Promise<void> {
     const server = getEnabledServerByName(req.params.name);
     if (!server) {
@@ -282,7 +305,8 @@ export function createMcpServerRoutes(db: Database.Database): Router {
       return;
     }
     try {
-      if (action === 'connect') await mcpClientManager.connect(server.name, serverConfigFor(server));
+      if (action === 'connect')
+        await mcpClientManager.connect(server.name, serverConfigFor(server));
       else if (action === 'refresh') {
         const config = serverConfigFor(server);
         await mcpClientManager.refresh(server.name, config);
@@ -291,8 +315,7 @@ export function createMcpServerRoutes(db: Database.Database): Router {
           listResources: () => mcpClientManager.listResources(server.name, config),
           listPrompts: () => mcpClientManager.listPrompts(server.name, config),
         });
-      }
-      else await mcpClientManager.disconnect(server.name);
+      } else await mcpClientManager.disconnect(server.name);
       res.json({ success: true, data: statusWithInventory(server) });
     } catch (error) {
       console.error(`[MCP Servers] Error during ${action} for "${server.name}":`, error);
@@ -319,12 +342,18 @@ export function createMcpServerRoutes(db: Database.Database): Router {
     try {
       const method = req.body?.method === 'device_code' ? 'device_code' : 'browser';
       const origin = `${req.protocol}://${req.get('host')}`;
-      const data = method === 'device_code'
-        ? await mcpOAuthSessions.startDeviceCodeFlow(server)
-        : await mcpOAuthSessions.startBrowserFlow(server, origin);
+      const data =
+        method === 'device_code'
+          ? await mcpOAuthSessions.startDeviceCodeFlow(server)
+          : await mcpOAuthSessions.startBrowserFlow(server, origin);
       res.json({ success: true, data });
     } catch (error) {
-      sendApiError(res, 400, 'MCP_OAUTH_START_FAILED', error instanceof Error ? error.message : String(error));
+      sendApiError(
+        res,
+        400,
+        'MCP_OAUTH_START_FAILED',
+        error instanceof Error ? error.message : String(error)
+      );
     }
   });
 
@@ -365,7 +394,9 @@ export function createMcpServerRoutes(db: Database.Database): Router {
     try {
       await mcpOAuthSessions.finishBrowserFlow(server, sessionId, code);
       void mcpClientManager.disconnect(server.name);
-      res.status(200).send('MCP authentication complete. You can close this window and return to ZClaudia.');
+      res
+        .status(200)
+        .send('MCP authentication complete. You can close this window and return to ZClaudia.');
     } catch (error) {
       res.status(400).send(error instanceof Error ? error.message : String(error));
     }
@@ -394,7 +425,7 @@ export function createMcpServerRoutes(db: Database.Database): Router {
     }
 
     try {
-      const server = mcpServerService.listServers().find((candidate) => candidate.name === name);
+      const server = mcpServerService.listServers().find(candidate => candidate.name === name);
       if (!server) {
         res.status(404).json({
           success: false,
@@ -411,7 +442,12 @@ export function createMcpServerRoutes(db: Database.Database): Router {
         return;
       }
 
-      const result = await mcpClientManager.callTool(name, serverConfigFor(server), tool, toolArgs || {});
+      const result = await mcpClientManager.callTool(
+        name,
+        serverConfigFor(server),
+        tool,
+        toolArgs || {}
+      );
 
       res.json({ success: true, data: { result } });
     } catch (error) {
@@ -434,7 +470,7 @@ export function createMcpServerRoutes(db: Database.Database): Router {
     const { name } = req.params;
 
     try {
-      const server = mcpServerService.listServers().find((candidate) => candidate.name === name);
+      const server = mcpServerService.listServers().find(candidate => candidate.name === name);
       if (!server) {
         res.status(404).json({
           success: false,

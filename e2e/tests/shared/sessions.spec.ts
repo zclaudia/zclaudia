@@ -80,7 +80,10 @@ testAllModes('should persist session data across page reload', async (browser, m
       await browser.waitForTimeout(1000);
     }
 
-    const messageAfterReselect = await browser.locator(`text="${uniqueText}"`).isVisible({ timeout: 3000 }).catch(() => false);
+    const messageAfterReselect = await browser
+      .locator(`text="${uniqueText}"`)
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
     if (messageAfterReselect) {
       console.log(`✓ Data persistence works in ${mode.name} (after reselect)`);
     } else {

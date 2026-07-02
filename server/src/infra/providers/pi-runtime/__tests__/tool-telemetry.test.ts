@@ -6,22 +6,38 @@ describe('ToolCallTelemetry', () => {
   it('counts tools, output bytes, repeated reads, and repeated mutations', () => {
     const telemetry = new ToolCallTelemetry();
 
-    telemetry.record('Read', { path: 'src/app.ts' }, {
-      content: [{ type: 'text', text: 'one' }],
-      details: { ok: true },
-    });
-    const readAgain = telemetry.record('Read', { path: 'src/app.ts' }, {
-      content: [{ type: 'text', text: 'two' }],
-      details: { ok: true },
-    });
-    telemetry.record('Edit', { file_path: 'src/app.ts' }, {
-      content: [{ type: 'text', text: 'three' }],
-      details: { ok: true },
-    });
-    const snapshot = telemetry.record('Edit', { file_path: 'src/app.ts' }, {
-      content: [{ type: 'text', text: 'four' }],
-      details: { ok: true },
-    }).snapshot;
+    telemetry.record(
+      'Read',
+      { path: 'src/app.ts' },
+      {
+        content: [{ type: 'text', text: 'one' }],
+        details: { ok: true },
+      }
+    );
+    const readAgain = telemetry.record(
+      'Read',
+      { path: 'src/app.ts' },
+      {
+        content: [{ type: 'text', text: 'two' }],
+        details: { ok: true },
+      }
+    );
+    telemetry.record(
+      'Edit',
+      { file_path: 'src/app.ts' },
+      {
+        content: [{ type: 'text', text: 'three' }],
+        details: { ok: true },
+      }
+    );
+    const snapshot = telemetry.record(
+      'Edit',
+      { file_path: 'src/app.ts' },
+      {
+        content: [{ type: 'text', text: 'four' }],
+        details: { ok: true },
+      }
+    ).snapshot;
 
     expect(readAgain.advisories[0]).toContain('twice');
     expect(snapshot).toMatchObject({
@@ -36,10 +52,14 @@ describe('ToolCallTelemetry', () => {
 
   it('marks Bash routing blocks as notable', () => {
     const telemetry = new ToolCallTelemetry();
-    const record = telemetry.record('Bash', { command: 'ls src' }, {
-      content: [{ type: 'text', text: 'Use LS' }],
-      details: { ok: false, error: 'bash_tool_routing_blocked' },
-    });
+    const record = telemetry.record(
+      'Bash',
+      { command: 'ls src' },
+      {
+        content: [{ type: 'text', text: 'Use LS' }],
+        details: { ok: false, error: 'bash_tool_routing_blocked' },
+      }
+    );
 
     expect(record.notable).toBe(true);
     expect(record.snapshot.bashRoutingBlocked).toBe(1);
@@ -47,18 +67,30 @@ describe('ToolCallTelemetry', () => {
 
   it('counts MultiEdit and EditSymbol as file mutations', () => {
     const telemetry = new ToolCallTelemetry();
-    telemetry.record('Edit', { file_path: 'src/app.ts' }, {
-      content: [{ type: 'text', text: 'one' }],
-      details: { ok: true },
-    });
-    telemetry.record('MultiEdit', { file_path: 'src/app.ts', edits: [] }, {
-      content: [{ type: 'text', text: 'two' }],
-      details: { ok: true },
-    });
-    const third = telemetry.record('EditSymbol', { file_path: 'src/app.ts', symbol: 'run' }, {
-      content: [{ type: 'text', text: 'three' }],
-      details: { ok: true },
-    });
+    telemetry.record(
+      'Edit',
+      { file_path: 'src/app.ts' },
+      {
+        content: [{ type: 'text', text: 'one' }],
+        details: { ok: true },
+      }
+    );
+    telemetry.record(
+      'MultiEdit',
+      { file_path: 'src/app.ts', edits: [] },
+      {
+        content: [{ type: 'text', text: 'two' }],
+        details: { ok: true },
+      }
+    );
+    const third = telemetry.record(
+      'EditSymbol',
+      { file_path: 'src/app.ts', symbol: 'run' },
+      {
+        content: [{ type: 'text', text: 'three' }],
+        details: { ok: true },
+      }
+    );
 
     expect(third.advisories[0]).toContain('MultiEdit');
     expect(third.snapshot).toMatchObject({

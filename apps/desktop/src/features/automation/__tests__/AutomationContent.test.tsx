@@ -8,7 +8,9 @@ vi.mock('../../../services/api/base', () => ({
   getAuthHeadersForBackend: () => ({ Authorization: '' }),
 }));
 
-vi.mock('../AutomationWorkflowDetail', () => ({ AutomationWorkflowDetail: () => <div data-testid="wf-detail" /> }));
+vi.mock('../AutomationWorkflowDetail', () => ({
+  AutomationWorkflowDetail: () => <div data-testid="wf-detail" />,
+}));
 vi.mock('../RunsTab', () => ({ RunsTab: () => <div data-testid="runs-tab" /> }));
 
 import { AutomationContent } from '../AutomationContent';
@@ -32,16 +34,18 @@ describe('AutomationContent', () => {
       if (url.endsWith('/api/projects')) return ok([{ id: 'p1', name: 'Project 1' }]);
       if (url.endsWith('/api/agent/config')) return ok({ permissionWorkflowOverrideId: null });
       if (url.includes('/api/automations')) {
-        return ok([{
-          id: 'w1',
-          name: 'Build',
-          enabled: true,
-          projectId: 'p1',
-          trigger: { type: 'interval', intervalMinutes: 60 },
-          action: { kind: 'activity', ref: 'shell', input: {} },
-          createdAt: 0,
-          updatedAt: 0,
-        }]);
+        return ok([
+          {
+            id: 'w1',
+            name: 'Build',
+            enabled: true,
+            projectId: 'p1',
+            trigger: { type: 'interval', intervalMinutes: 60 },
+            action: { kind: 'activity', ref: 'shell', input: {} },
+            createdAt: 0,
+            updatedAt: 0,
+          },
+        ]);
       }
       throw new Error(`Unhandled fetch: ${url}`);
     });
@@ -60,14 +64,16 @@ describe('AutomationContent', () => {
       expect(screen.getByText('Build')).toBeTruthy();
     });
     const countAfterLoad = mockFetch.mock.calls.filter(
-      ([input]) => String(input).includes('/api/automations') && !(input as RequestInit | undefined)?.method,
+      ([input]) =>
+        String(input).includes('/api/automations') && !(input as RequestInit | undefined)?.method
     ).length;
 
     rerender(<AutomationContent tab="automations" backendId="b1" />);
-    await new Promise((r) => setTimeout(r, 0));
+    await new Promise(r => setTimeout(r, 0));
 
     const countAfterRerender = mockFetch.mock.calls.filter(
-      ([input]) => String(input).includes('/api/automations') && !(input as RequestInit | undefined)?.method,
+      ([input]) =>
+        String(input).includes('/api/automations') && !(input as RequestInit | undefined)?.method
     ).length;
     expect(countAfterRerender).toBe(countAfterLoad);
   });
@@ -75,7 +81,7 @@ describe('AutomationContent', () => {
   it('does not fetch when no backend is selected', async () => {
     render(<AutomationContent tab="automations" backendId={null} />);
     expect(screen.getByRole('heading', { name: 'Automations' })).toBeTruthy();
-    await new Promise((r) => setTimeout(r, 0));
+    await new Promise(r => setTimeout(r, 0));
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
@@ -98,7 +104,9 @@ describe('AutomationContent', () => {
     fireEvent.change(nameInput, { target: { value: 'One shot' } });
 
     const triggerSelect = await waitFor(() => {
-      const buttons = screen.getAllByRole('button').filter(b => b.getAttribute('aria-haspopup') === 'listbox');
+      const buttons = screen
+        .getAllByRole('button')
+        .filter(b => b.getAttribute('aria-haspopup') === 'listbox');
       const found = buttons.find(b => b.textContent?.includes('Interval'));
       if (!found) throw new Error('trigger select not ready');
       return found;
@@ -119,12 +127,14 @@ describe('AutomationContent', () => {
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:3100/api/automations',
-        expect.objectContaining({ method: 'POST', body: expect.any(String) }),
+        expect.objectContaining({ method: 'POST', body: expect.any(String) })
       );
     });
 
-    const postCall = mockFetch.mock.calls.find((call) =>
-      String(call[0]).endsWith('/api/automations') && (call[1] as RequestInit | undefined)?.method === 'POST',
+    const postCall = mockFetch.mock.calls.find(
+      call =>
+        String(call[0]).endsWith('/api/automations') &&
+        (call[1] as RequestInit | undefined)?.method === 'POST'
     );
     const payload = JSON.parse(String((postCall?.[1] as RequestInit).body));
     expect(payload.trigger.type).toBe('once');

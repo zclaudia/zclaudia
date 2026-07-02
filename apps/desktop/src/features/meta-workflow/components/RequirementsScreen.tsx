@@ -1,10 +1,7 @@
 // apps/desktop/src/features/meta-workflow/components/RequirementsScreen.tsx
 import React, { useState } from 'react';
 import type { MetaWorkflowRun } from '@zclaudia/shared/features/meta-workflow';
-import {
-  sendSubmitRequirements,
-  sendResolveRequirements,
-} from '../api.js';
+import { sendSubmitRequirements, sendResolveRequirements } from '../api.js';
 import { useMetaWorkflowStore } from '../store.js';
 
 interface Props {
@@ -15,7 +12,7 @@ interface Props {
 
 export function RequirementsScreen({ projectId, run, socket }: Props): React.ReactElement {
   const [path, setPath] = useState(run.requirementsPath ?? 'design/requirements.md');
-  const patchView = useMetaWorkflowStore((s) => s.patchView);
+  const patchView = useMetaWorkflowStore(s => s.patchView);
 
   const isReview = run.status === 'requirement_review';
   const isDraft = run.status === 'requirement_draft';
@@ -24,11 +21,14 @@ export function RequirementsScreen({ projectId, run, socket }: Props): React.Rea
   return (
     <div className="space-y-4 max-w-2xl">
       <h3 className="text-lg font-semibold">Requirements — {run.title}</h3>
-      <div className="text-sm text-muted-foreground">Status: <span className="font-mono text-foreground">{run.status}</span></div>
+      <div className="text-sm text-muted-foreground">
+        Status: <span className="font-mono text-foreground">{run.status}</span>
+      </div>
 
       {approachingEscape && (
         <div className="border border-yellow-500/30 bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 p-3 rounded-md text-sm">
-          ⚠ Reject count: {run.rejectCount}. After the next reject the escape hatch (direct edit) becomes available.
+          ⚠ Reject count: {run.rejectCount}. After the next reject the escape hatch (direct edit)
+          becomes available.
         </div>
       )}
 
@@ -39,7 +39,7 @@ export function RequirementsScreen({ projectId, run, socket }: Props): React.Rea
           className="w-full bg-background border border-border rounded-md px-3 py-2 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 disabled:opacity-60"
           value={path}
           disabled={!isDraft}
-          onChange={(e) => setPath(e.target.value)}
+          onChange={e => setPath(e.target.value)}
         />
       </div>
 
@@ -47,7 +47,9 @@ export function RequirementsScreen({ projectId, run, socket }: Props): React.Rea
         {isDraft && (
           <button
             className="px-3 py-1.5 text-sm rounded-md bg-muted/60 text-foreground hover:bg-muted"
-            onClick={() => sendSubmitRequirements(socket, { runId: run.id, requirementsPath: path })}
+            onClick={() =>
+              sendSubmitRequirements(socket, { runId: run.id, requirementsPath: path })
+            }
           >
             Submit Requirements
           </button>

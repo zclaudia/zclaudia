@@ -138,9 +138,9 @@ describe('useAgentForSession', () => {
     const { result } = renderHook(() => useAgentForSession('sess-1'));
     expect(result.current.agent?.model).toBe('claude-sonnet-4-6');
 
-    useAgentProfileMetaStore.getState().setAll([
-      { ...agentProfile, model: 'kimi-k2.7-code', updatedAt: 1 },
-    ]);
+    useAgentProfileMetaStore
+      .getState()
+      .setAll([{ ...agentProfile, model: 'kimi-k2.7-code', updatedAt: 1 }]);
 
     await waitFor(() => {
       expect(result.current.agent?.model).toBe('kimi-k2.7-code');

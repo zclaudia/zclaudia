@@ -9,11 +9,11 @@ import { lookup } from 'dns/promises';
  * Covers RFC 1918, RFC 4193, loopback, and link-local addresses.
  */
 function isPrivateIPv4(ip: string): boolean {
-  if (ip.startsWith('10.')) return true;           // 10.0.0.0/8
-  if (ip.startsWith('192.168.')) return true;      // 192.168.0.0/16
-  if (ip.startsWith('169.254.')) return true;      // Link-local
-  if (ip.startsWith('127.')) return true;          // Loopback
-  if (ip.startsWith('0.')) return true;            // 0.0.0.0/8
+  if (ip.startsWith('10.')) return true; // 10.0.0.0/8
+  if (ip.startsWith('192.168.')) return true; // 192.168.0.0/16
+  if (ip.startsWith('169.254.')) return true; // Link-local
+  if (ip.startsWith('127.')) return true; // Loopback
+  if (ip.startsWith('0.')) return true; // 0.0.0.0/8
 
   // 172.16.0.0 - 172.31.255.255 (RFC 1918)
   if (ip.startsWith('172.')) {
@@ -38,10 +38,10 @@ export function isPrivateAddress(hostname: string): boolean {
   const v4mappedMatch = bare.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/i);
   if (v4mappedMatch) return isPrivateIPv4(v4mappedMatch[1]);
 
-  if (bare === '::1') return true;                       // Loopback
-  if (bare === '::') return true;                        // Unspecified
-  if (bare.startsWith('fe80:') || bare.startsWith('fe80%')) return true;  // Link-local
-  if (bare.startsWith('fc') || bare.startsWith('fd')) return true;  // RFC 4193 unique-local
+  if (bare === '::1') return true; // Loopback
+  if (bare === '::') return true; // Unspecified
+  if (bare.startsWith('fe80:') || bare.startsWith('fe80%')) return true; // Link-local
+  if (bare.startsWith('fc') || bare.startsWith('fd')) return true; // RFC 4193 unique-local
 
   return false;
 }
@@ -55,7 +55,7 @@ export async function isBlockedHostname(hostname: string): Promise<boolean> {
 
   try {
     const addresses = await lookup(hostname, { all: true, verbatim: true });
-    return addresses.some((addr) => isPrivateAddress(addr.address));
+    return addresses.some(addr => isPrivateAddress(addr.address));
   } catch {
     return false;
   }

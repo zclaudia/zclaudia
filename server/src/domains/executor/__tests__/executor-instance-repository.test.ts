@@ -13,17 +13,17 @@ describe('ExecutorInstanceRepository', () => {
     applyMigrations(db);
     // Seed minimal FK targets
     db.prepare(
-      `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
     ).run('proj-1', 'P', 'code', 0, 0);
     db.prepare(
       `INSERT INTO local_issues
         (id, project_id, title, description, status, priority, labels, created_at, updated_at, type, is_anonymous)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run('issue-1', 'proj-1', 'i', null, 'open', 'medium', '[]', 0, 0, 'implement', 0);
     db.prepare(
       `INSERT INTO spec_changes
         (id, project_id, sub_issue_id, slug, title, status, proposal_path, design_path, tasks_path, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       'sc-1',
       'proj-1',
@@ -35,7 +35,7 @@ describe('ExecutorInstanceRepository', () => {
       'openspec/changes/add-2fa/design.md',
       'openspec/changes/add-2fa/tasks.md',
       0,
-      0,
+      0
     );
     repo = new ExecutorInstanceRepository(db);
   });
@@ -87,7 +87,7 @@ describe('ExecutorInstanceRepository', () => {
       underlyingId: 'b',
     });
     const items = repo.listBySpecChange('sc-1');
-    expect(items.map((i) => i.id)).toEqual([a.id, b.id]);
+    expect(items.map(i => i.id)).toEqual([a.id, b.id]);
   });
 
   it('listByProjectAndStatus filters correctly', () => {
@@ -105,7 +105,49 @@ describe('ExecutorInstanceRepository', () => {
       underlyingId: 'b',
     });
     const pending = repo.listByProjectAndStatus('proj-1', 'pending');
-    expect(pending.map((i) => i.id)).toEqual([b.id]);
+    expect(pending.map(i => i.id)).toEqual([b.id]);
+  });
+
+  it('lists classic project changes without executor instances', () => {
+    db.prepare(
+      `INSERT INTO project_changes
+        (id, project_id, slug, title, summary, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run('pc-free', 'proj-1', 'free', 'Free', 'free summary', 'drafting', 0, 0);
+    db.prepare(
+      `INSERT INTO project_changes
+        (id, project_id, slug, title, summary, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run('pc-claimed', 'proj-1', 'claimed', 'Claimed', 'claimed summary', 'drafting', 0, 0);
+    repo.create({
+      projectId: 'proj-1',
+      specChangeId: 'sc-1',
+      type: 'classic',
+      underlyingId: 'pc-claimed',
+    });
+
+    expect(repo.listClassicChangeIdsWithoutExecutor('proj-1')).toEqual(['pc-free']);
+  });
+
+  it('lists meta workflow runs without executor instances', () => {
+    db.prepare(
+      `INSERT INTO meta_workflow_runs
+        (id, project_id, title, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)`
+    ).run('mw-free', 'proj-1', 'Free workflow', 'drafting', 0, 0);
+    db.prepare(
+      `INSERT INTO meta_workflow_runs
+        (id, project_id, title, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)`
+    ).run('mw-claimed', 'proj-1', 'Claimed workflow', 'drafting', 0, 0);
+    repo.create({
+      projectId: 'proj-1',
+      specChangeId: 'sc-1',
+      type: 'meta-workflow',
+      underlyingId: 'mw-claimed',
+    });
+
+    expect(repo.listMetaWorkflowRunIdsWithoutExecutor('proj-1')).toEqual(['mw-free']);
   });
 
   it('CHECK constraint rejects invalid type', () => {
@@ -114,9 +156,9 @@ describe('ExecutorInstanceRepository', () => {
         .prepare(
           `INSERT INTO executor_instances
             (id, project_id, spec_change_id, type, status_summary, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            VALUES (?, ?, ?, ?, ?, ?, ?)`
         )
-        .run('bad', 'proj-1', 'sc-1', 'invalid', 'pending', 0, 0),
+        .run('bad', 'proj-1', 'sc-1', 'invalid', 'pending', 0, 0)
     ).toThrow();
   });
 });

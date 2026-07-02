@@ -40,10 +40,7 @@ export default defineConfig({
       'src/hooks/chat/__tests__/useMobileViewport.test.tsx',
       'src/hooks/chat/__tests__/useCommandHandler.goal.test.ts',
     ],
-    exclude: [
-      '**/node_modules/**',
-      '**/src-tauri/**',
-    ],
+    exclude: ['**/node_modules/**', '**/src-tauri/**'],
     pool: 'forks',
     testTimeout: 10000,
     hookTimeout: 10000,

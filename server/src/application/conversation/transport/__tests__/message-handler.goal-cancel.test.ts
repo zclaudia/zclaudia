@@ -21,7 +21,13 @@ describe('run_cancel pauses the active goal', () => {
     const client = { id: 'c1' } as any;
     const clients = new Map() as any;
 
-    await handleClientMessage(client, { type: 'run_cancel', runId: 'r1' } as any, {} as any, clients, ctx);
+    await handleClientMessage(
+      client,
+      { type: 'run_cancel', runId: 'r1' } as any,
+      {} as any,
+      clients,
+      ctx
+    );
 
     expect(ctx.cancelRun).toHaveBeenCalledWith('r1');
     expect(ctx.pauseActiveGoalForSession).toHaveBeenCalledWith('s1');
@@ -32,7 +38,13 @@ describe('run_cancel pauses the active goal', () => {
     const client = { id: 'c1' } as any;
     const clients = new Map() as any;
 
-    await handleClientMessage(client, { type: 'run_cancel', runId: 'r1' } as any, {} as any, clients, ctx);
+    await handleClientMessage(
+      client,
+      { type: 'run_cancel', runId: 'r1' } as any,
+      {} as any,
+      clients,
+      ctx
+    );
 
     expect(ctx.cancelRun).toHaveBeenCalledWith('r1');
     expect(ctx.pauseActiveGoalForSession).not.toHaveBeenCalled();
@@ -43,7 +55,13 @@ describe('run_cancel pauses the active goal', () => {
     const client = { id: 'c1' } as any;
     const clients = new Map() as any;
 
-    await handleClientMessage(client, { type: 'run_cancel', runId: 'r1' } as any, {} as any, clients, ctx);
+    await handleClientMessage(
+      client,
+      { type: 'run_cancel', runId: 'r1' } as any,
+      {} as any,
+      clients,
+      ctx
+    );
 
     expect(ctx.cancelRun).toHaveBeenCalledWith('r1');
     expect(ctx.pauseActiveGoalForSession).not.toHaveBeenCalled();
@@ -55,7 +73,13 @@ describe('run_cancel pauses the active goal', () => {
     const clients = new Map() as any;
 
     await expect(
-      handleClientMessage(client, { type: 'run_cancel', runId: 'r1' } as any, {} as any, clients, ctx),
+      handleClientMessage(
+        client,
+        { type: 'run_cancel', runId: 'r1' } as any,
+        {} as any,
+        clients,
+        ctx
+      )
     ).resolves.not.toThrow();
 
     expect(ctx.cancelRun).toHaveBeenCalledWith('r1');

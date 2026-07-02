@@ -35,43 +35,55 @@ describe('progressive skill runtime', () => {
   });
 
   it('resolves execution policy from source defaults and heuristics', () => {
-    expect(resolveSkillExecutionPolicy({
-      id: 'coding-guidelines',
-      name: 'coding-guidelines',
-      description: 'Follow project conventions when editing code',
-      source: 'workspace',
-      filePath: '/skills/coding-guidelines/SKILL.md',
-      dirPath: '/skills/coding-guidelines',
-    })).toEqual(expect.objectContaining({
-      modes: ['inline', 'fork'],
-      defaultMode: 'inline',
-    }));
+    expect(
+      resolveSkillExecutionPolicy({
+        id: 'coding-guidelines',
+        name: 'coding-guidelines',
+        description: 'Follow project conventions when editing code',
+        source: 'workspace',
+        filePath: '/skills/coding-guidelines/SKILL.md',
+        dirPath: '/skills/coding-guidelines',
+      })
+    ).toEqual(
+      expect.objectContaining({
+        modes: ['inline', 'fork'],
+        defaultMode: 'inline',
+      })
+    );
 
-    expect(resolveSkillExecutionPolicy({
-      id: 'security-audit',
-      name: 'security-audit',
-      description: 'Audit and report security issues',
-      source: 'external',
-      filePath: '/skills/security-audit/SKILL.md',
-      dirPath: '/skills/security-audit',
-    })).toEqual(expect.objectContaining({
-      modes: ['inline', 'fork'],
-      defaultMode: 'fork',
-      source: 'heuristic',
-    }));
+    expect(
+      resolveSkillExecutionPolicy({
+        id: 'security-audit',
+        name: 'security-audit',
+        description: 'Audit and report security issues',
+        source: 'external',
+        filePath: '/skills/security-audit/SKILL.md',
+        dirPath: '/skills/security-audit',
+      })
+    ).toEqual(
+      expect.objectContaining({
+        modes: ['inline', 'fork'],
+        defaultMode: 'fork',
+        source: 'heuristic',
+      })
+    );
 
-    expect(resolveSkillExecutionPolicy({
-      id: 'plugin-reviewer',
-      name: 'plugin-reviewer',
-      description: 'Review code',
-      source: 'plugin',
-      filePath: '/plugin/skills/plugin-reviewer/SKILL.md',
-      dirPath: '/plugin/skills/plugin-reviewer',
-    })).toEqual(expect.objectContaining({
-      modes: ['fork'],
-      defaultMode: 'fork',
-      source: 'source-default',
-    }));
+    expect(
+      resolveSkillExecutionPolicy({
+        id: 'plugin-reviewer',
+        name: 'plugin-reviewer',
+        description: 'Review code',
+        source: 'plugin',
+        filePath: '/plugin/skills/plugin-reviewer/SKILL.md',
+        dirPath: '/plugin/skills/plugin-reviewer',
+      })
+    ).toEqual(
+      expect.objectContaining({
+        modes: ['fork'],
+        defaultMode: 'fork',
+        source: 'source-default',
+      })
+    );
   });
 
   it('layers profile overrides above skill metadata and heuristic defaults', () => {
@@ -89,37 +101,43 @@ describe('progressive skill runtime', () => {
       },
     };
 
-    expect(resolveSkillExecutionPolicy(skill)).toEqual(expect.objectContaining({
-      defaultMode: 'inline',
-      forkToolPolicy: 'web',
-      source: 'skill-metadata',
-    }));
+    expect(resolveSkillExecutionPolicy(skill)).toEqual(
+      expect.objectContaining({
+        defaultMode: 'inline',
+        forkToolPolicy: 'web',
+        source: 'skill-metadata',
+      })
+    );
 
-    expect(resolveSkillExecutionPolicy(skill, undefined, {
-      id: 'agent-1',
-      name: 'Agent',
-      llmProfileId: 'llm-1',
-      model: 'm',
-      systemPrompt: '',
-      enabledTools: [],
-      skillExecution: {
-        overrides: [
-          {
-            ref: { source: 'external', id: 'security-audit' },
-            allowedModes: ['fork'],
-            defaultMode: 'fork',
-            forkToolPolicy: 'read-only',
-          },
-        ],
-      },
-      createdAt: 0,
-      updatedAt: 0,
-    })).toEqual(expect.objectContaining({
-      modes: ['fork'],
-      defaultMode: 'fork',
-      forkToolPolicy: 'read-only',
-      source: 'profile-override',
-    }));
+    expect(
+      resolveSkillExecutionPolicy(skill, undefined, {
+        id: 'agent-1',
+        name: 'Agent',
+        llmProfileId: 'llm-1',
+        model: 'm',
+        systemPrompt: '',
+        enabledTools: [],
+        skillExecution: {
+          overrides: [
+            {
+              ref: { source: 'external', id: 'security-audit' },
+              allowedModes: ['fork'],
+              defaultMode: 'fork',
+              forkToolPolicy: 'read-only',
+            },
+          ],
+        },
+        createdAt: 0,
+        updatedAt: 0,
+      })
+    ).toEqual(
+      expect.objectContaining({
+        modes: ['fork'],
+        defaultMode: 'fork',
+        forkToolPolicy: 'read-only',
+        source: 'profile-override',
+      })
+    );
   });
 
   it('normalizes invalid default modes and rejects plugin inline expansion', () => {
@@ -136,44 +154,52 @@ describe('progressive skill runtime', () => {
       },
     });
 
-    expect(policy).toEqual(expect.objectContaining({
-      modes: ['fork'],
-      defaultMode: 'fork',
-      source: 'skill-metadata',
-    }));
+    expect(policy).toEqual(
+      expect.objectContaining({
+        modes: ['fork'],
+        defaultMode: 'fork',
+        source: 'skill-metadata',
+      })
+    );
     expect(policy.diagnostics).toContain('default_mode_not_allowed');
 
-    const pluginPolicy = resolveSkillExecutionPolicy({
-      id: 'plugin-reviewer',
-      name: 'plugin-reviewer',
-      description: 'Plugin reviewer',
-      source: 'plugin',
-      filePath: '/plugin/reviewer/SKILL.md',
-      dirPath: '/plugin/reviewer',
-    }, undefined, {
-      id: 'agent-1',
-      name: 'Agent',
-      llmProfileId: 'llm-1',
-      model: 'm',
-      systemPrompt: '',
-      enabledTools: [],
-      skillExecution: {
-        overrides: [
-          {
-            ref: { source: 'plugin', id: 'plugin-reviewer' },
-            allowedModes: ['inline'],
-            defaultMode: 'inline',
-          },
-        ],
+    const pluginPolicy = resolveSkillExecutionPolicy(
+      {
+        id: 'plugin-reviewer',
+        name: 'plugin-reviewer',
+        description: 'Plugin reviewer',
+        source: 'plugin',
+        filePath: '/plugin/reviewer/SKILL.md',
+        dirPath: '/plugin/reviewer',
       },
-      createdAt: 0,
-      updatedAt: 0,
-    });
+      undefined,
+      {
+        id: 'agent-1',
+        name: 'Agent',
+        llmProfileId: 'llm-1',
+        model: 'm',
+        systemPrompt: '',
+        enabledTools: [],
+        skillExecution: {
+          overrides: [
+            {
+              ref: { source: 'plugin', id: 'plugin-reviewer' },
+              allowedModes: ['inline'],
+              defaultMode: 'inline',
+            },
+          ],
+        },
+        createdAt: 0,
+        updatedAt: 0,
+      }
+    );
 
-    expect(pluginPolicy).toEqual(expect.objectContaining({
-      modes: ['fork'],
-      defaultMode: 'fork',
-    }));
+    expect(pluginPolicy).toEqual(
+      expect.objectContaining({
+        modes: ['fork'],
+        defaultMode: 'fork',
+      })
+    );
     expect(pluginPolicy.diagnostics).toContain('profile_override_cannot_expand_modes');
   });
 
@@ -210,42 +236,58 @@ describe('progressive skill runtime', () => {
     expect(catalog).toContain('Use when writing RFCs');
     expect(catalog).toContain('docs/**');
 
-    const listResult = await metaTools.find((tool) => tool.name === 'ListSkills')!.execute('list-1', {});
+    const listResult = await metaTools
+      .find(tool => tool.name === 'ListSkills')!
+      .execute('list-1', {});
     expect(textFrom(listResult)).toContain('design-spec');
-    expect(jsonFrom(listResult).skills[0].executionPolicy).toEqual(expect.objectContaining({
-      modes: expect.any(Array),
-      defaultMode: expect.any(String),
-    }));
-    expect(jsonFrom(listResult).skills[0].metadata).toEqual(expect.objectContaining({
-      whenToUse: 'Use when writing RFCs',
-      allowedTools: ['Read'],
-    }));
+    expect(jsonFrom(listResult).skills[0].executionPolicy).toEqual(
+      expect.objectContaining({
+        modes: expect.any(Array),
+        defaultMode: expect.any(String),
+      })
+    );
+    expect(jsonFrom(listResult).skills[0].metadata).toEqual(
+      expect.objectContaining({
+        whenToUse: 'Use when writing RFCs',
+        allowedTools: ['Read'],
+      })
+    );
 
-    const searchResult = await metaTools.find((tool) => tool.name === 'SearchSkills')!.execute('search-1', {
-      query: 'review',
-    });
+    const searchResult = await metaTools
+      .find(tool => tool.name === 'SearchSkills')!
+      .execute('search-1', {
+        query: 'review',
+      });
     const searchText = textFrom(searchResult);
     expect(searchText).toContain('reviewer');
     expect(searchText).not.toContain('design-spec');
 
-    const metadataSearchResult = await metaTools.find((tool) => tool.name === 'SearchSkills')!.execute('search-2', {
-      query: 'RFC',
-    });
+    const metadataSearchResult = await metaTools
+      .find(tool => tool.name === 'SearchSkills')!
+      .execute('search-2', {
+        query: 'RFC',
+      });
     expect(textFrom(metadataSearchResult)).toContain('design-spec');
 
-    const inspectResult = await metaTools.find((tool) => tool.name === 'InspectSkill')!.execute('inspect-1', {
-      ref: { source: 'workspace', id: 'design-spec' },
-    });
+    const inspectResult = await metaTools
+      .find(tool => tool.name === 'InspectSkill')!
+      .execute('inspect-1', {
+        ref: { source: 'workspace', id: 'design-spec' },
+      });
     const inspectText = textFrom(inspectResult);
     expect(inspectText).toContain('Write technical design specs');
     expect(inspectText).not.toContain('Follow the TDS workflow');
-    expect(jsonFrom(inspectResult).executionPolicy).toEqual(expect.objectContaining({
-      modes: ['inline', 'fork'],
-    }));
+    expect(jsonFrom(inspectResult).executionPolicy).toEqual(
+      expect.objectContaining({
+        modes: ['inline', 'fork'],
+      })
+    );
 
-    const loadResult = await metaTools.find((tool) => tool.name === 'LoadSkill')!.execute('load-1', {
-      ref: { source: 'workspace', id: 'design-spec' },
-    });
+    const loadResult = await metaTools
+      .find(tool => tool.name === 'LoadSkill')!
+      .execute('load-1', {
+        ref: { source: 'workspace', id: 'design-spec' },
+      });
 
     expect(textFrom(loadResult)).toContain('loaded');
     expect(state.loadedSkills).toEqual([{ source: 'workspace', id: 'design-spec' }]);
@@ -283,30 +325,40 @@ describe('progressive skill runtime', () => {
     ]);
     const metaTools = buildSkillMetaTools({ state });
 
-    const loadDenied = await metaTools.find((tool) => tool.name === 'LoadSkill')!.execute('load-denied', {
-      ref: { source: 'workspace', id: 'fork-only' },
-    });
-    expect(jsonFrom(loadDenied)).toEqual(expect.objectContaining({
-      ok: false,
-      error: 'policy_denied_inline',
-    }));
+    const loadDenied = await metaTools
+      .find(tool => tool.name === 'LoadSkill')!
+      .execute('load-denied', {
+        ref: { source: 'workspace', id: 'fork-only' },
+      });
+    expect(jsonFrom(loadDenied)).toEqual(
+      expect.objectContaining({
+        ok: false,
+        error: 'policy_denied_inline',
+      })
+    );
 
-    const runDenied = await metaTools.find((tool) => tool.name === 'RunSkill')!.execute('run-denied', {
-      ref: { source: 'workspace', id: 'inline-only' },
-      task: 'Do the thing',
-      mode: 'fork',
-    });
-    expect(jsonFrom(runDenied)).toEqual(expect.objectContaining({
-      ok: false,
-      error: 'policy_denied_fork',
-    }));
+    const runDenied = await metaTools
+      .find(tool => tool.name === 'RunSkill')!
+      .execute('run-denied', {
+        ref: { source: 'workspace', id: 'inline-only' },
+        task: 'Do the thing',
+        mode: 'fork',
+      });
+    expect(jsonFrom(runDenied)).toEqual(
+      expect.objectContaining({
+        ok: false,
+        error: 'policy_denied_fork',
+      })
+    );
 
     expect(state.loadedSkills).toEqual([]);
     expect(state.loadedSkillContents).toEqual({});
   });
 
   it('invokes user-facing inline skills from slash-style input with argument substitution', async () => {
-    loadDiscoveredSkillContentMock.mockResolvedValue('# Release Notes\nWrite notes for $ticket: $title\nAll args: $ARGUMENTS');
+    loadDiscoveredSkillContentMock.mockResolvedValue(
+      '# Release Notes\nWrite notes for $ticket: $title\nAll args: $ARGUMENTS'
+    );
     const state = createSkillRuntimeState([
       {
         id: 'release-notes',
@@ -321,24 +373,28 @@ describe('progressive skill runtime', () => {
         },
       },
     ]);
-    const invokeSkill = buildSkillMetaTools({ state }).find((tool) => tool.name === 'InvokeSkill')!;
+    const invokeSkill = buildSkillMetaTools({ state }).find(tool => tool.name === 'InvokeSkill')!;
 
     const result = await invokeSkill.execute('invoke-1', {
       input: '/release-notes ZOOM-1 "Great Feature"',
     });
 
-    expect(jsonFrom(result)).toEqual(expect.objectContaining({
-      ok: true,
-      mode: 'inline',
-      ref: { source: 'workspace', id: 'release-notes' },
-      args: 'ZOOM-1 "Great Feature"',
-    }));
+    expect(jsonFrom(result)).toEqual(
+      expect.objectContaining({
+        ok: true,
+        mode: 'inline',
+        ref: { source: 'workspace', id: 'release-notes' },
+        args: 'ZOOM-1 "Great Feature"',
+      })
+    );
     expect(buildActiveSkillContext(state)).toContain('Write notes for ZOOM-1: Great Feature');
     expect(buildActiveSkillContext(state)).toContain('All args: ZOOM-1 "Great Feature"');
   });
 
   it('prepares chat slash skill invocation by loading context and recording usage', async () => {
-    loadDiscoveredSkillContentMock.mockResolvedValue('# Release Notes\nWrite notes for $ticket: $title');
+    loadDiscoveredSkillContentMock.mockResolvedValue(
+      '# Release Notes\nWrite notes for $ticket: $title'
+    );
     const state = createSkillRuntimeState([
       {
         id: 'release-notes',
@@ -354,14 +410,19 @@ describe('progressive skill runtime', () => {
       },
     ]);
 
-    const result = await prepareDirectSkillInvocation(state, '/release-notes ZOOM-1 "Great Feature"');
+    const result = await prepareDirectSkillInvocation(
+      state,
+      '/release-notes ZOOM-1 "Great Feature"'
+    );
 
-    expect(result).toEqual(expect.objectContaining({
-      matched: true,
-      ok: true,
-      ref: { source: 'workspace', id: 'release-notes' },
-      processedInput: 'ZOOM-1 "Great Feature"',
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        matched: true,
+        ok: true,
+        ref: { source: 'workspace', id: 'release-notes' },
+        processedInput: 'ZOOM-1 "Great Feature"',
+      })
+    );
     expect(buildActiveSkillContext(state)).toContain('Write notes for ZOOM-1: Great Feature');
     expect(recordSkillUsageMock).toHaveBeenCalledWith({ source: 'workspace', id: 'release-notes' });
   });
@@ -375,7 +436,9 @@ describe('progressive skill runtime', () => {
         initialState: opts.initialState,
         subscribe: (fn: (event: any) => void) => {
           listener = fn;
-          return () => { listener = undefined; };
+          return () => {
+            listener = undefined;
+          };
         },
         prompt: vi.fn(async () => {
           listener?.({
@@ -410,14 +473,16 @@ describe('progressive skill runtime', () => {
     ]);
 
     const prepared = await prepareDirectSkillInvocation(state, '/security-audit "auth changes"');
-    expect(prepared).toEqual(expect.objectContaining({
-      matched: true,
-      ok: true,
-      mode: 'fork',
-      ref: { source: 'workspace', id: 'security-audit' },
-      task: '"auth changes"',
-      args: '"auth changes"',
-    }));
+    expect(prepared).toEqual(
+      expect.objectContaining({
+        matched: true,
+        ok: true,
+        mode: 'fork',
+        ref: { source: 'workspace', id: 'security-audit' },
+        task: '"auth changes"',
+        args: '"auth changes"',
+      })
+    );
 
     const executed = await executePreparedDirectSkillInvocation(state, prepared, {
       cwd: '/tmp/project',
@@ -425,14 +490,19 @@ describe('progressive skill runtime', () => {
       agentFactory,
     } as any);
 
-    expect(executed).toEqual(expect.objectContaining({
-      ok: true,
-      mode: 'fork',
-      result: 'Fork result: reviewed auth changes.',
-    }));
+    expect(executed).toEqual(
+      expect.objectContaining({
+        ok: true,
+        mode: 'fork',
+        result: 'Fork result: reviewed auth changes.',
+      })
+    );
     expect(buildActiveSkillContext(state)).toBe('');
     expect(nestedAgents[0].initialState.systemPrompt).toContain('Review auth changes carefully.');
-    expect(recordSkillUsageMock).toHaveBeenCalledWith({ source: 'workspace', id: 'security-audit' });
+    expect(recordSkillUsageMock).toHaveBeenCalledWith({
+      source: 'workspace',
+      id: 'security-audit',
+    });
   });
 
   it('rejects direct invocation for model-only skills', async () => {
@@ -447,17 +517,19 @@ describe('progressive skill runtime', () => {
         metadata: { userInvocable: false },
       },
     ]);
-    const invokeSkill = buildSkillMetaTools({ state }).find((tool) => tool.name === 'InvokeSkill')!;
+    const invokeSkill = buildSkillMetaTools({ state }).find(tool => tool.name === 'InvokeSkill')!;
 
     const result = await invokeSkill.execute('invoke-denied', {
       input: '/model-only please',
     });
 
-    expect(jsonFrom(result)).toEqual(expect.objectContaining({
-      ok: false,
-      error: 'skill_not_user_invocable',
-      ref: { source: 'workspace', id: 'model-only' },
-    }));
+    expect(jsonFrom(result)).toEqual(
+      expect.objectContaining({
+        ok: false,
+        error: 'skill_not_user_invocable',
+        ref: { source: 'workspace', id: 'model-only' },
+      })
+    );
     expect(state.loadedSkills).toEqual([]);
   });
 
@@ -473,26 +545,30 @@ describe('progressive skill runtime', () => {
       },
     ]);
     const metaTools = buildSkillMetaTools({ state });
-    const runSkill = metaTools.find((tool) => tool.name === 'RunSkill');
+    const runSkill = metaTools.find(tool => tool.name === 'RunSkill');
     expect(runSkill).toBeDefined();
 
     const missingTask = await runSkill!.execute('run-1', {
       ref: { source: 'external', id: 'security-audit' },
     });
-    expect(jsonFrom(missingTask)).toEqual(expect.objectContaining({
-      ok: false,
-      error: 'missing_task',
-    }));
+    expect(jsonFrom(missingTask)).toEqual(
+      expect.objectContaining({
+        ok: false,
+        error: 'missing_task',
+      })
+    );
 
     const inlineMode = await runSkill!.execute('run-2', {
       ref: { source: 'external', id: 'security-audit' },
       task: 'Check auth code',
       mode: 'inline',
     });
-    expect(jsonFrom(inlineMode)).toEqual(expect.objectContaining({
-      ok: false,
-      error: 'inline_mode_not_supported',
-    }));
+    expect(jsonFrom(inlineMode)).toEqual(
+      expect.objectContaining({
+        ok: false,
+        error: 'inline_mode_not_supported',
+      })
+    );
     expect(textFrom(inlineMode)).toContain('LoadSkill');
 
     expect(state.loadedSkills).toEqual([]);
@@ -501,7 +577,9 @@ describe('progressive skill runtime', () => {
   });
 
   it('executes RunSkill through a forked worker with read-only tools', async () => {
-    loadDiscoveredSkillContentMock.mockResolvedValue('# Security Audit\nReview $target for auth issues.');
+    loadDiscoveredSkillContentMock.mockResolvedValue(
+      '# Security Audit\nReview $target for auth issues.'
+    );
     const nestedAgents: any[] = [];
     const agentFactory = (opts: any) => {
       let listener: ((event: any) => void) | undefined;
@@ -509,7 +587,9 @@ describe('progressive skill runtime', () => {
         initialState: opts.initialState,
         subscribe: (fn: (event: any) => void) => {
           listener = fn;
-          return () => { listener = undefined; };
+          return () => {
+            listener = undefined;
+          };
         },
         prompt: vi.fn(async () => {
           listener?.({
@@ -546,25 +626,37 @@ describe('progressive skill runtime', () => {
       },
     } as any);
 
-    const result = await metaTools.find((tool) => tool.name === 'RunSkill')!.execute('run-3', {
-      ref: { source: 'external', id: 'security-audit' },
-      task: 'Check authentication changes',
-      args: '"authentication changes"',
-    });
+    const result = await metaTools
+      .find(tool => tool.name === 'RunSkill')!
+      .execute('run-3', {
+        ref: { source: 'external', id: 'security-audit' },
+        task: 'Check authentication changes',
+        args: '"authentication changes"',
+      });
 
-    expect(jsonFrom(result)).toEqual(expect.objectContaining({
-      ok: true,
-      mode: 'fork',
-      result: 'Audit result: no obvious auth issue.',
-      executionId: expect.any(String),
-      durationMs: expect.any(Number),
-      forkToolPolicy: 'read-only',
-      enabledForkTools: ['Read', 'Grep'],
-    }));
-    expect(loadDiscoveredSkillContentMock).toHaveBeenCalledWith({ source: 'external', id: 'security-audit' });
+    expect(jsonFrom(result)).toEqual(
+      expect.objectContaining({
+        ok: true,
+        mode: 'fork',
+        result: 'Audit result: no obvious auth issue.',
+        executionId: expect.any(String),
+        durationMs: expect.any(Number),
+        forkToolPolicy: 'read-only',
+        enabledForkTools: ['Read', 'Grep'],
+      })
+    );
+    expect(loadDiscoveredSkillContentMock).toHaveBeenCalledWith({
+      source: 'external',
+      id: 'security-audit',
+    });
     expect(nestedAgents).toHaveLength(1);
-    expect(nestedAgents[0].initialState.systemPrompt).toContain('Review authentication changes for auth issues.');
-    expect(nestedAgents[0].initialState.tools.map((tool: any) => tool.name).sort()).toEqual(['Grep', 'Read']);
+    expect(nestedAgents[0].initialState.systemPrompt).toContain(
+      'Review authentication changes for auth issues.'
+    );
+    expect(nestedAgents[0].initialState.tools.map((tool: any) => tool.name).sort()).toEqual([
+      'Grep',
+      'Read',
+    ]);
     expect(state.loadedSkills).toEqual([]);
     expect(state.loadedSkillContents).toEqual({});
   });
@@ -593,7 +685,7 @@ describe('progressive skill runtime', () => {
           }),
         }),
       },
-    } as any).find((tool) => tool.name === 'RunSkill')!;
+    } as any).find(tool => tool.name === 'RunSkill')!;
 
     const result = await runSkill.execute('run-failure', {
       ref: { source: 'external', id: 'broken' },
@@ -601,15 +693,17 @@ describe('progressive skill runtime', () => {
       mode: 'fork',
     });
 
-    expect(jsonFrom(result)).toEqual(expect.objectContaining({
-      ok: false,
-      error: 'skill_execution_failed',
-      message: 'nested failure',
-      executionId: expect.any(String),
-      durationMs: expect.any(Number),
-      forkToolPolicy: 'read-only',
-      enabledForkTools: ['Read'],
-    }));
+    expect(jsonFrom(result)).toEqual(
+      expect.objectContaining({
+        ok: false,
+        error: 'skill_execution_failed',
+        message: 'nested failure',
+        executionId: expect.any(String),
+        durationMs: expect.any(Number),
+        forkToolPolicy: 'read-only',
+        enabledForkTools: ['Read'],
+      })
+    );
   });
 
   it('uses fork tool policy without granting tools absent from the parent profile', async () => {
@@ -621,7 +715,9 @@ describe('progressive skill runtime', () => {
         initialState: opts.initialState,
         subscribe: (fn: (event: any) => void) => {
           listener = fn;
-          return () => { listener = undefined; };
+          return () => {
+            listener = undefined;
+          };
         },
         prompt: vi.fn(async () => {
           listener?.({
@@ -668,7 +764,7 @@ describe('progressive skill runtime', () => {
         enabledTools: ['Read', 'Grep', 'WebFetch', 'Edit'],
         agentFactory,
       },
-    } as any).find((tool) => tool.name === 'RunSkill')!;
+    } as any).find(tool => tool.name === 'RunSkill')!;
 
     await runSkill.execute('run-web', {
       ref: { source: 'external', id: 'web-audit' },
@@ -694,7 +790,9 @@ describe('progressive skill runtime', () => {
   });
 
   it('guides inline-default skills to LoadSkill unless fork is explicit', async () => {
-    loadDiscoveredSkillContentMock.mockResolvedValue('# Coding Guidelines\nFollow project conventions.');
+    loadDiscoveredSkillContentMock.mockResolvedValue(
+      '# Coding Guidelines\nFollow project conventions.'
+    );
     const state = createSkillRuntimeState([
       {
         id: 'coding-guidelines',
@@ -711,12 +809,16 @@ describe('progressive skill runtime', () => {
         initialState: opts.initialState,
         subscribe: (fn: (event: any) => void) => {
           listener = fn;
-          return () => { listener = undefined; };
+          return () => {
+            listener = undefined;
+          };
         },
         prompt: vi.fn(async () => {
           listener?.({
             type: 'agent_end',
-            messages: [{ role: 'assistant', content: [{ type: 'text', text: 'Use these conventions.' }] }],
+            messages: [
+              { role: 'assistant', content: [{ type: 'text', text: 'Use these conventions.' }] },
+            ],
           });
         }),
       };
@@ -724,26 +826,30 @@ describe('progressive skill runtime', () => {
     const runSkill = buildSkillMetaTools({
       state,
       execution: { cwd: '/tmp/project', enabledTools: ['Read'], agentFactory },
-    } as any).find((tool) => tool.name === 'RunSkill')!;
+    } as any).find(tool => tool.name === 'RunSkill')!;
 
     const defaultMode = await runSkill.execute('run-4', {
       ref: { source: 'workspace', id: 'coding-guidelines' },
       task: 'Apply coding style',
     });
-    expect(jsonFrom(defaultMode)).toEqual(expect.objectContaining({
-      ok: false,
-      error: 'use_load_skill',
-    }));
+    expect(jsonFrom(defaultMode)).toEqual(
+      expect.objectContaining({
+        ok: false,
+        error: 'use_load_skill',
+      })
+    );
 
     const explicitFork = await runSkill.execute('run-5', {
       ref: { source: 'workspace', id: 'coding-guidelines' },
       task: 'Apply coding style',
       mode: 'fork',
     });
-    expect(jsonFrom(explicitFork)).toEqual(expect.objectContaining({
-      ok: true,
-      result: 'Use these conventions.',
-    }));
+    expect(jsonFrom(explicitFork)).toEqual(
+      expect.objectContaining({
+        ok: true,
+        result: 'Use these conventions.',
+      })
+    );
     expect(state.loadedSkills).toEqual([]);
     expect(state.loadedSkillContents).toEqual({});
   });

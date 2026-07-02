@@ -41,7 +41,7 @@ export function isProcessAlive(pid: number): boolean {
 export async function waitForProcessesToExit(
   pids: number[],
   timeoutMs: number,
-  pollIntervalMs = 100,
+  pollIntervalMs = 100
 ): Promise<number[]> {
   const deadline = Date.now() + timeoutMs;
   let survivors = [...new Set(pids)].filter(isProcessAlive);
@@ -56,9 +56,7 @@ export async function waitForProcessesToExit(
 
 export async function listDescendantProcesses(parentPid: number): Promise<ChildProcessInfo[]> {
   try {
-    const { stdout } = await execFileAsync('ps', [
-      '-e', '-o', 'pid=,ppid=,etimes=,comm=,args=',
-    ]);
+    const { stdout } = await execFileAsync('ps', ['-e', '-o', 'pid=,ppid=,etimes=,comm=,args=']);
 
     const allProcesses = parsePsOutput(stdout);
 
@@ -84,9 +82,7 @@ export async function listDescendantProcesses(parentPid: number): Promise<ChildP
 
 export async function listAllProcesses(): Promise<ChildProcessInfo[]> {
   try {
-    const { stdout } = await execFileAsync('ps', [
-      '-e', '-o', 'pid=,ppid=,etimes=,comm=,args=',
-    ]);
+    const { stdout } = await execFileAsync('ps', ['-e', '-o', 'pid=,ppid=,etimes=,comm=,args=']);
     return parsePsOutput(stdout);
   } catch {
     return [];
@@ -98,16 +94,17 @@ export async function findProcessesByArgsIncludes(needles: string[]): Promise<Ch
   if (normalized.length === 0) return [];
 
   const allProcesses = await listAllProcesses();
-  return allProcesses.filter(proc =>
-    normalized.some(needle => proc.args.includes(needle))
-  );
+  return allProcesses.filter(proc => normalized.some(needle => proc.args.includes(needle)));
 }
 
 /**
  * Kill a process and all its descendants.
  * Sends SIGTERM first, then SIGKILL after a delay for any survivors.
  */
-export async function killProcessTree(pid: number, sigkillDelayMs = 3000): Promise<{ killed: number[]; failed: number[] }> {
+export async function killProcessTree(
+  pid: number,
+  sigkillDelayMs = 3000
+): Promise<{ killed: number[]; failed: number[] }> {
   const descendants = await listDescendantProcesses(pid);
   // Kill children first (leaves → root), then the parent
   const pidsToKill = [...descendants.map(p => p.pid).reverse(), pid];
@@ -145,6 +142,9 @@ export async function killProcessTree(pid: number, sigkillDelayMs = 3000): Promi
 export function summarizeProcesses(processes: ChildProcessInfo[]): string {
   if (processes.length === 0) return 'none';
   return processes
-    .map(proc => `PID=${proc.pid} PPID=${proc.ppid} CMD=${proc.command} ET=${proc.elapsedSeconds}s ARGS=${proc.args}`)
+    .map(
+      proc =>
+        `PID=${proc.pid} PPID=${proc.ppid} CMD=${proc.command} ET=${proc.elapsedSeconds}s ARGS=${proc.args}`
+    )
     .join(' | ');
 }

@@ -109,11 +109,13 @@ describe('resolveMultimodalFallbackForRun', () => {
     });
 
     expect(resolved.applied).toBe(true);
-    expect(resolved.agentProfile).toEqual(expect.objectContaining({
-      id: primaryAgent.id,
-      model: 'vision-model',
-      llmProfileId: fallback.id,
-    }));
+    expect(resolved.agentProfile).toEqual(
+      expect.objectContaining({
+        id: primaryAgent.id,
+        model: 'vision-model',
+        llmProfileId: fallback.id,
+      })
+    );
     expect(resolved.llmProfile.id).toBe(fallback.id);
     expect(resolved.llmProfileId).toBe(fallback.id);
     expect(resolved.providerType).toBe('openai');
@@ -153,14 +155,16 @@ describe('resolveMultimodalFallbackForRun', () => {
       models: [{ modelId: 'fallback-text', inputModalities: ['text'] }],
     });
 
-    expect(() => resolveMultimodalFallbackForRun({
-      db,
-      agentProfile: agent({
-        llmProfileId: primary.id,
-        multimodalFallback: { llmProfileId: fallback.id, model: 'fallback-text' },
-      }),
-      llmProfile: primary,
-      images: [{ name: 'a.png', mimeType: 'image/png', data: 'abc' }],
-    })).toThrow(/does not support image input/i);
+    expect(() =>
+      resolveMultimodalFallbackForRun({
+        db,
+        agentProfile: agent({
+          llmProfileId: primary.id,
+          multimodalFallback: { llmProfileId: fallback.id, model: 'fallback-text' },
+        }),
+        llmProfile: primary,
+        images: [{ name: 'a.png', mimeType: 'image/png', data: 'abc' }],
+      })
+    ).toThrow(/does not support image input/i);
   });
 });

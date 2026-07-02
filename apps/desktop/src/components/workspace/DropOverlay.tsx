@@ -18,10 +18,10 @@ const ZONES: { zone: DropZone; className: string }[] = [
  * component just reflects it.
  */
 export function DropOverlay({ paneId }: { paneId: string }) {
-  const active = useDragSplitStore((s) => s.active);
-  const hoverPaneId = useDragSplitStore((s) => s.hoverPaneId);
-  const hoverZone = useDragSplitStore((s) => s.hoverZone);
-  const disabled = useDragSplitStore((s) => s.disabled);
+  const active = useDragSplitStore(s => s.active);
+  const hoverPaneId = useDragSplitStore(s => s.hoverPaneId);
+  const hoverZone = useDragSplitStore(s => s.hoverZone);
+  const disabled = useDragSplitStore(s => s.disabled);
 
   if (!active) return null;
   const isHovered = hoverPaneId === paneId;

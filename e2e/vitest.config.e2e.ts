@@ -14,10 +14,7 @@ export default defineConfig({
     allowOnly: !process.env.CI,
     globalSetup: ['./e2e/setup/global-setup.ts'],
     reporters: ['default'],
-    setupFiles: [
-      './e2e/helpers/custom-matchers.ts',
-      './e2e/helpers/ai-test-utils.ts',
-    ],
+    setupFiles: ['./e2e/helpers/custom-matchers.ts', './e2e/helpers/ai-test-utils.ts'],
     // Environment variables for AI testing
     env: {
       OPENAI_BASE_URL: process.env.OPENAI_BASE_URL,

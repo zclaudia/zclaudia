@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import os from 'os';
 import fs from 'fs';
-import { migrations } from './migrations/index.js';
+import { migrations, applyPendingMigrations } from './migrations/index.js';
 import { ensureDefaultAgentProfile } from '../../domains/agent-profiles/ensure-default-agent-profile.js';
 import { backfillProtectedMcpOAuthCredentials } from '../services/mcp-oauth-credential-protector.js';
 
@@ -56,7 +56,7 @@ export function ensureSchemaIsCurrent(db: Database.Database): void {
     )
     .all() as Array<{ name: string }>;
 
-  const names = new Set(tables.map((t) => t.name));
+  const names = new Set(tables.map(t => t.name));
   if (names.has('providers') && !names.has('llm_profiles')) {
     throw new Error(
       `[ZClaudia] Schema mismatch: legacy 'providers' table exists but 'llm_profiles' is missing. ` +
@@ -81,8 +81,8 @@ export function ensureSchemaIsCurrent(db: Database.Database): void {
     .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'sessions'")
     .get() as { name: string } | undefined;
   if (sessionsTableExists) {
-    const sessionCols = db.prepare("PRAGMA table_info(sessions)").all() as Array<{ name: string }>;
-    const sessionColNames = new Set(sessionCols.map((c) => c.name));
+    const sessionCols = db.prepare('PRAGMA table_info(sessions)').all() as Array<{ name: string }>;
+    const sessionColNames = new Set(sessionCols.map(c => c.name));
     if (sessionColNames.has('llm_profile_id') && !sessionColNames.has('agent_profile_id')) {
       throw new Error(
         `[ZClaudia] Schema mismatch: sessions.llm_profile_id exists but sessions.agent_profile_id is missing. ` +
@@ -96,8 +96,8 @@ export function ensureSchemaIsCurrent(db: Database.Database): void {
     .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'projects'")
     .get() as { name: string } | undefined;
   if (projectsTableExists) {
-    const projectCols = db.prepare("PRAGMA table_info(projects)").all() as Array<{ name: string }>;
-    const projectColNames = new Set(projectCols.map((c) => c.name));
+    const projectCols = db.prepare('PRAGMA table_info(projects)').all() as Array<{ name: string }>;
+    const projectColNames = new Set(projectCols.map(c => c.name));
     if (projectColNames.has('llm_profile_id') && !projectColNames.has('default_agent_profile_id')) {
       throw new Error(
         `[ZClaudia] Schema mismatch: projects.llm_profile_id exists but projects.default_agent_profile_id is missing. ` +
@@ -108,44 +108,7 @@ export function ensureSchemaIsCurrent(db: Database.Database): void {
 }
 
 function runMigrations(db: Database.Database): void {
-  // Create migrations table if not exists
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS migrations (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL UNIQUE,
-      applied_at INTEGER NOT NULL
-    )
-  `);
-
-  const appliedMigrations = new Set(
-    (db.prepare('SELECT name FROM migrations').all() as Array<{ name: string }>).map((row) => row.name)
-  );
-
-  for (const migration of migrations) {
-    if (appliedMigrations.has(migration.name)) continue;
-
-    console.log(`Applying migration: ${migration.name}`);
-    try {
-      db.exec(migration.sql);
-    } catch (error) {
-      // Idempotent migrations tolerate duplicate column errors (schema already applied
-      // at the DB level but migration record was missing).
-      if (migration.idempotent) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (message.includes('duplicate column name:')) {
-          console.warn(`Migration ${migration.name} already applied at schema level, marking as applied.`);
-        } else {
-          throw error;
-        }
-      } else {
-        throw error;
-      }
-    }
-    db.prepare('INSERT INTO migrations (name, applied_at) VALUES (?, ?)').run(
-      migration.name,
-      Date.now()
-    );
-  }
+  applyPendingMigrations(db, migrations, { log: true });
 }
 
 export type { Database };

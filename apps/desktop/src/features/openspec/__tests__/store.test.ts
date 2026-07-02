@@ -40,7 +40,7 @@ describe('useOpenSpecStore', () => {
       createdAt: 0,
       updatedAt: 0,
     } as never);
-    expect(useOpenSpecStore.getState().issuesByProject.p1.map((i) => i.id)).toEqual(['b', 'a']);
+    expect(useOpenSpecStore.getState().issuesByProject.p1.map(i => i.id)).toEqual(['b', 'a']);
     s.upsertIssue({
       id: 'a',
       projectId: 'p1',
@@ -53,8 +53,8 @@ describe('useOpenSpecStore', () => {
       createdAt: 0,
       updatedAt: 0,
     } as never);
-    expect(useOpenSpecStore.getState().issuesByProject.p1.find((i) => i.id === 'a')!.status).toBe(
-      'planning',
+    expect(useOpenSpecStore.getState().issuesByProject.p1.find(i => i.id === 'a')!.status).toBe(
+      'planning'
     );
   });
 
@@ -78,9 +78,10 @@ describe('useOpenSpecStore', () => {
       createdAt: 0,
       updatedAt: 0,
     } as never);
-    expect(
-      useOpenSpecStore.getState().executorsBySpecChange.sc.map((e) => e.id),
-    ).toEqual(['e1', 'e2']);
+    expect(useOpenSpecStore.getState().executorsBySpecChange.sc.map(e => e.id)).toEqual([
+      'e1',
+      'e2',
+    ]);
   });
 
   it('patchView seeds from INITIAL_VIEW_STATE on first patch', () => {

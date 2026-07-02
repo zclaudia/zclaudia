@@ -18,7 +18,7 @@ const { mockProviderMetaStore } = vi.hoisted(() => {
     setProviderCommands: vi.fn(),
     setProviderCapabilities: vi.fn(),
   };
-  const store: any = (selector?: (s: any) => any) => selector ? selector(state) : state;
+  const store: any = (selector?: (s: any) => any) => (selector ? selector(state) : state);
   store.getState = () => state;
   store.setState = vi.fn();
   store.subscribe = vi.fn(() => vi.fn());
@@ -30,7 +30,14 @@ vi.mock('../../stores/llmProfileMetaStore', () => ({
 }));
 
 // Mock child components
-vi.mock('../../features/settings/LlmProfileManager', () => ({ LlmProfileManager: ({ isOpen, inline }: any) => isOpen ? <div data-testid="provider-manager" data-inline={inline}>ProviderManager</div> : null }));
+vi.mock('../../features/settings/LlmProfileManager', () => ({
+  LlmProfileManager: ({ isOpen, inline }: any) =>
+    isOpen ? (
+      <div data-testid="provider-manager" data-inline={inline}>
+        ProviderManager
+      </div>
+    ) : null,
+}));
 vi.mock('../../features/settings/GeneralSettings', async () => {
   const React = await import('react');
   const uiStoreModule = await import('../../stores/uiStore');
@@ -50,43 +57,65 @@ vi.mock('../../features/settings/GeneralSettings', async () => {
         .catch(() => setSdkVersions(null));
     }, [isOpen, activeServerExists, embeddedServerPort]);
 
-    return React.createElement('div', { 'data-testid': 'general-settings' },
+    return React.createElement(
+      'div',
+      { 'data-testid': 'general-settings' },
       React.createElement('h3', null, 'Appearance'),
       React.createElement('span', null, 'Theme'),
       React.createElement('div', { 'data-testid': 'theme-toggle' }, 'ThemeToggle'),
       React.createElement('span', null, 'Font Size'),
-      React.createElement('div', null,
-        ['small', 'medium', 'large'].map((size) =>
-          React.createElement('button', {
-            key: size,
-            onClick: () => setFontSize(size as any),
-          }, size.charAt(0).toUpperCase() + size.slice(1))
+      React.createElement(
+        'div',
+        null,
+        ['small', 'medium', 'large'].map(size =>
+          React.createElement(
+            'button',
+            {
+              key: size,
+              onClick: () => setFontSize(size as any),
+            },
+            size.charAt(0).toUpperCase() + size.slice(1)
+          )
         )
       ),
       React.createElement('h3', null, 'Local Server'),
       React.createElement('div', null, 'Embedded Server: ', embeddedServerStatus),
       embeddedServerStatus !== 'disabled'
-        ? React.createElement('button', {
-            onClick: () => { void restartEmbeddedServer(); },
-          }, 'Restart Embedded Server')
+        ? React.createElement(
+            'button',
+            {
+              onClick: () => {
+                void restartEmbeddedServer();
+              },
+            },
+            'Restart Embedded Server'
+          )
         : null,
       React.createElement('h3', null, 'About'),
       React.createElement('span', null, 'Version'),
       sdkVersions && sdkVersions.sdks
         ? sdkVersions.sdks.map((sdk: any) =>
-            React.createElement('div', { key: sdk.name },
+            React.createElement(
+              'div',
+              { key: sdk.name },
               React.createElement('span', null, sdk.name),
               React.createElement('span', null, sdk.current)
             )
           )
-        : null,
+        : null
     );
   }
   return { GeneralSettings };
 });
-vi.mock('../../features/settings/ServerGatewayConfig', () => ({ ServerGatewayConfig: () => <div data-testid="server-gateway-config">ServerGatewayConfig</div> }));
-vi.mock('../../features/settings/PluginSettings', () => ({ PluginSettings: () => <div data-testid="plugin-settings">PluginSettings</div> }));
-vi.mock('../../features/settings/McpServerSettings', () => ({ McpServerSettings: () => <div data-testid="mcp-settings">McpServerSettings</div> }));
+vi.mock('../../features/settings/ServerGatewayConfig', () => ({
+  ServerGatewayConfig: () => <div data-testid="server-gateway-config">ServerGatewayConfig</div>,
+}));
+vi.mock('../../features/settings/PluginSettings', () => ({
+  PluginSettings: () => <div data-testid="plugin-settings">PluginSettings</div>,
+}));
+vi.mock('../../features/settings/McpServerSettings', () => ({
+  McpServerSettings: () => <div data-testid="mcp-settings">McpServerSettings</div>,
+}));
 vi.mock('../../features/workflows/api', () => ({
   listAllWorkflows: vi.fn().mockResolvedValue([]),
 }));
@@ -106,7 +135,7 @@ vi.mock('../../contexts/ConnectionContext', () => ({
 }));
 
 // Mock services
-vi.mock('../../services/api', async (importOriginal) => {
+vi.mock('../../services/api', async importOriginal => {
   const mod = await importOriginal<Record<string, any>>();
   const stubbed: Record<string, any> = {};
   for (const key of Object.keys(mod)) {
@@ -116,14 +145,22 @@ vi.mock('../../services/api', async (importOriginal) => {
   stubbed.getAgentConfig = vi.fn(() => new Promise(() => {}));
   stubbed.updateAgentConfig = vi.fn().mockResolvedValue({});
   stubbed.getNotificationConfig = vi.fn().mockResolvedValue({
-    enabled: false, ntfyUrl: 'https://ntfy.sh', ntfyTopic: '', events: {
-      permissionRequest: true, promptRequest: true, runCompleted: false,
-      runFailed: false, backgroundPermission: false,
+    enabled: false,
+    ntfyUrl: 'https://ntfy.sh',
+    ntfyTopic: '',
+    events: {
+      permissionRequest: true,
+      promptRequest: true,
+      runCompleted: false,
+      runFailed: false,
+      backgroundPermission: false,
       processLeak: true,
     },
   });
   stubbed.sendTestNotification = vi.fn().mockResolvedValue({});
-  stubbed.getLocalNotificationBridgeStatus = vi.fn().mockResolvedValue({ ok: false, subscriptions: {} });
+  stubbed.getLocalNotificationBridgeStatus = vi
+    .fn()
+    .mockResolvedValue({ ok: false, subscriptions: {} });
   stubbed.getManagedProcesses = vi.fn(() => new Promise(() => {}));
   stubbed.getCrashReports = vi.fn(() => new Promise(() => {}));
   return stubbed;
@@ -134,7 +171,7 @@ vi.mock('../../services/logger', () => ({
   clearLogs: vi.fn(),
 }));
 // Mock shared
-vi.mock('@zclaudia/shared', async (importOriginal) => {
+vi.mock('@zclaudia/shared', async importOriginal => {
   const mod = await importOriginal<Record<string, any>>();
   return {
     ...mod,
@@ -155,7 +192,7 @@ vi.mock('@zclaudia/shared', async (importOriginal) => {
   };
 });
 
-import { SettingsPanel } from '../SettingsPanel';
+import { SettingsPanel } from '../../features/settings/SettingsPanel';
 import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useGatewayStore } from '../../stores/gatewayStore';
@@ -169,7 +206,7 @@ import { clearLogs, getLogCount, exportLogs } from '../../services/logger';
 import { invoke } from '@tauri-apps/api/core';
 import { isAndroid } from '../../utils/platform';
 
-vi.mock('../../utils/platform', async (importOriginal) => {
+vi.mock('../../utils/platform', async importOriginal => {
   const mod = await importOriginal<Record<string, any>>();
   return {
     ...mod,
@@ -223,8 +260,18 @@ function setupStores(overrides: Record<string, any> = {}) {
   useServerStore.setState({
     activeServerId: localBackend.backendId,
     connections: {
-      [localBackend.backendId]: { status: 'connected', error: null, isLocalConnection: true, features: [] },
-      [remoteBackend.backendId]: { status: 'connected', error: null, isLocalConnection: false, features: [] },
+      [localBackend.backendId]: {
+        status: 'connected',
+        error: null,
+        isLocalConnection: true,
+        features: [],
+      },
+      [remoteBackend.backendId]: {
+        status: 'connected',
+        error: null,
+        isLocalConnection: false,
+        features: [],
+      },
     },
     localServerPort: 3100,
     controlPlaneMode: 'embedded-local',
@@ -278,7 +325,6 @@ function setupStores(overrides: Record<string, any> = {}) {
       },
     },
   } as any);
-
 }
 
 describe('SettingsPanel', () => {
@@ -387,7 +433,6 @@ describe('SettingsPanel', () => {
     expect(container.querySelector('[data-testid="notifications-tab"]')).toBeTruthy();
   });
 
-
   it('shows Gateway tab for local server', async () => {
     const { container } = await renderSettingsPanel();
     expect(container.textContent).toContain('Gateway');
@@ -486,7 +531,9 @@ describe('SettingsPanel', () => {
     setupStores({ uiStore: { fontSize: 'medium', setFontSize } });
 
     const { container } = await renderSettingsPanel();
-    const smallBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Small');
+    const smallBtn = Array.from(container.querySelectorAll('button')).find(
+      b => b.textContent === 'Small'
+    );
     expect(smallBtn).toBeTruthy();
     await clickAsync(smallBtn!);
     expect(setFontSize).toHaveBeenCalledWith('small');
@@ -497,7 +544,9 @@ describe('SettingsPanel', () => {
     setupStores({ uiStore: { fontSize: 'medium', setFontSize } });
 
     const { container } = await renderSettingsPanel();
-    const largeBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Large');
+    const largeBtn = Array.from(container.querySelectorAll('button')).find(
+      b => b.textContent === 'Large'
+    );
     expect(largeBtn).toBeTruthy();
     await clickAsync(largeBtn!);
     expect(setFontSize).toHaveBeenCalledWith('large');
@@ -533,7 +582,12 @@ describe('SettingsPanel', () => {
     setupStores({
       serverStore: {
         connections: {
-          'local-standalone': { status: 'disconnected', error: null, isLocalConnection: true, features: [] },
+          'local-standalone': {
+            status: 'disconnected',
+            error: null,
+            isLocalConnection: true,
+            features: [],
+          },
           'remote-1': { status: 'connected', error: null, isLocalConnection: false, features: [] },
         },
       },
@@ -591,8 +645,8 @@ describe('SettingsPanel', () => {
     await clickAsync(debugTab!);
 
     // Find Clear button in diagnostics (not the search history clear)
-    const clearButtons = Array.from(container.querySelectorAll('button')).filter(b =>
-      b.textContent === 'Clear'
+    const clearButtons = Array.from(container.querySelectorAll('button')).filter(
+      b => b.textContent === 'Clear'
     );
     if (clearButtons.length > 0) {
       await clickAsync(clearButtons[0]);
@@ -607,8 +661,8 @@ describe('SettingsPanel', () => {
     expect(debugTab).toBeTruthy();
     await clickAsync(debugTab!);
 
-    const exportBtn = Array.from(container.querySelectorAll('button')).find(b =>
-      b.textContent === 'Export Logs'
+    const exportBtn = Array.from(container.querySelectorAll('button')).find(
+      b => b.textContent === 'Export Logs'
     );
     expect(exportBtn).toBeTruthy();
     // In test environment (no __TAURI_INTERNALS__), it should use web fallback
@@ -625,8 +679,8 @@ describe('SettingsPanel', () => {
     expect(debugTab).toBeTruthy();
     await clickAsync(debugTab!);
 
-    const cleanupBtn = Array.from(container.querySelectorAll('button')).find(b =>
-      b.textContent === 'Clean Leaked Processes'
+    const cleanupBtn = Array.from(container.querySelectorAll('button')).find(
+      b => b.textContent === 'Clean Leaked Processes'
     );
 
     expect(cleanupBtn).toBeTruthy();
@@ -640,7 +694,14 @@ describe('SettingsPanel', () => {
       facadeStore: {
         connectionState: 'connected',
         backends: [
-          { backendId: 'local-standalone', name: 'Local', online: true, runtimeState: 'visible', isThisInstance: true, instanceId: 'instance-local' },
+          {
+            backendId: 'local-standalone',
+            name: 'Local',
+            online: true,
+            runtimeState: 'visible',
+            isThisInstance: true,
+            instanceId: 'instance-local',
+          },
         ],
       },
     });
@@ -650,8 +711,8 @@ describe('SettingsPanel', () => {
     expect(debugTab).toBeTruthy();
     await clickAsync(debugTab!);
 
-    const cleanupBtn = Array.from(container.querySelectorAll('button')).find(b =>
-      b.textContent === 'Clean Leaked Processes'
+    const cleanupBtn = Array.from(container.querySelectorAll('button')).find(
+      b => b.textContent === 'Clean Leaked Processes'
     );
     expect(cleanupBtn).toBeTruthy();
     await clickAsync(cleanupBtn!);
@@ -756,17 +817,24 @@ describe('SettingsPanel', () => {
     await clickAsync(notifTab!);
 
     await waitFor(() => {
-      expect(container.textContent).toContain('Event types, enablement, and delivery policy are configured on the gateway, not on this device.');
+      expect(container.textContent).toContain(
+        'Event types, enablement, and delivery policy are configured on the gateway, not on this device.'
+      );
     });
   });
 
   it('shows notification event toggles when enabled', async () => {
     vi.mocked(isAndroid).mockReturnValue(true);
     (api.getNotificationConfig as ReturnType<typeof vi.fn>).mockResolvedValue({
-      enabled: true, ntfyUrl: 'https://ntfy.sh', ntfyTopic: 'test-topic',
+      enabled: true,
+      ntfyUrl: 'https://ntfy.sh',
+      ntfyTopic: 'test-topic',
       events: {
-        permissionRequest: true, promptRequest: true, runCompleted: false,
-        runFailed: false, backgroundPermission: false,
+        permissionRequest: true,
+        promptRequest: true,
+        runCompleted: false,
+        runFailed: false,
+        backgroundPermission: false,
         processLeak: true,
       },
     });
@@ -787,8 +855,17 @@ describe('SettingsPanel', () => {
   it('shows Send Test button for notifications', async () => {
     vi.mocked(isAndroid).mockReturnValue(true);
     (api.getNotificationConfig as ReturnType<typeof vi.fn>).mockResolvedValue({
-      enabled: true, ntfyUrl: 'https://ntfy.sh', ntfyTopic: 'test-topic',
-      events: { permissionRequest: true, promptRequest: true, runCompleted: false, runFailed: false, backgroundPermission: false, processLeak: true },
+      enabled: true,
+      ntfyUrl: 'https://ntfy.sh',
+      ntfyTopic: 'test-topic',
+      events: {
+        permissionRequest: true,
+        promptRequest: true,
+        runCompleted: false,
+        runFailed: false,
+        backgroundPermission: false,
+        processLeak: true,
+      },
     });
 
     const { container } = await renderSettingsPanel();
@@ -797,8 +874,8 @@ describe('SettingsPanel', () => {
     await clickAsync(notifTab!);
 
     await waitFor(() => {
-      const testBtn = Array.from(container.querySelectorAll('button')).find(b =>
-        b.textContent === 'Send Test'
+      const testBtn = Array.from(container.querySelectorAll('button')).find(
+        b => b.textContent === 'Send Test'
       );
       expect(testBtn).toBeTruthy();
     });
@@ -807,8 +884,17 @@ describe('SettingsPanel', () => {
   it('shows local bridge status on Android', async () => {
     (isAndroid as ReturnType<typeof vi.fn>).mockReturnValue(true);
     (api.getNotificationConfig as ReturnType<typeof vi.fn>).mockResolvedValue({
-      enabled: true, ntfyUrl: 'https://ntfy.sh', ntfyTopic: 'test-topic',
-      events: { permissionRequest: true, promptRequest: true, runCompleted: false, runFailed: false, backgroundPermission: false, processLeak: true },
+      enabled: true,
+      ntfyUrl: 'https://ntfy.sh',
+      ntfyTopic: 'test-topic',
+      events: {
+        permissionRequest: true,
+        promptRequest: true,
+        runCompleted: false,
+        runFailed: false,
+        backgroundPermission: false,
+        processLeak: true,
+      },
     });
     (api.getLocalNotificationBridgeStatus as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
@@ -828,15 +914,26 @@ describe('SettingsPanel', () => {
       expect(container.textContent).toContain('This device');
       expect(container.textContent).toContain('Local ntfy-bridge connected.');
       expect(container.textContent).toContain('Gateway policy');
-      expect(container.textContent).toContain('Event types, enablement, and delivery policy are configured on the gateway, not on this device.');
+      expect(container.textContent).toContain(
+        'Event types, enablement, and delivery policy are configured on the gateway, not on this device.'
+      );
     });
   });
 
   it('syncs local bridge automatically on Android when gateway policy loads', async () => {
     (isAndroid as ReturnType<typeof vi.fn>).mockReturnValue(true);
     (api.getNotificationConfig as ReturnType<typeof vi.fn>).mockResolvedValue({
-      enabled: true, ntfyUrl: 'https://ntfy.sh', ntfyTopic: 'test-topic',
-      events: { permissionRequest: true, promptRequest: true, runCompleted: false, runFailed: false, backgroundPermission: false, processLeak: true },
+      enabled: true,
+      ntfyUrl: 'https://ntfy.sh',
+      ntfyTopic: 'test-topic',
+      events: {
+        permissionRequest: true,
+        promptRequest: true,
+        runCompleted: false,
+        runFailed: false,
+        backgroundPermission: false,
+        processLeak: true,
+      },
     });
 
     const { container } = await renderSettingsPanel();
@@ -850,7 +947,9 @@ describe('SettingsPanel', () => {
 
   it('shows gateway policy as unavailable when loading notification config fails', async () => {
     (isAndroid as ReturnType<typeof vi.fn>).mockReturnValue(true);
-    (api.getNotificationConfig as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Gateway API call failed'));
+    (api.getNotificationConfig as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error('Gateway API call failed')
+    );
 
     const { container } = await renderSettingsPanel();
     const notifTab = container.querySelector('[data-testid="notifications-tab"]');
@@ -867,7 +966,9 @@ describe('SettingsPanel', () => {
 
   it('refreshes gateway notification config before syncing device on Android', async () => {
     (isAndroid as ReturnType<typeof vi.fn>).mockReturnValue(true);
-    (api.getNotificationConfig as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Initial load failed'));
+    (api.getNotificationConfig as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error('Initial load failed')
+    );
     (api.refreshNotificationConfig as ReturnType<typeof vi.fn>).mockResolvedValue({
       enabled: true,
       ntfyUrl: 'https://ntfy.example.com:28443',
@@ -907,7 +1008,9 @@ describe('SettingsPanel', () => {
       expect(container.textContent).toContain('https://ntfy.example.com:28443');
       expect(container.textContent).toContain('mc-topic');
       expect(container.textContent).toContain('bearer');
-      expect(container.textContent).toContain('This device is synced to the gateway notification policy.');
+      expect(container.textContent).toContain(
+        'This device is synced to the gateway notification policy.'
+      );
     });
   });
 
@@ -942,8 +1045,8 @@ describe('SettingsPanel', () => {
 
     const { container } = await renderSettingsPanel();
     // The server picker is in the sidebar with the server name label
-    const serverPickerBtn = Array.from(container.querySelectorAll('button')).find(b =>
-      b.textContent?.includes('Local') && b.className.includes('w-full')
+    const serverPickerBtn = Array.from(container.querySelectorAll('button')).find(
+      b => b.textContent?.includes('Local') && b.className.includes('w-full')
     );
     if (serverPickerBtn) {
       await clickAsync(serverPickerBtn);
@@ -982,14 +1085,14 @@ describe('SettingsPanel', () => {
 
     const { container } = await renderSettingsPanel();
     // Open server picker
-    const serverPickerBtn = Array.from(container.querySelectorAll('button')).find(b =>
-      b.textContent?.includes('Local') && b.className.includes('w-full')
+    const serverPickerBtn = Array.from(container.querySelectorAll('button')).find(
+      b => b.textContent?.includes('Local') && b.className.includes('w-full')
     );
     if (serverPickerBtn) {
       await clickAsync(serverPickerBtn);
       // Click Remote server
-      const remoteBtn = Array.from(container.querySelectorAll('button')).find(b =>
-        b.textContent?.includes('Remote') && !b.textContent?.includes('Local')
+      const remoteBtn = Array.from(container.querySelectorAll('button')).find(
+        b => b.textContent?.includes('Remote') && !b.textContent?.includes('Local')
       );
       if (remoteBtn) {
         await clickAsync(remoteBtn);
@@ -1038,7 +1141,12 @@ describe('SettingsPanel', () => {
     setupStores({
       serverStore: {
         connections: {
-          'local-standalone': { status: 'connected', error: null, isLocalConnection: true, features: [] },
+          'local-standalone': {
+            status: 'connected',
+            error: null,
+            isLocalConnection: true,
+            features: [],
+          },
         },
       },
     });
@@ -1048,5 +1156,4 @@ describe('SettingsPanel', () => {
     // Just verifying no crash with various statuses
     expect(container).toBeTruthy();
   });
-
 });

@@ -27,10 +27,10 @@ const TYPE_CHIPS: { value: LocalIssueType | 'all'; label: string }[] = [
 ];
 
 export function IssueListScreen({ projectId }: Props): React.ReactElement {
-  const issues = useOpenSpecStore((s) => s.issuesByProject[projectId] ?? []);
-  const view = useOpenSpecStore((s) => s.viewByProject[projectId]);
-  const patchView = useOpenSpecStore((s) => s.patchView);
-  const setIssues = useOpenSpecStore((s) => s.setIssues);
+  const issues = useOpenSpecStore(s => s.issuesByProject[projectId] ?? []);
+  const view = useOpenSpecStore(s => s.viewByProject[projectId]);
+  const patchView = useOpenSpecStore(s => s.patchView);
+  const setIssues = useOpenSpecStore(s => s.setIssues);
   const [epics, setEpics] = useState<Epic[]>([]);
 
   // Group: standalone issues (no epicId) + anonymous fold.
@@ -38,7 +38,7 @@ export function IssueListScreen({ projectId }: Props): React.ReactElement {
     const filter = view?.typeFilter;
     const matched =
       filter && filter !== null && filter !== ('all' as never)
-        ? issues.filter((i) => i.type === filter)
+        ? issues.filter(i => i.type === filter)
         : issues;
     const top: LocalIssue[] = [];
     const anon: LocalIssue[] = [];
@@ -53,7 +53,7 @@ export function IssueListScreen({ projectId }: Props): React.ReactElement {
   }, [issues, view?.typeFilter]);
 
   const issueCountForEpic = (epicId: string): number =>
-    issues.filter((i) => i.epicId === epicId).length;
+    issues.filter(i => i.epicId === epicId).length;
 
   const openIssue = async (issueId: string): Promise<void> => {
     const issue = await getIssue(issueId);
@@ -70,11 +70,11 @@ export function IssueListScreen({ projectId }: Props): React.ReactElement {
 
   const refresh = useCallback((): void => {
     listIssues(projectId)
-      .then((rows) => setIssues(projectId, rows))
-      .catch((e) => console.error('[openspec] listIssues failed', e));
+      .then(rows => setIssues(projectId, rows))
+      .catch(e => console.error('[openspec] listIssues failed', e));
     listEpics(projectId)
       .then(setEpics)
-      .catch((e) => console.error('[openspec] listEpics failed', e));
+      .catch(e => console.error('[openspec] listEpics failed', e));
   }, [projectId, setIssues]);
 
   useEffect(() => {
@@ -110,7 +110,7 @@ export function IssueListScreen({ projectId }: Props): React.ReactElement {
 
       {/* Type filter chips */}
       <div className="flex flex-wrap gap-1.5">
-        {TYPE_CHIPS.map((c) => {
+        {TYPE_CHIPS.map(c => {
           const active = (view?.typeFilter ?? 'all') === c.value;
           return (
             <button
@@ -137,7 +137,7 @@ export function IssueListScreen({ projectId }: Props): React.ReactElement {
         <div className="space-y-2">
           <div className="text-xs font-semibold uppercase text-muted-foreground">Epics</div>
           <ul className="space-y-2">
-            {epics.map((e) => (
+            {epics.map(e => (
               <li
                 key={e.id}
                 className="border border-border rounded-md p-3 bg-card cursor-pointer hover:bg-secondary/30 transition-colors"
@@ -163,24 +163,26 @@ export function IssueListScreen({ projectId }: Props): React.ReactElement {
         <div className="text-sm text-muted-foreground">
           No issues yet. Click "+ New Issue" to start.
         </div>
-      ) : topLevel.length > 0 && (
-        <ul className="space-y-2">
-          {topLevel.map((i) => (
-            <li
-              key={i.id}
-              className="border border-border rounded-md p-3 bg-card cursor-pointer hover:bg-secondary/30 transition-colors"
-              onClick={() => void openIssue(i.id)}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <div className="font-medium text-sm">{i.title}</div>
-                  <div className="text-xs text-muted-foreground">{i.type}</div>
+      ) : (
+        topLevel.length > 0 && (
+          <ul className="space-y-2">
+            {topLevel.map(i => (
+              <li
+                key={i.id}
+                className="border border-border rounded-md p-3 bg-card cursor-pointer hover:bg-secondary/30 transition-colors"
+                onClick={() => void openIssue(i.id)}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="font-medium text-sm">{i.title}</div>
+                    <div className="text-xs text-muted-foreground">{i.type}</div>
+                  </div>
+                  <IssueStatusBadge issue={i} />
                 </div>
-                <IssueStatusBadge issue={i} />
-              </div>
-            </li>
-          ))}
-        </ul>
+              </li>
+            ))}
+          </ul>
+        )
       )}
 
       {/* Anonymous fold */}
@@ -188,9 +190,7 @@ export function IssueListScreen({ projectId }: Props): React.ReactElement {
         <div className="border border-border rounded-md bg-muted/30">
           <button
             className="w-full text-left px-3 py-2 text-sm hover:bg-secondary flex items-center justify-between"
-            onClick={() =>
-              patchView(projectId, { anonymousExpanded: !view?.anonymousExpanded })
-            }
+            onClick={() => patchView(projectId, { anonymousExpanded: !view?.anonymousExpanded })}
           >
             <span>Anonymous ({anonymous.length})</span>
             <span className="text-xs opacity-60">{view?.anonymousExpanded ? '▾' : '▸'}</span>
@@ -198,7 +198,7 @@ export function IssueListScreen({ projectId }: Props): React.ReactElement {
           {view?.anonymousExpanded && (
             <>
               <ul className="border-t border-border divide-y divide-border">
-                {anonymous.map((i) => (
+                {anonymous.map(i => (
                   <li
                     key={i.id}
                     className="px-3 py-2 cursor-pointer hover:bg-secondary/30"
@@ -214,9 +214,7 @@ export function IssueListScreen({ projectId }: Props): React.ReactElement {
               <div className="px-3 py-1.5 text-right border-t border-border">
                 <button
                   className="text-xs text-primary hover:underline"
-                  onClick={() =>
-                    patchView(projectId, { screen: 'anonymous-management' })
-                  }
+                  onClick={() => patchView(projectId, { screen: 'anonymous-management' })}
                 >
                   Manage Anonymous Issues →
                 </button>

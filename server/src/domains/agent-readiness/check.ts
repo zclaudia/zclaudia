@@ -5,8 +5,15 @@ import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import { AgentProfileRepository } from '../agent-profiles/repository.js';
 import { LlmProfileRepository } from '../llm-profiles/repository.js';
 import { hasLlmCredential } from './credential.js';
-import { findInRegistryCrossProvider, tryGetRegistryModel } from '../../infra/providers/pi-runtime/registry-search.js';
-import { NoAgentAvailableError, resolveAgentForSession, type ResolveOptions } from '../agent-profiles/agent-resolver.js';
+import {
+  findInRegistryCrossProvider,
+  tryGetRegistryModel,
+} from '../../infra/providers/pi-runtime/registry-search.js';
+import {
+  NoAgentAvailableError,
+  resolveAgentForSession,
+  type ResolveOptions,
+} from '../agent-profiles/agent-resolver.js';
 
 /**
  * Whether the agent's chosen model is usable for its resolved profile.
@@ -20,12 +27,17 @@ function hasUsableModel(agentModel: string | undefined, llm: LlmProfileConfig): 
   if (!model) return false;
   const declared = llm.models;
   if (declared && declared.length > 0) {
-    return declared.some((m) => m.modelId === model);
+    return declared.some(m => m.modelId === model);
   }
-  return Boolean(tryGetRegistryModel(llm.providerType, model) ?? findInRegistryCrossProvider(model));
+  return Boolean(
+    tryGetRegistryModel(llm.providerType, model) ?? findInRegistryCrossProvider(model)
+  );
 }
 
-function readinessForResolvedAgent(agent: AgentProfileConfig | undefined, llm: LlmProfileConfig | null | undefined): AgentReadiness {
+function readinessForResolvedAgent(
+  agent: AgentProfileConfig | undefined,
+  llm: LlmProfileConfig | null | undefined
+): AgentReadiness {
   if (!agent) return { usable: false, reason: 'no_agent' };
   if (!llm) return { usable: false, reason: 'no_llm_profile' };
   if (!hasLlmCredential(llm)) return { usable: false, reason: 'no_credential' };
@@ -58,7 +70,10 @@ export function resolveAgentReadiness(db: Database.Database): AgentReadiness {
  * Readiness for the exact agent that SessionRepository will assign:
  * explicit > project default > global default.
  */
-export function resolveAgentReadinessForSession(db: Database.Database, opts: ResolveOptions): AgentReadiness {
+export function resolveAgentReadinessForSession(
+  db: Database.Database,
+  opts: ResolveOptions
+): AgentReadiness {
   try {
     const { agent, llm } = resolveAgentForSession(db, opts);
     return readinessForResolvedAgent(agent, llm);

@@ -49,13 +49,21 @@ interface PendingAttachment {
   previewUrl?: string;
 }
 
-export function CreateIssueDialog({ projectId, onClose, editIssue, initialValues, onCreated }: CreateIssueDialogProps) {
+export function CreateIssueDialog({
+  projectId,
+  onClose,
+  editIssue,
+  initialValues,
+  onCreated,
+}: CreateIssueDialogProps) {
   useAndroidBack(onClose, true, 25);
   const { createIssue, updateIssue } = useLocalIssueStore();
   const [title, setTitle] = useState(editIssue?.title ?? initialValues?.title ?? '');
-  const [description, setDescription] = useState(editIssue?.description ?? initialValues?.description ?? '');
+  const [description, setDescription] = useState(
+    editIssue?.description ?? initialValues?.description ?? ''
+  );
   const [priority, setPriority] = useState<LocalIssuePriority>(
-    editIssue?.priority ?? initialValues?.priority ?? 'medium',
+    editIssue?.priority ?? initialValues?.priority ?? 'medium'
   );
   const [labels, setLabels] = useState<string[]>(editIssue?.labels ?? initialValues?.labels ?? []);
   const [loading, setLoading] = useState(false);
@@ -65,7 +73,10 @@ export function CreateIssueDialog({ projectId, onClose, editIssue, initialValues
 
   // For edit mode, attach directly to the existing issue. For create mode we
   // queue files locally and upload after the issue is created.
-  const editAttachments = useAttachments(isEdit ? 'local_issue' : null, isEdit ? editIssue?.id : null);
+  const editAttachments = useAttachments(
+    isEdit ? 'local_issue' : null,
+    isEdit ? editIssue?.id : null
+  );
   const [pending, setPending] = useState<PendingAttachment[]>([]);
 
   // Track URLs so we can revoke on unmount even if `pending` was cleared
@@ -95,7 +106,7 @@ export function CreateIssueDialog({ projectId, onClose, editIssue, initialValues
     // already shows the thumbnail. Mutating the URL onto the entry inside an
     // effect would lose the thumbnail on the just-added file because no
     // re-render is scheduled by that mutation.
-    const additions: PendingAttachment[] = files.map((file) => {
+    const additions: PendingAttachment[] = files.map(file => {
       let previewUrl: string | undefined;
       if (file.type.startsWith('image/')) {
         previewUrl = URL.createObjectURL(file);
@@ -107,17 +118,17 @@ export function CreateIssueDialog({ projectId, onClose, editIssue, initialValues
         previewUrl,
       };
     });
-    setPending((prev) => [...prev, ...additions]);
+    setPending(prev => [...prev, ...additions]);
   };
 
   const removePending = (localId: string) => {
-    setPending((prev) => {
-      const target = prev.find((p) => p.localId === localId);
+    setPending(prev => {
+      const target = prev.find(p => p.localId === localId);
       if (target?.previewUrl) {
         URL.revokeObjectURL(target.previewUrl);
         previewUrlsRef.current.delete(target.previewUrl);
       }
-      return prev.filter((p) => p.localId !== localId);
+      return prev.filter(p => p.localId !== localId);
     });
   };
 
@@ -161,7 +172,7 @@ export function CreateIssueDialog({ projectId, onClose, editIssue, initialValues
             setError(
               uploadErr instanceof Error
                 ? `Issue saved but upload of "${p.file.name}" failed: ${uploadErr.message}`
-                : `Upload of "${p.file.name}" failed`,
+                : `Upload of "${p.file.name}" failed`
             );
           }
         }
@@ -180,7 +191,7 @@ export function CreateIssueDialog({ projectId, onClose, editIssue, initialValues
     if (pending.length === 0) return null;
     return (
       <div className="flex flex-wrap gap-2">
-        {pending.map((p) => (
+        {pending.map(p => (
           <div
             key={p.localId}
             data-testid="pending-attachment"
@@ -207,10 +218,13 @@ export function CreateIssueDialog({ projectId, onClose, editIssue, initialValues
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
       <div
         className="bg-card border border-border rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
           <h2 className="text-sm font-semibold">{isEdit ? 'Edit Issue' : 'New Issue'}</h2>
@@ -219,14 +233,22 @@ export function CreateIssueDialog({ projectId, onClose, editIssue, initialValues
           </button>
         </div>
 
-        <AttachmentDropZone onFiles={addFiles} className="rounded-b-lg flex-1 min-h-0 flex flex-col" label="Drop files to attach">
-          <form onSubmit={handleSubmit} onPaste={handlePaste} className="p-4 space-y-3 flex-1 overflow-y-auto">
+        <AttachmentDropZone
+          onFiles={addFiles}
+          className="rounded-b-lg flex-1 min-h-0 flex flex-col"
+          label="Drop files to attach"
+        >
+          <form
+            onSubmit={handleSubmit}
+            onPaste={handlePaste}
+            className="p-4 space-y-3 flex-1 overflow-y-auto"
+          >
             <div>
               <label className="text-xs font-medium text-muted-foreground">Title</label>
               <input
                 type="text"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={e => setTitle(e.target.value)}
                 className="mt-1 w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                 placeholder="Issue title"
                 autoFocus
@@ -237,7 +259,7 @@ export function CreateIssueDialog({ projectId, onClose, editIssue, initialValues
               <label className="text-xs font-medium text-muted-foreground">Description</label>
               <textarea
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={e => setDescription(e.target.value)}
                 className="mt-1 w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-primary min-h-[240px] resize-y leading-relaxed"
                 placeholder="Describe the issue (optional, markdown supported)"
               />
@@ -269,7 +291,7 @@ export function CreateIssueDialog({ projectId, onClose, editIssue, initialValues
                 {isEdit ? (
                   <AttachmentList
                     items={editAttachments.items as Attachment[]}
-                    onRemove={(id) => void editAttachments.remove(id)}
+                    onRemove={id => void editAttachments.remove(id)}
                     emptyText="Drop files here or click Attach"
                     sortable
                     ownerKind="local_issue"

@@ -11,7 +11,11 @@ vi.mock('../../../contexts/ThemeContext', () => ({
 // Mock react-syntax-highlighter
 vi.mock('react-syntax-highlighter', () => ({
   Prism: ({ children, language, showLineNumbers }: any) => (
-    <pre data-testid="syntax-highlighter" data-language={language} data-line-numbers={showLineNumbers}>
+    <pre
+      data-testid="syntax-highlighter"
+      data-language={language}
+      data-line-numbers={showLineNumbers}
+    >
       {children}
     </pre>
   ),

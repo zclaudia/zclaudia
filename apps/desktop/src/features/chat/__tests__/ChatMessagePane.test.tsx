@@ -9,17 +9,18 @@ const mockInteractionsState = {
 };
 
 vi.mock('../../../stores/interactionStore', () => ({
-  useInteractionStore: Object.assign(
-    (selector: any) => selector(mockInteractionsState),
-    { getState: () => mockInteractionsState },
-  ),
+  useInteractionStore: Object.assign((selector: any) => selector(mockInteractionsState), {
+    getState: () => mockInteractionsState,
+  }),
 }));
 
 vi.mock('../MessageList', () => ({
   MessageList: ({ streamingToolCalls }: { streamingToolCalls?: ToolCallState[] }) => (
     <div data-testid="message-list">
-      {streamingToolCalls?.map((toolCall) => (
-        <div key={toolCall.id} data-testid="inline-tool-call">{toolCall.id}</div>
+      {streamingToolCalls?.map(toolCall => (
+        <div key={toolCall.id} data-testid="inline-tool-call">
+          {toolCall.id}
+        </div>
       ))}
     </div>
   ),
@@ -103,7 +104,7 @@ function renderPane(overrides: Partial<Parameters<typeof ChatMessagePane>[0]> = 
 
 function defineScrollableMetrics(
   element: HTMLElement,
-  metrics: { scrollTop: number; scrollHeight: number; clientHeight: number },
+  metrics: { scrollTop: number; scrollHeight: number; clientHeight: number }
 ) {
   Object.defineProperty(element, 'scrollTop', {
     configurable: true,
@@ -202,9 +203,23 @@ describe('ChatMessagePane', () => {
     renderPane({
       scrollToBottom,
       sessionMessages: [
-        { id: 'm1', sessionId: 's1', role: 'assistant', content: 'hello', createdAt: 1, updatedAt: 1 },
+        {
+          id: 'm1',
+          sessionId: 's1',
+          role: 'assistant',
+          content: 'hello',
+          createdAt: 1,
+          updatedAt: 1,
+        },
       ] as any,
-      lastSessionMessage: { id: 'm1', sessionId: 's1', role: 'assistant', content: 'hello', createdAt: 1, updatedAt: 1 } as any,
+      lastSessionMessage: {
+        id: 'm1',
+        sessionId: 's1',
+        role: 'assistant',
+        content: 'hello',
+        createdAt: 1,
+        updatedAt: 1,
+      } as any,
     });
 
     expect(scrollToBottom).not.toHaveBeenCalled();
@@ -215,7 +230,14 @@ describe('ChatMessagePane', () => {
     const { container, rerender } = renderPane({
       scrollToBottom,
       sessionMessages: [
-        { id: 'm1', sessionId: 's1', role: 'assistant', content: 'hello', createdAt: 1, updatedAt: 1 },
+        {
+          id: 'm1',
+          sessionId: 's1',
+          role: 'assistant',
+          content: 'hello',
+          createdAt: 1,
+          updatedAt: 1,
+        },
       ] as any,
     });
 
@@ -255,10 +277,26 @@ describe('ChatMessagePane', () => {
         handleScroll={vi.fn()}
         handleMessageWheel={vi.fn()}
         retryLoad={vi.fn()}
-        sessionMessages={[
-          { id: 'm1', sessionId: 's1', role: 'assistant', content: 'hello', createdAt: 1, updatedAt: 1 },
-          { id: 'm2', sessionId: 's1', role: 'assistant', content: 'world', createdAt: 2, updatedAt: 2 },
-        ] as any}
+        sessionMessages={
+          [
+            {
+              id: 'm1',
+              sessionId: 's1',
+              role: 'assistant',
+              content: 'hello',
+              createdAt: 1,
+              updatedAt: 1,
+            },
+            {
+              id: 'm2',
+              sessionId: 's1',
+              role: 'assistant',
+              content: 'world',
+              createdAt: 2,
+              updatedAt: 2,
+            },
+          ] as any
+        }
         lastSessionMessage={null}
         lastStreamingBlock={null}
         streamingContentSignature=""
@@ -283,8 +321,22 @@ describe('ChatMessagePane', () => {
   it('fades only the message edges that have off-screen content', () => {
     const { container } = renderPane({
       sessionMessages: [
-        { id: 'm1', sessionId: 's1', role: 'assistant', content: 'hello', createdAt: 1, updatedAt: 1 },
-        { id: 'm2', sessionId: 's1', role: 'assistant', content: 'world', createdAt: 2, updatedAt: 2 },
+        {
+          id: 'm1',
+          sessionId: 's1',
+          role: 'assistant',
+          content: 'hello',
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        {
+          id: 'm2',
+          sessionId: 's1',
+          role: 'assistant',
+          content: 'world',
+          createdAt: 2,
+          updatedAt: 2,
+        },
       ] as any,
     });
     const scrollContainer = container.querySelector('.overflow-y-auto') as HTMLElement;
@@ -293,17 +345,29 @@ describe('ChatMessagePane', () => {
     const fade = () => scrollContainer.getAttribute('data-edge-fade');
 
     // Scrolled to the middle: content above and below → both edges fade.
-    defineScrollableMetrics(scrollContainer, { scrollTop: 300, scrollHeight: 1000, clientHeight: 500 });
+    defineScrollableMetrics(scrollContainer, {
+      scrollTop: 300,
+      scrollHeight: 1000,
+      clientHeight: 500,
+    });
     fireEvent.scroll(scrollContainer);
     expect(fade()).toBe('both');
 
     // Scrolled to the very top: nothing above → top edge stays crisp, bottom fades.
-    defineScrollableMetrics(scrollContainer, { scrollTop: 0, scrollHeight: 1000, clientHeight: 500 });
+    defineScrollableMetrics(scrollContainer, {
+      scrollTop: 0,
+      scrollHeight: 1000,
+      clientHeight: 500,
+    });
     fireEvent.scroll(scrollContainer);
     expect(fade()).toBe('bottom');
 
     // Scrolled to the very bottom: nothing below → newest message stays crisp.
-    defineScrollableMetrics(scrollContainer, { scrollTop: 500, scrollHeight: 1000, clientHeight: 500 });
+    defineScrollableMetrics(scrollContainer, {
+      scrollTop: 500,
+      scrollHeight: 1000,
+      clientHeight: 500,
+    });
     fireEvent.scroll(scrollContainer);
     expect(fade()).toBe('top');
   });

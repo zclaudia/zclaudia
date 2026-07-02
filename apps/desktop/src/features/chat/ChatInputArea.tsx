@@ -1,5 +1,14 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Lock, Unlock, X, FileText, FileEdit, FileDiff, Terminal as TerminalIcon, Plus } from 'lucide-react';
+import {
+  Lock,
+  Unlock,
+  X,
+  FileText,
+  FileEdit,
+  FileDiff,
+  Terminal as TerminalIcon,
+  Plus,
+} from 'lucide-react';
 import { useGoalStore } from '../../stores/goalStore';
 import { GoalPinnedBar } from '../../components/GoalPinnedBar';
 import { GoalDialog } from '../../components/GoalDialog';
@@ -62,7 +71,10 @@ interface ChatInputAreaProps {
   initialDraft: SessionDraft | undefined;
   draftExists: boolean;
   onSetMode: (sessionId: string, mode: string) => void;
-  onSetPermissionOverride: (sessionId: string, policy: Partial<UnifiedPermissionPolicy> | null) => void;
+  onSetPermissionOverride: (
+    sessionId: string,
+    policy: Partial<UnifiedPermissionPolicy> | null
+  ) => void;
   onWorktreeChange: (path: string) => Promise<void>;
   onSendMessage: (content: string, attachments?: Attachment[]) => void;
   onCancelRun: () => void;
@@ -102,13 +114,13 @@ export function ChatInputArea({
   onSteerQueueItem,
   centered = false,
 }: ChatInputAreaProps) {
-  const setDrawerOpen = useTerminalStore((s) => s.setDrawerOpen);
-  const isDrawerOpen = useTerminalStore((s) => s.isDrawerOpen);
-  const disabledBuiltinPanels = usePluginStore((s) => s.disabledBuiltinPanels);
-  const fileViewerOpen = useFileViewerStore((s) => s.isOpen);
-  const setAdvancedInput = useUIStore((s) => s.setAdvancedInput);
-  const openDraftEditor = useDraftEditorStore((s) => s.openEditor);
-  const setSendCallback = useDraftEditorStore((s) => s.setSendCallback);
+  const setDrawerOpen = useTerminalStore(s => s.setDrawerOpen);
+  const isDrawerOpen = useTerminalStore(s => s.isDrawerOpen);
+  const disabledBuiltinPanels = usePluginStore(s => s.disabledBuiltinPanels);
+  const fileViewerOpen = useFileViewerStore(s => s.isOpen);
+  const setAdvancedInput = useUIStore(s => s.setAdvancedInput);
+  const openDraftEditor = useDraftEditorStore(s => s.openEditor);
+  const setSendCallback = useDraftEditorStore(s => s.setSendCallback);
   // Reactive active-tab checks (work for both bottom and right placement)
   const draftPanelActive = usePanelIsActive('draft');
   const fileViewerPanelActive = usePanelIsActive('file-viewer');
@@ -150,8 +162,8 @@ export function ChatInputArea({
   // gates the fallback sources after consumption so the user's in-progress
   // edits stay put (otherwise initialValue would revert to the draft and
   // overwrite them on the next MessageInput effect).
-  const pendingPrefill = useComposerStore((s) => s.pendingPrefills[sessionId]);
-  const clearPendingPrefill = useComposerStore((s) => s.clearPendingPrefill);
+  const pendingPrefill = useComposerStore(s => s.pendingPrefills[sessionId]);
+  const clearPendingPrefill = useComposerStore(s => s.clearPendingPrefill);
   const [prefillConsumed, setPrefillConsumed] = useState(false);
 
   useEffect(() => {
@@ -170,22 +182,22 @@ export function ChatInputArea({
 
   const fallbackInitialValue = prefillConsumed
     ? undefined
-    : restoreMessage?.content ?? initialDraft?.content;
+    : (restoreMessage?.content ?? initialDraft?.content);
   const messageInputInitialValue = pendingPrefill?.content ?? fallbackInitialValue;
 
   // Goal state
-  const goalSlot = useGoalStore((s) => s.bySession[sessionId]);
-  const setStoreGoal = useGoalStore((s) => s.setGoal);
+  const goalSlot = useGoalStore(s => s.bySession[sessionId]);
+  const setStoreGoal = useGoalStore(s => s.setGoal);
   const [goalDialogOpen, setGoalDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!sessionId) return;
     let cancelled = false;
     getGoal(sessionId)
-      .then((g) => {
+      .then(g => {
         if (!cancelled) setStoreGoal(sessionId, g);
       })
-      .catch((err) => console.warn('[goal] fetch failed', err));
+      .catch(err => console.warn('[goal] fetch failed', err));
     return () => {
       cancelled = true;
     };
@@ -210,16 +222,14 @@ export function ChatInputArea({
         console.error('[goal] set failed', err);
       }
     },
-    [sessionId],
+    [sessionId]
   );
 
   const handleGoalPauseResume = useCallback(async () => {
     if (!goal) return;
     try {
       const next =
-        goal.status === 'paused'
-          ? await resumeGoal(sessionId)
-          : await pauseGoal(sessionId);
+        goal.status === 'paused' ? await resumeGoal(sessionId) : await pauseGoal(sessionId);
       setStoreGoal(sessionId, next);
     } catch (err) {
       console.error('[goal] toggle failed', err);
@@ -248,10 +258,10 @@ export function ChatInputArea({
               {currentSession.type === 'background'
                 ? 'Background session — read-only'
                 : currentSession.planStatus === 'planned'
-                ? 'Plan submitted — waiting for Supervisor to execute'
-                : currentSession.planStatus === 'executing'
-                ? 'Task executing — controlled by Supervisor'
-                : 'This session is read-only'}
+                  ? 'Plan submitted — waiting for Supervisor to execute'
+                  : currentSession.planStatus === 'executing'
+                    ? 'Task executing — controlled by Supervisor'
+                    : 'This session is read-only'}
             </span>
           </div>
           {currentSession.type === 'background' ? (
@@ -295,7 +305,7 @@ export function ChatInputArea({
         <ModeSelector
           capabilities={capabilities}
           value={isForcedPlanSession ? 'plan' : mode}
-          onChange={(m) => {
+          onChange={m => {
             if (isForcedPlanSession) return;
             onSetMode(sessionId, m);
           }}
@@ -306,7 +316,7 @@ export function ChatInputArea({
       )}
       <PermissionSelector
         value={permissionOverride}
-        onChange={(policy) => onSetPermissionOverride(sessionId, policy)}
+        onChange={policy => onSetPermissionOverride(sessionId, policy)}
         disabled={isLoading}
       />
       {currentProject?.id && currentProject?.rootPath && (
@@ -334,219 +344,238 @@ export function ChatInputArea({
       {/* Centered column matching the message reading column (ChatMessagePane) so
           the composer aligns with the chat content instead of stretching edge-to-edge. */}
       <div className="mx-auto w-full max-w-3xl">
-      {/* Pinned goal bar — only present when a goal exists */}
-      {goal && (
-        <div className="mb-1.5">
-          <GoalPinnedBar
-            goal={goal}
-            tokensUsed={goalSlot?.budgetTokensUsed ?? goal.tokensUsed}
-            turnsUsed={goalSlot?.budgetTurnsUsed ?? goal.turnsUsed}
-            onOpen={() => setGoalDialogOpen(true)}
-            onPauseResume={handleGoalPauseResume}
-            onClear={handleGoalClear}
+        {/* Pinned goal bar — only present when a goal exists */}
+        {goal && (
+          <div className="mb-1.5">
+            <GoalPinnedBar
+              goal={goal}
+              tokensUsed={goalSlot?.budgetTokensUsed ?? goal.tokensUsed}
+              turnsUsed={goalSlot?.budgetTurnsUsed ?? goal.turnsUsed}
+              onOpen={() => setGoalDialogOpen(true)}
+              onPauseResume={handleGoalPauseResume}
+              onClear={handleGoalClear}
+            />
+          </div>
+        )}
+        <GoalDialog
+          goal={goal}
+          open={goalDialogOpen}
+          onClose={() => setGoalDialogOpen(false)}
+          onSubmit={handleGoalSubmit}
+          onClear={handleGoalClear}
+        />
+        {isLoading && (
+          <SendQueueBar
+            sessionId={sessionId}
+            canSteer={!!sessionRunId}
+            onSteer={onSteerQueueItem}
           />
-        </div>
-      )}
-      <GoalDialog
-        goal={goal}
-        open={goalDialogOpen}
-        onClose={() => setGoalDialogOpen(false)}
-        onSubmit={handleGoalSubmit}
-        onClear={handleGoalClear}
-      />
-      {isLoading && (
-        <SendQueueBar
+        )}
+        {/* Mobile-only toolbar: three selectors, JS-gated to mobile only */}
+        {isMobile && <div className="mb-1.5 flex items-center gap-1">{selectorTrio}</div>}
+        <MessageInput
+          key={sessionId}
           sessionId={sessionId}
-          canSteer={!!sessionRunId}
-          onSteer={onSteerQueueItem}
-        />
-      )}
-      {/* Mobile-only toolbar: three selectors, JS-gated to mobile only */}
-      {isMobile && (
-        <div className="mb-1.5 flex items-center gap-1">{selectorTrio}</div>
-      )}
-      <MessageInput
-        key={sessionId}
-        sessionId={sessionId}
-        onSend={onSendMessage}
-        onCancel={onCancelRun}
-        onCommand={onCommand}
-        commands={commands}
-        projectRoot={fileReferenceRoot}
-        backendId={fileReferenceBackendId}
-        disabled={!isConnected}
-        isLoading={isLoading}
-        initialValue={messageInputInitialValue}
-        initialAttachments={restoreMessage?.attachments ?? initialDraft?.attachments}
-        advancedMode={advancedInput}
-        onRequestAdvancedMode={!isMobile && !advancedInput ? () => setAdvancedInput(true) : undefined}
-        mobileToolbarSlot={isMobile ? (() => {
-          const toolItems: Array<{ key: string; icon: React.ReactNode; label: string; isActive: boolean; hasBadge?: boolean; onClick: () => void }> = [];
-
-          if (!disabledBuiltinPanels.includes('draft')) {
-            const isActive = draftPanelActive;
-            toolItems.push({
-              key: 'draft',
-              icon: <FileEdit size={18} strokeWidth={1.75} />,
-              label: isActive ? 'Close Draft' : 'Draft Editor',
-              isActive,
-              hasBadge: draftExists && !isActive,
-              onClick: () => {
-                if (isActive) {
-                  useDraftEditorStore.getState().closeEditor();
-                } else {
-                  setSendCallback((content: string) => onSendMessage(content));
-                  openDraftEditor(sessionId);
-                }
-                closeMobileTools();
-              },
-            });
+          onSend={onSendMessage}
+          onCancel={onCancelRun}
+          onCommand={onCommand}
+          commands={commands}
+          projectRoot={fileReferenceRoot}
+          backendId={fileReferenceBackendId}
+          disabled={!isConnected}
+          isLoading={isLoading}
+          initialValue={messageInputInitialValue}
+          initialAttachments={restoreMessage?.attachments ?? initialDraft?.attachments}
+          advancedMode={advancedInput}
+          onRequestAdvancedMode={
+            !isMobile && !advancedInput ? () => setAdvancedInput(true) : undefined
           }
+          mobileToolbarSlot={
+            isMobile
+              ? (() => {
+                  const toolItems: Array<{
+                    key: string;
+                    icon: React.ReactNode;
+                    label: string;
+                    isActive: boolean;
+                    hasBadge?: boolean;
+                    onClick: () => void;
+                  }> = [];
 
-          if (currentProject?.rootPath && !disabledBuiltinPanels.includes('file-viewer')) {
-            const isActive = fileViewerPanelActive;
-            toolItems.push({
-              key: 'file-viewer',
-              icon: <FileText size={18} strokeWidth={1.75} />,
-              label: isActive ? 'Close Files' : 'File Viewer',
-              isActive,
-              onClick: () => {
-                if (isActive) {
-                  useFileViewerStore.getState().close();
-                } else if (fileViewerOpen) {
-                  activatePanel('file-viewer');
-                } else {
-                  const store = useFileViewerStore.getState();
-                  store.togglePanel();
-                  store.setSearchOpen(true);
-                  activatePanel('file-viewer');
-                }
-                closeMobileTools();
-              },
-            });
-          }
-
-          if (!disabledBuiltinPanels.includes('session-changes') && currentSession) {
-            const isActive = changesPanelActive;
-            toolItems.push({
-              key: 'session-changes',
-              icon: <FileDiff size={18} strokeWidth={1.75} />,
-              label: isActive ? 'Hide Changes' : 'Session Changes',
-              isActive,
-              onClick: () => {
-                const store = usePluginStore.getState();
-                if (isActive) {
-                  store.updatePanelVisibility('session-changes', false);
-                } else {
-                  store.updatePanelVisibility('session-changes', true);
-                  activatePanel('session-changes');
-                }
-                closeMobileTools();
-              },
-            });
-          }
-
-          if (!disabledBuiltinPanels.includes('terminal') && useServerStore.getState().activeServerSupports('remoteTerminal') && currentSession?.projectId) {
-            const pid = currentSession.projectId;
-            const isOpen = isDrawerOpen(pid);
-            const isActive = isOpen && terminalPanelActive;
-            toolItems.push({
-              key: 'terminal',
-              icon: <TerminalIcon size={18} strokeWidth={1.75} />,
-              label: isActive ? 'Hide Terminal' : 'Terminal',
-              isActive,
-              onClick: () => {
-                if (isActive) {
-                  setDrawerOpen(pid, false);
-                } else if (isOpen) {
-                  activatePanel('terminal');
-                } else {
-                  const store = useTerminalStore.getState();
-                  if (!store.getTerminalId(pid)) {
-                    store.openTerminal(pid);
+                  if (!disabledBuiltinPanels.includes('draft')) {
+                    const isActive = draftPanelActive;
+                    toolItems.push({
+                      key: 'draft',
+                      icon: <FileEdit size={18} strokeWidth={1.75} />,
+                      label: isActive ? 'Close Draft' : 'Draft Editor',
+                      isActive,
+                      hasBadge: draftExists && !isActive,
+                      onClick: () => {
+                        if (isActive) {
+                          useDraftEditorStore.getState().closeEditor();
+                        } else {
+                          setSendCallback((content: string) => onSendMessage(content));
+                          openDraftEditor(sessionId);
+                        }
+                        closeMobileTools();
+                      },
+                    });
                   }
-                  setDrawerOpen(pid, true);
-                  activatePanel('terminal');
-                }
-                closeMobileTools();
-              },
-            });
-          }
 
-          if (toolItems.length === 0) return undefined;
+                  if (currentProject?.rootPath && !disabledBuiltinPanels.includes('file-viewer')) {
+                    const isActive = fileViewerPanelActive;
+                    toolItems.push({
+                      key: 'file-viewer',
+                      icon: <FileText size={18} strokeWidth={1.75} />,
+                      label: isActive ? 'Close Files' : 'File Viewer',
+                      isActive,
+                      onClick: () => {
+                        if (isActive) {
+                          useFileViewerStore.getState().close();
+                        } else if (fileViewerOpen) {
+                          activatePanel('file-viewer');
+                        } else {
+                          const store = useFileViewerStore.getState();
+                          store.togglePanel();
+                          store.setSearchOpen(true);
+                          activatePanel('file-viewer');
+                        }
+                        closeMobileTools();
+                      },
+                    });
+                  }
 
-          const hasActiveItem = toolItems.some(t => t.isActive);
-          const hasBadge = toolItems.some(t => t.hasBadge);
+                  if (!disabledBuiltinPanels.includes('session-changes') && currentSession) {
+                    const isActive = changesPanelActive;
+                    toolItems.push({
+                      key: 'session-changes',
+                      icon: <FileDiff size={18} strokeWidth={1.75} />,
+                      label: isActive ? 'Hide Changes' : 'Session Changes',
+                      isActive,
+                      onClick: () => {
+                        const store = usePluginStore.getState();
+                        if (isActive) {
+                          store.updatePanelVisibility('session-changes', false);
+                        } else {
+                          store.updatePanelVisibility('session-changes', true);
+                          activatePanel('session-changes');
+                        }
+                        closeMobileTools();
+                      },
+                    });
+                  }
 
-          return (
-            <div className="flex items-center gap-1.5">
-              {toolItems.length > 0 && (
-                <div className="relative" ref={mobileToolsRef}>
-                  <button
-                    onClick={() => setMobileToolsOpen(v => !v)}
-                    className={`h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-full transition-colors relative ${hasActiveItem ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
-                    title="More tools"
-                  >
-                    <Plus size={20} strokeWidth={1.75} className={`transition-transform duration-200 ${mobileToolsOpen ? 'rotate-45' : ''}`} />
-                    {hasBadge && (
-                      <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full" />
-                    )}
-                  </button>
-                  {mobileToolsOpen && (
-                    <div className="absolute bottom-full left-0 mb-2 py-1 bg-popover border border-border rounded-xl shadow-lg min-w-[160px] z-50">
-                      {toolItems.map((item) => (
-                        <button
-                          key={item.key}
-                          onClick={item.onClick}
-                          className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors ${item.isActive ? 'text-primary bg-muted/40' : 'text-foreground hover:bg-muted'}`}
-                        >
-                          <span className="relative flex-shrink-0">
-                            {item.icon}
-                            {item.hasBadge && (
-                              <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full" />
+                  if (
+                    !disabledBuiltinPanels.includes('terminal') &&
+                    useServerStore.getState().activeServerSupports('remoteTerminal') &&
+                    currentSession?.projectId
+                  ) {
+                    const pid = currentSession.projectId;
+                    const isOpen = isDrawerOpen(pid);
+                    const isActive = isOpen && terminalPanelActive;
+                    toolItems.push({
+                      key: 'terminal',
+                      icon: <TerminalIcon size={18} strokeWidth={1.75} />,
+                      label: isActive ? 'Hide Terminal' : 'Terminal',
+                      isActive,
+                      onClick: () => {
+                        if (isActive) {
+                          setDrawerOpen(pid, false);
+                        } else if (isOpen) {
+                          activatePanel('terminal');
+                        } else {
+                          const store = useTerminalStore.getState();
+                          if (!store.getTerminalId(pid)) {
+                            store.openTerminal(pid);
+                          }
+                          setDrawerOpen(pid, true);
+                          activatePanel('terminal');
+                        }
+                        closeMobileTools();
+                      },
+                    });
+                  }
+
+                  if (toolItems.length === 0) return undefined;
+
+                  const hasActiveItem = toolItems.some(t => t.isActive);
+                  const hasBadge = toolItems.some(t => t.hasBadge);
+
+                  return (
+                    <div className="flex items-center gap-1.5">
+                      {toolItems.length > 0 && (
+                        <div className="relative" ref={mobileToolsRef}>
+                          <button
+                            onClick={() => setMobileToolsOpen(v => !v)}
+                            className={`h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-full transition-colors relative ${hasActiveItem ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                            title="More tools"
+                          >
+                            <Plus
+                              size={20}
+                              strokeWidth={1.75}
+                              className={`transition-transform duration-200 ${mobileToolsOpen ? 'rotate-45' : ''}`}
+                            />
+                            {hasBadge && (
+                              <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full" />
                             )}
-                          </span>
-                          {item.label}
-                        </button>
-                      ))}
+                          </button>
+                          {mobileToolsOpen && (
+                            <div className="absolute bottom-full left-0 mb-2 py-1 bg-popover border border-border rounded-xl shadow-lg min-w-[160px] z-50">
+                              {toolItems.map(item => (
+                                <button
+                                  key={item.key}
+                                  onClick={item.onClick}
+                                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors ${item.isActive ? 'text-primary bg-muted/40' : 'text-foreground hover:bg-muted'}`}
+                                >
+                                  <span className="relative flex-shrink-0">
+                                    {item.icon}
+                                    {item.hasBadge && (
+                                      <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full" />
+                                    )}
+                                  </span>
+                                  {item.label}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })() : undefined}
-        onToggleAdvanced={!isMobile ? () => setAdvancedInput(!advancedInput) : undefined}
-        placeholder={
-          !isConnected
-            ? 'Connecting...'
-            : isLoading
-            ? 'Type to queue a message — sends after this run (or Steer)...'
-            : (isForcedPlanSession || mode === 'plan')
-            ? 'Plan Mode: Analyze and plan (no code changes)...'
-            : advancedInput
-            ? 'Type a message  ·  / commands  ·  @ files  ·  Cmd+Enter to send'
-            : 'Type a message  ·  / commands  ·  @ files'
-        }
-      />
-      {!isMobile && (
-        <ComposerFooter
-          left={selectorTrio}
-          right={
-            <ContextUsagePopover
-              sessionId={sessionId}
-              latestCacheRead={currentUsage.latestCacheReadTokens}
-            >
-              <TokenUsageDisplay
-                latestInputTokens={currentUsage.latestInputTokens}
-                inputTokens={currentUsage.inputTokens}
-                contextUsedTokens={currentUsage.contextUsedTokens}
-                contextWindow={currentUsage.contextWindow}
-              />
-            </ContextUsagePopover>
+                  );
+                })()
+              : undefined
+          }
+          onToggleAdvanced={!isMobile ? () => setAdvancedInput(!advancedInput) : undefined}
+          placeholder={
+            !isConnected
+              ? 'Connecting...'
+              : isLoading
+                ? 'Type to queue a message — sends after this run (or Steer)...'
+                : isForcedPlanSession || mode === 'plan'
+                  ? 'Plan Mode: Analyze and plan (no code changes)...'
+                  : advancedInput
+                    ? 'Type a message  ·  / commands  ·  @ files  ·  Cmd+Enter to send'
+                    : 'Type a message  ·  / commands  ·  @ files'
           }
         />
-      )}
+        {!isMobile && (
+          <ComposerFooter
+            left={selectorTrio}
+            right={
+              <ContextUsagePopover
+                sessionId={sessionId}
+                latestCacheRead={currentUsage.latestCacheReadTokens}
+              >
+                <TokenUsageDisplay
+                  latestInputTokens={currentUsage.latestInputTokens}
+                  inputTokens={currentUsage.inputTokens}
+                  contextUsedTokens={currentUsage.contextUsedTokens}
+                  contextWindow={currentUsage.contextWindow}
+                />
+              </ContextUsagePopover>
+            }
+          />
+        )}
       </div>
     </div>
   );

@@ -112,8 +112,8 @@ describe('CommandRegistry', () => {
 
       const commands = commandRegistry.getAllCommands();
       expect(commands).toHaveLength(2);
-      expect(commands.map((c) => c.command)).toContain('/cmd1');
-      expect(commands.map((c) => c.command)).toContain('/cmd2');
+      expect(commands.map(c => c.command)).toContain('/cmd1');
+      expect(commands.map(c => c.command)).toContain('/cmd2');
     });
   });
 
@@ -149,7 +149,7 @@ describe('CommandRegistry', () => {
       commandRegistry.register({
         command: '/echo',
         description: 'Echo command',
-        handler: async (args) => ({
+        handler: async args => ({
           type: 'builtin',
           command: '/echo',
           data: { echoed: args.join(' ') },
@@ -293,7 +293,7 @@ describe('registerCommand helper', () => {
       {
         command: '/simple',
         description: 'A simple command',
-        handler: async (args) => ({
+        handler: async args => ({
           type: 'builtin',
           command: '/simple',
           data: { args },

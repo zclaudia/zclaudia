@@ -77,7 +77,10 @@ export default defineConfig({
       all: true,
       include: ['src/**/*.{ts,tsx}'],
       exclude: [
-        'src/test/**', '**/*.d.ts', 'src/main.tsx', 'src/**/__tests__/**',
+        'src/test/**',
+        '**/*.d.ts',
+        'src/main.tsx',
+        'src/**/__tests__/**',
         'src/hooks/useAutoUpdate.ts',
         'src/components/UpdateBanner.tsx',
         'src/components/MobileSetup.tsx',

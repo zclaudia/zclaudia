@@ -67,7 +67,7 @@ export const useSessionConfigStore = create<SessionConfigState>((set, get) => ({
 
   // System info actions
   setSystemInfo: (sessionId, info) =>
-    set((state) => {
+    set(state => {
       const usageNext = { ...state.sessionUsage };
       if (typeof info.contextWindow === 'number' && info.contextWindow > 0) {
         const existing = usageNext[sessionId];
@@ -95,35 +95,40 @@ export const useSessionConfigStore = create<SessionConfigState>((set, get) => ({
         sessionUsage: usageNext,
       };
     }),
-  clearSystemInfo: (sessionId) =>
-    set((state) => {
+  clearSystemInfo: sessionId =>
+    set(state => {
       const { [sessionId]: _, ...rest } = state.systemInfoBySession;
       return { systemInfoBySession: rest };
     }),
-  getSystemInfo: (sessionId) => get().systemInfoBySession[sessionId] || null,
+  getSystemInfo: sessionId => get().systemInfoBySession[sessionId] || null,
 
   // Mode actions (per session). Default getMode returns '' so ModeSelector
   // can fall back to capabilities.defaultModeId when no override is set.
   setMode: (sessionId, mode) =>
-    set((state) => ({
+    set(state => ({
       modeBySession: { ...state.modeBySession, [sessionId]: mode },
     })),
-  getMode: (sessionId) => get().modeBySession[sessionId] ?? '',
+  getMode: sessionId => get().modeBySession[sessionId] ?? '',
   setRuntimeMode: (sessionId, mode) =>
-    set((state) => ({
+    set(state => ({
       runtimeModes: { ...state.runtimeModes, [sessionId]: mode },
     })),
-  getRuntimeMode: (sessionId) => get().runtimeModes[sessionId] || '',
-  clearRuntimeMode: (sessionId) =>
-    set((state) => {
+  getRuntimeMode: sessionId => get().runtimeModes[sessionId] || '',
+  clearRuntimeMode: sessionId =>
+    set(state => {
       const { [sessionId]: _removedMode, ...remainingRuntimeModes } = state.runtimeModes;
       return { runtimeModes: remainingRuntimeModes };
     }),
 
   // Usage tracking
   addSessionUsage: (sessionId, usage) =>
-    set((state) => {
-      const existing = state.sessionUsage[sessionId] || { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 };
+    set(state => {
+      const existing = state.sessionUsage[sessionId] || {
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
+      };
       return {
         sessionUsage: {
           ...state.sessionUsage,
@@ -144,17 +149,17 @@ export const useSessionConfigStore = create<SessionConfigState>((set, get) => ({
         },
       };
     }),
-  clearSessionUsage: (sessionId) =>
-    set((state) => {
+  clearSessionUsage: sessionId =>
+    set(state => {
       const { [sessionId]: _, ...rest } = state.sessionUsage;
       return { sessionUsage: rest };
     }),
 
   setCompactionNotice: (sessionId, notice) =>
-    set((state) => ({ compactionNotice: { ...state.compactionNotice, [sessionId]: notice } })),
+    set(state => ({ compactionNotice: { ...state.compactionNotice, [sessionId]: notice } })),
 
-  clearCompactionNotice: (sessionId) =>
-    set((state) => {
+  clearCompactionNotice: sessionId =>
+    set(state => {
       const { [sessionId]: _removed, ...rest } = state.compactionNotice;
       return { compactionNotice: rest };
     }),

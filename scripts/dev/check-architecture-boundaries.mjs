@@ -2,10 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const DEFAULT_DESKTOP_COMPONENT_FEATURE_IMPORT_ALLOWLIST = [
-  // Existing migration targets. New shared components should not depend on features.
-  'apps/desktop/src/components/SettingsPanel.tsx',
-];
+const DEFAULT_DESKTOP_COMPONENT_FEATURE_IMPORT_ALLOWLIST = [];
 
 const DEFAULT_DESKTOP_LEGACY_PROJECT_STORE_ALLOWLIST = [
   // Existing migration targets. New code should use selectionStore directly.
@@ -54,9 +51,9 @@ function assertNoMatch(repoRoot, failures, relativePath, pattern, message) {
 
 function isSourceFile(relativePath) {
   return (
-    (relativePath.endsWith('.ts') || relativePath.endsWith('.tsx'))
-    && !relativePath.includes('/__tests__/')
-    && !relativePath.includes('/test/')
+    (relativePath.endsWith('.ts') || relativePath.endsWith('.tsx')) &&
+    !relativePath.includes('/__tests__/') &&
+    !relativePath.includes('/test/')
   );
 }
 
@@ -64,9 +61,7 @@ function assertDesktopProviderMetaBoundaries(repoRoot, failures) {
   const desktopFiles = walk(
     repoRoot,
     'apps/desktop/src',
-    (relativePath) =>
-      isSourceFile(relativePath)
-      && !relativePath.endsWith('/stores/projectStore.ts')
+    relativePath => isSourceFile(relativePath) && !relativePath.endsWith('/stores/projectStore.ts')
   );
 
   const forbiddenPatterns = [
@@ -80,11 +75,13 @@ function assertDesktopProviderMetaBoundaries(repoRoot, failures) {
     },
     {
       pattern: /useProjectStore\.getState\(\)\.providerCommands\b/,
-      message: 'Do not read providerCommands from projectStore.getState(); use providerMetaStore instead.',
+      message:
+        'Do not read providerCommands from projectStore.getState(); use providerMetaStore instead.',
     },
     {
       pattern: /useProjectStore\.getState\(\)\.providerCapabilities\b/,
-      message: 'Do not read providerCapabilities from projectStore.getState(); use providerMetaStore instead.',
+      message:
+        'Do not read providerCapabilities from projectStore.getState(); use providerMetaStore instead.',
     },
     {
       pattern: /useProjectStore\.getState\(\)\.setProviderCommands\b/,
@@ -92,7 +89,8 @@ function assertDesktopProviderMetaBoundaries(repoRoot, failures) {
     },
     {
       pattern: /useProjectStore\.getState\(\)\.setProviderCapabilities\b/,
-      message: 'Do not write providerCapabilities through projectStore; use providerMetaStore instead.',
+      message:
+        'Do not write providerCapabilities through projectStore; use providerMetaStore instead.',
     },
   ];
 
@@ -105,16 +103,15 @@ function assertDesktopProviderMetaBoundaries(repoRoot, failures) {
 
 function assertDesktopSelectionStoreBoundaries(repoRoot, failures, options) {
   const allowlist = new Set(
-    options.desktopLegacyProjectStoreAllowlist
-    ?? DEFAULT_DESKTOP_LEGACY_PROJECT_STORE_ALLOWLIST,
+    options.desktopLegacyProjectStoreAllowlist ?? DEFAULT_DESKTOP_LEGACY_PROJECT_STORE_ALLOWLIST
   );
   const desktopFiles = walk(
     repoRoot,
     'apps/desktop/src',
-    (relativePath) =>
-      isSourceFile(relativePath)
-      && !relativePath.endsWith('/stores/projectStore.ts')
-      && !allowlist.has(relativePath),
+    relativePath =>
+      isSourceFile(relativePath) &&
+      !relativePath.endsWith('/stores/projectStore.ts') &&
+      !allowlist.has(relativePath)
   );
   const forbiddenPatterns = [
     {
@@ -131,15 +128,18 @@ function assertDesktopSelectionStoreBoundaries(repoRoot, failures, options) {
     },
     {
       pattern: /useProjectStore\.getState\(\)\.selectedProjectId\b/,
-      message: 'Do not read selectedProjectId from projectStore.getState(); use selectionStore instead.',
+      message:
+        'Do not read selectedProjectId from projectStore.getState(); use selectionStore instead.',
     },
     {
       pattern: /useProjectStore\.getState\(\)\.selectedSessionId\b/,
-      message: 'Do not read selectedSessionId from projectStore.getState(); use selectionStore instead.',
+      message:
+        'Do not read selectedSessionId from projectStore.getState(); use selectionStore instead.',
     },
     {
       pattern: /useProjectStore\.getState\(\)\.dashboardViews\b/,
-      message: 'Do not read dashboardViews from projectStore.getState(); use selectionStore instead.',
+      message:
+        'Do not read dashboardViews from projectStore.getState(); use selectionStore instead.',
     },
   ];
 
@@ -155,8 +155,8 @@ function assertDesktopServicesApiBoundaries(repoRoot, failures, options) {
   if (!existsSync(path.join(repoRoot, relativePath))) return;
 
   const allowlist = new Set(
-    options.desktopServicesFeatureApiReexportAllowlist
-    ?? DEFAULT_DESKTOP_SERVICES_FEATURE_API_REEXPORT_ALLOWLIST,
+    options.desktopServicesFeatureApiReexportAllowlist ??
+      DEFAULT_DESKTOP_SERVICES_FEATURE_API_REEXPORT_ALLOWLIST
   );
   const content = read(repoRoot, relativePath);
   const reExportPattern = /export\s+\*\s+from\s+['"](?<source>\.\.\/features\/[^'"]+)['"]/g;
@@ -165,20 +165,20 @@ function assertDesktopServicesApiBoundaries(repoRoot, failures, options) {
     const source = match.groups?.source;
     if (source && allowlist.has(source)) continue;
     failures.push(
-      `${relativePath}: Do not re-export feature APIs from services/api; import feature APIs directly from the owning feature.`,
+      `${relativePath}: Do not re-export feature APIs from services/api; import feature APIs directly from the owning feature.`
     );
   }
 }
 
 function assertDesktopComponentFeatureImportBoundaries(repoRoot, failures, options) {
   const allowlist = new Set(
-    options.desktopComponentFeatureImportAllowlist
-    ?? DEFAULT_DESKTOP_COMPONENT_FEATURE_IMPORT_ALLOWLIST,
+    options.desktopComponentFeatureImportAllowlist ??
+      DEFAULT_DESKTOP_COMPONENT_FEATURE_IMPORT_ALLOWLIST
   );
   const componentFiles = walk(
     repoRoot,
     'apps/desktop/src/components',
-    (relativePath) => isSourceFile(relativePath) && !allowlist.has(relativePath),
+    relativePath => isSourceFile(relativePath) && !allowlist.has(relativePath)
   );
 
   for (const relativePath of componentFiles) {
@@ -187,25 +187,39 @@ function assertDesktopComponentFeatureImportBoundaries(repoRoot, failures, optio
       failures,
       relativePath,
       /from\s+['"][^'"]*features\//,
-      'Do not import feature modules from shared components; move shared code to components, hooks, services, or utils.',
+      'Do not import feature modules from shared components; move shared code to components, hooks, services, or utils.'
     );
   }
 }
 
-function assertProjectsRoutesNoRawSql(repoRoot, failures) {
-  const routeFiles = walk(
-    repoRoot,
-    'server/src/domains',
-    (relativePath) => relativePath.endsWith('/routes.ts'),
-  );
+function isServerRouteLikeFile(relativePath) {
+  if (!isSourceFile(relativePath)) return false;
+  const basename = path.posix.basename(relativePath);
+
+  if (relativePath.startsWith('server/src/domains/')) {
+    return (
+      basename === 'routes.ts' || basename.endsWith('-routes.ts') || basename === 'register.ts'
+    );
+  }
+
+  return relativePath.startsWith('server/src/application/conversation/handlers/');
+}
+
+function assertServerRouteLikeFilesNoRawSql(repoRoot, failures) {
+  const routeFiles = [
+    ...walk(repoRoot, 'server/src/domains', isServerRouteLikeFile),
+    ...walk(repoRoot, 'server/src/application/conversation/handlers', isServerRouteLikeFile),
+  ];
   const forbiddenPatterns = [
     {
-      pattern: /\bdb\.prepare\s*\(/,
-      message: 'Do not issue raw SQL in domain routes; move persistence to repository or service.',
+      pattern: /\.\s*prepare\s*\(/,
+      message:
+        'Do not issue raw SQL in domain route/register/handler files; move persistence to repository or service.',
     },
     {
-      pattern: /\bdb\.transaction\s*\(/,
-      message: 'Do not issue DB transactions in domain routes; move persistence to repository or service.',
+      pattern: /\.\s*transaction\s*\(/,
+      message:
+        'Do not issue DB transactions in domain route/register/handler files; move persistence to repository or service.',
     },
   ];
 
@@ -218,7 +232,7 @@ function assertProjectsRoutesNoRawSql(repoRoot, failures) {
 
 export function runArchitectureChecks(repoRoot = process.cwd(), options = {}) {
   const failures = [];
-  assertProjectsRoutesNoRawSql(repoRoot, failures);
+  assertServerRouteLikeFilesNoRawSql(repoRoot, failures);
   assertDesktopProviderMetaBoundaries(repoRoot, failures);
   assertDesktopSelectionStoreBoundaries(repoRoot, failures, options);
   assertDesktopServicesApiBoundaries(repoRoot, failures, options);

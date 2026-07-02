@@ -21,7 +21,7 @@ function relativeDate(ts: number): string {
 
 export function GitLogView({ projectId, worktreePath }: GitLogViewProps) {
   const log = useGitStore(selectLog(projectId, worktreePath));
-  const setLog = useGitStore((s) => s.setLog);
+  const setLog = useGitStore(s => s.setLog);
   const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -61,7 +61,7 @@ export function GitLogView({ projectId, worktreePath }: GitLogViewProps) {
           <div className="px-3 py-3 text-xs text-muted-foreground">No commits.</div>
         ) : (
           <div className="divide-y divide-border">
-            {log.map((c) => (
+            {log.map(c => (
               <div key={c.sha} className="px-3 py-2">
                 <div className="flex items-center gap-2 text-xs">
                   <span className="font-mono text-muted-foreground">{c.shortSha}</span>

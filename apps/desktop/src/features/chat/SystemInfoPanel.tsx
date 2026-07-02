@@ -1,5 +1,17 @@
 import { useState } from 'react';
-import { Cpu, Package, Shield, Key, Folder, Wrench, Monitor, Users, ChevronDown, ChevronRight, Terminal } from 'lucide-react';
+import {
+  Cpu,
+  Package,
+  Shield,
+  Key,
+  Folder,
+  Wrench,
+  Monitor,
+  Users,
+  ChevronDown,
+  ChevronRight,
+  Terminal,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { SystemInfo } from '@zclaudia/shared';
 
@@ -33,13 +45,9 @@ export function SystemInfoPanel({ systemInfo }: SystemInfoPanelProps) {
         <span className="text-primary text-sm">
           {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </span>
-        <span className="text-sm font-medium text-primary">
-          System Info
-        </span>
+        <span className="text-sm font-medium text-primary">System Info</span>
         {systemInfo.model && (
-          <span className="text-xs text-primary/70 ml-auto">
-            {systemInfo.model}
-          </span>
+          <span className="text-xs text-primary/70 ml-auto">{systemInfo.model}</span>
         )}
       </button>
 
@@ -48,9 +56,7 @@ export function SystemInfoPanel({ systemInfo }: SystemInfoPanelProps) {
         <div className="px-4 pb-3 space-y-2">
           {/* Primary info row */}
           <div className="flex flex-wrap gap-2 md:gap-3 text-xs">
-            {systemInfo.model && (
-              <InfoBadge icon={Cpu} label="Model" value={systemInfo.model} />
-            )}
+            {systemInfo.model && <InfoBadge icon={Cpu} label="Model" value={systemInfo.model} />}
             {systemInfo.claudeCodeVersion && (
               <InfoBadge icon={Package} label="Version" value={systemInfo.claudeCodeVersion} />
             )}
@@ -74,12 +80,7 @@ export function SystemInfoPanel({ systemInfo }: SystemInfoPanelProps) {
 
           {/* Tools */}
           {systemInfo.tools && systemInfo.tools.length > 0 && (
-            <CollapsibleList
-              icon={Wrench}
-              label="Tools"
-              items={systemInfo.tools}
-              maxVisible={5}
-            />
+            <CollapsibleList icon={Wrench} label="Tools" items={systemInfo.tools} maxVisible={5} />
           )}
 
           {/* MCP Servers */}
@@ -104,12 +105,7 @@ export function SystemInfoPanel({ systemInfo }: SystemInfoPanelProps) {
 
           {/* Agents */}
           {systemInfo.agents && systemInfo.agents.length > 0 && (
-            <CollapsibleList
-              icon={Users}
-              label="Agents"
-              items={systemInfo.agents}
-              maxVisible={3}
-            />
+            <CollapsibleList icon={Users} label="Agents" items={systemInfo.agents} maxVisible={3} />
           )}
         </div>
       )}

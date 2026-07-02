@@ -59,16 +59,13 @@ export class ProjectWorktreeService {
   listWorktrees(projectId: string): GitWorktree[] {
     const rootPath = this.getProjectRootPath(projectId);
     if (!rootPath) return [];
-    return listGitWorktrees(rootPath).map((wt) => ({
+    return listGitWorktrees(rootPath).map(wt => ({
       ...wt,
       managedBy: isSupervisorManagedPath(wt.path) ? ('supervisor' as const) : undefined,
     }));
   }
 
-  createWorktree(
-    projectId: string,
-    input: { branch?: string; path?: string },
-  ): GitWorktree {
+  createWorktree(projectId: string, input: { branch?: string; path?: string }): GitWorktree {
     const rootPath = this.getProjectRootPath(projectId);
     if (!rootPath) {
       throw new ProjectRootPathMissingError(projectId);
@@ -97,7 +94,7 @@ export class ProjectWorktreeService {
     }
 
     const worktrees = listGitWorktrees(rootPath);
-    const match = worktrees.find((wt) => path.normalize(wt.path) === target);
+    const match = worktrees.find(wt => path.normalize(wt.path) === target);
     if (!match) {
       throw new WorktreeNotFoundError(target);
     }
@@ -105,9 +102,8 @@ export class ProjectWorktreeService {
       throw new MainWorktreeError(target);
     }
 
-    const branchName = match.branch && !match.branch.startsWith('detached@')
-      ? match.branch
-      : undefined;
+    const branchName =
+      match.branch && !match.branch.startsWith('detached@') ? match.branch : undefined;
     await gitRemoveWorktree(rootPath, target, branchName);
   }
 
@@ -119,7 +115,7 @@ export class ProjectWorktreeService {
     const target = path.normalize(worktreePath);
 
     const worktrees = listGitWorktrees(rootPath);
-    const match = worktrees.find((wt) => path.normalize(wt.path) === target);
+    const match = worktrees.find(wt => path.normalize(wt.path) === target);
     if (!match) {
       throw new WorktreeNotFoundError(target);
     }
@@ -158,11 +154,14 @@ export class ProjectWorktreeService {
    * Validates that worktreePath is registered on the project and returns the main repo path.
    * Throws if the path is unknown or supervisor-managed (when checkManaged is true).
    */
-  resolveWorktreeForGitOp(projectId: string, worktreePath: string): { rootPath: string; worktreePath: string } {
+  resolveWorktreeForGitOp(
+    projectId: string,
+    worktreePath: string
+  ): { rootPath: string; worktreePath: string } {
     const rootPath = this.requireProjectRootPath(projectId);
     const target = path.normalize(worktreePath);
     const worktrees = listGitWorktrees(rootPath);
-    const match = worktrees.find((wt) => path.normalize(wt.path) === target);
+    const match = worktrees.find(wt => path.normalize(wt.path) === target);
     if (!match) {
       throw new WorktreeNotFoundError(target);
     }
@@ -191,17 +190,18 @@ export class ProjectWorktreeService {
   }
 
   private resolveBranchName(rawBranch?: string): string {
-    return rawBranch?.trim()
-      || `wt-${new Date()
+    return (
+      rawBranch?.trim() ||
+      `wt-${new Date()
         .toISOString()
         .slice(0, 16)
         .replace(/[-T:]/g, '')
-        .replace(/(\d{8})(\d{4})/, '$1-$2')}`;
+        .replace(/(\d{8})(\d{4})/, '$1-$2')}`
+    );
   }
 
   private resolveWorktreePath(rootPath: string, branch: string, rawPath?: string): string {
-    return rawPath?.trim()
-      || path.join(rootPath, '.worktrees', branch.replace(/\//g, '-'));
+    return rawPath?.trim() || path.join(rootPath, '.worktrees', branch.replace(/\//g, '-'));
   }
 
   private ensureWorktreesGitignore(repoPath: string): void {
@@ -211,7 +211,7 @@ export class ProjectWorktreeService {
     try {
       if (fs.existsSync(gitignorePath)) {
         const content = fs.readFileSync(gitignorePath, 'utf-8');
-        if (!content.split('\n').some((line) => line.trim() === entry)) {
+        if (!content.split('\n').some(line => line.trim() === entry)) {
           fs.appendFileSync(gitignorePath, `\n${entry}\n`);
         }
         return;

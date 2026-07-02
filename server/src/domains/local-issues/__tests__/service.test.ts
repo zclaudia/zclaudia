@@ -10,7 +10,7 @@ function createTestDb() {
   // local_issues.project_id has a FK to projects(id); seed the row used by the
   // tests below so create() doesn't trip the foreign-key constraint.
   db.prepare(
-    `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+    `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
   ).run('proj-1', 'P', 'code', 0, 0);
   return db;
 }
@@ -34,7 +34,10 @@ describe('LocalIssueService', () => {
     expect(issue.status).toBe('open');
     expect(broadcast).toHaveBeenCalledWith(
       'proj-1',
-      expect.objectContaining({ type: 'local_issue_update', issue: expect.objectContaining({ id: issue.id }) }),
+      expect.objectContaining({
+        type: 'local_issue_update',
+        issue: expect.objectContaining({ id: issue.id }),
+      })
     );
   });
 
@@ -73,7 +76,7 @@ describe('LocalIssueService', () => {
     expect(service.issueExists(issue.id)).toBe(false);
     expect(broadcast).toHaveBeenCalledWith(
       'proj-1',
-      expect.objectContaining({ type: 'local_issue_deleted' }),
+      expect.objectContaining({ type: 'local_issue_deleted' })
     );
   });
 
@@ -87,8 +90,9 @@ describe('LocalIssueService', () => {
   it('C2 invariant: updateIssue rejects status=tracked without a SpecChange', () => {
     const service = new LocalIssueService(db, broadcast);
     const issue = service.createIssue('proj-1', { title: 'Bug' });
-    expect(() => service.updateIssue(issue.id, { status: 'tracked' }))
-      .toThrow(/without a SpecChange/);
+    expect(() => service.updateIssue(issue.id, { status: 'tracked' })).toThrow(
+      /without a SpecChange/
+    );
     // open → closed remains allowed.
     expect(() => service.updateIssue(issue.id, { status: 'closed' })).not.toThrow();
   });

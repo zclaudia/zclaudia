@@ -23,27 +23,35 @@ export function saveSearchHistory(
   const createdAt = Date.now();
 
   // Insert new entry
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO search_history (id, user_id, query, result_count, created_at)
     VALUES (?, ?, ?, ?, ?)
-  `).run(id, userId, query, resultCount, createdAt);
+  `
+  ).run(id, userId, query, resultCount, createdAt);
 
   // Keep only the 50 most recent entries per user
-  const keepIds = db.prepare(`
+  const keepIds = db
+    .prepare(
+      `
     SELECT id FROM search_history
     WHERE user_id = ?
     ORDER BY created_at DESC
     LIMIT 50
-  `).all(userId) as Array<{ id: string }>;
+  `
+    )
+    .all(userId) as Array<{ id: string }>;
 
   if (keepIds.length === 50) {
     const idsToKeep = keepIds.map(row => row.id);
     const placeholders = idsToKeep.map(() => '?').join(',');
 
-    db.prepare(`
+    db.prepare(
+      `
       DELETE FROM search_history
       WHERE user_id = ? AND id NOT IN (${placeholders})
-    `).run(userId, ...idsToKeep);
+    `
+    ).run(userId, ...idsToKeep);
   }
 
   return {
@@ -64,13 +72,17 @@ export function getSearchHistory(
   userId: string = 'default',
   limit: number = 10
 ): SearchHistoryEntry[] {
-  const rows = db.prepare(`
+  const rows = db
+    .prepare(
+      `
     SELECT id, user_id as userId, query, result_count as resultCount, created_at as createdAt
     FROM search_history
     WHERE user_id = ?
     ORDER BY created_at DESC
     LIMIT ?
-  `).all(userId, limit) as SearchHistoryEntry[];
+  `
+    )
+    .all(userId, limit) as SearchHistoryEntry[];
 
   return rows;
 }
@@ -78,10 +90,7 @@ export function getSearchHistory(
 /**
  * Clear all search history for a user
  */
-export function clearSearchHistory(
-  db: Database,
-  userId: string = 'default'
-): void {
+export function clearSearchHistory(db: Database, userId: string = 'default'): void {
   db.prepare('DELETE FROM search_history WHERE user_id = ?').run(userId);
 }
 
@@ -94,13 +103,17 @@ export function getSearchSuggestions(
   userId: string = 'default',
   limit: number = 5
 ): string[] {
-  const rows = db.prepare(`
+  const rows = db
+    .prepare(
+      `
     SELECT DISTINCT query
     FROM search_history
     WHERE user_id = ? AND query LIKE ?
     ORDER BY created_at DESC
     LIMIT ?
-  `).all(userId, `${prefix}%`, limit) as Array<{ query: string }>;
+  `
+    )
+    .all(userId, `${prefix}%`, limit) as Array<{ query: string }>;
 
   return rows.map(row => row.query);
 }

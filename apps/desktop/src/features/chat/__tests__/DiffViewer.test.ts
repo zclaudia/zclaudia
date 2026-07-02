@@ -10,7 +10,7 @@ describe('computeDiff', () => {
 
   it('detects pure additions (empty old, non-empty new)', () => {
     const result = computeDiff('', 'line1\nline2');
-    const addLines = result.filter((l) => l.type === 'add');
+    const addLines = result.filter(l => l.type === 'add');
     expect(addLines).toHaveLength(2);
     expect(addLines[0].content).toBe('line1');
     expect(addLines[1].content).toBe('line2');
@@ -18,7 +18,7 @@ describe('computeDiff', () => {
 
   it('detects pure deletions (non-empty old, empty new)', () => {
     const result = computeDiff('line1\nline2', '');
-    const removeLines = result.filter((l) => l.type === 'remove');
+    const removeLines = result.filter(l => l.type === 'remove');
     expect(removeLines).toHaveLength(2);
     expect(removeLines[0].content).toBe('line1');
     expect(removeLines[1].content).toBe('line2');
@@ -27,14 +27,14 @@ describe('computeDiff', () => {
   it('detects no changes when strings are identical', () => {
     const text = 'line1\nline2\nline3';
     const result = computeDiff(text, text);
-    expect(result.every((l) => l.type === 'unchanged')).toBe(true);
+    expect(result.every(l => l.type === 'unchanged')).toBe(true);
     expect(result).toHaveLength(3);
   });
 
   it('detects a single line modification (remove old + add new)', () => {
     const result = computeDiff('hello world', 'hello dolly');
-    const removeLines = result.filter((l) => l.type === 'remove');
-    const addLines = result.filter((l) => l.type === 'add');
+    const removeLines = result.filter(l => l.type === 'remove');
+    const addLines = result.filter(l => l.type === 'add');
     expect(removeLines).toHaveLength(1);
     expect(removeLines[0].content).toBe('hello world');
     expect(addLines).toHaveLength(1);
@@ -50,16 +50,16 @@ describe('computeDiff', () => {
     expect(result[0]).toEqual({ type: 'unchanged', content: 'line1' });
 
     // line2 removed, modified added
-    const removed = result.filter((l) => l.type === 'remove');
-    const added = result.filter((l) => l.type === 'add');
-    expect(removed.some((l) => l.content === 'line2')).toBe(true);
-    expect(added.some((l) => l.content === 'modified')).toBe(true);
-    expect(added.some((l) => l.content === 'new line')).toBe(true);
+    const removed = result.filter(l => l.type === 'remove');
+    const added = result.filter(l => l.type === 'add');
+    expect(removed.some(l => l.content === 'line2')).toBe(true);
+    expect(added.some(l => l.content === 'modified')).toBe(true);
+    expect(added.some(l => l.content === 'new line')).toBe(true);
 
     // line3 and line4 unchanged
-    const unchanged = result.filter((l) => l.type === 'unchanged');
-    expect(unchanged.some((l) => l.content === 'line3')).toBe(true);
-    expect(unchanged.some((l) => l.content === 'line4')).toBe(true);
+    const unchanged = result.filter(l => l.type === 'unchanged');
+    expect(unchanged.some(l => l.content === 'line3')).toBe(true);
+    expect(unchanged.some(l => l.content === 'line4')).toBe(true);
   });
 
   it('handles insertion in the middle of unchanged lines', () => {

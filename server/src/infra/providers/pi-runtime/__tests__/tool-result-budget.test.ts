@@ -10,7 +10,6 @@ function textBlocks(text: string) {
   return [{ type: 'text', text }];
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function callCtx(toolName: string, text: string, details: Record<string, unknown> = {}): any {
   return {
     toolCall: { name: toolName, id: `tc-${Math.random().toString(36).slice(2)}` },
@@ -55,7 +54,7 @@ describe('per-turn tool result budget', () => {
     expect(first).toBeUndefined();
 
     const bigText = 'needle-at-start ' + 'b'.repeat(8000) + ' needle-at-end';
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const second: any = await h.afterToolCall!(callCtx('Grep', bigText));
     expect(second).toBeDefined();
     expect(second.details.budgetExceeded).toBe(true);
@@ -80,7 +79,7 @@ describe('per-turn tool result budget', () => {
   it('the budget resets at the turn boundary', async () => {
     const h = hooks(10_000);
     await h.afterToolCall!(callCtx('Grep', 'a'.repeat(9000)));
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const over: any = await h.afterToolCall!(callCtx('Grep', 'c'.repeat(9000)));
     expect(over?.details?.budgetExceeded).toBe(true);
 
@@ -110,7 +109,7 @@ describe('per-turn tool result budget', () => {
         details: {},
       },
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const out: any = await h.afterToolCall!(ctx as never);
     expect(out.details.budgetExceeded).toBe(true);
     // image block survives in context, only text was persisted

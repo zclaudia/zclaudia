@@ -18,13 +18,13 @@ const MARGIN = 8;
 
 export function ToolLauncherMenu({ sessionId, projectId, anchorRef, onPick }: Props) {
   const panels = usePluginStore(selectPluginPanels);
-  const disabled = usePluginStore((s) => s.disabledBuiltinPanels);
-  const backendId = useServerStore((s) => s.activeServerId);
+  const disabled = usePluginStore(s => s.disabledBuiltinPanels);
+  const backendId = useServerStore(s => s.activeServerId);
   const tools = panels.filter(
-    (p) =>
+    p =>
       (p.platforms ?? ['desktop']).includes('desktop') &&
       !disabled.includes(p.id) &&
-      !p.hideFromLauncher,
+      !p.hideFromLauncher
   );
 
   const menuRef = useRef<HTMLDivElement>(null);
@@ -77,13 +77,16 @@ export function ToolLauncherMenu({ sessionId, projectId, anchorRef, onPick }: Pr
       }}
       className="z-50 min-w-44 rounded-md border border-border bg-popover py-1 shadow-md"
     >
-      {tools.map((t) => {
+      {tools.map(t => {
         const Icon = iconForPanel(t.id);
         return (
           <button
             key={t.id}
             role="menuitem"
-            onClick={() => { openToolInWorkspace(sessionId, t.id, { projectId, backendId }); onPick(); }}
+            onClick={() => {
+              openToolInWorkspace(sessionId, t.id, { projectId, backendId });
+              onPick();
+            }}
             className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-foreground hover:bg-secondary"
           >
             <Icon className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
@@ -92,6 +95,6 @@ export function ToolLauncherMenu({ sessionId, projectId, anchorRef, onPick }: Pr
         );
       })}
     </div>,
-    document.body,
+    document.body
   );
 }

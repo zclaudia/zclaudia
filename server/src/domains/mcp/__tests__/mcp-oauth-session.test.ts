@@ -27,16 +27,25 @@ describe('McpOAuthSessionManager', () => {
       }),
       text: async () => '',
     });
-    const manager = new McpOAuthSessionManager({ updateOAuthCredentials: vi.fn() }, fetchMock as any);
+    const manager = new McpOAuthSessionManager(
+      { updateOAuthCredentials: vi.fn() },
+      fetchMock as any
+    );
 
-    const result = await manager.startBrowserFlow(serverWithOAuth({
-      enabled: true,
-      metadataUrl: 'https://auth.example.com/.well-known/oauth-authorization-server',
-      clientId: 'client',
-      scopes: ['repo'],
-    } as any), 'http://127.0.0.1:4141');
+    const result = await manager.startBrowserFlow(
+      serverWithOAuth({
+        enabled: true,
+        metadataUrl: 'https://auth.example.com/.well-known/oauth-authorization-server',
+        clientId: 'client',
+        scopes: ['repo'],
+      } as any),
+      'http://127.0.0.1:4141'
+    );
 
-    expect(fetchMock).toHaveBeenCalledWith('https://auth.example.com/.well-known/oauth-authorization-server', expect.objectContaining({ method: 'GET' }));
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://auth.example.com/.well-known/oauth-authorization-server',
+      expect.objectContaining({ method: 'GET' })
+    );
     expect(result.method).toBe('browser');
     const authUrl = new URL(result.authUrl);
     expect(authUrl.origin + authUrl.pathname).toBe('https://auth.example.com/oauth/authorize');
@@ -45,7 +54,8 @@ describe('McpOAuthSessionManager', () => {
   });
 
   it('discovers OAuth device and token endpoints from metadataUrl before device-code flow', async () => {
-    const fetchMock = vi.fn()
+    const fetchMock = vi
+      .fn()
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -65,20 +75,35 @@ describe('McpOAuthSessionManager', () => {
         }),
         text: async () => '',
       });
-    const manager = new McpOAuthSessionManager({ updateOAuthCredentials: vi.fn() }, fetchMock as any);
+    const manager = new McpOAuthSessionManager(
+      { updateOAuthCredentials: vi.fn() },
+      fetchMock as any
+    );
 
-    const result = await manager.startDeviceCodeFlow(serverWithOAuth({
-      enabled: true,
-      metadataUrl: 'https://auth.example.com/.well-known/oauth-authorization-server',
-      clientId: 'client',
-    } as any));
+    const result = await manager.startDeviceCodeFlow(
+      serverWithOAuth({
+        enabled: true,
+        metadataUrl: 'https://auth.example.com/.well-known/oauth-authorization-server',
+        clientId: 'client',
+      } as any)
+    );
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://auth.example.com/.well-known/oauth-authorization-server', expect.objectContaining({ method: 'GET' }));
-    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://auth.example.com/oauth/device', expect.objectContaining({ method: 'POST' }));
-    expect(result).toEqual(expect.objectContaining({
-      method: 'device_code',
-      userCode: 'USER-CODE',
-      verificationUri: 'https://auth.example.com/device',
-    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'https://auth.example.com/.well-known/oauth-authorization-server',
+      expect.objectContaining({ method: 'GET' })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'https://auth.example.com/oauth/device',
+      expect.objectContaining({ method: 'POST' })
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        method: 'device_code',
+        userCode: 'USER-CODE',
+        verificationUri: 'https://auth.example.com/device',
+      })
+    );
   });
 });

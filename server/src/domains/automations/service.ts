@@ -7,8 +7,16 @@
  */
 
 import type { Database } from 'better-sqlite3';
-import type { Automation, AutomationAction, AutomationTrigger } from '@zclaudia/shared/features/automations';
-import type { Workflow, WorkflowDefinition, WorkflowRun } from '@zclaudia/shared/features/workflows';
+import type {
+  Automation,
+  AutomationAction,
+  AutomationTrigger,
+} from '@zclaudia/shared/features/automations';
+import type {
+  Workflow,
+  WorkflowDefinition,
+  WorkflowRun,
+} from '@zclaudia/shared/features/workflows';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import { AutomationRepository } from './repository.js';
 import { WorkflowRunRepository } from '../workflows/workflow-run-repository.js';
@@ -28,7 +36,10 @@ export interface AutomationEnginePort {
     actionKind?: 'activity' | 'workflow';
     actionRef?: string;
     triggerDetail?: string;
-    triggerData?: { eventPayload?: Record<string, unknown>; triggerContext?: Record<string, unknown> };
+    triggerData?: {
+      eventPayload?: Record<string, unknown>;
+      triggerContext?: Record<string, unknown>;
+    };
     trackingKey?: string;
   }): Promise<WorkflowRun>;
   isRunningKey(key: string): boolean;
@@ -55,9 +66,12 @@ export class AutomationService {
 
   constructor(
     private db: Database,
-    private broadcastFn: (projectId: string | undefined, message: ServerMessage | { type: string; [key: string]: unknown }) => void,
+    private broadcastFn: (
+      projectId: string | undefined,
+      message: ServerMessage | { type: string; [key: string]: unknown }
+    ) => void,
     private engine: AutomationEnginePort,
-    private workflows: AutomationWorkflowLookupPort,
+    private workflows: AutomationWorkflowLookupPort
   ) {
     this.repo = new AutomationRepository(db);
     this.runRepo = new WorkflowRunRepository(db);
@@ -97,7 +111,10 @@ export class AutomationService {
       });
       return;
     }
-    if (existing.action.ref !== systemWorkflowId || JSON.stringify(existing.trigger) !== JSON.stringify(desiredTrigger)) {
+    if (
+      existing.action.ref !== systemWorkflowId ||
+      JSON.stringify(existing.trigger) !== JSON.stringify(desiredTrigger)
+    ) {
       this.repo.update(existing.id, { trigger: desiredTrigger, action: desiredAction });
     }
   }
@@ -128,7 +145,10 @@ export class AutomationService {
     return automation;
   }
 
-  updateAutomation(id: string, data: Partial<Omit<Automation, 'id' | 'projectId' | 'createdAt'>>): Automation {
+  updateAutomation(
+    id: string,
+    data: Partial<Omit<Automation, 'id' | 'projectId' | 'createdAt'>>
+  ): Automation {
     const existing = this.repo.findById(id);
     if (existing?.isSystem) throw new ImmutableSystemAutomationError();
     const automation = this.repo.update(id, data);
@@ -145,7 +165,11 @@ export class AutomationService {
     if (deleted) {
       this.nextRunByAutomation.delete(id);
       this.rebuildEventSubscriptions();
-      this.broadcastFn(existing?.projectId, { type: 'automation_deleted', automationId: id, projectId: existing?.projectId });
+      this.broadcastFn(existing?.projectId, {
+        type: 'automation_deleted',
+        automationId: id,
+        projectId: existing?.projectId,
+      });
     }
     return deleted;
   }
@@ -159,7 +183,7 @@ export class AutomationService {
       triggerDetail?: string;
       eventPayload?: Record<string, unknown>;
       triggerContext?: Record<string, unknown>;
-    },
+    }
   ): Promise<WorkflowRun> {
     const automation = this.repo.findById(automationId);
     if (!automation) throw new Error(`Automation not found: ${automationId}`);
@@ -175,7 +199,7 @@ export class AutomationService {
       triggerDetail?: string;
       eventPayload?: Record<string, unknown>;
       triggerContext?: Record<string, unknown>;
-    },
+    }
   ): Promise<WorkflowRun> {
     const { action } = automation;
 
@@ -231,24 +255,31 @@ export class AutomationService {
       for (const automation of this.repo.findAllEnabled()) {
         const nextRun = this.nextRunByAutomation.get(automation.id);
         if (nextRun == null || nextRun > now) continue;
-        const trackingKey = automation.action.kind === 'workflow'
-          ? automation.action.ref
-          : `automation:${automation.id}`;
+        const trackingKey =
+          automation.action.kind === 'workflow'
+            ? automation.action.ref
+            : `automation:${automation.id}`;
         if (this.engine.isRunningKey(trackingKey)) continue;
 
         const t = automation.trigger;
-        const triggerDetail = t.type === 'cron'
-          ? `cron: ${t.cron}`
-          : t.type === 'once'
-          ? `once: ${new Date(t.onceAt || 0).toISOString()}`
-          : `interval: ${t.intervalMinutes}min`;
+        const triggerDetail =
+          t.type === 'cron'
+            ? `cron: ${t.cron}`
+            : t.type === 'once'
+              ? `once: ${new Date(t.onceAt || 0).toISOString()}`
+              : `interval: ${t.intervalMinutes}min`;
 
         try {
           await this.runActionFor(automation, {
             initiator: `automation:${automation.id}`,
             triggerSource: 'schedule',
             triggerDetail,
-            triggerContext: { type: t.type, cron: t.cron, intervalMinutes: t.intervalMinutes, onceAt: t.onceAt },
+            triggerContext: {
+              type: t.type,
+              cron: t.cron,
+              intervalMinutes: t.intervalMinutes,
+              onceAt: t.onceAt,
+            },
           });
         } catch (err) {
           console.error(`[Automation] Schedule trigger failed for ${automation.id}:`, err);
@@ -264,7 +295,10 @@ export class AutomationService {
   }
 
   private syncSchedule(automation: Automation): void {
-    if (!automation.enabled) { this.nextRunByAutomation.delete(automation.id); return; }
+    if (!automation.enabled) {
+      this.nextRunByAutomation.delete(automation.id);
+      return;
+    }
     const t = automation.trigger;
     if (t.type !== 'cron' && t.type !== 'interval' && t.type !== 'once') {
       this.nextRunByAutomation.delete(automation.id);
@@ -277,7 +311,8 @@ export class AutomationService {
 
   private computeNextRun(t: AutomationTrigger): number | null {
     if (t.type === 'cron' && t.cron) return computeNextCronRun(t.cron);
-    if (t.type === 'interval' && t.intervalMinutes) return Date.now() + t.intervalMinutes * 60 * 1000;
+    if (t.type === 'interval' && t.intervalMinutes)
+      return Date.now() + t.intervalMinutes * 60 * 1000;
     if (t.type === 'once' && t.onceAt) return t.onceAt > Date.now() ? t.onceAt : null;
     return null;
   }
@@ -304,13 +339,17 @@ export class AutomationService {
         for (const a of automations) {
           const fresh = this.repo.findById(a.id);
           if (!fresh || !fresh.enabled) continue;
-          if (fresh.trigger.eventFilter && !this.matchesFilter(data, fresh.trigger.eventFilter)) continue;
+          if (fresh.trigger.eventFilter && !this.matchesFilter(data, fresh.trigger.eventFilter))
+            continue;
           try {
             await this.runActionFor(fresh, {
               initiator: `automation:${fresh.id}`,
               triggerSource: 'event',
               triggerDetail: `event: ${event}`,
-              eventPayload: data && typeof data === 'object' ? (data as Record<string, unknown>) : { value: data },
+              eventPayload:
+                data && typeof data === 'object'
+                  ? (data as Record<string, unknown>)
+                  : { value: data },
               triggerContext: { type: 'event', event },
             });
           } catch (err) {
@@ -335,6 +374,10 @@ export class AutomationService {
   }
 
   private broadcast(automation: Automation): void {
-    this.broadcastFn(automation.projectId, { type: 'automation_update', projectId: automation.projectId, automation });
+    this.broadcastFn(automation.projectId, {
+      type: 'automation_update',
+      projectId: automation.projectId,
+      automation,
+    });
   }
 }

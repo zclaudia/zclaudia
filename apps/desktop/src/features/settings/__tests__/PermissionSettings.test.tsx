@@ -88,9 +88,9 @@ describe('PermissionSettings', () => {
   });
 
   function findTriggerByText(textFragment: string): HTMLElement {
-    const triggers = screen.getAllByRole('button').filter(b =>
-      b.getAttribute('aria-haspopup') === 'listbox'
-    );
+    const triggers = screen
+      .getAllByRole('button')
+      .filter(b => b.getAttribute('aria-haspopup') === 'listbox');
     const match = triggers.find(b => b.textContent?.includes(textFragment));
     if (!match) throw new Error(`No Select trigger found containing "${textFragment}"`);
     return match;
@@ -152,9 +152,25 @@ describe('PermissionSettings', () => {
 
   it('lists non-system workflows as global override options', async () => {
     mockListAllWorkflows.mockResolvedValue([
-      { id: 'wf-global', name: 'Global Review', status: 'active', definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] } },
-      { id: 'wf-system', name: 'System Fallback', status: 'active', isSystem: true, definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] } },
-      { id: 'wf-disabled', name: 'Disabled Review', status: 'disabled', definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] } },
+      {
+        id: 'wf-global',
+        name: 'Global Review',
+        status: 'active',
+        definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] },
+      },
+      {
+        id: 'wf-system',
+        name: 'System Fallback',
+        status: 'active',
+        isSystem: true,
+        definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] },
+      },
+      {
+        id: 'wf-disabled',
+        name: 'Disabled Review',
+        status: 'disabled',
+        definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] },
+      },
     ]);
 
     render(<PermissionSettings />);

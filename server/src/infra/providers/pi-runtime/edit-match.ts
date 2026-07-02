@@ -7,7 +7,7 @@ const CURLY_MAP: Record<string, string> = {
 
 /** Map curly/smart quotes to their straight ASCII equivalents. */
 export function normalizeQuotes(str: string): string {
-  return str.replace(/[‘’“”]/g, (ch) => CURLY_MAP[ch] ?? ch);
+  return str.replace(/[‘’“”]/g, ch => CURLY_MAP[ch] ?? ch);
 }
 
 /**
@@ -44,7 +44,12 @@ export function countOccurrences(haystack: string, needle: string): number {
  * sequences are NOT treated as regex backreferences. When `replaceAll` is
  * false, only the first occurrence is replaced.
  */
-export function applyEdit(content: string, oldStr: string, newStr: string, replaceAll: boolean): string {
+export function applyEdit(
+  content: string,
+  oldStr: string,
+  newStr: string,
+  replaceAll: boolean
+): string {
   if (replaceAll) return content.split(oldStr).join(newStr);
   const i = content.indexOf(oldStr);
   if (i === -1) return content;
@@ -107,7 +112,7 @@ function shiftIndent(text: string, delta: number, indentChar: string): string {
 export function findWhitespaceMatch(
   fileContent: string,
   search: string,
-  replacement: string,
+  replacement: string
 ): WhitespaceMatchResult {
   const nf = fileContent.replace(/\r\n/g, '\n');
   const fileLines = nf.split('\n');
@@ -141,7 +146,10 @@ export function findWhitespaceMatch(
     // Pass 1: trailing-ws tolerant; leading indentation must match exactly.
     let pass1 = true;
     for (let j = 0; j < L; j++) {
-      if (trimEnd(fileLines[i + j]) !== trimEnd(searchLines[j])) { pass1 = false; break; }
+      if (trimEnd(fileLines[i + j]) !== trimEnd(searchLines[j])) {
+        pass1 = false;
+        break;
+      }
     }
     if (pass1) {
       adjusted = replacement;
@@ -158,19 +166,35 @@ export function findWhitespaceMatch(
         const fLine = fileLines[i + j];
         const sBlank = sLine.trim() === '';
         const fBlank = fLine.trim() === '';
-        if (sBlank || fBlank) { if (sBlank !== fBlank) { ok = false; break; } continue; }
-        if (sLine.trim() !== fLine.trim()) { ok = false; break; }
+        if (sBlank || fBlank) {
+          if (sBlank !== fBlank) {
+            ok = false;
+            break;
+          }
+          continue;
+        }
+        if (sLine.trim() !== fLine.trim()) {
+          ok = false;
+          break;
+        }
         const sWS = leadingWhitespace(sLine);
         const fWS = leadingWhitespace(fLine);
-        if (sWS.length > 0 && fWS.length > 0 && indentKind(sWS) !== indentKind(fWS)) { ok = false; break; }
+        if (sWS.length > 0 && fWS.length > 0 && indentKind(sWS) !== indentKind(fWS)) {
+          ok = false;
+          break;
+        }
         const d = fWS.length - sWS.length;
         if (delta === null) delta = d;
-        else if (d !== delta) { ok = false; break; }
+        else if (d !== delta) {
+          ok = false;
+          break;
+        }
       }
       if (ok && delta !== null) {
-        const fileIndentChar = leadingWhitespace(fileLines[i + fnbIdx])[0]
-          ?? leadingWhitespace(searchLines[fnbIdx])[0]
-          ?? ' ';
+        const fileIndentChar =
+          leadingWhitespace(fileLines[i + fnbIdx])[0] ??
+          leadingWhitespace(searchLines[fnbIdx])[0] ??
+          ' ';
         adjusted = shiftIndent(replacement, delta, fileIndentChar);
       }
     }
@@ -182,7 +206,12 @@ export function findWhitespaceMatch(
       // trailing whitespace (which is what triggered the Pass-1 tolerance).
       const lastLineLen = trimEnd(fileLines[lastIdx]).length;
       const end = lineStartOffsets[lastIdx] + lastLineLen;
-      matches.push({ start, end, actualOldString: fileContent.slice(start, end), adjustedNewString: adjusted });
+      matches.push({
+        start,
+        end,
+        actualOldString: fileContent.slice(start, end),
+        adjustedNewString: adjusted,
+      });
     }
   }
 

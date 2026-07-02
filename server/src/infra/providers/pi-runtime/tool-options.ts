@@ -4,14 +4,25 @@ import type { UnifiedPermissionPolicy } from '@zclaudia/shared/interaction/permi
 import type { ToolName } from '@zclaudia/shared/core/tools';
 import type { TaskExecutor } from '../../../domains/tasks/executors/types.js';
 import type { PermissionCallback } from '../message-types.js';
-import { createCommandDiagnosticsProvider, type CommandDiagnosticsOptions } from './command-diagnostics.js';
-import { composeWriteLifecycleHooks, createFileChangeLifecycleHooks, type FileChangeNotifier } from './file-change-notifier.js';
+import {
+  createCommandDiagnosticsProvider,
+  type CommandDiagnosticsOptions,
+} from './command-diagnostics.js';
+import {
+  composeWriteLifecycleHooks,
+  createFileChangeLifecycleHooks,
+  type FileChangeNotifier,
+} from './file-change-notifier.js';
 import { createLspDiagnosticsAdapter, type LspTransport } from './lsp-diagnostics-adapter.js';
 import { NoopEditGuard } from './noop-edit-guard.js';
 import { createReadFileStateStore, type ReadFileStateStore } from './read-file-state.js';
 import type { TaskRuntimeRegistryFactory } from './task-tools.js';
 import type { ToolExecutionObserver } from './tool-execution-observer.js';
-import type { DiagnosticsMode, WriteDiagnosticsProvider, WriteLifecycleHooks } from './write-lifecycle.js';
+import type {
+  DiagnosticsMode,
+  WriteDiagnosticsProvider,
+  WriteLifecycleHooks,
+} from './write-lifecycle.js';
 
 export interface ToolBridgeOptions {
   /** Subset of tools to enable. Default: all built-ins. */
@@ -65,18 +76,26 @@ export interface ToolBridgeOptions {
   toolExecutionObserver?: ToolExecutionObserver;
 }
 
-export function buildEffectiveToolOptions(cwd: string, options?: ToolBridgeOptions): ToolBridgeOptions {
+export function buildEffectiveToolOptions(
+  cwd: string,
+  options?: ToolBridgeOptions
+): ToolBridgeOptions {
   const lspAdapter = options?.lspDiagnosticsAdapter
     ? createLspDiagnosticsAdapter({ cwd, ...options.lspDiagnosticsAdapter })
     : undefined;
-  const fileChangeLifecycle = createFileChangeLifecycleHooks(options?.fileChangeNotifier ?? lspAdapter?.fileChangeNotifier);
+  const fileChangeLifecycle = createFileChangeLifecycleHooks(
+    options?.fileChangeNotifier ?? lspAdapter?.fileChangeNotifier
+  );
   return {
     ...options,
     readFileState: options?.readFileState ?? createReadFileStateStore(),
     noopGuard: options?.noopGuard ?? new NoopEditGuard(),
     writeLifecycle: composeWriteLifecycleHooks(options?.writeLifecycle, fileChangeLifecycle),
-    diagnosticsProvider: options?.diagnosticsProvider
-      ?? lspAdapter?.diagnosticsProvider
-      ?? (options?.diagnosticsCommand ? createCommandDiagnosticsProvider(cwd, options.diagnosticsCommand) : undefined),
+    diagnosticsProvider:
+      options?.diagnosticsProvider ??
+      lspAdapter?.diagnosticsProvider ??
+      (options?.diagnosticsCommand
+        ? createCommandDiagnosticsProvider(cwd, options.diagnosticsCommand)
+        : undefined),
   };
 }

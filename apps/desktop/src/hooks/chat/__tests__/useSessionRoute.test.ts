@@ -23,7 +23,15 @@ describe('useSessionRoute', () => {
       mode: 'direct',
       connectionState: 'connected',
       connectionError: null,
-      backends: [{ backendId: 'backend-1', runtimeState: 'ready', openState: 'open', online: true, name: 'B1' } as any],
+      backends: [
+        {
+          backendId: 'backend-1',
+          runtimeState: 'ready',
+          openState: 'open',
+          online: true,
+          name: 'B1',
+        } as any,
+      ],
       sessionStreams: {},
       localBackendId: null,
       currentInstanceId: null,
@@ -93,7 +101,7 @@ describe('useSessionRoute', () => {
   });
 
   it('returns error phase when facade connection is in error state', () => {
-    useFacadeStore.setState((state) => ({
+    useFacadeStore.setState(state => ({
       ...state,
       connectionState: 'error',
     }));
@@ -104,9 +112,18 @@ describe('useSessionRoute', () => {
   });
 
   it('derives lastError from backend lastError', () => {
-    useFacadeStore.setState((state) => ({
+    useFacadeStore.setState(state => ({
       ...state,
-      backends: [{ backendId: 'backend-1', runtimeState: 'error', openState: 'open', online: true, name: 'B1', lastError: 'backend failed' } as any],
+      backends: [
+        {
+          backendId: 'backend-1',
+          runtimeState: 'error',
+          openState: 'open',
+          online: true,
+          name: 'B1',
+          lastError: 'backend failed',
+        } as any,
+      ],
     }));
 
     const { result } = renderHook(() => useSessionRoute('session-1'));
@@ -116,17 +133,24 @@ describe('useSessionRoute', () => {
   });
 
   it('replays backend and session recovery after reconnect generation changes', () => {
-    const { result, rerender } = renderHook(() => useSessionRoute('session-1', { maintainDesiredState: true }));
+    const { result, rerender } = renderHook(() =>
+      useSessionRoute('session-1', { maintainDesiredState: true })
+    );
     const facade = useFacadeStore.getState().facade as any;
 
     expect(result.current.phase).toBe('opening_stream');
 
     act(() => {
-      useFacadeStore.setState((state) => ({
+      useFacadeStore.setState(state => ({
         ...state,
         reconnectGeneration: 2,
         sessionStreams: {
-          'backend-1:session-1': { streamKey: 'backend-1:session-1', backendId: 'backend-1', sessionId: 'session-1', state: 'open' },
+          'backend-1:session-1': {
+            streamKey: 'backend-1:session-1',
+            backendId: 'backend-1',
+            sessionId: 'session-1',
+            state: 'open',
+          },
         } as any,
       }));
     });

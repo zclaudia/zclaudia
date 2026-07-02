@@ -13,7 +13,7 @@ export function normalizeSessionType(type: SessionType | null | undefined): Sess
 }
 
 export function assertValidSessionState(
-  session: Pick<Session, 'type' | 'parentSessionId' | 'projectRole' | 'planStatus'>,
+  session: Pick<Session, 'type' | 'parentSessionId' | 'projectRole' | 'planStatus'>
 ): void {
   if (!VALID_SESSION_TYPES.has(session.type)) {
     throw new Error(`Invalid session type: ${session.type}`);
@@ -27,7 +27,11 @@ export function assertValidSessionState(
     throw new Error('Only task sessions can carry a plan status');
   }
 
-  if (session.projectRole && BACKGROUND_ONLY_ROLES.has(session.projectRole) && session.type !== 'background') {
+  if (
+    session.projectRole &&
+    BACKGROUND_ONLY_ROLES.has(session.projectRole) &&
+    session.type !== 'background'
+  ) {
     throw new Error(`Session role '${session.projectRole}' requires background session type`);
   }
 
@@ -36,7 +40,9 @@ export function assertValidSessionState(
   }
 }
 
-export function isPlanningTaskSession(session: Pick<Session, 'projectRole' | 'planStatus'>): boolean {
+export function isPlanningTaskSession(
+  session: Pick<Session, 'projectRole' | 'planStatus'>
+): boolean {
   return session.projectRole === 'task' && session.planStatus === 'planning';
 }
 
@@ -60,24 +66,27 @@ function normalizeOptionalString(value: unknown): string | undefined {
 }
 
 export function isSessionValidationError(error: unknown): error is Error {
-  return error instanceof Error
-    && (
-      error.message.includes('required')
-      || error.message.includes('Invalid')
-      || error.message.includes('cannot')
-      || error.message.includes('must')
-      || error.message.includes('Only')
-    );
+  return (
+    error instanceof Error &&
+    (error.message.includes('required') ||
+      error.message.includes('Invalid') ||
+      error.message.includes('cannot') ||
+      error.message.includes('must') ||
+      error.message.includes('Only'))
+  );
 }
 
 export function normalizeSessionCreateInput(input: SessionCreateInput): SessionCreateInput {
   return {
     projectId: normalizeOptionalString(input.projectId),
     name: normalizeOptionalString(input.name),
-    agentProfileId: input.agentProfileId == null ? undefined : normalizeOptionalString(input.agentProfileId),
+    agentProfileId:
+      input.agentProfileId == null ? undefined : normalizeOptionalString(input.agentProfileId),
     type: input.type ?? undefined,
-    parentSessionId: input.parentSessionId == null ? undefined : normalizeOptionalString(input.parentSessionId),
-    workingDirectory: input.workingDirectory == null ? undefined : normalizeOptionalString(input.workingDirectory),
+    parentSessionId:
+      input.parentSessionId == null ? undefined : normalizeOptionalString(input.parentSessionId),
+    workingDirectory:
+      input.workingDirectory == null ? undefined : normalizeOptionalString(input.workingDirectory),
   };
 }
 
@@ -88,17 +97,19 @@ export function buildSessionUpdatePatch(body: Record<string, unknown>): SessionU
     patch.name = body.name == null ? null : normalizeOptionalString(body.name);
   }
   if (Object.prototype.hasOwnProperty.call(body, 'agentProfileId')) {
-    patch.agentProfileId = body.agentProfileId == null ? null : normalizeOptionalString(body.agentProfileId);
+    patch.agentProfileId =
+      body.agentProfileId == null ? null : normalizeOptionalString(body.agentProfileId);
   }
   if (Object.prototype.hasOwnProperty.call(body, 'sdkSessionId')) {
-    patch.sdkSessionId = body.sdkSessionId == null ? null : normalizeOptionalString(body.sdkSessionId);
+    patch.sdkSessionId =
+      body.sdkSessionId == null ? null : normalizeOptionalString(body.sdkSessionId);
   }
 
   return patch;
 }
 
 export function buildUnlockedSessionState(
-  session: Pick<Session, 'type' | 'parentSessionId' | 'projectRole'>,
+  session: Pick<Session, 'type' | 'parentSessionId' | 'projectRole'>
 ): Pick<Session, 'type' | 'parentSessionId' | 'projectRole' | 'planStatus'> {
   return {
     type: session.type,
@@ -118,7 +129,9 @@ export interface TaskSessionSeed {
   workingDirectory?: string;
 }
 
-export function buildTaskPlanningSession(seed: TaskSessionSeed): Omit<Session, 'id' | 'createdAt' | 'updatedAt'> {
+export function buildTaskPlanningSession(
+  seed: TaskSessionSeed
+): Omit<Session, 'id' | 'createdAt' | 'updatedAt'> {
   return {
     projectId: seed.projectId,
     name: `Task: ${seed.title}`,
@@ -133,7 +146,7 @@ export function buildTaskPlanningSession(seed: TaskSessionSeed): Omit<Session, '
 }
 
 export function buildTaskExecutingSessionPatch(
-  workingDirectory: string,
+  workingDirectory: string
 ): Pick<Session, 'workingDirectory' | 'planStatus' | 'isReadOnly' | 'sdkSessionId'> {
   return {
     workingDirectory,

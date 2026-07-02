@@ -19,7 +19,9 @@ function makeDb(): Database.Database {
 
 describe('session sandbox domains', () => {
   let db: Database.Database;
-  beforeEach(() => { db = makeDb(); });
+  beforeEach(() => {
+    db = makeDb();
+  });
 
   it('returns [] when nothing is persisted', () => {
     expect(loadSessionSandboxDomains(db, 's1')).toEqual([]);

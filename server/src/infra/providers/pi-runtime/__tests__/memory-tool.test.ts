@@ -14,7 +14,10 @@ function run(params: Record<string, unknown>) {
 
 /** Extract the text content from a tool result */
 function text(result: { content: Array<{ type: string; text?: string }> }): string {
-  return result.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
+  return result.content
+    .filter(b => b.type === 'text')
+    .map(b => b.text)
+    .join('\n');
 }
 
 beforeEach(() => {
@@ -62,8 +65,15 @@ describe('Memory tool', () => {
     };
     const injected = createMemoryTool({ provider }) as any;
 
-    const viewed = await injected.execute('tc-provider', { command: 'view', path: '/memories/from-provider.md' });
-    await injected.execute('tc-provider', { command: 'create', path: '/memories/new.md', file_text: 'remember this' });
+    const viewed = await injected.execute('tc-provider', {
+      command: 'view',
+      path: '/memories/from-provider.md',
+    });
+    await injected.execute('tc-provider', {
+      command: 'create',
+      path: '/memories/new.md',
+      file_text: 'remember this',
+    });
 
     expect(text(viewed)).toContain('from provider');
     expect(calls).toEqual([
@@ -104,9 +114,19 @@ describe('Memory tool', () => {
 
   it('str_replace errors on missing and non-unique old_str', async () => {
     await run({ command: 'create', path: '/memories/a.md', file_text: 'dup dup' });
-    const missing = await run({ command: 'str_replace', path: '/memories/a.md', old_str: 'nope', new_str: 'x' });
+    const missing = await run({
+      command: 'str_replace',
+      path: '/memories/a.md',
+      old_str: 'nope',
+      new_str: 'x',
+    });
     expect((missing.details as any).error).toBe('not_found');
-    const dup = await run({ command: 'str_replace', path: '/memories/a.md', old_str: 'dup', new_str: 'x' });
+    const dup = await run({
+      command: 'str_replace',
+      path: '/memories/a.md',
+      old_str: 'dup',
+      new_str: 'x',
+    });
     expect((dup.details as any).error).toBe('not_unique');
   });
 
@@ -134,7 +154,11 @@ describe('Memory tool', () => {
   it('rename refuses to overwrite an existing target', async () => {
     await run({ command: 'create', path: '/memories/a.md', file_text: 'source' });
     await run({ command: 'create', path: '/memories/b.md', file_text: 'target' });
-    const result = await run({ command: 'rename', old_path: '/memories/a.md', new_path: '/memories/b.md' });
+    const result = await run({
+      command: 'rename',
+      old_path: '/memories/a.md',
+      new_path: '/memories/b.md',
+    });
     expect((result.details as any).error).toBe('target_exists');
     expect(fs.readFileSync(path.join(memoryDir, 'b.md'), 'utf8')).toBe('target');
   });
@@ -147,7 +171,11 @@ describe('Memory tool', () => {
   });
 
   it('rejects oversized memory writes', async () => {
-    const result = await run({ command: 'create', path: '/memories/large.md', file_text: 'x'.repeat(1024 * 1024 + 1) });
+    const result = await run({
+      command: 'create',
+      path: '/memories/large.md',
+      file_text: 'x'.repeat(1024 * 1024 + 1),
+    });
     expect((result.details as any).error).toBe('content_too_large');
     expect((result.details as any).maxBytes).toBe(1024 * 1024);
   });

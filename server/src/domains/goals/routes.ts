@@ -4,7 +4,7 @@ import type { GoalService } from './service.js';
 
 export function createGoalRoutes(
   svc: GoalService,
-  coordinator?: { onResumed(sessionId: string): Promise<void> },
+  coordinator?: { onResumed(sessionId: string): Promise<void> }
 ): Router {
   const router = Router({ mergeParams: true });
 
@@ -32,7 +32,12 @@ export function createGoalRoutes(
     } catch (err) {
       const message = err instanceof Error ? err.message : 'unknown error';
       const isConflict = message.includes('active goal');
-      return sendApiError(res, isConflict ? 409 : 400, isConflict ? 'goal_conflict' : 'invalid_input', message);
+      return sendApiError(
+        res,
+        isConflict ? 409 : 400,
+        isConflict ? 'goal_conflict' : 'invalid_input',
+        message
+      );
     }
   });
 
@@ -56,7 +61,9 @@ export function createGoalRoutes(
     try {
       const resumed = svc.resume(goal.id);
       // Fire-and-forget: re-arm the autonomous loop after resuming.
-      void coordinator?.onResumed(sessionId).catch((err) => console.error('[goal] onResumed error', err));
+      void coordinator
+        ?.onResumed(sessionId)
+        .catch(err => console.error('[goal] onResumed error', err));
       return res.json({ success: true, data: resumed });
     } catch (err) {
       return sendApiError(res, 400, 'invalid_transition', (err as Error).message);

@@ -53,20 +53,26 @@ export function handleClaudiaMessage(msg: ServerMessage, serverId: string): bool
         .map(t => ({ ...t, branchId: t.branchId ?? null }));
       snapshotStore.setTasks(snapshotTasks);
       snapshotStore.setActiveBranchIds(
-        Object.fromEntries(snapshotMsg.activeBranches.map((state) => [state.projectId, state.branchId]))
+        Object.fromEntries(
+          snapshotMsg.activeBranches.map(state => [state.projectId, state.branchId])
+        )
       );
       return true;
     }
 
     case 'claudia_message_delta': {
       const inlineDelta = msg as import('@zclaudia/shared').ClaudiaMessageDeltaMessage;
-      useClaudiaStore.getState().appendInlineDelta(inlineDelta.clientRequestId, inlineDelta.content);
+      useClaudiaStore
+        .getState()
+        .appendInlineDelta(inlineDelta.clientRequestId, inlineDelta.content);
       return true;
     }
 
     case 'claudia_message_completed': {
       const inlineCompleted = msg as import('@zclaudia/shared').ClaudiaMessageCompletedMessage;
-      useClaudiaStore.getState().completeInline(inlineCompleted.clientRequestId, inlineCompleted.responseText);
+      useClaudiaStore
+        .getState()
+        .completeInline(inlineCompleted.clientRequestId, inlineCompleted.responseText);
       return true;
     }
 
@@ -79,7 +85,9 @@ export function handleClaudiaMessage(msg: ServerMessage, serverId: string): bool
     case 'claudia_message_promoted': {
       const inlinePromoted = msg as import('@zclaudia/shared').ClaudiaMessagePromotedMessage;
       const claudiaForPromotion = useClaudiaStore.getState();
-      const inline = claudiaForPromotion.inlineResponses.find((r) => r.clientRequestId === inlinePromoted.clientRequestId);
+      const inline = claudiaForPromotion.inlineResponses.find(
+        r => r.clientRequestId === inlinePromoted.clientRequestId
+      );
       claudiaForPromotion.promoteInline(inlinePromoted.clientRequestId, inlinePromoted.taskId);
       claudiaForPromotion.addTask({
         id: inlinePromoted.taskId,
@@ -111,7 +119,7 @@ export function handleClaudiaMessage(msg: ServerMessage, serverId: string): bool
     case 'claudia_task_update': {
       const updateMsg = msg as import('@zclaudia/shared').ClaudiaTaskUpdateMessage;
       const claudiaStoreForUpdate = useClaudiaStore.getState();
-      const existing = claudiaStoreForUpdate.tasks.find((t) => t.id === updateMsg.taskId);
+      const existing = claudiaStoreForUpdate.tasks.find(t => t.id === updateMsg.taskId);
       if (!existing) {
         claudiaStoreForUpdate.addTask({
           id: updateMsg.taskId,
@@ -129,7 +137,11 @@ export function handleClaudiaMessage(msg: ServerMessage, serverId: string): bool
           ...(updateMsg.responseText !== undefined ? { responseText: updateMsg.responseText } : {}),
           ...(updateMsg.toolCount != null ? { toolCount: updateMsg.toolCount } : {}),
         });
-        if (updateMsg.status === 'completed' || updateMsg.status === 'failed' || updateMsg.status === 'cancelled') {
+        if (
+          updateMsg.status === 'completed' ||
+          updateMsg.status === 'failed' ||
+          updateMsg.status === 'cancelled'
+        ) {
           claudiaStoreForUpdate.clearStreamingText(updateMsg.taskId);
         }
         return true;
@@ -150,16 +162,21 @@ export function handleClaudiaMessage(msg: ServerMessage, serverId: string): bool
         ...(updateMsg.responseText !== undefined ? { responseText: updateMsg.responseText } : {}),
         ...(updateMsg.toolCount != null ? { toolCount: updateMsg.toolCount } : {}),
       });
-      if (updateMsg.status === 'completed' || updateMsg.status === 'failed' || updateMsg.status === 'cancelled') {
+      if (
+        updateMsg.status === 'completed' ||
+        updateMsg.status === 'failed' ||
+        updateMsg.status === 'cancelled'
+      ) {
         claudiaStoreForUpdate.clearStreamingText(updateMsg.taskId);
       }
       if (updateMsg.status === 'completed' || updateMsg.status === 'failed') {
         const taskTitle = existing?.title || updateMsg.title || updateMsg.input || 'Claudia task';
         useToastStore.getState().add({
           title: taskTitle,
-          message: updateMsg.status === 'completed'
-            ? (updateMsg.summary?.slice(0, 100) || 'Task completed')
-            : (updateMsg.error?.slice(0, 100) || 'Task failed'),
+          message:
+            updateMsg.status === 'completed'
+              ? updateMsg.summary?.slice(0, 100) || 'Task completed'
+              : updateMsg.error?.slice(0, 100) || 'Task failed',
           type: updateMsg.status === 'completed' ? 'success' : 'error',
           icon: updateMsg.status === 'completed' ? 'task' : 'error',
           initiator: 'claudia',

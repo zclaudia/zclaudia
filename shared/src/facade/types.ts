@@ -4,10 +4,7 @@
  * UI-facing types for the unified backend capability surface.
  */
 
-import type {
-  BackendPresence,
-  BackendResourceEventMessage,
-} from '@zclaudia/protocol/gateway';
+import type { BackendPresence, BackendResourceEventMessage } from '@zclaudia/protocol/gateway';
 import type { SessionItem, ProjectItem, SessionMessage } from '@zclaudia/protocol/zclaudia';
 import type { ClientMessage, ServerMessage } from '../wire/messages.js';
 
@@ -31,27 +28,13 @@ export type BackendConnectionState =
  *
  * Derived from registry presence + subscription + catalog initialization.
  */
-export type BackendRuntimeState =
-  | 'offline'
-  | 'visible'
-  | 'subscribing'
-  | 'ready'
-  | 'error';
+export type BackendRuntimeState = 'offline' | 'visible' | 'subscribing' | 'ready' | 'error';
 
 /** Backend subscription lifecycle state. */
-export type BackendOpenState =
-  | 'unsubscribed'
-  | 'subscribing'
-  | 'subscribed'
-  | 'error';
+export type BackendOpenState = 'unsubscribed' | 'subscribing' | 'subscribed' | 'error';
 
 /** Session stream lifecycle state. */
-export type SessionStreamState =
-  | 'closed'
-  | 'opening'
-  | 'open'
-  | 'closing'
-  | 'error';
+export type SessionStreamState = 'closed' | 'opening' | 'open' | 'closing' | 'error';
 
 // ============================================================================
 // Snapshots (UI-facing read models)
@@ -195,8 +178,20 @@ export type StreamCommand =
 /** Events that StreamManager returns for runtime to broadcast. */
 export type StreamEvent =
   | { type: 'session_stream_state_changed'; stream: SessionStreamSnapshot }
-  | { type: 'content_patch'; backendId: string; sessionId: string; messages: SessionMessage[]; latestOffset: number }
-  | { type: 'content_patch_failed'; backendId: string; sessionId: string; afterOffset: number; error: string }
+  | {
+      type: 'content_patch';
+      backendId: string;
+      sessionId: string;
+      messages: SessionMessage[];
+      latestOffset: number;
+    }
+  | {
+      type: 'content_patch_failed';
+      backendId: string;
+      sessionId: string;
+      afterOffset: number;
+      error: string;
+    }
   | { type: 'run_event'; backendId: string; sessionId: string; event: ServerMessage };
 
 /** Composite result from StreamManager operations. */
@@ -212,13 +207,31 @@ export interface StreamManagerResult {
 export type BackendFacadeEvent =
   | { type: 'connection_state_changed'; state: BackendConnectionState; error?: string }
   | { type: 'snapshot_updated'; snapshot: BackendFacadeSnapshot }
+  | { type: 'backends_removed'; backendIds: string[] }
   | { type: 'backend_state_changed'; backendId: string; state: BackendRuntimeState; error?: string }
-  | { type: 'backend_data_snapshot'; backendId: string; sessions: SessionItem[]; projects: ProjectItem[] }
+  | {
+      type: 'backend_data_snapshot';
+      backendId: string;
+      sessions: SessionItem[];
+      projects: ProjectItem[];
+    }
   | { type: 'backend_data_event'; backendId: string; event: BackendResourceEventMessage }
   | { type: 'session_stream_state_changed'; stream: SessionStreamSnapshot }
   | { type: 'run_event'; backendId: string; sessionId: string; event: ServerMessage }
-  | { type: 'content_patch_failed'; backendId: string; sessionId: string; afterOffset: number; error: string }
-  | { type: 'content_patch'; backendId: string; sessionId: string; messages: SessionMessage[]; latestOffset: number };
+  | {
+      type: 'content_patch_failed';
+      backendId: string;
+      sessionId: string;
+      afterOffset: number;
+      error: string;
+    }
+  | {
+      type: 'content_patch';
+      backendId: string;
+      sessionId: string;
+      messages: SessionMessage[];
+      latestOffset: number;
+    };
 
 // ============================================================================
 // BackendFacade Interface (UI-facing contract)

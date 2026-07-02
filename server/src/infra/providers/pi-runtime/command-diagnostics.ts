@@ -11,25 +11,27 @@ export interface CommandDiagnosticsOptions {
 }
 
 export function parseCommandDiagnostics(output: string): WriteLifecycleDiagnostic[] {
-  return output
-    .split(/\r?\n/)
-    .flatMap((line) => {
-      const match = /^(.*?):(\d+):(\d+)\s+-\s+(error|warning|info)\s+([^:]+):\s+(.*)$/.exec(line.trim());
-      if (!match) return [];
-      return [{
+  return output.split(/\r?\n/).flatMap(line => {
+    const match = /^(.*?):(\d+):(\d+)\s+-\s+(error|warning|info)\s+([^:]+):\s+(.*)$/.exec(
+      line.trim()
+    );
+    if (!match) return [];
+    return [
+      {
         path: match[1],
         line: Number(match[2]),
         column: Number(match[3]),
         severity: match[4] as WriteLifecycleDiagnostic['severity'],
         source: match[5],
         message: match[6],
-      }];
-    });
+      },
+    ];
+  });
 }
 
 export function createCommandDiagnosticsProvider(
   cwd: string,
-  options: CommandDiagnosticsOptions,
+  options: CommandDiagnosticsOptions
 ): WriteDiagnosticsProvider {
   return async () => {
     try {
@@ -41,7 +43,9 @@ export function createCommandDiagnosticsProvider(
       return parseCommandDiagnostics(`${result.stdout ?? ''}\n${result.stderr ?? ''}`);
     } catch (err) {
       const maybeOutput = err as { stdout?: string; stderr?: string };
-      const diagnostics = parseCommandDiagnostics(`${maybeOutput.stdout ?? ''}\n${maybeOutput.stderr ?? ''}`);
+      const diagnostics = parseCommandDiagnostics(
+        `${maybeOutput.stdout ?? ''}\n${maybeOutput.stderr ?? ''}`
+      );
       if (diagnostics.length > 0) return diagnostics;
       throw err;
     }

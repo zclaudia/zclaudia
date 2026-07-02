@@ -6,7 +6,7 @@ import type {
   SupervisionTask,
   SupervisionLogEvent,
 } from '@zclaudia/shared/features/supervision';
-import { SupervisionTaskRepository } from './repositories/supervision-task.js';
+import { type SupervisionTaskRepository } from './repositories/supervision-task.js';
 import type { SupervisionProjectPort, SupervisionSessionPort } from './ports.js';
 import type { ContextManager, CheckpointTrigger } from './context-manager.js';
 import type { SupervisionAiRunPort } from './ports.js';
@@ -34,13 +34,13 @@ export class CheckpointEngine {
       projectId: string,
       event: SupervisionLogEvent,
       detail?: Record<string, unknown>,
-      taskId?: string,
+      taskId?: string
     ) => void,
     private createTaskFn: (
       projectId: string,
-      data: { title: string; description: string; source: 'agent_discovered' },
+      data: { title: string; description: string; source: 'agent_discovered' }
     ) => SupervisionTask,
-    private aiRunPort: SupervisionAiRunPort,
+    private aiRunPort: SupervisionAiRunPort
   ) {}
 
   shouldTrigger(projectId: string, event: 'task_complete' | 'idle'): boolean {
@@ -110,7 +110,7 @@ export class CheckpointEngine {
         sessionId: session.id,
         input: prompt,
         workingDirectory: project.rootPath,
-        onMessage: (msg) => {
+        onMessage: msg => {
           this.handleCheckpointRunMessage(projectId, session.id, msg);
         },
       });
@@ -125,7 +125,7 @@ export class CheckpointEngine {
   private handleCheckpointRunMessage(
     projectId: string,
     sessionId: string,
-    msg: ServerMessage,
+    msg: ServerMessage
   ): void {
     if (msg.type === 'run_completed') {
       try {
@@ -163,11 +163,15 @@ export class CheckpointEngine {
   }
 
   parseCheckpointResult(sessionId: string): CheckpointResult | null {
-    const rows = this.db.prepare(`
+    const rows = this.db
+      .prepare(
+        `
       SELECT content FROM messages
       WHERE session_id = ? AND role = 'assistant'
       ORDER BY created_at DESC
-    `).all(sessionId) as Array<{ content: string }>;
+    `
+      )
+      .all(sessionId) as Array<{ content: string }>;
 
     for (const row of rows) {
       const match = CHECKPOINT_RESULT_REGEX.exec(row.content);
@@ -183,7 +187,8 @@ export class CheckpointEngine {
     const result: CheckpointResult = {};
 
     // Parse project summary update
-    const summaryMatch = /project_summary_update:\s*\|([\s\S]*?)(?=knowledge_updates:|discovered_tasks:|$)/i.exec(raw);
+    const summaryMatch =
+      /project_summary_update:\s*\|([\s\S]*?)(?=knowledge_updates:|discovered_tasks:|$)/i.exec(raw);
     if (summaryMatch) {
       result.projectSummaryUpdate = summaryMatch[1].trim();
     }
@@ -326,7 +331,7 @@ Only include sections that have actual updates. If nothing needs updating, outpu
         return;
       }
       if (this.shouldTrigger(projectId, 'task_complete')) {
-        this.runCheckpoint(projectId).catch((err) => {
+        this.runCheckpoint(projectId).catch(err => {
           console.error(`[CheckpointEngine] Interval checkpoint failed for ${projectId}:`, err);
         });
       }

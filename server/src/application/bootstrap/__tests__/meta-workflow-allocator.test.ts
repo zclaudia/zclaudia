@@ -63,7 +63,9 @@ describe('meta-workflow-allocator persistent per-run worktree', () => {
 
     // Subsequent acquire for same runId triggers a fresh underlying acquire.
     await allocator.acquire({ runId: 'run-A', phaseId: 'p2', attempt: 1 });
-    const pool = supervisorService.getWorktreePoolIfExists.mock.results.at(-1)!.value as { acquire: ReturnType<typeof vi.fn> };
+    const pool = supervisorService.getWorktreePoolIfExists.mock.results.at(-1)!.value as {
+      acquire: ReturnType<typeof vi.fn>;
+    };
     expect(pool.acquire).toHaveBeenCalledTimes(2);
   });
 
@@ -82,7 +84,9 @@ describe('meta-workflow-allocator persistent per-run worktree', () => {
 
   it('releaseRun awaits an in-flight acquire before releasing', async () => {
     let resolveAcquire: (p: string) => void;
-    const acquirePromise = new Promise<string>((res) => { resolveAcquire = res; });
+    const acquirePromise = new Promise<string>(res => {
+      resolveAcquire = res;
+    });
     const releaseMock = vi.fn();
     const supervisorService = {
       getWorktreePoolIfExists: vi.fn().mockReturnValue({

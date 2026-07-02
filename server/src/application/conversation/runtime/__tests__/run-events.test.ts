@@ -6,7 +6,11 @@ const cleanupPendingPermissionsMock = vi.fn();
 const upsertAssistantMessageMock = vi.fn();
 const pluginEventsEmitMock = vi.fn(async () => {});
 const sendMessageMock = vi.fn();
-const maybeCompactMock = vi.fn(async () => ({ outcome: 'skipped', compacted: false, reason: 'below_threshold' }));
+const maybeCompactMock = vi.fn(async () => ({
+  outcome: 'skipped',
+  compacted: false,
+  reason: 'below_threshold',
+}));
 
 vi.mock('../run-lifecycle.js', () => ({
   cleanupPendingPermissions: cleanupPendingPermissionsMock,
@@ -90,12 +94,14 @@ describe('ws/run-events', () => {
 
     expect(activeRun.fullContent).toBe('hello');
     expect(activeRun.contentBlocks).toEqual([{ type: 'text', content: 'hello' }]);
-    expect(sendRunEventMock).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'delta',
-      runId: 'run-1',
-      sessionId: 'session-1',
-      content: 'hello',
-    }));
+    expect(sendRunEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'delta',
+        runId: 'run-1',
+        sessionId: 'session-1',
+        content: 'hello',
+      })
+    );
   });
 
   it('routes canonical tool_started provider events through the domain event path', async () => {
@@ -149,12 +155,14 @@ describe('ws/run-events', () => {
       input: { file_path: '/repo/src/app.ts' },
     });
     expect(activeRun.contentBlocks).toEqual([{ type: 'tool_use', toolUseId: 'tool-1' }]);
-    expect(sendRunEventMock).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'tool_use',
-      runId: 'run-1',
-      toolUseId: 'tool-1',
-      toolName: 'Read',
-    }));
+    expect(sendRunEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'tool_use',
+        runId: 'run-1',
+        toolUseId: 'tool-1',
+        toolName: 'Read',
+      })
+    );
   });
 
   it('routes canonical tool_finished provider events through the domain event path', async () => {
@@ -205,13 +213,15 @@ describe('ws/run-events', () => {
       output: 'contents',
       isError: false,
     });
-    expect(sendRunEventMock).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'tool_result',
-      runId: 'run-1',
-      toolUseId: 'tool-1',
-      toolName: 'Read',
-      result: 'contents',
-    }));
+    expect(sendRunEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'tool_result',
+        runId: 'run-1',
+        toolUseId: 'tool-1',
+        toolName: 'Read',
+        result: 'contents',
+      })
+    );
   });
 
   it('persists system info and emits session_created on init', async () => {
@@ -268,15 +278,19 @@ describe('ws/run-events', () => {
     });
 
     expect(persistSessionWorkingDirectoryMock).toHaveBeenCalledWith('/tmp/project');
-    expect(activeRun.latestSystemInfo).toEqual(expect.objectContaining({ cwd: '/tmp/project', model: 'sonnet' }));
+    expect(activeRun.latestSystemInfo).toEqual(
+      expect.objectContaining({ cwd: '/tmp/project', model: 'sonnet' })
+    );
     expect(activeRun.providerSessionId).toBe('sdk-session-1');
     expect(state.sdkSessionId).toBe('sdk-session-1');
     expect(runSqlMock).toHaveBeenCalledWith('sdk-session-1', expect.any(Number), 'session-1');
-    expect(sendRunEventMock).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'system_info',
-      runId: 'run-1',
-      systemInfo: expect.objectContaining({ cwd: '/tmp/project', model: 'sonnet' }),
-    }));
+    expect(sendRunEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'system_info',
+        runId: 'run-1',
+        systemInfo: expect.objectContaining({ cwd: '/tmp/project', model: 'sonnet' }),
+      })
+    );
     expect(sendRunEventMock).toHaveBeenCalledWith({
       type: 'session_created',
       sessionId: 'session-1',
@@ -337,29 +351,38 @@ describe('ws/run-events', () => {
       usage: { inputTokens: 1, outputTokens: 2 },
       indexMetadata: true,
     });
-    expect(sendRunEventMock).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'delta',
-      runId: 'run-1',
-      content: 'done',
-    }));
-    expect(sendRunEventMock).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'run_completed',
-      runId: 'run-1',
-      sessionId: 'session-1',
-      usage: { inputTokens: 1, outputTokens: 2 },
-    }));
-    expect(pluginEventsEmitMock).toHaveBeenCalledWith('run.completed', expect.objectContaining({
-      runId: 'run-1',
-      sessionId: 'session-1',
-    }));
+    expect(sendRunEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'delta',
+        runId: 'run-1',
+        content: 'done',
+      })
+    );
+    expect(sendRunEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'run_completed',
+        runId: 'run-1',
+        sessionId: 'session-1',
+        usage: { inputTokens: 1, outputTokens: 2 },
+      })
+    );
+    expect(pluginEventsEmitMock).toHaveBeenCalledWith(
+      'run.completed',
+      expect.objectContaining({
+        runId: 'run-1',
+        sessionId: 'session-1',
+      })
+    );
     expect(broadcastHeartbeatMock).toHaveBeenCalled();
-    expect(postItemMock).toHaveBeenCalledWith(expect.objectContaining({
-      sessionId: 'session-1',
-      title: 'Run completed: session-1',
-      summary: 'Session response is ready.',
-      status: 'completed',
-      source: 'manual',
-    }));
+    expect(postItemMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 'session-1',
+        title: 'Run completed: session-1',
+        summary: 'Session response is ready.',
+        status: 'completed',
+        source: 'manual',
+      })
+    );
     expect(sendRunEventMock).toHaveBeenCalledWith({
       type: 'background_task_update',
       sessionId: 'session-1',
@@ -393,7 +416,11 @@ describe('ws/run-events', () => {
       db: {} as any,
       input: 'hello',
       modeValue: 'default',
-      msg: { type: 'result', subtype: 'success', usage: { inputTokens: 1, outputTokens: 2 } } as any,
+      msg: {
+        type: 'result',
+        subtype: 'success',
+        usage: { inputTokens: 1, outputTokens: 2 },
+      } as any,
       notificationService: { notify: vi.fn() } as any,
       notificationsService: { postItem: vi.fn() } as any,
       persistSessionWorkingDirectory: vi.fn(),
@@ -441,7 +468,11 @@ describe('ws/run-events', () => {
       db: {} as any,
       input: 'hello',
       modeValue: 'default',
-      msg: { type: 'result', subtype: 'success', usage: { inputTokens: 1, outputTokens: 2 } } as any,
+      msg: {
+        type: 'result',
+        subtype: 'success',
+        usage: { inputTokens: 1, outputTokens: 2 },
+      } as any,
       notificationService: { notify: vi.fn() } as any,
       notificationsService: { postItem: vi.fn() } as any,
       persistSessionWorkingDirectory: vi.fn(),
@@ -455,10 +486,12 @@ describe('ws/run-events', () => {
       providerRegistry: registry as any,
     });
 
-    expect(sendRunEventMock).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'delta',
-      content: 'fallback text',
-    }));
+    expect(sendRunEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'delta',
+        content: 'fallback text',
+      })
+    );
     expect(activeRun.fullContent).toBe('fallback text');
   });
 
@@ -493,7 +526,11 @@ describe('ws/run-events', () => {
       db: {} as any,
       input: 'hello',
       modeValue: 'default',
-      msg: { type: 'result', subtype: 'success', usage: { inputTokens: 1, outputTokens: 2 } } as any,
+      msg: {
+        type: 'result',
+        subtype: 'success',
+        usage: { inputTokens: 1, outputTokens: 2 },
+      } as any,
       notificationService: { notify: vi.fn() } as any,
       notificationsService: { postItem: vi.fn() } as any,
       persistSessionWorkingDirectory: vi.fn(),
@@ -509,10 +546,12 @@ describe('ws/run-events', () => {
 
     expect(activeRun.fullContent).toBe('');
     // No delta event for a synthetic fallback.
-    expect(sendRunEventMock).not.toHaveBeenCalledWith(expect.objectContaining({
-      type: 'delta',
-      content: expect.any(String),
-    }));
+    expect(sendRunEventMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'delta',
+        content: expect.any(String),
+      })
+    );
   });
 
   it('fails runs on provider error and removes them from activeRuns', async () => {
@@ -561,24 +600,31 @@ describe('ws/run-events', () => {
     });
 
     expect(upsertAssistantMessageMock).toHaveBeenCalledWith(activeRun, { indexMetadata: true });
-    expect(sendRunEventMock).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'run_failed',
-      runId: 'run-1',
-      sessionId: 'session-1',
-    }));
+    expect(sendRunEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'run_failed',
+        runId: 'run-1',
+        sessionId: 'session-1',
+      })
+    );
     expect(activeRun.phase).toBe('failed');
-    expect(pluginEventsEmitMock).toHaveBeenCalledWith('run.error', expect.objectContaining({
-      runId: 'run-1',
-      sessionId: 'session-1',
-    }));
+    expect(pluginEventsEmitMock).toHaveBeenCalledWith(
+      'run.error',
+      expect.objectContaining({
+        runId: 'run-1',
+        sessionId: 'session-1',
+      })
+    );
     expect(broadcastHeartbeatMock).toHaveBeenCalled();
-    expect(postItemMock).toHaveBeenCalledWith(expect.objectContaining({
-      sessionId: 'session-1',
-      title: 'Run failed: session-1',
-      error: 'provider exploded',
-      status: 'failed',
-      source: 'manual',
-    }));
+    expect(postItemMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 'session-1',
+        title: 'Run failed: session-1',
+        error: 'provider exploded',
+        status: 'failed',
+        source: 'manual',
+      })
+    );
     expect(cleanupPendingPermissionsMock).toHaveBeenCalled();
     expect(activeRuns.has('run-1')).toBe(false);
   });
@@ -631,7 +677,10 @@ describe('ws/run-events', () => {
     });
 
     expect(sendRunEventMock).toHaveBeenCalledWith({
-      type: 'mode_change', runId: 'run-1', sessionId: 'session-1', mode: 'plan',
+      type: 'mode_change',
+      runId: 'run-1',
+      sessionId: 'session-1',
+      mode: 'plan',
     });
     expect(activeRun.aiInitiatedPlanMode).toBe(true);
     expect(activeRun.originalMode).toBe('default');
@@ -683,7 +732,10 @@ describe('ws/run-events', () => {
     });
 
     expect(sendRunEventMock).toHaveBeenCalledWith({
-      type: 'mode_change', runId: 'run-1', sessionId: 'session-1', mode: 'default',
+      type: 'mode_change',
+      runId: 'run-1',
+      sessionId: 'session-1',
+      mode: 'default',
     });
     expect(activeRun.aiInitiatedPlanMode).toBe(false);
     expect(setSessionModeMock).toHaveBeenCalledWith('session-1', 'default');
@@ -731,12 +783,14 @@ describe('ws/run-events', () => {
       providerRegistry: mockProviderRegistry as any,
     });
 
-    expect(sendRunEventMock).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'tool_use',
-      toolName: 'createPlan',
-      semantic: 'plan_proposal',
-      effect: { kind: 'file_change', files: [{ path: 'src/a.ts', changeKind: 'modify' }] },
-    }));
+    expect(sendRunEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'tool_use',
+        toolName: 'createPlan',
+        semantic: 'plan_proposal',
+        effect: { kind: 'file_change', files: [{ path: 'src/a.ts', changeKind: 'modify' }] },
+      })
+    );
     expect(activeRun.collectedToolCalls[0]).toMatchObject({
       toolUseId: 'tu-x',
       effect: { kind: 'file_change', files: [{ path: 'src/a.ts', changeKind: 'modify' }] },
@@ -745,7 +799,10 @@ describe('ws/run-events', () => {
 
   it('backfills normalized tool effects from internal tool_result events', async () => {
     const sendRunEventMock = vi.fn();
-    const effect = { kind: 'file_change', files: [{ path: 'src/a.ts', changeKind: 'modify', summary: '@@ diff' }] };
+    const effect = {
+      kind: 'file_change',
+      files: [{ path: 'src/a.ts', changeKind: 'modify', summary: '@@ diff' }],
+    };
     const activeRun = {
       sessionId: 'session-1',
       providerType: 'cursor',
@@ -789,11 +846,13 @@ describe('ws/run-events', () => {
       output: 'updated',
       effect,
     });
-    expect(sendRunEventMock).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'tool_result',
-      toolName: 'Edit',
-      effect,
-    }));
+    expect(sendRunEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'tool_result',
+        toolName: 'Edit',
+        effect,
+      })
+    );
   });
 
   it('tracks background tasks from Bash tool_result text when SDK task notifications are absent', async () => {
@@ -826,7 +885,8 @@ describe('ws/run-events', () => {
       msg: {
         type: 'tool_result',
         toolUseId: 'bash-1',
-        toolResult: 'Command running in background with ID: b1bh5uv01. Output is being written to: /tmp/out',
+        toolResult:
+          'Command running in background with ID: b1bh5uv01. Output is being written to: /tmp/out',
       } as any,
       notificationService: {} as any,
       persistSessionWorkingDirectory: vi.fn(),
@@ -842,10 +902,12 @@ describe('ws/run-events', () => {
 
     expect(activeRun.pendingBackgroundTasks).toBe(1);
     expect(state.backgroundTaskKeys.has('task:b1bh5uv01')).toBe(true);
-    expect(sendRunEventMock).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'tool_result',
-      toolName: 'Bash',
-    }));
+    expect(sendRunEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'tool_result',
+        toolName: 'Bash',
+      })
+    );
   });
 
   it('does not double count Monitor started text and matching SDK task notification', async () => {
@@ -890,7 +952,8 @@ describe('ws/run-events', () => {
       msg: {
         type: 'tool_result',
         toolUseId: 'monitor-1',
-        toolResult: 'Monitor started (task bve70ij13, timeout 300000ms). You will be notified on each event.',
+        toolResult:
+          'Monitor started (task bve70ij13, timeout 300000ms). You will be notified on each event.',
       } as any,
       toolUseIdToName: new Map([['monitor-1', 'Monitor']]),
     });
@@ -950,12 +1013,14 @@ describe('ws/run-events', () => {
       providerRegistry: mockProviderRegistry as any,
     });
 
-    expect(sendRunEventMock).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'tool_activity',
-      runId: 'run-1',
-      toolUseId: 'bash-1',
-      content: 'partial stdout',
-    }));
+    expect(sendRunEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'tool_activity',
+        runId: 'run-1',
+        toolUseId: 'bash-1',
+        content: 'partial stdout',
+      })
+    );
   });
 
   it('falls back to the latest uncompleted Agent tool when tool_activity has no toolUseId (Claude SDK path)', async () => {
@@ -996,11 +1061,13 @@ describe('ws/run-events', () => {
       providerRegistry: mockProviderRegistry as any,
     });
 
-    expect(sendRunEventMock).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'tool_activity',
-      toolUseId: 'a-2',
-      content: 'sub-agent text',
-    }));
+    expect(sendRunEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'tool_activity',
+        toolUseId: 'a-2',
+        content: 'sub-agent text',
+      })
+    );
   });
 
   it('accumulates thinking_delta content into activeRun.thinkingBlocks (single block)', async () => {
@@ -1038,8 +1105,14 @@ describe('ws/run-events', () => {
       providerRegistry: mockProviderRegistry as any,
     };
 
-    handleProviderEvent({ ...common, msg: { type: 'thinking_delta', thinkingContent: 'step 1 ' } as any });
-    handleProviderEvent({ ...common, msg: { type: 'thinking_delta', thinkingContent: 'step 2' } as any });
+    handleProviderEvent({
+      ...common,
+      msg: { type: 'thinking_delta', thinkingContent: 'step 1 ' } as any,
+    });
+    handleProviderEvent({
+      ...common,
+      msg: { type: 'thinking_delta', thinkingContent: 'step 2' } as any,
+    });
 
     expect(activeRun.thinkingBlocks).toHaveLength(1);
     expect(activeRun.thinkingBlocks[0].text).toBe('step 1 step 2');
@@ -1213,7 +1286,7 @@ describe('ws/run-events', () => {
 
     expect(warnSpy).toHaveBeenCalledWith(
       '[Task Notification] Failed to backfill PID for taskId=task-1:',
-      'ps failed',
+      'ps failed'
     );
     warnSpy.mockRestore();
   });
@@ -1272,11 +1345,13 @@ describe('ws/run-events', () => {
       const activeRun = buildBaseActiveRun();
       const { handleProviderEvent } = await import('../run-events.js');
 
-      handleProviderEvent(commonParams(activeRun, {
-        type: 'result',
-        content: 'done',
-        usage: { inputTokens: 1, outputTokens: 2 },
-      } as any));
+      handleProviderEvent(
+        commonParams(activeRun, {
+          type: 'result',
+          content: 'done',
+          usage: { inputTokens: 1, outputTokens: 2 },
+        } as any)
+      );
 
       expect(activeRun.phase).toBe('completed');
     });
@@ -1285,10 +1360,12 @@ describe('ws/run-events', () => {
       const activeRun = buildBaseActiveRun();
       const { handleProviderEvent } = await import('../run-events.js');
 
-      handleProviderEvent(commonParams(activeRun, {
-        type: 'error',
-        error: 'provider exploded',
-      } as any));
+      handleProviderEvent(
+        commonParams(activeRun, {
+          type: 'error',
+          error: 'provider exploded',
+        } as any)
+      );
 
       expect(activeRun.phase).toBe('failed');
     });
@@ -1297,12 +1374,14 @@ describe('ws/run-events', () => {
       const activeRun = buildBaseActiveRun();
       const { handleProviderEvent } = await import('../run-events.js');
 
-      handleProviderEvent(commonParams(activeRun, {
-        type: 'task_notification',
-        taskId: 'task-A',
-        taskStatus: 'started',
-        taskMessage: 'started',
-      } as any));
+      handleProviderEvent(
+        commonParams(activeRun, {
+          type: 'task_notification',
+          taskId: 'task-A',
+          taskStatus: 'started',
+          taskMessage: 'started',
+        } as any)
+      );
 
       expect(activeRun.pendingBackgroundTasks).toBe(1);
       expect(activeRun.phase).toBe('awaiting_followup');
@@ -1312,20 +1391,24 @@ describe('ws/run-events', () => {
       const activeRun = buildBaseActiveRun();
       const { handleProviderEvent } = await import('../run-events.js');
 
-      handleProviderEvent(commonParams(activeRun, {
-        type: 'task_notification',
-        taskId: 'task-B',
-        taskStatus: 'started',
-        taskMessage: 'started',
-      } as any));
+      handleProviderEvent(
+        commonParams(activeRun, {
+          type: 'task_notification',
+          taskId: 'task-B',
+          taskStatus: 'started',
+          taskMessage: 'started',
+        } as any)
+      );
       expect(activeRun.phase).toBe('awaiting_followup');
 
-      handleProviderEvent(commonParams(activeRun, {
-        type: 'task_notification',
-        taskId: 'task-B',
-        taskStatus: 'completed',
-        taskMessage: 'done',
-      } as any));
+      handleProviderEvent(
+        commonParams(activeRun, {
+          type: 'task_notification',
+          taskId: 'task-B',
+          taskStatus: 'completed',
+          taskMessage: 'done',
+        } as any)
+      );
 
       expect(activeRun.pendingBackgroundTasks).toBe(0);
       expect(activeRun.phase).toBe('running');
@@ -1408,7 +1491,11 @@ describe('run-events agent_end -> maybeCompact', () => {
       llmProfile,
     } as any;
 
-    maybeCompactMock.mockResolvedValueOnce({ outcome: 'skipped', compacted: false, reason: 'below_threshold' });
+    maybeCompactMock.mockResolvedValueOnce({
+      outcome: 'skipped',
+      compacted: false,
+      reason: 'below_threshold',
+    });
 
     const { handleProviderEvent } = await import('../run-events.js');
 
@@ -1443,19 +1530,23 @@ describe('run-events agent_end -> maybeCompact', () => {
     await Promise.resolve();
 
     expect(maybeCompactMock).toHaveBeenCalledTimes(1);
-    expect(maybeCompactMock).toHaveBeenCalledWith(expect.objectContaining({
-      sessionId: 'session-1',
-      agentProfile,
-      llmProfile,
-      source: 'auto',
-    }));
+    expect(maybeCompactMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 'session-1',
+        agentProfile,
+        llmProfile,
+        source: 'auto',
+      })
+    );
   });
 
   it('sends compaction_completed event before run_completed when compaction succeeds', async () => {
     const sendRunEventMock = vi.fn();
     const agentProfile = { id: 'ap1', model: 'claude-sonnet-4-6' } as any;
     const llmProfile = {
-      id: 'lp1', providerType: 'anthropic', apiKey: 'k',
+      id: 'lp1',
+      providerType: 'anthropic',
+      apiKey: 'k',
       // Tight per-model window forces compaction in the mocked maybeCompactMock,
       // but we don't rely on it here — the mock returns the canned result directly.
       models: [{ modelId: 'claude-sonnet-4-6', contextWindow: 100 }],
@@ -1515,9 +1606,9 @@ describe('run-events agent_end -> maybeCompact', () => {
     await vi.runAllTimersAsync();
     await Promise.resolve();
 
-    const calls = sendRunEventMock.mock.calls.map((c) => c[0]);
-    const compactionIdx = calls.findIndex((e) => e?.type === 'compaction_completed');
-    const completedIdx = calls.findIndex((e) => e?.type === 'run_completed');
+    const calls = sendRunEventMock.mock.calls.map(c => c[0]);
+    const compactionIdx = calls.findIndex(e => e?.type === 'compaction_completed');
+    const completedIdx = calls.findIndex(e => e?.type === 'run_completed');
     expect(compactionIdx).toBeGreaterThanOrEqual(0);
     expect(completedIdx).toBeGreaterThanOrEqual(0);
     expect(compactionIdx).toBeLessThan(completedIdx);

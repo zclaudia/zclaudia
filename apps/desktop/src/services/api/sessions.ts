@@ -22,11 +22,11 @@ export interface SessionCompactionResponse {
 
 export async function getSessionCompaction(
   sessionId: string,
-  compactionId: string,
+  compactionId: string
 ): Promise<SessionCompactionResponse> {
   return apiCallForBackend<SessionCompactionResponse>(
     getBackendIdForSession(sessionId),
-    `/api/sessions/${sessionId}/compactions/${compactionId}`,
+    `/api/sessions/${sessionId}/compactions/${compactionId}`
   );
 }
 import { useOwnershipStore } from '../../stores/ownershipStore';
@@ -42,7 +42,11 @@ function getBackendIdForProject(projectId: string): string | null {
 
 export async function getSessions(projectId?: string, options?: RequestInit): Promise<Session[]> {
   const query = projectId ? `?projectId=${projectId}` : '';
-  return apiCallForBackend<Session[]>(projectId ? getBackendIdForProject(projectId) : null, `/api/sessions${query}`, options);
+  return apiCallForBackend<Session[]>(
+    projectId ? getBackendIdForProject(projectId) : null,
+    `/api/sessions${query}`,
+    options
+  );
 }
 
 export async function reorderSessions(projectId: string, orderedIds: string[]): Promise<void> {
@@ -52,7 +56,9 @@ export async function reorderSessions(projectId: string, orderedIds: string[]): 
   });
 }
 
-export async function getSessionRunState(sessionId: string): Promise<{ sessionId: string; isRunning: boolean; activeRunId?: string }> {
+export async function getSessionRunState(
+  sessionId: string
+): Promise<{ sessionId: string; isRunning: boolean; activeRunId?: string }> {
   return apiCallForBackend<{ sessionId: string; isRunning: boolean; activeRunId?: string }>(
     getBackendIdForSession(sessionId),
     `/api/sessions/${sessionId}/run-state`
@@ -69,17 +75,14 @@ export async function createSession(data: {
 }): Promise<Session> {
   return apiCallForBackend<Session>(getBackendIdForProject(data.projectId), '/api/sessions', {
     method: 'POST',
-    body: JSON.stringify(data)
+    body: JSON.stringify(data),
   });
 }
 
-export async function updateSession(
-  id: string,
-  data: Partial<Session>
-): Promise<void> {
+export async function updateSession(id: string, data: Partial<Session>): Promise<void> {
   return apiCallVoidForBackend(getBackendIdForSession(id), `/api/sessions/${id}`, {
     method: 'PUT',
-    body: JSON.stringify(data)
+    body: JSON.stringify(data),
   });
 }
 
@@ -87,40 +90,58 @@ export async function updateSessionWorkingDirectory(
   sessionId: string,
   workingDirectory: string
 ): Promise<Session> {
-  return apiCallForBackend<Session>(getBackendIdForSession(sessionId), `/api/sessions/${sessionId}/working-directory`, {
-    method: 'PATCH',
-    body: JSON.stringify({ workingDirectory })
-  });
+  return apiCallForBackend<Session>(
+    getBackendIdForSession(sessionId),
+    `/api/sessions/${sessionId}/working-directory`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ workingDirectory }),
+    }
+  );
 }
 
 export async function resetSessionSdkSession(sessionId: string): Promise<void> {
-  return apiCallVoidForBackend(getBackendIdForSession(sessionId), `/api/sessions/${sessionId}/reset-sdk-session`, { method: 'POST' });
+  return apiCallVoidForBackend(
+    getBackendIdForSession(sessionId),
+    `/api/sessions/${sessionId}/reset-sdk-session`,
+    { method: 'POST' }
+  );
 }
 
 export async function dismissInterrupted(sessionId: string): Promise<void> {
   // Fire-and-forget, no error check
-  await fetchApiForBackend(`/api/sessions/${sessionId}/dismiss-interrupted`, getBackendIdForSession(sessionId), { method: 'PATCH' });
+  await fetchApiForBackend(
+    `/api/sessions/${sessionId}/dismiss-interrupted`,
+    getBackendIdForSession(sessionId),
+    { method: 'PATCH' }
+  );
 }
 
 export async function unlockSession(sessionId: string): Promise<Session> {
-  return apiCallForBackend<Session>(getBackendIdForSession(sessionId), `/api/sessions/${sessionId}/unlock`, { method: 'PATCH' });
+  return apiCallForBackend<Session>(
+    getBackendIdForSession(sessionId),
+    `/api/sessions/${sessionId}/unlock`,
+    { method: 'PATCH' }
+  );
 }
 
 export async function deleteSession(id: string): Promise<void> {
-  return apiCallVoidForBackend(getBackendIdForSession(id), `/api/sessions/${id}`, { method: 'DELETE' });
+  return apiCallVoidForBackend(getBackendIdForSession(id), `/api/sessions/${id}`, {
+    method: 'DELETE',
+  });
 }
 
 export async function archiveSessions(sessionIds: string[]): Promise<void> {
   return apiCallVoid('/api/sessions/archive', {
     method: 'POST',
-    body: JSON.stringify({ sessionIds })
+    body: JSON.stringify({ sessionIds }),
   });
 }
 
 export async function restoreSessions(sessionIds: string[]): Promise<void> {
   return apiCallVoid('/api/sessions/restore', {
     method: 'POST',
-    body: JSON.stringify({ sessionIds })
+    body: JSON.stringify({ sessionIds }),
   });
 }
 
@@ -161,13 +182,22 @@ export async function getSessionMessages(
   if (options?.aroundMessageId) params.set('aroundMessageId', options.aroundMessageId);
 
   const query = params.toString() ? `?${params.toString()}` : '';
-  return apiCallForBackend<MessagesResponse>(getBackendIdForSession(sessionId), `/api/sessions/${sessionId}/messages${query}`, {
-    signal: options?.signal,
-  });
+  return apiCallForBackend<MessagesResponse>(
+    getBackendIdForSession(sessionId),
+    `/api/sessions/${sessionId}/messages${query}`,
+    {
+      signal: options?.signal,
+    }
+  );
 }
 
-export async function exportSession(sessionId: string): Promise<{ markdown: string; sessionName: string }> {
-  return apiCallForBackend<{ markdown: string; sessionName: string }>(getBackendIdForSession(sessionId), `/api/sessions/${sessionId}/export`);
+export async function exportSession(
+  sessionId: string
+): Promise<{ markdown: string; sessionName: string }> {
+  return apiCallForBackend<{ markdown: string; sessionName: string }>(
+    getBackendIdForSession(sessionId),
+    `/api/sessions/${sessionId}/export`
+  );
 }
 
 /**
@@ -181,7 +211,7 @@ export async function exportSession(sessionId: string): Promise<{ markdown: stri
 export async function forkSession(
   sessionId: string,
   treeEntryId: string,
-  name?: string,
+  name?: string
 ): Promise<Session> {
   return apiCallForBackend<Session>(
     getBackendIdForSession(sessionId),
@@ -189,7 +219,7 @@ export async function forkSession(
     {
       method: 'POST',
       body: JSON.stringify({ treeEntryId, ...(name ? { name } : {}) }),
-    },
+    }
   );
 }
 
@@ -203,7 +233,7 @@ export async function forkSession(
  */
 export async function branchSession(
   sessionId: string,
-  treeEntryId: string,
+  treeEntryId: string
 ): Promise<{ sessionId: string; leafId: string }> {
   return apiCallForBackend<{ sessionId: string; leafId: string }>(
     getBackendIdForSession(sessionId),
@@ -211,6 +241,6 @@ export async function branchSession(
     {
       method: 'POST',
       body: JSON.stringify({ treeEntryId }),
-    },
+    }
   );
 }

@@ -16,27 +16,32 @@ interface Props {
   epicId: string;
 }
 
-export function EpicDetailScreen({
-  projectId,
-  epicId,
-}: Props): React.ReactElement {
+export function EpicDetailScreen({ projectId, epicId }: Props): React.ReactElement {
   const [epic, setEpic] = useState<Epic | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const subIssues = useOpenSpecStore((s) =>
-    (s.issuesByProject[projectId] ?? []).filter((i) => i.epicId === epicId),
+  const subIssues = useOpenSpecStore(s =>
+    (s.issuesByProject[projectId] ?? []).filter(i => i.epicId === epicId)
   );
-  const patchView = useOpenSpecStore((s) => s.patchView);
-  const upsertIssue = useOpenSpecStore((s) => s.upsertIssue);
+  const patchView = useOpenSpecStore(s => s.patchView);
+  const upsertIssue = useOpenSpecStore(s => s.upsertIssue);
 
   useEffect(() => {
     let cancelled = false;
-    api.getEpic(epicId)
-      .then((value) => { if (!cancelled) setEpic(value); })
-      .catch((e) => { if (!cancelled) setLoadError((e as Error).message); });
-    api.listIssuesByEpic(epicId)
-      .then((list) => list.forEach(upsertIssue))
+    api
+      .getEpic(epicId)
+      .then(value => {
+        if (!cancelled) setEpic(value);
+      })
+      .catch(e => {
+        if (!cancelled) setLoadError((e as Error).message);
+      });
+    api
+      .listIssuesByEpic(epicId)
+      .then(list => list.forEach(upsertIssue))
       .catch(() => undefined);
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [epicId, upsertIssue]);
 
   if (!epic) {
@@ -44,9 +49,7 @@ export function EpicDetailScreen({
       <div className="p-4">
         <button
           className="text-sm text-primary hover:underline"
-          onClick={() =>
-            patchView(projectId, { screen: 'issues', selectedEpicId: undefined })
-          }
+          onClick={() => patchView(projectId, { screen: 'issues', selectedEpicId: undefined })}
         >
           ← Back to Issues
         </button>
@@ -58,8 +61,7 @@ export function EpicDetailScreen({
   }
 
   const allClosed =
-    subIssues.length > 0 &&
-    subIssues.every((i) => i.status === 'closed' || i.status === 'cancelled');
+    subIssues.length > 0 && subIssues.every(i => i.status === 'closed' || i.status === 'cancelled');
 
   const onClose = async (): Promise<void> => {
     try {
@@ -75,9 +77,7 @@ export function EpicDetailScreen({
       <nav className="text-sm text-muted-foreground flex items-center gap-2">
         <button
           className="text-primary hover:underline"
-          onClick={() =>
-            patchView(projectId, { screen: 'issues', selectedEpicId: undefined })
-          }
+          onClick={() => patchView(projectId, { screen: 'issues', selectedEpicId: undefined })}
         >
           ← Issues
         </button>
@@ -111,9 +111,7 @@ export function EpicDetailScreen({
         <h4 className="text-sm font-semibold">Issues</h4>
         <button
           className="px-2.5 py-1.5 text-xs rounded-md bg-secondary hover:bg-secondary/80"
-          onClick={() =>
-            patchView(projectId, { showNewIssue: true, selectedEpicId: epic.id })
-          }
+          onClick={() => patchView(projectId, { showNewIssue: true, selectedEpicId: epic.id })}
         >
           + Add Sub-Issue
         </button>
@@ -125,7 +123,7 @@ export function EpicDetailScreen({
         </div>
       ) : (
         <ul className="space-y-2">
-          {subIssues.map((s) => (
+          {subIssues.map(s => (
             <li
               key={s.id}
               className="border border-border rounded-md p-3 bg-card cursor-pointer hover:bg-secondary/30 transition-colors"

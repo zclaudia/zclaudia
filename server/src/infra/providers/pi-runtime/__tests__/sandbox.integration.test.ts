@@ -10,7 +10,12 @@ const gated = isSandboxAvailable() ? describe : describe.skip;
 async function runWrapped(command: string, workspaceRoot: string, timeoutSec = 20) {
   const w = await wrapCommand(command, { workspaceRoot });
   expect(w.sandboxed).toBe(true);
-  return runBash({ command: '', cwd: workspaceRoot, timeoutSec, sandbox: { argv: w.argv!, env: w.env! } });
+  return runBash({
+    command: '',
+    cwd: workspaceRoot,
+    timeoutSec,
+    sandbox: { argv: w.argv!, env: w.env! },
+  });
 }
 
 gated('sandbox enforcement (real OS sandbox present)', () => {
@@ -35,7 +40,11 @@ gated('sandbox enforcement (real OS sandbox present)', () => {
   it('network: a non-allow-listed domain is blocked', async () => {
     const ws = mkdtempSync(join(tmpdir(), 'zc-sbx-ws-'));
     // example.com is NOT in DEFAULT_ALLOWED_DOMAINS → must be blocked (fast-fail via proxy)
-    const r = await runWrapped(`curl -sS -m 6 -o /dev/null -w "HTTP:%{http_code}" https://example.com 2>&1 || echo "BLOCKED:$?"`, ws, 12);
+    const r = await runWrapped(
+      `curl -sS -m 6 -o /dev/null -w "HTTP:%{http_code}" https://example.com 2>&1 || echo "BLOCKED:$?"`,
+      ws,
+      12
+    );
     rmSync(ws, { recursive: true, force: true });
     // a real HTTP:200 would mean the network sandbox is NOT active — that must not happen
     expect(r.output).not.toContain('HTTP:200');

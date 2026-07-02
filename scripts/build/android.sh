@@ -13,12 +13,12 @@
 #
 # Requires: JDK 17, Android SDK, NDK, Rust Android targets
 set -euo pipefail
-cd "$(dirname "$0")/../.."
+# shellcheck source=scripts/build/common.sh
+source "$(dirname "$0")/common.sh"
+zclaudia_cd_repo_root
 
 # Load .env if present (for RELEASE_REMOTE, etc.)
-if [ -f .env ]; then
-  set -a; source .env; set +a
-fi
+zclaudia_load_env
 
 # Release remote config (only needed when RELEASE=1)
 RELEASE_REMOTE="${RELEASE_REMOTE:-origin}"
@@ -58,10 +58,9 @@ if [[ "$(uname)" == "Darwin" ]]; then
   export JAVA_HOME
   export ANDROID_HOME="${ANDROID_HOME:-/opt/homebrew/share/android-commandlinetools}"
   # Prefer rustup-managed toolchain over Homebrew Rust
-  export PATH="$HOME/.cargo/bin:$PATH"
+  zclaudia_prefer_rustup
   # Ensure Node.js is available (fnm / nvm) and matches .node-version
-  if command -v fnm >/dev/null 2>&1; then eval "$(fnm env --use-on-cd)"; fnm use --silent-if-unchanged 2>/dev/null || true; fi
-  if command -v nvm >/dev/null 2>&1; then nvm use 2>/dev/null || true; fi
+  zclaudia_setup_node
 else
   export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-17-openjdk-amd64}"
   export ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
@@ -76,14 +75,7 @@ BUILD_TOOLS="$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION"
 
 # --- Preflight checks ---
 echo "=== Preflight checks ==="
-for cmd in java rustup pnpm adb; do
-  if command -v "$cmd" >/dev/null 2>&1; then
-    echo "  [OK] $cmd"
-  else
-    echo "  [FAIL] $cmd not found"
-    exit 1
-  fi
-done
+zclaudia_require_commands java rustup pnpm adb
 [ -d "$ANDROID_HOME" ] || { echo "ERROR: ANDROID_HOME not found at $ANDROID_HOME"; exit 1; }
 echo "  [OK] ANDROID_HOME=$ANDROID_HOME"
 [ -d "$NDK_HOME" ] || { echo "ERROR: NDK not found at $NDK_HOME"; exit 1; }

@@ -1,6 +1,9 @@
 import type { TaskRecord, TaskResult, TaskStatus } from '@zclaudia/shared/core/task';
 
-import type { AgentRunnerTask, AgentTaskRunner } from '../../../application/orchestration/agent-task-runner.js';
+import type {
+  AgentRunnerTask,
+  AgentTaskRunner,
+} from '../../../application/orchestration/agent-task-runner.js';
 import type { TaskExecutor, TaskExecutorUpdate } from './types.js';
 
 function metadataRecord(task: TaskRecord): Record<string, unknown> {
@@ -19,13 +22,17 @@ interface PendingAgentRun {
 
 function deferredRun(): PendingAgentRun {
   let resolve!: (update: TaskExecutorUpdate) => void;
-  const promise = new Promise<TaskExecutorUpdate>((res) => {
+  const promise = new Promise<TaskExecutorUpdate>(res => {
     resolve = res;
   });
   return { promise, resolve };
 }
 
-function toRunnerTask(task: TaskRecord, prompt: string, metadata: Record<string, unknown>): AgentRunnerTask {
+function toRunnerTask(
+  task: TaskRecord,
+  prompt: string,
+  metadata: Record<string, unknown>
+): AgentRunnerTask {
   return {
     id: task.id,
     parentTaskId: task.parentTaskId ?? null,
@@ -53,7 +60,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs?: number): Promise<T> {
   if (!timeoutMs) return promise;
   return Promise.race([
     promise,
-    new Promise<T>((resolve) => {
+    new Promise<T>(resolve => {
       setTimeout(() => {
         resolve({
           status: 'failed',
@@ -115,7 +122,11 @@ export class AgentTaskExecutor implements TaskExecutor {
       };
     }
     const result = await withTimeout(pending.promise, options?.timeoutMs);
-    if (result.status === 'completed' || result.status === 'failed' || result.status === 'stopped') {
+    if (
+      result.status === 'completed' ||
+      result.status === 'failed' ||
+      result.status === 'stopped'
+    ) {
       this.pendingRuns.delete(taskId);
     }
     return result;

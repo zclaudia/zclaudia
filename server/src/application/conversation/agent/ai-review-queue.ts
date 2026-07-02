@@ -15,7 +15,11 @@
  */
 
 import type { AIReviewConfig, AIReviewResult } from '@zclaudia/shared/interaction/permissions';
-import { evaluateAIReview, type AIReviewContext, type AIReviewProvider } from './delegation-evaluator.js';
+import {
+  evaluateAIReview,
+  type AIReviewContext,
+  type AIReviewProvider,
+} from './delegation-evaluator.js';
 
 export interface AIReviewQueueOptions {
   /** Factory to create/resolve the analysis provider. Called once per queue lifetime (or on rotation). */
@@ -60,9 +64,9 @@ export class AIReviewQueue {
   enqueue(
     requestId: string,
     config: AIReviewConfig,
-    ctx: Omit<AIReviewContext, 'analysisProvider' | 'sessionId'>,
+    ctx: Omit<AIReviewContext, 'analysisProvider' | 'sessionId'>
   ): Promise<AIReviewResult> {
-    return new Promise<AIReviewResult>((resolve) => {
+    return new Promise<AIReviewResult>(resolve => {
       this.queue.push({ requestId, config, ctx, resolve, cancelled: false });
       this.processNext();
     });
@@ -129,8 +133,14 @@ export class AIReviewQueue {
 
       const provider = this.getProvider(entry.config.analysisLlmProfileId);
       if (!provider) {
-        console.log(`[AI Review Queue] No provider available (analysisLlmProfileId=${entry.config.analysisLlmProfileId || 'default'})`);
-        entry.resolve({ decision: 'uncertain', reasoning: 'No AI review provider available', confidence: 0 });
+        console.log(
+          `[AI Review Queue] No provider available (analysisLlmProfileId=${entry.config.analysisLlmProfileId || 'default'})`
+        );
+        entry.resolve({
+          decision: 'uncertain',
+          reasoning: 'No AI review provider available',
+          confidence: 0,
+        });
         return;
       }
 

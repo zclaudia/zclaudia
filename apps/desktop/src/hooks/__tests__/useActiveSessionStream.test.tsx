@@ -51,7 +51,7 @@ describe('useActiveSessionStream', () => {
       providerCapabilities: {},
     });
 
-    useServerStore.setState((state) => ({
+    useServerStore.setState(state => ({
       ...state,
       activeServerId: 'backend-1',
     }));
@@ -62,7 +62,7 @@ describe('useActiveSessionStream', () => {
       taskOwners: {},
     });
 
-    useRunStore.setState((state) => ({
+    useRunStore.setState(state => ({
       ...state,
       pagination: {
         ...state.pagination,
@@ -93,7 +93,7 @@ describe('useActiveSessionStream', () => {
     expect(facade.catchUpContent).not.toHaveBeenCalled();
 
     act(() => {
-      useFacadeStore.setState((state) => ({
+      useFacadeStore.setState(state => ({
         ...state,
         sessionStreams: {
           ...state.sessionStreams,
@@ -119,18 +119,18 @@ describe('useActiveSessionStream', () => {
     const { rerender } = renderHook(() => useActiveSessionStream());
 
     act(() => {
-      useOwnershipStore.setState((state) => ({
+      useOwnershipStore.setState(state => ({
         ...state,
         sessionBackendIds: {
           ...state.sessionBackendIds,
           'session-2': 'backend-2',
         },
       }));
-      useProjectStore.setState((state) => ({
+      useProjectStore.setState(state => ({
         ...state,
         selectedSessionId: 'session-2',
       }));
-      useServerStore.setState((state) => ({
+      useServerStore.setState(state => ({
         ...state,
         activeServerId: 'backend-2',
       }));

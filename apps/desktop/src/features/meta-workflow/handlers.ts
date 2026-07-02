@@ -18,11 +18,10 @@ export function handleMetaWorkflowMessage(msg: ServerMessage): boolean {
       return true;
 
     case 'meta_workflow_impact_recommendation':
-      useMetaWorkflowStore.getState().recordRecommendation(
-        msg.runId,
-        msg.phaseId,
-        { kind: msg.recommendation.kind, reason: msg.recommendation.reason },
-      );
+      useMetaWorkflowStore.getState().recordRecommendation(msg.runId, msg.phaseId, {
+        kind: msg.recommendation.kind,
+        reason: msg.recommendation.reason,
+      });
       return true;
 
     default:

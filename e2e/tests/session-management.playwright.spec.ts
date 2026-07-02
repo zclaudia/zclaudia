@@ -5,16 +5,14 @@
  * Covers creating, switching, archiving, and managing sessions.
  */
 
-import { test, expect } from '../fixtures/test-fixtures';
-import { ChatPage, ProjectPage } from '../page-objects';
+import { test } from '../fixtures/test-fixtures';
+import { ProjectPage } from '../page-objects';
 import { ensureServerConnection } from '../helpers/connection-helper';
 
 test.describe('Session Management', () => {
-  let chatPage: ChatPage;
   let projectPage: ProjectPage;
 
-  test.beforeEach(async ({ page, cleanDb }) => {
-    chatPage = new ChatPage(page);
+  test.beforeEach(async ({ page, cleanDb: _cleanDb }) => {
     projectPage = new ProjectPage(page);
 
     await page.goto('/');
@@ -32,7 +30,10 @@ test.describe('Session Management', () => {
     const hasNoProjects = await noProjectsText.isVisible({ timeout: 2000 }).catch(() => false);
 
     if (hasNoProjects) {
-      const success = await projectPage.createProject('Session Test Project', '/tmp/session-test-project');
+      const success = await projectPage.createProject(
+        'Session Test Project',
+        '/tmp/session-test-project'
+      );
       if (!success) {
         console.log('  ⚠️ Could not create test project (server may not be connected)');
         return false;
@@ -52,7 +53,9 @@ test.describe('Session Management', () => {
 
   // Helper: Get session list
   async function getSessionCount(page: any): Promise<number> {
-    const sessionItems = page.locator('[data-testid="session-item"], .session-item, [class*="session-list"] > div');
+    const sessionItems = page.locator(
+      '[data-testid="session-item"], .session-item, [class*="session-list"] > div'
+    );
     return await sessionItems.count();
   }
 
@@ -69,7 +72,11 @@ test.describe('Session Management', () => {
     }
 
     // Click new session button
-    const newSessionBtn = page.locator('button[title*="New Session"], button[data-testid="new-session-btn"], button:has-text("New Session")').first();
+    const newSessionBtn = page
+      .locator(
+        'button[title*="New Session"], button[data-testid="new-session-btn"], button:has-text("New Session")'
+      )
+      .first();
     const hasNewBtn = await newSessionBtn.isVisible({ timeout: 2000 }).catch(() => false);
 
     if (hasNewBtn) {
@@ -111,7 +118,7 @@ test.describe('Session Management', () => {
     }
 
     // Ensure at least 2 sessions exist
-    let sessionCount = await getSessionCount(page);
+    const sessionCount = await getSessionCount(page);
 
     if (sessionCount < 2) {
       // Create another session
@@ -132,7 +139,9 @@ test.describe('Session Management', () => {
       await page.waitForTimeout(500);
 
       // Check if session is now active
-      const activeIndicator = page.locator('.session-active, [data-active="true"], .selected-session').first();
+      const activeIndicator = page
+        .locator('.session-active, [data-active="true"], .selected-session')
+        .first();
       const isActive = await activeIndicator.isVisible({ timeout: 2000 }).catch(() => false);
 
       if (isActive) {
@@ -188,7 +197,9 @@ test.describe('Session Management', () => {
       await page.waitForTimeout(300);
 
       // Look for archive button
-      const archiveBtn = firstSession.locator('button[title*="Archive"], button:has-text("Archive")').first();
+      const archiveBtn = firstSession
+        .locator('button[title*="Archive"], button:has-text("Archive")')
+        .first();
       const hasArchive = await archiveBtn.isVisible({ timeout: 1000 }).catch(() => false);
 
       if (hasArchive) {
@@ -227,7 +238,7 @@ test.describe('Session Management', () => {
     }
 
     // Ensure at least 2 sessions (can't delete active session)
-    let sessionCount = await getSessionCount(page);
+    const sessionCount = await getSessionCount(page);
 
     if (sessionCount < 2) {
       const newSessionBtn = page.locator('button[title*="New Session"]').first();
@@ -246,14 +257,18 @@ test.describe('Session Management', () => {
       await page.waitForTimeout(300);
 
       // Look for delete button
-      const deleteBtn = secondSession.locator('button[title*="Delete"], button[title*="Remove"]').first();
+      const deleteBtn = secondSession
+        .locator('button[title*="Delete"], button[title*="Remove"]')
+        .first();
       const hasDelete = await deleteBtn.isVisible({ timeout: 1000 }).catch(() => false);
 
       if (hasDelete) {
         await deleteBtn.click();
 
         // Confirm deletion
-        const confirmBtn = page.locator('button:has-text("Confirm"), button:has-text("Delete")').first();
+        const confirmBtn = page
+          .locator('button:has-text("Confirm"), button:has-text("Delete")')
+          .first();
         if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
           await confirmBtn.click();
           await page.waitForTimeout(500);
@@ -281,7 +296,9 @@ test.describe('Session Management', () => {
     }
 
     // Look for search input
-    const searchInput = page.locator('input[placeholder*="Search"], input[placeholder*="session"]').first();
+    const searchInput = page
+      .locator('input[placeholder*="Search"], input[placeholder*="session"]')
+      .first();
     const hasSearch = await searchInput.isVisible({ timeout: 2000 }).catch(() => false);
 
     if (hasSearch) {
@@ -399,7 +416,9 @@ test.describe('Session Management', () => {
     }
 
     // Check for worktree indicator in session
-    const worktreeIndicator = page.locator('[data-testid="worktree-badge"], .worktree-indicator, text=/worktree/i').first();
+    const worktreeIndicator = page
+      .locator('[data-testid="worktree-badge"], .worktree-indicator, text=/worktree/i')
+      .first();
     const hasIndicator = await worktreeIndicator.isVisible({ timeout: 2000 }).catch(() => false);
 
     if (hasIndicator) {

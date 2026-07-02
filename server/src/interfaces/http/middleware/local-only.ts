@@ -15,7 +15,7 @@ export function localOnlyMiddleware(req: Request, res: Response, next: NextFunct
   if (!isLocalhost(req)) {
     res.status(403).json({
       success: false,
-      error: { code: 'LOCAL_ONLY', message: 'This endpoint is only accessible from localhost' }
+      error: { code: 'LOCAL_ONLY', message: 'This endpoint is only accessible from localhost' },
     });
     return;
   }

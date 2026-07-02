@@ -20,14 +20,14 @@ export const DEFAULT_AGENT_ID = 'default-agent';
  */
 export function seedDefaultAgent(
   db: Database.Database,
-  opts: { id?: string; name?: string } = {},
+  opts: { id?: string; name?: string } = {}
 ): string {
   const id = opts.id ?? DEFAULT_AGENT_ID;
   const name = opts.name ?? 'Default';
   const now = Date.now();
   db.prepare(
     `INSERT OR IGNORE INTO agent_profiles (id, name, is_default, created_at, updated_at)
-     VALUES (?, ?, 1, ?, ?)`,
+     VALUES (?, ?, 1, ?, ?)`
   ).run(id, name, now, now);
   return id;
 }

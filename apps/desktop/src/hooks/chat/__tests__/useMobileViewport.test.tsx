@@ -78,7 +78,9 @@ describe('useMobileViewport', () => {
 
     const { getByTestId } = render(<HookHarness />);
     const root = getByTestId('chat-root') as HTMLDivElement;
-    const resizeHandler = vi.mocked(viewport.addEventListener).mock.calls.find(([event]) => event === 'resize')?.[1] as () => void;
+    const resizeHandler = vi
+      .mocked(viewport.addEventListener)
+      .mock.calls.find(([event]) => event === 'resize')?.[1] as () => void;
 
     expect(root.style.position).toBe('');
 

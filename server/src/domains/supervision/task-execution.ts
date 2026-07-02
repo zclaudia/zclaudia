@@ -5,7 +5,11 @@ import type { Session } from '@zclaudia/shared/core/session';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import type { SupervisionLogEvent, SupervisionTask } from '@zclaudia/shared/features/supervision';
 import type { SupervisionTaskRepository } from './repositories/supervision-task.js';
-import type { SupervisionProjectPort, SupervisionSessionPort, SupervisionSessionModelPort } from './ports.js';
+import type {
+  SupervisionProjectPort,
+  SupervisionSessionPort,
+  SupervisionSessionModelPort,
+} from './ports.js';
 import type { ContextManager } from './context-manager.js';
 import type { WorktreeManager } from './worktree-manager.js';
 import type { TaskScheduler } from './task-scheduler.js';
@@ -29,16 +33,12 @@ interface TaskExecutionDeps {
   handleTaskRunMessage: (taskId: string, projectId: string, msg: ServerMessage) => void;
   handleLiteTaskMessage: (taskId: string, projectId: string, msg: ServerMessage) => void;
   getContextManager: (projectId: string, rootPath: string) => ContextManager;
-  buildTaskPrompt: (
-    task: SupervisionTask,
-    projectName: string,
-    contextInjection: string,
-  ) => string;
+  buildTaskPrompt: (task: SupervisionTask, projectName: string, contextInjection: string) => string;
   log: (
     projectId: string,
     event: SupervisionLogEvent,
     detail?: Record<string, unknown>,
-    taskId?: string,
+    taskId?: string
   ) => void;
   broadcastTaskUpdate: (taskId: string, projectId: string) => void;
 }
@@ -67,10 +67,15 @@ export class TaskExecution {
         const pool = this.deps.worktreeManager.getWorktreePool(task.projectId);
         workingDirectory = await pool.acquire(task.id, task.attempt);
         acquiredFromPool = true;
-        this.deps.log(task.projectId, 'worktree_acquired', {
-          taskId: task.id,
-          worktreePath: workingDirectory,
-        }, task.id);
+        this.deps.log(
+          task.projectId,
+          'worktree_acquired',
+          {
+            taskId: task.id,
+            worktreePath: workingDirectory,
+          },
+          task.id
+        );
       } catch (err) {
         console.error(`[Supervisor] Failed to acquire worktree for task ${task.id}:`, err);
         this.markTaskStartFailed(task, err);
@@ -99,13 +104,18 @@ export class TaskExecution {
       taskMarkedRunning = true;
 
       this.deps.broadcastTaskUpdate(task.id, task.projectId);
-      this.deps.log(task.projectId, 'task_status_changed', {
-        taskId: task.id,
-        from: task.status,
-        to: 'running',
-        sessionId: session.id,
-        workingDirectory,
-      }, task.id);
+      this.deps.log(
+        task.projectId,
+        'task_status_changed',
+        {
+          taskId: task.id,
+          from: task.status,
+          to: 'running',
+          sessionId: session.id,
+          workingDirectory,
+        },
+        task.id
+      );
       this.deps.dispatcher.dispatchAll(agg.releaseEvents());
 
       const contextManager = this.deps.getContextManager(task.projectId, project.rootPath);
@@ -120,7 +130,7 @@ export class TaskExecution {
         sessionId: session.id,
         input: systemPrompt,
         workingDirectory,
-        onMessage: (msg) => {
+        onMessage: msg => {
           this.deps.handleTaskRunMessage(task.id, task.projectId, msg);
           this.deps.broadcast(msg);
         },
@@ -140,13 +150,18 @@ export class TaskExecution {
           const agg = new TaskAggregate(currentTask, this.deps.taskRepo);
           agg.markStartFailed(err instanceof Error ? err.message : String(err));
           this.deps.broadcastTaskUpdate(task.id, task.projectId);
-          this.deps.log(task.projectId, 'task_status_changed', {
-            taskId: task.id,
-            from: 'running',
-            to: 'failed',
-            reason: 'start_failed',
-            error: err instanceof Error ? err.message : String(err),
-          }, task.id);
+          this.deps.log(
+            task.projectId,
+            'task_status_changed',
+            {
+              taskId: task.id,
+              from: 'running',
+              to: 'failed',
+              reason: 'start_failed',
+              error: err instanceof Error ? err.message : String(err),
+            },
+            task.id
+          );
           this.deps.dispatcher.dispatchAll(agg.releaseEvents());
         }
       }
@@ -159,11 +174,16 @@ export class TaskExecution {
       if (acquiredFromPool && !taskMarkedRunning) {
         const pool = this.deps.worktreeManager.getPoolsMap().get(task.projectId);
         pool?.release(workingDirectory);
-        this.deps.log(task.projectId, 'worktree_released', {
-          taskId: task.id,
-          worktreePath: workingDirectory,
-          reason: 'start_task_failed_before_running',
-        }, task.id);
+        this.deps.log(
+          task.projectId,
+          'worktree_released',
+          {
+            taskId: task.id,
+            worktreePath: workingDirectory,
+            reason: 'start_task_failed_before_running',
+          },
+          task.id
+        );
       }
     }
   }
@@ -186,12 +206,17 @@ export class TaskExecution {
       agg.markLiteStarted(session.id);
 
       this.deps.broadcastTaskUpdate(task.id, task.projectId);
-      this.deps.log(task.projectId, 'task_status_changed', {
-        taskId: task.id,
-        from: task.status,
-        to: 'running',
-        sessionId: session.id,
-      }, task.id);
+      this.deps.log(
+        task.projectId,
+        'task_status_changed',
+        {
+          taskId: task.id,
+          from: task.status,
+          to: 'running',
+          sessionId: session.id,
+        },
+        task.id
+      );
       this.deps.dispatcher.dispatchAll(agg.releaseEvents());
 
       const clientId = `lite_task_${task.id}`;
@@ -203,7 +228,7 @@ export class TaskExecution {
         sessionId: session.id,
         input: task.description,
         workingDirectory: project.rootPath,
-        onMessage: (msg) => {
+        onMessage: msg => {
           this.deps.handleLiteTaskMessage(task.id, task.projectId, msg);
           this.deps.broadcast(msg);
         },
@@ -225,7 +250,7 @@ export class TaskExecution {
         const patch = this.deps.sessionModel.buildTaskExecutingSessionPatch(workingDirectory);
         this.deps.sessionRepo.update(
           existing.id,
-          patch as Partial<Omit<Session, 'id' | 'createdAt' | 'updatedAt'>>,
+          patch as Partial<Omit<Session, 'id' | 'createdAt' | 'updatedAt'>>
         );
         return {
           ...existing,
@@ -260,14 +285,11 @@ export class TaskExecution {
         taskId: task.id,
         parentSessionId: project.agent?.mainSessionId,
         workingDirectory: project.rootPath,
-      }),
+      })
     );
   }
 
-  private markTaskStartFailed(
-    task: SupervisionTask,
-    err: unknown,
-  ): void {
+  private markTaskStartFailed(task: SupervisionTask, err: unknown): void {
     const currentTask = this.deps.taskRepo.findById(task.id);
     if (!currentTask) return;
 
@@ -276,13 +298,18 @@ export class TaskExecution {
     agg.markStartFailed(errorMsg);
 
     this.deps.broadcastTaskUpdate(task.id, task.projectId);
-    this.deps.log(task.projectId, 'task_status_changed', {
-      taskId: task.id,
-      from: currentTask.status,
-      to: 'failed',
-      reason: 'start_failed',
-      error: errorMsg,
-    }, task.id);
+    this.deps.log(
+      task.projectId,
+      'task_status_changed',
+      {
+        taskId: task.id,
+        from: currentTask.status,
+        to: 'failed',
+        reason: 'start_failed',
+        error: errorMsg,
+      },
+      task.id
+    );
     this.deps.dispatcher.dispatchAll(agg.releaseEvents());
   }
 }

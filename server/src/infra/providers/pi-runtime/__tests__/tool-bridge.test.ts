@@ -1,6 +1,19 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { mkdtemp, rm, mkdir, writeFile } from 'fs/promises';
-import { chmodSync, lstatSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync, statSync, symlinkSync, utimesSync, truncateSync } from 'fs';
+import {
+  chmodSync,
+  lstatSync,
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  rmSync,
+  readFileSync,
+  existsSync,
+  statSync,
+  symlinkSync,
+  utimesSync,
+  truncateSync,
+} from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import Database from 'better-sqlite3';
@@ -9,7 +22,10 @@ import { getDeferredDiagnosticsResult } from '../write-lifecycle.js';
 import { filePathToUri, type LspTransport } from '../lsp-diagnostics-adapter.js';
 import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
 import { TaskRepository } from '../../../../domains/tasks/repository.js';
-import { CommandTaskExecutor, pidAlive } from '../../../../domains/tasks/executors/command-executor.js';
+import {
+  CommandTaskExecutor,
+  pidAlive,
+} from '../../../../domains/tasks/executors/command-executor.js';
 import { mcpClientManager } from '../../../../utils/mcp-client-manager.js';
 import * as sandbox from '../sandbox.js';
 
@@ -252,21 +268,27 @@ describe('buildTools', () => {
       ],
     });
 
-    expect(permissionCallback).toHaveBeenCalledWith(expect.objectContaining({
-      requestId: 'question-1',
-      toolName: 'AskUserQuestion',
-      detail: 'Which tool should the agent use next?',
-    }));
+    expect(permissionCallback).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestId: 'question-1',
+        toolName: 'AskUserQuestion',
+        detail: 'Which tool should the agent use next?',
+      })
+    );
     expect(result.details).toMatchObject({ ok: true, answered: true });
     expect(result.content[0].text).toContain('Use WebFetch first.');
   });
 
   it('WebFetch converts HTML to markdown by default and drops scripts', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => ({
-      status: 200,
-      statusText: 'OK',
-      text: async () => '<html><body><h1>Hello</h1><script>bad()</script><p>World &amp; Friends</p></body></html>',
-    })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        status: 200,
+        statusText: 'OK',
+        text: async () =>
+          '<html><body><h1>Hello</h1><script>bad()</script><p>World &amp; Friends</p></body></html>',
+      }))
+    );
     const webFetch = buildTools('/tmp', { enabled: ['WebFetch'] })[0] as any;
 
     const result = await webFetch.execute('fetch-1', { url: 'https://example.com' });
@@ -278,13 +300,16 @@ describe('buildTools', () => {
   });
 
   it('WebFetch returns non-HTML content (JSON) verbatim', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      statusText: 'OK',
-      headers: new Headers({ 'content-type': 'application/json' }),
-      text: async () => '{"name":"widget","version":"1.0"}',
-    })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: new Headers({ 'content-type': 'application/json' }),
+        text: async () => '{"name":"widget","version":"1.0"}',
+      }))
+    );
     const webFetch = buildTools('/tmp', { enabled: ['WebFetch'] })[0] as any;
 
     const result = await webFetch.execute('fetch-1', { url: 'https://example.com/pkg.json' });
@@ -305,13 +330,16 @@ describe('buildTools', () => {
   });
 
   it('WebFetch includes non-2xx status details without throwing away the body', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => ({
-      ok: false,
-      status: 404,
-      statusText: 'Not Found',
-      headers: new Headers({ 'content-type': 'text/html' }),
-      text: async () => '<html><body><h1>Missing</h1></body></html>',
-    })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+        headers: new Headers({ 'content-type': 'text/html' }),
+        text: async () => '<html><body><h1>Missing</h1></body></html>',
+      }))
+    );
     const webFetch = buildTools('/tmp', { enabled: ['WebFetch'] })[0] as any;
 
     const result = await webFetch.execute('fetch-1', { url: 'https://example.com/missing' });
@@ -322,11 +350,13 @@ describe('buildTools', () => {
   });
 
   it('WebSearch returns snippets, decodes DuckDuckGo redirects, and applies domain filters', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      statusText: 'OK',
-      text: async () => `
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        text: async () => `
         <div class="result">
           <a class="result__a" href="//duckduckgo.com/l/?uddg=${encodeURIComponent('https://docs.example.com/api?x=1&y=2')}">API &amp; Docs</a>
           <a class="result__snippet">Current docs for the API.</a>
@@ -336,7 +366,8 @@ describe('buildTools', () => {
           <a class="result__snippet">Should be filtered out.</a>
         </div>
       `,
-    })));
+      }))
+    );
     const webSearch = buildTools('/tmp', { enabled: ['WebSearch'] })[0] as any;
 
     const result = await webSearch.execute('search-1', {
@@ -358,12 +389,15 @@ describe('buildTools', () => {
   });
 
   it('WebSearch reports provider failures as structured errors', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => ({
-      ok: false,
-      status: 503,
-      statusText: 'Service Unavailable',
-      text: async () => 'search is down',
-    })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: false,
+        status: 503,
+        statusText: 'Service Unavailable',
+        text: async () => 'search is down',
+      }))
+    );
     const webSearch = buildTools('/tmp', { enabled: ['WebSearch'] })[0] as any;
 
     const result = await webSearch.execute('search-1', { query: 'api docs' });
@@ -459,20 +493,22 @@ describe('buildTools', () => {
       const parsed = JSON.parse(result.content[0].text);
       const task = taskRepo.findById(parsed.taskId);
 
-      expect(agentTaskExecutor.start).toHaveBeenCalledWith(expect.objectContaining({
-        id: parsed.taskId,
-        type: 'agent',
-        metadata: expect.objectContaining({
-          prompt: 'Explore this repo',
-          wait: true,
-          permissionOverride: {
-            profile: {
-              fileWrite: 'ask',
-              networkOps: 'block',
+      expect(agentTaskExecutor.start).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: parsed.taskId,
+          type: 'agent',
+          metadata: expect.objectContaining({
+            prompt: 'Explore this repo',
+            wait: true,
+            permissionOverride: {
+              profile: {
+                fileWrite: 'ask',
+                networkOps: 'block',
+              },
             },
-          },
-        }),
-      }));
+          }),
+        })
+      );
       expect(agentTaskExecutor.wait).toHaveBeenCalledWith(parsed.taskId);
       expect(parsed).toMatchObject({
         ok: true,
@@ -491,7 +527,11 @@ describe('buildTools', () => {
         result: { text: 'direct child agent result' },
         metadata: expect.objectContaining({ prompt: 'Explore this repo', wait: true }),
       });
-      expect(taskRepo.listEvents(parsed.taskId).map(event => event.type)).toEqual(['created', 'started', 'completed']);
+      expect(taskRepo.listEvents(parsed.taskId).map(event => event.type)).toEqual([
+        'created',
+        'started',
+        'completed',
+      ]);
     } finally {
       db.close();
     }
@@ -509,7 +549,12 @@ describe('buildTools', () => {
       result: { text: 'Child agent summary' },
     });
     taskRepo.addEvent({ taskId: task.id, type: 'created', status: 'queued' });
-    taskRepo.addEvent({ taskId: task.id, type: 'completed', status: 'completed', payload: { text: 'Child agent summary' } });
+    taskRepo.addEvent({
+      taskId: task.id,
+      type: 'completed',
+      status: 'completed',
+      payload: { text: 'Child agent summary' },
+    });
     const taskOutput = buildTools('/tmp', {
       enabled: ['TaskOutput'],
       db,
@@ -525,7 +570,10 @@ describe('buildTools', () => {
       status: 'completed',
       result: { text: 'Child agent summary' },
     });
-    expect(parsed.events.map((event: { type: string }) => event.type)).toEqual(['created', 'completed']);
+    expect(parsed.events.map((event: { type: string }) => event.type)).toEqual([
+      'created',
+      'completed',
+    ]);
     db.close();
   });
 
@@ -570,14 +618,22 @@ describe('buildTools', () => {
         intervalMs: 30_000,
       },
     });
-    expect(taskRepo.listEvents(started.taskId).map(event => event.type)).toEqual(['created', 'started', 'stopped']);
+    expect(taskRepo.listEvents(started.taskId).map(event => event.type)).toEqual([
+      'created',
+      'started',
+      'stopped',
+    ]);
     db.close();
   });
 
   it('MCPTool reports missing db context as a structured error', async () => {
     const mcpTool = buildTools('/tmp', { enabled: ['MCPTool'] })[0] as any;
 
-    const result = await mcpTool.execute('mcp-1', { server: 'github', tool: 'create_issue', arguments: {} });
+    const result = await mcpTool.execute('mcp-1', {
+      server: 'github',
+      tool: 'create_issue',
+      arguments: {},
+    });
 
     expect(result.details).toMatchObject({ ok: false, error: 'missing_db_context' });
     expect(result.content[0].text).toContain('MCP tools require a database-backed run context');
@@ -635,7 +691,11 @@ describe('buildTools', () => {
     await writeFile(path.join(root, 'dist', 'bundle.js'), 'ignored\n');
     const glob = buildTools(root, { enabled: ['Glob'] })[0] as any;
 
-    const result = await glob.execute('glob-1', { pattern: '**/*.ts', path: 'src', max_results: 10 });
+    const result = await glob.execute('glob-1', {
+      pattern: '**/*.ts',
+      path: 'src',
+      max_results: 10,
+    });
     const parsed = JSON.parse(result.content[0].text);
 
     expect(result.details).toMatchObject({ ok: true, pattern: '**/*.ts', total: 2 });
@@ -648,12 +708,10 @@ describe('buildTools', () => {
     const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-grep-'));
     tempDirs.push(root);
     await mkdir(path.join(root, 'src'), { recursive: true });
-    await writeFile(path.join(root, 'src', 'feature.ts'), [
-      'before',
-      'const target = true;',
-      'after',
-      '',
-    ].join('\n'));
+    await writeFile(
+      path.join(root, 'src', 'feature.ts'),
+      ['before', 'const target = true;', 'after', ''].join('\n')
+    );
     await writeFile(path.join(root, 'src', 'feature.md'), 'target in docs\n');
     const grep = buildTools(root, { enabled: ['grep'] })[0] as any;
 
@@ -668,9 +726,24 @@ describe('buildTools', () => {
 
     expect(result.details).toMatchObject({ ok: true, pattern: 'target', total: 3 });
     expect(parsed.results).toEqual([
-      expect.objectContaining({ file: 'src/feature.ts', line: 1, preview: 'before', isMatch: false }),
-      expect.objectContaining({ file: 'src/feature.ts', line: 2, preview: 'const target = true;', isMatch: true }),
-      expect.objectContaining({ file: 'src/feature.ts', line: 3, preview: 'after', isMatch: false }),
+      expect.objectContaining({
+        file: 'src/feature.ts',
+        line: 1,
+        preview: 'before',
+        isMatch: false,
+      }),
+      expect.objectContaining({
+        file: 'src/feature.ts',
+        line: 2,
+        preview: 'const target = true;',
+        isMatch: true,
+      }),
+      expect.objectContaining({
+        file: 'src/feature.ts',
+        line: 3,
+        preview: 'after',
+        isMatch: false,
+      }),
     ]);
   });
 
@@ -678,12 +751,10 @@ describe('buildTools', () => {
     const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-lsp-'));
     tempDirs.push(root);
     await mkdir(path.join(root, 'src'), { recursive: true });
-    await writeFile(path.join(root, 'src', 'feature.ts'), [
-      'export function targetSymbol() {',
-      '  return 1;',
-      '}',
-      '',
-    ].join('\n'));
+    await writeFile(
+      path.join(root, 'src', 'feature.ts'),
+      ['export function targetSymbol() {', '  return 1;', '}', ''].join('\n')
+    );
     await writeFile(path.join(root, 'src', 'feature.md'), 'targetSymbol in docs\n');
     const lsp = buildTools(root, { enabled: ['LSPTool'] })[0] as any;
 
@@ -695,7 +766,12 @@ describe('buildTools', () => {
     });
     const parsed = JSON.parse(result.content[0].text);
 
-    expect(result.details).toMatchObject({ ok: true, action: 'symbols', fallback: 'ripgrep', total: 1 });
+    expect(result.details).toMatchObject({
+      ok: true,
+      action: 'symbols',
+      fallback: 'ripgrep',
+      total: 1,
+    });
     expect(parsed.results).toEqual([
       expect.objectContaining({
         file: 'src/feature.ts',
@@ -752,7 +828,11 @@ describe('Grep bridge tool', () => {
   it('case_insensitive matches both FOO and foo', async () => {
     const dir = await fixture();
     const grep = buildTools(dir, { enabled: ['Grep'] })[0] as any;
-    const res = await grep.execute('c3', { pattern: 'foo', case_insensitive: true, output_mode: 'files_with_matches' });
+    const res = await grep.execute('c3', {
+      pattern: 'foo',
+      case_insensitive: true,
+      output_mode: 'files_with_matches',
+    });
     const parsed = JSON.parse(res.content[0].text);
     rmSync(dir, { recursive: true, force: true });
     expect(parsed.files.sort()).toEqual(['a.ts', 'b.ts']);
@@ -775,7 +855,11 @@ describe('Grep bridge tool', () => {
     writeFileSync(path.join(dir, 'f2.ts'), 'const NEEDLE = 2;\n');
     writeFileSync(path.join(dir, 'f3.ts'), 'const NEEDLE = 3;\n');
     const grep = buildTools(dir, { enabled: ['Grep'] })[0] as any;
-    const res = await grep.execute('c5', { pattern: 'NEEDLE', output_mode: 'count', max_results: 2 });
+    const res = await grep.execute('c5', {
+      pattern: 'NEEDLE',
+      output_mode: 'count',
+      max_results: 2,
+    });
     const parsed = JSON.parse(res.content[0].text);
     rmSync(dir, { recursive: true, force: true });
     expect(parsed.truncated).toBe(true);
@@ -786,7 +870,9 @@ describe('Grep bridge tool', () => {
 describe('Write bridge tool', () => {
   it('creates a new file and reports type "create"', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
-    const write = buildTools(dir, { enabled: ['Write'] }).find((t: any) => t.name === 'Write') as any;
+    const write = buildTools(dir, { enabled: ['Write'] }).find(
+      (t: any) => t.name === 'Write'
+    ) as any;
     const res = await write.execute('w1', { file_path: 'sub/new.txt', content: 'hello' });
     const onDisk = readFileSync(path.join(dir, 'sub/new.txt'), 'utf8');
     rmSync(dir, { recursive: true, force: true });
@@ -796,7 +882,9 @@ describe('Write bridge tool', () => {
 
   it('rejects writing content larger than the mutation cap', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-large-content-'));
-    const write = buildTools(dir, { enabled: ['Write'] }).find((t: any) => t.name === 'Write') as any;
+    const write = buildTools(dir, { enabled: ['Write'] }).find(
+      (t: any) => t.name === 'Write'
+    ) as any;
 
     const res = await write.execute('w-large-content', {
       file_path: 'large.txt',
@@ -815,8 +903,10 @@ describe('Write bridge tool', () => {
 
   it('caps large write diff details and structured patch output', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-diff-cap-'));
-    const original = Array.from({ length: 1_000 }, (_, i) => `old-${i}`.padEnd(45, 'a')).join('\n') + '\n';
-    const updated = Array.from({ length: 1_000 }, (_, i) => `new-${i}`.padEnd(45, 'b')).join('\n') + '\n';
+    const original =
+      Array.from({ length: 1_000 }, (_, i) => `old-${i}`.padEnd(45, 'a')).join('\n') + '\n';
+    const updated =
+      Array.from({ length: 1_000 }, (_, i) => `new-${i}`.padEnd(45, 'b')).join('\n') + '\n';
     writeFileSync(path.join(dir, 'large-diff.ts'), original);
     const tools = buildTools(dir, { enabled: ['Read', 'Write'] });
     const read = tools.find((t: any) => t.name === 'Read') as any;
@@ -835,7 +925,9 @@ describe('Write bridge tool', () => {
 
   it('rejects writing outside the workspace', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
-    const write = buildTools(dir, { enabled: ['Write'] }).find((t: any) => t.name === 'Write') as any;
+    const write = buildTools(dir, { enabled: ['Write'] }).find(
+      (t: any) => t.name === 'Write'
+    ) as any;
     const res = await write.execute('w2', { file_path: '../escape.txt', content: 'x' });
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.error).toBe('path_outside_workspace');
@@ -845,9 +937,14 @@ describe('Write bridge tool', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
     const outside = mkdtempSync(path.join(tmpdir(), 'zc-write-outside-'));
     symlinkSync(outside, path.join(dir, 'outside-link'), 'dir');
-    const write = buildTools(dir, { enabled: ['Write'] }).find((t: any) => t.name === 'Write') as any;
+    const write = buildTools(dir, { enabled: ['Write'] }).find(
+      (t: any) => t.name === 'Write'
+    ) as any;
 
-    const res = await write.execute('w-symlink-parent', { file_path: 'outside-link/escape.txt', content: 'x' });
+    const res = await write.execute('w-symlink-parent', {
+      file_path: 'outside-link/escape.txt',
+      content: 'x',
+    });
     const outsideChanged = existsSync(path.join(outside, 'escape.txt'));
 
     rmSync(dir, { recursive: true, force: true });
@@ -877,7 +974,9 @@ describe('Write bridge tool', () => {
 
   it('rejects writing obvious private key material', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
-    const write = buildTools(dir, { enabled: ['Write'] }).find((t: any) => t.name === 'Write') as any;
+    const write = buildTools(dir, { enabled: ['Write'] }).find(
+      (t: any) => t.name === 'Write'
+    ) as any;
 
     const res = await write.execute('w-secret', {
       file_path: 'key.pem',
@@ -890,11 +989,14 @@ describe('Write bridge tool', () => {
 
   it('rejects writing obvious API token material', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
-    const write = buildTools(dir, { enabled: ['Write'] }).find((t: any) => t.name === 'Write') as any;
+    const write = buildTools(dir, { enabled: ['Write'] }).find(
+      (t: any) => t.name === 'Write'
+    ) as any;
 
     const res = await write.execute('w-token-secret', {
       file_path: '.env',
-      content: 'ANTHROPIC_API_KEY=sk-ant-api03-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\n',
+      content:
+        'ANTHROPIC_API_KEY=sk-ant-api03-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\n',
     });
 
     rmSync(dir, { recursive: true, force: true });
@@ -903,7 +1005,9 @@ describe('Write bridge tool', () => {
 
   it('rejects dangerous permission changes in agent settings files', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
-    const write = buildTools(dir, { enabled: ['Write'] }).find((t: any) => t.name === 'Write') as any;
+    const write = buildTools(dir, { enabled: ['Write'] }).find(
+      (t: any) => t.name === 'Write'
+    ) as any;
 
     const res = await write.execute('w-settings-unsafe', {
       file_path: '.claude/settings.json',
@@ -917,7 +1021,9 @@ describe('Write bridge tool', () => {
   it('requires an existing file to be read before overwriting it', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
     writeFileSync(path.join(dir, 'f.ts'), 'const a = 1;\n');
-    const write = buildTools(dir, { enabled: ['Write'] }).find((t: any) => t.name === 'Write') as any;
+    const write = buildTools(dir, { enabled: ['Write'] }).find(
+      (t: any) => t.name === 'Write'
+    ) as any;
 
     const res = await write.execute('w3', { file_path: 'f.ts', content: 'const a = 2;\n' });
 
@@ -950,7 +1056,10 @@ describe('Write bridge tool', () => {
     const write = tools.find((t: any) => t.name === 'Write') as any;
 
     await read.execute('r-write-diff', { path: 'f.ts' });
-    const res = await write.execute('w-diff', { file_path: 'f.ts', content: 'const a = 1;\nconst b = 3;\n' });
+    const res = await write.execute('w-diff', {
+      file_path: 'f.ts',
+      content: 'const a = 1;\nconst b = 3;\n',
+    });
 
     rmSync(dir, { recursive: true, force: true });
     expect(res.details).toMatchObject({
@@ -1010,30 +1119,51 @@ describe('Write bridge tool', () => {
     writeFileSync(filePath, 'const a = 1;\n');
     const afterWrite = vi.fn().mockResolvedValue({
       notifications: ['indexed f.ts'],
-      diagnostics: [{ path: 'f.ts', line: 1, severity: 'warning', message: 'check import order', source: 'fake-lsp' }],
+      diagnostics: [
+        {
+          path: 'f.ts',
+          line: 1,
+          severity: 'warning',
+          message: 'check import order',
+          source: 'fake-lsp',
+        },
+      ],
     });
     const tools = buildTools(dir, { enabled: ['Read', 'Write'], writeLifecycle: { afterWrite } });
     const read = tools.find((t: any) => t.name === 'Read') as any;
     const write = tools.find((t: any) => t.name === 'Write') as any;
 
     await read.execute('r-write-lifecycle-update', { path: 'f.ts' });
-    const res = await write.execute('w-lifecycle-update', { file_path: 'f.ts', content: 'const a = 2;\n' });
+    const res = await write.execute('w-lifecycle-update', {
+      file_path: 'f.ts',
+      content: 'const a = 2;\n',
+    });
 
     rmSync(dir, { recursive: true, force: true });
-    expect(afterWrite).toHaveBeenCalledWith(expect.objectContaining({
-      operation: 'write',
-      type: 'update',
-      path: 'f.ts',
-      absolutePath: filePath,
-      originalContent: 'const a = 1;\n',
-      updatedContent: 'const a = 2;\n',
-      firstChangedLine: 1,
-    }));
+    expect(afterWrite).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'write',
+        type: 'update',
+        path: 'f.ts',
+        absolutePath: filePath,
+        originalContent: 'const a = 1;\n',
+        updatedContent: 'const a = 2;\n',
+        firstChangedLine: 1,
+      })
+    );
     expect(afterWrite.mock.calls[0][0].diff).toContain('-const a = 1;');
     expect(afterWrite.mock.calls[0][0].diff).toContain('+const a = 2;');
     expect(res.details.lifecycle).toMatchObject({
       notifications: ['indexed f.ts'],
-      diagnostics: [{ path: 'f.ts', line: 1, severity: 'warning', message: 'check import order', source: 'fake-lsp' }],
+      diagnostics: [
+        {
+          path: 'f.ts',
+          line: 1,
+          severity: 'warning',
+          message: 'check import order',
+          source: 'fake-lsp',
+        },
+      ],
     });
   });
 
@@ -1045,16 +1175,21 @@ describe('Write bridge tool', () => {
       fileChangeNotifier: { notifyFileChanged },
     } as any).find((t: any) => t.name === 'Write') as any;
 
-    const res = await write.execute('w-file-change-notify', { file_path: 'f.ts', content: 'const a = 1;\n' });
+    const res = await write.execute('w-file-change-notify', {
+      file_path: 'f.ts',
+      content: 'const a = 1;\n',
+    });
 
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.ok).toBe(true);
-    expect(notifyFileChanged).toHaveBeenCalledWith(expect.objectContaining({
-      path: 'f.ts',
-      absolutePath: path.join(dir, 'f.ts'),
-      changeKind: 'create',
-      operation: 'write',
-    }));
+    expect(notifyFileChanged).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: 'f.ts',
+        absolutePath: path.join(dir, 'f.ts'),
+        changeKind: 'create',
+        operation: 'write',
+      })
+    );
     expect(res.details.lifecycle).toMatchObject({
       notifications: ['file_change_notified:f.ts'],
     });
@@ -1063,21 +1198,44 @@ describe('Write bridge tool', () => {
   it('returns diagnostics from a diagnostics provider adapter after writing', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
     const diagnosticsProvider = vi.fn().mockResolvedValue([
-      { path: 'f.ts', line: 1, column: 7, severity: 'error', message: 'Type mismatch', source: 'fake-ts' },
+      {
+        path: 'f.ts',
+        line: 1,
+        column: 7,
+        severity: 'error',
+        message: 'Type mismatch',
+        source: 'fake-ts',
+      },
     ]);
-    const write = buildTools(dir, { enabled: ['Write'], diagnosticsProvider }).find((t: any) => t.name === 'Write') as any;
+    const write = buildTools(dir, { enabled: ['Write'], diagnosticsProvider }).find(
+      (t: any) => t.name === 'Write'
+    ) as any;
 
-    const res = await write.execute('w-diagnostics-provider', { file_path: 'f.ts', content: 'const a: string = 1;\n' });
+    const res = await write.execute('w-diagnostics-provider', {
+      file_path: 'f.ts',
+      content: 'const a: string = 1;\n',
+    });
 
     rmSync(dir, { recursive: true, force: true });
-    expect(diagnosticsProvider).toHaveBeenCalledWith(expect.objectContaining({
-      operation: 'write',
-      type: 'create',
-      path: 'f.ts',
-      updatedContent: 'const a: string = 1;\n',
-    }));
+    expect(diagnosticsProvider).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'write',
+        type: 'create',
+        path: 'f.ts',
+        updatedContent: 'const a: string = 1;\n',
+      })
+    );
     expect(res.details.lifecycle).toMatchObject({
-      diagnostics: [{ path: 'f.ts', line: 1, column: 7, severity: 'error', message: 'Type mismatch', source: 'fake-ts' }],
+      diagnostics: [
+        {
+          path: 'f.ts',
+          line: 1,
+          column: 7,
+          severity: 'error',
+          message: 'Type mismatch',
+          source: 'fake-ts',
+        },
+      ],
     });
   });
 
@@ -1091,11 +1249,23 @@ describe('Write bridge tool', () => {
       },
     } as any).find((t: any) => t.name === 'Write') as any;
 
-    const res = await write.execute('w-command-diagnostics', { file_path: 'f.ts', content: 'const a: string = 1;\n' });
+    const res = await write.execute('w-command-diagnostics', {
+      file_path: 'f.ts',
+      content: 'const a: string = 1;\n',
+    });
 
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.lifecycle).toMatchObject({
-      diagnostics: [{ path: 'f.ts', line: 1, column: 7, severity: 'error', message: 'Type mismatch', source: 'TS2322' }],
+      diagnostics: [
+        {
+          path: 'f.ts',
+          line: 1,
+          column: 7,
+          severity: 'error',
+          message: 'Type mismatch',
+          source: 'TS2322',
+        },
+      ],
     });
   });
 
@@ -1104,16 +1274,18 @@ describe('Write bridge tool', () => {
     const filePath = path.join(dir, 'f.ts');
     const handlers = new Map<string, (params: unknown) => void>();
     const transport: LspTransport = {
-      notify: vi.fn(async (method) => {
+      notify: vi.fn(async method => {
         if (method === 'textDocument/didSave') {
           handlers.get('textDocument/publishDiagnostics')?.({
             uri: filePathToUri(filePath),
-            diagnostics: [{
-              range: { start: { line: 0, character: 6 } },
-              severity: 1,
-              message: 'Type mismatch',
-              source: 'tsserver',
-            }],
+            diagnostics: [
+              {
+                range: { start: { line: 0, character: 6 } },
+                severity: 1,
+                message: 'Type mismatch',
+                source: 'tsserver',
+              },
+            ],
           });
         }
       }),
@@ -1127,13 +1299,25 @@ describe('Write bridge tool', () => {
       lspDiagnosticsAdapter: { transport, diagnosticsTimeoutMs: 100 },
     } as any).find((t: any) => t.name === 'Write') as any;
 
-    const res = await write.execute('w-lsp-diagnostics', { file_path: 'f.ts', content: 'const a: string = 1;\n' });
+    const res = await write.execute('w-lsp-diagnostics', {
+      file_path: 'f.ts',
+      content: 'const a: string = 1;\n',
+    });
 
     rmSync(dir, { recursive: true, force: true });
     expect(transport.notify).toHaveBeenCalledWith('textDocument/didOpen', expect.any(Object));
     expect(transport.notify).toHaveBeenCalledWith('textDocument/didSave', expect.any(Object));
     expect(res.details.lifecycle).toMatchObject({
-      diagnostics: [{ path: 'f.ts', line: 1, column: 7, severity: 'error', message: 'Type mismatch', source: 'tsserver' }],
+      diagnostics: [
+        {
+          path: 'f.ts',
+          line: 1,
+          column: 7,
+          severity: 'error',
+          message: 'Type mismatch',
+          source: 'tsserver',
+        },
+      ],
       notifications: ['file_change_notified:f.ts'],
     });
   });
@@ -1141,10 +1325,14 @@ describe('Write bridge tool', () => {
   it('defers slow diagnostics provider results without blocking write completion', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
     let releaseDiagnostics!: () => void;
-    const diagnosticsReady = new Promise<void>(resolve => { releaseDiagnostics = resolve; });
+    const diagnosticsReady = new Promise<void>(resolve => {
+      releaseDiagnostics = resolve;
+    });
     const diagnosticsProvider = vi.fn(async () => {
       await diagnosticsReady;
-      return [{ path: 'f.ts', line: 1, severity: 'warning', message: 'late warning', source: 'fake-ts' }];
+      return [
+        { path: 'f.ts', line: 1, severity: 'warning', message: 'late warning', source: 'fake-ts' },
+      ];
     });
     const write = buildTools(dir, {
       enabled: ['Write'],
@@ -1152,7 +1340,10 @@ describe('Write bridge tool', () => {
       diagnosticsMode: 'deferred',
     }).find((t: any) => t.name === 'Write') as any;
 
-    const res = await write.execute('w-deferred-diagnostics', { file_path: 'f.ts', content: 'const a = 1;\n' });
+    const res = await write.execute('w-deferred-diagnostics', {
+      file_path: 'f.ts',
+      content: 'const a = 1;\n',
+    });
     expect(res.details.lifecycle).toMatchObject({
       deferredDiagnostics: { status: 'pending' },
     });
@@ -1163,7 +1354,15 @@ describe('Write bridge tool', () => {
     await vi.waitFor(() => {
       expect(getDeferredDiagnosticsResult(id)).toMatchObject({
         status: 'completed',
-        diagnostics: [{ path: 'f.ts', line: 1, severity: 'warning', message: 'late warning', source: 'fake-ts' }],
+        diagnostics: [
+          {
+            path: 'f.ts',
+            line: 1,
+            severity: 'warning',
+            message: 'late warning',
+            source: 'fake-ts',
+          },
+        ],
       });
     });
 
@@ -1174,29 +1373,41 @@ describe('Write bridge tool', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
     const filePath = path.join(dir, 'new.ts');
     const afterWrite = vi.fn().mockResolvedValue({ notifications: ['created new.ts'] });
-    const write = buildTools(dir, { enabled: ['Write'], writeLifecycle: { afterWrite } }).find((t: any) => t.name === 'Write') as any;
+    const write = buildTools(dir, { enabled: ['Write'], writeLifecycle: { afterWrite } }).find(
+      (t: any) => t.name === 'Write'
+    ) as any;
 
-    const res = await write.execute('w-lifecycle-create', { file_path: 'new.ts', content: 'export const a = 1;\n' });
+    const res = await write.execute('w-lifecycle-create', {
+      file_path: 'new.ts',
+      content: 'export const a = 1;\n',
+    });
 
     rmSync(dir, { recursive: true, force: true });
-    expect(afterWrite).toHaveBeenCalledWith(expect.objectContaining({
-      operation: 'write',
-      type: 'create',
-      path: 'new.ts',
-      absolutePath: filePath,
-      originalContent: null,
-      updatedContent: 'export const a = 1;\n',
-      firstChangedLine: 1,
-    }));
+    expect(afterWrite).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'write',
+        type: 'create',
+        path: 'new.ts',
+        absolutePath: filePath,
+        originalContent: null,
+        updatedContent: 'export const a = 1;\n',
+        firstChangedLine: 1,
+      })
+    );
     expect(res.details.lifecycle).toMatchObject({ notifications: ['created new.ts'] });
   });
 
   it('keeps the write successful when the lifecycle hook fails', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
     const afterWrite = vi.fn().mockRejectedValue(new Error('diagnostics unavailable'));
-    const write = buildTools(dir, { enabled: ['Write'], writeLifecycle: { afterWrite } }).find((t: any) => t.name === 'Write') as any;
+    const write = buildTools(dir, { enabled: ['Write'], writeLifecycle: { afterWrite } }).find(
+      (t: any) => t.name === 'Write'
+    ) as any;
 
-    const res = await write.execute('w-lifecycle-failure', { file_path: 'new.ts', content: 'export const a = 1;\n' });
+    const res = await write.execute('w-lifecycle-failure', {
+      file_path: 'new.ts',
+      content: 'export const a = 1;\n',
+    });
     const onDisk = readFileSync(path.join(dir, 'new.ts'), 'utf8');
 
     rmSync(dir, { recursive: true, force: true });
@@ -1216,7 +1427,10 @@ describe('Write bridge tool', () => {
       writeLifecycle: { afterWrite, timeoutMs: 5 },
     }).find((t: any) => t.name === 'Write') as any;
 
-    const res = await write.execute('w-lifecycle-timeout', { file_path: 'new.ts', content: 'export const a = 1;\n' });
+    const res = await write.execute('w-lifecycle-timeout', {
+      file_path: 'new.ts',
+      content: 'export const a = 1;\n',
+    });
     const onDisk = readFileSync(path.join(dir, 'new.ts'), 'utf8');
 
     rmSync(dir, { recursive: true, force: true });
@@ -1247,8 +1461,12 @@ describe('Write bridge tool', () => {
   it('serializes concurrent writes to the same file through lifecycle completion', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
     let releaseFirst!: () => void;
-    const firstBlocked = new Promise<void>(resolve => { releaseFirst = resolve; });
-    const afterWrite = vi.fn((input: any) => input.updatedContent.includes('one') ? firstBlocked : undefined);
+    const firstBlocked = new Promise<void>(resolve => {
+      releaseFirst = resolve;
+    });
+    const afterWrite = vi.fn((input: any) =>
+      input.updatedContent.includes('one') ? firstBlocked : undefined
+    );
     const write = buildTools(dir, {
       enabled: ['Write'],
       writeLifecycle: { afterWrite, timeoutMs: 1000 },
@@ -1302,7 +1520,10 @@ describe('Write bridge tool', () => {
     writeFileSync(filePath, 'const external = true;\n');
     const past = new Date(Date.now() - 5000);
     utimesSync(filePath, past, past);
-    const res = await write.execute('w-stale-mtime', { file_path: 'f.ts', content: 'const a = 2;\n' });
+    const res = await write.execute('w-stale-mtime', {
+      file_path: 'f.ts',
+      content: 'const a = 2;\n',
+    });
     const onDisk = readFileSync(filePath, 'utf8');
 
     rmSync(dir, { recursive: true, force: true });
@@ -1321,7 +1542,10 @@ describe('Write bridge tool', () => {
     await read.execute('r-write-mtime-only', { path: 'f.ts' });
     const future = new Date(Date.now() + 5000);
     utimesSync(filePath, future, future);
-    const res = await write.execute('w-mtime-only', { file_path: 'f.ts', content: 'const a = 2;\n' });
+    const res = await write.execute('w-mtime-only', {
+      file_path: 'f.ts',
+      content: 'const a = 2;\n',
+    });
     const onDisk = readFileSync(filePath, 'utf8');
 
     rmSync(dir, { recursive: true, force: true });
@@ -1337,7 +1561,10 @@ describe('Write bridge tool', () => {
     const write = tools.find((t: any) => t.name === 'Write') as any;
 
     await read.execute('r-write-crlf', { path: 'f.ts' });
-    const res = await write.execute('w-crlf', { file_path: 'f.ts', content: 'const a = 1;\nconst b = 3;\n' });
+    const res = await write.execute('w-crlf', {
+      file_path: 'f.ts',
+      content: 'const a = 1;\nconst b = 3;\n',
+    });
     const onDisk = readFileSync(path.join(dir, 'f.ts'), 'utf8');
 
     rmSync(dir, { recursive: true, force: true });
@@ -1355,7 +1582,10 @@ describe('Write bridge tool', () => {
     const write = tools.find((t: any) => t.name === 'Write') as any;
 
     await read.execute('r-write-mode', { path: 'script.sh' });
-    const res = await write.execute('w-mode', { file_path: 'script.sh', content: '#!/bin/sh\necho new\n' });
+    const res = await write.execute('w-mode', {
+      file_path: 'script.sh',
+      content: '#!/bin/sh\necho new\n',
+    });
     const mode = statSync(filePath).mode & 0o777;
 
     rmSync(dir, { recursive: true, force: true });
@@ -1372,7 +1602,10 @@ describe('Write bridge tool', () => {
     const write = tools.find((t: any) => t.name === 'Write') as any;
 
     await read.execute('r-write-utf16', { path: 'utf16.ts' });
-    const res = await write.execute('w-utf16', { file_path: 'utf16.ts', content: 'const a = 2;\n' });
+    const res = await write.execute('w-utf16', {
+      file_path: 'utf16.ts',
+      content: 'const a = 2;\n',
+    });
     const onDisk = readFileSync(filePath);
 
     rmSync(dir, { recursive: true, force: true });
@@ -1584,7 +1817,11 @@ describe('Edit bridge tool', () => {
     expect(res.details).toMatchObject({ ok: false, error: 'patch_partial_failure' });
     expect(res.details.perFileResults).toEqual([
       expect.objectContaining({ path: 'a.ts', ok: true, preview: true }),
-      expect.objectContaining({ path: 'link.ts', ok: false, error: expect.stringMatching(/symlink_escape|path_outside_workspace/) }),
+      expect.objectContaining({
+        path: 'link.ts',
+        ok: false,
+        error: expect.stringMatching(/symlink_escape|path_outside_workspace/),
+      }),
     ]);
     expect(a).toBe('const a = 1;\n');
     expect(linkStillSymlink).toBe(true);
@@ -1620,7 +1857,11 @@ describe('Edit bridge tool', () => {
     const read = tools.find((t: any) => t.name === 'Read') as any;
     const edit = tools.find((t: any) => t.name === 'Edit') as any;
     await read.execute('r-edit', { path: 'f.ts' });
-    const res = await edit.execute('e1', { file_path: 'f.ts', old_string: 'const a = 1;', new_string: 'const a = 2;' });
+    const res = await edit.execute('e1', {
+      file_path: 'f.ts',
+      old_string: 'const a = 1;',
+      new_string: 'const a = 2;',
+    });
     const onDisk = readFileSync(path.join(dir, 'f.ts'), 'utf8');
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.ok).toBe(true);
@@ -1635,7 +1876,11 @@ describe('Edit bridge tool', () => {
     const edit = tools.find((t: any) => t.name === 'Edit') as any;
 
     await read.execute('r-edit-diff', { path: 'f.ts' });
-    const res = await edit.execute('e-diff', { file_path: 'f.ts', old_string: 'const b = 2;', new_string: 'const b = 3;' });
+    const res = await edit.execute('e-diff', {
+      file_path: 'f.ts',
+      old_string: 'const b = 2;',
+      new_string: 'const b = 3;',
+    });
 
     rmSync(dir, { recursive: true, force: true });
     expect(res.details).toMatchObject({
@@ -1673,8 +1918,10 @@ describe('Edit bridge tool', () => {
 
   it('caps large edit diff details and structured patch output', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-diff-cap-'));
-    const original = Array.from({ length: 1_000 }, (_, i) => `old-${i}`.padEnd(45, 'a')).join('\n') + '\n';
-    const updated = Array.from({ length: 1_000 }, (_, i) => `new-${i}`.padEnd(45, 'b')).join('\n') + '\n';
+    const original =
+      Array.from({ length: 1_000 }, (_, i) => `old-${i}`.padEnd(45, 'a')).join('\n') + '\n';
+    const updated =
+      Array.from({ length: 1_000 }, (_, i) => `new-${i}`.padEnd(45, 'b')).join('\n') + '\n';
     writeFileSync(path.join(dir, 'large-diff.ts'), original);
     const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
     const read = tools.find((t: any) => t.name === 'Read') as any;
@@ -1697,12 +1944,10 @@ describe('Edit bridge tool', () => {
 
   it('applies same-file batch edits in one Edit call and keeps the snapshot current', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
-    writeFileSync(path.join(dir, 'f.ts'), [
-      'const a = 1;',
-      'const b = 2;',
-      'const c = 3;',
-      '',
-    ].join('\n'));
+    writeFileSync(
+      path.join(dir, 'f.ts'),
+      ['const a = 1;', 'const b = 2;', 'const c = 3;', ''].join('\n')
+    );
     const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
     const read = tools.find((t: any) => t.name === 'Read') as any;
     const edit = tools.find((t: any) => t.name === 'Edit') as any;
@@ -1770,9 +2015,7 @@ describe('Edit bridge tool', () => {
 
     const single = await multiEdit.execute('me-single', {
       file_path: 'f.ts',
-      edits: [
-        { old_string: 'const a = 1;', new_string: 'const a = 10;' },
-      ],
+      edits: [{ old_string: 'const a = 1;', new_string: 'const a = 10;' }],
     });
     const malformed = await multiEdit.execute('me-malformed', {
       file_path: 'f.ts',
@@ -1784,10 +2027,19 @@ describe('Edit bridge tool', () => {
     const onDisk = readFileSync(path.join(dir, 'f.ts'), 'utf8');
 
     rmSync(dir, { recursive: true, force: true });
-    expect(single.details).toMatchObject({ ok: false, error: 'invalid_edits', editCount: 1, minEdits: 2 });
-    expect(single.content[0].text).toContain('MultiEdit requires at least 2 replacements; use Edit for one exact replacement');
+    expect(single.details).toMatchObject({
+      ok: false,
+      error: 'invalid_edits',
+      editCount: 1,
+      minEdits: 2,
+    });
+    expect(single.content[0].text).toContain(
+      'MultiEdit requires at least 2 replacements; use Edit for one exact replacement'
+    );
     expect(malformed.details).toMatchObject({ ok: false, error: 'missing_strings', editIndex: 1 });
-    expect(malformed.content[0].text).toContain('MultiEdit edits[1] requires old_string and new_string');
+    expect(malformed.content[0].text).toContain(
+      'MultiEdit edits[1] requires old_string and new_string'
+    );
     expect(malformed.content[0].text).not.toContain('Edit edits must');
     expect(onDisk).toBe('const a = 1;\nconst b = 2;\n');
   });
@@ -1898,12 +2150,14 @@ describe('Edit bridge tool', () => {
     expect(preview.details.preview).toBe(true);
     expect(res.details.ok).toBe(true);
     expect(notifyFileChanged).toHaveBeenCalledTimes(1);
-    expect(notifyFileChanged).toHaveBeenCalledWith(expect.objectContaining({
-      path: 'f.ts',
-      absolutePath: filePath,
-      changeKind: 'modify',
-      operation: 'edit',
-    }));
+    expect(notifyFileChanged).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: 'f.ts',
+        absolutePath: filePath,
+        changeKind: 'modify',
+        operation: 'edit',
+      })
+    );
   });
 
   it('edits a line by hashline anchor', async () => {
@@ -1969,7 +2223,11 @@ describe('Edit bridge tool', () => {
     const onDisk = readFileSync(path.join(dir, 'f.ts'), 'utf8');
 
     rmSync(dir, { recursive: true, force: true });
-    expect(res.details).toMatchObject({ ok: true, preview: true, hashline: { tag: readRes.details.hashline.tag } });
+    expect(res.details).toMatchObject({
+      ok: true,
+      preview: true,
+      hashline: { tag: readRes.details.hashline.tag },
+    });
     expect(res.details.diff).toContain('+const b = 3;');
     expect(onDisk).toBe('const a = 1;\nconst b = 2;\n');
   });
@@ -2028,7 +2286,11 @@ describe('Edit bridge tool', () => {
     const edit = tools.find((t: any) => t.name === 'Edit') as any;
 
     await read.execute('r-focused-patch', { path: 'f.ts' });
-    const res = await edit.execute('e-focused-patch', { file_path: 'f.ts', old_string: 'line 6', new_string: 'line six' });
+    const res = await edit.execute('e-focused-patch', {
+      file_path: 'f.ts',
+      old_string: 'line 6',
+      new_string: 'line six',
+    });
 
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.structuredPatch).toEqual([
@@ -2052,7 +2314,11 @@ describe('Edit bridge tool', () => {
     const edit = tools.find((t: any) => t.name === 'Edit') as any;
 
     await read.execute('r-edit-backup', { path: 'f.ts' });
-    const res = await edit.execute('e-backup', { file_path: 'f.ts', old_string: 'const a = 1;', new_string: 'const a = 2;' });
+    const res = await edit.execute('e-backup', {
+      file_path: 'f.ts',
+      old_string: 'const a = 1;',
+      new_string: 'const a = 2;',
+    });
     const backupContent = readFileSync(String(res.details.backup?.path), 'utf8');
 
     rmSync(dir, { recursive: true, force: true });
@@ -2065,28 +2331,52 @@ describe('Edit bridge tool', () => {
     const filePath = path.join(dir, 'f.ts');
     writeFileSync(filePath, 'const a = 1;\n');
     const afterWrite = vi.fn().mockResolvedValue({
-      diagnostics: [{ path: 'f.ts', line: 1, column: 7, severity: 'error', message: 'fake diagnostic', source: 'fake-lsp' }],
+      diagnostics: [
+        {
+          path: 'f.ts',
+          line: 1,
+          column: 7,
+          severity: 'error',
+          message: 'fake diagnostic',
+          source: 'fake-lsp',
+        },
+      ],
     });
     const tools = buildTools(dir, { enabled: ['Read', 'Edit'], writeLifecycle: { afterWrite } });
     const read = tools.find((t: any) => t.name === 'Read') as any;
     const edit = tools.find((t: any) => t.name === 'Edit') as any;
 
     await read.execute('r-edit-lifecycle', { path: 'f.ts' });
-    const res = await edit.execute('e-lifecycle', { file_path: 'f.ts', old_string: 'const a = 1;', new_string: 'const a = 2;' });
+    const res = await edit.execute('e-lifecycle', {
+      file_path: 'f.ts',
+      old_string: 'const a = 1;',
+      new_string: 'const a = 2;',
+    });
 
     rmSync(dir, { recursive: true, force: true });
-    expect(afterWrite).toHaveBeenCalledWith(expect.objectContaining({
-      operation: 'edit',
-      type: 'update',
-      path: 'f.ts',
-      absolutePath: filePath,
-      originalContent: 'const a = 1;\n',
-      updatedContent: 'const a = 2;\n',
-      firstChangedLine: 1,
-    }));
+    expect(afterWrite).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'edit',
+        type: 'update',
+        path: 'f.ts',
+        absolutePath: filePath,
+        originalContent: 'const a = 1;\n',
+        updatedContent: 'const a = 2;\n',
+        firstChangedLine: 1,
+      })
+    );
     expect(res.details.replaced).toBe(1);
     expect(res.details.lifecycle).toMatchObject({
-      diagnostics: [{ path: 'f.ts', line: 1, column: 7, severity: 'error', message: 'fake diagnostic', source: 'fake-lsp' }],
+      diagnostics: [
+        {
+          path: 'f.ts',
+          line: 1,
+          column: 7,
+          severity: 'error',
+          message: 'fake diagnostic',
+          source: 'fake-lsp',
+        },
+      ],
     });
   });
 
@@ -2095,7 +2385,11 @@ describe('Edit bridge tool', () => {
     writeFileSync(path.join(dir, 'f.ts'), 'const a = 1;\n');
     const edit = buildTools(dir, { enabled: ['Edit'] }).find((t: any) => t.name === 'Edit') as any;
 
-    const res = await edit.execute('e-unread', { file_path: 'f.ts', old_string: 'const a = 1;', new_string: 'const a = 2;' });
+    const res = await edit.execute('e-unread', {
+      file_path: 'f.ts',
+      old_string: 'const a = 1;',
+      new_string: 'const a = 2;',
+    });
 
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.error).toBe('file_not_read');
@@ -2109,7 +2403,11 @@ describe('Edit bridge tool', () => {
     const edit = tools.find((t: any) => t.name === 'Edit') as any;
 
     await read.execute('r-ipynb', { path: 'n.ipynb' });
-    const res = await edit.execute('e-ipynb', { file_path: 'n.ipynb', old_string: '{}', new_string: '{"cells":[]}' });
+    const res = await edit.execute('e-ipynb', {
+      file_path: 'n.ipynb',
+      old_string: '{}',
+      new_string: '{"cells":[]}',
+    });
 
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.error).toBe('unsupported_notebook_edit');
@@ -2122,7 +2420,11 @@ describe('Edit bridge tool', () => {
     truncateSync(filePath, 1024 * 1024 * 1024 + 1);
     const edit = buildTools(dir, { enabled: ['Edit'] }).find((t: any) => t.name === 'Edit') as any;
 
-    const res = await edit.execute('e-large', { file_path: 'large.ts', old_string: 'a', new_string: 'b' });
+    const res = await edit.execute('e-large', {
+      file_path: 'large.ts',
+      old_string: 'a',
+      new_string: 'b',
+    });
 
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.error).toBe('file_too_large');
@@ -2212,7 +2514,11 @@ describe('Edit bridge tool', () => {
     const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
     const edit = tools.find((t: any) => t.name === 'Edit') as any;
 
-    const res = await edit.execute('e-unread', { file_path: 'f.ts', old_string: 'const a = 1;', new_string: 'const a = 3;' });
+    const res = await edit.execute('e-unread', {
+      file_path: 'f.ts',
+      old_string: 'const a = 1;',
+      new_string: 'const a = 3;',
+    });
 
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.error).toBe('file_not_read');
@@ -2228,7 +2534,11 @@ describe('Edit bridge tool', () => {
     const edit = tools.find((t: any) => t.name === 'Edit') as any;
 
     await read.execute('r-partial', { path: 'f.ts', offset: 1, limit: 1 });
-    const res = await edit.execute('e-partial', { file_path: 'f.ts', old_string: 'const a = 1;', new_string: 'const a = 3;' });
+    const res = await edit.execute('e-partial', {
+      file_path: 'f.ts',
+      old_string: 'const a = 1;',
+      new_string: 'const a = 3;',
+    });
 
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.ok).toBe(true);
@@ -2242,7 +2552,11 @@ describe('Edit bridge tool', () => {
     const edit = tools.find((t: any) => t.name === 'Edit') as any;
 
     await read.execute('r-edit-crlf', { path: 'f.ts' });
-    const res = await edit.execute('e-crlf', { file_path: 'f.ts', old_string: 'const b = 2;', new_string: 'const b = 3;' });
+    const res = await edit.execute('e-crlf', {
+      file_path: 'f.ts',
+      old_string: 'const b = 2;',
+      new_string: 'const b = 3;',
+    });
     const onDisk = readFileSync(path.join(dir, 'f.ts'), 'utf8');
 
     rmSync(dir, { recursive: true, force: true });
@@ -2262,7 +2576,11 @@ describe('Edit bridge tool', () => {
     writeFileSync(filePath, 'const external = true;\n');
     const future = new Date(Date.now() + 5000);
     utimesSync(filePath, future, future);
-    const res = await edit.execute('e-stale', { file_path: 'f.ts', old_string: 'const a = 1;', new_string: 'const a = 2;' });
+    const res = await edit.execute('e-stale', {
+      file_path: 'f.ts',
+      old_string: 'const a = 1;',
+      new_string: 'const a = 2;',
+    });
     const onDisk = readFileSync(filePath, 'utf8');
 
     rmSync(dir, { recursive: true, force: true });
@@ -2330,7 +2648,12 @@ describe('Edit bridge tool', () => {
     const read = tools.find((t: any) => t.name === 'Read') as any;
     const edit = tools.find((t: any) => t.name === 'Edit') as any;
     await read.execute('r-replace-all', { path: 'f.ts' });
-    const res = await edit.execute('e3', { file_path: 'f.ts', old_string: 'x', new_string: 'y', replace_all: true });
+    const res = await edit.execute('e3', {
+      file_path: 'f.ts',
+      old_string: 'x',
+      new_string: 'y',
+      replace_all: true,
+    });
     const onDisk = readFileSync(path.join(dir, 'f.ts'), 'utf8');
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.replaced).toBe(2);
@@ -2357,7 +2680,11 @@ describe('Edit bridge tool', () => {
     const read = tools.find((t: any) => t.name === 'Read') as any;
     const edit = tools.find((t: any) => t.name === 'Edit') as any;
     await read.execute('r-curly', { path: 'f.ts' });
-    const res = await edit.execute('e5', { file_path: 'f.ts', old_string: 'const msg = "hello";', new_string: 'const msg = "world";' });
+    const res = await edit.execute('e5', {
+      file_path: 'f.ts',
+      old_string: 'const msg = "hello";',
+      new_string: 'const msg = "world";',
+    });
     const onDisk = readFileSync(path.join(dir, 'f.ts'), 'utf8');
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.ok).toBe(true);
@@ -2394,7 +2721,10 @@ describe('Bash bridge tool', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-bashtool-'));
     mkdirSync(path.join(dir, 'sub'));
     writeFileSync(path.join(dir, 'sub', 'marker.txt'), 'x');
-    const res = await bashTool(dir).execute('b3', { command: 'test -f marker.txt && printf marker.txt', cwd: 'sub' });
+    const res = await bashTool(dir).execute('b3', {
+      command: 'test -f marker.txt && printf marker.txt',
+      cwd: 'sub',
+    });
     rmSync(dir, { recursive: true, force: true });
     expect(res.content[0].text).toContain('marker.txt');
   });
@@ -2427,7 +2757,8 @@ describe('Bash bridge tool', () => {
 });
 
 describe('Read image files', () => {
-  const PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const PNG_BASE64 =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
   it('returns an image content block for image files when vision is supported', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-read-img-'));
@@ -2480,7 +2811,10 @@ describe('Read image files', () => {
   it('mid-size images bypass text read size limit when vision is supported', async () => {
     // Images between DEFAULT_READ_MAX_BYTES (512KB) and 5MB vision cap bypass the text-read size limit
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-read-img-mid-'));
-    writeFileSync(path.join(dir, 'mid.png'), Buffer.concat([Buffer.from(PNG_BASE64, 'base64'), Buffer.alloc(1024 * 1024)]));
+    writeFileSync(
+      path.join(dir, 'mid.png'),
+      Buffer.concat([Buffer.from(PNG_BASE64, 'base64'), Buffer.alloc(1024 * 1024)])
+    );
     const read = buildTools(dir, { enabled: ['Read'], supportsVision: true } as any)[0] as any;
 
     const result = await read.execute('read-img-mid', { path: 'mid.png' });
@@ -2551,7 +2885,9 @@ describe('Bash background execution', () => {
 
   it('returns immediately with a taskId and the process runs detached', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-bashbg-'));
-    const bash = buildTools(dir, { enabled: ['Bash'], db }).find((t: any) => t.name === 'Bash') as any;
+    const bash = buildTools(dir, { enabled: ['Bash'], db }).find(
+      (t: any) => t.name === 'Bash'
+    ) as any;
     const start = Date.now();
     const res = await bash.execute('bg1', { command: 'sleep 5', run_in_background: true });
     const elapsed = Date.now() - start;
@@ -2576,8 +2912,13 @@ describe('Bash background execution', () => {
   it('plan/read-only mode refuses run_in_background (no workspace write)', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-bgplan-'));
     const target = path.join(dir, 'pwned.txt');
-    const bash = buildTools(dir, { enabled: ['Bash'], sandboxReadOnly: true, db }).find((t: any) => t.name === 'Bash') as any;
-    const res = await bash.execute('bgp1', { command: `echo PWNED > "${target}"`, run_in_background: true });
+    const bash = buildTools(dir, { enabled: ['Bash'], sandboxReadOnly: true, db }).find(
+      (t: any) => t.name === 'Bash'
+    ) as any;
+    const res = await bash.execute('bgp1', {
+      command: `echo PWNED > "${target}"`,
+      run_in_background: true,
+    });
     await new Promise(r => setTimeout(r, 300));
     const existed = existsSync(target);
     rmSync(dir, { recursive: true, force: true });
@@ -2611,10 +2952,13 @@ describe('Bash background execution', () => {
     expect(new TaskRepository(db).findById(res.details.taskId)?.metadata).toMatchObject({
       sandboxed: true,
     });
-    expect(wrap).toHaveBeenCalledWith('echo bg-original', expect.objectContaining({
-      workspaceRoot: dir,
-      extraAllowedDomains: ['example.test'],
-    }));
+    expect(wrap).toHaveBeenCalledWith(
+      'echo bg-original',
+      expect.objectContaining({
+        workspaceRoot: dir,
+        extraAllowedDomains: ['example.test'],
+      })
+    );
   });
 });
 
@@ -2648,7 +2992,10 @@ describe('TaskOutput for command tasks', () => {
     const tools = buildTools(dir, { enabled: ['Bash', 'TaskOutput'], db });
     const bash = tools.find((t: any) => t.name === 'Bash') as any;
     const taskOutput = tools.find((t: any) => t.name === 'TaskOutput') as any;
-    const started = await bash.execute('to1', { command: 'echo first-line; sleep 30', run_in_background: true });
+    const started = await bash.execute('to1', {
+      command: 'echo first-line; sleep 30',
+      run_in_background: true,
+    });
     const taskId = started.details.taskId as string;
     await new Promise(r => setTimeout(r, 500));
 
@@ -2661,7 +3008,10 @@ describe('TaskOutput for command tasks', () => {
     expect(r1.details.status).toBe('running');
     expect(r1.details.eof).toBe(true);
 
-    const r2 = await taskOutput.execute('to3', { task_id: taskId, output_offset: r1.details.nextOffset });
+    const r2 = await taskOutput.execute('to3', {
+      task_id: taskId,
+      output_offset: r1.details.nextOffset,
+    });
     expect(r2.details.rawOutput).toBe('');
     expect(r2.content[0].text).toContain('Output:\n(no output)');
     expect(r2.details.eof).toBe(true);
@@ -2675,7 +3025,10 @@ describe('TaskOutput for command tasks', () => {
     const tools = buildTools(dir, { enabled: ['Bash', 'TaskOutput'], db });
     const bash = tools.find((t: any) => t.name === 'Bash') as any;
     const taskOutput = tools.find((t: any) => t.name === 'TaskOutput') as any;
-    const started = await bash.execute('to4', { command: "printf 'l1\\nl2\\nl3\\n'", run_in_background: true });
+    const started = await bash.execute('to4', {
+      command: "printf 'l1\\nl2\\nl3\\n'",
+      run_in_background: true,
+    });
     const taskId = started.details.taskId as string;
     await new Promise(r => setTimeout(r, 700));
 
@@ -2772,7 +3125,9 @@ describe('Monitor stops command tasks', () => {
 });
 
 describe('Bash sandbox wiring (foreground)', () => {
-  afterEach(() => { vi.restoreAllMocks(); });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
   it('regular mode + sandbox unavailable → fail-open, command still runs', async () => {
     vi.spyOn(sandbox, 'wrapCommand').mockResolvedValue({ sandboxed: false });
@@ -2787,7 +3142,9 @@ describe('Bash sandbox wiring (foreground)', () => {
   it('plan/read-only mode + sandbox unavailable → fail-closed (errorResult, no run)', async () => {
     vi.spyOn(sandbox, 'wrapCommand').mockResolvedValue({ sandboxed: false });
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-bsbx-'));
-    const bash = buildTools(dir, { enabled: ['Bash'], sandboxReadOnly: true }).find((t: any) => t.name === 'Bash') as any;
+    const bash = buildTools(dir, { enabled: ['Bash'], sandboxReadOnly: true }).find(
+      (t: any) => t.name === 'Bash'
+    ) as any;
     const res = await bash.execute('s2', { command: 'echo shouldnotrun' });
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.error).toBe('sandbox_unavailable_plan_mode');
@@ -2798,7 +3155,9 @@ describe('Bash sandbox wiring (foreground)', () => {
     vi.spyOn(sandbox, 'wrapCommand').mockResolvedValue({ sandboxed: false });
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-bsbx-'));
     const permissionCallback = vi.fn().mockResolvedValue({ behavior: 'allow' });
-    const bash = buildTools(dir, { enabled: ['Bash'], permissionCallback }).find((t: any) => t.name === 'Bash') as any;
+    const bash = buildTools(dir, { enabled: ['Bash'], permissionCallback }).find(
+      (t: any) => t.name === 'Bash'
+    ) as any;
 
     const res = await bash.execute('s-critical-no-sandbox', { command: 'sudo rm package.json' });
 
@@ -2808,7 +3167,11 @@ describe('Bash sandbox wiring (foreground)', () => {
   });
 
   it('sandboxed → runs via the wrapped argv', async () => {
-    vi.spyOn(sandbox, 'wrapCommand').mockResolvedValue({ sandboxed: true, argv: ['sh', '-c', 'echo VIAARGV'], env: process.env });
+    vi.spyOn(sandbox, 'wrapCommand').mockResolvedValue({
+      sandboxed: true,
+      argv: ['sh', '-c', 'echo VIAARGV'],
+      env: process.env,
+    });
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-bsbx-'));
     const bash = buildTools(dir, { enabled: ['Bash'] }).find((t: any) => t.name === 'Bash') as any;
     const res = await bash.execute('s3', { command: 'echo original' });

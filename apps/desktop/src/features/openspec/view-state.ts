@@ -11,12 +11,7 @@ export type OpenSpecScreen =
   | 'corpus'
   | 'anonymous-management';
 
-export type OpenSpecTypeFilter =
-  | 'implement'
-  | 'bug'
-  | 'enhancement'
-  | 'chore'
-  | null;
+export type OpenSpecTypeFilter = 'implement' | 'bug' | 'enhancement' | 'chore' | null;
 
 export type OpenSpecArtifactTab = 'proposal' | 'design' | 'tasks' | 'delta';
 

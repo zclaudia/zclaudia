@@ -135,7 +135,7 @@ export class BootstrapScanRepository extends BaseRepository<
   findActiveByProject(projectId: string): BootstrapScan | null {
     const row = this.db
       .prepare(
-        `SELECT * FROM bootstrap_scans WHERE project_id = ? AND status IN ('running','awaiting_review') ORDER BY started_at DESC LIMIT 1`,
+        `SELECT * FROM bootstrap_scans WHERE project_id = ? AND status IN ('running','awaiting_review') ORDER BY started_at DESC LIMIT 1`
       )
       .get(projectId);
     return row ? this.mapRow(row) : null;
@@ -145,6 +145,6 @@ export class BootstrapScanRepository extends BaseRepository<
     const rows = this.db
       .prepare(`SELECT * FROM bootstrap_scans WHERE project_id = ? ORDER BY started_at DESC`)
       .all(projectId);
-    return rows.map((r) => this.mapRow(r));
+    return rows.map(r => this.mapRow(r));
   }
 }

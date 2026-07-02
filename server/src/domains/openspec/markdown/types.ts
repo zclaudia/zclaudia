@@ -1,5 +1,12 @@
 /** RFC 2119 keywords as recognized by OpenSpec specs. */
-export type RfcKeyword = 'MUST' | 'MUST NOT' | 'SHALL' | 'SHALL NOT' | 'SHOULD' | 'SHOULD NOT' | 'MAY';
+export type RfcKeyword =
+  | 'MUST'
+  | 'MUST NOT'
+  | 'SHALL'
+  | 'SHALL NOT'
+  | 'SHOULD'
+  | 'SHOULD NOT'
+  | 'MAY';
 
 export interface ParsedScenario {
   name: string;
@@ -42,8 +49,8 @@ export type DeltaOp =
 
 export function flattenDelta(delta: DeltaDoc): DeltaOp[] {
   return [
-    ...delta.added.map((r) => ({ kind: 'add' as const, requirement: r })),
-    ...delta.modified.map((r) => ({ kind: 'modify' as const, requirement: r })),
-    ...delta.removed.map((name) => ({ kind: 'remove' as const, name })),
+    ...delta.added.map(r => ({ kind: 'add' as const, requirement: r })),
+    ...delta.modified.map(r => ({ kind: 'modify' as const, requirement: r })),
+    ...delta.removed.map(name => ({ kind: 'remove' as const, name })),
   ];
 }

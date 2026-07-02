@@ -11,23 +11,22 @@ interface SelectionState {
   setDashboardView: (projectId: string, view: ProjectDashboardView) => void;
 }
 
-export const useSelectionStore = create<SelectionState>((set) => ({
+export const useSelectionStore = create<SelectionState>(set => ({
   selectedProjectId: null,
   selectedSessionId: null,
   dashboardViews: {},
 
-  setSelectedProjectId: (selectedProjectId) => set((state) => (
-    state.selectedProjectId === selectedProjectId ? state : { selectedProjectId }
-  )),
+  setSelectedProjectId: selectedProjectId =>
+    set(state => (state.selectedProjectId === selectedProjectId ? state : { selectedProjectId })),
 
-  setSelectedSessionId: (selectedSessionId) => set((state) => (
-    state.selectedSessionId === selectedSessionId ? state : { selectedSessionId }
-  )),
+  setSelectedSessionId: selectedSessionId =>
+    set(state => (state.selectedSessionId === selectedSessionId ? state : { selectedSessionId })),
 
-  setDashboardView: (projectId, view) => set((state) => ({
-    dashboardViews: {
-      ...state.dashboardViews,
-      [projectId]: view,
-    },
-  })),
+  setDashboardView: (projectId, view) =>
+    set(state => ({
+      dashboardViews: {
+        ...state.dashboardViews,
+        [projectId]: view,
+      },
+    })),
 }));

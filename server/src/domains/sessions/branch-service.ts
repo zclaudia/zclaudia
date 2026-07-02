@@ -3,13 +3,19 @@ import { SqliteSessionStorage } from '../../infra/providers/pi-runtime/session-t
 import { readActivePathRows, writeProjectedMessages } from './reproject-messages.js';
 
 export class BranchError extends Error {
-  constructor(readonly status: number, readonly code: string, message: string) {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    message: string
+  ) {
     super(message);
   }
 }
 
 function entryBelongsToSession(db: Database, sessionId: string, entryId: string): boolean {
-  return !!db.prepare(`SELECT 1 FROM session_entries WHERE id = ? AND session_id = ?`).get(entryId, sessionId);
+  return !!db
+    .prepare(`SELECT 1 FROM session_entries WHERE id = ? AND session_id = ?`)
+    .get(entryId, sessionId);
 }
 
 /**
@@ -17,7 +23,11 @@ function entryBelongsToSession(db: Database, sessionId: string, entryId: string)
  * and rewrite the messages projection to the new active path. The old tip remains
  * in session_entries as a sibling branch; it just leaves the linear UI view.
  */
-export async function branchSessionAt(db: Database, sessionId: string, entryId: string): Promise<{ sessionId: string; leafId: string }> {
+export async function branchSessionAt(
+  db: Database,
+  sessionId: string,
+  entryId: string
+): Promise<{ sessionId: string; leafId: string }> {
   if (!db.prepare(`SELECT 1 FROM sessions WHERE id = ?`).get(sessionId)) {
     throw new BranchError(404, 'NOT_FOUND', `session not found: ${sessionId}`);
   }

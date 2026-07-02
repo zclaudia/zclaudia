@@ -62,7 +62,9 @@ test('E1: Upload file via button click', async () => {
   await browser.waitForTimeout(1000);
 
   // Verify attachment preview appears (uses bg-muted wrapper and bg-secondary cards)
-  const preview = browser.locator('.bg-muted.rounded-lg, .bg-secondary.rounded-lg, img[alt][src^="data:image"]').first();
+  const preview = browser
+    .locator('.bg-muted.rounded-lg, .bg-secondary.rounded-lg, img[alt][src^="data:image"]')
+    .first();
   await expect(preview).toBeVisible({ timeout: 3000 });
 
   console.log('✅ File uploaded successfully via button');
@@ -72,7 +74,9 @@ test('E2: Upload file via drag and drop (AI)', async () => {
   console.log('Test E2: Upload via drag-drop');
 
   // First, ensure any previous attachments are removed (delete buttons are absolute positioned in top-right)
-  const removeButtons = browser.locator('.bg-destructive.rounded-full, button.absolute[class*="destructive"]');
+  const removeButtons = browser.locator(
+    '.bg-destructive.rounded-full, button.absolute[class*="destructive"]'
+  );
   const removeCount = await removeButtons.count();
   if (removeCount > 0) {
     // Hover over attachment to make delete button visible
@@ -92,7 +96,9 @@ test('E2: Upload file via drag and drop (AI)', async () => {
   await browser.waitForTimeout(1000);
 
   // Verify upload succeeded
-  const preview = browser.locator('.bg-muted.rounded-lg, .bg-secondary.rounded-lg, img[src^="data:image"]').first();
+  const preview = browser
+    .locator('.bg-muted.rounded-lg, .bg-secondary.rounded-lg, img[src^="data:image"]')
+    .first();
   await expect(preview).toBeVisible({ timeout: 3000 });
 
   console.log('✅ File upload via input succeeded (drag-drop equivalent)');
@@ -102,7 +108,9 @@ test('E3: Upload multiple files', async () => {
   console.log('Test E3: Multiple file upload');
 
   // Clear any existing attachments first
-  const removeButtons = browser.locator('.bg-destructive.rounded-full, button.absolute[class*="destructive"]');
+  const removeButtons = browser.locator(
+    '.bg-destructive.rounded-full, button.absolute[class*="destructive"]'
+  );
   const removeCount = await removeButtons.count();
   for (let i = 0; i < removeCount; i++) {
     // Hover to make delete button visible
@@ -138,7 +146,9 @@ test('E4: Click image preview to enlarge (AI)', async () => {
   console.log('Test E4: Preview enlargement');
 
   // Setup: Upload an image first
-  const removeButtons = browser.locator('.bg-destructive.rounded-full, button.absolute[class*="destructive"]');
+  const removeButtons = browser.locator(
+    '.bg-destructive.rounded-full, button.absolute[class*="destructive"]'
+  );
   const removeCount = await removeButtons.count();
   for (let i = 0; i < removeCount; i++) {
     const attachment = browser.locator('.bg-secondary.rounded-lg').first();
@@ -161,7 +171,9 @@ test('E4: Click image preview to enlarge (AI)', async () => {
     await browser.waitForTimeout(1000);
 
     // Verify modal or enlarged view appears
-    const enlargedView = browser.locator('[class*="modal"], [class*="lightbox"], [class*="overlay"], [class*="enlarged"]');
+    const enlargedView = browser.locator(
+      '[class*="modal"], [class*="lightbox"], [class*="overlay"], [class*="enlarged"]'
+    );
     const isVisible = await enlargedView.isVisible({ timeout: 3000 }).catch(() => false);
 
     if (isVisible) {
@@ -186,7 +198,9 @@ test('E5: Display file size information', async () => {
   console.log('Test E5: File size display');
 
   // Clear and upload a file
-  const removeButtons = browser.locator('.bg-destructive.rounded-full, button.absolute[class*="destructive"]');
+  const removeButtons = browser.locator(
+    '.bg-destructive.rounded-full, button.absolute[class*="destructive"]'
+  );
   const removeCount = await removeButtons.count();
   for (let i = 0; i < removeCount; i++) {
     const attachment = browser.locator('.bg-secondary.rounded-lg').first();
@@ -207,7 +221,7 @@ test('E5: Display file size information', async () => {
   const sizePattern = /\d+\.?\d*\s*(B|KB|MB|bytes)/i;
   const sizeElement = browser.locator(`text=${sizePattern}`);
 
-  const hasSizeInfo = await sizeElement.count() > 0;
+  const hasSizeInfo = (await sizeElement.count()) > 0;
 
   if (hasSizeInfo) {
     const sizeText = await sizeElement.first().textContent();
@@ -224,8 +238,10 @@ test('E6: Remove uploaded attachment (AI)', async () => {
   console.log('Test E6: Remove attachment');
 
   // Setup: Upload a file first
-  const removeButtons = browser.locator('.bg-destructive.rounded-full, button.absolute[class*="destructive"]');
-  let removeCount = await removeButtons.count();
+  const removeButtons = browser.locator(
+    '.bg-destructive.rounded-full, button.absolute[class*="destructive"]'
+  );
+  const removeCount = await removeButtons.count();
   for (let i = 0; i < removeCount; i++) {
     const attachment = browser.locator('.bg-secondary.rounded-lg').first();
     if (await attachment.isVisible().catch(() => false)) {
@@ -255,7 +271,7 @@ test('E6: Remove uploaded attachment (AI)', async () => {
     const countAfter = await attachmentsBefore.count();
     expect(countAfter).toBeLessThan(countBefore);
     console.log('✅ Attachment removed successfully via AI');
-  } catch (error: any) {
+  } catch {
     console.log('AI removal failed, using traditional method');
 
     // Fallback: Traditional removal (hover first to make button visible)
@@ -276,7 +292,9 @@ test('E7: File type validation - Large file rejection', async () => {
   console.log('Test E7: File size validation');
 
   // Clear existing attachments
-  const removeButtons = browser.locator('.bg-destructive.rounded-full, button.absolute[class*="destructive"]');
+  const removeButtons = browser.locator(
+    '.bg-destructive.rounded-full, button.absolute[class*="destructive"]'
+  );
   const removeCount = await removeButtons.count();
   for (let i = 0; i < removeCount; i++) {
     const attachment = browser.locator('.bg-secondary.rounded-lg').first();

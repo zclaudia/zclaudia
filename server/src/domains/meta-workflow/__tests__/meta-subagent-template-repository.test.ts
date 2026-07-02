@@ -56,12 +56,18 @@ describe('MetaSubagentTemplateRepository', () => {
   it('updates allowedTools', () => {
     const now = Date.now();
     const tmpl = repo.create({
-      systemPrompt: 'p', allowedTools: ['Read'],
+      systemPrompt: 'p',
+      allowedTools: ['Read'],
       maxTurns: 10,
       terminationCondition: { kind: 'output-keyword', target: '[X]' },
-      sourceType: 'auto', createdAt: now, updatedAt: now,
+      sourceType: 'auto',
+      createdAt: now,
+      updatedAt: now,
     });
-    const updated = repo.update(tmpl.id, { allowedTools: ['Read', 'Grep', 'Glob'], updatedAt: now + 1 });
+    const updated = repo.update(tmpl.id, {
+      allowedTools: ['Read', 'Grep', 'Glob'],
+      updatedAt: now + 1,
+    });
     expect(updated.allowedTools).toEqual(['Read', 'Grep', 'Glob']);
   });
 });

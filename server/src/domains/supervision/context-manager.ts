@@ -4,12 +4,12 @@ import yaml from 'js-yaml';
 import matter from 'gray-matter';
 
 export interface ContextDocument {
-  id: string;              // relative path, e.g. "specs/requirements.md"
-  category: string;        // from YAML frontmatter
-  source: string;          // 'user' | 'agent'
+  id: string; // relative path, e.g. "specs/requirements.md"
+  category: string; // from YAML frontmatter
+  source: string; // 'user' | 'agent'
   version: number;
-  updated: string;         // ISO date
-  content: string;         // markdown body (without frontmatter)
+  updated: string; // ISO date
+  content: string; // markdown body (without frontmatter)
 }
 
 export interface WorkflowAction {
@@ -100,7 +100,7 @@ export class ContextManager {
     fs.writeFileSync(
       path.join(this.supervisionPath, GOAL_FILE),
       goalMeta + `# Project Goal\n\n${projectName}\n`,
-      'utf-8',
+      'utf-8'
     );
 
     // project-summary.md
@@ -110,17 +110,13 @@ export class ContextManager {
       version: 1,
       updated: now,
     });
-    fs.writeFileSync(
-      path.join(this.supervisionPath, PROJECT_SUMMARY_FILE),
-      summaryMeta,
-      'utf-8',
-    );
+    fs.writeFileSync(path.join(this.supervisionPath, PROJECT_SUMMARY_FILE), summaryMeta, 'utf-8');
 
     // workflow.yaml
     fs.writeFileSync(
       path.join(this.supervisionPath, WORKFLOW_FILE),
       yaml.dump(DEFAULT_WORKFLOW, { lineWidth: -1 }),
-      'utf-8',
+      'utf-8'
     );
   }
 
@@ -143,28 +139,45 @@ export class ContextManager {
       },
       {
         name: 'design.md',
-        frontmatter: { kind: 'design', changeId: change.id, status: 'awaiting_review', version: 1, updatedAt: now },
-        content: '# Design\n\n## Overview\n\n## Touched Modules\n\n## Out of Scope\n\n## Technical Approach\n\n## Risks\n\n## Testing Strategy\n\n## Acceptance Criteria\n',
+        frontmatter: {
+          kind: 'design',
+          changeId: change.id,
+          status: 'awaiting_review',
+          version: 1,
+          updatedAt: now,
+        },
+        content:
+          '# Design\n\n## Overview\n\n## Touched Modules\n\n## Out of Scope\n\n## Technical Approach\n\n## Risks\n\n## Testing Strategy\n\n## Acceptance Criteria\n',
       },
       {
         name: 'execution.md',
-        frontmatter: { kind: 'execution', changeId: change.id, status: 'awaiting_review', designVersion: 1, updatedAt: now },
-        content: '# Execution Plan\n\n## Summary\n\n## Phases\n\n## Execution Strategy\n\n## Verification Plan\n\n## Automation Policy\n\n## Risks Before Start\n',
+        frontmatter: {
+          kind: 'execution',
+          changeId: change.id,
+          status: 'awaiting_review',
+          designVersion: 1,
+          updatedAt: now,
+        },
+        content:
+          '# Execution Plan\n\n## Summary\n\n## Phases\n\n## Execution Strategy\n\n## Verification Plan\n\n## Automation Policy\n\n## Risks Before Start\n',
       },
       {
         name: 'tasks.md',
         frontmatter: { kind: 'tasks', changeId: change.id, status: 'draft', updatedAt: now },
-        content: '# Tasks\n\n## T1 <title>\n\n- Summary:\n- Scope:\n- Depends On:\n- Deliverables:\n- Verification:\n',
+        content:
+          '# Tasks\n\n## T1 <title>\n\n- Summary:\n- Scope:\n- Depends On:\n- Deliverables:\n- Verification:\n',
       },
       {
         name: 'acceptance.md',
         frontmatter: { kind: 'acceptance', changeId: change.id, status: 'pending', updatedAt: now },
-        content: '# Acceptance\n\n## Task-Level Checks\n\n## Change-Level Checks\n\n## Open Issues\n\n## Final Decision\n',
+        content:
+          '# Acceptance\n\n## Task-Level Checks\n\n## Change-Level Checks\n\n## Open Issues\n\n## Final Decision\n',
       },
       {
         name: 'sync-log.md',
         frontmatter: { kind: 'sync-log', changeId: change.id, status: 'draft', updatedAt: now },
-        content: '# Sync Log\n\n## Updated Files\n\n## Summary Of Spec Changes\n\n## Follow-up Notes\n',
+        content:
+          '# Sync Log\n\n## Updated Files\n\n## Summary Of Spec Changes\n\n## Follow-up Notes\n',
       },
     ];
 
@@ -218,7 +231,7 @@ export class ContextManager {
   updateDocument(
     docId: string,
     content: string,
-    meta?: Partial<{ category: string; source: string }>,
+    meta?: Partial<{ category: string; source: string }>
   ): void {
     const filePath = path.join(this.supervisionPath, docId);
     const now = new Date().toISOString();
@@ -268,7 +281,7 @@ export class ContextManager {
   updateStructuredDocument(
     docId: string,
     frontmatterPatch: Record<string, unknown>,
-    content: string,
+    content: string
   ): void {
     const filePath = path.join(this.supervisionPath, docId);
     const parentDir = path.dirname(filePath);
@@ -306,9 +319,9 @@ export class ContextManager {
   } {
     try {
       const raw = fs.readFileSync(filePath, 'utf-8');
-      const versionMatch = raw.match(/^\s*version:\s*(\d+)\s*$/mi);
-      const categoryMatch = raw.match(/^\s*category:\s*(.+)\s*$/mi);
-      const sourceMatch = raw.match(/^\s*source:\s*(.+)\s*$/mi);
+      const versionMatch = raw.match(/^\s*version:\s*(\d+)\s*$/im);
+      const categoryMatch = raw.match(/^\s*category:\s*(.+)\s*$/im);
+      const sourceMatch = raw.match(/^\s*source:\s*(.+)\s*$/im);
 
       return {
         version: versionMatch ? Number(versionMatch[1]) : undefined,
@@ -320,7 +333,11 @@ export class ContextManager {
     }
   }
 
-  private writeStructuredDoc(filePath: string, frontmatter: Record<string, unknown>, content: string): void {
+  private writeStructuredDoc(
+    filePath: string,
+    frontmatter: Record<string, unknown>,
+    content: string
+  ): void {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.writeFileSync(filePath, matter.stringify(content, frontmatter), 'utf-8');
   }
@@ -419,7 +436,7 @@ export class ContextManager {
       };
     } catch (err) {
       throw new Error(
-        `Failed to parse ${filePath}: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to parse ${filePath}: ${err instanceof Error ? err.message : String(err)}`
       );
     }
   }
@@ -432,11 +449,7 @@ export class ContextManager {
     if (!fs.existsSync(resultsDir)) {
       fs.mkdirSync(resultsDir, { recursive: true });
     }
-    fs.writeFileSync(
-      path.join(resultsDir, `task-${taskId}.md`),
-      content,
-      'utf-8',
-    );
+    fs.writeFileSync(path.join(resultsDir, `task-${taskId}.md`), content, 'utf-8');
   }
 
   /**
@@ -447,11 +460,7 @@ export class ContextManager {
     if (!fs.existsSync(resultsDir)) {
       fs.mkdirSync(resultsDir, { recursive: true });
     }
-    fs.writeFileSync(
-      path.join(resultsDir, `task-${taskId}.review.md`),
-      content,
-      'utf-8',
-    );
+    fs.writeFileSync(path.join(resultsDir, `task-${taskId}.review.md`), content, 'utf-8');
   }
 
   /**
@@ -511,7 +520,7 @@ export class ContextManager {
       };
     } catch (err) {
       throw new Error(
-        `Failed to parse context document ${filePath}: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to parse context document ${filePath}: ${err instanceof Error ? err.message : String(err)}`
       );
     }
   }

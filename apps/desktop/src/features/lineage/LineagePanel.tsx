@@ -13,40 +13,41 @@ import { LineageEmptyState } from './LineageEmptyState';
 import { useLineageStore } from './lineageStore';
 
 export function LineagePanel() {
-  const selectedSessionId = useSelectionStore((s) => s.selectedSessionId);
+  const selectedSessionId = useSelectionStore(s => s.selectedSessionId);
   // session-list identity changes after fork/branch → reload
-  const sessions = useProjectStore((s) => s.sessions);
-  const requestMessageJump = useUIStore((s) => s.requestMessageJump);
+  const sessions = useProjectStore(s => s.sessions);
+  const requestMessageJump = useUIStore(s => s.requestMessageJump);
   const { selectSession } = useSelectionCoordinator();
-  const graph = useLineageStore((s) => s.graph);
-  const reload = useLineageStore((s) => s.reload);
+  const graph = useLineageStore(s => s.graph);
+  const reload = useLineageStore(s => s.reload);
 
-  useEffect(() => { void reload(selectedSessionId); }, [reload, selectedSessionId, sessions]);
+  useEffect(() => {
+    void reload(selectedSessionId);
+  }, [reload, selectedSessionId, sessions]);
 
-  const onNodeClick = useCallback((node: GraphNode) => {
-    const messageId = node.jump.messageId;
-    if (!messageId) return;
-    const backendId = useOwnershipStore.getState().getSessionBackendId(node.sessionId);
-    requestMessageJump(node.sessionId, messageId);
-    selectSession(node.sessionId, { backendId });
-  }, [requestMessageJump, selectSession]);
+  const onNodeClick = useCallback(
+    (node: GraphNode) => {
+      const messageId = node.jump.messageId;
+      if (!messageId) return;
+      const backendId = useOwnershipStore.getState().getSessionBackendId(node.sessionId);
+      requestMessageJump(node.sessionId, messageId);
+      selectSession(node.sessionId, { backendId });
+    },
+    [requestMessageJump, selectSession]
+  );
 
   const layout = graph ? computeLayout(graph) : null;
   const isLinear = !!graph && graph.sessions.length <= 1 && graph.forkEdges.length === 0;
   const laneColorOf = useCallback(
-    (sid: string) => laneColor(graph?.sessions.find((s) => s.id === sid)?.laneOrder ?? 0),
-    [graph],
+    (sid: string) => laneColor(graph?.sessions.find(s => s.id === sid)?.laneOrder ?? 0),
+    [graph]
   );
 
   return (
     <div className="flex h-full flex-col bg-card">
       <div className="flex-1 overflow-auto">
         {layout && layout.nodes.length > 0 && (
-          <LineageGraph
-            model={layout}
-            onNodeClick={onNodeClick}
-            laneColorOf={laneColorOf}
-          />
+          <LineageGraph model={layout} onNodeClick={onNodeClick} laneColorOf={laneColorOf} />
         )}
         {graph && isLinear && <LineageEmptyState />}
         {graph?.truncated && (
@@ -60,10 +61,10 @@ export function LineagePanel() {
 }
 
 export function LineageActions() {
-  const selectedSessionId = useSelectionStore((s) => s.selectedSessionId);
-  const graph = useLineageStore((s) => s.graph);
-  const loading = useLineageStore((s) => s.loading);
-  const reload = useLineageStore((s) => s.reload);
+  const selectedSessionId = useSelectionStore(s => s.selectedSessionId);
+  const graph = useLineageStore(s => s.graph);
+  const loading = useLineageStore(s => s.loading);
+  const reload = useLineageStore(s => s.reload);
 
   return (
     <div className="flex items-center gap-2">

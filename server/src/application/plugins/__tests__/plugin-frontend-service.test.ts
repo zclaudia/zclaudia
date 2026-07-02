@@ -22,8 +22,12 @@ describe('PluginFrontendService', () => {
       pathExists: vi.fn(),
     });
 
-    expect(() => service.resolveFrontendFile('bad plugin', 'index.html')).toThrowError(PluginFrontendError);
-    expect(() => service.resolveFrontendFile('missing', 'index.html')).toThrowError('Plugin not found');
+    expect(() => service.resolveFrontendFile('bad plugin', 'index.html')).toThrowError(
+      PluginFrontendError
+    );
+    expect(() => service.resolveFrontendFile('missing', 'index.html')).toThrowError(
+      'Plugin not found'
+    );
   });
 
   it('rejects missing files and traversal outside plugin root', () => {
@@ -35,7 +39,11 @@ describe('PluginFrontendService', () => {
       pathExists: vi.fn().mockReturnValue(false),
     });
 
-    expect(() => service.resolveFrontendFile('test-plugin', '../etc/passwd')).toThrowError('Forbidden');
-    expect(() => service.resolveFrontendFile('test-plugin', 'missing.html')).toThrowError('File not found');
+    expect(() => service.resolveFrontendFile('test-plugin', '../etc/passwd')).toThrowError(
+      'Forbidden'
+    );
+    expect(() => service.resolveFrontendFile('test-plugin', 'missing.html')).toThrowError(
+      'File not found'
+    );
   });
 });

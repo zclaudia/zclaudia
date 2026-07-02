@@ -50,7 +50,10 @@ function ensureWorktreesIgnored(rootPath: string): void {
   const entry = '.worktrees/';
   try {
     if (fs.existsSync(gitignorePath)) {
-      const lines = fs.readFileSync(gitignorePath, 'utf-8').split('\n').map(line => line.trim());
+      const lines = fs
+        .readFileSync(gitignorePath, 'utf-8')
+        .split('\n')
+        .map(line => line.trim());
       if (!lines.includes(entry) && !lines.includes('.worktrees')) {
         fs.appendFileSync(gitignorePath, `\n${entry}\n`);
       }
@@ -76,7 +79,13 @@ export function createAgentWorktree(rootPath: string, taskId: string): AgentWork
 }
 
 function slugify(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'wt';
+  return (
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 40) || 'wt'
+  );
 }
 
 /**
@@ -109,7 +118,7 @@ function uniqueCommitCount(rootPath: string, branch: string): number {
   // next --branches only; tags can't shadow the agent branch anyway.
   const output = git(
     rootPath,
-    `rev-list --count refs/heads/${branch} --not --exclude=${branch} --branches --tags`,
+    `rev-list --count refs/heads/${branch} --not --exclude=${branch} --branches --tags`
   );
   return Number.parseInt(output.trim(), 10) || 0;
 }
@@ -118,7 +127,10 @@ function uniqueCommitCount(rootPath: string, branch: string): number {
  * Remove the worktree and its branch when the agent left no trace; keep both
  * when there are uncommitted changes or commits unique to the agent branch.
  */
-export function cleanupAgentWorktree(rootPath: string, worktree: AgentWorktree): AgentWorktreeCleanup {
+export function cleanupAgentWorktree(
+  rootPath: string,
+  worktree: AgentWorktree
+): AgentWorktreeCleanup {
   try {
     if (git(worktree.path, 'status --porcelain').trim().length > 0) {
       return { removed: false, reason: 'has_changes' };

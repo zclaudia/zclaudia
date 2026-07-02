@@ -47,7 +47,7 @@ describe('hooks/useMediaQuery', () => {
     const queryListeners = listeners.get(query);
     if (queryListeners) {
       const event = { matches, media: query } as MediaQueryListEvent;
-      queryListeners.forEach((callback) => callback(event));
+      queryListeners.forEach(callback => callback(event));
     }
   };
 
@@ -108,10 +108,9 @@ describe('hooks/useMediaQuery', () => {
     });
 
     it('re-subscribes when query changes', () => {
-      const { rerender } = renderHook(
-        ({ query }) => useMediaQuery(query),
-        { initialProps: { query: '(max-width: 767px)' } }
-      );
+      const { rerender } = renderHook(({ query }) => useMediaQuery(query), {
+        initialProps: { query: '(max-width: 767px)' },
+      });
 
       expect(matchMediaMock).toHaveBeenCalledWith('(max-width: 767px)');
 

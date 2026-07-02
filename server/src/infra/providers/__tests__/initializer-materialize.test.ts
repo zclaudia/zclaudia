@@ -7,17 +7,27 @@ const ENV = ['OPENAI_BASE_URL', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY'];
 const SAVED: Record<string, string | undefined> = {};
 let db: Database.Database;
 beforeEach(() => {
-  for (const k of ENV) { SAVED[k] = process.env[k]; delete process.env[k]; }
+  for (const k of ENV) {
+    SAVED[k] = process.env[k];
+    delete process.env[k];
+  }
   db = new Database(':memory:');
   applyMigrations(db);
 });
 afterEach(() => {
   db.close();
-  for (const k of ENV) { if (SAVED[k] === undefined) delete process.env[k]; else process.env[k] = SAVED[k]; }
+  for (const k of ENV) {
+    if (SAVED[k] === undefined) delete process.env[k];
+    else process.env[k] = SAVED[k];
+  }
 });
 
 function defaultProfile() {
-  return db.prepare("SELECT name, provider_type AS providerType, base_url AS baseUrl, api_key AS apiKey FROM llm_profiles WHERE is_default=1").get() as any;
+  return db
+    .prepare(
+      'SELECT name, provider_type AS providerType, base_url AS baseUrl, api_key AS apiKey FROM llm_profiles WHERE is_default=1'
+    )
+    .get() as any;
 }
 
 describe('autoDetectProviders — env materialization', () => {
@@ -68,10 +78,12 @@ describe('autoDetectProviders — env materialization', () => {
   });
   it('backfill never touches an openai-codex default profile (keyless during OAuth)', () => {
     // seed a codex default profile directly (keyless, mid-OAuth)
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO llm_profiles (id, name, provider_type, base_url, api_key, compat, is_default, created_at, updated_at)
       VALUES ('codex1', 'Codex', 'openai-codex', NULL, NULL, NULL, 1, 0, 0)
-    `).run();
+    `
+    ).run();
     process.env.ANTHROPIC_API_KEY = 'sk-ant';
     autoDetectProviders(db);
     const p = defaultProfile();

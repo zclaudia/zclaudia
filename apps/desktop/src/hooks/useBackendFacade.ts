@@ -45,11 +45,11 @@ export function useBackendFacade(): void {
   const unsubEventRef = useRef<(() => void) | null>(null);
 
   // Embedded mode: use embedded server port
-  const embeddedPort = useServerStore((s) => s.localServerPort);
+  const embeddedPort = useServerStore(s => s.localServerPort);
 
   // Direct mode: use direct gateway config
-  const directGatewayUrl = useGatewayStore((s) => s.directGatewayUrl);
-  const directGatewaySecret = useGatewayStore((s) => s.directGatewaySecret);
+  const directGatewayUrl = useGatewayStore(s => s.directGatewayUrl);
+  const directGatewaySecret = useGatewayStore(s => s.directGatewaySecret);
 
   // Determine mode by control-plane source, not platform.
   const mode = directGatewayUrl && directGatewaySecret ? 'direct' : 'embedded';
@@ -136,4 +136,3 @@ export function useBackendFacade(): void {
     };
   }, [mode, embeddedPort, directGatewayUrl, directGatewaySecret]);
 }
-

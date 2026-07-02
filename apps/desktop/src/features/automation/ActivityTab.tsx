@@ -25,7 +25,7 @@ export function ActivityTab({ api }: ActivityTabProps) {
     await api
       .get('/api/workflow-step-types')
       .then((all: WorkflowStepTypeMeta[]) =>
-        setActivities((all ?? []).filter((m) => m.source === 'activity')),
+        setActivities((all ?? []).filter(m => m.source === 'activity'))
       )
       .catch(() => setActivities([]));
     setLoading(false);
@@ -76,7 +76,7 @@ export function ActivityTab({ api }: ActivityTabProps) {
               {category}
             </h3>
             <div className="space-y-1.5">
-              {items.map((a) => (
+              {items.map(a => (
                 <ActivityCard key={a.type} activity={a} />
               ))}
             </div>

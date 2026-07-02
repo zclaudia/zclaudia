@@ -78,7 +78,9 @@ test.describe('Slash Commands', () => {
     await page.waitForTimeout(500);
 
     // Look for command suggestions dropdown
-    const suggestions = page.locator('[class*="autocomplete"], [class*="suggestion"], [role="listbox"]').first();
+    const suggestions = page
+      .locator('[class*="autocomplete"], [class*="suggestion"], [role="listbox"]')
+      .first();
     const hasSuggestions = await suggestions.isVisible({ timeout: 2000 }).catch(() => false);
 
     if (hasSuggestions) {
@@ -112,7 +114,9 @@ test.describe('Slash Commands', () => {
     await page.waitForTimeout(2000);
 
     // Look for help response
-    const helpContent = page.locator('text=/Commands|Available|Usage|Help/i, [class*="help-content"]').first();
+    const helpContent = page
+      .locator('text=/Commands|Available|Usage|Help/i, [class*="help-content"]')
+      .first();
     const hasHelp = await helpContent.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (hasHelp) {
@@ -238,7 +242,9 @@ test.describe('Slash Commands', () => {
     await page.waitForTimeout(1000);
 
     // Look for compact indicator
-    const compactIndicator = page.locator('[class*="compact"], text=/Compacted|Compressed/i').first();
+    const compactIndicator = page
+      .locator('[class*="compact"], text=/Compacted|Compressed/i')
+      .first();
     const hasCompact = await compactIndicator.isVisible({ timeout: 3000 }).catch(() => false);
 
     if (hasCompact) {
@@ -266,7 +272,9 @@ test.describe('Slash Commands', () => {
     await page.waitForTimeout(1000);
 
     // Look for error message
-    const errorMessage = page.locator('[class*="error"], text=/Unknown command|Invalid|not found/i').first();
+    const errorMessage = page
+      .locator('[class*="error"], text=/Unknown command|Invalid|not found/i')
+      .first();
     const hasError = await errorMessage.isVisible({ timeout: 3000 }).catch(() => false);
 
     if (hasError) {
@@ -414,7 +422,9 @@ test.describe('Slash Commands', () => {
     }
 
     // Look for command reference button or hint
-    const refBtn = page.locator('button[title*="Commands"], [data-testid="command-reference"]').first();
+    const refBtn = page
+      .locator('button[title*="Commands"], [data-testid="command-reference"]')
+      .first();
     const hasRef = await refBtn.isVisible({ timeout: 2000 }).catch(() => false);
 
     if (hasRef) {

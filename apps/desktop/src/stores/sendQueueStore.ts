@@ -42,7 +42,7 @@ interface SendQueueState {
 function withQueue(
   state: SendQueueState,
   sessionId: string,
-  updater: (items: QueueItem[]) => QueueItem[],
+  updater: (items: QueueItem[]) => QueueItem[]
 ): Partial<SendQueueState> {
   const next = updater(state.queues[sessionId] ?? []);
   if (next.length === 0) {
@@ -56,39 +56,35 @@ function withQueue(
 // Holds messages the user composed while a run was active. They wait here
 // (client-only, in-memory) until the run ends, then ship one-by-one as new
 // runs. The user may also "Steer now" any item to inject it mid-run.
-export const useSendQueueStore = create<SendQueueState>((set) => ({
+export const useSendQueueStore = create<SendQueueState>(set => ({
   queues: {},
 
-  enqueue: (item) =>
-    set((state) =>
-      withQueue(state, item.sessionId, (items) => [
+  enqueue: item =>
+    set(state =>
+      withQueue(state, item.sessionId, items => [
         ...items,
         { ...item, id: crypto.randomUUID(), createdAt: Date.now() },
-      ]),
+      ])
     ),
 
   removeItem: (sessionId, itemId) =>
-    set((state) =>
-      withQueue(state, sessionId, (items) =>
-        items.filter((i) => i.id !== itemId),
-      ),
-    ),
+    set(state => withQueue(state, sessionId, items => items.filter(i => i.id !== itemId))),
 
   popFirst: (sessionId, intent) => {
     let popped: QueueItem | undefined;
-    set((state) =>
-      withQueue(state, sessionId, (items) => {
-        const idx = items.findIndex((i) => i.intent === intent);
+    set(state =>
+      withQueue(state, sessionId, items => {
+        const idx = items.findIndex(i => i.intent === intent);
         if (idx === -1) return items;
         popped = items[idx];
         return items.filter((_, i) => i !== idx);
-      }),
+      })
     );
     return popped;
   },
 
-  clearSession: (sessionId) =>
-    set((state) => {
+  clearSession: sessionId =>
+    set(state => {
       if (!state.queues[sessionId]) return state;
       const { [sessionId]: _, ...rest } = state.queues;
       return { queues: rest };

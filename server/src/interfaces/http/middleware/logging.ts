@@ -66,7 +66,7 @@ export const detailedLoggingMiddleware: Middleware = async (ctx, next) => {
     clientId,
     authenticated,
     isLocal,
-    payload: JSON.stringify(payload).substring(0, 200)  // Truncate large payloads
+    payload: JSON.stringify(payload).substring(0, 200), // Truncate large payloads
   });
 
   try {
@@ -80,7 +80,7 @@ export const detailedLoggingMiddleware: Middleware = async (ctx, next) => {
         success: response.metadata.success,
         duration,
         error: response.metadata.error,
-        payloadSize: JSON.stringify(response.payload).length
+        payloadSize: JSON.stringify(response.payload).length,
       });
     }
 
@@ -92,7 +92,7 @@ export const detailedLoggingMiddleware: Middleware = async (ctx, next) => {
       requestId: id,
       duration,
       error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
+      stack: error instanceof Error ? error.stack : undefined,
     });
     throw error;
   }

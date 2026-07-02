@@ -19,14 +19,14 @@ function formatLatency(latencyMs?: number | null): string | null {
 }
 
 export function ServerSelector({ placement = 'down' }: { placement?: 'down' | 'up' } = {}) {
-  const activeServerId = useServerStore((s) => s.activeServerId);
-  const connections = useServerStore((s) => s.connections);
-  const setActiveServer = useServerStore((s) => s.setActiveServer);
+  const activeServerId = useServerStore(s => s.activeServerId);
+  const connections = useServerStore(s => s.connections);
+  const setActiveServer = useServerStore(s => s.setActiveServer);
 
-  const gatewayUrl = useGatewayStore((s) => s.gatewayUrl);
-  const gatewaySecret = useGatewayStore((s) => s.gatewaySecret);
-  const setLastActiveBackend = useGatewayStore((s) => s.setLastActiveBackend);
-  const showLocalBackend = useGatewayStore((s) => s.showLocalBackend);
+  const gatewayUrl = useGatewayStore(s => s.gatewayUrl);
+  const gatewaySecret = useGatewayStore(s => s.gatewaySecret);
+  const setLastActiveBackend = useGatewayStore(s => s.setLastActiveBackend);
+  const showLocalBackend = useGatewayStore(s => s.showLocalBackend);
 
   const { connectServer } = useConnection();
   const isMobile = useIsMobile();
@@ -38,7 +38,10 @@ export function ServerSelector({ placement = 'down' }: { placement?: 'down' | 'u
   // Position the dropdown via a body portal so it escapes the sidebar's
   // backdrop-filter containing block (which otherwise clips/anchors it).
   const toggleOpen = () => {
-    if (isOpen) { setIsOpen(false); return; }
+    if (isOpen) {
+      setIsOpen(false);
+      return;
+    }
     const r = triggerRef.current?.getBoundingClientRect();
     if (r) {
       const width = Math.min(Math.max(r.width, 256), window.innerWidth - 16);
@@ -51,21 +54,22 @@ export function ServerSelector({ placement = 'down' }: { placement?: 'down' | 'u
     setIsOpen(true);
   };
 
-  const backends = useFacadeStore((s) => s.backends);
-  const localBackendId = useFacadeStore((s) => s.localBackendId);
-  const currentInstanceId = useFacadeStore((s) => s.currentInstanceId);
-  const facadeConnectionState = useFacadeStore((s) => s.connectionState);
+  const backends = useFacadeStore(s => s.backends);
+  const localBackendId = useFacadeStore(s => s.localBackendId);
+  const currentInstanceId = useFacadeStore(s => s.currentInstanceId);
+  const facadeConnectionState = useFacadeStore(s => s.connectionState);
   const activeBackend = backends.find(b => b.backendId === activeServerId);
   const fallbackBackend =
-    activeBackend
-    || (localBackendId ? backends.find((b) => b.backendId === localBackendId) : null)
-    || backends.find((b) => b.isThisInstance)
-    || null;
+    activeBackend ||
+    (localBackendId ? backends.find(b => b.backendId === localBackendId) : null) ||
+    backends.find(b => b.isThisInstance) ||
+    null;
   const displayedBackend = activeBackend || fallbackBackend;
   const displayedBackendId = displayedBackend?.backendId ?? activeServerId ?? null;
-  const getViewState = (backendId: string | null | undefined): BackendRecoveryViewState | MobileBackendViewState => (
-    getMobileBackendViewState(backendId, facadeConnectionState, backends)
-  );
+  const getViewState = (
+    backendId: string | null | undefined
+  ): BackendRecoveryViewState | MobileBackendViewState =>
+    getMobileBackendViewState(backendId, facadeConnectionState, backends);
   const activeRecoveryState = getViewState(displayedBackendId);
   const activeRecoveryError: string | null = null;
   const isGatewayReady = isMobileGatewayConnected(facadeConnectionState);
@@ -74,7 +78,9 @@ export function ServerSelector({ placement = 'down' }: { placement?: 'down' | 'u
   // the local backend must be visible so the user can switch back.
   const isActiveRemote = activeServerId && localBackendId && activeServerId !== localBackendId;
   const effectiveShowLocal = showLocalBackend || !!isActiveRemote;
-  const remoteBackends = backends.filter(b => shouldShowNonCurrentInstanceBackend(b, currentInstanceId, effectiveShowLocal));
+  const remoteBackends = backends.filter(b =>
+    shouldShowNonCurrentInstanceBackend(b, currentInstanceId, effectiveShowLocal)
+  );
 
   const handleBackendClick = (backend: BackendSnapshot) => {
     if (getViewState(backend.backendId) === 'offline') return;
@@ -138,7 +144,9 @@ export function ServerSelector({ placement = 'down' }: { placement?: 'down' | 'u
         className="flex w-full min-w-0 items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary hover:bg-muted transition-colors"
         data-testid="server-selector"
       >
-        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${getStatusColor(activeRecoveryState)}`} />
+        <span
+          className={`w-2 h-2 rounded-full flex-shrink-0 ${getStatusColor(activeRecoveryState)}`}
+        />
         <span className="flex-1 min-w-0 text-left text-sm truncate">
           {displayedBackend?.name || (isMobile ? 'Select Server' : 'No Server')}
         </span>
@@ -153,89 +161,95 @@ export function ServerSelector({ placement = 'down' }: { placement?: 'down' | 'u
       </button>
 
       {/* Dropdown — portaled to body to escape the sidebar's clipping context */}
-      {isOpen && createPortal(
-        <>
-          <div className="fixed inset-0 z-[55]" onClick={() => setIsOpen(false)} />
-          <div style={menuStyle} className="max-h-[70vh] overflow-y-auto bg-card border border-border rounded-lg shadow-xl z-[60]">
-          {/* Status */}
-          <div className="px-3 py-2 border-b border-border">
-            <div className="flex items-center gap-2 text-sm">
-              <span className={`w-2 h-2 rounded-full ${getStatusColor(activeRecoveryState)}`} />
-              <span className="text-muted-foreground" data-testid="connection-status">{getStatusText(activeRecoveryState)}</span>
-            </div>
-          </div>
-
-          {/* Gateway Section */}
-          <div>
-            <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider bg-secondary/50 flex items-center justify-between">
-              <span>{isMobile ? 'Servers' : 'Gateway'}</span>
-              {isGatewayConfigured && (
-                <div className="flex items-center gap-1">
-                  <span className={`w-1.5 h-1.5 rounded-full ${
-                    isGatewayReady
-                      ? 'bg-success'
-                      : 'bg-destructive'
-                  }`} />
-                  <span className="text-[10px] normal-case font-normal">
-                    {isGatewayReady
-                      ? 'Connected'
-                      : 'Disconnected'}
+      {isOpen &&
+        createPortal(
+          <>
+            <div className="fixed inset-0 z-[55]" onClick={() => setIsOpen(false)} />
+            <div
+              style={menuStyle}
+              className="max-h-[70vh] overflow-y-auto bg-card border border-border rounded-lg shadow-xl z-[60]"
+            >
+              {/* Status */}
+              <div className="px-3 py-2 border-b border-border">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className={`w-2 h-2 rounded-full ${getStatusColor(activeRecoveryState)}`} />
+                  <span className="text-muted-foreground" data-testid="connection-status">
+                    {getStatusText(activeRecoveryState)}
                   </span>
                 </div>
-              )}
+              </div>
+
+              {/* Gateway Section */}
+              <div>
+                <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider bg-secondary/50 flex items-center justify-between">
+                  <span>{isMobile ? 'Servers' : 'Gateway'}</span>
+                  {isGatewayConfigured && (
+                    <div className="flex items-center gap-1">
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          isGatewayReady ? 'bg-success' : 'bg-destructive'
+                        }`}
+                      />
+                      <span className="text-[10px] normal-case font-normal">
+                        {isGatewayReady ? 'Connected' : 'Disconnected'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {!isGatewayConfigured ? (
+                  <div className="px-3 py-2 text-xs text-muted-foreground text-center">
+                    {isMobile ? 'Gateway not configured' : 'Configure in Settings > Gateway'}
+                  </div>
+                ) : isGatewayReady && remoteBackends.length > 0 ? (
+                  <div className="max-h-48 overflow-y-auto">
+                    {(() => {
+                      const sameDevice = remoteBackends.filter(b => b.isThisDevice);
+                      const remote = remoteBackends.filter(b => !b.isThisDevice);
+                      const renderItem = (backend: BackendSnapshot) => (
+                        <GatewayBackendItem
+                          key={backend.backendId}
+                          backend={backend}
+                          isActive={activeServerId === backend.backendId}
+                          latencyMs={connections[backend.backendId]?.latencyMs}
+                          recoveryViewState={getViewState(backend.backendId)}
+                          onClick={() => handleBackendClick(backend)}
+                        />
+                      );
+                      // Only show group headers when there are items in both groups
+                      const showGroups = sameDevice.length > 0 && remote.length > 0;
+                      return (
+                        <>
+                          {showGroups && sameDevice.length > 0 && (
+                            <div className="px-3 py-1 text-[10px] font-medium text-muted-foreground/70 uppercase tracking-wider">
+                              This Device
+                            </div>
+                          )}
+                          {sameDevice.map(renderItem)}
+                          {showGroups && remote.length > 0 && (
+                            <div className="px-3 py-1 text-[10px] font-medium text-muted-foreground/70 uppercase tracking-wider">
+                              Remote
+                            </div>
+                          )}
+                          {remote.map(renderItem)}
+                        </>
+                      );
+                    })()}
+                  </div>
+                ) : isGatewayReady ? (
+                  <div className="px-3 py-2 text-xs text-muted-foreground text-center">
+                    No backends available
+                  </div>
+                ) : (
+                  <div className="px-3 py-2 text-xs text-muted-foreground text-center">
+                    Connecting to gateway...
+                  </div>
+                )}
+              </div>
             </div>
-
-            {!isGatewayConfigured ? (
-              <div className="px-3 py-2 text-xs text-muted-foreground text-center">
-                {isMobile ? 'Gateway not configured' : 'Configure in Settings > Gateway'}
-              </div>
-            ) : isGatewayReady && remoteBackends.length > 0 ? (
-              <div className="max-h-48 overflow-y-auto">
-                {(() => {
-                  const sameDevice = remoteBackends.filter(b => b.isThisDevice);
-                  const remote = remoteBackends.filter(b => !b.isThisDevice);
-                  const renderItem = (backend: BackendSnapshot) => (
-                    <GatewayBackendItem
-                      key={backend.backendId}
-                      backend={backend}
-                      isActive={activeServerId === backend.backendId}
-
-                      latencyMs={connections[backend.backendId]?.latencyMs}
-                      recoveryViewState={getViewState(backend.backendId)}
-                      onClick={() => handleBackendClick(backend)}
-
-                    />
-                  );
-                  // Only show group headers when there are items in both groups
-                  const showGroups = sameDevice.length > 0 && remote.length > 0;
-                  return (
-                    <>
-                      {showGroups && sameDevice.length > 0 && (
-                        <div className="px-3 py-1 text-[10px] font-medium text-muted-foreground/70 uppercase tracking-wider">This Device</div>
-                      )}
-                      {sameDevice.map(renderItem)}
-                      {showGroups && remote.length > 0 && (
-                        <div className="px-3 py-1 text-[10px] font-medium text-muted-foreground/70 uppercase tracking-wider">Remote</div>
-                      )}
-                      {remote.map(renderItem)}
-                    </>
-                  );
-                })()}
-              </div>
-            ) : isGatewayReady ? (
-              <div className="px-3 py-2 text-xs text-muted-foreground text-center">
-                No backends available
-              </div>
-            ) : (
-              <div className="px-3 py-2 text-xs text-muted-foreground text-center">
-                Connecting to gateway...
-              </div>
-            )}
-          </div>
-          </div>
-        </>,
-        document.body
-      )}
+          </>,
+          document.body
+        )}
     </div>
   );
 }
@@ -254,24 +268,35 @@ function GatewayBackendItem({
   onClick: () => void;
 }) {
   const isReachable = recoveryViewState !== 'offline';
-  const statusColor = recoveryViewState === 'ready'
-    ? 'bg-success'
-    : ['transport_reconnecting', 'backend_subscribing', 'data_syncing', 'session_syncing'].includes(recoveryViewState)
-    ? 'bg-warning animate-pulse'
-    : recoveryViewState === 'backend_visible'
-    ? 'bg-warning'
-    : recoveryViewState === 'error'
-    ? 'bg-destructive'
-    : 'bg-muted-foreground';
+  const statusColor =
+    recoveryViewState === 'ready'
+      ? 'bg-success'
+      : [
+            'transport_reconnecting',
+            'backend_subscribing',
+            'data_syncing',
+            'session_syncing',
+          ].includes(recoveryViewState)
+        ? 'bg-warning animate-pulse'
+        : recoveryViewState === 'backend_visible'
+          ? 'bg-warning'
+          : recoveryViewState === 'error'
+            ? 'bg-destructive'
+            : 'bg-muted-foreground';
   const isNonProdChannel = backend.channel && backend.channel !== 'prod';
 
   const offlineLabel = (() => {
     switch (recoveryViewState) {
-      case 'backend_subscribing': return 'Subscribing';
-      case 'data_syncing': return 'Syncing';
-      case 'backend_visible': return 'Idle';
-      case 'error': return 'Error';
-      default: return 'Offline';
+      case 'backend_subscribing':
+        return 'Subscribing';
+      case 'data_syncing':
+        return 'Syncing';
+      case 'backend_visible':
+        return 'Idle';
+      case 'error':
+        return 'Error';
+      default:
+        return 'Offline';
     }
   })();
 
@@ -299,14 +324,10 @@ function GatewayBackendItem({
           </span>
         )}
         {!isReachable && (
-          <span className="text-xs text-muted-foreground flex-shrink-0">
-            {offlineLabel}
-          </span>
+          <span className="text-xs text-muted-foreground flex-shrink-0">{offlineLabel}</span>
         )}
       </div>
-      <div className="text-xs text-muted-foreground truncate ml-4 mt-0.5">
-        {backend.backendId}
-      </div>
+      <div className="text-xs text-muted-foreground truncate ml-4 mt-0.5">{backend.backendId}</div>
     </div>
   );
 }

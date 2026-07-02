@@ -14,11 +14,15 @@ export function parseDelta(markdown: string): DeltaDoc {
 
   // Purpose (optional)
   let purpose: string | undefined;
-  const purposeIdx = lines.findIndex((l) => /^##\s+Purpose\s*$/i.test(l));
+  const purposeIdx = lines.findIndex(l => /^##\s+Purpose\s*$/i.test(l));
   if (purposeIdx >= 0) {
     const nextH2 = lines.findIndex((l, i) => i > purposeIdx && /^##\s+/.test(l));
     const endIdx = nextH2 >= 0 ? nextH2 : lines.length;
-    purpose = lines.slice(purposeIdx + 1, endIdx).join('\n').trim() || undefined;
+    purpose =
+      lines
+        .slice(purposeIdx + 1, endIdx)
+        .join('\n')
+        .trim() || undefined;
   }
 
   const added = extractRequirements(lines, /^##\s+ADDED Requirements\s*$/i);
@@ -29,19 +33,21 @@ export function parseDelta(markdown: string): DeltaDoc {
 }
 
 function extractRequirements(lines: string[], headingPattern: RegExp): ParsedRequirement[] {
-  const start = lines.findIndex((l) => headingPattern.test(l));
+  const start = lines.findIndex(l => headingPattern.test(l));
   if (start === -1) return [];
   const end = lines.findIndex((l, i) => i > start && /^##\s+/.test(l));
   const sectionEnd = end >= 0 ? end : lines.length;
   const sectionLines = lines.slice(start + 1, sectionEnd);
 
   // Reuse parseSpec by synthesizing a minimal spec doc containing only these requirements.
-  const synthetic = ['# synthetic Specification', '', '## Requirements', ...sectionLines].join('\n');
+  const synthetic = ['# synthetic Specification', '', '## Requirements', ...sectionLines].join(
+    '\n'
+  );
   return parseSpec(synthetic).requirements;
 }
 
 function extractRemoved(lines: string[]): string[] {
-  const start = lines.findIndex((l) => /^##\s+REMOVED Requirements\s*$/i.test(l));
+  const start = lines.findIndex(l => /^##\s+REMOVED Requirements\s*$/i.test(l));
   if (start === -1) return [];
   const end = lines.findIndex((l, i) => i > start && /^##\s+/.test(l));
   const sectionEnd = end >= 0 ? end : lines.length;

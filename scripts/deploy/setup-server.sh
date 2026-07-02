@@ -25,6 +25,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 ENV_FILE="$PROJECT_ROOT/.env.server"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+PACKAGE_MANAGER=""
 
 # Minimum versions
 MIN_NODE_MAJOR=20
@@ -64,9 +65,11 @@ check_node() {
 }
 
 check_pnpm() {
+  PACKAGE_MANAGER="$(node -p "require('${PROJECT_ROOT}/package.json').packageManager")"
+
   if ! command -v pnpm &>/dev/null; then
     warn "pnpm is not installed. Installing via corepack..."
-    corepack enable && corepack prepare pnpm@latest --activate \
+    corepack enable && corepack prepare "$PACKAGE_MANAGER" --activate \
       || die "Failed to install pnpm. Please install manually: npm install -g pnpm"
   fi
 
@@ -104,7 +107,14 @@ check_build_tools() {
 install_deps() {
   info "Installing dependencies..."
   cd "$PROJECT_ROOT"
-  pnpm install --frozen-lockfile 2>/dev/null || pnpm install
+  if ! pnpm install --frozen-lockfile; then
+    if [[ "${ZCLAUDIA_DEPLOY_REPAIR_INSTALL:-0}" == "1" ]]; then
+      warn "Frozen install failed; running mutable install because ZCLAUDIA_DEPLOY_REPAIR_INSTALL=1"
+      pnpm install
+    else
+      die "Frozen install failed. Fix pnpm-lock.yaml or rerun with ZCLAUDIA_DEPLOY_REPAIR_INSTALL=1 to repair dependencies."
+    fi
+  fi
   ok "Dependencies installed"
 }
 

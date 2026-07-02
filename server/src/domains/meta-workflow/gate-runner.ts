@@ -15,7 +15,11 @@ export async function runGate(gate: AcceptanceGate, cwd: string): Promise<MetaWo
   const effectiveCwd = gate.cwd ? join(cwd, gate.cwd) : cwd;
   const start = Date.now();
 
-  const { stdout, stderr, exitCode, timedOut } = await execShell(gate.command, effectiveCwd, gate.expect.durationMaxMs);
+  const { stdout, stderr, exitCode, timedOut } = await execShell(
+    gate.command,
+    effectiveCwd,
+    gate.expect.durationMaxMs
+  );
   const durationMs = Date.now() - start;
 
   const expectedExit = gate.expect.exitCode ?? 0;
@@ -30,13 +34,19 @@ export async function runGate(gate: AcceptanceGate, cwd: string): Promise<MetaWo
   if (passed && gate.expect.fileExists) {
     for (const rel of gate.expect.fileExists) {
       const p = isAbsolute(rel) ? rel : join(effectiveCwd, rel);
-      if (!existsSync(p)) { passed = false; break; }
+      if (!existsSync(p)) {
+        passed = false;
+        break;
+      }
     }
   }
   if (passed && gate.expect.fileNotExists) {
     for (const rel of gate.expect.fileNotExists) {
       const p = isAbsolute(rel) ? rel : join(effectiveCwd, rel);
-      if (existsSync(p)) { passed = false; break; }
+      if (existsSync(p)) {
+        passed = false;
+        break;
+      }
     }
   }
 
@@ -53,7 +63,7 @@ export async function runGate(gate: AcceptanceGate, cwd: string): Promise<MetaWo
 export async function runGates(
   gates: AcceptanceGate[],
   cwd: string,
-  opts: RunGatesOptions = {},
+  opts: RunGatesOptions = {}
 ): Promise<MetaWorkflowGateResult[]> {
   const results: MetaWorkflowGateResult[] = [];
   for (const gate of gates) {
@@ -67,22 +77,28 @@ export async function runGates(
 function execShell(
   command: string,
   cwd: string,
-  timeoutMs?: number,
+  timeoutMs?: number
 ): Promise<{ stdout: string; stderr: string; exitCode: number; timedOut: boolean }> {
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     const child = spawn(command, { cwd, shell: true });
     let stdout = '';
     let stderr = '';
     let timedOut = false;
 
-    const timer = timeoutMs ? setTimeout(() => {
-      timedOut = true;
-      child.kill('SIGTERM');
-    }, timeoutMs) : null;
+    const timer = timeoutMs
+      ? setTimeout(() => {
+          timedOut = true;
+          child.kill('SIGTERM');
+        }, timeoutMs)
+      : null;
 
-    child.stdout?.on('data', (b: Buffer) => { stdout += b.toString(); });
-    child.stderr?.on('data', (b: Buffer) => { stderr += b.toString(); });
-    child.on('close', (code) => {
+    child.stdout?.on('data', (b: Buffer) => {
+      stdout += b.toString();
+    });
+    child.stderr?.on('data', (b: Buffer) => {
+      stderr += b.toString();
+    });
+    child.on('close', code => {
       if (timer) clearTimeout(timer);
       resolve({ stdout, stderr, exitCode: code ?? -1, timedOut });
     });

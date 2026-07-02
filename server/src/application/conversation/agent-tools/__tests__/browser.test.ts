@@ -33,10 +33,15 @@ describe('agent-tools/browser', () => {
 
   it('fetches pages with redirect blocking and returns extracted text by default', async () => {
     vi.mocked(isBlockedHostname).mockResolvedValue(false);
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      text: vi.fn().mockResolvedValue('<h1>Hello</h1><script>bad()</script><p>World &amp; Friends</p>'),
-    }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: vi
+          .fn()
+          .mockResolvedValue('<h1>Hello</h1><script>bad()</script><p>World &amp; Friends</p>'),
+      })
+    );
 
     const { registerBrowserTool } = await import('../browser.js');
     registerBrowserTool();
@@ -51,7 +56,7 @@ describe('agent-tools/browser', () => {
         headers: expect.objectContaining({
           'User-Agent': 'ZClaudia-Agent/1.0',
         }),
-      }),
+      })
     );
     expect(JSON.parse(result)).toEqual({
       url: 'https://example.com/docs',
@@ -61,10 +66,13 @@ describe('agent-tools/browser', () => {
 
   it('returns raw bodies unchanged when format=raw', async () => {
     vi.mocked(isBlockedHostname).mockResolvedValue(false);
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      text: vi.fn().mockResolvedValue('{"ok":true}'),
-    }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: vi.fn().mockResolvedValue('{"ok":true}'),
+      })
+    );
 
     const { registerBrowserTool } = await import('../browser.js');
     registerBrowserTool();
@@ -77,12 +85,15 @@ describe('agent-tools/browser', () => {
 
   it('returns HTTP errors in a structured payload', async () => {
     vi.mocked(isBlockedHostname).mockResolvedValue(false);
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: false,
-      status: 429,
-      statusText: 'Too Many Requests',
-      text: vi.fn(),
-    }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        statusText: 'Too Many Requests',
+        text: vi.fn(),
+      })
+    );
 
     const { registerBrowserTool } = await import('../browser.js');
     registerBrowserTool();

@@ -4,36 +4,51 @@ import * as api from '../../api.js';
 import { useOpenSpecStore } from '../../store.js';
 import { SpecMarkdownPreview } from './SpecMarkdownPreview.js';
 
-interface Props { scan: BootstrapScan; onClose: () => void; }
+interface Props {
+  scan: BootstrapScan;
+  onClose: () => void;
+}
 
 export function ReviewStep({ scan, onClose }: Props): React.ReactElement {
-  const candidates = useOpenSpecStore((s) => s.initCandidatesByScan[scan.id] ?? []);
-  const upsert = useOpenSpecStore((s) => s.upsertInitCandidate);
+  const candidates = useOpenSpecStore(s => s.initCandidatesByScan[scan.id] ?? []);
+  const upsert = useOpenSpecStore(s => s.upsertInitCandidate);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const visible = candidates.filter((c) => c.selected && c.phase !== 'excluded');
-  const pending = visible.filter((c) => ['generated', 'failed'].includes(c.phase));
-  const approved = visible.filter((c) => c.phase === 'approved').length;
-  const rejected = visible.filter((c) => c.phase === 'rejected').length;
-  const failed = visible.filter((c) => c.phase === 'failed').length;
+  const visible = candidates.filter(c => c.selected && c.phase !== 'excluded');
+  const pending = visible.filter(c => ['generated', 'failed'].includes(c.phase));
+  const approved = visible.filter(c => c.phase === 'approved').length;
+  const rejected = visible.filter(c => c.phase === 'rejected').length;
+  const failed = visible.filter(c => c.phase === 'failed').length;
 
   async function doApprove(c: Candidate): Promise<void> {
     setBusyId(c.id);
-    try { upsert(scan.id, await api.approveCandidate(c.id)); }
-    catch (e) { console.error(e); }
-    finally { setBusyId(null); }
+    try {
+      upsert(scan.id, await api.approveCandidate(c.id));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setBusyId(null);
+    }
   }
   async function doReject(c: Candidate): Promise<void> {
     setBusyId(c.id);
-    try { upsert(scan.id, await api.rejectCandidate(c.id)); }
-    catch (e) { console.error(e); }
-    finally { setBusyId(null); }
+    try {
+      upsert(scan.id, await api.rejectCandidate(c.id));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setBusyId(null);
+    }
   }
   async function doRetry(c: Candidate): Promise<void> {
     setBusyId(c.id);
-    try { upsert(scan.id, await api.retryCandidate(c.id)); }
-    catch (e) { console.error(e); }
-    finally { setBusyId(null); }
+    try {
+      upsert(scan.id, await api.retryCandidate(c.id));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setBusyId(null);
+    }
   }
   async function doFinalize(): Promise<void> {
     await api.finalizeBootstrap(scan.id);
@@ -49,7 +64,7 @@ export function ReviewStep({ scan, onClose }: Props): React.ReactElement {
         </div>
       </div>
       <div className="space-y-3">
-        {visible.map((c) => (
+        {visible.map(c => (
           <div key={c.id} className="border rounded p-2">
             <div className="flex items-center justify-between gap-2">
               <span className="font-mono text-xs">{c.capability}</span>
@@ -60,12 +75,16 @@ export function ReviewStep({ scan, onClose }: Props): React.ReactElement {
                       className="px-2 py-0.5 text-xs rounded bg-green-500/15 text-green-600"
                       disabled={busyId === c.id}
                       onClick={() => void doApprove(c)}
-                    >✅ Approve</button>
+                    >
+                      ✅ Approve
+                    </button>
                     <button
                       className="px-2 py-0.5 text-xs rounded bg-red-500/15 text-red-500"
                       disabled={busyId === c.id}
                       onClick={() => void doReject(c)}
-                    >❌ Reject</button>
+                    >
+                      ❌ Reject
+                    </button>
                   </>
                 )}
                 {c.phase === 'failed' && (
@@ -73,10 +92,14 @@ export function ReviewStep({ scan, onClose }: Props): React.ReactElement {
                     className="px-2 py-0.5 text-xs rounded bg-yellow-500/15 text-yellow-700"
                     disabled={busyId === c.id}
                     onClick={() => void doRetry(c)}
-                  >🔁 Retry</button>
+                  >
+                    🔁 Retry
+                  </button>
                 )}
                 {c.phase === 'approved' && <span className="text-xs text-green-600">approved</span>}
-                {c.phase === 'rejected' && <span className="text-xs text-muted-foreground">rejected</span>}
+                {c.phase === 'rejected' && (
+                  <span className="text-xs text-muted-foreground">rejected</span>
+                )}
               </div>
             </div>
             {c.generated_md && <SpecMarkdownPreview md={c.generated_md} />}
@@ -90,7 +113,9 @@ export function ReviewStep({ scan, onClose }: Props): React.ReactElement {
           disabled={pending.length > 0}
           title={pending.length > 0 ? 'Resolve all pending items first' : 'Finalize'}
           onClick={() => void doFinalize()}
-        >Finalize ({approved + rejected}/{visible.length})</button>
+        >
+          Finalize ({approved + rejected}/{visible.length})
+        </button>
       </div>
     </div>
   );

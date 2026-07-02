@@ -11,14 +11,21 @@ import type {
 export function renderExecutionPlanMarkdown(
   change: ProjectChange,
   plan: ChangeExecutionPlan,
-  tasks: SupervisionTask[],
+  tasks: SupervisionTask[]
 ): string {
-  const verification = plan.verification.length > 0
-    ? plan.verification.map((item) => `- ${item.label}${item.required ? ' (required)' : ''}${item.command ? ` — \`${item.command}\`` : ''}`).join('\n')
-    : '- No structured verification items yet';
-  const phases = plan.phases && plan.phases.length > 0
-    ? plan.phases.map((phase) => `- ${phase.title}: ${phase.summary}`).join('\n')
-    : '- Currently running as a single phase';
+  const verification =
+    plan.verification.length > 0
+      ? plan.verification
+          .map(
+            item =>
+              `- ${item.label}${item.required ? ' (required)' : ''}${item.command ? ` — \`${item.command}\`` : ''}`
+          )
+          .join('\n')
+      : '- No structured verification items yet';
+  const phases =
+    plan.phases && plan.phases.length > 0
+      ? plan.phases.map(phase => `- ${phase.title}: ${phase.summary}`).join('\n')
+      : '- Currently running as a single phase';
   return [
     '# Execution Plan',
     '',
@@ -65,30 +72,26 @@ export function renderTasksMarkdown(change: ProjectChange, tasks: SupervisionTas
     ].join('\n');
   }
 
-  const sections = tasks.map((task, index) => [
-    `## T${index + 1} ${task.title}`,
-    '',
-    `- Status: \`${task.status}\``,
-    `- Summary: ${task.description}`,
-    `- Scope: ${task.scope?.join(', ') || '(none)'}`,
-    `- Depends On: ${task.dependencies.length > 0 ? task.dependencies.join(', ') : '(none)'}`,
-    `- Deliverables: ${task.acceptanceCriteria.length > 0 ? task.acceptanceCriteria.join('; ') : '(none)'}`,
-    `- Verification: ${task.relevantDocIds?.length ? task.relevantDocIds.join(', ') : '(not specified)'}`,
-    '',
-  ].join('\n'));
+  const sections = tasks.map((task, index) =>
+    [
+      `## T${index + 1} ${task.title}`,
+      '',
+      `- Status: \`${task.status}\``,
+      `- Summary: ${task.description}`,
+      `- Scope: ${task.scope?.join(', ') || '(none)'}`,
+      `- Depends On: ${task.dependencies.length > 0 ? task.dependencies.join(', ') : '(none)'}`,
+      `- Deliverables: ${task.acceptanceCriteria.length > 0 ? task.acceptanceCriteria.join('; ') : '(none)'}`,
+      `- Verification: ${task.relevantDocIds?.length ? task.relevantDocIds.join(', ') : '(not specified)'}`,
+      '',
+    ].join('\n')
+  );
 
-  return [
-    '# Tasks',
-    '',
-    `> Change: ${change.title}`,
-    '',
-    ...sections,
-  ].join('\n');
+  return ['# Tasks', '', `> Change: ${change.title}`, '', ...sections].join('\n');
 }
 
 export function renderAcceptanceMarkdown(change: ProjectChange, tasks: SupervisionTask[]): string {
-  const acceptedTasks = tasks.filter((task) => ['approved', 'integrated'].includes(task.status));
-  const openTasks = tasks.filter((task) => !['approved', 'integrated'].includes(task.status));
+  const acceptedTasks = tasks.filter(task => ['approved', 'integrated'].includes(task.status));
+  const openTasks = tasks.filter(task => !['approved', 'integrated'].includes(task.status));
   const finalDecision = (() => {
     if (change.status === 'completed') return 'Accepted, synced, and completed.';
     if (change.status === 'syncing') return 'Acceptance approved. Ready for final spec sync.';
@@ -102,19 +105,19 @@ export function renderAcceptanceMarkdown(change: ProjectChange, tasks: Supervisi
     '## Task-Level Checks',
     '',
     acceptedTasks.length > 0
-      ? acceptedTasks.map((task) => `- ${task.title}: ${task.status}`).join('\n')
+      ? acceptedTasks.map(task => `- ${task.title}: ${task.status}`).join('\n')
       : '- No completed task-level checks yet',
     '',
     '## Change-Level Checks',
     '',
     change.acceptanceCriteria.length > 0
-      ? change.acceptanceCriteria.map((item) => `- ${item}`).join('\n')
+      ? change.acceptanceCriteria.map(item => `- ${item}`).join('\n')
       : '- No explicit change-level acceptance criteria',
     '',
     '## Open Issues',
     '',
     openTasks.length > 0
-      ? openTasks.map((task) => `- ${task.title}: ${task.status}`).join('\n')
+      ? openTasks.map(task => `- ${task.title}: ${task.status}`).join('\n')
       : '- None',
     '',
     '## Final Decision',
@@ -139,9 +142,7 @@ export function renderSyncLogMarkdown(change: ProjectChange, summary?: string): 
     '',
     '## Follow-up Notes',
     '',
-    change.status === 'completed'
-      ? '- Change marked completed'
-      : '- Awaiting sync approval',
+    change.status === 'completed' ? '- Change marked completed' : '- Awaiting sync approval',
     '',
   ].join('\n');
 }

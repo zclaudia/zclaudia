@@ -12,7 +12,7 @@ function freshDb(): Database.Database {
   db.prepare(`INSERT INTO projects (id) VALUES (?)`).run('proj-1');
   db.prepare(
     `INSERT INTO meta_workflow_runs (id, project_id, title, status, reject_count, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
   ).run('run-1', 'proj-1', 't', 'executing', 0, 0, 0);
   return db;
 }
@@ -38,7 +38,14 @@ describe('MetaWorkflowPhaseRepository', () => {
       maxRetries: 3,
       inputsSnapshot: [{ kind: 'file', source: 'design/requirements.md' }],
       outputsSnapshot: [{ kind: 'commit', description: 'impl' }],
-      gatesSnapshot: [{ id: 'compile', description: 'mvn compile', command: 'mvn compile', expect: { exitCode: 0 } }],
+      gatesSnapshot: [
+        {
+          id: 'compile',
+          description: 'mvn compile',
+          command: 'mvn compile',
+          expect: { exitCode: 0 },
+        },
+      ],
       createdAt: now,
     });
     expect(phase.id).toBeTruthy();
@@ -49,19 +56,42 @@ describe('MetaWorkflowPhaseRepository', () => {
 
   it('findByRun returns phases', () => {
     const now = Date.now();
-    repo.create({ runId: 'run-1', phaseId: 'p1', phaseType: 'code-implement', status: 'pending',
-                  executeEntity: 'workflow', attempt: 0, maxRetries: 3, createdAt: now });
-    repo.create({ runId: 'run-1', phaseId: 'p2', phaseType: 'design-doc', status: 'pending',
-                  executeEntity: 'workflow', attempt: 0, maxRetries: 3, createdAt: now + 1 });
+    repo.create({
+      runId: 'run-1',
+      phaseId: 'p1',
+      phaseType: 'code-implement',
+      status: 'pending',
+      executeEntity: 'workflow',
+      attempt: 0,
+      maxRetries: 3,
+      createdAt: now,
+    });
+    repo.create({
+      runId: 'run-1',
+      phaseId: 'p2',
+      phaseType: 'design-doc',
+      status: 'pending',
+      executeEntity: 'workflow',
+      attempt: 0,
+      maxRetries: 3,
+      createdAt: now + 1,
+    });
     const phases = repo.findByRun('run-1');
     expect(phases).toHaveLength(2);
   });
 
   it('updates phase status', () => {
     const now = Date.now();
-    const created = repo.create({ runId: 'run-1', phaseId: 'p1', phaseType: 'code-implement',
-                                  status: 'pending', executeEntity: 'workflow',
-                                  attempt: 0, maxRetries: 3, createdAt: now });
+    const created = repo.create({
+      runId: 'run-1',
+      phaseId: 'p1',
+      phaseType: 'code-implement',
+      status: 'pending',
+      executeEntity: 'workflow',
+      attempt: 0,
+      maxRetries: 3,
+      createdAt: now,
+    });
     const updated = repo.update(created.id, { status: 'running', attempt: 1, startedAt: now + 10 });
     expect(updated.status).toBe('running');
     expect(updated.attempt).toBe(1);
@@ -70,11 +100,20 @@ describe('MetaWorkflowPhaseRepository', () => {
 
   it('stale flag fields round-trip', () => {
     const now = Date.now();
-    const phase = repo.create({ runId: 'run-1', phaseId: 'p1', phaseType: 'code-implement',
-                                status: 'done', executeEntity: 'workflow',
-                                attempt: 1, maxRetries: 3, createdAt: now });
+    const phase = repo.create({
+      runId: 'run-1',
+      phaseId: 'p1',
+      phaseType: 'code-implement',
+      status: 'done',
+      executeEntity: 'workflow',
+      attempt: 1,
+      maxRetries: 3,
+      createdAt: now,
+    });
     const updated = repo.update(phase.id, {
-      status: 'stale', staleSince: now + 100, staleSourcePhaseId: 'p-upstream',
+      status: 'stale',
+      staleSince: now + 100,
+      staleSourcePhaseId: 'p-upstream',
     });
     expect(updated.status).toBe('stale');
     expect(updated.staleSince).toBe(now + 100);
@@ -83,8 +122,16 @@ describe('MetaWorkflowPhaseRepository', () => {
 
   it('findByRunAndPhaseId returns the unique phase', () => {
     const now = Date.now();
-    repo.create({ runId: 'run-1', phaseId: 'p1', phaseType: 'code-implement', status: 'pending',
-                  executeEntity: 'workflow', attempt: 0, maxRetries: 3, createdAt: now });
+    repo.create({
+      runId: 'run-1',
+      phaseId: 'p1',
+      phaseType: 'code-implement',
+      status: 'pending',
+      executeEntity: 'workflow',
+      attempt: 0,
+      maxRetries: 3,
+      createdAt: now,
+    });
     const phase = repo.findByRunAndPhaseId('run-1', 'p1');
     expect(phase).not.toBeNull();
     expect(phase?.phaseId).toBe('p1');

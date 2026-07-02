@@ -5,7 +5,9 @@ import { migration } from '../../../../storage/migrations/021_session_entries.js
 import { SqliteSessionStorage } from '../sqlite-session-storage.js';
 import { projectEntriesToMessageRows } from '../message-projection.js';
 import {
-  buildUserMessage, buildAssistantTurnMessages, appendMessagesToTree,
+  buildUserMessage,
+  buildAssistantTurnMessages,
+  appendMessagesToTree,
 } from '../write-path.js';
 
 function makeDb(): Database.Database {
@@ -35,14 +37,26 @@ describe('write-path builders', () => {
     const msgs = buildAssistantTurnMessages({
       fullContent: 'done',
       thinkingBlocks: [{ text: 'hmm', signature: 'sig' }],
-      collectedToolCalls: [{ toolUseId: 'tc1', name: 'edit', input: { p: 1 }, output: 'ok', isError: false }],
+      collectedToolCalls: [
+        { toolUseId: 'tc1', name: 'edit', input: { p: 1 }, output: 'ok', isError: false },
+      ],
     }) as any[];
     expect(msgs).toHaveLength(2);
     expect(msgs[0].role).toBe('assistant');
     const types = msgs[0].content.map((b: any) => b.type);
     expect(types).toEqual(['thinking', 'text', 'toolCall']);
-    expect(msgs[0].content[2]).toMatchObject({ type: 'toolCall', id: 'tc1', name: 'edit', arguments: { p: 1 } });
-    expect(msgs[1]).toMatchObject({ role: 'toolResult', toolCallId: 'tc1', toolName: 'edit', isError: false });
+    expect(msgs[0].content[2]).toMatchObject({
+      type: 'toolCall',
+      id: 'tc1',
+      name: 'edit',
+      arguments: { p: 1 },
+    });
+    expect(msgs[1]).toMatchObject({
+      role: 'toolResult',
+      toolCallId: 'tc1',
+      toolName: 'edit',
+      isError: false,
+    });
     expect(msgs[1].content).toEqual([{ type: 'text', text: 'ok' }]);
   });
 
@@ -63,12 +77,19 @@ describe('write-path builders', () => {
 
   it('usage survives the tree round-trip and is readable for the compaction threshold', async () => {
     const { Session: _S } = await import('@earendil-works/pi-agent-core');
-    const { lastAssistantPromptTokens } = await import('../../../../../application/conversation/compaction/context-estimate.js');
+    const { lastAssistantPromptTokens } =
+      await import('../../../../../application/conversation/compaction/context-estimate.js');
     const db = makeDb();
     appendMessagesToTree(db, 's1', [buildUserMessage('q', [])]);
-    appendMessagesToTree(db, 's1', buildAssistantTurnMessages({
-      fullContent: 'a', collectedToolCalls: [], usage: { input: 1000, cacheRead: 500, output: 20 },
-    }));
+    appendMessagesToTree(
+      db,
+      's1',
+      buildAssistantTurnMessages({
+        fullContent: 'a',
+        collectedToolCalls: [],
+        usage: { input: 1000, cacheRead: 500, output: 20 },
+      })
+    );
     const ctx = await new _S(new SqliteSessionStorage(db, 's1')).buildContext();
     // input + cacheRead + cacheWrite (output excluded) = 1500
     expect(lastAssistantPromptTokens(ctx.messages as any)).toBe(1500);
@@ -77,7 +98,11 @@ describe('write-path builders', () => {
   it('appendMessagesToTree writes entries readable via buildContext, chained + leaf advanced', async () => {
     const db = makeDb();
     appendMessagesToTree(db, 's1', [buildUserMessage('q', [])]);
-    appendMessagesToTree(db, 's1', buildAssistantTurnMessages({ fullContent: 'a', collectedToolCalls: [] }));
+    appendMessagesToTree(
+      db,
+      's1',
+      buildAssistantTurnMessages({ fullContent: 'a', collectedToolCalls: [] })
+    );
     const ctx = await new Session(new SqliteSessionStorage(db, 's1')).buildContext();
     expect(ctx.messages.map((m: any) => m.role)).toEqual(['user', 'assistant']);
     expect((ctx.messages[0] as any).content).toBe('q');
@@ -86,21 +111,36 @@ describe('write-path builders', () => {
   it('appendMessagesToTree is atomic: a mid-batch failure rolls back the whole turn + leaf', () => {
     const db = makeDb();
     appendMessagesToTree(db, 's1', [buildUserMessage('q', [])]);
-    const leafBefore = (db.prepare(`SELECT leaf_id AS l FROM session_leaf WHERE session_id='s1'`).get() as { l: string }).l;
-    const countBefore = (db.prepare(`SELECT count(*) AS c FROM session_entries WHERE session_id='s1'`).get() as { c: number }).c;
+    const leafBefore = (
+      db.prepare(`SELECT leaf_id AS l FROM session_leaf WHERE session_id='s1'`).get() as {
+        l: string;
+      }
+    ).l;
+    const countBefore = (
+      db.prepare(`SELECT count(*) AS c FROM session_entries WHERE session_id='s1'`).get() as {
+        c: number;
+      }
+    ).c;
 
     // Second message has circular content → JSON.stringify throws after the first is inserted.
     const circular: any = { role: 'assistant', content: 'x' };
     circular.content = circular;
-    expect(() => appendMessagesToTree(db, 's1', [
-      { role: 'assistant', content: 'ok' } as any,
-      circular,
-    ])).toThrow();
+    expect(() =>
+      appendMessagesToTree(db, 's1', [{ role: 'assistant', content: 'ok' } as any, circular])
+    ).toThrow();
 
-    const countAfter = (db.prepare(`SELECT count(*) AS c FROM session_entries WHERE session_id='s1'`).get() as { c: number }).c;
-    const leafAfter = (db.prepare(`SELECT leaf_id AS l FROM session_leaf WHERE session_id='s1'`).get() as { l: string }).l;
+    const countAfter = (
+      db.prepare(`SELECT count(*) AS c FROM session_entries WHERE session_id='s1'`).get() as {
+        c: number;
+      }
+    ).c;
+    const leafAfter = (
+      db.prepare(`SELECT leaf_id AS l FROM session_leaf WHERE session_id='s1'`).get() as {
+        l: string;
+      }
+    ).l;
     expect(countAfter).toBe(countBefore); // the 'ok' entry was rolled back
-    expect(leafAfter).toBe(leafBefore);   // leaf not advanced
+    expect(leafAfter).toBe(leafBefore); // leaf not advanced
   });
 
   it('nests inside an outer transaction (savepoint) — a tree failure rolls back the whole turn across tables', () => {
@@ -111,24 +151,41 @@ describe('write-path builders', () => {
     const circular: any = { role: 'assistant', content: 'x' };
     circular.content = circular; // JSON.stringify throws inside appendMessagesToTree
 
-    expect(() => db.transaction(() => {
-      db.prepare(`INSERT INTO messages (id, session_id, content) VALUES ('m1', 's1', 'hi')`).run();
-      appendMessagesToTree(db, 's1', [circular]); // nested tx (savepoint) — throws
-    })()).toThrow();
+    expect(() =>
+      db.transaction(() => {
+        db.prepare(
+          `INSERT INTO messages (id, session_id, content) VALUES ('m1', 's1', 'hi')`
+        ).run();
+        appendMessagesToTree(db, 's1', [circular]); // nested tx (savepoint) — throws
+      })()
+    ).toThrow();
 
     expect((db.prepare(`SELECT count(*) AS c FROM messages`).get() as { c: number }).c).toBe(0);
-    expect((db.prepare(`SELECT count(*) AS c FROM session_entries WHERE session_id='s1'`).get() as { c: number }).c).toBe(0);
+    expect(
+      (
+        db.prepare(`SELECT count(*) AS c FROM session_entries WHERE session_id='s1'`).get() as {
+          c: number;
+        }
+      ).c
+    ).toBe(0);
   });
 
   it('projection parity: tree entries collapse to the coarse messages rows', async () => {
     const db = makeDb();
     appendMessagesToTree(db, 's1', [buildUserMessage('q', [])]);
-    appendMessagesToTree(db, 's1', buildAssistantTurnMessages({
-      fullContent: 'a', collectedToolCalls: [{ toolUseId: 't1', name: 'read', input: {}, output: 'file', isError: false }],
-    }));
+    appendMessagesToTree(
+      db,
+      's1',
+      buildAssistantTurnMessages({
+        fullContent: 'a',
+        collectedToolCalls: [
+          { toolUseId: 't1', name: 'read', input: {}, output: 'file', isError: false },
+        ],
+      })
+    );
     const branch = await new SqliteSessionStorage(db, 's1').getEntries();
     const rows = projectEntriesToMessageRows(branch);
-    expect(rows.map((r) => r.role)).toEqual(['user', 'assistant']);
+    expect(rows.map(r => r.role)).toEqual(['user', 'assistant']);
     expect(rows[0].content).toBe('q');
     expect(rows[1].content).toBe('a');
     expect(rows[1].metadata?.toolCalls).toEqual([

@@ -1,5 +1,9 @@
 import type { BackendFacadeEvent } from '@zclaudia/shared';
-import { syncBackendDataEvent, syncBackendDataSnapshot } from './backend-data-sync';
+import {
+  syncBackendDataEvent,
+  syncBackendDataSnapshot,
+  syncBackendsRemoved,
+} from './backend-data-sync';
 import { syncBackendLifecycle } from './backend-lifecycle-sync';
 import { syncConnectionState, syncSnapshotToGatewayStore } from './gateway-connection-sync';
 import {
@@ -32,6 +36,10 @@ export function syncToGatewayStore(event: BackendFacadeEvent): void {
 
     case 'backend_data_snapshot':
       syncBackendDataSnapshot(event);
+      break;
+
+    case 'backends_removed':
+      syncBackendsRemoved(event);
       break;
 
     case 'backend_data_event':

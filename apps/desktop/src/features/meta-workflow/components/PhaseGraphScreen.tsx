@@ -10,7 +10,11 @@ import {
   type OnNodeDrag,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import type { MetaWorkflowRun, PhasesDoc, MetaWorkflowPhase } from '@zclaudia/shared/features/meta-workflow';
+import type {
+  MetaWorkflowRun,
+  PhasesDoc,
+  MetaWorkflowPhase,
+} from '@zclaudia/shared/features/meta-workflow';
 import { useMetaWorkflowStore } from '../store.js';
 
 interface Props {
@@ -39,12 +43,15 @@ function toFlow(doc: PhasesDoc, phases: MetaWorkflowPhase[]): { nodes: Node[]; e
   const depth: Record<string, number> = {};
   function calcDepth(id: string): number {
     if (depth[id] !== undefined) return depth[id];
-    const def = doc.phases.find((p) => p.id === id);
-    if (!def || def.dependsOn.length === 0) { depth[id] = 0; return 0; }
-    depth[id] = Math.max(...def.dependsOn.map((d) => calcDepth(d))) + 1;
+    const def = doc.phases.find(p => p.id === id);
+    if (!def || def.dependsOn.length === 0) {
+      depth[id] = 0;
+      return 0;
+    }
+    depth[id] = Math.max(...def.dependsOn.map(d => calcDepth(d))) + 1;
     return depth[id];
   }
-  doc.phases.forEach((p) => calcDepth(p.id));
+  doc.phases.forEach(p => calcDepth(p.id));
 
   const byDepth: Record<number, string[]> = {};
   for (const [id, d] of Object.entries(depth)) {
@@ -52,7 +59,7 @@ function toFlow(doc: PhasesDoc, phases: MetaWorkflowPhase[]): { nodes: Node[]; e
     byDepth[d].push(id);
   }
 
-  const nodes: Node[] = doc.phases.map((p) => {
+  const nodes: Node[] = doc.phases.map(p => {
     const d = depth[p.id];
     const lane = byDepth[d].indexOf(p.id);
     const status = statusByPhaseId[p.id] ?? 'pending';
@@ -68,7 +75,12 @@ function toFlow(doc: PhasesDoc, phases: MetaWorkflowPhase[]): { nodes: Node[]; e
           </div>
         ),
       },
-      style: { background: STATUS_COLOR[status] ?? '#fff', border: '1px solid #cbd5e1', borderRadius: 6, width: 180 },
+      style: {
+        background: STATUS_COLOR[status] ?? '#fff',
+        border: '1px solid #cbd5e1',
+        borderRadius: 6,
+        width: 180,
+      },
     };
   });
 
@@ -82,10 +94,10 @@ function toFlow(doc: PhasesDoc, phases: MetaWorkflowPhase[]): { nodes: Node[]; e
 }
 
 export function PhaseGraphScreen({ projectId, run, socket: _socket }: Props): React.ReactElement {
-  const phases = useMetaWorkflowStore((s) => s.phases[run.id] ?? []);
-  const patchView = useMetaWorkflowStore((s) => s.patchView);
-  const layouts = useMetaWorkflowStore((s) => s.layouts[run.id] ?? {});
-  const setNodePosition = useMetaWorkflowStore((s) => s.setNodePosition);
+  const phases = useMetaWorkflowStore(s => s.phases[run.id] ?? []);
+  const patchView = useMetaWorkflowStore(s => s.patchView);
+  const layouts = useMetaWorkflowStore(s => s.layouts[run.id] ?? {});
+  const setNodePosition = useMetaWorkflowStore(s => s.setNodePosition);
 
   const { nodes, edges } = useMemo(() => {
     if (!run.phasesJson) return { nodes: [], edges: [] };
@@ -100,22 +112,22 @@ export function PhaseGraphScreen({ projectId, run, socket: _socket }: Props): Re
   // Merge stored positions on top of the computed initial layout.
   const initialNodes = useMemo<Node[]>(
     () =>
-      nodes.map((n) => {
+      nodes.map(n => {
         const saved = layouts[n.id];
         return saved ? { ...n, position: saved } : n;
       }),
     // Only when computed nodes change (status update etc). Saved positions reapplied below via state init.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [nodes],
+    [nodes]
   );
 
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState(initialNodes);
 
   // Keep rfNodes in sync when phases data changes (status badges) — preserves x/y from rfNodes.
   useEffect(() => {
-    setRfNodes((prev) => {
-      const byId = new Map(prev.map((n) => [n.id, n]));
-      return initialNodes.map((n) => {
+    setRfNodes(prev => {
+      const byId = new Map(prev.map(n => [n.id, n]));
+      return initialNodes.map(n => {
         const existing = byId.get(n.id);
         return existing ? { ...n, position: existing.position } : n;
       });
@@ -126,14 +138,16 @@ export function PhaseGraphScreen({ projectId, run, socket: _socket }: Props): Re
     (_event, node) => {
       setNodePosition(run.id, node.id, { x: node.position.x, y: node.position.y });
     },
-    [run.id, setNodePosition],
+    [run.id, setNodePosition]
   );
 
   if (!run.phasesJson) {
     return (
       <div>
         <h3 className="text-lg font-semibold mb-3">Phase Graph — {run.title}</h3>
-        <div className="text-sm text-muted-foreground">Run has no phases.json yet. Approve requirements to enter splitting.</div>
+        <div className="text-sm text-muted-foreground">
+          Run has no phases.json yet. Approve requirements to enter splitting.
+        </div>
       </div>
     );
   }
@@ -142,8 +156,10 @@ export function PhaseGraphScreen({ projectId, run, socket: _socket }: Props): Re
     <div className="space-y-3">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold">Phase Graph — {run.title}</h3>
-        <button className="px-2.5 py-1.5 text-xs rounded-md bg-secondary hover:bg-secondary/80"
-                onClick={() => patchView(projectId, { screen: 'phase-board' })}>
+        <button
+          className="px-2.5 py-1.5 text-xs rounded-md bg-secondary hover:bg-secondary/80"
+          onClick={() => patchView(projectId, { screen: 'phase-board' })}
+        >
           View Board
         </button>
       </div>

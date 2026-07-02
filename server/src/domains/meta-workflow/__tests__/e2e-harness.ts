@@ -102,7 +102,11 @@ export function buildHarness(opts: HarnessOptions = {}): Harness {
     aiCalls,
     cleanup() {
       db.close();
-      try { rmSync(gitRepo, { recursive: true, force: true }); } catch { /* best-effort */ }
+      try {
+        rmSync(gitRepo, { recursive: true, force: true });
+      } catch {
+        /* best-effort */
+      }
     },
   };
 }
@@ -121,12 +125,14 @@ export function buildLinearPhasesJson(count: number): string {
       dependsOn: idx === 0 ? [] : [letters[idx - 1]],
       inputs: [],
       outputs: [{ kind: 'commit', description: `${id} commit` }],
-      acceptanceGates: [{
-        id: 'g',
-        description: 'always pass',
-        command: 'true',
-        expect: { exitCode: 0 },
-      }],
+      acceptanceGates: [
+        {
+          id: 'g',
+          description: 'always pass',
+          command: 'true',
+          expect: { exitCode: 0 },
+        },
+      ],
     })),
     smokePath: letters,
     metadata: { generatedAt: 0, requirementsPath: 'design/requirements.md' },

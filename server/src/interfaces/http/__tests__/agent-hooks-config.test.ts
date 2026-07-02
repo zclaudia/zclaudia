@@ -3,7 +3,10 @@ import express from 'express';
 import request from 'supertest';
 import Database from 'better-sqlite3';
 import { createAgentRoutes } from '../agent.js';
-import { createAgentProfilesTable, seedDefaultAgent } from '../../../test-helpers/seed-default-agent.js';
+import {
+  createAgentProfilesTable,
+  seedDefaultAgent,
+} from '../../../test-helpers/seed-default-agent.js';
 
 function createTestDb(): Database.Database {
   const db = new Database(':memory:');
@@ -84,10 +87,12 @@ function createTestApp(db: Database.Database) {
 
 function seedDefaultConfig(db: Database.Database) {
   const now = Date.now();
-  db.prepare(`
+  db.prepare(
+    `
     INSERT OR IGNORE INTO agent_config (id, enabled, created_at, updated_at)
     VALUES (1, 1, ?, ?)
-  `).run(now, now);
+  `
+  ).run(now, now);
 }
 
 describe('agent config hooks', () => {
@@ -117,9 +122,7 @@ describe('agent config hooks', () => {
   describe('PUT /api/agent/config — hooks field', () => {
     it('accepts a valid hooks array and returns it as stored JSON', async () => {
       const hooks = [{ event: 'PreToolUse', command: 'echo hello' }];
-      const res = await request(app)
-        .put('/api/agent/config')
-        .send({ hooks });
+      const res = await request(app).put('/api/agent/config').send({ hooks });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
@@ -128,9 +131,7 @@ describe('agent config hooks', () => {
 
     it('rejects a hooks array containing an invalid entry', async () => {
       const hooks = [{ event: 'Nope', command: 'echo bad' }];
-      const res = await request(app)
-        .put('/api/agent/config')
-        .send({ hooks });
+      const res = await request(app).put('/api/agent/config').send({ hooks });
 
       expect(res.status).toBe(400);
       expect(res.body.success).toBe(false);
@@ -140,9 +141,7 @@ describe('agent config hooks', () => {
 
     it('rejects hooks with a missing command', async () => {
       const hooks = [{ event: 'PreToolUse' }];
-      const res = await request(app)
-        .put('/api/agent/config')
-        .send({ hooks });
+      const res = await request(app).put('/api/agent/config').send({ hooks });
 
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
@@ -168,9 +167,7 @@ describe('agent config hooks', () => {
       const hooks = [{ event: 'PreToolUse', command: 'persist me' }];
       db.prepare('UPDATE agent_config SET hooks = ? WHERE id = 1').run(JSON.stringify(hooks));
 
-      const res = await request(app)
-        .put('/api/agent/config')
-        .send({ enabled: false });
+      const res = await request(app).put('/api/agent/config').send({ enabled: false });
 
       expect(res.status).toBe(200);
       expect(res.body.data.hooks).toBe(JSON.stringify(hooks));
@@ -180,9 +177,7 @@ describe('agent config hooks', () => {
       const hooks = [{ event: 'PreToolUse', command: 'to be cleared' }];
       db.prepare('UPDATE agent_config SET hooks = ? WHERE id = 1').run(JSON.stringify(hooks));
 
-      const res = await request(app)
-        .put('/api/agent/config')
-        .send({ hooks: null });
+      const res = await request(app).put('/api/agent/config').send({ hooks: null });
 
       expect(res.status).toBe(200);
       expect(res.body.data.hooks).toBeNull();

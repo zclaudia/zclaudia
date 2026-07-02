@@ -2,21 +2,29 @@ import React from 'react';
 import type { Candidate } from '../../api.js';
 import { useOpenSpecStore } from '../../store.js';
 
-interface Props { candidate: Candidate; }
+interface Props {
+  candidate: Candidate;
+}
 
 function statusIcon(phase: Candidate['phase']): string {
   switch (phase) {
-    case 'generating': return '⏳';
-    case 'generated':  return '✅';
-    case 'failed':     return '❌';
-    case 'approved':   return '✓';
-    case 'rejected':   return '✗';
-    default:           return '⬜';
+    case 'generating':
+      return '⏳';
+    case 'generated':
+      return '✅';
+    case 'failed':
+      return '❌';
+    case 'approved':
+      return '✓';
+    case 'rejected':
+      return '✗';
+    default:
+      return '⬜';
   }
 }
 
 export function CapabilityProgressItem({ candidate }: Props): React.ReactElement {
-  const streamingMd = useOpenSpecStore((s) => s.initStreamingByCandidate[candidate.id]);
+  const streamingMd = useOpenSpecStore(s => s.initStreamingByCandidate[candidate.id]);
 
   return (
     <div className="border rounded p-2">

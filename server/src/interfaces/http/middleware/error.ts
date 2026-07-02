@@ -53,32 +53,20 @@ export const errorHandlingMiddleware: Middleware = async (ctx, next) => {
 
     // Handle AppError with custom error code
     if (error instanceof AppError) {
-      return errorResponse(
-        ctx.request,
-        error.code,
-        error.message,
-        error.details
-      );
+      return errorResponse(ctx.request, error.code, error.message, error.details);
     }
 
     // Handle generic Error
     if (error instanceof Error) {
       // Extract error code from error if it has one
       const code = (error as any).code || 'INTERNAL_ERROR';
-      return errorResponse(
-        ctx.request,
-        code,
-        error.message
-      );
+      return errorResponse(ctx.request, code, error.message);
     }
 
     // Handle unknown error types
-    return errorResponse(
-      ctx.request,
-      'INTERNAL_ERROR',
-      'An unexpected error occurred',
-      { error: String(error) }
-    );
+    return errorResponse(ctx.request, 'INTERNAL_ERROR', 'An unexpected error occurred', {
+      error: String(error),
+    });
   }
 };
 
@@ -101,12 +89,7 @@ export const validationErrorMiddleware: Middleware = async (ctx, next) => {
   } catch (error) {
     if (error instanceof AppError && error.code === 'VALIDATION_ERROR') {
       console.log(`[ValidationError] ${error.message}`, error.details);
-      return errorResponse(
-        ctx.request,
-        'VALIDATION_ERROR',
-        error.message,
-        error.details
-      );
+      return errorResponse(ctx.request, 'VALIDATION_ERROR', error.message, error.details);
     }
     // Not a validation error, re-throw to be handled by errorHandlingMiddleware
     throw error;
@@ -153,12 +136,9 @@ export const dbErrorMiddleware: Middleware = async (ctx, next) => {
 
       // Database not found / not accessible
       if (error.message.includes('no such table') || error.message.includes('database is locked')) {
-        return errorResponse(
-          ctx.request,
-          'DATABASE_ERROR',
-          'Database error occurred',
-          { originalError: error.message }
-        );
+        return errorResponse(ctx.request, 'DATABASE_ERROR', 'Database error occurred', {
+          originalError: error.message,
+        });
       }
     }
 

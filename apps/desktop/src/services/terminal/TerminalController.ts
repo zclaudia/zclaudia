@@ -322,7 +322,7 @@ export class TerminalController {
    */
   private bindOnDataOnce(): void {
     if (this.dataDisposable || !this.terminal) return;
-    this.dataDisposable = this.terminal.onData((data) => {
+    this.dataDisposable = this.terminal.onData(data => {
       this.deps.sendMessage({
         type: 'terminal_input',
         terminalId: this.deps.terminalId,
@@ -398,7 +398,7 @@ export class TerminalController {
   private guardTransition(next: TerminalLifecycleKind): boolean {
     if (canTransition(this.state.kind, next)) return true;
     this.deps.logger?.warn(
-      `[TerminalController:${this.deps.terminalId}] illegal transition ${this.state.kind} -> ${next}`,
+      `[TerminalController:${this.deps.terminalId}] illegal transition ${this.state.kind} -> ${next}`
     );
     return false;
   }

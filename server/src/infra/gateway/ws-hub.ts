@@ -70,7 +70,11 @@ export class FacadeWsHub {
     }
     // Close all client connections
     for (const session of this.clients.values()) {
-      try { session.ws.close(); } catch { /* ignore */ }
+      try {
+        session.ws.close();
+      } catch {
+        /* ignore */
+      }
     }
     this.clients.clear();
   }
@@ -184,7 +188,11 @@ export class FacadeWsHub {
         } else {
           // Slow consumer — mark for removal
           toRemove.push(session.clientId);
-          try { session.ws.close(); } catch { /* ignore */ }
+          try {
+            session.ws.close();
+          } catch {
+            /* ignore */
+          }
         }
       } catch {
         toRemove.push(session.clientId);
@@ -202,6 +210,8 @@ export class FacadeWsHub {
       if (ws.readyState === 1 /* WebSocket.OPEN */) {
         ws.send(JSON.stringify(msg));
       }
-    } catch { /* ignore send errors */ }
+    } catch {
+      /* ignore send errors */
+    }
   }
 }

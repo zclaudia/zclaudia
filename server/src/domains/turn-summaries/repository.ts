@@ -20,20 +20,16 @@ export class TurnSummaryRepository {
 
   findByTurn(sessionId: string, userMessageId: string): TurnSummary | null {
     const row = this.db
-      .prepare(
-        'SELECT * FROM turn_summaries WHERE session_id = ? AND user_message_id = ?',
-      )
+      .prepare('SELECT * FROM turn_summaries WHERE session_id = ? AND user_message_id = ?')
       .get(sessionId, userMessageId);
     return row ? this.mapRow(row) : null;
   }
 
   listBySession(sessionId: string): TurnSummary[] {
     const rows = this.db
-      .prepare(
-        'SELECT * FROM turn_summaries WHERE session_id = ? ORDER BY generated_at DESC',
-      )
+      .prepare('SELECT * FROM turn_summaries WHERE session_id = ? ORDER BY generated_at DESC')
       .all(sessionId);
-    return rows.map((r) => this.mapRow(r));
+    return rows.map(r => this.mapRow(r));
   }
 
   upsert(summary: TurnSummary): void {
@@ -49,7 +45,7 @@ export class TurnSummaryRepository {
           solved           = excluded.solved,
           open_issues      = excluded.open_issues,
           model            = excluded.model,
-          generated_at     = excluded.generated_at`,
+          generated_at     = excluded.generated_at`
       )
       .run(
         summary.sessionId,
@@ -59,13 +55,11 @@ export class TurnSummaryRepository {
         summary.solved,
         summary.openIssues,
         summary.model,
-        summary.generatedAt,
+        summary.generatedAt
       );
   }
 
   deleteBySession(sessionId: string): void {
-    this.db
-      .prepare('DELETE FROM turn_summaries WHERE session_id = ?')
-      .run(sessionId);
+    this.db.prepare('DELETE FROM turn_summaries WHERE session_id = ?').run(sessionId);
   }
 }

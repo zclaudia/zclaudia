@@ -116,10 +116,7 @@ export function SkillTokenHighlighter({
         }
         if (seg.kind === 'hidden') {
           return (
-            <span
-              key={i}
-              style={{ color: 'transparent', WebkitTextFillColor: 'transparent' }}
-            >
+            <span key={i} style={{ color: 'transparent', WebkitTextFillColor: 'transparent' }}>
               {seg.text}
             </span>
           );
@@ -140,7 +137,7 @@ export function SkillTokenHighlighter({
           </mark>
         );
       }),
-    [value, commandSet, skillIds],
+    [value, commandSet, skillIds]
   );
 
   return (
@@ -150,7 +147,12 @@ export function SkillTokenHighlighter({
       // The overlay carries the visible text color; the textarea above is
       // transparent. pointer-events/selection disabled so interaction still
       // hits the textarea.
-      style={{ ...style, pointerEvents: 'none', userSelect: 'none', color: 'hsl(var(--foreground))' }}
+      style={{
+        ...style,
+        pointerEvents: 'none',
+        userSelect: 'none',
+        color: 'hsl(var(--foreground))',
+      }}
     >
       {nodes}
       {'\n'}

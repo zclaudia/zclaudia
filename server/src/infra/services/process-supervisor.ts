@@ -1,8 +1,18 @@
-import { execFile, spawn as nodeSpawn, type ChildProcess, type ChildProcessWithoutNullStreams, type SpawnOptionsWithoutStdio } from 'child_process';
+import {
+  execFile,
+  spawn as nodeSpawn,
+  type ChildProcess,
+  type ChildProcessWithoutNullStreams,
+  type SpawnOptionsWithoutStdio,
+} from 'child_process';
 import { promisify } from 'util';
 import { newId } from '../../utils/uuid.js';
 import type Database from 'better-sqlite3';
-import { isProcessAlive, listAllProcesses, listDescendantProcesses } from '../../utils/process-tree.js';
+import {
+  isProcessAlive,
+  listAllProcesses,
+  listDescendantProcesses,
+} from '../../utils/process-tree.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -141,7 +151,7 @@ function parseJsonObject(value: string | null): Record<string, unknown> | null {
   if (!value) return null;
   try {
     const parsed = JSON.parse(value);
-    return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null;
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
   } catch {
     return null;
   }
@@ -157,7 +167,10 @@ async function getProcessGroupId(pid: number): Promise<number | null> {
   }
 }
 
-function classifyCommand(command: string, args: string[]): { source: ManagedProcessSource; tags: string[] } {
+function classifyCommand(
+  command: string,
+  args: string[]
+): { source: ManagedProcessSource; tags: string[] } {
   const full = `${command} ${args.join(' ')}`.toLowerCase();
   const isTest =
     full.includes('vitest') ||
@@ -237,7 +250,9 @@ export class ProcessSupervisor {
     return processId;
   }
 
-  async trackCommand(spec: Omit<SpawnSpec, 'source' | 'tags'> & { command: string; args?: string[] }): Promise<SpawnResult> {
+  async trackCommand(
+    spec: Omit<SpawnSpec, 'source' | 'tags'> & { command: string; args?: string[] }
+  ): Promise<SpawnResult> {
     const args = spec.args ?? [];
     const classified = classifyCommand(spec.command, args);
     return this.spawn({
@@ -249,16 +264,20 @@ export class ProcessSupervisor {
   }
 
   async adoptPersistedProcesses(): Promise<void> {
-    const rows = this.db.prepare(`
+    const rows = this.db
+      .prepare(
+        `
       SELECT *
       FROM managed_processes
       WHERE status IN ('starting', 'running', 'orphaned')
       ORDER BY started_at DESC
-    `).all() as ManagedProcessRow[];
+    `
+      )
+      .all() as ManagedProcessRow[];
 
     if (rows.length === 0) return;
     const allProcesses = await listAllProcesses();
-    const byPid = new Map(allProcesses.map((proc) => [proc.pid, proc]));
+    const byPid = new Map(allProcesses.map(proc => [proc.pid, proc]));
 
     for (const row of rows) {
       const pid = row.root_pid ?? row.pid;
@@ -272,8 +291,10 @@ export class ProcessSupervisor {
 
       const procInfo = byPid.get(pid);
       const expectedArgs = `${row.command} ${parseJsonArray(row.args_json).join(' ')}`.trim();
-      const commandMatches = !procInfo || procInfo.args.includes(expectedArgs) || procInfo.command.includes(row.command);
-      const elapsedOk = !procInfo || (Date.now() - row.started_at) >= (procInfo.elapsedSeconds * 1000 - 60_000);
+      const commandMatches =
+        !procInfo || procInfo.args.includes(expectedArgs) || procInfo.command.includes(row.command);
+      const elapsedOk =
+        !procInfo || Date.now() - row.started_at >= procInfo.elapsedSeconds * 1000 - 60_000;
 
       if (commandMatches && elapsedOk) {
         this.runtime.set(row.process_id, { childPids: [] });
@@ -283,29 +304,37 @@ export class ProcessSupervisor {
           orphanedAt: row.orphaned_at ?? Date.now(),
           pid,
           rootPid: pid,
-          pgid: row.pgid ?? await getProcessGroupId(pid),
+          pgid: row.pgid ?? (await getProcessGroupId(pid)),
         });
       }
     }
   }
 
   listProcesses(): ManagedProcessRecord[] {
-    const rows = this.db.prepare(`
+    const rows = this.db
+      .prepare(
+        `
       SELECT *
       FROM managed_processes
       ORDER BY started_at DESC
       LIMIT 200
-    `).all() as ManagedProcessRow[];
-    return rows.map((row) => this.toRecord(row));
+    `
+      )
+      .all() as ManagedProcessRow[];
+    return rows.map(row => this.toRecord(row));
   }
 
   getProcess(processId: string): ManagedProcessRecord | null {
-    const row = this.db.prepare(`
+    const row = this.db
+      .prepare(
+        `
       SELECT *
       FROM managed_processes
       WHERE process_id = ?
       LIMIT 1
-    `).get(processId) as ManagedProcessRow | undefined;
+    `
+      )
+      .get(processId) as ManagedProcessRow | undefined;
     return row ? this.toRecord(row) : null;
   }
 
@@ -388,8 +417,11 @@ export class ProcessSupervisor {
     return processId;
   }
 
-  private attachChildProcess(processId: string, child: ChildProcess): Promise<{ code: number | null; signal: string | null }> {
-    return new Promise<{ code: number | null; signal: string | null }>((resolve) => {
+  private attachChildProcess(
+    processId: string,
+    child: ChildProcess
+  ): Promise<{ code: number | null; signal: string | null }> {
+    return new Promise<{ code: number | null; signal: string | null }>(resolve => {
       let initialized = false;
       const initialize = async () => {
         if (initialized) return;
@@ -415,7 +447,7 @@ export class ProcessSupervisor {
         });
       }
 
-      child.once('error', (error) => {
+      child.once('error', error => {
         this.updateRecord(processId, {
           status: 'failed',
           exitedAt: Date.now(),
@@ -438,11 +470,15 @@ export class ProcessSupervisor {
 
   private async refreshRuntimeChildren(): Promise<void> {
     for (const [processId] of this.runtime) {
-      const row = this.db.prepare(`
+      const row = this.db
+        .prepare(
+          `
         SELECT root_pid, status
         FROM managed_processes
         WHERE process_id = ?
-      `).get(processId) as { root_pid: number | null; status: ManagedProcessStatus } | undefined;
+      `
+        )
+        .get(processId) as { root_pid: number | null; status: ManagedProcessStatus } | undefined;
 
       if (!row?.root_pid) continue;
       if (!isProcessAlive(row.root_pid)) {
@@ -459,65 +495,74 @@ export class ProcessSupervisor {
       const descendants = await listDescendantProcesses(row.root_pid);
       const runtime = this.runtime.get(processId);
       if (runtime) {
-        runtime.childPids = descendants.map((proc) => proc.pid);
+        runtime.childPids = descendants.map(proc => proc.pid);
       }
     }
   }
 
   private insertRecord(record: Omit<ManagedProcessRecord, 'childPids' | 'childCount'>): void {
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO managed_processes (
         process_id, source, status, pid, ppid, root_pid, pgid, command, args_json, cwd,
         owner_session_id, owner_task_id, owner_backend_id, owner_run_id, owner_request_id,
         parent_process_id, started_at, exited_at, exit_code, signal, protected, tags_json,
         adopted, orphaned_at, metadata_json
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      record.processId,
-      record.source,
-      record.status,
-      record.pid,
-      record.ppid,
-      record.rootPid,
-      record.pgid,
-      record.command,
-      JSON.stringify(record.args),
-      record.cwd,
-      record.ownerSessionId,
-      record.ownerTaskId,
-      record.ownerBackendId,
-      record.ownerRunId,
-      record.ownerRequestId,
-      record.parentProcessId,
-      record.startedAt,
-      record.exitedAt,
-      record.exitCode,
-      record.signal,
-      record.protected ? 1 : 0,
-      JSON.stringify(record.tags),
-      record.adopted ? 1 : 0,
-      record.orphanedAt,
-      record.metadata ? JSON.stringify(record.metadata) : null,
-    );
+    `
+      )
+      .run(
+        record.processId,
+        record.source,
+        record.status,
+        record.pid,
+        record.ppid,
+        record.rootPid,
+        record.pgid,
+        record.command,
+        JSON.stringify(record.args),
+        record.cwd,
+        record.ownerSessionId,
+        record.ownerTaskId,
+        record.ownerBackendId,
+        record.ownerRunId,
+        record.ownerRequestId,
+        record.parentProcessId,
+        record.startedAt,
+        record.exitedAt,
+        record.exitCode,
+        record.signal,
+        record.protected ? 1 : 0,
+        JSON.stringify(record.tags),
+        record.adopted ? 1 : 0,
+        record.orphanedAt,
+        record.metadata ? JSON.stringify(record.metadata) : null
+      );
   }
 
-  private updateRecord(processId: string, patch: {
-    status?: ManagedProcessStatus;
-    pid?: number | null;
-    ppid?: number | null;
-    rootPid?: number | null;
-    pgid?: number | null;
-    exitedAt?: number | null;
-    exitCode?: number | null;
-    signal?: string | null;
-    adopted?: boolean;
-    orphanedAt?: number | null;
-    metadata?: Record<string, unknown>;
-  }): void {
+  private updateRecord(
+    processId: string,
+    patch: {
+      status?: ManagedProcessStatus;
+      pid?: number | null;
+      ppid?: number | null;
+      rootPid?: number | null;
+      pgid?: number | null;
+      exitedAt?: number | null;
+      exitCode?: number | null;
+      signal?: string | null;
+      adopted?: boolean;
+      orphanedAt?: number | null;
+      metadata?: Record<string, unknown>;
+    }
+  ): void {
     const current = this.getProcess(processId);
     if (!current) return;
     const nextMetadata = patch.metadata ? patch.metadata : current.metadata;
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       UPDATE managed_processes
       SET status = ?,
           pid = ?,
@@ -531,38 +576,50 @@ export class ProcessSupervisor {
           orphaned_at = ?,
           metadata_json = ?
       WHERE process_id = ?
-    `).run(
-      patch.status ?? current.status,
-      patch.pid ?? current.pid,
-      patch.ppid ?? current.ppid,
-      patch.rootPid ?? current.rootPid,
-      patch.pgid ?? current.pgid,
-      patch.exitedAt ?? current.exitedAt,
-      patch.exitCode ?? current.exitCode,
-      patch.signal ?? current.signal,
-      patch.adopted === undefined ? (current.adopted ? 1 : 0) : (patch.adopted ? 1 : 0),
-      patch.orphanedAt ?? current.orphanedAt,
-      nextMetadata ? JSON.stringify(nextMetadata) : null,
-      processId,
-    );
+    `
+      )
+      .run(
+        patch.status ?? current.status,
+        patch.pid ?? current.pid,
+        patch.ppid ?? current.ppid,
+        patch.rootPid ?? current.rootPid,
+        patch.pgid ?? current.pgid,
+        patch.exitedAt ?? current.exitedAt,
+        patch.exitCode ?? current.exitCode,
+        patch.signal ?? current.signal,
+        patch.adopted === undefined ? (current.adopted ? 1 : 0) : patch.adopted ? 1 : 0,
+        patch.orphanedAt ?? current.orphanedAt,
+        nextMetadata ? JSON.stringify(nextMetadata) : null,
+        processId
+      );
   }
 
   private runGarbageCollection(): void {
     const cutoff = Date.now() - TERMINAL_RETENTION_MS;
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       DELETE FROM managed_processes
       WHERE status IN ('exited', 'failed', 'killed') AND exited_at IS NOT NULL AND exited_at < ?
-    `).run(cutoff);
+    `
+      )
+      .run(cutoff);
 
-    const countRow = this.db.prepare(`
+    const countRow = this.db
+      .prepare(
+        `
       SELECT COUNT(*) as count
       FROM managed_processes
       WHERE status IN ('exited', 'failed', 'killed')
-    `).get() as { count: number };
+    `
+      )
+      .get() as { count: number };
 
     const overflow = countRow.count - MAX_TERMINAL_RECORDS;
     if (overflow > 0) {
-      this.db.prepare(`
+      this.db
+        .prepare(
+          `
         DELETE FROM managed_processes
         WHERE process_id IN (
           SELECT process_id
@@ -571,7 +628,9 @@ export class ProcessSupervisor {
           ORDER BY exited_at ASC
           LIMIT ?
         )
-      `).run(overflow);
+      `
+        )
+        .run(overflow);
     }
   }
 }

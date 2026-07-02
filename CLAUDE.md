@@ -21,18 +21,18 @@ zclaudia/
 
 ## Key Ports & Environment Variables
 
-| Service | Default Port | Port Env | Notes |
-|---------|-------------|----------|-------|
-| Server | 3100 | `PORT` (supports `0` for random) | `SERVER_HOST` defaults to `0.0.0.0` |
-| Gateway | 3200 | `GATEWAY_PORT` | |
-| Vite dev | 1420 | - | hardcoded, `strictPort: true` |
+| Service  | Default Port | Port Env                         | Notes                               |
+| -------- | ------------ | -------------------------------- | ----------------------------------- |
+| Server   | 3100         | `PORT` (supports `0` for random) | `SERVER_HOST` defaults to `0.0.0.0` |
+| Gateway  | 3200         | `GATEWAY_PORT`                   |                                     |
+| Vite dev | 1420         | -                                | hardcoded, `strictPort: true`       |
 
-| Env Var | Used By | Purpose |
-|---------|---------|---------|
+| Env Var             | Used By         | Purpose                                           |
+| ------------------- | --------------- | ------------------------------------------------- |
 | `ZCLAUDIA_DATA_DIR` | server, gateway | Override data directory (default: `~/.zclaudia/`) |
-| `GATEWAY_URL` | server | WebSocket URL to connect to gateway |
-| `GATEWAY_SECRET` | server, gateway | Shared secret for gateway auth |
-| `GATEWAY_NAME` | server | Backend display name on gateway |
+| `GATEWAY_URL`       | server          | WebSocket URL to connect to gateway               |
+| `GATEWAY_SECRET`    | server, gateway | Shared secret for gateway auth                    |
+| `GATEWAY_NAME`      | server          | Backend display name on gateway                   |
 
 ## Server (`server/`)
 
@@ -78,13 +78,13 @@ zclaudia/
 
 ## Scripts
 
-| Script | Purpose |
-|--------|---------|
-| `scripts/deploy/gateway.sh` | Deploy gateway Docker container (supports multi-instance) |
-| `scripts/deploy/server.sh` | Deploy server on remote host (systemd) |
-| `scripts/deploy/setup-server.sh` | Initial server setup + systemd service install |
-| `scripts/build/{android,linux,macos}.sh` | Platform-specific builds |
-| `scripts/release/version-bump.sh` | Version management |
+| Script                                   | Purpose                                                   |
+| ---------------------------------------- | --------------------------------------------------------- |
+| `scripts/deploy/gateway.sh`              | Deploy gateway Docker container (supports multi-instance) |
+| `scripts/deploy/server.sh`               | Deploy server on remote host (systemd)                    |
+| `scripts/deploy/setup-server.sh`         | Initial server setup + systemd service install            |
+| `scripts/build/{android,linux,macos}.sh` | Platform-specific builds                                  |
+| `scripts/release/version-bump.sh`        | Version management                                        |
 
 ## Dev Commands
 

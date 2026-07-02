@@ -15,15 +15,7 @@ export interface HandleModeTransitionInput {
 }
 
 export function handleModeTransition(input: HandleModeTransitionInput): void {
-  const {
-    activeRun,
-    modeValue,
-    msg,
-    providerRegistry,
-    providerType,
-    runId,
-    sendRunEvent,
-  } = input;
+  const { activeRun, modeValue, msg, providerRegistry, providerType, runId, sendRunEvent } = input;
   const transition = msg.modeTransition;
   if (!transition) return;
 
@@ -40,7 +32,9 @@ export function handleModeTransition(input: HandleModeTransitionInput): void {
     if (modeValue !== 'plan') {
       activeRun.aiInitiatedPlanMode = true;
       activeRun.originalMode = activeRun.originalMode ?? modeValue;
-      console.log(`[Permission] AI entered plan mode during ${modeValue} run (provider=${activeRun.providerType})`);
+      console.log(
+        `[Permission] AI entered plan mode during ${modeValue} run (provider=${activeRun.providerType})`
+      );
     }
   } else if (transition.reason === 'exit') {
     activeRun.aiInitiatedPlanMode = false;

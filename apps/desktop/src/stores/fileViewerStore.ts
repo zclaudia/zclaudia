@@ -10,7 +10,7 @@ interface FileViewerState {
   // Panel open state
   isOpen: boolean;
   // Currently viewed file
-  filePath: string | null;    // relative path from project root
+  filePath: string | null; // relative path from project root
   projectRoot: string | null;
   // File content
   content: string | null;
@@ -34,7 +34,12 @@ interface FileViewerState {
   // LRU content cache  (key = "projectRoot\0relativePath")
   contentCache: Map<string, string>;
 
-  openFile: (projectRoot: string, relativePath: string, targetLine?: number, targetEndLine?: number) => void;
+  openFile: (
+    projectRoot: string,
+    relativePath: string,
+    targetLine?: number,
+    targetEndLine?: number
+  ) => void;
   setContent: (content: string) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
@@ -48,7 +53,9 @@ interface FileViewerState {
   getCached: (projectRoot: string, relativePath: string) => string | undefined;
 }
 
-function cacheKey(root: string, path: string) { return `${root}\0${path}`; }
+function cacheKey(root: string, path: string) {
+  return `${root}\0${path}`;
+}
 function clampTreeWidth(widthPx: number) {
   return Math.max(TREE_WIDTH_MIN, Math.min(TREE_WIDTH_MAX, Math.round(widthPx)));
 }
@@ -69,9 +76,14 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
   fullscreen: false,
   contentCache: new Map(),
 
-  openFile: (projectRoot: string, relativePath: string, targetLine?: number, targetEndLine?: number) => {
+  openFile: (
+    projectRoot: string,
+    relativePath: string,
+    targetLine?: number,
+    targetEndLine?: number
+  ) => {
     const cached = get().contentCache.get(cacheKey(projectRoot, relativePath));
-    set((state) => ({
+    set(state => ({
       isOpen: true,
       filePath: relativePath,
       projectRoot,
@@ -102,14 +114,18 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
     set({ content, loading: false });
   },
 
-  setLoading: (loading: boolean) =>
-    set({ loading }),
+  setLoading: (loading: boolean) => set({ loading }),
 
-  setError: (error: string | null) =>
-    set({ error, loading: false }),
+  setError: (error: string | null) => set({ error, loading: false }),
 
   close: () => {
-    set({ isOpen: false, searchOpen: false, fullscreen: false, targetLine: null, targetEndLine: null });
+    set({
+      isOpen: false,
+      searchOpen: false,
+      fullscreen: false,
+      targetLine: null,
+      targetEndLine: null,
+    });
     // Hide file viewer panel in bottom panel
     usePluginStore.getState().updatePanelVisibility('file-viewer', false);
   },
@@ -120,20 +136,15 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
     usePluginStore.getState().updatePanelVisibility('file-viewer', next);
   },
 
-  setShowTree: (show: boolean) =>
-    set({ showTree: show }),
+  setShowTree: (show: boolean) => set({ showTree: show }),
 
-  toggleTree: () =>
-    set((state) => ({ showTree: !state.showTree })),
+  toggleTree: () => set(state => ({ showTree: !state.showTree })),
 
-  setTreeWidthPx: (widthPx) =>
-    set({ treeWidthPx: clampTreeWidth(widthPx) }),
+  setTreeWidthPx: widthPx => set({ treeWidthPx: clampTreeWidth(widthPx) }),
 
-  setSearchOpen: (open: boolean) =>
-    set({ searchOpen: open, isOpen: open ? true : undefined }),
+  setSearchOpen: (open: boolean) => set({ searchOpen: open, isOpen: open ? true : undefined }),
 
-  setFullscreen: (open: boolean) =>
-    set({ fullscreen: open }),
+  setFullscreen: (open: boolean) => set({ fullscreen: open }),
 
   getCached: (projectRoot: string, relativePath: string) =>
     get().contentCache.get(cacheKey(projectRoot, relativePath)),

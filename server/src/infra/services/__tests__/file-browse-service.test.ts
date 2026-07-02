@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import { FileBrowseError, FileBrowseService } from '../file-browse-service.js';
 
-vi.mock('fs', async (importOriginal) => {
+vi.mock('fs', async importOriginal => {
   const original = await importOriginal<typeof import('fs')>();
   return {
     ...original,
@@ -17,7 +17,7 @@ vi.mock('fs', async (importOriginal) => {
   };
 });
 
-vi.mock('os', async (importOriginal) => {
+vi.mock('os', async importOriginal => {
   const original = await importOriginal<typeof import('os')>();
   return { ...original, homedir: vi.fn(() => '/home/me') };
 });
@@ -31,7 +31,7 @@ describe('FileBrowseService', () => {
 
   it('lists directory entries with directories first', () => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.statSync).mockImplementation((target) => {
+    vi.mocked(fs.statSync).mockImplementation(target => {
       if (typeof target === 'string' && (target === '/project' || target.endsWith('src'))) {
         return { isDirectory: () => true, isFile: () => false } as fs.Stats;
       }
@@ -50,7 +50,9 @@ describe('FileBrowseService', () => {
   });
 
   it('throws validation error for unsafe path traversal', () => {
-    expect(() => service.listDirectory('/project', '../../../etc', '', '50')).toThrowError(FileBrowseError);
+    expect(() => service.listDirectory('/project', '../../../etc', '', '50')).toThrowError(
+      FileBrowseError
+    );
     try {
       service.listDirectory('/project', '../../../etc', '', '50');
     } catch (error) {
@@ -105,7 +107,7 @@ describe('FileBrowseService', () => {
 
       const result = service.browseDirectories('/code');
 
-      expect(result.directories.map((d) => d.name)).toEqual(['alpha', 'zebra']);
+      expect(result.directories.map(d => d.name)).toEqual(['alpha', 'zebra']);
       expect(result.directories[0].path).toBe('/code/alpha');
       expect(result.path).toBe('/code');
       expect(result.parent).toBe('/');

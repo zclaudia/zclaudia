@@ -77,7 +77,9 @@ test.describe('Search Functionality', () => {
     await page.keyboard.press('Meta+f').catch(() => {});
     await page.waitForTimeout(500);
 
-    const searchInput = page.locator('input[placeholder*="Search"], input[type="search"], [data-testid="search-input"]').first();
+    const searchInput = page
+      .locator('input[placeholder*="Search"], input[type="search"], [data-testid="search-input"]')
+      .first();
     if (await searchInput.isVisible({ timeout: 1000 }).catch(() => false)) {
       return true;
     }
@@ -108,7 +110,9 @@ test.describe('Search Functionality', () => {
     const opened = await openSearch(page);
 
     if (opened) {
-      const searchInput = page.locator('input[placeholder*="Search"], input[type="search"]').first();
+      const searchInput = page
+        .locator('input[placeholder*="Search"], input[type="search"]')
+        .first();
       await searchInput.fill('programming');
       await page.waitForTimeout(1000);
 
@@ -142,7 +146,9 @@ test.describe('Search Functionality', () => {
     const opened = await openSearch(page);
 
     if (opened) {
-      const searchInput = page.locator('input[placeholder*="Search"], input[type="search"]').first();
+      const searchInput = page
+        .locator('input[placeholder*="Search"], input[type="search"]')
+        .first();
       await searchInput.fill('xyznonexistent12345');
       await page.waitForTimeout(1000);
 
@@ -176,13 +182,17 @@ test.describe('Search Functionality', () => {
     const opened = await openSearch(page);
 
     if (opened) {
-      const searchInput = page.locator('input[placeholder*="Search"], input[type="search"]').first();
+      const searchInput = page
+        .locator('input[placeholder*="Search"], input[type="search"]')
+        .first();
       await searchInput.fill('test');
       await page.waitForTimeout(1000);
 
       // Look for next/prev buttons
       const nextBtn = page.locator('button[title*="Next"], button[aria-label*="Next"]').first();
-      const prevBtn = page.locator('button[title*="Previous"], button[aria-label*="Previous"]').first();
+      const prevBtn = page
+        .locator('button[title*="Previous"], button[aria-label*="Previous"]')
+        .first();
 
       if (await nextBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
         await nextBtn.click();
@@ -224,7 +234,9 @@ test.describe('Search Functionality', () => {
 
     if (opened) {
       // Look for project filter dropdown
-      const projectFilter = page.locator('select[name*="project"], [data-testid="project-filter"]').first();
+      const projectFilter = page
+        .locator('select[name*="project"], [data-testid="project-filter"]')
+        .first();
       const hasFilter = await projectFilter.isVisible({ timeout: 1000 }).catch(() => false);
 
       if (hasFilter) {
@@ -285,12 +297,16 @@ test.describe('Search Functionality', () => {
     const opened = await openSearch(page);
 
     if (opened) {
-      const searchInput = page.locator('input[placeholder*="Search"], input[type="search"]').first();
+      const searchInput = page
+        .locator('input[placeholder*="Search"], input[type="search"]')
+        .first();
       await searchInput.fill('France');
       await page.waitForTimeout(1000);
 
       // Look for result preview/snippet
-      const preview = page.locator('[class*="preview"], [class*="snippet"], [class*="context"]').first();
+      const preview = page
+        .locator('[class*="preview"], [class*="snippet"], [class*="context"]')
+        .first();
       const hasPreview = await preview.isVisible({ timeout: 2000 }).catch(() => false);
 
       if (hasPreview) {
@@ -321,7 +337,9 @@ test.describe('Search Functionality', () => {
 
     if (opened) {
       // Perform a search first
-      const searchInput = page.locator('input[placeholder*="Search"], input[type="search"]').first();
+      const searchInput = page
+        .locator('input[placeholder*="Search"], input[type="search"]')
+        .first();
       await searchInput.fill('first search');
       await page.waitForTimeout(500);
       await searchInput.clear();
@@ -361,7 +379,9 @@ test.describe('Search Functionality', () => {
     const opened = await openSearch(page);
 
     if (opened) {
-      const searchInput = page.locator('input[placeholder*="Search"], input[type="search"]').first();
+      const searchInput = page
+        .locator('input[placeholder*="Search"], input[type="search"]')
+        .first();
       await searchInput.fill('test query');
       await page.waitForTimeout(500);
 
@@ -432,7 +452,9 @@ test.describe('Search Functionality', () => {
 
     if (opened) {
       // Look for regex toggle
-      const regexToggle = page.locator('[data-testid="regex-toggle"], button:has-text("Regex")').first();
+      const regexToggle = page
+        .locator('[data-testid="regex-toggle"], button:has-text("Regex")')
+        .first();
       const hasRegex = await regexToggle.isVisible({ timeout: 1000 }).catch(() => false);
 
       if (hasRegex) {
@@ -440,7 +462,9 @@ test.describe('Search Functionality', () => {
         await page.waitForTimeout(300);
         console.log('  ✓ Regex mode enabled');
 
-        const searchInput = page.locator('input[placeholder*="Search"], input[type="search"]').first();
+        const searchInput = page
+          .locator('input[placeholder*="Search"], input[type="search"]')
+          .first();
         await searchInput.fill('test.*message');
         await page.waitForTimeout(500);
         console.log('  ✓ Regex search executed');

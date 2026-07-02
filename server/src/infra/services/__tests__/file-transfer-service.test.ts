@@ -46,7 +46,11 @@ describe('FileTransferService', () => {
       mimeType: 'text/plain',
       size: 12,
     });
-    expect(fileStore.storeFileByMoving).toHaveBeenCalledWith('/tmp/upload-1', 'test.txt', 'text/plain');
+    expect(fileStore.storeFileByMoving).toHaveBeenCalledWith(
+      '/tmp/upload-1',
+      'test.txt',
+      'text/plain'
+    );
   });
 
   it('throws NO_FILE when multipart payload has no file', () => {
@@ -60,7 +64,7 @@ describe('FileTransferService', () => {
     const result = service.storeJsonUpload(
       'test.txt',
       'text/plain',
-      Buffer.from('hello').toString('base64'),
+      Buffer.from('hello').toString('base64')
     );
 
     expect(result).toEqual({
@@ -72,16 +76,16 @@ describe('FileTransferService', () => {
     expect(fileStore.storeFileFromBuffer).toHaveBeenCalledWith(
       'test.txt',
       'text/plain',
-      Buffer.from('hello'),
+      Buffer.from('hello')
     );
   });
 
   it('rejects oversized JSON uploads', () => {
     const data = Buffer.alloc(11 * 1024 * 1024).toString('base64');
 
-    expect(() => service.storeJsonUpload('large.bin', 'application/octet-stream', data)).toThrowError(
-      FileTransferError,
-    );
+    expect(() =>
+      service.storeJsonUpload('large.bin', 'application/octet-stream', data)
+    ).toThrowError(FileTransferError);
   });
 
   it('resolves download metadata and path', () => {
@@ -118,6 +122,9 @@ describe('FileTransferService', () => {
 
     const insertRun = vi.fn();
     const prepare = vi.fn((sql: string) => {
+      if (sql.includes('SELECT s.working_directory')) {
+        return { get: vi.fn().mockReturnValue({ working_directory: '/tmp', root_path: '/repo' }) };
+      }
       if (sql.includes('SELECT 1 FROM sessions')) {
         return { get: vi.fn().mockReturnValue({ id: 'sess-1' }) };
       }
@@ -141,7 +148,11 @@ describe('FileTransferService', () => {
       fileSize: 256,
       autoDownload: true,
     });
-    expect(fileStore.storeFileFromPath).toHaveBeenCalledWith('/tmp/file.txt', 'file.txt', 'text/plain');
+    expect(fileStore.storeFileFromPath).toHaveBeenCalledWith(
+      '/tmp/file.txt',
+      'file.txt',
+      'text/plain'
+    );
     expect(insertRun).toHaveBeenCalled();
     expect(sendMessage).toHaveBeenCalledWith(
       ws,
@@ -150,11 +161,36 @@ describe('FileTransferService', () => {
         sessionId: 'sess-1',
         fileId: 'file-4',
         fileName: 'file.txt',
-      }),
+      })
+    );
+  });
+
+  it('rejects unscoped local file push by default', () => {
+    expect(() => service.pushLocalFile('/tmp/file.txt', 'sess-1', undefined)).toThrowError(
+      'File push requires a session-scoped server context'
+    );
+  });
+
+  it('rejects local file push outside session roots', () => {
+    const ctx: FilesRouteBroadcastContext = {
+      db: {
+        prepare: vi.fn().mockReturnValue({
+          get: vi.fn().mockReturnValue({ working_directory: '/workspace', root_path: '/repo' }),
+        }),
+      } as never,
+      getAuthenticatedClients: vi.fn().mockReturnValue([]),
+      getNextOffset: vi.fn().mockReturnValue(1),
+      sendMessage: vi.fn(),
+    };
+
+    expect(() => service.pushLocalFile('/etc/passwd', 'sess-1', undefined, ctx)).toThrowError(
+      'filePath must be inside the session working directory or project root'
     );
   });
 
   it('rejects push when source path is missing', () => {
-    expect(() => service.pushLocalFile(undefined, 'sess-1', undefined)).toThrowError(FileTransferError);
+    expect(() => service.pushLocalFile(undefined, 'sess-1', undefined)).toThrowError(
+      FileTransferError
+    );
   });
 });

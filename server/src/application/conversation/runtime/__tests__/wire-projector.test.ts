@@ -4,7 +4,7 @@ import { projectRunDomainEventToWireMessages } from '../wire-projector.js';
 
 function event<TType extends Parameters<typeof createRunDomainEvent>[0]['type']>(
   type: TType,
-  payload: Parameters<typeof createRunDomainEvent<TType>>[0]['payload'],
+  payload: Parameters<typeof createRunDomainEvent<TType>>[0]['payload']
 ) {
   return createRunDomainEvent({
     eventId: `event-${type}`,
@@ -21,18 +21,26 @@ function event<TType extends Parameters<typeof createRunDomainEvent>[0]['type']>
 
 describe('wire projector', () => {
   it('projects assistant and tool events to existing run wire messages', () => {
-    expect(projectRunDomainEventToWireMessages(event('assistant.textDelta', {
-      content: 'hello',
-    }))).toEqual([
+    expect(
+      projectRunDomainEventToWireMessages(
+        event('assistant.textDelta', {
+          content: 'hello',
+        })
+      )
+    ).toEqual([
       { type: 'delta', runId: 'run-1', sessionId: 'session-1', content: 'hello', seq: 9 },
     ]);
 
-    expect(projectRunDomainEventToWireMessages(event('tool.started', {
-      toolUseId: 'tool-1',
-      toolName: 'Read',
-      input: { file_path: 'README.md' },
-      semantic: 'plan_proposal',
-    }))).toEqual([
+    expect(
+      projectRunDomainEventToWireMessages(
+        event('tool.started', {
+          toolUseId: 'tool-1',
+          toolName: 'Read',
+          input: { file_path: 'README.md' },
+          semantic: 'plan_proposal',
+        })
+      )
+    ).toEqual([
       {
         type: 'tool_use',
         runId: 'run-1',
@@ -46,12 +54,16 @@ describe('wire projector', () => {
       },
     ]);
 
-    expect(projectRunDomainEventToWireMessages(event('tool.finished', {
-      toolUseId: 'tool-1',
-      toolName: 'Read',
-      output: 'contents',
-      isError: false,
-    }))).toEqual([
+    expect(
+      projectRunDomainEventToWireMessages(
+        event('tool.finished', {
+          toolUseId: 'tool-1',
+          toolName: 'Read',
+          output: 'contents',
+          isError: false,
+        })
+      )
+    ).toEqual([
       {
         type: 'tool_result',
         runId: 'run-1',
@@ -67,16 +79,24 @@ describe('wire projector', () => {
   });
 
   it('projects lifecycle, retry, and mode events to existing wire messages', () => {
-    expect(projectRunDomainEventToWireMessages(event('run.completed', {
-      usage: undefined,
-    }))).toEqual([
+    expect(
+      projectRunDomainEventToWireMessages(
+        event('run.completed', {
+          usage: undefined,
+        })
+      )
+    ).toEqual([
       { type: 'run_completed', runId: 'run-1', sessionId: 'session-1', usage: undefined, seq: 9 },
     ]);
 
-    expect(projectRunDomainEventToWireMessages(event('run.failed', {
-      error: 'provider error',
-      errorCode: 'BAD_MODEL',
-    }))).toEqual([
+    expect(
+      projectRunDomainEventToWireMessages(
+        event('run.failed', {
+          error: 'provider error',
+          errorCode: 'BAD_MODEL',
+        })
+      )
+    ).toEqual([
       {
         type: 'run_failed',
         runId: 'run-1',
@@ -87,12 +107,16 @@ describe('wire projector', () => {
       },
     ]);
 
-    expect(projectRunDomainEventToWireMessages(event('run.retryScheduled', {
-      attempt: 2,
-      maxAttempts: 3,
-      delayMs: 1000,
-      status: 529,
-    }))).toEqual([
+    expect(
+      projectRunDomainEventToWireMessages(
+        event('run.retryScheduled', {
+          attempt: 2,
+          maxAttempts: 3,
+          delayMs: 1000,
+          status: 529,
+        })
+      )
+    ).toEqual([
       {
         type: 'run_retrying',
         runId: 'run-1',
@@ -105,19 +129,27 @@ describe('wire projector', () => {
       },
     ]);
 
-    expect(projectRunDomainEventToWireMessages(event('mode.changed', {
-      mode: 'plan',
-      reason: 'enter',
-    }))).toEqual([
+    expect(
+      projectRunDomainEventToWireMessages(
+        event('mode.changed', {
+          mode: 'plan',
+          reason: 'enter',
+        })
+      )
+    ).toEqual([
       { type: 'mode_change', runId: 'run-1', sessionId: 'session-1', mode: 'plan', seq: 9 },
     ]);
   });
 
   it('projects compaction and background task events to existing wire messages', () => {
-    expect(projectRunDomainEventToWireMessages(event('compaction.completed', {
-      compactionId: 'compaction-1',
-      tokensBefore: 1234,
-    }))).toEqual([
+    expect(
+      projectRunDomainEventToWireMessages(
+        event('compaction.completed', {
+          compactionId: 'compaction-1',
+          tokensBefore: 1234,
+        })
+      )
+    ).toEqual([
       {
         type: 'compaction_completed',
         runId: 'run-1',
@@ -127,11 +159,15 @@ describe('wire projector', () => {
       },
     ]);
 
-    expect(projectRunDomainEventToWireMessages(event('backgroundTask.finished', {
-      taskId: 'task-1',
-      status: 'completed',
-      message: 'done',
-    }))).toEqual([
+    expect(
+      projectRunDomainEventToWireMessages(
+        event('backgroundTask.finished', {
+          taskId: 'task-1',
+          status: 'completed',
+          message: 'done',
+        })
+      )
+    ).toEqual([
       {
         type: 'task_notification',
         runId: 'run-1',
@@ -145,9 +181,13 @@ describe('wire projector', () => {
   });
 
   it('does not project internal-only provider turn events to wire messages', () => {
-    expect(projectRunDomainEventToWireMessages(event('run.providerTurnFinished', {
-      content: 'done',
-      usage: undefined,
-    }))).toEqual([]);
+    expect(
+      projectRunDomainEventToWireMessages(
+        event('run.providerTurnFinished', {
+          content: 'done',
+          usage: undefined,
+        })
+      )
+    ).toEqual([]);
   });
 });

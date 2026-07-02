@@ -124,10 +124,9 @@ export function handleProviderEvent({
 
     case 'tool_result':
     case 'tool_finished': {
-      const toolName = msg.toolName || (msg.toolUseId ? toolUseIdToName.get(msg.toolUseId) || '' : '');
-      const dispatchMsg = toolName && toolName !== msg.toolName
-        ? { ...msg, toolName }
-        : msg;
+      const toolName =
+        msg.toolName || (msg.toolUseId ? toolUseIdToName.get(msg.toolUseId) || '' : '');
+      const dispatchMsg = toolName && toolName !== msg.toolName ? { ...msg, toolName } : msg;
       dispatchProviderRuntimeEventToDomain({
         activeRun,
         providerEvent: dispatchMsg as ProviderRuntimeEvent,
@@ -166,10 +165,10 @@ export function handleProviderEvent({
       // tool_execution_update) populate msg.toolUseId directly. Fall back
       // to the legacy "most recent uncompleted Agent" heuristic for the
       // Claude SDK path which only emits sub-agent progress text.
-      const targetToolUseId = msg.toolUseId
-        || [...activeRun.collectedToolCalls]
-          .reverse()
-          .find(tc => tc.name === 'Agent' && !tc.output)?.toolUseId;
+      const targetToolUseId =
+        msg.toolUseId ||
+        [...activeRun.collectedToolCalls].reverse().find(tc => tc.name === 'Agent' && !tc.output)
+          ?.toolUseId;
       if (targetToolUseId && msg.content) {
         dispatchProviderRuntimeEventToDomain({
           activeRun,
@@ -235,16 +234,27 @@ export function handleProviderEvent({
       // synchronous call stack unwinds to handleRunStart's catch → handleRunException,
       // which compacts and retries. handleProviderEvent is sync (: void), so this
       // throw propagates through consume-provider-stream's while-loop.
-      if (isContextOverflowError(rawProviderError, msg.errorCode) && !isTerminalPhase(activeRun.phase)) {
-        console.warn(`[Overflow] runId=${runId} provider rejected turn for context overflow; deferring to recovery`);
+      if (
+        isContextOverflowError(rawProviderError, msg.errorCode) &&
+        !isTerminalPhase(activeRun.phase)
+      ) {
+        console.warn(
+          `[Overflow] runId=${runId} provider rejected turn for context overflow; deferring to recovery`
+        );
         throw new ContextOverflowError(rawProviderError);
       }
 
       const authHint = activeRun.providerType
         ? providerRegistry.getPolicy(activeRun.providerType)?.authErrorHint
         : undefined;
-      const errorMessage = formatProviderErrorMessage(rawProviderError, activeRun.providerType, authHint);
-      console.error(`[Provider Error] runId=${runId} provider=${activeRun.providerType}: ${rawProviderError}`);
+      const errorMessage = formatProviderErrorMessage(
+        rawProviderError,
+        activeRun.providerType,
+        authHint
+      );
+      console.error(
+        `[Provider Error] runId=${runId} provider=${activeRun.providerType}: ${rawProviderError}`
+      );
 
       failProviderTurn({
         activeRun,

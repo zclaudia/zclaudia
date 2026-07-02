@@ -20,17 +20,20 @@ export class AIRiskAnalysisStepExecutor implements StepExecutorPort {
   async execute(
     node: WorkflowNodeDef,
     config: Record<string, unknown>,
-    ctx: StepContext,
+    ctx: StepContext
   ): Promise<StepResult> {
     const event = ctx.eventPayload;
     if (!event) {
-      return { status: 'failed', output: {}, error: 'No event payload - ai_risk_analysis requires a permission.escalated trigger' };
+      return {
+        status: 'failed',
+        output: {},
+        error: 'No event payload - ai_risk_analysis requires a permission.escalated trigger',
+      };
     }
 
     const eventAIReview = asAIReviewConfig(event.aiReview);
-    const enabled = typeof config.enabled === 'boolean'
-      ? config.enabled
-      : eventAIReview.enabled ?? true;
+    const enabled =
+      typeof config.enabled === 'boolean' ? config.enabled : (eventAIReview.enabled ?? true);
     if (!enabled) {
       return {
         status: 'completed',
@@ -46,22 +49,22 @@ export class AIRiskAnalysisStepExecutor implements StepExecutorPort {
     const cwd = stringConfig(config.cwd, event.cwd) ?? ctx.projectRootPath;
     if (!cwd) return { status: 'failed', output: {}, error: 'No working directory configured' };
 
-    const llmProfileId = stringConfig(config.analysisLlmProfileId, eventAIReview.analysisLlmProfileId)
-      ?? ctx.llmProfileId;
+    const llmProfileId =
+      stringConfig(config.analysisLlmProfileId, eventAIReview.analysisLlmProfileId) ??
+      ctx.llmProfileId;
     if (!llmProfileId) return { status: 'failed', output: {}, error: 'No provider configured' };
 
-    const requestId = typeof event.requestId === 'string' && event.requestId
-      ? event.requestId
-      : ctx.stepRunId;
+    const requestId =
+      typeof event.requestId === 'string' && event.requestId ? event.requestId : ctx.stepRunId;
     const confidenceThreshold = numberConfig(
       config.confidenceThreshold,
       eventAIReview.confidenceThreshold,
-      DEFAULT_CONFIDENCE_THRESHOLD,
+      DEFAULT_CONFIDENCE_THRESHOLD
     );
     const maxAutoApprovalsPerMinute = numberConfig(
       config.maxAutoApprovalsPerMinute,
       eventAIReview.maxAutoApprovalsPerMinute,
-      DEFAULT_MAX_AUTO_APPROVALS_PER_MINUTE,
+      DEFAULT_MAX_AUTO_APPROVALS_PER_MINUTE
     );
 
     const result = await this.agentLoopRunner.run({
@@ -101,7 +104,8 @@ export class AIRiskAnalysisStepExecutor implements StepExecutorPort {
       },
       context: { policy: 'step-local', key: `permission:${requestId}:${node.id}` },
       limits: {
-        maxTurns: typeof config.maxTurns === 'number' ? config.maxTurns : DEFAULT_RISK_ANALYSIS_MAX_TURNS,
+        maxTurns:
+          typeof config.maxTurns === 'number' ? config.maxTurns : DEFAULT_RISK_ANALYSIS_MAX_TURNS,
         timeoutMs: node.timeoutMs ?? DEFAULT_RISK_ANALYSIS_TIMEOUT_MS,
       },
       permissionMode: 'allow-declared-tools',
@@ -121,9 +125,10 @@ export class AIRiskAnalysisStepExecutor implements StepExecutorPort {
       };
     }
 
-    const rawDecision = result.output.decision === 'approve' || result.output.decision === 'deny'
-      ? result.output.decision
-      : 'uncertain';
+    const rawDecision =
+      result.output.decision === 'approve' || result.output.decision === 'deny'
+        ? result.output.decision
+        : 'uncertain';
     const confidence = typeof result.output.confidence === 'number' ? result.output.confidence : 0;
     const rawReasoning = String(result.output.reasoning ?? '');
     const belowThreshold = confidence < confidenceThreshold;
@@ -131,9 +136,10 @@ export class AIRiskAnalysisStepExecutor implements StepExecutorPort {
     const reasoning = belowThreshold
       ? `LLM confidence ${(confidence * 100).toFixed(0)}% below threshold ${(confidenceThreshold * 100).toFixed(0)}%: ${rawReasoning}`
       : rawReasoning;
-    const metadata = result.output.metadata && typeof result.output.metadata === 'object'
-      ? result.output.metadata
-      : undefined;
+    const metadata =
+      result.output.metadata && typeof result.output.metadata === 'object'
+        ? result.output.metadata
+        : undefined;
 
     return {
       status: 'completed',
@@ -150,7 +156,7 @@ export class AIRiskAnalysisStepExecutor implements StepExecutorPort {
 }
 
 function asAIReviewConfig(value: unknown): Partial<AIReviewConfig> {
-  return value && typeof value === 'object' ? value as Partial<AIReviewConfig> : {};
+  return value && typeof value === 'object' ? (value as Partial<AIReviewConfig>) : {};
 }
 
 function numberConfig(primary: unknown, fallback: unknown, defaultValue: number): number {
@@ -165,7 +171,11 @@ function stringConfig(primary: unknown, fallback: unknown): string | undefined {
   return undefined;
 }
 
-function templateStringConfig(ctx: StepContext, primary: unknown, fallback: unknown): string | undefined {
+function templateStringConfig(
+  ctx: StepContext,
+  primary: unknown,
+  fallback: unknown
+): string | undefined {
   if (typeof primary === 'string' && primary.trim()) return ctx.resolveTemplate(primary);
   if (typeof fallback === 'string' && fallback.trim()) return fallback;
   return undefined;

@@ -41,7 +41,10 @@ import { confirm } from '../../stores/confirmDialogStore';
 function agentReadinessReasonFromDetails(details: unknown): AgentReadinessReason | undefined {
   if (!details || typeof details !== 'object') return undefined;
   const reason = (details as { reason?: unknown }).reason;
-  return reason === 'no_agent' || reason === 'no_llm_profile' || reason === 'no_credential' || reason === 'no_model'
+  return reason === 'no_agent' ||
+    reason === 'no_llm_profile' ||
+    reason === 'no_credential' ||
+    reason === 'no_model'
     ? reason
     : undefined;
 }
@@ -126,9 +129,9 @@ export function Sidebar({
   } = data;
 
   const onlineBackends = useOnlineBackends();
-  const expandedBackendIds = useSidebarExpansionStore((s) => s.expandedBackendIds);
-  const toggleBackend = useSidebarExpansionStore((s) => s.toggleBackend);
-  const expandBackend = useSidebarExpansionStore((s) => s.expandBackend);
+  const expandedBackendIds = useSidebarExpansionStore(s => s.expandedBackendIds);
+  const toggleBackend = useSidebarExpansionStore(s => s.toggleBackend);
+  const expandBackend = useSidebarExpansionStore(s => s.expandBackend);
   const autoExpandedRef = useRef(false);
 
   // Lazily connect/disconnect remote backends as their rows expand/collapse.
@@ -157,55 +160,65 @@ export function Sidebar({
   const [contextMenuProject, setContextMenuProject] = useState<string | null>(null);
   const [contextMenuPos, setContextMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [settingsProjectId, setSettingsProjectId] = useState<string | null>(null);
-  const refreshReadiness = useAgentReadinessStore((s) => s.refresh);
-  const [agentDialogReason, setAgentDialogReason] = useState<AgentReadinessReason | undefined>(undefined);
+  const refreshReadiness = useAgentReadinessStore(s => s.refresh);
+  const [agentDialogReason, setAgentDialogReason] = useState<AgentReadinessReason | undefined>(
+    undefined
+  );
   const [agentDialogOpen, setAgentDialogOpen] = useState(false);
   const search = useSearchSidebar();
   // Controlled-or-uncontrolled search popover state.
   const [internalSearchOpen, setInternalSearchOpen] = useState(false);
   const searchOpen = searchOpenProp ?? internalSearchOpen;
-  const setSearchOpen = useCallback((open: boolean) => {
-    if (onSearchOpenChange) onSearchOpenChange(open);
-    else setInternalSearchOpen(open);
-  }, [onSearchOpenChange]);
+  const setSearchOpen = useCallback(
+    (open: boolean) => {
+      if (onSearchOpenChange) onSearchOpenChange(open);
+      else setInternalSearchOpen(open);
+    },
+    [onSearchOpenChange]
+  );
 
   // Resizable width (desktop) — mirrors the right sidebar's drag handle.
-  const sidebarWidth = useSidebarWidthStore((s) => s.widthPx);
-  const setSidebarWidth = useSidebarWidthStore((s) => s.setWidth);
+  const sidebarWidth = useSidebarWidthStore(s => s.widthPx);
+  const setSidebarWidth = useSidebarWidthStore(s => s.setWidth);
   const resizeDragging = useRef(false);
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(0);
   const resizeCleanupRef = useRef<(() => void) | null>(null);
   useEffect(() => () => resizeCleanupRef.current?.(), []);
-  const onResizeStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault();
-    resizeDragging.current = true;
-    resizeStartX.current = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    resizeStartWidth.current = useSidebarWidthStore.getState().widthPx;
-    const onMove = (ev: MouseEvent | TouchEvent) => {
-      if (!resizeDragging.current) return;
-      const clientX = 'touches' in ev ? ev.touches[0].clientX : ev.clientX;
-      // Handle is on the right edge: dragging right widens the sidebar.
-      setSidebarWidth(resizeStartWidth.current + (clientX - resizeStartX.current));
-    };
-    const cleanup = () => {
-      resizeDragging.current = false;
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-      document.removeEventListener('touchmove', onMove);
-      document.removeEventListener('touchend', onUp);
-      resizeCleanupRef.current = null;
-    };
-    const onUp = () => cleanup();
-    resizeCleanupRef.current = cleanup;
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-    document.addEventListener('touchmove', onMove);
-    document.addEventListener('touchend', onUp);
-  }, [setSidebarWidth]);
+  const onResizeStart = useCallback(
+    (e: React.MouseEvent | React.TouchEvent) => {
+      e.preventDefault();
+      resizeDragging.current = true;
+      resizeStartX.current = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      resizeStartWidth.current = useSidebarWidthStore.getState().widthPx;
+      const onMove = (ev: MouseEvent | TouchEvent) => {
+        if (!resizeDragging.current) return;
+        const clientX = 'touches' in ev ? ev.touches[0].clientX : ev.clientX;
+        // Handle is on the right edge: dragging right widens the sidebar.
+        setSidebarWidth(resizeStartWidth.current + (clientX - resizeStartX.current));
+      };
+      const cleanup = () => {
+        resizeDragging.current = false;
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        document.removeEventListener('touchmove', onMove);
+        document.removeEventListener('touchend', onUp);
+        resizeCleanupRef.current = null;
+      };
+      const onUp = () => cleanup();
+      resizeCleanupRef.current = cleanup;
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+      document.addEventListener('touchmove', onMove);
+      document.addEventListener('touchend', onUp);
+    },
+    [setSidebarWidth]
+  );
   const [expandedWorktrees, setExpandedWorktrees] = useState<Set<string>>(new Set());
   const [regularSessionsCollapsed, setRegularSessionsCollapsed] = useState<Set<string>>(new Set());
-  const [worktreesByProject, setWorktreesByProject] = useState<Map<string, GitWorktree[]>>(new Map());
+  const [worktreesByProject, setWorktreesByProject] = useState<Map<string, GitWorktree[]>>(
+    new Map()
+  );
 
   // Fetch agent readiness whenever the connection is established.
   useEffect(() => {
@@ -237,10 +250,10 @@ export function Sidebar({
 
   // --- Agent profile dropdown source ---
   // Lazily load agent profiles for the new-session dropdown.
-  const agentProfiles = useAgentProfileMetaStore((s) => s.profiles);
-  const agentLoaded = useAgentProfileMetaStore((s) => s.loaded);
-  const agentLoading = useAgentProfileMetaStore((s) => s.loading);
-  const loadAllAgents = useAgentProfileMetaStore((s) => s.loadAll);
+  const agentProfiles = useAgentProfileMetaStore(s => s.profiles);
+  const agentLoaded = useAgentProfileMetaStore(s => s.loaded);
+  const agentLoading = useAgentProfileMetaStore(s => s.loading);
+  const loadAllAgents = useAgentProfileMetaStore(s => s.loadAll);
   useEffect(() => {
     if (!agentLoaded && !agentLoading) {
       void loadAllAgents();
@@ -280,13 +293,15 @@ export function Sidebar({
     newProjectRootPath,
     newSessionName,
     newSessionAgentProfileId,
-    onAgentNotReady: (details) => {
+    onAgentNotReady: details => {
       showAgentRequiredDialog(agentReadinessReasonFromDetails(details));
       void refreshReadiness();
     },
   });
 
-  const settingsProject = settingsProjectId ? visibleProjects.find(p => p.id === settingsProjectId) || null : null;
+  const settingsProject = settingsProjectId
+    ? visibleProjects.find(p => p.id === settingsProjectId) || null
+    : null;
 
   // --- Worktree logic ---
   useEffect(() => {
@@ -297,12 +312,15 @@ export function Sidebar({
     }
   }, [expandedProjects, worktreesByProject, refreshProjectWorktrees]);
 
-  const getWorktreeGroupsForProject = useCallback((projectId: string): WorktreeGroup[] => {
-    const projectSessions = sessionsByProject.get(projectId) || [];
-    const project = visibleProjects.find(p => p.id === projectId);
-    const worktrees = worktreesByProject.get(projectId) || [];
-    return groupSessionsByWorktreeFn(projectSessions, project?.rootPath, worktrees);
-  }, [sessionsByProject, visibleProjects, worktreesByProject]);
+  const getWorktreeGroupsForProject = useCallback(
+    (projectId: string): WorktreeGroup[] => {
+      const projectSessions = sessionsByProject.get(projectId) || [];
+      const project = visibleProjects.find(p => p.id === projectId);
+      const worktrees = worktreesByProject.get(projectId) || [];
+      return groupSessionsByWorktreeFn(projectSessions, project?.rootPath, worktrees);
+    },
+    [sessionsByProject, visibleProjects, worktreesByProject]
+  );
 
   const toggleWorktree = useCallback((key: string) => {
     setExpandedWorktrees(prev => {
@@ -340,22 +358,25 @@ export function Sidebar({
     });
   }, []);
 
-  const handleDeleteWorktree = useCallback(async (projectId: string, worktreePath: string, branchName?: string) => {
-    const label = branchName || worktreePath;
-    const confirmed = await confirm({
-      title: 'Remove worktree?',
-      message: `This deletes the directory at "${worktreePath}" and the local branch "${label}". This cannot be undone.`,
-      confirmLabel: 'Remove',
-      destructive: true,
-    });
-    if (!confirmed) return;
+  const handleDeleteWorktree = useCallback(
+    async (projectId: string, worktreePath: string, branchName?: string) => {
+      const label = branchName || worktreePath;
+      const confirmed = await confirm({
+        title: 'Remove worktree?',
+        message: `This deletes the directory at "${worktreePath}" and the local branch "${label}". This cannot be undone.`,
+        confirmLabel: 'Remove',
+        destructive: true,
+      });
+      if (!confirmed) return;
 
-    const result = await runWithToast(`Remove worktree '${label}'`, projectId, () =>
-      api.deleteProjectWorktree(projectId, worktreePath),
-    );
-    if (result === null) return;
-    await refreshProjectWorktrees(projectId);
-  }, [refreshProjectWorktrees]);
+      const result = await runWithToast(`Remove worktree '${label}'`, projectId, () =>
+        api.deleteProjectWorktree(projectId, worktreePath)
+      );
+      if (result === null) return;
+      await refreshProjectWorktrees(projectId);
+    },
+    [refreshProjectWorktrees]
+  );
 
   const toggleProject = (projectId: string) => {
     const newExpanded = new Set(expandedProjects);
@@ -409,77 +430,89 @@ export function Sidebar({
     return false;
   }, [refreshReadiness, showAgentRequiredDialog]);
 
-  const runAfterAgentGate = useCallback((action: () => void | Promise<void>, options?: { forceRefresh?: boolean }) => {
-    if (!options?.forceRefresh && useAgentReadinessStore.getState().readiness?.usable === true) {
-      void action();
-      return;
-    }
-    void ensureAgentGate().then((ok) => {
-      if (ok) void action();
-    });
-  }, [ensureAgentGate]);
+  const runAfterAgentGate = useCallback(
+    (action: () => void | Promise<void>, options?: { forceRefresh?: boolean }) => {
+      if (!options?.forceRefresh && useAgentReadinessStore.getState().readiness?.usable === true) {
+        void action();
+        return;
+      }
+      void ensureAgentGate().then(ok => {
+        if (ok) void action();
+      });
+    },
+    [ensureAgentGate]
+  );
 
   // --- Shared renderers ---
   const renderProjectItems = (backendProjects: typeof filteredProjects) => (
     <SortableList
-      items={backendProjects.map((p) => p.id)}
+      items={backendProjects.map(p => p.id)}
       onReorder={actions.handleReorderProjects}
       className="space-y-2"
     >
-      {backendProjects.map((project) => (
+      {backendProjects.map(project => (
         <SortableItem
           key={project.id}
           id={project.id}
           wrapperClassName="items-start"
           dragHandleClassName="w-4 h-4 -ml-1 mr-0.5 mt-2"
         >
-              <ProjectListItem
-                project={project}
-                isExpanded={expandedProjects.has(project.id)}
-                onToggle={() => toggleProject(project.id)}
-                sessions={getFilteredSessionsForProject(project.id)}
-                selectedSessionId={selectedSessionId}
-                onSelectSession={actions.handleSessionSelect}
-                onOpenDashboard={isMobile ? (pid) => { onOpenDashboard?.(pid); onClose?.(); } : onOpenDashboard}
-                hasPendingForSession={hasPendingForSession}
-                activeRunSessionIds={activeRunSessionIds}
-                getProviderName={getProviderName}
-                getWorktreeBranch={getWorktreeBranch}
-                supervisorAgent={supervisorAgents[project.id]}
-                worktrees={worktreesByProject.get(project.id) || []}
-                expandedWorktrees={expandedWorktrees}
-                onToggleWorktree={toggleWorktree}
-                onDeleteWorktree={handleDeleteWorktree}
-                regularSessionsCollapsed={regularSessionsCollapsed.has(project.id)}
-                onToggleRegularSessions={() => toggleRegularSessions(project.id)}
-                onReorderSessions={actions.handleReorderSessions}
-                isMobile={isMobile}
-                contextMenuProject={contextMenuProject}
-                contextMenuPos={contextMenuPos}
-                onOpenContextMenu={openContextMenu}
-                onCloseContextMenu={() => setContextMenuProject(null)}
-                onSettingsProject={setSettingsProjectId}
-                onDeleteProject={actions.handleDeleteProject}
-                isCreatingSession={creatingSessionForProject === project.id}
-                newSessionName={newSessionName}
-                onNewSessionNameChange={setNewSessionName}
-                newSessionAgentProfileId={newSessionAgentProfileId}
-                onNewSessionAgentProfileIdChange={setNewSessionAgentProfileId}
-                onStartCreatingSession={() => {
-                  runAfterAgentGate(() => setCreatingSessionForProject(project.id));
-                }}
-                onCreateSession={() => {
-                  runAfterAgentGate(() => actions.handleCreateSession(project.id), { forceRefresh: true });
-                }}
-                onCancelCreateSession={() => {
-                  setCreatingSessionForProject(null);
-                  setNewSessionName('');
-                  setNewSessionAgentProfileId('');
-                }}
-                isConnected={isConnected}
-                agents={agents}
-                onPopOutSession={actions.handlePopOutSession}
-              />
+          <ProjectListItem
+            project={project}
+            isExpanded={expandedProjects.has(project.id)}
+            onToggle={() => toggleProject(project.id)}
+            sessions={getFilteredSessionsForProject(project.id)}
+            selectedSessionId={selectedSessionId}
+            onSelectSession={actions.handleSessionSelect}
+            onOpenDashboard={
+              isMobile
+                ? pid => {
+                    onOpenDashboard?.(pid);
+                    onClose?.();
+                  }
+                : onOpenDashboard
+            }
+            hasPendingForSession={hasPendingForSession}
+            activeRunSessionIds={activeRunSessionIds}
+            getProviderName={getProviderName}
+            getWorktreeBranch={getWorktreeBranch}
+            supervisorAgent={supervisorAgents[project.id]}
+            worktrees={worktreesByProject.get(project.id) || []}
+            expandedWorktrees={expandedWorktrees}
+            onToggleWorktree={toggleWorktree}
+            onDeleteWorktree={handleDeleteWorktree}
+            regularSessionsCollapsed={regularSessionsCollapsed.has(project.id)}
+            onToggleRegularSessions={() => toggleRegularSessions(project.id)}
+            onReorderSessions={actions.handleReorderSessions}
+            isMobile={isMobile}
+            contextMenuProject={contextMenuProject}
+            contextMenuPos={contextMenuPos}
+            onOpenContextMenu={openContextMenu}
+            onCloseContextMenu={() => setContextMenuProject(null)}
+            onSettingsProject={setSettingsProjectId}
+            onDeleteProject={actions.handleDeleteProject}
+            isCreatingSession={creatingSessionForProject === project.id}
+            newSessionName={newSessionName}
+            onNewSessionNameChange={setNewSessionName}
+            newSessionAgentProfileId={newSessionAgentProfileId}
+            onNewSessionAgentProfileIdChange={setNewSessionAgentProfileId}
+            onStartCreatingSession={() => {
+              runAfterAgentGate(() => setCreatingSessionForProject(project.id));
+            }}
+            onCreateSession={() => {
+              runAfterAgentGate(() => actions.handleCreateSession(project.id), {
+                forceRefresh: true,
+              });
+            }}
+            onCancelCreateSession={() => {
+              setCreatingSessionForProject(null);
+              setNewSessionName('');
+              setNewSessionAgentProfileId('');
+            }}
+            isConnected={isConnected}
+            agents={agents}
+            onPopOutSession={actions.handlePopOutSession}
+          />
         </SortableItem>
       ))}
     </SortableList>
@@ -491,7 +524,7 @@ export function Sidebar({
         <p className="text-sm text-muted-foreground px-2">No backends online</p>
       ) : (
         <div className="space-y-2">
-          {onlineBackends.map((backend) => {
+          {onlineBackends.map(backend => {
             const backendProjects = getProjectsForBackend(backend.backendId);
             const expanded = expandedBackendIds.includes(backend.backendId);
             return (
@@ -501,10 +534,12 @@ export function Sidebar({
                   online={backend.online}
                   expanded={expanded}
                   onToggle={() => toggleBackend(backend.backendId)}
-                  onNewProject={() => runAfterAgentGate(() => {
-                    setNewProjectBackendId(backend.backendId);
-                    setShowNewProjectForm(true);
-                  })}
+                  onNewProject={() =>
+                    runAfterAgentGate(() => {
+                      setNewProjectBackendId(backend.backendId);
+                      setShowNewProjectForm(true);
+                    })
+                  }
                   newProjectDisabled={!isConnected}
                 >
                   {backendProjects.length === 0 ? (
@@ -517,12 +552,18 @@ export function Sidebar({
                   <div className="pl-3">
                     <NewProjectForm
                       showForm
-                      onShowForm={(show: boolean) => { if (!show) setShowNewProjectForm(false); }}
+                      onShowForm={(show: boolean) => {
+                        if (!show) setShowNewProjectForm(false);
+                      }}
                       newProjectName={newProjectName}
                       onProjectNameChange={setNewProjectName}
                       newProjectRootPath={newProjectRootPath}
                       onProjectRootPathChange={setNewProjectRootPath}
-                      onCreateProject={() => runAfterAgentGate(() => actions.handleCreateProject(backend.backendId), { forceRefresh: true })}
+                      onCreateProject={() =>
+                        runAfterAgentGate(() => actions.handleCreateProject(backend.backendId), {
+                          forceRefresh: true,
+                        })
+                      }
                       creatingProject={creatingProject}
                       isMobile={isMobile}
                       backends={[backend]}
@@ -541,26 +582,28 @@ export function Sidebar({
 
   const renderPortaledModals = () => (
     <>
-      {!!settingsProjectId && createPortal(
-        <ProjectSettings
-          project={settingsProject}
-          isOpen={!!settingsProjectId}
-          onClose={() => setSettingsProjectId(null)}
-        />,
-        document.body
-      )}
-      {agentDialogOpen && createPortal(
-        <AgentRequiredDialog
-          open={agentDialogOpen}
-          reason={agentDialogReason}
-          onClose={() => setAgentDialogOpen(false)}
-          onConfigure={(tab) => {
-            setAgentDialogOpen(false);
-            onOpenSettings?.(tab);
-          }}
-        />,
-        document.body,
-      )}
+      {!!settingsProjectId &&
+        createPortal(
+          <ProjectSettings
+            project={settingsProject}
+            isOpen={!!settingsProjectId}
+            onClose={() => setSettingsProjectId(null)}
+          />,
+          document.body
+        )}
+      {agentDialogOpen &&
+        createPortal(
+          <AgentRequiredDialog
+            open={agentDialogOpen}
+            reason={agentDialogReason}
+            onClose={() => setAgentDialogOpen(false)}
+            onConfigure={tab => {
+              setAgentDialogOpen(false);
+              onOpenSettings?.(tab);
+            }}
+          />,
+          document.body
+        )}
       {createPortal(<PluginPermissionDialog />, document.body)}
     </>
   );
@@ -572,7 +615,10 @@ export function Sidebar({
     return (
       <>
         <div className="fixed inset-0 bg-black/50 z-40" onClick={onClose} />
-        <div ref={sidebarSwipeRef} className="fixed inset-y-0 left-0 w-64 bg-card/80 glass z-50 shadow-apple-xl flex flex-col safe-top-pad safe-bottom-pad">
+        <div
+          ref={sidebarSwipeRef}
+          className="fixed inset-y-0 left-0 w-64 bg-card/80 glass z-50 shadow-apple-xl flex flex-col safe-top-pad safe-bottom-pad"
+        >
           <MobileSidebarHeader
             onClose={onClose}
             onOpenNotifications={onOpenNotifications}
@@ -593,14 +639,21 @@ export function Sidebar({
           />
 
           <SidebarNav
-            onHome={() => { onHome(); onClose?.(); }}
+            onHome={() => {
+              onHome();
+              onClose?.();
+            }}
             isHomeActive={isHomeActive}
             isMobile
-            automationMode={automationMode ? {
-              tab: automationMode.tab,
-              onSelectTab: automationMode.onSelectTab,
-              onBack: automationMode.onBack,
-            } : undefined}
+            automationMode={
+              automationMode
+                ? {
+                    tab: automationMode.tab,
+                    onSelectTab: automationMode.onSelectTab,
+                    onBack: automationMode.onBack,
+                  }
+                : undefined
+            }
           />
 
           <div className="flex-1 overflow-y-auto scrollbar-hidden p-2">
@@ -630,10 +683,7 @@ export function Sidebar({
             />
           </div>
 
-          <SidebarFooter
-            onShowSettings={() => onOpenSettings?.()}
-            isMobile
-          />
+          <SidebarFooter onShowSettings={() => onOpenSettings?.()} isMobile />
         </div>
 
         {renderPortaledModals()}
@@ -651,86 +701,87 @@ export function Sidebar({
   const clampedSidebarWidth = Math.max(
     SIDEBAR_WIDTH_LIMITS.MIN_WIDTH_PX,
     Math.min(
-      (typeof window !== 'undefined' ? window.innerWidth : 1920) * (SIDEBAR_WIDTH_LIMITS.MAX_WIDTH_VW / 100),
-      sidebarWidth,
-    ),
+      (typeof window !== 'undefined' ? window.innerWidth : 1920) *
+        (SIDEBAR_WIDTH_LIMITS.MAX_WIDTH_VW / 100),
+      sidebarWidth
+    )
   );
   return (
     <>
-    <div
-      className="relative flex flex-shrink-0 flex-col border-r border-border/50 bg-[hsl(var(--sidebar))]"
-      style={{ width: clampedSidebarWidth }}
-    >
-      {/* Resize handle on the right edge */}
       <div
-        className="absolute top-0 right-0 z-20 h-full w-1 cursor-ew-resize hover:bg-muted"
-        onMouseDown={onResizeStart}
-        onTouchStart={onResizeStart}
-        aria-hidden
-      />
-      <div className="relative z-50 flex-shrink-0">
-        <SidebarTopBar
-          onToggle={onToggle}
-          onOpenSearch={() => setSearchOpen(!searchOpen)}
-          isSearchOpen={searchOpen}
-          onOpenNotifications={onOpenNotifications}
-          isNotificationsOpen={isNotificationsOpen}
-          notificationUnreadCount={notificationUnreadCount}
-          disableNotifications={disableNotifications}
+        className="relative flex flex-shrink-0 flex-col border-r border-border/50 bg-[hsl(var(--sidebar))]"
+        style={{ width: clampedSidebarWidth }}
+      >
+        {/* Resize handle on the right edge */}
+        <div
+          className="absolute top-0 right-0 z-20 h-full w-1 cursor-ew-resize hover:bg-muted"
+          onMouseDown={onResizeStart}
+          onTouchStart={onResizeStart}
+          aria-hidden
         />
-      </div>
-
-      <SearchModal
-        open={searchOpen}
-        onClose={() => setSearchOpen(false)}
-        search={search}
-        sessions={sessions}
-        onResultSelect={(sessionId, messageId, ownerBackendId) => {
-          actions.handleSearchResultSelect(sessionId, messageId, ownerBackendId);
-          setSearchOpen(false);
-        }}
-      />
-
-      <SidebarNav
-        onHome={onHome}
-        isHomeActive={isHomeActive}
-        onOpenAutomations={onOpenAutomations}
-        automationMode={automationMode ? {
-          tab: automationMode.tab,
-          onSelectTab: automationMode.onSelectTab,
-          onBack: automationMode.onBack,
-        } : undefined}
-      />
-
-      <div className="flex-1 overflow-y-auto scrollbar-hidden p-2">
-        {automationMode ? (
-          <AutomationTree
-            tab={automationMode.tab}
-            api={automationApi}
-            activeBackendId={automationMode.activeBackendId}
-            selectedProjectId={automationMode.projectId}
-            backends={onlineBackends}
-            getProjectsForBackend={getProjectsForBackend}
-            expandedBackendIds={expandedBackendIds}
-            onToggleBackend={toggleBackend}
-            onSelectScope={automationMode.onSelectScope}
+        <div className="relative z-50 flex-shrink-0">
+          <SidebarTopBar
+            onToggle={onToggle}
+            onOpenSearch={() => setSearchOpen(!searchOpen)}
+            isSearchOpen={searchOpen}
+            onOpenNotifications={onOpenNotifications}
+            isNotificationsOpen={isNotificationsOpen}
+            notificationUnreadCount={notificationUnreadCount}
+            disableNotifications={disableNotifications}
           />
-        ) : (
-          renderProjectList()
-        )}
-      </div>
+        </div>
 
-      <div className="flex-shrink-0">
-        <ActiveSessionsPanel
-          onSessionSelect={actions.handleActiveSessionSelect}
+        <SearchModal
+          open={searchOpen}
+          onClose={() => setSearchOpen(false)}
+          search={search}
+          sessions={sessions}
+          onResultSelect={(sessionId, messageId, ownerBackendId) => {
+            actions.handleSearchResultSelect(sessionId, messageId, ownerBackendId);
+            setSearchOpen(false);
+          }}
         />
-      </div>
 
-      <SidebarFooter
-        onShowSettings={() => onOpenSettings?.()}
-      />
-    </div>
-    {renderPortaledModals()}
+        <SidebarNav
+          onHome={onHome}
+          isHomeActive={isHomeActive}
+          onOpenAutomations={onOpenAutomations}
+          automationMode={
+            automationMode
+              ? {
+                  tab: automationMode.tab,
+                  onSelectTab: automationMode.onSelectTab,
+                  onBack: automationMode.onBack,
+                }
+              : undefined
+          }
+        />
+
+        <div className="flex-1 overflow-y-auto scrollbar-hidden p-2">
+          {automationMode ? (
+            <AutomationTree
+              tab={automationMode.tab}
+              api={automationApi}
+              activeBackendId={automationMode.activeBackendId}
+              selectedProjectId={automationMode.projectId}
+              backends={onlineBackends}
+              getProjectsForBackend={getProjectsForBackend}
+              expandedBackendIds={expandedBackendIds}
+              onToggleBackend={toggleBackend}
+              onSelectScope={automationMode.onSelectScope}
+            />
+          ) : (
+            renderProjectList()
+          )}
+        </div>
+
+        <div className="flex-shrink-0">
+          <ActiveSessionsPanel onSessionSelect={actions.handleActiveSessionSelect} />
+        </div>
+
+        <SidebarFooter onShowSettings={() => onOpenSettings?.()} />
+      </div>
+      {renderPortaledModals()}
     </>
   );
 }

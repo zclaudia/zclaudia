@@ -55,24 +55,29 @@ function createDb(): Database.Database {
   return db;
 }
 
-function insertWorkflow(db: Database.Database, values: {
-  id: string;
-  status?: string;
-  isSystem?: boolean;
-  systemKey?: string | null;
-  templateId?: string | null;
-}) {
-  db.prepare(`
+function insertWorkflow(
+  db: Database.Database,
+  values: {
+    id: string;
+    status?: string;
+    isSystem?: boolean;
+    systemKey?: string | null;
+    templateId?: string | null;
+  }
+) {
+  db.prepare(
+    `
     INSERT INTO workflows (
       id, project_id, name, status, definition, template_id, is_system, system_key, created_at, updated_at
     ) VALUES (?, NULL, ?, ?, '{}', ?, ?, ?, 1, 1)
-  `).run(
+  `
+  ).run(
     values.id,
     values.id,
     values.status ?? 'active',
     values.templateId ?? null,
     values.isSystem ? 1 : 0,
-    values.systemKey ?? null,
+    values.systemKey ?? null
   );
 }
 
@@ -101,11 +106,15 @@ describe('PermissionWorkflowResolver', () => {
   it('prefers project override over global override', () => {
     insertWorkflow(db, { id: 'wf-project' });
     insertWorkflow(db, { id: 'wf-global' });
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO projects (id, name, type, permission_workflow_override_id, created_at, updated_at)
       VALUES ('p1', 'Project', 'code', 'wf-project', 1, 1)
-    `).run();
-    db.prepare(`UPDATE agent_config SET permission_workflow_override_id = 'wf-global' WHERE id = 1`).run();
+    `
+    ).run();
+    db.prepare(
+      `UPDATE agent_config SET permission_workflow_override_id = 'wf-global' WHERE id = 1`
+    ).run();
 
     const resolved = resolver.resolve('p1');
     expect(resolved.source).toBe('project_override');
@@ -114,11 +123,15 @@ describe('PermissionWorkflowResolver', () => {
 
   it('falls back to global override when project override is unavailable', () => {
     insertWorkflow(db, { id: 'wf-global' });
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO projects (id, name, type, permission_workflow_override_id, created_at, updated_at)
       VALUES ('p1', 'Project', 'code', 'wf-missing', 1, 1)
-    `).run();
-    db.prepare(`UPDATE agent_config SET permission_workflow_override_id = 'wf-global' WHERE id = 1`).run();
+    `
+    ).run();
+    db.prepare(
+      `UPDATE agent_config SET permission_workflow_override_id = 'wf-global' WHERE id = 1`
+    ).run();
 
     const resolved = resolver.resolve('p1');
     expect(resolved.source).toBe('global_override');
@@ -127,11 +140,15 @@ describe('PermissionWorkflowResolver', () => {
 
   it('falls back to system fallback when overrides are invalid', () => {
     insertWorkflow(db, { id: 'wf-global', status: 'disabled' });
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO projects (id, name, type, permission_workflow_override_id, created_at, updated_at)
       VALUES ('p1', 'Project', 'code', 'wf-missing', 1, 1)
-    `).run();
-    db.prepare(`UPDATE agent_config SET permission_workflow_override_id = 'wf-global' WHERE id = 1`).run();
+    `
+    ).run();
+    db.prepare(
+      `UPDATE agent_config SET permission_workflow_override_id = 'wf-global' WHERE id = 1`
+    ).run();
 
     const resolved = resolver.resolve('p1');
     expect(resolved.source).toBe('system_fallback');
@@ -140,7 +157,9 @@ describe('PermissionWorkflowResolver', () => {
 
   it('uses global override when no project is provided', () => {
     insertWorkflow(db, { id: 'wf-global' });
-    db.prepare(`UPDATE agent_config SET permission_workflow_override_id = 'wf-global' WHERE id = 1`).run();
+    db.prepare(
+      `UPDATE agent_config SET permission_workflow_override_id = 'wf-global' WHERE id = 1`
+    ).run();
 
     const resolved = resolver.resolve();
     expect(resolved.source).toBe('global_override');
@@ -153,11 +172,15 @@ describe('PermissionWorkflowResolver', () => {
       isSystem: true,
       systemKey: 'other_system_workflow',
     });
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO projects (id, name, type, permission_workflow_override_id, created_at, updated_at)
       VALUES ('p1', 'Project', 'code', 'wf-system-override', 1, 1)
-    `).run();
-    db.prepare(`UPDATE agent_config SET permission_workflow_override_id = 'wf-system-override' WHERE id = 1`).run();
+    `
+    ).run();
+    db.prepare(
+      `UPDATE agent_config SET permission_workflow_override_id = 'wf-system-override' WHERE id = 1`
+    ).run();
 
     const resolved = resolver.resolve('p1');
     expect(resolved.source).toBe('system_fallback');
@@ -166,7 +189,9 @@ describe('PermissionWorkflowResolver', () => {
 
   it('triggers escalation with an explicit event initiator', async () => {
     insertWorkflow(db, { id: 'wf-global' });
-    db.prepare(`UPDATE agent_config SET permission_workflow_override_id = 'wf-global' WHERE id = 1`).run();
+    db.prepare(
+      `UPDATE agent_config SET permission_workflow_override_id = 'wf-global' WHERE id = 1`
+    ).run();
 
     await resolver.triggerPermissionEscalation(undefined, {
       eventPayload: { requestId: 'req-1' },
@@ -177,7 +202,7 @@ describe('PermissionWorkflowResolver', () => {
       'event',
       'event: permission.escalated',
       expect.objectContaining({ eventPayload: expect.any(Object) }),
-      'event',
+      'event'
     );
   });
 });

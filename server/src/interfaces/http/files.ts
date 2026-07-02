@@ -1,10 +1,14 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, type Request, type Response, type NextFunction } from 'express';
 import * as fs from 'fs';
 import * as os from 'os';
 import { newId } from '../../utils/uuid.js';
 import multer from 'multer';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
-import type { DirectoryBrowseResponse, DirectoryListingResponse, FileContentResponse } from '@zclaudia/shared/files';
+import type {
+  DirectoryBrowseResponse,
+  DirectoryListingResponse,
+  FileContentResponse,
+} from '@zclaudia/shared/files';
 import { fileStore } from '../../infra/storage/fileStore.js';
 import { FileBrowseError, FileBrowseService } from '../../infra/services/file-browse-service.js';
 import {
@@ -23,8 +27,8 @@ const upload = multer({
     },
   }),
   limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB limit
-  }
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
 });
 
 export function createFilesRoutes(broadcastCtx?: FilesRouteBroadcastContext): Router {
@@ -40,12 +44,12 @@ export function createFilesRoutes(broadcastCtx?: FilesRouteBroadcastContext): Ro
         if (err.code === 'LIMIT_FILE_SIZE') {
           return res.status(413).json({
             success: false,
-            error: { code: 'FILE_TOO_LARGE', message: 'File exceeds 10MB limit' }
+            error: { code: 'FILE_TOO_LARGE', message: 'File exceeds 10MB limit' },
           });
         }
         return res.status(400).json({
           success: false,
-          error: { code: 'UPLOAD_ERROR', message: err.message }
+          error: { code: 'UPLOAD_ERROR', message: err.message },
         });
       }
       if (err) {
@@ -61,8 +65,8 @@ export function createFilesRoutes(broadcastCtx?: FilesRouteBroadcastContext): Ro
             fileId: result.fileId,
             name: result.name,
             mimeType: result.mimeType,
-            size: result.size
-          }
+            size: result.size,
+          },
         });
       } catch (error) {
         if (error instanceof FileTransferError) {
@@ -71,7 +75,11 @@ export function createFilesRoutes(broadcastCtx?: FilesRouteBroadcastContext): Ro
         }
         // Clean up temp file on error
         if (req.file?.path) {
-          try { fs.unlinkSync(req.file.path); } catch { /* ignore */ }
+          try {
+            fs.unlinkSync(req.file.path);
+          } catch {
+            /* ignore */
+          }
         }
         console.error('[Files] Error uploading file:', error);
         sendApiError(res, 500, 'UPLOAD_ERROR', 'Failed to upload file');
@@ -88,7 +96,7 @@ export function createFilesRoutes(broadcastCtx?: FilesRouteBroadcastContext): Ro
 
       res.json({
         success: true,
-        data: result
+        data: result,
       });
     } catch (error) {
       if (error instanceof FileTransferError) {
@@ -108,24 +116,29 @@ export function createFilesRoutes(broadcastCtx?: FilesRouteBroadcastContext): Ro
         projectRoot,
         relativePath = '',
         query = '',
-        maxResults = '50'
+        maxResults = '50',
       } = req.query as Record<string, string>;
 
-      const response = fileBrowseService.listDirectory(projectRoot, relativePath, query, maxResults);
+      const response = fileBrowseService.listDirectory(
+        projectRoot,
+        relativePath,
+        query,
+        maxResults
+      );
 
       res.json({ success: true, data: response } as ApiResponse<DirectoryListingResponse>);
     } catch (error) {
       if (error instanceof FileBrowseError) {
         res.status(error.status).json({
           success: false,
-          error: { code: error.code, message: error.message }
+          error: { code: error.code, message: error.message },
         });
         return;
       }
       console.error('Error listing directory:', error);
       res.status(500).json({
         success: false,
-        error: { code: 'SERVER_ERROR', message: 'Failed to list directory' }
+        error: { code: 'SERVER_ERROR', message: 'Failed to list directory' },
       });
     }
   });
@@ -142,14 +155,14 @@ export function createFilesRoutes(broadcastCtx?: FilesRouteBroadcastContext): Ro
       if (error instanceof FileBrowseError) {
         res.status(error.status).json({
           success: false,
-          error: { code: error.code, message: error.message }
+          error: { code: error.code, message: error.message },
         });
         return;
       }
       console.error('Error browsing directories:', error);
       res.status(500).json({
         success: false,
-        error: { code: 'SERVER_ERROR', message: 'Failed to browse directories' }
+        error: { code: 'SERVER_ERROR', message: 'Failed to browse directories' },
       });
     }
   });
@@ -167,14 +180,14 @@ export function createFilesRoutes(broadcastCtx?: FilesRouteBroadcastContext): Ro
       if (error instanceof FileBrowseError) {
         res.status(error.status).json({
           success: false,
-          error: { code: error.code, message: error.message }
+          error: { code: error.code, message: error.message },
         });
         return;
       }
       console.error('Error reading file:', error);
       res.status(500).json({
         success: false,
-        error: { code: 'SERVER_ERROR', message: 'Failed to read file' }
+        error: { code: 'SERVER_ERROR', message: 'Failed to read file' },
       });
     }
   });
@@ -188,19 +201,22 @@ export function createFilesRoutes(broadcastCtx?: FilesRouteBroadcastContext): Ro
 
       // Set appropriate headers for download
       res.setHeader('Content-Type', metadata.mimeType);
-      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(metadata.name)}"`);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${encodeURIComponent(metadata.name)}"`
+      );
       res.setHeader('Content-Length', metadata.size.toString());
 
       // Stream the file
       const readStream = fs.createReadStream(filePath);
       readStream.pipe(res);
 
-      readStream.on('error', (err) => {
+      readStream.on('error', err => {
         console.error(`[Files] Stream error for ${fileId}:`, err);
         if (!res.headersSent) {
           res.status(500).json({
             success: false,
-            error: { code: 'STREAM_ERROR', message: 'Failed to stream file' }
+            error: { code: 'STREAM_ERROR', message: 'Failed to stream file' },
           });
         }
       });
@@ -219,11 +235,16 @@ export function createFilesRoutes(broadcastCtx?: FilesRouteBroadcastContext): Ro
   router.post('/push', (req: Request, res: Response) => {
     try {
       const { filePath: sourcePath, sessionId, description } = req.body;
-      const result = fileTransferService.pushLocalFile(sourcePath, sessionId, description, broadcastCtx);
+      const result = fileTransferService.pushLocalFile(
+        sourcePath,
+        sessionId,
+        description,
+        broadcastCtx
+      );
 
       res.json({
         success: true,
-        data: result
+        data: result,
       });
     } catch (error) {
       if (error instanceof FileTransferError) {
@@ -246,7 +267,7 @@ export function createFilesRoutes(broadcastCtx?: FilesRouteBroadcastContext): Ro
       if (!file) {
         res.status(404).json({
           success: false,
-          error: { code: 'NOT_FOUND', message: 'File not found' }
+          error: { code: 'NOT_FOUND', message: 'File not found' },
         });
         return;
       }
@@ -257,14 +278,14 @@ export function createFilesRoutes(broadcastCtx?: FilesRouteBroadcastContext): Ro
           fileId: file.id,
           name: file.name,
           mimeType: file.mimeType,
-          data: file.data // base64
-        }
+          data: file.data, // base64
+        },
       });
     } catch (error) {
       console.error('[Files] Error retrieving file:', error);
       res.status(500).json({
         success: false,
-        error: { code: 'RETRIEVAL_ERROR', message: 'Failed to retrieve file' }
+        error: { code: 'RETRIEVAL_ERROR', message: 'Failed to retrieve file' },
       });
     }
   });

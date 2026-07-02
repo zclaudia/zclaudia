@@ -36,190 +36,206 @@ export const useOwnershipStore = create<OwnershipState>()((set, get) => ({
   projectBackendIds: {},
   taskOwners: {},
 
-  setSessionOwner: (sessionId, backendId, ownershipVersion = 0) => set((state) => ({
-    sessionBackendIds: {
-      ...state.sessionBackendIds,
-      [sessionId]: backendId,
-    },
-    sessionOwnershipVersions: {
-      ...state.sessionOwnershipVersions,
-      [sessionId]: ownershipVersion,
-    },
-  })),
+  setSessionOwner: (sessionId, backendId, ownershipVersion = 0) =>
+    set(state => ({
+      sessionBackendIds: {
+        ...state.sessionBackendIds,
+        [sessionId]: backendId,
+      },
+      sessionOwnershipVersions: {
+        ...state.sessionOwnershipVersions,
+        [sessionId]: ownershipVersion,
+      },
+    })),
 
-  setSessionOwners: (sessionIds, backendId, ownershipVersion = 0) => set((state) => {
-    if (sessionIds.length === 0) return state;
+  setSessionOwners: (sessionIds, backendId, ownershipVersion = 0) =>
+    set(state => {
+      if (sessionIds.length === 0) return state;
 
-    const next = { ...state.sessionBackendIds };
-    const nextVersions = { ...state.sessionOwnershipVersions };
-    for (const sessionId of sessionIds) {
-      next[sessionId] = backendId;
-      nextVersions[sessionId] = ownershipVersion;
-    }
-    return {
-      sessionBackendIds: next,
-      sessionOwnershipVersions: nextVersions,
-    };
-  }),
-
-  removeSessionOwner: (sessionId) => set((state) => {
-    if (!(sessionId in state.sessionBackendIds)) return state;
-    const next = { ...state.sessionBackendIds };
-    const nextVersions = { ...state.sessionOwnershipVersions };
-    delete next[sessionId];
-    delete nextVersions[sessionId];
-    return {
-      sessionBackendIds: next,
-      sessionOwnershipVersions: nextVersions,
-    };
-  }),
-
-  removeSessionOwnersByBackend: (backendId) => set((state) => {
-    const next = { ...state.sessionBackendIds };
-    const nextVersions = { ...state.sessionOwnershipVersions };
-    let changed = false;
-    for (const [sessionId, ownerBackendId] of Object.entries(next)) {
-      if (ownerBackendId === backendId) {
-        delete next[sessionId];
-        delete nextVersions[sessionId];
-        changed = true;
+      const next = { ...state.sessionBackendIds };
+      const nextVersions = { ...state.sessionOwnershipVersions };
+      for (const sessionId of sessionIds) {
+        next[sessionId] = backendId;
+        nextVersions[sessionId] = ownershipVersion;
       }
-    }
-    return changed
-      ? {
-          sessionBackendIds: next,
-          sessionOwnershipVersions: nextVersions,
+      return {
+        sessionBackendIds: next,
+        sessionOwnershipVersions: nextVersions,
+      };
+    }),
+
+  removeSessionOwner: sessionId =>
+    set(state => {
+      if (!(sessionId in state.sessionBackendIds)) return state;
+      const next = { ...state.sessionBackendIds };
+      const nextVersions = { ...state.sessionOwnershipVersions };
+      delete next[sessionId];
+      delete nextVersions[sessionId];
+      return {
+        sessionBackendIds: next,
+        sessionOwnershipVersions: nextVersions,
+      };
+    }),
+
+  removeSessionOwnersByBackend: backendId =>
+    set(state => {
+      const next = { ...state.sessionBackendIds };
+      const nextVersions = { ...state.sessionOwnershipVersions };
+      let changed = false;
+      for (const [sessionId, ownerBackendId] of Object.entries(next)) {
+        if (ownerBackendId === backendId) {
+          delete next[sessionId];
+          delete nextVersions[sessionId];
+          changed = true;
         }
-      : state;
-  }),
+      }
+      return changed
+        ? {
+            sessionBackendIds: next,
+            sessionOwnershipVersions: nextVersions,
+          }
+        : state;
+    }),
 
   clearSessionOwners: () => set({ sessionBackendIds: {}, sessionOwnershipVersions: {} }),
 
-  getSessionBackendId: (sessionId) => {
+  getSessionBackendId: sessionId => {
     if (!sessionId) return null;
     const backendId = get().sessionBackendIds[sessionId] ?? null;
     if (!backendId) return null;
     return resolveCanonicalBackendId(backendId, resolveLocalBackendId() ?? backendId);
   },
 
-  getSessionOwnershipVersion: (sessionId) => {
+  getSessionOwnershipVersion: sessionId => {
     if (!sessionId) return null;
     return get().sessionOwnershipVersions[sessionId] ?? null;
   },
 
-  stampSessionOwnershipVersion: (sessionIds, ownershipVersion) => set((state) => {
-    if (sessionIds.length === 0) return state;
-    const allUpToDate = sessionIds.every(id => state.sessionOwnershipVersions[id] === ownershipVersion);
-    if (allUpToDate) return state;
-    const next = { ...state.sessionOwnershipVersions };
-    for (const sessionId of sessionIds) {
-      next[sessionId] = ownershipVersion;
-    }
-    return { sessionOwnershipVersions: next };
-  }),
-
-  stampBackendOwnershipVersion: (backendId, ownershipVersion) => set((state) => {
-    const next = { ...state.sessionOwnershipVersions };
-    let changed = false;
-    for (const [sessionId, ownerBackendId] of Object.entries(state.sessionBackendIds)) {
-      if (ownerBackendId === backendId) {
+  stampSessionOwnershipVersion: (sessionIds, ownershipVersion) =>
+    set(state => {
+      if (sessionIds.length === 0) return state;
+      const allUpToDate = sessionIds.every(
+        id => state.sessionOwnershipVersions[id] === ownershipVersion
+      );
+      if (allUpToDate) return state;
+      const next = { ...state.sessionOwnershipVersions };
+      for (const sessionId of sessionIds) {
         next[sessionId] = ownershipVersion;
-        changed = true;
       }
-    }
-    return changed ? { sessionOwnershipVersions: next } : state;
-  }),
+      return { sessionOwnershipVersions: next };
+    }),
 
-  setProjectOwner: (projectId, backendId) => set((state) => ({
-    projectBackendIds: {
-      ...state.projectBackendIds,
-      [projectId]: backendId,
-    },
-  })),
-
-  setProjectOwners: (projectIds, backendId) => set((state) => {
-    if (projectIds.length === 0) return state;
-
-    const next = { ...state.projectBackendIds };
-    for (const projectId of projectIds) {
-      next[projectId] = backendId;
-    }
-    return { projectBackendIds: next };
-  }),
-
-  removeProjectOwner: (projectId) => set((state) => {
-    if (!(projectId in state.projectBackendIds)) return state;
-    const next = { ...state.projectBackendIds };
-    delete next[projectId];
-    return { projectBackendIds: next };
-  }),
-
-  removeProjectOwnersByBackend: (backendId) => set((state) => {
-    const next = { ...state.projectBackendIds };
-    let changed = false;
-    for (const [projectId, ownerBackendId] of Object.entries(next)) {
-      if (ownerBackendId === backendId) {
-        delete next[projectId];
-        changed = true;
+  stampBackendOwnershipVersion: (backendId, ownershipVersion) =>
+    set(state => {
+      const next = { ...state.sessionOwnershipVersions };
+      let changed = false;
+      for (const [sessionId, ownerBackendId] of Object.entries(state.sessionBackendIds)) {
+        if (ownerBackendId === backendId) {
+          next[sessionId] = ownershipVersion;
+          changed = true;
+        }
       }
-    }
-    return changed ? { projectBackendIds: next } : state;
-  }),
+      return changed ? { sessionOwnershipVersions: next } : state;
+    }),
+
+  setProjectOwner: (projectId, backendId) =>
+    set(state => ({
+      projectBackendIds: {
+        ...state.projectBackendIds,
+        [projectId]: backendId,
+      },
+    })),
+
+  setProjectOwners: (projectIds, backendId) =>
+    set(state => {
+      if (projectIds.length === 0) return state;
+
+      const next = { ...state.projectBackendIds };
+      for (const projectId of projectIds) {
+        next[projectId] = backendId;
+      }
+      return { projectBackendIds: next };
+    }),
+
+  removeProjectOwner: projectId =>
+    set(state => {
+      if (!(projectId in state.projectBackendIds)) return state;
+      const next = { ...state.projectBackendIds };
+      delete next[projectId];
+      return { projectBackendIds: next };
+    }),
+
+  removeProjectOwnersByBackend: backendId =>
+    set(state => {
+      const next = { ...state.projectBackendIds };
+      let changed = false;
+      for (const [projectId, ownerBackendId] of Object.entries(next)) {
+        if (ownerBackendId === backendId) {
+          delete next[projectId];
+          changed = true;
+        }
+      }
+      return changed ? { projectBackendIds: next } : state;
+    }),
 
   clearProjectOwners: () => set({ projectBackendIds: {} }),
 
-  getProjectBackendId: (projectId) => {
+  getProjectBackendId: projectId => {
     if (!projectId) return null;
     const backendId = get().projectBackendIds[projectId] ?? null;
     if (!backendId) return null;
     return resolveCanonicalBackendId(backendId, resolveLocalBackendId() ?? backendId);
   },
 
-  setTaskOwner: (taskId, backendId, projectId = null) => set((state) => ({
-    taskOwners: {
-      ...state.taskOwners,
-      [taskId]: { backendId, projectId },
-    },
-  })),
+  setTaskOwner: (taskId, backendId, projectId = null) =>
+    set(state => ({
+      taskOwners: {
+        ...state.taskOwners,
+        [taskId]: { backendId, projectId },
+      },
+    })),
 
-  setTaskOwners: (taskIds, backendId, projectId = null) => set((state) => {
-    if (taskIds.length === 0) return state;
-    const next = { ...state.taskOwners };
-    for (const taskId of taskIds) {
-      next[taskId] = { backendId, projectId };
-    }
-    return { taskOwners: next };
-  }),
-
-  removeTaskOwner: (taskId) => set((state) => {
-    if (!(taskId in state.taskOwners)) return state;
-    const next = { ...state.taskOwners };
-    delete next[taskId];
-    return { taskOwners: next };
-  }),
-
-  removeTaskOwnersByBackend: (backendId) => set((state) => {
-    const next = { ...state.taskOwners };
-    let changed = false;
-    for (const [taskId, owner] of Object.entries(next)) {
-      if (owner.backendId === backendId) {
-        delete next[taskId];
-        changed = true;
+  setTaskOwners: (taskIds, backendId, projectId = null) =>
+    set(state => {
+      if (taskIds.length === 0) return state;
+      const next = { ...state.taskOwners };
+      for (const taskId of taskIds) {
+        next[taskId] = { backendId, projectId };
       }
-    }
-    return changed ? { taskOwners: next } : state;
-  }),
+      return { taskOwners: next };
+    }),
+
+  removeTaskOwner: taskId =>
+    set(state => {
+      if (!(taskId in state.taskOwners)) return state;
+      const next = { ...state.taskOwners };
+      delete next[taskId];
+      return { taskOwners: next };
+    }),
+
+  removeTaskOwnersByBackend: backendId =>
+    set(state => {
+      const next = { ...state.taskOwners };
+      let changed = false;
+      for (const [taskId, owner] of Object.entries(next)) {
+        if (owner.backendId === backendId) {
+          delete next[taskId];
+          changed = true;
+        }
+      }
+      return changed ? { taskOwners: next } : state;
+    }),
 
   clearTaskOwners: () => set({ taskOwners: {} }),
 
-  getTaskBackendId: (taskId) => {
+  getTaskBackendId: taskId => {
     if (!taskId) return null;
     const backendId = get().taskOwners[taskId]?.backendId ?? null;
     if (!backendId) return null;
     return resolveCanonicalBackendId(backendId, resolveLocalBackendId() ?? backendId);
   },
 
-  getTaskProjectId: (taskId) => {
+  getTaskProjectId: taskId => {
     if (!taskId) return null;
     return get().taskOwners[taskId]?.projectId ?? null;
   },

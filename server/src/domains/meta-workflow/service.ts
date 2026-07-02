@@ -32,7 +32,7 @@ const execFileP = promisify(execFile);
 async function collectGitContext(
   cwd: string,
   previousSha: string,
-  currentSha: string,
+  currentSha: string
 ): Promise<string> {
   const safe = async (args: string[]): Promise<string> => {
     try {
@@ -150,11 +150,13 @@ export class MetaWorkflowService {
 
     const validation = validatePhasesJson(run.phasesJson);
     if (!validation.ok) throw new Error('Run has invalid phasesJson');
-    const phaseDef = validation.doc.phases.find((p) => p.id === phaseId);
+    const phaseDef = validation.doc.phases.find(p => p.id === phaseId);
     if (!phaseDef) throw new Error(`Phase def not in phases.json: ${phaseId}`);
 
     const worktreePath = await this.opts.worktreeAllocator.acquire({
-      runId, phaseId, attempt: phase.attempt + 1,
+      runId,
+      phaseId,
+      attempt: phase.attempt + 1,
     });
     let result: PhaseExecutionResult;
     try {
@@ -184,7 +186,7 @@ export class MetaWorkflowService {
   private allPhasesDone(runId: string): boolean {
     const phases = this.phaseRepo.findByRun(runId);
     if (phases.length === 0) return false;
-    return phases.every((p) => p.status === 'done');
+    return phases.every(p => p.status === 'done');
   }
 
   // ── Reuse pool ──────────────────────────────────────────
@@ -206,12 +208,10 @@ export class MetaWorkflowService {
     const items = this.poolRepo.listActive(filters?.phaseType);
     const q = filters?.search?.trim().toLowerCase();
     if (!q) return items;
-    return items.filter((it) => {
-      const hay = [
-        it.description ?? '',
-        ...(it.tags ?? []),
-        it.entityId ?? '',
-      ].join(' ').toLowerCase();
+    return items.filter(it => {
+      const hay = [it.description ?? '', ...(it.tags ?? []), it.entityId ?? '']
+        .join(' ')
+        .toLowerCase();
       return hay.includes(q);
     });
   }
@@ -267,7 +267,7 @@ export class MetaWorkflowService {
 
   async evaluateImpact(
     runId: string,
-    phaseId: string,
+    phaseId: string
   ): Promise<{ kind: 'rerun' | 'ignore' | 'minor-fix'; reason: string }> {
     const phase = this.phaseRepo.findByRunAndPhaseId(runId, phaseId);
     if (!phase) throw new Error(`Phase not found: run=${runId} phase=${phaseId}`);
@@ -298,7 +298,8 @@ export class MetaWorkflowService {
     if (upstreamArtifacts.length < 2) {
       return {
         kind: 'rerun',
-        reason: 'Upstream has fewer than 2 artifact versions — no prior to compare against (static fallback).',
+        reason:
+          'Upstream has fewer than 2 artifact versions — no prior to compare against (static fallback).',
       };
     }
     const currentSha = upstreamArtifacts[0].commitSha ?? '(no commit)';
@@ -339,21 +340,23 @@ export class MetaWorkflowService {
     ].join('\n');
 
     let collected = '';
-    await new Promise<void>((resolve) => {
+    await new Promise<void>(resolve => {
       const timer = setTimeout(() => resolve(), 60_000);
-      this.opts.aiRunPort!.startVirtualRun({
-        input: prompt,
-        onMessage: (m) => {
-          if (m.content) collected += m.content;
-          if (m.kind === 'run_completed' || m.kind === 'completed' || m.kind === 'final') {
-            clearTimeout(timer);
-            resolve();
-          }
-        },
-      }).catch(() => {
-        clearTimeout(timer);
-        resolve();
-      });
+      this.opts
+        .aiRunPort!.startVirtualRun({
+          input: prompt,
+          onMessage: m => {
+            if (m.content) collected += m.content;
+            if (m.kind === 'run_completed' || m.kind === 'completed' || m.kind === 'final') {
+              clearTimeout(timer);
+              resolve();
+            }
+          },
+        })
+        .catch(() => {
+          clearTimeout(timer);
+          resolve();
+        });
     });
 
     // Try to extract JSON.
@@ -365,7 +368,10 @@ export class MetaWorkflowService {
       };
     }
     try {
-      const parsed = JSON.parse(match[0]) as { kind: 'rerun' | 'ignore' | 'minor-fix'; reason: string };
+      const parsed = JSON.parse(match[0]) as {
+        kind: 'rerun' | 'ignore' | 'minor-fix';
+        reason: string;
+      };
       if (typeof parsed.reason !== 'string' || parsed.reason.length === 0) {
         throw new Error('reason missing');
       }
@@ -394,8 +400,8 @@ export class MetaWorkflowService {
       visited.add(next);
       results.push(await this.rerunPhase(runId, next));
       const directDown = validation.doc.phases
-        .filter((p) => p.dependsOn.includes(next))
-        .map((p) => p.id);
+        .filter(p => p.dependsOn.includes(next))
+        .map(p => p.id);
       queue.push(...directDown);
     }
     return results;

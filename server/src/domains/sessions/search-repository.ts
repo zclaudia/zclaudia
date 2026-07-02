@@ -35,7 +35,7 @@ export class SessionSearchRepository {
 
   private buildSessionFilters(
     prefix: string,
-    query: SessionSearchQuery,
+    query: SessionSearchQuery
   ): { conditions: string[]; params: Array<string | number> } {
     const conditions: string[] = [];
     const params: Array<string | number> = [];
@@ -80,12 +80,14 @@ export class SessionSearchRepository {
       }
 
       const sessionFilters = this.buildSessionFilters('m', query);
-      conditions.push(...sessionFilters.conditions.map(condition =>
-        condition
-          .replace('m.session_id', 's.id')
-          .replace('m.project_id', 's.project_id')
-          .replace('m.created_at', 'm.created_at'),
-      ));
+      conditions.push(
+        ...sessionFilters.conditions.map(condition =>
+          condition
+            .replace('m.session_id', 's.id')
+            .replace('m.project_id', 's.project_id')
+            .replace('m.created_at', 'm.created_at')
+        )
+      );
       params.push(...sessionFilters.params);
 
       let orderBy = 'ORDER BY rank';
@@ -119,7 +121,7 @@ export class SessionSearchRepository {
         condition
           .replace('fr.session_id', 's.id')
           .replace('fr.project_id', 's.project_id')
-          .replace('fr.created_at', 'fr.created_at'),
+          .replace('fr.created_at', 'fr.created_at')
       );
       params.push(...sessionFilters.params);
 
@@ -155,7 +157,7 @@ export class SessionSearchRepository {
         condition
           .replace('tc.session_id', 's.id')
           .replace('tc.project_id', 's.project_id')
-          .replace('tc.created_at', 'tc.created_at'),
+          .replace('tc.created_at', 'tc.created_at')
       );
       params.push(...sessionFilters.params);
 

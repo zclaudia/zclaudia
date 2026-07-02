@@ -18,23 +18,24 @@ import type { InteractionPromptMessage } from '@zclaudia/shared';
 
 function resolveOwnerBackendId(backendId: string | null, serverId: string): string {
   const rawBackendId = backendId || parseBackendId(serverId) || serverId;
-  return resolveCanonicalBackendId(rawBackendId, resolveLocalBackendId() ?? rawBackendId) ?? rawBackendId;
+  return (
+    resolveCanonicalBackendId(rawBackendId, resolveLocalBackendId() ?? rawBackendId) ?? rawBackendId
+  );
 }
 
-function buildProviderPromptInteraction(
-  prompt: {
-    requestId: string;
-    sessionId: string;
-    questions: import('@zclaudia/shared').AskUserQuestionItem[];
-  },
-): InteractionPromptMessage {
+function buildProviderPromptInteraction(prompt: {
+  requestId: string;
+  sessionId: string;
+  questions: import('@zclaudia/shared').AskUserQuestionItem[];
+}): InteractionPromptMessage {
   return {
     type: 'interaction_prompt',
     interactionId: prompt.requestId,
     sessionId: prompt.sessionId,
     source: 'provider_native',
     createdAt: Date.now(),
-    title: Array.isArray(prompt.questions) && prompt.questions.length > 1 ? 'Questions' : 'Question',
+    title:
+      Array.isArray(prompt.questions) && prompt.questions.length > 1 ? 'Questions' : 'Question',
     fields: (prompt.questions || []).map((question, index) => {
       const promptQuestion = question as typeof question & {
         placeholder?: string;
@@ -46,7 +47,7 @@ function buildProviderPromptInteraction(
         label: question.question,
         description: question.header,
         type: question.multiSelect ? 'multiselect' : 'select',
-        options: (question.options || []).map((option) => ({
+        options: (question.options || []).map(option => ({
           value: option.label,
           label: option.label,
           description: option.description,
@@ -65,7 +66,10 @@ function buildProviderPromptInteraction(
 
 export interface HeartbeatState {
   entityVersions: Map<string, { projects: number; plugins: number }>;
-  projectFetchInFlight: Map<string, { version: number; generation: number; promise: Promise<void> }>;
+  projectFetchInFlight: Map<
+    string,
+    { version: number; generation: number; promise: Promise<void> }
+  >;
   serverSyncGenerations: Map<string, number>;
   terminalRunSeqByRun: Map<string, { seq?: number; endedAt: number }>;
   TERMINAL_RUN_TOMBSTONE_MS: number;
@@ -92,14 +96,15 @@ function shouldIgnoreHeartbeatRun(state: HeartbeatState, runId: string, lastSeq?
 
 function reconcileStaleBackgroundRunTasks(
   serverId: string,
-  activeBackgroundSessionIds: Set<string>,
+  activeBackgroundSessionIds: Set<string>
 ): void {
   const backgroundTaskStore = useBackgroundTaskStore.getState();
   const now = Date.now();
 
   for (const task of Object.values(backgroundTaskStore.tasks) as any[]) {
     if (task.serverId && task.serverId !== serverId) continue;
-    if (task.status !== 'started' && task.status !== 'in_progress' && task.status !== 'paused') continue;
+    if (task.status !== 'started' && task.status !== 'in_progress' && task.status !== 'paused')
+      continue;
 
     let backgroundSessionId: string | null = null;
     if (task.source === 'background_run' && task.id.startsWith('background:')) {
@@ -124,7 +129,7 @@ function reconcileStaleBackgroundRunTasks(
 export function handleHeartbeat(
   heartbeat: StateHeartbeatMessage,
   ctx: MessageHandlerContext,
-  state: HeartbeatState,
+  state: HeartbeatState
 ): void {
   const { serverId, backendId, serverRunsRef, logTag } = ctx;
   const backendName = ctx.resolveBackendName();
@@ -135,20 +140,22 @@ export function handleHeartbeat(
 
   const serverActiveRunIds = new Set(heartbeat.activeRuns.map(r => r.runId));
   const activeBackgroundSessionIds = new Set(
-    heartbeat.activeRuns
-      .filter(r => r.sessionType === 'background')
-      .map(r => r.sessionId)
+    heartbeat.activeRuns.filter(r => r.sessionType === 'background').map(r => r.sessionId)
   );
 
   // Add missing runs
   for (const run of heartbeat.activeRuns) {
     if (!chatState.activeRuns[run.runId]) {
       if (shouldIgnoreHeartbeatRun(state, run.runId, run.lastSeq)) {
-        console.log(`[${logTag}] Ignoring stale heartbeat resurrection for run ${run.runId} lastSeq=${run.lastSeq ?? 'none'}`);
+        console.log(
+          `[${logTag}] Ignoring stale heartbeat resurrection for run ${run.runId} lastSeq=${run.lastSeq ?? 'none'}`
+        );
         continue;
       }
       const isBackground = run.sessionType === 'background';
-      console.log(`[${logTag}] Heartbeat resurrecting run ${run.runId} sessionId=${run.sessionId} lastSeq=${run.lastSeq ?? 'none'}`);
+      console.log(
+        `[${logTag}] Heartbeat resurrecting run ${run.runId} sessionId=${run.sessionId} lastSeq=${run.lastSeq ?? 'none'}`
+      );
       chatState.startRun(run.runId, run.sessionId, isBackground);
       if (!isBackground) {
         if (!serverRunsRef.has(serverId)) {
@@ -173,11 +180,9 @@ export function handleHeartbeat(
           usePromptRequestStore.getState().clearRequestsForSession(sessionId);
           useInteractionStore.getState().clearSession(sessionId);
           useProjectStore.getState().setSessionActive(sessionId, false);
-          useSessionsStore.getState().setSessionActiveFlag(
-            getSessionBucketKeyForBackend(backendId),
-            sessionId,
-            false
-          );
+          useSessionsStore
+            .getState()
+            .setSessionActiveFlag(getSessionBucketKeyForBackend(backendId), sessionId, false);
           void eagerSyncCurrentSession(serverId);
           void recoverCurrentSessionTail(serverId, sessionId);
         }
@@ -234,23 +239,23 @@ export function handleHeartbeat(
       });
     }
     if (!(useInteractionStore.getState().has?.(q.requestId) ?? false)) {
-      useInteractionStore.getState().upsertInteraction(buildProviderPromptInteraction({
-        requestId: q.requestId,
-        sessionId: q.sessionId,
-        questions: q.questions,
-      }));
+      useInteractionStore.getState().upsertInteraction(
+        buildProviderPromptInteraction({
+          requestId: q.requestId,
+          sessionId: q.sessionId,
+          questions: q.questions,
+        })
+      );
     }
   }
 
   // Reconcile active sessions
   const activeSessionIds = new Set<string>(
-    heartbeat.activeRuns
-      .filter(r => r.sessionType !== 'background')
-      .map(r => r.sessionId)
+    heartbeat.activeRuns.filter(r => r.sessionType !== 'background').map(r => r.sessionId)
   );
   useSessionRunStateStore.getState().reconcileBackendActiveRuns({
     backendId,
-    activeRuns: heartbeat.activeRuns.map((run) => ({
+    activeRuns: heartbeat.activeRuns.map(run => ({
       runId: run.runId,
       sessionId: run.sessionId,
       sessionType: run.sessionType,
@@ -261,23 +266,28 @@ export function handleHeartbeat(
   if (backendId) {
     useSessionsStore.getState().reconcileActiveStatus(backendId, activeSessionIds);
   } else {
-    useSessionsStore.getState().setActiveSessionsForBackend(getSessionBucketKeyForBackend(backendId), activeSessionIds);
+    useSessionsStore
+      .getState()
+      .setActiveSessionsForBackend(getSessionBucketKeyForBackend(backendId), activeSessionIds);
   }
 
   // Sync feed unread count
   if (heartbeat.unreadFeedCount !== undefined) {
     import('../../stores/notificationFeedStore').then(m => {
       const store = m.useNotificationFeedStore.getState();
-      const derivedUnreadCount = store.items.reduce((count, item) => count + (item.readAt ? 0 : 1), 0);
-      const nextUnreadCount = store.hydrated && !store.hasMore
-        ? derivedUnreadCount
-        : heartbeat.unreadFeedCount!;
-      const nextUnreadCountsByTab = store.hydrated && !store.hasMore
-        ? store.unreadCountsByTab
-        : (heartbeat.unreadFeedCountsByTab ?? store.unreadCountsByTab);
+      const derivedUnreadCount = store.items.reduce(
+        (count, item) => count + (item.readAt ? 0 : 1),
+        0
+      );
+      const nextUnreadCount =
+        store.hydrated && !store.hasMore ? derivedUnreadCount : heartbeat.unreadFeedCount!;
+      const nextUnreadCountsByTab =
+        store.hydrated && !store.hasMore
+          ? store.unreadCountsByTab
+          : (heartbeat.unreadFeedCountsByTab ?? store.unreadCountsByTab);
       if (
-        store.unreadCount !== nextUnreadCount
-        || store.unreadCountsByTab !== nextUnreadCountsByTab
+        store.unreadCount !== nextUnreadCount ||
+        store.unreadCountsByTab !== nextUnreadCountsByTab
       ) {
         m.useNotificationFeedStore.setState({
           unreadCount: nextUnreadCount,
@@ -299,15 +309,15 @@ export function handleHeartbeat(
         console.log(`[${logTag}] Projects version ${cached.projects} → ${targetVersion}, fetching`);
         const ownerBackendId = resolveOwnerBackendId(backendId, serverId);
         const fetchPromise = getProjectsForBackend(backendId ?? null)
-          .then((projects) => {
+          .then(projects => {
             const current = state.projectFetchInFlight.get(serverId);
             const latestKnownVersion = state.entityVersions.get(serverId)?.projects ?? 0;
             const latestGeneration = state.serverSyncGenerations.get(serverId) ?? 0;
             if (
-              current?.version !== targetVersion
-              || current.generation !== generation
-              || latestKnownVersion > targetVersion
-              || latestGeneration !== generation
+              current?.version !== targetVersion ||
+              current.generation !== generation ||
+              latestKnownVersion > targetVersion ||
+              latestGeneration !== generation
             ) {
               return;
             }
@@ -325,7 +335,11 @@ export function handleHeartbeat(
             }
             console.error(`[${logTag}] Project fetch failed:`, err);
           });
-        state.projectFetchInFlight.set(serverId, { version: targetVersion, generation, promise: fetchPromise });
+        state.projectFetchInFlight.set(serverId, {
+          version: targetVersion,
+          generation,
+          promise: fetchPromise,
+        });
       }
     }
 

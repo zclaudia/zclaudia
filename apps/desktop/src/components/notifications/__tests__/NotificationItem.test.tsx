@@ -88,7 +88,9 @@ describe('NotificationItem — onAfterSelect', () => {
 
   it('does NOT fire onAfterSelect when there is no session to navigate to', () => {
     const onAfterSelect = vi.fn();
-    render(<NotificationItem item={makeItem({ sessionId: undefined })} onAfterSelect={onAfterSelect} />);
+    render(
+      <NotificationItem item={makeItem({ sessionId: undefined })} onAfterSelect={onAfterSelect} />
+    );
     fireEvent.click(screen.getByText('Task done'));
     expect(onAfterSelect).not.toHaveBeenCalled();
   });

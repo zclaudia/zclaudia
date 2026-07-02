@@ -30,20 +30,16 @@ const BLOCK_FILE_NAMES = new Set([
   'known_hosts',
 ]);
 
-const BLOCK_EXTENSIONS = new Set([
-  '.pem',
-  '.key',
-  '.p12',
-  '.pfx',
-  '.crt',
-  '.der',
-]);
+const BLOCK_EXTENSIONS = new Set(['.pem', '.key', '.p12', '.pfx', '.crt', '.der']);
 
 const BLOCK_TEXT_PATTERNS: Array<{ pattern: RegExp; reason: string }> = [
   { pattern: /\bprintenv\b/i, reason: 'Command accesses full environment variables' },
   { pattern: /\benv\b(?![A-Za-z0-9_-])/i, reason: 'Command accesses full environment variables' },
   { pattern: /\bset\b(?![A-Za-z0-9_-])/i, reason: 'Command may print shell variables' },
-  { pattern: /\bcat\s+['"]?(?:\.env(?:\.[^'"\\/\s]+)?|~\/\.ssh\/|~\/\.aws\/)/i, reason: 'Command reads a known sensitive file' },
+  {
+    pattern: /\bcat\s+['"]?(?:\.env(?:\.[^'"\\/\s]+)?|~\/\.ssh\/|~\/\.aws\/)/i,
+    reason: 'Command reads a known sensitive file',
+  },
 ];
 
 const REDACTION_PATTERNS: Array<{ pattern: RegExp; replacement: string; label: string }> = [
@@ -83,7 +79,8 @@ const REDACTION_PATTERNS: Array<{ pattern: RegExp; replacement: string; label: s
     label: 'query_secret',
   },
   {
-    pattern: /(["']?(?:api[_-]?key|token|secret|password|client_secret|access_token)["']?\s*[:=]\s*["']?)[^"'\n\r\s]+/gi,
+    pattern:
+      /(["']?(?:api[_-]?key|token|secret|password|client_secret|access_token)["']?\s*[:=]\s*["']?)[^"'\n\r\s]+/gi,
     replacement: '$1[REDACTED_SECRET]',
     label: 'named_secret',
   },
@@ -105,7 +102,7 @@ export function isBlockedReviewPath(filePath: string): boolean {
   const extension = extname(normalized).toLowerCase();
   if (BLOCK_FILE_NAMES.has(fileName) || fileName.startsWith('.env.')) return true;
   if (BLOCK_EXTENSIONS.has(extension)) return true;
-  return BLOCK_PATH_SEGMENTS.some((segment) => normalized.includes(segment));
+  return BLOCK_PATH_SEGMENTS.some(segment => normalized.includes(segment));
 }
 
 function collectBlockReasons(text: string): string[] {
@@ -147,7 +144,10 @@ export function guardReviewText(text: string): ReviewPayloadGuardResult {
   };
 }
 
-export function guardReviewFileContent(filePath: string, content: string): ReviewPayloadGuardResult {
+export function guardReviewFileContent(
+  filePath: string,
+  content: string
+): ReviewPayloadGuardResult {
   if (isBlockedReviewPath(filePath)) {
     return {
       disposition: 'do_not_send',

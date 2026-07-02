@@ -1,7 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createAssistantMessageEventStream, type AssistantMessage, type AssistantMessageEvent } from '@earendil-works/pi-ai';
+import {
+  createAssistantMessageEventStream,
+  type AssistantMessage,
+  type AssistantMessageEvent,
+} from '@earendil-works/pi-ai';
 import type { StreamFn } from '@earendil-works/pi-agent-core';
-import { withStreamRetry, computeDelay, isRetryable, MAX_ATTEMPTS, MAX_DELAY_MS } from '../retry-stream.js';
+import {
+  withStreamRetry,
+  computeDelay,
+  isRetryable,
+  MAX_ATTEMPTS,
+  MAX_DELAY_MS,
+} from '../retry-stream.js';
 
 const am = (over: Partial<AssistantMessage> = {}): AssistantMessage =>
   ({ role: 'assistant', content: [], stopReason: 'stop', ...over }) as unknown as AssistantMessage;
@@ -26,7 +36,11 @@ function scriptedStream(scripts: AttemptScript[]): { fn: StreamFn; calls: number
     i += 1;
     const stream = createAssistantMessageEventStream();
     void (async () => {
-      if (script.response) await opts?.onResponse?.({ status: script.response.status, headers: script.response.headers ?? {} }, _m as never);
+      if (script.response)
+        await opts?.onResponse?.(
+          { status: script.response.status, headers: script.response.headers ?? {} },
+          _m as never
+        );
       for (const ev of script.events) stream.push(ev);
       stream.end();
     })();
@@ -35,7 +49,9 @@ function scriptedStream(scripts: AttemptScript[]): { fn: StreamFn; calls: number
   return { fn, calls };
 }
 
-async function collect(stream: AsyncIterable<AssistantMessageEvent>): Promise<AssistantMessageEvent[]> {
+async function collect(
+  stream: AsyncIterable<AssistantMessageEvent>
+): Promise<AssistantMessageEvent[]> {
   const out: AssistantMessageEvent[] = [];
   for await (const ev of stream) out.push(ev);
   return out;
@@ -72,7 +88,12 @@ describe('withStreamRetry', () => {
     expect(events.map(e => e.type)).toEqual(['start', 'text_start', 'done']);
     expect(calls.length).toBe(2);
     expect(onRetry).toHaveBeenCalledTimes(1);
-    expect(onRetry).toHaveBeenCalledWith({ attempt: 2, maxAttempts: MAX_ATTEMPTS, delayMs: 1000, status: 429 });
+    expect(onRetry).toHaveBeenCalledWith({
+      attempt: 2,
+      maxAttempts: MAX_ATTEMPTS,
+      delayMs: 1000,
+      status: 429,
+    });
   });
 
   it('does not retry once content has been forwarded', async () => {
@@ -115,9 +136,7 @@ describe('withStreamRetry', () => {
 
   it('gives up after MAX_ATTEMPTS with onRetry fired MAX_ATTEMPTS-1 times', async () => {
     const onRetry = vi.fn();
-    const { fn, calls } = scriptedStream([
-      { response: { status: 529 }, events: [START, ERR()] },
-    ]);
+    const { fn, calls } = scriptedStream([{ response: { status: 529 }, events: [START, ERR()] }]);
 
     const wrapped = withStreamRetry(fn, { onRetry });
     const resultStream = wrapped({} as never, { messages: [] }, undefined);
@@ -149,7 +168,12 @@ describe('withStreamRetry', () => {
     await vi.advanceTimersByTimeAsync(0);
 
     // onRetry should have been called with delayMs 30_000
-    expect(onRetry).toHaveBeenCalledWith({ attempt: 2, maxAttempts: MAX_ATTEMPTS, delayMs: 30_000, status: 429 });
+    expect(onRetry).toHaveBeenCalledWith({
+      attempt: 2,
+      maxAttempts: MAX_ATTEMPTS,
+      delayMs: 30_000,
+      status: 429,
+    });
 
     // Advance to just before the delay expires — stream not done yet
     await vi.advanceTimersByTimeAsync(29_999);
@@ -163,9 +187,7 @@ describe('withStreamRetry', () => {
 
   it('does not retry non-retryable statuses (401)', async () => {
     const onRetry = vi.fn();
-    const { fn, calls } = scriptedStream([
-      { response: { status: 401 }, events: [START, ERR()] },
-    ]);
+    const { fn, calls } = scriptedStream([{ response: { status: 401 }, events: [START, ERR()] }]);
 
     const wrapped = withStreamRetry(fn, { onRetry });
     const resultStream = wrapped({} as never, { messages: [] }, undefined);
@@ -182,7 +204,7 @@ describe('withStreamRetry', () => {
   it('treats missing onResponse (connection failure) as retryable with status undefined', async () => {
     const onRetry = vi.fn();
     const { fn } = scriptedStream([
-      { events: [ERR()] },  // no response callback fired
+      { events: [ERR()] }, // no response callback fired
       { response: { status: 200 }, events: [START, TEXT, DONE] },
     ]);
 
@@ -200,9 +222,7 @@ describe('withStreamRetry', () => {
 
   it('abort during backoff emits a synthetic aborted error immediately', async () => {
     const ac = new AbortController();
-    const { fn } = scriptedStream([
-      { response: { status: 429 }, events: [START, ERR()] },
-    ]);
+    const { fn } = scriptedStream([{ response: { status: 429 }, events: [START, ERR()] }]);
 
     const wrapped = withStreamRetry(fn, {});
     const resultStream = wrapped({} as never, { messages: [] }, { signal: ac.signal });
@@ -224,9 +244,7 @@ describe('withStreamRetry', () => {
 
   it('chains the caller-provided onResponse', async () => {
     const callerOnResponse = vi.fn();
-    const { fn } = scriptedStream([
-      { response: { status: 200 }, events: [START, TEXT, DONE] },
-    ]);
+    const { fn } = scriptedStream([{ response: { status: 200 }, events: [START, TEXT, DONE] }]);
 
     const wrapped = withStreamRetry(fn, {});
     const resultStream = wrapped({} as never, { messages: [] }, { onResponse: callerOnResponse });
@@ -238,17 +256,23 @@ describe('withStreamRetry', () => {
     expect(callerOnResponse).toHaveBeenCalledTimes(1);
     expect(callerOnResponse).toHaveBeenCalledWith(
       expect.objectContaining({ status: 200 }),
-      expect.anything(),
+      expect.anything()
     );
   });
 
   it('surfaces a synthetic error instead of crashing when caller onResponse throws', async () => {
     const { fn } = scriptedStream([{ response: { status: 200 }, events: [START, TEXT, DONE] }]);
-    const events = await collect(await withStreamRetry(fn)({} as never, {} as never, {
-      onResponse: () => { throw new Error('caller boom'); },
-    }));
-    expect(events.map((e) => e.type)).toEqual(['error']);
-    expect((events[0] as { error: { errorMessage?: string } }).error.errorMessage).toContain('caller boom');
+    const events = await collect(
+      await withStreamRetry(fn)({} as never, {} as never, {
+        onResponse: () => {
+          throw new Error('caller boom');
+        },
+      })
+    );
+    expect(events.map(e => e.type)).toEqual(['error']);
+    expect((events[0] as { error: { errorMessage?: string } }).error.errorMessage).toContain(
+      'caller boom'
+    );
   });
 });
 

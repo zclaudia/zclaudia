@@ -6,11 +6,11 @@ export type ParsedJsonOutput =
 
 export function createObjectJsonContract(
   schema: Record<string, unknown>,
-  repairAttempts = 1,
+  repairAttempts = 1
 ): JsonOutputContract {
   if (schema.type !== 'object') {
     throw new Error(
-      "createObjectJsonContract expects an object schema root; schema.type must be 'object'",
+      "createObjectJsonContract expects an object schema root; schema.type must be 'object'"
     );
   }
 
@@ -50,13 +50,14 @@ export function parseJsonOutput(text: string, contract: JsonOutputContract): Par
 }
 
 export function buildJsonContractPrompt(input: string, contract: JsonOutputContract): string {
-  return [
-    input,
-    buildJsonContractInstruction(contract),
-  ].filter(Boolean).join('\n\n');
+  return [input, buildJsonContractInstruction(contract)].filter(Boolean).join('\n\n');
 }
 
-export function buildJsonRepairPrompt(previousOutput: string, errors: string[], contract: JsonOutputContract): string {
+export function buildJsonRepairPrompt(
+  previousOutput: string,
+  errors: string[],
+  contract: JsonOutputContract
+): string {
   return [
     buildJsonContractInstruction(contract),
     `The previous output failed validation: ${errors.join('; ')}`,
@@ -97,7 +98,11 @@ function extractJsonObject(text: string): string | undefined {
   return undefined;
 }
 
-function validateSchemaSubset(value: unknown, schema: Record<string, unknown>, path: string): string[] {
+function validateSchemaSubset(
+  value: unknown,
+  schema: Record<string, unknown>,
+  path: string
+): string[] {
   const errors: string[] = [];
   const expectedType = schema.type;
 

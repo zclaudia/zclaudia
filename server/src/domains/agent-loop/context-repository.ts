@@ -27,7 +27,7 @@ export interface ResolvedAgentLoopContext {
 export class AgentLoopContextRepository {
   constructor(
     private readonly db: Database.Database,
-    private readonly deps: ClockDeps = {},
+    private readonly deps: ClockDeps = {}
   ) {}
 
   resolveContextForRun(args: ResolveAgentLoopContextArgs): ResolvedAgentLoopContext {
@@ -59,10 +59,12 @@ export class AgentLoopContextRepository {
         `
       INSERT INTO agent_loop_events (id, context_id, kind, payload, created_at)
       VALUES (?, ?, ?, ?, ?)
-    `,
+    `
       )
       .run(event.id, event.contextId, event.kind, JSON.stringify(event.payload), event.createdAt);
-    this.db.prepare('UPDATE agent_loop_contexts SET updated_at = ? WHERE id = ?').run(now, args.contextId);
+    this.db
+      .prepare('UPDATE agent_loop_contexts SET updated_at = ? WHERE id = ?')
+      .run(now, args.contextId);
     return event;
   }
 
@@ -79,7 +81,7 @@ export class AgentLoopContextRepository {
         LIMIT ?
       )
       ORDER BY created_at ASC, event_rowid ASC
-    `,
+    `
       )
       .all(contextId, limit) as Array<{
       id: string;
@@ -88,7 +90,7 @@ export class AgentLoopContextRepository {
       payload: string;
       created_at: number;
     }>;
-    return rows.map((row) => ({
+    return rows.map(row => ({
       id: row.id,
       contextId: row.context_id,
       kind: row.kind,
@@ -104,20 +106,28 @@ export class AgentLoopContextRepository {
     return `trace:none:${newId()}`;
   }
 
-  private findContext(ownerType: string, ownerId: string, contextKey: string): AgentLoopContext | undefined {
+  private findContext(
+    ownerType: string,
+    ownerId: string,
+    contextKey: string
+  ): AgentLoopContext | undefined {
     const row = this.db
       .prepare(
         `
       SELECT id, owner_type, owner_id, context_key, policy, summary, created_at, updated_at
       FROM agent_loop_contexts
       WHERE owner_type = ? AND owner_id = ? AND context_key = ?
-    `,
+    `
       )
       .get(ownerType, ownerId, contextKey) as Record<string, unknown> | undefined;
     return row ? this.mapContext(row) : undefined;
   }
 
-  private createContext(owner: AgentLoopOwner, policy: AgentLoopContextPolicy, contextKey: string): AgentLoopContext {
+  private createContext(
+    owner: AgentLoopOwner,
+    policy: AgentLoopContextPolicy,
+    contextKey: string
+  ): AgentLoopContext {
     const now = this.now();
     const context: AgentLoopContext = {
       id: newId(),
@@ -133,7 +143,7 @@ export class AgentLoopContextRepository {
         `
       INSERT INTO agent_loop_contexts (id, owner_type, owner_id, context_key, policy, summary, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `,
+    `
       )
       .run(
         context.id,
@@ -143,7 +153,7 @@ export class AgentLoopContextRepository {
         context.policy,
         null,
         now,
-        now,
+        now
       );
     return context;
   }

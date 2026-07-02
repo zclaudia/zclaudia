@@ -3,7 +3,10 @@ import { parseMessageInput } from '../message-input.js';
 
 describe('parseMessageInput', () => {
   it('parses the {text, attachments} envelope', () => {
-    const raw = JSON.stringify({ text: 'look at this', attachments: [{ fileId: 'f1', name: 'a.png', mimeType: 'image/png', type: 'image' }] });
+    const raw = JSON.stringify({
+      text: 'look at this',
+      attachments: [{ fileId: 'f1', name: 'a.png', mimeType: 'image/png', type: 'image' }],
+    });
     expect(parseMessageInput(raw)).toEqual({
       text: 'look at this',
       attachments: [{ fileId: 'f1', name: 'a.png', mimeType: 'image/png', type: 'image' }],
@@ -20,7 +23,14 @@ describe('parseMessageInput', () => {
   });
 
   it('drops malformed attachment entries', () => {
-    const raw = JSON.stringify({ text: 't', attachments: [{ fileId: 'f1', name: 'a.png', mimeType: 'image/png', type: 'image' }, { junk: true }, null] });
+    const raw = JSON.stringify({
+      text: 't',
+      attachments: [
+        { fileId: 'f1', name: 'a.png', mimeType: 'image/png', type: 'image' },
+        { junk: true },
+        null,
+      ],
+    });
     expect(parseMessageInput(raw).attachments).toHaveLength(1);
   });
 

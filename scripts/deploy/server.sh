@@ -36,6 +36,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 ENV_FILE="$DATA_DIR/.env"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+PACKAGE_MANAGER=""
 
 VERSION_FILE="$DATA_DIR/.version"
 
@@ -67,20 +68,29 @@ echo ""
 
 # ── Resolve paths ─────────────────────────────────────────────
 NODE_BIN="$(command -v node 2>/dev/null)" || die "node not found"
-PNPM_BIN="$(command -v pnpm 2>/dev/null)" || die "pnpm not found"
 NODE_DIR="$(dirname "$NODE_BIN")"
+PACKAGE_MANAGER="$(node -e 'console.log(require(process.argv[1]).packageManager)' "$PROJECT_ROOT/package.json")"
+corepack enable
+corepack prepare "$PACKAGE_MANAGER" --activate
 
 # ── 1. Install deps ──────────────────────────────────────────
 info "Installing dependencies..."
 cd "$PROJECT_ROOT"
-pnpm install --frozen-lockfile 2>/dev/null || pnpm install
+if ! corepack pnpm install --frozen-lockfile; then
+  if [[ "${ZCLAUDIA_DEPLOY_REPAIR_INSTALL:-0}" == "1" ]]; then
+    echo -e "${YELLOW}▸ Frozen install failed; running mutable install because ZCLAUDIA_DEPLOY_REPAIR_INSTALL=1${NC}"
+    corepack pnpm install
+  else
+    die "Frozen install failed. Fix pnpm-lock.yaml or rerun with ZCLAUDIA_DEPLOY_REPAIR_INSTALL=1 to repair dependencies."
+  fi
+fi
 ok "Dependencies installed"
 
 # ── 2. Build ──────────────────────────────────────────────────
 info "Building shared..."
-pnpm --filter @zclaudia/shared run build
+corepack pnpm --filter @zclaudia/shared run build
 info "Building server..."
-pnpm --filter @zclaudia/server run build
+corepack pnpm --filter @zclaudia/server run build
 ok "Build complete"
 
 # ── 3. Ensure ~/.zclaudia/.env ──────────────────────────────

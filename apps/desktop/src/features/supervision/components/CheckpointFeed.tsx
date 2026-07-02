@@ -11,26 +11,34 @@ interface CheckpointFeedProps {
 export function CheckpointFeed({ projectId }: CheckpointFeedProps) {
   const [logs, setLogs] = useState<SupervisionLog[]>([]);
   const [loading, setLoading] = useState(false);
-  const lastCheckpoint = useSupervisionStore((s) => s.lastCheckpoint[projectId]);
+  const lastCheckpoint = useSupervisionStore(s => s.lastCheckpoint[projectId]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    api.getSupervisionLogs(projectId, 50)
-      .then((data) => {
+    api
+      .getSupervisionLogs(projectId, 50)
+      .then(data => {
         if (!cancelled) {
           // Filter for checkpoint-related events
-          const checkpointLogs = data.filter((l) =>
-            l.event === 'checkpoint_completed' ||
-            l.event === 'context_updated' ||
-            l.event === 'task_created',
+          const checkpointLogs = data.filter(
+            l =>
+              l.event === 'checkpoint_completed' ||
+              l.event === 'context_updated' ||
+              l.event === 'task_created'
           );
           setLogs(checkpointLogs);
         }
       })
-      .catch(() => { /* ignore */ })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .catch(() => {
+        /* ignore */
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [projectId]);
 
   const formatTime = (ts: number) => {
@@ -65,14 +73,15 @@ export function CheckpointFeed({ projectId }: CheckpointFeedProps) {
           </div>
         ) : (
           <div className="px-3 py-1">
-            {logs.map((log) => (
-              <div key={log.id} className="flex items-start gap-2 py-1.5 border-b border-border/30 last:border-0">
+            {logs.map(log => (
+              <div
+                key={log.id}
+                className="flex items-start gap-2 py-1.5 border-b border-border/30 last:border-0"
+              >
                 <Clock size={10} className="text-muted-foreground mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-medium">
-                      {formatEventLabel(log.event)}
-                    </span>
+                    <span className="text-xs font-medium">{formatEventLabel(log.event)}</span>
                     <span className="text-[10px] text-muted-foreground">
                       {formatDate(log.createdAt)} {formatTime(log.createdAt)}
                     </span>

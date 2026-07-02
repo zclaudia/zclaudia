@@ -16,7 +16,7 @@ import { apiCall, apiCallVoid } from './unwrap';
 export async function initSupervisionAgent(
   projectId: string,
   config?: Partial<SupervisorConfig>,
-  mode?: AgentMode,
+  mode?: AgentMode
 ): Promise<ProjectAgent> {
   return apiCall<ProjectAgent>(`/api/projects/${projectId}/agent/init`, {
     method: 'POST',
@@ -35,7 +35,7 @@ export async function getSupervisionAgent(projectId: string): Promise<ProjectAge
 
 export async function updateSupervisionAgentAction(
   projectId: string,
-  action: 'pause' | 'resume' | 'archive' | 'approve_setup',
+  action: 'pause' | 'resume' | 'archive' | 'approve_setup'
 ): Promise<ProjectAgent> {
   return apiCall<ProjectAgent>(`/api/projects/${projectId}/agent/action`, {
     method: 'POST',
@@ -45,7 +45,7 @@ export async function updateSupervisionAgentAction(
 
 export async function getSupervisionTasks(
   projectId: string,
-  changeId?: string,
+  changeId?: string
 ): Promise<SupervisionTask[]> {
   const params = changeId ? `?changeId=${encodeURIComponent(changeId)}` : '';
   return apiCall<SupervisionTask[]>(`/api/projects/${projectId}/tasks${params}`);
@@ -73,7 +73,7 @@ export async function createProjectChange(
     nonGoals?: string[];
     scope?: string[];
     acceptanceCriteria?: string[];
-  },
+  }
 ): Promise<ProjectChange> {
   return apiCall<ProjectChange>(`/api/projects/${projectId}/changes`, {
     method: 'POST',
@@ -85,10 +85,7 @@ export async function getChangeExecutionPlan(changeId: string): Promise<ChangeEx
   return apiCall<ChangeExecutionPlan>(`/api/changes/${changeId}/execution`);
 }
 
-export async function requestDesignGate(
-  changeId: string,
-  notes?: string,
-): Promise<ProjectChange> {
+export async function requestDesignGate(changeId: string, notes?: string): Promise<ProjectChange> {
   return apiCall<ProjectChange>(`/api/changes/${changeId}/gates/design/request`, {
     method: 'POST',
     body: JSON.stringify({ notes }),
@@ -98,7 +95,7 @@ export async function requestDesignGate(
 export async function resolveDesignGate(
   changeId: string,
   decision: DesignGateDecision,
-  notes?: string,
+  notes?: string
 ): Promise<ProjectChange> {
   return apiCall<ProjectChange>(`/api/changes/${changeId}/gates/design/resolve`, {
     method: 'POST',
@@ -108,7 +105,7 @@ export async function resolveDesignGate(
 
 export async function requestExecutionGate(
   changeId: string,
-  notes?: string,
+  notes?: string
 ): Promise<ProjectChange> {
   return apiCall<ProjectChange>(`/api/changes/${changeId}/gates/execution/request`, {
     method: 'POST',
@@ -119,7 +116,7 @@ export async function requestExecutionGate(
 export async function resolveExecutionGate(
   changeId: string,
   decision: ExecutionGateDecision,
-  notes?: string,
+  notes?: string
 ): Promise<ProjectChange> {
   return apiCall<ProjectChange>(`/api/changes/${changeId}/gates/execution/resolve`, {
     method: 'POST',
@@ -129,7 +126,7 @@ export async function resolveExecutionGate(
 
 export async function requestChangeSync(
   changeId: string,
-  summary?: string,
+  summary?: string
 ): Promise<ProjectChange> {
   return apiCall<ProjectChange>(`/api/changes/${changeId}/sync/request`, {
     method: 'POST',
@@ -137,10 +134,7 @@ export async function requestChangeSync(
   });
 }
 
-export async function requestAcceptance(
-  changeId: string,
-  notes?: string,
-): Promise<ProjectChange> {
+export async function requestAcceptance(changeId: string, notes?: string): Promise<ProjectChange> {
   return apiCall<ProjectChange>(`/api/changes/${changeId}/acceptance/request`, {
     method: 'POST',
     body: JSON.stringify({ notes }),
@@ -150,7 +144,7 @@ export async function requestAcceptance(
 export async function resolveAcceptance(
   changeId: string,
   decision: AcceptanceDecision,
-  notes?: string,
+  notes?: string
 ): Promise<ProjectChange> {
   return apiCall<ProjectChange>(`/api/changes/${changeId}/acceptance/resolve`, {
     method: 'POST',
@@ -160,7 +154,7 @@ export async function resolveAcceptance(
 
 export async function completeProjectChange(
   changeId: string,
-  summary?: string,
+  summary?: string
 ): Promise<ProjectChange> {
   return apiCall<ProjectChange>(`/api/changes/${changeId}/complete`, {
     method: 'POST',
@@ -171,7 +165,7 @@ export async function completeProjectChange(
 export async function updateChangeDocument(
   changeId: string,
   docType: 'design' | 'execution' | 'tasks',
-  content: string,
+  content: string
 ): Promise<ProjectChange> {
   return apiCall<ProjectChange>(`/api/changes/${changeId}/docs/${docType}`, {
     method: 'PUT',
@@ -194,7 +188,7 @@ export async function createSupervisionTask(
     scheduleCron?: string;
     scheduleEnabled?: boolean;
     retryDelayMs?: number;
-  },
+  }
 ): Promise<SupervisionTask> {
   return apiCall<SupervisionTask>(`/api/projects/${projectId}/tasks`, {
     method: 'POST',
@@ -220,7 +214,9 @@ export async function getTaskPlanStatus(taskId: string): Promise<TaskPlanStatus>
   return apiCall<TaskPlanStatus>(`/api/tasks/${taskId}/plan-status`);
 }
 
-export async function submitTaskPlan(taskId: string): Promise<{ task: SupervisionTask; sessionId: string }> {
+export async function submitTaskPlan(
+  taskId: string
+): Promise<{ task: SupervisionTask; sessionId: string }> {
   return apiCall<{ task: SupervisionTask; sessionId: string }>(`/api/tasks/${taskId}/plan/submit`, {
     method: 'POST',
   });
@@ -228,10 +224,20 @@ export async function submitTaskPlan(taskId: string): Promise<{ task: Supervisio
 
 export async function updateSupervisionTask(
   taskId: string,
-  data: Partial<Pick<SupervisionTask,
-    'title' | 'description' | 'priority' | 'dependencies' | 'dependencyMode'
-    | 'acceptanceCriteria' | 'relevantDocIds' | 'scope' | 'taskSpecificContext'
-  >>,
+  data: Partial<
+    Pick<
+      SupervisionTask,
+      | 'title'
+      | 'description'
+      | 'priority'
+      | 'dependencies'
+      | 'dependencyMode'
+      | 'acceptanceCriteria'
+      | 'relevantDocIds'
+      | 'scope'
+      | 'taskSpecificContext'
+    >
+  >
 ): Promise<SupervisionTask> {
   return apiCall<SupervisionTask>(`/api/tasks/${taskId}`, {
     method: 'PUT',
@@ -253,7 +259,7 @@ export async function approveSupervisionTaskResult(taskId: string): Promise<Supe
 
 export async function rejectSupervisionTaskResult(
   taskId: string,
-  notes: string,
+  notes: string
 ): Promise<SupervisionTask> {
   return apiCall<SupervisionTask>(`/api/tasks/${taskId}/review/reject`, {
     method: 'POST',
@@ -291,13 +297,13 @@ export async function getSupervisionBudget(projectId: string): Promise<{
   remaining?: number;
 }> {
   return apiCall<{ usage: number; limit?: number; remaining?: number }>(
-    `/api/projects/${projectId}/budget`,
+    `/api/projects/${projectId}/budget`
   );
 }
 
 export async function getSupervisionLogs(
   projectId: string,
-  limit?: number,
+  limit?: number
 ): Promise<SupervisionLog[]> {
   const params = limit ? `?limit=${limit}` : '';
   return apiCall<SupervisionLog[]>(`/api/projects/${projectId}/logs${params}`);

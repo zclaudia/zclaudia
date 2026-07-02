@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, type Request, type Response } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -6,7 +6,11 @@ import type Database from 'better-sqlite3';
 import { parseCommandArgs, substituteArgs } from '@earendil-works/pi-agent-core';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
-import type { CommandExecuteRequest, CommandExecuteResponse, SlashCommand } from '@zclaudia/shared/features/commands';
+import type {
+  CommandExecuteRequest,
+  CommandExecuteResponse,
+  SlashCommand,
+} from '@zclaudia/shared/features/commands';
 import { LOCAL_COMMANDS } from '@zclaudia/shared/features/commands';
 import { commandRegistry, type CommandContext } from '../../application/commands/registry.js';
 import { ensureBuiltinCommandsRegistered } from '../../application/commands/init.js';
@@ -28,7 +32,10 @@ export interface CommandsRoutesDeps {
 }
 
 // Scan directory for custom command files (.md)
-async function scanCommandsDirectory(dir: string, namespace: 'project' | 'user'): Promise<SlashCommand[]> {
+async function scanCommandsDirectory(
+  dir: string,
+  namespace: 'project' | 'user'
+): Promise<SlashCommand[]> {
   const commands: SlashCommand[] = [];
 
   try {
@@ -61,7 +68,7 @@ async function scanCommandsDirectory(dir: string, namespace: 'project' | 'user')
             description,
             source: 'custom',
             scope: namespace === 'project' ? 'project' : 'global',
-            filePath: fullPath
+            filePath: fullPath,
           });
         } catch (err) {
           console.error(`Error parsing command file ${fullPath}:`, err);
@@ -124,14 +131,19 @@ export function createCommandsRoutes(deps?: CommandsRoutesDeps): Router {
           builtin: LOCAL_COMMANDS,
           custom: customCommands,
           plugin: pluginCommands,
-          count: LOCAL_COMMANDS.length + customCommands.length + pluginCommands.length
-        }
-      } as ApiResponse<{ builtin: SlashCommand[]; custom: SlashCommand[]; plugin: SlashCommand[]; count: number }>);
+          count: LOCAL_COMMANDS.length + customCommands.length + pluginCommands.length,
+        },
+      } as ApiResponse<{
+        builtin: SlashCommand[];
+        custom: SlashCommand[];
+        plugin: SlashCommand[];
+        count: number;
+      }>);
     } catch (error) {
       console.error('Error listing commands:', error);
       res.status(500).json({
         success: false,
-        error: { code: 'SERVER_ERROR', message: 'Failed to list commands' }
+        error: { code: 'SERVER_ERROR', message: 'Failed to list commands' },
       });
     }
   });
@@ -146,7 +158,7 @@ export function createCommandsRoutes(deps?: CommandsRoutesDeps): Router {
       if (!commandName) {
         res.status(400).json({
           success: false,
-          error: { code: 'VALIDATION_ERROR', message: 'commandName is required' }
+          error: { code: 'VALIDATION_ERROR', message: 'commandName is required' },
         });
         return;
       }
@@ -173,7 +185,10 @@ export function createCommandsRoutes(deps?: CommandsRoutesDeps): Router {
             } catch (err) {
               // Stale agent / no agent configured — leave enriched fields unset
               // so the handler can fail soft with a structured message.
-              console.warn(`[commands.execute] agent resolution failed for session ${context.sessionId}:`, err instanceof Error ? err.message : err);
+              console.warn(
+                `[commands.execute] agent resolution failed for session ${context.sessionId}:`,
+                err instanceof Error ? err.message : err
+              );
             }
           }
         }
@@ -187,7 +202,10 @@ export function createCommandsRoutes(deps?: CommandsRoutesDeps): Router {
       if (!commandPath) {
         res.status(400).json({
           success: false,
-          error: { code: 'VALIDATION_ERROR', message: 'commandPath is required for custom commands' }
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'commandPath is required for custom commands',
+          },
         });
         return;
       }
@@ -205,10 +223,19 @@ export function createCommandsRoutes(deps?: CommandsRoutesDeps): Router {
         return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
       };
 
-      if (!(isUnderBase(userBase) || isUnderBase(pluginsBase) || (projectBase && isUnderBase(projectBase)))) {
+      if (
+        !(
+          isUnderBase(userBase) ||
+          isUnderBase(pluginsBase) ||
+          (projectBase && isUnderBase(projectBase))
+        )
+      ) {
         res.status(403).json({
           success: false,
-          error: { code: 'FORBIDDEN', message: 'Command must be in .claude/commands or .claude/plugins directory' }
+          error: {
+            code: 'FORBIDDEN',
+            message: 'Command must be in .claude/commands or .claude/plugins directory',
+          },
         });
         return;
       }
@@ -217,7 +244,7 @@ export function createCommandsRoutes(deps?: CommandsRoutesDeps): Router {
       if (!fs.existsSync(commandPath)) {
         res.status(404).json({
           success: false,
-          error: { code: 'NOT_FOUND', message: `Command file not found: ${commandPath}` }
+          error: { code: 'NOT_FOUND', message: `Command file not found: ${commandPath}` },
         });
         return;
       }
@@ -229,7 +256,7 @@ export function createCommandsRoutes(deps?: CommandsRoutesDeps): Router {
       const result: CommandExecuteResponse = {
         type: 'custom',
         command: commandName,
-        content: processedContent
+        content: processedContent,
       };
 
       res.json({ success: true, data: result } as ApiResponse<CommandExecuteResponse>);
@@ -237,7 +264,7 @@ export function createCommandsRoutes(deps?: CommandsRoutesDeps): Router {
       console.error('Error executing command:', error);
       res.status(500).json({
         success: false,
-        error: { code: 'SERVER_ERROR', message: 'Failed to execute command' }
+        error: { code: 'SERVER_ERROR', message: 'Failed to execute command' },
       });
     }
   });

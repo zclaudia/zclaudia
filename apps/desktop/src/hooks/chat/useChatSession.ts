@@ -22,22 +22,24 @@ interface UseChatSessionParams {
 
 export function useChatSession({ sessionId, isConnected }: UseChatSessionParams) {
   // ── Session-scoped store selectors ──
-  const sessionMessages = useChatMessageStore((s) => s.messages[sessionId] || EMPTY_MESSAGES);
-  const sessionRunId = useRunStore((s) => s.getSessionRunId(sessionId));
-  const isSessionRunning = useRunStore((s) => {
-    return Object.values(s.activeRuns).some((sid) => sid === sessionId);
+  const sessionMessages = useChatMessageStore(s => s.messages[sessionId] || EMPTY_MESSAGES);
+  const sessionRunId = useRunStore(s => s.getSessionRunId(sessionId));
+  const isSessionRunning = useRunStore(s => {
+    return Object.values(s.activeRuns).some(sid => sid === sessionId);
   });
-  const isLoading = useRunStore((s) => {
+  const isLoading = useRunStore(s => {
     const { activeRuns, backgroundRunIds } = s;
-    return Object.entries(activeRuns).some(([runId, sid]) => sid === sessionId && !backgroundRunIds.has(runId));
+    return Object.entries(activeRuns).some(
+      ([runId, sid]) => sid === sessionId && !backgroundRunIds.has(runId)
+    );
   });
-  const sessionHealth = useRunStore((s) => s.getSessionHealth(sessionId));
-  const sessionRetryStatus = useRunStore((s) => {
+  const sessionHealth = useRunStore(s => s.getSessionHealth(sessionId));
+  const sessionRetryStatus = useRunStore(s => {
     const runId = s.getSessionRunId(sessionId);
     if (!runId) return null;
     return s.runRetryStatus[runId] || null;
   });
-  const sessionToolCallsRecord = useRunStore((s) => {
+  const sessionToolCallsRecord = useRunStore(s => {
     const runId = s.getSessionRunId(sessionId);
     if (!runId) return null;
     return s.activeToolCalls[runId] || null;
@@ -46,52 +48,56 @@ export function useChatSession({ sessionId, isConnected }: UseChatSessionParams)
     () => (sessionToolCallsRecord ? Object.values(sessionToolCallsRecord) : EMPTY_TOOL_CALLS),
     [sessionToolCallsRecord]
   );
-  const sessionContentBlocks = useRunStore((s) => {
+  const sessionContentBlocks = useRunStore(s => {
     const runId = s.getSessionRunId(sessionId);
     if (!runId) return EMPTY_CONTENT_BLOCKS;
     return s.runContentBlocks[runId] || EMPTY_CONTENT_BLOCKS;
   });
-  const sessionToolCallHistory = useRunStore((s) => {
+  const sessionToolCallHistory = useRunStore(s => {
     const runId = s.getSessionRunId(sessionId);
     if (!runId) return EMPTY_TOOL_CALLS;
     return s.toolCallsHistory[runId] || EMPTY_TOOL_CALLS;
   });
-  const currentUsage = useSessionConfigStore((s) => s.sessionUsage[sessionId] || null);
-  const currentSystemInfo = useSessionConfigStore((s) => s.systemInfoBySession[sessionId] || null);
+  const currentUsage = useSessionConfigStore(s => s.sessionUsage[sessionId] || null);
+  const currentSystemInfo = useSessionConfigStore(s => s.systemInfoBySession[sessionId] || null);
 
   // Store actions
-  const addMessage = useChatMessageStore((s) => s.addMessage);
-  const clearMessages = useChatMessageStore((s) => s.clearMessages);
-  const setMode = useSessionConfigStore((s) => s.setMode);
-  const selectedMode = useSessionConfigStore((s) => s.modeBySession[sessionId] ?? '');
-  const runtimeMode = useSessionConfigStore((s) => s.runtimeModes[sessionId] || '');
-  const permissionOverride = useSessionOverridesStore((s) => s.permissionOverrides[sessionId] ?? null);
-  const setPermissionOverride = useSessionOverridesStore((s) => s.setPermissionOverride);
+  const addMessage = useChatMessageStore(s => s.addMessage);
+  const clearMessages = useChatMessageStore(s => s.clearMessages);
+  const setMode = useSessionConfigStore(s => s.setMode);
+  const selectedMode = useSessionConfigStore(s => s.modeBySession[sessionId] ?? '');
+  const runtimeMode = useSessionConfigStore(s => s.runtimeModes[sessionId] || '');
+  const permissionOverride = useSessionOverridesStore(
+    s => s.permissionOverrides[sessionId] ?? null
+  );
+  const setPermissionOverride = useSessionOverridesStore(s => s.setPermissionOverride);
 
   // ── Derived values ──
-  const useStreamingSegmented = isLoading && sessionContentBlocks.length > 1 && sessionToolCallHistory.length > 0;
+  const useStreamingSegmented =
+    isLoading && sessionContentBlocks.length > 1 && sessionToolCallHistory.length > 0;
 
-  const lastSessionMessage = sessionMessages.length > 0 ? sessionMessages[sessionMessages.length - 1] : null;
-  const lastStreamingBlock = sessionContentBlocks.length > 0
-    ? sessionContentBlocks[sessionContentBlocks.length - 1]
-    : null;
+  const lastSessionMessage =
+    sessionMessages.length > 0 ? sessionMessages[sessionMessages.length - 1] : null;
+  const lastStreamingBlock =
+    sessionContentBlocks.length > 0 ? sessionContentBlocks[sessionContentBlocks.length - 1] : null;
   const streamingContentSignature = lastStreamingBlock
     ? `${lastStreamingBlock.type}:${lastStreamingBlock.type === 'text' ? lastStreamingBlock.content : 'toolUseId' in lastStreamingBlock ? lastStreamingBlock.toolUseId : ''}`
     : '';
 
   // ── Project store ──
-  const sessions = useProjectStore((s) => s.sessions);
-  const projects = useProjectStore((s) => s.projects);
-  const legacyProviders = useProjectStore((s) => s.providers);
-  const activeServerId = useServerStore((s) => s.activeServerId);
-  const scopedProviders = useLlmProfileMetaStore((s) => s.getProviders(activeServerId));
+  const sessions = useProjectStore(s => s.sessions);
+  const projects = useProjectStore(s => s.projects);
+  const legacyProviders = useProjectStore(s => s.providers);
+  const activeServerId = useServerStore(s => s.activeServerId);
+  const scopedProviders = useLlmProfileMetaStore(s => s.getProviders(activeServerId));
   const providers = scopedProviders.length > 0 ? scopedProviders : legacyProviders;
 
   const currentSession = sessions.find(s => s.id === sessionId);
   const currentProject = currentSession
-    ? projects.find(p => p.id === currentSession.projectId) ?? null
+    ? (projects.find(p => p.id === currentSession.projectId) ?? null)
     : null;
-  const isForcedPlanSession = currentSession?.projectRole === 'task' && currentSession?.planStatus === 'planning';
+  const isForcedPlanSession =
+    currentSession?.projectRole === 'task' && currentSession?.planStatus === 'planning';
   // `runtimeMode` reflects provider-side transient state within the current run
   // (for example, Claude calling EnterPlanMode mid-run). Backend mode_change
   // events now also sync to selectedMode (via setMode in messageHandler) so the
@@ -112,12 +118,15 @@ export function useChatSession({ sessionId, isConnected }: UseChatSessionParams)
     contextUsedTokens: undefined,
   };
   const fileReferenceRoot = currentSession?.workingDirectory || currentProject?.rootPath;
-  const fileReferenceBackendId = useOwnershipStore(
-    (s) => currentSession?.projectId ? s.getProjectBackendId(currentSession.projectId) : null,
+  const fileReferenceBackendId = useOwnershipStore(s =>
+    currentSession?.projectId ? s.getProjectBackendId(currentSession.projectId) : null
   );
 
   // ── Provider capabilities ──
-  const { llmProfileId, capabilities, commands, commandsCacheKey } = useProviderCapabilities({ sessionId, isConnected });
+  const { llmProfileId, capabilities, commands, commandsCacheKey } = useProviderCapabilities({
+    sessionId,
+    isConnected,
+  });
 
   return {
     // Messages & run state

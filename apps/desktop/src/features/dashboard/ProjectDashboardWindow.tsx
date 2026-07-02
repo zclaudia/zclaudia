@@ -60,7 +60,7 @@ export function ProjectDashboardWindow({
         } else {
           useProjectStore.getState().setProjects(projects);
         }
-        const nextProject = projects.find((item) => item.id === projectId) ?? null;
+        const nextProject = projects.find(item => item.id === projectId) ?? null;
         setProject(nextProject);
         if (!nextProject) {
           setError('Project not found');
@@ -80,19 +80,14 @@ export function ProjectDashboardWindow({
 
   return (
     <div className="flex h-dvh flex-col bg-background text-foreground safe-top-pad">
-      {serverName && (
-        <WindowContextBar serverName={serverName} projectId={projectId} />
-      )}
+      {serverName && <WindowContextBar serverName={serverName} projectId={projectId} />}
       <div className="min-h-0 flex-1">
         {error ? (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
             {error}
           </div>
         ) : project ? (
-          <ProjectDashboard
-            projectId={project.id}
-            projectRootPath={project.rootPath}
-          />
+          <ProjectDashboard projectId={project.id} projectRootPath={project.rootPath} />
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
             Loading dashboard...

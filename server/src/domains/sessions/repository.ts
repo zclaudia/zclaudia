@@ -50,7 +50,10 @@ export class SessionRepository extends BaseRepository<
       .run(autoTitle, autoTitleMsgCount, sessionId);
   }
 
-  createQuery(data: Omit<Session, 'id' | 'createdAt' | 'updatedAt'>): { sql: string; params: any[] } {
+  createQuery(data: Omit<Session, 'id' | 'createdAt' | 'updatedAt'>): {
+    sql: string;
+    params: any[];
+  } {
     const id = newId();
     const now = Date.now();
 
@@ -97,7 +100,10 @@ export class SessionRepository extends BaseRepository<
     };
   }
 
-  updateQuery(id: string, data: Partial<Omit<Session, 'id' | 'createdAt' | 'updatedAt'>>): { sql: string; params: any[] } {
+  updateQuery(
+    id: string,
+    data: Partial<Omit<Session, 'id' | 'createdAt' | 'updatedAt'>>
+  ): { sql: string; params: any[] } {
     const updates: string[] = [];
     const params: any[] = [];
 
@@ -169,35 +175,126 @@ export class SessionRepository extends BaseRepository<
   }
 
   findByProjectId(projectId: string): Session[] {
-    const rows = this.db.prepare(`
+    const rows = this.db
+      .prepare(
+        `
       SELECT * FROM sessions
       WHERE project_id = ?
       ORDER BY updated_at DESC
-    `).all(projectId);
+    `
+      )
+      .all(projectId);
     return rows.map(row => this.mapRow(row));
   }
 
   findByProjectRole(projectId: string, role: string): Session[] {
-    const rows = this.db.prepare(`
+    const rows = this.db
+      .prepare(
+        `
       SELECT * FROM sessions
       WHERE project_id = ? AND project_role = ?
       ORDER BY created_at DESC
-    `).all(projectId, role);
+    `
+      )
+      .all(projectId, role);
     return rows.map(row => this.mapRow(row));
   }
 
   findBySdkSessionId(sdkSessionId: string): Session | null {
-    const row = this.db.prepare(`
+    const row = this.db
+      .prepare(
+        `
       SELECT * FROM sessions
       WHERE sdk_session_id = ?
-    `).get(sdkSessionId);
+    `
+      )
+      .get(sdkSessionId);
     return row ? this.mapRow(row) : null;
   }
 
+  exists(id: string): boolean {
+    const row = this.db.prepare('SELECT 1 FROM sessions WHERE id = ?').get(id);
+    return Boolean(row);
+  }
+
+  isArchived(id: string): boolean {
+    const row = this.db.prepare('SELECT archived_at FROM sessions WHERE id = ?').get(id) as
+      | { archived_at: number | null }
+      | undefined;
+    return Boolean(row?.archived_at);
+  }
+
+  archiveIfActive(id: string, archivedAt = Date.now()): boolean {
+    const result = this.db
+      .prepare(
+        'UPDATE sessions SET archived_at = ?, updated_at = ? WHERE id = ? AND archived_at IS NULL'
+      )
+      .run(archivedAt, archivedAt, id);
+    return result.changes > 0;
+  }
+
+  findRegularSessionWorktree(id: string): { projectId: string; workingDirectory: string } | null {
+    const row = this.db
+      .prepare('SELECT project_id, type, working_directory FROM sessions WHERE id = ?')
+      .get(id) as
+      | { project_id: string; type: string; working_directory: string | null }
+      | undefined;
+    if (!row?.working_directory || row.type !== 'regular') return null;
+    return { projectId: row.project_id, workingDirectory: row.working_directory };
+  }
+
+  createWithId(id: string, data: Omit<Session, 'id' | 'createdAt' | 'updatedAt'>): Session {
+    const now = Date.now();
+    const { agent } = resolveAgentForSession(this.db, {
+      explicitAgentId: data.agentProfileId,
+      projectId: data.projectId,
+    });
+
+    this.db
+      .prepare(
+        `
+      INSERT INTO sessions (
+        id, project_id, name, agent_profile_id, sdk_session_id, type,
+        parent_session_id, working_directory, sort_order,
+        project_role, task_id, plan_status, is_read_only, last_run_status,
+        forked_from_session_id, fork_entry_id,
+        created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `
+      )
+      .run(
+        id,
+        data.projectId,
+        data.name || null,
+        agent.id,
+        data.sdkSessionId || null,
+        data.type || 'regular',
+        data.parentSessionId || null,
+        data.workingDirectory || null,
+        data.sortOrder ?? 0,
+        data.projectRole || null,
+        data.taskId || null,
+        data.planStatus || null,
+        data.isReadOnly ? 1 : 0,
+        data.lastRunStatus || null,
+        data.forkedFromSessionId || null,
+        data.forkEntryId || null,
+        now,
+        now
+      );
+
+    const created = this.findById(id);
+    if (!created) throw new Error(`Failed to create session: ${id}`);
+    return created;
+  }
+
   findNextSortOrder(projectId: string): number {
-    const row = this.db.prepare(
-      'SELECT COALESCE(MAX(sort_order), -1) + 1 as sortOrder FROM sessions WHERE project_id = ?'
-    ).get(projectId) as { sortOrder: number };
+    const row = this.db
+      .prepare(
+        'SELECT COALESCE(MAX(sort_order), -1) + 1 as sortOrder FROM sessions WHERE project_id = ?'
+      )
+      .get(projectId) as { sortOrder: number };
     return row.sortOrder;
   }
 }

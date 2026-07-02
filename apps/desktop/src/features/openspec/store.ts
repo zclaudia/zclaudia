@@ -55,7 +55,7 @@ interface OpenSpecStore {
   clearProject: (projectId: ProjectId) => void;
 }
 
-export const useOpenSpecStore = create<OpenSpecStore>((set) => ({
+export const useOpenSpecStore = create<OpenSpecStore>(set => ({
   issuesByProject: {},
   specChangesById: {},
   executorsBySpecChange: {},
@@ -66,29 +66,28 @@ export const useOpenSpecStore = create<OpenSpecStore>((set) => ({
   initStreamingByCandidate: {},
 
   setIssues: (projectId, issues) =>
-    set((s) => ({ issuesByProject: { ...s.issuesByProject, [projectId]: issues } })),
+    set(s => ({ issuesByProject: { ...s.issuesByProject, [projectId]: issues } })),
 
-  upsertIssue: (issue) =>
-    set((s) => {
+  upsertIssue: issue =>
+    set(s => {
       const list = s.issuesByProject[issue.projectId] ?? [];
-      const idx = list.findIndex((i) => i.id === issue.id);
+      const idx = list.findIndex(i => i.id === issue.id);
       const next =
         idx >= 0 ? [...list.slice(0, idx), issue, ...list.slice(idx + 1)] : [issue, ...list];
       return { issuesByProject: { ...s.issuesByProject, [issue.projectId]: next } };
     }),
 
-  setSpecChange: (sc) =>
-    set((s) => ({ specChangesById: { ...s.specChangesById, [sc.id]: sc } })),
+  setSpecChange: sc => set(s => ({ specChangesById: { ...s.specChangesById, [sc.id]: sc } })),
 
   setExecutors: (specChangeId, list) =>
-    set((s) => ({
+    set(s => ({
       executorsBySpecChange: { ...s.executorsBySpecChange, [specChangeId]: list },
     })),
 
-  upsertExecutor: (inst) =>
-    set((s) => {
+  upsertExecutor: inst =>
+    set(s => {
       const list = s.executorsBySpecChange[inst.specChangeId] ?? [];
-      const idx = list.findIndex((e) => e.id === inst.id);
+      const idx = list.findIndex(e => e.id === inst.id);
       const next =
         idx >= 0 ? [...list.slice(0, idx), inst, ...list.slice(idx + 1)] : [...list, inst];
       return {
@@ -97,10 +96,10 @@ export const useOpenSpecStore = create<OpenSpecStore>((set) => ({
     }),
 
   setCorpus: (projectId, items) =>
-    set((s) => ({ corpusByProject: { ...s.corpusByProject, [projectId]: items } })),
+    set(s => ({ corpusByProject: { ...s.corpusByProject, [projectId]: items } })),
 
   patchView: (projectId, patch) =>
-    set((s) => {
+    set(s => {
       const current = s.viewByProject[projectId] ?? INITIAL_VIEW_STATE;
       return {
         viewByProject: { ...s.viewByProject, [projectId]: { ...current, ...patch } },
@@ -108,15 +107,15 @@ export const useOpenSpecStore = create<OpenSpecStore>((set) => ({
     }),
 
   setInitScan: (projectId, scan) =>
-    set((s) => ({ initScansByProject: { ...s.initScansByProject, [projectId]: scan } })),
+    set(s => ({ initScansByProject: { ...s.initScansByProject, [projectId]: scan } })),
 
   setInitCandidates: (scanId, candidates) =>
-    set((s) => ({ initCandidatesByScan: { ...s.initCandidatesByScan, [scanId]: candidates } })),
+    set(s => ({ initCandidatesByScan: { ...s.initCandidatesByScan, [scanId]: candidates } })),
 
   upsertInitCandidate: (scanId, candidate) =>
-    set((s) => {
+    set(s => {
       const current = s.initCandidatesByScan[scanId] ?? [];
-      const idx = current.findIndex((c) => c.id === candidate.id);
+      const idx = current.findIndex(c => c.id === candidate.id);
       const next =
         idx >= 0
           ? [...current.slice(0, idx), candidate, ...current.slice(idx + 1)]
@@ -125,19 +124,19 @@ export const useOpenSpecStore = create<OpenSpecStore>((set) => ({
     }),
 
   appendStreamingChunk: (candidateId, contentSoFar) =>
-    set((s) => ({
+    set(s => ({
       initStreamingByCandidate: { ...s.initStreamingByCandidate, [candidateId]: contentSoFar },
     })),
 
-  clearStreaming: (candidateId) =>
-    set((s) => {
+  clearStreaming: candidateId =>
+    set(s => {
       const next = { ...s.initStreamingByCandidate };
       delete next[candidateId];
       return { initStreamingByCandidate: next };
     }),
 
-  clearProject: (projectId) =>
-    set((s) => {
+  clearProject: projectId =>
+    set(s => {
       const { [projectId]: _issues, ...issuesRest } = s.issuesByProject;
       void _issues;
       const { [projectId]: _corpus, ...corpusRest } = s.corpusByProject;

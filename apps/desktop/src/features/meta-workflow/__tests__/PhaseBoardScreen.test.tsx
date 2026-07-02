@@ -28,7 +28,7 @@ function makeRun(overrides: Partial<MetaWorkflowRun> = {}): MetaWorkflowRun {
 function makePhaseRecord(
   phaseId: string,
   status: MetaWorkflowPhaseStatus,
-  overrides: Partial<MetaWorkflowPhase> = {},
+  overrides: Partial<MetaWorkflowPhase> = {}
 ): MetaWorkflowPhase {
   return {
     id: `rec-${phaseId}`,
@@ -60,16 +60,10 @@ describe('PhaseBoardScreen', () => {
   });
 
   it('renders the empty-state message when no phases are loaded', async () => {
-    render(
-      <PhaseBoardScreen
-        projectId="p1"
-        run={makeRun()}
-        socket={{ send: vi.fn() }}
-      />,
-    );
+    render(<PhaseBoardScreen projectId="p1" run={makeRun()} socket={{ send: vi.fn() }} />);
     // No phases initially → empty-state copy is shown.
     expect(
-      screen.getByText(/No phases yet\. Set the phases\.json to instantiate them\./i),
+      screen.getByText(/No phases yet\. Set the phases\.json to instantiate them\./i)
     ).toBeInTheDocument();
     // Confirm the effect's listPhases call fired (and resolved to []), so the
     // empty-state stays after the microtask flush.
@@ -96,7 +90,7 @@ describe('PhaseBoardScreen', () => {
         projectId="p1"
         run={makeRun({ title: 'Kanban demo' })}
         socket={{ send: vi.fn() }}
-      />,
+      />
     );
 
     // Header reflects the run title.
@@ -126,13 +120,7 @@ describe('PhaseBoardScreen', () => {
       phases: { 'run-1': seeded },
     });
     const user = userEvent.setup();
-    render(
-      <PhaseBoardScreen
-        projectId="p1"
-        run={makeRun()}
-        socket={{ send: vi.fn() }}
-      />,
-    );
+    render(<PhaseBoardScreen projectId="p1" run={makeRun()} socket={{ send: vi.fn() }} />);
 
     // PhaseCard fires onClick on its outer container; the inner phaseId label
     // is the most stable click target.
@@ -152,13 +140,7 @@ describe('PhaseBoardScreen', () => {
       phases: { 'run-1': seeded },
     });
     const user = userEvent.setup();
-    render(
-      <PhaseBoardScreen
-        projectId="p1"
-        run={makeRun()}
-        socket={{ send: vi.fn() }}
-      />,
-    );
+    render(<PhaseBoardScreen projectId="p1" run={makeRun()} socket={{ send: vi.fn() }} />);
     await user.click(await screen.findByRole('button', { name: /View Graph/i }));
     await waitFor(() => {
       const view = useMetaWorkflowStore.getState().viewByProject['p1'];

@@ -13,9 +13,9 @@ import { computeConnectionPlan } from './backendConnectionLifecycle';
  */
 export function useBackendConnectionLifecycle(): void {
   const { connectServer, disconnectServer, isServerConnected } = useConnection();
-  const expandedBackendIds = useSidebarExpansionStore((s) => s.expandedBackendIds);
-  const foregroundBackendId = useServerStore((s) => s.activeServerId);
-  const localBackendId = useFacadeStore((s) => s.localBackendId);
+  const expandedBackendIds = useSidebarExpansionStore(s => s.expandedBackendIds);
+  const foregroundBackendId = useServerStore(s => s.activeServerId);
+  const localBackendId = useFacadeStore(s => s.localBackendId);
 
   const managedRef = useRef<string[]>([]);
 
@@ -27,8 +27,15 @@ export function useBackendConnectionLifecycle(): void {
       managedBackendIds: managedRef.current,
       isConnected: isServerConnected,
     });
-    plan.toConnect.forEach((id) => connectServer(id));
-    plan.toDisconnect.forEach((id) => disconnectServer(id));
+    plan.toConnect.forEach(id => connectServer(id));
+    plan.toDisconnect.forEach(id => disconnectServer(id));
     managedRef.current = plan.nextManaged;
-  }, [expandedBackendIds, foregroundBackendId, localBackendId, connectServer, disconnectServer, isServerConnected]);
+  }, [
+    expandedBackendIds,
+    foregroundBackendId,
+    localBackendId,
+    connectServer,
+    disconnectServer,
+    isServerConnected,
+  ]);
 }

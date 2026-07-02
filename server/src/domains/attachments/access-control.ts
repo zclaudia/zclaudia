@@ -25,7 +25,7 @@ export function registerOwnerGuard(kind: AttachmentOwnerKind, guard: OwnerGuard)
 export async function checkOwnerAccess(
   kind: AttachmentOwnerKind,
   ownerId: string,
-  req: Request,
+  req: Request
 ): Promise<boolean> {
   const guard = guards.get(kind);
   if (!guard) return true;

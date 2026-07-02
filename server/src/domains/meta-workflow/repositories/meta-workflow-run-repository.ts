@@ -59,12 +59,20 @@ export class MetaWorkflowRunRepository extends BaseRepository<MetaWorkflowRun, C
         created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       params: [
-        id, data.projectId, data.title, data.description ?? null, data.status,
-        data.requirementsPath ?? null, data.phasesJson ?? null, data.smokePathRunId ?? null,
-        data.rejectCount, data.defaultLlmProfileId ?? null,
+        id,
+        data.projectId,
+        data.title,
+        data.description ?? null,
+        data.status,
+        data.requirementsPath ?? null,
+        data.phasesJson ?? null,
+        data.smokePathRunId ?? null,
+        data.rejectCount,
+        data.defaultLlmProfileId ?? null,
         data.config ? JSON.stringify(data.config) : null,
         data.worktreeId ?? null,
-        data.createdAt, data.updatedAt,
+        data.createdAt,
+        data.updatedAt,
       ],
     };
   }
@@ -74,18 +82,18 @@ export class MetaWorkflowRunRepository extends BaseRepository<MetaWorkflowRun, C
     const params: unknown[] = [];
 
     const map: Array<[keyof Update, string, (v: unknown) => unknown]> = [
-      ['title', 'title', (v) => v],
-      ['description', 'description', (v) => v ?? null],
-      ['status', 'status', (v) => v],
-      ['requirementsPath', 'requirements_path', (v) => v ?? null],
-      ['phasesJson', 'phases_json', (v) => v ?? null],
-      ['smokePathRunId', 'smoke_path_run_id', (v) => v ?? null],
-      ['rejectCount', 'reject_count', (v) => v],
-      ['defaultLlmProfileId', 'default_llm_profile_id', (v) => v ?? null],
-      ['config', 'config', (v) => (v ? JSON.stringify(v) : null)],
-      ['worktreeId', 'worktree_id', (v) => v ?? null],
-      ['updatedAt', 'updated_at', (v) => v],
-      ['completedAt', 'completed_at', (v) => v ?? null],
+      ['title', 'title', v => v],
+      ['description', 'description', v => v ?? null],
+      ['status', 'status', v => v],
+      ['requirementsPath', 'requirements_path', v => v ?? null],
+      ['phasesJson', 'phases_json', v => v ?? null],
+      ['smokePathRunId', 'smoke_path_run_id', v => v ?? null],
+      ['rejectCount', 'reject_count', v => v],
+      ['defaultLlmProfileId', 'default_llm_profile_id', v => v ?? null],
+      ['config', 'config', v => (v ? JSON.stringify(v) : null)],
+      ['worktreeId', 'worktree_id', v => v ?? null],
+      ['updatedAt', 'updated_at', v => v],
+      ['completedAt', 'completed_at', v => v ?? null],
     ];
 
     for (const [key, col, transform] of map) {
@@ -106,9 +114,11 @@ export class MetaWorkflowRunRepository extends BaseRepository<MetaWorkflowRun, C
   }
 
   findByProject(projectId: string, limit = 50): MetaWorkflowRun[] {
-    const rows = this.db.prepare(
-      `SELECT * FROM meta_workflow_runs WHERE project_id = ? ORDER BY created_at DESC LIMIT ?`,
-    ).all(projectId, limit);
-    return rows.map((r) => this.mapRow(r));
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM meta_workflow_runs WHERE project_id = ? ORDER BY created_at DESC LIMIT ?`
+      )
+      .all(projectId, limit);
+    return rows.map(r => this.mapRow(r));
   }
 }

@@ -34,7 +34,9 @@ function assembleCodingTemplate(input: AssemblyInput): string {
     input.filePushContext,
     input.interactionToolPrompt,
     input.sessionSystemPrompt,
-  ].filter(Boolean).join('\n\n');
+  ]
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 function assembleAgentTemplate(input: AssemblyInput): string {
@@ -47,7 +49,9 @@ function assembleAgentTemplate(input: AssemblyInput): string {
     input.filePushContext,
     input.interactionToolPrompt,
     input.sessionSystemPrompt,
-  ].filter(Boolean).join('\n\n');
+  ]
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 const SUPERVISION_SYSTEM_PROMPT = `You are a Supervisor Agent for ZClaudia. You manage code tasks within a project: planning, executing, reviewing, and merging changes.
@@ -73,7 +77,9 @@ function assembleSupervisionTemplate(input: AssemblyInput): string {
     input.skillDirectoryHint,
     input.memoryContext,
     input.sessionSystemPrompt,
-  ].filter(Boolean).join('\n\n');
+  ]
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 const REVIEW_SYSTEM_PROMPT = `You are a Code Review Agent for ZClaudia. You review code changes for correctness, security, performance, and maintainability.
@@ -102,7 +108,9 @@ function assembleReviewTemplate(input: AssemblyInput): string {
     input.skillDirectoryHint,
     input.memoryContext,
     input.sessionSystemPrompt,
-  ].filter(Boolean).join('\n\n');
+  ]
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 function assembleDebugTemplate(input: AssemblyInput): string {
@@ -113,7 +121,9 @@ function assembleDebugTemplate(input: AssemblyInput): string {
     input.skillDirectoryHint,
     input.memoryContext,
     input.sessionSystemPrompt,
-  ].filter(Boolean).join('\n\n');
+  ]
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 export function createContextEngine(): ContextEngine {

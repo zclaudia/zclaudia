@@ -35,10 +35,7 @@ export function ImageLightbox({ attachment, onClose }: ImageLightboxProps) {
         <X className="w-5 h-5" />
       </button>
 
-      <div
-        className="max-h-full max-w-full"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="max-h-full max-w-full" onClick={e => e.stopPropagation()}>
         {src ? (
           <img
             src={src}

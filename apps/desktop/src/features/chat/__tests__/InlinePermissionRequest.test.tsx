@@ -19,7 +19,7 @@ describe('InlinePermissionRequest', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
-    usePermissionStore.setState((state) => ({
+    usePermissionStore.setState(state => ({
       ...state,
       pendingRequests: [],
       pendingRequest: null,
@@ -46,7 +46,9 @@ describe('InlinePermissionRequest', () => {
     const onDecisionB = vi.fn();
     rerender(<InlinePermissionRequest request={request} onDecision={onDecisionB} />);
 
-    expect(screen.getByPlaceholderText('Why do you reject exiting plan mode?')).toHaveValue('Do not exit now');
+    expect(screen.getByPlaceholderText('Why do you reject exiting plan mode?')).toHaveValue(
+      'Do not exit now'
+    );
   });
 
   it('renders permission required heading', () => {
@@ -101,7 +103,11 @@ describe('InlinePermissionRequest', () => {
   });
 
   it('renders credential input for requiresCredential', () => {
-    const request = makeRequest({ toolName: 'Bash', requiresCredential: true, credentialHint: 'sudo_password' });
+    const request = makeRequest({
+      toolName: 'Bash',
+      requiresCredential: true,
+      credentialHint: 'sudo_password',
+    });
     render(<InlinePermissionRequest request={request} onDecision={vi.fn()} />);
     expect(screen.getByText('Credential Required')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Enter sudo password')).toBeInTheDocument();
@@ -118,7 +124,9 @@ describe('InlinePermissionRequest', () => {
     const onDecision = vi.fn();
     render(<InlinePermissionRequest request={request} onDecision={onDecision} />);
 
-    fireEvent.change(screen.getByPlaceholderText('Enter credential'), { target: { value: 'my-pass' } });
+    fireEvent.change(screen.getByPlaceholderText('Enter credential'), {
+      target: { value: 'my-pass' },
+    });
     expect(screen.getByText('Allow')).not.toBeDisabled();
 
     fireEvent.click(screen.getByText('Allow'));
@@ -153,12 +161,22 @@ describe('InlinePermissionRequest', () => {
   });
 
   it('does not show Deny + Comment when detail has no plan field', () => {
-    render(<InlinePermissionRequest request={makeRequest({ toolName: 'Bash', detail: '{}' })} onDecision={vi.fn()} />);
+    render(
+      <InlinePermissionRequest
+        request={makeRequest({ toolName: 'Bash', detail: '{}' })}
+        onDecision={vi.fn()}
+      />
+    );
     expect(screen.queryByText('Deny + Comment')).not.toBeInTheDocument();
   });
 
   it('does not show feedback textarea when detail has no plan field', () => {
-    render(<InlinePermissionRequest request={makeRequest({ toolName: 'Bash', detail: '{}' })} onDecision={vi.fn()} />);
+    render(
+      <InlinePermissionRequest
+        request={makeRequest({ toolName: 'Bash', detail: '{}' })}
+        onDecision={vi.fn()}
+      />
+    );
     expect(screen.queryByPlaceholderText(/Why do you reject/)).not.toBeInTheDocument();
   });
 
@@ -180,19 +198,26 @@ describe('InlinePermissionRequest', () => {
       <InlinePermissionRequest request={request} onDecision={onDecision} />
     );
 
-    fireEvent.change(
-      screen.getByPlaceholderText('Why do you reject exiting plan mode?'),
-      { target: { value: 'Need more analysis first' } }
-    );
+    fireEvent.change(screen.getByPlaceholderText('Why do you reject exiting plan mode?'), {
+      target: { value: 'Need more analysis first' },
+    });
     firstMount.unmount();
 
     render(<InlinePermissionRequest request={request} onDecision={onDecision} />);
 
-    expect(screen.getByPlaceholderText('Why do you reject exiting plan mode?')).toHaveValue('Need more analysis first');
+    expect(screen.getByPlaceholderText('Why do you reject exiting plan mode?')).toHaveValue(
+      'Need more analysis first'
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Deny + Comment' }));
 
-    expect(onDecision).toHaveBeenCalledWith(request.requestId, false, false, undefined, 'Need more analysis first');
+    expect(onDecision).toHaveBeenCalledWith(
+      request.requestId,
+      false,
+      false,
+      undefined,
+      'Need more analysis first'
+    );
     expect(usePermissionStore.getState().feedbackDrafts[request.requestId]).toBeUndefined();
   });
 
@@ -220,7 +245,7 @@ describe('InlinePermissionRequest', () => {
     const request = makeRequest({ timeoutSec: 30 });
 
     // Set feedback in store
-    usePermissionStore.setState((state) => ({
+    usePermissionStore.setState(state => ({
       ...state,
       feedbackDrafts: { 'req-exit-plan-1': 'my feedback' },
     }));
@@ -229,7 +254,13 @@ describe('InlinePermissionRequest', () => {
 
     fireEvent.click(screen.getByText('Deny + Comment'));
 
-    expect(onDecision).toHaveBeenCalledWith('req-exit-plan-1', false, false, undefined, 'my feedback');
+    expect(onDecision).toHaveBeenCalledWith(
+      'req-exit-plan-1',
+      false,
+      false,
+      undefined,
+      'my feedback'
+    );
     // After deny+comment, component should show resolved state
     expect(screen.getByText(/Denied/)).toBeInTheDocument();
   });
@@ -245,7 +276,7 @@ describe('InlinePermissionRequest', () => {
   });
 
   it('shows sanitized payload metadata when AI review used redaction', () => {
-    usePermissionStore.setState((state) => ({
+    usePermissionStore.setState(state => ({
       ...state,
       aiReviewResults: {
         'req-exit-plan-1': {
@@ -261,13 +292,18 @@ describe('InlinePermissionRequest', () => {
       },
     }));
 
-    render(<InlinePermissionRequest request={makeRequest({ toolName: 'Bash', detail: '{}' })} onDecision={vi.fn()} />);
+    render(
+      <InlinePermissionRequest
+        request={makeRequest({ toolName: 'Bash', detail: '{}' })}
+        onDecision={vi.fn()}
+      />
+    );
 
     expect(screen.getByText(/Remote AI review used sanitized payload/)).toBeInTheDocument();
   });
 
   it('shows explicit skipped-remote-review metadata when sensitive local material was detected', () => {
-    usePermissionStore.setState((state) => ({
+    usePermissionStore.setState(state => ({
       ...state,
       aiReviewResults: {
         'req-exit-plan-1': {
@@ -282,8 +318,15 @@ describe('InlinePermissionRequest', () => {
       },
     }));
 
-    render(<InlinePermissionRequest request={makeRequest({ toolName: 'Bash', detail: '{}' })} onDecision={vi.fn()} />);
+    render(
+      <InlinePermissionRequest
+        request={makeRequest({ toolName: 'Bash', detail: '{}' })}
+        onDecision={vi.fn()}
+      />
+    );
 
-    expect(screen.getByText('Remote AI review skipped because sensitive local material was detected.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Remote AI review skipped because sensitive local material was detected.')
+    ).toBeInTheDocument();
   });
 });

@@ -53,9 +53,11 @@ describe('memory-store', () => {
     store.set(null, 'prefs', 'theme', 'light', 'global');
     store.set(null, 'prefs', 'theme', 'dark', 'global');
 
-    const rows = db.prepare(
-      'SELECT value FROM agent_memory WHERE project_id IS NULL AND namespace = ? AND key = ?'
-    ).all('prefs', 'theme') as Array<{ value: string }>;
+    const rows = db
+      .prepare(
+        'SELECT value FROM agent_memory WHERE project_id IS NULL AND namespace = ? AND key = ?'
+      )
+      .all('prefs', 'theme') as Array<{ value: string }>;
 
     expect(rows).toHaveLength(1);
     expect(rows[0]?.value).toBe('dark');
@@ -81,7 +83,7 @@ describe('memory-store', () => {
       expect.arrayContaining([
         [null, 'dark'],
         ['project-1', 'light'],
-      ]),
+      ])
     );
     expect(memories.some(entry => entry.projectId === 'project-2')).toBe(false);
   });
@@ -110,10 +112,12 @@ describe('activity-log', () => {
   });
 
   it('ignores corrupted metadata instead of throwing', () => {
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO agent_activity_log (id, project_id, session_id, type, summary, metadata, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run('log-1', 'project-1', 'session-1', 'summary', 'Broken metadata', '{bad json', Date.now());
+    `
+    ).run('log-1', 'project-1', 'session-1', 'summary', 'Broken metadata', '{bad json', Date.now());
 
     expect(() => getRecentActivity(db, 'project-1')).not.toThrow();
     expect(getRecentActivity(db, 'project-1')[0]?.metadata).toBeUndefined();

@@ -1,12 +1,9 @@
 import type { Database } from 'better-sqlite3';
-import type {
-  ProjectChange,
-  SupervisionLogEvent,
-} from '@zclaudia/shared/features/supervision';
-import { ProjectChangeRepository } from './repositories/project-change.js';
+import type { ProjectChange, SupervisionLogEvent } from '@zclaudia/shared/features/supervision';
+import { type ProjectChangeRepository } from './repositories/project-change.js';
 import type { SupervisionProjectPort } from './ports.js';
 import type { ContextManager, ContextDocument } from './context-manager.js';
-import { SupervisorContextService } from './supervisor-context.js';
+import { type SupervisorContextService } from './supervisor-context.js';
 
 export interface BaselineServiceDeps {
   db: Database;
@@ -48,7 +45,7 @@ export class BaselineService {
   updateChangeDocument(
     changeId: string,
     docType: 'design' | 'execution' | 'tasks',
-    content: string,
+    content: string
   ): ProjectChange {
     const change = this.changeRepo.findById(changeId);
     if (!change) throw new Error(`Change not found: ${changeId}`);
@@ -65,7 +62,7 @@ export class BaselineService {
       manager.updateStructuredDocument(
         `changes/${change.id}/${docType}.md`,
         { category: docType, source: 'user' },
-        content,
+        content
       );
     }
 

@@ -1,4 +1,4 @@
-import { Page, Locator } from '@playwright/test';
+import type { Page, Locator } from '@playwright/test';
 
 /**
  * Page Object Model for the Chat interface
@@ -61,7 +61,7 @@ export class ChatPage {
   async waitForResponse(timeout = 10000): Promise<void> {
     await this.assistantMessages.last().waitFor({
       state: 'visible',
-      timeout
+      timeout,
     });
   }
 
@@ -69,8 +69,10 @@ export class ChatPage {
    * Get the last message content
    */
   async getLastMessage(): Promise<string> {
-    const lastMessage = this.messageList.locator('[data-role="assistant"], [data-role="user"]').last();
-    return await lastMessage.textContent() || '';
+    const lastMessage = this.messageList
+      .locator('[data-role="assistant"], [data-role="user"]')
+      .last();
+    return (await lastMessage.textContent()) || '';
   }
 
   /**
@@ -175,6 +177,6 @@ export class ChatPage {
    */
   async getLastToolName(): Promise<string> {
     const lastToolName = this.toolName.last();
-    return await lastToolName.textContent() || '';
+    return (await lastToolName.textContent()) || '';
   }
 }

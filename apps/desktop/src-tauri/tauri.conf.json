@@ -41,9 +41,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "externalBin": [
-      "binaries/node"
-    ],
+    "externalBin": ["binaries/node"],
     "macOS": {
       "signingIdentity": "ZClaudia Signing",
       "hardenedRuntime": true,
@@ -57,9 +55,7 @@
     },
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQwQUMxMTdBNUNDRDVCRDAKUldUUVc4MWNlaEdzUUw1VXI4WlpORGVySFc1QmJZN1E1U2tRNHVWRldMSG5JOGhCMXdpcEpIdTYK",
-      "endpoints": [
-        "https://github.com/zclaudia/zclaudia/releases/latest/download/latest.json"
-      ]
+      "endpoints": ["https://github.com/zclaudia/zclaudia/releases/latest/download/latest.json"]
     }
   }
 }

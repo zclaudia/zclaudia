@@ -5,9 +5,9 @@ import {
   type RunDomainEventType,
 } from './run-domain-events.js';
 
-export type RunDomainEventListener<TType extends PublicRunDomainEventType = PublicRunDomainEventType> = (
-  event: Extract<RunDomainEvent, { type: TType }>,
-) => void | Promise<void>;
+export type RunDomainEventListener<
+  TType extends PublicRunDomainEventType = PublicRunDomainEventType,
+> = (event: Extract<RunDomainEvent, { type: TType }>) => void | Promise<void>;
 
 type AnyRunDomainEventListener = (event: RunDomainEvent) => void | Promise<void>;
 
@@ -20,17 +20,19 @@ export class RunDomainEventListenerRegistry {
   private readonly onListenerError: (error: unknown, event: RunDomainEvent) => void;
 
   constructor(options: RunDomainEventListenerRegistryOptions = {}) {
-    this.onListenerError = options.onListenerError ?? ((error, event) => {
-      console.warn('[RunDomainEventListeners] listener failed:', {
-        eventType: event.type,
-        error: error instanceof Error ? error.message : error,
+    this.onListenerError =
+      options.onListenerError ??
+      ((error, event) => {
+        console.warn('[RunDomainEventListeners] listener failed:', {
+          eventType: event.type,
+          error: error instanceof Error ? error.message : error,
+        });
       });
-    });
   }
 
   on<TType extends PublicRunDomainEventType>(
     type: TType,
-    listener: RunDomainEventListener<TType>,
+    listener: RunDomainEventListener<TType>
   ): () => void {
     if (!isPublicRunDomainEventType(type as RunDomainEventType)) {
       throw new Error(`"${type}" is not a public run domain event`);

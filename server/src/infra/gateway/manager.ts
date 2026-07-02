@@ -21,7 +21,10 @@ type FacadeProvider = {
   getWsHub(): FacadeWsHub;
 };
 
-import type { ActiveRun, ConnectedClient as WsConnectedClient } from '../../application/conversation/transport/types.js';
+import type {
+  ActiveRun,
+  ConnectedClient as WsConnectedClient,
+} from '../../application/conversation/transport/types.js';
 
 type ActiveRunsMap = Map<string, ActiveRun>;
 
@@ -49,7 +52,10 @@ export interface GatewayManagerDeps {
   serverContext: ServerContext;
   activeRuns: ActiveRunsMap;
   connectedClients: Map<string, WsConnectedClient>;
-  createVirtualClient: (channelId: string, transport: { send: (msg: ServerMessage) => void }) => WsConnectedClient;
+  createVirtualClient: (
+    channelId: string,
+    transport: { send: (msg: ServerMessage) => void }
+  ) => WsConnectedClient;
   cancelRun: (runId: string) => void;
   host: string;
 }
@@ -125,7 +131,9 @@ export class GatewayManager {
       localHandler: this.createLocalBackendHandler(),
     });
     this.attachFacadeProvider(standaloneFacade);
-    console.log(`📡 Facade WS endpoint: ws://${this.host}:${this.actualPort}/ws/backend-facade (standalone)`);
+    console.log(
+      `📡 Facade WS endpoint: ws://${this.host}:${this.actualPort}/ws/backend-facade (standalone)`
+    );
   }
 
   private ensureEmbeddedGatewayFacade(): void {
@@ -133,7 +141,7 @@ export class GatewayManager {
     const embeddedFacade = new EmbeddedBackendFacadeProvider(
       this.gatewayClient,
       this.createLocalBackendHandler(),
-      this.actualPort,
+      this.actualPort
     );
     this.attachFacadeProvider(embeddedFacade);
     console.log(`📡 Facade WS endpoint: ws://${this.host}:${this.actualPort}/ws/backend-facade`);
@@ -142,14 +150,18 @@ export class GatewayManager {
   loadConfig(): GatewayConfig | null {
     try {
       const db = this.db;
-      const row = db.prepare(`
+      const row = db
+        .prepare(
+          `
         SELECT id, enabled, gateway_url, gateway_secret, backend_name, backend_id,
                register_as_backend,
                proxy_url, proxy_username, proxy_password,
                created_at, updated_at
         FROM gateway_config
         WHERE id = 1
-      `).get() as Record<string, unknown> | undefined;
+      `
+        )
+        .get() as Record<string, unknown> | undefined;
 
       if (!row) return null;
 
@@ -165,7 +177,7 @@ export class GatewayManager {
         proxyUsername: row.proxy_username as string | undefined,
         proxyPassword: row.proxy_password as string | undefined,
         createdAt: row.created_at as number,
-        updatedAt: row.updated_at as number
+        updatedAt: row.updated_at as number,
       };
     } catch (error) {
       console.error('Failed to load gateway config:', error);
@@ -220,7 +232,7 @@ export class GatewayManager {
     setGatewayClient(this.gatewayClient);
 
     this.gatewayClient.events.setOutgoingEvents({
-      onConnectionStateChanged: (connected) => {
+      onConnectionStateChanged: connected => {
         if (connected) {
           this.ensureEmbeddedGatewayFacade();
         } else {
@@ -236,7 +248,7 @@ export class GatewayManager {
         virtualClient = this.createVirtualClient(channelId, {
           send: (msg: ServerMessage) => {
             this.gatewayClient?.commands.channel.sendToIncoming(channelId, msg);
-          }
+          },
         });
         this.virtualClients.set(channelId, virtualClient);
         // Register in connectedClients so that run-event broadcasts
@@ -253,7 +265,7 @@ export class GatewayManager {
       await serverContext.handleMessage(virtualClient, message);
     });
 
-    this.gatewayClient.commands.channel.onIncomingClosed((channelId) => {
+    this.gatewayClient.commands.channel.onIncomingClosed(channelId => {
       handleChannelClosed(channelId, this.activeRuns);
       this.virtualClients.delete(channelId);
       this.connectedClients.delete(channelId);
@@ -263,14 +275,18 @@ export class GatewayManager {
     // Set up catch-up handler for content recovery
     this.gatewayClient.commands.channel.onCatchUp(async (sessionId, afterOffset) => {
       try {
-        const rows = serverContext.db.prepare(`
+        const rows = serverContext.db
+          .prepare(
+            `
           SELECT id as messageId, session_id as sessionId, offset, role, created_at as createdAt, content
           FROM messages
           WHERE session_id = ? AND offset > ?
           ORDER BY offset ASC
-        `).all(sessionId, afterOffset) as MessageCatchUpRow[];
+        `
+          )
+          .all(sessionId, afterOffset) as MessageCatchUpRow[];
 
-        return rows.map((r) => ({
+        return rows.map(r => ({
           messageId: r.messageId,
           sessionId: r.sessionId,
           offset: r.offset,
@@ -287,7 +303,10 @@ export class GatewayManager {
     this.gatewayClient.commands.connection.connect();
 
     // Set identity immediately
-    serverContext.updateGatewayIdentity(this.gatewayClient.queries.identity.getInstanceId(), this.gatewayClient.queries.identity.getDeviceId());
+    serverContext.updateGatewayIdentity(
+      this.gatewayClient.queries.identity.getInstanceId(),
+      this.gatewayClient.queries.identity.getDeviceId()
+    );
 
     // Sync gateway status periodically
     const syncGatewayStatus = setInterval(() => {
@@ -297,7 +316,9 @@ export class GatewayManager {
         if (backendId) {
           serverContext.updateGatewayBackendId(backendId);
         }
-        serverContext.updateDiscoveredBackends(this.gatewayClient.queries.registry.getDiscoveredBackends());
+        serverContext.updateDiscoveredBackends(
+          this.gatewayClient.queries.registry.getDiscoveredBackends()
+        );
       }
     }, 2000);
 
@@ -347,7 +368,7 @@ export class GatewayManager {
     const serverEventListeners = new Set<(message: ServerMessage) => void>();
 
     return {
-      onMessage: async (message) => {
+      onMessage: async message => {
         if (!facadeVirtualClient) {
           facadeVirtualClient = createVirtualClient('facade-local', {
             send: (msg: ServerMessage) => {
@@ -367,21 +388,25 @@ export class GatewayManager {
         }
         await serverContext.handleMessage(facadeVirtualClient, message);
       },
-      onStreamOpen: (_sessionId) => {
+      onStreamOpen: _sessionId => {
         // Stream open is handled at the facade level — no server-side action needed
       },
-      onStreamClose: (_sessionId) => {
+      onStreamClose: _sessionId => {
         // Stream close is handled at the facade level
       },
       onCatchUp: async (sessionId, afterOffset) => {
         try {
-          const rows = serverContext.db.prepare(`
+          const rows = serverContext.db
+            .prepare(
+              `
             SELECT id as messageId, session_id as sessionId, offset, role, created_at as createdAt, content
             FROM messages
             WHERE session_id = ? AND offset > ?
             ORDER BY offset ASC
-          `).all(sessionId, afterOffset) as MessageCatchUpRow[];
-          return rows.map((r) => ({
+          `
+            )
+            .all(sessionId, afterOffset) as MessageCatchUpRow[];
+          return rows.map(r => ({
             messageId: r.messageId,
             sessionId: r.sessionId,
             offset: r.offset,
@@ -394,7 +419,7 @@ export class GatewayManager {
           throw error;
         }
       },
-      onServerEvent: (listener) => {
+      onServerEvent: listener => {
         serverEventListeners.add(listener);
         return () => {
           serverEventListeners.delete(listener);
@@ -402,7 +427,9 @@ export class GatewayManager {
       },
       getSessionItems: () => {
         try {
-          const sessions = serverContext.db.prepare(`
+          const sessions = serverContext.db
+            .prepare(
+              `
             SELECT s.id, s.name, s.project_id as projectId,
                    s.created_at as createdAt, s.updated_at as updatedAt,
                    s.archived_at as archivedAt
@@ -411,34 +438,46 @@ export class GatewayManager {
             WHERE s.archived_at IS NULL
               AND (p.is_internal IS NULL OR p.is_internal = 0)
             ORDER BY s.updated_at DESC
-          `).all() as Array<Record<string, unknown>>;
-          return sessions.map((s): SessionItem => ({
-            sessionId: s.id as string,
-            projectId: (s.projectId as string) || undefined,
-            title: (s.name as string) || undefined,
-            createdAt: s.createdAt as number,
-            updatedAt: s.updatedAt as number,
-            lastMessageAt: s.updatedAt as number,
-            runStatus: hasForegroundActiveRunForSession(activeRuns, s.id as string) ? 'running' : 'idle',
-          }));
+          `
+            )
+            .all() as Array<Record<string, unknown>>;
+          return sessions.map(
+            (s): SessionItem => ({
+              sessionId: s.id as string,
+              projectId: (s.projectId as string) || undefined,
+              title: (s.name as string) || undefined,
+              createdAt: s.createdAt as number,
+              updatedAt: s.updatedAt as number,
+              lastMessageAt: s.updatedAt as number,
+              runStatus: hasForegroundActiveRunForSession(activeRuns, s.id as string)
+                ? 'running'
+                : 'idle',
+            })
+          );
         } catch {
           return [];
         }
       },
       getProjectItems: () => {
         try {
-          const projects = serverContext.db.prepare(`
+          const projects = serverContext.db
+            .prepare(
+              `
             SELECT id, name, created_at as createdAt, updated_at as updatedAt
             FROM projects
             WHERE is_internal = 0
             ORDER BY updated_at DESC
-          `).all() as Array<Record<string, unknown>>;
-          return projects.map((p): ProjectItem => ({
-            projectId: p.id as string,
-            name: (p.name as string) || '',
-            createdAt: p.createdAt as number,
-            updatedAt: p.updatedAt as number,
-          }));
+          `
+            )
+            .all() as Array<Record<string, unknown>>;
+          return projects.map(
+            (p): ProjectItem => ({
+              projectId: p.id as string,
+              name: (p.name as string) || '',
+              createdAt: p.createdAt as number,
+              updatedAt: p.updatedAt as number,
+            })
+          );
         } catch {
           return [];
         }

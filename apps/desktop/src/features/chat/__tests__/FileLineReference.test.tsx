@@ -57,23 +57,14 @@ describe('parseFileLineRef', () => {
 });
 
 describe('FILE_LINE_REF_REGEX', () => {
-  it.each([
-    'foo.ts:1',
-    'foo.tsx:42',
-    'a/b/c.ts:10-20',
-    'snake_case.py:1',
-    '.hidden.json:3',
-  ])('matches %s', (s) => {
-    expect(FILE_LINE_REF_REGEX.test(s)).toBe(true);
-  });
+  it.each(['foo.ts:1', 'foo.tsx:42', 'a/b/c.ts:10-20', 'snake_case.py:1', '.hidden.json:3'])(
+    'matches %s',
+    s => {
+      expect(FILE_LINE_REF_REGEX.test(s)).toBe(true);
+    }
+  );
 
-  it.each([
-    'foo.ts',
-    'foo:42',
-    '4 + 2',
-    'const x = 1',
-    'foo.ts:abc',
-  ])('does not match %s', (s) => {
+  it.each(['foo.ts', 'foo:42', '4 + 2', 'const x = 1', 'foo.ts:abc'])('does not match %s', s => {
     expect(FILE_LINE_REF_REGEX.test(s)).toBe(false);
   });
 });
@@ -87,20 +78,16 @@ describe('INLINE_FILE_REF_REGEX', () => {
     '.hidden.json',
     'foo.ts:1',
     'foo.ts:1-3',
-  ])('matches %s', (s) => {
+  ])('matches %s', s => {
     expect(INLINE_FILE_REF_REGEX.test(s)).toBe(true);
   });
 
-  it.each([
-    'foo',
-    'foo:42',
-    '4 + 2',
-    'const x = 1',
-    'see foo.ts',
-    'foo.ts:abc',
-  ])('does not match %s', (s) => {
-    expect(INLINE_FILE_REF_REGEX.test(s)).toBe(false);
-  });
+  it.each(['foo', 'foo:42', '4 + 2', 'const x = 1', 'see foo.ts', 'foo.ts:abc'])(
+    'does not match %s',
+    s => {
+      expect(INLINE_FILE_REF_REGEX.test(s)).toBe(false);
+    }
+  );
 });
 
 describe('FileLineReference', () => {
@@ -120,9 +107,7 @@ describe('FileLineReference', () => {
 
   it('resolves an exact relative path via search', async () => {
     mockListDirectory.mockResolvedValueOnce({
-      entries: [
-        { name: 'foo.ts', path: 'src/foo.ts', type: 'file' },
-      ],
+      entries: [{ name: 'foo.ts', path: 'src/foo.ts', type: 'file' }],
       currentPath: '',
       hasMore: false,
     });
@@ -177,7 +162,11 @@ describe('FileLineReference', () => {
   it('matches a partial path by suffix (app/Foo.tsx → apps/desktop/src/app/Foo.tsx)', async () => {
     mockListDirectory.mockResolvedValueOnce({
       entries: [
-        { name: 'MobileOverlays.tsx', path: 'apps/desktop/src/app/MobileOverlays.tsx', type: 'file' },
+        {
+          name: 'MobileOverlays.tsx',
+          path: 'apps/desktop/src/app/MobileOverlays.tsx',
+          type: 'file',
+        },
       ],
       currentPath: '',
       hasMore: false,
@@ -191,7 +180,7 @@ describe('FileLineReference', () => {
         '/repo',
         'apps/desktop/src/app/MobileOverlays.tsx',
         1,
-        undefined,
+        undefined
       );
     });
     expect(mockListDirectory).toHaveBeenCalledWith({
@@ -222,7 +211,7 @@ describe('FileLineReference', () => {
         '/repo',
         'apps/desktop/src/utils/index.ts',
         3,
-        undefined,
+        undefined
       );
     });
   });
@@ -237,9 +226,7 @@ describe('FileLineReference', () => {
       hasMore: false,
     });
 
-    render(
-      <FileLineReference text="foo.ts:7" projectRoot="/repo" backendId="b1" />,
-    );
+    render(<FileLineReference text="foo.ts:7" projectRoot="/repo" backendId="b1" />);
     fireEvent.click(screen.getByRole('button'));
 
     await waitFor(() => {
@@ -255,9 +242,7 @@ describe('FileLineReference', () => {
 
   it('looks up a bare basename without a line target', async () => {
     mockListDirectory.mockResolvedValueOnce({
-      entries: [
-        { name: 'App.tsx', path: 'src/App.tsx', type: 'file' },
-      ],
+      entries: [{ name: 'App.tsx', path: 'src/App.tsx', type: 'file' }],
       currentPath: '',
       hasMore: false,
     });
@@ -293,7 +278,7 @@ describe('FileLineReference', () => {
     fireEvent.click(screen.getByRole('button'));
     expect(mockOpenFile).not.toHaveBeenCalled();
     expect(mockToastAdd).toHaveBeenCalledWith(
-      expect.objectContaining({ title: 'No project selected' }),
+      expect.objectContaining({ title: 'No project selected' })
     );
   });
 
@@ -309,7 +294,7 @@ describe('FileLineReference', () => {
 
     await waitFor(() => {
       expect(mockToastAdd).toHaveBeenCalledWith(
-        expect.objectContaining({ title: 'File not found' }),
+        expect.objectContaining({ title: 'File not found' })
       );
     });
     expect(mockOpenFile).not.toHaveBeenCalled();

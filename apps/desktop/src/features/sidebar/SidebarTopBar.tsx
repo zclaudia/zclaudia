@@ -36,7 +36,6 @@ export function SidebarTopBar({
           icons sit left-aligned right after the lights; the remaining space is
           draggable for moving the window. */}
       <div className="flex h-9 items-center gap-1 pl-[76px] pr-2" data-tauri-drag-region>
-
         <button
           onClick={onOpenSearch}
           className={`${iconBtn} ${isSearchOpen ? 'bg-secondary text-foreground' : ''}`}
@@ -64,7 +63,9 @@ export function SidebarTopBar({
         )}
 
         <button
-          onClick={() => { void openWindowManagerWindow(); }}
+          onClick={() => {
+            void openWindowManagerWindow();
+          }}
           className={iconBtn}
           title="Windows"
           aria-label="Open window manager"

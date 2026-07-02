@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { parseToolRule, formatToolRule, suggestRuleForRequest, compileGlob } from '../tool-rule-syntax.js';
+import {
+  parseToolRule,
+  formatToolRule,
+  suggestRuleForRequest,
+  compileGlob,
+} from '../tool-rule-syntax.js';
 
 describe('compileGlob', () => {
   it('escapes regex specials and translates wildcards', () => {
@@ -25,12 +30,21 @@ describe('parseToolRule', () => {
   });
 
   it('parses Tool(glob) into a compiled pattern', () => {
-    expect(parseToolRule('Bash(git *)')).toEqual({ ok: true, rule: { toolName: 'Bash', pattern: '^git(\\s.*)?$' } });
-    expect(parseToolRule('Read(*.env)')).toEqual({ ok: true, rule: { toolName: 'Read', pattern: '^.*\\.env$' } });
+    expect(parseToolRule('Bash(git *)')).toEqual({
+      ok: true,
+      rule: { toolName: 'Bash', pattern: '^git(\\s.*)?$' },
+    });
+    expect(parseToolRule('Read(*.env)')).toEqual({
+      ok: true,
+      rule: { toolName: 'Read', pattern: '^.*\\.env$' },
+    });
   });
 
   it('passes ToolName(/regex/) through verbatim', () => {
-    expect(parseToolRule('Bash(/^docker (run|exec)/)')).toEqual({ ok: true, rule: { toolName: 'Bash', pattern: '^docker (run|exec)' } });
+    expect(parseToolRule('Bash(/^docker (run|exec)/)')).toEqual({
+      ok: true,
+      rule: { toolName: 'Bash', pattern: '^docker (run|exec)' },
+    });
   });
 
   it('rejects invalid syntax', () => {
@@ -43,7 +57,13 @@ describe('parseToolRule', () => {
 
 describe('formatToolRule (round-trip)', () => {
   it('round-trips compiler-produced rules back to glob text', () => {
-    for (const text of ['Bash(git *)', 'Read(*.env)', 'Bash(npm run build *)', 'WebFetch', 'Bash(file?.txt)']) {
+    for (const text of [
+      'Bash(git *)',
+      'Read(*.env)',
+      'Bash(npm run build *)',
+      'WebFetch',
+      'Bash(file?.txt)',
+    ]) {
       const parsed = parseToolRule(text);
       expect(parsed.ok).toBe(true);
       if (parsed.ok) expect(formatToolRule(parsed.rule)).toBe(text);
@@ -51,12 +71,18 @@ describe('formatToolRule (round-trip)', () => {
   });
 
   it('falls back to /regex/ display for foreign regexes', () => {
-    expect(formatToolRule({ toolName: 'Bash', pattern: '^docker (run|exec)' })).toBe('Bash(/^docker (run|exec)/)');
+    expect(formatToolRule({ toolName: 'Bash', pattern: '^docker (run|exec)' })).toBe(
+      'Bash(/^docker (run|exec)/)'
+    );
   });
 
   it('does not decompile foreign escape sequences to wrong globs', () => {
-    expect(formatToolRule({ toolName: 'Bash', pattern: '^git\\scommit$' })).toBe('Bash(/^git\\scommit$/)');
-    expect(formatToolRule({ toolName: 'Bash', pattern: '^git\\tcommit$' })).toBe('Bash(/^git\\tcommit$/)');
+    expect(formatToolRule({ toolName: 'Bash', pattern: '^git\\scommit$' })).toBe(
+      'Bash(/^git\\scommit$/)'
+    );
+    expect(formatToolRule({ toolName: 'Bash', pattern: '^git\\tcommit$' })).toBe(
+      'Bash(/^git\\tcommit$/)'
+    );
   });
 
   it('still decompiles compiler-escaped specials', () => {

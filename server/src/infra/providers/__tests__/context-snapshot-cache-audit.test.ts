@@ -23,7 +23,8 @@ describe('diffPrefixForCacheAudit', () => {
   it('flags toolsStable=false when the tool set changes', () => {
     diffPrefixForCacheAudit('sessZ', 'SYS', 'CAT', tools);
     const changed = diffPrefixForCacheAudit('sessZ', 'SYS', 'CAT', [
-      ...tools, { name: 'Bash', description: 'b', parameters: {} },
+      ...tools,
+      { name: 'Bash', description: 'b', parameters: {} },
     ]);
     expect(changed.toolsStable).toBe(false);
   });

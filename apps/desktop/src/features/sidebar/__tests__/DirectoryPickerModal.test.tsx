@@ -8,7 +8,7 @@ vi.mock('../../../services/api', () => ({ browseDirectories: vi.fn() }));
 const resp = (path: string, parent: string | null, dirs: string[]) => ({
   path,
   parent,
-  directories: dirs.map((n) => ({ name: n, path: `${path}/${n}` })),
+  directories: dirs.map(n => ({ name: n, path: `${path}/${n}` })),
 });
 
 describe('DirectoryPickerModal', () => {
@@ -28,7 +28,10 @@ describe('DirectoryPickerModal', () => {
     render(<DirectoryPickerModal open backendId={null} onClose={vi.fn()} onSelect={vi.fn()} />);
     fireEvent.click(await screen.findByText('code'));
     await waitFor(() =>
-      expect(api.browseDirectories).toHaveBeenLastCalledWith({ path: '/home/me/code', backendId: null }),
+      expect(api.browseDirectories).toHaveBeenLastCalledWith({
+        path: '/home/me/code',
+        backendId: null,
+      })
     );
   });
 
@@ -40,7 +43,7 @@ describe('DirectoryPickerModal', () => {
     await screen.findByText('code');
     fireEvent.click(screen.getByRole('button', { name: 'Up one level' }));
     await waitFor(() =>
-      expect(api.browseDirectories).toHaveBeenLastCalledWith({ path: '/home', backendId: null }),
+      expect(api.browseDirectories).toHaveBeenLastCalledWith({ path: '/home', backendId: null })
     );
   });
 
@@ -63,9 +66,17 @@ describe('DirectoryPickerModal', () => {
 
   it('seeds the browse from the initial path', async () => {
     vi.mocked(api.browseDirectories).mockResolvedValue(resp('/work/proj', '/work', []));
-    render(<DirectoryPickerModal open backendId="b1" initialPath="/work/proj" onClose={vi.fn()} onSelect={vi.fn()} />);
+    render(
+      <DirectoryPickerModal
+        open
+        backendId="b1"
+        initialPath="/work/proj"
+        onClose={vi.fn()}
+        onSelect={vi.fn()}
+      />
+    );
     await waitFor(() =>
-      expect(api.browseDirectories).toHaveBeenCalledWith({ path: '/work/proj', backendId: 'b1' }),
+      expect(api.browseDirectories).toHaveBeenCalledWith({ path: '/work/proj', backendId: 'b1' })
     );
   });
 });

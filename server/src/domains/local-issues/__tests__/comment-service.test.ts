@@ -14,7 +14,7 @@ function createTestDb() {
   // local_issues.project_id has a FK to projects(id); seed the row used by the
   // tests below so create() doesn't trip the foreign-key constraint.
   db.prepare(
-    `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+    `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
   ).run('proj-1', 'P', 'code', 0, 0);
   return db;
 }
@@ -47,7 +47,7 @@ describe('LocalIssueCommentService', () => {
         type: 'local_issue_comment_update',
         issueId,
         comment: expect.objectContaining({ body: 'hello world' }),
-      }),
+      })
     );
   });
 
@@ -64,22 +64,22 @@ describe('LocalIssueCommentService', () => {
   it('listByIssue returns comments in creation order', async () => {
     commentService.createComment(issueId, 'first');
     // small delay to ensure timestamps differ
-    await new Promise((r) => setTimeout(r, 2));
+    await new Promise(r => setTimeout(r, 2));
     commentService.createComment(issueId, 'second');
     const list = commentService.listByIssue(issueId);
-    expect(list.map((c) => c.body)).toEqual(['first', 'second']);
+    expect(list.map(c => c.body)).toEqual(['first', 'second']);
   });
 
   it('updateComment changes body + bumps updated_at + broadcasts', async () => {
     const created = commentService.createComment(issueId, 'original');
     broadcast.mockClear();
-    await new Promise((r) => setTimeout(r, 5));
+    await new Promise(r => setTimeout(r, 5));
     const updated = commentService.updateComment(created.id, 'revised');
     expect(updated.body).toBe('revised');
     expect(updated.updatedAt).toBeGreaterThan(created.updatedAt);
     expect(broadcast).toHaveBeenCalledWith(
       'proj-1',
-      expect.objectContaining({ type: 'local_issue_comment_update' }),
+      expect.objectContaining({ type: 'local_issue_comment_update' })
     );
   });
 
@@ -91,7 +91,7 @@ describe('LocalIssueCommentService', () => {
     expect(commentService.listByIssue(issueId)).toEqual([]);
     expect(broadcast).toHaveBeenCalledWith(
       'proj-1',
-      expect.objectContaining({ type: 'local_issue_comment_deleted', commentId: created.id }),
+      expect.objectContaining({ type: 'local_issue_comment_deleted', commentId: created.id })
     );
   });
 

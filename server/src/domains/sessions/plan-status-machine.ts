@@ -27,9 +27,9 @@ function normalizeStatus(status: PlanStatus): string {
  * Map from current status -> set of valid next statuses.
  */
 const PLAN_STATUS_TRANSITIONS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
-  ['null',      new Set(['null', 'planning'])],
-  ['planning',  new Set(['planned', 'executing', 'null'])],
-  ['planned',   new Set(['executing', 'null'])],
+  ['null', new Set(['null', 'planning'])],
+  ['planning', new Set(['planned', 'executing', 'null'])],
+  ['planned', new Set(['executing', 'null'])],
   ['executing', new Set(['null'])],
 ]);
 
@@ -53,9 +53,7 @@ export function assertPlanStatusTransition(from: PlanStatus, to: PlanStatus): vo
 
   const allowed = PLAN_STATUS_TRANSITIONS.get(fromKey) ?? UNKNOWN_STATUS_ALLOWED;
   if (!allowed.has(toKey)) {
-    throw new Error(
-      `Invalid plan-status transition: '${fromKey}' -> '${toKey}'`,
-    );
+    throw new Error(`Invalid plan-status transition: '${fromKey}' -> '${toKey}'`);
   }
 }
 

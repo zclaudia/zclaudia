@@ -1,7 +1,11 @@
 import { BaseRepository } from '../../infra/repositories/base.js';
 import type { Database } from 'better-sqlite3';
 import { normalizeWorkflowDefinition } from '@zclaudia/shared/features/workflows';
-import type { Workflow, WorkflowStatus, WorkflowDefinition } from '@zclaudia/shared/features/workflows';
+import type {
+  Workflow,
+  WorkflowStatus,
+  WorkflowDefinition,
+} from '@zclaudia/shared/features/workflows';
 import { newId } from '../../utils/uuid.js';
 
 type WorkflowCreate = Omit<Workflow, 'id' | 'createdAt' | 'updatedAt'>;
@@ -71,16 +75,46 @@ export class WorkflowRepository extends BaseRepository<Workflow, WorkflowCreate,
     const sets: string[] = ['updated_at = ?'];
     const params: unknown[] = [now];
 
-    if (data.name !== undefined) { sets.push('name = ?'); params.push(data.name); }
-    if (data.description !== undefined) { sets.push('description = ?'); params.push(data.description); }
-    if (data.status !== undefined) { sets.push('status = ?'); params.push(data.status); }
-    if (data.definition !== undefined) { sets.push('definition = ?'); params.push(JSON.stringify(data.definition)); }
-    if (data.templateId !== undefined) { sets.push('template_id = ?'); params.push(data.templateId); }
-    if (data.isSystem !== undefined) { sets.push('is_system = ?'); params.push(data.isSystem ? 1 : 0); }
-    if (data.systemKey !== undefined) { sets.push('system_key = ?'); params.push(data.systemKey); }
-    if (data.sourcePluginId !== undefined) { sets.push('source_plugin_id = ?'); params.push(data.sourcePluginId); }
-    if (data.sourceType !== undefined) { sets.push('source_type = ?'); params.push(data.sourceType); }
-    if (data.authoringMode !== undefined) { sets.push('authoring_mode = ?'); params.push(data.authoringMode); }
+    if (data.name !== undefined) {
+      sets.push('name = ?');
+      params.push(data.name);
+    }
+    if (data.description !== undefined) {
+      sets.push('description = ?');
+      params.push(data.description);
+    }
+    if (data.status !== undefined) {
+      sets.push('status = ?');
+      params.push(data.status);
+    }
+    if (data.definition !== undefined) {
+      sets.push('definition = ?');
+      params.push(JSON.stringify(data.definition));
+    }
+    if (data.templateId !== undefined) {
+      sets.push('template_id = ?');
+      params.push(data.templateId);
+    }
+    if (data.isSystem !== undefined) {
+      sets.push('is_system = ?');
+      params.push(data.isSystem ? 1 : 0);
+    }
+    if (data.systemKey !== undefined) {
+      sets.push('system_key = ?');
+      params.push(data.systemKey);
+    }
+    if (data.sourcePluginId !== undefined) {
+      sets.push('source_plugin_id = ?');
+      params.push(data.sourcePluginId);
+    }
+    if (data.sourceType !== undefined) {
+      sets.push('source_type = ?');
+      params.push(data.sourceType);
+    }
+    if (data.authoringMode !== undefined) {
+      sets.push('authoring_mode = ?');
+      params.push(data.authoringMode);
+    }
 
     params.push(id);
     return {
@@ -90,12 +124,16 @@ export class WorkflowRepository extends BaseRepository<Workflow, WorkflowCreate,
   }
 
   findByProject(projectId: string): Workflow[] {
-    const rows = this.db.prepare('SELECT * FROM workflows WHERE project_id = ? ORDER BY created_at DESC').all(projectId);
+    const rows = this.db
+      .prepare('SELECT * FROM workflows WHERE project_id = ? ORDER BY created_at DESC')
+      .all(projectId);
     return rows.map(row => this.mapRow(row));
   }
 
   findByProjectAndTemplate(projectId: string, templateId: string): Workflow | null {
-    const row = this.db.prepare('SELECT * FROM workflows WHERE project_id = ? AND template_id = ?').get(projectId, templateId);
+    const row = this.db
+      .prepare('SELECT * FROM workflows WHERE project_id = ? AND template_id = ?')
+      .get(projectId, templateId);
     return row ? this.mapRow(row) : null;
   }
 
@@ -105,12 +143,16 @@ export class WorkflowRepository extends BaseRepository<Workflow, WorkflowCreate,
   }
 
   findGlobal(): Workflow[] {
-    const rows = this.db.prepare('SELECT * FROM workflows WHERE project_id IS NULL ORDER BY created_at DESC').all();
+    const rows = this.db
+      .prepare('SELECT * FROM workflows WHERE project_id IS NULL ORDER BY created_at DESC')
+      .all();
     return rows.map(row => this.mapRow(row));
   }
 
   findGlobalByTemplate(templateId: string): Workflow | null {
-    const row = this.db.prepare('SELECT * FROM workflows WHERE project_id IS NULL AND template_id = ?').get(templateId);
+    const row = this.db
+      .prepare('SELECT * FROM workflows WHERE project_id IS NULL AND template_id = ?')
+      .get(templateId);
     return row ? this.mapRow(row) : null;
   }
 
@@ -120,9 +162,9 @@ export class WorkflowRepository extends BaseRepository<Workflow, WorkflowCreate,
   }
 
   findOverrideMetadataById(id: string): WorkflowOverrideMetadata | null {
-    const row = this.db.prepare(
-      'SELECT id, is_system FROM workflows WHERE id = ?'
-    ).get(id) as { id: string; is_system?: number | null } | undefined;
+    const row = this.db.prepare('SELECT id, is_system FROM workflows WHERE id = ?').get(id) as
+      | { id: string; is_system?: number | null }
+      | undefined;
     return row ? { id: row.id, isSystem: row.is_system === 1 } : null;
   }
 

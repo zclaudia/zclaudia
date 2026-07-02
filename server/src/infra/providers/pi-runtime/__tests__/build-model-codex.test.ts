@@ -16,7 +16,12 @@ function makeCodexProfile(): LlmProfileConfig {
     id: 'p1',
     name: 'codex',
     providerType: 'openai-codex',
-    oauthCredentials: { access: 'a-token', refresh: 'r', expires: Date.now() + 60_000, accountId: 'acct_x' },
+    oauthCredentials: {
+      access: 'a-token',
+      refresh: 'r',
+      expires: Date.now() + 60_000,
+      accountId: 'acct_x',
+    },
     createdAt: 1,
     updatedAt: 1,
   };
@@ -44,7 +49,12 @@ describe('buildModel — openai-codex', () => {
   });
 
   it('getApiKey delegates to refreshIfNeeded', async () => {
-    (refreshIfNeeded as any).mockResolvedValue({ access: 'fresh-a', refresh: 'r', expires: 1, accountId: 'acct_x' });
+    (refreshIfNeeded as any).mockResolvedValue({
+      access: 'fresh-a',
+      refresh: 'r',
+      expires: 1,
+      accountId: 'acct_x',
+    });
 
     const { getApiKey } = buildModel(makeCodexProfile(), 'gpt-5-codex');
     expect(getApiKey).toBeDefined();
@@ -65,7 +75,7 @@ describe('buildModel — openai-codex', () => {
         ...makeCodexProfile(),
         requestHeaders: { 'X-Org-Id': 'stale-org', originator: 'wrong-originator' },
       },
-      'gpt-5-codex',
+      'gpt-5-codex'
     );
 
     expect(model.headers?.['X-Org-Id']).toBeUndefined();

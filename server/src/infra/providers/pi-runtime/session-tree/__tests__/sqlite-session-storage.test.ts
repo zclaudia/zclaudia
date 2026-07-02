@@ -14,7 +14,10 @@ function makeDb(): Database.Database {
 
 function userEntry(id: string, parentId: string | null, text: string): MessageEntry {
   return {
-    type: 'message', id, parentId, timestamp: '2026-06-20T00:00:00.000Z',
+    type: 'message',
+    id,
+    parentId,
+    timestamp: '2026-06-20T00:00:00.000Z',
     message: { role: 'user', content: text } as MessageEntry['message'],
   };
 }
@@ -22,7 +25,10 @@ function userEntry(id: string, parentId: string | null, text: string): MessageEn
 describe('SqliteSessionStorage', () => {
   let db: Database.Database;
   let storage: SqliteSessionStorage;
-  beforeEach(() => { db = makeDb(); storage = new SqliteSessionStorage(db, 's1'); });
+  beforeEach(() => {
+    db = makeDb();
+    storage = new SqliteSessionStorage(db, 's1');
+  });
 
   it('createEntryId returns a fresh uuid each call', async () => {
     const a = await storage.createEntryId();
@@ -69,7 +75,7 @@ describe('SqliteSessionStorage', () => {
     await storage.appendEntry(userEntry('e2', 'e1', 'b'));
     await storage.appendEntry(userEntry('e3', 'e2', 'c'));
     const path = await storage.getPathToRoot('e3');
-    expect(path.map((p) => p.id)).toEqual(['e1', 'e2', 'e3']);
+    expect(path.map(p => p.id)).toEqual(['e1', 'e2', 'e3']);
   });
 
   it('getPathToRoot(null) returns empty', async () => {
@@ -78,14 +84,28 @@ describe('SqliteSessionStorage', () => {
 
   it('findEntries filters by type', async () => {
     await storage.appendEntry(userEntry('e1', null, 'a'));
-    expect((await storage.findEntries('message')).map((e) => e.id)).toEqual(['e1']);
+    expect((await storage.findEntries('message')).map(e => e.id)).toEqual(['e1']);
     expect(await storage.findEntries('compaction')).toEqual([]);
   });
 
   it('getLabel returns the latest label targeting an entry', async () => {
     await storage.appendEntry(userEntry('e1', null, 'a'));
-    await storage.appendEntry({ type: 'label', id: 'l1', parentId: 'e1', timestamp: '2026-06-20T00:00:01.000Z', targetId: 'e1', label: 'first' });
-    await storage.appendEntry({ type: 'label', id: 'l2', parentId: 'l1', timestamp: '2026-06-20T00:00:02.000Z', targetId: 'e1', label: 'second' });
+    await storage.appendEntry({
+      type: 'label',
+      id: 'l1',
+      parentId: 'e1',
+      timestamp: '2026-06-20T00:00:01.000Z',
+      targetId: 'e1',
+      label: 'first',
+    });
+    await storage.appendEntry({
+      type: 'label',
+      id: 'l2',
+      parentId: 'l1',
+      timestamp: '2026-06-20T00:00:02.000Z',
+      targetId: 'e1',
+      label: 'second',
+    });
     expect(await storage.getLabel('e1')).toBe('second');
   });
 
@@ -116,10 +136,15 @@ describe('SqliteSessionStorage', () => {
 
   it('round-trips a CompactionEntry with optional details + fromHook', async () => {
     const entry = {
-      type: 'compaction' as const, id: 'c1', parentId: 'e1',
+      type: 'compaction' as const,
+      id: 'c1',
+      parentId: 'e1',
       timestamp: '2026-06-20T00:00:05.000Z',
-      summary: 'SUM', firstKeptEntryId: 'e1', tokensBefore: 42,
-      details: { source: 'auto', readFiles: ['a.ts'], modifiedFiles: [] }, fromHook: false,
+      summary: 'SUM',
+      firstKeptEntryId: 'e1',
+      tokensBefore: 42,
+      details: { source: 'auto', readFiles: ['a.ts'], modifiedFiles: [] },
+      fromHook: false,
     };
     await storage.appendEntry(entry as Parameters<typeof storage.appendEntry>[0]);
     expect(await storage.getEntry('c1')).toEqual(entry);

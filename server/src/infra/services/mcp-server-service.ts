@@ -14,7 +14,10 @@ import {
   normalizeMcpServerTrustPolicy,
 } from '@zclaudia/shared/core/mcp';
 import { newId } from '../../utils/uuid.js';
-import { protectMcpOAuthCredentials, unprotectMcpOAuthCredentials } from './mcp-oauth-credential-protector.js';
+import {
+  protectMcpOAuthCredentials,
+  unprotectMcpOAuthCredentials,
+} from './mcp-oauth-credential-protector.js';
 
 export interface McpServerRow {
   id: string;
@@ -75,7 +78,7 @@ export class McpServerServiceError extends Error {
   constructor(
     readonly status: number,
     readonly code: string,
-    message: string,
+    message: string
   ) {
     super(message);
   }
@@ -157,16 +160,20 @@ function stringifyOAuthCredentials(value: unknown): string | null {
 export class McpServerService {
   constructor(
     private readonly db: Database.Database,
-    private readonly now: () => number = () => Date.now(),
+    private readonly now: () => number = () => Date.now()
   ) {}
 
   listServers(): McpServerConfig[] {
-    const rows = this.db.prepare(`
+    const rows = this.db
+      .prepare(
+        `
       SELECT id, name, command, args, env, enabled, description,
              source, provider_scope, trust_policy, transport, url, headers,
              headers_helper, oauth_config, oauth_credentials, created_at, updated_at
       FROM mcp_servers ORDER BY name ASC
-    `).all() as McpServerRow[];
+    `
+      )
+      .all() as McpServerRow[];
 
     return rows.map(rowToConfig);
   }
@@ -174,46 +181,62 @@ export class McpServerService {
   createServer(input: CreateMcpServerInput): McpServerConfig {
     const transport = normalizeMcpServerTransport(input.transport);
     if (!input.name || (transport === 'stdio' && !input.command)) {
-      throw new McpServerServiceError(400, 'INVALID_INPUT', 'name and command are required for stdio MCP servers');
+      throw new McpServerServiceError(
+        400,
+        'INVALID_INPUT',
+        'name and command are required for stdio MCP servers'
+      );
     }
     if (transport !== 'stdio' && !input.url) {
-      throw new McpServerServiceError(400, 'INVALID_INPUT', 'name and url are required for remote MCP servers');
+      throw new McpServerServiceError(
+        400,
+        'INVALID_INPUT',
+        'name and url are required for remote MCP servers'
+      );
     }
 
     const existing = this.db.prepare('SELECT id FROM mcp_servers WHERE name = ?').get(input.name);
     if (existing) {
-      throw new McpServerServiceError(409, 'DUPLICATE', `MCP server "${input.name}" already exists`);
+      throw new McpServerServiceError(
+        409,
+        'DUPLICATE',
+        `MCP server "${input.name}" already exists`
+      );
     }
 
     const id = newId();
     const now = this.now();
 
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO mcp_servers (
         id, name, command, args, env, enabled, description, source,
         provider_scope, trust_policy, transport, url, headers,
         headers_helper, oauth_config, oauth_credentials, created_at, updated_at
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, 'user', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      id,
-      input.name,
-      input.command ?? '',
-      input.args ? JSON.stringify(input.args) : null,
-      input.env ? JSON.stringify(input.env) : null,
-      input.enabled !== false ? 1 : 0,
-      input.description || null,
-      input.providerScope ? JSON.stringify(input.providerScope) : null,
-      stringifyTrustPolicy(input.trustPolicy),
-      transport,
-      input.url || null,
-      stringifyHeaders(input.headers),
-      normalizeMcpHeadersHelper(input.headersHelper) ?? null,
-      stringifyOAuthConfig(input.oauthConfig),
-      stringifyOAuthCredentials(input.oauthCredentials),
-      now,
-      now,
-    );
+    `
+      )
+      .run(
+        id,
+        input.name,
+        input.command ?? '',
+        input.args ? JSON.stringify(input.args) : null,
+        input.env ? JSON.stringify(input.env) : null,
+        input.enabled !== false ? 1 : 0,
+        input.description || null,
+        input.providerScope ? JSON.stringify(input.providerScope) : null,
+        stringifyTrustPolicy(input.trustPolicy),
+        transport,
+        input.url || null,
+        stringifyHeaders(input.headers),
+        normalizeMcpHeadersHelper(input.headersHelper) ?? null,
+        stringifyOAuthConfig(input.oauthConfig),
+        stringifyOAuthCredentials(input.oauthCredentials),
+        now,
+        now
+      );
 
     return this.requireServerById(id);
   }
@@ -222,13 +245,21 @@ export class McpServerService {
     this.assertExists(id);
 
     if (input.name) {
-      const duplicate = this.db.prepare('SELECT id FROM mcp_servers WHERE name = ? AND id != ?').get(input.name, id);
+      const duplicate = this.db
+        .prepare('SELECT id FROM mcp_servers WHERE name = ? AND id != ?')
+        .get(input.name, id);
       if (duplicate) {
-        throw new McpServerServiceError(409, 'DUPLICATE', `MCP server "${input.name}" already exists`);
+        throw new McpServerServiceError(
+          409,
+          'DUPLICATE',
+          `MCP server "${input.name}" already exists`
+        );
       }
     }
 
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       UPDATE mcp_servers SET
         name = COALESCE(?, name),
         command = COALESCE(?, command),
@@ -246,30 +277,40 @@ export class McpServerService {
         oauth_credentials = CASE WHEN ? THEN ? ELSE oauth_credentials END,
         updated_at = ?
       WHERE id = ?
-    `).run(
-      input.name || null,
-      input.command || null,
-      input.args !== undefined ? JSON.stringify(input.args) : null,
-      input.env !== undefined ? JSON.stringify(input.env) : null,
-      input.enabled !== undefined ? (input.enabled ? 1 : 0) : null,
-      input.description !== undefined ? (input.description || null) : null,
-      input.providerScope !== undefined ? (input.providerScope ? JSON.stringify(input.providerScope) : null) : null,
-      input.trustPolicy !== undefined ? stringifyTrustPolicy(input.trustPolicy) : null,
-      input.transport !== undefined ? 1 : 0,
-      input.transport !== undefined ? normalizeMcpServerTransport(input.transport) : null,
-      input.url !== undefined ? 1 : 0,
-      input.url !== undefined ? (input.url || null) : null,
-      input.headers !== undefined ? 1 : 0,
-      input.headers !== undefined ? stringifyHeaders(input.headers) : null,
-      input.headersHelper !== undefined ? 1 : 0,
-      input.headersHelper !== undefined ? (normalizeMcpHeadersHelper(input.headersHelper) ?? null) : null,
-      input.oauthConfig !== undefined ? 1 : 0,
-      input.oauthConfig !== undefined ? stringifyOAuthConfig(input.oauthConfig) : null,
-      input.oauthCredentials !== undefined ? 1 : 0,
-      input.oauthCredentials !== undefined ? stringifyOAuthCredentials(input.oauthCredentials) : null,
-      this.now(),
-      id,
-    );
+    `
+      )
+      .run(
+        input.name || null,
+        input.command || null,
+        input.args !== undefined ? JSON.stringify(input.args) : null,
+        input.env !== undefined ? JSON.stringify(input.env) : null,
+        input.enabled !== undefined ? (input.enabled ? 1 : 0) : null,
+        input.description !== undefined ? input.description || null : null,
+        input.providerScope !== undefined
+          ? input.providerScope
+            ? JSON.stringify(input.providerScope)
+            : null
+          : null,
+        input.trustPolicy !== undefined ? stringifyTrustPolicy(input.trustPolicy) : null,
+        input.transport !== undefined ? 1 : 0,
+        input.transport !== undefined ? normalizeMcpServerTransport(input.transport) : null,
+        input.url !== undefined ? 1 : 0,
+        input.url !== undefined ? input.url || null : null,
+        input.headers !== undefined ? 1 : 0,
+        input.headers !== undefined ? stringifyHeaders(input.headers) : null,
+        input.headersHelper !== undefined ? 1 : 0,
+        input.headersHelper !== undefined
+          ? (normalizeMcpHeadersHelper(input.headersHelper) ?? null)
+          : null,
+        input.oauthConfig !== undefined ? 1 : 0,
+        input.oauthConfig !== undefined ? stringifyOAuthConfig(input.oauthConfig) : null,
+        input.oauthCredentials !== undefined ? 1 : 0,
+        input.oauthCredentials !== undefined
+          ? stringifyOAuthCredentials(input.oauthCredentials)
+          : null,
+        this.now(),
+        id
+      );
 
     return this.requireServerById(id);
   }
@@ -291,18 +332,20 @@ export class McpServerService {
     }
 
     const newEnabled = row.enabled === 1 ? 0 : 1;
-    this.db.prepare('UPDATE mcp_servers SET enabled = ?, updated_at = ? WHERE id = ?')
+    this.db
+      .prepare('UPDATE mcp_servers SET enabled = ?, updated_at = ? WHERE id = ?')
       .run(newEnabled, this.now(), id);
 
     return this.requireServerById(id);
   }
 
   findEnabledServerByName(name: string): McpServerConfig | undefined {
-    return this.listServers().find((server) => server.name === name && server.enabled);
+    return this.listServers().find(server => server.name === name && server.enabled);
   }
 
   updateOAuthCredentials(name: string, credentials: McpOAuthCredentials | null): void {
-    this.db.prepare('UPDATE mcp_servers SET oauth_credentials = ?, updated_at = ? WHERE name = ?')
+    this.db
+      .prepare('UPDATE mcp_servers SET oauth_credentials = ?, updated_at = ? WHERE name = ?')
       .run(credentials ? stringifyOAuthCredentials(credentials) : null, this.now(), name);
   }
 
@@ -314,12 +357,16 @@ export class McpServerService {
   }
 
   private requireServerById(id: string): McpServerConfig {
-    const row = this.db.prepare(`
+    const row = this.db
+      .prepare(
+        `
       SELECT id, name, command, args, env, enabled, description,
              source, provider_scope, trust_policy, transport, url, headers,
              headers_helper, oauth_config, oauth_credentials, created_at, updated_at
       FROM mcp_servers WHERE id = ?
-    `).get(id) as McpServerRow | undefined;
+    `
+      )
+      .get(id) as McpServerRow | undefined;
 
     if (!row) {
       throw new McpServerServiceError(404, 'NOT_FOUND', 'MCP server not found');

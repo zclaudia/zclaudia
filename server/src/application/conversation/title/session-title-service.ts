@@ -25,7 +25,9 @@ const inFlight = new Set<string>();
 
 /** Fire-and-forget: never throws into the caller, never blocks run completion. */
 export function maybeGenerateSessionTitle(deps: MaybeGenerateSessionTitleDeps): void {
-  void runTitleGeneration(deps).catch(() => { /* silent by design */ });
+  void runTitleGeneration(deps).catch(() => {
+    /* silent by design */
+  });
 }
 
 async function runTitleGeneration(deps: MaybeGenerateSessionTitleDeps): Promise<void> {
@@ -37,11 +39,14 @@ async function runTitleGeneration(deps: MaybeGenerateSessionTitleDeps): Promise<
   if (!session || session.type === 'background') return;
 
   const userMsgCount = new SessionMessageRepository(db).countUserMessagesBySession(sessionId);
-  if (!shouldRegenerateTitle({
-    autoTitle: session.autoTitle,
-    autoTitleMsgCount: session.autoTitleMsgCount,
-    userMsgCount,
-  })) return;
+  if (
+    !shouldRegenerateTitle({
+      autoTitle: session.autoTitle,
+      autoTitleMsgCount: session.autoTitleMsgCount,
+      userMsgCount,
+    })
+  )
+    return;
 
   inFlight.add(sessionId);
   try {

@@ -3,6 +3,7 @@ import type { ServerInfo, ApiResponse } from '@zclaudia/shared';
 import { resolveGatewayBackendUrl } from '../gatewayProxy';
 import { useServerStore } from '../../stores/serverStore';
 import { getControlPlaneMode, isLocalBackendId } from '../../utils/controlPlane';
+import { fetchApiForBackend, fetchLocalApi } from './base';
 
 /**
  * Get server info (including whether authentication is required).
@@ -34,7 +35,10 @@ function resolveProbeBaseUrl(serverId: string): string | null {
   return `http://localhost:${localPort}`;
 }
 
-export async function probeServerLatency(serverId: string, timeoutMs = 5000): Promise<number | null> {
+export async function probeServerLatency(
+  serverId: string,
+  timeoutMs = 5000
+): Promise<number | null> {
   const baseUrl = resolveProbeBaseUrl(serverId);
   if (!baseUrl) return null;
 
@@ -59,10 +63,12 @@ export async function probeServerLatency(serverId: string, timeoutMs = 5000): Pr
 
 // Agent API
 export async function ensureAgent(): Promise<{ projectId: string; sessionId: string }> {
-  const { fetchLocalApi } = await import('./base');
-  const result = await fetchLocalApi<{ projectId: string; sessionId: string }>('/api/agent/ensure', {
-    method: 'POST'
-  });
+  const result = await fetchLocalApi<{ projectId: string; sessionId: string }>(
+    '/api/agent/ensure',
+    {
+      method: 'POST',
+    }
+  );
   if (!result.success || !result.data) {
     throw new Error(result.error?.message || 'Failed to ensure agent');
   }
@@ -81,7 +87,6 @@ export interface AgentConfig {
 }
 
 export async function getAgentConfig(): Promise<AgentConfig> {
-  const { fetchLocalApi } = await import('./base');
   const result = await fetchLocalApi<AgentConfig>('/api/agent/config');
   if (!result.success || !result.data) {
     throw new Error(result.error?.message || 'Failed to get agent config');
@@ -96,10 +101,9 @@ export async function updateAgentConfig(config: {
   permissionPolicy?: string | null;
   hooks?: string | null;
 }): Promise<AgentConfig> {
-  const { fetchLocalApi } = await import('./base');
   const result = await fetchLocalApi<AgentConfig>('/api/agent/config', {
     method: 'PUT',
-    body: JSON.stringify(config)
+    body: JSON.stringify(config),
   });
   if (!result.success || !result.data) {
     throw new Error(result.error?.message || 'Failed to update agent config');
@@ -118,8 +122,10 @@ export interface ProcessInfo {
 }
 
 export async function getProcessInfo(pid: number, backendId?: string | null): Promise<ProcessInfo> {
-  const { fetchApiForBackend } = await import('./base');
-  const result = await fetchApiForBackend<ProcessInfo>(`/api/system/process-info/${pid}`, backendId);
+  const result = await fetchApiForBackend<ProcessInfo>(
+    `/api/system/process-info/${pid}`,
+    backendId
+  );
   if (!result.success || !result.data) return { alive: false, pid };
   return result.data;
 }

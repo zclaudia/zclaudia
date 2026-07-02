@@ -16,7 +16,9 @@ export class ProjectChangeRepository {
 
   private hasTable(): boolean {
     const row = this.db
-      .prepare("SELECT 1 as ok FROM sqlite_master WHERE type = 'table' AND name = 'project_changes'")
+      .prepare(
+        "SELECT 1 as ok FROM sqlite_master WHERE type = 'table' AND name = 'project_changes'"
+      )
       .get() as { ok?: number } | undefined;
     return Boolean(row?.ok);
   }
@@ -57,7 +59,7 @@ export class ProjectChangeRepository {
     const rows = this.db
       .prepare('SELECT * FROM project_changes WHERE project_id = ? ORDER BY created_at DESC')
       .all(projectId);
-    return rows.map((row) => this.mapRow(row));
+    return rows.map(row => this.mapRow(row));
   }
 
   findActiveByProjectId(projectId: string): ProjectChange | undefined {
@@ -99,30 +101,38 @@ export class ProjectChangeRepository {
     const slugBase = slugify(data.title);
     let slug = slugBase;
     let suffix = 2;
-    while (this.db.prepare('SELECT 1 FROM project_changes WHERE project_id = ? AND slug = ?').get(data.projectId, slug)) {
+    while (
+      this.db
+        .prepare('SELECT 1 FROM project_changes WHERE project_id = ? AND slug = ?')
+        .get(data.projectId, slug)
+    ) {
       slug = `${slugBase}-${suffix++}`;
     }
 
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO project_changes (
         id, project_id, slug, title, summary, motivation, non_goals, scope,
         acceptance_criteria, status, active, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      id,
-      data.projectId,
-      slug,
-      data.title,
-      data.summary,
-      data.motivation ?? null,
-      JSON.stringify(data.nonGoals ?? []),
-      JSON.stringify(data.scope ?? []),
-      JSON.stringify(data.acceptanceCriteria ?? []),
-      'draft',
-      data.active === false ? 0 : 1,
-      now,
-      now,
-    );
+    `
+      )
+      .run(
+        id,
+        data.projectId,
+        slug,
+        data.title,
+        data.summary,
+        data.motivation ?? null,
+        JSON.stringify(data.nonGoals ?? []),
+        JSON.stringify(data.scope ?? []),
+        JSON.stringify(data.acceptanceCriteria ?? []),
+        'draft',
+        data.active === false ? 0 : 1,
+        now,
+        now
+      );
 
     return this.findById(id)!;
   }
@@ -142,25 +152,61 @@ export class ProjectChangeRepository {
       executionApprovedAt: number | null;
       syncApprovedAt: number | null;
       completedAt: number | null;
-    }>,
+    }>
   ): ProjectChange {
     if (!this.hasTable()) {
       throw new Error('project_changes table is not available');
     }
     const updates: string[] = [];
     const params: unknown[] = [];
-    if (data.title !== undefined) { updates.push('title = ?'); params.push(data.title); }
-    if (data.summary !== undefined) { updates.push('summary = ?'); params.push(data.summary); }
-    if (data.motivation !== undefined) { updates.push('motivation = ?'); params.push(data.motivation); }
-    if (data.nonGoals !== undefined) { updates.push('non_goals = ?'); params.push(JSON.stringify(data.nonGoals)); }
-    if (data.scope !== undefined) { updates.push('scope = ?'); params.push(JSON.stringify(data.scope)); }
-    if (data.acceptanceCriteria !== undefined) { updates.push('acceptance_criteria = ?'); params.push(JSON.stringify(data.acceptanceCriteria)); }
-    if (data.active !== undefined) { updates.push('active = ?'); params.push(data.active ? 1 : 0); }
-    if (data.status !== undefined) { updates.push('status = ?'); params.push(data.status); }
-    if (data.designApprovedAt !== undefined) { updates.push('design_approved_at = ?'); params.push(data.designApprovedAt); }
-    if (data.executionApprovedAt !== undefined) { updates.push('execution_approved_at = ?'); params.push(data.executionApprovedAt); }
-    if (data.syncApprovedAt !== undefined) { updates.push('sync_approved_at = ?'); params.push(data.syncApprovedAt); }
-    if (data.completedAt !== undefined) { updates.push('completed_at = ?'); params.push(data.completedAt); }
+    if (data.title !== undefined) {
+      updates.push('title = ?');
+      params.push(data.title);
+    }
+    if (data.summary !== undefined) {
+      updates.push('summary = ?');
+      params.push(data.summary);
+    }
+    if (data.motivation !== undefined) {
+      updates.push('motivation = ?');
+      params.push(data.motivation);
+    }
+    if (data.nonGoals !== undefined) {
+      updates.push('non_goals = ?');
+      params.push(JSON.stringify(data.nonGoals));
+    }
+    if (data.scope !== undefined) {
+      updates.push('scope = ?');
+      params.push(JSON.stringify(data.scope));
+    }
+    if (data.acceptanceCriteria !== undefined) {
+      updates.push('acceptance_criteria = ?');
+      params.push(JSON.stringify(data.acceptanceCriteria));
+    }
+    if (data.active !== undefined) {
+      updates.push('active = ?');
+      params.push(data.active ? 1 : 0);
+    }
+    if (data.status !== undefined) {
+      updates.push('status = ?');
+      params.push(data.status);
+    }
+    if (data.designApprovedAt !== undefined) {
+      updates.push('design_approved_at = ?');
+      params.push(data.designApprovedAt);
+    }
+    if (data.executionApprovedAt !== undefined) {
+      updates.push('execution_approved_at = ?');
+      params.push(data.executionApprovedAt);
+    }
+    if (data.syncApprovedAt !== undefined) {
+      updates.push('sync_approved_at = ?');
+      params.push(data.syncApprovedAt);
+    }
+    if (data.completedAt !== undefined) {
+      updates.push('completed_at = ?');
+      params.push(data.completedAt);
+    }
     updates.push('updated_at = ?');
     params.push(Date.now());
     params.push(id);
@@ -174,11 +220,15 @@ export class ProjectChangeRepository {
 
   updateStatus(id: string, status: ChangeStatus): ProjectChange {
     const now = Date.now();
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       UPDATE project_changes
       SET status = ?, updated_at = ?, completed_at = CASE WHEN ? = 'completed' THEN ? ELSE completed_at END
       WHERE id = ?
-    `).run(status, now, status, now, id);
+    `
+      )
+      .run(status, now, status, now, id);
 
     const updated = this.findById(id);
     if (!updated) {

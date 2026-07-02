@@ -15,22 +15,22 @@ export function useProviderManager() {
   );
 
   const updateProvider = useCallback(
-    async (id: string, updates: Partial<Omit<LlmProfileConfig, 'id' | 'createdAt' | 'updatedAt'>>) => {
+    async (
+      id: string,
+      updates: Partial<Omit<LlmProfileConfig, 'id' | 'createdAt' | 'updatedAt'>>
+    ) => {
       await api.updateLlmProfile(id, updates);
     },
     []
   );
 
-  const deleteProvider = useCallback(
-    async (id: string) => {
-      await api.deleteLlmProfile(id);
-    },
-    []
-  );
+  const deleteProvider = useCallback(async (id: string) => {
+    await api.deleteLlmProfile(id);
+  }, []);
 
   return {
     addProvider,
     updateProvider,
-    deleteProvider
+    deleteProvider,
   };
 }

@@ -4,7 +4,10 @@ import type { WebSocket } from 'ws';
 import { createPluginRoutes } from './routes.js';
 import { createPluginToolsRoutes } from './tools-routes.js';
 import { pluginLoader } from './loader.js';
-import { sendMessage, bumpPluginsVersion } from '../../application/conversation/transport/broadcast.js';
+import {
+  sendMessage,
+  bumpPluginsVersion,
+} from '../../application/conversation/transport/broadcast.js';
 import type { ActiveRun } from '../../application/conversation/transport/types.js';
 import { pluginEvents } from '../../infra/events/index.js';
 import { permissionManager as pluginPermissionManager } from './permissions.js';
@@ -23,34 +26,48 @@ export interface PluginsDomainDeps {
 }
 
 export function registerPluginsDomain(deps: PluginsDomainDeps): void {
-  const { app, authMiddleware, localOnlyMiddleware, db, activeRuns, clients, broadcastPluginState } = deps;
+  const {
+    app,
+    authMiddleware,
+    localOnlyMiddleware,
+    db,
+    activeRuns,
+    clients,
+    broadcastPluginState,
+  } = deps;
 
   app.use('/api/plugins', authMiddleware, createPluginRoutes());
-  app.use('/api/plugins', localOnlyMiddleware, createPluginToolsRoutes({
-    getActiveProfile: (sessionId) => {
-      for (const run of activeRuns.values()) {
-        if (run.sessionId === sessionId && !isTerminalPhase(run.phase)) {
-          return run.effectiveProfile;
+  app.use(
+    '/api/plugins',
+    localOnlyMiddleware,
+    createPluginToolsRoutes({
+      getActiveProfile: sessionId => {
+        for (const run of activeRuns.values()) {
+          if (run.sessionId === sessionId && !isTerminalPhase(run.phase)) {
+            return run.effectiveProfile;
+          }
         }
-      }
-      return undefined;
-    },
-    getSessionType: (sessionId) => {
-      const row = db.prepare('SELECT type FROM sessions WHERE id = ?').get(sessionId) as { type: string } | undefined;
-      return row?.type;
-    },
-    resolveActiveSessionId: () => {
-      for (const run of activeRuns.values()) {
-        if (!isTerminalPhase(run.phase)) {
-          return run.sessionId;
+        return undefined;
+      },
+      getSessionType: sessionId => {
+        const row = db.prepare('SELECT type FROM sessions WHERE id = ?').get(sessionId) as
+          | { type: string }
+          | undefined;
+        return row?.type;
+      },
+      resolveActiveSessionId: () => {
+        for (const run of activeRuns.values()) {
+          if (!isTerminalPhase(run.phase)) {
+            return run.sessionId;
+          }
         }
-      }
-      return undefined;
-    },
-  }));
+        return undefined;
+      },
+    })
+  );
 
-  pluginLoader.setBroadcast((msg) => {
-    clients.forEach((client) => {
+  pluginLoader.setBroadcast(msg => {
+    clients.forEach(client => {
       if (client.authenticated) {
         sendMessage(client.ws, msg);
       }
@@ -70,14 +87,14 @@ export function registerPluginsDomain(deps: PluginsDomainDeps): void {
     broadcastPluginState();
   });
 
-  pluginPermissionManager.onRequest((request) => {
+  pluginPermissionManager.onRequest(request => {
     const msg: import('@zclaudia/shared/wire/messages').PluginPermissionRequestMessage = {
       type: 'plugin_permission_request',
       pluginId: request.pluginId,
       pluginName: request.pluginName,
       permissions: request.permissions as string[],
     };
-    clients.forEach((client) => {
+    clients.forEach(client => {
       if (client.authenticated) {
         sendMessage(client.ws, msg);
       }

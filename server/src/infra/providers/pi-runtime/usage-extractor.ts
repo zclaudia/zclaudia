@@ -3,7 +3,11 @@ import type { AgentMessage } from '@earendil-works/pi-agent-core';
 
 export function zeroUsage(): Usage {
   return {
-    input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0,
+    input: 0,
+    output: 0,
+    cacheRead: 0,
+    cacheWrite: 0,
+    totalTokens: 0,
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
   };
 }
@@ -20,7 +24,7 @@ export function extractErrorStop(messages: AgentMessage[]): string | undefined {
     const m = messages[i] as { role?: string; stopReason?: string; errorMessage?: string };
     if (m.role !== 'assistant') continue;
     return m.stopReason === 'error'
-      ? (m.errorMessage || 'LLM provider returned an error stop reason')
+      ? m.errorMessage || 'LLM provider returned an error stop reason'
       : undefined;
   }
   return undefined;
@@ -71,7 +75,7 @@ export function extractUsage(messages: AgentMessage[]): Usage {
 
 export function withContextUsedTokens<T extends Partial<Usage>>(
   usage: T,
-  lastCallUsage?: Partial<Usage>,
+  lastCallUsage?: Partial<Usage>
 ): T & { contextUsedTokens?: number } {
   if (!lastCallUsage) return usage;
   return {

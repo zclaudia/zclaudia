@@ -55,9 +55,7 @@ describe('todo-state-tracker', () => {
     });
 
     it('returns no updates when all items persist', () => {
-      trackAndAutoComplete(sessionId, 'id-1', [
-        { content: 'Task A', status: 'pending' },
-      ]);
+      trackAndAutoComplete(sessionId, 'id-1', [{ content: 'Task A', status: 'pending' }]);
 
       const updates = trackAndAutoComplete(sessionId, 'id-2', [
         { content: 'Task A', status: 'in_progress' },
@@ -68,9 +66,7 @@ describe('todo-state-tracker', () => {
     });
 
     it('only updates the most recent previous interaction', () => {
-      trackAndAutoComplete(sessionId, 'id-1', [
-        { content: 'Task A', status: 'pending' },
-      ]);
+      trackAndAutoComplete(sessionId, 'id-1', [{ content: 'Task A', status: 'pending' }]);
       trackAndAutoComplete(sessionId, 'id-2', [
         { content: 'Task A', status: 'in_progress' },
         { content: 'Task B', status: 'pending' },
@@ -130,9 +126,7 @@ describe('todo-state-tracker', () => {
       ]);
 
       // Window 4: [D] — pure narrowing (no new items), skip auto-complete
-      const u4 = trackAndAutoComplete(sessionId, 'id-4', [
-        { content: 'D', status: 'in_progress' },
-      ]);
+      const u4 = trackAndAutoComplete(sessionId, 'id-4', [{ content: 'D', status: 'in_progress' }]);
       expect(u4).toEqual([]); // C stays pending, finalize will handle it
     });
 
@@ -143,9 +137,7 @@ describe('todo-state-tracker', () => {
       ]);
 
       // Narrow to just [D] — no new items, skip
-      const u = trackAndAutoComplete(sessionId, 'id-2', [
-        { content: 'D', status: 'in_progress' },
-      ]);
+      const u = trackAndAutoComplete(sessionId, 'id-2', [{ content: 'D', status: 'in_progress' }]);
       expect(u).toEqual([]);
 
       // Finalize marks all remaining as completed
@@ -157,9 +149,7 @@ describe('todo-state-tracker', () => {
         { content: 'D', status: 'completed' },
       ]);
       expect(fin[1].interactionId).toBe('id-2');
-      expect(fin[1].todos).toEqual([
-        { content: 'D', status: 'completed' },
-      ]);
+      expect(fin[1].todos).toEqual([{ content: 'D', status: 'completed' }]);
     });
   });
 
@@ -193,18 +183,14 @@ describe('todo-state-tracker', () => {
     });
 
     it('returns empty when all items already completed', () => {
-      trackAndAutoComplete(sessionId, 'id-1', [
-        { content: 'Task A', status: 'completed' },
-      ]);
+      trackAndAutoComplete(sessionId, 'id-1', [{ content: 'Task A', status: 'completed' }]);
 
       const updates = finalizeSession(sessionId);
       expect(updates).toEqual([]);
     });
 
     it('cleans up session state after finalize', () => {
-      trackAndAutoComplete(sessionId, 'id-1', [
-        { content: 'Task A', status: 'pending' },
-      ]);
+      trackAndAutoComplete(sessionId, 'id-1', [{ content: 'Task A', status: 'pending' }]);
 
       finalizeSession(sessionId);
 
@@ -222,9 +208,7 @@ describe('todo-state-tracker', () => {
 
   describe('clearSession', () => {
     it('removes session state without producing updates', () => {
-      trackAndAutoComplete(sessionId, 'id-1', [
-        { content: 'Task A', status: 'pending' },
-      ]);
+      trackAndAutoComplete(sessionId, 'id-1', [{ content: 'Task A', status: 'pending' }]);
 
       clearSession(sessionId);
 

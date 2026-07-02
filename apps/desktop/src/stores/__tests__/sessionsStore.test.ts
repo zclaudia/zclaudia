@@ -23,10 +23,7 @@ describe('sessionsStore', () => {
 
   describe('setRemoteSessions', () => {
     it('sets sessions for a backend', () => {
-      const sessions = [
-        createRemoteSession({ id: 's1' }),
-        createRemoteSession({ id: 's2' }),
-      ];
+      const sessions = [createRemoteSession({ id: 's1' }), createRemoteSession({ id: 's2' })];
       useSessionsStore.getState().setRemoteSessions('backend-1', sessions);
 
       const stored = useSessionsStore.getState().remoteSessions.get('backend-1');
@@ -173,8 +170,12 @@ describe('sessionsStore', () => {
     });
 
     it('does not affect other backends', () => {
-      useSessionsStore.getState().setRemoteSessions('backend-1', [createRemoteSession({ id: 's1' })]);
-      useSessionsStore.getState().setRemoteSessions('backend-2', [createRemoteSession({ id: 's2' })]);
+      useSessionsStore
+        .getState()
+        .setRemoteSessions('backend-1', [createRemoteSession({ id: 's1' })]);
+      useSessionsStore
+        .getState()
+        .setRemoteSessions('backend-2', [createRemoteSession({ id: 's2' })]);
 
       useSessionsStore.getState().clearBackendSessions('backend-1');
 
@@ -191,9 +192,15 @@ describe('sessionsStore', () => {
 
   describe('clearAllSessions', () => {
     it('removes all sessions across all backends', () => {
-      useSessionsStore.getState().setRemoteSessions('backend-1', [createRemoteSession({ id: 's1' })]);
-      useSessionsStore.getState().setRemoteSessions('backend-2', [createRemoteSession({ id: 's2' })]);
-      useSessionsStore.getState().setRemoteSessions('backend-3', [createRemoteSession({ id: 's3' })]);
+      useSessionsStore
+        .getState()
+        .setRemoteSessions('backend-1', [createRemoteSession({ id: 's1' })]);
+      useSessionsStore
+        .getState()
+        .setRemoteSessions('backend-2', [createRemoteSession({ id: 's2' })]);
+      useSessionsStore
+        .getState()
+        .setRemoteSessions('backend-3', [createRemoteSession({ id: 's3' })]);
 
       useSessionsStore.getState().clearAllSessions();
 
@@ -355,7 +362,9 @@ describe('sessionsStore', () => {
     it('handles missing backend gracefully', () => {
       useSessionsStore.getState().setSessionActiveById('missing', 's1', true);
       // Should not throw
-      expect(useSessionsStore.getState().activeSessionIdsByBackend.get('missing')).toEqual(new Set(['s1']));
+      expect(useSessionsStore.getState().activeSessionIdsByBackend.get('missing')).toEqual(
+        new Set(['s1'])
+      );
     });
 
     it('handles missing session id gracefully', () => {

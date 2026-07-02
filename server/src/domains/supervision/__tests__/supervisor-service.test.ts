@@ -2,12 +2,26 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vites
 import Database from 'better-sqlite3';
 import { newId } from '../../../utils/uuid.js';
 
-const { mockExecSync, mockContextManagerLoadAll, mockValidatePlanFile, mockComputeNextCronRun } = vi.hoisted(() => ({
-  mockExecSync: vi.fn(),
-  mockContextManagerLoadAll: vi.fn().mockReturnValue({ documents: [], workflow: { onTaskComplete: [], onCheckpoint: [], checkpointTrigger: { type: 'on_task_complete' } } }),
-  mockValidatePlanFile: vi.fn().mockReturnValue({ exists: true, ready: true, score: 100, missing: [], path: '/tmp/test-project/.supervision/plans/task-xxx.plan.md' }),
-  mockComputeNextCronRun: vi.fn().mockReturnValue(Date.now() + 3600000),
-}));
+const { mockExecSync, mockContextManagerLoadAll, mockValidatePlanFile, mockComputeNextCronRun } =
+  vi.hoisted(() => ({
+    mockExecSync: vi.fn(),
+    mockContextManagerLoadAll: vi.fn().mockReturnValue({
+      documents: [],
+      workflow: {
+        onTaskComplete: [],
+        onCheckpoint: [],
+        checkpointTrigger: { type: 'on_task_complete' },
+      },
+    }),
+    mockValidatePlanFile: vi.fn().mockReturnValue({
+      exists: true,
+      ready: true,
+      score: 100,
+      missing: [],
+      path: '/tmp/test-project/.supervision/plans/task-xxx.plan.md',
+    }),
+    mockComputeNextCronRun: vi.fn().mockReturnValue(Date.now() + 3600000),
+  }));
 
 vi.mock('child_process', () => ({
   execSync: mockExecSync,
@@ -26,7 +40,11 @@ vi.mock('../context-manager.js', () => {
     updateStructuredDocument = vi.fn();
     loadAll = mockContextManagerLoadAll;
     getContextForTask = vi.fn().mockReturnValue('');
-    getWorkflow = vi.fn().mockReturnValue({ onTaskComplete: [], onCheckpoint: [], checkpointTrigger: { type: 'on_task_complete' } });
+    getWorkflow = vi.fn().mockReturnValue({
+      onTaskComplete: [],
+      onCheckpoint: [],
+      checkpointTrigger: { type: 'on_task_complete' },
+    });
     writeTaskResult = vi.fn();
     writeReviewResult = vi.fn();
     constructor(_rootPath: string) {}
@@ -100,7 +118,10 @@ import { ProjectChangeRepository } from '../repositories/project-change.js';
 import { ProjectRepository } from '../../projects/index.js';
 import { SessionRepository } from '../../sessions/repository.js';
 import type { ProjectAgent, SupervisorConfig } from '@zclaudia/shared/features/supervision';
-import { createAgentProfilesTable, seedDefaultAgent } from '../../../test-helpers/seed-default-agent.js';
+import {
+  createAgentProfilesTable,
+  seedDefaultAgent,
+} from '../../../test-helpers/seed-default-agent.js';
 
 const mockSupervisionAiRunPort = {
   startVirtualRun: vi.fn(),
@@ -301,20 +322,20 @@ function createTestDb(): Database.Database {
 
 function seedProject(
   db: Database.Database,
-  opts: { rootPath?: string; agent?: ProjectAgent } = {},
+  opts: { rootPath?: string; agent?: ProjectAgent } = {}
 ): string {
   const id = newId();
   const now = Date.now();
   db.prepare(
     `INSERT INTO projects (id, name, type, root_path, agent, created_at, updated_at)
-     VALUES (?, ?, 'code', ?, ?, ?, ?)`,
+     VALUES (?, ?, 'code', ?, ?, ?, ?)`
   ).run(
     id,
     'Test Project',
     opts.rootPath ?? '/tmp/test-project',
     opts.agent ? JSON.stringify(opts.agent) : null,
     now,
-    now,
+    now
   );
   return id;
 }
@@ -350,7 +371,15 @@ describe('SupervisorService', () => {
     sessionRepo = new SessionRepository(db);
     changeRepo = new ProjectChangeRepository(db);
     broadcastFn = vi.fn();
-    service = new SupervisorService(db, taskRepo, projectRepo, sessionRepo, mockSessionModel, broadcastFn, mockSupervisionAiRunPort as any);
+    service = new SupervisorService(
+      db,
+      taskRepo,
+      projectRepo,
+      sessionRepo,
+      mockSessionModel,
+      broadcastFn,
+      mockSupervisionAiRunPort as any
+    );
   });
 
   afterAll(() => {
@@ -372,14 +401,27 @@ describe('SupervisorService', () => {
     broadcastFn.mockClear();
     mockSupervisionAiRunPort.startVirtualRun.mockReset();
     mockExecSync.mockReset();
-    mockContextManagerLoadAll.mockReset().mockReturnValue({ documents: [], workflow: { onTaskComplete: [], onCheckpoint: [], checkpointTrigger: { type: 'on_task_complete' } } });
+    mockContextManagerLoadAll.mockReset().mockReturnValue({
+      documents: [],
+      workflow: {
+        onTaskComplete: [],
+        onCheckpoint: [],
+        checkpointTrigger: { type: 'on_task_complete' },
+      },
+    });
     mockWorktreePoolInstance.init.mockClear();
     mockWorktreePoolInstance.acquire.mockClear();
     mockWorktreePoolInstance.release.mockClear();
     mockWorktreePoolInstance.mergeBack.mockClear().mockResolvedValue({ success: true });
     mockWorktreePoolInstance.destroy.mockClear();
     mockWorktreePoolInstance.isInitialized.mockClear().mockReturnValue(false);
-    mockValidatePlanFile.mockReset().mockReturnValue({ exists: true, ready: true, score: 100, missing: [], path: '/tmp/test-project/.supervision/plans/task-xxx.plan.md' });
+    mockValidatePlanFile.mockReset().mockReturnValue({
+      exists: true,
+      ready: true,
+      score: 100,
+      missing: [],
+      path: '/tmp/test-project/.supervision/plans/task-xxx.plan.md',
+    });
     mockComputeNextCronRun.mockReset().mockReturnValue(Date.now() + 3600000);
   });
 
@@ -435,7 +477,7 @@ describe('SupervisorService', () => {
       const now = Date.now();
       db.prepare(
         `INSERT INTO projects (id, name, type, root_path, created_at, updated_at)
-         VALUES (?, ?, 'code', NULL, ?, ?)`,
+         VALUES (?, ?, 'code', NULL, ?, ?)`
       ).run(id, 'No Root', now, now);
 
       expect(() => service.initAgent(id)).toThrow('has no rootPath');
@@ -479,7 +521,7 @@ describe('SupervisorService', () => {
       });
 
       expect(() => service.updateAgentPhase(projectId, 'pause')).toThrow(
-        "Cannot pause agent in phase 'paused'",
+        "Cannot pause agent in phase 'paused'"
       );
     });
 
@@ -487,7 +529,7 @@ describe('SupervisorService', () => {
       const projectId = seedProject(db, { agent: makeAgent({ phase: 'active' }) });
 
       expect(() => service.updateAgentPhase(projectId, 'resume')).toThrow(
-        "Cannot resume agent in phase 'active'",
+        "Cannot resume agent in phase 'active'"
       );
     });
 
@@ -503,7 +545,7 @@ describe('SupervisorService', () => {
       const projectId = seedProject(db);
 
       expect(() => service.updateAgentPhase(projectId, 'pause')).toThrow(
-        'No agent found for project',
+        'No agent found for project'
       );
     });
 
@@ -652,7 +694,7 @@ describe('SupervisorService', () => {
         service.createTask(projectId, {
           title: 'No agent',
           description: 'Should fail',
-        }),
+        })
       ).toThrow('No agent found for project');
     });
 
@@ -679,7 +721,7 @@ describe('SupervisorService', () => {
 
       // broadcastFn should have been called with a supervision_task_update
       const taskUpdateCalls = broadcastFn.mock.calls.filter(
-        (call: any[]) => call[0]?.type === 'supervision_task_update',
+        (call: any[]) => call[0]?.type === 'supervision_task_update'
       );
       expect(taskUpdateCalls.length).toBeGreaterThan(0);
     });
@@ -716,12 +758,12 @@ describe('SupervisorService', () => {
       expect(manager.updateStructuredDocument).toHaveBeenCalledWith(
         `changes/${change.id}/execution.md`,
         expect.objectContaining({ kind: 'execution', changeId: change.id }),
-        expect.any(String),
+        expect.any(String)
       );
       expect(manager.updateStructuredDocument).toHaveBeenCalledWith(
         `changes/${change.id}/tasks.md`,
         expect.objectContaining({ kind: 'tasks', changeId: change.id, taskCount: 1 }),
-        expect.any(String),
+        expect.any(String)
       );
     });
 
@@ -733,11 +775,13 @@ describe('SupervisorService', () => {
         summary: 'Other project change',
       });
 
-      expect(() => service.createTask(projectId, {
-        changeId: otherChange.id,
-        title: 'Invalid',
-        description: 'Should fail',
-      })).toThrow(`Change ${otherChange.id} does not belong to project ${projectId}`);
+      expect(() =>
+        service.createTask(projectId, {
+          changeId: otherChange.id,
+          title: 'Invalid',
+          description: 'Should fail',
+        })
+      ).toThrow(`Change ${otherChange.id} does not belong to project ${projectId}`);
     });
 
     it('C3: falls back to per-project Ad-hoc Change when no active change exists', () => {
@@ -799,9 +843,7 @@ describe('SupervisorService', () => {
       });
       // task is 'pending' not 'proposed'
 
-      expect(() => service.approveTask(task.id)).toThrow(
-        "Cannot approve task in status 'pending'",
-      );
+      expect(() => service.approveTask(task.id)).toThrow("Cannot approve task in status 'pending'");
     });
   });
 
@@ -837,9 +879,7 @@ describe('SupervisorService', () => {
         source: 'user',
       });
 
-      expect(() => service.rejectTask(task.id)).toThrow(
-        "Cannot reject task in status 'pending'",
-      );
+      expect(() => service.rejectTask(task.id)).toThrow("Cannot reject task in status 'pending'");
     });
   });
 
@@ -877,9 +917,7 @@ describe('SupervisorService', () => {
         status: 'running',
       });
 
-      await expect(service.approveTaskResult(task.id)).rejects.toThrow(
-        /Invalid task transition/,
-      );
+      await expect(service.approveTaskResult(task.id)).rejects.toThrow(/Invalid task transition/);
     });
 
     it('attempts merge when task has worktree session', async () => {
@@ -909,10 +947,12 @@ describe('SupervisorService', () => {
       const result = await service.approveTaskResult(task.id);
       expect(result.status).toBe('integrated');
       expect(mockWorktreePoolInstance.mergeBack).toHaveBeenCalledWith(
-        task.id, 1, '/tmp/worktrees/supervision/slot-0',
+        task.id,
+        1,
+        '/tmp/worktrees/supervision/slot-0'
       );
       expect(mockWorktreePoolInstance.release).toHaveBeenCalledWith(
-        '/tmp/worktrees/supervision/slot-0',
+        '/tmp/worktrees/supervision/slot-0'
       );
     });
 
@@ -1011,7 +1051,7 @@ describe('SupervisorService', () => {
       });
 
       expect(() => service.rejectTaskResult(task.id, 'notes')).toThrow(
-        "Cannot reject result for task in status 'pending'",
+        "Cannot reject result for task in status 'pending'"
       );
     });
   });
@@ -1064,7 +1104,7 @@ describe('SupervisorService', () => {
       // Instead, let's directly verify by checking status after tick is triggered
       // We can verify through getTasks
       const allTasks = service.getTasks(projectId);
-      const dependent = allTasks.find((t) => t.id === task.id)!;
+      const dependent = allTasks.find(t => t.id === task.id)!;
       expect(dependent.status).toBe('pending'); // Still pending until tick runs
     });
 
@@ -1207,9 +1247,9 @@ describe('SupervisorService', () => {
       service.createTask(projectId, { title: 'T2', description: 'd' });
 
       // Third task should exceed limit and pause agent
-      expect(() =>
-        service.createTask(projectId, { title: 'T3', description: 'd' }),
-      ).toThrow('Budget limit exceeded');
+      expect(() => service.createTask(projectId, { title: 'T3', description: 'd' })).toThrow(
+        'Budget limit exceeded'
+      );
 
       const project = projectRepo.findById(projectId);
       expect(project!.agent!.phase).toBe('paused');
@@ -1238,8 +1278,10 @@ describe('SupervisorService', () => {
         title: 'Change A',
         summary: 'Summary A',
       });
-      db.prepare('UPDATE project_changes SET active = 0, status = ? WHERE id = ?')
-        .run('completed', changeA.id);
+      db.prepare('UPDATE project_changes SET active = 0, status = ? WHERE id = ?').run(
+        'completed',
+        changeA.id
+      );
       const changeB = service.createChange(projectId, {
         title: 'Change B',
         summary: 'Summary B',
@@ -1268,7 +1310,7 @@ describe('SupervisorService', () => {
       expect(manager.updateStructuredDocument).toHaveBeenCalledWith(
         `changes/${change.id}/execution.md`,
         expect.objectContaining({ kind: 'execution', changeId: change.id, status: 'executing' }),
-        expect.stringContaining('## Current Change Status'),
+        expect.stringContaining('## Current Change Status')
       );
     });
 
@@ -1285,7 +1327,10 @@ describe('SupervisorService', () => {
       const updated = service.requestChangeSync(change.id, 'ready for sync');
 
       expect(updated.status).toBe('syncing');
-      const syncRun = db.prepare('SELECT status, summary FROM change_sync_runs WHERE change_id = ? ORDER BY created_at DESC LIMIT 1')
+      const syncRun = db
+        .prepare(
+          'SELECT status, summary FROM change_sync_runs WHERE change_id = ? ORDER BY created_at DESC LIMIT 1'
+        )
         .get(change.id) as { status: string; summary: string };
       expect(syncRun.status).toBe('pending');
       expect(syncRun.summary).toBe('ready for sync');
@@ -1304,7 +1349,10 @@ describe('SupervisorService', () => {
 
       expect(accepting.status).toBe('accepting');
       expect(synced.status).toBe('syncing');
-      const syncRun = db.prepare('SELECT status, summary FROM change_sync_runs WHERE change_id = ? ORDER BY created_at DESC LIMIT 1')
+      const syncRun = db
+        .prepare(
+          'SELECT status, summary FROM change_sync_runs WHERE change_id = ? ORDER BY created_at DESC LIMIT 1'
+        )
         .get(change.id) as { status: string; summary: string };
       expect(syncRun.status).toBe('pending');
       expect(syncRun.summary).toBe('approved');
@@ -1313,7 +1361,7 @@ describe('SupervisorService', () => {
       expect(manager.updateStructuredDocument).toHaveBeenCalledWith(
         `changes/${change.id}/acceptance.md`,
         expect.objectContaining({ kind: 'acceptance', changeId: change.id }),
-        expect.stringContaining('## Final Decision'),
+        expect.stringContaining('## Final Decision')
       );
     });
 
@@ -1326,7 +1374,11 @@ describe('SupervisorService', () => {
 
       service.resolveExecutionGate(change.id, 'approve_execution', 'ready');
       service.requestAcceptance(change.id, 'ready for acceptance');
-      const reopened = service.resolveAcceptance(change.id, 'revise_execution', 'needs another pass');
+      const reopened = service.resolveAcceptance(
+        change.id,
+        'revise_execution',
+        'needs another pass'
+      );
 
       expect(reopened.status).toBe('executing');
     });
@@ -1346,7 +1398,10 @@ describe('SupervisorService', () => {
       expect(completed.status).toBe('completed');
       expect(completed.active).toBe(false);
       expect(completed.syncApprovedAt).toBeDefined();
-      const syncRun = db.prepare('SELECT status, applied_at FROM change_sync_runs WHERE change_id = ? ORDER BY created_at DESC LIMIT 1')
+      const syncRun = db
+        .prepare(
+          'SELECT status, applied_at FROM change_sync_runs WHERE change_id = ? ORDER BY created_at DESC LIMIT 1'
+        )
         .get(change.id) as { status: string; applied_at: number | null };
       expect(syncRun.status).toBe('applied');
       expect(syncRun.applied_at).toBeTruthy();
@@ -1360,7 +1415,7 @@ describe('SupervisorService', () => {
       });
 
       expect(() => service.requestAcceptance(change.id, 'too early')).toThrow(
-        "Cannot request acceptance when change is in status 'draft'",
+        "Cannot request acceptance when change is in status 'draft'"
       );
     });
 
@@ -1372,7 +1427,7 @@ describe('SupervisorService', () => {
       });
 
       expect(() => service.resolveAcceptance(change.id, 'approve_acceptance', 'skip')).toThrow(
-        "Cannot resolve acceptance when change is in status 'draft'",
+        "Cannot resolve acceptance when change is in status 'draft'"
       );
     });
 
@@ -1384,7 +1439,7 @@ describe('SupervisorService', () => {
       });
 
       expect(() => service.completeChange(change.id, 'too early')).toThrow(
-        "Cannot complete change when status is 'draft'",
+        "Cannot complete change when status is 'draft'"
       );
     });
 
@@ -1408,7 +1463,7 @@ describe('SupervisorService', () => {
       expect(manager.updateDocument).toHaveBeenCalledWith(
         `changes/${change.id}/design.md`,
         '# Revised design',
-        expect.objectContaining({ category: 'design', source: 'user' }),
+        expect.objectContaining({ category: 'design', source: 'user' })
       );
     });
 
@@ -1427,7 +1482,6 @@ describe('SupervisorService', () => {
       expect(updated.status).toBe('planning');
       expect(updated.executionApprovedAt).toBeUndefined();
     });
-
   });
 
   describe('updateTask()', () => {
@@ -1459,7 +1513,7 @@ describe('SupervisorService', () => {
         .all(projectId) as any[];
 
       expect(logs.length).toBeGreaterThan(0);
-      const initLog = logs.find((l) => l.event === 'agent_initialized');
+      const initLog = logs.find(l => l.event === 'agent_initialized');
       expect(initLog).toBeDefined();
     });
 
@@ -1551,7 +1605,7 @@ describe('SupervisorService', () => {
 
   describe('tick() parallel mode', () => {
     // Helper: flush microtasks so async startTask() completes
-    const flushPromises = () => new Promise<void>((resolve) => setTimeout(resolve, 10));
+    const flushPromises = () => new Promise<void>(resolve => setTimeout(resolve, 10));
 
     it('starts multiple tasks when maxConcurrentTasks > 1 and isGit', async () => {
       // isGitProject returns true
@@ -1569,9 +1623,27 @@ describe('SupervisorService', () => {
       });
 
       // Create 3 queued tasks
-      const q1 = taskRepo.create({ projectId, title: 'T1', description: 'd', source: 'user', status: 'queued' });
-      const q2 = taskRepo.create({ projectId, title: 'T2', description: 'd', source: 'user', status: 'queued' });
-      const q3 = taskRepo.create({ projectId, title: 'T3', description: 'd', source: 'user', status: 'queued' });
+      const q1 = taskRepo.create({
+        projectId,
+        title: 'T1',
+        description: 'd',
+        source: 'user',
+        status: 'queued',
+      });
+      const q2 = taskRepo.create({
+        projectId,
+        title: 'T2',
+        description: 'd',
+        source: 'user',
+        status: 'queued',
+      });
+      const q3 = taskRepo.create({
+        projectId,
+        title: 'T3',
+        description: 'd',
+        source: 'user',
+        status: 'queued',
+      });
 
       // Trigger tick (startTask is async — need to flush)
       (service as any).tick();
@@ -1588,7 +1660,9 @@ describe('SupervisorService', () => {
 
     it('forces maxConcurrentTasks=1 for non-git projects', () => {
       // isGitProject returns false
-      mockExecSync.mockImplementation(() => { throw new Error('not a git repo'); });
+      mockExecSync.mockImplementation(() => {
+        throw new Error('not a git repo');
+      });
 
       const projectId = seedProject(db, {
         agent: makeAgent({
@@ -1601,8 +1675,20 @@ describe('SupervisorService', () => {
         }),
       });
 
-      const q1 = taskRepo.create({ projectId, title: 'T1', description: 'd', source: 'user', status: 'queued' });
-      const q2 = taskRepo.create({ projectId, title: 'T2', description: 'd', source: 'user', status: 'queued' });
+      const q1 = taskRepo.create({
+        projectId,
+        title: 'T1',
+        description: 'd',
+        source: 'user',
+        status: 'queued',
+      });
+      const q2 = taskRepo.create({
+        projectId,
+        title: 'T2',
+        description: 'd',
+        source: 'user',
+        status: 'queued',
+      });
 
       (service as any).tick();
 
@@ -1628,11 +1714,29 @@ describe('SupervisorService', () => {
       });
 
       // 1 already running
-      taskRepo.create({ projectId, title: 'Running', description: 'd', source: 'user', status: 'running' });
+      taskRepo.create({
+        projectId,
+        title: 'Running',
+        description: 'd',
+        source: 'user',
+        status: 'running',
+      });
 
       // 2 queued
-      const q1 = taskRepo.create({ projectId, title: 'Q1', description: 'd', source: 'user', status: 'queued' });
-      const q2 = taskRepo.create({ projectId, title: 'Q2', description: 'd', source: 'user', status: 'queued' });
+      const q1 = taskRepo.create({
+        projectId,
+        title: 'Q1',
+        description: 'd',
+        source: 'user',
+        status: 'queued',
+      });
+      const q2 = taskRepo.create({
+        projectId,
+        title: 'Q2',
+        description: 'd',
+        source: 'user',
+        status: 'queued',
+      });
 
       (service as any).tick();
       await flushPromises();
@@ -1659,10 +1763,22 @@ describe('SupervisorService', () => {
       });
 
       // 1 reviewing task (does NOT block in parallel mode)
-      taskRepo.create({ projectId, title: 'Reviewing', description: 'd', source: 'user', status: 'reviewing' });
+      taskRepo.create({
+        projectId,
+        title: 'Reviewing',
+        description: 'd',
+        source: 'user',
+        status: 'reviewing',
+      });
 
       // 1 queued task
-      const q1 = taskRepo.create({ projectId, title: 'Q1', description: 'd', source: 'user', status: 'queued' });
+      const q1 = taskRepo.create({
+        projectId,
+        title: 'Q1',
+        description: 'd',
+        source: 'user',
+        status: 'queued',
+      });
 
       (service as any).tick();
       await flushPromises();
@@ -1703,7 +1819,7 @@ describe('SupervisorService', () => {
       const result = await service.resolveConflict(task.id);
       expect(result.status).toBe('integrated');
       expect(mockWorktreePoolInstance.release).toHaveBeenCalledWith(
-        '/tmp/worktrees/supervision/slot-0',
+        '/tmp/worktrees/supervision/slot-0'
       );
     });
 
@@ -1747,7 +1863,7 @@ describe('SupervisorService', () => {
       });
 
       await expect(service.resolveConflict(task.id)).rejects.toThrow(
-        'No worktree found for this task',
+        'No worktree found for this task'
       );
     });
   });
@@ -1783,7 +1899,7 @@ describe('SupervisorService', () => {
       service.rejectTaskResult(task.id, 'Needs work');
 
       expect(mockWorktreePoolInstance.release).toHaveBeenCalledWith(
-        '/tmp/worktrees/supervision/slot-0',
+        '/tmp/worktrees/supervision/slot-0'
       );
     });
   });
@@ -1842,12 +1958,22 @@ describe('SupervisorService', () => {
       db.prepare(
         `INSERT INTO messages (id, session_id, role, content, metadata, created_at)
          VALUES (?, ?, 'assistant', 'hello', ?, ?)`
-      ).run(newId(), sessionId, JSON.stringify({ usage: { input_tokens: 100, output_tokens: 50 } }), Date.now());
+      ).run(
+        newId(),
+        sessionId,
+        JSON.stringify({ usage: { input_tokens: 100, output_tokens: 50 } }),
+        Date.now()
+      );
 
       db.prepare(
         `INSERT INTO messages (id, session_id, role, content, metadata, created_at)
          VALUES (?, ?, 'assistant', 'world', ?, ?)`
-      ).run(newId(), sessionId, JSON.stringify({ usage: { input_tokens: 200, output_tokens: 75 } }), Date.now());
+      ).run(
+        newId(),
+        sessionId,
+        JSON.stringify({ usage: { input_tokens: 200, output_tokens: 75 } }),
+        Date.now()
+      );
 
       expect(service.getTokenUsage(projectId)).toBe(425); // 100+50+200+75
     });
@@ -1891,7 +2017,12 @@ describe('SupervisorService', () => {
       db.prepare(
         `INSERT INTO messages (id, session_id, role, content, metadata, created_at)
          VALUES (?, ?, 'assistant', 'x', ?, ?)`
-      ).run(newId(), sessionId, JSON.stringify({ usage: { input_tokens: 80, output_tokens: 30 } }), Date.now());
+      ).run(
+        newId(),
+        sessionId,
+        JSON.stringify({ usage: { input_tokens: 80, output_tokens: 30 } }),
+        Date.now()
+      );
 
       // Budget = 100, usage = 110 → should pause
       const result = (service as any).checkBudgetLimits(projectId);
@@ -2034,7 +2165,12 @@ describe('SupervisorService', () => {
       db.prepare(
         `INSERT INTO supervision_logs (id, project_id, event, detail, created_at)
          VALUES (?, ?, 'budget_paused', ?, ?)`
-      ).run('log-x', projectId, JSON.stringify({ reason: 'token_budget_exceeded', usage: 500 }), Date.now());
+      ).run(
+        'log-x',
+        projectId,
+        JSON.stringify({ reason: 'token_budget_exceeded', usage: 500 }),
+        Date.now()
+      );
 
       const logs = service.getLogs(projectId);
       const budgetLog = logs.find(l => l.event === 'budget_paused');
@@ -2236,7 +2372,9 @@ describe('SupervisorService', () => {
 
   describe('tick() paused agent', () => {
     it('does not schedule any tasks when agent is paused', () => {
-      const projectId = seedProject(db, { agent: makeAgent({ phase: 'paused', pausedReason: 'user' }) });
+      const projectId = seedProject(db, {
+        agent: makeAgent({ phase: 'paused', pausedReason: 'user' }),
+      });
 
       const task = taskRepo.create({
         projectId,
@@ -2410,12 +2548,17 @@ describe('SupervisorService', () => {
       const sessionId = newId();
       db.prepare(
         `INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-         VALUES (?, ?, 'test', ?, ?)`,
+         VALUES (?, ?, 'test', ?, ?)`
       ).run(sessionId, projectId, Date.now(), Date.now());
       db.prepare(
         `INSERT INTO messages (id, session_id, role, content, metadata, created_at)
-         VALUES (?, ?, 'assistant', 'x', ?, ?)`,
-      ).run(newId(), sessionId, JSON.stringify({ usage: { input_tokens: 80, output_tokens: 30 } }), Date.now());
+         VALUES (?, ?, 'assistant', 'x', ?, ?)`
+      ).run(
+        newId(),
+        sessionId,
+        JSON.stringify({ usage: { input_tokens: 80, output_tokens: 30 } }),
+        Date.now()
+      );
 
       // Create a queued task
       const task = taskRepo.create({
@@ -2455,7 +2598,9 @@ describe('SupervisorService', () => {
       service.reloadContext(projectId);
 
       // contextSyncStatus should be 'error'
-      const row = db.prepare('SELECT context_sync_status FROM projects WHERE id = ?').get(projectId) as any;
+      const row = db
+        .prepare('SELECT context_sync_status FROM projects WHERE id = ?')
+        .get(projectId) as any;
       expect(row.context_sync_status).toBe('error');
 
       // Agent should be paused with reason 'sync_error'
@@ -2474,7 +2619,9 @@ describe('SupervisorService', () => {
       service.reloadContext(projectId);
 
       const logs = db
-        .prepare("SELECT * FROM supervision_logs WHERE project_id = ? AND event = 'context_sync_error'")
+        .prepare(
+          "SELECT * FROM supervision_logs WHERE project_id = ? AND event = 'context_sync_error'"
+        )
         .all(projectId) as any[];
 
       expect(logs.length).toBe(1);
@@ -2486,12 +2633,17 @@ describe('SupervisorService', () => {
       const projectId = seedProject(db, { agent: makeAgent({ phase: 'active' }) });
 
       // First: set error state
-      db.prepare('UPDATE projects SET context_sync_status = ? WHERE id = ?').run('error', projectId);
+      db.prepare('UPDATE projects SET context_sync_status = ? WHERE id = ?').run(
+        'error',
+        projectId
+      );
 
       // Now reload succeeds (default mock behavior)
       service.reloadContext(projectId);
 
-      const row = db.prepare('SELECT context_sync_status FROM projects WHERE id = ?').get(projectId) as any;
+      const row = db
+        .prepare('SELECT context_sync_status FROM projects WHERE id = ?')
+        .get(projectId) as any;
       expect(row.context_sync_status).toBe('synced');
     });
 
@@ -2505,7 +2657,9 @@ describe('SupervisorService', () => {
       service.reloadContext(projectId);
 
       // contextSyncStatus should still be set to error
-      const row = db.prepare('SELECT context_sync_status FROM projects WHERE id = ?').get(projectId) as any;
+      const row = db
+        .prepare('SELECT context_sync_status FROM projects WHERE id = ?')
+        .get(projectId) as any;
       expect(row.context_sync_status).toBe('error');
 
       // No agent, so no pause — project should still have no agent
@@ -2521,7 +2675,9 @@ describe('SupervisorService', () => {
   describe('non-git project behavior', () => {
     it('forces serial execution (maxConcurrentTasks=1) for non-git projects', () => {
       // isGitProject returns false
-      mockExecSync.mockImplementation(() => { throw new Error('not a git repo'); });
+      mockExecSync.mockImplementation(() => {
+        throw new Error('not a git repo');
+      });
 
       const projectId = seedProject(db, {
         agent: makeAgent({
@@ -2534,9 +2690,27 @@ describe('SupervisorService', () => {
         }),
       });
 
-      const q1 = taskRepo.create({ projectId, title: 'T1', description: 'd', source: 'user', status: 'queued' });
-      const q2 = taskRepo.create({ projectId, title: 'T2', description: 'd', source: 'user', status: 'queued' });
-      const q3 = taskRepo.create({ projectId, title: 'T3', description: 'd', source: 'user', status: 'queued' });
+      const q1 = taskRepo.create({
+        projectId,
+        title: 'T1',
+        description: 'd',
+        source: 'user',
+        status: 'queued',
+      });
+      const q2 = taskRepo.create({
+        projectId,
+        title: 'T2',
+        description: 'd',
+        source: 'user',
+        status: 'queued',
+      });
+      const q3 = taskRepo.create({
+        projectId,
+        title: 'T3',
+        description: 'd',
+        source: 'user',
+        status: 'queued',
+      });
 
       (service as any).tick();
 
@@ -2683,7 +2857,7 @@ describe('SupervisorService', () => {
       const now = Date.now();
       db.prepare(
         `INSERT INTO projects (id, name, type, root_path, agent, created_at, updated_at)
-         VALUES (?, ?, 'code', NULL, ?, ?, ?)`,
+         VALUES (?, ?, 'code', NULL, ?, ?, ?)`
       ).run(id, 'No Root', JSON.stringify(makeAgent()), now, now);
 
       const task = taskRepo.create({
@@ -2705,7 +2879,9 @@ describe('SupervisorService', () => {
   describe('submitTaskPlan()', () => {
     it('submits plan and transitions task to queued (then tick may start it)', () => {
       // Use a paused agent so tick() doesn't immediately start the task
-      const projectId = seedProject(db, { agent: makeAgent({ phase: 'paused', pausedReason: 'user' }) });
+      const projectId = seedProject(db, {
+        agent: makeAgent({ phase: 'paused', pausedReason: 'user' }),
+      });
 
       const task = taskRepo.create({
         projectId,
@@ -2796,7 +2972,7 @@ describe('SupervisorService', () => {
       const now = Date.now();
       db.prepare(
         `INSERT INTO projects (id, name, type, root_path, created_at, updated_at)
-         VALUES (?, ?, 'code', NULL, ?, ?)`,
+         VALUES (?, ?, 'code', NULL, ?, ?)`
       ).run(id, 'No Root', now, now);
 
       const docs = service.getContextDocuments(id);
@@ -2808,7 +2984,11 @@ describe('SupervisorService', () => {
 
       mockContextManagerLoadAll.mockReturnValue({
         documents: [{ id: 'goal.md', content: 'test' }],
-        workflow: { onTaskComplete: [], onCheckpoint: [], checkpointTrigger: { type: 'on_task_complete' } },
+        workflow: {
+          onTaskComplete: [],
+          onCheckpoint: [],
+          checkpointTrigger: { type: 'on_task_complete' },
+        },
       });
 
       const docs = service.getContextDocuments(projectId);
@@ -3294,7 +3474,7 @@ describe('SupervisorService', () => {
   // ========================================
 
   describe('tick() lite mode', () => {
-    const flushPromises = () => new Promise<void>((resolve) => setTimeout(resolve, 10));
+    const flushPromises = () => new Promise<void>(resolve => setTimeout(resolve, 10));
 
     it('starts a lite task when queued in lite mode', async () => {
       const projectId = seedProject(db, {
@@ -3337,8 +3517,20 @@ describe('SupervisorService', () => {
         }),
       });
 
-      taskRepo.create({ projectId, title: 'Running', description: 'd', source: 'user', status: 'running' });
-      const q1 = taskRepo.create({ projectId, title: 'Q1', description: 'd', source: 'user', status: 'queued' });
+      taskRepo.create({
+        projectId,
+        title: 'Running',
+        description: 'd',
+        source: 'user',
+        status: 'running',
+      });
+      const q1 = taskRepo.create({
+        projectId,
+        title: 'Q1',
+        description: 'd',
+        source: 'user',
+        status: 'queued',
+      });
 
       (service as any).tick();
       await flushPromises();
@@ -3466,8 +3658,9 @@ describe('SupervisorService', () => {
       });
 
       // Manually set schedule_next_run in DB since create may not persist it correctly
-      db.prepare('UPDATE supervision_tasks SET schedule_next_run = ?, schedule_enabled = 1 WHERE id = ?')
-        .run(now - 1000, task.id);
+      db.prepare(
+        'UPDATE supervision_tasks SET schedule_next_run = ?, schedule_enabled = 1 WHERE id = ?'
+      ).run(now - 1000, task.id);
 
       (service as any).checkScheduledTasks(projectId);
 
@@ -3494,8 +3687,9 @@ describe('SupervisorService', () => {
       });
 
       // Set next run in the future
-      db.prepare('UPDATE supervision_tasks SET schedule_next_run = ?, schedule_enabled = 1 WHERE id = ?')
-        .run(now + 60000, task.id);
+      db.prepare(
+        'UPDATE supervision_tasks SET schedule_next_run = ?, schedule_enabled = 1 WHERE id = ?'
+      ).run(now + 60000, task.id);
 
       (service as any).checkScheduledTasks(projectId);
 
@@ -3519,8 +3713,9 @@ describe('SupervisorService', () => {
         scheduleEnabled: true,
       });
 
-      db.prepare('UPDATE supervision_tasks SET schedule_next_run = ?, schedule_enabled = 1 WHERE id = ?')
-        .run(now - 1000, task.id);
+      db.prepare(
+        'UPDATE supervision_tasks SET schedule_next_run = ?, schedule_enabled = 1 WHERE id = ?'
+      ).run(now - 1000, task.id);
 
       (service as any).checkScheduledTasks(projectId);
 
@@ -3573,14 +3768,30 @@ describe('SupervisorService', () => {
   describe('lifecycle start/stop', () => {
     it('start() is idempotent — calling twice does not create duplicate intervals', () => {
       // Use a separate service to avoid interfering with the shared one
-      const svc = new SupervisorService(db, taskRepo, projectRepo, sessionRepo, mockSessionModel, vi.fn(), mockSupervisionAiRunPort as any);
+      const svc = new SupervisorService(
+        db,
+        taskRepo,
+        projectRepo,
+        sessionRepo,
+        mockSessionModel,
+        vi.fn(),
+        mockSupervisionAiRunPort as any
+      );
       svc.start(60000); // Long interval to avoid actual ticks
       svc.start(60000); // Should be no-op
       svc.stop();
     });
 
     it('stop() clears interval and destroys worktree pools', () => {
-      const svc = new SupervisorService(db, taskRepo, projectRepo, sessionRepo, mockSessionModel, vi.fn(), mockSupervisionAiRunPort as any);
+      const svc = new SupervisorService(
+        db,
+        taskRepo,
+        projectRepo,
+        sessionRepo,
+        mockSessionModel,
+        vi.fn(),
+        mockSupervisionAiRunPort as any
+      );
       svc.start(60000);
 
       // Force a pool creation
@@ -3594,7 +3805,15 @@ describe('SupervisorService', () => {
     });
 
     it('stop() without start() does not throw', () => {
-      const svc = new SupervisorService(db, taskRepo, projectRepo, sessionRepo, mockSessionModel, vi.fn(), mockSupervisionAiRunPort as any);
+      const svc = new SupervisorService(
+        db,
+        taskRepo,
+        projectRepo,
+        sessionRepo,
+        mockSessionModel,
+        vi.fn(),
+        mockSupervisionAiRunPort as any
+      );
       svc.stop(); // Should not throw
     });
   });
@@ -3608,7 +3827,7 @@ describe('SupervisorService', () => {
       const projectId = seedProject(db, { agent: makeAgent({ phase: 'active' }) });
 
       expect(() => service.updateAgentPhase(projectId, 'approve_setup')).toThrow(
-        "Cannot approve setup for agent in phase 'active'",
+        "Cannot approve setup for agent in phase 'active'"
       );
     });
   });
@@ -3751,7 +3970,7 @@ describe('SupervisorService', () => {
       const now = Date.now();
       db.prepare(
         `INSERT INTO projects (id, name, type, root_path, created_at, updated_at)
-         VALUES (?, ?, 'code', NULL, ?, ?)`,
+         VALUES (?, ?, 'code', NULL, ?, ?)`
       ).run(id, 'No Root', now, now);
 
       expect(() => service.reloadContext(id)).toThrow('has no rootPath');
@@ -3800,7 +4019,7 @@ describe('SupervisorService', () => {
       });
 
       await expect(service.resolveConflict(task.id)).rejects.toThrow(
-        'No worktree found for this task',
+        'No worktree found for this task'
       );
     });
   });

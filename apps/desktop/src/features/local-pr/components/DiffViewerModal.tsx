@@ -36,11 +36,17 @@ export function DiffViewerModal({ title, diff, onClose }: DiffViewerModalProps) 
   }, [diff]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 safe-top-pad safe-bottom-pad" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 safe-top-pad safe-bottom-pad"
+      onClick={onClose}
+    >
       <div
         className="bg-background border border-border rounded-xl shadow-xl w-[90vw] max-w-4xl max-h-[80vh] flex flex-col"
-        style={{ maxHeight: 'calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 1.5rem)' }}
-        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxHeight:
+            'calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 1.5rem)',
+        }}
+        onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
           <h2 className="text-sm font-semibold truncate" title={title}>
@@ -56,7 +62,7 @@ export function DiffViewerModal({ title, diff, onClose }: DiffViewerModalProps) 
 
         <div className="flex-1 overflow-auto p-0">
           <pre className="text-xs font-mono leading-5">
-            {lines.map((line) => (
+            {lines.map(line => (
               <div key={line.key} className={`px-4 ${LINE_STYLES[line.type]}`}>
                 {line.text || '\u00A0'}
               </div>

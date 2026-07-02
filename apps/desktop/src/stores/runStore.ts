@@ -5,13 +5,13 @@ import { useChatMessageStore, findLastAssistantMessageIndex } from './chatMessag
 
 // Tool call state for displaying in the UI
 export interface ToolCallState {
-  id: string;            // tool_use_id
+  id: string; // tool_use_id
   toolName: string;
   toolInput: unknown;
   status: 'running' | 'completed' | 'error';
   result?: unknown;
   isError?: boolean;
-  activity?: string;     // Subagent activity text (e.g. "Reading file X...")
+  activity?: string; // Subagent activity text (e.g. "Reading file X...")
   /**
    * Provider-declared semantic category (e.g. `'plan_proposal'`). Lets the
    * UI pick a renderer without string-matching provider-specific tool names.
@@ -65,8 +65,21 @@ interface RunState {
   clearRunRetryStatus: (runId: string) => void;
 
   // Actions — Tool calls (per run)
-  addToolCall: (runId: string, toolUseId: string, toolName: string, toolInput: unknown, semantic?: ToolSemantic, effect?: ToolEffect) => void;
-  updateToolCallResult: (runId: string, toolUseId: string, result: unknown, isError?: boolean, effect?: ToolEffect) => void;
+  addToolCall: (
+    runId: string,
+    toolUseId: string,
+    toolName: string,
+    toolInput: unknown,
+    semantic?: ToolSemantic,
+    effect?: ToolEffect
+  ) => void;
+  updateToolCallResult: (
+    runId: string,
+    toolUseId: string,
+    result: unknown,
+    isError?: boolean,
+    effect?: ToolEffect
+  ) => void;
   updateToolCallActivity: (runId: string, toolUseId: string, activity: string) => void;
 
   // Actions — Content blocks (per run)
@@ -99,7 +112,7 @@ export const useRunStore = create<RunState>((set, get) => ({
   startRun: (runId, sessionId, isBackground) => {
     const newBackgroundRunIds = new Set(get().backgroundRunIds);
     if (isBackground) newBackgroundRunIds.add(runId);
-    set((state) => ({
+    set(state => ({
       activeRuns: { ...state.activeRuns, [runId]: sessionId },
       backgroundRunIds: newBackgroundRunIds,
       activeToolCalls: { ...state.activeToolCalls, [runId]: {} },
@@ -108,9 +121,9 @@ export const useRunStore = create<RunState>((set, get) => ({
     }));
   },
 
-  endRun: (runId) => {
+  endRun: runId => {
     const sessionId = get().activeRuns[runId];
-    set((state) => {
+    set(state => {
       const { [runId]: _removedRun, ...remainingRuns } = state.activeRuns;
       const { [runId]: _removedTC, ...remainingTC } = state.activeToolCalls;
       const { [runId]: _removedHist, ...remainingHist } = state.toolCallsHistory;
@@ -133,12 +146,13 @@ export const useRunStore = create<RunState>((set, get) => ({
   },
 
   updateRunHealth: (runId, health) =>
-    set((state) => {
+    set(state => {
       const existing = state.runHealth[runId];
-      if (existing
-        && existing.health === health.health
-        && existing.lastActivityAt === health.lastActivityAt
-        && existing.loopPattern === health.loopPattern
+      if (
+        existing &&
+        existing.health === health.health &&
+        existing.lastActivityAt === health.lastActivityAt &&
+        existing.loopPattern === health.loopPattern
       ) {
         return state;
       }
@@ -146,10 +160,10 @@ export const useRunStore = create<RunState>((set, get) => ({
     }),
 
   updateRunRetryStatus: (runId, status) =>
-    set((state) => ({ runRetryStatus: { ...state.runRetryStatus, [runId]: status } })),
+    set(state => ({ runRetryStatus: { ...state.runRetryStatus, [runId]: status } })),
 
-  clearRunRetryStatus: (runId) =>
-    set((state) => {
+  clearRunRetryStatus: runId =>
+    set(state => {
       if (!state.runRetryStatus[runId]) return state;
       const { [runId]: _removed, ...rest } = state.runRetryStatus;
       return { runRetryStatus: rest };
@@ -158,7 +172,7 @@ export const useRunStore = create<RunState>((set, get) => ({
   // ── Tool call actions (per run) ────────────────────────────────
 
   addToolCall: (runId, toolUseId, toolName, toolInput, semantic, effect) =>
-    set((state) => {
+    set(state => {
       const newToolCall: ToolCallState = {
         id: toolUseId,
         toolName,
@@ -184,7 +198,7 @@ export const useRunStore = create<RunState>((set, get) => ({
     }),
 
   updateToolCallResult: (runId, toolUseId, result, isError, effect) =>
-    set((state) => {
+    set(state => {
       const runToolCalls = state.activeToolCalls[runId];
       if (!runToolCalls) return state;
       const existing = runToolCalls[toolUseId];
@@ -194,7 +208,7 @@ export const useRunStore = create<RunState>((set, get) => ({
 
       const updatedToolCall = {
         ...existing,
-        status: isError ? 'error' as const : 'completed' as const,
+        status: isError ? ('error' as const) : ('completed' as const),
         result,
         isError,
         effect: effect ?? existing.effect,
@@ -208,13 +222,13 @@ export const useRunStore = create<RunState>((set, get) => ({
         },
         toolCallsHistory: {
           ...state.toolCallsHistory,
-          [runId]: runHistory.map(tc => tc.id === toolUseId ? updatedToolCall : tc),
+          [runId]: runHistory.map(tc => (tc.id === toolUseId ? updatedToolCall : tc)),
         },
       };
     }),
 
   updateToolCallActivity: (runId, toolUseId, activity) =>
-    set((state) => {
+    set(state => {
       const runToolCalls = state.activeToolCalls[runId];
       if (!runToolCalls) return state;
       const existing = runToolCalls[toolUseId];
@@ -229,7 +243,7 @@ export const useRunStore = create<RunState>((set, get) => ({
         },
         toolCallsHistory: {
           ...state.toolCallsHistory,
-          [runId]: runHistory.map(tc => tc.id === toolUseId ? updated : tc),
+          [runId]: runHistory.map(tc => (tc.id === toolUseId ? updated : tc)),
         },
       };
     }),
@@ -237,12 +251,15 @@ export const useRunStore = create<RunState>((set, get) => ({
   // ── Content block actions (per run) ──────────────────────────
 
   appendTextBlock: (runId, content) =>
-    set((state) => {
+    set(state => {
       const blocks = state.runContentBlocks[runId] || [];
       const lastBlock = blocks[blocks.length - 1];
       let updatedBlocks: ContentBlock[];
       if (lastBlock && lastBlock.type === 'text') {
-        updatedBlocks = [...blocks.slice(0, -1), { type: 'text', content: lastBlock.content + content }];
+        updatedBlocks = [
+          ...blocks.slice(0, -1),
+          { type: 'text', content: lastBlock.content + content },
+        ];
       } else {
         updatedBlocks = [...blocks, { type: 'text', content }];
       }
@@ -252,7 +269,7 @@ export const useRunStore = create<RunState>((set, get) => ({
     }),
 
   addToolUseBlock: (runId, toolUseId) =>
-    set((state) => {
+    set(state => {
       const blocks = state.runContentBlocks[runId] || [];
       // Business idempotency: skip if toolUseId already in content blocks
       if (blocks.some(b => b.type === 'tool_use' && b.toolUseId === toolUseId)) {
@@ -268,19 +285,20 @@ export const useRunStore = create<RunState>((set, get) => ({
 
   // Finalize run data (tool calls + content blocks) onto the assistant message in one atomic update.
   // Prefers existing data when it's more complete (e.g., from API/metadata loaded before mid-stream join).
-  finalizeRunToMessage: (runId) => {
+  finalizeRunToMessage: runId => {
     const sessionId = get().activeRuns[runId];
     if (!sessionId) return;
     const runHistory = get().toolCallsHistory[runId] || [];
     const blocks = get().runContentBlocks[runId] || [];
-    useChatMessageStore.setState((state) => {
+    useChatMessageStore.setState(state => {
       const sessionMessages = state.messages[sessionId] || [];
       if (sessionMessages.length === 0) return state;
       const assistantIdx = findLastAssistantMessageIndex(sessionMessages);
       if (assistantIdx === -1) return state;
       const assistantMessage = sessionMessages[assistantIdx];
       const existingToolCalls = assistantMessage.toolCalls || [];
-      const toolCalls = runHistory.length >= existingToolCalls.length ? [...runHistory] : existingToolCalls;
+      const toolCalls =
+        runHistory.length >= existingToolCalls.length ? [...runHistory] : existingToolCalls;
       const existingBlocks = assistantMessage.contentBlocks || [];
       const contentBlocks = blocks.length >= existingBlocks.length ? [...blocks] : existingBlocks;
       const updatedMessages = [
@@ -292,14 +310,14 @@ export const useRunStore = create<RunState>((set, get) => ({
     });
   },
 
-  isSessionLoading: (sessionId) => {
+  isSessionLoading: sessionId => {
     const { activeRuns, backgroundRunIds } = get();
     return Object.entries(activeRuns).some(
       ([runId, sid]) => sid === sessionId && !backgroundRunIds.has(runId)
     );
   },
 
-  getSessionRunId: (sessionId) => {
+  getSessionRunId: sessionId => {
     const { activeRuns } = get();
     for (const [runId, sid] of Object.entries(activeRuns)) {
       if (sid === sessionId) return runId;
@@ -307,28 +325,28 @@ export const useRunStore = create<RunState>((set, get) => ({
     return null;
   },
 
-  getSessionHealth: (sessionId) => {
+  getSessionHealth: sessionId => {
     const state = get();
     const runId = state.getSessionRunId(sessionId);
     if (!runId) return null;
     return state.runHealth[runId] || null;
   },
 
-  getSessionToolCalls: (sessionId) => {
+  getSessionToolCalls: sessionId => {
     const state = get();
     const runId = state.getSessionRunId(sessionId);
     if (!runId) return [];
     return Object.values(state.activeToolCalls[runId] || {});
   },
 
-  getSessionContentBlocks: (sessionId) => {
+  getSessionContentBlocks: sessionId => {
     const state = get();
     const runId = state.getSessionRunId(sessionId);
     if (!runId) return [];
     return state.runContentBlocks[runId] || [];
   },
 
-  getSessionToolCallHistory: (sessionId) => {
+  getSessionToolCallHistory: sessionId => {
     const state = get();
     const runId = state.getSessionRunId(sessionId);
     if (!runId) return [];

@@ -17,7 +17,9 @@ const LEGACY_TO_PCP_MODE: Record<LegacyPermissionMode, PCPPermissionMode> = {
 };
 
 function isPcpPermissionMode(mode: string): mode is PCPPermissionMode {
-  return mode === 'supervised' || mode === 'auto_edit' || mode === 'autonomous' || mode === 'plan_only';
+  return (
+    mode === 'supervised' || mode === 'auto_edit' || mode === 'autonomous' || mode === 'plan_only'
+  );
 }
 
 export function normalizePermissionMode(mode?: string): PCPPermissionMode | undefined {
@@ -30,10 +32,7 @@ export function normalizePermissionMode(mode?: string): PCPPermissionMode | unde
  * Map a PCP standard permission mode to the provider's native mode string.
  * Falls back to the safest supported mode if the requested mode is unavailable.
  */
-export function mapPermissionMode(
-  manifest: PCPProviderManifest,
-  requestedMode?: string,
-): string {
+export function mapPermissionMode(manifest: PCPProviderManifest, requestedMode?: string): string {
   const map = manifest.permissionModeMap;
   if (!map) return requestedMode || 'default';
 
@@ -68,4 +67,3 @@ export function mapPermissionMode(
   // Last resort: supervised or first available
   return map.supervised ?? Object.values(map)[0] ?? 'default';
 }
-

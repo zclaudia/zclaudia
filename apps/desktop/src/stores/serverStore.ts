@@ -61,10 +61,13 @@ export const useServerStore = create<ServerState>()((set, get) => ({
   localServerPort: null,
   controlPlaneMode: 'embedded-local',
 
-  setActiveServer: (id) => {
+  setActiveServer: id => {
     const prev = get().activeServerId;
     if (prev === id) return;
-    console.log(`[ServerStore] setActiveServer: ${prev} → ${id}`, new Error().stack?.split('\n').slice(1, 4).join(' | '));
+    console.log(
+      `[ServerStore] setActiveServer: ${prev} → ${id}`,
+      new Error().stack?.split('\n').slice(1, 4).join(' | ')
+    );
     set({ activeServerId: id });
   },
 
@@ -84,7 +87,12 @@ export const useServerStore = create<ServerState>()((set, get) => ({
     const state = get();
     const existing = state.connections[serverId]?.features;
     // Skip if features haven't changed (avoids re-renders from periodic snapshot updates)
-    if (existing && existing.length === features.length && existing.every((f, i) => f === features[i])) return;
+    if (
+      existing &&
+      existing.length === features.length &&
+      existing.every((f, i) => f === features[i])
+    )
+      return;
     set({
       connections: {
         ...state.connections,
@@ -118,7 +126,7 @@ export const useServerStore = create<ServerState>()((set, get) => ({
     });
   },
 
-  recordHeartbeat: (serverId) => {
+  recordHeartbeat: serverId => {
     const state = get();
     const existing = state.connections[serverId];
     const wasDegraded = existing?.connectionQuality === 'degraded';
@@ -147,15 +155,15 @@ export const useServerStore = create<ServerState>()((set, get) => ({
     });
   },
 
-  setLocalServerPort: (port) => {
+  setLocalServerPort: port => {
     set({ localServerPort: port });
   },
 
-  setControlPlaneMode: (mode) => {
+  setControlPlaneMode: mode => {
     set({ controlPlaneMode: mode });
   },
 
-  getServerConnection: (serverId) => {
+  getServerConnection: serverId => {
     return get().connections[serverId];
   },
 
@@ -165,7 +173,7 @@ export const useServerStore = create<ServerState>()((set, get) => ({
     return state.connections[state.activeServerId];
   },
 
-  activeServerSupports: (feature) => {
+  activeServerSupports: feature => {
     const state = get();
     if (!state.activeServerId) return false;
     const conn = state.connections[state.activeServerId];

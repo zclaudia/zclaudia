@@ -19,7 +19,10 @@ import type {
   PluginSchedulerAPI,
 } from './runtime-apis.js';
 
-export type CommandHandler = (args: string[], context?: Record<string, unknown>) => Promise<unknown> | unknown;
+export type CommandHandler = (
+  args: string[],
+  context?: Record<string, unknown>
+) => Promise<unknown> | unknown;
 
 export interface PluginContext {
   pluginId: string;

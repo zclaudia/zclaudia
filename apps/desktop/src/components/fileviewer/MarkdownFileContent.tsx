@@ -36,13 +36,19 @@ export function MarkdownFileContent({ content }: MarkdownFileContentProps) {
               const isBlock = (className ?? '').includes('language-');
               const codeText = String(children);
               if (isBlock || codeText.includes('\n')) {
-                return <code className={className} {...props}>{children}</code>;
+                return (
+                  <code className={className} {...props}>
+                    {children}
+                  </code>
+                );
               }
               return (
                 <code className={className} {...props}>
                   {hasInlineMarkdownIcon(codeText) ? (
                     <TextWithInlineMarkdownIcons text={codeText} />
-                  ) : children}
+                  ) : (
+                    children
+                  )}
                 </code>
               );
             },
@@ -77,28 +83,60 @@ export function MarkdownFileContent({ content }: MarkdownFileContentProps) {
               );
             },
             h1({ children }) {
-              return <h1><MarkdownChildrenWithInlineIcons>{children}</MarkdownChildrenWithInlineIcons></h1>;
+              return (
+                <h1>
+                  <MarkdownChildrenWithInlineIcons>{children}</MarkdownChildrenWithInlineIcons>
+                </h1>
+              );
             },
             h2({ children }) {
-              return <h2><MarkdownChildrenWithInlineIcons>{children}</MarkdownChildrenWithInlineIcons></h2>;
+              return (
+                <h2>
+                  <MarkdownChildrenWithInlineIcons>{children}</MarkdownChildrenWithInlineIcons>
+                </h2>
+              );
             },
             h3({ children }) {
-              return <h3><MarkdownChildrenWithInlineIcons>{children}</MarkdownChildrenWithInlineIcons></h3>;
+              return (
+                <h3>
+                  <MarkdownChildrenWithInlineIcons>{children}</MarkdownChildrenWithInlineIcons>
+                </h3>
+              );
             },
             h4({ children }) {
-              return <h4><MarkdownChildrenWithInlineIcons>{children}</MarkdownChildrenWithInlineIcons></h4>;
+              return (
+                <h4>
+                  <MarkdownChildrenWithInlineIcons>{children}</MarkdownChildrenWithInlineIcons>
+                </h4>
+              );
             },
             h5({ children }) {
-              return <h5><MarkdownChildrenWithInlineIcons>{children}</MarkdownChildrenWithInlineIcons></h5>;
+              return (
+                <h5>
+                  <MarkdownChildrenWithInlineIcons>{children}</MarkdownChildrenWithInlineIcons>
+                </h5>
+              );
             },
             h6({ children }) {
-              return <h6><MarkdownChildrenWithInlineIcons>{children}</MarkdownChildrenWithInlineIcons></h6>;
+              return (
+                <h6>
+                  <MarkdownChildrenWithInlineIcons>{children}</MarkdownChildrenWithInlineIcons>
+                </h6>
+              );
             },
             p({ children }) {
-              return <p><MarkdownChildrenWithInlineIcons>{children}</MarkdownChildrenWithInlineIcons></p>;
+              return (
+                <p>
+                  <MarkdownChildrenWithInlineIcons>{children}</MarkdownChildrenWithInlineIcons>
+                </p>
+              );
             },
             li({ children }) {
-              return <li><MarkdownChildrenWithInlineIcons>{children}</MarkdownChildrenWithInlineIcons></li>;
+              return (
+                <li>
+                  <MarkdownChildrenWithInlineIcons>{children}</MarkdownChildrenWithInlineIcons>
+                </li>
+              );
             },
           }}
         >

@@ -26,8 +26,7 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 const SOURCE_HINTS: Record<string, string> = {
-  fallback:
-    'No spec found for this model — declare it on your LLM profile for an accurate window.',
+  fallback: 'No spec found for this model — declare it on your LLM profile for an accurate window.',
   openai_compat_default:
     'Using the openai-compat 128,000 default — no registry match; declare the model on your LLM profile for accuracy.',
 };
@@ -43,11 +42,41 @@ export function ContextUsageCard({ usage, bare = false }: ContextUsageCardProps)
   const usedPercent = contextWindow > 0 ? (usedTokens / contextWindow) * 100 : 0;
 
   const rows = [
-    { key: 'system-prompt', label: 'System prompt', tokens: breakdown.systemPrompt.tokens, estimated: breakdown.systemPrompt.estimated, color: 'bg-blue-500' },
-    { key: 'tools', label: `Tools (${breakdown.tools.count})`, tokens: breakdown.tools.tokens, estimated: breakdown.tools.estimated, color: 'bg-violet-500' },
-    { key: 'skills', label: 'Skills', tokens: breakdown.skills.tokens, estimated: breakdown.skills.estimated, color: 'bg-amber-500' },
-    { key: 'messages', label: 'Messages', tokens: breakdown.messages.tokens, estimated: breakdown.messages.estimated, color: 'bg-emerald-500' },
-    { key: 'free-space', label: 'Free space', tokens: breakdown.freeSpace.tokens, estimated: false, color: 'bg-muted' },
+    {
+      key: 'system-prompt',
+      label: 'System prompt',
+      tokens: breakdown.systemPrompt.tokens,
+      estimated: breakdown.systemPrompt.estimated,
+      color: 'bg-blue-500',
+    },
+    {
+      key: 'tools',
+      label: `Tools (${breakdown.tools.count})`,
+      tokens: breakdown.tools.tokens,
+      estimated: breakdown.tools.estimated,
+      color: 'bg-violet-500',
+    },
+    {
+      key: 'skills',
+      label: 'Skills',
+      tokens: breakdown.skills.tokens,
+      estimated: breakdown.skills.estimated,
+      color: 'bg-amber-500',
+    },
+    {
+      key: 'messages',
+      label: 'Messages',
+      tokens: breakdown.messages.tokens,
+      estimated: breakdown.messages.estimated,
+      color: 'bg-emerald-500',
+    },
+    {
+      key: 'free-space',
+      label: 'Free space',
+      tokens: breakdown.freeSpace.tokens,
+      estimated: false,
+      color: 'bg-muted',
+    },
   ];
 
   const segmentPercent = (tokens: number) =>
@@ -73,18 +102,20 @@ export function ContextUsageCard({ usage, bare = false }: ContextUsageCardProps)
       </div>
 
       <div className="flex h-2 w-full overflow-hidden rounded-full bg-background/60">
-        {rows.filter((r) => r.key !== 'free-space').map((row) => (
-          <div
-            key={row.key}
-            data-testid={`context-segment-${row.key}`}
-            className={row.color}
-            style={{ width: `${segmentPercent(row.tokens)}%` }}
-          />
-        ))}
+        {rows
+          .filter(r => r.key !== 'free-space')
+          .map(row => (
+            <div
+              key={row.key}
+              data-testid={`context-segment-${row.key}`}
+              className={row.color}
+              style={{ width: `${segmentPercent(row.tokens)}%` }}
+            />
+          ))}
       </div>
 
       <ul className="space-y-1">
-        {rows.map((row) => (
+        {rows.map(row => (
           <li key={row.key} className="flex items-center gap-2">
             <span className={`inline-block h-2 w-2 rounded-sm flex-shrink-0 ${row.color}`} />
             <span className="text-foreground/90">{row.label}</span>
@@ -100,8 +131,8 @@ export function ContextUsageCard({ usage, bare = false }: ContextUsageCardProps)
 
       <div className="border-t border-border/40 pt-1.5 text-[10px] text-muted-foreground/80 space-y-0.5">
         <div>
-          Breakdown values are chars/4 estimates; the total comes from real usage.
-          {' '}({SOURCE_LABELS[usage.contextWindowSource] ?? usage.contextWindowSource})
+          Breakdown values are chars/4 estimates; the total comes from real usage. (
+          {SOURCE_LABELS[usage.contextWindowSource] ?? usage.contextWindowSource})
         </div>
         {SOURCE_HINTS[usage.contextWindowSource] && (
           <div>{SOURCE_HINTS[usage.contextWindowSource]}</div>

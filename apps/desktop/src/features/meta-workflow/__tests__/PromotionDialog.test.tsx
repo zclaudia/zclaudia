@@ -41,7 +41,7 @@ describe('PromotionDialog', () => {
         run={makeRun()}
         poolItemId={undefined}
         socket={{ send: vi.fn() }}
-      />,
+      />
     );
     // Form heading + fields are absent in the fallback (closed) state.
     expect(screen.queryByText(/Promote Reusable Pool Item/i)).not.toBeInTheDocument();
@@ -52,9 +52,7 @@ describe('PromotionDialog', () => {
   });
 
   it('Cancel switches the view back to phase-board without calling the promote API', async () => {
-    const promoteSpy = vi
-      .spyOn(api, 'promotePoolItem')
-      .mockResolvedValue({} as never);
+    const promoteSpy = vi.spyOn(api, 'promotePoolItem').mockResolvedValue({} as never);
     const user = userEvent.setup();
     render(
       <PromotionDialog
@@ -62,7 +60,7 @@ describe('PromotionDialog', () => {
         run={makeRun()}
         poolItemId="pool-item-1"
         socket={{ send: vi.fn() }}
-      />,
+      />
     );
     await user.click(screen.getByRole('button', { name: /^Cancel$/i }));
     expect(promoteSpy).not.toHaveBeenCalled();
@@ -72,9 +70,7 @@ describe('PromotionDialog', () => {
   });
 
   it('Promote button submits the configured payload via promotePoolItem', async () => {
-    const promoteSpy = vi
-      .spyOn(api, 'promotePoolItem')
-      .mockResolvedValue({} as never);
+    const promoteSpy = vi.spyOn(api, 'promotePoolItem').mockResolvedValue({} as never);
     const user = userEvent.setup();
     render(
       <PromotionDialog
@@ -82,7 +78,7 @@ describe('PromotionDialog', () => {
         run={makeRun()}
         poolItemId="pool-item-1"
         socket={{ send: vi.fn() }}
-      />,
+      />
     );
     // Labels in PromotionDialog are not associated with their inputs (no htmlFor/id),
     // so use positional selection: tags (placeholder), name (2nd textbox), description (3rd textbox = textarea).
@@ -99,7 +95,7 @@ describe('PromotionDialog', () => {
       'pool-item-1',
       ['tag-a', 'tag-b'],
       'reusable-x',
-      'Promoted helper',
+      'Promoted helper'
     );
   });
 });

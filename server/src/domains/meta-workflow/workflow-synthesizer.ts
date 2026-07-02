@@ -1,7 +1,5 @@
 // server/src/domains/meta-workflow/workflow-synthesizer.ts
-import type {
-  PhaseDef,
-} from '@zclaudia/shared/features/meta-workflow';
+import type { PhaseDef } from '@zclaudia/shared/features/meta-workflow';
 import type {
   WorkflowDefinition,
   WorkflowNodeDef,
@@ -56,7 +54,7 @@ export function synthesizeWorkflow(phase: PhaseDef): WorkflowDefinition {
       name: 'Verify acceptance gates',
       type: 'shell',
       config: {
-        gates: phase.acceptanceGates.map((g) => ({
+        gates: phase.acceptanceGates.map(g => ({
           id: g.id,
           command: g.command,
           cwd: g.cwd,

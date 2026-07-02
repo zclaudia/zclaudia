@@ -4,6 +4,7 @@
 
 import type { ServerFeature } from '../../core/server.js';
 import type { SessionType } from '../../core/session.js';
+import type { NotificationUnreadCountsByTab } from '../../features/notification-feed.js';
 import type { AskUserQuestionItem } from '../../interaction/forms.js';
 
 // Authentication message (sent after WebSocket connection)
@@ -30,9 +31,9 @@ export interface AuthResultMessage {
   type: 'auth_result';
   success: boolean;
   error?: string;
-  isLocalConnection?: boolean;  // Whether the connection is from localhost
-  serverVersion?: string;       // Server version string
-  features?: ServerFeature[];   // Server-advertised feature flags
+  isLocalConnection?: boolean; // Whether the connection is from localhost
+  serverVersion?: string; // Server version string
+  features?: ServerFeature[]; // Server-advertised feature flags
   /** PEM-encoded RSA-OAEP public key for E2E credential encryption */
   publicKey?: string;
 }
@@ -138,7 +139,7 @@ export interface StateHeartbeatMessage {
   /** Unread Agent Feed item count — for badge display on reconnect */
   unreadFeedCount?: number;
   /** Unread Agent Feed item count by tab — for notch and inbox badges on reconnect */
-  unreadFeedCountsByTab?: import('../../features/notification-feed.js').NotificationUnreadCountsByTab;
+  unreadFeedCountsByTab?: NotificationUnreadCountsByTab;
   /** Version counters for stable application-layer entities.
    *  Client compares with its local cache and fetches via REST if stale. */
   versions?: {
@@ -146,3 +147,12 @@ export interface StateHeartbeatMessage {
     plugins?: number;
   };
 }
+
+export type CoreClientMessage = AuthMessage | PingMessage;
+
+export type CoreServerMessage =
+  | AuthResultMessage
+  | PongMessage
+  | ErrorMessage
+  | SystemInfoMessage
+  | StateHeartbeatMessage;

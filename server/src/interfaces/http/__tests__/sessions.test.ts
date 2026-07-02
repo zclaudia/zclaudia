@@ -5,7 +5,10 @@ import Database from 'better-sqlite3';
 import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import { createSessionRoutes } from '../../../domains/sessions/routes.js';
-import { createAgentProfilesTable, seedDefaultAgent } from '../../../test-helpers/seed-default-agent.js';
+import {
+  createAgentProfilesTable,
+  seedDefaultAgent,
+} from '../../../test-helpers/seed-default-agent.js';
 
 const nodeRequire = createRequire(import.meta.url);
 const mutableFs = nodeRequire('node:fs') as typeof import('node:fs');
@@ -113,9 +116,12 @@ function createTestApp(db: Database.Database) {
   app.use(express.json());
   activeRuns = new Map<string, any>();
   mockBroadcastSessionEvent = vi.fn();
-  app.use('/api/sessions', createSessionRoutes(db, activeRuns, {
-    publishSessionEvent: mockBroadcastSessionEvent,
-  }));
+  app.use(
+    '/api/sessions',
+    createSessionRoutes(db, activeRuns, {
+      publishSessionEvent: mockBroadcastSessionEvent,
+    })
+  );
   return app;
 }
 
@@ -159,16 +165,23 @@ describe('sessions routes', () => {
     // Create a test project + usable default agent/profile pair (required by
     // SessionRepository.create auto-resolve and regular-session readiness gate).
     const now = Date.now();
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO projects (id, name, type, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
-    `).run('project-1', 'Test Project', 'code', now, now);
-    db.prepare(`
+    `
+    ).run('project-1', 'Test Project', 'code', now, now);
+    db.prepare(
+      `
       INSERT INTO llm_profiles (id, name, provider_type, api_key, is_default, created_at, updated_at)
       VALUES (?, ?, ?, ?, 1, ?, ?)
-    `).run('llm-default', 'Default LLM', 'anthropic', 'sk-test', now, now);
+    `
+    ).run('llm-default', 'Default LLM', 'anthropic', 'sk-test', now, now);
     const agentId = seedDefaultAgent(db);
-    db.prepare('UPDATE agent_profiles SET llm_profile_id = ? WHERE id = ?').run('llm-default', agentId);
+    db.prepare('UPDATE agent_profiles SET llm_profile_id = ? WHERE id = ?').run(
+      'llm-default',
+      agentId
+    );
   });
 
   describe('GET /api/sessions', () => {
@@ -182,14 +195,18 @@ describe('sessions routes', () => {
 
     it('returns all sessions', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Session 1', now, now);
-      db.prepare(`
+      `
+      ).run('s1', 'project-1', 'Session 1', now, now);
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s2', 'project-1', 'Session 2', now + 1000, now + 1000);
+      `
+      ).run('s2', 'project-1', 'Session 2', now + 1000, now + 1000);
 
       const res = await request(app).get('/api/sessions');
 
@@ -200,19 +217,25 @@ describe('sessions routes', () => {
     it('filters by projectId when provided', async () => {
       const now = Date.now();
       // Create another project
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('project-2', 'Another Project', 'code', now, now);
+      `
+      ).run('project-2', 'Another Project', 'code', now, now);
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Session 1', now, now);
-      db.prepare(`
+      `
+      ).run('s1', 'project-1', 'Session 1', now, now);
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s2', 'project-2', 'Session 2', now, now);
+      `
+      ).run('s2', 'project-2', 'Session 2', now, now);
 
       const res = await request(app).get('/api/sessions?projectId=project-1');
 
@@ -223,10 +246,12 @@ describe('sessions routes', () => {
 
     it('includes archived sessions when includeArchived=true', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Archived Session', now, now, now);
+      `
+      ).run('s1', 'project-1', 'Archived Session', now, now, now);
 
       const res = await request(app).get('/api/sessions?includeArchived=true');
 
@@ -237,19 +262,25 @@ describe('sessions routes', () => {
 
     it('includes archived project sessions when projectId and includeArchived=true are both provided', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('project-2', 'Another Project', 'code', now, now);
+      `
+      ).run('project-2', 'Another Project', 'code', now, now);
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Archived In Project 1', now, now, now);
-      db.prepare(`
+      `
+      ).run('s1', 'project-1', 'Archived In Project 1', now, now, now);
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s2', 'project-2', 'Archived In Project 2', now, now, now);
+      `
+      ).run('s2', 'project-2', 'Archived In Project 2', now, now, now);
 
       const res = await request(app).get('/api/sessions?projectId=project-1&includeArchived=true');
 
@@ -260,14 +291,18 @@ describe('sessions routes', () => {
 
     it('orders by updated_at DESC', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Older', now, now);
-      db.prepare(`
+      `
+      ).run('s1', 'project-1', 'Older', now, now);
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s2', 'project-1', 'Newer', now, now + 1000);
+      `
+      ).run('s2', 'project-1', 'Newer', now, now + 1000);
 
       const res = await request(app).get('/api/sessions');
 
@@ -277,14 +312,18 @@ describe('sessions routes', () => {
 
     it('orders by sort_order before updated_at', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, sort_order, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Pinned Older', 0, now, now);
-      db.prepare(`
+      `
+      ).run('s1', 'project-1', 'Pinned Older', 0, now, now);
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, sort_order, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s2', 'project-1', 'Newer But Later In Sort', 1, now, now + 1000);
+      `
+      ).run('s2', 'project-1', 'Newer But Later In Sort', 1, now, now + 1000);
 
       const res = await request(app).get('/api/sessions');
 
@@ -297,10 +336,12 @@ describe('sessions routes', () => {
   describe('GET /api/sessions/:id', () => {
     it('returns session by id', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, sdk_session_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Test Session', 'sdk-123', now, now);
+      `
+      ).run('s1', 'project-1', 'Test Session', 'sdk-123', now, now);
 
       const res = await request(app).get('/api/sessions/s1');
 
@@ -334,9 +375,7 @@ describe('sessions routes', () => {
     });
 
     it('returns 400 when projectId missing', async () => {
-      const res = await request(app)
-        .post('/api/sessions')
-        .send({ name: 'New Session' });
+      const res = await request(app).post('/api/sessions').send({ name: 'New Session' });
 
       expect(res.status).toBe(400);
       expect(res.body.success).toBe(false);
@@ -354,9 +393,7 @@ describe('sessions routes', () => {
     });
 
     it('returns 400 when project does not exist', async () => {
-      const res = await request(app)
-        .post('/api/sessions')
-        .send({ projectId: 'nonexistent' });
+      const res = await request(app).post('/api/sessions').send({ projectId: 'nonexistent' });
 
       expect(res.status).toBe(400);
       expect(res.body.success).toBe(false);
@@ -365,14 +402,18 @@ describe('sessions routes', () => {
 
     it('assigns new sessions to the end of the current project sort order', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, sort_order, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Existing 1', 0, now, now);
-      db.prepare(`
+      `
+      ).run('s1', 'project-1', 'Existing 1', 0, now, now);
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, sort_order, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s2', 'project-1', 'Existing 2', 1, now, now);
+      `
+      ).run('s2', 'project-1', 'Existing 2', 1, now, now);
 
       const res = await request(app)
         .post('/api/sessions')
@@ -381,26 +422,33 @@ describe('sessions routes', () => {
       expect(res.status).toBe(201);
       expect(res.body.data.sortOrder).toBe(2);
 
-      const row = db.prepare('SELECT sort_order FROM sessions WHERE id = ?').get(res.body.data.id) as { sort_order: number };
+      const row = db
+        .prepare('SELECT sort_order FROM sessions WHERE id = ?')
+        .get(res.body.data.id) as { sort_order: number };
       expect(row.sort_order).toBe(2);
     });
 
     it('creates session with explicit agentProfileId from body (overrides default)', async () => {
       // seed a second agent profile that is NOT the default
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO agent_profiles (id, name, is_default, created_at, updated_at)
         VALUES (?, ?, 0, ?, ?)
-      `).run('agent-explicit', 'Explicit Agent', now, now);
+      `
+      ).run('agent-explicit', 'Explicit Agent', now, now);
 
-      const res = await request(app)
-        .post('/api/sessions')
-        .send({ projectId: 'project-1', name: 'Explicit Session', agentProfileId: 'agent-explicit' });
+      const res = await request(app).post('/api/sessions').send({
+        projectId: 'project-1',
+        name: 'Explicit Session',
+        agentProfileId: 'agent-explicit',
+      });
 
       expect(res.status).toBe(201);
       expect(res.body.success).toBe(true);
 
-      const created = db.prepare('SELECT agent_profile_id FROM sessions WHERE id = ?')
+      const created = db
+        .prepare('SELECT agent_profile_id FROM sessions WHERE id = ?')
         .get(res.body.data.id) as { agent_profile_id: string };
       expect(created.agent_profile_id).toBe('agent-explicit');
     });
@@ -433,11 +481,16 @@ describe('sessions routes', () => {
 
     it('returns 409 AGENT_NOT_READY when the resolved agent model is not usable even if another agent is usable', async () => {
       const now = Date.now();
-      db.prepare('UPDATE agent_profiles SET model = ? WHERE id = ?').run('totally-unregistered-model-id', 'default-agent');
-      db.prepare(`
+      db.prepare('UPDATE agent_profiles SET model = ? WHERE id = ?').run(
+        'totally-unregistered-model-id',
+        'default-agent'
+      );
+      db.prepare(
+        `
         INSERT INTO agent_profiles (id, name, llm_profile_id, model, is_default, created_at, updated_at)
         VALUES (?, ?, ?, ?, 0, ?, ?)
-      `).run('agent-good', 'Good Agent', 'llm-default', 'claude-sonnet-4-6', now, now);
+      `
+      ).run('agent-good', 'Good Agent', 'llm-default', 'claude-sonnet-4-6', now, now);
 
       const res = await request(app)
         .post('/api/sessions')
@@ -465,10 +518,12 @@ describe('sessions routes', () => {
   describe('PUT /api/sessions/:id', () => {
     it('updates session fields', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Original', now, now);
+      `
+      ).run('s1', 'project-1', 'Original', now, now);
 
       const res = await request(app)
         .put('/api/sessions/s1')
@@ -478,15 +533,15 @@ describe('sessions routes', () => {
       expect(res.body.success).toBe(true);
 
       // Verify update
-      const row = db.prepare('SELECT name, sdk_session_id FROM sessions WHERE id = ?').get('s1') as { name: string; sdk_session_id: string };
+      const row = db
+        .prepare('SELECT name, sdk_session_id FROM sessions WHERE id = ?')
+        .get('s1') as { name: string; sdk_session_id: string };
       expect(row.name).toBe('Updated');
       expect(row.sdk_session_id).toBe('sdk-456');
     });
 
     it('returns 404 for non-existent session', async () => {
-      const res = await request(app)
-        .put('/api/sessions/nonexistent')
-        .send({ name: 'Updated' });
+      const res = await request(app).put('/api/sessions/nonexistent').send({ name: 'Updated' });
 
       expect(res.status).toBe(404);
       expect(res.body.success).toBe(false);
@@ -494,18 +549,20 @@ describe('sessions routes', () => {
 
     it('preserves omitted nullable fields when updating another field', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, agent_profile_id, sdk_session_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Original', 'default-agent', 'sdk-123', now, now);
+      `
+      ).run('s1', 'project-1', 'Original', 'default-agent', 'sdk-123', now, now);
 
-      const res = await request(app)
-        .put('/api/sessions/s1')
-        .send({ name: 'Updated Name' });
+      const res = await request(app).put('/api/sessions/s1').send({ name: 'Updated Name' });
 
       expect(res.status).toBe(200);
 
-      const row = db.prepare('SELECT name, agent_profile_id, sdk_session_id FROM sessions WHERE id = ?').get('s1') as any;
+      const row = db
+        .prepare('SELECT name, agent_profile_id, sdk_session_id FROM sessions WHERE id = ?')
+        .get('s1') as any;
       expect(row.name).toBe('Updated Name');
       expect(row.agent_profile_id).toBe('default-agent');
       expect(row.sdk_session_id).toBe('sdk-123');
@@ -513,14 +570,14 @@ describe('sessions routes', () => {
 
     it('clears nullable fields only when explicitly set to null', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, agent_profile_id, sdk_session_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Original', 'default-agent', 'sdk-123', now, now);
+      `
+      ).run('s1', 'project-1', 'Original', 'default-agent', 'sdk-123', now, now);
 
-      const res = await request(app)
-        .put('/api/sessions/s1')
-        .send({ sdkSessionId: null });
+      const res = await request(app).put('/api/sessions/s1').send({ sdkSessionId: null });
 
       expect(res.status).toBe(200);
 
@@ -530,10 +587,12 @@ describe('sessions routes', () => {
 
     it('trims updated string fields', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, agent_profile_id, sdk_session_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Original', 'default-agent', 'sdk-123', now, now);
+      `
+      ).run('s1', 'project-1', 'Original', 'default-agent', 'sdk-123', now, now);
 
       const res = await request(app)
         .put('/api/sessions/s1')
@@ -541,7 +600,9 @@ describe('sessions routes', () => {
 
       expect(res.status).toBe(200);
 
-      const row = db.prepare('SELECT name, sdk_session_id FROM sessions WHERE id = ?').get('s1') as any;
+      const row = db
+        .prepare('SELECT name, sdk_session_id FROM sessions WHERE id = ?')
+        .get('s1') as any;
       expect(row.name).toBe('Updated');
       expect(row.sdk_session_id).toBe('sdk-456');
     });
@@ -550,10 +611,12 @@ describe('sessions routes', () => {
   describe('DELETE /api/sessions/:id', () => {
     it('deletes session', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'To Delete', now, now);
+      `
+      ).run('s1', 'project-1', 'To Delete', now, now);
 
       const res = await request(app).delete('/api/sessions/s1');
 
@@ -577,18 +640,22 @@ describe('sessions routes', () => {
     beforeEach(() => {
       const now = Date.now();
       // Create a session for message tests
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Test Session', now, now);
+      `
+      ).run('s1', 'project-1', 'Test Session', now, now);
     });
 
     it('returns messages with pagination info', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO messages (id, session_id, role, content, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('m1', 's1', 'user', 'Hello', now);
+      `
+      ).run('m1', 's1', 'user', 'Hello', now);
 
       const res = await request(app).get('/api/sessions/s1/messages');
 
@@ -602,10 +669,12 @@ describe('sessions routes', () => {
     it('limits results to specified limit', async () => {
       const now = Date.now();
       for (let i = 0; i < 10; i++) {
-        db.prepare(`
+        db.prepare(
+          `
           INSERT INTO messages (id, session_id, role, content, created_at)
           VALUES (?, ?, ?, ?, ?)
-        `).run(`m${i}`, 's1', 'user', `Message ${i}`, now + i);
+        `
+        ).run(`m${i}`, 's1', 'user', `Message ${i}`, now + i);
       }
 
       const res = await request(app).get('/api/sessions/s1/messages?limit=5');
@@ -617,18 +686,24 @@ describe('sessions routes', () => {
 
     it('returns messages in chronological order', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO messages (id, session_id, role, content, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('m1', 's1', 'user', 'First', now);
-      db.prepare(`
+      `
+      ).run('m1', 's1', 'user', 'First', now);
+      db.prepare(
+        `
         INSERT INTO messages (id, session_id, role, content, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('m2', 's1', 'assistant', 'Second', now + 1000);
-      db.prepare(`
+      `
+      ).run('m2', 's1', 'assistant', 'Second', now + 1000);
+      db.prepare(
+        `
         INSERT INTO messages (id, session_id, role, content, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('m3', 's1', 'user', 'Third', now + 2000);
+      `
+      ).run('m3', 's1', 'user', 'Third', now + 2000);
 
       const res = await request(app).get('/api/sessions/s1/messages');
 
@@ -641,15 +716,19 @@ describe('sessions routes', () => {
     it('paginates with before cursor', async () => {
       const now = Date.now();
       for (let i = 0; i < 10; i++) {
-        db.prepare(`
+        db.prepare(
+          `
           INSERT INTO messages (id, session_id, role, content, created_at)
           VALUES (?, ?, ?, ?, ?)
-        `).run(`m${i}`, 's1', 'user', `Message ${i}`, now + i * 1000);
+        `
+        ).run(`m${i}`, 's1', 'user', `Message ${i}`, now + i * 1000);
       }
 
       // Get messages before timestamp of message 5
       const beforeTimestamp = now + 5000;
-      const res = await request(app).get(`/api/sessions/s1/messages?before=${beforeTimestamp}&limit=3`);
+      const res = await request(app).get(
+        `/api/sessions/s1/messages?before=${beforeTimestamp}&limit=3`
+      );
 
       expect(res.status).toBe(200);
       expect(res.body.data.messages).toHaveLength(3);
@@ -659,10 +738,12 @@ describe('sessions routes', () => {
 
     it('calculates hasMore correctly', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO messages (id, session_id, role, content, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('m1', 's1', 'user', 'Only one', now);
+      `
+      ).run('m1', 's1', 'user', 'Only one', now);
 
       const res = await request(app).get('/api/sessions/s1/messages?limit=50');
 
@@ -673,10 +754,12 @@ describe('sessions routes', () => {
     it('returns a window around a target message', async () => {
       const now = Date.now();
       for (let i = 0; i < 10; i++) {
-        db.prepare(`
+        db.prepare(
+          `
           INSERT INTO messages (id, session_id, role, content, created_at, offset)
           VALUES (?, ?, ?, ?, ?, ?)
-        `).run(`m${i}`, 's1', 'user', `Message ${i}`, now + i * 1000, i + 1);
+        `
+        ).run(`m${i}`, 's1', 'user', `Message ${i}`, now + i * 1000, i + 1);
       }
 
       const res = await request(app).get('/api/sessions/s1/messages?aroundMessageId=m5&limit=5');
@@ -696,7 +779,11 @@ describe('sessions routes', () => {
     });
 
     it('does not return activeRun for completed or background runs', async () => {
-      activeRuns.set('run-completed', { sessionId: 's1', phase: 'completed', sessionType: 'regular' });
+      activeRuns.set('run-completed', {
+        sessionId: 's1',
+        phase: 'completed',
+        sessionType: 'regular',
+      });
       activeRuns.set('run-bg', { sessionId: 's1', phase: 'running', sessionType: 'background' });
 
       const res = await request(app).get('/api/sessions/s1/messages');
@@ -709,10 +796,12 @@ describe('sessions routes', () => {
   describe('POST /api/sessions/:id/messages', () => {
     beforeEach(() => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Test Session', now, now);
+      `
+      ).run('s1', 'project-1', 'Test Session', now, now);
     });
 
     it('creates message', async () => {
@@ -728,7 +817,9 @@ describe('sessions routes', () => {
     });
 
     it('updates session updated_at', async () => {
-      const beforeUpdate = db.prepare('SELECT updated_at FROM sessions WHERE id = ?').get('s1') as { updated_at: number };
+      const beforeUpdate = db.prepare('SELECT updated_at FROM sessions WHERE id = ?').get('s1') as {
+        updated_at: number;
+      };
 
       // Wait a bit to ensure timestamp difference
       await new Promise(resolve => setTimeout(resolve, 10));
@@ -737,19 +828,17 @@ describe('sessions routes', () => {
         .post('/api/sessions/s1/messages')
         .send({ role: 'user', content: 'Hello!' });
 
-      const afterUpdate = db.prepare('SELECT updated_at FROM sessions WHERE id = ?').get('s1') as { updated_at: number };
+      const afterUpdate = db.prepare('SELECT updated_at FROM sessions WHERE id = ?').get('s1') as {
+        updated_at: number;
+      };
       expect(afterUpdate.updated_at).toBeGreaterThan(beforeUpdate.updated_at);
     });
 
     it('returns 400 when role or content missing', async () => {
-      const res1 = await request(app)
-        .post('/api/sessions/s1/messages')
-        .send({ content: 'Hello!' });
+      const res1 = await request(app).post('/api/sessions/s1/messages').send({ content: 'Hello!' });
       expect(res1.status).toBe(400);
 
-      const res2 = await request(app)
-        .post('/api/sessions/s1/messages')
-        .send({ role: 'user' });
+      const res2 = await request(app).post('/api/sessions/s1/messages').send({ role: 'user' });
       expect(res2.status).toBe(400);
     });
 
@@ -771,7 +860,9 @@ describe('sessions routes', () => {
       expect(res.status).toBe(201);
 
       // Verify in database
-      const row = db.prepare('SELECT metadata FROM messages WHERE id = ?').get(res.body.data.id) as { metadata: string };
+      const row = db
+        .prepare('SELECT metadata FROM messages WHERE id = ?')
+        .get(res.body.data.id) as { metadata: string };
       expect(JSON.parse(row.metadata)).toEqual(metadata);
     });
   });
@@ -779,22 +870,28 @@ describe('sessions routes', () => {
   describe('GET /api/sessions/:id/export', () => {
     beforeEach(() => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Export Test Session', now, now);
+      `
+      ).run('s1', 'project-1', 'Export Test Session', now, now);
     });
 
     it('returns markdown with session name and messages', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO messages (id, session_id, role, content, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('m1', 's1', 'user', 'Hello Claude', now);
-      db.prepare(`
+      `
+      ).run('m1', 's1', 'user', 'Hello Claude', now);
+      db.prepare(
+        `
         INSERT INTO messages (id, session_id, role, content, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('m2', 's1', 'assistant', 'Hello! How can I help?', now + 1000);
+      `
+      ).run('m2', 's1', 'assistant', 'Hello! How can I help?', now + 1000);
 
       const res = await request(app).get('/api/sessions/s1/export');
 
@@ -816,10 +913,12 @@ describe('sessions routes', () => {
           { name: 'Bash', input: { command: 'ls' }, output: 'error', isError: true },
         ],
       };
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO messages (id, session_id, role, content, metadata, created_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('m1', 's1', 'assistant', 'Done', JSON.stringify(metadata), now);
+      `
+      ).run('m1', 's1', 'assistant', 'Done', JSON.stringify(metadata), now);
 
       const res = await request(app).get('/api/sessions/s1/export');
 
@@ -836,10 +935,12 @@ describe('sessions routes', () => {
       const metadata = {
         usage: { inputTokens: 1500, outputTokens: 800 },
       };
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO messages (id, session_id, role, content, metadata, created_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('m1', 's1', 'assistant', 'Response', JSON.stringify(metadata), now);
+      `
+      ).run('m1', 's1', 'assistant', 'Response', JSON.stringify(metadata), now);
 
       const res = await request(app).get('/api/sessions/s1/export');
 
@@ -858,10 +959,12 @@ describe('sessions routes', () => {
 
     it('uses "Untitled Session" for session without name', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s2', 'project-1', null, now, now);
+      `
+      ).run('s2', 'project-1', null, now, now);
 
       const res = await request(app).get('/api/sessions/s2/export');
 
@@ -873,24 +976,32 @@ describe('sessions routes', () => {
   describe('GET /api/sessions/search/messages', () => {
     beforeEach(() => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Session 1', now, now);
+      `
+      ).run('s1', 'project-1', 'Session 1', now, now);
 
       // Insert messages that will be indexed by FTS trigger
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO messages (id, session_id, role, content, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('m1', 's1', 'user', 'How to implement authentication?', now);
-      db.prepare(`
+      `
+      ).run('m1', 's1', 'user', 'How to implement authentication?', now);
+      db.prepare(
+        `
         INSERT INTO messages (id, session_id, role, content, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('m2', 's1', 'assistant', 'You can use JWT tokens for authentication.', now + 1000);
-      db.prepare(`
+      `
+      ).run('m2', 's1', 'assistant', 'You can use JWT tokens for authentication.', now + 1000);
+      db.prepare(
+        `
         INSERT INTO messages (id, session_id, role, content, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('m3', 's1', 'user', 'Tell me about database migrations.', now + 2000);
+      `
+      ).run('m3', 's1', 'user', 'Tell me about database migrations.', now + 2000);
     });
 
     it('returns matching messages for search query', async () => {
@@ -899,7 +1010,9 @@ describe('sessions routes', () => {
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.data.results.length).toBeGreaterThanOrEqual(1);
-      expect(res.body.data.results.some((r: { content: string }) => r.content.includes('authentication'))).toBe(true);
+      expect(
+        res.body.data.results.some((r: { content: string }) => r.content.includes('authentication'))
+      ).toBe(true);
     });
 
     it('returns empty results for empty query', async () => {
@@ -912,20 +1025,28 @@ describe('sessions routes', () => {
     it('filters by projectId', async () => {
       const now = Date.now();
       // Create another project with a session and message
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('project-2', 'Other Project', 'code', now, now);
-      db.prepare(`
+      `
+      ).run('project-2', 'Other Project', 'code', now, now);
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s2', 'project-2', 'Session 2', now, now);
-      db.prepare(`
+      `
+      ).run('s2', 'project-2', 'Session 2', now, now);
+      db.prepare(
+        `
         INSERT INTO messages (id, session_id, role, content, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('m4', 's2', 'user', 'Authentication in project 2', now);
+      `
+      ).run('m4', 's2', 'user', 'Authentication in project 2', now);
 
-      const res = await request(app).get('/api/sessions/search/messages?q=authentication&projectId=project-1');
+      const res = await request(app).get(
+        '/api/sessions/search/messages?q=authentication&projectId=project-1'
+      );
 
       expect(res.status).toBe(200);
       // All results should be from project-1
@@ -937,10 +1058,12 @@ describe('sessions routes', () => {
     it('truncates content to 200 characters', async () => {
       const now = Date.now();
       const longContent = 'authentication '.repeat(50); // > 200 chars
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO messages (id, session_id, role, content, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('m-long', 's1', 'user', longContent, now + 5000);
+      `
+      ).run('m-long', 's1', 'user', longContent, now + 5000);
 
       const res = await request(app).get('/api/sessions/search/messages?q=authentication');
 
@@ -962,10 +1085,12 @@ internal reasoning zclaudia plan
 
 
   zclaudia-agent configured successfully   `;
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO messages (id, session_id, role, content, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('m-think', 's1', 'assistant', contentWithThink, now + 6000);
+      `
+      ).run('m-think', 's1', 'assistant', contentWithThink, now + 6000);
 
       const res = await request(app).get('/api/sessions/search/messages?q=zclaudia');
 
@@ -999,14 +1124,18 @@ internal reasoning zclaudia plan
   describe('GET /api/sessions with includeArchived', () => {
     it('excludes archived sessions by default', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s-active', 'project-1', 'Active', null, now, now);
-      db.prepare(`
+      `
+      ).run('s-active', 'project-1', 'Active', null, now, now);
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s-archived', 'project-1', 'Archived', now, now, now);
+      `
+      ).run('s-archived', 'project-1', 'Archived', now, now, now);
 
       const res = await request(app).get('/api/sessions');
       expect(res.status).toBe(200);
@@ -1016,14 +1145,18 @@ internal reasoning zclaudia plan
 
     it('includes archived sessions when includeArchived=true', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s-active', 'project-1', 'Active', null, now, now);
-      db.prepare(`
+      `
+      ).run('s-active', 'project-1', 'Active', null, now, now);
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s-archived', 'project-1', 'Archived', now, now, now);
+      `
+      ).run('s-archived', 'project-1', 'Archived', now, now, now);
 
       const res = await request(app).get('/api/sessions?includeArchived=true');
       expect(res.status).toBe(200);
@@ -1034,14 +1167,18 @@ internal reasoning zclaudia plan
   describe('GET /api/sessions/archived', () => {
     it('returns only archived sessions', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s-active', 'project-1', 'Active', null, now, now);
-      db.prepare(`
+      `
+      ).run('s-active', 'project-1', 'Active', null, now, now);
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s-archived', 'project-1', 'Archived', now, now, now);
+      `
+      ).run('s-archived', 'project-1', 'Archived', now, now, now);
 
       const res = await request(app).get('/api/sessions/archived');
       expect(res.status).toBe(200);
@@ -1059,14 +1196,18 @@ internal reasoning zclaudia plan
   describe('POST /api/sessions/archive', () => {
     it('archives sessions', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Session 1', now, now);
-      db.prepare(`
+      `
+      ).run('s1', 'project-1', 'Session 1', now, now);
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s2', 'project-1', 'Session 2', now, now);
+      `
+      ).run('s2', 'project-1', 'Session 2', now, now);
 
       const res = await request(app)
         .post('/api/sessions/archive')
@@ -1081,17 +1222,13 @@ internal reasoning zclaudia plan
     });
 
     it('returns 400 when sessionIds missing', async () => {
-      const res = await request(app)
-        .post('/api/sessions/archive')
-        .send({});
+      const res = await request(app).post('/api/sessions/archive').send({});
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
     });
 
     it('returns 400 when sessionIds is empty array', async () => {
-      const res = await request(app)
-        .post('/api/sessions/archive')
-        .send({ sessionIds: [] });
+      const res = await request(app).post('/api/sessions/archive').send({ sessionIds: [] });
       expect(res.status).toBe(400);
     });
   });
@@ -1099,10 +1236,12 @@ internal reasoning zclaudia plan
   describe('POST /api/sessions/restore', () => {
     it('restores archived sessions', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Session 1', now, now, now);
+      `
+      ).run('s1', 'project-1', 'Session 1', now, now, now);
 
       const res = await request(app)
         .post('/api/sessions/restore')
@@ -1116,9 +1255,7 @@ internal reasoning zclaudia plan
     });
 
     it('returns 400 when sessionIds missing', async () => {
-      const res = await request(app)
-        .post('/api/sessions/restore')
-        .send({});
+      const res = await request(app).post('/api/sessions/restore').send({});
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
     });
@@ -1127,14 +1264,18 @@ internal reasoning zclaudia plan
   describe('GET /api/sessions/sync', () => {
     it('returns sessions updated since timestamp', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Old', now - 10000, now - 10000);
-      db.prepare(`
+      `
+      ).run('s1', 'project-1', 'Old', now - 10000, now - 10000);
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s2', 'project-1', 'New', now, now);
+      `
+      ).run('s2', 'project-1', 'New', now, now);
 
       const res = await request(app).get(`/api/sessions/sync?since=${now - 5000}`);
       expect(res.status).toBe(200);
@@ -1146,10 +1287,12 @@ internal reasoning zclaudia plan
 
     it('returns all sessions when since=0', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'S1', now, now);
+      `
+      ).run('s1', 'project-1', 'S1', now, now);
 
       const res = await request(app).get('/api/sessions/sync?since=0');
       expect(res.status).toBe(200);
@@ -1164,10 +1307,12 @@ internal reasoning zclaudia plan
 
     it('excludes archived sessions', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s-archived', 'project-1', 'Archived', now, now, now);
+      `
+      ).run('s-archived', 'project-1', 'Archived', now, now, now);
 
       const res = await request(app).get('/api/sessions/sync?since=0');
       expect(res.status).toBe(200);
@@ -1176,10 +1321,12 @@ internal reasoning zclaudia plan
 
     it('includes isActive status from activeRuns', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Running', now, now);
+      `
+      ).run('s1', 'project-1', 'Running', now, now);
       activeRuns.set('run-1', { sessionId: 's1', phase: 'running', sessionType: 'regular' });
 
       const res = await request(app).get('/api/sessions/sync?since=0');
@@ -1221,32 +1368,40 @@ internal reasoning zclaudia plan
   describe('PATCH /api/sessions/:id/unlock', () => {
     it('restores planning status for task sessions', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, project_role, is_read_only, plan_status, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Locked', 'task', 1, 'completed', now, now);
+      `
+      ).run('s1', 'project-1', 'Locked', 'task', 1, 'completed', now, now);
 
       const res = await request(app).patch('/api/sessions/s1/unlock');
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
 
-      const row = db.prepare('SELECT is_read_only, plan_status FROM sessions WHERE id = ?').get('s1') as any;
+      const row = db
+        .prepare('SELECT is_read_only, plan_status FROM sessions WHERE id = ?')
+        .get('s1') as any;
       expect(row.is_read_only).toBe(0);
       expect(row.plan_status).toBe('planning');
     });
 
     it('clears plan status for regular sessions', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, is_read_only, plan_status, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run('s2', 'project-1', 'Locked Regular', 1, 'completed', now, now);
+      `
+      ).run('s2', 'project-1', 'Locked Regular', 1, 'completed', now, now);
 
       const res = await request(app).patch('/api/sessions/s2/unlock');
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
 
-      const row = db.prepare('SELECT is_read_only, plan_status FROM sessions WHERE id = ?').get('s2') as any;
+      const row = db
+        .prepare('SELECT is_read_only, plan_status FROM sessions WHERE id = ?')
+        .get('s2') as any;
       expect(row.is_read_only).toBe(0);
       expect(row.plan_status).toBeNull();
     });
@@ -1260,10 +1415,12 @@ internal reasoning zclaudia plan
   describe('POST /api/sessions/:id/reset-sdk-session', () => {
     it('resets sdk_session_id to null', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, sdk_session_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Test', 'sdk-123', now, now);
+      `
+      ).run('s1', 'project-1', 'Test', 'sdk-123', now, now);
 
       const res = await request(app).post('/api/sessions/s1/reset-sdk-session');
       expect(res.status).toBe(200);
@@ -1283,10 +1440,12 @@ internal reasoning zclaudia plan
   describe('PATCH /api/sessions/:id/dismiss-interrupted', () => {
     it('clears last_run_status', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, last_run_status, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Test', 'interrupted', now, now);
+      `
+      ).run('s1', 'project-1', 'Test', 'interrupted', now, now);
 
       const res = await request(app).patch('/api/sessions/s1/dismiss-interrupted');
       expect(res.status).toBe(200);
@@ -1323,14 +1482,19 @@ internal reasoning zclaudia plan
 
     it('creates session with parentSessionId', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('parent-1', 'project-1', 'Parent', now, now);
+      `
+      ).run('parent-1', 'project-1', 'Parent', now, now);
 
-      const res = await request(app)
-        .post('/api/sessions')
-        .send({ projectId: 'project-1', name: 'Child', parentSessionId: 'parent-1', type: 'background' });
+      const res = await request(app).post('/api/sessions').send({
+        projectId: 'project-1',
+        name: 'Child',
+        parentSessionId: 'parent-1',
+        type: 'background',
+      });
 
       expect(res.status).toBe(201);
       expect(res.body.data.parentSessionId).toBe('parent-1');
@@ -1340,16 +1504,20 @@ internal reasoning zclaudia plan
   describe('GET /api/sessions/:id/messages with after/afterOffset', () => {
     beforeEach(() => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Test Session', now, now);
+      `
+      ).run('s1', 'project-1', 'Test Session', now, now);
 
       for (let i = 0; i < 5; i++) {
-        db.prepare(`
+        db.prepare(
+          `
           INSERT INTO messages (id, session_id, role, content, created_at, offset)
           VALUES (?, ?, ?, ?, ?, ?)
-        `).run(`m${i}`, 's1', 'user', `Message ${i}`, now + i * 1000, i);
+        `
+        ).run(`m${i}`, 's1', 'user', `Message ${i}`, now + i * 1000, i);
       }
     });
 
@@ -1395,10 +1563,12 @@ internal reasoning zclaudia plan
     it('returns search history after searches', async () => {
       // Insert some search history
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO search_history (id, user_id, query, result_count, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('sh1', 'default', 'test query', 5, now);
+      `
+      ).run('sh1', 'default', 'test query', 5, now);
 
       const res = await request(app).get('/api/sessions/search/history');
       expect(res.status).toBe(200);
@@ -1410,16 +1580,20 @@ internal reasoning zclaudia plan
   describe('DELETE /api/sessions/search/history', () => {
     it('clears search history', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO search_history (id, user_id, query, result_count, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('sh1', 'default', 'test', 5, now);
+      `
+      ).run('sh1', 'default', 'test', 5, now);
 
       const res = await request(app).delete('/api/sessions/search/history');
       expect(res.status).toBe(200);
       expect(res.body.data.cleared).toBe(true);
 
-      const count = db.prepare('SELECT COUNT(*) as c FROM search_history WHERE user_id = ?').get('default') as any;
+      const count = db
+        .prepare('SELECT COUNT(*) as c FROM search_history WHERE user_id = ?')
+        .get('default') as any;
       expect(count.c).toBe(0);
     });
   });
@@ -1427,10 +1601,12 @@ internal reasoning zclaudia plan
   describe('PATCH /api/sessions/:id/working-directory', () => {
     it('updates working directory successfully', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Test', now, now);
+      `
+      ).run('s1', 'project-1', 'Test', now, now);
 
       // Use a directory that actually exists on the filesystem
       const testDir = tmpdir();
@@ -1455,10 +1631,12 @@ internal reasoning zclaudia plan
 
     it('returns 409 for locked planning task session', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, project_role, plan_status, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Task', 'task', 'planning', now, now);
+      `
+      ).run('s1', 'project-1', 'Task', 'task', 'planning', now, now);
 
       const res = await request(app)
         .patch('/api/sessions/s1/working-directory')
@@ -1470,10 +1648,12 @@ internal reasoning zclaudia plan
 
     it('returns 400 when path does not exist', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Test', now, now);
+      `
+      ).run('s1', 'project-1', 'Test', now, now);
 
       const origExistsSync = mutableFs.existsSync;
       mutableFs.existsSync = vi.fn().mockReturnValue(false);
@@ -1490,14 +1670,14 @@ internal reasoning zclaudia plan
 
     it('clears working directory when not provided', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, working_directory, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Test', '/old/path', now, now);
+      `
+      ).run('s1', 'project-1', 'Test', '/old/path', now, now);
 
-      const res = await request(app)
-        .patch('/api/sessions/s1/working-directory')
-        .send({});
+      const res = await request(app).patch('/api/sessions/s1/working-directory').send({});
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
@@ -1507,23 +1687,31 @@ internal reasoning zclaudia plan
   describe('search with role and sort filters', () => {
     beforeEach(() => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Session 1', now, now);
+      `
+      ).run('s1', 'project-1', 'Session 1', now, now);
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO messages (id, session_id, role, content, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('m1', 's1', 'user', 'authentication request from user', now);
-      db.prepare(`
+      `
+      ).run('m1', 's1', 'user', 'authentication request from user', now);
+      db.prepare(
+        `
         INSERT INTO messages (id, session_id, role, content, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('m2', 's1', 'assistant', 'authentication response from assistant', now + 1000);
+      `
+      ).run('m2', 's1', 'assistant', 'authentication response from assistant', now + 1000);
     });
 
     it('filters by role=user', async () => {
-      const res = await request(app).get('/api/sessions/search/messages?q=authentication&role=user');
+      const res = await request(app).get(
+        '/api/sessions/search/messages?q=authentication&role=user'
+      );
 
       expect(res.status).toBe(200);
       for (const r of res.body.data.results) {
@@ -1532,7 +1720,9 @@ internal reasoning zclaudia plan
     });
 
     it('filters by role=assistant', async () => {
-      const res = await request(app).get('/api/sessions/search/messages?q=authentication&role=assistant');
+      const res = await request(app).get(
+        '/api/sessions/search/messages?q=authentication&role=assistant'
+      );
 
       expect(res.status).toBe(200);
       for (const r of res.body.data.results) {
@@ -1541,15 +1731,21 @@ internal reasoning zclaudia plan
     });
 
     it('sorts by newest', async () => {
-      const res = await request(app).get('/api/sessions/search/messages?q=authentication&sort=newest');
+      const res = await request(app).get(
+        '/api/sessions/search/messages?q=authentication&sort=newest'
+      );
       expect(res.status).toBe(200);
       if (res.body.data.results.length > 1) {
-        expect(res.body.data.results[0].createdAt).toBeGreaterThan(res.body.data.results[1].createdAt);
+        expect(res.body.data.results[0].createdAt).toBeGreaterThan(
+          res.body.data.results[1].createdAt
+        );
       }
     });
 
     it('sorts by oldest', async () => {
-      const res = await request(app).get('/api/sessions/search/messages?q=authentication&sort=oldest');
+      const res = await request(app).get(
+        '/api/sessions/search/messages?q=authentication&sort=oldest'
+      );
       expect(res.status).toBe(200);
       if (res.body.data.results.length > 1) {
         expect(res.body.data.results[0].createdAt).toBeLessThan(res.body.data.results[1].createdAt);
@@ -1557,13 +1753,17 @@ internal reasoning zclaudia plan
     });
 
     it('sorts by session', async () => {
-      const res = await request(app).get('/api/sessions/search/messages?q=authentication&sort=session');
+      const res = await request(app).get(
+        '/api/sessions/search/messages?q=authentication&sort=session'
+      );
       expect(res.status).toBe(200);
       expect(res.body.data.results.length).toBeGreaterThanOrEqual(1);
     });
 
     it('filters by sessionIds', async () => {
-      const res = await request(app).get('/api/sessions/search/messages?q=authentication&sessionIds=s1');
+      const res = await request(app).get(
+        '/api/sessions/search/messages?q=authentication&sessionIds=s1'
+      );
       expect(res.status).toBe(200);
       for (const r of res.body.data.results) {
         expect(r.sessionId).toBe('s1');
@@ -1572,7 +1772,9 @@ internal reasoning zclaudia plan
 
     it('filters by date range', async () => {
       const now = Date.now();
-      const res = await request(app).get(`/api/sessions/search/messages?q=authentication&startDate=${now - 100000}&endDate=${now + 100000}`);
+      const res = await request(app).get(
+        `/api/sessions/search/messages?q=authentication&startDate=${now - 100000}&endDate=${now + 100000}`
+      );
       expect(res.status).toBe(200);
       expect(res.body.data.results.length).toBeGreaterThanOrEqual(1);
     });
@@ -1589,101 +1791,145 @@ internal reasoning zclaudia plan
         .send({ projectId: 'project-1', name: 'New Session' });
 
       expect(res.status).toBe(201);
-      expect(mockBroadcastSessionEvent).toHaveBeenCalledWith('created', expect.objectContaining({ name: 'New Session' }));
+      expect(mockBroadcastSessionEvent).toHaveBeenCalledWith(
+        'created',
+        expect.objectContaining({ name: 'New Session' })
+      );
     });
 
     it('broadcasts session updated on PUT', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Original', now, now);
+      `
+      ).run('s1', 'project-1', 'Original', now, now);
 
       await request(app).put('/api/sessions/s1').send({ name: 'Updated' });
 
-      expect(mockBroadcastSessionEvent).toHaveBeenCalledWith('updated', expect.objectContaining({ id: 's1' }));
+      expect(mockBroadcastSessionEvent).toHaveBeenCalledWith(
+        'updated',
+        expect.objectContaining({ id: 's1' })
+      );
     });
 
     it('broadcasts session deleted on DELETE', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'To Delete', now, now);
+      `
+      ).run('s1', 'project-1', 'To Delete', now, now);
 
       await request(app).delete('/api/sessions/s1');
 
-      expect(mockBroadcastSessionEvent).toHaveBeenCalledWith('deleted', expect.objectContaining({ id: 's1' }));
+      expect(mockBroadcastSessionEvent).toHaveBeenCalledWith(
+        'deleted',
+        expect.objectContaining({ id: 's1' })
+      );
     });
 
     it('broadcasts on archive', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Session', now, now);
+      `
+      ).run('s1', 'project-1', 'Session', now, now);
 
-      await request(app).post('/api/sessions/archive').send({ sessionIds: ['s1'] });
+      await request(app)
+        .post('/api/sessions/archive')
+        .send({ sessionIds: ['s1'] });
 
-      expect(mockBroadcastSessionEvent).toHaveBeenCalledWith('updated', expect.objectContaining({ id: 's1' }));
+      expect(mockBroadcastSessionEvent).toHaveBeenCalledWith(
+        'updated',
+        expect.objectContaining({ id: 's1' })
+      );
     });
 
     it('broadcasts on restore', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Session', now, now, now);
+      `
+      ).run('s1', 'project-1', 'Session', now, now, now);
 
-      await request(app).post('/api/sessions/restore').send({ sessionIds: ['s1'] });
+      await request(app)
+        .post('/api/sessions/restore')
+        .send({ sessionIds: ['s1'] });
 
-      expect(mockBroadcastSessionEvent).toHaveBeenCalledWith('updated', expect.objectContaining({ id: 's1' }));
+      expect(mockBroadcastSessionEvent).toHaveBeenCalledWith(
+        'updated',
+        expect.objectContaining({ id: 's1' })
+      );
     });
 
     it('broadcasts on unlock', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, is_read_only, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Locked', 1, now, now);
+      `
+      ).run('s1', 'project-1', 'Locked', 1, now, now);
 
       await request(app).patch('/api/sessions/s1/unlock');
 
-      expect(mockBroadcastSessionEvent).toHaveBeenCalledWith('updated', expect.objectContaining({ id: 's1' }));
+      expect(mockBroadcastSessionEvent).toHaveBeenCalledWith(
+        'updated',
+        expect.objectContaining({ id: 's1' })
+      );
     });
 
     it('broadcasts on reset-sdk-session', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, sdk_session_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Test', 'sdk-123', now, now);
+      `
+      ).run('s1', 'project-1', 'Test', 'sdk-123', now, now);
 
       await request(app).post('/api/sessions/s1/reset-sdk-session');
 
-      expect(mockBroadcastSessionEvent).toHaveBeenCalledWith('updated', expect.objectContaining({ id: 's1' }));
+      expect(mockBroadcastSessionEvent).toHaveBeenCalledWith(
+        'updated',
+        expect.objectContaining({ id: 's1' })
+      );
     });
 
     it('broadcasts on dismiss-interrupted', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, last_run_status, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Interrupted', 'interrupted', now, now);
+      `
+      ).run('s1', 'project-1', 'Interrupted', 'interrupted', now, now);
 
       await request(app).patch('/api/sessions/s1/dismiss-interrupted');
 
-      expect(mockBroadcastSessionEvent).toHaveBeenCalledWith('updated', expect.objectContaining({ id: 's1' }));
+      expect(mockBroadcastSessionEvent).toHaveBeenCalledWith(
+        'updated',
+        expect.objectContaining({ id: 's1' })
+      );
     });
   });
 
   describe('message size trimming', () => {
     it('trims large messages once past the minimum count and over the byte budget', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Test', now, now);
+      `
+      ).run('s1', 'project-1', 'Test', now, now);
 
       // The page budget keeps at least MESSAGE_PAGE_MIN_MESSAGES (10) before
       // trimming, then caps at MESSAGE_PAGE_MAX_BYTES (4MB). Insert enough large
@@ -1692,10 +1938,12 @@ internal reasoning zclaudia plan
       const largeContent = 'x'.repeat(400 * 1024);
       const inserted = 15;
       for (let i = 0; i < inserted; i++) {
-        db.prepare(`
+        db.prepare(
+          `
           INSERT INTO messages (id, session_id, role, content, created_at)
           VALUES (?, ?, ?, ?, ?)
-        `).run(`m${i}`, 's1', 'user', largeContent, now + i * 1000);
+        `
+        ).run(`m${i}`, 's1', 'user', largeContent, now + i * 1000);
       }
 
       const res = await request(app).get('/api/sessions/s1/messages?limit=100');
@@ -1710,19 +1958,23 @@ internal reasoning zclaudia plan
 
     it('does not let a few oversized messages collapse the page below the floor', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Test', now, now);
+      `
+      ).run('s1', 'project-1', 'Test', now, now);
 
       // Three 300KB messages exceed the old 512KB cap, but the floor guarantees
       // they all come back rather than collapsing to 1-2 items.
       const largeContent = 'x'.repeat(300 * 1024);
       for (let i = 0; i < 3; i++) {
-        db.prepare(`
+        db.prepare(
+          `
           INSERT INTO messages (id, session_id, role, content, created_at)
           VALUES (?, ?, ?, ?, ?)
-        `).run(`m${i}`, 's1', 'user', largeContent, now + i * 1000);
+        `
+        ).run(`m${i}`, 's1', 'user', largeContent, now + i * 1000);
       }
 
       const res = await request(app).get('/api/sessions/s1/messages?limit=100');
@@ -1734,18 +1986,24 @@ internal reasoning zclaudia plan
   describe('GET /api/sessions/search/suggestions', () => {
     it('returns suggestions matching prefix', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO search_history (id, user_id, query, result_count, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('sh1', 'default', 'authentication setup', 5, now);
-      db.prepare(`
+      `
+      ).run('sh1', 'default', 'authentication setup', 5, now);
+      db.prepare(
+        `
         INSERT INTO search_history (id, user_id, query, result_count, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('sh2', 'default', 'auth token', 3, now + 1000);
-      db.prepare(`
+      `
+      ).run('sh2', 'default', 'auth token', 3, now + 1000);
+      db.prepare(
+        `
         INSERT INTO search_history (id, user_id, query, result_count, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('sh3', 'default', 'database migration', 2, now + 2000);
+      `
+      ).run('sh3', 'default', 'database migration', 2, now + 2000);
 
       const res = await request(app).get('/api/sessions/search/suggestions?prefix=auth');
       expect(res.status).toBe(200);
@@ -1763,16 +2021,22 @@ internal reasoning zclaudia plan
   describe('POST /api/sessions/reorder', () => {
     it('updates sort_order without changing updated_at', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, sort_order, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Session 1', 0, now, now);
-      db.prepare(`
+      `
+      ).run('s1', 'project-1', 'Session 1', 0, now, now);
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, sort_order, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s2', 'project-1', 'Session 2', 1, now, now + 1000);
+      `
+      ).run('s2', 'project-1', 'Session 2', 1, now, now + 1000);
 
-      const before = db.prepare('SELECT id, sort_order, updated_at FROM sessions ORDER BY id').all() as Array<{ id: string; sort_order: number; updated_at: number }>;
+      const before = db
+        .prepare('SELECT id, sort_order, updated_at FROM sessions ORDER BY id')
+        .all() as Array<{ id: string; sort_order: number; updated_at: number }>;
 
       const res = await request(app)
         .post('/api/sessions/reorder')
@@ -1780,7 +2044,9 @@ internal reasoning zclaudia plan
 
       expect(res.status).toBe(200);
 
-      const after = db.prepare('SELECT id, sort_order, updated_at FROM sessions ORDER BY id').all() as Array<{ id: string; sort_order: number; updated_at: number }>;
+      const after = db
+        .prepare('SELECT id, sort_order, updated_at FROM sessions ORDER BY id')
+        .all() as Array<{ id: string; sort_order: number; updated_at: number }>;
       expect(after).toEqual([
         { id: 's1', sort_order: 1, updated_at: before[0].updated_at },
         { id: 's2', sort_order: 0, updated_at: before[1].updated_at },
@@ -1791,10 +2057,12 @@ internal reasoning zclaudia plan
   describe('POST /api/sessions/:id/branch — run-active + validation guards', () => {
     beforeEach(() => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Test Session', now, now);
+      `
+      ).run('s1', 'project-1', 'Test Session', now, now);
     });
 
     it('returns 409 SESSION_RUNNING when the session has an active run', async () => {
@@ -1821,9 +2089,7 @@ internal reasoning zclaudia plan
     });
 
     it('returns 400 VALIDATION_ERROR when treeEntryId is missing', async () => {
-      const res = await request(app)
-        .post('/api/sessions/s1/branch')
-        .send({});
+      const res = await request(app).post('/api/sessions/s1/branch').send({});
 
       expect(res.status).toBe(400);
       expect(res.body.success).toBe(false);
@@ -1831,9 +2097,7 @@ internal reasoning zclaudia plan
     });
 
     it('returns 400 VALIDATION_ERROR when body is empty', async () => {
-      const res = await request(app)
-        .post('/api/sessions/s1/branch')
-        .send('');
+      const res = await request(app).post('/api/sessions/s1/branch').send('');
 
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
@@ -1846,23 +2110,45 @@ internal reasoning zclaudia plan
     beforeEach(() => {
       const now = Date.now();
       sessionId = 'cg-s1';
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run(sessionId, 'project-1', 'Graph Session', now, now);
+      `
+      ).run(sessionId, 'project-1', 'Graph Session', now, now);
 
       // Seed two entries + leaf for the graph builder to read
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO session_entries (id, session_id, parent_id, type, payload, timestamp)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('e1', sessionId, null, 'message', JSON.stringify({ message: { role: 'user', content: 'u1' } }), new Date(now).toISOString());
-      db.prepare(`
+      `
+      ).run(
+        'e1',
+        sessionId,
+        null,
+        'message',
+        JSON.stringify({ message: { role: 'user', content: 'u1' } }),
+        new Date(now).toISOString()
+      );
+      db.prepare(
+        `
         INSERT INTO session_entries (id, session_id, parent_id, type, payload, timestamp)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('e2', sessionId, 'e1', 'message', JSON.stringify({ message: { role: 'assistant', content: [{ type: 'text', text: 'a1' }] } }), new Date(now + 1000).toISOString());
-      db.prepare(`
+      `
+      ).run(
+        'e2',
+        sessionId,
+        'e1',
+        'message',
+        JSON.stringify({ message: { role: 'assistant', content: [{ type: 'text', text: 'a1' }] } }),
+        new Date(now + 1000).toISOString()
+      );
+      db.prepare(
+        `
         INSERT INTO session_leaf (session_id, leaf_id) VALUES (?, ?)
-      `).run(sessionId, 'e2');
+      `
+      ).run(sessionId, 'e2');
     });
 
     it('returns 200 with a context graph for a known session', async () => {
@@ -1883,10 +2169,12 @@ internal reasoning zclaudia plan
   describe('POST /api/sessions/:id/fork — run-active + validation guards', () => {
     beforeEach(() => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Test Session', now, now);
+      `
+      ).run('s1', 'project-1', 'Test Session', now, now);
     });
 
     it('returns 409 SESSION_RUNNING when the session has an active run', async () => {
@@ -1902,7 +2190,11 @@ internal reasoning zclaudia plan
     });
 
     it('returns 409 SESSION_RUNNING for non-terminal phases (awaiting_permission)', async () => {
-      activeRuns.set('run-perm', { sessionId: 's1', phase: 'awaiting_permission', sessionType: 'regular' });
+      activeRuns.set('run-perm', {
+        sessionId: 's1',
+        phase: 'awaiting_permission',
+        sessionType: 'regular',
+      });
 
       const res = await request(app)
         .post('/api/sessions/s1/fork')
@@ -1913,9 +2205,7 @@ internal reasoning zclaudia plan
     });
 
     it('returns 400 VALIDATION_ERROR when treeEntryId is missing', async () => {
-      const res = await request(app)
-        .post('/api/sessions/s1/fork')
-        .send({});
+      const res = await request(app).post('/api/sessions/s1/fork').send({});
 
       expect(res.status).toBe(400);
       expect(res.body.success).toBe(false);
@@ -1923,9 +2213,7 @@ internal reasoning zclaudia plan
     });
 
     it('returns 400 VALIDATION_ERROR when body is empty', async () => {
-      const res = await request(app)
-        .post('/api/sessions/s1/fork')
-        .send('');
+      const res = await request(app).post('/api/sessions/s1/fork').send('');
 
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');

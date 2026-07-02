@@ -1,4 +1,14 @@
-import { FileEdit, FileText, FileDiff, Terminal as TerminalIcon, GitFork, Brain, GitBranch, PanelTop, type LucideIcon } from 'lucide-react';
+import {
+  FileEdit,
+  FileText,
+  FileDiff,
+  Terminal as TerminalIcon,
+  GitFork,
+  Brain,
+  GitBranch,
+  PanelTop,
+  type LucideIcon,
+} from 'lucide-react';
 
 /** Maps a SessionTool.iconKey to its Lucide icon. Shared by RightSidebar and
  *  RightSidebarEmptyState (kept out of RightSidebar.tsx to avoid an import cycle). */

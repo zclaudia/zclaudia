@@ -20,7 +20,7 @@ export class ActivityRegistry {
   }
 
   listMeta(): WorkflowStepTypeMeta[] {
-    return [...this.activities.values()].map((a) => ({
+    return [...this.activities.values()].map(a => ({
       type: a.type,
       name: a.name,
       description: a.description,
@@ -35,7 +35,7 @@ export class ActivityRegistry {
   async invoke(
     type: string,
     input: Record<string, unknown>,
-    services: ActivityServices,
+    services: ActivityServices
   ): Promise<ActivityResult> {
     const activity = this.activities.get(type);
     if (!activity) {
@@ -44,9 +44,13 @@ export class ActivityRegistry {
     const schema = activity.configSchema as { required?: string[] } | undefined;
     if (schema?.required?.length) {
       const config = (input ?? {}) as Record<string, unknown>;
-      const missing = schema.required.filter((k) => config[k] === undefined);
+      const missing = schema.required.filter(k => config[k] === undefined);
       if (missing.length) {
-        return { status: 'failed', output: {}, error: `Missing required config: ${missing.join(', ')}` };
+        return {
+          status: 'failed',
+          output: {},
+          error: `Missing required config: ${missing.join(', ')}`,
+        };
       }
     }
     return activity.invoke(input, services);

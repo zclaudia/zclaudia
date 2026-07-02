@@ -19,7 +19,9 @@ export function IssueMarkdown({ content, compact = false }: IssueMarkdownProps) 
   const dark = isDarkTheme(resolvedTheme);
   const size = compact ? 'prose-xs' : 'prose-sm';
   return (
-    <div className={`prose ${size} max-w-none min-w-0 ${dark ? 'dark:prose-invert' : ''} prose-pre:my-2 prose-p:my-1.5 prose-headings:mt-3 prose-headings:mb-1.5`}>
+    <div
+      className={`prose ${size} max-w-none min-w-0 ${dark ? 'dark:prose-invert' : ''} prose-pre:my-2 prose-p:my-1.5 prose-headings:mt-3 prose-headings:mb-1.5`}
+    >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{

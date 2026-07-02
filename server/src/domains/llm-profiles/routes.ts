@@ -1,7 +1,11 @@
-import { Router, Request, Response } from 'express';
+import { Router, type Request, type Response } from 'express';
 import type Database from 'better-sqlite3';
 import { LLM_PROVIDER_TYPES } from '@zclaudia/shared/core/llm-profile';
-import type { LlmProfileConfig, LlmProfileModelEntry, ModelInputModality } from '@zclaudia/shared/core/llm-profile';
+import type {
+  LlmProfileConfig,
+  LlmProfileModelEntry,
+  ModelInputModality,
+} from '@zclaudia/shared/core/llm-profile';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import { LlmProfileRepository } from './repository.js';
 import {
@@ -49,13 +53,18 @@ function normalizeInputModalities(input: unknown, index: number): ModelInputModa
   const seen = new Set<ModelInputModality>();
   for (let j = 0; j < input.length; j += 1) {
     const value = input[j];
-    if (typeof value !== 'string' || !VALID_INPUT_MODALITIES.includes(value as ModelInputModality)) {
-      throw new Error(`models[${index}].inputModalities[${j}] must be one of: ${VALID_INPUT_MODALITIES.join(', ')}`);
+    if (
+      typeof value !== 'string' ||
+      !VALID_INPUT_MODALITIES.includes(value as ModelInputModality)
+    ) {
+      throw new Error(
+        `models[${index}].inputModalities[${j}] must be one of: ${VALID_INPUT_MODALITIES.join(', ')}`
+      );
     }
     seen.add(value as ModelInputModality);
   }
   if (seen.has('image')) seen.add('text');
-  return VALID_INPUT_MODALITIES.filter((value) => seen.has(value));
+  return VALID_INPUT_MODALITIES.filter(value => seen.has(value));
 }
 
 function validateModels(input: unknown): LlmProfileModelEntry[] | undefined {
@@ -120,7 +129,9 @@ function validateRequestHeaders(input: unknown): Record<string, string> {
       throw new Error(`requestHeaders["${key}"] must be a string`);
     }
     if (RESERVED_HEADER_KEYS.has(key.toLowerCase())) {
-      throw new Error(`Header "${key}" is reserved (managed by API key / pi-ai); remove it from requestHeaders`);
+      throw new Error(
+        `Header "${key}" is reserved (managed by API key / pi-ai); remove it from requestHeaders`
+      );
     }
     out[key] = value;
   }
@@ -135,9 +146,9 @@ function validateRequestHeaders(input: unknown): Record<string, string> {
  *
  * Returns the config or a structured error so the caller can 400 cleanly.
  */
-function buildPreviewProfile(body: unknown):
-  | { ok: true; profile: LlmProfileConfig }
-  | { ok: false; error: string } {
+function buildPreviewProfile(
+  body: unknown
+): { ok: true; profile: LlmProfileConfig } | { ok: false; error: string } {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return { ok: false, error: 'request body must be a JSON object' };
   }
@@ -145,7 +156,10 @@ function buildPreviewProfile(body: unknown):
 
   const providerType = typeof b.providerType === 'string' ? b.providerType : '';
   if (!providerType || !VALID_PROVIDER_TYPES.includes(providerType)) {
-    return { ok: false, error: `providerType is required and must be one of: ${VALID_PROVIDER_TYPES.join(', ')}` };
+    return {
+      ok: false,
+      error: `providerType is required and must be one of: ${VALID_PROVIDER_TYPES.join(', ')}`,
+    };
   }
 
   if (b.baseUrl !== undefined && b.baseUrl !== null && typeof b.baseUrl !== 'string') {
@@ -171,8 +185,8 @@ function buildPreviewProfile(body: unknown):
   }
 
   const profile: LlmProfileConfig = {
-    id: '',                  // preview: never persisted, no DB lookup uses it
-    name: '',                // preview: cosmetic; fetch/probe ignore it
+    id: '', // preview: never persisted, no DB lookup uses it
+    name: '', // preview: cosmetic; fetch/probe ignore it
     providerType,
     baseUrl: typeof b.baseUrl === 'string' ? b.baseUrl : undefined,
     apiKey: typeof b.apiKey === 'string' ? b.apiKey : undefined,
@@ -348,7 +362,17 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
 
   router.post('/', (req: Request, res: Response) => {
     try {
-      const { name, providerType = 'anthropic', baseUrl, apiKey, compat, requestHeaders: rawRequestHeaders, models: rawModels, isDefault, cacheRetention } = req.body;
+      const {
+        name,
+        providerType = 'anthropic',
+        baseUrl,
+        apiKey,
+        compat,
+        requestHeaders: rawRequestHeaders,
+        models: rawModels,
+        isDefault,
+        cacheRetention,
+      } = req.body;
 
       if (!name) {
         res.status(400).json({
@@ -361,7 +385,10 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
       if (providerType && !VALID_PROVIDER_TYPES.includes(providerType)) {
         res.status(400).json({
           success: false,
-          error: { code: 'VALIDATION_ERROR', message: `Invalid provider type. Must be one of: ${VALID_PROVIDER_TYPES.join(', ')}` },
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: `Invalid provider type. Must be one of: ${VALID_PROVIDER_TYPES.join(', ')}`,
+          },
         });
         return;
       }
@@ -369,7 +396,10 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
       if (cacheRetention != null && !VALID_CACHE_RETENTION.includes(cacheRetention)) {
         res.status(400).json({
           success: false,
-          error: { code: 'VALIDATION_ERROR', message: `Invalid cacheRetention. Must be one of: ${VALID_CACHE_RETENTION.join(', ')}` },
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: `Invalid cacheRetention. Must be one of: ${VALID_CACHE_RETENTION.join(', ')}`,
+          },
         });
         return;
       }
@@ -381,7 +411,10 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
       } catch (err) {
         res.status(400).json({
           success: false,
-          error: { code: 'VALIDATION_ERROR', message: err instanceof Error ? err.message : String(err) },
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: err instanceof Error ? err.message : String(err),
+          },
         });
         return;
       }
@@ -392,7 +425,10 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
       } catch (err) {
         res.status(400).json({
           success: false,
-          error: { code: 'VALIDATION_ERROR', message: err instanceof Error ? err.message : String(err) },
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: err instanceof Error ? err.message : String(err),
+          },
         });
         return;
       }
@@ -430,7 +466,10 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
       if (body.providerType && !VALID_PROVIDER_TYPES.includes(body.providerType)) {
         res.status(400).json({
           success: false,
-          error: { code: 'VALIDATION_ERROR', message: `Invalid provider type. Must be one of: ${VALID_PROVIDER_TYPES.join(', ')}` },
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: `Invalid provider type. Must be one of: ${VALID_PROVIDER_TYPES.join(', ')}`,
+          },
         });
         return;
       }
@@ -438,7 +477,10 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
       if (body.cacheRetention != null && !VALID_CACHE_RETENTION.includes(body.cacheRetention)) {
         res.status(400).json({
           success: false,
-          error: { code: 'VALIDATION_ERROR', message: `Invalid cacheRetention. Must be one of: ${VALID_CACHE_RETENTION.join(', ')}` },
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: `Invalid cacheRetention. Must be one of: ${VALID_CACHE_RETENTION.join(', ')}`,
+          },
         });
         return;
       }
@@ -449,21 +491,28 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
 
       const patch: Partial<LlmProfileConfig> = {};
       if (Object.prototype.hasOwnProperty.call(body, 'name')) patch.name = body.name ?? null;
-      if (Object.prototype.hasOwnProperty.call(body, 'providerType')) patch.providerType = body.providerType ?? null;
-      if (Object.prototype.hasOwnProperty.call(body, 'baseUrl')) patch.baseUrl = body.baseUrl ?? null;
+      if (Object.prototype.hasOwnProperty.call(body, 'providerType'))
+        patch.providerType = body.providerType ?? null;
+      if (Object.prototype.hasOwnProperty.call(body, 'baseUrl'))
+        patch.baseUrl = body.baseUrl ?? null;
       if (Object.prototype.hasOwnProperty.call(body, 'apiKey')) patch.apiKey = body.apiKey ?? null;
       if (Object.prototype.hasOwnProperty.call(body, 'compat')) patch.compat = body.compat ?? null;
-      if (Object.prototype.hasOwnProperty.call(body, 'cacheRetention')) patch.cacheRetention = body.cacheRetention ?? null;
+      if (Object.prototype.hasOwnProperty.call(body, 'cacheRetention'))
+        patch.cacheRetention = body.cacheRetention ?? null;
       if (Object.prototype.hasOwnProperty.call(body, 'requestHeaders')) {
         try {
           const validated = validateRequestHeaders(body.requestHeaders);
-          patch.requestHeaders = Object.keys(validated).length > 0
-            ? validated
-            : null as unknown as LlmProfileConfig['requestHeaders'];
+          patch.requestHeaders =
+            Object.keys(validated).length > 0
+              ? validated
+              : (null as unknown as LlmProfileConfig['requestHeaders']);
         } catch (err) {
           res.status(400).json({
             success: false,
-            error: { code: 'VALIDATION_ERROR', message: err instanceof Error ? err.message : String(err) },
+            error: {
+              code: 'VALIDATION_ERROR',
+              message: err instanceof Error ? err.message : String(err),
+            },
           });
           return;
         }
@@ -474,12 +523,16 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
         } catch (err) {
           res.status(400).json({
             success: false,
-            error: { code: 'VALIDATION_ERROR', message: err instanceof Error ? err.message : String(err) },
+            error: {
+              code: 'VALIDATION_ERROR',
+              message: err instanceof Error ? err.message : String(err),
+            },
           });
           return;
         }
       }
-      if (Object.prototype.hasOwnProperty.call(body, 'isDefault')) patch.isDefault = Boolean(body.isDefault);
+      if (Object.prototype.hasOwnProperty.call(body, 'isDefault'))
+        patch.isDefault = Boolean(body.isDefault);
 
       let updated: LlmProfileConfig;
       try {
@@ -546,7 +599,10 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
         return;
       }
 
-      res.json({ success: true, data: repo.setDefault(req.params.id) } as ApiResponse<LlmProfileConfig>);
+      res.json({
+        success: true,
+        data: repo.setDefault(req.params.id),
+      } as ApiResponse<LlmProfileConfig>);
     } catch (error) {
       console.error('Error setting default llm profile:', error);
       res.status(500).json({

@@ -7,7 +7,12 @@ import {
 
 export type NotchTab = NotificationInboxTab | `plugin:${string}`;
 
-export const NOTCH_TABS: readonly NotchTab[] = ['sessions', 'claudia', 'approvals', 'system'] as const;
+export const NOTCH_TABS: readonly NotchTab[] = [
+  'sessions',
+  'claudia',
+  'approvals',
+  'system',
+] as const;
 
 export const NOTCH_TAB_LABELS: Record<NotchTab, string> = {
   sessions: 'Sessions',

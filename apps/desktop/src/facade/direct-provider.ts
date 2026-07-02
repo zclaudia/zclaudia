@@ -6,10 +6,7 @@
  *
  */
 
-import {
-  BackendFacadeRuntimeCore,
-  DEFAULT_GC_INTERVAL,
-} from '@zclaudia/shared';
+import { BackendFacadeRuntimeCore, DEFAULT_GC_INTERVAL } from '@zclaudia/shared';
 import type {
   BackendFacade,
   BackendFacadeEvent,
@@ -58,23 +55,49 @@ export class DirectBackendFacadeProvider implements BackendFacade {
   // BackendFacade delegation
   // --------------------------------------------------------------------------
 
-  getSnapshot(): BackendFacadeSnapshot { return this.core.getSnapshot(); }
-  subscribe(listener: (snapshot: BackendFacadeSnapshot) => void): () => void { return this.core.subscribe(listener); }
-  onEvent(listener: (event: BackendFacadeEvent) => void): () => void { return this.core.onEvent(listener); }
+  getSnapshot(): BackendFacadeSnapshot {
+    return this.core.getSnapshot();
+  }
+  subscribe(listener: (snapshot: BackendFacadeSnapshot) => void): () => void {
+    return this.core.subscribe(listener);
+  }
+  onEvent(listener: (event: BackendFacadeEvent) => void): () => void {
+    return this.core.onEvent(listener);
+  }
 
-  openBackend(backendId: string): void { this.core.openBackend(backendId); }
-  closeBackend(backendId: string): void { this.core.closeBackend(backendId); }
-  sendToBackend(backendId: string, message: ClientMessage): void { this.core.sendToBackend(backendId, message); }
+  openBackend(backendId: string): void {
+    this.core.openBackend(backendId);
+  }
+  closeBackend(backendId: string): void {
+    this.core.closeBackend(backendId);
+  }
+  sendToBackend(backendId: string, message: ClientMessage): void {
+    this.core.sendToBackend(backendId, message);
+  }
 
-  openSessionStream(backendId: string, sessionId: string): void { this.core.openSessionStream(backendId, sessionId); }
-  closeSessionStream(backendId: string, sessionId: string): void { this.core.closeSessionStream(backendId, sessionId); }
-  catchUpContent(backendId: string, sessionId: string, afterOffset: number): void { this.core.catchUpContent(backendId, sessionId, afterOffset); }
+  openSessionStream(backendId: string, sessionId: string): void {
+    this.core.openSessionStream(backendId, sessionId);
+  }
+  closeSessionStream(backendId: string, sessionId: string): void {
+    this.core.closeSessionStream(backendId, sessionId);
+  }
+  catchUpContent(backendId: string, sessionId: string, afterOffset: number): void {
+    this.core.catchUpContent(backendId, sessionId, afterOffset);
+  }
 
-  getHttpBaseUrl(backendId: string): string | null { return this.core.getHttpBaseUrl(backendId); }
-  getHttpHeaders(): Record<string, string> { return this.core.getHttpHeaders(); }
+  getHttpBaseUrl(backendId: string): string | null {
+    return this.core.getHttpBaseUrl(backendId);
+  }
+  getHttpHeaders(): Record<string, string> {
+    return this.core.getHttpHeaders();
+  }
 
-  forceReconnect(): void { this.adapter.forceReconnect(); }
-  probeHealth(): void { this.adapter.probeHealth(); }
+  forceReconnect(): void {
+    this.adapter.forceReconnect();
+  }
+  probeHealth(): void {
+    this.adapter.probeHealth();
+  }
 
   // --------------------------------------------------------------------------
   // GC Timer

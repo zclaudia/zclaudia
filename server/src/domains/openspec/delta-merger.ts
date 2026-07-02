@@ -66,9 +66,10 @@ export function applyDelta(corpus: ParsedSpec, delta: DeltaDoc): MergeResult {
   for (const r of corpus.requirements) if (byName.has(r.name)) orderedNames.push(r.name);
   for (const name of added) if (!orderedNames.includes(name)) orderedNames.push(name);
   // MODIFIED-missing inserts also need to be appended (treated like new additions, but not tracked in `added`).
-  for (const name of modifiedMissing) if (byName.has(name) && !orderedNames.includes(name)) orderedNames.push(name);
+  for (const name of modifiedMissing)
+    if (byName.has(name) && !orderedNames.includes(name)) orderedNames.push(name);
 
-  const mergedRequirements = orderedNames.map((n) => byName.get(n) as ParsedRequirement);
+  const mergedRequirements = orderedNames.map(n => byName.get(n) as ParsedRequirement);
 
   return {
     spec: {

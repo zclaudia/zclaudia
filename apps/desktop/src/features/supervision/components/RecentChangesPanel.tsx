@@ -24,8 +24,12 @@ export function RecentChangesPanel({
     <div className="rounded-lg border border-border bg-card px-3 py-3">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">Recent Changes</div>
-          <div className="mt-1 text-xs text-muted-foreground">Read-only history for this project.</div>
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">
+            Recent Changes
+          </div>
+          <div className="mt-1 text-xs text-muted-foreground">
+            Read-only history for this project.
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <span className="rounded-full bg-secondary px-2 py-1 text-[10px] font-medium text-muted-foreground">
@@ -42,7 +46,7 @@ export function RecentChangesPanel({
       </div>
 
       <div className="mt-3 space-y-2">
-        {recentHistory.map((change) => (
+        {recentHistory.map(change => (
           <div
             key={change.id}
             className={`rounded-md border px-3 py-2 transition-colors ${
@@ -61,7 +65,9 @@ export function RecentChangesPanel({
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="truncate text-xs font-medium text-foreground">{change.title}</div>
-                  <div className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">{change.summary}</div>
+                  <div className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">
+                    {change.summary}
+                  </div>
                 </div>
                 <span className="rounded-full bg-background px-2 py-1 text-[10px] font-medium text-muted-foreground">
                   {changeStatusLabel[change.status] ?? change.status}

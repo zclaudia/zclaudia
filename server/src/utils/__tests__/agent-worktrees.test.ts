@@ -3,11 +3,7 @@ import { execSync } from 'child_process';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
-import {
-  createAgentWorktree,
-  cleanupAgentWorktree,
-  isGitRepository,
-} from '../agent-worktrees.js';
+import { createAgentWorktree, cleanupAgentWorktree, isGitRepository } from '../agent-worktrees.js';
 
 function git(cwd: string, cmd: string): string {
   return execSync(`git ${cmd}`, { cwd, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] });

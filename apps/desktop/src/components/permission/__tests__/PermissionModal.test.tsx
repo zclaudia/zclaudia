@@ -23,16 +23,12 @@ describe('PermissionModal', () => {
   };
 
   it('returns null when request is null', () => {
-    const { container } = render(
-      <PermissionModal request={null} onDecision={mockOnDecision} />
-    );
+    const { container } = render(<PermissionModal request={null} onDecision={mockOnDecision} />);
     expect(container.firstChild).toBeNull();
   });
 
   it('renders modal when request is provided', () => {
-    render(
-      <PermissionModal request={defaultRequest} onDecision={mockOnDecision} />
-    );
+    render(<PermissionModal request={defaultRequest} onDecision={mockOnDecision} />);
 
     expect(screen.getByText('Permission Required')).toBeInTheDocument();
     expect(screen.getByText('Bash')).toBeInTheDocument();
@@ -53,28 +49,19 @@ describe('PermissionModal', () => {
 
   it('displays detail correctly', () => {
     const detail = 'Some long detail text here';
-    render(
-      <PermissionModal
-        request={{ ...defaultRequest, detail }}
-        onDecision={mockOnDecision}
-      />
-    );
+    render(<PermissionModal request={{ ...defaultRequest, detail }} onDecision={mockOnDecision} />);
 
     expect(screen.getByText(detail)).toBeInTheDocument();
   });
 
   it('shows initial countdown timer', () => {
-    render(
-      <PermissionModal request={defaultRequest} onDecision={mockOnDecision} />
-    );
+    render(<PermissionModal request={defaultRequest} onDecision={mockOnDecision} />);
 
     expect(screen.getByText('60s')).toBeInTheDocument();
   });
 
   it('countdown decrements every second', () => {
-    render(
-      <PermissionModal request={defaultRequest} onDecision={mockOnDecision} />
-    );
+    render(<PermissionModal request={defaultRequest} onDecision={mockOnDecision} />);
 
     expect(screen.getByText('60s')).toBeInTheDocument();
 
@@ -93,10 +80,7 @@ describe('PermissionModal', () => {
 
   it('auto-denies when countdown reaches zero', () => {
     render(
-      <PermissionModal
-        request={{ ...defaultRequest, timeoutSec: 3 }}
-        onDecision={mockOnDecision}
-      />
+      <PermissionModal request={{ ...defaultRequest, timeoutSec: 3 }} onDecision={mockOnDecision} />
     );
 
     expect(mockOnDecision).not.toHaveBeenCalled();
@@ -109,9 +93,7 @@ describe('PermissionModal', () => {
   });
 
   it('calls onDecision with allow=true when Allow clicked', () => {
-    render(
-      <PermissionModal request={defaultRequest} onDecision={mockOnDecision} />
-    );
+    render(<PermissionModal request={defaultRequest} onDecision={mockOnDecision} />);
 
     fireEvent.click(screen.getByText('Allow'));
 
@@ -119,9 +101,7 @@ describe('PermissionModal', () => {
   });
 
   it('calls onDecision with allow=false when Deny clicked', () => {
-    render(
-      <PermissionModal request={defaultRequest} onDecision={mockOnDecision} />
-    );
+    render(<PermissionModal request={defaultRequest} onDecision={mockOnDecision} />);
 
     fireEvent.click(screen.getByText('Deny'));
 
@@ -129,9 +109,7 @@ describe('PermissionModal', () => {
   });
 
   it('includes remember flag when checkbox is checked and Allow clicked', () => {
-    render(
-      <PermissionModal request={defaultRequest} onDecision={mockOnDecision} />
-    );
+    render(<PermissionModal request={defaultRequest} onDecision={mockOnDecision} />);
 
     const checkbox = screen.getAllByRole('checkbox')[0];
     fireEvent.click(checkbox);
@@ -143,9 +121,7 @@ describe('PermissionModal', () => {
   });
 
   it('includes remember flag when checkbox is checked and Deny clicked', () => {
-    render(
-      <PermissionModal request={defaultRequest} onDecision={mockOnDecision} />
-    );
+    render(<PermissionModal request={defaultRequest} onDecision={mockOnDecision} />);
 
     const checkbox = screen.getAllByRole('checkbox')[0];
     fireEvent.click(checkbox);
@@ -204,17 +180,13 @@ describe('PermissionModal', () => {
   });
 
   it('displays warning text about auto-deny', () => {
-    render(
-      <PermissionModal request={defaultRequest} onDecision={mockOnDecision} />
-    );
+    render(<PermissionModal request={defaultRequest} onDecision={mockOnDecision} />);
 
     expect(screen.getByText(/Auto-deny in/)).toBeInTheDocument();
   });
 
   it('shows description text about tool approval', () => {
-    render(
-      <PermissionModal request={defaultRequest} onDecision={mockOnDecision} />
-    );
+    render(<PermissionModal request={defaultRequest} onDecision={mockOnDecision} />);
 
     expect(
       screen.getByText('Claude wants to use a tool that requires your approval')
@@ -222,13 +194,9 @@ describe('PermissionModal', () => {
   });
 
   it('shows remember checkbox label', () => {
-    render(
-      <PermissionModal request={defaultRequest} onDecision={mockOnDecision} />
-    );
+    render(<PermissionModal request={defaultRequest} onDecision={mockOnDecision} />);
 
-    expect(
-      screen.getByText('Remember this decision for this session')
-    ).toBeInTheDocument();
+    expect(screen.getByText('Remember this decision for this session')).toBeInTheDocument();
   });
 
   it('cleans up interval on unmount', () => {
@@ -300,16 +268,12 @@ describe('PermissionModal', () => {
   });
 
   it('shows queue size badge when queueSize > 1', () => {
-    render(
-      <PermissionModal request={defaultRequest} queueSize={5} onDecision={mockOnDecision} />
-    );
+    render(<PermissionModal request={defaultRequest} queueSize={5} onDecision={mockOnDecision} />);
     expect(screen.getByText('+4 more')).toBeInTheDocument();
   });
 
   it('does not show queue badge when queueSize is 1', () => {
-    render(
-      <PermissionModal request={defaultRequest} queueSize={1} onDecision={mockOnDecision} />
-    );
+    render(<PermissionModal request={defaultRequest} queueSize={1} onDecision={mockOnDecision} />);
     expect(screen.queryByText(/more/)).not.toBeInTheDocument();
   });
 
@@ -325,10 +289,7 @@ describe('PermissionModal', () => {
 
   it('shows "Waiting for your decision" when timeoutSec is 0', () => {
     render(
-      <PermissionModal
-        request={{ ...defaultRequest, timeoutSec: 0 }}
-        onDecision={mockOnDecision}
-      />
+      <PermissionModal request={{ ...defaultRequest, timeoutSec: 0 }} onDecision={mockOnDecision} />
     );
     expect(screen.getByText('Waiting for your decision')).toBeInTheDocument();
   });
@@ -351,7 +312,9 @@ describe('PermissionModal', () => {
       />
     );
 
-    act(() => { vi.advanceTimersByTime(2000); });
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
     expect(mockOnDecision).not.toHaveBeenCalled();
   });
 
@@ -395,7 +358,9 @@ describe('PermissionModal', () => {
       />
     );
 
-    fireEvent.change(screen.getByPlaceholderText('Your credential'), { target: { value: 'old-pass' } });
+    fireEvent.change(screen.getByPlaceholderText('Your credential'), {
+      target: { value: 'old-pass' },
+    });
 
     rerender(
       <PermissionModal
@@ -431,13 +396,18 @@ describe('PermissionModal', () => {
     );
     fireEvent.click(screen.getByLabelText(/always allow/i));
     fireEvent.click(screen.getByText('Allow'));
-    expect(mockOnDecision).toHaveBeenCalledWith('req-1', true, false, undefined, undefined, 'Bash(git push *)');
+    expect(mockOnDecision).toHaveBeenCalledWith(
+      'req-1',
+      true,
+      false,
+      undefined,
+      undefined,
+      'Bash(git push *)'
+    );
   });
 
   it('always-allow and remember are mutually exclusive — always-allow unchecks remember', () => {
-    render(
-      <PermissionModal request={defaultRequest} onDecision={mockOnDecision} />
-    );
+    render(<PermissionModal request={defaultRequest} onDecision={mockOnDecision} />);
     const checkboxes = screen.getAllByRole('checkbox');
     const rememberCheckbox = checkboxes[0];
     // Check remember first
@@ -449,16 +419,14 @@ describe('PermissionModal', () => {
   });
 
   it('always-allow and remember are mutually exclusive — remember unchecks always-allow', () => {
-    render(
-      <PermissionModal request={defaultRequest} onDecision={mockOnDecision} />
-    );
+    render(<PermissionModal request={defaultRequest} onDecision={mockOnDecision} />);
     // Check always-allow first
     const alwaysAllowCheckbox = screen.getByLabelText(/always allow/i);
     fireEvent.click(alwaysAllowCheckbox);
     expect(alwaysAllowCheckbox).toBeChecked();
     // Then check remember — always-allow should be unchecked
     const checkboxes = screen.getAllByRole('checkbox');
-    const rememberCheckbox = checkboxes.find((c) => c !== alwaysAllowCheckbox)!;
+    const rememberCheckbox = checkboxes.find(c => c !== alwaysAllowCheckbox)!;
     fireEvent.click(rememberCheckbox);
     expect(alwaysAllowCheckbox).not.toBeChecked();
   });

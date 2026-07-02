@@ -2,9 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { DEFAULT_UNIFIED_POLICY } from '@zclaudia/shared/interaction/permissions';
 import { applyMigrations } from '../../../infra/storage/migrations/index.js';
-import {
-  createWorkflowAgentPermissionCallbackFactory,
-} from '../step-executors/workflow-agent-permissions.js';
+import { createWorkflowAgentPermissionCallbackFactory } from '../step-executors/workflow-agent-permissions.js';
 import type { AgentLoopPermissionDecision } from '../../agent-loop/index.js';
 
 describe('createWorkflowAgentPermissionCallbackFactory', () => {
@@ -24,20 +22,24 @@ describe('createWorkflowAgentPermissionCallbackFactory', () => {
       purpose: 'workflow.ai_prompt',
     });
 
-    await expect(callback!({
-      requestId: 'req-1',
-      toolName: 'Read',
-      toolInput: { path: 'README.md' },
-      detail: 'README.md',
-      timeoutSeconds: 0,
-    })).resolves.toEqual({ behavior: 'allow' });
+    await expect(
+      callback!({
+        requestId: 'req-1',
+        toolName: 'Read',
+        toolInput: { path: 'README.md' },
+        detail: 'README.md',
+        timeoutSeconds: 0,
+      })
+    ).resolves.toEqual({ behavior: 'allow' });
   });
 
   it('delegates escalated tool calls to the permission workflow', async () => {
-    db.prepare('UPDATE agent_config SET permission_policy = ? WHERE id = 1').run(JSON.stringify({
-      ...DEFAULT_UNIFIED_POLICY,
-      customRules: [{ toolName: 'Bash', action: 'escalate' }],
-    }));
+    db.prepare('UPDATE agent_config SET permission_policy = ? WHERE id = 1').run(
+      JSON.stringify({
+        ...DEFAULT_UNIFIED_POLICY,
+        customRules: [{ toolName: 'Bash', action: 'escalate' }],
+      })
+    );
 
     let resolvePermission!: (decision: AgentLoopPermissionDecision) => void;
     const permissionBridge = {
@@ -86,14 +88,17 @@ describe('createWorkflowAgentPermissionCallbackFactory', () => {
           runId: 'run-1',
           sessionId: 'run-1',
           toolName: 'Bash',
-        }),
+        })
       );
-      expect(permissionWorkflowResolver.triggerPermissionEscalation).toHaveBeenCalledWith('project-1', expect.objectContaining({
-        eventPayload: expect.objectContaining({
-          requestId: 'req-1',
-          toolName: 'Bash',
-        }),
-      }));
+      expect(permissionWorkflowResolver.triggerPermissionEscalation).toHaveBeenCalledWith(
+        'project-1',
+        expect.objectContaining({
+          eventPayload: expect.objectContaining({
+            requestId: 'req-1',
+            toolName: 'Bash',
+          }),
+        })
+      );
     });
 
     resolvePermission({ behavior: 'allow', updatedInput: { command: 'npm publish' } });
@@ -153,7 +158,7 @@ describe('createWorkflowAgentPermissionCallbackFactory', () => {
           toolName: 'SandboxNetworkAccess',
           isEscalateAlways: true,
           matchedRule: 'Always escalate',
-        }),
+        })
       );
     });
 
@@ -167,10 +172,12 @@ describe('createWorkflowAgentPermissionCallbackFactory', () => {
   });
 
   it('denies when the permission workflow finishes without a decision', async () => {
-    db.prepare('UPDATE agent_config SET permission_policy = ? WHERE id = 1').run(JSON.stringify({
-      ...DEFAULT_UNIFIED_POLICY,
-      customRules: [{ toolName: 'Bash', action: 'escalate' }],
-    }));
+    db.prepare('UPDATE agent_config SET permission_policy = ? WHERE id = 1').run(
+      JSON.stringify({
+        ...DEFAULT_UNIFIED_POLICY,
+        customRules: [{ toolName: 'Bash', action: 'escalate' }],
+      })
+    );
 
     const permissionBridge = {
       register: vi.fn(),
@@ -200,13 +207,15 @@ describe('createWorkflowAgentPermissionCallbackFactory', () => {
       purpose: 'workflow.ai_prompt',
     });
 
-    await expect(callback!({
-      requestId: 'req-without-decision',
-      toolName: 'Bash',
-      toolInput: { command: 'npm publish' },
-      detail: 'npm publish',
-      timeoutSeconds: 0,
-    })).resolves.toEqual({
+    await expect(
+      callback!({
+        requestId: 'req-without-decision',
+        toolName: 'Bash',
+        toolInput: { command: 'npm publish' },
+        detail: 'npm publish',
+        timeoutSeconds: 0,
+      })
+    ).resolves.toEqual({
       behavior: 'deny',
       message: 'Permission workflow completed without a decision (completed)',
     });

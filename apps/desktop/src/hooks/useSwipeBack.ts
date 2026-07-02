@@ -52,129 +52,161 @@ export function useSwipeBack<E extends HTMLElement = HTMLDivElement>(options: Us
   } = options;
 
   const stateRef = useRef<SwipeState>({
-    startX: 0, startY: 0, startTime: 0, tracking: false, source: null,
+    startX: 0,
+    startY: 0,
+    startTime: 0,
+    tracking: false,
+    source: null,
   });
 
   const containerRef = useRef<E>(null);
 
-  const beginTracking = useCallback((source: 'touch' | 'pointer', x: number, y: number) => {
-    if (!enabled) return;
-    if (stateRef.current.tracking && stateRef.current.source !== source) return;
+  const beginTracking = useCallback(
+    (source: 'touch' | 'pointer', x: number, y: number) => {
+      if (!enabled) return;
+      if (stateRef.current.tracking && stateRef.current.source !== source) return;
 
-    const rect = containerRef.current?.getBoundingClientRect();
-    const containerWidth = rect?.width ?? containerRef.current?.clientWidth ?? window.innerWidth;
-    const clampedRatio = Math.min(Math.max(edgeWidthRatio ?? 0, 0), 1);
-    const computedEdgeWidth = edgeWidthRatio != null
-      ? Math.max(1, Math.floor(containerWidth * clampedRatio))
-      : edgeWidth;
-    const leftEdge = rect?.left ?? 0;
-    const rightEdge = rect?.right ?? window.innerWidth;
+      const rect = containerRef.current?.getBoundingClientRect();
+      const containerWidth = rect?.width ?? containerRef.current?.clientWidth ?? window.innerWidth;
+      const clampedRatio = Math.min(Math.max(edgeWidthRatio ?? 0, 0), 1);
+      const computedEdgeWidth =
+        edgeWidthRatio != null ? Math.max(1, Math.floor(containerWidth * clampedRatio)) : edgeWidth;
+      const leftEdge = rect?.left ?? 0;
+      const rightEdge = rect?.right ?? window.innerWidth;
 
-    let inEdge = false;
-    if (fullWidth) {
-      inEdge = true;
-    } else if (startZone) {
-      const normalizedStart = Math.min(Math.max(startZone.startRatio, 0), 1);
-      const normalizedEnd = Math.min(Math.max(startZone.endRatio, 0), 1);
-      const zoneStart = leftEdge + containerWidth * Math.min(normalizedStart, normalizedEnd);
-      const zoneEnd = leftEdge + containerWidth * Math.max(normalizedStart, normalizedEnd);
-      inEdge = x >= zoneStart && x <= zoneEnd;
-    } else if (direction === 'right') {
-      inEdge = x <= leftEdge + computedEdgeWidth;
-    } else {
-      inEdge = x >= rightEdge - computedEdgeWidth;
-    }
+      let inEdge = false;
+      if (fullWidth) {
+        inEdge = true;
+      } else if (startZone) {
+        const normalizedStart = Math.min(Math.max(startZone.startRatio, 0), 1);
+        const normalizedEnd = Math.min(Math.max(startZone.endRatio, 0), 1);
+        const zoneStart = leftEdge + containerWidth * Math.min(normalizedStart, normalizedEnd);
+        const zoneEnd = leftEdge + containerWidth * Math.max(normalizedStart, normalizedEnd);
+        inEdge = x >= zoneStart && x <= zoneEnd;
+      } else if (direction === 'right') {
+        inEdge = x <= leftEdge + computedEdgeWidth;
+      } else {
+        inEdge = x >= rightEdge - computedEdgeWidth;
+      }
 
-    if (!inEdge) return;
+      if (!inEdge) return;
 
-    stateRef.current = {
-      startX: x,
-      startY: y,
-      startTime: Date.now(),
-      tracking: true,
-      source,
-    };
-    onProgress?.(0);
-  }, [enabled, direction, edgeWidth, edgeWidthRatio, fullWidth, onProgress, startZone]);
+      stateRef.current = {
+        startX: x,
+        startY: y,
+        startTime: Date.now(),
+        tracking: true,
+        source,
+      };
+      onProgress?.(0);
+    },
+    [enabled, direction, edgeWidth, edgeWidthRatio, fullWidth, onProgress, startZone]
+  );
 
-  const updateTracking = useCallback((source: 'touch' | 'pointer', x: number, y: number) => {
-    if (!stateRef.current.tracking || stateRef.current.source !== source) return;
-    const deltaY = Math.abs(y - stateRef.current.startY);
-    const deltaX = Math.abs(x - stateRef.current.startX);
+  const updateTracking = useCallback(
+    (source: 'touch' | 'pointer', x: number, y: number) => {
+      if (!stateRef.current.tracking || stateRef.current.source !== source) return;
+      const deltaY = Math.abs(y - stateRef.current.startY);
+      const deltaX = Math.abs(x - stateRef.current.startX);
 
-    // Cancel if vertical movement is dominant (user is scrolling)
-    if (deltaY > deltaX && deltaY > 10) {
+      // Cancel if vertical movement is dominant (user is scrolling)
+      if (deltaY > deltaX && deltaY > 10) {
+        stateRef.current.tracking = false;
+        stateRef.current.source = null;
+        onProgress?.(0);
+        return;
+      }
+      const directionalDelta =
+        direction === 'right' ? x - stateRef.current.startX : stateRef.current.startX - x;
+      onProgress?.(Math.max(0, Math.min(1, directionalDelta / threshold)));
+    },
+    [direction, onProgress, threshold]
+  );
+
+  const endTracking = useCallback(
+    (source: 'touch' | 'pointer', x: number) => {
+      if (!stateRef.current.tracking || stateRef.current.source !== source) return;
       stateRef.current.tracking = false;
       stateRef.current.source = null;
+
+      const deltaX = x - stateRef.current.startX;
+      const elapsed = Date.now() - stateRef.current.startTime;
+      const velocity = Math.abs(deltaX) / elapsed;
+
+      const isCorrectDirection = direction === 'right' ? deltaX > 0 : deltaX < 0;
+      const meetsThreshold = Math.abs(deltaX) >= threshold;
+      const meetsVelocity = velocity >= velocityThreshold;
+
+      if (isCorrectDirection && (meetsThreshold || meetsVelocity)) {
+        onSwipe();
+      }
       onProgress?.(0);
-      return;
-    }
-    const directionalDelta = direction === 'right'
-      ? x - stateRef.current.startX
-      : stateRef.current.startX - x;
-    onProgress?.(Math.max(0, Math.min(1, directionalDelta / threshold)));
-  }, [direction, onProgress, threshold]);
+    },
+    [direction, threshold, velocityThreshold, onSwipe, onProgress]
+  );
 
-  const endTracking = useCallback((source: 'touch' | 'pointer', x: number) => {
-    if (!stateRef.current.tracking || stateRef.current.source !== source) return;
-    stateRef.current.tracking = false;
-    stateRef.current.source = null;
+  const handleTouchStart = useCallback(
+    (e: TouchEvent) => {
+      const touch = e.touches[0];
+      if (!touch) return;
+      beginTracking('touch', touch.clientX, touch.clientY);
+    },
+    [beginTracking]
+  );
 
-    const deltaX = x - stateRef.current.startX;
-    const elapsed = Date.now() - stateRef.current.startTime;
-    const velocity = Math.abs(deltaX) / elapsed;
+  const handleTouchMove = useCallback(
+    (e: TouchEvent) => {
+      const touch = e.touches[0];
+      if (!touch) return;
+      updateTracking('touch', touch.clientX, touch.clientY);
+    },
+    [updateTracking]
+  );
 
-    const isCorrectDirection = direction === 'right' ? deltaX > 0 : deltaX < 0;
-    const meetsThreshold = Math.abs(deltaX) >= threshold;
-    const meetsVelocity = velocity >= velocityThreshold;
+  const handleTouchEnd = useCallback(
+    (e: TouchEvent) => {
+      const touch = e.changedTouches[0];
+      if (!touch) return;
+      endTracking('touch', touch.clientX);
+    },
+    [endTracking]
+  );
 
-    if (isCorrectDirection && (meetsThreshold || meetsVelocity)) {
-      onSwipe();
-    }
-    onProgress?.(0);
-  }, [direction, threshold, velocityThreshold, onSwipe, onProgress]);
+  const handlePointerDown = useCallback(
+    (e: PointerEvent) => {
+      if (e.pointerType === 'mouse') return;
+      beginTracking('pointer', e.clientX, e.clientY);
+    },
+    [beginTracking]
+  );
 
-  const handleTouchStart = useCallback((e: TouchEvent) => {
-    const touch = e.touches[0];
-    if (!touch) return;
-    beginTracking('touch', touch.clientX, touch.clientY);
-  }, [beginTracking]);
+  const handlePointerMove = useCallback(
+    (e: PointerEvent) => {
+      if (e.pointerType === 'mouse') return;
+      updateTracking('pointer', e.clientX, e.clientY);
+    },
+    [updateTracking]
+  );
 
-  const handleTouchMove = useCallback((e: TouchEvent) => {
-    const touch = e.touches[0];
-    if (!touch) return;
-    updateTracking('touch', touch.clientX, touch.clientY);
-  }, [updateTracking]);
+  const handlePointerUp = useCallback(
+    (e: PointerEvent) => {
+      if (e.pointerType === 'mouse') return;
+      endTracking('pointer', e.clientX);
+    },
+    [endTracking]
+  );
 
-  const handleTouchEnd = useCallback((e: TouchEvent) => {
-    const touch = e.changedTouches[0];
-    if (!touch) return;
-    endTracking('touch', touch.clientX);
-  }, [endTracking]);
-
-  const handlePointerDown = useCallback((e: PointerEvent) => {
-    if (e.pointerType === 'mouse') return;
-    beginTracking('pointer', e.clientX, e.clientY);
-  }, [beginTracking]);
-
-  const handlePointerMove = useCallback((e: PointerEvent) => {
-    if (e.pointerType === 'mouse') return;
-    updateTracking('pointer', e.clientX, e.clientY);
-  }, [updateTracking]);
-
-  const handlePointerUp = useCallback((e: PointerEvent) => {
-    if (e.pointerType === 'mouse') return;
-    endTracking('pointer', e.clientX);
-  }, [endTracking]);
-
-  const handlePointerCancel = useCallback((e: PointerEvent) => {
-    if (e.pointerType === 'mouse') return;
-    if (stateRef.current.source === 'pointer') {
-      stateRef.current.tracking = false;
-      stateRef.current.source = null;
-      onProgress?.(0);
-    }
-  }, [onProgress]);
+  const handlePointerCancel = useCallback(
+    (e: PointerEvent) => {
+      if (e.pointerType === 'mouse') return;
+      if (stateRef.current.source === 'pointer') {
+        stateRef.current.tracking = false;
+        stateRef.current.source = null;
+        onProgress?.(0);
+      }
+    },
+    [onProgress]
+  );
 
   useEffect(() => {
     const el = global ? document.documentElement : containerRef.current;

@@ -38,5 +38,5 @@ const OVERFLOW_CODES = new Set(['context_length_exceeded', '413']);
 export function isContextOverflowError(raw: string, errorCode?: string): boolean {
   if (errorCode && OVERFLOW_CODES.has(errorCode.toLowerCase())) return true;
   const text = (raw || '').toLowerCase();
-  return OVERFLOW_SUBSTRINGS.some((s) => text.includes(s));
+  return OVERFLOW_SUBSTRINGS.some(s => text.includes(s));
 }

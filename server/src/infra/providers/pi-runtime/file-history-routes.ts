@@ -7,7 +7,9 @@ export function createFileHistoryRoutes(): Router {
   router.get('/file-history/backups/:id', async (req: Request, res: Response) => {
     const backup = await getFileBackup(req.params.id);
     if (!backup) {
-      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Backup not found' } });
+      res
+        .status(404)
+        .json({ success: false, error: { code: 'NOT_FOUND', message: 'Backup not found' } });
       return;
     }
     res.json({ success: true, data: backup });

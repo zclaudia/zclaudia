@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, type Request, type Response } from 'express';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import type { LocalPR } from '@zclaudia/shared/features/local-pr';
 import type { WorktreeConfig } from '@zclaudia/shared/core/project';
@@ -10,7 +10,7 @@ import type { Database } from 'better-sqlite3';
 export function createLocalPRRoutes(
   localPRService: LocalPRService,
   db: Database,
-  onProjectChanged?: () => void,
+  onProjectChanged?: () => void
 ): Router {
   const router = Router();
   const projectRepo = new ProjectRepository(db);
@@ -41,11 +41,17 @@ export function createLocalPRRoutes(
         return;
       }
 
-      const pr = await localPRService.createPR(projectId, worktreePath, { title, description, baseBranch, autoReview });
+      const pr = await localPRService.createPR(projectId, worktreePath, {
+        title,
+        description,
+        baseBranch,
+        autoReview,
+      });
       res.status(201).json({ success: true, data: pr } as ApiResponse<LocalPR>);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create local PR';
-      const status = message.includes('already exists') || message.includes('No new commits') ? 400 : 500;
+      const status =
+        message.includes('already exists') || message.includes('No new commits') ? 400 : 500;
       res.status(status).json({ success: false, error: { code: 'CREATE_ERROR', message } });
     }
   });
@@ -94,7 +100,9 @@ export function createLocalPRRoutes(
     try {
       const pr = localPRService.getRepo().findById(req.params.prId);
       if (!pr) {
-        res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Local PR not found' } });
+        res
+          .status(404)
+          .json({ success: false, error: { code: 'NOT_FOUND', message: 'Local PR not found' } });
         return;
       }
       const updated = localPRService.getRepo().update(pr.id, { status: 'closed' });
@@ -111,12 +119,17 @@ export function createLocalPRRoutes(
     try {
       const pr = localPRService.getRepo().findById(req.params.prId);
       if (!pr) {
-        res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Local PR not found' } });
+        res
+          .status(404)
+          .json({ success: false, error: { code: 'NOT_FOUND', message: 'Local PR not found' } });
         return;
       }
       // Reset to open so the scheduler picks it up
       localPRService.getRepo().update(pr.id, { status: 'open' });
-      res.json({ success: true, data: localPRService.getRepo().findById(pr.id) } as ApiResponse<LocalPR>);
+      res.json({
+        success: true,
+        data: localPRService.getRepo().findById(pr.id),
+      } as ApiResponse<LocalPR>);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to retry review';
       res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message } });
@@ -128,7 +141,9 @@ export function createLocalPRRoutes(
     try {
       const pr = localPRService.getRepo().findById(req.params.prId);
       if (!pr) {
-        res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Local PR not found' } });
+        res
+          .status(404)
+          .json({ success: false, error: { code: 'NOT_FOUND', message: 'Local PR not found' } });
         return;
       }
       if (pr.status !== 'open' && pr.status !== 'review_failed') {
@@ -144,7 +159,10 @@ export function createLocalPRRoutes(
       }
       const { llmProfileId } = req.body;
       await localPRService.startReview(pr.id, llmProfileId || undefined);
-      res.json({ success: true, data: localPRService.getRepo().findById(pr.id) } as ApiResponse<LocalPR>);
+      res.json({
+        success: true,
+        data: localPRService.getRepo().findById(pr.id),
+      } as ApiResponse<LocalPR>);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to start review';
       res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message } });
@@ -156,17 +174,23 @@ export function createLocalPRRoutes(
     try {
       const pr = localPRService.getRepo().findById(req.params.prId);
       if (!pr) {
-        res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Local PR not found' } });
+        res
+          .status(404)
+          .json({ success: false, error: { code: 'NOT_FOUND', message: 'Local PR not found' } });
         return;
       }
       await localPRService.mergePR(pr.id);
-      res.json({ success: true, data: localPRService.getRepo().findById(pr.id) } as ApiResponse<LocalPR>);
+      res.json({
+        success: true,
+        data: localPRService.getRepo().findById(pr.id),
+      } as ApiResponse<LocalPR>);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to trigger merge';
-      const status =
-        message.includes('Cannot merge PR in status') ? 400
-          : message.includes('Main worktree is dirty') ? 409
-            : 500;
+      const status = message.includes('Cannot merge PR in status')
+        ? 400
+        : message.includes('Main worktree is dirty')
+          ? 409
+          : 500;
       res.status(status).json({ success: false, error: { code: 'INTERNAL_ERROR', message } });
     }
   });
@@ -176,11 +200,16 @@ export function createLocalPRRoutes(
     try {
       const pr = localPRService.getRepo().findById(req.params.prId);
       if (!pr) {
-        res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Local PR not found' } });
+        res
+          .status(404)
+          .json({ success: false, error: { code: 'NOT_FOUND', message: 'Local PR not found' } });
         return;
       }
       await localPRService.cancelMerge(pr.id);
-      res.json({ success: true, data: localPRService.getRepo().findById(pr.id) } as ApiResponse<LocalPR>);
+      res.json({
+        success: true,
+        data: localPRService.getRepo().findById(pr.id),
+      } as ApiResponse<LocalPR>);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to cancel merge';
       const status = message.includes('Cannot cancel merge in status') ? 400 : 500;
@@ -193,13 +222,18 @@ export function createLocalPRRoutes(
     try {
       const pr = localPRService.getRepo().findById(req.params.prId);
       if (!pr) {
-        res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Local PR not found' } });
+        res
+          .status(404)
+          .json({ success: false, error: { code: 'NOT_FOUND', message: 'Local PR not found' } });
         return;
       }
       if (pr.executionState !== 'queued') {
         res.status(400).json({
           success: false,
-          error: { code: 'INVALID_STATE', message: `PR is not queued (current state: ${pr.executionState})` },
+          error: {
+            code: 'INVALID_STATE',
+            message: `PR is not queued (current state: ${pr.executionState})`,
+          },
         });
         return;
       }
@@ -208,7 +242,10 @@ export function createLocalPRRoutes(
         pendingAction: 'none',
         statusMessage: 'Queue cancelled by user.',
       });
-      res.json({ success: true, data: localPRService.getRepo().findById(pr.id) } as ApiResponse<LocalPR>);
+      res.json({
+        success: true,
+        data: localPRService.getRepo().findById(pr.id),
+      } as ApiResponse<LocalPR>);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to cancel queue';
       res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message } });
@@ -220,13 +257,18 @@ export function createLocalPRRoutes(
     try {
       const pr = localPRService.getRepo().findById(req.params.prId);
       if (!pr) {
-        res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Local PR not found' } });
+        res
+          .status(404)
+          .json({ success: false, error: { code: 'NOT_FOUND', message: 'Local PR not found' } });
         return;
       }
       if (pr.executionState !== 'failed') {
         res.status(400).json({
           success: false,
-          error: { code: 'INVALID_STATE', message: `PR is not failed (current state: ${pr.executionState})` },
+          error: {
+            code: 'INVALID_STATE',
+            message: `PR is not failed (current state: ${pr.executionState})`,
+          },
         });
         return;
       }
@@ -235,7 +277,10 @@ export function createLocalPRRoutes(
         executionState: 'queued',
         executionError: undefined,
       });
-      res.json({ success: true, data: localPRService.getRepo().findById(pr.id) } as ApiResponse<LocalPR>);
+      res.json({
+        success: true,
+        data: localPRService.getRepo().findById(pr.id),
+      } as ApiResponse<LocalPR>);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to retry';
       res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message } });
@@ -247,17 +292,24 @@ export function createLocalPRRoutes(
     try {
       const pr = localPRService.getRepo().findById(req.params.prId);
       if (!pr) {
-        res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Local PR not found' } });
+        res
+          .status(404)
+          .json({ success: false, error: { code: 'NOT_FOUND', message: 'Local PR not found' } });
         return;
       }
       await localPRService.triggerConflictResolution(pr.id);
-      res.json({ success: true, data: localPRService.getRepo().findById(pr.id) } as ApiResponse<LocalPR>);
+      res.json({
+        success: true,
+        data: localPRService.getRepo().findById(pr.id),
+      } as ApiResponse<LocalPR>);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to trigger conflict resolution';
-      const status =
-        message.includes('Cannot resolve conflict in status') ? 400
-          : message.includes('No provider available') ? 400
-            : 500;
+      const message =
+        error instanceof Error ? error.message : 'Failed to trigger conflict resolution';
+      const status = message.includes('Cannot resolve conflict in status')
+        ? 400
+        : message.includes('No provider available')
+          ? 400
+          : 500;
       res.status(status).json({ success: false, error: { code: 'INTERNAL_ERROR', message } });
     }
   });
@@ -267,11 +319,16 @@ export function createLocalPRRoutes(
     try {
       const pr = localPRService.getRepo().findById(req.params.prId);
       if (!pr) {
-        res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Local PR not found' } });
+        res
+          .status(404)
+          .json({ success: false, error: { code: 'NOT_FOUND', message: 'Local PR not found' } });
         return;
       }
       await localPRService.reopenPR(pr.id);
-      res.json({ success: true, data: localPRService.getRepo().findById(pr.id) } as ApiResponse<LocalPR>);
+      res.json({
+        success: true,
+        data: localPRService.getRepo().findById(pr.id),
+      } as ApiResponse<LocalPR>);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to reopen PR';
       const status = message.includes('Cannot reopen PR in status') ? 400 : 500;
@@ -284,17 +341,23 @@ export function createLocalPRRoutes(
     try {
       const pr = localPRService.getRepo().findById(req.params.prId);
       if (!pr) {
-        res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Local PR not found' } });
+        res
+          .status(404)
+          .json({ success: false, error: { code: 'NOT_FOUND', message: 'Local PR not found' } });
         return;
       }
       await localPRService.revertMergedPR(pr.id);
-      res.json({ success: true, data: localPRService.getRepo().findById(pr.id) } as ApiResponse<LocalPR>);
+      res.json({
+        success: true,
+        data: localPRService.getRepo().findById(pr.id),
+      } as ApiResponse<LocalPR>);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to revert merged PR';
-      const status =
-        message.includes('Cannot revert PR in status') ? 400
-          : message.includes('Main worktree is dirty') ? 409
-            : 500;
+      const status = message.includes('Cannot revert PR in status')
+        ? 400
+        : message.includes('Main worktree is dirty')
+          ? 409
+          : 500;
       res.status(status).json({ success: false, error: { code: 'INTERNAL_ERROR', message } });
     }
   });

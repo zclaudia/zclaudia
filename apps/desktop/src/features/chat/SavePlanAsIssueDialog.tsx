@@ -32,7 +32,7 @@ export function SavePlanAsIssueDialog({
     >
       <div
         className="bg-card border border-border rounded-lg shadow-lg w-full max-w-md"
-        onClick={(e) => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h2 className="text-sm font-semibold">Save plan as issue</h2>
@@ -47,17 +47,14 @@ export function SavePlanAsIssueDialog({
         </div>
         <form onSubmit={handleSubmit} className="p-4 space-y-3">
           <div>
-            <label
-              htmlFor="save-plan-title"
-              className="text-xs font-medium text-muted-foreground"
-            >
+            <label htmlFor="save-plan-title" className="text-xs font-medium text-muted-foreground">
               Title
             </label>
             <input
               id="save-plan-title"
               type="text"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={e => setTitle(e.target.value)}
               autoFocus
               className="mt-1 w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
               placeholder="Issue title"

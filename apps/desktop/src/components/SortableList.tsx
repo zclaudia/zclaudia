@@ -35,13 +35,7 @@ interface SortableItemProps {
  * plain click still falls through to the item's own handler (e.g. select).
  */
 export function SortableItem({ id, children, wrapperClassName }: SortableItemProps) {
-  const {
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id });
+  const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -109,14 +103,14 @@ export function SortableList({
     // Prefer the item directly under the pointer. This makes upward reordering
     // in compact lists much more reliable than center-based matching alone.
     const pointerCollisions = pointerWithin(args).filter(
-      (collision) => String(collision.id) !== String(args.active.id)
+      collision => String(collision.id) !== String(args.active.id)
     );
     if (pointerCollisions.length > 0) {
       return pointerCollisions;
     }
 
     return closestCorners(args).filter(
-      (collision) => String(collision.id) !== String(args.active.id)
+      collision => String(collision.id) !== String(args.active.id)
     );
   }, []);
 
@@ -150,9 +144,7 @@ export function SortableList({
       <SortableContext items={items} strategy={verticalListSortingStrategy}>
         <ul className={className}>{children}</ul>
       </SortableContext>
-      <DragOverlay>
-        {activeId && renderOverlay ? renderOverlay(activeId) : null}
-      </DragOverlay>
+      <DragOverlay>{activeId && renderOverlay ? renderOverlay(activeId) : null}</DragOverlay>
     </DndContext>
   );
 }

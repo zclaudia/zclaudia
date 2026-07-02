@@ -36,9 +36,7 @@ describe('CompactionMarkerCard', () => {
   });
 
   it('expands on click and reveals the summary', () => {
-    const { getByRole, getByText } = render(
-      <CompactionMarkerCard marker={makeMarker()} />
-    );
+    const { getByRole, getByText } = render(<CompactionMarkerCard marker={makeMarker()} />);
     const button = getByRole('button');
     expect(button.getAttribute('aria-expanded')).toBe('false');
     fireEvent.click(button);
@@ -48,14 +46,20 @@ describe('CompactionMarkerCard', () => {
 
   it('shows customInstructions only when source=manual + instructions present', () => {
     const { getByRole, getByText, queryByText, rerender } = render(
-      <CompactionMarkerCard marker={makeMarker({ source: 'manual', customInstructions: 'focus on auth' })} />
+      <CompactionMarkerCard
+        marker={makeMarker({ source: 'manual', customInstructions: 'focus on auth' })}
+      />
     );
     fireEvent.click(getByRole('button'));
     expect(getByText('Custom instructions')).toBeTruthy();
     expect(getByText('focus on auth')).toBeTruthy();
 
     // Same instructions but source=auto -> not shown
-    rerender(<CompactionMarkerCard marker={makeMarker({ source: 'auto', customInstructions: 'focus on auth' })} />);
+    rerender(
+      <CompactionMarkerCard
+        marker={makeMarker({ source: 'auto', customInstructions: 'focus on auth' })}
+      />
+    );
     fireEvent.click(getByRole('button')); // re-collapsing previous one; new tree starts collapsed
     // After rerender the card is a new tree; click once to expand:
     fireEvent.click(getByRole('button'));
@@ -78,9 +82,7 @@ describe('CompactionMarkerCard', () => {
   });
 
   it('does not render file activity section when both file lists are empty', () => {
-    const { getByRole, queryByText } = render(
-      <CompactionMarkerCard marker={makeMarker()} />
-    );
+    const { getByRole, queryByText } = render(<CompactionMarkerCard marker={makeMarker()} />);
     fireEvent.click(getByRole('button'));
     expect(queryByText(/File activity/)).toBeNull();
   });

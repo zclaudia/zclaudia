@@ -14,7 +14,6 @@ function proxyProfile(over: Partial<LlmProfileConfig> = {}): LlmProfileConfig {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const devRole = (model: any): boolean | undefined => model.compat?.supportsDeveloperRole;
 
 describe('buildModel — openai-compat developer role', () => {
@@ -33,9 +32,9 @@ describe('buildModel — openai-compat developer role', () => {
 
   it('preserves other registry compat fields when pinning developer role', () => {
     // deepseek registry entry carries thinkingFormat:'deepseek' — must survive.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const { model } = buildModel(proxyProfile(), 'deepseek-v4-flash');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     expect((model as any).compat?.thinkingFormat).toBe('deepseek');
     expect(devRole(model)).toBe(false);
   });
@@ -43,7 +42,7 @@ describe('buildModel — openai-compat developer role', () => {
   it('respects an explicit profile compat override (true wins)', () => {
     const { model } = buildModel(
       proxyProfile({ compat: { supportsDeveloperRole: true } }),
-      'deepseek-v4-flash',
+      'deepseek-v4-flash'
     );
     expect(devRole(model)).toBe(true);
   });
@@ -51,7 +50,7 @@ describe('buildModel — openai-compat developer role', () => {
   it('does NOT force developer role off for canonical api.openai.com', () => {
     const { model } = buildModel(
       proxyProfile({ baseUrl: 'https://api.openai.com/v1' }),
-      'some-unregistered-model-xyz',
+      'some-unregistered-model-xyz'
     );
     expect(devRole(model)).not.toBe(false);
   });

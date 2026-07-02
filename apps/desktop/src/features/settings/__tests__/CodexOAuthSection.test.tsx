@@ -3,7 +3,11 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { LlmProfileConfig } from '@zclaudia/shared';
 import { CodexOAuthSection } from '../CodexOAuthSection';
 import { useServerStore } from '../../../stores/serverStore';
-import { fetchCodexModels, startCodexOAuth, updateLlmProfile } from '../../../services/api/llm-profiles';
+import {
+  fetchCodexModels,
+  startCodexOAuth,
+  updateLlmProfile,
+} from '../../../services/api/llm-profiles';
 
 vi.mock('../../../services/api/llm-profiles', () => ({
   fetchCodexModels: vi.fn(),
@@ -41,13 +45,17 @@ describe('CodexOAuthSection', () => {
         profile={profile}
         onCredentialsChanged={vi.fn()}
         onBeforeSignIn={vi.fn(async () => null)}
-      />,
+      />
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Sign in with ChatGPT' }));
 
     await waitFor(() => {
-      expect(screen.getByText('Failed to save the profile before signing in. Please fix the form errors first.')).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'Failed to save the profile before signing in. Please fix the form errors first.'
+        )
+      ).toBeInTheDocument();
     });
     expect(startCodexOAuth).not.toHaveBeenCalled();
   });
@@ -59,12 +67,7 @@ describe('CodexOAuthSection', () => {
       authUrl: 'https://auth.openai.com/oauth/authorize?client_id=codex',
     });
 
-    render(
-      <CodexOAuthSection
-        profile={profile}
-        onCredentialsChanged={vi.fn()}
-      />,
-    );
+    render(<CodexOAuthSection profile={profile} onCredentialsChanged={vi.fn()} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Sign in with ChatGPT' }));
 
@@ -73,7 +76,7 @@ describe('CodexOAuthSection', () => {
     });
     expect(screen.getByRole('link', { name: 'Open authorization page' })).toHaveAttribute(
       'href',
-      'https://auth.openai.com/oauth/authorize?client_id=codex',
+      'https://auth.openai.com/oauth/authorize?client_id=codex'
     );
   });
 
@@ -87,12 +90,7 @@ describe('CodexOAuthSection', () => {
       expiresAt: Date.now() + 900_000,
     });
 
-    render(
-      <CodexOAuthSection
-        profile={profile}
-        onCredentialsChanged={vi.fn()}
-      />,
-    );
+    render(<CodexOAuthSection profile={profile} onCredentialsChanged={vi.fn()} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Sign in with ChatGPT' }));
 
@@ -103,19 +101,19 @@ describe('CodexOAuthSection', () => {
     const link = screen.getByRole('link', { name: 'Open authorization page' });
     expect(link).toHaveAttribute('href', 'https://auth.openai.com/codex/device');
     expect(link.getAttribute('href')).not.toContain('user_code');
-    expect(screen.getByText('Device code authorization must be enabled for Codex.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Device code authorization must be enabled for Codex.')
+    ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'View OpenAI authentication docs' })).toHaveAttribute(
       'href',
-      'https://developers.openai.com/codex/auth#preferred-device-code-authentication-beta',
+      'https://developers.openai.com/codex/auth#preferred-device-code-authentication-beta'
     );
   });
 
   it('syncs fetched Codex models back onto the profile', async () => {
     const onCredentialsChanged = vi.fn();
     vi.mocked(fetchCodexModels).mockResolvedValue({
-      models: [
-        { id: 'gpt-5-codex', displayName: 'GPT-5 Codex', contextWindow: 272_000 },
-      ],
+      models: [{ id: 'gpt-5-codex', displayName: 'GPT-5 Codex', contextWindow: 272_000 }],
       fetchedAt: Date.now(),
       source: 'live',
     });
@@ -124,10 +122,15 @@ describe('CodexOAuthSection', () => {
       <CodexOAuthSection
         profile={{
           ...profile,
-          oauthCredentials: { access: 'access-token', refresh: 'refresh-token', expires: Date.now() + 60_000, accountId: 'acct_1' },
+          oauthCredentials: {
+            access: 'access-token',
+            refresh: 'refresh-token',
+            expires: Date.now() + 60_000,
+            accountId: 'acct_1',
+          },
         }}
         onCredentialsChanged={onCredentialsChanged}
-      />,
+      />
     );
 
     await waitFor(() => {

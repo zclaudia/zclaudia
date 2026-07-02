@@ -53,7 +53,11 @@ class MockXMLHttpRequest {
   send: ReturnType<typeof vi.fn>;
   abort = vi.fn();
   private listeners = new Map<string, () => void>();
-  private progressHandler?: (e: { lengthComputable: boolean; loaded: number; total: number }) => void;
+  private progressHandler?: (e: {
+    lengthComputable: boolean;
+    loaded: number;
+    total: number;
+  }) => void;
 
   constructor() {
     this.upload = {
@@ -100,9 +104,7 @@ describe('attachments api - simple wrappers', () => {
   it('listAttachments builds query string', async () => {
     apiCall.mockResolvedValue([{ id: 'x' }]);
     const result = await listAttachments('local_issue', 'issue 1');
-    expect(apiCall).toHaveBeenCalledWith(
-      '/api/attachments?ownerKind=local_issue&ownerId=issue+1',
-    );
+    expect(apiCall).toHaveBeenCalledWith('/api/attachments?ownerKind=local_issue&ownerId=issue+1');
     expect(result).toEqual([{ id: 'x' }]);
   });
 
@@ -110,7 +112,7 @@ describe('attachments api - simple wrappers', () => {
     apiCall.mockResolvedValue([]);
     await listAttachmentCounts('comment', ['a', 'b', 'c']);
     expect(apiCall).toHaveBeenCalledWith(
-      '/api/attachments/counts?ownerKind=comment&ownerIds=a%2Cb%2Cc',
+      '/api/attachments/counts?ownerKind=comment&ownerIds=a%2Cb%2Cc'
     );
   });
 
@@ -192,7 +194,7 @@ describe('attachments api - uploadAttachment transport selection', () => {
     MockXMLHttpRequest.nextResponse = { success: false, error: { message: 'oops' } };
     const file = new File(['x'], 'x.png');
     await expect(uploadAttachment('local_issue', 'issue-1', file)).rejects.toThrow(
-      /Upload failed with status 500/,
+      /Upload failed with status 500/
     );
   });
 });
@@ -213,7 +215,7 @@ describe('fetchAttachmentBlobUrl', () => {
     expect(url).toBe('blob:abc');
     expect(fetchMock).toHaveBeenCalledWith(
       'http://localhost:3100/api/attachments/a1/raw',
-      expect.objectContaining({ headers: { Authorization: 'Bearer t' } }),
+      expect.objectContaining({ headers: { Authorization: 'Bearer t' } })
     );
   });
 

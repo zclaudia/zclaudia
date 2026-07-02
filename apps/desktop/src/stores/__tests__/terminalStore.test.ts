@@ -34,7 +34,9 @@ describe('terminalStore', () => {
       const terminalId = useTerminalStore.getState().openTerminal('project-1');
 
       expect(terminalId).toBeTruthy();
-      expect(useTerminalStore.getState().terminals[getTerminalScopeKey('project-1', 'backend-1')]).toBe(terminalId);
+      expect(
+        useTerminalStore.getState().terminals[getTerminalScopeKey('project-1', 'backend-1')]
+      ).toBe(terminalId);
     });
 
     it('returns existing terminal if project already has one', () => {
@@ -67,7 +69,9 @@ describe('terminalStore', () => {
       const terminalId = useTerminalStore.getState().openTerminal('project-1');
       useTerminalStore.getState().closeTerminal(terminalId);
 
-      expect(useTerminalStore.getState().terminals[getTerminalScopeKey('project-1', 'backend-1')]).toBeUndefined();
+      expect(
+        useTerminalStore.getState().terminals[getTerminalScopeKey('project-1', 'backend-1')]
+      ).toBeUndefined();
     });
 
     it('does not affect other terminals', () => {
@@ -76,8 +80,12 @@ describe('terminalStore', () => {
 
       useTerminalStore.getState().closeTerminal(id1);
 
-      expect(useTerminalStore.getState().terminals[getTerminalScopeKey('project-1', 'backend-1')]).toBeUndefined();
-      expect(useTerminalStore.getState().terminals[getTerminalScopeKey('project-2', 'backend-1')]).toBeTruthy();
+      expect(
+        useTerminalStore.getState().terminals[getTerminalScopeKey('project-1', 'backend-1')]
+      ).toBeUndefined();
+      expect(
+        useTerminalStore.getState().terminals[getTerminalScopeKey('project-2', 'backend-1')]
+      ).toBeTruthy();
     });
 
     it('is safe to call with non-existent terminal ID', () => {
@@ -120,7 +128,9 @@ describe('terminalStore', () => {
       const terminalId = useTerminalStore.getState().openTerminal('project-1');
       useTerminalStore.getState().handleTerminalExited(terminalId);
 
-      expect(useTerminalStore.getState().terminals[getTerminalScopeKey('project-1', 'backend-1')]).toBeUndefined();
+      expect(
+        useTerminalStore.getState().terminals[getTerminalScopeKey('project-1', 'backend-1')]
+      ).toBeUndefined();
     });
 
     it('allows opening a new terminal for the same project after exit', () => {
@@ -129,7 +139,9 @@ describe('terminalStore', () => {
 
       const second = useTerminalStore.getState().openTerminal('project-1');
       expect(second).not.toBe(first);
-      expect(useTerminalStore.getState().terminals[getTerminalScopeKey('project-1', 'backend-1')]).toBe(second);
+      expect(
+        useTerminalStore.getState().terminals[getTerminalScopeKey('project-1', 'backend-1')]
+      ).toBe(second);
     });
 
     it('is safe to call with non-existent terminal ID', () => {

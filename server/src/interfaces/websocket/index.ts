@@ -86,21 +86,18 @@ export class MessageRouter {
   /**
    * Register a message handler for a specific message type
    */
-  register(
-    messageType: string,
-    handler: MessageHandler,
-    options?: RouteOptions
-  ): void {
+  register(messageType: string, handler: MessageHandler, options?: RouteOptions): void {
     // Compose route-specific middleware with global middleware
     const allMiddleware = [...this.globalMiddleware, ...(options?.middleware || [])];
 
     // Create final handler with middleware
-    const finalHandler: MessageHandler = allMiddleware.length > 0
-      ? async (ctx: MessageContext) => {
-          const composed = composeMiddleware(...allMiddleware);
-          return composed(ctx, handler);
-        }
-      : handler;
+    const finalHandler: MessageHandler =
+      allMiddleware.length > 0
+        ? async (ctx: MessageContext) => {
+            const composed = composeMiddleware(...allMiddleware);
+            return composed(ctx, handler);
+          }
+        : handler;
 
     this.routes.set(messageType, finalHandler);
   }
@@ -122,18 +119,19 @@ export class MessageRouter {
     const handlers = createCrudHandlers(entityName, repository);
 
     // Default message type names (matches existing convention)
-    const messageTypes = options?.messageTypes || {
+    const messageTypes = {
       list: `get_${entityName}`,
-      create: `add_${entityName.slice(0, -1)}`,  // Remove 's' for singular
+      create: `add_${entityName.slice(0, -1)}`, // Remove 's' for singular
       update: `update_${entityName.slice(0, -1)}`,
-      delete: `delete_${entityName.slice(0, -1)}`
+      delete: `delete_${entityName.slice(0, -1)}`,
+      ...options?.messageTypes,
     };
 
     // Register each CRUD handler
-    this.register(messageTypes.list!, handlers.list, options);
-    this.register(messageTypes.create!, handlers.create, options);
-    this.register(messageTypes.update!, handlers.update, options);
-    this.register(messageTypes.delete!, handlers.delete, options);
+    this.register(messageTypes.list, handlers.list, options);
+    this.register(messageTypes.create, handlers.create, options);
+    this.register(messageTypes.update, handlers.update, options);
+    this.register(messageTypes.delete, handlers.delete, options);
 
     console.log(`[Router] Registered CRUD routes for ${entityName}:`, Object.values(messageTypes));
   }
@@ -145,10 +143,7 @@ export class MessageRouter {
    * @param request - Correlated request message
    * @returns Response or void if no handler found
    */
-  async route(
-    client: ConnectedClient,
-    request: Request
-  ): Promise<Response | void> {
+  async route(client: ConnectedClient, request: Request): Promise<Response | void> {
     const handler = this.routes.get(request.type);
 
     if (!handler) {
@@ -161,7 +156,7 @@ export class MessageRouter {
       client,
       request,
       db: this.db,
-      metadata: new Map()
+      metadata: new Map(),
     };
 
     try {

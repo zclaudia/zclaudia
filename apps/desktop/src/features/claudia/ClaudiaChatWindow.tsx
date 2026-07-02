@@ -36,11 +36,21 @@ function ClaudiaChatWindowContent({
   isMobile = false,
   hostProjectId,
   contextProjectId,
-}: { isMobile?: boolean; hostProjectId?: string; contextProjectId?: string }) {
+}: {
+  isMobile?: boolean;
+  hostProjectId?: string;
+  contextProjectId?: string;
+}) {
   useDataLoader();
-  const { claudiaTaskSessionIds, hasRunning: hasClaudiaRunning, hasPermissionPending: hasClaudiaPermissionPending } = useClaudiaStatus();
-  const permissionRequests = usePermissionStore((state) =>
-    state.pendingRequests.filter((request) => !request.sessionId || claudiaTaskSessionIds.includes(request.sessionId))
+  const {
+    claudiaTaskSessionIds,
+    hasRunning: hasClaudiaRunning,
+    hasPermissionPending: hasClaudiaPermissionPending,
+  } = useClaudiaStatus();
+  const permissionRequests = usePermissionStore(state =>
+    state.pendingRequests.filter(
+      request => !request.sessionId || claudiaTaskSessionIds.includes(request.sessionId)
+    )
   );
   const lastAutoOpenedRequestIdRef = useRef<string | null>(null);
 
@@ -85,7 +95,13 @@ function ClaudiaChatWindowContent({
     })();
   }, [permissionRequests]);
 
-  return <ClaudiaChat isMobile={isMobile} hostProjectId={hostProjectId} contextProjectId={contextProjectId} />;
+  return (
+    <ClaudiaChat
+      isMobile={isMobile}
+      hostProjectId={hostProjectId}
+      contextProjectId={contextProjectId}
+    />
+  );
 }
 
 /** Header with theme-aware logo */
@@ -105,7 +121,9 @@ function ClaudiaHeader({ onClose }: { onClose: () => void }) {
           className="w-5 h-5 object-contain"
           draggable={false}
         />
-        <span className="font-semibold text-xs text-foreground" data-tauri-drag-region>Claudia</span>
+        <span className="font-semibold text-xs text-foreground" data-tauri-drag-region>
+          Claudia
+        </span>
       </div>
       <button
         onClick={onClose}
@@ -113,7 +131,12 @@ function ClaudiaHeader({ onClose }: { onClose: () => void }) {
         title="Hide"
       >
         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M6 18L18 6M6 6l12 12"
+          />
         </svg>
       </button>
     </div>
@@ -130,7 +153,9 @@ export function ClaudiaChatWindow({
   projectId,
   contextProjectId,
 }: ClaudiaChatWindowProps) {
-  const [context, setContext] = useState<Required<Pick<ClaudiaWindowContext, 'serverUrl' | 'authToken'>> & ClaudiaWindowContext>(() => ({
+  const [context, setContext] = useState<
+    Required<Pick<ClaudiaWindowContext, 'serverUrl' | 'authToken'>> & ClaudiaWindowContext
+  >(() => ({
     serverUrl,
     authToken,
     serverId,
@@ -153,13 +178,13 @@ export function ClaudiaChatWindow({
       const { listen } = await import('@tauri-apps/api/event');
       const win = getCurrentWindow();
       // Hide instead of destroying so reopen is instant.
-      cleanupClose = await win.onCloseRequested(async (e) => {
+      cleanupClose = await win.onCloseRequested(async e => {
         e.preventDefault();
         const { invoke } = await import('@tauri-apps/api/core');
         await invoke('hide_claudia_chat');
       });
-      cleanupContext = await listen<ClaudiaWindowContext>('claudia:context', (event) => {
-        setContext((prev) => ({ ...prev, ...event.payload }));
+      cleanupContext = await listen<ClaudiaWindowContext>('claudia:context', event => {
+        setContext(prev => ({ ...prev, ...event.payload }));
       });
     })();
     return () => {

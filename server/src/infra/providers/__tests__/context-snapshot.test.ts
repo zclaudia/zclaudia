@@ -65,7 +65,10 @@ describe('context snapshot store', () => {
     captureContextSnapshot(baseCapture);
     recordContextUsage('s1', { input: 500, output: 80, cacheRead: 4500, cacheWrite: 0 });
     expect(getContextSnapshot('s1')?.lastUsage).toEqual({
-      input: 500, output: 80, cacheRead: 4500, cacheWrite: 0,
+      input: 500,
+      output: 80,
+      cacheRead: 4500,
+      cacheWrite: 0,
     });
   });
 

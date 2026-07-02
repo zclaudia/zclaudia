@@ -10,10 +10,7 @@ describe('Read bridge tool module', () => {
   it('declares path requirements and the hashline parameter in its schema', () => {
     const read = createReadBridgeTool('/tmp') as any;
 
-    expect(read.parameters.anyOf).toEqual([
-      { required: ['path'] },
-      { required: ['file_path'] },
-    ]);
+    expect(read.parameters.anyOf).toEqual([{ required: ['path'] }, { required: ['file_path'] }]);
     expect(read.parameters.properties.hashline).toMatchObject({ type: 'boolean' });
   });
 
@@ -77,7 +74,9 @@ describe('Read bridge tool module', () => {
     const result = await read.execute('read-1', { path: 'big.ts', offset: 1, limit: 10 });
 
     expect(result.details).toMatchObject({ totalLines: 50, returnedLines: 10 });
-    expect(result.content[0].text).toContain('Showing lines 1-10 of 50. 40 more lines below — call Read again with offset=11 to continue.');
+    expect(result.content[0].text).toContain(
+      'Showing lines 1-10 of 50. 40 more lines below — call Read again with offset=11 to continue.'
+    );
   });
 
   it('reports a clear footer when offset is past the end of a normal text file', async () => {
@@ -88,7 +87,9 @@ describe('Read bridge tool module', () => {
     const result = await read.execute('read-past-eof', { path: 'sample.ts', offset: 10, limit: 2 });
 
     expect(result.details).toMatchObject({ ok: true, totalLines: 3, returnedLines: 0 });
-    expect(result.content[0].text).toContain('Offset 10 is past end of file — 3 lines total. Re-read with offset=3 or lower.');
+    expect(result.content[0].text).toContain(
+      'Offset 10 is past end of file — 3 lines total. Re-read with offset=3 or lower.'
+    );
     expect(result.content[0].text).not.toContain('10-3');
   });
 
@@ -112,8 +113,16 @@ describe('Read bridge tool module', () => {
 
     const result = await read.execute('read-ranges', { path: 'sample.ts', ranges: '2-3,10-11' });
 
-    expect(result.details).toMatchObject({ ok: true, format: 'ranges', totalLines: 20, returnedLines: 4 });
-    expect(result.details.ranges).toEqual([[2, 3], [10, 11]]);
+    expect(result.details).toMatchObject({
+      ok: true,
+      format: 'ranges',
+      totalLines: 20,
+      returnedLines: 4,
+    });
+    expect(result.details.ranges).toEqual([
+      [2, 3],
+      [10, 11],
+    ]);
     const text = result.content[0].text;
     expect(text).toContain('2|line2');
     expect(text).toContain('3|line3');
@@ -285,7 +294,12 @@ describe('Read bridge tool module', () => {
 
     const result = await read.execute('read-1', { path: 'minified.js' });
 
-    expect(result.details).toMatchObject({ ok: true, totalLines: 5, returnedLines: 5, columnTruncated: 2000 });
+    expect(result.details).toMatchObject({
+      ok: true,
+      totalLines: 5,
+      returnedLines: 5,
+      columnTruncated: 2000,
+    });
     expect(result.content[0].text).toContain('chars clipped]');
     // Display stays far under the raw 150k chars thanks to per-line clipping.
     expect(result.content[0].text.length).toBeLessThan(20_000);
@@ -348,17 +362,36 @@ describe('Read bridge tool module', () => {
     const read = createReadBridgeTool(root) as any;
 
     const head = await read.execute('read-1', { path: 'huge.csv', offset: 1, limit: 10 });
-    expect(head.details).toMatchObject({ ok: true, totalLines: 60_000, returnedLines: 10, streamed: true });
+    expect(head.details).toMatchObject({
+      ok: true,
+      totalLines: 60_000,
+      returnedLines: 10,
+      streamed: true,
+    });
     expect(head.content[0].text).toContain('1|row-1');
-    expect(head.content[0].text).toContain('59990 more lines below — call Read again with offset=11');
+    expect(head.content[0].text).toContain(
+      '59990 more lines below — call Read again with offset=11'
+    );
 
     const mid = await read.execute('read-2', { path: 'huge.csv', offset: 30_000, limit: 3 });
-    expect(mid.details).toMatchObject({ ok: true, totalLines: 60_000, returnedLines: 3, streamed: true });
+    expect(mid.details).toMatchObject({
+      ok: true,
+      totalLines: 60_000,
+      returnedLines: 3,
+      streamed: true,
+    });
     expect(mid.content[0].text).toContain('30000|row-30000');
 
     const pastEnd = await read.execute('read-3', { path: 'huge.csv', offset: 60_001, limit: 5 });
-    expect(pastEnd.details).toMatchObject({ ok: true, totalLines: 60_000, returnedLines: 0, streamed: true });
-    expect(pastEnd.content[0].text).toContain('Offset 60001 is past end of file — 60000 lines total. Re-read with offset=60000 or lower.');
+    expect(pastEnd.details).toMatchObject({
+      ok: true,
+      totalLines: 60_000,
+      returnedLines: 0,
+      streamed: true,
+    });
+    expect(pastEnd.content[0].text).toContain(
+      'Offset 60001 is past end of file — 60000 lines total. Re-read with offset=60000 or lower.'
+    );
     expect(pastEnd.content[0].text).not.toContain('60001-60000');
   });
 

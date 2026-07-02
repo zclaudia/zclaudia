@@ -46,7 +46,22 @@ describe('ensureDefaultAgentProfile', () => {
       include: [],
       exclude: [],
     });
-    expect(agents[0].enabledTools).toEqual(['Read', 'Write', 'Edit', 'MultiEdit', 'ReadSymbol', 'EditSymbol', 'Bash', 'Eval', 'Grep', 'Glob', 'LS', 'EnterPlanMode', 'ExitPlanMode', 'Memory']);
+    expect(agents[0].enabledTools).toEqual([
+      'Read',
+      'Write',
+      'Edit',
+      'MultiEdit',
+      'ReadSymbol',
+      'EditSymbol',
+      'Bash',
+      'Eval',
+      'Grep',
+      'Glob',
+      'LS',
+      'EnterPlanMode',
+      'ExitPlanMode',
+      'Memory',
+    ]);
     log.mockRestore();
   });
 
@@ -87,7 +102,12 @@ describe('ensureDefaultAgentProfile', () => {
   it('is a no-op when agent_profiles already has rows', () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
     const llmRepo = new LlmProfileRepository(db);
-    const lp = llmRepo.create({ name: 'a', providerType: 'anthropic', apiKey: 'sk', isDefault: true });
+    const lp = llmRepo.create({
+      name: 'a',
+      providerType: 'anthropic',
+      apiKey: 'sk',
+      isDefault: true,
+    });
     const agentRepo = new AgentProfileRepository(db);
     agentRepo.create({
       name: 'existing',

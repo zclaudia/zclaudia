@@ -10,28 +10,66 @@ import type { FilePushItem } from '../../stores/filePushStore';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 
 const EXT_TO_LANG: Record<string, string> = {
-  ts: 'typescript', tsx: 'tsx', js: 'javascript', jsx: 'jsx',
-  json: 'json', md: 'markdown', py: 'python', rs: 'rust',
-  go: 'go', sh: 'bash', bash: 'bash', zsh: 'bash',
-  yml: 'yaml', yaml: 'yaml', toml: 'toml',
-  css: 'css', scss: 'scss', less: 'less',
-  html: 'html', xml: 'xml', svg: 'xml',
-  sql: 'sql', graphql: 'graphql',
-  rb: 'ruby', java: 'java', kt: 'kotlin',
-  c: 'c', cpp: 'cpp', h: 'c', hpp: 'cpp',
-  cs: 'csharp', swift: 'swift', m: 'objectivec',
-  lua: 'lua', r: 'r', pl: 'perl',
-  dockerfile: 'docker', makefile: 'makefile',
+  ts: 'typescript',
+  tsx: 'tsx',
+  js: 'javascript',
+  jsx: 'jsx',
+  json: 'json',
+  md: 'markdown',
+  py: 'python',
+  rs: 'rust',
+  go: 'go',
+  sh: 'bash',
+  bash: 'bash',
+  zsh: 'bash',
+  yml: 'yaml',
+  yaml: 'yaml',
+  toml: 'toml',
+  css: 'css',
+  scss: 'scss',
+  less: 'less',
+  html: 'html',
+  xml: 'xml',
+  svg: 'xml',
+  sql: 'sql',
+  graphql: 'graphql',
+  rb: 'ruby',
+  java: 'java',
+  kt: 'kotlin',
+  c: 'c',
+  cpp: 'cpp',
+  h: 'c',
+  hpp: 'cpp',
+  cs: 'csharp',
+  swift: 'swift',
+  m: 'objectivec',
+  lua: 'lua',
+  r: 'r',
+  pl: 'perl',
+  dockerfile: 'docker',
+  makefile: 'makefile',
 };
 
 type PreviewType = 'image' | 'video' | 'audio' | 'text' | 'markdown' | 'unsupported';
 
 /** Text-like MIME types that can be syntax-highlighted */
-const TEXT_MIME_PREFIXES = ['text/', 'application/json', 'application/xml', 'application/javascript', 'application/typescript'];
+const TEXT_MIME_PREFIXES = [
+  'text/',
+  'application/json',
+  'application/xml',
+  'application/javascript',
+  'application/typescript',
+];
 
 const TEXT_EXTENSIONS = new Set([
   ...Object.keys(EXT_TO_LANG),
-  'txt', 'log', 'env', 'gitignore', 'editorconfig', 'prettierrc', 'eslintrc',
+  'txt',
+  'log',
+  'env',
+  'gitignore',
+  'editorconfig',
+  'prettierrc',
+  'eslintrc',
 ]);
 
 function getFileExtension(fileName: string): string {
@@ -172,19 +210,33 @@ export function FilePreviewModal({ item, onClose }: FilePreviewModalProps) {
         aria-label="Close preview"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M6 18L18 6M6 6l12 12"
+          />
         </svg>
       </button>
 
       {/* Header */}
       <header
         className="flex items-center justify-between px-4 py-3 bg-black/60 text-white flex-shrink-0 pr-16"
-        onClick={(e) => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center gap-3 min-w-0">
-          <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-md transition-colors" aria-label="Close">
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-white/10 rounded-md transition-colors"
+            aria-label="Close"
+          >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
             </svg>
           </button>
           <span className="text-sm font-medium truncate">{item.fileName}</span>
@@ -205,11 +257,9 @@ export function FilePreviewModal({ item, onClose }: FilePreviewModalProps) {
       {/* Content */}
       <div
         className="flex-1 overflow-auto flex items-center justify-center"
-        onClick={(e) => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
       >
-        {loading && (
-          <div className="text-white/60 text-sm">Loading...</div>
-        )}
+        {loading && <div className="text-white/60 text-sm">Loading...</div>}
 
         {error && (
           <div className="text-center text-white/80 p-8">
@@ -240,8 +290,18 @@ export function FilePreviewModal({ item, onClose }: FilePreviewModalProps) {
         {!loading && !error && previewType === 'audio' && dataUrl && (
           <div className="w-full max-w-md px-8">
             <div className="text-center text-white/60 mb-4">
-              <svg className="w-16 h-16 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+              <svg
+                className="w-16 h-16 mx-auto mb-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1}
+                  d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
+                />
               </svg>
               <span className="text-sm">{item.fileName}</span>
             </div>
@@ -330,24 +390,30 @@ function ImagePreview({ src, alt }: { src: string; alt: string }) {
   }, []);
 
   const handleDoubleClick = useCallback(() => {
-    setScale(s => s === 1 ? 2 : 1);
+    setScale(s => (s === 1 ? 2 : 1));
     setPosition({ x: 0, y: 0 });
   }, []);
 
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    if (scale <= 1) return;
-    setDragging(true);
-    lastPos.current = { x: e.clientX, y: e.clientY };
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-  }, [scale]);
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (scale <= 1) return;
+      setDragging(true);
+      lastPos.current = { x: e.clientX, y: e.clientY };
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    },
+    [scale]
+  );
 
-  const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (!dragging) return;
-    const dx = e.clientX - lastPos.current.x;
-    const dy = e.clientY - lastPos.current.y;
-    lastPos.current = { x: e.clientX, y: e.clientY };
-    setPosition(p => ({ x: p.x + dx, y: p.y + dy }));
-  }, [dragging]);
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!dragging) return;
+      const dx = e.clientX - lastPos.current.x;
+      const dy = e.clientY - lastPos.current.y;
+      lastPos.current = { x: e.clientX, y: e.clientY };
+      setPosition(p => ({ x: p.x + dx, y: p.y + dy }));
+    },
+    [dragging]
+  );
 
   const handlePointerUp = useCallback(() => {
     setDragging(false);
@@ -362,7 +428,10 @@ function ImagePreview({ src, alt }: { src: string; alt: string }) {
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      style={{ cursor: scale > 1 ? (dragging ? 'grabbing' : 'grab') : 'default', touchAction: 'none' }}
+      style={{
+        cursor: scale > 1 ? (dragging ? 'grabbing' : 'grab') : 'default',
+        touchAction: 'none',
+      }}
     >
       <img
         src={src}

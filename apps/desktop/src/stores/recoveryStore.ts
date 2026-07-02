@@ -7,9 +7,21 @@ import type {
 } from '@zclaudia/shared';
 
 export type RecoveryCoordinatorStatus = 'ready' | 'background' | 'recovering' | 'error';
-export type TransportStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error' | 'stopped';
+export type TransportStatus =
+  | 'idle'
+  | 'connecting'
+  | 'connected'
+  | 'reconnecting'
+  | 'error'
+  | 'stopped';
 export type BackendRecoveryStatus = 'absent' | 'visible' | 'subscribing' | 'ready' | 'error';
-export type DataSyncStatus = 'idle' | 'stale' | 'syncing_full' | 'syncing_delta' | 'ready' | 'error';
+export type DataSyncStatus =
+  | 'idle'
+  | 'stale'
+  | 'syncing_full'
+  | 'syncing_delta'
+  | 'ready'
+  | 'error';
 export type ActiveSessionRecoveryStatus =
   | 'idle'
   | 'resolving_owner'
@@ -123,9 +135,10 @@ function mapTransportStatus(state: BackendConnectionState): TransportStatus {
   }
 }
 
-function mapBackendStatus(
-  runtimeState: BackendRuntimeState,
-): { status: BackendRecoveryStatus; subscribed: boolean } {
+function mapBackendStatus(runtimeState: BackendRuntimeState): {
+  status: BackendRecoveryStatus;
+  subscribed: boolean;
+} {
   switch (runtimeState) {
     case 'ready':
       return { status: 'ready', subscribed: true };
@@ -146,7 +159,7 @@ function upsertBackendState(
   current: BackendRecoveryState | undefined,
   backendId: string,
   status: BackendRecoveryStatus,
-  overrides: Partial<BackendRecoveryState> = {},
+  overrides: Partial<BackendRecoveryState> = {}
 ): BackendRecoveryState {
   const enteredAt = current?.status === status ? current.statusEnteredAt : now();
   return {
@@ -167,7 +180,7 @@ function upsertDataSyncState(
   current: DataSyncState | undefined,
   backendId: string,
   status: DataSyncStatus,
-  overrides: Partial<DataSyncState> = {},
+  overrides: Partial<DataSyncState> = {}
 ): DataSyncState {
   const enteredAt = current?.status === status ? current.statusEnteredAt : now();
   return {
@@ -186,7 +199,7 @@ function upsertDataSyncState(
 function updateActiveSession(
   current: ActiveSessionRecoveryState,
   status: ActiveSessionRecoveryStatus,
-  overrides: Partial<ActiveSessionRecoveryState> = {},
+  overrides: Partial<ActiveSessionRecoveryState> = {}
 ): ActiveSessionRecoveryState {
   const enteredAt = current.status === status ? current.statusEnteredAt : now();
   return {
@@ -196,7 +209,6 @@ function updateActiveSession(
     ...overrides,
   };
 }
-
 
 export const RECOVERY_MAX_RETRIES = {
   TRANSPORT: 5,
@@ -229,7 +241,11 @@ interface RecoveryState {
   noteDataSyncFailed: (backendId: string, error: string) => void;
   noteDataSyncSucceeded: (backendId: string) => number;
   noteActiveSessionResolving: (sessionId: string, backendId: string | null) => void;
-  noteActiveSessionOwnerVerified: (sessionId: string, backendId: string, ownershipVersion: number) => void;
+  noteActiveSessionOwnerVerified: (
+    sessionId: string,
+    backendId: string,
+    ownershipVersion: number
+  ) => void;
   noteActiveSessionWaiting: (sessionId: string, backendId: string | null) => void;
   noteActiveSessionOpeningStream: (sessionId: string, backendId: string) => void;
   noteActiveSessionCatchingUp: (sessionId: string, backendId: string) => void;
@@ -259,261 +275,274 @@ export const useRecoveryStore = create<RecoveryState>()((set, get) => ({
   nextOwnershipVersion: 1,
   backgroundAt: null,
 
-  setSelection: (activeBackendId, selectedSessionId) => set((state) => {
-    if (
-      state.activeBackendId === activeBackendId
-      && state.selectedSessionId === selectedSessionId
-      && (
-        (!selectedSessionId && state.activeSession.sessionId === null)
-        || state.activeSession.sessionId === selectedSessionId
-      )
-    ) {
-      return state;
-    }
-
-    let activeSession = state.activeSession;
-    if (!selectedSessionId) {
-      activeSession = initialActiveSession();
-    } else if (state.activeSession.sessionId !== selectedSessionId) {
-      activeSession = {
-        sessionId: selectedSessionId,
-        status: state.coordinator === 'recovering' ? 'stale' : 'idle',
-        backendId: null,
-        ownershipVersion: null,
-        retryCount: 0,
-        lastError: null,
-        hasGapMarker: false,
-        lastMessageAt: null,
-        statusEnteredAt: now(),
-      };
-    }
-
-    return {
-      activeBackendId,
-      selectedSessionId,
-      activeSession,
-    };
-  }),
-
-  noteBackground: () => set({
-    coordinator: 'background',
-    backgroundAt: now(),
-  }),
-
-  startRecovery: (mode) => set((state) => {
-    const nextGeneration = state.transport.generation + 1;
-    const backends: Record<string, BackendRecoveryState> = {};
-    for (const [backendId, backend] of Object.entries(state.backends)) {
-      backends[backendId] = {
-        ...backend,
-        // Preserve subscribed — it reflects the facade's actual subscription state.
-        // If still subscribed (common in embedded mode), keeping this true
-        // lets noteDataSyncSucceeded restore the backend to ready after sync.
-        dataReady: false,
-        retryCount: 0,
-        lastCloseReason: backend.status === 'ready' ? 'transport_reconnecting' : backend.lastCloseReason,
-        statusEnteredAt: now(),
-      };
-    }
-
-    const dataSyncs: Record<string, DataSyncState> = {};
-    for (const [backendId, dataSync] of Object.entries(state.dataSyncs)) {
-      dataSyncs[backendId] = {
-        ...dataSync,
-        status: backendId === state.activeBackendId ? 'stale' : dataSync.status,
-        retryCount: 0,
-        statusEnteredAt: backendId === state.activeBackendId ? now() : dataSync.statusEnteredAt,
-      };
-    }
-
-    const activeSession = state.selectedSessionId
-      ? {
-          ...state.activeSession,
-          sessionId: state.selectedSessionId,
-          status: 'stale' as const,
-          retryCount: 0,
-          lastError: null,
-          statusEnteredAt: now(),
-        }
-      : initialActiveSession();
-
-    return {
-      coordinator: 'recovering',
-      transport: {
-        ...state.transport,
-        mode: mode ?? state.transport.mode,
-        generation: nextGeneration,
-        // Don't override transport.status — it's managed by connection_state_changed
-        // events from the WS lifecycle. If the WS is still connected (common in
-        // embedded mode), the coordinator can proceed immediately.
-        error: null,
-        retryCount: 0,
-      },
-      backends,
-      dataSyncs,
-      activeSession,
-      backgroundAt: null,
-    };
-  }),
-
-  startBackendRecovery: (backendId) => set((state) => {
-    if (state.coordinator === 'recovering') return state;
-    if (state.transport.status !== 'connected') return state;
-    if (state.activeBackendId !== backendId) return state;
-
-    const backend = state.backends[backendId];
-    if (!backend) return state;
-
-    // Only recover data syncs that were previously tracked (i.e. synced at least
-    // once). Missing data sync entry means first boot, not a disruption.
-    const dataNeedsSync = state.dataSyncs[backendId] != null
-      && state.dataSyncs[backendId].status !== 'ready';
-    // Only recover sessions that were actively in use — idle means first boot.
-    const sessionNeedsRecovery = state.selectedSessionId
-      && state.activeSession.status !== 'live'
-      && state.activeSession.status !== 'idle';
-
-    if (!dataNeedsSync && !sessionNeedsRecovery) return state;
-
-    const dataSyncs = { ...state.dataSyncs };
-    if (dataSyncs[backendId]) {
-      dataSyncs[backendId] = {
-        ...dataSyncs[backendId],
-        status: 'stale',
-        retryCount: 0,
-        lastError: null,
-        statusEnteredAt: now(),
-      };
-    }
-
-    const activeSession = state.selectedSessionId
-      ? {
-          ...state.activeSession,
-          sessionId: state.selectedSessionId,
-          status: 'stale' as const,
-          retryCount: 0,
-          lastError: null,
-          statusEnteredAt: now(),
-        }
-      : state.activeSession;
-
-    return {
-      coordinator: 'recovering',
-      dataSyncs,
-      activeSession,
-    };
-  }),
-
-  setTransportState: (state, error) => set((current) => {
-    const status = mapTransportStatus(state);
-    const coordinator =
-      status === 'error' && current.coordinator === 'recovering'
-        ? 'error'
-        : current.coordinator;
-    return {
-      coordinator,
-      transport: {
-        ...current.transport,
-        status,
-        error: error ?? null,
-        statusEnteredAt: now(),
-      },
-    };
-  }),
-
-  applySnapshot: (snapshot) => set((state) => {
-    const backends = { ...state.backends };
-    const seen = new Set<string>();
-
-    for (const backend of snapshot.backends) {
-      seen.add(backend.backendId);
-      const current = backends[backend.backendId];
-      const mapped = mapBackendStatus(backend.runtimeState);
-      backends[backend.backendId] = upsertBackendState(
-        current,
-        backend.backendId,
-        mapped.status,
-        {
-          lastError: backend.lastError ?? current?.lastError ?? null,
-          subscribed: mapped.subscribed,
-          dataReady: mapped.subscribed ? (current?.dataReady ?? false) : false,
-        },
-      );
-    }
-
-    for (const backendId of Object.keys(backends)) {
-      if (!seen.has(backendId)) {
-        backends[backendId] = upsertBackendState(backends[backendId], backendId, 'absent', {
-          subscribed: false,
-          dataReady: false,
-        });
+  setSelection: (activeBackendId, selectedSessionId) =>
+    set(state => {
+      if (
+        state.activeBackendId === activeBackendId &&
+        state.selectedSessionId === selectedSessionId &&
+        ((!selectedSessionId && state.activeSession.sessionId === null) ||
+          state.activeSession.sessionId === selectedSessionId)
+      ) {
+        return state;
       }
-    }
 
-    let coordinator = state.coordinator;
-    if (coordinator === 'recovering' && snapshot.connectionState === 'connected' && !state.activeBackendId) {
-      coordinator = 'ready';
-    }
+      let activeSession = state.activeSession;
+      if (!selectedSessionId) {
+        activeSession = initialActiveSession();
+      } else if (state.activeSession.sessionId !== selectedSessionId) {
+        activeSession = {
+          sessionId: selectedSessionId,
+          status: state.coordinator === 'recovering' ? 'stale' : 'idle',
+          backendId: null,
+          ownershipVersion: null,
+          retryCount: 0,
+          lastError: null,
+          hasGapMarker: false,
+          lastMessageAt: null,
+          statusEnteredAt: now(),
+        };
+      }
 
-    return {
-      coordinator,
-      transport: {
-        ...state.transport,
-        mode: snapshot.mode,
-        // Don't override transport.status from snapshot — the snapshot's
-        // connectionState reflects server-side state (e.g. gateway connection),
-        // not the client WS state. Transport is managed by setTransportState.
-        lastMessageAt: now(),
-      },
-      backends,
-    };
-  }),
+      return {
+        activeBackendId,
+        selectedSessionId,
+        activeSession,
+      };
+    }),
 
-  noteBackendSubscribing: (backendId) => set((state) => ({
-    backends: {
-      ...state.backends,
-      [backendId]: upsertBackendState(state.backends[backendId], backendId, 'subscribing', {
-        lastError: null,
-      }),
-    },
-  })),
+  noteBackground: () =>
+    set({
+      coordinator: 'background',
+      backgroundAt: now(),
+    }),
 
-  noteDataSyncStarted: (backendId, mode) => set((state) => ({
-    dataSyncs: {
-      ...state.dataSyncs,
-      [backendId]: upsertDataSyncState(
-        state.dataSyncs[backendId],
-        backendId,
-        mode === 'delta' ? 'syncing_delta' : 'syncing_full',
-        { lastError: null },
-      ),
-    },
-  })),
+  startRecovery: mode =>
+    set(state => {
+      const nextGeneration = state.transport.generation + 1;
+      const backends: Record<string, BackendRecoveryState> = {};
+      for (const [backendId, backend] of Object.entries(state.backends)) {
+        backends[backendId] = {
+          ...backend,
+          // Preserve subscribed — it reflects the facade's actual subscription state.
+          // If still subscribed (common in embedded mode), keeping this true
+          // lets noteDataSyncSucceeded restore the backend to ready after sync.
+          dataReady: false,
+          retryCount: 0,
+          lastCloseReason:
+            backend.status === 'ready' ? 'transport_reconnecting' : backend.lastCloseReason,
+          statusEnteredAt: now(),
+        };
+      }
 
-  noteDataSyncFailed: (backendId, error) => set((state) => {
-    const current = state.dataSyncs[backendId];
-    const retryCount = (current?.retryCount ?? 0) + 1;
-    const maxRetries = current?.status === 'syncing_delta'
-      ? RECOVERY_MAX_RETRIES.DATA_SYNC_DELTA
-      : RECOVERY_MAX_RETRIES.DATA_SYNC_FULL;
-    const retriesExhausted = retryCount >= maxRetries;
-    // On failure (not exhausted), reset to 'stale' so the planner can re-trigger sync.
-    // Previously syncing_full stayed as syncing_full, causing the planner to think a sync
-    // was still in flight and only recovering via the 30s reconciliation tick.
-    const nextStatus: DataSyncStatus = retriesExhausted ? 'error' : 'stale';
-    return {
-      coordinator: retriesExhausted && state.coordinator === 'recovering' ? 'error' : state.coordinator,
-      dataSyncs: {
-        ...state.dataSyncs,
-        [backendId]: upsertDataSyncState(current, backendId, nextStatus, {
-          lastError: error,
-          retryCount,
+      const dataSyncs: Record<string, DataSyncState> = {};
+      for (const [backendId, dataSync] of Object.entries(state.dataSyncs)) {
+        dataSyncs[backendId] = {
+          ...dataSync,
+          status: backendId === state.activeBackendId ? 'stale' : dataSync.status,
+          retryCount: 0,
+          statusEnteredAt: backendId === state.activeBackendId ? now() : dataSync.statusEnteredAt,
+        };
+      }
+
+      const activeSession = state.selectedSessionId
+        ? {
+            ...state.activeSession,
+            sessionId: state.selectedSessionId,
+            status: 'stale' as const,
+            retryCount: 0,
+            lastError: null,
+            statusEnteredAt: now(),
+          }
+        : initialActiveSession();
+
+      return {
+        coordinator: 'recovering',
+        transport: {
+          ...state.transport,
+          mode: mode ?? state.transport.mode,
+          generation: nextGeneration,
+          // Don't override transport.status — it's managed by connection_state_changed
+          // events from the WS lifecycle. If the WS is still connected (common in
+          // embedded mode), the coordinator can proceed immediately.
+          error: null,
+          retryCount: 0,
+        },
+        backends,
+        dataSyncs,
+        activeSession,
+        backgroundAt: null,
+      };
+    }),
+
+  startBackendRecovery: backendId =>
+    set(state => {
+      if (state.coordinator === 'recovering') return state;
+      if (state.transport.status !== 'connected') return state;
+      if (state.activeBackendId !== backendId) return state;
+
+      const backend = state.backends[backendId];
+      if (!backend) return state;
+
+      // Only recover data syncs that were previously tracked (i.e. synced at least
+      // once). Missing data sync entry means first boot, not a disruption.
+      const dataNeedsSync =
+        state.dataSyncs[backendId] != null && state.dataSyncs[backendId].status !== 'ready';
+      // Only recover sessions that were actively in use — idle means first boot.
+      const sessionNeedsRecovery =
+        state.selectedSessionId &&
+        state.activeSession.status !== 'live' &&
+        state.activeSession.status !== 'idle';
+
+      if (!dataNeedsSync && !sessionNeedsRecovery) return state;
+
+      const dataSyncs = { ...state.dataSyncs };
+      if (dataSyncs[backendId]) {
+        dataSyncs[backendId] = {
+          ...dataSyncs[backendId],
+          status: 'stale',
+          retryCount: 0,
+          lastError: null,
+          statusEnteredAt: now(),
+        };
+      }
+
+      const activeSession = state.selectedSessionId
+        ? {
+            ...state.activeSession,
+            sessionId: state.selectedSessionId,
+            status: 'stale' as const,
+            retryCount: 0,
+            lastError: null,
+            statusEnteredAt: now(),
+          }
+        : state.activeSession;
+
+      return {
+        coordinator: 'recovering',
+        dataSyncs,
+        activeSession,
+      };
+    }),
+
+  setTransportState: (state, error) =>
+    set(current => {
+      const status = mapTransportStatus(state);
+      const coordinator =
+        status === 'error' && current.coordinator === 'recovering' ? 'error' : current.coordinator;
+      return {
+        coordinator,
+        transport: {
+          ...current.transport,
+          status,
+          error: error ?? null,
+          statusEnteredAt: now(),
+        },
+      };
+    }),
+
+  applySnapshot: snapshot =>
+    set(state => {
+      const backends = { ...state.backends };
+      const seen = new Set<string>();
+
+      for (const backend of snapshot.backends) {
+        seen.add(backend.backendId);
+        const current = backends[backend.backendId];
+        const mapped = mapBackendStatus(backend.runtimeState);
+        backends[backend.backendId] = upsertBackendState(
+          current,
+          backend.backendId,
+          mapped.status,
+          {
+            lastError: backend.lastError ?? current?.lastError ?? null,
+            subscribed: mapped.subscribed,
+            dataReady: mapped.subscribed ? (current?.dataReady ?? false) : false,
+          }
+        );
+      }
+
+      for (const backendId of Object.keys(backends)) {
+        if (!seen.has(backendId)) {
+          backends[backendId] = upsertBackendState(backends[backendId], backendId, 'absent', {
+            subscribed: false,
+            dataReady: false,
+          });
+        }
+      }
+
+      let coordinator = state.coordinator;
+      if (
+        coordinator === 'recovering' &&
+        snapshot.connectionState === 'connected' &&
+        !state.activeBackendId
+      ) {
+        coordinator = 'ready';
+      }
+
+      return {
+        coordinator,
+        transport: {
+          ...state.transport,
+          mode: snapshot.mode,
+          // Don't override transport.status from snapshot — the snapshot's
+          // connectionState reflects server-side state (e.g. gateway connection),
+          // not the client WS state. Transport is managed by setTransportState.
+          lastMessageAt: now(),
+        },
+        backends,
+      };
+    }),
+
+  noteBackendSubscribing: backendId =>
+    set(state => ({
+      backends: {
+        ...state.backends,
+        [backendId]: upsertBackendState(state.backends[backendId], backendId, 'subscribing', {
+          lastError: null,
         }),
       },
-    };
-  }),
+    })),
 
-  noteDataSyncSucceeded: (backendId) => {
+  noteDataSyncStarted: (backendId, mode) =>
+    set(state => ({
+      dataSyncs: {
+        ...state.dataSyncs,
+        [backendId]: upsertDataSyncState(
+          state.dataSyncs[backendId],
+          backendId,
+          mode === 'delta' ? 'syncing_delta' : 'syncing_full',
+          { lastError: null }
+        ),
+      },
+    })),
+
+  noteDataSyncFailed: (backendId, error) =>
+    set(state => {
+      const current = state.dataSyncs[backendId];
+      const retryCount = (current?.retryCount ?? 0) + 1;
+      const maxRetries =
+        current?.status === 'syncing_delta'
+          ? RECOVERY_MAX_RETRIES.DATA_SYNC_DELTA
+          : RECOVERY_MAX_RETRIES.DATA_SYNC_FULL;
+      const retriesExhausted = retryCount >= maxRetries;
+      // On failure (not exhausted), reset to 'stale' so the planner can re-trigger sync.
+      // Previously syncing_full stayed as syncing_full, causing the planner to think a sync
+      // was still in flight and only recovering via the 30s reconciliation tick.
+      const nextStatus: DataSyncStatus = retriesExhausted ? 'error' : 'stale';
+      return {
+        coordinator:
+          retriesExhausted && state.coordinator === 'recovering' ? 'error' : state.coordinator,
+        dataSyncs: {
+          ...state.dataSyncs,
+          [backendId]: upsertDataSyncState(current, backendId, nextStatus, {
+            lastError: error,
+            retryCount,
+          }),
+        },
+      };
+    }),
+
+  noteDataSyncSucceeded: backendId => {
     const state = get();
     const dataSync = state.dataSyncs[backendId];
     const backend = state.backends[backendId];
@@ -522,10 +551,12 @@ export const useRecoveryStore = create<RecoveryState>()((set, get) => ({
       return dataSync.ownershipVersion ?? state.nextOwnershipVersion;
     }
     const ownershipVersion = state.nextOwnershipVersion;
-    set((s) => {
+    set(s => {
       const b = s.backends[backendId];
       const subscribed = b?.subscribed ?? false;
-      const backendStatus = subscribed ? 'ready' as const : (b?.status ?? 'subscribing' as const);
+      const backendStatus = subscribed
+        ? ('ready' as const)
+        : (b?.status ?? ('subscribing' as const));
       return {
         dataSyncs: {
           ...s.dataSyncs,
@@ -548,203 +579,234 @@ export const useRecoveryStore = create<RecoveryState>()((set, get) => ({
     return ownershipVersion;
   },
 
-  noteActiveSessionResolving: (sessionId, backendId) => set((state) => ({
-    activeSession: updateActiveSession(state.activeSession, 'resolving_owner', {
-      sessionId,
-      backendId,
-      ownershipVersion: null,
-      lastError: null,
-      hasGapMarker: false,
-    }),
-  })),
+  noteActiveSessionResolving: (sessionId, backendId) =>
+    set(state => ({
+      activeSession: updateActiveSession(state.activeSession, 'resolving_owner', {
+        sessionId,
+        backendId,
+        ownershipVersion: null,
+        lastError: null,
+        hasGapMarker: false,
+      }),
+    })),
 
-  noteActiveSessionOwnerVerified: (sessionId, backendId, ownershipVersion) => set((state) => ({
-    activeSession: updateActiveSession(state.activeSession, 'opening_stream', {
-      sessionId,
-      backendId,
-      ownershipVersion,
-      lastError: null,
-    }),
-  })),
+  noteActiveSessionOwnerVerified: (sessionId, backendId, ownershipVersion) =>
+    set(state => ({
+      activeSession: updateActiveSession(state.activeSession, 'opening_stream', {
+        sessionId,
+        backendId,
+        ownershipVersion,
+        lastError: null,
+      }),
+    })),
 
-  noteActiveSessionWaiting: (sessionId, backendId) => set((state) => ({
-    activeSession: updateActiveSession(state.activeSession, 'waiting_backend_ready', {
-      sessionId,
-      backendId,
-    }),
-  })),
+  noteActiveSessionWaiting: (sessionId, backendId) =>
+    set(state => ({
+      activeSession: updateActiveSession(state.activeSession, 'waiting_backend_ready', {
+        sessionId,
+        backendId,
+      }),
+    })),
 
-  noteActiveSessionOpeningStream: (sessionId, backendId) => set((state) => ({
-    activeSession: updateActiveSession(state.activeSession, 'opening_stream', {
-      sessionId,
-      backendId,
-    }),
-  })),
+  noteActiveSessionOpeningStream: (sessionId, backendId) =>
+    set(state => ({
+      activeSession: updateActiveSession(state.activeSession, 'opening_stream', {
+        sessionId,
+        backendId,
+      }),
+    })),
 
-  noteActiveSessionCatchingUp: (sessionId, backendId) => set((state) => ({
-    activeSession: updateActiveSession(state.activeSession, 'catching_up', {
-      sessionId,
-      backendId,
-    }),
-  })),
+  noteActiveSessionCatchingUp: (sessionId, backendId) =>
+    set(state => ({
+      activeSession: updateActiveSession(state.activeSession, 'catching_up', {
+        sessionId,
+        backendId,
+      }),
+    })),
 
-  noteActiveSessionHydrating: (sessionId, backendId) => set((state) => ({
-    activeSession: updateActiveSession(state.activeSession, 'hydrating_tail', {
-      sessionId,
-      backendId,
-    }),
-  })),
+  noteActiveSessionHydrating: (sessionId, backendId) =>
+    set(state => ({
+      activeSession: updateActiveSession(state.activeSession, 'hydrating_tail', {
+        sessionId,
+        backendId,
+      }),
+    })),
 
-  noteActiveSessionLive: (sessionId, backendId) => set((state) => ({
-    activeSession: updateActiveSession(state.activeSession, 'live', {
-      sessionId,
-      backendId,
-      lastError: null,
-    }),
-  })),
+  noteActiveSessionLive: (sessionId, backendId) =>
+    set(state => ({
+      activeSession: updateActiveSession(state.activeSession, 'live', {
+        sessionId,
+        backendId,
+        lastError: null,
+      }),
+    })),
 
-  noteActiveSessionStale: () => set((state) => ({
-    activeSession: state.activeSession.sessionId
-      ? updateActiveSession(state.activeSession, 'stale')
-      : state.activeSession,
-  })),
+  noteActiveSessionStale: () =>
+    set(state => ({
+      activeSession: state.activeSession.sessionId
+        ? updateActiveSession(state.activeSession, 'stale')
+        : state.activeSession,
+    })),
 
-  noteActiveSessionError: (error) => set((state) => ({
-    coordinator: state.coordinator === 'recovering' ? 'error' : state.coordinator,
-    activeSession: updateActiveSession(state.activeSession, 'error', { lastError: error }),
-  })),
+  noteActiveSessionError: error =>
+    set(state => ({
+      coordinator: state.coordinator === 'recovering' ? 'error' : state.coordinator,
+      activeSession: updateActiveSession(state.activeSession, 'error', { lastError: error }),
+    })),
 
-  noteActiveSessionMessage: () => set((state) => ({
-    activeSession: { ...state.activeSession, lastMessageAt: now() },
-  })),
+  noteActiveSessionMessage: () =>
+    set(state => ({
+      activeSession: { ...state.activeSession, lastMessageAt: now() },
+    })),
 
-  noteTransportTimeout: () => set((state) => {
-    const retryCount = state.transport.retryCount + 1;
-    const retriesExhausted = retryCount >= RECOVERY_MAX_RETRIES.TRANSPORT;
-    return {
-      coordinator: retriesExhausted && state.coordinator === 'recovering' ? 'error' : state.coordinator,
-      transport: {
-        ...state.transport,
-        status: 'error' as const,
-        retryCount,
-        error: `Transport connect timeout (attempt ${retryCount}/${RECOVERY_MAX_RETRIES.TRANSPORT})`,
-        statusEnteredAt: now(),
-      },
-    };
-  }),
-
-  noteBackendTimeout: (backendId) => set((state) => {
-    const backend = state.backends[backendId];
-    if (!backend) return state;
-    const retryCount = backend.retryCount + 1;
-    return {
-      backends: {
-        ...state.backends,
-        [backendId]: upsertBackendState(backend, backendId, 'error', {
-          retryCount,
-          lastError: `Backend subscribe timeout (attempt ${retryCount}/${RECOVERY_MAX_RETRIES.BACKEND})`,
-          subscribed: false,
-          dataReady: false,
-        }),
-      },
-    };
-  }),
-
-  noteDataSyncTimeout: (backendId) => set((state) => {
-    const dataSync = state.dataSyncs[backendId];
-    if (!dataSync) return state;
-    const retryCount = dataSync.retryCount + 1;
-    const wasDelta = dataSync.status === 'syncing_delta';
-    const maxRetries = wasDelta ? RECOVERY_MAX_RETRIES.DATA_SYNC_DELTA : RECOVERY_MAX_RETRIES.DATA_SYNC_FULL;
-    const retriesExhausted = retryCount >= maxRetries;
-    const nextStatus: DataSyncStatus = wasDelta
-      ? 'stale'
-      : (retriesExhausted ? 'error' : dataSync.status);
-    return {
-      coordinator: retriesExhausted && !wasDelta && state.coordinator === 'recovering' ? 'error' : state.coordinator,
-      dataSyncs: {
-        ...state.dataSyncs,
-        [backendId]: upsertDataSyncState(dataSync, backendId, nextStatus, {
-          retryCount,
-          lastError: `Data sync timeout (attempt ${retryCount}/${maxRetries})`,
-        }),
-      },
-    };
-  }),
-
-  noteActiveSessionTimeout: () => set((state) => {
-    const session = state.activeSession;
-    const retryCount = session.retryCount + 1;
-    const inCatchUpPhase = session.status === 'catching_up' || session.status === 'hydrating_tail';
-    if (inCatchUpPhase) {
+  noteTransportTimeout: () =>
+    set(state => {
+      const retryCount = state.transport.retryCount + 1;
+      const retriesExhausted = retryCount >= RECOVERY_MAX_RETRIES.TRANSPORT;
       return {
-        activeSession: updateActiveSession(session, 'live', {
+        coordinator:
+          retriesExhausted && state.coordinator === 'recovering' ? 'error' : state.coordinator,
+        transport: {
+          ...state.transport,
+          status: 'error' as const,
           retryCount,
-          hasGapMarker: true,
-          lastError: null,
+          error: `Transport connect timeout (attempt ${retryCount}/${RECOVERY_MAX_RETRIES.TRANSPORT})`,
+          statusEnteredAt: now(),
+        },
+      };
+    }),
+
+  noteBackendTimeout: backendId =>
+    set(state => {
+      const backend = state.backends[backendId];
+      if (!backend) return state;
+      const retryCount = backend.retryCount + 1;
+      return {
+        backends: {
+          ...state.backends,
+          [backendId]: upsertBackendState(backend, backendId, 'error', {
+            retryCount,
+            lastError: `Backend subscribe timeout (attempt ${retryCount}/${RECOVERY_MAX_RETRIES.BACKEND})`,
+            subscribed: false,
+            dataReady: false,
+          }),
+        },
+      };
+    }),
+
+  noteDataSyncTimeout: backendId =>
+    set(state => {
+      const dataSync = state.dataSyncs[backendId];
+      if (!dataSync) return state;
+      const retryCount = dataSync.retryCount + 1;
+      const wasDelta = dataSync.status === 'syncing_delta';
+      const maxRetries = wasDelta
+        ? RECOVERY_MAX_RETRIES.DATA_SYNC_DELTA
+        : RECOVERY_MAX_RETRIES.DATA_SYNC_FULL;
+      const retriesExhausted = retryCount >= maxRetries;
+      const nextStatus: DataSyncStatus = wasDelta
+        ? 'stale'
+        : retriesExhausted
+          ? 'error'
+          : dataSync.status;
+      return {
+        coordinator:
+          retriesExhausted && !wasDelta && state.coordinator === 'recovering'
+            ? 'error'
+            : state.coordinator,
+        dataSyncs: {
+          ...state.dataSyncs,
+          [backendId]: upsertDataSyncState(dataSync, backendId, nextStatus, {
+            retryCount,
+            lastError: `Data sync timeout (attempt ${retryCount}/${maxRetries})`,
+          }),
+        },
+      };
+    }),
+
+  noteActiveSessionTimeout: () =>
+    set(state => {
+      const session = state.activeSession;
+      const retryCount = session.retryCount + 1;
+      const inCatchUpPhase =
+        session.status === 'catching_up' || session.status === 'hydrating_tail';
+      if (inCatchUpPhase) {
+        return {
+          activeSession: updateActiveSession(session, 'live', {
+            retryCount,
+            hasGapMarker: true,
+            lastError: null,
+          }),
+        };
+      }
+      const retriesExhausted = retryCount >= RECOVERY_MAX_RETRIES.SESSION_STREAM;
+      return {
+        coordinator:
+          retriesExhausted && state.coordinator === 'recovering' ? 'error' : state.coordinator,
+        activeSession: updateActiveSession(session, 'error', {
+          retryCount,
+          lastError: `Active session recovery timeout (attempt ${retryCount}/${RECOVERY_MAX_RETRIES.SESSION_STREAM})`,
         }),
       };
-    }
-    const retriesExhausted = retryCount >= RECOVERY_MAX_RETRIES.SESSION_STREAM;
-    return {
-      coordinator: retriesExhausted && state.coordinator === 'recovering' ? 'error' : state.coordinator,
-      activeSession: updateActiveSession(session, 'error', {
-        retryCount,
-        lastError: `Active session recovery timeout (attempt ${retryCount}/${RECOVERY_MAX_RETRIES.SESSION_STREAM})`,
-      }),
-    };
-  }),
+    }),
 
-  completeRecoveryIfPossible: () => set((state) => {
-    if (state.coordinator !== 'recovering') return state;
-    if (state.transport.status !== 'connected') return state;
+  completeRecoveryIfPossible: () =>
+    set(state => {
+      if (state.coordinator !== 'recovering') return state;
+      if (state.transport.status !== 'connected') return state;
 
-    if (!state.activeBackendId) {
-      return { coordinator: 'ready' };
-    }
+      if (!state.activeBackendId) {
+        return { coordinator: 'ready' };
+      }
 
-    const backend = state.backends[state.activeBackendId];
-    const dataSync = state.dataSyncs[state.activeBackendId];
-    if (!backend || backend.status !== 'ready') return state;
-    if (!dataSync || dataSync.status !== 'ready') return state;
-    if (!state.selectedSessionId) {
-      return { coordinator: 'ready' };
-    }
-    if (
-      state.activeSession.sessionId === state.selectedSessionId
-      && state.activeSession.status === 'live'
-    ) {
-      return { coordinator: 'ready' };
-    }
-    return state;
-  }),
+      const backend = state.backends[state.activeBackendId];
+      const dataSync = state.dataSyncs[state.activeBackendId];
+      if (!backend || backend.status !== 'ready') return state;
+      if (!dataSync || dataSync.status !== 'ready') return state;
+      if (!state.selectedSessionId) {
+        return { coordinator: 'ready' };
+      }
+      if (
+        state.activeSession.sessionId === state.selectedSessionId &&
+        state.activeSession.status === 'live'
+      ) {
+        return { coordinator: 'ready' };
+      }
+      return state;
+    }),
 
   markReady: () => set({ coordinator: 'ready' }),
 
-  getVerifiedSessionBackendId: (sessionId) => {
+  getVerifiedSessionBackendId: sessionId => {
     if (!sessionId) return null;
     const activeSession = get().activeSession;
     if (activeSession.sessionId !== sessionId) return null;
     if (
-      activeSession.status === 'opening_stream'
-      || activeSession.status === 'catching_up'
-      || activeSession.status === 'hydrating_tail'
-      || activeSession.status === 'live'
+      activeSession.status === 'opening_stream' ||
+      activeSession.status === 'catching_up' ||
+      activeSession.status === 'hydrating_tail' ||
+      activeSession.status === 'live'
     ) {
       return activeSession.backendId;
     }
     return null;
   },
 
-  getBackendViewState: (backendId) => {
+  getBackendViewState: backendId => {
     const state = get();
-    const backend = backendId ? state.backends[backendId] ?? null : null;
-    const dataSync = backendId ? state.dataSyncs[backendId] ?? null : null;
-    const activeSession = state.activeSession.sessionId && backendId === state.activeBackendId
-      ? state.activeSession
-      : null;
+    const backend = backendId ? (state.backends[backendId] ?? null) : null;
+    const dataSync = backendId ? (state.dataSyncs[backendId] ?? null) : null;
+    const activeSession =
+      state.activeSession.sessionId && backendId === state.activeBackendId
+        ? state.activeSession
+        : null;
 
-    if (state.transport.status === 'error' || backend?.status === 'error' || dataSync?.status === 'error' || activeSession?.status === 'error') {
+    if (
+      state.transport.status === 'error' ||
+      backend?.status === 'error' ||
+      dataSync?.status === 'error' ||
+      activeSession?.status === 'error'
+    ) {
       return 'error';
     }
     if (state.transport.status === 'idle' || state.transport.status === 'stopped') {
@@ -756,13 +818,26 @@ export const useRecoveryStore = create<RecoveryState>()((set, get) => ({
     if (!backend || backend.status === 'absent') return 'offline';
     if (backend.status === 'visible') return 'backend_visible';
     if (backend.status === 'subscribing') return 'backend_subscribing';
-    if (!dataSync || dataSync.status === 'stale' || dataSync.status === 'syncing_full' || dataSync.status === 'syncing_delta' || dataSync.status === 'idle') {
+    if (
+      !dataSync ||
+      dataSync.status === 'stale' ||
+      dataSync.status === 'syncing_full' ||
+      dataSync.status === 'syncing_delta' ||
+      dataSync.status === 'idle'
+    ) {
       return 'data_syncing';
     }
     if (
-      state.selectedSessionId
-      && activeSession
-      && ['resolving_owner', 'waiting_backend_ready', 'opening_stream', 'catching_up', 'hydrating_tail', 'stale'].includes(activeSession.status)
+      state.selectedSessionId &&
+      activeSession &&
+      [
+        'resolving_owner',
+        'waiting_backend_ready',
+        'opening_stream',
+        'catching_up',
+        'hydrating_tail',
+        'stale',
+      ].includes(activeSession.status)
     ) {
       return 'session_syncing';
     }

@@ -127,7 +127,11 @@ describe('ThemeToggle', () => {
     // Use w-full to distinguish dropdown option buttons from the toggle button
     const allButtons = container.querySelectorAll('button');
     const darkButton = Array.from(allButtons).find(
-      b => b.textContent?.includes('Dark') && !b.textContent?.includes('Warm') && !b.textContent?.includes('Cool') && b.className.includes('w-full')
+      b =>
+        b.textContent?.includes('Dark') &&
+        !b.textContent?.includes('Warm') &&
+        !b.textContent?.includes('Cool') &&
+        b.className.includes('w-full')
     );
     expect(darkButton?.className).toContain('bg-muted/60');
   });

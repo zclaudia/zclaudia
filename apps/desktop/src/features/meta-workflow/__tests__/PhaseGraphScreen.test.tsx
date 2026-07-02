@@ -36,19 +36,24 @@ vi.mock('@xyflow/react', () => {
       data-testid="reactflow"
       data-node-count={String(nodes.length)}
       data-edge-count={String(edges.length)}
-      data-node-ids={nodes.map((n) => n.id).join(',')}
-      data-edge-ids={edges.map((e) => e.id).join(',')}
+      data-node-ids={nodes.map(n => n.id).join(',')}
+      data-edge-ids={edges.map(e => e.id).join(',')}
     >
       <ul data-testid="reactflow-nodes">
-        {nodes.map((n) => (
+        {nodes.map(n => (
           <li key={n.id} data-testid={`rf-node-${n.id}`} data-node-id={n.id}>
             {n.data?.label}
           </li>
         ))}
       </ul>
       <ul data-testid="reactflow-edges">
-        {edges.map((e) => (
-          <li key={e.id} data-testid={`rf-edge-${e.id}`} data-source={e.source} data-target={e.target}>
+        {edges.map(e => (
+          <li
+            key={e.id}
+            data-testid={`rf-edge-${e.id}`}
+            data-source={e.source}
+            data-target={e.target}
+          >
             {e.source}-&gt;{e.target}
           </li>
         ))}
@@ -103,7 +108,7 @@ function makePhasesDoc(phases: PhaseDef[]): PhasesDoc {
   return {
     version: '1',
     phases,
-    smokePath: phases.map((p) => p.id),
+    smokePath: phases.map(p => p.id),
     metadata: { generatedAt: 1, requirementsPath: 'design/req.md' },
   };
 }
@@ -111,7 +116,7 @@ function makePhasesDoc(phases: PhaseDef[]): PhasesDoc {
 function makePhaseRecord(
   phaseId: string,
   status: MetaWorkflowPhaseStatus,
-  overrides: Partial<MetaWorkflowPhase> = {},
+  overrides: Partial<MetaWorkflowPhase> = {}
 ): MetaWorkflowPhase {
   return {
     id: `rec-${phaseId}`,
@@ -146,12 +151,10 @@ describe('PhaseGraphScreen', () => {
         projectId="p1"
         run={makeRun({ phasesJson: undefined })}
         socket={{ send: vi.fn() }}
-      />,
+      />
     );
     expect(screen.getByText(/Phase Graph\s*—\s*My run/)).toBeInTheDocument();
-    expect(
-      screen.getByText(/Run has no phases\.json yet/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Run has no phases\.json yet/i)).toBeInTheDocument();
     // The mocked ReactFlow must NOT have been rendered in the empty state.
     expect(screen.queryByTestId('reactflow')).not.toBeInTheDocument();
   });
@@ -176,7 +179,7 @@ describe('PhaseGraphScreen', () => {
         projectId="p1"
         run={makeRun({ phasesJson: JSON.stringify(doc) })}
         socket={{ send: vi.fn() }}
-      />,
+      />
     );
 
     const rf = screen.getByTestId('reactflow');
@@ -204,7 +207,7 @@ describe('PhaseGraphScreen', () => {
         projectId="p1"
         run={makeRun({ phasesJson: '{not valid json' })}
         socket={{ send: vi.fn() }}
-      />,
+      />
     );
     // Malformed JSON falls through to the empty {nodes:[], edges:[]} render.
     const rf = screen.getByTestId('reactflow');
@@ -223,7 +226,7 @@ describe('PhaseGraphScreen', () => {
         projectId="p1"
         run={makeRun({ phasesJson: JSON.stringify(doc) })}
         socket={{ send: vi.fn() }}
-      />,
+      />
     );
     await user.click(screen.getByRole('button', { name: /View Board/i }));
     const view = useMetaWorkflowStore.getState().viewByProject['p1'];

@@ -23,7 +23,7 @@ describe('ServerState Claudia task snapshot', () => {
     } as never;
     state.agentTaskExecutor = {
       type: 'agent',
-      start: vi.fn(async (task) => ({
+      start: vi.fn(async task => ({
         status: 'running',
         executorRef: { providerType: 'zclaudia-agent-runner', taskId: task.id },
         sessionId: 'session-1',
@@ -78,7 +78,9 @@ describe('ServerState Claudia task snapshot', () => {
         input: 'Review login flow',
       },
     });
-    taskService.startTask(task.id, { executorRef: { providerType: 'zclaudia-agent-runner', taskId: task.id } });
+    taskService.startTask(task.id, {
+      executorRef: { providerType: 'zclaudia-agent-runner', taskId: task.id },
+    });
     taskService.completeTask(task.id, { text: 'Login summary' });
 
     const state = new ServerState();

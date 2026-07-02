@@ -2,11 +2,7 @@
 import type { WorkflowEngine } from '../../workflows/engine.js';
 import type { WorkflowRunRepository } from '../../workflows/workflow-run-repository.js';
 import type { WorkflowRun } from '@zclaudia/shared/features/workflows';
-import type {
-  RunEntity,
-  SynthesizedEntity,
-  RunEntityOutcome,
-} from '../phase-executor.js';
+import type { RunEntity, SynthesizedEntity, RunEntityOutcome } from '../phase-executor.js';
 
 export interface CreateWorkflowRunEntityOptions {
   engine: WorkflowEngine;
@@ -45,7 +41,7 @@ export function createWorkflowRunEntity(opts: CreateWorkflowRunEntityOptions): R
       trackingKey: entity.workflowId,
     });
 
-    return new Promise<RunEntityOutcome>((resolve) => {
+    return new Promise<RunEntityOutcome>(resolve => {
       let settled = false;
       const finish = (outcome: RunEntityOutcome) => {
         if (settled) return;

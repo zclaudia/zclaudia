@@ -19,9 +19,11 @@ export function extractMessageText(content: string): string {
     }
     if (Array.isArray(parsed)) {
       const parts = parsed
-        .map((b) => (b && typeof b === 'object' && (b as { type?: unknown }).type === 'text'
-          ? String((b as { text?: unknown }).text ?? '')
-          : ''))
+        .map(b =>
+          b && typeof b === 'object' && (b as { type?: unknown }).type === 'text'
+            ? String((b as { text?: unknown }).text ?? '')
+            : ''
+        )
         .filter(Boolean);
       if (parts.length > 0) return parts.join(' ');
     }
@@ -87,7 +89,7 @@ export function extractThinking(text: string): { thinking: string; content: stri
   }
 
   const thinking = thinkSections
-    .map((section) => section.trim())
+    .map(section => section.trim())
     .filter(Boolean)
     .join('\n\n');
 

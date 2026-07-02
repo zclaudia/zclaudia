@@ -179,7 +179,10 @@ vi.mock('../../utils/controlPlane', () => ({
   getControlPlaneMode: () => mockControlPlaneMode,
   isLocalBackendId: (id: string | null | undefined) => id === 'server-1' || id === 'local',
   resolveLocalBackendId: () => 'server-1',
-  resolveCanonicalBackendId: (backendId: string | null | undefined, fallback: string | null = null) => backendId ?? fallback,
+  resolveCanonicalBackendId: (
+    backendId: string | null | undefined,
+    fallback: string | null = null
+  ) => backendId ?? fallback,
 }));
 
 // Mock the gatewayStore
@@ -192,7 +195,7 @@ vi.mock('../../stores/gatewayStore', () => ({
     }),
   },
   isGatewayTarget: (id: string) => id?.startsWith('gw:'),
-  parseBackendId: (id: string) => id?.startsWith('gw:') ? id.slice(3) : id,
+  parseBackendId: (id: string) => (id?.startsWith('gw:') ? id.slice(3) : id),
 }));
 
 vi.mock('../gatewayProxy', () => ({
@@ -225,10 +228,11 @@ describe('api', () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
-      json: () => Promise.resolve({
-        success: false,
-        error: { code, message },
-      }),
+      json: () =>
+        Promise.resolve({
+          success: false,
+          error: { code, message },
+        }),
     });
   };
 
@@ -695,7 +699,9 @@ describe('api', () => {
     it('getDeferredDiagnostics returns deferred diagnostics status', async () => {
       const data = {
         status: 'completed' as const,
-        diagnostics: [{ path: 'file.ts', line: 1, severity: 'warning' as const, message: 'late warning' }],
+        diagnostics: [
+          { path: 'file.ts', line: 1, severity: 'warning' as const, message: 'late warning' },
+        ],
       };
       mockResponse(data);
 
@@ -704,12 +710,17 @@ describe('api', () => {
       expect(result).toEqual(data);
       expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:3100/api/providers/deferred-diagnostics/diag%201',
-        expect.objectContaining({ headers: expect.any(Object) }),
+        expect.objectContaining({ headers: expect.any(Object) })
       );
     });
 
     it('restoreFileBackup posts to the file history restore endpoint', async () => {
-      const data = { id: 'backup 1', originalPath: 'file.ts', path: '/tmp/backup.bak', restored: true as const };
+      const data = {
+        id: 'backup 1',
+        originalPath: 'file.ts',
+        path: '/tmp/backup.bak',
+        restored: true as const,
+      };
       mockResponse(data);
 
       const result = await restoreFileBackup('backup 1');
@@ -717,7 +728,7 @@ describe('api', () => {
       expect(result).toEqual(data);
       expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:3100/api/providers/file-history/backups/backup%201/restore',
-        expect.objectContaining({ method: 'POST', body: JSON.stringify({}) }),
+        expect.objectContaining({ method: 'POST', body: JSON.stringify({}) })
       );
     });
 
@@ -731,7 +742,8 @@ describe('api', () => {
   describe('Server Management API', () => {
     it('getServerInfo', async () => {
       mockFetch.mockResolvedValueOnce({
-        ok: true, status: 200,
+        ok: true,
+        status: 200,
         json: () => Promise.resolve({ success: true, data: { version: '1.0' } }),
       });
       const result = await getServerInfo('localhost:3100');
@@ -770,7 +782,6 @@ describe('api', () => {
       const result = await disconnectServerFromGateway();
       expect(result.message).toBe('disconnected');
     });
-
   });
 
   describe('Agent API', () => {
@@ -788,7 +799,7 @@ describe('api', () => {
 
       expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:3100/api/agent/ensure',
-        expect.objectContaining({ method: 'POST' }),
+        expect.objectContaining({ method: 'POST' })
       );
     });
 
@@ -804,7 +815,7 @@ describe('api', () => {
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({ Authorization: 'Bearer gw-token' }),
-        }),
+        })
       );
     });
 
@@ -822,7 +833,14 @@ describe('api', () => {
     });
 
     it('updateAgentConfig', async () => {
-      mockResponse({ enabled: true, projectId: 'p1', sessionId: 's1', llmProfileId: null, permissionWorkflowOverrideId: null, permissionPolicy: null });
+      mockResponse({
+        enabled: true,
+        projectId: 'p1',
+        sessionId: 's1',
+        llmProfileId: null,
+        permissionWorkflowOverrideId: null,
+        permissionPolicy: null,
+      });
       await updateAgentConfig({ permissionWorkflowOverrideId: 'wf-1' });
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('/api/agent/config'),
@@ -892,7 +910,11 @@ describe('api', () => {
 
     it('createLocalPR', async () => {
       mockResponse({ id: 'pr1' });
-      const result = await createLocalPR('p1', { title: 'PR', sourceBranch: 'feature', targetBranch: 'main' });
+      const result = await createLocalPR('p1', {
+        title: 'PR',
+        sourceBranch: 'feature',
+        targetBranch: 'main',
+      });
       expect(result.id).toBe('pr1');
     });
 
@@ -1036,7 +1058,8 @@ describe('api', () => {
 
     it('fetchLocalApi works', async () => {
       mockFetch.mockResolvedValueOnce({
-        ok: true, status: 200,
+        ok: true,
+        status: 200,
         json: () => Promise.resolve({ success: true, data: 'local' }),
       });
       const result = await fetchLocalApi('/api/test');
@@ -1125,7 +1148,11 @@ describe('api', () => {
     it('createSupervisionTask creates a task', async () => {
       const task = { id: 't1', title: 'New Task' };
       mockResponse(task);
-      const result = await createSupervisionTask('p1', { title: 'New Task', description: 'Desc', priority: 0 });
+      const result = await createSupervisionTask('p1', {
+        title: 'New Task',
+        description: 'Desc',
+        priority: 0,
+      });
       expect(result).toEqual(task);
     });
 
@@ -1226,7 +1253,13 @@ describe('api', () => {
     });
 
     it('getSupervisionBudget returns budget', async () => {
-      const budget = { maxConcurrentTasks: 3, currentActiveTasks: 1, maxTotalTasks: 10, currentTotalTasks: 5, maxBudgetUsd: 100 };
+      const budget = {
+        maxConcurrentTasks: 3,
+        currentActiveTasks: 1,
+        maxTotalTasks: 10,
+        currentTotalTasks: 5,
+        maxBudgetUsd: 100,
+      };
       mockResponse(budget);
       const result = await getSupervisionBudget('p1');
       expect(result).toEqual(budget);
@@ -1375,10 +1408,13 @@ describe('api', () => {
     it('upsertWorktreeConfig upserts config', async () => {
       const config = { projectId: 'p1', worktreePath: '/path' };
       mockResponse(config);
-      const result = await upsertWorktreeConfig('p1', { worktreePath: '/path', autoCreatePR: true, autoReview: false });
+      const result = await upsertWorktreeConfig('p1', {
+        worktreePath: '/path',
+        autoCreatePR: true,
+        autoReview: false,
+      });
       expect(result).toEqual(config);
     });
-
   });
 
   describe('fetchLocalApi', () => {
@@ -1386,10 +1422,7 @@ describe('api', () => {
       mockResponse({ key: 'value' });
       const result = await fetchLocalApi('/api/test');
       expect(result).toEqual({ success: true, data: { key: 'value' } });
-      expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:3100/api/test',
-        expect.any(Object)
-      );
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:3100/api/test', expect.any(Object));
     });
 
     it('throws AuthError on 401', async () => {
@@ -1429,7 +1462,11 @@ describe('api', () => {
 
   describe('git branch api', () => {
     const okResponse = () =>
-      mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve({ success: true }) });
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ success: true }),
+      });
 
     it('checkoutGitBranch POSTs worktree + branch', async () => {
       okResponse();
@@ -1447,7 +1484,10 @@ describe('api', () => {
       expect(String(url)).toContain('/api/projects/project-1/git/branch');
       expect(init.method).toBe('POST');
       expect(JSON.parse(init.body as string)).toMatchObject({
-        worktree: '/wt', name: 'feature', checkout: true, startPoint: 'main',
+        worktree: '/wt',
+        name: 'feature',
+        checkout: true,
+        startPoint: 'main',
       });
     });
 
@@ -1457,7 +1497,11 @@ describe('api', () => {
       const [url, init] = mockFetch.mock.calls[0];
       expect(String(url)).toContain('/api/projects/project-1/git/branch');
       expect(init.method).toBe('DELETE');
-      expect(JSON.parse(init.body as string)).toMatchObject({ worktree: '/wt', name: 'feature', force: true });
+      expect(JSON.parse(init.body as string)).toMatchObject({
+        worktree: '/wt',
+        name: 'feature',
+        force: true,
+      });
     });
   });
 
@@ -1518,12 +1562,20 @@ describe('api', () => {
 
     it('upsertWorktreeConfig throws on error', async () => {
       mockError();
-      await expect(upsertWorktreeConfig('p1', { worktreePath: '/path', autoCreatePR: true, autoReview: false })).rejects.toThrow('Server error');
+      await expect(
+        upsertWorktreeConfig('p1', { worktreePath: '/path', autoCreatePR: true, autoReview: false })
+      ).rejects.toThrow('Server error');
     });
 
     it('upsertWorktreeConfig throws default message', async () => {
       mockErrorNoMessage();
-      await expect(upsertWorktreeConfig('p1', { worktreePath: '/path', autoCreatePR: false, autoReview: false })).rejects.toThrow('API call failed');
+      await expect(
+        upsertWorktreeConfig('p1', {
+          worktreePath: '/path',
+          autoCreatePR: false,
+          autoReview: false,
+        })
+      ).rejects.toThrow('API call failed');
     });
   });
 });

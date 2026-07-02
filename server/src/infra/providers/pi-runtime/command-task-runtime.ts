@@ -1,9 +1,17 @@
 import type { TaskRecord, TaskResult } from '@zclaudia/shared/core/task';
 
-import { TaskRepository } from '../../../domains/tasks/repository.js';
+import { type TaskRepository } from '../../../domains/tasks/repository.js';
 import { TaskService } from '../../../domains/tasks/task-service.js';
-import { CommandTaskExecutor, commandTaskLogPath, pidAlive } from '../../../domains/tasks/executors/command-executor.js';
-import { extractBashOutputInsights, formatBashResultText, type FormatBashResultInput } from './bash-output.js';
+import {
+  CommandTaskExecutor,
+  commandTaskLogPath,
+  pidAlive,
+} from '../../../domains/tasks/executors/command-executor.js';
+import {
+  extractBashOutputInsights,
+  formatBashResultText,
+  type FormatBashResultInput,
+} from './bash-output.js';
 import { errorResult, textResult } from './tool-common.js';
 import { readTaskLogWindow } from './task-output-window.js';
 import type { TaskRuntime } from './task-runtime.js';
@@ -19,7 +27,10 @@ function commandTaskCwd(taskMetadata: unknown): string {
   if (!taskMetadata || typeof taskMetadata !== 'object') return '.';
   const metadata = taskMetadata as Record<string, unknown>;
   const cwd = typeof metadata.cwd === 'string' && metadata.cwd ? metadata.cwd : undefined;
-  const workspaceRoot = typeof metadata.workspaceRoot === 'string' && metadata.workspaceRoot ? metadata.workspaceRoot : undefined;
+  const workspaceRoot =
+    typeof metadata.workspaceRoot === 'string' && metadata.workspaceRoot
+      ? metadata.workspaceRoot
+      : undefined;
   if (!cwd) return '.';
   return workspaceRoot ? toWorkspaceRelative(workspaceRoot, cwd) || '.' : cwd;
 }
@@ -52,7 +63,9 @@ export class CommandTaskRuntime implements TaskRuntime {
     const pid = task.executorRef?.pid;
     if (task.status === 'running' && typeof pid === 'number' && !pidAlive(pid)) {
       try {
-        current = new TaskService(this.repo).completeTask(task.id, { text: 'Process exited (exit code unknown; observed after restart)' });
+        current = new TaskService(this.repo).completeTask(task.id, {
+          text: 'Process exited (exit code unknown; observed after restart)',
+        });
       } catch {
         current = this.repo.findById(task.id) ?? task;
       }
@@ -63,26 +76,30 @@ export class CommandTaskRuntime implements TaskRuntime {
       return errorResult(window.code, window.message, window.details);
     }
     const metadata = (current.metadata ?? {}) as Record<string, unknown>;
-    const command = typeof metadata.command === 'string' && metadata.command
-      ? metadata.command
-      : typeof current.executorRef?.command === 'string'
-        ? current.executorRef.command
-        : '<unknown>';
+    const command =
+      typeof metadata.command === 'string' && metadata.command
+        ? metadata.command
+        : typeof current.executorRef?.command === 'string'
+          ? current.executorRef.command
+          : '<unknown>';
     const exitCode = commandExitCode(current.result, current.status);
     const insights = extractBashOutputInsights(window.output);
-    const text = formatBashResultText({
-      command,
-      cwd: commandTaskCwd(current.metadata),
-      output: window.output,
-      fullOutput: window.output,
-      exitCode,
-      durationMs: commandTaskDurationMs(current.createdAt, current.updatedAt, current.status),
-      truncated: window.truncated,
-      timedOut: false,
-      sandboxed: metadata.sandboxed === true,
-      status: commandTaskStatus(current.status),
-      ...(window.truncated ? { fullOutputPath: logPath } : {}),
-    }, insights);
+    const text = formatBashResultText(
+      {
+        command,
+        cwd: commandTaskCwd(current.metadata),
+        output: window.output,
+        fullOutput: window.output,
+        exitCode,
+        durationMs: commandTaskDurationMs(current.createdAt, current.updatedAt, current.status),
+        truncated: window.truncated,
+        timedOut: false,
+        sandboxed: metadata.sandboxed === true,
+        status: commandTaskStatus(current.status),
+        ...(window.truncated ? { fullOutputPath: logPath } : {}),
+      },
+      insights
+    );
     return textResult(text, {
       ok: true,
       taskId: current.id,

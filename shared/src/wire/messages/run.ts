@@ -5,6 +5,7 @@
 
 import type { SessionType } from '../../core/session.js';
 import type { ToolEffect, UsageInfo } from '../../core/message.js';
+import type { PCPEffectiveProfile } from '../../core/pcp.js';
 import type { UnifiedPermissionPolicy } from '../../interaction/permissions.js';
 
 export interface RunStartMessage {
@@ -60,7 +61,7 @@ export interface RunStartedMessage {
   /** Monotonically increasing event sequence number within this run (starts at 1) */
   seq?: number;
   /** PCP effective provider profile for this run */
-  effectiveProfile?: import('../../core/pcp.js').PCPEffectiveProfile;
+  effectiveProfile?: PCPEffectiveProfile;
 }
 
 export interface SessionCreatedMessage {
@@ -260,14 +261,14 @@ export interface BackgroundTaskUpdateMessage {
   parentSessionId?: string;
   status: BackgroundTaskStatus;
   name?: string;
-  reason?: string;       // e.g. 'Permission escalated', 'Completed successfully'
+  reason?: string; // e.g. 'Permission escalated', 'Completed successfully'
 }
 
 // Background session has a pending permission that needs user attention (Server → Client)
 export interface BackgroundPermissionPendingMessage {
   type: 'background_permission_pending';
-  sessionId: string;     // The background session
-  requestId: string;     // Permission request ID (use with permission_decision to resolve)
+  sessionId: string; // The background session
+  requestId: string; // Permission request ID (use with permission_decision to resolve)
   toolName: string;
   detail: string;
   timeoutSeconds: number;
@@ -282,9 +283,9 @@ export interface TaskNotificationMessage {
   status?: string;
   message?: string;
   seq?: number;
-  cliPid?: number;         // CLI subprocess PID (for process-tree based task killing)
-  taskCommand?: string;    // Actual command being run (e.g. "npm test")
-  taskRootPid?: number;    // Root PID of the task's process tree
+  cliPid?: number; // CLI subprocess PID (for process-tree based task killing)
+  taskCommand?: string; // Actual command being run (e.g. "npm test")
+  taskRootPid?: number; // Root PID of the task's process tree
 }
 
 // SDK background task progress update (Server → Client)
@@ -319,3 +320,34 @@ export interface TaskStatusNotificationMessage {
     duration_ms: number;
   };
 }
+
+export type RunClientMessage =
+  | RunStartMessage
+  | RunCancelMessage
+  | RunSteerMessage
+  | KillLeakedProcessesMessage
+  | StopBackgroundTaskMessage
+  | BackgroundRunningCommandMessage
+  | AgentStartMessage
+  | AgentCancelMessage;
+
+export type RunServerMessage =
+  | RunStartedMessage
+  | SessionCreatedMessage
+  | DeltaMessage
+  | ToolUseMessage
+  | ToolResultMessage
+  | ToolActivityMessage
+  | ModeChangeMessage
+  | RunCompletedMessage
+  | RunFailedMessage
+  | RunRetryingMessage
+  | CompactionCompletedEvent
+  | CompactionFailedEvent
+  | MessageAppendedMessage
+  | BackgroundTaskUpdateMessage
+  | BackgroundPermissionPendingMessage
+  | TaskNotificationMessage
+  | TaskProgressMessage
+  | TaskStatusNotificationMessage
+  | ProcessCleanupResultMessage;

@@ -28,33 +28,36 @@ import {
   getStagedDiff,
 } from '../git-operations.js';
 
-type ExecFileCallback = (
-  error: Error | null,
-  result: { stdout: string; stderr?: string },
-) => void;
+type ExecFileCallback = (error: Error | null, result: { stdout: string; stderr?: string }) => void;
 
 function mockGitSuccess(stdout: string) {
-  mockExecFile.mockImplementation((_cmd: string, _args: string[], _opts: unknown, cb: ExecFileCallback) => {
-    cb(null, { stdout });
-  });
+  mockExecFile.mockImplementation(
+    (_cmd: string, _args: string[], _opts: unknown, cb: ExecFileCallback) => {
+      cb(null, { stdout });
+    }
+  );
 }
 
 function mockGitSequence(outputs: (string | Error)[]) {
   let i = 0;
-  mockExecFile.mockImplementation((_cmd: string, _args: string[], _opts: unknown, cb: ExecFileCallback) => {
-    const output = outputs[i++] ?? '';
-    if (output instanceof Error) {
-      cb(output, { stdout: '', stderr: '' });
-    } else {
-      cb(null, { stdout: output });
+  mockExecFile.mockImplementation(
+    (_cmd: string, _args: string[], _opts: unknown, cb: ExecFileCallback) => {
+      const output = outputs[i++] ?? '';
+      if (output instanceof Error) {
+        cb(output, { stdout: '', stderr: '' });
+      } else {
+        cb(null, { stdout: output });
+      }
     }
-  });
+  );
 }
 
 function mockGitError(err: Error & { stderr?: string; stdout?: string }) {
-  mockExecFile.mockImplementation((_cmd: string, _args: string[], _opts: unknown, cb: ExecFileCallback) => {
-    cb(err, { stdout: err.stdout || '', stderr: err.stderr || '' });
-  });
+  mockExecFile.mockImplementation(
+    (_cmd: string, _args: string[], _opts: unknown, cb: ExecFileCallback) => {
+      cb(err, { stdout: err.stdout || '', stderr: err.stderr || '' });
+    }
+  );
 }
 
 describe('git-operations', () => {
@@ -121,10 +124,10 @@ describe('git-operations', () => {
   describe('commitAllChanges', () => {
     it('commits and returns SHA', async () => {
       mockGitSequence([
-        '',                           // git add -A
+        '', // git add -A
         ' file.ts | 5 ++---\n 1 file changed, 2 insertions(+), 3 deletions(-)\n', // git diff --cached --stat
-        '',                           // git commit
-        'abc123\n',                   // git rev-parse HEAD
+        '', // git commit
+        'abc123\n', // git rev-parse HEAD
       ]);
       const sha = await commitAllChanges('/repo');
       expect(sha).toBe('abc123');
@@ -132,10 +135,10 @@ describe('git-operations', () => {
 
     it('generates message for single file', async () => {
       mockGitSequence([
-        '',                                   // git add -A
+        '', // git add -A
         ' src/index.ts | 5 ++---\n 1 file changed\n', // git diff --cached --stat
-        '',                                   // git commit
-        'abc123\n',                           // rev-parse
+        '', // git commit
+        'abc123\n', // rev-parse
       ]);
       await commitAllChanges('/repo');
       // Check commit message contains filename
@@ -144,12 +147,7 @@ describe('git-operations', () => {
     });
 
     it('generates message for multiple files', async () => {
-      mockGitSequence([
-        '',
-        ' a.ts | 1 +\n b.ts | 2 ++\n 2 files changed\n',
-        '',
-        'def456\n',
-      ]);
+      mockGitSequence(['', ' a.ts | 1 +\n b.ts | 2 ++\n 2 files changed\n', '', 'def456\n']);
       await commitAllChanges('/repo');
       const commitCall = mockExecFile.mock.calls[2];
       const msg = commitCall[1][commitCall[1].indexOf('-m') + 1];
@@ -158,10 +156,10 @@ describe('git-operations', () => {
 
     it('uses fallback message on diff error', async () => {
       mockGitSequence([
-        '',                      // git add
+        '', // git add
         new Error('diff error'), // git diff fails
-        '',                      // git commit
-        'abc\n',                 // rev-parse
+        '', // git commit
+        'abc\n', // rev-parse
       ]);
       await commitAllChanges('/repo');
       const commitCall = mockExecFile.mock.calls[2];
@@ -172,7 +170,9 @@ describe('git-operations', () => {
   describe('getNewCommits', () => {
     it('parses commit log', async () => {
       const SEP = '\x1f';
-      mockGitSuccess(`abc123${SEP}fix bug${SEP}Author${SEP}1700000000\ndef456${SEP}add feature${SEP}Dev${SEP}1700001000\n`);
+      mockGitSuccess(
+        `abc123${SEP}fix bug${SEP}Author${SEP}1700000000\ndef456${SEP}add feature${SEP}Dev${SEP}1700001000\n`
+      );
       const commits = await getNewCommits('/repo', 'feature', 'main');
       expect(commits).toHaveLength(2);
       expect(commits[0].sha).toBe('abc123');
@@ -237,27 +237,21 @@ describe('git-operations', () => {
 
     it('falls back to local branches when origin/HEAD fails', async () => {
       mockGitSequence([
-        new Error('no origin'),  // rev-parse fails
-        '* main\n',             // branch --list
+        new Error('no origin'), // rev-parse fails
+        '* main\n', // branch --list
       ]);
       const branch = await getMainBranch('/repo');
       expect(branch).toBe('main');
     });
 
     it('returns master when main not found', async () => {
-      mockGitSequence([
-        new Error('no origin'),
-        '* master\n',
-      ]);
+      mockGitSequence([new Error('no origin'), '* master\n']);
       const branch = await getMainBranch('/repo');
       expect(branch).toBe('master');
     });
 
     it('defaults to master when everything fails', async () => {
-      mockGitSequence([
-        new Error('no origin'),
-        new Error('no branches'),
-      ]);
+      mockGitSequence([new Error('no origin'), new Error('no branches')]);
       const branch = await getMainBranch('/repo');
       expect(branch).toBe('master');
     });
@@ -333,7 +327,10 @@ describe('git-operations', () => {
       mockGitSuccess('');
       await checkoutBranch('/repo', 'feature');
       expect(mockExecFile).toHaveBeenCalledWith(
-        'git', ['checkout', 'feature'], expect.anything(), expect.any(Function),
+        'git',
+        ['checkout', 'feature'],
+        expect.anything(),
+        expect.any(Function)
       );
     });
 
@@ -346,7 +343,9 @@ describe('git-operations', () => {
         stderr: 'error: Your local changes would be overwritten by checkout.',
       });
       mockGitError(err);
-      await expect(checkoutBranch('/repo', 'feature')).rejects.toThrow(/local changes would be overwritten/);
+      await expect(checkoutBranch('/repo', 'feature')).rejects.toThrow(
+        /local changes would be overwritten/
+      );
     });
   });
 
@@ -355,7 +354,10 @@ describe('git-operations', () => {
       mockGitSuccess('');
       await createBranch('/repo', 'feature');
       expect(mockExecFile).toHaveBeenCalledWith(
-        'git', ['branch', 'feature'], expect.anything(), expect.any(Function),
+        'git',
+        ['branch', 'feature'],
+        expect.anything(),
+        expect.any(Function)
       );
     });
 
@@ -363,7 +365,10 @@ describe('git-operations', () => {
       mockGitSuccess('');
       await createBranch('/repo', 'feature', { checkout: true, startPoint: 'main' });
       expect(mockExecFile).toHaveBeenCalledWith(
-        'git', ['checkout', '-b', 'feature', 'main'], expect.anything(), expect.any(Function),
+        'git',
+        ['checkout', '-b', 'feature', 'main'],
+        expect.anything(),
+        expect.any(Function)
       );
     });
 
@@ -377,7 +382,10 @@ describe('git-operations', () => {
       mockGitSuccess('');
       await deleteBranch('/repo', 'feature');
       expect(mockExecFile).toHaveBeenCalledWith(
-        'git', ['branch', '-d', 'feature'], expect.anything(), expect.any(Function),
+        'git',
+        ['branch', '-d', 'feature'],
+        expect.anything(),
+        expect.any(Function)
       );
     });
 
@@ -385,7 +393,10 @@ describe('git-operations', () => {
       mockGitSuccess('');
       await deleteBranch('/repo', 'feature', { force: true });
       expect(mockExecFile).toHaveBeenCalledWith(
-        'git', ['branch', '-D', 'feature'], expect.anything(), expect.any(Function),
+        'git',
+        ['branch', '-D', 'feature'],
+        expect.anything(),
+        expect.any(Function)
       );
     });
   });
@@ -393,7 +404,7 @@ describe('git-operations', () => {
   describe('getStagedDiff', () => {
     it('returns diff, stat, files and not-truncated for a small staged diff', async () => {
       mockGitSequence([
-        'diff --git a/a.ts b/a.ts\n+hello',  // git diff --cached
+        'diff --git a/a.ts b/a.ts\n+hello', // git diff --cached
         ' a.ts | 1 +\n 1 file changed, 1 insertion(+)', // git diff --cached --stat
         'a.ts\n', // git diff --cached --name-only
       ]);

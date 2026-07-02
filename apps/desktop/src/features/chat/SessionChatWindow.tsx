@@ -98,9 +98,7 @@ export function SessionChatWindow({
 
   return (
     <div className="flex flex-col h-dvh bg-background text-foreground safe-top-pad">
-      {serverName && (
-        <WindowContextBar serverName={serverName} projectId={projectId} />
-      )}
+      {serverName && <WindowContextBar serverName={serverName} projectId={projectId} />}
       <div className="flex-1 min-h-0">
         <ConnectionProvider
           standaloneServerUrl={serverUrl}
@@ -109,10 +107,7 @@ export function SessionChatWindow({
           standaloneGatewayUrl={gatewayUrl}
           standaloneGatewaySecret={gatewaySecret}
         >
-          <SessionChatContent
-            sessionId={sessionId}
-            projectId={projectId}
-          />
+          <SessionChatContent sessionId={sessionId} projectId={projectId} />
         </ConnectionProvider>
       </div>
     </div>
@@ -128,9 +123,9 @@ function SessionChatContent({ sessionId, projectId }: SessionChatContentProps) {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { selectProject, selectSession } = useSelectionCoordinator();
-  const activeServerId = useServerStore((s) => s.activeServerId);
-  const facadeConnectionState = useFacadeStore((s) => s.connectionState);
-  const facadeBackends = useFacadeStore((s) => s.backends);
+  const activeServerId = useServerStore(s => s.activeServerId);
+  const facadeConnectionState = useFacadeStore(s => s.connectionState);
+  const facadeBackends = useFacadeStore(s => s.backends);
   const isConnected = isMobileBackendUsable({
     backendId: activeServerId,
     connectionState: facadeConnectionState,
@@ -169,7 +164,9 @@ function SessionChatContent({ sessionId, projectId }: SessionChatContentProps) {
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [isConnected, sessionId, projectId, selectProject, selectSession]);
 
   if (error) {
@@ -178,7 +175,9 @@ function SessionChatContent({ sessionId, projectId }: SessionChatContentProps) {
         <div className="text-center">
           <div className="text-sm text-destructive mb-2">{error}</div>
           <button
-            onClick={() => { void closeCurrentWindow(); }}
+            onClick={() => {
+              void closeCurrentWindow();
+            }}
             className="px-3 py-1.5 text-xs rounded-md border border-border hover:bg-secondary"
           >
             Close Window
@@ -199,7 +198,9 @@ function SessionChatContent({ sessionId, projectId }: SessionChatContentProps) {
   return (
     <SessionChatLayout
       sessionId={sessionId}
-      onReturnToDashboard={() => { void closeCurrentWindow(); }}
+      onReturnToDashboard={() => {
+        void closeCurrentWindow();
+      }}
     />
   );
 }

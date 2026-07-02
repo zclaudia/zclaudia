@@ -55,7 +55,13 @@ describe('ProjectDashboard', () => {
   const projectId = 'p1';
 
   beforeEach(() => {
-    useSupervisionStore.setState({ tasks: {}, agents: {}, activeChanges: {}, executionPlans: {}, lastCheckpoint: {} });
+    useSupervisionStore.setState({
+      tasks: {},
+      agents: {},
+      activeChanges: {},
+      executionPlans: {},
+      lastCheckpoint: {},
+    });
     useProjectStore.setState({
       projects: [{ id: projectId, name: 'Test', rootPath: '/tmp' }],
       dashboardViews: {},
@@ -119,7 +125,7 @@ describe('ProjectDashboard', () => {
     expect(container.querySelector('[data-testid="task-board"]')).toBeTruthy();
     // Click back button
     const backBtn = Array.from(container.querySelectorAll('button')).find(
-      (b) => b.textContent?.includes('Dashboard') && b.querySelector('svg'),
+      b => b.textContent?.includes('Dashboard') && b.querySelector('svg')
     );
     if (backBtn) {
       await act(async () => {

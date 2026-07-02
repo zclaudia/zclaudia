@@ -14,7 +14,7 @@ export function ensureDefaultAgentProfile(db: Database.Database): void {
   const llmProfile = llmRepo.findDefault() ?? llmRepo.findAllOrdered()[0];
   if (!llmProfile) {
     console.warn(
-      '[ensureDefaultAgentProfile] no LlmProfile exists; deferring agent seed until user creates an LlmProfile.',
+      '[ensureDefaultAgentProfile] no LlmProfile exists; deferring agent seed until user creates an LlmProfile.'
     );
     return;
   }

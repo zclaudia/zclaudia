@@ -2,7 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, cleanup, fireEvent } from '@testing-library/react';
 import { SupervisorWorkspacePanel } from '../SupervisorWorkspacePanel';
 import { useSupervisionStore } from '../../store';
-import type { ChangeExecutionPlan, ProjectAgent, ProjectChange, SupervisionTask } from '@zclaudia/shared';
+import type {
+  ChangeExecutionPlan,
+  ProjectAgent,
+  ProjectChange,
+  SupervisionTask,
+} from '@zclaudia/shared';
 
 const mockGetActiveProjectChange = vi.fn();
 const mockGetChangeExecutionPlan = vi.fn();
@@ -145,7 +150,9 @@ describe('SupervisorWorkspacePanel', () => {
   });
 
   it('enables execution approval in awaiting execution review state', async () => {
-    mockGetActiveProjectChange.mockResolvedValue(makeChange({ status: 'awaiting_execution_review' }));
+    mockGetActiveProjectChange.mockResolvedValue(
+      makeChange({ status: 'awaiting_execution_review' })
+    );
 
     render(<SupervisorWorkspacePanel projectId="proj-1" agent={makeAgent()} />);
 
@@ -211,8 +218,20 @@ describe('SupervisorWorkspacePanel', () => {
     mockGetActiveProjectChange.mockResolvedValue(makeChange({ status: 'executing' }));
     mockGetProjectChanges.mockResolvedValue([
       makeChange({ id: 'change-1', status: 'executing', active: true }),
-      makeChange({ id: 'change-2', title: 'Old refactor', summary: 'Completed cleanup', status: 'completed', active: false }),
-      makeChange({ id: 'change-3', title: 'Dropped spike', summary: 'Cancelled experiment', status: 'cancelled', active: false }),
+      makeChange({
+        id: 'change-2',
+        title: 'Old refactor',
+        summary: 'Completed cleanup',
+        status: 'completed',
+        active: false,
+      }),
+      makeChange({
+        id: 'change-3',
+        title: 'Dropped spike',
+        summary: 'Cancelled experiment',
+        status: 'cancelled',
+        active: false,
+      }),
     ]);
 
     render(<SupervisorWorkspacePanel projectId="proj-1" agent={makeAgent()} />);
@@ -232,7 +251,14 @@ describe('SupervisorWorkspacePanel', () => {
     mockGetActiveProjectChange.mockResolvedValue(makeChange({ status: 'executing' }));
     mockGetProjectChanges.mockResolvedValue([
       makeChange({ id: 'change-1', status: 'executing', active: true }),
-      makeChange({ id: 'change-2', title: 'Old refactor', summary: 'Completed cleanup', status: 'completed', active: false, updatedAt: oldUpdatedAt }),
+      makeChange({
+        id: 'change-2',
+        title: 'Old refactor',
+        summary: 'Completed cleanup',
+        status: 'completed',
+        active: false,
+        updatedAt: oldUpdatedAt,
+      }),
     ]);
     mockGetSupervisionContext.mockResolvedValue([
       { id: 'changes/change-1/design.md', version: 1, content: '# Active Design' },
@@ -273,7 +299,13 @@ describe('SupervisorWorkspacePanel', () => {
     mockGetActiveProjectChange.mockResolvedValue(makeChange({ status: 'executing' }));
     mockGetProjectChanges.mockResolvedValue([
       makeChange({ id: 'change-1', status: 'executing', active: true }),
-      makeChange({ id: 'change-2', title: 'Old refactor', summary: 'Completed cleanup', status: 'completed', active: false }),
+      makeChange({
+        id: 'change-2',
+        title: 'Old refactor',
+        summary: 'Completed cleanup',
+        status: 'completed',
+        active: false,
+      }),
     ]);
     mockGetSupervisionContext.mockResolvedValue([
       { id: 'changes/change-1/design.md', version: 1, content: '# Active Design' },
@@ -321,7 +353,7 @@ describe('SupervisorWorkspacePanel', () => {
       expect(mockUpdateChangeDocument).toHaveBeenCalledWith(
         'change-1',
         'design',
-        '# Updated Design\n\nNew details',
+        '# Updated Design\n\nNew details'
       );
     });
   });
@@ -330,8 +362,20 @@ describe('SupervisorWorkspacePanel', () => {
     mockGetActiveProjectChange.mockResolvedValue(makeChange({ status: 'executing' }));
     mockGetProjectChanges.mockResolvedValue([
       makeChange({ id: 'change-1', status: 'executing', active: true }),
-      makeChange({ id: 'change-2', title: 'Old refactor', summary: 'Completed cleanup', status: 'completed', active: false }),
-      makeChange({ id: 'change-3', title: 'Dropped spike', summary: 'Cancelled experiment', status: 'cancelled', active: false }),
+      makeChange({
+        id: 'change-2',
+        title: 'Old refactor',
+        summary: 'Completed cleanup',
+        status: 'completed',
+        active: false,
+      }),
+      makeChange({
+        id: 'change-3',
+        title: 'Dropped spike',
+        summary: 'Cancelled experiment',
+        status: 'cancelled',
+        active: false,
+      }),
     ]);
 
     render(<SupervisorWorkspacePanel projectId="proj-1" agent={makeAgent()} />);
@@ -372,7 +416,9 @@ describe('SupervisorWorkspacePanel', () => {
   });
 
   it('shows sync summary for completed change previews', async () => {
-    mockGetActiveProjectChange.mockResolvedValue(makeChange({ status: 'completed', active: false }));
+    mockGetActiveProjectChange.mockResolvedValue(
+      makeChange({ status: 'completed', active: false })
+    );
     mockGetProjectChanges.mockResolvedValue([
       makeChange({ id: 'change-1', status: 'completed', active: false }),
     ]);
@@ -380,8 +426,16 @@ describe('SupervisorWorkspacePanel', () => {
       { id: 'changes/change-1/design.md', version: 1, content: '# Design' },
       { id: 'changes/change-1/execution.md', version: 1, content: '# Execution' },
       { id: 'changes/change-1/tasks.md', version: 1, content: '# Tasks' },
-      { id: 'changes/change-1/acceptance.md', version: 1, content: '# Acceptance\n\nAccepted, synced, and completed.' },
-      { id: 'changes/change-1/sync-log.md', version: 1, content: '# Sync Log\n\nSpecs synced to baseline and change docs.' },
+      {
+        id: 'changes/change-1/acceptance.md',
+        version: 1,
+        content: '# Acceptance\n\nAccepted, synced, and completed.',
+      },
+      {
+        id: 'changes/change-1/sync-log.md',
+        version: 1,
+        content: '# Sync Log\n\nSpecs synced to baseline and change docs.',
+      },
     ]);
 
     render(<SupervisorWorkspacePanel projectId="proj-1" agent={makeAgent()} />);
@@ -392,5 +446,4 @@ describe('SupervisorWorkspacePanel', () => {
 
     expect(screen.getByText('Specs synced to baseline and change docs.')).toBeInTheDocument();
   });
-
 });

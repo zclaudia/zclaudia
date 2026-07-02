@@ -101,19 +101,45 @@ export class ExecutorInstanceRepository extends BaseRepository<
 
   listBySpecChange(specChangeId: string): ExecutorInstance[] {
     const rows = this.db
-      .prepare(
-        `SELECT * FROM executor_instances WHERE spec_change_id = ? ORDER BY created_at ASC`,
-      )
+      .prepare(`SELECT * FROM executor_instances WHERE spec_change_id = ? ORDER BY created_at ASC`)
       .all(specChangeId);
-    return rows.map((r) => this.mapRow(r));
+    return rows.map(r => this.mapRow(r));
   }
 
   listByProjectAndStatus(projectId: string, status: ExecutorStatus): ExecutorInstance[] {
     const rows = this.db
       .prepare(
-        `SELECT * FROM executor_instances WHERE project_id = ? AND status_summary = ? ORDER BY updated_at DESC`,
+        `SELECT * FROM executor_instances WHERE project_id = ? AND status_summary = ? ORDER BY updated_at DESC`
       )
       .all(projectId, status);
-    return rows.map((r) => this.mapRow(r));
+    return rows.map(r => this.mapRow(r));
+  }
+
+  listClassicChangeIdsWithoutExecutor(projectId: string): string[] {
+    const rows = this.db
+      .prepare(
+        `SELECT pc.id FROM project_changes pc
+         WHERE pc.project_id = ?
+           AND NOT EXISTS (
+             SELECT 1 FROM executor_instances ei
+             WHERE ei.underlying_id = pc.id AND ei.type = 'classic'
+           )`
+      )
+      .all(projectId) as { id: string }[];
+    return rows.map(row => row.id);
+  }
+
+  listMetaWorkflowRunIdsWithoutExecutor(projectId: string): string[] {
+    const rows = this.db
+      .prepare(
+        `SELECT mr.id FROM meta_workflow_runs mr
+         WHERE mr.project_id = ?
+           AND NOT EXISTS (
+             SELECT 1 FROM executor_instances ei
+             WHERE ei.underlying_id = mr.id AND ei.type = 'meta-workflow'
+           )`
+      )
+      .all(projectId) as { id: string }[];
+    return rows.map(row => row.id);
   }
 }

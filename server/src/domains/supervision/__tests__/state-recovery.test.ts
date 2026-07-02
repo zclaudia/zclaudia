@@ -6,7 +6,10 @@ import { SupervisionTaskRepository } from '../repositories/supervision-task.js';
 import { SessionRepository } from '../../sessions/repository.js';
 import { ProjectRepository } from '../../projects/index.js';
 import type { ProjectAgent } from '@zclaudia/shared/features/supervision';
-import { createAgentProfilesTable, seedDefaultAgent } from '../../../test-helpers/seed-default-agent.js';
+import {
+  createAgentProfilesTable,
+  seedDefaultAgent,
+} from '../../../test-helpers/seed-default-agent.js';
 
 function createTestDb(): Database.Database {
   const db = new Database(':memory:');
@@ -106,14 +109,21 @@ function makeAgent(overrides: Partial<ProjectAgent> = {}): ProjectAgent {
 
 function seedProject(
   db: Database.Database,
-  opts: { agent?: ProjectAgent; rootPath?: string } = {},
+  opts: { agent?: ProjectAgent; rootPath?: string } = {}
 ): string {
   const id = newId();
   const now = Date.now();
   db.prepare(
     `INSERT INTO projects (id, name, type, root_path, agent, created_at, updated_at)
-     VALUES (?, ?, 'code', ?, ?, ?, ?)`,
-  ).run(id, 'Test Project', opts.rootPath ?? '/tmp/test', opts.agent ? JSON.stringify(opts.agent) : null, now, now);
+     VALUES (?, ?, 'code', ?, ?, ?, ?)`
+  ).run(
+    id,
+    'Test Project',
+    opts.rootPath ?? '/tmp/test',
+    opts.agent ? JSON.stringify(opts.agent) : null,
+    now,
+    now
+  );
   return id;
 }
 
@@ -149,7 +159,14 @@ describe('StateRecovery', () => {
   });
 
   function createRecovery() {
-    return new StateRecovery(db, taskRepo, sessionRepo, projectRepo, mockSupervisorService, activeRuns);
+    return new StateRecovery(
+      db,
+      taskRepo,
+      sessionRepo,
+      projectRepo,
+      mockSupervisorService,
+      activeRuns
+    );
   }
 
   // ========================================
@@ -160,7 +177,12 @@ describe('StateRecovery', () => {
     it('re-queues a stuck running task with retries remaining', () => {
       const projectId = seedProject(db, { agent: makeAgent() });
       const task = taskRepo.create({
-        projectId, title: 'Stuck', description: 'd', source: 'user', status: 'running', maxRetries: 2,
+        projectId,
+        title: 'Stuck',
+        description: 'd',
+        source: 'user',
+        status: 'running',
+        maxRetries: 2,
       });
 
       const recovery = createRecovery();
@@ -178,7 +200,12 @@ describe('StateRecovery', () => {
     it('fails a stuck running task when max retries exceeded', () => {
       const projectId = seedProject(db, { agent: makeAgent() });
       const task = taskRepo.create({
-        projectId, title: 'Stuck exhausted', description: 'd', source: 'user', status: 'running', maxRetries: 0,
+        projectId,
+        title: 'Stuck exhausted',
+        description: 'd',
+        source: 'user',
+        status: 'running',
+        maxRetries: 0,
       });
 
       const recovery = createRecovery();
@@ -195,7 +222,11 @@ describe('StateRecovery', () => {
     it('does not touch running tasks that have an active run', () => {
       const projectId = seedProject(db, { agent: makeAgent() });
       const task = taskRepo.create({
-        projectId, title: 'Active', description: 'd', source: 'user', status: 'running',
+        projectId,
+        title: 'Active',
+        description: 'd',
+        source: 'user',
+        status: 'running',
       });
 
       activeRuns.set(`supervisor_task_${task.id}`, { runId: 'r1' });
@@ -205,14 +236,16 @@ describe('StateRecovery', () => {
 
       const updated = taskRepo.findById(task.id)!;
       expect(updated.status).toBe('running');
-      expect(report.actions.filter(a => a.type === 'task_requeued' || a.type === 'task_failed')).toHaveLength(0);
+      expect(
+        report.actions.filter(a => a.type === 'task_requeued' || a.type === 'task_failed')
+      ).toHaveLength(0);
     });
 
     it('skips projects without agents', () => {
       const projectId = seedProject(db);
       db.prepare(
         `INSERT INTO supervision_tasks (id, project_id, title, description, source, status, priority, attempt, created_at, updated_at)
-         VALUES (?, ?, 'orphan', 'd', 'user', 'running', 0, 1, ?, ?)`,
+         VALUES (?, ?, 'orphan', 'd', 'user', 'running', 0, 1, ?, ?)`
       ).run(newId(), projectId, Date.now(), Date.now());
 
       const recovery = createRecovery();
@@ -224,7 +257,12 @@ describe('StateRecovery', () => {
     it('records recovery_error and continues with later steps when one step throws', () => {
       const projectId = seedProject(db, { agent: makeAgent() });
       const task = taskRepo.create({
-        projectId, title: 'Stuck', description: 'd', source: 'user', status: 'running', maxRetries: 2,
+        projectId,
+        title: 'Stuck',
+        description: 'd',
+        source: 'user',
+        status: 'running',
+        maxRetries: 2,
       });
 
       const recovery = createRecovery() as any;
@@ -247,14 +285,20 @@ describe('StateRecovery', () => {
     it('releases worktree slots for tasks in terminal states', () => {
       const projectId = seedProject(db, { agent: makeAgent() });
       taskRepo.create({
-        projectId, title: 'Done', description: 'd', source: 'user', status: 'integrated',
+        projectId,
+        title: 'Done',
+        description: 'd',
+        source: 'user',
+        status: 'integrated',
       });
 
       const mockPool = {
         getStatus: vi.fn().mockReturnValue({
           total: 2,
           available: 1,
-          inUse: [{ path: '/wt/slot-0', inUse: true, taskId: taskRepo.findByProjectId(projectId)[0].id }],
+          inUse: [
+            { path: '/wt/slot-0', inUse: true, taskId: taskRepo.findByProjectId(projectId)[0].id },
+          ],
         }),
         release: vi.fn(),
       };
@@ -272,7 +316,11 @@ describe('StateRecovery', () => {
     it('does not release worktree for running tasks', () => {
       const projectId = seedProject(db, { agent: makeAgent() });
       const task = taskRepo.create({
-        projectId, title: 'Running', description: 'd', source: 'user', status: 'running',
+        projectId,
+        title: 'Running',
+        description: 'd',
+        source: 'user',
+        status: 'running',
       });
       activeRuns.set(`supervisor_task_${task.id}`, {});
 
@@ -323,7 +371,10 @@ describe('StateRecovery', () => {
     it('archives unarchived checkpoint sessions', () => {
       const projectId = seedProject(db, { agent: makeAgent() });
       const session = sessionRepo.create({
-        projectId, name: 'Checkpoint', type: 'background', projectRole: 'checkpoint',
+        projectId,
+        name: 'Checkpoint',
+        type: 'background',
+        projectRole: 'checkpoint',
       } as any);
 
       const recovery = createRecovery();
@@ -337,10 +388,18 @@ describe('StateRecovery', () => {
     it('archives unarchived review sessions for terminal tasks', () => {
       const projectId = seedProject(db, { agent: makeAgent() });
       const task = taskRepo.create({
-        projectId, title: 'Done', description: 'd', source: 'user', status: 'integrated',
+        projectId,
+        title: 'Done',
+        description: 'd',
+        source: 'user',
+        status: 'integrated',
       });
       sessionRepo.create({
-        projectId, name: 'Review', type: 'background', projectRole: 'review', taskId: task.id,
+        projectId,
+        name: 'Review',
+        type: 'background',
+        projectRole: 'review',
+        taskId: task.id,
       } as any);
 
       const recovery = createRecovery();
@@ -352,10 +411,18 @@ describe('StateRecovery', () => {
     it('does not archive review sessions for non-terminal tasks', () => {
       const projectId = seedProject(db, { agent: makeAgent() });
       const task = taskRepo.create({
-        projectId, title: 'Active', description: 'd', source: 'user', status: 'reviewing',
+        projectId,
+        title: 'Active',
+        description: 'd',
+        source: 'user',
+        status: 'reviewing',
       });
       const session = sessionRepo.create({
-        projectId, name: 'Review', type: 'background', projectRole: 'review', taskId: task.id,
+        projectId,
+        name: 'Review',
+        type: 'background',
+        projectRole: 'review',
+        taskId: task.id,
       } as any);
 
       const recovery = createRecovery();
@@ -369,7 +436,10 @@ describe('StateRecovery', () => {
     it('does not archive already archived sessions', () => {
       const projectId = seedProject(db, { agent: makeAgent() });
       const session = sessionRepo.create({
-        projectId, name: 'Old checkpoint', type: 'background', projectRole: 'checkpoint',
+        projectId,
+        name: 'Old checkpoint',
+        type: 'background',
+        projectRole: 'checkpoint',
       } as any);
       sessionRepo.update(session.id, { archivedAt: Date.now() });
 
@@ -399,7 +469,11 @@ describe('StateRecovery', () => {
     it('does not transition agent to idle when pending tasks exist', () => {
       const projectId = seedProject(db, { agent: makeAgent({ phase: 'active' }) });
       taskRepo.create({
-        projectId, title: 'Pending', description: 'd', source: 'user', status: 'pending',
+        projectId,
+        title: 'Pending',
+        description: 'd',
+        source: 'user',
+        status: 'pending',
       });
 
       const recovery = createRecovery();
@@ -441,11 +515,28 @@ describe('StateRecovery', () => {
       const proj2 = seedProject(db, { agent: makeAgent({ phase: 'active' }) });
 
       // proj1: stuck task + orphaned checkpoint
-      taskRepo.create({ projectId: proj1, title: 'Stuck', description: 'd', source: 'user', status: 'running' });
-      sessionRepo.create({ projectId: proj1, name: 'Ckpt', type: 'background', projectRole: 'checkpoint' } as any);
+      taskRepo.create({
+        projectId: proj1,
+        title: 'Stuck',
+        description: 'd',
+        source: 'user',
+        status: 'running',
+      });
+      sessionRepo.create({
+        projectId: proj1,
+        name: 'Ckpt',
+        type: 'background',
+        projectRole: 'checkpoint',
+      } as any);
 
       // proj2: no active tasks → should idle
-      taskRepo.create({ projectId: proj2, title: 'Done', description: 'd', source: 'user', status: 'integrated' });
+      taskRepo.create({
+        projectId: proj2,
+        title: 'Done',
+        description: 'd',
+        source: 'user',
+        status: 'integrated',
+      });
 
       const recovery = createRecovery();
       const report = recovery.recover();
@@ -467,7 +558,13 @@ describe('StateRecovery', () => {
 
     it('idempotent: calling recover twice produces same result', () => {
       const projectId = seedProject(db, { agent: makeAgent({ phase: 'active' }) });
-      taskRepo.create({ projectId, title: 'Stuck', description: 'd', source: 'user', status: 'running' });
+      taskRepo.create({
+        projectId,
+        title: 'Stuck',
+        description: 'd',
+        source: 'user',
+        status: 'running',
+      });
 
       const recovery = createRecovery();
       const report1 = recovery.recover();

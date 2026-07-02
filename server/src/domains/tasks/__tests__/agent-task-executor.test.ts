@@ -33,22 +33,25 @@ describe('AgentTaskExecutor', () => {
 
     const update = await executor.start(makeTask());
 
-    expect(runner.run).toHaveBeenCalledWith(expect.objectContaining({
-      id: 'canonical-task-1',
-      task: 'Investigate workflow',
-      projectId: 'project-1',
-      contextTemplate: 'agent',
-      permissionOverride: {
-        profile: {
-          fileWrite: 'ask',
+    expect(runner.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'canonical-task-1',
+        task: 'Investigate workflow',
+        projectId: 'project-1',
+        contextTemplate: 'agent',
+        permissionOverride: {
+          profile: {
+            fileWrite: 'ask',
+          },
         },
-      },
-    }), expect.objectContaining({
-      onStarted: expect.any(Function),
-      onDelta: expect.any(Function),
-      onCompleted: expect.any(Function),
-      onFailed: expect.any(Function),
-    }));
+      }),
+      expect.objectContaining({
+        onStarted: expect.any(Function),
+        onDelta: expect.any(Function),
+        onCompleted: expect.any(Function),
+        onFailed: expect.any(Function),
+      })
+    );
     expect(update).toEqual({
       status: 'running',
       executorRef: {
@@ -61,11 +64,13 @@ describe('AgentTaskExecutor', () => {
   it('waits for the direct runner result and maps it to a canonical task result', async () => {
     const runner = {
       run: vi.fn((_task, callbacks) => {
-        queueMicrotask(() => callbacks.onCompleted({
-          resultSummary: 'Agent completed',
-          responseText: 'Full agent response',
-          toolCount: 2,
-        }));
+        queueMicrotask(() =>
+          callbacks.onCompleted({
+            resultSummary: 'Agent completed',
+            responseText: 'Full agent response',
+            toolCount: 2,
+          })
+        );
       }),
     };
     const executor = new AgentTaskExecutor(runner as never);

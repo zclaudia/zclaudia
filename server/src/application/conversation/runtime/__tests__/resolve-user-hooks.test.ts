@@ -22,7 +22,9 @@ function createDb(): Database.Database {
     );
   `);
   const now = Date.now();
-  db.prepare('INSERT INTO agent_config (id, enabled, created_at, updated_at) VALUES (1, 1, ?, ?)').run(now, now);
+  db.prepare(
+    'INSERT INTO agent_config (id, enabled, created_at, updated_at) VALUES (1, 1, ?, ?)'
+  ).run(now, now);
   return db;
 }
 
@@ -39,18 +41,20 @@ describe('resolveUserHooks', () => {
       JSON.stringify([
         { event: 'PreToolUse', command: 'g1' },
         { event: 'PreToolUse', command: 'g2', enabled: false },
-      ]),
+      ])
     );
-    db.prepare('INSERT INTO projects (id, name, hooks_override, created_at, updated_at) VALUES (?, ?, ?, ?, ?)').run(
+    db.prepare(
+      'INSERT INTO projects (id, name, hooks_override, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
+    ).run(
       'proj-1',
       'Test Project',
       JSON.stringify([{ event: 'PostToolUse', command: 'p1' }]),
       now,
-      now,
+      now
     );
 
     const hooks = resolveUserHooks(db, 'proj-1');
-    expect(hooks.map((h) => h.command)).toEqual(['g1', 'p1']);
+    expect(hooks.map(h => h.command)).toEqual(['g1', 'p1']);
   });
 
   it('tolerates corrupt JSON and missing rows', () => {
@@ -68,12 +72,12 @@ describe('resolveUserHooks', () => {
       JSON.stringify([
         { event: 'PreToolUse', command: 'valid' },
         { event: 'Nope', command: 'x' },
-      ]),
+      ])
     );
 
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const hooks = resolveUserHooks(db, 'no-project');
-    expect(hooks.map((h) => h.command)).toEqual(['valid']);
+    expect(hooks.map(h => h.command)).toEqual(['valid']);
     expect(warnSpy).toHaveBeenCalled();
     warnSpy.mockRestore();
   });
@@ -86,30 +90,32 @@ describe('resolveUserHooks', () => {
   it('returns only global hooks when project has no hooks_override', () => {
     const now = Date.now();
     db.prepare('UPDATE agent_config SET hooks = ? WHERE id = 1').run(
-      JSON.stringify([{ event: 'PreToolUse', command: 'g1' }]),
+      JSON.stringify([{ event: 'PreToolUse', command: 'g1' }])
     );
     db.prepare('INSERT INTO projects (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)').run(
       'proj-no-hooks',
       'No Hooks Project',
       now,
-      now,
+      now
     );
 
     const hooks = resolveUserHooks(db, 'proj-no-hooks');
-    expect(hooks.map((h) => h.command)).toEqual(['g1']);
+    expect(hooks.map(h => h.command)).toEqual(['g1']);
   });
 
   it('returns only project hooks when global has none', () => {
     const now = Date.now();
-    db.prepare('INSERT INTO projects (id, name, hooks_override, created_at, updated_at) VALUES (?, ?, ?, ?, ?)').run(
+    db.prepare(
+      'INSERT INTO projects (id, name, hooks_override, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
+    ).run(
       'proj-only',
       'Project Only',
       JSON.stringify([{ event: 'PostToolUse', command: 'p1' }]),
       now,
-      now,
+      now
     );
 
     const hooks = resolveUserHooks(db, 'proj-only');
-    expect(hooks.map((h) => h.command)).toEqual(['p1']);
+    expect(hooks.map(h => h.command)).toEqual(['p1']);
   });
 });

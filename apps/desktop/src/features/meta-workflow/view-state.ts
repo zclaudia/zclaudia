@@ -5,13 +5,13 @@
  * Plus 'list' for the top-level "all runs in this project" view.
  */
 export type MetaWorkflowScreen =
-  | 'list'             // runs list (default for a project with no active run)
-  | 'requirements'     // requirements dialog + approve/reject/challenge
-  | 'phase-graph'      // phasesJson visualization + edit
-  | 'phase-board'      // phase cards grid
-  | 'phase-detail'     // single-phase drilldown
-  | 'promotion'        // promotion dialog (modal over board)
-  | 'reuse-pool';      // reusable pool browser
+  | 'list' // runs list (default for a project with no active run)
+  | 'requirements' // requirements dialog + approve/reject/challenge
+  | 'phase-graph' // phasesJson visualization + edit
+  | 'phase-board' // phase cards grid
+  | 'phase-detail' // single-phase drilldown
+  | 'promotion' // promotion dialog (modal over board)
+  | 'reuse-pool'; // reusable pool browser
 
 export interface MetaWorkflowViewState {
   screen: MetaWorkflowScreen;

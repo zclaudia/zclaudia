@@ -16,8 +16,9 @@ export function DraftPanel() {
     finishDraft,
   } = useDraftEditorStore();
 
-  const selectedSessionId = useSelectionStore((s) => s.selectedSessionId);
-  const sessionMatches = !!activeSessionId && (!selectedSessionId || activeSessionId === selectedSessionId);
+  const selectedSessionId = useSelectionStore(s => s.selectedSessionId);
+  const sessionMatches =
+    !!activeSessionId && (!selectedSessionId || activeSessionId === selectedSessionId);
 
   // Self-initialize: bind the editor to the selected session (workspace launcher
   // opens this panel without calling openEditor). Also re-converges on switch.
@@ -107,7 +108,8 @@ export function DraftPanel() {
               This draft auto-saves and syncs across your devices — come back anytime.
             </p>
             <p className="text-xs text-muted-foreground">
-              Press <kbd className="rounded border border-border px-1.5 py-0.5">⌘↵</kbd> to send to chat
+              Press <kbd className="rounded border border-border px-1.5 py-0.5">⌘↵</kbd> to send to
+              chat
             </p>
           </div>
         )}

@@ -1,6 +1,10 @@
 // Supervision v2 protocol messages
 
-import type { SupervisionTask, ProjectAgent, SupervisorConfig } from '../../features/supervision.js';
+import type {
+  SupervisionTask,
+  ProjectAgent,
+  SupervisorConfig,
+} from '../../features/supervision.js';
 
 // Client → Server messages
 
@@ -27,9 +31,18 @@ export interface AddSupervisionTaskMessage {
 export interface UpdateSupervisionTaskMessage {
   type: 'update_supervision_task';
   taskId: string;
-  updates: Partial<Pick<SupervisionTask,
-    'title' | 'description' | 'priority' | 'status'
-    | 'acceptanceCriteria' | 'dependencies' | 'dependencyMode'>>;
+  updates: Partial<
+    Pick<
+      SupervisionTask,
+      | 'title'
+      | 'description'
+      | 'priority'
+      | 'status'
+      | 'acceptanceCriteria'
+      | 'dependencies'
+      | 'dependencyMode'
+    >
+  >;
 }
 
 export interface InitSupervisionAgentMessage {
@@ -68,3 +81,16 @@ export interface SupervisionCheckpointMessage {
   projectId: string;
   summary: string;
 }
+
+export type SupervisionClientMessage =
+  | GetSupervisionTasksMessage
+  | AddSupervisionTaskMessage
+  | UpdateSupervisionTaskMessage
+  | InitSupervisionAgentMessage
+  | UpdateSupervisionAgentMessage
+  | ReloadSupervisionContextMessage;
+
+export type SupervisionServerMessage =
+  | SupervisionTaskUpdateMessage
+  | SupervisionAgentUpdateMessage
+  | SupervisionCheckpointMessage;

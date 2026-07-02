@@ -1,8 +1,16 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  newPane, findPane, findPaneWithTool, findToolConflict,
-  removePane, setRatioAt, pickFirstPane, isSafeTree, isSplitWorkspace,
-  activeToolRef, sameRef,
+  newPane,
+  findPane,
+  findPaneWithTool,
+  findToolConflict,
+  removePane,
+  setRatioAt,
+  pickFirstPane,
+  isSafeTree,
+  isSplitWorkspace,
+  activeToolRef,
+  sameRef,
   type LayoutNode,
 } from '../rightWorkspaceStore';
 import { useRightWorkspaceStore } from '../rightWorkspaceStore';
@@ -30,9 +38,14 @@ describe('rightWorkspaceStore helpers', () => {
 
   it('activeToolRef disambiguates two same-tool tabs by instanceKey', () => {
     const pane = {
-      id: 'p', kind: 'pane' as const,
-      tools: [{ toolId: 'terminal', instanceKey: 'a' }, { toolId: 'terminal', instanceKey: 'b' }],
-      activeToolId: 'terminal', activeInstanceKey: 'b',
+      id: 'p',
+      kind: 'pane' as const,
+      tools: [
+        { toolId: 'terminal', instanceKey: 'a' },
+        { toolId: 'terminal', instanceKey: 'b' },
+      ],
+      activeToolId: 'terminal',
+      activeInstanceKey: 'b',
     };
     expect(activeToolRef(pane).instanceKey).toBe('b');
   });
@@ -103,8 +116,11 @@ describe('rightWorkspaceStore — simple actions', () => {
   it('ensureSession creates an empty workspace once', () => {
     const s = useRightWorkspaceStore.getState();
     s.ensureSession('A');
-    expect(useRightWorkspaceStore.getState().bySession.A)
-      .toEqual({ root: null, primaryPaneId: null, focusedPaneId: null });
+    expect(useRightWorkspaceStore.getState().bySession.A).toEqual({
+      root: null,
+      primaryPaneId: null,
+      focusedPaneId: null,
+    });
     s.ensureSession('A'); // idempotent
     expect(useRightWorkspaceStore.getState().order).toEqual(['A']);
   });
@@ -138,7 +154,10 @@ describe('rightWorkspaceStore — openTool', () => {
     const ws = useRightWorkspaceStore.getState().bySession.A;
     expect(ws.root!.kind).toBe('pane');
     expect(ws.root!.id).toBe(primary);
-    expect((ws.root as any).tools.map((t: any) => t.toolId)).toEqual(['file-viewer', 'session-changes']);
+    expect((ws.root as any).tools.map((t: any) => t.toolId)).toEqual([
+      'file-viewer',
+      'session-changes',
+    ]);
     expect((ws.root as any).activeToolId).toBe('session-changes');
   });
 
@@ -154,7 +173,11 @@ describe('rightWorkspaceStore — openTool', () => {
   it('opening an already-open singleton focuses it instead of duplicating', () => {
     const s = useRightWorkspaceStore.getState();
     s.openTool('A', 'memory', { openMode: 'dedicated' });
-    s.openTool('A', 'terminal', { openMode: 'dedicated', instanceKey: 'be::p', multiInstance: true });
+    s.openTool('A', 'terminal', {
+      openMode: 'dedicated',
+      instanceKey: 'be::p',
+      multiInstance: true,
+    });
     const before = useRightWorkspaceStore.getState().bySession.A.root;
     s.openTool('A', 'memory', { openMode: 'dedicated' }); // already open
     const ws = useRightWorkspaceStore.getState().bySession.A;
@@ -177,8 +200,12 @@ describe('rightWorkspaceStore — openTool', () => {
     const s = useRightWorkspaceStore.getState();
     s.openTool('A', 'file-viewer', { openMode: 'shared' });
     s.openTool('B', 'terminal', { openMode: 'dedicated' });
-    expect((useRightWorkspaceStore.getState().bySession.A.root as any).activeToolId).toBe('file-viewer');
-    expect((useRightWorkspaceStore.getState().bySession.B.root as any).activeToolId).toBe('terminal');
+    expect((useRightWorkspaceStore.getState().bySession.A.root as any).activeToolId).toBe(
+      'file-viewer'
+    );
+    expect((useRightWorkspaceStore.getState().bySession.B.root as any).activeToolId).toBe(
+      'terminal'
+    );
   });
 });
 
@@ -271,9 +298,9 @@ describe('rightWorkspaceStore — LRU eviction', () => {
     const { bySession, order } = useRightWorkspaceStore.getState();
     expect(order.length).toBe(50);
     expect(Object.keys(bySession).length).toBe(50);
-    expect(bySession.S0).toBeUndefined();   // oldest evicted
-    expect(bySession.S54).toBeDefined();    // newest kept
-    expect(order[0]).toBe('S54');           // MRU front
+    expect(bySession.S0).toBeUndefined(); // oldest evicted
+    expect(bySession.S54).toBeDefined(); // newest kept
+    expect(order[0]).toBe('S54'); // MRU front
   });
 });
 
@@ -282,11 +309,16 @@ describe('rightWorkspaceStore — tab actions', () => {
 
   it('setActiveTool switches the active tab and focuses the pane', () => {
     const pane = {
-      id: 'P1', kind: 'pane' as const,
+      id: 'P1',
+      kind: 'pane' as const,
       tools: [{ toolId: 'memory' }, { toolId: 'file-viewer' }],
-      activeToolId: 'file-viewer', activeInstanceKey: undefined,
+      activeToolId: 'file-viewer',
+      activeInstanceKey: undefined,
     };
-    useRightWorkspaceStore.setState({ bySession: { A: { root: pane, primaryPaneId: 'P1', focusedPaneId: 'P1' } }, order: ['A'] });
+    useRightWorkspaceStore.setState({
+      bySession: { A: { root: pane, primaryPaneId: 'P1', focusedPaneId: 'P1' } },
+      order: ['A'],
+    });
     useRightWorkspaceStore.getState().setActiveTool('A', 'P1', 'memory');
     const ws = useRightWorkspaceStore.getState().bySession.A;
     expect((ws.root as any).activeToolId).toBe('memory');
@@ -294,18 +326,32 @@ describe('rightWorkspaceStore — tab actions', () => {
   });
 
   it('setActiveTool is a no-op when the tool is not in the pane', () => {
-    const pane = { id: 'P1', kind: 'pane' as const, tools: [{ toolId: 'memory' }], activeToolId: 'memory' };
-    useRightWorkspaceStore.setState({ bySession: { A: { root: pane, primaryPaneId: 'P1', focusedPaneId: 'P1' } }, order: ['A'] });
+    const pane = {
+      id: 'P1',
+      kind: 'pane' as const,
+      tools: [{ toolId: 'memory' }],
+      activeToolId: 'memory',
+    };
+    useRightWorkspaceStore.setState({
+      bySession: { A: { root: pane, primaryPaneId: 'P1', focusedPaneId: 'P1' } },
+      order: ['A'],
+    });
     const before = useRightWorkspaceStore.getState().bySession.A.root;
     useRightWorkspaceStore.getState().setActiveTool('A', 'P1', 'terminal');
     expect(useRightWorkspaceStore.getState().bySession.A.root).toBe(before);
   });
 
   it('closeTool removes one tab and keeps the active tab', () => {
-    const pane = { id: 'P1', kind: 'pane' as const,
+    const pane = {
+      id: 'P1',
+      kind: 'pane' as const,
       tools: [{ toolId: 'memory' }, { toolId: 'file-viewer' }, { toolId: 'session-changes' }],
-      activeToolId: 'session-changes' };
-    useRightWorkspaceStore.setState({ bySession: { A: { root: pane, primaryPaneId: 'P1', focusedPaneId: 'P1' } }, order: ['A'] });
+      activeToolId: 'session-changes',
+    };
+    useRightWorkspaceStore.setState({
+      bySession: { A: { root: pane, primaryPaneId: 'P1', focusedPaneId: 'P1' } },
+      order: ['A'],
+    });
     useRightWorkspaceStore.getState().closeTool('A', 'P1', 'file-viewer');
     const p = useRightWorkspaceStore.getState().bySession.A.root as any;
     expect(p.tools.map((t: any) => t.toolId)).toEqual(['memory', 'session-changes']);
@@ -313,10 +359,16 @@ describe('rightWorkspaceStore — tab actions', () => {
   });
 
   it('closeTool re-activates a neighbor when the active tab closes', () => {
-    const pane = { id: 'P1', kind: 'pane' as const,
+    const pane = {
+      id: 'P1',
+      kind: 'pane' as const,
       tools: [{ toolId: 'memory' }, { toolId: 'file-viewer' }, { toolId: 'session-changes' }],
-      activeToolId: 'file-viewer' };
-    useRightWorkspaceStore.setState({ bySession: { A: { root: pane, primaryPaneId: 'P1', focusedPaneId: 'P1' } }, order: ['A'] });
+      activeToolId: 'file-viewer',
+    };
+    useRightWorkspaceStore.setState({
+      bySession: { A: { root: pane, primaryPaneId: 'P1', focusedPaneId: 'P1' } },
+      order: ['A'],
+    });
     useRightWorkspaceStore.getState().closeTool('A', 'P1', 'file-viewer');
     const p = useRightWorkspaceStore.getState().bySession.A.root as any;
     expect(p.tools.map((t: any) => t.toolId)).toEqual(['memory', 'session-changes']);
@@ -324,8 +376,16 @@ describe('rightWorkspaceStore — tab actions', () => {
   });
 
   it('closeTool collapses the pane when its last tab closes', () => {
-    const pane = { id: 'P1', kind: 'pane' as const, tools: [{ toolId: 'memory' }], activeToolId: 'memory' };
-    useRightWorkspaceStore.setState({ bySession: { A: { root: pane, primaryPaneId: 'P1', focusedPaneId: 'P1' } }, order: ['A'] });
+    const pane = {
+      id: 'P1',
+      kind: 'pane' as const,
+      tools: [{ toolId: 'memory' }],
+      activeToolId: 'memory',
+    };
+    useRightWorkspaceStore.setState({
+      bySession: { A: { root: pane, primaryPaneId: 'P1', focusedPaneId: 'P1' } },
+      order: ['A'],
+    });
     useRightWorkspaceStore.getState().closeTool('A', 'P1', 'memory');
     const ws = useRightWorkspaceStore.getState().bySession.A;
     expect(ws.root).toBeNull();
@@ -340,7 +400,11 @@ describe('rightWorkspaceStore — tab actions', () => {
     const paneId = useRightWorkspaceStore.getState().bySession.A.root!.id;
     s.reorderTab('A', paneId, 0, 2); // move memory to the end
     const pane = useRightWorkspaceStore.getState().bySession.A.root as any;
-    expect(pane.tools.map((t: any) => t.toolId)).toEqual(['file-viewer', 'session-changes', 'memory']);
+    expect(pane.tools.map((t: any) => t.toolId)).toEqual([
+      'file-viewer',
+      'session-changes',
+      'memory',
+    ]);
   });
 
   it('reorderTab ignores out-of-range indices', () => {
@@ -362,7 +426,11 @@ describe('rightWorkspaceStore — tab actions', () => {
     s.moveTab('A', p2, p1, 'session-changes', undefined); // move the only tab of P2 → P1
     const ws = useRightWorkspaceStore.getState().bySession.A;
     expect(ws.root!.kind).toBe('pane'); // P2 emptied → group collapsed to P1
-    expect((ws.root as any).tools.map((t: any) => t.toolId)).toEqual(['memory', 'file-viewer', 'session-changes']);
+    expect((ws.root as any).tools.map((t: any) => t.toolId)).toEqual([
+      'memory',
+      'file-viewer',
+      'session-changes',
+    ]);
     expect((ws.root as any).activeToolId).toBe('session-changes');
     expect(ws.focusedPaneId).toBe(p1);
   });

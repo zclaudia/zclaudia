@@ -6,11 +6,20 @@ import { useTopLevelViewStore } from '../../../stores/topLevelViewStore';
 
 const api = {
   get: vi.fn().mockResolvedValue([
-    { id: 'w1', name: 'Alpha', enabled: true, projectId: undefined,
-      trigger: { type: 'manual' }, action: { kind: 'activity', ref: 'git_commit' },
-      createdAt: 0, updatedAt: 0 },
+    {
+      id: 'w1',
+      name: 'Alpha',
+      enabled: true,
+      projectId: undefined,
+      trigger: { type: 'manual' },
+      action: { kind: 'activity', ref: 'git_commit' },
+      createdAt: 0,
+      updatedAt: 0,
+    },
   ]),
-  post: vi.fn(), patch: vi.fn(), del: vi.fn(),
+  post: vi.fn(),
+  patch: vi.fn(),
+  del: vi.fn(),
 } as any;
 
 beforeEach(() => {
@@ -35,9 +44,18 @@ describe('Workflow action', () => {
         return [{ id: 'wf1', name: 'AI Auto Commit' }];
       }
       if (url.startsWith('/api/workflow-step-types')) {
-        return { success: true, data: [
-          { type: 'ai_prompt', name: 'AI Prompt', description: 'Run AI', category: 'AI', source: 'activity' },
-        ] };
+        return {
+          success: true,
+          data: [
+            {
+              type: 'ai_prompt',
+              name: 'AI Prompt',
+              description: 'Run AI',
+              category: 'AI',
+              source: 'activity',
+            },
+          ],
+        };
       }
       // /api/automations
       return [];
@@ -55,7 +73,9 @@ describe('Workflow action', () => {
 
     // Select the Workflow action type
     const actionSelect = await waitFor(() => {
-      const buttons = screen.getAllByRole('button').filter(b => b.getAttribute('aria-haspopup') === 'listbox');
+      const buttons = screen
+        .getAllByRole('button')
+        .filter(b => b.getAttribute('aria-haspopup') === 'listbox');
       const found = buttons.find(b => b.textContent?.includes('AI Prompt'));
       if (!found) throw new Error('action select not ready');
       return found;
@@ -65,8 +85,12 @@ describe('Workflow action', () => {
 
     // Pick the workflow from its select
     const workflowSelect = await waitFor(() => {
-      const buttons = screen.getAllByRole('button').filter(b => b.getAttribute('aria-haspopup') === 'listbox');
-      const found = buttons.find(b => b.textContent?.includes('AI Auto Commit') || b.textContent?.includes('Select workflow'));
+      const buttons = screen
+        .getAllByRole('button')
+        .filter(b => b.getAttribute('aria-haspopup') === 'listbox');
+      const found = buttons.find(
+        b => b.textContent?.includes('AI Auto Commit') || b.textContent?.includes('Select workflow')
+      );
       if (!found) throw new Error('workflow select not ready');
       return found;
     });
@@ -76,9 +100,14 @@ describe('Workflow action', () => {
     const createBtn = await screen.findByRole('button', { name: 'Create' });
     fireEvent.click(createBtn);
 
-    await waitFor(() => expect(post).toHaveBeenCalledWith('/api/automations', expect.objectContaining({
-      action: expect.objectContaining({ kind: 'workflow', ref: 'wf1' }),
-    })));
+    await waitFor(() =>
+      expect(post).toHaveBeenCalledWith(
+        '/api/automations',
+        expect.objectContaining({
+          action: expect.objectContaining({ kind: 'workflow', ref: 'wf1' }),
+        })
+      )
+    );
   });
 });
 
@@ -94,9 +123,25 @@ describe('Catalog-driven activity actions', () => {
         return {
           success: true,
           data: [
-            { type: 'git_commit', name: 'Git Commit', description: 'Stage and commit', category: 'Git', source: 'activity',
-              configSchema: { type: 'object', properties: { message: { type: 'string', description: 'Commit message' } }, required: ['message'] } },
-            { type: 'condition', name: 'Condition', description: 'branch', category: 'Flow Control', source: 'builtin' },
+            {
+              type: 'git_commit',
+              name: 'Git Commit',
+              description: 'Stage and commit',
+              category: 'Git',
+              source: 'activity',
+              configSchema: {
+                type: 'object',
+                properties: { message: { type: 'string', description: 'Commit message' } },
+                required: ['message'],
+              },
+            },
+            {
+              type: 'condition',
+              name: 'Condition',
+              description: 'branch',
+              category: 'Flow Control',
+              source: 'builtin',
+            },
           ],
         };
       }
@@ -108,14 +153,25 @@ describe('Catalog-driven activity actions', () => {
     render(<AutomationsTab api={catApi} projectName={() => 'Global'} />);
 
     fireEvent.click(await screen.findByRole('button', { name: 'New' }));
-    fireEvent.change(await screen.findByPlaceholderText('Automation name'), { target: { value: 'Commit it' } });
+    fireEvent.change(await screen.findByPlaceholderText('Automation name'), {
+      target: { value: 'Commit it' },
+    });
 
     // Open the action-type select and pick the catalog activity 'Git Commit'.
     // The action select is the second listbox button (after the trigger select).
     const actionSelect = await waitFor(() => {
-      const buttons = screen.getAllByRole('button').filter((b) => b.getAttribute('aria-haspopup') === 'listbox');
+      const buttons = screen
+        .getAllByRole('button')
+        .filter(b => b.getAttribute('aria-haspopup') === 'listbox');
       // Trigger select shows 'Interval'; action select is the other one
-      const found = buttons.find((b) => !b.textContent?.includes('Interval') && !b.textContent?.includes('Manual') && !b.textContent?.includes('Cron') && !b.textContent?.includes('Once') && !b.textContent?.includes('Event'));
+      const found = buttons.find(
+        b =>
+          !b.textContent?.includes('Interval') &&
+          !b.textContent?.includes('Manual') &&
+          !b.textContent?.includes('Cron') &&
+          !b.textContent?.includes('Once') &&
+          !b.textContent?.includes('Event')
+      );
       if (!found) throw new Error('action select not ready');
       return found;
     });
@@ -131,6 +187,10 @@ describe('Catalog-driven activity actions', () => {
 
     await waitFor(() => expect(post).toHaveBeenCalled());
     const [, body] = post.mock.calls[0];
-    expect(body.action).toEqual({ kind: 'activity', ref: 'git_commit', input: { message: 'feat: y' } });
+    expect(body.action).toEqual({
+      kind: 'activity',
+      ref: 'git_commit',
+      input: { message: 'feat: y' },
+    });
   });
 });

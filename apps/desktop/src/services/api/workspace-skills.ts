@@ -56,10 +56,13 @@ export async function getWorkspaceSkills(): Promise<WorkspaceSkillInfo[]> {
 }
 
 export async function getWorkspaceSkillsResult(): Promise<WorkspaceSkillsResult> {
-  const result = await fetchLocalApi<WorkspaceSkillInfo[]>('/api/workspace/skills') as ApiResponse<WorkspaceSkillInfo[]> & {
+  const result = (await fetchLocalApi<WorkspaceSkillInfo[]>(
+    '/api/workspace/skills'
+  )) as ApiResponse<WorkspaceSkillInfo[]> & {
     diagnostics?: SkillLoadDiagnostic[];
   };
-  if (!result.success || !result.data) throw new Error(result.error?.message || 'Failed to load workspace skills');
+  if (!result.success || !result.data)
+    throw new Error(result.error?.message || 'Failed to load workspace skills');
   return {
     skills: result.data,
     diagnostics: result.diagnostics ?? [],
@@ -67,8 +70,11 @@ export async function getWorkspaceSkillsResult(): Promise<WorkspaceSkillsResult>
 }
 
 export async function getWorkspaceSkill(skillId: string): Promise<{ id: string; content: string }> {
-  const result = await fetchLocalApi<{ id: string; content: string }>(`/api/workspace/skills/${encodeURIComponent(skillId)}`);
-  if (!result.success || !result.data) throw new Error(result.error?.message || 'Failed to load workspace skill');
+  const result = await fetchLocalApi<{ id: string; content: string }>(
+    `/api/workspace/skills/${encodeURIComponent(skillId)}`
+  );
+  if (!result.success || !result.data)
+    throw new Error(result.error?.message || 'Failed to load workspace skill');
   return result.data;
 }
 
@@ -90,7 +96,8 @@ export async function deleteWorkspaceSkill(skillId: string): Promise<void> {
 
 export async function getExternalSkillDirs(): Promise<string[]> {
   const result = await fetchLocalApi<string[]>('/api/workspace/skill-dirs');
-  if (!result.success || !result.data) throw new Error(result.error?.message || 'Failed to load external skill directories');
+  if (!result.success || !result.data)
+    throw new Error(result.error?.message || 'Failed to load external skill directories');
   return result.data;
 }
 
@@ -100,5 +107,6 @@ export async function saveExternalSkillDirs(dirs: string[]): Promise<void> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ dirs }),
   });
-  if (!result.success) throw new Error(result.error?.message || 'Failed to save external skill directories');
+  if (!result.success)
+    throw new Error(result.error?.message || 'Failed to save external skill directories');
 }

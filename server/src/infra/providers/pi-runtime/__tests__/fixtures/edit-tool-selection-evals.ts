@@ -2,34 +2,34 @@ import type { ToolName } from '@zclaudia/shared/core/tools';
 
 export type EditToolSelectionEvalAssertion =
   | {
-    kind: 'prompt';
-    terms: string[];
-  }
+      kind: 'prompt';
+      terms: string[];
+    }
   | {
-    kind: 'core-tools';
-    tools: ToolName[];
-  }
+      kind: 'core-tools';
+      tools: ToolName[];
+    }
   | {
-    kind: 'schema';
-    tool: ToolName;
-    required?: string[];
-    properties: string[];
-  }
+      kind: 'schema';
+      tool: ToolName;
+      required?: string[];
+      properties: string[];
+    }
   | {
-    kind: 'metadata';
-    tool: ToolName;
-    declaredReadOnly: boolean;
-    mutatesWorkspace: boolean;
-  }
+      kind: 'metadata';
+      tool: ToolName;
+      declaredReadOnly: boolean;
+      mutatesWorkspace: boolean;
+    }
   | {
-    kind: 'loop-recovery';
-    tool: ToolName;
-    args: Record<string, unknown>;
-    details: Record<string, unknown>;
-    attempts: number;
-    nextTool?: ToolName;
-    terms: string[];
-  };
+      kind: 'loop-recovery';
+      tool: ToolName;
+      args: Record<string, unknown>;
+      details: Record<string, unknown>;
+      attempts: number;
+      nextTool?: ToolName;
+      terms: string[];
+    };
 
 export interface EditToolSelectionEvalFixture {
   id: string;
@@ -74,7 +74,11 @@ export const EDIT_TOOL_SELECTION_EVAL_FIXTURES: readonly EditToolSelectionEvalFi
       { kind: 'core-tools', tools: ['ReadSymbol', 'EditSymbol'] },
       {
         kind: 'prompt',
-        terms: ['ReadSymbol before EditSymbol', 'function, method, class, or exported variable', 'expected_body_digest'],
+        terms: [
+          'ReadSymbol before EditSymbol',
+          'function, method, class, or exported variable',
+          'expected_body_digest',
+        ],
       },
       {
         kind: 'schema',
@@ -86,7 +90,14 @@ export const EDIT_TOOL_SELECTION_EVAL_FIXTURES: readonly EditToolSelectionEvalFi
         kind: 'schema',
         tool: 'EditSymbol',
         required: ['symbol', 'new_body'],
-        properties: ['file_path', 'path', 'symbol', 'new_body', 'expected_body_digest', 'preview_only'],
+        properties: [
+          'file_path',
+          'path',
+          'symbol',
+          'new_body',
+          'expected_body_digest',
+          'preview_only',
+        ],
       },
       { kind: 'metadata', tool: 'ReadSymbol', declaredReadOnly: true, mutatesWorkspace: false },
       { kind: 'metadata', tool: 'EditSymbol', declaredReadOnly: false, mutatesWorkspace: true },
@@ -147,7 +158,14 @@ export const EDIT_TOOL_SELECTION_EVAL_FIXTURES: readonly EditToolSelectionEvalFi
       { kind: 'core-tools', tools: ['Read', 'Write'] },
       {
         kind: 'prompt',
-        terms: ['Use Write', 'full-file rewrites', 'JSON arrays', 'Markdown tables', 'YAML', 'TOML'],
+        terms: [
+          'Use Write',
+          'full-file rewrites',
+          'JSON arrays',
+          'Markdown tables',
+          'YAML',
+          'TOML',
+        ],
       },
       {
         kind: 'schema',
@@ -170,7 +188,11 @@ export const EDIT_TOOL_SELECTION_EVAL_FIXTURES: readonly EditToolSelectionEvalFi
       { kind: 'core-tools', tools: ['Edit'] },
       {
         kind: 'prompt',
-        terms: ['After a successful Write, Edit, MultiEdit, or EditSymbol result', 'rely on its diff', 'do not call Read again only to verify'],
+        terms: [
+          'After a successful Write, Edit, MultiEdit, or EditSymbol result',
+          'rely on its diff',
+          'do not call Read again only to verify',
+        ],
       },
       { kind: 'metadata', tool: 'Edit', declaredReadOnly: false, mutatesWorkspace: true },
     ],

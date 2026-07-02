@@ -1,4 +1,4 @@
-import { WebSocket } from 'ws';
+import { type WebSocket } from 'ws';
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import type { ToolCall, ContentBlock, ThinkingBlock } from '@zclaudia/shared/core/message';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
@@ -6,8 +6,15 @@ import type { PCPEffectiveProfile } from '@zclaudia/shared/core/pcp';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { AskUserQuestionItem } from '@zclaudia/shared/interaction/forms';
-import type { PermissionDecision, SteerHandle, SystemInfo } from '../../../infra/providers/types.js';
-import type { ExternalToolRuntimeState, SkillRuntimeState } from '../../../infra/providers/pi-runtime/index.js';
+import type {
+  PermissionDecision,
+  SteerHandle,
+  SystemInfo,
+} from '../../../infra/providers/types.js';
+import type {
+  ExternalToolRuntimeState,
+  SkillRuntimeState,
+} from '../../../infra/providers/pi-runtime/index.js';
 import type { initDatabase } from '../../../infra/storage/db.js';
 import type { ProcessMonitor } from '../../../utils/process-monitor.js';
 import type { NotificationSender } from '../../../infra/push/notification-sender.js';
@@ -17,7 +24,7 @@ export interface ConnectedClient {
   id: string;
   ws: WebSocket;
   isAlive: boolean;
-  isLocal: boolean;       // Whether this is a localhost connection
+  isLocal: boolean; // Whether this is a localhost connection
   authenticated: boolean; // Whether the client has been authenticated
 }
 
@@ -44,19 +51,19 @@ export interface RunIdentityState {
   runId: string;
   sessionId: string;
   projectId: string;
-  sessionType: 'regular' | 'background' | 'agent';  // Session type for this run
+  sessionType: 'regular' | 'background' | 'agent'; // Session type for this run
 }
 
 export interface RunConnectionState {
   clientId: string;
-  client: ConnectedClient;      // Direct reference (works for both real WS and virtual gateway clients)
+  client: ConnectedClient; // Direct reference (works for both real WS and virtual gateway clients)
 }
 
 export interface RunProviderState {
   abortController?: AbortController;
-  providerType?: string;         // Provider type for this run
-  providerSessionId?: string;    // Provider session ID (for abort support)
-  providerCwd?: string;          // Provider cwd (for abort support)
+  providerType?: string; // Provider type for this run
+  providerSessionId?: string; // Provider session ID (for abort support)
+  providerCwd?: string; // Provider cwd (for abort support)
 }
 
 export interface RunPermissionState {
@@ -115,7 +122,7 @@ export interface RunHealthState {
   // Stuck/loop detection
   startedAt: number;
   lastActivityAt: number;
-  recentToolCalls: string[];  // Last N tool names (sliding window for loop detection)
+  recentToolCalls: string[]; // Last N tool names (sliding window for loop detection)
   loopHeartbeatStreak: number; // Consecutive heartbeats that detect a loop pattern
   /** Number of SDK background tasks (run_in_background) still in flight.
    *  When > 0, the provider stream must stay open after `result` so that
@@ -181,7 +188,8 @@ export interface RunSteeringState {
 // Keep this as a composition of smaller run facets so consumers can move toward
 // narrow dependencies instead of accepting the whole runtime state bag.
 export interface ActiveRun
-  extends RunIdentityState,
+  extends
+    RunIdentityState,
     RunConnectionState,
     RunProviderState,
     RunPermissionState,
@@ -209,10 +217,7 @@ export const MAX_OVERFLOW_RETRIES = 1;
 export const PERIODIC_SAVE_INTERVAL_MS = 5000;
 
 // Create a virtual client for Gateway-forwarded messages
-export function createVirtualClient(
-  clientId: string,
-  sender: MessageSender
-): ConnectedClient {
+export function createVirtualClient(clientId: string, sender: MessageSender): ConnectedClient {
   return {
     id: clientId,
     ws: {
@@ -220,10 +225,10 @@ export function createVirtualClient(
       send: (data: string) => {
         const message = JSON.parse(data);
         sender.send(message);
-      }
+      },
     } as WebSocket,
     isAlive: true,
     isLocal: false,
-    authenticated: true
+    authenticated: true,
   };
 }

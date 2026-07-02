@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import * as path from 'path';
 import type { TaskRecord, TaskStatus } from '@zclaudia/shared/core/task';
 
-import { TaskRepository } from '../../../domains/tasks/repository.js';
+import { type TaskRepository } from '../../../domains/tasks/repository.js';
 import { TaskService } from '../../../domains/tasks/task-service.js';
 import type { TaskExecutorUpdate } from '../../../domains/tasks/executors/types.js';
 import { killProcessTree } from './bash-runner.js';
@@ -24,37 +24,37 @@ const EVAL_TASK_SOURCE = [
   "const payload = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));",
   "fs.mkdirSync(require('path').dirname(payload.logPath), { recursive: true });",
   "const log = fs.createWriteStream(payload.logPath, { flags: 'a', mode: 0o600 });",
-  "function writeLog(text) { log.write(String(text)); }",
-  "const kernelConsole = {};",
+  'function writeLog(text) { log.write(String(text)); }',
+  'const kernelConsole = {};',
   "for (const level of ['log', 'info', 'warn', 'error', 'debug', 'trace']) {",
   "  kernelConsole[level] = (...args) => writeLog(args.map((a) => (typeof a === 'string' ? a : util.inspect(a, { depth: 4, maxArrayLength: 200, maxStringLength: 8192 }))).join(' ') + '\\n');",
-  "}",
-  "const contextObject = {",
-  "  console: kernelConsole, require, process, Buffer,",
-  "  URL, URLSearchParams, TextEncoder, TextDecoder,",
-  "  setTimeout, clearTimeout, setInterval, clearInterval, setImmediate, queueMicrotask,",
-  "  AbortController, AbortSignal, structuredClone, fetch: globalThis.fetch, crypto: globalThis.crypto,",
-  "};",
-  "contextObject.globalThis = contextObject;",
-  "const context = vm.createContext(contextObject);",
-  "function inspectValue(value) { return util.inspect(value, { depth: 4, maxArrayLength: 200, maxStringLength: 8192 }); }",
-  "(async () => {",
-  "  try {",
-  "    let value;",
+  '}',
+  'const contextObject = {',
+  '  console: kernelConsole, require, process, Buffer,',
+  '  URL, URLSearchParams, TextEncoder, TextDecoder,',
+  '  setTimeout, clearTimeout, setInterval, clearInterval, setImmediate, queueMicrotask,',
+  '  AbortController, AbortSignal, structuredClone, fetch: globalThis.fetch, crypto: globalThis.crypto,',
+  '};',
+  'contextObject.globalThis = contextObject;',
+  'const context = vm.createContext(contextObject);',
+  'function inspectValue(value) { return util.inspect(value, { depth: 4, maxArrayLength: 200, maxStringLength: 8192 }); }',
+  '(async () => {',
+  '  try {',
+  '    let value;',
   "    if (/\\bawait\\b/.test(payload.code)) value = await vm.runInContext('(async () => {\\n' + payload.code + '\\n})()', context, { filename: 'eval-task' });",
   "    else { value = vm.runInContext(payload.code, context, { filename: 'eval-task' }); if (value && typeof value.then === 'function') value = await value; }",
   "    const text = value === undefined ? 'Eval completed' : inspectValue(value);",
   "    if (value !== undefined) writeLog(text + '\\n');",
   "    fs.writeFileSync(payload.resultPath, JSON.stringify({ ok: true, text }), { encoding: 'utf8', mode: 0o600 });",
-  "    log.end(() => process.exit(0));",
-  "  } catch (err) {",
-  "    const stack = err && err.stack ? String(err.stack) : String(err);",
+  '    log.end(() => process.exit(0));',
+  '  } catch (err) {',
+  '    const stack = err && err.stack ? String(err.stack) : String(err);',
   "    const error = stack.split('\\n').slice(0, 8).join('\\n');",
   "    writeLog(error + '\\n');",
   "    fs.writeFileSync(payload.resultPath, JSON.stringify({ ok: false, error }), { encoding: 'utf8', mode: 0o600 });",
-  "    log.end(() => process.exit(1));",
-  "  }",
-  "})();",
+  '    log.end(() => process.exit(1));',
+  '  }',
+  '})();',
 ].join('\n');
 
 function evalTaskLogPath(taskId: string): string {
@@ -77,13 +77,20 @@ function shellQuote(value: string): string {
   return `'${value.replace(/'/g, "'\\''")}'`;
 }
 
-function parseResult(resultPath: string): { ok: true; text: string } | { ok: false; error: string } | undefined {
+function parseResult(
+  resultPath: string
+): { ok: true; text: string } | { ok: false; error: string } | undefined {
   try {
     const parsed = JSON.parse(readFileSync(resultPath, 'utf8')) as unknown;
     if (parsed && typeof parsed === 'object') {
       const value = parsed as Record<string, unknown>;
-      if (value.ok === true) return { ok: true, text: typeof value.text === 'string' ? value.text : 'Eval completed' };
-      if (value.ok === false) return { ok: false, error: typeof value.error === 'string' ? value.error : 'Eval task failed' };
+      if (value.ok === true)
+        return { ok: true, text: typeof value.text === 'string' ? value.text : 'Eval completed' };
+      if (value.ok === false)
+        return {
+          ok: false,
+          error: typeof value.error === 'string' ? value.error : 'Eval task failed',
+        };
     }
   } catch {
     // result file is best-effort
@@ -104,22 +111,30 @@ export class EvalTaskRuntime implements TaskRuntime {
     const metadata = (task.metadata ?? {}) as Record<string, unknown>;
     const code = typeof metadata.code === 'string' ? metadata.code : '';
     if (!code.trim()) throw new Error('eval task requires metadata.code');
-    const workspaceRoot = typeof metadata.workspaceRoot === 'string' ? metadata.workspaceRoot : process.cwd();
+    const workspaceRoot =
+      typeof metadata.workspaceRoot === 'string' ? metadata.workspaceRoot : process.cwd();
     const readOnly = metadata.readOnly === true;
-    const timeoutMs = typeof metadata.timeoutMs === 'number' && Number.isFinite(metadata.timeoutMs)
-      ? metadata.timeoutMs
-      : 30_000;
+    const timeoutMs =
+      typeof metadata.timeoutMs === 'number' && Number.isFinite(metadata.timeoutMs)
+        ? metadata.timeoutMs
+        : 30_000;
     const logPath = evalTaskLogPath(task.id);
     const resultPath = evalTaskResultPath(task.id);
     mkdirSync(path.dirname(logPath), { recursive: true });
     const scriptPath = evalTaskScriptPath();
     const payloadPath = path.join(resolveDataDir(), 'task-scripts', `${task.id}.eval.json`);
-    writeFileSync(payloadPath, JSON.stringify({ code, logPath, resultPath }), { encoding: 'utf8', mode: 0o600 });
-
-    const wrap = await sandbox.wrapCommand(`${shellQuote(process.execPath)} ${shellQuote(scriptPath)} ${shellQuote(payloadPath)}`, {
-      workspaceRoot,
-      readOnly,
+    writeFileSync(payloadPath, JSON.stringify({ code, logPath, resultPath }), {
+      encoding: 'utf8',
+      mode: 0o600,
     });
+
+    const wrap = await sandbox.wrapCommand(
+      `${shellQuote(process.execPath)} ${shellQuote(scriptPath)} ${shellQuote(payloadPath)}`,
+      {
+        workspaceRoot,
+        readOnly,
+      }
+    );
     if (!wrap.sandboxed && readOnly) {
       throw new Error('Eval task in read-only mode requires the sandbox, which is not available.');
     }
@@ -143,11 +158,11 @@ export class EvalTaskRuntime implements TaskRuntime {
       if (child.pid) killProcessTree(child.pid);
       this.finalize(task.id, null, 'Eval task timed out');
     }, timeoutMs);
-    child.on('error', (err) => {
+    child.on('error', err => {
       clearTimeout(timer);
       this.finalize(task.id, null, `Eval task spawn error: ${err.message}`);
     });
-    child.on('exit', (code) => {
+    child.on('exit', code => {
       clearTimeout(timer);
       this.finalize(task.id, code);
     });
@@ -159,7 +174,8 @@ export class EvalTaskRuntime implements TaskRuntime {
       const current = this.repo.findById(taskId);
       if (!current || TERMINAL.has(current.status)) return;
       const metadata = (current.metadata ?? {}) as Record<string, unknown>;
-      const resultPath = typeof metadata.resultPath === 'string' ? metadata.resultPath : evalTaskResultPath(taskId);
+      const resultPath =
+        typeof metadata.resultPath === 'string' ? metadata.resultPath : evalTaskResultPath(taskId);
       const result = parseResult(resultPath);
       if (errorNote) {
         this.service.failTask(taskId, { error: errorNote });
@@ -181,7 +197,10 @@ export class EvalTaskRuntime implements TaskRuntime {
     const current = this.repo.findById(task.id) ?? task;
     if (TERMINAL.has(current.status)) return current;
     const metadata = (current.metadata ?? {}) as Record<string, unknown>;
-    const resultPath = typeof metadata.resultPath === 'string' ? metadata.resultPath : evalTaskResultPath(current.id);
+    const resultPath =
+      typeof metadata.resultPath === 'string'
+        ? metadata.resultPath
+        : evalTaskResultPath(current.id);
     const result = parseResult(resultPath);
     if (result?.ok === true) {
       return this.service.completeTask(current.id, { text: result.text });
@@ -261,7 +280,7 @@ export class EvalTaskRuntime implements TaskRuntime {
       if (!task) return { status: 'stopped' };
       if (TERMINAL.has(task.status)) return { status: task.status, result: task.result };
       if (Date.now() >= deadline) return { status: task.status };
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 500));
     }
   }
 
@@ -276,16 +295,16 @@ export class EvalTaskRuntime implements TaskRuntime {
       }
     }
     const metadata = (current.metadata ?? {}) as Record<string, unknown>;
-    const logPath = typeof metadata.logPath === 'string' ? metadata.logPath : evalTaskLogPath(current.id);
+    const logPath =
+      typeof metadata.logPath === 'string' ? metadata.logPath : evalTaskLogPath(current.id);
     const window = readTaskLogWindow(logPath, args);
     if (!window.ok) return errorResult(window.code, window.message, window.details);
     const code = typeof metadata.code === 'string' ? metadata.code : '<unknown>';
-    const workspaceRoot = typeof metadata.workspaceRoot === 'string' ? metadata.workspaceRoot : undefined;
+    const workspaceRoot =
+      typeof metadata.workspaceRoot === 'string' ? metadata.workspaceRoot : undefined;
     const cwd = workspaceRoot ? toWorkspaceRelative(workspaceRoot, workspaceRoot) || '.' : '.';
     const terminal = TERMINAL.has(current.status);
-    const status = current.status === 'completed'
-      ? 'success'
-      : current.status;
+    const status = current.status === 'completed' ? 'success' : current.status;
     const text = [
       `Eval: ${truncateText(code.replace(/\s+/g, ' ').trim(), 160)}`,
       `Cwd: ${cwd}`,
@@ -316,7 +335,9 @@ export class EvalTaskRuntime implements TaskRuntime {
       try {
         const pid = task.executorRef?.pid;
         if (task.status === 'queued') {
-          this.service.stopTask(task.id, { error: 'eval task was still queued after server restart' });
+          this.service.stopTask(task.id, {
+            error: 'eval task was still queued after server restart',
+          });
         } else if (typeof pid !== 'number' || !pidAlive(pid)) {
           this.settleObservedExit(task, 'eval process not found after server restart');
         } else {

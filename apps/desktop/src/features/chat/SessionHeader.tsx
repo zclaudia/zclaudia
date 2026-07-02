@@ -1,5 +1,27 @@
 import { useState } from 'react';
-import { RotateCcw, Download, ExternalLink, Archive, ArrowLeft, MoreHorizontal, WifiOff, Bot, Cpu, FolderOpen, PieChart, ChevronDown, Package, Shield, Key, Wrench, Monitor, Terminal, Users, PanelRight, MessageSquare } from 'lucide-react';
+import {
+  RotateCcw,
+  Download,
+  ExternalLink,
+  Archive,
+  ArrowLeft,
+  MoreHorizontal,
+  WifiOff,
+  Bot,
+  Cpu,
+  FolderOpen,
+  PieChart,
+  ChevronDown,
+  Package,
+  Shield,
+  Key,
+  Wrench,
+  Monitor,
+  Terminal,
+  Users,
+  PanelRight,
+  MessageSquare,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Session, Project, SystemInfo } from '@zclaudia/shared';
 import { useServerStore } from '../../stores/serverStore';
@@ -11,12 +33,13 @@ import { resolveTopicChip } from './sessionTopicChip';
 
 const DEFAULT_AGENT_LABEL = 'Default Coding Agent';
 
-const isDesktopTauri = typeof window !== 'undefined'
-  && '__TAURI_INTERNALS__' in window
-  && !navigator.userAgent.includes('Android');
+const isDesktopTauri =
+  typeof window !== 'undefined' &&
+  '__TAURI_INTERNALS__' in window &&
+  !navigator.userAgent.includes('Android');
 
-const isStandaloneSessionWindow = typeof window !== 'undefined'
-  && new URLSearchParams(window.location.search).has('sessionWindow');
+const isStandaloneSessionWindow =
+  typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('sessionWindow');
 
 interface SessionHeaderProps {
   currentSession: Session;
@@ -68,7 +91,7 @@ export function SessionHeader({
   const [showInfo, setShowInfo] = useState(false);
   const activeServerId = useServerStore(s => s.activeServerId);
   const connectionQuality = useServerStore(s =>
-    activeServerId ? s.connections[activeServerId]?.connectionQuality : undefined,
+    activeServerId ? s.connections[activeServerId]?.connectionQuality : undefined
   );
   const { agent } = useAgentForSession(currentSession?.id);
   const modelValue = systemInfo?.model || agent?.model || null;
@@ -80,19 +103,19 @@ export function SessionHeader({
   const pathValue = systemInfo?.cwd || currentSession?.workingDirectory || null;
 
   // Topic anchor chip: first user message in the session
-  const firstUserText = useChatMessageStore((s) => {
+  const firstUserText = useChatMessageStore(s => {
     const msgs = s.messages[currentSession.id];
-    return msgs?.find((m) => m.role === 'user')?.content ?? null;
+    return msgs?.find(m => m.role === 'user')?.content ?? null;
   });
   const topicText = firstUserText ? firstUserText.replace(/\s+/g, ' ').trim().slice(0, 40) : null;
   const chipText = resolveTopicChip(currentSession.autoTitle, topicText);
 
   // Right-panel toggle — a persistent affordance on desktop (like Cursor's panel toggle).
-  const rightCollapsed = useRightSidebarStore((s) => s.collapsed);
-  const rightUnread = useRightSidebarStore((s) => s.unread);
-  const toggleRightPanel = useRightSidebarStore((s) => s.toggleCollapsed);
+  const rightCollapsed = useRightSidebarStore(s => s.collapsed);
+  const rightUnread = useRightSidebarStore(s => s.unread);
+  const toggleRightPanel = useRightSidebarStore(s => s.toggleCollapsed);
   const rightWorkspaceHasContent = useRightWorkspaceStore(
-    (s) => (s.bySession[currentSession.id]?.root ?? null) !== null,
+    s => (s.bySession[currentSession.id]?.root ?? null) !== null
   );
   const showRightToggle = !isMobile && currentSession.type !== 'background';
   const rightExpanded = !rightCollapsed;
@@ -101,9 +124,7 @@ export function SessionHeader({
   };
 
   return (
-    <div
-      className="relative flex min-h-[48px] items-center gap-2.5 px-3 py-0 sm:min-h-[36px] sm:px-3.5 sm:py-0 bg-background safe-top-pad"
-    >
+    <div className="relative flex min-h-[48px] items-center gap-2.5 px-3 py-0 sm:min-h-[36px] sm:px-3.5 sm:py-0 bg-background safe-top-pad">
       <div className="absolute inset-x-0 top-0 hidden h-2 sm:block" data-tauri-drag-region />
       {/* Mobile: hamburger menu */}
       {isMobile && onOpenSidebar && (
@@ -113,7 +134,12 @@ export function SessionHeader({
           aria-label="Open menu"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 6h16M4 12h16M4 18h16"
+            />
           </svg>
         </button>
       )}
@@ -139,8 +165,8 @@ export function SessionHeader({
           autoFocus
           type="text"
           value={renameValue}
-          onChange={(e) => onRenameChange(e.target.value)}
-          onKeyDown={(e) => {
+          onChange={e => onRenameChange(e.target.value)}
+          onKeyDown={e => {
             if (e.key === 'Enter') onRenameConfirm();
             if (e.key === 'Escape') onRenameCancel();
           }}
@@ -172,7 +198,7 @@ export function SessionHeader({
       {currentSession.type !== 'background' && (
         <div className="relative hidden shrink-0 sm:block">
           <button
-            onClick={() => setShowInfo((v) => !v)}
+            onClick={() => setShowInfo(v => !v)}
             className={`inline-flex max-w-[260px] items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] leading-none transition-colors ${showInfo ? 'border-border bg-secondary text-foreground' : 'border-border/70 bg-muted/40 text-muted-foreground hover:text-foreground'}`}
             title="Session info"
             aria-haspopup="dialog"
@@ -200,9 +226,7 @@ export function SessionHeader({
                 </div>
                 <div className="flex max-h-[60vh] flex-col gap-2 overflow-y-auto px-3 pb-3 text-xs">
                   <InfoRow icon={Bot} label="Agent" value={agent?.name ?? DEFAULT_AGENT_LABEL} />
-                  {modelValue && (
-                    <InfoRow icon={Cpu} label="Model" value={modelValue} />
-                  )}
+                  {modelValue && <InfoRow icon={Cpu} label="Model" value={modelValue} />}
                   {systemInfo?.claudeCodeVersion && (
                     <InfoRow icon={Package} label="Version" value={systemInfo.claudeCodeVersion} />
                   )}
@@ -212,9 +236,7 @@ export function SessionHeader({
                   {systemInfo?.apiKeySource && (
                     <InfoRow icon={Key} label="API key" value={systemInfo.apiKeySource} />
                   )}
-                  {pathValue && (
-                    <InfoRow icon={FolderOpen} label="Path" value={pathValue} mono />
-                  )}
+                  {pathValue && <InfoRow icon={FolderOpen} label="Path" value={pathValue} mono />}
                   {contextPercent != null && (
                     <InfoRow icon={PieChart} label="Context" value={`${contextPercent}%`} />
                   )}
@@ -273,7 +295,10 @@ export function SessionHeader({
                   >
                     <button
                       role="menuitem"
-                      onClick={() => { onResetProviderSession(); onToggleSessionMenu(); }}
+                      onClick={() => {
+                        onResetProviderSession();
+                        onToggleSessionMenu();
+                      }}
                       disabled={isLoading}
                       className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-foreground hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
                     >
@@ -282,7 +307,10 @@ export function SessionHeader({
                     </button>
                     <button
                       role="menuitem"
-                      onClick={() => { onExport(); onToggleSessionMenu(); }}
+                      onClick={() => {
+                        onExport();
+                        onToggleSessionMenu();
+                      }}
                       className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-foreground hover:bg-secondary"
                     >
                       <Download size={14} className="text-muted-foreground" />
@@ -291,7 +319,10 @@ export function SessionHeader({
                     {isDesktopTauri && !isStandaloneSessionWindow && (
                       <button
                         role="menuitem"
-                        onClick={() => { onPopOut(); onToggleSessionMenu(); }}
+                        onClick={() => {
+                          onPopOut();
+                          onToggleSessionMenu();
+                        }}
                         className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-foreground hover:bg-secondary"
                       >
                         <ExternalLink size={14} className="text-muted-foreground" />
@@ -301,7 +332,10 @@ export function SessionHeader({
                     <div className="my-1 h-px bg-border" />
                     <button
                       role="menuitem"
-                      onClick={() => { onArchive(); onToggleSessionMenu(); }}
+                      onClick={() => {
+                        onArchive();
+                        onToggleSessionMenu();
+                      }}
                       disabled={archiveDisabled}
                       title={archiveDisabled ? 'Stop the run before archiving' : undefined}
                       className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-destructive hover:bg-destructive/8 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
@@ -329,7 +363,10 @@ export function SessionHeader({
                   <div className="fixed inset-0 z-[70]" onClick={onToggleSessionMenu} />
                   <div className="fixed right-3 top-[calc(env(safe-area-inset-top,0px)+42px)] z-[80] min-w-[180px] overflow-hidden rounded-xl border border-border/80 bg-card shadow-2xl">
                     <button
-                      onClick={() => { onResetProviderSession(); onToggleSessionMenu(); }}
+                      onClick={() => {
+                        onResetProviderSession();
+                        onToggleSessionMenu();
+                      }}
                       disabled={isLoading}
                       className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 text-foreground hover:bg-muted disabled:opacity-50"
                     >
@@ -337,14 +374,20 @@ export function SessionHeader({
                       Reset Session
                     </button>
                     <button
-                      onClick={() => { onExport(); onToggleSessionMenu(); }}
+                      onClick={() => {
+                        onExport();
+                        onToggleSessionMenu();
+                      }}
                       className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 text-foreground hover:bg-muted"
                     >
                       <Download size={14} />
                       Export Markdown
                     </button>
                     <button
-                      onClick={() => { onArchive(); onToggleSessionMenu(); }}
+                      onClick={() => {
+                        onArchive();
+                        onToggleSessionMenu();
+                      }}
                       disabled={archiveDisabled}
                       title={archiveDisabled ? 'Stop the run before archiving' : undefined}
                       className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
@@ -434,7 +477,7 @@ function InfoChips({
         ))}
         {hasMore && (
           <button
-            onClick={() => setShowAll((v) => !v)}
+            onClick={() => setShowAll(v => !v)}
             className="text-[10px] text-primary hover:underline"
           >
             {showAll ? 'show less' : `+${items.length - maxVisible} more`}

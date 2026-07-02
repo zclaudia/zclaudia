@@ -40,7 +40,7 @@ const sessionTodos = new Map<string, TrackedTodo[]>();
 export function trackAndAutoComplete(
   sessionId: string,
   interactionId: string,
-  todos: NormalizedTodoItem[],
+  todos: NormalizedTodoItem[]
 ): TodoStateUpdate[] {
   const previous = sessionTodos.get(sessionId) || [];
   const updates: TodoStateUpdate[] = [];
@@ -48,18 +48,18 @@ export function trackAndAutoComplete(
   // Only compare against the most recent tracked interaction
   if (previous.length > 0) {
     const last = previous[previous.length - 1];
-    const lastContentSet = new Set(last.todos.map((t) => t.content));
-    const newContentSet = new Set(todos.map((t) => t.content));
+    const lastContentSet = new Set(last.todos.map(t => t.content));
+    const newContentSet = new Set(todos.map(t => t.content));
 
     // Only auto-complete when the new list introduces at least one item
     // not in the previous list (= window "shifted", not just "narrowed").
     // Pure narrowing (e.g. [A,B,C,D] → [A,B]) likely means the agent is
     // picking a working window, not that removed items are done.
-    const hasNewItems = todos.some((t) => !lastContentSet.has(t.content));
+    const hasNewItems = todos.some(t => !lastContentSet.has(t.content));
 
     if (hasNewItems) {
       let changed = false;
-      const updatedTodos = last.todos.map((t) => {
+      const updatedTodos = last.todos.map(t => {
         if (t.status !== 'completed' && t.status !== 'cancelled' && !newContentSet.has(t.content)) {
           changed = true;
           return { ...t, status: 'completed' as const };
@@ -92,7 +92,7 @@ export function finalizeSession(sessionId: string): TodoStateUpdate[] {
 
   for (const prev of previous) {
     let changed = false;
-    const updatedTodos = prev.todos.map((t) => {
+    const updatedTodos = prev.todos.map(t => {
       if (t.status !== 'completed' && t.status !== 'cancelled') {
         changed = true;
         return { ...t, status: 'completed' as const };

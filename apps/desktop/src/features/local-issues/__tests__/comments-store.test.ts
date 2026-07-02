@@ -15,7 +15,15 @@ const mockedCreate = vi.mocked(api.createIssueComment);
 const mockedUpdate = vi.mocked(api.updateIssueComment);
 const mockedDelete = vi.mocked(api.deleteIssueComment);
 
-const makeComment = (overrides: Partial<{ id: string; issueId: string; body: string; createdAt: number; updatedAt: number }> = {}) => ({
+const makeComment = (
+  overrides: Partial<{
+    id: string;
+    issueId: string;
+    body: string;
+    createdAt: number;
+    updatedAt: number;
+  }> = {}
+) => ({
   id: overrides.id ?? 'c1',
   issueId: overrides.issueId ?? 'i1',
   body: overrides.body ?? 'hello',
@@ -30,7 +38,7 @@ describe('useLocalIssueCommentStore', () => {
       loading: {},
       loaded: new Set(),
     });
-    [mockedList, mockedCreate, mockedUpdate, mockedDelete].forEach((m) => m.mockReset());
+    [mockedList, mockedCreate, mockedUpdate, mockedDelete].forEach(m => m.mockReset());
   });
 
   it('loadComments fetches once and populates comments sorted by createdAt', async () => {
@@ -39,7 +47,7 @@ describe('useLocalIssueCommentStore', () => {
       makeComment({ id: 'a', createdAt: 100 }),
     ]);
     await useLocalIssueCommentStore.getState().loadComments('i1');
-    expect(useLocalIssueCommentStore.getState().comments['i1'].map((c) => c.id)).toEqual(['a', 'b']);
+    expect(useLocalIssueCommentStore.getState().comments['i1'].map(c => c.id)).toEqual(['a', 'b']);
     expect(useLocalIssueCommentStore.getState().loaded.has('i1')).toBe(true);
   });
 
@@ -80,11 +88,11 @@ describe('useLocalIssueCommentStore', () => {
     expect(useLocalIssueCommentStore.getState().comments['i1'][0].body).toBe('v2');
   });
 
-  it('deleteCommentLocal removes from the issue\'s list', () => {
+  it("deleteCommentLocal removes from the issue's list", () => {
     useLocalIssueCommentStore.getState().upsertComment(makeComment({ id: 'c1' }));
     useLocalIssueCommentStore.getState().upsertComment(makeComment({ id: 'c2' }));
     useLocalIssueCommentStore.getState().deleteCommentLocal('i1', 'c1');
-    expect(useLocalIssueCommentStore.getState().comments['i1'].map((c) => c.id)).toEqual(['c2']);
+    expect(useLocalIssueCommentStore.getState().comments['i1'].map(c => c.id)).toEqual(['c2']);
   });
 
   it('removeComment hits the API and updates the local store', async () => {

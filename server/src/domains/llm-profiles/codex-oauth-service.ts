@@ -1,10 +1,13 @@
 import { Mutex } from 'async-mutex';
-import { getOAuthApiKey } from '@earendil-works/pi-ai/oauth';
+import { getOAuthApiKey, type OAuthCredentials } from '@earendil-works/pi-ai/oauth';
 import type { LlmProfileConfig, CodexOAuthCredentials } from '@zclaudia/shared/core/llm-profile';
 import { CodexOAuthError } from './codex-oauth-errors.js';
 
 export interface OAuthCredentialsWriter {
-  updateOAuthCredentials(profileId: string, creds: CodexOAuthCredentials | null): Promise<void> | void;
+  updateOAuthCredentials(
+    profileId: string,
+    creds: CodexOAuthCredentials | null
+  ): Promise<void> | void;
 }
 
 /**
@@ -41,37 +44,54 @@ const TERMINAL_PATTERNS = [
 
 function classifyRefreshError(err: unknown): 'TERMINAL' | 'TRANSIENT' {
   const msg = err instanceof Error ? err.message : String(err);
-  return TERMINAL_PATTERNS.some((re) => re.test(msg)) ? 'TERMINAL' : 'TRANSIENT';
+  return TERMINAL_PATTERNS.some(re => re.test(msg)) ? 'TERMINAL' : 'TRANSIENT';
 }
 
 function asCodexCredentials(creds: unknown): CodexOAuthCredentials {
+  if (!creds || typeof creds !== 'object') {
+    throw new CodexOAuthError(
+      'REFRESH_FAILED_TRANSIENT',
+      'pi-ai returned credentials without expected fields (accountId missing or wrong type)'
+    );
+  }
+  const candidate = creds as Record<string, unknown>;
   if (
-    creds &&
-    typeof (creds as any).access === 'string' &&
-    typeof (creds as any).refresh === 'string' &&
-    typeof (creds as any).expires === 'number' &&
-    typeof (creds as any).accountId === 'string'
+    typeof candidate.access === 'string' &&
+    typeof candidate.refresh === 'string' &&
+    typeof candidate.expires === 'number' &&
+    typeof candidate.accountId === 'string'
   ) {
     return creds as CodexOAuthCredentials;
   }
   throw new CodexOAuthError(
     'REFRESH_FAILED_TRANSIENT',
-    'pi-ai returned credentials without expected fields (accountId missing or wrong type)',
+    'pi-ai returned credentials without expected fields (accountId missing or wrong type)'
   );
 }
 
 function startFlight(
   profile: LlmProfileConfig,
   entry: FlightEntry,
-  writer: OAuthCredentialsWriter,
+  writer: OAuthCredentialsWriter
 ): Promise<CodexOAuthCredentials> {
   const promise = (async (): Promise<CodexOAuthCredentials> => {
     try {
+      const oauthCredentials = profile.oauthCredentials;
+      if (!oauthCredentials) {
+        throw new CodexOAuthError(
+          'NOT_AUTHENTICATED',
+          'NOT_AUTHENTICATED: OAuth credentials missing for openai-codex'
+        );
+      }
+      const currentCredentials = oauthCredentials as unknown as OAuthCredentials;
       const result = await getOAuthApiKey('openai-codex', {
-        'openai-codex': profile.oauthCredentials as any,
+        'openai-codex': currentCredentials,
       });
       if (!result) {
-        throw new CodexOAuthError('NOT_AUTHENTICATED', 'NOT_AUTHENTICATED: OAuth credentials missing for openai-codex');
+        throw new CodexOAuthError(
+          'NOT_AUTHENTICATED',
+          'NOT_AUTHENTICATED: OAuth credentials missing for openai-codex'
+        );
       }
       const fresh = asCodexCredentials(result.newCredentials);
       if (fresh !== (profile.oauthCredentials as unknown)) {
@@ -85,12 +105,12 @@ function startFlight(
         await writer.updateOAuthCredentials(profile.id, null);
         throw new CodexOAuthError(
           'REFRESH_FAILED_TERMINAL',
-          err instanceof Error ? err.message : 'Refresh failed (terminal)',
+          err instanceof Error ? err.message : 'Refresh failed (terminal)'
         );
       }
       throw new CodexOAuthError(
         'REFRESH_FAILED_TRANSIENT',
-        err instanceof Error ? err.message : 'Refresh failed (transient)',
+        err instanceof Error ? err.message : 'Refresh failed (transient)'
       );
     } finally {
       entry.inFlight = null;
@@ -113,10 +133,13 @@ function startFlight(
  */
 export async function refreshIfNeeded(
   profile: LlmProfileConfig,
-  writer: OAuthCredentialsWriter,
+  writer: OAuthCredentialsWriter
 ): Promise<CodexOAuthCredentials> {
   if (!profile.oauthCredentials) {
-    throw new CodexOAuthError('NOT_AUTHENTICATED', 'NOT_AUTHENTICATED: Codex profile is not authenticated');
+    throw new CodexOAuthError(
+      'NOT_AUTHENTICATED',
+      'NOT_AUTHENTICATED: Codex profile is not authenticated'
+    );
   }
 
   const entry = getEntry(profile.id);
@@ -129,7 +152,7 @@ export async function refreshIfNeeded(
   // Slow path: acquire mutex briefly to do a check-and-set of inFlight.
   // The mutex is released immediately after setting inFlight, NOT after the
   // pi-ai call completes — that is what enables the single-flight coalescing.
-  let flight: Promise<CodexOAuthCredentials>;
+  let flight: Promise<CodexOAuthCredentials> | undefined;
   await entry.mutex.runExclusive(() => {
     if (entry.inFlight) {
       flight = entry.inFlight;
@@ -138,5 +161,8 @@ export async function refreshIfNeeded(
     }
   });
 
-  return flight!;
+  if (!flight) {
+    throw new CodexOAuthError('REFRESH_FAILED_TRANSIENT', 'Failed to start OAuth refresh request');
+  }
+  return flight;
 }

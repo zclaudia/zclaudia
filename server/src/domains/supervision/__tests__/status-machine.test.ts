@@ -16,21 +16,23 @@ describe('supervision status machine', () => {
   });
 
   it('rejects invalid lifecycle transitions', () => {
-    expect(() => assertTaskTransition('proposed', 'running')).toThrow("Invalid task transition: 'proposed' -> 'running'");
+    expect(() => assertTaskTransition('proposed', 'running')).toThrow(
+      "Invalid task transition: 'proposed' -> 'running'"
+    );
     expect(() => assertTaskTransition('merge_conflict', 'failed')).toThrow();
   });
 
   it('validates exact status requirements', () => {
     expect(() => assertTaskStatus('reviewing', 'reviewing', 'approve result for')).not.toThrow();
     expect(() => assertTaskStatus('queued', 'reviewing', 'approve result for')).toThrow(
-      "Cannot approve result for task in status 'queued'; must be 'reviewing'",
+      "Cannot approve result for task in status 'queued'; must be 'reviewing'"
     );
   });
 
   it('validates allowed status sets', () => {
     expect(() => assertTaskStatusIn('failed', ['failed', 'cancelled'], 'retry')).not.toThrow();
     expect(() => assertTaskStatusIn('running', ['failed', 'cancelled'], 'retry')).toThrow(
-      "Cannot retry task in status 'running'",
+      "Cannot retry task in status 'running'"
     );
   });
 

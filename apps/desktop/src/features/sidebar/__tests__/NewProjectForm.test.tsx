@@ -28,7 +28,7 @@ describe('NewProjectForm backend picker', () => {
         backends={backends}
         selectedBackendId="local"
         onSelectedBackendIdChange={() => {}}
-      />,
+      />
     );
     const select = screen.getByLabelText('Create in backend') as HTMLSelectElement;
     expect(select).toBeInTheDocument();
@@ -43,7 +43,7 @@ describe('NewProjectForm backend picker', () => {
         backends={[backends[0]]}
         selectedBackendId="local"
         onSelectedBackendIdChange={() => {}}
-      />,
+      />
     );
     expect(screen.queryByLabelText('Create in backend')).toBeNull();
   });
@@ -56,7 +56,7 @@ describe('NewProjectForm backend picker', () => {
         backends={backends}
         selectedBackendId="local"
         onSelectedBackendIdChange={onSelectedBackendIdChange}
-      />,
+      />
     );
     fireEvent.change(screen.getByLabelText('Create in backend'), { target: { value: 'remote' } });
     expect(onSelectedBackendIdChange).toHaveBeenCalledWith('remote');

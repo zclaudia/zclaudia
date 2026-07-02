@@ -64,9 +64,9 @@ describe('AttachmentRepository', () => {
     const a3 = add({ ownerId: 'i-2', sortOrder: 0, name: 'c' });
 
     const list = repo.findByOwner('local_issue', 'i-1');
-    expect(list.map((r) => r.id)).toEqual([a2.id, a1.id]);
+    expect(list.map(r => r.id)).toEqual([a2.id, a1.id]);
     // a3 belongs to i-2, must not appear
-    expect(list.map((r) => r.id)).not.toContain(a3.id);
+    expect(list.map(r => r.id)).not.toContain(a3.id);
   });
 
   it('counts attachments grouped by owner', () => {
@@ -104,7 +104,7 @@ describe('AttachmentRepository', () => {
     add({ ownerId: 'i-2' });
 
     const removed = repo.deleteByOwner('local_issue', 'i-1');
-    expect(removed.map((r) => r.id).sort()).toEqual([a1.id, a2.id].sort());
+    expect(removed.map(r => r.id).sort()).toEqual([a1.id, a2.id].sort());
     expect(repo.findByOwner('local_issue', 'i-1')).toHaveLength(0);
     expect(repo.findByOwner('local_issue', 'i-2')).toHaveLength(1);
   });

@@ -40,8 +40,11 @@ export class WorkflowService {
 
   constructor(
     private db: Database,
-    private broadcastFn: (projectId: string | undefined, message: ServerMessage | { type: string; projectId?: string; [key: string]: unknown }) => void,
-    private engine: WorkflowEngine,
+    private broadcastFn: (
+      projectId: string | undefined,
+      message: ServerMessage | { type: string; projectId?: string; [key: string]: unknown }
+    ) => void,
+    private engine: WorkflowEngine
   ) {
     this.workflowRepo = new WorkflowRepository(db);
     this.runRepo = new WorkflowRunRepository(db);
@@ -59,7 +62,9 @@ export class WorkflowService {
     const template = BUILTIN_WORKFLOW_TEMPLATES.find(t => t.id === PERMISSION_WORKFLOW_TEMPLATE_ID);
     if (!template) return;
 
-    const systemWorkflow = this.workflowRepo.findBySystemKey(SYSTEM_PERMISSION_ESCALATION_FALLBACK_KEY);
+    const systemWorkflow = this.workflowRepo.findBySystemKey(
+      SYSTEM_PERMISSION_ESCALATION_FALLBACK_KEY
+    );
     if (!systemWorkflow) {
       const legacyGlobal = this.workflowRepo.findGlobalByTemplate(PERMISSION_WORKFLOW_TEMPLATE_ID);
       if (legacyGlobal) {
@@ -70,7 +75,9 @@ export class WorkflowService {
           systemKey: SYSTEM_PERMISSION_ESCALATION_FALLBACK_KEY,
           sourceType: 'template',
         });
-        console.log(`[Workflow] Adopted global builtin workflow as system fallback: ${template.name}`);
+        console.log(
+          `[Workflow] Adopted global builtin workflow as system fallback: ${template.name}`
+        );
         return;
       }
 
@@ -89,10 +96,11 @@ export class WorkflowService {
       return;
     }
 
-    const needsRepair = systemWorkflow.status !== 'active'
-      || systemWorkflow.templateId !== PERMISSION_WORKFLOW_TEMPLATE_ID
-      || !systemWorkflow.isSystem
-      || JSON.stringify(systemWorkflow.definition) !== JSON.stringify(template.definition);
+    const needsRepair =
+      systemWorkflow.status !== 'active' ||
+      systemWorkflow.templateId !== PERMISSION_WORKFLOW_TEMPLATE_ID ||
+      !systemWorkflow.isSystem ||
+      JSON.stringify(systemWorkflow.definition) !== JSON.stringify(template.definition);
 
     if (needsRepair) {
       this.workflowRepo.update(systemWorkflow.id, {
@@ -130,10 +138,11 @@ export class WorkflowService {
       return;
     }
 
-    const needsRepair = existing.status !== 'active'
-      || existing.templateId !== AI_AUTO_COMMIT_TEMPLATE_ID
-      || !existing.isSystem
-      || JSON.stringify(existing.definition) !== JSON.stringify(template.definition);
+    const needsRepair =
+      existing.status !== 'active' ||
+      existing.templateId !== AI_AUTO_COMMIT_TEMPLATE_ID ||
+      !existing.isSystem ||
+      JSON.stringify(existing.definition) !== JSON.stringify(template.definition);
 
     if (needsRepair) {
       this.workflowRepo.update(existing.id, {
@@ -199,7 +208,10 @@ export class WorkflowService {
     return workflow;
   }
 
-  updateWorkflow(workflowId: string, data: Partial<Omit<Workflow, 'id' | 'projectId' | 'createdAt'>>): Workflow {
+  updateWorkflow(
+    workflowId: string,
+    data: Partial<Omit<Workflow, 'id' | 'projectId' | 'createdAt'>>
+  ): Workflow {
     const existing = this.workflowRepo.findById(workflowId);
     if (existing?.isSystem) {
       throw new ImmutableSystemWorkflowError();
@@ -234,7 +246,9 @@ export class WorkflowService {
 
   createFromTemplate(projectId: string | undefined, templateId: string): Workflow {
     if (templateId === PERMISSION_WORKFLOW_TEMPLATE_ID) {
-      throw new ImmutableSystemWorkflowError('Permission escalation template is managed by the system');
+      throw new ImmutableSystemWorkflowError(
+        'Permission escalation template is managed by the system'
+      );
     }
     const template = BUILTIN_WORKFLOW_TEMPLATES.find(t => t.id === templateId);
     if (!template) throw new Error(`Template not found: ${templateId}`);
@@ -263,8 +277,11 @@ export class WorkflowService {
     workflowId: string,
     triggerSource: 'manual' | 'schedule' | 'event' = 'manual',
     triggerDetail?: string,
-    triggerData?: { eventPayload?: Record<string, unknown>; triggerContext?: Record<string, unknown> },
-    initiator?: string,
+    triggerData?: {
+      eventPayload?: Record<string, unknown>;
+      triggerContext?: Record<string, unknown>;
+    },
+    initiator?: string
   ): Promise<WorkflowRun> {
     const workflow = this.workflowRepo.findById(workflowId);
     if (!workflow) throw new Error(`Workflow not found: ${workflowId}`);

@@ -73,7 +73,9 @@ describe('TaskDetail', () => {
   });
 
   it('renders meta information', () => {
-    render(<TaskDetail task={makeTask({ priority: 5, attempt: 2, maxRetries: 3 })} onClose={onClose} />);
+    render(
+      <TaskDetail task={makeTask({ priority: 5, attempt: 2, maxRetries: 3 })} onClose={onClose} />
+    );
     expect(screen.getByText('User')).toBeInTheDocument();
     expect(screen.getByText('5')).toBeInTheDocument();
     expect(screen.getByText('2 / 4')).toBeInTheDocument(); // attempt / maxRetries + 1
@@ -94,19 +96,14 @@ describe('TaskDetail', () => {
       <TaskDetail
         task={makeTask({ acceptanceCriteria: ['Tests pass', 'No regressions'] })}
         onClose={onClose}
-      />,
+      />
     );
     expect(screen.getByText('Tests pass')).toBeInTheDocument();
     expect(screen.getByText('No regressions')).toBeInTheDocument();
   });
 
   it('renders scope chips', () => {
-    render(
-      <TaskDetail
-        task={makeTask({ scope: ['src/auth', 'src/api'] })}
-        onClose={onClose}
-      />,
-    );
+    render(<TaskDetail task={makeTask({ scope: ['src/auth', 'src/api'] })} onClose={onClose} />);
     expect(screen.getByText('src/auth')).toBeInTheDocument();
     expect(screen.getByText('src/api')).toBeInTheDocument();
   });
@@ -121,7 +118,7 @@ describe('TaskDetail', () => {
           },
         })}
         onClose={onClose}
-      />,
+      />
     );
     expect(screen.getByText('All done')).toBeInTheDocument();
     expect(screen.getByText('a.ts')).toBeInTheDocument();
@@ -139,7 +136,7 @@ describe('TaskDetail', () => {
           },
         })}
         onClose={onClose}
-      />,
+      />
     );
     expect(screen.getByText('Looks good but needs error handling')).toBeInTheDocument();
   });
@@ -148,7 +145,9 @@ describe('TaskDetail', () => {
     render(<TaskDetail task={makeTask()} onClose={onClose} />);
     // The X button in the header
     const closeButtons = screen.getAllByRole('button');
-    const closeBtn = closeButtons.find((btn) => btn.getAttribute('aria-label') || btn.querySelector('svg'));
+    const closeBtn = closeButtons.find(
+      btn => btn.getAttribute('aria-label') || btn.querySelector('svg')
+    );
     if (closeBtn) fireEvent.click(closeBtn);
     expect(onClose).toHaveBeenCalled();
   });
@@ -173,7 +172,7 @@ describe('TaskDetail', () => {
           result: { summary: 'Done', filesChanged: [], reviewVerdict: 'approve' },
         })}
         onClose={onClose}
-      />,
+      />
     );
     expect(screen.getByText('Approve Result')).toBeInTheDocument();
     expect(screen.getByText('Reject Result')).toBeInTheDocument();
@@ -219,7 +218,7 @@ describe('TaskDetail', () => {
           },
         })}
         onClose={onClose}
-      />,
+      />
     );
     expect(screen.getByText('PASS')).toBeInTheDocument();
     expect(screen.getByText('FAIL')).toBeInTheDocument();
@@ -234,13 +233,11 @@ describe('TaskDetail', () => {
           result: {
             summary: 'Done',
             filesChanged: [],
-            workflowOutputs: [
-              { action: 'build', success: true },
-            ],
+            workflowOutputs: [{ action: 'build', success: true }],
           },
         })}
         onClose={onClose}
-      />,
+      />
     );
     expect(screen.getByText('PASS')).toBeInTheDocument();
     expect(screen.getByText('build')).toBeInTheDocument();
@@ -287,7 +284,7 @@ describe('TaskDetail', () => {
           result: { summary: 'Done', filesChanged: [], reviewVerdict: 'approve' },
         })}
         onClose={onClose}
-      />,
+      />
     );
     fireEvent.click(screen.getByText('Approve Result'));
 
@@ -307,7 +304,7 @@ describe('TaskDetail', () => {
           result: { summary: 'Done', filesChanged: [], reviewVerdict: 'approve' },
         })}
         onClose={onClose}
-      />,
+      />
     );
     fireEvent.click(screen.getByText('Reject Result'));
 
@@ -355,7 +352,7 @@ describe('TaskDetail', () => {
           result: { summary: 'Done', filesChanged: [] },
         })}
         onClose={onClose}
-      />,
+      />
     );
     expect(screen.queryByText('Files changed:')).not.toBeInTheDocument();
   });

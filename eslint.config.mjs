@@ -19,6 +19,8 @@ export default [
       '**/test-results/**',
       '**/.cache/**',
       '**/.worktrees/**',
+      '**/.claude/**',
+      '**/.claire/**',
       '**/.zclaudia/**',
       // Tauri 生成的文件
       '**/src-tauri/target/**',
@@ -108,18 +110,21 @@ export default [
       'react-hooks/gating': 'warn',
       // Classic two stay at their recommended levels (rules-of-hooks=error,
       // exhaustive-deps=warn) — those have been our hard guards all along.
-      'react-refresh/only-export-components': [
-        'warn',
-        { allowConstantExport: true },
-      ],
+      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
     },
   },
 
   // 测试文件宽松规则
   {
-    files: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}', '**/e2e/**/*.ts'],
+    files: [
+      '**/*.test.{ts,tsx}',
+      '**/*.spec.{ts,tsx}',
+      '**/e2e/**/*.ts',
+      'apps/desktop/src/test/**/*.{ts,tsx}',
+    ],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
       'no-console': 'off',
     },
   },

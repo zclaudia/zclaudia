@@ -1,8 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-  validatePlanMarkdownContent,
-  validatePlanFile,
-} from '../plan-validator.js';
+import { validatePlanMarkdownContent, validatePlanFile } from '../plan-validator.js';
 import * as fs from 'fs';
 import * as path from 'path';
 

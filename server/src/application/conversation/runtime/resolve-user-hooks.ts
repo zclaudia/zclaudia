@@ -10,8 +10,12 @@ type Db = { prepare: (sql: string) => { get: (...a: unknown[]) => unknown } };
  */
 export function resolveUserHooks(db: Db, projectId: string): UserHookDefinition[] {
   const out: UserHookDefinition[] = [];
-  const globalRow = db.prepare('SELECT hooks FROM agent_config WHERE id = 1').get() as { hooks: string | null } | undefined;
-  const projectRow = db.prepare('SELECT hooks_override FROM projects WHERE id = ?').get(projectId) as { hooks_override: string | null } | undefined;
+  const globalRow = db.prepare('SELECT hooks FROM agent_config WHERE id = 1').get() as
+    | { hooks: string | null }
+    | undefined;
+  const projectRow = db
+    .prepare('SELECT hooks_override FROM projects WHERE id = ?')
+    .get(projectId) as { hooks_override: string | null } | undefined;
   const layers: Array<[string, string | null | undefined]> = [
     ['global', globalRow?.hooks],
     ['project', projectRow?.hooks_override],
@@ -21,7 +25,7 @@ export function resolveUserHooks(db: Db, projectId: string): UserHookDefinition[
     try {
       const { hooks, warnings } = parseUserHooks(JSON.parse(raw));
       for (const w of warnings) console.warn(`[UserHooks] ${label}: ${w}`);
-      out.push(...hooks.filter((h) => h.enabled !== false));
+      out.push(...hooks.filter(h => h.enabled !== false));
     } catch {
       console.warn(`[UserHooks] corrupt ${label} hooks JSON, ignoring`);
     }

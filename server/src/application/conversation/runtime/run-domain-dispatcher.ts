@@ -23,7 +23,7 @@ export interface DispatchProviderRuntimeEventInput {
 }
 
 export function dispatchProviderRuntimeEventToDomain(
-  input: DispatchProviderRuntimeEventInput,
+  input: DispatchProviderRuntimeEventInput
 ): RunDomainEvent[] {
   const domainEvents = translateProviderRuntimeEvent({
     event: input.providerEvent,

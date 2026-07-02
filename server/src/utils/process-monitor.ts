@@ -58,7 +58,7 @@ export class ProcessMonitor {
   constructor(
     getActiveRunCount: ActiveRunCountFn,
     onLeakDetected: OnLeakDetectedFn,
-    options?: ProcessMonitorOptions,
+    options?: ProcessMonitorOptions
   ) {
     this.getActiveRunCount = getActiveRunCount;
     this.onLeakDetected = onLeakDetected;
@@ -98,17 +98,21 @@ export class ProcessMonitor {
     }
   }
 
-  private async scanForLeaks(): Promise<{ activeRunCount: number; leakedProcesses: ChildProcessInfo[] }> {
+  private async scanForLeaks(): Promise<{
+    activeRunCount: number;
+    leakedProcesses: ChildProcessInfo[];
+  }> {
     const activeRunCount = this.getActiveRunCount();
     if (activeRunCount > 0) {
       return { activeRunCount, leakedProcesses: [] };
     }
 
     const children = await listDescendantProcesses(this.serverPid);
-    const leakedProcesses = children.filter(p =>
-      p.elapsedSeconds >= this.opts.minElapsedSeconds &&
-      this.isReasonableElapsedSeconds(p.elapsedSeconds) &&
-      !this.isIgnoredCommand(p.command),
+    const leakedProcesses = children.filter(
+      p =>
+        p.elapsedSeconds >= this.opts.minElapsedSeconds &&
+        this.isReasonableElapsedSeconds(p.elapsedSeconds) &&
+        !this.isIgnoredCommand(p.command)
     );
 
     return { activeRunCount, leakedProcesses };
@@ -144,7 +148,8 @@ export class ProcessMonitor {
 
     // Determine whether to notify: new PIDs → immediate, same PIDs → cooldown
     const currentPids = new Set(leaked.map(p => p.pid));
-    const sameAsLast = currentPids.size === this.lastNotifiedPids.size &&
+    const sameAsLast =
+      currentPids.size === this.lastNotifiedPids.size &&
       [...currentPids].every(pid => this.lastNotifiedPids.has(pid));
 
     let shouldNotify = false;
@@ -154,7 +159,10 @@ export class ProcessMonitor {
       this.consecutiveSuppressions = 0;
     } else {
       // Same PIDs still lingering — apply cooldown with progressive backoff
-      const tierIndex = Math.min(this.consecutiveSuppressions, ProcessMonitor.COOLDOWN_TIERS_MS.length - 1);
+      const tierIndex = Math.min(
+        this.consecutiveSuppressions,
+        ProcessMonitor.COOLDOWN_TIERS_MS.length - 1
+      );
       const cooldownMs = ProcessMonitor.COOLDOWN_TIERS_MS[tierIndex];
       if (now - this.lastNotifyTime >= cooldownMs) {
         shouldNotify = true;

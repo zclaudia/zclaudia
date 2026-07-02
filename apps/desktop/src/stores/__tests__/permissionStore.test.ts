@@ -75,7 +75,10 @@ describe('permissionStore', () => {
       usePermissionStore.getState().clearRequestById('req-2');
 
       expect(usePermissionStore.getState().pendingRequests).toHaveLength(2);
-      expect(usePermissionStore.getState().pendingRequests.map(r => r.requestId)).toEqual(['req-1', 'req-3']);
+      expect(usePermissionStore.getState().pendingRequests.map(r => r.requestId)).toEqual([
+        'req-1',
+        'req-3',
+      ]);
     });
 
     it('advances pendingRequest when the first item is removed', () => {
@@ -114,15 +117,15 @@ describe('permissionStore', () => {
 
   describe('clearStaleRequests', () => {
     it('removes requests for a server that are not in the valid set', () => {
-      usePermissionStore.getState().setPendingRequest(
-        createRequest({ requestId: 'req-1', serverId: 'gw:backend-1' })
-      );
-      usePermissionStore.getState().setPendingRequest(
-        createRequest({ requestId: 'req-2', serverId: 'gw:backend-1' })
-      );
-      usePermissionStore.getState().setPendingRequest(
-        createRequest({ requestId: 'req-3', serverId: 'gw:backend-1' })
-      );
+      usePermissionStore
+        .getState()
+        .setPendingRequest(createRequest({ requestId: 'req-1', serverId: 'gw:backend-1' }));
+      usePermissionStore
+        .getState()
+        .setPendingRequest(createRequest({ requestId: 'req-2', serverId: 'gw:backend-1' }));
+      usePermissionStore
+        .getState()
+        .setPendingRequest(createRequest({ requestId: 'req-3', serverId: 'gw:backend-1' }));
 
       // Only req-2 is still valid
       usePermissionStore.getState().clearStaleRequests('gw:backend-1', new Set(['req-2']));
@@ -132,12 +135,12 @@ describe('permissionStore', () => {
     });
 
     it('does not affect requests from other servers', () => {
-      usePermissionStore.getState().setPendingRequest(
-        createRequest({ requestId: 'req-1', serverId: 'gw:backend-1' })
-      );
-      usePermissionStore.getState().setPendingRequest(
-        createRequest({ requestId: 'req-2', serverId: 'gw:backend-2' })
-      );
+      usePermissionStore
+        .getState()
+        .setPendingRequest(createRequest({ requestId: 'req-1', serverId: 'gw:backend-1' }));
+      usePermissionStore
+        .getState()
+        .setPendingRequest(createRequest({ requestId: 'req-2', serverId: 'gw:backend-2' }));
 
       // Clear stale requests for backend-1 with no valid IDs
       usePermissionStore.getState().clearStaleRequests('gw:backend-1', new Set());
@@ -147,28 +150,25 @@ describe('permissionStore', () => {
     });
 
     it('keeps all requests when all are valid', () => {
-      usePermissionStore.getState().setPendingRequest(
-        createRequest({ requestId: 'req-1', serverId: 'gw:backend-1' })
-      );
-      usePermissionStore.getState().setPendingRequest(
-        createRequest({ requestId: 'req-2', serverId: 'gw:backend-1' })
-      );
+      usePermissionStore
+        .getState()
+        .setPendingRequest(createRequest({ requestId: 'req-1', serverId: 'gw:backend-1' }));
+      usePermissionStore
+        .getState()
+        .setPendingRequest(createRequest({ requestId: 'req-2', serverId: 'gw:backend-1' }));
 
-      usePermissionStore.getState().clearStaleRequests(
-        'gw:backend-1',
-        new Set(['req-1', 'req-2'])
-      );
+      usePermissionStore.getState().clearStaleRequests('gw:backend-1', new Set(['req-1', 'req-2']));
 
       expect(usePermissionStore.getState().pendingRequests).toHaveLength(2);
     });
 
     it('removes all requests when valid set is empty', () => {
-      usePermissionStore.getState().setPendingRequest(
-        createRequest({ requestId: 'req-1', serverId: 'gw:backend-1' })
-      );
-      usePermissionStore.getState().setPendingRequest(
-        createRequest({ requestId: 'req-2', serverId: 'gw:backend-1' })
-      );
+      usePermissionStore
+        .getState()
+        .setPendingRequest(createRequest({ requestId: 'req-1', serverId: 'gw:backend-1' }));
+      usePermissionStore
+        .getState()
+        .setPendingRequest(createRequest({ requestId: 'req-2', serverId: 'gw:backend-1' }));
 
       usePermissionStore.getState().clearStaleRequests('gw:backend-1', new Set());
 
@@ -179,12 +179,12 @@ describe('permissionStore', () => {
 
   describe('clearRequestsForSession', () => {
     it('removes requests and scoped state for a completed session', () => {
-      usePermissionStore.getState().setPendingRequest(
-        createRequest({ requestId: 'req-1', sessionId: 'session-1' })
-      );
-      usePermissionStore.getState().setPendingRequest(
-        createRequest({ requestId: 'req-2', sessionId: 'session-2' })
-      );
+      usePermissionStore
+        .getState()
+        .setPendingRequest(createRequest({ requestId: 'req-1', sessionId: 'session-1' }));
+      usePermissionStore
+        .getState()
+        .setPendingRequest(createRequest({ requestId: 'req-2', sessionId: 'session-2' }));
       usePermissionStore.getState().setFeedbackDraft('req-1', 'Feedback');
       usePermissionStore.getState().setAIReviewResult('req-1', {
         decision: 'approve',
@@ -193,14 +193,21 @@ describe('permissionStore', () => {
       });
       usePermissionStore.getState().setWorkflowProgress('req-1', {
         workflowRunId: 'wf-1',
-        currentStep: { id: 'decide', type: 'permission_decide', status: 'completed', label: 'Auto-Approve' },
+        currentStep: {
+          id: 'decide',
+          type: 'permission_decide',
+          status: 'completed',
+          label: 'Auto-Approve',
+        },
         completedSteps: ['decide'],
         totalSteps: 1,
       });
 
       usePermissionStore.getState().clearRequestsForSession('session-1');
 
-      expect(usePermissionStore.getState().pendingRequests.map(r => r.requestId)).toEqual(['req-2']);
+      expect(usePermissionStore.getState().pendingRequests.map(r => r.requestId)).toEqual([
+        'req-2',
+      ]);
       expect(usePermissionStore.getState().pendingRequest?.requestId).toBe('req-2');
       expect(usePermissionStore.getState().feedbackDrafts['req-1']).toBeUndefined();
       expect(usePermissionStore.getState().aiReviewResults['req-1']).toBeUndefined();
@@ -219,9 +226,7 @@ describe('permissionStore', () => {
 
   describe('hasRequest', () => {
     it('returns true for existing request', () => {
-      usePermissionStore.getState().setPendingRequest(
-        createRequest({ requestId: 'req-1' })
-      );
+      usePermissionStore.getState().setPendingRequest(createRequest({ requestId: 'req-1' }));
 
       expect(usePermissionStore.getState().hasRequest('req-1')).toBe(true);
     });
@@ -231,9 +236,7 @@ describe('permissionStore', () => {
     });
 
     it('returns false after request is cleared', () => {
-      usePermissionStore.getState().setPendingRequest(
-        createRequest({ requestId: 'req-1' })
-      );
+      usePermissionStore.getState().setPendingRequest(createRequest({ requestId: 'req-1' }));
       usePermissionStore.getState().clearRequestById('req-1');
 
       expect(usePermissionStore.getState().hasRequest('req-1')).toBe(false);
@@ -319,7 +322,12 @@ describe('permissionStore', () => {
       });
       usePermissionStore.getState().setWorkflowProgress('req-1', {
         workflowRunId: 'wf-1',
-        currentStep: { id: 'decide', type: 'permission_decide', status: 'completed', label: 'Auto-Approve' },
+        currentStep: {
+          id: 'decide',
+          type: 'permission_decide',
+          status: 'completed',
+          label: 'Auto-Approve',
+        },
         completedSteps: ['decide'],
         totalSteps: 1,
       });
@@ -340,12 +348,12 @@ describe('permissionStore', () => {
     });
 
     it('clearStaleRequests removes feedbackDrafts for stale requests', () => {
-      usePermissionStore.getState().setPendingRequest(
-        createRequest({ requestId: 'req-1', serverId: 'gw:backend-1' })
-      );
-      usePermissionStore.getState().setPendingRequest(
-        createRequest({ requestId: 'req-2', serverId: 'gw:backend-1' })
-      );
+      usePermissionStore
+        .getState()
+        .setPendingRequest(createRequest({ requestId: 'req-1', serverId: 'gw:backend-1' }));
+      usePermissionStore
+        .getState()
+        .setPendingRequest(createRequest({ requestId: 'req-2', serverId: 'gw:backend-1' }));
       usePermissionStore.getState().setFeedbackDraft('req-1', 'Feedback for req-1');
       usePermissionStore.getState().setFeedbackDraft('req-2', 'Feedback for req-2');
 

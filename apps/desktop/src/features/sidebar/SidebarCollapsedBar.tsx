@@ -31,11 +31,21 @@ export function SidebarCollapsedBar({
       className="flex h-9 flex-shrink-0 items-center gap-1 bg-background pl-[76px] pr-2"
       data-tauri-drag-region
     >
-      <button onClick={onExpand} className={iconBtn} title="Expand sidebar" aria-label="Expand sidebar">
+      <button
+        onClick={onExpand}
+        className={iconBtn}
+        title="Expand sidebar"
+        aria-label="Expand sidebar"
+      >
         <PanelLeft size={16} strokeWidth={1.75} />
       </button>
 
-      <button onClick={onOpenSearch} className={iconBtn} title="Search messages" aria-label="Search messages">
+      <button
+        onClick={onOpenSearch}
+        className={iconBtn}
+        title="Search messages"
+        aria-label="Search messages"
+      >
         <Search size={16} strokeWidth={1.75} />
       </button>
 
@@ -56,7 +66,9 @@ export function SidebarCollapsedBar({
       )}
 
       <button
-        onClick={() => { void openWindowManagerWindow(); }}
+        onClick={() => {
+          void openWindowManagerWindow();
+        }}
         className={iconBtn}
         title="Windows"
         aria-label="Open window manager"

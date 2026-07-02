@@ -1,10 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-  uploadFile,
-  validateFile,
-  downloadFile,
-  readFileAsBase64,
-} from '../fileUpload.js';
+import { uploadFile, validateFile, downloadFile, readFileAsBase64 } from '../fileUpload.js';
 const mockServerStoreState = {
   activeServerId: 'local',
 };
@@ -58,15 +53,24 @@ class MockXMLHttpRequest {
   open = vi.fn();
   send: ReturnType<typeof vi.fn>;
   private listeners = new Map<string, () => void>();
-  private progressHandler?: (e: { lengthComputable: boolean; loaded: number; total: number }) => void;
+  private progressHandler?: (e: {
+    lengthComputable: boolean;
+    loaded: number;
+    total: number;
+  }) => void;
 
   constructor() {
     this.status = MockXMLHttpRequest.nextStatus;
     this.responseText = MockXMLHttpRequest.nextResponseText;
     this.upload = {
-      addEventListener: vi.fn((event: string, handler: (e: { lengthComputable: boolean; loaded: number; total: number }) => void) => {
-        if (event === 'progress') this.progressHandler = handler;
-      }),
+      addEventListener: vi.fn(
+        (
+          event: string,
+          handler: (e: { lengthComputable: boolean; loaded: number; total: number }) => void
+        ) => {
+          if (event === 'progress') this.progressHandler = handler;
+        }
+      ),
     };
     this.addEventListener = vi.fn((event: string, handler: () => void) => {
       this.listeners.set(event, handler);
@@ -133,7 +137,9 @@ describe('services/fileUpload', () => {
   it('validates allowed file types', () => {
     const file = new File(['content'], 'test.txt', { type: 'text/plain' });
 
-    expect(validateFile(file, { allowedTypes: ['text/plain', 'application/json'] })).toEqual({ valid: true });
+    expect(validateFile(file, { allowedTypes: ['text/plain', 'application/json'] })).toEqual({
+      valid: true,
+    });
   });
 
   it('rejects disallowed file types', () => {
@@ -152,7 +158,10 @@ describe('services/fileUpload', () => {
 
     expect(result.fileId).toBe('file-123');
     expect(result.name).toBe('test.txt');
-    expect(MockXMLHttpRequest.instances[0].open).toHaveBeenCalledWith('POST', 'http://localhost:3100/api/files/upload');
+    expect(MockXMLHttpRequest.instances[0].open).toHaveBeenCalledWith(
+      'POST',
+      'http://localhost:3100/api/files/upload'
+    );
   });
 
   it('reports upload progress in direct mode', async () => {
@@ -164,7 +173,7 @@ describe('services/fileUpload', () => {
     const xhr = MockXMLHttpRequest.instances[0];
     expect(xhr.upload.addEventListener).toHaveBeenCalledWith('progress', expect.any(Function));
     expect(progressCallback).toHaveBeenCalledWith(
-      expect.objectContaining({ loaded: 50, total: 100, percentage: 50 }),
+      expect.objectContaining({ loaded: 50, total: 100, percentage: 50 })
     );
   });
 
@@ -187,10 +196,10 @@ describe('services/fileUpload', () => {
     expect(result.fileId).toBe('file-123');
     expect(mockFetch).toHaveBeenCalledWith(
       'http://localhost:3100/api/files/upload-json',
-      expect.objectContaining({ method: 'POST' }),
+      expect.objectContaining({ method: 'POST' })
     );
     expect(progressCallback).toHaveBeenCalledWith(
-      expect.objectContaining({ loaded: file.size, total: file.size, percentage: 100 }),
+      expect.objectContaining({ loaded: file.size, total: file.size, percentage: 100 })
     );
   });
 

@@ -31,7 +31,8 @@ describe('background task coordinator', () => {
     const activeRun = buildRun();
     const state: any = {};
     const sendRunEvent = vi.fn();
-    const { handleTaskNotification, trackBackgroundTaskFromToolResult } = await import('../background-task-coordinator.js');
+    const { handleTaskNotification, trackBackgroundTaskFromToolResult } =
+      await import('../background-task-coordinator.js');
 
     trackBackgroundTaskFromToolResult({
       activeRun,
@@ -44,7 +45,12 @@ describe('background task coordinator', () => {
 
     handleTaskNotification({
       activeRun,
-      msg: { type: 'task_notification', taskId: 'task-1', taskStatus: 'started', taskMessage: 'started' } as any,
+      msg: {
+        type: 'task_notification',
+        taskId: 'task-1',
+        taskStatus: 'started',
+        taskMessage: 'started',
+      } as any,
       providerRegistry: { get: vi.fn(() => undefined) } as any,
       runId: 'run-1',
       sendRunEvent,
@@ -54,11 +60,13 @@ describe('background task coordinator', () => {
     expect(activeRun.pendingBackgroundTasks).toBe(1);
     expect(activeRun.phase).toBe('awaiting_followup');
     expect(state.backgroundTaskKeys.has('task:task-1')).toBe(true);
-    expect(sendRunEvent).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'task_notification',
-      taskId: 'task-1',
-      status: 'started',
-    }));
+    expect(sendRunEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'task_notification',
+        taskId: 'task-1',
+        status: 'started',
+      })
+    );
   });
 
   it('finishes tracked background tasks and recomputes phase', async () => {
@@ -106,7 +114,12 @@ describe('background task coordinator', () => {
 
     handleTaskNotification({
       activeRun,
-      msg: { type: 'task_notification', taskId: 'task-1', taskStatus: 'started', taskMessage: 'started' } as any,
+      msg: {
+        type: 'task_notification',
+        taskId: 'task-1',
+        taskStatus: 'started',
+        taskMessage: 'started',
+      } as any,
       providerRegistry: providerRegistry as any,
       runId: 'run-1',
       sendRunEvent,

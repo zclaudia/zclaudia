@@ -11,7 +11,7 @@ describe('JsonSchemaConfigForm', () => {
     };
     const onChange = vi.fn();
     const { container } = render(
-      <JsonSchemaConfigForm schema={schema} config={{ name: 'hello' }} onChange={onChange} />,
+      <JsonSchemaConfigForm schema={schema} config={{ name: 'hello' }} onChange={onChange} />
     );
     expect(container.textContent).toContain('Name');
     const input = container.querySelector('input[type="text"]') as HTMLInputElement;
@@ -27,7 +27,7 @@ describe('JsonSchemaConfigForm', () => {
     };
     const onChange = vi.fn();
     const { container } = render(
-      <JsonSchemaConfigForm schema={schema} config={{ name: '' }} onChange={onChange} />,
+      <JsonSchemaConfigForm schema={schema} config={{ name: '' }} onChange={onChange} />
     );
     const input = container.querySelector('input[type="text"]') as HTMLInputElement;
     fireEvent.change(input, { target: { value: 'world' } });
@@ -42,7 +42,7 @@ describe('JsonSchemaConfigForm', () => {
     };
     const onChange = vi.fn();
     const { container } = render(
-      <JsonSchemaConfigForm schema={schema} config={{ count: 42 }} onChange={onChange} />,
+      <JsonSchemaConfigForm schema={schema} config={{ count: 42 }} onChange={onChange} />
     );
     const input = container.querySelector('input[type="number"]') as HTMLInputElement;
     expect(input).toBeTruthy();
@@ -57,7 +57,7 @@ describe('JsonSchemaConfigForm', () => {
     };
     const onChange = vi.fn();
     const { container } = render(
-      <JsonSchemaConfigForm schema={schema} config={{ enabled: true }} onChange={onChange} />,
+      <JsonSchemaConfigForm schema={schema} config={{ enabled: true }} onChange={onChange} />
     );
     const checkbox = container.querySelector('input[type="checkbox"]') as HTMLInputElement;
     expect(checkbox).toBeTruthy();
@@ -72,7 +72,7 @@ describe('JsonSchemaConfigForm', () => {
     };
     const onChange = vi.fn();
     const { container } = render(
-      <JsonSchemaConfigForm schema={schema} config={{ enabled: true }} onChange={onChange} />,
+      <JsonSchemaConfigForm schema={schema} config={{ enabled: true }} onChange={onChange} />
     );
     const checkbox = container.querySelector('input[type="checkbox"]') as HTMLInputElement;
     fireEvent.click(checkbox);
@@ -87,7 +87,7 @@ describe('JsonSchemaConfigForm', () => {
     };
     const onChange = vi.fn();
     const { container } = render(
-      <JsonSchemaConfigForm schema={schema} config={{ color: 'green' }} onChange={onChange} />,
+      <JsonSchemaConfigForm schema={schema} config={{ color: 'green' }} onChange={onChange} />
     );
     const trigger = container.querySelector('button[aria-haspopup="listbox"]') as HTMLButtonElement;
     expect(trigger).toBeTruthy();
@@ -106,7 +106,7 @@ describe('JsonSchemaConfigForm', () => {
     };
     const onChange = vi.fn();
     const { container } = render(
-      <JsonSchemaConfigForm schema={schema} config={{ body: 'text here' }} onChange={onChange} />,
+      <JsonSchemaConfigForm schema={schema} config={{ body: 'text here' }} onChange={onChange} />
     );
     const textarea = container.querySelector('textarea') as HTMLTextAreaElement;
     expect(textarea).toBeTruthy();
@@ -121,7 +121,7 @@ describe('JsonSchemaConfigForm', () => {
     };
     const onChange = vi.fn();
     const { container } = render(
-      <JsonSchemaConfigForm schema={schema} config={{ secret: 'abc' }} onChange={onChange} />,
+      <JsonSchemaConfigForm schema={schema} config={{ secret: 'abc' }} onChange={onChange} />
     );
     const input = container.querySelector('input[type="password"]') as HTMLInputElement;
     expect(input).toBeTruthy();
@@ -136,7 +136,7 @@ describe('JsonSchemaConfigForm', () => {
     };
     const onChange = vi.fn();
     const { container } = render(
-      <JsonSchemaConfigForm schema={schema} config={{}} onChange={onChange} />,
+      <JsonSchemaConfigForm schema={schema} config={{}} onChange={onChange} />
     );
     expect(container.textContent).toContain('Name *');
   });
@@ -149,7 +149,7 @@ describe('JsonSchemaConfigForm', () => {
     };
     const onChange = vi.fn();
     const { container } = render(
-      <JsonSchemaConfigForm schema={schema} config={{}} onChange={onChange} />,
+      <JsonSchemaConfigForm schema={schema} config={{}} onChange={onChange} />
     );
     expect(container.textContent).toContain('Enter your name');
   });
@@ -162,7 +162,7 @@ describe('JsonSchemaConfigForm', () => {
     };
     const onChange = vi.fn();
     const { container } = render(
-      <JsonSchemaConfigForm schema={schema} config={{}} onChange={onChange} />,
+      <JsonSchemaConfigForm schema={schema} config={{}} onChange={onChange} />
     );
     expect(container.textContent).toContain('${stepId.output.field}');
   });
@@ -171,7 +171,7 @@ describe('JsonSchemaConfigForm', () => {
     const schema = { properties: {} };
     const onChange = vi.fn();
     const { container } = render(
-      <JsonSchemaConfigForm schema={schema} config={{}} onChange={onChange} />,
+      <JsonSchemaConfigForm schema={schema} config={{}} onChange={onChange} />
     );
     // Should not show the hint text either
     expect(container.textContent).not.toContain('${stepId.output.field}');

@@ -27,16 +27,20 @@ testAllModes('can access main UI elements', async (browser, mode) => {
 });
 
 // Example 2: Test that only runs in specific modes
-testModes(['local', 'gateway'], 'can create project without API key validation', async (browser, mode) => {
-  // This test only runs in Local and Gateway modes
-  // (skipped in Remote mode which has stricter auth)
+testModes(
+  ['local', 'gateway'],
+  'can create project without API key validation',
+  async (browser, mode) => {
+    // This test only runs in Local and Gateway modes
+    // (skipped in Remote mode which has stricter auth)
 
-  const addProjectBtn = browser.locator('button[title="Add Project"]');
-  if (await addProjectBtn.isVisible({ timeout: 3000 })) {
-    await addProjectBtn.click();
-    console.log(`✓ Project creation available in ${mode.name}`);
+    const addProjectBtn = browser.locator('button[title="Add Project"]');
+    if (await addProjectBtn.isVisible({ timeout: 3000 })) {
+      await addProjectBtn.click();
+      console.log(`✓ Project creation available in ${mode.name}`);
+    }
   }
-});
+);
 
 // Example 3: For simpler cases, you can also use regular tests
 // and manually call connection helpers if needed

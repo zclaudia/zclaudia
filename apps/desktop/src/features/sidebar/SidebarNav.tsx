@@ -32,7 +32,13 @@ const AUTOMATION_TABS: { key: AutomationTab; label: string; Icon: typeof Zap }[]
  * destinations (Home, Automations). In automation mode it lists a Back row plus
  * the automation tabs. Pinned above the scrollable project list.
  */
-export function SidebarNav({ onHome, isHomeActive, onOpenAutomations, automationMode, isMobile }: SidebarNavProps) {
+export function SidebarNav({
+  onHome,
+  isHomeActive,
+  onOpenAutomations,
+  automationMode,
+  isMobile,
+}: SidebarNavProps) {
   const rowBase = isMobile
     ? 'w-full text-left px-3 py-3 rounded-md text-sm hover:bg-secondary active:bg-secondary hover:text-foreground flex items-center gap-2'
     : 'w-full text-left px-2 py-1.5 rounded-md text-sm hover:bg-secondary hover:text-foreground flex items-center gap-2';

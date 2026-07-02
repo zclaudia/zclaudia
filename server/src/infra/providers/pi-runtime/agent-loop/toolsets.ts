@@ -1,6 +1,9 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type { ToolName } from '@zclaudia/shared/core/tools';
-import type { AgentLoopPermissionCallback, AgentLoopPermissionMode } from '../../../../domains/agent-loop/index.js';
+import type {
+  AgentLoopPermissionCallback,
+  AgentLoopPermissionMode,
+} from '../../../../domains/agent-loop/index.js';
 import { buildTools } from '../tool-bridge.js';
 
 export interface ToolsetContext {
@@ -57,22 +60,27 @@ const BUILTIN_AGENT_LOOP_TOOLSET_DEFINITIONS: Record<string, MutableAgentLoopToo
   },
 };
 
-function freezeBuiltinToolsetDescriptor(descriptor: MutableAgentLoopToolsetDescriptor): AgentLoopToolsetDescriptor {
+function freezeBuiltinToolsetDescriptor(
+  descriptor: MutableAgentLoopToolsetDescriptor
+): AgentLoopToolsetDescriptor {
   return Object.freeze({
     ...descriptor,
     tools: Object.freeze([...descriptor.tools]) as readonly ToolName[],
-    ...(descriptor.permissionTools ? { permissionTools: Object.freeze([...descriptor.permissionTools]) } : {}),
+    ...(descriptor.permissionTools
+      ? { permissionTools: Object.freeze([...descriptor.permissionTools]) }
+      : {}),
   });
 }
 
-export const BUILTIN_AGENT_LOOP_TOOLSETS: Readonly<Record<string, AgentLoopToolsetDescriptor>> = Object.freeze(
-  Object.fromEntries(
-    Object.entries(BUILTIN_AGENT_LOOP_TOOLSET_DEFINITIONS).map(([id, descriptor]) => [
-      id,
-      freezeBuiltinToolsetDescriptor(descriptor),
-    ]),
-  ),
-);
+export const BUILTIN_AGENT_LOOP_TOOLSETS: Readonly<Record<string, AgentLoopToolsetDescriptor>> =
+  Object.freeze(
+    Object.fromEntries(
+      Object.entries(BUILTIN_AGENT_LOOP_TOOLSET_DEFINITIONS).map(([id, descriptor]) => [
+        id,
+        freezeBuiltinToolsetDescriptor(descriptor),
+      ])
+    )
+  );
 
 export function getAgentLoopToolsetDescriptor(id: string): AgentLoopToolsetDescriptor | undefined {
   return BUILTIN_AGENT_LOOP_TOOLSETS[id];

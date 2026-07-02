@@ -77,7 +77,7 @@ export async function consumeProviderStream(input: ConsumeProviderStreamInput): 
         'server_provider',
         msg.type,
         msg,
-        summarizeProviderMessage(msg as { type: string; [key: string]: unknown }),
+        summarizeProviderMessage(msg as { type: string; [key: string]: unknown })
       );
       if (!activeRuns.has(runId)) {
         await iterator.return?.();
@@ -117,7 +117,7 @@ export async function consumeProviderStream(input: ConsumeProviderStreamInput): 
           // The follow-up turn will be handled as a brand-new run.
           console.log(
             `[Stream] Run ${runId} completed with ${activeRun.pendingBackgroundTasks} pending background task(s), ` +
-            `handing off stream to background consumer`,
+              `handing off stream to background consumer`
           );
           spawnBackgroundFollowUpConsumer(iterator, {
             activeRuns,
@@ -147,7 +147,12 @@ export async function consumeProviderStream(input: ConsumeProviderStreamInput): 
           trace.setMeta({ cwd: msg.systemInfo.cwd || cwd });
         }
         if (msg.sessionId && msg.sessionId !== previousSdkSessionId) {
-          trace.log('server_provider', 'provider_session_attached', { sdkSessionId: state.sdkSessionId }, `provider session ${msg.sessionId}`);
+          trace.log(
+            'server_provider',
+            'provider_session_attached',
+            { sdkSessionId: state.sdkSessionId },
+            `provider session ${msg.sessionId}`
+          );
         }
       }
     }
@@ -163,7 +168,12 @@ export async function consumeProviderStream(input: ConsumeProviderStreamInput): 
   // we have no positive signal that this was an error, and any server-side
   // distinguishing of this degraded path can rely on the trace event below.
   if (!isTerminalPhase(activeRun.phase)) {
-    trace.log('server_norm', 'stream_ended_without_result', { runId, providerType }, 'provider stream ended without result event');
+    trace.log(
+      'server_norm',
+      'stream_ended_without_result',
+      { runId, providerType },
+      'provider stream ended without result event'
+    );
     sendRunEvent({
       type: 'run_completed',
       runId,

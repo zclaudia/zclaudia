@@ -134,6 +134,6 @@ export class SpecChangeRepository extends BaseRepository<
     const rows = this.db
       .prepare(`SELECT * FROM spec_changes WHERE project_id = ? ORDER BY created_at DESC`)
       .all(projectId);
-    return rows.map((r) => this.mapRow(r));
+    return rows.map(r => this.mapRow(r));
   }
 }

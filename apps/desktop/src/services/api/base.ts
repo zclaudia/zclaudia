@@ -3,7 +3,11 @@ import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 
 import { resolveGatewayBackendUrl, getGatewayAuthHeaders } from '../gatewayProxy';
-import { getControlPlaneMode, isLocalBackendId, resolveLocalBackendId } from '../../utils/controlPlane';
+import {
+  getControlPlaneMode,
+  isLocalBackendId,
+  resolveLocalBackendId,
+} from '../../utils/controlPlane';
 
 /** Check if the active server advertises a specific feature. */
 export function activeServerSupports(feature: ServerFeature): boolean {
@@ -20,7 +24,7 @@ export class AuthError extends Error {
 
 async function readAuthErrorMessage(response: Response, fallback: string): Promise<string> {
   try {
-    const body = await response.clone().json() as { error?: { message?: string } } | undefined;
+    const body = (await response.clone().json()) as { error?: { message?: string } } | undefined;
     return body?.error?.message?.trim() || fallback;
   } catch {
     return fallback;
@@ -101,10 +105,7 @@ export function getAuthHeaders(): HeadersInit {
   return getAuthHeadersForBackend();
 }
 
-export async function fetchApi<T>(
-  path: string,
-  options?: RequestInit
-): Promise<ApiResponse<T>> {
+export async function fetchApi<T>(path: string, options?: RequestInit): Promise<ApiResponse<T>> {
   return fetchApiForBackend<T>(path, undefined, options);
 }
 
@@ -120,8 +121,8 @@ export async function fetchApiForBackend<T>(
     headers: {
       'Content-Type': 'application/json',
       ...authHeaders,
-      ...options?.headers
-    }
+      ...options?.headers,
+    },
   });
 
   // Handle authentication errors
@@ -177,8 +178,8 @@ export async function fetchLocalApi<T>(
     headers: {
       'Content-Type': 'application/json',
       ...getLocalAuthHeaders(),
-      ...options?.headers
-    }
+      ...options?.headers,
+    },
   });
 
   if (response.status === 401) {

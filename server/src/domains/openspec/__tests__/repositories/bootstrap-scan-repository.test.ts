@@ -12,7 +12,7 @@ describe('BootstrapScanRepository', () => {
     db.pragma('foreign_keys = ON');
     applyMigrations(db);
     db.prepare(
-      `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
     ).run('proj-1', 'P', 'code', 0, 0);
     repo = new BootstrapScanRepository(db);
   });
@@ -51,9 +51,9 @@ describe('BootstrapScanRepository', () => {
     expect(() =>
       db
         .prepare(
-          `INSERT INTO bootstrap_scans (id, project_id, status, started_at) VALUES (?, ?, ?, ?)`,
+          `INSERT INTO bootstrap_scans (id, project_id, status, started_at) VALUES (?, ?, ?, ?)`
         )
-        .run('x', 'proj-1', 'invalid', 0),
+        .run('x', 'proj-1', 'invalid', 0)
     ).toThrow();
   });
 
@@ -65,7 +65,7 @@ describe('BootstrapScanRepository', () => {
     const b = repo.create({ projectId: 'proj-1' });
     db.prepare(`UPDATE bootstrap_scans SET started_at = ? WHERE id = ?`).run(2, b.id);
     const items = repo.listByProject('proj-1');
-    expect(items.map((i) => i.id)).toEqual([b.id, a.id]);
+    expect(items.map(i => i.id)).toEqual([b.id, a.id]);
   });
 
   describe('init_phase column', () => {

@@ -8,7 +8,13 @@ import { recordFileBackup } from './file-history.js';
 import { runWithFileWriteLock } from './file-write-lock.js';
 import type { NoopEditGuard } from './noop-edit-guard.js';
 import type { ReadFileStateStore } from './read-file-state.js';
-import { applyLineEndingStyle, decodeTextBuffer, lineEndingFor, readTextFileWithMetadata, writeTextFileAtomic } from './text-io.js';
+import {
+  applyLineEndingStyle,
+  decodeTextBuffer,
+  lineEndingFor,
+  readTextFileWithMetadata,
+  writeTextFileAtomic,
+} from './text-io.js';
 import { errorResult, textResult, toolParams } from './tool-common.js';
 import { resolveInsideWorkspace, toWorkspaceRelative } from './workspace-paths.js';
 
@@ -17,20 +23,30 @@ export interface AstBridgeToolOptions {
   noopGuard?: NoopEditGuard;
 }
 
-export function createAstGrepTool(cwd: string): AgentTool<any> {
+type AgentToolParameters = AgentTool['parameters'];
+
+function agentToolParameters(schema: Record<string, unknown>): AgentToolParameters {
+  return schema as AgentToolParameters;
+}
+
+export function createAstGrepTool(cwd: string): AgentTool {
   return {
     name: 'AstGrep',
     label: 'AstGrep',
-    description: 'Structural code search via AST patterns (ast-grep syntax). Use metavariables like $ARG / $$$ARGS, e.g. "console.log($ARG)" or "function $NAME($$$PARAMS) { $$$BODY }". Matches syntax, not text - immune to whitespace and formatting. Languages: JS/TS/TSX/HTML/CSS.',
-    parameters: {
+    description:
+      'Structural code search via AST patterns (ast-grep syntax). Use metavariables like $ARG / $$$ARGS, e.g. "console.log($ARG)" or "function $NAME($$$PARAMS) { $$$BODY }". Matches syntax, not text - immune to whitespace and formatting. Languages: JS/TS/TSX/HTML/CSS.',
+    parameters: agentToolParameters({
       type: 'object',
       properties: {
         pattern: { type: 'string', description: 'AST pattern with $METAVAR placeholders' },
-        path: { type: 'string', description: 'File or directory to search (default: workspace root)' },
+        path: {
+          type: 'string',
+          description: 'File or directory to search (default: workspace root)',
+        },
         max_results: { type: 'number', default: 50 },
       },
       required: ['pattern'],
-    } as any,
+    }),
     execute: async (toolCallId: string, params: unknown) => {
       const args = toolParams(toolCallId, params);
       if (typeof args.pattern !== 'string' || !args.pattern.trim()) {
@@ -40,7 +56,10 @@ export function createAstGrepTool(cwd: string): AgentTool<any> {
       try {
         searchRoot = resolveInsideWorkspace(cwd, args.path);
       } catch (err) {
-        return errorResult('path_outside_workspace', err instanceof Error ? err.message : String(err));
+        return errorResult(
+          'path_outside_workspace',
+          err instanceof Error ? err.message : String(err)
+        );
       }
       const maxResults = Math.max(1, Math.min(Number(args.max_results ?? 50) || 50, 200));
       try {
@@ -49,7 +68,10 @@ export function createAstGrepTool(cwd: string): AgentTool<any> {
         let total = 0;
         let truncated = false;
         for (const file of files) {
-          if (total >= maxResults) { truncated = true; break; }
+          if (total >= maxResults) {
+            truncated = true;
+            break;
+          }
           let content: string;
           try {
             content = decodeTextBuffer(await readFile(file)).content;
@@ -59,46 +81,69 @@ export function createAstGrepTool(cwd: string): AgentTool<any> {
           const matches = await findAstMatches(content, file, args.pattern);
           const relPath = toWorkspaceRelative(cwd, file);
           for (const match of matches) {
-            if (total >= maxResults) { truncated = true; break; }
+            if (total >= maxResults) {
+              truncated = true;
+              break;
+            }
             total += 1;
             lines.push(`${relPath}:${match.line}: ${match.text.split('\n')[0]}`);
           }
         }
         return textResult(lines.length > 0 ? lines.join('\n') : 'No matches found.', {
-          ok: true, matches: total, truncated,
+          ok: true,
+          matches: total,
+          truncated,
         });
       } catch (err) {
         return errorResult('ast_grep_failed', err instanceof Error ? err.message : String(err));
       }
     },
-  } as unknown as AgentTool<any>;
+  };
 }
 
-export function createAstEditTool(cwd: string, options?: AstBridgeToolOptions): AgentTool<any> {
+export function createAstEditTool(cwd: string, options?: AstBridgeToolOptions): AgentTool {
   return {
     name: 'AstEdit',
     label: 'AstEdit',
-    description: 'Structural rewrite via AST patterns (ast-grep syntax). Replaces every match of pattern with rewrite; metavariables ($ARG, $$$ARGS) captured by the pattern are substituted into the rewrite. Set dry_run:true to preview the diff without writing. Languages: JS/TS/TSX/HTML/CSS.',
-    parameters: {
+    description:
+      'Structural rewrite via AST patterns (ast-grep syntax). Replaces every match of pattern with rewrite; metavariables ($ARG, $$$ARGS) captured by the pattern are substituted into the rewrite. Set dry_run:true to preview the diff without writing. Languages: JS/TS/TSX/HTML/CSS.',
+    parameters: agentToolParameters({
       type: 'object',
       properties: {
         pattern: { type: 'string', description: 'AST pattern with $METAVAR placeholders' },
-        rewrite: { type: 'string', description: 'Replacement template; may reference captured metavariables' },
-        path: { type: 'string', description: 'File or directory to rewrite (default: workspace root)' },
-        dry_run: { type: 'boolean', default: false, description: 'Preview the diff without writing' },
+        rewrite: {
+          type: 'string',
+          description: 'Replacement template; may reference captured metavariables',
+        },
+        path: {
+          type: 'string',
+          description: 'File or directory to rewrite (default: workspace root)',
+        },
+        dry_run: {
+          type: 'boolean',
+          default: false,
+          description: 'Preview the diff without writing',
+        },
       },
       required: ['pattern', 'rewrite'],
-    } as any,
+    }),
     execute: async (toolCallId: string, params: unknown) => {
       const args = toolParams(toolCallId, params);
-      if (typeof args.pattern !== 'string' || !args.pattern.trim() || typeof args.rewrite !== 'string') {
+      if (
+        typeof args.pattern !== 'string' ||
+        !args.pattern.trim() ||
+        typeof args.rewrite !== 'string'
+      ) {
         return errorResult('missing_pattern', 'AstEdit requires pattern and rewrite');
       }
       let searchRoot: string;
       try {
         searchRoot = resolveInsideWorkspace(cwd, args.path);
       } catch (err) {
-        return errorResult('path_outside_workspace', err instanceof Error ? err.message : String(err));
+        return errorResult(
+          'path_outside_workspace',
+          err instanceof Error ? err.message : String(err)
+        );
       }
       const previewOnly = args.dry_run === true;
       try {
@@ -113,13 +158,20 @@ export function createAstEditTool(cwd: string, options?: AstBridgeToolOptions): 
           } catch {
             continue;
           }
-          const result = await rewriteAstMatches(original.content, file, args.pattern, args.rewrite);
+          const result = await rewriteAstMatches(
+            original.content,
+            file,
+            args.pattern,
+            args.rewrite
+          );
           if (!result || result.updated === original.content) continue;
           const relPath = toWorkspaceRelative(cwd, file);
           const generatedMarker = findAutoGeneratedMarker(file, original.content);
           if (generatedMarker) {
             perFileResults.push({
-              ok: false, error: 'auto_generated_file', path: relPath,
+              ok: false,
+              error: 'auto_generated_file',
+              path: relPath,
               message: buildAutoGeneratedMessage(relPath, generatedMarker),
             });
             continue;
@@ -129,13 +181,22 @@ export function createAstEditTool(cwd: string, options?: AstBridgeToolOptions): 
           if (!previewOnly) {
             await runWithFileWriteLock(file, async () => {
               const backup = await recordFileBackup(relPath, original.content, file);
-              await writeTextFileAtomic(file, applyLineEndingStyle(result.updated, lineEndingFor(original.content)), original);
+              await writeTextFileAtomic(
+                file,
+                applyLineEndingStyle(result.updated, lineEndingFor(original.content)),
+                original
+              );
               await options?.readFileState?.recordWrite(file, result.updated);
               options?.noopGuard?.clear(file);
               perFileResults.push({ ok: true, path: relPath, replaced: result.replaced, backup });
             });
           } else {
-            perFileResults.push({ ok: true, preview: true, path: relPath, replaced: result.replaced });
+            perFileResults.push({
+              ok: true,
+              preview: true,
+              path: relPath,
+              replaced: result.replaced,
+            });
           }
           totalReplaced += result.replaced;
         }
@@ -143,12 +204,15 @@ export function createAstEditTool(cwd: string, options?: AstBridgeToolOptions): 
         if (totalReplaced === 0) {
           if (failures.length > 0) {
             const first = failures[0];
-            return errorResult(String(first.error), String(first.message ?? 'Edit refused'), { perFileResults });
+            return errorResult(String(first.error), String(first.message ?? 'Edit refused'), {
+              perFileResults,
+            });
           }
           return errorResult('no_matches', 'Pattern did not match anything in the target path.');
         }
-        const summary = `${previewOnly ? 'Previewed' : 'Applied'} ${totalReplaced} replacement(s) in ${diffs.length} file(s).`
-          + (failures.length > 0 ? ` ${failures.length} file(s) skipped (auto-generated).` : '');
+        const summary =
+          `${previewOnly ? 'Previewed' : 'Applied'} ${totalReplaced} replacement(s) in ${diffs.length} file(s).` +
+          (failures.length > 0 ? ` ${failures.length} file(s) skipped (auto-generated).` : '');
         return textResult(`${summary}\n\n${diffs.join('\n')}`, {
           ok: true,
           ...(previewOnly ? { preview: true } : {}),
@@ -160,5 +224,5 @@ export function createAstEditTool(cwd: string, options?: AstBridgeToolOptions): 
         return errorResult('ast_edit_failed', err instanceof Error ? err.message : String(err));
       }
     },
-  } as unknown as AgentTool<any>;
+  };
 }

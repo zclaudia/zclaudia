@@ -19,7 +19,7 @@ interface WorktreeDetailProps {
 
 export function WorktreeDetail({ projectId, worktree, onRefreshList }: WorktreeDetailProps) {
   const [tab, setTab] = useState<SubTab>('status');
-  const setStatus = useGitStore((s) => s.setStatus);
+  const setStatus = useGitStore(s => s.setStatus);
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -44,14 +44,21 @@ export function WorktreeDetail({ projectId, worktree, onRefreshList }: WorktreeD
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold truncate">{worktree.branch}</span>
               {worktree.isMain && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500">main</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500">
+                  main
+                </span>
               )}
               {worktree.managedBy === 'supervisor' && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-500">supervisor</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-500">
+                  supervisor
+                </span>
               )}
             </div>
             <div className="flex items-center gap-1 mt-0.5">
-              <span className="text-[11px] text-muted-foreground font-mono truncate" title={worktree.path}>
+              <span
+                className="text-[11px] text-muted-foreground font-mono truncate"
+                title={worktree.path}
+              >
                 {worktree.path}
               </span>
               <button
@@ -71,7 +78,7 @@ export function WorktreeDetail({ projectId, worktree, onRefreshList }: WorktreeD
       {/* Sub-tabs */}
       <div className="border-b border-border px-3 py-2">
         <div className="inline-flex items-center gap-0.5 rounded-lg bg-secondary/60 p-1">
-          {(['status', 'commits', 'branches', 'stash'] as const).map((t) => (
+          {(['status', 'commits', 'branches', 'stash'] as const).map(t => (
             <button
               key={t}
               type="button"
@@ -93,7 +100,11 @@ export function WorktreeDetail({ projectId, worktree, onRefreshList }: WorktreeD
         {tab === 'status' && <GitStatusView projectId={projectId} worktreePath={worktree.path} />}
         {tab === 'commits' && <GitLogView projectId={projectId} worktreePath={worktree.path} />}
         {tab === 'branches' && (
-          <GitBranchesView projectId={projectId} worktreePath={worktree.path} onAfterMutation={onAfterSync} />
+          <GitBranchesView
+            projectId={projectId}
+            worktreePath={worktree.path}
+            onAfterMutation={onAfterSync}
+          />
         )}
         {tab === 'stash' && (
           <GitStashView

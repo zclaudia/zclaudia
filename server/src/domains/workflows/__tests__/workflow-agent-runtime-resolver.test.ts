@@ -52,12 +52,13 @@ describe('DefaultWorkflowAgentRuntimeResolver', () => {
   });
 
   it('uses the project default agent profile and appends workflow system context', async () => {
-    db.prepare('UPDATE agent_config SET hooks = ? WHERE id = 1').run(JSON.stringify([
-      { event: 'PreToolUse', command: 'echo global' },
-    ]));
-    db.prepare('UPDATE projects SET hooks_override = ? WHERE id = ?').run(JSON.stringify([
-      { event: 'PostToolUse', command: 'echo project' },
-    ]), projectId);
+    db.prepare('UPDATE agent_config SET hooks = ? WHERE id = 1').run(
+      JSON.stringify([{ event: 'PreToolUse', command: 'echo global' }])
+    );
+    db.prepare('UPDATE projects SET hooks_override = ? WHERE id = ?').run(
+      JSON.stringify([{ event: 'PostToolUse', command: 'echo project' }]),
+      projectId
+    );
     const resolver = new DefaultWorkflowAgentRuntimeResolver(db);
 
     const runtime = await resolver.resolve({

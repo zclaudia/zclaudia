@@ -11,7 +11,7 @@
 import * as crypto from 'crypto';
 
 interface KeyPair {
-  publicKey: string;   // PEM-encoded SPKI public key
+  publicKey: string; // PEM-encoded SPKI public key
   privateKey: crypto.KeyObject;
 }
 
@@ -68,7 +68,7 @@ export function decryptCredential(encryptedBase64: string): string {
       padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
       oaepHash: 'sha256',
     },
-    encryptedBuffer,
+    encryptedBuffer
   );
 
   return decrypted.toString('utf8');

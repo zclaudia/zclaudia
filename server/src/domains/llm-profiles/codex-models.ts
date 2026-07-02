@@ -35,7 +35,7 @@ export async function fetchCodexModels(
   profileId: string,
   accessToken: string,
   accountId: string,
-  opts: FetchOptions = {},
+  opts: FetchOptions = {}
 ): Promise<CodexModelsResult> {
   const now = Date.now();
   if (!opts.refresh) {
@@ -59,7 +59,9 @@ export async function fetchCodexModels(
     if (!resp.ok) throw new Error(`Codex /models returned ${resp.status}`);
 
     const body = (await resp.json()) as { models?: Array<Record<string, unknown>> };
-    const models = (body.models ?? []).map(mapCatalogEntry).filter((m): m is CodexModelEntry => m !== null);
+    const models = (body.models ?? [])
+      .map(mapCatalogEntry)
+      .filter((m): m is CodexModelEntry => m !== null);
 
     const result: CodexModelsResult = { models, fetchedAt: now, source: 'live' };
     cache.set(profileId, result);
@@ -88,10 +90,10 @@ function mapCatalogEntry(raw: Record<string, unknown>): CodexModelEntry | null {
 function bundledFallback(): CodexModelEntry[] {
   try {
     const models = getModels('openai-codex');
-    return models.map((m) => ({
+    return models.map(m => ({
       id: m.id,
       displayName: (m as any).name ?? m.id,
-      contextWindow: CONTEXT_WINDOW,  // hard-clamp
+      contextWindow: CONTEXT_WINDOW, // hard-clamp
     }));
   } catch {
     return [];

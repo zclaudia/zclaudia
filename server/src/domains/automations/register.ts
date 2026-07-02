@@ -9,14 +9,21 @@ import type { Express, RequestHandler } from 'express';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import type { initDatabase } from '../../infra/storage/db.js';
 import type { WorkflowSchedulingPort } from '../workflows/ports/runtime.js';
-import { AutomationService, type AutomationEnginePort, type AutomationWorkflowLookupPort } from './service.js';
+import {
+  AutomationService,
+  type AutomationEnginePort,
+  type AutomationWorkflowLookupPort,
+} from './service.js';
 import { createAutomationRoutes } from '../../interfaces/http/automations.js';
 
 export interface AutomationsDomainDeps {
   db: ReturnType<typeof initDatabase>;
   app: Express;
   authMiddleware: RequestHandler;
-  broadcast: (projectId: string | undefined, msg: ServerMessage | { type: string; [key: string]: unknown }) => void;
+  broadcast: (
+    projectId: string | undefined,
+    msg: ServerMessage | { type: string; [key: string]: unknown }
+  ) => void;
   engine: AutomationEnginePort;
   workflows: AutomationWorkflowLookupPort;
   systemTaskRegistry: WorkflowSchedulingPort;
@@ -48,7 +55,11 @@ export function registerAutomationsDomain(deps: AutomationsDomainDeps): Automati
       await automationService.tick();
       systemTaskRegistry.markRunComplete('system:automation_scheduler', Date.now() - start);
     } catch (err) {
-      systemTaskRegistry.markRunComplete('system:automation_scheduler', Date.now() - start, String(err));
+      systemTaskRegistry.markRunComplete(
+        'system:automation_scheduler',
+        Date.now() - start,
+        String(err)
+      );
       console.error('[Automation] Tick error:', err);
     }
   }, 10000);

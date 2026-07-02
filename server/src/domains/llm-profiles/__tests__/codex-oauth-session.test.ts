@@ -19,12 +19,12 @@ describe('CodexOAuthSessionManager', () => {
     let capturedOnAuth: ((info: { url: string; instructions?: string }) => void) | null = null;
     (loginOpenAICodex as any).mockImplementation((opts: any) => {
       capturedOnAuth = opts.onAuth;
-      return new Promise(() => {});  // never resolves in this test
+      return new Promise(() => {}); // never resolves in this test
     });
 
     const startPromise = mgr.startBrowserFlow('p1');
     // Wait a microtask for loginOpenAICodex to be called
-    await new Promise((r) => setImmediate(r));
+    await new Promise(r => setImmediate(r));
     capturedOnAuth!({ url: 'https://auth.openai.com/oauth/authorize?x=1' });
 
     const session = await startPromise;
@@ -41,7 +41,7 @@ describe('CodexOAuthSessionManager', () => {
     });
 
     const startPromise = mgr.startDeviceCodeFlow('p1');
-    await new Promise((r) => setImmediate(r));
+    await new Promise(r => setImmediate(r));
     captured!({ userCode: 'ABCD-1234', verificationUri: 'https://auth.openai.com/codex/device' });
 
     const session = await startPromise;
@@ -51,9 +51,11 @@ describe('CodexOAuthSessionManager', () => {
   });
 
   it('sanitizes Cloudflare HTML device-code failures', async () => {
-    (loginOpenAICodexDeviceCode as any).mockRejectedValue(new Error(
-      'OpenAI Codex device code request failed with status 429: <!DOCTYPE html><html><head><title>Just a moment...</title></head><body>Enable JavaScript and cookies to continue<script>window._cf_chl_opt = {}</script></body></html>',
-    ));
+    (loginOpenAICodexDeviceCode as any).mockRejectedValue(
+      new Error(
+        'OpenAI Codex device code request failed with status 429: <!DOCTYPE html><html><head><title>Just a moment...</title></head><body>Enable JavaScript and cookies to continue<script>window._cf_chl_opt = {}</script></body></html>'
+      )
+    );
 
     try {
       await mgr.startDeviceCodeFlow('p1');
@@ -63,7 +65,9 @@ describe('CodexOAuthSessionManager', () => {
         code: 'OAUTH_DEVICE_AUTH_CHALLENGE',
         message: expect.stringContaining('OpenAI blocked the Codex device-code request'),
       });
-      expect(err instanceof Error ? err.message : String(err)).not.toMatch(/<!DOCTYPE html|_cf_chl/i);
+      expect(err instanceof Error ? err.message : String(err)).not.toMatch(
+        /<!DOCTYPE html|_cf_chl/i
+      );
     }
   });
 
@@ -75,7 +79,7 @@ describe('CodexOAuthSessionManager', () => {
     });
 
     const session = await mgr.startBrowserFlow('p1');
-    await new Promise((r) => setTimeout(r, 5));
+    await new Promise(r => setTimeout(r, 5));
     const status = mgr.getStatus(session.sessionId);
     expect(status?.state).toBe('success');
     expect(status?.credentials).toEqual(credsFromPiAi);
@@ -85,9 +89,12 @@ describe('CodexOAuthSessionManager', () => {
     mgr.dispose();
     let resolvePersist!: () => void;
     const writer = {
-      updateOAuthCredentials: vi.fn(() => new Promise<void>((resolve) => {
-        resolvePersist = resolve;
-      })),
+      updateOAuthCredentials: vi.fn(
+        () =>
+          new Promise<void>(resolve => {
+            resolvePersist = resolve;
+          })
+      ),
     };
     mgr = new CodexOAuthSessionManager(writer);
     const credsFromPiAi = { access: 'a', refresh: 'r', expires: 1, accountId: 'acct_x' };
@@ -97,13 +104,13 @@ describe('CodexOAuthSessionManager', () => {
     });
 
     const session = await mgr.startBrowserFlow('p1');
-    await new Promise((r) => setTimeout(r, 5));
+    await new Promise(r => setTimeout(r, 5));
 
     expect(writer.updateOAuthCredentials).toHaveBeenCalledWith('p1', credsFromPiAi);
     expect(mgr.getStatus(session.sessionId)?.state).toBe('pending');
 
     resolvePersist();
-    await new Promise((r) => setTimeout(r, 5));
+    await new Promise(r => setTimeout(r, 5));
 
     const status = mgr.getStatus(session.sessionId);
     expect(status?.state).toBe('success');
@@ -122,7 +129,7 @@ describe('CodexOAuthSessionManager', () => {
 
     const session = await mgr.startBrowserFlow('p1');
     mgr.cancel(session.sessionId);
-    await new Promise((r) => setTimeout(r, 5));
+    await new Promise(r => setTimeout(r, 5));
     expect(receivedSignal?.aborted).toBe(true);
     expect(mgr.getStatus(session.sessionId)?.state).toBe('cancelled');
   });

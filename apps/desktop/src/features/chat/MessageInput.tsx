@@ -1,10 +1,20 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import type { KeyboardEvent, ClipboardEvent, ChangeEvent } from 'react';
-import { ArrowUp, Paperclip, X, Square, File as FileIcon, ChevronRight, Plus, ChevronUp, ChevronDown } from 'lucide-react';
+import {
+  ArrowUp,
+  Paperclip,
+  X,
+  Square,
+  File as FileIcon,
+  ChevronRight,
+  Plus,
+  ChevronUp,
+  ChevronDown,
+} from 'lucide-react';
 import { Icon } from '../../components/ui/Icon';
 import { getFileIcon } from '../../config/icons';
 import type { SlashCommand, FileEntry, SkillRef } from '@zclaudia/shared';
-import { skillRefKey } from '@zclaudia/shared';
+import { skillRefKey, validateMessageAttachmentFiles } from '@zclaudia/shared';
 import * as api from '../../services/api';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { useComposerStore, type SessionDraft } from '../../stores/composerStore';
@@ -25,19 +35,19 @@ export interface Attachment {
 }
 
 interface MessageInputProps {
-  sessionId: string;           // Session ID for draft persistence
+  sessionId: string; // Session ID for draft persistence
   onSend: (message: string, attachments?: Attachment[]) => void;
   onCancel?: () => void;
   onCommand?: (command: string, args: string) => void;
-  commands?: SlashCommand[];  // Commands from provider
-  projectRoot?: string;       // Project root for @ file mentions
-  backendId?: string | null;  // Backend ID for routing file listing API calls
+  commands?: SlashCommand[]; // Commands from provider
+  projectRoot?: string; // Project root for @ file mentions
+  backendId?: string | null; // Backend ID for routing file listing API calls
   disabled?: boolean;
   isLoading?: boolean;
   placeholder?: string;
-  initialValue?: string;      // Initial value to set (e.g., for restoring after cancel)
+  initialValue?: string; // Initial value to set (e.g., for restoring after cancel)
   initialAttachments?: Attachment[]; // Initial attachments to restore
-  advancedMode?: boolean;     // Advanced input: larger textarea, Enter=newline on desktop
+  advancedMode?: boolean; // Advanced input: larger textarea, Enter=newline on desktop
   onToggleAdvanced?: () => void; // Toggle between normal and advanced mode
   mobileToolbarSlot?: React.ReactNode; // Extra buttons rendered in mobile action row
   onRequestAdvancedMode?: () => void;
@@ -114,18 +124,21 @@ export function MessageInput({
     return window.visualViewport?.height ?? window.innerHeight;
   }, []);
   const isMobile = useIsMobile();
-  const setDraft = useComposerStore((s) => s.setDraft);
-  const clearDraft = useComposerStore((s) => s.clearDraft);
+  const setDraft = useComposerStore(s => s.setDraft);
+  const clearDraft = useComposerStore(s => s.clearDraft);
   const { agent } = useAgentForSession(sessionId);
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform);
   const [value, setValue] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [showCommands, setShowCommands] = useState(false);
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
   const [workspaceSkills, setWorkspaceSkills] = useState<WorkspaceSkillInfo[]>([]);
   const [mentionState, setMentionState] = useState<MentionState>(initialMentionState);
   const [isComposing, setIsComposing] = useState(false); // Track IME composition state
-  const [availableViewportHeight, setAvailableViewportHeight] = useState(getAvailableViewportHeight);
+  const [availableViewportHeight, setAvailableViewportHeight] = useState(
+    getAvailableViewportHeight
+  );
   const expandedInputMaxHeight = Math.max(
     EXPANDED_INPUT_MIN_HEIGHT_PX,
     Math.min(Math.floor(availableViewportHeight * 0.4), 320)
@@ -142,10 +155,13 @@ export function MessageInput({
   const pendingDraftAttachmentsRef = useRef<Attachment[]>([]);
   const lastSubmissionRef = useRef<{ key: string; at: number } | null>(null);
 
-  const getPendingDraft = useCallback((): SessionDraft => ({
-    content: pendingDraftValueRef.current,
-    attachments: pendingDraftAttachmentsRef.current,
-  }), []);
+  const getPendingDraft = useCallback(
+    (): SessionDraft => ({
+      content: pendingDraftValueRef.current,
+      attachments: pendingDraftAttachmentsRef.current,
+    }),
+    []
+  );
 
   const flushDraftPersistence = useCallback(() => {
     if (draftPersistTimeoutRef.current) {
@@ -177,11 +193,14 @@ export function MessageInput({
   }, [getPendingDraft, sessionId, setDraft]);
 
   // Update value and persist draft to store
-  const updateValue = useCallback((newValue: string) => {
-    setValue(newValue);
-    pendingDraftValueRef.current = newValue;
-    scheduleDraftPersistence();
-  }, [scheduleDraftPersistence]);
+  const updateValue = useCallback(
+    (newValue: string) => {
+      setValue(newValue);
+      pendingDraftValueRef.current = newValue;
+      scheduleDraftPersistence();
+    },
+    [scheduleDraftPersistence]
+  );
 
   // Update value when initialValue changes (e.g., after cancel to restore previous message)
   useEffect(() => {
@@ -245,8 +264,9 @@ export function MessageInput({
 
   useEffect(() => {
     let cancelled = false;
-    api.getWorkspaceSkillsResult()
-      .then((result) => {
+    api
+      .getWorkspaceSkillsResult()
+      .then(result => {
         if (!cancelled) setWorkspaceSkills(result.skills ?? []);
       })
       .catch(() => {
@@ -259,33 +279,27 @@ export function MessageInput({
 
   // Ids of currently-known skills — used to decide which `/name` tokens in the
   // textarea get highlighted (only real skills, not arbitrary `/path` text).
-  const skillIds = useMemo(
-    () => new Set(workspaceSkills.map((s) => s.id)),
-    [workspaceSkills],
-  );
+  const skillIds = useMemo(() => new Set(workspaceSkills.map(s => s.id)), [workspaceSkills]);
   // Full command strings (e.g. `/clear`, `/commit-commands:commit`) for the
   // same purpose — commands are highlighted in a different color than skills.
-  const commandSet = useMemo(() => new Set(commands.map((c) => c.command)), [commands]);
+  const commandSet = useMemo(() => new Set(commands.map(c => c.command)), [commands]);
 
   // Pinned skill refs on the active agent profile. Empty when there is no
   // profile (or before it loads). These are the source of truth for pin state;
   // the runtime already auto-loads them at session start (pi-runtime/skills.ts).
   const pinnedRefs = useMemo(
     () => agent?.skillSelection?.pinned ?? [],
-    [agent?.skillSelection?.pinned],
+    [agent?.skillSelection?.pinned]
   );
-  const pinnedKeys = useMemo(
-    () => new Set(pinnedRefs.map((ref) => skillRefKey(ref))),
-    [pinnedRefs],
-  );
+  const pinnedKeys = useMemo(() => new Set(pinnedRefs.map(ref => skillRefKey(ref))), [pinnedRefs]);
 
   // Filter commands based on input (memoized to avoid O(n) filter on every render)
   const slashSuggestions = useMemo<SlashSuggestion[]>(() => {
     if (!value.startsWith('/') || value.includes(' ')) return [];
     const query = value.toLowerCase();
     const skillSuggestions: SlashSuggestion[] = workspaceSkills
-      .filter((skill) => skill.eligible !== false && skill.metadata?.userInvocable !== false)
-      .filter((skill) => `/${skill.id}`.toLowerCase().startsWith(query))
+      .filter(skill => skill.eligible !== false && skill.metadata?.userInvocable !== false)
+      .filter(skill => `/${skill.id}`.toLowerCase().startsWith(query))
       .map((skill): SlashSuggestion => {
         const ref: SkillRef = { source: skill.source ?? 'workspace', id: skill.id };
         return {
@@ -302,13 +316,15 @@ export function MessageInput({
         };
       });
     const commandSuggestions: SlashSuggestion[] = commands
-      .filter((cmd) => cmd.command.toLowerCase().startsWith(query))
-      .map((cmd): SlashSuggestion => ({
-        index: 0,
-        type: 'command',
-        value: cmd.command,
-        description: cmd.description,
-      }));
+      .filter(cmd => cmd.command.toLowerCase().startsWith(query))
+      .map(
+        (cmd): SlashSuggestion => ({
+          index: 0,
+          type: 'command',
+          value: cmd.command,
+          description: cmd.description,
+        })
+      );
     // Order: pinned skills first, then remaining skills by usage desc, then
     // commands. Reassign contiguous indices so keyboard-nav + scroll-into-view
     // stay aligned across the visual groups rendered by SlashMenu.
@@ -326,27 +342,30 @@ export function MessageInput({
   }, [value, commands, workspaceSkills, pinnedKeys]);
 
   // Detect @ mention in text
-  const detectMention = useCallback((text: string, cursorPos: number): { triggerIndex: number; query: string } | null => {
-    // Find the last @ before cursor that's not preceded by a non-space character
-    for (let i = cursorPos - 1; i >= 0; i--) {
-      const char = text[i];
-      if (char === '@') {
-        // Check if @ is at start or preceded by whitespace
-        if (i === 0 || /\s/.test(text[i - 1])) {
-          return {
-            triggerIndex: i,
-            query: text.substring(i + 1, cursorPos)
-          };
+  const detectMention = useCallback(
+    (text: string, cursorPos: number): { triggerIndex: number; query: string } | null => {
+      // Find the last @ before cursor that's not preceded by a non-space character
+      for (let i = cursorPos - 1; i >= 0; i--) {
+        const char = text[i];
+        if (char === '@') {
+          // Check if @ is at start or preceded by whitespace
+          if (i === 0 || /\s/.test(text[i - 1])) {
+            return {
+              triggerIndex: i,
+              query: text.substring(i + 1, cursorPos),
+            };
+          }
+          break;
         }
-        break;
+        // Stop if we hit whitespace (except within the path)
+        if (char === ' ' || char === '\n' || char === '\t') {
+          break;
+        }
       }
-      // Stop if we hit whitespace (except within the path)
-      if (char === ' ' || char === '\n' || char === '\t') {
-        break;
-      }
-    }
-    return null;
-  }, []);
+      return null;
+    },
+    []
+  );
 
   // Parse query into path components
   const parseQuery = useCallback((query: string) => {
@@ -357,37 +376,42 @@ export function MessageInput({
   }, []);
 
   // Fetch directory entries with debouncing
-  const fetchEntries = useCallback(async (projectRootPath: string, relativePath: string, query: string, resolvedBackendId?: string | null) => {
-    if (!projectRootPath) return;
+  const fetchEntries = useCallback(
+    async (
+      projectRootPath: string,
+      relativePath: string,
+      query: string,
+      resolvedBackendId?: string | null
+    ) => {
+      if (!projectRootPath) return;
 
-    setMentionState(prev => ({ ...prev, isLoading: true, hasError: false }));
+      setMentionState(prev => ({ ...prev, isLoading: true, hasError: false }));
 
-    try {
-      const result = await api.listDirectory({
-        projectRoot: projectRootPath,
-        relativePath,
-        query,
-        maxResults: 20,
-        backendId: resolvedBackendId,
-      });
+      try {
+        const result = await api.listDirectory({
+          projectRoot: projectRootPath,
+          relativePath,
+          query,
+          maxResults: 20,
+          backendId: resolvedBackendId,
+        });
 
-      setMentionState(prev => ({
-        ...prev,
-        entries: result.entries,
-        isLoading: false,
-        selectedIndex: 0
-      }));
-    } catch (error) {
-      console.error('Failed to fetch directory listing:', error);
-      setMentionState(prev => ({ ...prev, entries: [], isLoading: false, hasError: true }));
-    }
-  }, []);
+        setMentionState(prev => ({
+          ...prev,
+          entries: result.entries,
+          isLoading: false,
+          selectedIndex: 0,
+        }));
+      } catch (error) {
+        console.error('Failed to fetch directory listing:', error);
+        setMentionState(prev => ({ ...prev, entries: [], isLoading: false, hasError: true }));
+      }
+    },
+    []
+  );
 
   // Debounced fetch
-  const debouncedFetchEntries = useMemo(
-    () => debounce(fetchEntries, 150),
-    [fetchEntries]
-  );
+  const debouncedFetchEntries = useMemo(() => debounce(fetchEntries, 150), [fetchEntries]);
 
   // Auto-resize textarea height based on content and fall back to internal scrolling past a max height.
   useEffect(() => {
@@ -426,7 +450,14 @@ export function MessageInput({
       textarea.style.height = '';
       textarea.style.overflowY = 'auto';
     }
-  }, [value, advancedMode, expandedInputHeight, isMobile, availableViewportHeight, onRequestAdvancedMode]);
+  }, [
+    value,
+    advancedMode,
+    expandedInputHeight,
+    isMobile,
+    availableViewportHeight,
+    onRequestAdvancedMode,
+  ]);
 
   useEffect(() => {
     if (!isMobile) return;
@@ -456,7 +487,7 @@ export function MessageInput({
   useEffect(() => {
     if (showCommands && commandListRef.current) {
       const selectedElement = commandListRef.current.querySelector(
-        `[data-index="${selectedCommandIndex}"]`,
+        `[data-index="${selectedCommandIndex}"]`
       ) as HTMLElement | null;
       if (selectedElement?.scrollIntoView) {
         selectedElement.scrollIntoView({ block: 'nearest' });
@@ -467,7 +498,9 @@ export function MessageInput({
   // Scroll selected mention into view
   useEffect(() => {
     if (mentionState.isActive && mentionListRef.current) {
-      const selectedElement = mentionListRef.current.querySelector(`[data-index="${mentionState.selectedIndex}"]`) as HTMLElement;
+      const selectedElement = mentionListRef.current.querySelector(
+        `[data-index="${mentionState.selectedIndex}"]`
+      ) as HTMLElement;
       if (selectedElement?.scrollIntoView) {
         selectedElement.scrollIntoView({ block: 'nearest' });
       }
@@ -495,7 +528,7 @@ export function MessageInput({
           hasError: false,
           triggerIndex: mention.triggerIndex,
           query: mention.query,
-          currentPath
+          currentPath,
         }));
 
         debouncedFetchEntries(projectRoot, currentPath, searchQuery, backendId);
@@ -506,31 +539,84 @@ export function MessageInput({
   };
 
   // Select a file/directory entry
-  const selectMentionEntry = useCallback((entry: FileEntry) => {
-    if (entry.type === 'directory') {
-      // Navigate into directory
-      const newPath = entry.path;
+  const selectMentionEntry = useCallback(
+    (entry: FileEntry) => {
+      if (entry.type === 'directory') {
+        // Navigate into directory
+        const newPath = entry.path;
+        const before = value.substring(0, mentionState.triggerIndex);
+        const after = value.substring(mentionState.triggerIndex + mentionState.query.length + 1);
+        const newValue = `${before}@${newPath}/${after}`;
+
+        updateValue(newValue);
+
+        const newCursorPos = before.length + newPath.length + 2; // +2 for @ and /
+
+        setMentionState(prev => ({
+          ...prev,
+          query: newPath + '/',
+          currentPath: newPath,
+          selectedIndex: 0,
+        }));
+
+        // Fetch new directory contents
+        if (projectRoot) {
+          fetchEntries(projectRoot, newPath, '', backendId);
+        }
+
+        // Set cursor position
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.selectionStart = newCursorPos;
+            textareaRef.current.selectionEnd = newCursorPos;
+            textareaRef.current.focus();
+          }
+        }, 0);
+      } else {
+        // Insert file reference
+        const before = value.substring(0, mentionState.triggerIndex);
+        const after = value.substring(mentionState.triggerIndex + mentionState.query.length + 1);
+        const newValue = `${before}@${entry.path} ${after}`;
+
+        updateValue(newValue);
+        setMentionState(initialMentionState);
+
+        // Move cursor after the inserted path
+        const newCursorPos = before.length + entry.path.length + 2; // +2 for @ and space
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.selectionStart = newCursorPos;
+            textareaRef.current.selectionEnd = newCursorPos;
+            textareaRef.current.focus();
+          }
+        }, 0);
+      }
+    },
+    [value, mentionState, projectRoot, backendId, fetchEntries]
+  );
+
+  // Navigate to a specific path (for breadcrumb navigation)
+  const navigateToPath = useCallback(
+    (path: string) => {
       const before = value.substring(0, mentionState.triggerIndex);
       const after = value.substring(mentionState.triggerIndex + mentionState.query.length + 1);
-      const newValue = `${before}@${newPath}/${after}`;
+      const newQuery = path ? `${path}/` : '';
+      const newValue = `${before}@${newQuery}${after}`;
 
       updateValue(newValue);
-
-      const newCursorPos = before.length + newPath.length + 2; // +2 for @ and /
 
       setMentionState(prev => ({
         ...prev,
-        query: newPath + '/',
-        currentPath: newPath,
-        selectedIndex: 0
+        query: newQuery,
+        currentPath: path,
+        selectedIndex: 0,
       }));
 
-      // Fetch new directory contents
       if (projectRoot) {
-        fetchEntries(projectRoot, newPath, '', backendId);
+        fetchEntries(projectRoot, path, '', backendId);
       }
 
-      // Set cursor position
+      const newCursorPos = before.length + newQuery.length + 1;
       setTimeout(() => {
         if (textareaRef.current) {
           textareaRef.current.selectionStart = newCursorPos;
@@ -538,56 +624,9 @@ export function MessageInput({
           textareaRef.current.focus();
         }
       }, 0);
-    } else {
-      // Insert file reference
-      const before = value.substring(0, mentionState.triggerIndex);
-      const after = value.substring(mentionState.triggerIndex + mentionState.query.length + 1);
-      const newValue = `${before}@${entry.path} ${after}`;
-
-      updateValue(newValue);
-      setMentionState(initialMentionState);
-
-      // Move cursor after the inserted path
-      const newCursorPos = before.length + entry.path.length + 2; // +2 for @ and space
-      setTimeout(() => {
-        if (textareaRef.current) {
-          textareaRef.current.selectionStart = newCursorPos;
-          textareaRef.current.selectionEnd = newCursorPos;
-          textareaRef.current.focus();
-        }
-      }, 0);
-    }
-  }, [value, mentionState, projectRoot, backendId, fetchEntries]);
-
-  // Navigate to a specific path (for breadcrumb navigation)
-  const navigateToPath = useCallback((path: string) => {
-    const before = value.substring(0, mentionState.triggerIndex);
-    const after = value.substring(mentionState.triggerIndex + mentionState.query.length + 1);
-    const newQuery = path ? `${path}/` : '';
-    const newValue = `${before}@${newQuery}${after}`;
-
-    updateValue(newValue);
-
-    setMentionState(prev => ({
-      ...prev,
-      query: newQuery,
-      currentPath: path,
-      selectedIndex: 0
-    }));
-
-    if (projectRoot) {
-      fetchEntries(projectRoot, path, '', backendId);
-    }
-
-    const newCursorPos = before.length + newQuery.length + 1;
-    setTimeout(() => {
-      if (textareaRef.current) {
-        textareaRef.current.selectionStart = newCursorPos;
-        textareaRef.current.selectionEnd = newCursorPos;
-        textareaRef.current.focus();
-      }
-    }, 0);
-  }, [value, mentionState, projectRoot, backendId, fetchEntries]);
+    },
+    [value, mentionState, projectRoot, backendId, fetchEntries]
+  );
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     // Handle @ mention selection
@@ -596,9 +635,7 @@ export function MessageInput({
         e.preventDefault();
         setMentionState(prev => ({
           ...prev,
-          selectedIndex: prev.selectedIndex < prev.entries.length - 1
-            ? prev.selectedIndex + 1
-            : 0
+          selectedIndex: prev.selectedIndex < prev.entries.length - 1 ? prev.selectedIndex + 1 : 0,
         }));
         return;
       }
@@ -606,9 +643,7 @@ export function MessageInput({
         e.preventDefault();
         setMentionState(prev => ({
           ...prev,
-          selectedIndex: prev.selectedIndex > 0
-            ? prev.selectedIndex - 1
-            : prev.entries.length - 1
+          selectedIndex: prev.selectedIndex > 0 ? prev.selectedIndex - 1 : prev.entries.length - 1,
         }));
         return;
       }
@@ -640,17 +675,13 @@ export function MessageInput({
       // ArrowDown or Ctrl+N/Cmd+N to move down
       if (e.key === 'ArrowDown' || ((e.ctrlKey || e.metaKey) && e.key === 'n')) {
         e.preventDefault();
-        setSelectedCommandIndex((prev) =>
-          prev < slashSuggestions.length - 1 ? prev + 1 : 0
-        );
+        setSelectedCommandIndex(prev => (prev < slashSuggestions.length - 1 ? prev + 1 : 0));
         return;
       }
       // ArrowUp or Ctrl+P/Cmd+P to move up
       if (e.key === 'ArrowUp' || ((e.ctrlKey || e.metaKey) && e.key === 'p')) {
         e.preventDefault();
-        setSelectedCommandIndex((prev) =>
-          prev > 0 ? prev - 1 : slashSuggestions.length - 1
-        );
+        setSelectedCommandIndex(prev => (prev > 0 ? prev - 1 : slashSuggestions.length - 1));
         return;
       }
       if (e.key === 'Tab' || e.key === 'Enter') {
@@ -731,18 +762,18 @@ export function MessageInput({
         e.preventDefault();
         const file = item.getAsFile();
         if (file) {
-          await addFileAsAttachment(file);
+          await addFilesAsAttachments([file]);
         }
         return;
       }
     }
   };
 
-  const addFileAsAttachment = async (file: File): Promise<void> => {
+  const readFileAsAttachment = async (file: File): Promise<void> => {
     if (file.type.startsWith('image/')) {
       file = await downscaleImageFile(file);
     }
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
         const attachment: Attachment = {
@@ -752,7 +783,7 @@ export function MessageInput({
           data: reader.result as string,
           mimeType: file.type,
         };
-        setAttachments((prev) => {
+        setAttachments(prev => {
           const nextAttachments = [...prev, attachment];
           pendingDraftAttachmentsRef.current = nextAttachments;
           scheduleDraftPersistence();
@@ -760,17 +791,37 @@ export function MessageInput({
         });
         resolve();
       };
+      reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
       reader.readAsDataURL(file);
     });
+  };
+
+  const addFilesAsAttachments = async (files: File[]): Promise<void> => {
+    const validation = validateMessageAttachmentFiles(files, {
+      existingCount: pendingDraftAttachmentsRef.current.length,
+    });
+
+    if (validation.rejected.length > 0) {
+      setAttachmentError(validation.rejected.map(issue => issue.message).join(' '));
+    } else {
+      setAttachmentError(null);
+    }
+
+    for (const file of validation.accepted) {
+      try {
+        await readFileAsAttachment(file);
+        setAttachmentError(null);
+      } catch {
+        setAttachmentError(`Failed to read "${file.name}".`);
+      }
+    }
   };
 
   const handleFileSelect = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
-    for (const file of Array.from(files)) {
-      await addFileAsAttachment(file);
-    }
+    await addFilesAsAttachments(Array.from(files));
 
     // Reset input
     if (fileInputRef.current) {
@@ -779,8 +830,8 @@ export function MessageInput({
   };
 
   const removeAttachment = (id: string) => {
-    setAttachments((prev) => {
-      const nextAttachments = prev.filter((a) => a.id !== id);
+    setAttachments(prev => {
+      const nextAttachments = prev.filter(a => a.id !== id);
       pendingDraftAttachmentsRef.current = nextAttachments;
       scheduleDraftPersistence();
       return nextAttachments;
@@ -793,7 +844,7 @@ export function MessageInput({
     const trimmedValue = value.trim();
     const submissionKey = JSON.stringify({
       text: trimmedValue,
-      attachments: attachments.map((attachment) => attachment.id),
+      attachments: attachments.map(attachment => attachment.id),
     });
     const lastSubmission = lastSubmissionRef.current;
 
@@ -838,6 +889,7 @@ export function MessageInput({
       setValue('');
       clearDraft(sessionId);
       setAttachments([]);
+      setAttachmentError(null);
       pendingDraftAttachmentsRef.current = [];
     }
   };
@@ -857,10 +909,10 @@ export function MessageInput({
       const key = skillRefKey(ref);
       const current = agent.skillSelection?.pinned ?? [];
       const pinned = nextPinned
-        ? current.some((r) => skillRefKey(r) === key)
+        ? current.some(r => skillRefKey(r) === key)
           ? current
           : [...current, ref]
-        : current.filter((r) => skillRefKey(r) !== key);
+        : current.filter(r => skillRefKey(r) !== key);
       const nextSelection = { ...agent.skillSelection, pinned };
       try {
         await api.updateAgentProfile(agent.id, { skillSelection: nextSelection });
@@ -873,7 +925,7 @@ export function MessageInput({
         void useAgentProfileMetaStore.getState().loadAll();
       }
     },
-    [agent],
+    [agent]
   );
 
   // Chip activation: insert the skill's slash command into the composer.
@@ -883,7 +935,7 @@ export function MessageInput({
       setShowCommands(false);
       textareaRef.current?.focus();
     },
-    [updateValue],
+    [updateValue]
   );
 
   return (
@@ -905,7 +957,7 @@ export function MessageInput({
         pinnedRefs={pinnedRefs}
         skills={workspaceSkills}
         onActivate={handleActivateChip}
-        onUnpin={(ref) => void handleTogglePin(ref, false)}
+        onUnpin={ref => void handleTogglePin(ref, false)}
       />
 
       {/* @ Mention suggestions dropdown */}
@@ -917,10 +969,7 @@ export function MessageInput({
           {/* Breadcrumb navigation */}
           {mentionState.currentPath && (
             <div className="px-4 py-2 border-b border-border text-sm text-muted-foreground flex items-center gap-1 flex-wrap">
-              <button
-                onClick={() => navigateToPath('')}
-                className="hover:text-foreground"
-              >
+              <button onClick={() => navigateToPath('')} className="hover:text-foreground">
                 root
               </button>
               {mentionState.currentPath.split('/').map((part, idx, arr) => (
@@ -940,7 +989,9 @@ export function MessageInput({
           {mentionState.isLoading ? (
             <div className="px-4 py-3 text-muted-foreground text-sm">Loading...</div>
           ) : mentionState.hasError ? (
-            <div className="px-4 py-3 text-destructive text-sm">Failed to list files — check server connection</div>
+            <div className="px-4 py-3 text-destructive text-sm">
+              Failed to list files — check server connection
+            </div>
           ) : mentionState.entries.length === 0 ? (
             <div className="px-4 py-3 text-muted-foreground text-sm">No files found</div>
           ) : (
@@ -953,7 +1004,11 @@ export function MessageInput({
                   index === mentionState.selectedIndex ? 'bg-muted' : ''
                 }`}
               >
-                <Icon icon={getFileIcon(entry.name, entry.type === 'directory')} size={16} className="text-muted-foreground" />
+                <Icon
+                  icon={getFileIcon(entry.name, entry.type === 'directory')}
+                  size={16}
+                  className="text-muted-foreground"
+                />
                 <span className="flex-1 truncate">{entry.name}</span>
                 {entry.type === 'directory' && (
                   <ChevronRight size={14} className="text-muted-foreground" />
@@ -969,10 +1024,19 @@ export function MessageInput({
         </div>
       )}
 
+      {attachmentError && (
+        <div
+          role="alert"
+          className="mb-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        >
+          {attachmentError}
+        </div>
+      )}
+
       {/* Attachments preview */}
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-2 p-2 bg-muted rounded-lg">
-          {attachments.map((attachment) => (
+          {attachments.map(attachment => (
             <div
               key={attachment.id}
               className="relative group bg-secondary rounded-lg overflow-hidden"
@@ -986,7 +1050,11 @@ export function MessageInput({
               ) : (
                 <div className="h-20 w-32 flex items-center justify-center p-2">
                   <div className="text-center">
-                    <FileIcon size={32} strokeWidth={1.5} className="mx-auto text-muted-foreground" />
+                    <FileIcon
+                      size={32}
+                      strokeWidth={1.5}
+                      className="mx-auto text-muted-foreground"
+                    />
                     <span className="text-xs text-muted-foreground truncate block mt-1">
                       {attachment.name}
                     </span>
@@ -1016,38 +1084,44 @@ export function MessageInput({
               skillIds={skillIds}
               commandSet={commandSet}
               className="pointer-events-none absolute inset-0 w-full resize-none min-h-[1.5rem] overflow-y-auto border-0 p-0 whitespace-pre-wrap break-words"
-              style={{ fontSize: 'var(--chat-font-input, 0.875rem)', maxHeight: `${Math.max(120, availableViewportHeight * 0.3)}px` }}
+              style={{
+                fontSize: 'var(--chat-font-input, 0.875rem)',
+                maxHeight: `${Math.max(120, availableViewportHeight * 0.3)}px`,
+              }}
             />
             <textarea
-            data-testid="message-input"
-            ref={textareaRef}
-            value={value}
-            onChange={handleChange}
-            onKeyDown={handleKeyDown}
-            onPaste={handlePaste}
-            onCompositionStart={() => {
-              if (compositionTimeoutRef.current) {
-                clearTimeout(compositionTimeoutRef.current);
-                compositionTimeoutRef.current = null;
-              }
-              setIsComposing(true);
-            }}
-            onCompositionEnd={() => {
-              compositionTimeoutRef.current = setTimeout(() => {
-                setIsComposing(false);
-                compositionTimeoutRef.current = null;
-              }, 50);
-            }}
-            disabled={disabled}
-            placeholder={placeholder}
-            spellCheck={false}
-            autoCorrect="off"
-            autoCapitalize="off"
-            autoComplete="off"
-            rows={1}
-            className="relative w-full bg-transparent text-transparent caret-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed resize-none min-h-[1.5rem] overflow-y-auto border-0 p-0"
-            style={{ fontSize: 'var(--chat-font-input, 0.875rem)', maxHeight: `${Math.max(120, availableViewportHeight * 0.3)}px` }}
-          />
+              data-testid="message-input"
+              ref={textareaRef}
+              value={value}
+              onChange={handleChange}
+              onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
+              onCompositionStart={() => {
+                if (compositionTimeoutRef.current) {
+                  clearTimeout(compositionTimeoutRef.current);
+                  compositionTimeoutRef.current = null;
+                }
+                setIsComposing(true);
+              }}
+              onCompositionEnd={() => {
+                compositionTimeoutRef.current = setTimeout(() => {
+                  setIsComposing(false);
+                  compositionTimeoutRef.current = null;
+                }, 50);
+              }}
+              disabled={disabled}
+              placeholder={placeholder}
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="off"
+              autoComplete="off"
+              rows={1}
+              className="relative w-full bg-transparent text-transparent caret-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed resize-none min-h-[1.5rem] overflow-y-auto border-0 p-0"
+              style={{
+                fontSize: 'var(--chat-font-input, 0.875rem)',
+                maxHeight: `${Math.max(120, availableViewportHeight * 0.3)}px`,
+              }}
+            />
           </div>
           <div className="flex items-center gap-2 mt-2">
             {/* Attachment button */}
@@ -1092,26 +1166,25 @@ export function MessageInput({
             )}
           </div>
         </div>
-      ) : (
-        advancedMode ? (
-          /* Desktop advanced: textarea owns the top area; actions live in a separate bottom bar. */
-          <div
-            data-testid="composer-box"
-            className="flex flex-col rounded-2xl border border-border bg-input px-4 pt-3 pb-2 transition-colors duration-200 focus-within:border-primary/60 focus-within:shadow-apple-md"
-          >
-            <div className="relative">
-              <SkillTokenHighlighter
-                value={value}
-                skillIds={skillIds}
-                commandSet={commandSet}
-                className="pointer-events-none absolute inset-0 w-full resize-none overflow-auto border-0 px-0 py-1 pr-2 leading-6 whitespace-pre-wrap break-words"
-                style={{
-                  fontSize: 'var(--chat-font-input, 0.875rem)',
-                  minHeight: `${expandedInputHeight}px`,
-                  maxHeight: `${expandedInputMaxHeight}px`,
-                }}
-              />
-              <textarea
+      ) : advancedMode ? (
+        /* Desktop advanced: textarea owns the top area; actions live in a separate bottom bar. */
+        <div
+          data-testid="composer-box"
+          className="flex flex-col rounded-2xl border border-border bg-input px-4 pt-3 pb-2 transition-colors duration-200 focus-within:border-primary/60 focus-within:shadow-apple-md"
+        >
+          <div className="relative">
+            <SkillTokenHighlighter
+              value={value}
+              skillIds={skillIds}
+              commandSet={commandSet}
+              className="pointer-events-none absolute inset-0 w-full resize-none overflow-auto border-0 px-0 py-1 pr-2 leading-6 whitespace-pre-wrap break-words"
+              style={{
+                fontSize: 'var(--chat-font-input, 0.875rem)',
+                minHeight: `${expandedInputHeight}px`,
+                maxHeight: `${expandedInputMaxHeight}px`,
+              }}
+            />
+            <textarea
               data-testid="message-input"
               ref={textareaRef}
               value={value}
@@ -1145,66 +1218,9 @@ export function MessageInput({
                 maxHeight: `${expandedInputMaxHeight}px`,
               }}
             />
-            </div>
-
-            <div className="mt-2 flex items-center gap-2">
-              <button
-                data-testid="attach-button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={disabled}
-                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Add attachment (images, files)"
-              >
-                <Plus size={18} strokeWidth={1.75} />
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept="image/*,.pdf,.txt,.md,.json,.csv"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
-              <div className="flex-1" />
-              {onToggleAdvanced && (
-                <button
-                  data-testid="advanced-toggle"
-                  onClick={onToggleAdvanced}
-                  className="flex h-6 w-6 flex-shrink-0 items-center justify-center text-primary transition-colors"
-                  title="Normal input"
-                >
-                  <ChevronDown size={14} strokeWidth={2} />
-                </button>
-              )}
-              {isLoading && onCancel ? (
-                <button
-                  data-testid="cancel-button"
-                  onClick={onCancel}
-                  className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-foreground text-background hover:bg-foreground/90"
-                  title="Cancel (Esc)"
-                >
-                  <Square size={12} fill="currentColor" strokeWidth={0} />
-                </button>
-              ) : (
-                <button
-                  data-testid="send-button"
-                  onClick={handleSend}
-                  disabled={disabled || (!value.trim() && attachments.length === 0)}
-                  className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
-                  title={`Send message (${isMac ? 'Cmd' : 'Ctrl'}+Enter)`}
-                >
-                  <ArrowUp size={18} strokeWidth={2.25} />
-                </button>
-              )}
-            </div>
           </div>
-        ) : (
-          /* Desktop collapsed: single-row layout — all controls inside the bordered box */
-          <div
-            data-testid="composer-box"
-            className="flex min-h-12 items-center gap-2 rounded-2xl border border-border bg-input px-2.5 transition-colors duration-200 focus-within:border-primary/60 focus-within:shadow-apple-md"
-          >
-            {/* Attachment button */}
+
+          <div className="mt-2 flex items-center gap-2">
             <button
               data-testid="attach-button"
               onClick={() => fileInputRef.current?.click()}
@@ -1222,62 +1238,17 @@ export function MessageInput({
               onChange={handleFileSelect}
               className="hidden"
             />
-
-            {/* Text input */}
-            <div className="flex-1 relative">
-              <SkillTokenHighlighter
-                value={value}
-                skillIds={skillIds}
-                commandSet={commandSet}
-                className="pointer-events-none absolute inset-0 block h-6 w-full resize-none overflow-hidden border-0 p-0 leading-6 whitespace-pre-wrap break-words"
-                style={{ fontSize: 'var(--chat-font-input, 0.875rem)' }}
-              />
-              <textarea
-                data-testid="message-input"
-                ref={textareaRef}
-                value={value}
-                onChange={handleChange}
-                onKeyDown={handleKeyDown}
-                onPaste={handlePaste}
-                onCompositionStart={() => {
-                  if (compositionTimeoutRef.current) {
-                    clearTimeout(compositionTimeoutRef.current);
-                    compositionTimeoutRef.current = null;
-                  }
-                  setIsComposing(true);
-                }}
-                onCompositionEnd={() => {
-                  compositionTimeoutRef.current = setTimeout(() => {
-                    setIsComposing(false);
-                    compositionTimeoutRef.current = null;
-                  }, 50);
-                }}
-                disabled={disabled}
-                placeholder={placeholder}
-                spellCheck={false}
-                autoCorrect="off"
-                autoCapitalize="off"
-                autoComplete="off"
-                rows={1}
-                className="relative block h-6 w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-transparent caret-foreground leading-6 placeholder:text-muted-foreground/60 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                style={{ fontSize: 'var(--chat-font-input, 0.875rem)' }}
-              />
-            </div>
-
-            {/* Multiline toggle (only when onToggleAdvanced is provided) — kept
-                visually light: small bare icon, no hover box, sits close to Send. */}
+            <div className="flex-1" />
             {onToggleAdvanced && (
               <button
                 data-testid="advanced-toggle"
                 onClick={onToggleAdvanced}
-                className="flex h-6 w-6 flex-shrink-0 items-center justify-center -mr-1 text-muted-foreground/50 transition-colors hover:text-foreground"
-                title="Advanced input (Enter to newline)"
+                className="flex h-6 w-6 flex-shrink-0 items-center justify-center text-primary transition-colors"
+                title="Normal input"
               >
-                <ChevronUp size={14} strokeWidth={2} />
+                <ChevronDown size={14} strokeWidth={2} />
               </button>
             )}
-
-            {/* Send/Cancel button */}
             {isLoading && onCancel ? (
               <button
                 data-testid="cancel-button"
@@ -1293,13 +1264,114 @@ export function MessageInput({
                 onClick={handleSend}
                 disabled={disabled || (!value.trim() && attachments.length === 0)}
                 className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
-                title="Send message (Enter)"
+                title={`Send message (${isMac ? 'Cmd' : 'Ctrl'}+Enter)`}
               >
                 <ArrowUp size={18} strokeWidth={2.25} />
               </button>
             )}
           </div>
-        )
+        </div>
+      ) : (
+        /* Desktop collapsed: single-row layout — all controls inside the bordered box */
+        <div
+          data-testid="composer-box"
+          className="flex min-h-12 items-center gap-2 rounded-2xl border border-border bg-input px-2.5 transition-colors duration-200 focus-within:border-primary/60 focus-within:shadow-apple-md"
+        >
+          {/* Attachment button */}
+          <button
+            data-testid="attach-button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={disabled}
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Add attachment (images, files)"
+          >
+            <Plus size={18} strokeWidth={1.75} />
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/*,.pdf,.txt,.md,.json,.csv"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+
+          {/* Text input */}
+          <div className="flex-1 relative">
+            <SkillTokenHighlighter
+              value={value}
+              skillIds={skillIds}
+              commandSet={commandSet}
+              className="pointer-events-none absolute inset-0 block h-6 w-full resize-none overflow-hidden border-0 p-0 leading-6 whitespace-pre-wrap break-words"
+              style={{ fontSize: 'var(--chat-font-input, 0.875rem)' }}
+            />
+            <textarea
+              data-testid="message-input"
+              ref={textareaRef}
+              value={value}
+              onChange={handleChange}
+              onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
+              onCompositionStart={() => {
+                if (compositionTimeoutRef.current) {
+                  clearTimeout(compositionTimeoutRef.current);
+                  compositionTimeoutRef.current = null;
+                }
+                setIsComposing(true);
+              }}
+              onCompositionEnd={() => {
+                compositionTimeoutRef.current = setTimeout(() => {
+                  setIsComposing(false);
+                  compositionTimeoutRef.current = null;
+                }, 50);
+              }}
+              disabled={disabled}
+              placeholder={placeholder}
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="off"
+              autoComplete="off"
+              rows={1}
+              className="relative block h-6 w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-transparent caret-foreground leading-6 placeholder:text-muted-foreground/60 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ fontSize: 'var(--chat-font-input, 0.875rem)' }}
+            />
+          </div>
+
+          {/* Multiline toggle (only when onToggleAdvanced is provided) — kept
+                visually light: small bare icon, no hover box, sits close to Send. */}
+          {onToggleAdvanced && (
+            <button
+              data-testid="advanced-toggle"
+              onClick={onToggleAdvanced}
+              className="flex h-6 w-6 flex-shrink-0 items-center justify-center -mr-1 text-muted-foreground/50 transition-colors hover:text-foreground"
+              title="Advanced input (Enter to newline)"
+            >
+              <ChevronUp size={14} strokeWidth={2} />
+            </button>
+          )}
+
+          {/* Send/Cancel button */}
+          {isLoading && onCancel ? (
+            <button
+              data-testid="cancel-button"
+              onClick={onCancel}
+              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-foreground text-background hover:bg-foreground/90"
+              title="Cancel (Esc)"
+            >
+              <Square size={12} fill="currentColor" strokeWidth={0} />
+            </button>
+          ) : (
+            <button
+              data-testid="send-button"
+              onClick={handleSend}
+              disabled={disabled || (!value.trim() && attachments.length === 0)}
+              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
+              title="Send message (Enter)"
+            >
+              <ArrowUp size={18} strokeWidth={2.25} />
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

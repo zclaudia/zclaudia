@@ -40,7 +40,7 @@ export class ToolRegistry {
         `[ToolRegistry] Tool "${meta.id}" already registered by ${existing.source}` +
           (existing.pluginId ? ` (${existing.pluginId})` : '') +
           `. Overwriting with ${meta.source}` +
-          (meta.pluginId ? ` (${meta.pluginId})` : ''),
+          (meta.pluginId ? ` (${meta.pluginId})` : '')
       );
     }
     this.tools.set(meta.id, meta);
@@ -59,21 +59,21 @@ export class ToolRegistry {
   }
 
   getAllDefinitions(): ToolDefinition[] {
-    return Array.from(this.tools.values()).map((tool) => tool.definition);
+    return Array.from(this.tools.values()).map(tool => tool.definition);
   }
 
   getDefinitionsBySource(source: ToolSource): ToolDefinition[] {
     return Array.from(this.tools.values())
-      .filter((tool) => tool.source === source)
-      .map((tool) => tool.definition);
+      .filter(tool => tool.source === source)
+      .map(tool => tool.definition);
   }
 
   getDefinitionsByScope(scope: ToolScope): ToolDefinition[] {
     // Undefined or empty scope is treated as "callable from any caller scope"
     // (back-compat). Matches the symmetric guard in execute() below.
     return Array.from(this.tools.values())
-      .filter((tool) => !tool.scope || tool.scope.length === 0 || tool.scope.includes(scope))
-      .map((tool) => tool.definition);
+      .filter(tool => !tool.scope || tool.scope.length === 0 || tool.scope.includes(scope))
+      .map(tool => tool.definition);
   }
 
   getAll(): ToolMeta[] {
@@ -84,7 +84,7 @@ export class ToolRegistry {
     toolName: string,
     args: Record<string, unknown>,
     context?: Record<string, unknown>,
-    scope?: ToolScope,
+    scope?: ToolScope
   ): Promise<string> {
     const tool = this.tools.get(toolName);
 
@@ -119,7 +119,7 @@ export class ToolRegistry {
   }
 
   getByPlugin(pluginId: string): ToolMeta[] {
-    return Array.from(this.tools.values()).filter((tool) => tool.pluginId === pluginId);
+    return Array.from(this.tools.values()).filter(tool => tool.pluginId === pluginId);
   }
 
   clearByPlugin(pluginId: string): number {
@@ -146,7 +146,7 @@ export class ToolRegistry {
 
   getBridgeTools(): ToolMeta[] {
     return Array.from(this.tools.values()).filter(
-      (tool) => tool.source === 'plugin' || tool.source === 'interaction' || tool.source === 'skill',
+      tool => tool.source === 'plugin' || tool.source === 'interaction' || tool.source === 'skill'
     );
   }
 
@@ -164,7 +164,7 @@ export const toolRegistry = new ToolRegistry();
 export function registerTool(
   registration: ToolRegistration,
   source: ToolSource = 'plugin',
-  pluginId?: string,
+  pluginId?: string
 ): void {
   toolRegistry.register({
     id: registration.id,

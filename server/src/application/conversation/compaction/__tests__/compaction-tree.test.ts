@@ -15,7 +15,9 @@ function makeDb(): Database.Database {
 
 describe('appendCompactionToTree', () => {
   let db: Database.Database;
-  beforeEach(() => { db = makeDb(); });
+  beforeEach(() => {
+    db = makeDb();
+  });
 
   it('writes a compaction entry that buildContext honors as a boundary', async () => {
     const session = new Session(new SqliteSessionStorage(db, 's1'));
@@ -33,9 +35,11 @@ describe('appendCompactionToTree', () => {
     const ctx = await session.buildContext();
     // The boundary is materialized as a synthetic `compactionSummary` message
     // (carrying `summary`) followed by the kept tail of real messages.
-    const summaryMsgs = ctx.messages.filter((m) => (m as { role: string }).role === 'compactionSummary');
-    expect(summaryMsgs.some((m) => (m as { summary?: string }).summary?.includes('SUM'))).toBe(true);
-    const contents = ctx.messages.map((m) => (m as { content?: string }).content);
+    const summaryMsgs = ctx.messages.filter(
+      m => (m as { role: string }).role === 'compactionSummary'
+    );
+    expect(summaryMsgs.some(m => (m as { summary?: string }).summary?.includes('SUM'))).toBe(true);
+    const contents = ctx.messages.map(m => (m as { content?: string }).content);
     expect(contents).not.toContain('old');
     expect(contents).toContain('keep');
   });
@@ -55,9 +59,9 @@ describe('appendCompactionToTree', () => {
       },
     });
 
-    const row = db.prepare(
-      `SELECT payload FROM session_entries WHERE id = ? AND type = 'compaction'`,
-    ).get(id) as { payload: string };
+    const row = db
+      .prepare(`SELECT payload FROM session_entries WHERE id = ? AND type = 'compaction'`)
+      .get(id) as { payload: string };
     const payload = JSON.parse(row.payload);
     expect(payload.summary).toBe('SUM');
     expect(payload.firstKeptEntryId).toBe(keep);

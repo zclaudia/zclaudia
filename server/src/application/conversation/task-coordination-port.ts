@@ -36,12 +36,14 @@ export interface TaskCoordinationPort {
     branchAction: BranchAction;
     contextReset?: boolean;
   }): Promise<{ taskId: string; sessionId: string }>;
-  getCanonicalAgentTask(taskId: string): {
-    taskId: string;
-    projectId: string | null;
-    branchId: string | null;
-    llmProfileId?: string;
-  } | undefined;
+  getCanonicalAgentTask(taskId: string):
+    | {
+        taskId: string;
+        projectId: string | null;
+        branchId: string | null;
+        llmProfileId?: string;
+      }
+    | undefined;
   continueCanonicalAgentTask(input: {
     parentTaskId: string;
     input: string;

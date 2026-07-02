@@ -18,7 +18,7 @@ vi.mock('../../features/sidebar/Sidebar', () => ({
   ),
 }));
 
-vi.mock('../../components/SettingsPanel', () => ({
+vi.mock('../../features/settings/SettingsPanel', () => ({
   SettingsPanel: ({ initialTab, onClose }: { initialTab?: string; onClose: () => void }) => (
     <section data-testid="settings-panel" data-initial-tab={initialTab ?? ''}>
       <button onClick={onClose}>Back to app</button>
@@ -36,8 +36,12 @@ vi.mock('../../features/dashboard/ProjectDashboard', () => ({
 
 vi.mock('../../features/sidebar/NotificationsModal', () => ({ NotificationsModal: () => null }));
 vi.mock('../../features/sidebar/SidebarCollapsedBar', () => ({ SidebarCollapsedBar: () => null }));
-vi.mock('../../components/setup/MobileSetup', () => ({ MobileSetup: () => <div>Mobile setup</div> }));
-vi.mock('../../components/setup/WindowsSetup', () => ({ WindowsSetup: () => <div>Windows setup</div> }));
+vi.mock('../../components/setup/MobileSetup', () => ({
+  MobileSetup: () => <div>Mobile setup</div>,
+}));
+vi.mock('../../components/setup/WindowsSetup', () => ({
+  WindowsSetup: () => <div>Windows setup</div>,
+}));
 vi.mock('../../components/ToastContainer', () => ({
   ToastContainer: ({ className }: { className?: string }) => (
     <div data-testid="toast-container" className={className ?? ''} />
@@ -67,7 +71,9 @@ vi.mock('../../hooks/useAndroidBack', () => ({ useAndroidBack: mockUseAndroidBac
 vi.mock('../../hooks/useSwipeBack', () => ({ useSwipeBack: () => ({ current: null }) }));
 vi.mock('../../hooks/useNotchBridgeHost', () => ({ useNotchBridgeHost: () => undefined }));
 vi.mock('../../hooks/useAutoUpdate', () => ({ useAutoUpdate: () => undefined }));
-vi.mock('../../hooks/useServerLatencyMonitor', () => ({ useServerLatencyMonitor: () => undefined }));
+vi.mock('../../hooks/useServerLatencyMonitor', () => ({
+  useServerLatencyMonitor: () => undefined,
+}));
 vi.mock('../../hooks/useActiveSessionStream', () => ({ useActiveSessionStream: () => undefined }));
 vi.mock('../../hooks/useMainWindowGeometry', () => ({ useMainWindowGeometry: () => undefined }));
 vi.mock('../../hooks/useClaudiaDesktop', () => ({ useClaudiaDesktop: () => undefined }));
@@ -182,7 +188,9 @@ describe('App top-level view routing', () => {
       expect(getByTestId('settings-panel')).toBeTruthy();
     });
 
-    const fileViewerBackCalls = mockUseAndroidBack.mock.calls.filter(([, , priority]) => priority === 25);
+    const fileViewerBackCalls = mockUseAndroidBack.mock.calls.filter(
+      ([, , priority]) => priority === 25
+    );
     expect(fileViewerBackCalls.at(-1)?.[1]).toBe(false);
   });
 
@@ -199,6 +207,8 @@ describe('App top-level view routing', () => {
 
     const toastContainer = getByTestId('toast-container');
     expect(toastContainer).toBeTruthy();
-    expect(toastContainer.className).toBe('fixed top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2');
+    expect(toastContainer.className).toBe(
+      'fixed top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2'
+    );
   });
 });

@@ -1,5 +1,7 @@
 // Plugin protocol messages
 
+import type { CapabilityNegotiationResult, PluginRequirements } from '../../plugin-types.js';
+
 // Plugin state (Server → Client)
 export interface PluginStateMessage {
   type: 'plugin_state';
@@ -19,9 +21,9 @@ export interface PluginStateMessage {
     /** Effective platform scope: 'universal' (backend-only) or 'desktop' (has UI) */
     platform: 'universal' | 'desktop';
     /** Capability requirements declared in manifest */
-    requires?: import('../../plugin-types.js').PluginRequirements;
+    requires?: PluginRequirements;
     /** Result of capability negotiation */
-    capabilities?: import('../../plugin-types.js').CapabilityNegotiationResult;
+    capabilities?: CapabilityNegotiationResult;
   }>;
 }
 
@@ -75,6 +77,11 @@ export interface PluginNotchTabUnregisteredMessage {
   pluginId: string;
 }
 
+// Agent profiles changed (Server -> Client) - sent when plugin-contributed profiles are installed.
+export interface AgentProfilesChangedMessage {
+  type: 'agent_profiles_changed';
+}
+
 // File Push notification (Server → Client)
 export interface FilePushNotificationMessage {
   type: 'file_push';
@@ -87,3 +94,16 @@ export interface FilePushNotificationMessage {
   autoDownload: boolean;
   messageId?: string;
 }
+
+export type PluginsClientMessage = never;
+
+export type PluginsServerMessage =
+  | PluginStateMessage
+  | PluginNotificationMessage
+  | PluginShowPanelMessage
+  | PluginPanelRegisteredMessage
+  | PluginPanelUnregisteredMessage
+  | PluginNotchTabRegisteredMessage
+  | PluginNotchTabUnregisteredMessage
+  | AgentProfilesChangedMessage
+  | FilePushNotificationMessage;

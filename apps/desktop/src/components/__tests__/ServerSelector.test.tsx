@@ -8,7 +8,7 @@ vi.mock('../../contexts/ConnectionContext', () => ({
   }),
 }));
 vi.mock('../../hooks/useMediaQuery', () => ({ useIsMobile: () => false }));
-vi.mock('../../utils/platform', async (importOriginal) => {
+vi.mock('../../utils/platform', async importOriginal => {
   const mod = await importOriginal<Record<string, any>>();
   return {
     ...mod,
@@ -33,7 +33,15 @@ describe('ServerSelector', () => {
       setActiveServer: vi.fn(),
     } as any);
     useFacadeStore.setState({
-      backends: [{ backendId: 'local', name: 'Local Server', online: true, runtimeState: 'ready', isThisInstance: true } as any],
+      backends: [
+        {
+          backendId: 'local',
+          name: 'Local Server',
+          online: true,
+          runtimeState: 'ready',
+          isThisInstance: true,
+        } as any,
+      ],
       localBackendId: 'local',
       currentInstanceId: 'inst-local',
       connectionState: 'connected',
@@ -110,13 +118,15 @@ describe('ServerSelector', () => {
 
   it('keeps the trigger shrinkable for long backend names', () => {
     useFacadeStore.setState({
-      backends: [{
-        backendId: 'local',
-        name: 'Backend on example-super-long-hostname-with-extra-labels',
-        online: true,
-        runtimeState: 'ready',
-        isThisInstance: true,
-      } as any],
+      backends: [
+        {
+          backendId: 'local',
+          name: 'Backend on example-super-long-hostname-with-extra-labels',
+          online: true,
+          runtimeState: 'ready',
+          isThisInstance: true,
+        } as any,
+      ],
     });
 
     const { container } = render(<ServerSelector />);
@@ -168,7 +178,9 @@ describe('ServerSelector', () => {
   it('shows connecting status', () => {
     useFacadeStore.setState({
       connectionState: 'connecting',
-      backends: [{ backendId: 'local', runtimeState: 'visible', name: 'Local Server', isThisInstance: true }],
+      backends: [
+        { backendId: 'local', runtimeState: 'visible', name: 'Local Server', isThisInstance: true },
+      ],
     } as any);
 
     const { container } = render(<ServerSelector />);
@@ -202,18 +214,29 @@ describe('ServerSelector', () => {
     const button = container.querySelector('[data-testid="server-selector"]')!;
     fireEvent.click(button);
 
-    expect(document.body.querySelector('[data-testid="connection-status"]')!.textContent).toBe('Connected');
+    expect(document.body.querySelector('[data-testid="connection-status"]')!.textContent).toBe(
+      'Connected'
+    );
 
     act(() => {
       useFacadeStore.setState({
         connectionState: 'connecting',
-        backends: [{ backendId: 'local', runtimeState: 'visible', name: 'Local Server', isThisInstance: true }],
+        backends: [
+          {
+            backendId: 'local',
+            runtimeState: 'visible',
+            name: 'Local Server',
+            isThisInstance: true,
+          },
+        ],
       } as any);
     });
 
     rerender(<ServerSelector />);
 
-    expect(document.body.querySelector('[data-testid="connection-status"]')!.textContent).toBe('Reconnecting...');
+    expect(document.body.querySelector('[data-testid="connection-status"]')!.textContent).toBe(
+      'Reconnecting...'
+    );
   });
 
   it('uses mobile recovery status on Android', () => {
@@ -228,13 +251,23 @@ describe('ServerSelector', () => {
     const button = container.querySelector('[data-testid="server-selector"]')!;
     fireEvent.click(button);
 
-    expect(document.body.querySelector('[data-testid="connection-status"]')!.textContent).toBe('Connected');
+    expect(document.body.querySelector('[data-testid="connection-status"]')!.textContent).toBe(
+      'Connected'
+    );
   });
 
   it('shows reconnecting state when transport is not connected', () => {
     useFacadeStore.setState({
       connectionState: 'connecting',
-      backends: [{ backendId: 'local', runtimeState: 'visible', name: 'Local Server', online: true, isThisInstance: true }],
+      backends: [
+        {
+          backendId: 'local',
+          runtimeState: 'visible',
+          name: 'Local Server',
+          online: true,
+          isThisInstance: true,
+        },
+      ],
       localBackendId: 'local',
     } as any);
     useGatewayStore.setState({
@@ -247,6 +280,8 @@ describe('ServerSelector', () => {
     const button = container.querySelector('[data-testid="server-selector"]')!;
     fireEvent.click(button);
 
-    expect(document.body.querySelector('[data-testid="connection-status"]')!.textContent).toBe('Reconnecting...');
+    expect(document.body.querySelector('[data-testid="connection-status"]')!.textContent).toBe(
+      'Reconnecting...'
+    );
   });
 });

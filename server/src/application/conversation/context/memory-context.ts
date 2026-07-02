@@ -35,7 +35,9 @@ export function buildMemoryContext(memoryDir: string): string | undefined {
     index = index.replace(/�+$/, '');
     truncated = true;
   }
-  if (truncated) index += '\n[index truncated — use the Memory tool to view the full MEMORY.md and prune stale entries]';
+  if (truncated)
+    index +=
+      '\n[index truncated — use the Memory tool to view the full MEMORY.md and prune stale entries]';
 
   // The index is agent-written data, not instructions — delimit it explicitly
   // so a poisoned line cannot fabricate a new top-level prompt section.

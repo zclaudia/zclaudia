@@ -1,7 +1,12 @@
 import { newId } from '../../../utils/uuid.js';
 
 import type { AgentLoopConfig, StreamFn } from '@earendil-works/pi-agent-core';
-import { truncateHead, truncateTail, DEFAULT_MAX_LINES, type TruncationResult } from '@earendil-works/pi-agent-core';
+import {
+  truncateHead,
+  truncateTail,
+  DEFAULT_MAX_LINES,
+  type TruncationResult,
+} from '@earendil-works/pi-agent-core';
 import type { PermissionCallback } from '../types.js';
 import type { UserHookDefinition } from '@zclaudia/shared/interaction/user-hooks';
 import { runPreToolUseHooks, runPostToolUseHooks } from './user-hooks.js';
@@ -54,7 +59,14 @@ function buildToolDetail(toolName: string, args: unknown): string {
   if (toolName === 'Bash' && typeof argsObj.command === 'string') {
     return argsObj.command;
   }
-  if (toolName === 'Read' || toolName === 'Edit' || toolName === 'MultiEdit' || toolName === 'Write' || toolName === 'ReadSymbol' || toolName === 'EditSymbol') {
+  if (
+    toolName === 'Read' ||
+    toolName === 'Edit' ||
+    toolName === 'MultiEdit' ||
+    toolName === 'Write' ||
+    toolName === 'ReadSymbol' ||
+    toolName === 'EditSymbol'
+  ) {
     const filePath = argsObj.file_path ?? argsObj.path;
     if (typeof filePath === 'string') return filePath;
   }
@@ -72,7 +84,8 @@ function buildToolDetail(toolName: string, args: unknown): string {
     if (firstQuestion && typeof firstQuestion === 'object') {
       const question = (firstQuestion as { question?: unknown }).question;
       if (typeof question === 'string' && question.trim()) {
-        const extra = argsObj.questions.length > 1 ? ` (+${argsObj.questions.length - 1} more)` : '';
+        const extra =
+          argsObj.questions.length > 1 ? ` (+${argsObj.questions.length - 1} more)` : '';
         return question.trim() + extra;
       }
     }
@@ -131,7 +144,7 @@ export function truncateContent(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   content: Array<{ type: string; text?: string; [k: string]: any }>,
   toolName: string,
-  limit: number,
+  limit: number
 ): TruncateResult {
   let totalSize = 0;
   for (const block of content) {
@@ -154,7 +167,7 @@ export function truncateContent(
     const blockBytes = Buffer.byteLength(block.text, 'utf8');
     const perBlockLimit = Math.max(
       MIN_PER_BLOCK_BUDGET_BYTES,
-      Math.floor((limit * blockBytes) / totalSize) - TRUNC_MARKER_OVERHEAD_BYTES,
+      Math.floor((limit * blockBytes) / totalSize) - TRUNC_MARKER_OVERHEAD_BYTES
     );
     const result: TruncationResult = truncFn(block.text, {
       maxBytes: perBlockLimit,
@@ -203,14 +216,18 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
         // Hooks see the ORIGINAL model-supplied args — decision.updatedInput
         // may embed decrypted credentials (sudo rewrite) that must never
         // reach user hook processes.
-        const outcome = await runPreToolUseHooks(input.userHooks, {
-          event: 'PreToolUse',
-          toolName,
-          toolInput: args,
-          detail: buildToolDetail(toolName, args),
-          cwd: input.cwd ?? process.cwd(),
-          sessionId: input.sessionId,
-        }, input.abortSignal);
+        const outcome = await runPreToolUseHooks(
+          input.userHooks,
+          {
+            event: 'PreToolUse',
+            toolName,
+            toolInput: args,
+            detail: buildToolDetail(toolName, args),
+            cwd: input.cwd ?? process.cwd(),
+            sessionId: input.sessionId,
+          },
+          input.abortSignal
+        );
         if (outcome.blocked) return { block: true, reason: outcome.reason };
       }
       if (decision.updatedInput !== undefined) {
@@ -270,21 +287,32 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
           }
         }
       }
-      if (toolName === 'Write' && typeof args?.file_path === 'string' && result?.details?.ok !== false) {
+      if (
+        toolName === 'Write' &&
+        typeof args?.file_path === 'string' &&
+        result?.details?.ok !== false
+      ) {
         const key = args.file_path.trim();
         if (key) editAttemptsByPath.delete(key);
       }
       if (input.userHooks?.length) {
-        const extras = await runPostToolUseHooks(input.userHooks, {
-          event: 'PostToolUse',
-          toolName,
-          toolInput: args,
-          detail: buildToolDetail(toolName, args),
-          cwd: input.cwd ?? process.cwd(),
-          sessionId: input.sessionId,
-        }, input.abortSignal);
+        const extras = await runPostToolUseHooks(
+          input.userHooks,
+          {
+            event: 'PostToolUse',
+            toolName,
+            toolInput: args,
+            detail: buildToolDetail(toolName, args),
+            cwd: input.cwd ?? process.cwd(),
+            sessionId: input.sessionId,
+          },
+          input.abortSignal
+        );
         if (extras.length > 0) {
-          content = [...content, ...extras.map((text: string) => ({ type: 'text', text: `[hook] ${text}` }))];
+          content = [
+            ...content,
+            ...extras.map((text: string) => ({ type: 'text', text: `[hook] ${text}` })),
+          ];
           hookAppended = true;
         }
       }
@@ -300,7 +328,7 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
         const loopAttempt = toolFailureGuard.recordFailureWithResult(
           toolName,
           args as Record<string, unknown> | undefined,
-          result.details as Record<string, unknown> | undefined,
+          result.details as Record<string, unknown> | undefined
         );
         const attempts = loopAttempt.attempts;
         if (attempts >= TOOL_FAILURE_HARD_LIMIT) {
@@ -308,17 +336,22 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
             toolName,
             args as Record<string, unknown> | undefined,
             result.details as Record<string, unknown> | undefined,
-            attempts,
+            attempts
           );
-          const bashDetails = loopAttempt.kind === 'bash_failure' ? result.details as Record<string, unknown> | undefined : undefined;
-          const sameFailure = Array.isArray(bashDetails?.diagnostics) && bashDetails.diagnostics.length > 0
-            ? 'the same diagnostics'
-            : Array.isArray(bashDetails?.failedTests) && bashDetails.failedTests.length > 0
-              ? 'the same failed tests'
-              : 'the same failure result';
-          const baseLoopText = loopAttempt.kind === 'bash_failure'
-            ? `This Bash command has failed ${attempts} times with ${sameFailure}. Stop re-running it unchanged — inspect the reported files/tests, edit the underlying cause, or run a different diagnostic command.`
-            : `This tool call has failed ${attempts} times with identical inputs. Stop retrying the same call — change the approach, inspect prerequisites, or ask the user.`;
+          const bashDetails =
+            loopAttempt.kind === 'bash_failure'
+              ? (result.details as Record<string, unknown> | undefined)
+              : undefined;
+          const sameFailure =
+            Array.isArray(bashDetails?.diagnostics) && bashDetails.diagnostics.length > 0
+              ? 'the same diagnostics'
+              : Array.isArray(bashDetails?.failedTests) && bashDetails.failedTests.length > 0
+                ? 'the same failed tests'
+                : 'the same failure result';
+          const baseLoopText =
+            loopAttempt.kind === 'bash_failure'
+              ? `This Bash command has failed ${attempts} times with ${sameFailure}. Stop re-running it unchanged — inspect the reported files/tests, edit the underlying cause, or run a different diagnostic command.`
+              : `This tool call has failed ${attempts} times with identical inputs. Stop retrying the same call — change the approach, inspect prerequisites, or ask the user.`;
           const recoveryText = loopRecovery
             ? ` Recovery: ${loopRecovery.summary} ${loopRecovery.steps.join(' ')}`
             : '';
@@ -334,7 +367,10 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
           // SELF_EXPLANATORY) and downstream readers can detect the loop.
           result.details = {
             ...result.details,
-            error: loopAttempt.kind === 'bash_failure' ? 'bash_failure_loop_detected' : 'tool_loop_detected',
+            error:
+              loopAttempt.kind === 'bash_failure'
+                ? 'bash_failure_loop_detected'
+                : 'tool_loop_detected',
             loopAttempts: attempts,
             loopKind: loopAttempt.kind,
             ...(loopRecovery ? { loopRecovery } : {}),
@@ -345,10 +381,14 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
         toolFailureGuard.recordSuccess(toolName, args as Record<string, unknown> | undefined);
       }
 
-      const telemetry = toolTelemetry.record(toolName, args as Record<string, unknown> | undefined, {
-        content,
-        details: result.details as Record<string, unknown> | undefined,
-      });
+      const telemetry = toolTelemetry.record(
+        toolName,
+        args as Record<string, unknown> | undefined,
+        {
+          content,
+          details: result.details as Record<string, unknown> | undefined,
+        }
+      );
       if (telemetry.advisories.length > 0) {
         content = [
           ...content,
@@ -368,20 +408,29 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
       // Per-turn budget: once cumulative tool-result text exceeds the budget,
       // large results move to disk and only a preview plus the file path stays
       // in context (the model can Read the file back when it needs the rest).
-      if (turnBudgetBytes > 0
-        && finalSize > PERSIST_MIN_BYTES
-        && turnSpentBytes + finalSize > turnBudgetBytes) {
+      if (
+        turnBudgetBytes > 0 &&
+        finalSize > PERSIST_MIN_BYTES &&
+        turnSpentBytes + finalSize > turnBudgetBytes
+      ) {
         const persisted = persistToolResultText(toolName, content);
         if (persisted) {
           const direction = selectTruncDirection(toolName);
           const previewFn = direction === 'head' ? truncateHead : truncateTail;
           const previewSource = content
-            .filter((block: { type: string; text?: string }) => block.type === 'text' && typeof block.text === 'string')
+            .filter(
+              (block: { type: string; text?: string }) =>
+                block.type === 'text' && typeof block.text === 'string'
+            )
             .map((block: { text?: string }) => block.text as string)
             .join('\n');
-          const preview = previewFn(previewSource, { maxBytes: PERSIST_PREVIEW_BYTES, maxLines: DEFAULT_MAX_LINES });
-          const note = `[Tool result (${persisted.size} bytes) exceeded this turn's context budget and was saved to `
-            + `${persisted.filePath} — Read that file if you need the full output. Preview (${direction}):]\n${preview.content}`;
+          const preview = previewFn(previewSource, {
+            maxBytes: PERSIST_PREVIEW_BYTES,
+            maxLines: DEFAULT_MAX_LINES,
+          });
+          const note =
+            `[Tool result (${persisted.size} bytes) exceeded this turn's context budget and was saved to ` +
+            `${persisted.filePath} — Read that file if you need the full output. Preview (${direction}):]\n${preview.content}`;
           const replacement = [
             ...content.filter((block: { type: string }) => block.type !== 'text'),
             { type: 'text', text: note },
@@ -402,7 +451,14 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
       }
       turnSpentBytes += finalSize;
 
-      if (!truncated.didTruncate && !hookAppended && !remediationAppended && !telemetryUpdated && !detailsUpdated) return undefined;
+      if (
+        !truncated.didTruncate &&
+        !hookAppended &&
+        !remediationAppended &&
+        !telemetryUpdated &&
+        !detailsUpdated
+      )
+        return undefined;
       return {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         content: finalContent as any,

@@ -24,13 +24,12 @@ export class AnthropicEvaluatorPort implements EvaluatorLlmPort {
 
   constructor(private readonly deps: AnthropicEvaluatorPortDeps = {}) {}
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async evaluate(_req: EvaluatorRequest): Promise<EvaluatorLlmResult> {
     // TODO(pi-agent): replace with real LLM call once provider dispatch is wired.
     // The integration test stubs this port — this body is only reached in production,
     // where the goal will fall through to an 'error' verdict in GoalEvaluator.catch().
     throw new Error(
-      '[AnthropicEvaluatorPort] LLM dispatch not yet implemented — pi-agent integration pending',
+      '[AnthropicEvaluatorPort] LLM dispatch not yet implemented — pi-agent integration pending'
     );
   }
 }

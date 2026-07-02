@@ -55,7 +55,7 @@ export class ClassicAdapter implements IExecutor {
   constructor(
     private db: Database,
     private lifecycle: ChangeLifecycle,
-    private instance: ExecutorInstance,
+    private instance: ExecutorInstance
   ) {
     this.repo = new ExecutorInstanceRepository(db);
   }
@@ -114,7 +114,7 @@ export class ClassicAdapter implements IExecutor {
 
   private persistStatus(
     s: ExecutorStatus,
-    extra?: { startedAt?: number; completedAt?: number },
+    extra?: { startedAt?: number; completedAt?: number }
   ): void {
     this.repo.update(this.instance.id, {
       statusSummary: s,

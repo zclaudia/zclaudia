@@ -16,12 +16,18 @@ describe('ProcessMonitor', () => {
   });
 
   it('reports leaked descendant processes when no runs are active', async () => {
-    mockExecFile.mockImplementation((_cmd, _args, cb: (err: Error | null, result: { stdout: string; stderr: string }) => void) => {
-      cb(null, {
-        stdout: `${process.pid} 1 500 node node server.js\n200 ${process.pid} 180 pi-agent pi-agent --resume\n`,
-        stderr: '',
-      });
-    });
+    mockExecFile.mockImplementation(
+      (
+        _cmd,
+        _args,
+        cb: (err: Error | null, result: { stdout: string; stderr: string }) => void
+      ) => {
+        cb(null, {
+          stdout: `${process.pid} 1 500 node node server.js\n200 ${process.pid} 180 pi-agent pi-agent --resume\n`,
+          stderr: '',
+        });
+      }
+    );
 
     const onLeakDetected = vi.fn();
     const monitor = new ProcessMonitor(() => 0, onLeakDetected, { minElapsedSeconds: 60 });
@@ -36,20 +42,26 @@ describe('ProcessMonitor', () => {
         elapsedSeconds: 180,
       }),
     ]);
-    expect(onLeakDetected).toHaveBeenCalledWith(expect.objectContaining({
-      leakedProcesses: expect.arrayContaining([
-        expect.objectContaining({ pid: 200 }),
-      ]),
-    }));
+    expect(onLeakDetected).toHaveBeenCalledWith(
+      expect.objectContaining({
+        leakedProcesses: expect.arrayContaining([expect.objectContaining({ pid: 200 })]),
+      })
+    );
   });
 
   it('skips leak detection while runs are active', async () => {
-    mockExecFile.mockImplementation((_cmd, _args, cb: (err: Error | null, result: { stdout: string; stderr: string }) => void) => {
-      cb(null, {
-        stdout: `${process.pid} 1 500 node node server.js\n201 ${process.pid} 240 pi-agent pi-agent --resume\n`,
-        stderr: '',
-      });
-    });
+    mockExecFile.mockImplementation(
+      (
+        _cmd,
+        _args,
+        cb: (err: Error | null, result: { stdout: string; stderr: string }) => void
+      ) => {
+        cb(null, {
+          stdout: `${process.pid} 1 500 node node server.js\n201 ${process.pid} 240 pi-agent pi-agent --resume\n`,
+          stderr: '',
+        });
+      }
+    );
 
     const onLeakDetected = vi.fn();
     const monitor = new ProcessMonitor(() => 1, onLeakDetected, { minElapsedSeconds: 60 });
@@ -61,12 +73,18 @@ describe('ProcessMonitor', () => {
   });
 
   it('kills leaked processes on forced cleanup', async () => {
-    mockExecFile.mockImplementation((_cmd, _args, cb: (err: Error | null, result: { stdout: string; stderr: string }) => void) => {
-      cb(null, {
-        stdout: `${process.pid} 1 500 node node server.js\n202 ${process.pid} 300 pi-agent pi-agent --resume\n`,
-        stderr: '',
-      });
-    });
+    mockExecFile.mockImplementation(
+      (
+        _cmd,
+        _args,
+        cb: (err: Error | null, result: { stdout: string; stderr: string }) => void
+      ) => {
+        cb(null, {
+          stdout: `${process.pid} 1 500 node node server.js\n202 ${process.pid} 300 pi-agent pi-agent --resume\n`,
+          stderr: '',
+        });
+      }
+    );
 
     const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
     const monitor = new ProcessMonitor(() => 0, vi.fn(), { minElapsedSeconds: 60 });
@@ -92,12 +110,18 @@ describe('ProcessMonitor', () => {
   });
 
   it('ignores the monitor ps helper when it appears as a descendant', async () => {
-    mockExecFile.mockImplementation((_cmd, _args, cb: (err: Error | null, result: { stdout: string; stderr: string }) => void) => {
-      cb(null, {
-        stdout: `${process.pid} 1 120 node node server.js\n203 ${process.pid} 121 ps ps -e -o pid=,ppid=,etimes=,comm=,args=\n`,
-        stderr: '',
-      });
-    });
+    mockExecFile.mockImplementation(
+      (
+        _cmd,
+        _args,
+        cb: (err: Error | null, result: { stdout: string; stderr: string }) => void
+      ) => {
+        cb(null, {
+          stdout: `${process.pid} 1 120 node node server.js\n203 ${process.pid} 121 ps ps -e -o pid=,ppid=,etimes=,comm=,args=\n`,
+          stderr: '',
+        });
+      }
+    );
 
     const onLeakDetected = vi.fn();
     const monitor = new ProcessMonitor(() => 0, onLeakDetected, { minElapsedSeconds: 60 });
@@ -109,12 +133,18 @@ describe('ProcessMonitor', () => {
   });
 
   it('ignores descendants with impossible elapsed times', async () => {
-    mockExecFile.mockImplementation((_cmd, _args, cb: (err: Error | null, result: { stdout: string; stderr: string }) => void) => {
-      cb(null, {
-        stdout: `${process.pid} 1 120 node node server.js\n204 ${process.pid} 4123168608 ps ps -e -o pid=,ppid=,etimes=,comm=,args=\n205 ${process.pid} 180 pi-agent pi-agent --resume\n`,
-        stderr: '',
-      });
-    });
+    mockExecFile.mockImplementation(
+      (
+        _cmd,
+        _args,
+        cb: (err: Error | null, result: { stdout: string; stderr: string }) => void
+      ) => {
+        cb(null, {
+          stdout: `${process.pid} 1 120 node node server.js\n204 ${process.pid} 4123168608 ps ps -e -o pid=,ppid=,etimes=,comm=,args=\n205 ${process.pid} 180 pi-agent pi-agent --resume\n`,
+          stderr: '',
+        });
+      }
+    );
 
     const onLeakDetected = vi.fn();
     const monitor = new ProcessMonitor(() => 0, onLeakDetected, { minElapsedSeconds: 60 });
@@ -129,10 +159,10 @@ describe('ProcessMonitor', () => {
         elapsedSeconds: 180,
       }),
     ]);
-    expect(onLeakDetected).toHaveBeenCalledWith(expect.objectContaining({
-      leakedProcesses: expect.arrayContaining([
-        expect.objectContaining({ pid: 205 }),
-      ]),
-    }));
+    expect(onLeakDetected).toHaveBeenCalledWith(
+      expect.objectContaining({
+        leakedProcesses: expect.arrayContaining([expect.objectContaining({ pid: 205 })]),
+      })
+    );
   });
 });

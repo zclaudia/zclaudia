@@ -15,26 +15,33 @@ import {
  * (backend/project/session selection from external sources).
  */
 export function useDeepLinkNavigation(controlPlaneState: string) {
-  const { selectBackend, selectProject: selectProjectRoute, selectSession: selectSessionRoute } = useSelectionCoordinator();
+  const {
+    selectBackend,
+    selectProject: selectProjectRoute,
+    selectSession: selectSessionRoute,
+  } = useSelectionCoordinator();
 
-  const applyTarget = useCallback((target: SelectionDeepLinkTarget) => {
-    if (!hasSelectionDeepLinkTarget(target)) return;
+  const applyTarget = useCallback(
+    (target: SelectionDeepLinkTarget) => {
+      if (!hasSelectionDeepLinkTarget(target)) return;
 
-    if (target.sessionId) {
-      selectSessionRoute(target.sessionId, { backendId: target.backendId });
-      return;
-    }
+      if (target.sessionId) {
+        selectSessionRoute(target.sessionId, { backendId: target.backendId });
+        return;
+      }
 
-    if (target.projectId) {
-      if (target.backendId) selectBackend(target.backendId);
-      selectProjectRoute(target.projectId);
-      return;
-    }
+      if (target.projectId) {
+        if (target.backendId) selectBackend(target.backendId);
+        selectProjectRoute(target.projectId);
+        return;
+      }
 
-    if (target.backendId) {
-      selectBackend(target.backendId);
-    }
-  }, [selectBackend, selectProjectRoute, selectSessionRoute]);
+      if (target.backendId) {
+        selectBackend(target.backendId);
+      }
+    },
+    [selectBackend, selectProjectRoute, selectSessionRoute]
+  );
 
   // Apply deep link from URL query params on initial ready
   useEffect(() => {

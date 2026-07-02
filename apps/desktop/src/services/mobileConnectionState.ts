@@ -19,28 +19,28 @@ export function isMobileBackendUsable(input: {
   const { backendId, connectionState, backends } = input;
   if (!backendId) return false;
   if (connectionState !== 'connected') return false;
-  return backends.some((backend) => backend.backendId === backendId && backend.runtimeState === 'ready');
+  return backends.some(
+    backend => backend.backendId === backendId && backend.runtimeState === 'ready'
+  );
 }
 
 export function getUsableMobileBackendIds(
   connectionState: BackendConnectionState,
-  backends: BackendSnapshot[],
+  backends: BackendSnapshot[]
 ): string[] {
   if (connectionState !== 'connected') return [];
   return backends
-    .filter((backend) => backend.runtimeState === 'ready')
-    .map((backend) => backend.backendId);
+    .filter(backend => backend.runtimeState === 'ready')
+    .map(backend => backend.backendId);
 }
 
-export function isMobileGatewayConnected(
-  connectionState: BackendConnectionState,
-): boolean {
+export function isMobileGatewayConnected(connectionState: BackendConnectionState): boolean {
   return connectionState === 'connected';
 }
 
 export function getMobileControlPlaneState(
   connectionState: BackendConnectionState,
-  snapshotVersion: number,
+  snapshotVersion: number
 ): MobileControlPlaneState {
   if (connectionState === 'connected' && snapshotVersion > 1) return 'ready';
   if (connectionState === 'error') return 'error';
@@ -50,23 +50,23 @@ export function getMobileControlPlaneState(
 export function getVisibleMobileBackends(
   backends: BackendSnapshot[],
   currentInstanceId: string | null,
-  showLocalBackend: boolean,
+  showLocalBackend: boolean
 ): BackendSnapshot[] {
   return backends.filter(
-    (backend) =>
-      backend.runtimeState !== 'offline'
-      && shouldShowNonCurrentInstanceBackend(backend, currentInstanceId, showLocalBackend),
+    backend =>
+      backend.runtimeState !== 'offline' &&
+      shouldShowNonCurrentInstanceBackend(backend, currentInstanceId, showLocalBackend)
   );
 }
 
 export function getMobileBackendViewState(
   backendId: string | null | undefined,
   connectionState: BackendConnectionState,
-  backends: BackendSnapshot[],
+  backends: BackendSnapshot[]
 ): MobileBackendViewState {
   if (!backendId) return 'offline';
 
-  const backend = backends.find((item) => item.backendId === backendId);
+  const backend = backends.find(item => item.backendId === backendId);
   if (!backend || backend.runtimeState === 'offline') return 'offline';
   if (connectionState !== 'connected') return 'transport_reconnecting';
   if (backend.runtimeState === 'ready') return 'ready';

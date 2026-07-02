@@ -10,8 +10,8 @@ export function MobileGatewayConfig() {
     setDirectGatewayConfig,
     clearDirectGatewayConfig,
   } = useGatewayStore();
-  const facadeConnectionState = useFacadeStore((s) => s.connectionState);
-  const facadeConnectionError = useFacadeStore((s) => s.connectionError);
+  const facadeConnectionState = useFacadeStore(s => s.connectionState);
+  const facadeConnectionError = useFacadeStore(s => s.connectionError);
   const isGatewayConnected = isMobileGatewayConnected(facadeConnectionState);
   const displayStatus = isGatewayConnected ? 'connected' : facadeConnectionState;
   const displayError = facadeConnectionError;
@@ -44,7 +44,9 @@ export function MobileGatewayConfig() {
       {/* Connection status */}
       <div className="p-3 bg-secondary/50 rounded-lg space-y-1">
         <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full ${isGatewayConnected ? 'bg-success' : 'bg-destructive'}`} />
+          <span
+            className={`w-2 h-2 rounded-full ${isGatewayConnected ? 'bg-success' : 'bg-destructive'}`}
+          />
           <span className="text-sm">
             {isGatewayConnected ? 'Gateway connected' : `Gateway ${displayStatus}`}
           </span>
@@ -55,9 +57,7 @@ export function MobileGatewayConfig() {
           </p>
         )}
         {displayError && (
-          <p className="text-[10px] text-destructive break-all">
-            Error: {displayError}
-          </p>
+          <p className="text-[10px] text-destructive break-all">Error: {displayError}</p>
         )}
       </div>
 
@@ -67,7 +67,10 @@ export function MobileGatewayConfig() {
         <input
           type="text"
           value={url}
-          onChange={(e) => { setUrl(e.target.value); setDirty(true); }}
+          onChange={e => {
+            setUrl(e.target.value);
+            setDirty(true);
+          }}
           placeholder="http://gateway.example.com:3200"
           className="w-full px-3 py-2.5 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary"
         />
@@ -79,7 +82,10 @@ export function MobileGatewayConfig() {
         <input
           type="password"
           value={secret}
-          onChange={(e) => { setSecret(e.target.value); setDirty(true); }}
+          onChange={e => {
+            setSecret(e.target.value);
+            setDirty(true);
+          }}
           placeholder="Enter gateway secret"
           className="w-full px-3 py-2.5 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary"
         />

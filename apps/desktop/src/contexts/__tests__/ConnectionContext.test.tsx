@@ -83,13 +83,10 @@ const mockServerStore = {
 };
 
 vi.mock('../../stores/serverStore', () => ({
-  useServerStore: Object.assign(
-    () => ({}),
-    {
-      getState: () => mockServerStore,
-      setState: vi.fn((partial: any) => Object.assign(mockServerStore, partial)),
-    },
-  ),
+  useServerStore: Object.assign(() => ({}), {
+    getState: () => mockServerStore,
+    setState: vi.fn((partial: any) => Object.assign(mockServerStore, partial)),
+  }),
 }));
 
 vi.mock('../../stores/gatewayStore', () => {
@@ -103,12 +100,12 @@ vi.mock('../../stores/gatewayStore', () => {
   };
   const setState = vi.fn((partial: any) => Object.assign(store, partial));
   const useGatewayStore = Object.assign(
-    (selector?: (s: any) => any) => selector ? selector(store) : store,
+    (selector?: (s: any) => any) => (selector ? selector(store) : store),
     {
       getState: () => store,
       setState,
       _store: store,
-    },
+    }
   );
   return {
     useGatewayStore,
@@ -127,11 +124,12 @@ const mockFacadeStore = {
 
 vi.mock('../../stores/facadeStore', () => ({
   useFacadeStore: Object.assign(
-    (selector?: (s: typeof mockFacadeStore) => unknown) => selector ? selector(mockFacadeStore) : mockFacadeStore,
+    (selector?: (s: typeof mockFacadeStore) => unknown) =>
+      selector ? selector(mockFacadeStore) : mockFacadeStore,
     {
       getState: () => mockFacadeStore,
       setState: vi.fn((partial: any) => Object.assign(mockFacadeStore, partial)),
-    },
+    }
   ),
 }));
 
@@ -217,7 +215,7 @@ describe('ConnectionContext', () => {
         type: 'permission_decision',
         requestId: 'req-1',
         allow: true,
-      }),
+      })
     );
     expect(mockPermissionStore.clearRequestById).toHaveBeenCalledWith('req-1');
   });
@@ -243,14 +241,12 @@ describe('ConnectionContext', () => {
         type: 'permission_decision',
         requestId: 'req-2',
         allow: false,
-      }),
+      })
     );
   });
 
   it('handlePermissionDecision includes feedback when provided', async () => {
-    mockPermissionStore.pendingRequests = [
-      { requestId: 'req-3', toolName: 'Bash', detail: '{}' },
-    ];
+    mockPermissionStore.pendingRequests = [{ requestId: 'req-3', toolName: 'Bash', detail: '{}' }];
 
     const wrapper = ({ children }: { children: ReactNode }) => (
       <ConnectionProvider>{children}</ConnectionProvider>
@@ -265,7 +261,7 @@ describe('ConnectionContext', () => {
     expect(mockSocket.sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         feedback: 'Not needed',
-      }),
+      })
     );
   });
 
@@ -312,7 +308,7 @@ describe('ConnectionContext', () => {
       expect.objectContaining({
         type: 'prompt_answer',
         requestId: 'ask-2',
-      }),
+      })
     );
   });
 
@@ -342,7 +338,9 @@ describe('ConnectionContext', () => {
 
   it('parses standalone server URL and sets port', async () => {
     const wrapper = ({ children }: { children: ReactNode }) => (
-      <ConnectionProvider standaloneServerUrl="http://localhost:5678">{children}</ConnectionProvider>
+      <ConnectionProvider standaloneServerUrl="http://localhost:5678">
+        {children}
+      </ConnectionProvider>
     );
 
     renderHook(() => useConnection(), { wrapper });
@@ -426,7 +424,7 @@ describe('ConnectionContext', () => {
     expect(mockSocket.sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         encryptedCredential: 'encrypted_cred',
-      }),
+      })
     );
 
     // Reset
@@ -462,7 +460,7 @@ describe('ConnectionContext', () => {
 
     expect(consoleSpy).toHaveBeenCalledWith(
       expect.stringContaining('Failed to encrypt credential'),
-      expect.any(Error),
+      expect.any(Error)
     );
     // Should still send the message without encrypted credential
     expect(mockSocket.sendMessage).toHaveBeenCalled();

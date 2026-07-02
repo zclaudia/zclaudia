@@ -30,7 +30,7 @@ describe('BootstrapService', () => {
     db.pragma('foreign_keys = ON');
     applyMigrations(db);
     db.prepare(
-      `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
     ).run('proj-1', 'P', 'code', 0, 0);
     projectRoot = mkdtempSync(join(tmpdir(), 'bootstrap-'));
     reviewRepo = new BootstrapReviewItemRepository(db);
@@ -97,7 +97,7 @@ describe('BootstrapService', () => {
     fs.mkdirSync(corpusDir, { recursive: true });
     fs.writeFileSync(
       join(corpusDir, 'spec.md'),
-      `# auth Specification\n\n## Requirements\n\n### Requirement: Login\n\nSystem SHALL authenticate.\n\n#### Scenario: Valid\n- **WHEN** valid\n- **THEN** SHALL return token\n`,
+      `# auth Specification\n\n## Requirements\n\n### Requirement: Login\n\nSystem SHALL authenticate.\n\n#### Scenario: Valid\n- **WHEN** valid\n- **THEN** SHALL return token\n`
     );
 
     const explore = new AiExploreService({
@@ -144,7 +144,7 @@ describe('BootstrapService', () => {
     // Review items persisted
     const pending = reviewRepo.listPendingByScan(result.scan.id);
     expect(pending).toHaveLength(2);
-    expect(pending.map((p) => p.operation).sort()).toEqual(['modify', 'remove']);
+    expect(pending.map(p => p.operation).sort()).toEqual(['modify', 'remove']);
   });
 
   it('throws when another scan is already active', async () => {
@@ -153,10 +153,10 @@ describe('BootstrapService', () => {
     await svc.start({ projectId: 'proj-1', mode: 'rescan' }); // completed (no perCapability → empty)
     // Manually mark as awaiting_review to simulate an active scan
     db.prepare(`UPDATE bootstrap_scans SET status = 'awaiting_review' WHERE project_id = ?`).run(
-      'proj-1',
+      'proj-1'
     );
     await expect(svc.start({ projectId: 'proj-1', mode: 'rescan' })).rejects.toThrow(
-      /already active/,
+      /already active/
     );
   });
 
@@ -187,9 +187,9 @@ describe('BootstrapService', () => {
     // Start a scan and manually rewind it to 'running' to simulate an
     // interrupted bootstrap that never finished.
     const completed = await svc.start({ projectId: 'proj-1', mode: 'rescan' });
-    db.prepare(
-      `UPDATE bootstrap_scans SET status='running', finished_at=NULL WHERE id = ?`,
-    ).run(completed.scan.id);
+    db.prepare(`UPDATE bootstrap_scans SET status='running', finished_at=NULL WHERE id = ?`).run(
+      completed.scan.id
+    );
 
     const cancelled = svc.cancelScan(completed.scan.id);
     expect(cancelled.status).toBe('cancelled');
@@ -223,11 +223,13 @@ describe('BootstrapService', () => {
   describe('init mode: start', () => {
     it('starts Phase 1 in background and returns scan immediately with init_phase=discovering', async () => {
       let resolveAi: (() => void) | null = null;
-      const aiStarted = new Promise<void>((resolve) => { resolveAi = resolve; });
+      const aiStarted = new Promise<void>(resolve => {
+        resolveAi = resolve;
+      });
       const port = {
         async startVirtualRun(args: any) {
           resolveAi!();
-          await new Promise<void>((r) => setTimeout(r, 50));
+          await new Promise<void>(r => setTimeout(r, 50));
           args.onMessage?.({
             kind: 'assistant',
             content: JSON.stringify({
@@ -241,17 +243,23 @@ describe('BootstrapService', () => {
       const explore = new AiExploreService({ aiRunPort: port, timeoutMs: 5000 });
       const broadcastCalls: any[] = [];
       const svc = new BootstrapService({
-        db, explore, getProjectRoot: () => projectRoot,
+        db,
+        explore,
+        getProjectRoot: () => projectRoot,
         broadcast: (scanId, payload) => broadcastCalls.push({ scanId, payload }),
       });
       const result = await svc.start({ projectId: 'proj-1', mode: 'initial' });
       expect(result.scan.status).toBe('running');
       expect(result.scan.initPhase).toBe('discovering');
       await aiStarted;
-      await new Promise((r) => setTimeout(r, 150));
-      const refreshed = db.prepare(`SELECT * FROM bootstrap_scans WHERE id = ?`).get(result.scan.id) as any;
+      await new Promise(r => setTimeout(r, 150));
+      const refreshed = db
+        .prepare(`SELECT * FROM bootstrap_scans WHERE id = ?`)
+        .get(result.scan.id) as any;
       expect(refreshed.init_phase).toBe('picking');
-      const candidates = db.prepare(`SELECT * FROM bootstrap_candidates WHERE scan_id = ?`).all(result.scan.id);
+      const candidates = db
+        .prepare(`SELECT * FROM bootstrap_candidates WHERE scan_id = ?`)
+        .all(result.scan.id);
       expect(candidates).toHaveLength(1);
     });
   });
@@ -279,15 +287,17 @@ describe('BootstrapService', () => {
       const svc = makeSvc();
       const scanId = await setupAwaitingPicker(svc);
       svc.addCandidate(scanId, { name: 'manual-cap', description: 'x' });
-      expect(() => svc.addCandidate(scanId, { name: 'manual-cap', description: 'y' }))
-        .toThrow(/already exists/);
+      expect(() => svc.addCandidate(scanId, { name: 'manual-cap', description: 'y' })).toThrow(
+        /already exists/
+      );
     });
 
     it('addCandidate rejects invalid kebab-case name', async () => {
       const svc = makeSvc();
       const scanId = await setupAwaitingPicker(svc);
-      expect(() => svc.addCandidate(scanId, { name: 'BadName', description: 'x' }))
-        .toThrow(/kebab/);
+      expect(() => svc.addCandidate(scanId, { name: 'BadName', description: 'x' })).toThrow(
+        /kebab/
+      );
     });
 
     it('patchCandidate updates title and description', async () => {
@@ -303,7 +313,9 @@ describe('BootstrapService', () => {
       const scanId = await setupAwaitingPicker(svc);
       const c = svc.addCandidate(scanId, { name: 'a', description: 'x' });
       svc.removeCandidate(c.id);
-      const refreshed = db.prepare(`SELECT phase FROM bootstrap_candidates WHERE id = ?`).get(c.id) as any;
+      const refreshed = db
+        .prepare(`SELECT phase FROM bootstrap_candidates WHERE id = ?`)
+        .get(c.id) as any;
       expect(refreshed.phase).toBe('excluded');
     });
   });
@@ -324,24 +336,35 @@ describe('BootstrapService', () => {
       const explore = new AiExploreService({ aiRunPort: port, timeoutMs: 5000 });
       const broadcasts: any[] = [];
       const svc = new BootstrapService({
-        db, explore, getProjectRoot: () => projectRoot, broadcast: (id, p) => broadcasts.push({ id, p }),
+        db,
+        explore,
+        getProjectRoot: () => projectRoot,
+        broadcast: (id, p) => broadcasts.push({ id, p }),
       });
       const scanId = 'scan-gen';
-      db.prepare(`INSERT INTO bootstrap_scans (id, project_id, status, started_at, applied_count, pending_count, init_phase)
-                  VALUES (?, 'proj-1', 'awaiting_review', ?, 0, 0, 'picking')`).run(scanId, Date.now());
+      db.prepare(
+        `INSERT INTO bootstrap_scans (id, project_id, status, started_at, applied_count, pending_count, init_phase)
+                  VALUES (?, 'proj-1', 'awaiting_review', ?, 0, 0, 'picking')`
+      ).run(scanId, Date.now());
       const c1 = svc.addCandidate(scanId, { name: 'auth', description: 'login' });
       const c2 = svc.addCandidate(scanId, { name: 'billing', description: 'subs' });
 
       await svc.commitGeneration(scanId);
-      await new Promise((r) => setTimeout(r, 200));
+      await new Promise(r => setTimeout(r, 200));
 
       expect(calls).toBe(2);
-      const r1 = db.prepare(`SELECT phase, generated_md FROM bootstrap_candidates WHERE id = ?`).get(c1.id) as any;
-      const r2 = db.prepare(`SELECT phase, generated_md FROM bootstrap_candidates WHERE id = ?`).get(c2.id) as any;
+      const r1 = db
+        .prepare(`SELECT phase, generated_md FROM bootstrap_candidates WHERE id = ?`)
+        .get(c1.id) as any;
+      const r2 = db
+        .prepare(`SELECT phase, generated_md FROM bootstrap_candidates WHERE id = ?`)
+        .get(c2.id) as any;
       expect(r1.phase).toBe('generated');
       expect(r2.phase).toBe('generated');
       expect(r1.generated_md).toBe(validMd);
-      const scan = db.prepare(`SELECT init_phase FROM bootstrap_scans WHERE id = ?`).get(scanId) as any;
+      const scan = db
+        .prepare(`SELECT init_phase FROM bootstrap_scans WHERE id = ?`)
+        .get(scanId) as any;
       expect(scan.init_phase).toBe('reviewing');
     });
   });
@@ -352,10 +375,14 @@ describe('BootstrapService', () => {
 
     function seedGenerated(svc: BootstrapService) {
       const scanId = 'scan-rev';
-      db.prepare(`INSERT INTO bootstrap_scans (id, project_id, status, started_at, applied_count, pending_count, init_phase)
-                  VALUES (?, 'proj-1', 'awaiting_review', ?, 0, 0, 'reviewing')`).run(scanId, Date.now());
+      db.prepare(
+        `INSERT INTO bootstrap_scans (id, project_id, status, started_at, applied_count, pending_count, init_phase)
+                  VALUES (?, 'proj-1', 'awaiting_review', ?, 0, 0, 'reviewing')`
+      ).run(scanId, Date.now());
       const c = svc.addCandidate(scanId, { name: 'auth', description: 'login' });
-      db.prepare(`UPDATE bootstrap_candidates SET phase='generated', generated_md=? WHERE id=?`).run(validMd, c.id);
+      db.prepare(
+        `UPDATE bootstrap_candidates SET phase='generated', generated_md=? WHERE id=?`
+      ).run(validMd, c.id);
       return { scanId, candidateId: c.id };
     }
 
@@ -378,7 +405,9 @@ describe('BootstrapService', () => {
       // Modify config, approve another — should not be overwritten
       fs.writeFileSync(cfg, 'schema: spec-driven\ncontext: |\n  custom user content\n');
       const c2 = svc.addCandidate('scan-rev', { name: 'billing', description: 'subs' });
-      db.prepare(`UPDATE bootstrap_candidates SET phase='generated', generated_md=? WHERE id=?`).run(validMd, c2.id);
+      db.prepare(
+        `UPDATE bootstrap_candidates SET phase='generated', generated_md=? WHERE id=?`
+      ).run(validMd, c2.id);
       svc.approveCandidate(c2.id);
       expect(fs.readFileSync(cfg, 'utf-8')).toContain('custom user content');
     });
@@ -387,7 +416,9 @@ describe('BootstrapService', () => {
       const svc = makeSvc();
       const { candidateId } = seedGenerated(svc);
       svc.rejectCandidate(candidateId);
-      const after = db.prepare(`SELECT phase FROM bootstrap_candidates WHERE id=?`).get(candidateId) as any;
+      const after = db
+        .prepare(`SELECT phase FROM bootstrap_candidates WHERE id=?`)
+        .get(candidateId) as any;
       expect(after.phase).toBe('rejected');
     });
 
@@ -402,19 +433,28 @@ describe('BootstrapService', () => {
       };
       const explore = new AiExploreService({ aiRunPort: port, timeoutMs: 5000 });
       const svc = new BootstrapService({
-        db, explore, getProjectRoot: () => projectRoot, broadcast: () => {},
+        db,
+        explore,
+        getProjectRoot: () => projectRoot,
+        broadcast: () => {},
       });
       const scanId = 'scan-retry';
-      db.prepare(`INSERT INTO bootstrap_scans (id, project_id, status, started_at, applied_count, pending_count, init_phase)
-                  VALUES (?, 'proj-1', 'awaiting_review', ?, 0, 0, 'reviewing')`).run(scanId, Date.now());
+      db.prepare(
+        `INSERT INTO bootstrap_scans (id, project_id, status, started_at, applied_count, pending_count, init_phase)
+                  VALUES (?, 'proj-1', 'awaiting_review', ?, 0, 0, 'reviewing')`
+      ).run(scanId, Date.now());
       const c = svc.addCandidate(scanId, { name: 'auth', description: 'login' });
-      db.prepare(`UPDATE bootstrap_candidates SET phase='failed', error_message='boom' WHERE id=?`).run(c.id);
+      db.prepare(
+        `UPDATE bootstrap_candidates SET phase='failed', error_message='boom' WHERE id=?`
+      ).run(c.id);
 
       await svc.retryCandidate(c.id);
-      await new Promise((r) => setTimeout(r, 150));
+      await new Promise(r => setTimeout(r, 150));
 
       expect(calls).toBe(1);
-      const after = db.prepare(`SELECT phase, generated_md FROM bootstrap_candidates WHERE id=?`).get(c.id) as any;
+      const after = db
+        .prepare(`SELECT phase, generated_md FROM bootstrap_candidates WHERE id=?`)
+        .get(c.id) as any;
       expect(after.phase).toBe('generated');
       expect(after.generated_md).toBe(validMd);
     });
@@ -424,7 +464,10 @@ describe('BootstrapService', () => {
   function makeSvc(): BootstrapService {
     const explore = new AiExploreService({ aiRunPort: mkPort({ perCapability: {} }) });
     return new BootstrapService({
-      db, explore, getProjectRoot: () => projectRoot, broadcast: () => {},
+      db,
+      explore,
+      getProjectRoot: () => projectRoot,
+      broadcast: () => {},
     });
   }
 });

@@ -200,44 +200,77 @@ function createDb(): Database.Database {
   createAgentProfilesTable(db);
 
   const now = Date.now();
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO llm_profiles (id, name, provider_type, created_at, updated_at)
     VALUES ('provider-1', 'Anthropic', 'anthropic', ?, ?)
-  `).run(now, now);
+  `
+  ).run(now, now);
 
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO projects (id, llm_profile_id, root_path, system_prompt)
     VALUES ('project-1', 'provider-1', '/tmp', 'project system prompt')
-  `).run();
+  `
+  ).run();
 
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO agent_profiles (
       id, name, llm_profile_id, model, system_prompt, enabled_tools,
       is_default, created_at, updated_at
     )
     VALUES ('agent-1', 'Test Agent', 'provider-1', 'claude-sonnet-4-6', 'agent system prompt',
       '["read","write","edit","bash","grep","find","ls"]', 1, ?, ?)
-  `).run(now, now);
+  `
+  ).run(now, now);
 
   return db;
 }
 
-function insertSession(db: Database.Database, values: {
-  id: string;
-  type: 'agent' | 'regular' | 'background';
-  sdkSessionId?: string | null;
-}) {
-  db.prepare(`
+function insertSession(
+  db: Database.Database,
+  values: {
+    id: string;
+    type: 'agent' | 'regular' | 'background';
+    sdkSessionId?: string | null;
+  }
+) {
+  db.prepare(
+    `
     INSERT INTO sessions (
       id, project_id, name, sdk_session_id, type, parent_session_id, working_directory, project_role,
       plan_status, task_id, agent_profile_id, system_prompt, is_read_only, last_run_status, created_at, updated_at, archived_at
     )
     VALUES (?, 'project-1', 'Test Session', NULL, ?, NULL, NULL, NULL, NULL, NULL, 'agent-1', NULL, NULL, NULL, ?, ?, NULL)
-  `).run(values.id, values.type, Date.now(), Date.now());
+  `
+  ).run(values.id, values.type, Date.now(), Date.now());
 
   if (values.sdkSessionId !== undefined) {
-    db.prepare(`UPDATE sessions SET sdk_session_id = ? WHERE id = ?`).run(values.sdkSessionId, values.id);
+    db.prepare(`UPDATE sessions SET sdk_session_id = ? WHERE id = ?`).run(
+      values.sdkSessionId,
+      values.id
+    );
   }
+}
+
+function createRunHandlerContext(overrides: Record<string, unknown> = {}) {
+  return {
+    activeRuns: new Map(),
+    processMonitor: null,
+    notificationService: { notify: vi.fn() } as any,
+    serverPort: null,
+    broadcastHeartbeat: vi.fn(),
+    providerRegistry: mockProviderRegistry,
+    permissionBridge: {
+      register: vi.fn(),
+      setWorkflowRunId: vi.fn(),
+    } as any,
+    permissionWorkflowResolver: {
+      triggerPermissionEscalation: vi.fn(),
+    } as any,
+    ...overrides,
+  };
 }
 
 async function* createProviderStream() {
@@ -294,14 +327,7 @@ describe('ws/run-handler', () => {
       db as any,
       {},
       undefined,
-      {
-        activeRuns: new Map(),
-        processMonitor: null,
-        notificationService: { notify: vi.fn() } as any,
-        serverPort: null,
-        broadcastHeartbeat: vi.fn(),
-        providerRegistry: mockProviderRegistry,
-      },
+      createRunHandlerContext()
     );
 
     // Skill content is no longer pre-loaded — the agent reads SKILL.md on demand
@@ -312,7 +338,7 @@ describe('ws/run-handler', () => {
         baseSystemPrompt: 'agent system prompt',
         workspacePrompt: 'workspace prompt',
         skillDirectoryHint: 'skill directory',
-      }),
+      })
     );
     const [, ctxArgs] = assembleContextMock.mock.calls[0] as [string, Record<string, unknown>];
     expect(ctxArgs.activeSkillsContent).toBeUndefined();
@@ -323,10 +349,13 @@ describe('ws/run-handler', () => {
       'please review this change',
       expect.objectContaining({
         systemPrompt: 'assembled system prompt',
-        agentProfile: expect.objectContaining({ id: 'agent-1', systemPrompt: 'agent system prompt' }),
+        agentProfile: expect.objectContaining({
+          id: 'agent-1',
+          systemPrompt: 'agent system prompt',
+        }),
         enabledTools: ['Read', 'Write', 'Edit', 'Bash', 'Grep', 'LS'],
       }),
-      expect.any(Function),
+      expect.any(Function)
     );
   });
 
@@ -354,21 +383,14 @@ describe('ws/run-handler', () => {
       db as any,
       {},
       undefined,
-      {
-        activeRuns: new Map(),
-        processMonitor: null,
-        notificationService: { notify: vi.fn() } as any,
-        serverPort: null,
-        broadcastHeartbeat: vi.fn(),
-        providerRegistry: mockProviderRegistry,
-      },
+      createRunHandlerContext()
     );
 
     expect(assembleContextMock).toHaveBeenCalledWith(
       'review',
       expect.objectContaining({
         skillDirectoryHint: 'skill directory',
-      }),
+      })
     );
     const [, ctxArgs] = assembleContextMock.mock.calls[0] as [string, Record<string, unknown>];
     expect(ctxArgs.activeSkillsContent).toBeUndefined();
@@ -405,24 +427,20 @@ describe('ws/run-handler', () => {
       db as any,
       {},
       undefined,
-      {
-        activeRuns: new Map(),
-        processMonitor: null,
-        notificationService: { notify: vi.fn() } as any,
-        serverPort: null,
-        broadcastHeartbeat: vi.fn(),
-        providerRegistry: mockProviderRegistry,
+      createRunHandlerContext({
         sessionSync: {
           broadcastSessionUpdated: (sessionId: string, dbArg: any) => {
             const gw = getGatewayClientMock();
             if (!gw) return;
-            const row = dbArg.prepare(
-              'SELECT id, name, last_run_status as lastRunStatus, updated_at as updatedAt, archived_at as archivedAt FROM sessions WHERE id = ?'
-            ).get(sessionId);
+            const row = dbArg
+              .prepare(
+                'SELECT id, name, last_run_status as lastRunStatus, updated_at as updatedAt, archived_at as archivedAt FROM sessions WHERE id = ?'
+              )
+              .get(sessionId);
             if (row) gw.commands.backendData.broadcastSessionEvent('updated', row);
           },
         },
-      },
+      })
     );
 
     expect(broadcastSessionEvent.mock.calls.length).toBeGreaterThanOrEqual(2);
@@ -445,9 +463,7 @@ describe('ws/run-handler', () => {
       throw new Error('process exited with code 1');
     }
 
-    providerRunMock
-      .mockReturnValueOnce(crashStream())
-      .mockReturnValueOnce(createProviderStream());
+    providerRunMock.mockReturnValueOnce(crashStream()).mockReturnValueOnce(createProviderStream());
 
     const { handleRunStart } = await import('../run-handler.js');
 
@@ -468,14 +484,7 @@ describe('ws/run-handler', () => {
       db as any,
       {},
       undefined,
-      {
-        activeRuns: new Map(),
-        processMonitor: null,
-        notificationService: { notify: vi.fn() } as any,
-        serverPort: null,
-        broadcastHeartbeat: vi.fn(),
-        providerRegistry: mockProviderRegistry,
-      },
+      createRunHandlerContext()
     );
 
     expect(providerRunMock).toHaveBeenCalledTimes(2);
@@ -508,7 +517,9 @@ describe('ws/run-handler', () => {
       });
 
       observedStatusDuringResume = (
-        db.prepare('SELECT last_run_status FROM sessions WHERE id = ?').get('session-background') as { last_run_status: string | null }
+        db
+          .prepare('SELECT last_run_status FROM sessions WHERE id = ?')
+          .get('session-background') as { last_run_status: string | null }
       ).last_run_status;
 
       yield {
@@ -550,7 +561,7 @@ describe('ws/run-handler', () => {
         serverPort: null,
         broadcastHeartbeat: vi.fn(),
         providerRegistry: mockProviderRegistry,
-      },
+      }
     );
 
     await vi.advanceTimersByTimeAsync(1000);
@@ -558,13 +569,15 @@ describe('ws/run-handler', () => {
 
     const sentMessages = sendMessageMock.mock.calls.map(([_, payload]) => payload);
     expect(observedStatusDuringResume).toBe('running');
-    expect(sentMessages).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        type: 'background_task_update',
-        sessionId: 'session-background',
-        status: 'running',
-      }),
-    ]));
+    expect(sentMessages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'background_task_update',
+          sessionId: 'session-background',
+          status: 'running',
+        }),
+      ])
+    );
 
     vi.useRealTimers();
   });

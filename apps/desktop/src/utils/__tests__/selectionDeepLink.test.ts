@@ -37,7 +37,9 @@ describe('selectionDeepLink', () => {
   });
 
   it('parses selection target from a full click url', () => {
-    expect(parseSelectionDeepLinkUrl('zclaudia://open?backendId=b1&projectId=p1&sessionId=s1')).toEqual({
+    expect(
+      parseSelectionDeepLinkUrl('zclaudia://open?backendId=b1&projectId=p1&sessionId=s1')
+    ).toEqual({
       backendId: 'b1',
       projectId: 'p1',
       sessionId: 's1',
@@ -45,7 +47,8 @@ describe('selectionDeepLink', () => {
   });
 
   it('consumes pending native selection target from window global first', () => {
-    (window as any).__ZCLAUDIA_PENDING_SELECTION_TARGET__ = 'zclaudia://open?backendId=b1&sessionId=s1';
+    (window as any).__ZCLAUDIA_PENDING_SELECTION_TARGET__ =
+      'zclaudia://open?backendId=b1&sessionId=s1';
     (window as any).AndroidNotifications = {
       consumeSelectionTarget: vi.fn(() => 'zclaudia://open?backendId=ignored&sessionId=ignored'),
     };

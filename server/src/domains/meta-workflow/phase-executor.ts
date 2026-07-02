@@ -6,7 +6,7 @@ import type {
   MetaSubagentTemplate,
 } from '@zclaudia/shared/features/meta-workflow';
 import type { WorkflowDefinition } from '@zclaudia/shared/features/workflows';
-import { MetaWorkflowPhaseAggregate } from './phase-aggregate.js';
+import { type MetaWorkflowPhaseAggregate } from './phase-aggregate.js';
 import { synthesizeWorkflow } from './workflow-synthesizer.js';
 import { synthesizeSubagent } from './subagent-synthesizer.js';
 import { runGates } from './gate-runner.js';
@@ -20,7 +20,10 @@ export interface RunEntityOutcome {
   exitOk: boolean;
 }
 
-export type RunEntity = (entity: SynthesizedEntity, opts: { worktreePath: string }) => Promise<RunEntityOutcome>;
+export type RunEntity = (
+  entity: SynthesizedEntity,
+  opts: { worktreePath: string }
+) => Promise<RunEntityOutcome>;
 
 export interface MetaPhaseExecutorOptions {
   aggregate: MetaWorkflowPhaseAggregate;
@@ -40,7 +43,7 @@ export class MetaPhaseExecutor {
   async execute(
     phaseRecordId: string,
     def: PhaseDef,
-    worktreePath: string,
+    worktreePath: string
   ): Promise<PhaseExecutionResult> {
     const { aggregate, runEntity } = this.opts;
 
@@ -78,7 +81,11 @@ export class MetaPhaseExecutor {
         const latest = this.opts.artifactRepo.findLatestByPhase(phaseRecordId);
         const version = (latest?.version ?? 0) + 1;
         this.opts.artifactRepo.create({
-          phaseRecordId, version, gateResults: [], status: 'stale', createdAt: Date.now(),
+          phaseRecordId,
+          version,
+          gateResults: [],
+          status: 'stale',
+          createdAt: Date.now(),
         });
       }
       return { phase, gateResults: [] };
@@ -87,7 +94,7 @@ export class MetaPhaseExecutor {
     aggregate.enterVerifyingGates(phaseRecordId);
 
     const gateResults = await runGates(def.acceptanceGates, worktreePath);
-    const allPassed = gateResults.every((r) => r.passed);
+    const allPassed = gateResults.every(r => r.passed);
 
     const phase = allPassed
       ? aggregate.markDone(phaseRecordId)

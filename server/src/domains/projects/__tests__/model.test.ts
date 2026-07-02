@@ -54,10 +54,13 @@ describe('projects model', () => {
       updatedAt: 1,
     } as Project;
 
-    const nextState = applyProjectPatch(existing, buildProjectPatch({
-      type: 'chat_only',
-      reviewLlmProfileId: null,
-    }));
+    const nextState = applyProjectPatch(
+      existing,
+      buildProjectPatch({
+        type: 'chat_only',
+        reviewLlmProfileId: null,
+      })
+    );
 
     expect(nextState).toMatchObject({
       name: 'Original',
@@ -76,7 +79,11 @@ describe('projects model', () => {
       updatedAt: 1,
     } as Project;
 
-    expect(() => applyProjectPatch(existing, buildProjectPatch({ name: null }))).toThrow('Name is required');
-    expect(() => applyProjectPatch(existing, buildProjectPatch({ type: null }))).toThrow('Type is required');
+    expect(() => applyProjectPatch(existing, buildProjectPatch({ name: null }))).toThrow(
+      'Name is required'
+    );
+    expect(() => applyProjectPatch(existing, buildProjectPatch({ type: null }))).toThrow(
+      'Type is required'
+    );
   });
 });

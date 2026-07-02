@@ -14,7 +14,9 @@ describe('meta-workflow status machine', () => {
   });
 
   it('rejects run completed → requirement_draft', () => {
-    expect(() => assertRunTransition('completed', 'requirement_draft')).toThrow(/Invalid run transition/);
+    expect(() => assertRunTransition('completed', 'requirement_draft')).toThrow(
+      /Invalid run transition/
+    );
   });
 
   it('same-status is always allowed', () => {
@@ -48,10 +50,14 @@ describe('meta-workflow status machine', () => {
   });
 
   it('assertRunStatusIn throws on disallowed', () => {
-    expect(() => assertRunStatusIn('completed', ['executing'], 'kick off')).toThrow(/Cannot kick off run/);
+    expect(() => assertRunStatusIn('completed', ['executing'], 'kick off')).toThrow(
+      /Cannot kick off run/
+    );
   });
 
   it('assertPhaseStatusIn throws on disallowed', () => {
-    expect(() => assertPhaseStatusIn('done', ['running'], 'mark failed')).toThrow(/Cannot mark failed phase/);
+    expect(() => assertPhaseStatusIn('done', ['running'], 'mark failed')).toThrow(
+      /Cannot mark failed phase/
+    );
   });
 });

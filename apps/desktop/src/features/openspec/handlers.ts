@@ -23,7 +23,7 @@ export function handleOpenSpecMessage(msg: ServerMessage): boolean {
       // Refetch the executor list for this spec_change.
       api
         .listExecutors(specChangeId)
-        .then((list) => useOpenSpecStore.getState().setExecutors(specChangeId, list))
+        .then(list => useOpenSpecStore.getState().setExecutors(specChangeId, list))
         .catch(() => undefined);
       return true;
     }
@@ -32,7 +32,7 @@ export function handleOpenSpecMessage(msg: ServerMessage): boolean {
       const { subIssueId } = msg;
       api
         .getIssue(subIssueId)
-        .then((issue) => useOpenSpecStore.getState().upsertIssue(issue))
+        .then(issue => useOpenSpecStore.getState().upsertIssue(issue))
         .catch(() => undefined);
       return true;
     }
@@ -41,7 +41,7 @@ export function handleOpenSpecMessage(msg: ServerMessage): boolean {
       const { specChangeId } = msg;
       api
         .getSpecChange(specChangeId)
-        .then((sc) => useOpenSpecStore.getState().setSpecChange(sc))
+        .then(sc => useOpenSpecStore.getState().setSpecChange(sc))
         .catch(() => undefined);
       return true;
     }

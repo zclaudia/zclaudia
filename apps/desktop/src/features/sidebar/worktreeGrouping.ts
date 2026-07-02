@@ -1,11 +1,11 @@
 import type { Session, GitWorktree } from '@zclaudia/shared';
 
 export interface WorktreeGroup {
-  key: string;           // workingDirectory path or '__root__'
-  label: string;         // Display label: branch name or relative path
+  key: string; // workingDirectory path or '__root__'
+  label: string; // Display label: branch name or relative path
   isRoot: boolean;
   sessions: Session[];
-  branchName?: string;   // From GitWorktree API
+  branchName?: string; // From GitWorktree API
 }
 
 /**
@@ -31,7 +31,7 @@ function relativePath(from: string, to: string): string {
 export function groupSessionsByWorktree(
   sessions: Session[],
   rootPath: string | undefined,
-  worktrees: GitWorktree[],
+  worktrees: GitWorktree[]
 ): WorktreeGroup[] {
   if (sessions.length === 0) return [];
 

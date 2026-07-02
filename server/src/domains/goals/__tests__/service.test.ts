@@ -11,19 +11,19 @@ function makeDb() {
   const now = Date.now();
   db.prepare(
     `INSERT INTO projects (id, name, created_at, updated_at)
-     VALUES (?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?)`
   ).run('p1', 'p', now, now);
   db.prepare(
     `INSERT INTO llm_profiles (id, name, created_at, updated_at)
-     VALUES (?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?)`
   ).run('lp1', 'lp', now, now);
   db.prepare(
     `INSERT INTO agent_profiles (id, name, llm_profile_id, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?)`
   ).run('ap1', 'ap', 'lp1', now, now);
   db.prepare(
     `INSERT INTO sessions (id, project_id, agent_profile_id, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?)`
   ).run('s1', 'p1', 'ap1', now, now);
   return db;
 }
@@ -38,7 +38,7 @@ describe('GoalService', () => {
     db = makeDb();
     repo = new GoalRepository(db);
     emitted = [];
-    svc = new GoalService(repo, { publish: (e) => emitted.push(e) });
+    svc = new GoalService(repo, { publish: e => emitted.push(e) });
   });
 
   it('setGoal creates an active goal and emits state-changed', () => {
@@ -98,7 +98,12 @@ describe('GoalService', () => {
     svc.recordVerdict(goal.id, 'continue', 'still working');
     expect(svc.get(goal.id)?.lastVerdictReason).toBe('still working');
     expect(emitted).toEqual([
-      { type: 'goal:evaluator-verdict', goalId: goal.id, kind: 'continue', reason: 'still working' },
+      {
+        type: 'goal:evaluator-verdict',
+        goalId: goal.id,
+        kind: 'continue',
+        reason: 'still working',
+      },
     ]);
   });
 

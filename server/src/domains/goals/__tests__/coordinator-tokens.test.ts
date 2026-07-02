@@ -4,9 +4,18 @@ import type { Goal } from '../types.js';
 
 function makeGoal(over: Partial<Goal> = {}): Goal {
   return {
-    id: 'g1', sessionId: 's1', objective: 'do it', status: 'active',
-    tokenBudget: 100, tokensUsed: 0, maxTurns: 50, turnsUsed: 0,
-    startedAt: 1, endedAt: null, endReason: null, lastVerdictReason: null,
+    id: 'g1',
+    sessionId: 's1',
+    objective: 'do it',
+    status: 'active',
+    tokenBudget: 100,
+    tokensUsed: 0,
+    maxTurns: 50,
+    turnsUsed: 0,
+    startedAt: 1,
+    endedAt: null,
+    endReason: null,
+    lastVerdictReason: null,
     ...over,
   } as Goal;
 }
@@ -14,13 +23,21 @@ function makeGoal(over: Partial<Goal> = {}): Goal {
 function makeDeps(goal: Goal) {
   const service = {
     getActive: vi.fn(() => goal),
-    addTokenUsage: vi.fn((_id: string, t: number) => { goal.tokensUsed += t; return goal; }),
+    addTokenUsage: vi.fn((_id: string, t: number) => {
+      goal.tokensUsed += t;
+      return goal;
+    }),
     markBudgetLimited: vi.fn(),
     recordVerdict: vi.fn(),
     incrementTurns: vi.fn(),
     markCompleted: vi.fn(),
   };
-  const evaluator = { evaluate: vi.fn(async () => ({ tokensUsed: 5, verdict: { kind: 'continue', reason: 'keep going' } })) };
+  const evaluator = {
+    evaluate: vi.fn(async () => ({
+      tokensUsed: 5,
+      verdict: { kind: 'continue', reason: 'keep going' },
+    })),
+  };
   const transcript = { read: vi.fn(async () => []) };
   const continuer = { appendAndRun: vi.fn(async () => {}) };
   return { service, evaluator, transcript, continuer, resolveLlmProfile: () => 'p' };
@@ -28,7 +45,13 @@ function makeDeps(goal: Goal) {
 
 describe('GoalCoordinator onResumed', () => {
   it('schedules one continuation turn for an active goal within budget', async () => {
-    const goal = makeGoal({ status: 'active', tokenBudget: 1000, tokensUsed: 0, maxTurns: 50, turnsUsed: 3 });
+    const goal = makeGoal({
+      status: 'active',
+      tokenBudget: 1000,
+      tokensUsed: 0,
+      maxTurns: 50,
+      turnsUsed: 3,
+    });
     const deps = makeDeps(goal);
     const coord = new GoalCoordinator(deps as any);
 
@@ -50,7 +73,13 @@ describe('GoalCoordinator onResumed', () => {
   });
 
   it('does nothing when max turns is reached', async () => {
-    const goal = makeGoal({ status: 'active', tokenBudget: 1000, tokensUsed: 0, maxTurns: 50, turnsUsed: 50 });
+    const goal = makeGoal({
+      status: 'active',
+      tokenBudget: 1000,
+      tokensUsed: 0,
+      maxTurns: 50,
+      turnsUsed: 50,
+    });
     const deps = makeDeps(goal);
     const coord = new GoalCoordinator(deps as any);
 

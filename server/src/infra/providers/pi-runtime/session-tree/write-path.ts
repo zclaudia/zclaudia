@@ -6,7 +6,13 @@ import { newId } from '../../../../utils/uuid.js';
 export interface AssistantTurnData {
   fullContent: string;
   thinkingBlocks?: Array<{ text: string; signature?: string; redacted?: boolean }>;
-  collectedToolCalls?: Array<{ toolUseId: string; name: string; input?: unknown; output?: unknown; isError?: boolean }>;
+  collectedToolCalls?: Array<{
+    toolUseId: string;
+    name: string;
+    input?: unknown;
+    output?: unknown;
+    isError?: boolean;
+  }>;
   /** Provider usage for this turn. Stored on the assistant entry so the
    *  compaction threshold (lastAssistantPromptTokens) can anchor on the real
    *  prompt-token count instead of degrading to a chars/4 estimate. */
@@ -16,7 +22,7 @@ export interface AssistantTurnData {
 /** Build a pi user AgentMessage. Image attachments become ref-carrying image
  *  blocks (no bytes in the tree); the read-time Route A postprocessor fills `data`. */
 export function buildUserMessage(text: string, attachments: MessageAttachment[]): AgentMessage {
-  const images = (attachments ?? []).filter((a) => a.type === 'image');
+  const images = (attachments ?? []).filter(a => a.type === 'image');
   if (images.length === 0) {
     return { role: 'user', content: text } as AgentMessage;
   }
@@ -45,15 +51,22 @@ export function buildAssistantTurnMessages(turn: AssistantTurnData): AgentMessag
   }
   if (turn.fullContent) content.push({ type: 'text', text: turn.fullContent });
   for (const tc of turn.collectedToolCalls ?? []) {
-    content.push({ type: 'toolCall', id: tc.toolUseId, name: tc.name, arguments: (tc.input as Record<string, unknown> | undefined) ?? {} });
+    content.push({
+      type: 'toolCall',
+      id: tc.toolUseId,
+      name: tc.name,
+      arguments: (tc.input as Record<string, unknown> | undefined) ?? {},
+    });
   }
-  const messages: AgentMessage[] = [{
-    role: 'assistant',
-    content,
-    stopReason: (turn.collectedToolCalls?.length ? 'toolUse' : 'stop'),
-    ...(turn.usage ? { usage: turn.usage } : {}),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as any];
+  const messages: AgentMessage[] = [
+    {
+      role: 'assistant',
+      content,
+      stopReason: turn.collectedToolCalls?.length ? 'toolUse' : 'stop',
+      ...(turn.usage ? { usage: turn.usage } : {}),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any,
+  ];
   for (const tc of turn.collectedToolCalls ?? []) {
     messages.push({
       role: 'toolResult',
@@ -74,14 +87,18 @@ export function buildAssistantTurnMessages(turn: AssistantTurnData): AgentMessag
  * synchronous so the sync run-lifecycle write path can call it. Returns the new
  * entry ids in order.
  */
-export function appendMessagesToTree(db: Database, sessionId: string, messages: AgentMessage[]): string[] {
+export function appendMessagesToTree(
+  db: Database,
+  sessionId: string,
+  messages: AgentMessage[]
+): string[] {
   const insert = db.prepare(
     `INSERT INTO session_entries (id, session_id, parent_id, type, payload, timestamp)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?)`
   );
   const setLeaf = db.prepare(
     `INSERT INTO session_leaf (session_id, leaf_id) VALUES (?, ?)
-     ON CONFLICT(session_id) DO UPDATE SET leaf_id = excluded.leaf_id`,
+     ON CONFLICT(session_id) DO UPDATE SET leaf_id = excluded.leaf_id`
   );
   const getLeaf = db.prepare(`SELECT leaf_id AS leafId FROM session_leaf WHERE session_id = ?`);
   // One transaction per turn: a mid-batch failure (e.g. a bad payload) must not

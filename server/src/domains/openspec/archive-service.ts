@@ -57,19 +57,19 @@ export class ArchiveService {
     const deltaFiles = await this.findDeltaFiles(changeDir, sc.deltaSpecPaths);
 
     // 2. Parse + validate ALL deltas first; abort on any validation error.
-    const parsed = deltaFiles.map((f) => ({
+    const parsed = deltaFiles.map(f => ({
       capability: f.capability,
       delta: parseDelta(fs.readFileSync(f.absPath, 'utf-8')),
     }));
 
     const validationErrors = parsed
-      .map((p) => ({ capability: p.capability, result: validateDelta(p.delta) }))
-      .filter((r) => !r.result.ok)
-      .map((r) => ({
+      .map(p => ({ capability: p.capability, result: validateDelta(p.delta) }))
+      .filter(r => !r.result.ok)
+      .map(r => ({
         capability: r.capability,
         issues: r.result.issues
-          .filter((i) => i.severity === 'error')
-          .map((i) => `${i.location}: ${i.message}`),
+          .filter(i => i.severity === 'error')
+          .map(i => `${i.location}: ${i.message}`),
       }));
 
     if (validationErrors.length > 0) {
@@ -118,7 +118,7 @@ export class ArchiveService {
 
   private async findDeltaFiles(
     changeDir: string,
-    _knownPaths: string[],
+    _knownPaths: string[]
   ): Promise<{ capability: string; absPath: string }[]> {
     const found: { capability: string; absPath: string }[] = [];
     const specsDir = path.join(changeDir, 'specs');

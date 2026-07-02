@@ -148,7 +148,7 @@ test.describe('Chat Core Functionality - Standard Playwright', () => {
       const isVisible = await assistantMsg.isVisible().catch(() => false);
       if (!isVisible) continue;
 
-      const currentText = await assistantMsg.textContent().catch(() => '') || '';
+      const currentText = (await assistantMsg.textContent().catch(() => '')) || '';
 
       if (currentText !== previousText && currentText.length > previousText.length) {
         updateCount++;
@@ -257,7 +257,9 @@ test.describe('Chat Core Functionality - Standard Playwright', () => {
     await page.waitForTimeout(1000);
 
     // Look for cancel button
-    const cancelBtn = page.locator('button[title*="Cancel"], button[title*="Stop"], button[aria-label*="Cancel"]').first();
+    const cancelBtn = page
+      .locator('button[title*="Cancel"], button[title*="Stop"], button[aria-label*="Cancel"]')
+      .first();
     const hasCancelBtn = await cancelBtn.isVisible({ timeout: 3000 }).catch(() => false);
 
     if (hasCancelBtn) {
@@ -284,7 +286,9 @@ test.describe('Chat Core Functionality - Standard Playwright', () => {
     }
 
     // Send a message asking for markdown
-    await chatPage.sendMessage('Please respond with: **bold** and _italic_ text, plus a code block with `console.log("test")`');
+    await chatPage.sendMessage(
+      'Please respond with: **bold** and _italic_ text, plus a code block with `console.log("test")`'
+    );
     await page.waitForTimeout(5000);
 
     // Wait for response
@@ -326,7 +330,9 @@ test.describe('Chat Core Functionality - Standard Playwright', () => {
 
     // Get initial scroll position
     const initialScroll = await page.evaluate(() => {
-      const list = document.querySelector('[class*="message-list"], [class*="chat"] > div, main > div');
+      const list = document.querySelector(
+        '[class*="message-list"], [class*="chat"] > div, main > div'
+      );
       return list ? list.scrollTop : 0;
     });
 
@@ -336,7 +342,9 @@ test.describe('Chat Core Functionality - Standard Playwright', () => {
 
     // Get new scroll position
     const newScroll = await page.evaluate(() => {
-      const list = document.querySelector('[class*="message-list"], [class*="chat"] > div, main > div');
+      const list = document.querySelector(
+        '[class*="message-list"], [class*="chat"] > div, main > div'
+      );
       if (!list) return 0;
       // Check if scrolled to bottom (within tolerance)
       const isAtBottom = Math.abs(list.scrollTop + list.clientHeight - list.scrollHeight) < 50;

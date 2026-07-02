@@ -290,7 +290,10 @@ describe('LocalPRsPanel', () => {
     // can prevent the fork pool from terminating).
     let resolveLoad: () => void = () => {};
     mockLoadPRs.mockImplementation(
-      () => new Promise<void>((res) => { resolveLoad = res; }),
+      () =>
+        new Promise<void>(res => {
+          resolveLoad = res;
+        })
     );
     const { container, unmount } = render(<LocalPRsPanel projectId="proj-1" />);
     expect(container.textContent).toContain('Loading');

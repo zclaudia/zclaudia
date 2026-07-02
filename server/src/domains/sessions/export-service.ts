@@ -23,7 +23,7 @@ export class SessionExportError extends Error {
   constructor(
     readonly status: number,
     readonly code: string,
-    message: string,
+    message: string
   ) {
     super(message);
   }
@@ -33,19 +33,27 @@ export class SessionExportService {
   constructor(private readonly db: Database.Database) {}
 
   exportSession(sessionId: string): SessionExportResult {
-    const session = this.db.prepare(`
+    const session = this.db
+      .prepare(
+        `
       SELECT id, project_id as projectId, name, created_at as createdAt
       FROM sessions WHERE id = ?
-    `).get(sessionId) as ExportSessionRow | undefined;
+    `
+      )
+      .get(sessionId) as ExportSessionRow | undefined;
 
     if (!session) {
       throw new SessionExportError(404, 'NOT_FOUND', 'Session not found');
     }
 
-    const messages = this.db.prepare(`
+    const messages = this.db
+      .prepare(
+        `
       SELECT role, content, metadata, created_at as createdAt
       FROM messages WHERE session_id = ? ORDER BY created_at ASC
-    `).all(sessionId) as ExportMessageRow[];
+    `
+      )
+      .all(sessionId) as ExportMessageRow[];
 
     const lines: string[] = [];
     const sessionName = session.name || 'Untitled Session';
@@ -54,7 +62,8 @@ export class SessionExportService {
     lines.push('', '---', '');
 
     for (const msg of messages) {
-      const roleLabel = msg.role === 'user' ? 'User' : msg.role === 'assistant' ? 'Assistant' : 'System';
+      const roleLabel =
+        msg.role === 'user' ? 'User' : msg.role === 'assistant' ? 'Assistant' : 'System';
       const time = new Date(msg.createdAt).toLocaleTimeString();
       lines.push(`## ${roleLabel} *(${time})*`, '', msg.content, '');
 
@@ -89,9 +98,10 @@ export class SessionExportService {
         lines.push('**Tool Calls:**');
         for (const toolCall of meta.toolCalls) {
           const status = toolCall.isError ? 'error' : 'ok';
-          const input = toolCall.input && typeof toolCall.input === 'object'
-            ? toolCall.input.file_path || toolCall.input.command || toolCall.input.pattern || ''
-            : '';
+          const input =
+            toolCall.input && typeof toolCall.input === 'object'
+              ? toolCall.input.file_path || toolCall.input.command || toolCall.input.pattern || ''
+              : '';
           lines.push(`- **${toolCall.name || 'Unknown'}** \`${String(input)}\` -> ${status}`);
         }
         lines.push('');
@@ -100,7 +110,7 @@ export class SessionExportService {
       if (meta.usage) {
         lines.push(
           `*Tokens: ${(meta.usage.inputTokens || 0).toLocaleString()} in / ${(meta.usage.outputTokens || 0).toLocaleString()} out*`,
-          '',
+          ''
         );
       }
     } catch {

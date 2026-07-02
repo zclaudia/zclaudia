@@ -73,7 +73,9 @@ vi.mock('../../utils/platform', () => ({
   }),
   isDesktopTauriNonWindows: vi.fn(() => {
     const t = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-    return t && !navigator.userAgent.includes('Android') && !navigator.userAgent.includes('Windows');
+    return (
+      t && !navigator.userAgent.includes('Android') && !navigator.userAgent.includes('Windows')
+    );
   }),
 }));
 
@@ -187,26 +189,28 @@ describe('services/fileDownload', () => {
 
       await downloadPushedFile('nonexistent');
 
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('No push item found')
-      );
+      expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('No push item found'));
     });
 
     it('updates status to downloading', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: true,
-        headers: new Headers({
-          'Content-Length': '12',
-          'Content-Type': 'text/plain',
-        }),
-        body: {
-          getReader: () => ({
-            read: vi.fn()
-              .mockResolvedValueOnce({ done: false, value: new Uint8Array([116, 101, 115, 116]) })
-              .mockResolvedValueOnce({ done: true }),
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          headers: new Headers({
+            'Content-Length': '12',
+            'Content-Type': 'text/plain',
           }),
-        },
-      }));
+          body: {
+            getReader: () => ({
+              read: vi
+                .fn()
+                .mockResolvedValueOnce({ done: false, value: new Uint8Array([116, 101, 115, 116]) })
+                .mockResolvedValueOnce({ done: true }),
+            }),
+          },
+        })
+      );
 
       // Mock URL and document for browser download fallback
       vi.stubGlobal('URL', {
@@ -225,10 +229,13 @@ describe('services/fileDownload', () => {
     });
 
     it('handles download error', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: false,
-        status: 404,
-      }));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 404,
+        })
+      );
 
       await downloadPushedFile('file-123');
 
@@ -245,21 +252,25 @@ describe('services/fileDownload', () => {
         new Uint8Array([32, 99, 111, 110, 116, 101, 110, 116]),
       ];
 
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: true,
-        headers: new Headers({
-          'Content-Length': '12',
-          'Content-Type': 'text/plain',
-        }),
-        body: {
-          getReader: () => ({
-            read: vi.fn()
-              .mockResolvedValueOnce({ done: false, value: chunks[0] })
-              .mockResolvedValueOnce({ done: false, value: chunks[1] })
-              .mockResolvedValueOnce({ done: true }),
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          headers: new Headers({
+            'Content-Length': '12',
+            'Content-Type': 'text/plain',
           }),
-        },
-      }));
+          body: {
+            getReader: () => ({
+              read: vi
+                .fn()
+                .mockResolvedValueOnce({ done: false, value: chunks[0] })
+                .mockResolvedValueOnce({ done: false, value: chunks[1] })
+                .mockResolvedValueOnce({ done: true }),
+            }),
+          },
+        })
+      );
 
       vi.stubGlobal('URL', {
         createObjectURL: vi.fn(() => 'blob:test'),
@@ -281,15 +292,18 @@ describe('services/fileDownload', () => {
     it('falls back to blob download when no streaming', async () => {
       const mockBlob = new Blob(['test content'], { type: 'text/plain' });
 
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: true,
-        headers: new Headers({
-          'Content-Length': '12',
-          'Content-Type': 'text/plain',
-        }),
-        body: null,
-        blob: vi.fn().mockResolvedValue(mockBlob),
-      }));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          headers: new Headers({
+            'Content-Length': '12',
+            'Content-Type': 'text/plain',
+          }),
+          body: null,
+          blob: vi.fn().mockResolvedValue(mockBlob),
+        })
+      );
 
       vi.stubGlobal('URL', {
         createObjectURL: vi.fn(() => 'blob:test'),
@@ -349,18 +363,21 @@ describe('services/fileDownload', () => {
     it('saves file to Downloads folder on Tauri desktop', async () => {
       mockTauriInternals();
 
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: true,
-        headers: new Headers({
-          'Content-Length': '12',
-          'Content-Type': 'text/plain',
-        }),
-        body: {
-          getReader: () => ({
-            read: vi.fn().mockResolvedValue({ done: true }),
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          headers: new Headers({
+            'Content-Length': '12',
+            'Content-Type': 'text/plain',
           }),
-        },
-      }));
+          body: {
+            getReader: () => ({
+              read: vi.fn().mockResolvedValue({ done: true }),
+            }),
+          },
+        })
+      );
 
       await downloadPushedFile('file-123');
 
@@ -376,18 +393,21 @@ describe('services/fileDownload', () => {
         .mockResolvedValueOnce(true)
         .mockResolvedValueOnce(false);
 
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: true,
-        headers: new Headers({
-          'Content-Length': '12',
-          'Content-Type': 'text/plain',
-        }),
-        body: {
-          getReader: () => ({
-            read: vi.fn().mockResolvedValue({ done: true }),
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          headers: new Headers({
+            'Content-Length': '12',
+            'Content-Type': 'text/plain',
           }),
-        },
-      }));
+          body: {
+            getReader: () => ({
+              read: vi.fn().mockResolvedValue({ done: true }),
+            }),
+          },
+        })
+      );
 
       await downloadPushedFile('file-123');
 
@@ -412,20 +432,24 @@ describe('services/fileDownload', () => {
       const origArrayBuffer = Blob.prototype.arrayBuffer;
       Blob.prototype.arrayBuffer = mockArrayBuffer;
 
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: true,
-        headers: new Headers({
-          'Content-Length': '4',
-          'Content-Type': 'text/plain',
-        }),
-        body: {
-          getReader: () => ({
-            read: vi.fn()
-              .mockResolvedValueOnce({ done: false, value: new Uint8Array([116, 101, 115, 116]) })
-              .mockResolvedValueOnce({ done: true }),
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          headers: new Headers({
+            'Content-Length': '4',
+            'Content-Type': 'text/plain',
           }),
-        },
-      }));
+          body: {
+            getReader: () => ({
+              read: vi
+                .fn()
+                .mockResolvedValueOnce({ done: false, value: new Uint8Array([116, 101, 115, 116]) })
+                .mockResolvedValueOnce({ done: true }),
+            }),
+          },
+        })
+      );
 
       await downloadPushedFile('file-123');
 
@@ -453,7 +477,9 @@ describe('services/fileDownload', () => {
       });
 
       (window as any).AndroidFiles = {
-        saveToDownloads: vi.fn().mockImplementation(() => { throw new Error('copy failed'); }),
+        saveToDownloads: vi.fn().mockImplementation(() => {
+          throw new Error('copy failed');
+        }),
         openFile: vi.fn(),
       };
 
@@ -462,17 +488,21 @@ describe('services/fileDownload', () => {
       const origArrayBuffer = Blob.prototype.arrayBuffer;
       Blob.prototype.arrayBuffer = mockArrayBuffer;
 
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: true,
-        headers: new Headers({ 'Content-Length': '4', 'Content-Type': 'text/plain' }),
-        body: {
-          getReader: () => ({
-            read: vi.fn()
-              .mockResolvedValueOnce({ done: false, value: new Uint8Array([116, 101, 115, 116]) })
-              .mockResolvedValueOnce({ done: true }),
-          }),
-        },
-      }));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          headers: new Headers({ 'Content-Length': '4', 'Content-Type': 'text/plain' }),
+          body: {
+            getReader: () => ({
+              read: vi
+                .fn()
+                .mockResolvedValueOnce({ done: false, value: new Uint8Array([116, 101, 115, 116]) })
+                .mockResolvedValueOnce({ done: true }),
+            }),
+          },
+        })
+      );
 
       await downloadPushedFile('file-123');
 
@@ -498,17 +528,21 @@ describe('services/fileDownload', () => {
       const { writeFile } = await import('@tauri-apps/plugin-fs');
       vi.mocked(writeFile).mockRejectedValueOnce(new Error('write failed'));
 
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: true,
-        headers: new Headers({ 'Content-Length': '4', 'Content-Type': 'text/plain' }),
-        body: {
-          getReader: () => ({
-            read: vi.fn()
-              .mockResolvedValueOnce({ done: false, value: new Uint8Array([116, 101, 115, 116]) })
-              .mockResolvedValueOnce({ done: true }),
-          }),
-        },
-      }));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          headers: new Headers({ 'Content-Length': '4', 'Content-Type': 'text/plain' }),
+          body: {
+            getReader: () => ({
+              read: vi
+                .fn()
+                .mockResolvedValueOnce({ done: false, value: new Uint8Array([116, 101, 115, 116]) })
+                .mockResolvedValueOnce({ done: true }),
+            }),
+          },
+        })
+      );
 
       vi.stubGlobal('URL', {
         createObjectURL: vi.fn(() => 'blob:test'),
@@ -589,17 +623,21 @@ describe('services/fileDownload', () => {
 
   describe('streaming without content-length', () => {
     it('downloads without progress tracking when content-length is 0', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: true,
-        headers: new Headers({ 'Content-Type': 'text/plain' }),
-        body: {
-          getReader: () => ({
-            read: vi.fn()
-              .mockResolvedValueOnce({ done: false, value: new Uint8Array([116, 101, 115, 116]) })
-              .mockResolvedValueOnce({ done: true }),
-          }),
-        },
-      }));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          headers: new Headers({ 'Content-Type': 'text/plain' }),
+          body: {
+            getReader: () => ({
+              read: vi
+                .fn()
+                .mockResolvedValueOnce({ done: false, value: new Uint8Array([116, 101, 115, 116]) })
+                .mockResolvedValueOnce({ done: true }),
+            }),
+          },
+        })
+      );
 
       vi.stubGlobal('URL', {
         createObjectURL: vi.fn(() => 'blob:test'),

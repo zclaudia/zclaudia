@@ -49,3 +49,11 @@ export interface BootstrapEventMessage {
     [k: string]: unknown;
   };
 }
+
+export type OpenSpecClientMessage = never;
+
+export type OpenSpecServerMessage =
+  | OpenSpecExecutorStatusChangedMessage
+  | OpenSpecSubIssueStatusChangedMessage
+  | OpenSpecSpecChangeStatusChangedMessage
+  | BootstrapEventMessage;

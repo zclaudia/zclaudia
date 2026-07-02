@@ -74,9 +74,7 @@ describe('hooks/useSessionManager', () => {
 
   describe('internal refresh', () => {
     it('fetches sessions and updates store after add', async () => {
-      const mockSessions = [
-        { id: 'session-1', projectId: 'project-1', title: 'Session 1' },
-      ];
+      const mockSessions = [{ id: 'session-1', projectId: 'project-1', title: 'Session 1' }];
       mockCreateSession.mockResolvedValueOnce({ id: 'new-session' });
       mockGetSessions.mockResolvedValueOnce(mockSessions);
 
@@ -160,9 +158,9 @@ describe('hooks/useSessionManager', () => {
 
       const { result } = renderHook(() => useSessionManager());
 
-      await expect(
-        result.current.updateSession('session-1', { title: 'Test' })
-      ).rejects.toThrow('Update failed');
+      await expect(result.current.updateSession('session-1', { title: 'Test' })).rejects.toThrow(
+        'Update failed'
+      );
     });
   });
 
@@ -185,9 +183,7 @@ describe('hooks/useSessionManager', () => {
 
       const { result } = renderHook(() => useSessionManager());
 
-      await expect(
-        result.current.deleteSession('session-1')
-      ).rejects.toThrow('Delete failed');
+      await expect(result.current.deleteSession('session-1')).rejects.toThrow('Delete failed');
     });
   });
 

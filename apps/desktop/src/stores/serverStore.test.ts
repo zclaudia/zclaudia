@@ -23,7 +23,10 @@ describe('serverStore', () => {
 
   it('stores backend features', () => {
     useServerStore.getState().setServerFeatures('backend-1', ['search', 'fileUpload']);
-    expect(useServerStore.getState().connections['backend-1']?.features).toEqual(['search', 'fileUpload']);
+    expect(useServerStore.getState().connections['backend-1']?.features).toEqual([
+      'search',
+      'fileUpload',
+    ]);
   });
 
   it('stores backend public key', () => {
@@ -34,7 +37,9 @@ describe('serverStore', () => {
   it('stores backend latency', () => {
     useServerStore.getState().setServerLatency('backend-1', 123);
     expect(useServerStore.getState().connections['backend-1']?.latencyMs).toBe(123);
-    expect(useServerStore.getState().connections['backend-1']?.lastLatencyProbeAt).toBeTypeOf('number');
+    expect(useServerStore.getState().connections['backend-1']?.lastLatencyProbeAt).toBeTypeOf(
+      'number'
+    );
   });
 
   it('updates control plane mode', () => {

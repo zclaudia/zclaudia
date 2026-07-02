@@ -1,7 +1,6 @@
 import os from 'os';
 
 interface SqliteLikeDb {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   prepare?: (sql: string) => {
     get: (...args: any[]) => Record<string, unknown> | undefined;
   };
@@ -30,25 +29,32 @@ export function getBackendDisplayName(db?: SqliteLikeDb | null): string {
   const backendName = typeof row?.backendName === 'string' ? row.backendName.trim() : '';
   if (backendName) return backendName;
 
-  const envName = typeof process.env.GATEWAY_NAME === 'string' ? process.env.GATEWAY_NAME.trim() : '';
+  const envName =
+    typeof process.env.GATEWAY_NAME === 'string' ? process.env.GATEWAY_NAME.trim() : '';
   if (envName) return envName;
 
   return `Backend on ${os.hostname()}`;
 }
 
-export function getSessionDisplayName(db: SqliteLikeDb | null | undefined, sessionId: string): string {
+export function getSessionDisplayName(
+  db: SqliteLikeDb | null | undefined,
+  sessionId: string
+): string {
   const row = safeGetRow(
     db,
     `SELECT name
      FROM sessions
      WHERE id = ?`,
-    sessionId,
+    sessionId
   );
   const sessionName = typeof row?.name === 'string' ? row.name.trim() : '';
   return sessionName || sessionId;
 }
 
-export function formatSessionBackendContext(db: SqliteLikeDb | null | undefined, sessionId: string): string {
+export function formatSessionBackendContext(
+  db: SqliteLikeDb | null | undefined,
+  sessionId: string
+): string {
   const sessionName = getSessionDisplayName(db, sessionId);
   const backendName = getBackendDisplayName(db);
   return `Session ${sessionName} on backend ${backendName}`;
@@ -67,7 +73,7 @@ export function getBackendRouteId(db?: SqliteLikeDb | null): string | null {
 
 export function buildAppSelectionClickUrl(
   db: SqliteLikeDb | null | undefined,
-  target: { sessionId?: string; projectId?: string; backendId?: string | null },
+  target: { sessionId?: string; projectId?: string; backendId?: string | null }
 ): string | undefined {
   const baseUrl = (process.env.ZCLAUDIA_APP_URL || process.env.PUBLIC_APP_URL || '').trim();
   if (!baseUrl) return undefined;

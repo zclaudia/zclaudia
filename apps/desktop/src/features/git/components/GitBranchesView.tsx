@@ -11,9 +11,13 @@ interface GitBranchesViewProps {
   onAfterMutation?: () => void | Promise<void>;
 }
 
-export function GitBranchesView({ projectId, worktreePath, onAfterMutation }: GitBranchesViewProps) {
+export function GitBranchesView({
+  projectId,
+  worktreePath,
+  onAfterMutation,
+}: GitBranchesViewProps) {
   const branches = useGitStore(selectBranches(projectId, worktreePath));
-  const setBranches = useGitStore((s) => s.setBranches);
+  const setBranches = useGitStore(s => s.setBranches);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [newName, setNewName] = useState('');
@@ -37,34 +41,37 @@ export function GitBranchesView({ projectId, worktreePath, onAfterMutation }: Gi
     if (onAfterMutation) await onAfterMutation();
   }, [refresh, onAfterMutation]);
 
-  const switchTo = useCallback(async (name: string) => {
-    if (busy) return;
-    // Warn if the worktree has uncommitted changes a checkout could disrupt.
-    try {
-      const status = await api.getGitStatus(projectId, worktreePath);
-      if (status.staged.length > 0 || status.unstaged.length > 0) {
-        const ok = window.confirm(
-          `This worktree has uncommitted changes. Switching to "${name}" may fail or carry them over. Continue?`,
-        );
-        if (!ok) return;
+  const switchTo = useCallback(
+    async (name: string) => {
+      if (busy) return;
+      // Warn if the worktree has uncommitted changes a checkout could disrupt.
+      try {
+        const status = await api.getGitStatus(projectId, worktreePath);
+        if (status.staged.length > 0 || status.unstaged.length > 0) {
+          const ok = window.confirm(
+            `This worktree has uncommitted changes. Switching to "${name}" may fail or carry them over. Continue?`
+          );
+          if (!ok) return;
+        }
+      } catch {
+        // If the status check fails, proceed and let git surface any error.
       }
-    } catch {
-      // If the status check fails, proceed and let git surface any error.
-    }
-    setBusy(true);
-    const result = await runWithToast(`Switch to ${name}`, projectId, () => api.checkoutGitBranch(projectId, worktreePath, name));
-    setBusy(false);
-    if (result !== null) await afterChange();
-  }, [busy, projectId, worktreePath, afterChange]);
+      setBusy(true);
+      const result = await runWithToast(`Switch to ${name}`, projectId, () =>
+        api.checkoutGitBranch(projectId, worktreePath, name)
+      );
+      setBusy(false);
+      if (result !== null) await afterChange();
+    },
+    [busy, projectId, worktreePath, afterChange]
+  );
 
   const createBranch = useCallback(async () => {
     const name = newName.trim();
     if (!name || busy) return;
     setBusy(true);
-    const result = await runWithToast(
-      `Create ${name}`,
-      projectId,
-      () => api.createGitBranch(projectId, worktreePath, name, { checkout: true }),
+    const result = await runWithToast(`Create ${name}`, projectId, () =>
+      api.createGitBranch(projectId, worktreePath, name, { checkout: true })
     );
     setBusy(false);
     if (result !== null) {
@@ -73,42 +80,53 @@ export function GitBranchesView({ projectId, worktreePath, onAfterMutation }: Gi
     }
   }, [newName, busy, projectId, worktreePath, afterChange]);
 
-  const deleteBranch = useCallback(async (name: string) => {
-    if (busy) return;
-    if (!window.confirm(`Delete branch "${name}"?`)) return;
-    setBusy(true);
-    let mutated = false;
-    try {
-      await api.deleteGitBranch(projectId, worktreePath, name, false);
-      mutated = true;
-      useToastStore.getState().add({ title: `Deleted ${name}`, type: 'success', projectId, icon: 'system' });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (/not fully merged/i.test(message)) {
-        if (window.confirm(`"${name}" is not fully merged. Force delete?`)) {
-          const r = await runWithToast(
-            `Force delete ${name}`,
+  const deleteBranch = useCallback(
+    async (name: string) => {
+      if (busy) return;
+      if (!window.confirm(`Delete branch "${name}"?`)) return;
+      setBusy(true);
+      let mutated = false;
+      try {
+        await api.deleteGitBranch(projectId, worktreePath, name, false);
+        mutated = true;
+        useToastStore
+          .getState()
+          .add({ title: `Deleted ${name}`, type: 'success', projectId, icon: 'system' });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (/not fully merged/i.test(message)) {
+          if (window.confirm(`"${name}" is not fully merged. Force delete?`)) {
+            const r = await runWithToast(`Force delete ${name}`, projectId, () =>
+              api.deleteGitBranch(projectId, worktreePath, name, true)
+            );
+            if (r !== null) mutated = true;
+          }
+        } else {
+          useToastStore.getState().add({
+            title: `Delete ${name} failed`,
+            message,
+            type: 'error',
             projectId,
-            () => api.deleteGitBranch(projectId, worktreePath, name, true),
-          );
-          if (r !== null) mutated = true;
+            icon: 'error',
+          });
         }
-      } else {
-        useToastStore.getState().add({ title: `Delete ${name} failed`, message, type: 'error', projectId, icon: 'error' });
+      } finally {
+        setBusy(false);
+        if (mutated) await afterChange();
       }
-    } finally {
-      setBusy(false);
-      if (mutated) await afterChange();
-    }
-  }, [busy, projectId, worktreePath, afterChange]);
+    },
+    [busy, projectId, worktreePath, afterChange]
+  );
 
-  const local = branches?.filter((b) => !b.isRemote) ?? [];
-  const remote = branches?.filter((b) => b.isRemote) ?? [];
+  const local = branches?.filter(b => !b.isRemote) ?? [];
+  const remote = branches?.filter(b => b.isRemote) ?? [];
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Branches</span>
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Branches
+        </span>
         <button
           type="button"
           onClick={() => refresh()}
@@ -123,8 +141,10 @@ export function GitBranchesView({ projectId, worktreePath, onAfterMutation }: Gi
       <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border">
         <input
           value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') createBranch(); }}
+          onChange={e => setNewName(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') createBranch();
+          }}
           placeholder="New branch name"
           className="min-w-0 flex-1 bg-background border border-border rounded px-2 py-1 text-xs"
         />
@@ -143,7 +163,13 @@ export function GitBranchesView({ projectId, worktreePath, onAfterMutation }: Gi
           <div className="text-xs text-muted-foreground">Loading…</div>
         ) : (
           <>
-            <BranchSection title="Local" branches={local} busy={busy} onSwitch={switchTo} onDelete={deleteBranch} />
+            <BranchSection
+              title="Local"
+              branches={local}
+              busy={busy}
+              onSwitch={switchTo}
+              onDelete={deleteBranch}
+            />
             <BranchSection title="Remote" branches={remote} busy={busy} />
           </>
         )}
@@ -172,7 +198,7 @@ function BranchSection({
         {title} <span className="text-muted-foreground">({branches.length})</span>
       </div>
       <div className="bg-secondary/30 border border-border rounded-lg divide-y divide-border overflow-hidden">
-        {branches.map((b) => (
+        {branches.map(b => (
           <div key={b.name} className="flex items-center justify-between px-2 py-1.5 group">
             <button
               type="button"
@@ -182,14 +208,23 @@ function BranchSection({
               title={b.isCurrent ? 'Current branch' : onSwitch ? `Switch to ${b.name}` : undefined}
             >
               <BranchIcon className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-              <span className={`text-xs truncate ${b.isCurrent ? 'font-semibold text-primary' : ''}`}>{b.name}</span>
+              <span
+                className={`text-xs truncate ${b.isCurrent ? 'font-semibold text-primary' : ''}`}
+              >
+                {b.name}
+              </span>
               {b.isCurrent && (
-                <span className="text-[9px] px-1 py-0.5 rounded bg-muted/60 text-primary flex-shrink-0">current</span>
+                <span className="text-[9px] px-1 py-0.5 rounded bg-muted/60 text-primary flex-shrink-0">
+                  current
+                </span>
               )}
             </button>
             <div className="flex items-center gap-1.5 ml-2">
               {b.upstream && (
-                <span className="text-[10px] text-muted-foreground font-mono truncate" title={b.upstream}>
+                <span
+                  className="text-[10px] text-muted-foreground font-mono truncate"
+                  title={b.upstream}
+                >
                   {b.upstream}
                 </span>
               )}

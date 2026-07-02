@@ -60,19 +60,29 @@ describe('uiStore', () => {
       for (const preset of ['small', 'medium', 'large'] as FontSizePreset[]) {
         for (const field of requiredFields) {
           expect(FONT_CONFIGS[preset]).toHaveProperty(field);
-          expect(typeof FONT_CONFIGS[preset][field as keyof typeof FONT_CONFIGS.small]).toBe('string');
+          expect(typeof FONT_CONFIGS[preset][field as keyof typeof FONT_CONFIGS.small]).toBe(
+            'string'
+          );
         }
       }
     });
 
     it('small font sizes are smaller than medium', () => {
-      expect(parseFloat(FONT_CONFIGS.small.prose)).toBeLessThan(parseFloat(FONT_CONFIGS.medium.prose));
-      expect(parseFloat(FONT_CONFIGS.small.code)).toBeLessThan(parseFloat(FONT_CONFIGS.medium.code));
+      expect(parseFloat(FONT_CONFIGS.small.prose)).toBeLessThan(
+        parseFloat(FONT_CONFIGS.medium.prose)
+      );
+      expect(parseFloat(FONT_CONFIGS.small.code)).toBeLessThan(
+        parseFloat(FONT_CONFIGS.medium.code)
+      );
     });
 
     it('medium font sizes are smaller than large', () => {
-      expect(parseFloat(FONT_CONFIGS.medium.prose)).toBeLessThan(parseFloat(FONT_CONFIGS.large.prose));
-      expect(parseFloat(FONT_CONFIGS.medium.code)).toBeLessThan(parseFloat(FONT_CONFIGS.large.code));
+      expect(parseFloat(FONT_CONFIGS.medium.prose)).toBeLessThan(
+        parseFloat(FONT_CONFIGS.large.prose)
+      );
+      expect(parseFloat(FONT_CONFIGS.medium.code)).toBeLessThan(
+        parseFloat(FONT_CONFIGS.large.code)
+      );
     });
   });
 

@@ -32,8 +32,12 @@ function isBinaryAvailable(name: string): boolean {
 }
 
 const OS_ALIASES: Record<string, string> = {
-  macos: 'darwin', mac: 'darwin', windows: 'win32',
-  linux: 'linux', darwin: 'darwin', win32: 'win32',
+  macos: 'darwin',
+  mac: 'darwin',
+  windows: 'win32',
+  linux: 'linux',
+  darwin: 'darwin',
+  win32: 'win32',
 };
 
 /**
@@ -42,13 +46,13 @@ const OS_ALIASES: Record<string, string> = {
  */
 export function meetsRequirements(
   requirements: SkillRequirements | undefined,
-  ctx: RequirementContext = {},
+  ctx: RequirementContext = {}
 ): boolean {
   if (!requirements) return true;
 
   if (requirements.os && requirements.os.length > 0) {
     const current = ctx.os ?? process.platform;
-    const required = requirements.os.map((os) => OS_ALIASES[os.toLowerCase()] ?? os.toLowerCase());
+    const required = requirements.os.map(os => OS_ALIASES[os.toLowerCase()] ?? os.toLowerCase());
     if (!required.includes(current)) return false;
   }
   if (requirements.binaries) {

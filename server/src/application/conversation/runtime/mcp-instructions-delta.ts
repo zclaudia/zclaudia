@@ -8,11 +8,15 @@ import { newId } from '../../../utils/uuid.js';
 import { mcpClientManager } from '../../../utils/mcp-client-manager.js';
 
 function readPreviousDeltas(db: Database.Database, sessionId: string): McpInstructionsDelta[] {
-  const rows = db.prepare<[string], { metadata: string | null }>(`
+  const rows = db
+    .prepare<[string], { metadata: string | null }>(
+      `
     SELECT metadata FROM messages
     WHERE session_id = ? AND metadata IS NOT NULL
     ORDER BY created_at ASC
-  `).all(sessionId);
+  `
+    )
+    .all(sessionId);
   const deltas: McpInstructionsDelta[] = [];
   for (const row of rows) {
     try {
@@ -28,39 +32,46 @@ function readPreviousDeltas(db: Database.Database, sessionId: string): McpInstru
 }
 
 function nextOffset(db: Database.Database, sessionId: string): number {
-  const row = db.prepare<[string], { nextOffset: number }>(`
+  const row = db
+    .prepare<[string], { nextOffset: number }>(
+      `
     SELECT COALESCE(MAX(offset), 0) + 1 AS nextOffset
     FROM messages
     WHERE session_id = ?
-  `).get(sessionId);
+  `
+    )
+    .get(sessionId);
   return row?.nextOffset ?? 1;
 }
 
 export function persistMcpInstructionsDeltaForSession(
   db: Database.Database,
-  sessionId: string,
+  sessionId: string
 ): McpInstructionsDelta | null {
   if (!db || typeof (db as { prepare?: unknown }).prepare !== 'function') return null;
-  const connectedInstructions = mcpClientManager.listStatuses()
-    .filter((status) => status.state === 'connected' && status.instructions?.trim())
-    .map((status) => ({ name: status.name, instructions: status.instructions }));
+  const connectedInstructions = mcpClientManager
+    .listStatuses()
+    .filter(status => status.state === 'connected' && status.instructions?.trim())
+    .map(status => ({ name: status.name, instructions: status.instructions }));
   const delta = computeMcpInstructionsDelta(
     connectedInstructions,
     readPreviousDeltas(db, sessionId),
-    Date.now(),
+    Date.now()
   );
   if (!delta) return null;
 
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO messages (id, session_id, role, content, metadata, created_at, offset)
     VALUES (?, ?, 'system', ?, ?, ?, ?)
-  `).run(
+  `
+  ).run(
     newId(),
     sessionId,
     `MCP server instructions updated: +${delta.addedNames.join(', ') || 'none'} -${delta.removedNames.join(', ') || 'none'}`,
     JSON.stringify({ type: MCP_INSTRUCTIONS_DELTA_METADATA_TYPE, delta }),
     delta.createdAt,
-    nextOffset(db, sessionId),
+    nextOffset(db, sessionId)
   );
   return delta;
 }

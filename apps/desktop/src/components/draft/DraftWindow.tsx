@@ -19,9 +19,13 @@ function useWindowCloseSync(sessionId: string) {
       const unlistenCloseRequested = await win.onCloseRequested(() => {
         void emitTo('main', 'draft-window-closed', { sessionId }).catch(() => {});
       });
-      dispose = () => { unlistenCloseRequested(); };
+      dispose = () => {
+        unlistenCloseRequested();
+      };
     })();
-    return () => { dispose?.(); };
+    return () => {
+      dispose?.();
+    };
   }, [sessionId]);
 }
 
@@ -46,9 +50,7 @@ export function DraftWindow({
 }: DraftWindowProps) {
   return (
     <div className="flex flex-col h-dvh bg-background text-foreground">
-      {serverName && (
-        <WindowContextBar serverName={serverName} />
-      )}
+      {serverName && <WindowContextBar serverName={serverName} />}
       <ConnectionProvider
         standaloneServerUrl={serverUrl}
         standaloneServerId={serverId}
@@ -97,7 +99,9 @@ function DraftWindowContent({ sessionId }: { sessionId: string }) {
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [isConnected, sessionId]);
 
   // Periodically check if session is archived
@@ -106,12 +110,14 @@ function DraftWindowContent({ sessionId }: { sessionId: string }) {
     const check = async () => {
       try {
         const sessions = await api.getSessions();
-        const session = sessions.find((s) => s.id === sessionId);
+        const session = sessions.find(s => s.id === sessionId);
         if (session && (session as any).archivedAt) {
           setSessionArchived(true);
           setIsReadOnly(true);
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     };
     check();
     const interval = setInterval(check, SESSION_CHECK_INTERVAL_MS);
@@ -126,37 +132,45 @@ function DraftWindowContent({ sessionId }: { sessionId: string }) {
     };
   }, [sessionId]);
 
-  const saveDraft = useCallback(async (value: string) => {
-    setIsSaving(true);
-    try {
-      if (!hasDraftContent(value)) {
-        await api.deleteSessionDraft(sessionId);
-        setLastSavedAt(null);
-        return;
+  const saveDraft = useCallback(
+    async (value: string) => {
+      setIsSaving(true);
+      try {
+        if (!hasDraftContent(value)) {
+          await api.deleteSessionDraft(sessionId);
+          setLastSavedAt(null);
+          return;
+        }
+        const draft = await api.upsertSessionDraft(sessionId, value, CLIENT_DEVICE_ID);
+        if (draft) setLastSavedAt(draft.updatedAt);
+      } catch (error) {
+        console.error('[DraftWindow] Failed to save:', error);
+      } finally {
+        setIsSaving(false);
       }
-      const draft = await api.upsertSessionDraft(sessionId, value, CLIENT_DEVICE_ID);
-      if (draft) setLastSavedAt(draft.updatedAt);
-    } catch (error) {
-      console.error('[DraftWindow] Failed to save:', error);
-    } finally {
-      setIsSaving(false);
-    }
-  }, [hasDraftContent, sessionId]);
+    },
+    [hasDraftContent, sessionId]
+  );
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value;
-    if (new TextEncoder().encode(value).length > MAX_CONTENT_BYTES) return;
-    setContent(value);
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const value = e.target.value;
+      if (new TextEncoder().encode(value).length > MAX_CONTENT_BYTES) return;
+      setContent(value);
 
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => saveDraft(value), SAVE_DEBOUNCE_MS);
-  }, [saveDraft]);
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => saveDraft(value), SAVE_DEBOUNCE_MS);
+    },
+    [saveDraft]
+  );
 
   const handleDiscard = useCallback(async () => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     try {
       await api.deleteSessionDraft(sessionId);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     // Close window
     const { getCurrentWindow } = await import('@tauri-apps/api/window');
     getCurrentWindow().close();
@@ -196,9 +210,18 @@ function DraftWindowContent({ sessionId }: { sessionId: string }) {
         className="flex items-center gap-2 px-3 py-1.5 border-b border-border flex-shrink-0 bg-card"
         data-tauri-drag-region
       >
-        <svg className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+        <svg
+          className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+          />
         </svg>
         <span className="text-xs font-medium text-muted-foreground truncate" data-tauri-drag-region>
           Draft
@@ -207,7 +230,8 @@ function DraftWindowContent({ sessionId }: { sessionId: string }) {
           {charCount} chars
           {sizePercent > 80 && (
             <span className={sizePercent > 95 ? 'text-red-500' : 'text-yellow-500'}>
-              {' '}({sizePercent}%)
+              {' '}
+              ({sizePercent}%)
             </span>
           )}
         </span>

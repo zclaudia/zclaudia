@@ -40,7 +40,10 @@ function extractSections(markdown: string): Record<string, string> {
   return out;
 }
 
-export function validatePlanMarkdownContent(content: string, filePath: string): PlanValidationResult {
+export function validatePlanMarkdownContent(
+  content: string,
+  filePath: string
+): PlanValidationResult {
   const sections = extractSections(content);
   const missing: string[] = [];
 
@@ -50,8 +53,8 @@ export function validatePlanMarkdownContent(content: string, filePath: string): 
 
   // Soft checks (do not block readiness when required sections are present)
   let score = 0;
-  const requiredHit = REQUIRED_SECTIONS.filter((s) => !!sections[s]).length;
-  const optionalHit = OPTIONAL_SECTIONS.filter((s) => !!sections[s]).length;
+  const requiredHit = REQUIRED_SECTIONS.filter(s => !!sections[s]).length;
+  const optionalHit = OPTIONAL_SECTIONS.filter(s => !!sections[s]).length;
   score += Math.round((requiredHit / REQUIRED_SECTIONS.length) * 80);
   score += Math.round((optionalHit / OPTIONAL_SECTIONS.length) * 15);
   if (content.trim().length >= 250) score += 5;

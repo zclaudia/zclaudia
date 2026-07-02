@@ -29,8 +29,8 @@ interface TraceRecord {
 }
 
 const TRACE_ENABLED = process.env.ZCLAUDIA_PROVIDER_TRACE === '1';
-const TRACE_DIR = process.env.ZCLAUDIA_PROVIDER_TRACE_DIR
-  || path.join('/tmp', 'zclaudia-provider-traces');
+const TRACE_DIR =
+  process.env.ZCLAUDIA_PROVIDER_TRACE_DIR || path.join('/tmp', 'zclaudia-provider-traces');
 const MAX_PREVIEW_CHARS = 2000;
 
 function truncateString(value: string, maxChars = MAX_PREVIEW_CHARS): string {
@@ -40,14 +40,16 @@ function truncateString(value: string, maxChars = MAX_PREVIEW_CHARS): string {
 
 function redactKey(key: string): boolean {
   const normalized = key.toLowerCase();
-  return normalized.includes('token')
-    || normalized.includes('secret')
-    || normalized.includes('password')
-    || normalized.includes('authorization')
-    || normalized.includes('cookie')
-    || normalized.includes('credential')
-    || normalized.includes('apikey')
-    || normalized.includes('api_key');
+  return (
+    normalized.includes('token') ||
+    normalized.includes('secret') ||
+    normalized.includes('password') ||
+    normalized.includes('authorization') ||
+    normalized.includes('cookie') ||
+    normalized.includes('credential') ||
+    normalized.includes('apikey') ||
+    normalized.includes('api_key')
+  );
 }
 
 function sanitize(value: unknown, depth = 0): unknown {
@@ -63,7 +65,7 @@ function sanitize(value: unknown, depth = 0): unknown {
     };
   }
   if (Array.isArray(value)) {
-    return value.slice(0, 25).map((item) => sanitize(item, depth + 1));
+    return value.slice(0, 25).map(item => sanitize(item, depth + 1));
   }
   if (typeof value === 'object') {
     const record = value as Record<string, unknown>;
@@ -159,7 +161,10 @@ export function summarizeServerMessage(message: { type: string; [key: string]: u
   }
 }
 
-export function summarizeProviderMessage(message: { type: string; [key: string]: unknown }): string {
+export function summarizeProviderMessage(message: {
+  type: string;
+  [key: string]: unknown;
+}): string {
   switch (message.type) {
     case 'init':
       return `init session=${String(message.sessionId || '')}`;

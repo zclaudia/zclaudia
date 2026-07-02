@@ -16,7 +16,15 @@ interface BackendRowProps {
  * name, and an expand chevron; expanded content (the project subtree) is supplied
  * by the parent. Presentational only — no data or connection logic (Phase 3).
  */
-export function BackendRow({ name, online, expanded, onToggle, children, onNewProject, newProjectDisabled }: BackendRowProps) {
+export function BackendRow({
+  name,
+  online,
+  expanded,
+  onToggle,
+  children,
+  onNewProject,
+  newProjectDisabled,
+}: BackendRowProps) {
   return (
     <div className="space-y-1">
       <div className="group flex items-center rounded-md hover:bg-secondary transition-colors">
@@ -31,8 +39,12 @@ export function BackendRow({ name, online, expanded, onToggle, children, onNewPr
             strokeWidth={2}
             className={`flex-shrink-0 text-muted-foreground transition-transform ${expanded ? 'rotate-90' : ''}`}
           />
-          <span className={`h-2 w-2 flex-shrink-0 rounded-full ${online ? 'bg-success' : 'bg-muted-foreground'}`} />
-          <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{name}</span>
+          <span
+            className={`h-2 w-2 flex-shrink-0 rounded-full ${online ? 'bg-success' : 'bg-muted-foreground'}`}
+          />
+          <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+            {name}
+          </span>
         </button>
         {onNewProject && (
           <button

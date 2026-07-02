@@ -12,7 +12,7 @@ import { sendMessage } from '../transport/broadcast.js';
 export function handleGetNotifications(
   client: ConnectedClient,
   message: GetNotificationsMessage,
-  notificationService: NotificationService,
+  notificationService: NotificationService
 ): void {
   const result = notificationService.listItems({
     limit: message.limit,
@@ -31,7 +31,7 @@ export function handleGetNotifications(
 
 export function handleMarkNotificationsRead(
   message: MarkNotificationsReadMessage,
-  notificationService: NotificationService,
+  notificationService: NotificationService
 ): void {
   if (Array.isArray(message.itemIds)) {
     notificationService.markRead(message.itemIds);
@@ -40,14 +40,14 @@ export function handleMarkNotificationsRead(
 
 export function handleMarkAllNotificationsRead(
   _message: MarkAllNotificationsReadMessage,
-  notificationService: NotificationService,
+  notificationService: NotificationService
 ): void {
   notificationService.markAllRead();
 }
 
 export function handleDismissNotifications(
   message: DismissNotificationsMessage,
-  notificationService: NotificationService,
+  notificationService: NotificationService
 ): void {
   if (Array.isArray(message.itemIds)) {
     notificationService.dismissItems(message.itemIds);

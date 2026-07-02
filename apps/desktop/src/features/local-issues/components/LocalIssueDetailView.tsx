@@ -1,12 +1,5 @@
 import { useState } from 'react';
-import {
-  Pencil,
-  RotateCcw,
-  Trash2,
-  X,
-  Paperclip,
-  Zap,
-} from 'lucide-react';
+import { Pencil, RotateCcw, Trash2, X, Paperclip, Zap } from 'lucide-react';
 import type { LocalIssue } from '@zclaudia/shared';
 import { ACTIONABLE_LABEL } from '@zclaudia/shared';
 import { useLocalIssueStore } from '../store';
@@ -74,13 +67,17 @@ export function LocalIssueDetailView({ issue, projectId, onDeleted }: LocalIssue
           <div className="flex items-start gap-3">
             <div className="flex-1 min-w-0 space-y-1.5">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded-full ${STATUS_COLORS[issue.status] ?? ''}`}>
+                <span
+                  className={`text-[11px] font-medium px-1.5 py-0.5 rounded-full ${STATUS_COLORS[issue.status] ?? ''}`}
+                >
                   {issue.status.replace('_', ' ')}
                 </span>
-                <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded-full ${PRIORITY_COLORS[issue.priority] ?? ''}`}>
+                <span
+                  className={`text-[11px] font-medium px-1.5 py-0.5 rounded-full ${PRIORITY_COLORS[issue.priority] ?? ''}`}
+                >
                   {issue.priority}
                 </span>
-                {issue.labels.map((label) => (
+                {issue.labels.map(label => (
                   <span
                     key={label}
                     className="text-[11px] px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-500 dark:text-purple-400"
@@ -99,7 +96,9 @@ export function LocalIssueDetailView({ issue, projectId, onDeleted }: LocalIssue
                     <Zap size={14} className="text-amber-500" aria-hidden />
                   </span>
                 )}
-                <h1 className="text-base font-semibold leading-snug break-words flex-1">{issue.title}</h1>
+                <h1 className="text-base font-semibold leading-snug break-words flex-1">
+                  {issue.title}
+                </h1>
               </div>
             </div>
             <div className="flex items-center gap-0.5 flex-shrink-0 -mt-0.5">
@@ -175,7 +174,7 @@ export function LocalIssueDetailView({ issue, projectId, onDeleted }: LocalIssue
             </div>
             <AttachmentList
               items={attachments.items}
-              onRemove={(id) => void attachments.remove(id)}
+              onRemove={id => void attachments.remove(id)}
               sortable
               ownerKind="local_issue"
               ownerId={issue.id}

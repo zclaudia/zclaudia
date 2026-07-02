@@ -7,15 +7,12 @@ import type { FilePushItem } from '../../../stores/filePushStore';
 vi.mock('../../../stores/filePushStore', () => {
   const items: FilePushItem[] = [];
   return {
-    useFilePushStore: Object.assign(
-      (selector: any) => selector({ items }),
-      {
-        getState: () => ({
-          removeItem: vi.fn(),
-          items,
-        }),
-      }
-    ),
+    useFilePushStore: Object.assign((selector: any) => selector({ items }), {
+      getState: () => ({
+        removeItem: vi.fn(),
+        items,
+      }),
+    }),
     __setItems: (newItems: FilePushItem[]) => {
       items.length = 0;
       items.push(...newItems);
@@ -124,22 +121,12 @@ describe('FilePushCard', () => {
   });
 
   it('shows default Failed text when no error message', () => {
-    render(
-      <FilePushCard
-        item={{ ...baseItem, status: 'error' }}
-        onPreview={mockOnPreview}
-      />
-    );
+    render(<FilePushCard item={{ ...baseItem, status: 'error' }} onPreview={mockOnPreview} />);
     expect(screen.getByText('Failed')).toBeInTheDocument();
   });
 
   it('shows dismiss button for completed items', () => {
-    render(
-      <FilePushCard
-        item={{ ...baseItem, status: 'completed' }}
-        onPreview={mockOnPreview}
-      />
-    );
+    render(<FilePushCard item={{ ...baseItem, status: 'completed' }} onPreview={mockOnPreview} />);
     expect(screen.getByLabelText('Dismiss')).toBeInTheDocument();
   });
 
@@ -155,10 +142,7 @@ describe('FilePushCard', () => {
 
   it('renders image icon for image mime type', () => {
     render(
-      <FilePushCard
-        item={{ ...baseItem, mimeType: 'image/png' }}
-        onPreview={mockOnPreview}
-      />
+      <FilePushCard item={{ ...baseItem, mimeType: 'image/png' }} onPreview={mockOnPreview} />
     );
     // Icon is an SVG, just check it renders without error
     expect(screen.getByText('test.txt')).toBeInTheDocument();
@@ -176,10 +160,7 @@ describe('FilePushCard', () => {
 
   it('renders archive icon for zip files', () => {
     render(
-      <FilePushCard
-        item={{ ...baseItem, mimeType: 'application/zip' }}
-        onPreview={mockOnPreview}
-      />
+      <FilePushCard item={{ ...baseItem, mimeType: 'application/zip' }} onPreview={mockOnPreview} />
     );
     expect(screen.getByText('test.txt')).toBeInTheDocument();
   });
@@ -211,12 +192,7 @@ describe('FilePushCard', () => {
       items: [],
     } as any);
 
-    render(
-      <FilePushCard
-        item={{ ...baseItem, status: 'completed' }}
-        onPreview={mockOnPreview}
-      />
-    );
+    render(<FilePushCard item={{ ...baseItem, status: 'completed' }} onPreview={mockOnPreview} />);
     fireEvent.click(screen.getByLabelText('Dismiss'));
     expect(removeItem).toHaveBeenCalledWith('f1');
   });
@@ -227,7 +203,12 @@ describe('FilePushCard', () => {
 
     render(
       <FilePushCard
-        item={{ ...baseItem, status: 'completed', savedPath: '/path/to/image.png', mimeType: 'image/png' }}
+        item={{
+          ...baseItem,
+          status: 'completed',
+          savedPath: '/path/to/image.png',
+          mimeType: 'image/png',
+        }}
         onPreview={mockOnPreview}
       />
     );
@@ -261,7 +242,12 @@ describe('FilePushCard', () => {
 
     render(
       <FilePushCard
-        item={{ ...baseItem, status: 'completed', privatePath: '/data/file.pdf', mimeType: 'application/pdf' }}
+        item={{
+          ...baseItem,
+          status: 'completed',
+          privatePath: '/data/file.pdf',
+          mimeType: 'application/pdf',
+        }}
         onPreview={mockOnPreview}
       />
     );
@@ -277,12 +263,7 @@ describe('FilePushCard', () => {
     vi.mocked(isPreviewable).mockReturnValue(false);
     vi.mocked(isAndroid).mockReturnValue(false);
 
-    render(
-      <FilePushCard
-        item={{ ...baseItem, status: 'completed' }}
-        onPreview={mockOnPreview}
-      />
-    );
+    render(<FilePushCard item={{ ...baseItem, status: 'completed' }} onPreview={mockOnPreview} />);
     // No Open button since hasOpenablePath is false
     expect(screen.queryByText('Open')).not.toBeInTheDocument();
   });
@@ -346,7 +327,7 @@ describe('FilePushNotificationList', () => {
   });
 
   it('renders cards for session items', async () => {
-    const { __setItems } = await import('../../../stores/filePushStore') as any;
+    const { __setItems } = (await import('../../../stores/filePushStore')) as any;
     __setItems([
       {
         fileId: 'f1',

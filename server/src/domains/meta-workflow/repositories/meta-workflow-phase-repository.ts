@@ -89,7 +89,12 @@ export class MetaWorkflowPhaseRepository extends BaseRepository<MetaWorkflowPhas
         created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       params: [
-        id, data.runId, data.phaseId, data.phaseType, data.status, data.executeEntity,
+        id,
+        data.runId,
+        data.phaseId,
+        data.phaseType,
+        data.status,
+        data.executeEntity,
         data.reusedFromPoolId ?? null,
         data.generatedWorkflowId ?? null,
         data.generatedSubagentId ?? null,
@@ -97,7 +102,8 @@ export class MetaWorkflowPhaseRepository extends BaseRepository<MetaWorkflowPhas
         data.worktreePath ?? null,
         data.staleSince ?? null,
         data.staleSourcePhaseId ?? null,
-        data.attempt, data.maxRetries,
+        data.attempt,
+        data.maxRetries,
         data.inputsSnapshot ? JSON.stringify(data.inputsSnapshot) : null,
         data.outputsSnapshot ? JSON.stringify(data.outputsSnapshot) : null,
         data.gatesSnapshot ? JSON.stringify(data.gatesSnapshot) : null,
@@ -114,7 +120,10 @@ export class MetaWorkflowPhaseRepository extends BaseRepository<MetaWorkflowPhas
     const params: unknown[] = [];
 
     const jsonFields = new Set<keyof Update>([
-      'inputsSnapshot', 'outputsSnapshot', 'gatesSnapshot', 'executeConfigSnapshot',
+      'inputsSnapshot',
+      'outputsSnapshot',
+      'gatesSnapshot',
+      'executeConfigSnapshot',
     ]);
 
     const fieldMap: Array<[keyof Update, string]> = [
@@ -163,16 +172,16 @@ export class MetaWorkflowPhaseRepository extends BaseRepository<MetaWorkflowPhas
   }
 
   findByRun(runId: string): MetaWorkflowPhase[] {
-    const rows = this.db.prepare(
-      `SELECT * FROM meta_workflow_phases WHERE run_id = ? ORDER BY created_at ASC`,
-    ).all(runId);
-    return rows.map((r) => this.mapRow(r));
+    const rows = this.db
+      .prepare(`SELECT * FROM meta_workflow_phases WHERE run_id = ? ORDER BY created_at ASC`)
+      .all(runId);
+    return rows.map(r => this.mapRow(r));
   }
 
   findByRunAndPhaseId(runId: string, phaseId: string): MetaWorkflowPhase | null {
-    const row = this.db.prepare(
-      `SELECT * FROM meta_workflow_phases WHERE run_id = ? AND phase_id = ? LIMIT 1`,
-    ).get(runId, phaseId);
+    const row = this.db
+      .prepare(`SELECT * FROM meta_workflow_phases WHERE run_id = ? AND phase_id = ? LIMIT 1`)
+      .get(runId, phaseId);
     return row ? this.mapRow(row) : null;
   }
 }

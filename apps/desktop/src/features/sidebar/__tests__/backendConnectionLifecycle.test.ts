@@ -71,7 +71,7 @@ describe('computeConnectionPlan', () => {
       foregroundBackendId: 'local',
       localBackendId: 'local',
       managedBackendIds: [],
-      isConnected: (id) => id === 'remote-1',
+      isConnected: id => id === 'remote-1',
     });
     expect(plan.toConnect).toEqual([]);
     expect(plan.nextManaged).toEqual([]);

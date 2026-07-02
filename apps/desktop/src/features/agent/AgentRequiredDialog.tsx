@@ -11,7 +11,12 @@ interface AgentRequiredDialogProps {
   onConfigure: (tab: Extract<SettingsTab, 'providers' | 'agents'>) => void;
 }
 
-export function AgentRequiredDialog({ open, reason, onClose, onConfigure }: AgentRequiredDialogProps) {
+export function AgentRequiredDialog({
+  open,
+  reason,
+  onClose,
+  onConfigure,
+}: AgentRequiredDialogProps) {
   const isMobile = useIsMobile();
   useAndroidBack(onClose, isMobile && open, 25);
   if (!open) return null;

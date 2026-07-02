@@ -64,16 +64,17 @@ export async function createModeConfig(browser: BrowserAdapter, mode: ModeConfig
   const serverNameInput = browser.locator('input[placeholder*="Server name"]');
   await serverNameInput.fill(mode.name);
 
-  if (mode.gatewayUrl) {
+  const { gatewayUrl } = mode;
+  if (gatewayUrl) {
     const gatewayBtn = browser.locator('button:has-text("Gateway")').first();
     await gatewayBtn.click();
     await browser.waitForTimeout(300);
 
     const gatewayUrlInput = browser.locator('input[placeholder*="Gateway URL"]');
-    await gatewayUrlInput.fill(mode.gatewayUrl!);
+    await gatewayUrlInput.fill(gatewayUrl);
 
     const gatewaySecretInput = browser.locator('input[placeholder*="Gateway Secret"]').first();
-    await gatewaySecretInput.fill(mode.gatewaySecret!);
+    await gatewaySecretInput.fill(mode.gatewaySecret ?? '');
 
     const backendIdInput = browser.locator('input[placeholder*="Backend ID"]');
     await backendIdInput.fill(mode.backendId || '');
@@ -168,8 +169,9 @@ export async function ensureActiveSession(browser: BrowserAdapter): Promise<void
     await browser.waitForTimeout(500);
 
     const newSessionBtn = browser.locator('[data-testid="new-session-btn"]').first();
-    const expanded = await newSessionBtn.isVisible({ timeout: 2000 }).catch(() => false)
-      || await sessionItem.isVisible({ timeout: 500 }).catch(() => false);
+    const expanded =
+      (await newSessionBtn.isVisible({ timeout: 2000 }).catch(() => false)) ||
+      (await sessionItem.isVisible({ timeout: 500 }).catch(() => false));
 
     if (!expanded) {
       console.log('[ensureActiveSession] Project not expanded, clicking again...');
@@ -212,7 +214,10 @@ export async function ensureActiveSession(browser: BrowserAdapter): Promise<void
 /**
  * Wait for connection to be established
  */
-export async function waitForConnection(browser: BrowserAdapter, timeout: number = 15000): Promise<boolean> {
+export async function waitForConnection(
+  browser: BrowserAdapter,
+  timeout: number = 15000
+): Promise<boolean> {
   const startTime = Date.now();
 
   while (Date.now() - startTime < timeout) {

@@ -12,7 +12,7 @@ vi.mock('../../../../infra/events/index.js', () => ({
 
 function event<TType extends Parameters<typeof createRunDomainEvent>[0]['type']>(
   type: TType,
-  payload: Parameters<typeof createRunDomainEvent<TType>>[0]['payload'],
+  payload: Parameters<typeof createRunDomainEvent<TType>>[0]['payload']
 ) {
   return createRunDomainEvent({
     eventId: `event-${type}`,
@@ -32,15 +32,18 @@ describe('plugin domain event listener', () => {
   });
 
   it('emits legacy plugin events from public run domain events', async () => {
-    const { registerPluginDomainEventListener } = await import('../plugin-domain-event-listener.js');
+    const { registerPluginDomainEventListener } =
+      await import('../plugin-domain-event-listener.js');
     const registry = new RunDomainEventListenerRegistry();
     const unsubscribe = registerPluginDomainEventListener(registry);
 
-    registry.emit(event('tool.started', {
-      toolUseId: 'tool-1',
-      toolName: 'Read',
-      input: { file_path: 'README.md' },
-    }));
+    registry.emit(
+      event('tool.started', {
+        toolUseId: 'tool-1',
+        toolName: 'Read',
+        input: { file_path: 'README.md' },
+      })
+    );
 
     expect(pluginEventsEmitMock).toHaveBeenCalledWith('run.toolCall', {
       runId: 'run-1',
@@ -51,26 +54,31 @@ describe('plugin domain event listener', () => {
     });
 
     unsubscribe();
-    registry.emit(event('tool.started', {
-      toolUseId: 'tool-1',
-      toolName: 'Read',
-      input: { file_path: 'README.md' },
-    }));
+    registry.emit(
+      event('tool.started', {
+        toolUseId: 'tool-1',
+        toolName: 'Read',
+        input: { file_path: 'README.md' },
+      })
+    );
     expect(pluginEventsEmitMock).toHaveBeenCalledTimes(1);
   });
 
   it('registers at most once for the same registry', async () => {
-    const { registerPluginDomainEventListener } = await import('../plugin-domain-event-listener.js');
+    const { registerPluginDomainEventListener } =
+      await import('../plugin-domain-event-listener.js');
     const registry = new RunDomainEventListenerRegistry();
 
     registerPluginDomainEventListener(registry);
     registerPluginDomainEventListener(registry);
-    registry.emit(event('tool.finished', {
-      toolUseId: 'tool-1',
-      toolName: 'Read',
-      output: 'contents',
-      isError: false,
-    }));
+    registry.emit(
+      event('tool.finished', {
+        toolUseId: 'tool-1',
+        toolName: 'Read',
+        output: 'contents',
+        isError: false,
+      })
+    );
 
     expect(pluginEventsEmitMock).toHaveBeenCalledTimes(1);
     expect(pluginEventsEmitMock).toHaveBeenCalledWith('run.toolResult', {

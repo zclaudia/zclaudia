@@ -73,16 +73,14 @@ export function AttachmentThumbnail({
           <Icon className="h-8 w-8 text-muted-foreground" />
         )}
 
-        {slotTopLeft && (
-          <div className="absolute top-1 left-1">{slotTopLeft}</div>
-        )}
+        {slotTopLeft && <div className="absolute top-1 left-1">{slotTopLeft}</div>}
 
         {(onRemove || onDownload) && (
           <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             {onDownload && (
               <button
                 type="button"
-                onClick={(e) => {
+                onClick={e => {
                   e.stopPropagation();
                   onDownload(attachment);
                 }}
@@ -95,7 +93,7 @@ export function AttachmentThumbnail({
             {onRemove && (
               <button
                 type="button"
-                onClick={(e) => {
+                onClick={e => {
                   e.stopPropagation();
                   onRemove(attachment.id);
                 }}
@@ -113,9 +111,7 @@ export function AttachmentThumbnail({
         <div className="text-[11px] truncate" title={attachment.name}>
           {attachment.name}
         </div>
-        <div className="text-[10px] text-muted-foreground">
-          {formatFileSize(attachment.size)}
-        </div>
+        <div className="text-[10px] text-muted-foreground">{formatFileSize(attachment.size)}</div>
       </div>
     </div>
   );

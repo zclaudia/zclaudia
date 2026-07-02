@@ -10,10 +10,10 @@ import { useAttachmentsStore, ownerKey } from '../store';
  */
 export function useAttachmentCount(
   kind: AttachmentOwnerKind | null | undefined,
-  id: string | null | undefined,
+  id: string | null | undefined
 ): number {
   const key = kind && id ? ownerKey(kind, id) : '';
-  return useAttachmentsStore((state) => {
+  return useAttachmentsStore(state => {
     if (!key) return 0;
     const list = state.byOwner[key];
     if (list) return list.length;
@@ -33,9 +33,9 @@ export function useAttachmentCount(
  */
 export function useAttachmentCounts(
   kind: AttachmentOwnerKind | null | undefined,
-  ids: string[],
+  ids: string[]
 ): void {
-  const loadCounts = useAttachmentsStore((s) => s.loadAttachmentCounts);
+  const loadCounts = useAttachmentsStore(s => s.loadAttachmentCounts);
 
   // Sorted-and-joined signature so identical id sets in different orders
   // don't trigger redundant requests.

@@ -1,11 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { selectProjectIdsForBackend } from '../projectGrouping';
 
-const projects = [
-  { id: 'p1' },
-  { id: 'p2' },
-  { id: 'p3' },
-] as any[];
+const projects = [{ id: 'p1' }, { id: 'p2' }, { id: 'p3' }] as any[];
 
 function ownerOf(id: string): string | null {
   return ({ p1: 'backend-a', p2: 'backend-b' } as Record<string, string>)[id] ?? null;

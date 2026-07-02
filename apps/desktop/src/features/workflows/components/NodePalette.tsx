@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { useWorkflowStore } from '../store';
 import { getStepIcon } from './nodes/StepNode';
 
-
 const BUILTIN_STEP_CATEGORIES: { label: string; steps: { type: string; label: string }[] }[] = [
   {
     label: 'Git',
@@ -84,7 +83,7 @@ export function NodePalette() {
               <div
                 key={step.type}
                 draggable
-                onDragStart={(e) => onDragStart(e, step.type, step.label)}
+                onDragStart={e => onDragStart(e, step.type, step.label)}
                 className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-md cursor-grab border border-border hover:bg-secondary active:cursor-grabbing transition-colors"
               >
                 <span className="text-muted-foreground">{getStepIcon(step.type)}</span>

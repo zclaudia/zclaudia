@@ -18,31 +18,36 @@ function normalizePath(p: string): string {
 const PHASE_DOT: Record<string, { label: string; dot: string }> = {
   active: { label: 'active', dot: 'bg-green-500' },
   paused: { label: 'paused', dot: 'bg-yellow-500' },
-  setup:  { label: 'setup',  dot: 'bg-blue-500' },
-  idle:   { label: 'idle',   dot: 'bg-muted-foreground/40' },
+  setup: { label: 'setup', dot: 'bg-blue-500' },
+  idle: { label: 'idle', dot: 'bg-muted-foreground/40' },
 };
 
 function splitProjectSessions(
   sessionList: Session[],
   hasSupervisor: boolean,
-  supervisorMainSessionId?: string,
+  supervisorMainSessionId?: string
 ) {
   if (!hasSupervisor) {
     return { mainSession: null, taskSessions: [], regularSessions: sessionList };
   }
 
-  const mainSession = (
-    supervisorMainSessionId
-      ? sessionList.find((session) => session.id === supervisorMainSessionId)
-      : undefined
-  ) ?? sessionList.find((session) => session.projectRole === 'main') ?? null;
+  const mainSession =
+    (supervisorMainSessionId
+      ? sessionList.find(session => session.id === supervisorMainSessionId)
+      : undefined) ??
+    sessionList.find(session => session.projectRole === 'main') ??
+    null;
   const taskParentSessionId = supervisorMainSessionId ?? mainSession?.id;
   const taskSessions: Session[] = [];
   const regularSessions: Session[] = [];
 
   for (const session of sessionList) {
     if (mainSession && session.id === mainSession.id) continue;
-    if (taskParentSessionId && session.projectRole === 'task' && session.parentSessionId === taskParentSessionId) {
+    if (
+      taskParentSessionId &&
+      session.projectRole === 'task' &&
+      session.parentSessionId === taskParentSessionId
+    ) {
       taskSessions.push(session);
       continue;
     }
@@ -148,14 +153,14 @@ export function ProjectListItem({
   const renderSortableSessions = (
     sessionList: Session[],
     className = 'space-y-0.5',
-    sessionOpts: RenderSessionOptions = {},
+    sessionOpts: RenderSessionOptions = {}
   ) => (
     <SortableList
-      items={sessionList.map((s) => s.id)}
-      onReorder={(ordered) => onReorderSessions(project.id, ordered)}
+      items={sessionList.map(s => s.id)}
+      onReorder={ordered => onReorderSessions(project.id, ordered)}
       className={className}
     >
-      {sessionList.map((session) => (
+      {sessionList.map(session => (
         <SortableItem key={session.id} id={session.id} dragHandleClassName="w-3 h-3 -ml-0.5 mr-0.5">
           {renderSession(session, sessionOpts)}
         </SortableItem>
@@ -167,17 +172,21 @@ export function ProjectListItem({
   const { mainSession, taskSessions, regularSessions } = splitProjectSessions(
     sessions,
     hasSupervisor,
-    supervisorAgent?.mainSessionId,
+    supervisorAgent?.mainSessionId
   );
-  const supervisorSessionId = hasSupervisor ? (supervisorAgent?.mainSessionId ?? mainSession?.id) : undefined;
-  const phaseDot = hasSupervisor ? (PHASE_DOT[supervisorAgent?.phase ?? 'idle'] ?? PHASE_DOT.idle) : undefined;
-  const regularSessionIds = new Set(regularSessions.map((session) => session.id));
+  const supervisorSessionId = hasSupervisor
+    ? (supervisorAgent?.mainSessionId ?? mainSession?.id)
+    : undefined;
+  const phaseDot = hasSupervisor
+    ? (PHASE_DOT[supervisorAgent?.phase ?? 'idle'] ?? PHASE_DOT.idle)
+    : undefined;
+  const regularSessionIds = new Set(regularSessions.map(session => session.id));
   const groups = groupSessionsByWorktree(sessions, project.rootPath, worktrees)
-    .map((group) => ({
+    .map(group => ({
       ...group,
-      sessions: group.sessions.filter((session) => regularSessionIds.has(session.id)),
+      sessions: group.sessions.filter(session => regularSessionIds.has(session.id)),
     }))
-    .filter((group) => group.sessions.length > 0);
+    .filter(group => group.sessions.length > 0);
 
   const renderRegularSessions = () => {
     if (regularSessions.length === 0) return null;
@@ -187,7 +196,7 @@ export function ProjectListItem({
     return groups.map(group => {
       const matchedWorktree = group.isRoot
         ? null
-        : worktrees.find((wt) => normalizePath(wt.path) === normalizePath(group.key)) ?? null;
+        : (worktrees.find(wt => normalizePath(wt.path) === normalizePath(group.key)) ?? null);
       const canDeleteWorktree = Boolean(
         matchedWorktree && !matchedWorktree.isMain && matchedWorktree.managedBy !== 'supervisor'
       );
@@ -205,7 +214,7 @@ export function ProjectListItem({
             {renderSession(session, {
               // Root worktree gets no branch tag; named worktrees show the git
               // branch (e.g. "feat/my-test") for consistency with group headers.
-              worktreeBranchOverride: group.isRoot ? undefined : (group.branchName || group.label),
+              worktreeBranchOverride: group.isRoot ? undefined : group.branchName || group.label,
               onDeleteWorktree: canDeleteWorktree ? onDelete : undefined,
             })}
           </div>
@@ -232,20 +241,28 @@ export function ProjectListItem({
   return (
     <>
       <div className="flex items-center group relative">
-        <button
-          onClick={onToggle}
-          className={projectButtonClass}
-        >
+        <button onClick={onToggle} className={projectButtonClass}>
           {isExpanded ? (
-            <FolderOpen className="w-4 h-4 flex-shrink-0 text-muted-foreground" strokeWidth={1.75} />
+            <FolderOpen
+              className="w-4 h-4 flex-shrink-0 text-muted-foreground"
+              strokeWidth={1.75}
+            />
           ) : (
             <Folder className="w-4 h-4 flex-shrink-0 text-muted-foreground" strokeWidth={1.75} />
           )}
-          <span className="min-w-0 truncate text-sm font-medium text-foreground">{project.name}</span>
+          <span className="min-w-0 truncate text-sm font-medium text-foreground">
+            {project.name}
+          </span>
           {isExpanded ? (
-            <ChevronDown className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground/70" strokeWidth={2} />
+            <ChevronDown
+              className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground/70"
+              strokeWidth={2}
+            />
           ) : (
-            <ChevronRight className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground/70" strokeWidth={2} />
+            <ChevronRight
+              className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground/70"
+              strokeWidth={2}
+            />
           )}
         </button>
         {/* Supervisor phase — shown at rest, yields to the hover actions */}
@@ -260,12 +277,22 @@ export function ProjectListItem({
         )}
         {/* Project menu button */}
         <button
-          onClick={(e) => onOpenContextMenu(e, 'project', project.id)}
+          onClick={e => onOpenContextMenu(e, 'project', project.id)}
           className={menuButtonClass}
           aria-label="Project menu"
         >
-          <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+          <svg
+            className="w-3.5 h-3.5 text-muted-foreground"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
+            />
           </svg>
         </button>
         {/* New session — placed last */}
@@ -280,11 +307,15 @@ export function ProjectListItem({
         </button>
 
         {/* Project context menu */}
-        {contextMenuProject === project.id && contextMenuPos && (
+        {contextMenuProject === project.id &&
+          contextMenuPos &&
           createPortal(
             <>
               <div className="fixed inset-0 z-40" onClick={onCloseContextMenu} />
-              <div className={menuContainerClass} style={{ top: contextMenuPos.top, left: contextMenuPos.left }}>
+              <div
+                className={menuContainerClass}
+                style={{ top: contextMenuPos.top, left: contextMenuPos.left }}
+              >
                 <button
                   onClick={() => {
                     onSettingsProject(project.id);
@@ -292,9 +323,24 @@ export function ProjectListItem({
                   }}
                   className={menuItemClass}
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
                   </svg>
                   Settings
                 </button>
@@ -302,16 +348,25 @@ export function ProjectListItem({
                   onClick={() => onDeleteProject(project.id, project.name)}
                   className={`${menuItemClass} text-destructive`}
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    />
                   </svg>
                   Delete
                 </button>
               </div>
             </>,
             document.body
-          )
-        )}
+          )}
       </div>
 
       {/* Sessions — a left guide rail fades in only while this region is hovered */}
@@ -337,9 +392,7 @@ export function ProjectListItem({
               "SESSIONS N" header. The header (a collapse-all toggle) is only
               useful for the flat, ungrouped list. */}
           {regularSessions.length > 0 && hasSupervisor && groups.length > 0 && (
-            <div className="mt-1">
-              {renderRegularSessions()}
-            </div>
+            <div className="mt-1">{renderRegularSessions()}</div>
           )}
           {regularSessions.length > 0 && hasSupervisor && groups.length === 0 && (
             <div className="mt-1">
@@ -355,16 +408,19 @@ export function ProjectListItem({
                 </span>
                 <svg
                   className={`ml-auto w-2.5 h-2.5 opacity-40 transition-transform duration-200 ${!regularSessionsCollapsed ? 'rotate-90' : ''}`}
-                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
                 </svg>
               </button>
-              {!regularSessionsCollapsed && (
-                <div className="mt-0.5">
-                  {renderRegularSessions()}
-                </div>
-              )}
+              {!regularSessionsCollapsed && <div className="mt-0.5">{renderRegularSessions()}</div>}
             </div>
           )}
           {!hasSupervisor && renderRegularSessions()}
@@ -375,8 +431,8 @@ export function ProjectListItem({
               <input
                 type="text"
                 value={newSessionName}
-                onChange={(e) => onNewSessionNameChange(e.target.value)}
-                onKeyDown={(e) => {
+                onChange={e => onNewSessionNameChange(e.target.value)}
+                onKeyDown={e => {
                   if (e.key === 'Enter') onCreateSession();
                   if (e.key === 'Escape') onCancelCreateSession();
                 }}
@@ -393,7 +449,7 @@ export function ProjectListItem({
                   className={isMobile ? 'mt-2' : 'mt-1'}
                   options={[
                     { value: '', label: 'Default (from project)' },
-                    ...agents.map((a) => ({
+                    ...agents.map(a => ({
                       value: a.id,
                       label: `${a.name}${a.isDefault ? ' *' : ''}`,
                     })),
@@ -401,16 +457,10 @@ export function ProjectListItem({
                 />
               )}
               <div className={buttonRowClass}>
-                <button
-                  onClick={onCreateSession}
-                  className={createBtnClass}
-                >
+                <button onClick={onCreateSession} className={createBtnClass}>
                   Create
                 </button>
-                <button
-                  onClick={onCancelCreateSession}
-                  className={cancelBtnClass}
-                >
+                <button onClick={onCancelCreateSession} className={cancelBtnClass}>
                   Cancel
                 </button>
               </div>

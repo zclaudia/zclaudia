@@ -44,6 +44,6 @@ export function useProjectManager() {
   return {
     addProject,
     updateProject,
-    deleteProject
+    deleteProject,
   };
 }

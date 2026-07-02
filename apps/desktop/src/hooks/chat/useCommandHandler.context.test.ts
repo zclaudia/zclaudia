@@ -3,7 +3,7 @@ import { renderHook } from '@testing-library/react';
 import { useCommandHandler } from './useCommandHandler';
 import type { SlashCommand } from '@zclaudia/shared';
 
-vi.mock('../../services/api', async (importOriginal) => ({
+vi.mock('../../services/api', async importOriginal => ({
   ...(await importOriginal<object>()),
   getSessionContextUsage: vi.fn(),
 }));
@@ -31,7 +31,7 @@ function setup() {
       llmProfileId: undefined,
       commandsCacheKey: 'k',
       setDrawerOpen: vi.fn(),
-    }),
+    })
   );
   return { result, addMessage };
 }

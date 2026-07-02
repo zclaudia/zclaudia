@@ -9,10 +9,9 @@ function makeWorkspace(): string {
   return mkdtempSync(path.join(tmpdir(), 'zc-hashline-'));
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getTools(dir: string): Record<string, any> {
   const tools = buildTools(dir, { enabled: ['Read', 'Edit', 'Write'] });
-  return Object.fromEntries(tools.map((t) => [t.name, t]));
+  return Object.fromEntries(tools.map(t => [t.name, t]));
 }
 
 describe('replaceHashlineLine with snapshot disambiguation', () => {
@@ -33,7 +32,9 @@ describe('replaceHashlineLine with snapshot disambiguation', () => {
     // Without context the first match (inside boot) would be replaced. With the
     // snapshot, context around the snapshot's first occurrence (inside start) wins.
     const updated = replaceHashlineLine(current, hash, '  CLOSER();', snapshot);
-    expect(updated).toBe('function boot() {\n  closer();\n}\nfunction start() {\n  CLOSER();\n}\nfunction stop() {\n  closer();\n}\n');
+    expect(updated).toBe(
+      'function boot() {\n  closer();\n}\nfunction start() {\n  CLOSER();\n}\nfunction stop() {\n  closer();\n}\n'
+    );
   });
 
   it('returns undefined when the anchored line no longer exists', () => {
@@ -48,10 +49,15 @@ describe('hashline edit drift tolerance (integration)', () => {
     writeFileSync(path.join(dir, 'f.ts'), 'const a = 1;\nconst target = "old";\nconst b = 2;\n');
     const tools = getTools(dir);
     const read = await tools.Read.execute('r1', { path: 'f.ts', hashline: true });
-    const anchor = read.details.hashline.lines.find((l: { text: string }) => l.text.includes('target'));
+    const anchor = read.details.hashline.lines.find((l: { text: string }) =>
+      l.text.includes('target')
+    );
 
     // Out-of-band drift: lines prepended, tag now stale.
-    writeFileSync(path.join(dir, 'f.ts'), '// new header\nconst a = 1;\nconst target = "old";\nconst b = 2;\n');
+    writeFileSync(
+      path.join(dir, 'f.ts'),
+      '// new header\nconst a = 1;\nconst target = "old";\nconst b = 2;\n'
+    );
 
     const res = await tools.Edit.execute('e1', {
       file_path: 'f.ts',
@@ -93,11 +99,12 @@ describe('no-op edit loop guard (integration)', () => {
     const tools = getTools(dir);
     await tools.Read.execute('r1', { path: 'f.ts' });
 
-    const attempt = () => tools.Edit.execute('e', {
-      file_path: 'f.ts',
-      old_string: 'does not exist anywhere',
-      new_string: 'whatever',
-    });
+    const attempt = () =>
+      tools.Edit.execute('e', {
+        file_path: 'f.ts',
+        old_string: 'does not exist anywhere',
+        new_string: 'whatever',
+      });
     const first = await attempt();
     const second = await attempt();
     const third = await attempt();
@@ -114,11 +121,12 @@ describe('no-op edit loop guard (integration)', () => {
     const tools = getTools(dir);
     await tools.Read.execute('r1', { path: 'f.ts' });
 
-    const bad = () => tools.Edit.execute('e', {
-      file_path: 'f.ts',
-      old_string: 'missing text',
-      new_string: 'whatever',
-    });
+    const bad = () =>
+      tools.Edit.execute('e', {
+        file_path: 'f.ts',
+        old_string: 'missing text',
+        new_string: 'whatever',
+      });
     await bad();
     await bad();
     const good = await tools.Edit.execute('e-good', {
@@ -139,11 +147,12 @@ describe('no-op edit loop guard (integration)', () => {
     const tools = getTools(dir);
     await tools.Read.execute('r1', { path: 'f.ts' });
 
-    const attempt = (needle: string) => tools.Edit.execute('e', {
-      file_path: 'f.ts',
-      old_string: needle,
-      new_string: 'whatever',
-    });
+    const attempt = (needle: string) =>
+      tools.Edit.execute('e', {
+        file_path: 'f.ts',
+        old_string: needle,
+        new_string: 'whatever',
+      });
     await attempt('missing one');
     await attempt('missing two');
     const third = await attempt('missing three');

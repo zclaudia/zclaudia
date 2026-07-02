@@ -42,13 +42,9 @@ export function CreateLocalPRDialog({
         ]);
         setAllWorktrees(worktrees);
         const activePRPaths = new Set(
-          prs
-            .filter((pr) => !['merged', 'closed'].includes(pr.status))
-            .map((pr) => pr.worktreePath),
+          prs.filter(pr => !['merged', 'closed'].includes(pr.status)).map(pr => pr.worktreePath)
         );
-        const available = worktrees.filter(
-          (wt) => !wt.isMain && !activePRPaths.has(wt.path),
-        );
+        const available = worktrees.filter(wt => !wt.isMain && !activePRPaths.has(wt.path));
         setAvailableWorktrees(available);
         // Auto-select if only one available or default matches
         if (defaultWorktreePath) {
@@ -114,7 +110,7 @@ export function CreateLocalPRDialog({
                 size="lg"
                 options={[
                   { value: '', label: 'Select a worktree…' },
-                  ...availableWorktrees.map((wt) => ({
+                  ...availableWorktrees.map(wt => ({
                     value: wt.path,
                     label: `${wt.branch} (${wt.path})`,
                   })),
@@ -124,7 +120,7 @@ export function CreateLocalPRDialog({
               <input
                 type="text"
                 value={worktreePath}
-                onChange={(e) => setWorktreePath(e.target.value)}
+                onChange={e => setWorktreePath(e.target.value)}
                 placeholder="/path/to/worktree"
                 className="w-full text-sm text-base bg-muted border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary"
               />
@@ -143,8 +139,8 @@ export function CreateLocalPRDialog({
               options={[
                 { value: '', label: 'Auto-detect (main/master)' },
                 ...allWorktrees
-                  .filter((wt) => wt.path !== worktreePath)
-                  .map((wt) => ({
+                  .filter(wt => wt.path !== worktreePath)
+                  .map(wt => ({
                     value: wt.branch,
                     label: `${wt.branch}${wt.isMain ? ' (main worktree)' : ''}`,
                   })),
@@ -154,12 +150,13 @@ export function CreateLocalPRDialog({
 
           <div>
             <label className="text-xs font-medium text-muted-foreground block mb-1">
-              Title <span className="text-muted-foreground">(optional — defaults to branch/commit)</span>
+              Title{' '}
+              <span className="text-muted-foreground">(optional — defaults to branch/commit)</span>
             </label>
             <input
               type="text"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={e => setTitle(e.target.value)}
               placeholder="Brief description of the feature"
               className="w-full text-sm text-base bg-muted border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary"
             />
@@ -171,7 +168,7 @@ export function CreateLocalPRDialog({
             </label>
             <textarea
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={e => setDescription(e.target.value)}
               placeholder="Additional context for the reviewer"
               rows={3}
               className="w-full text-sm text-base bg-muted border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary resize-none"
@@ -182,12 +179,10 @@ export function CreateLocalPRDialog({
             <input
               type="checkbox"
               checked={autoReview}
-              onChange={(e) => setAutoReview(e.target.checked)}
+              onChange={e => setAutoReview(e.target.checked)}
               className="rounded-md border-border"
             />
-            <span className="text-xs text-muted-foreground">
-              Enable auto AI review
-            </span>
+            <span className="text-xs text-muted-foreground">Enable auto AI review</span>
           </label>
 
           {error && (

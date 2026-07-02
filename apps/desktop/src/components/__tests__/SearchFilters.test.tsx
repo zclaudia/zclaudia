@@ -40,8 +40,8 @@ describe('SearchFilters', () => {
     // The close button has an svg
     const closeButtons = container.querySelectorAll('button');
     // Click the close button (last button in header area)
-    const svgButton = Array.from(closeButtons).find(
-      b => b.querySelector('svg path[d*="M6 18L18 6"]')
+    const svgButton = Array.from(closeButtons).find(b =>
+      b.querySelector('svg path[d*="M6 18L18 6"]')
     );
     if (svgButton) {
       fireEvent.click(svgButton);
@@ -52,10 +52,7 @@ describe('SearchFilters', () => {
   it('shows Clear All button when active filters exist', () => {
     const onChange = vi.fn();
     const { getByText } = render(
-      <SearchFilters
-        filters={{ projectId: 'p1', role: 'user' }}
-        onFiltersChange={onChange}
-      />
+      <SearchFilters filters={{ projectId: 'p1', role: 'user' }} onFiltersChange={onChange} />
     );
     expect(getByText('Clear All')).toBeTruthy();
   });
@@ -65,11 +62,7 @@ describe('SearchFilters', () => {
       { id: 's1', name: 'Session 1', projectId: 'p1', createdAt: 0, updatedAt: 0, messages: [] },
     ] as any;
     const { getByText } = render(
-      <SearchFilters
-        filters={defaultFilters}
-        sessions={sessions}
-        onFiltersChange={() => {}}
-      />
+      <SearchFilters filters={defaultFilters} sessions={sessions} onFiltersChange={() => {}} />
     );
     expect(getByText('Session 1')).toBeTruthy();
   });

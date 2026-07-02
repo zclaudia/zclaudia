@@ -12,9 +12,10 @@ function upsertBackgroundTask(taskId: string, task: BackgroundTask): void {
   const existingTask = backgroundTaskStore.tasks[taskId];
 
   if (existingTask) {
-    const nextDescription = !task.description || task.description === 'Background Task'
-      ? existingTask.description
-      : task.description;
+    const nextDescription =
+      !task.description || task.description === 'Background Task'
+        ? existingTask.description
+        : task.description;
     backgroundTaskStore.updateTask(taskId, {
       ...task,
       startedAt: existingTask.startedAt,
@@ -30,7 +31,10 @@ function upsertBackgroundTask(taskId: string, task: BackgroundTask): void {
   backgroundTaskStore.addTask(task);
 }
 
-export function handleBackgroundTaskMessage(msg: ServerMessage, ctx: MessageDispatchContext): boolean {
+export function handleBackgroundTaskMessage(
+  msg: ServerMessage,
+  ctx: MessageDispatchContext
+): boolean {
   const { serverId } = ctx;
 
   switch (msg.type) {
@@ -39,11 +43,8 @@ export function handleBackgroundTaskMessage(msg: ServerMessage, ctx: MessageDisp
       if (!targetSessionId) return true;
 
       const taskId = `background:${msg.sessionId}`;
-      const mappedStatus = msg.status === 'running'
-        ? 'in_progress'
-        : msg.status === 'paused'
-        ? 'paused'
-        : msg.status;
+      const mappedStatus =
+        msg.status === 'running' ? 'in_progress' : msg.status === 'paused' ? 'paused' : msg.status;
 
       upsertBackgroundTask(taskId, {
         id: taskId,
@@ -70,7 +71,13 @@ export function handleBackgroundTaskMessage(msg: ServerMessage, ctx: MessageDisp
           description: msg.message || 'Background Task',
           source: 'sdk_task',
           stoppable: true,
-          status: (msg.status || 'in_progress') as 'started' | 'in_progress' | 'paused' | 'completed' | 'failed' | 'stopped',
+          status: (msg.status || 'in_progress') as
+            | 'started'
+            | 'in_progress'
+            | 'paused'
+            | 'completed'
+            | 'failed'
+            | 'stopped',
           startedAt: Date.now(),
           summary: msg.message,
           completedAt: isCompletedBackgroundStatus(msg.status) ? Date.now() : undefined,

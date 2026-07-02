@@ -41,14 +41,24 @@ function timeAgo(ts: number): string {
   return `${Math.floor(diff / 86_400_000)}d ago`;
 }
 
-export function TaskCard({ task, collapsed, permissionRequired = false, interrupted = false, onViewDetails, onContinue, onCancel, onDismiss }: TaskCardProps) {
+export function TaskCard({
+  task,
+  collapsed,
+  permissionRequired = false,
+  interrupted = false,
+  onViewDetails,
+  onContinue,
+  onCancel,
+  onDismiss,
+}: TaskCardProps) {
   const config = interrupted
     ? { dot: 'bg-red-400 animate-pulse', label: 'Interrupted' }
     : permissionRequired
-    ? { dot: 'bg-orange-500 animate-pulse', label: 'Permission Required' }
-    : STATUS_CONFIG[task.status];
-  const isTerminal = task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled';
-  const streamingText = useClaudiaStore((s) => s.streamingText[task.id]);
+      ? { dot: 'bg-orange-500 animate-pulse', label: 'Permission Required' }
+      : STATUS_CONFIG[task.status];
+  const isTerminal =
+    task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled';
+  const streamingText = useClaudiaStore(s => s.streamingText[task.id]);
   const [manualExpand, setManualExpand] = useState(false);
 
   // Determine what text to show, strip <think> blocks
@@ -67,20 +77,27 @@ export function TaskCard({ task, collapsed, permissionRequired = false, interrup
         <span className="text-xs text-muted-foreground truncate flex-1">
           {snippet || config.label}
         </span>
-        <span className="text-[10px] text-muted-foreground/50 flex-shrink-0">{timeAgo(task.createdAt)}</span>
+        <span className="text-[10px] text-muted-foreground/50 flex-shrink-0">
+          {timeAgo(task.createdAt)}
+        </span>
       </div>
     );
   }
 
   const isLong = displayText ? displayText.length > COLLAPSE_THRESHOLD : false;
-  const showText = displayText && (!isLong || manualExpand) ? displayText : displayText?.slice(0, COLLAPSE_THRESHOLD);
+  const showText =
+    displayText && (!isLong || manualExpand)
+      ? displayText
+      : displayText?.slice(0, COLLAPSE_THRESHOLD);
 
   return (
     <div className="rounded-lg border border-border bg-card/50 p-3 space-y-2">
       {/* Header: status dot + title + label + time + branch context */}
       <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
         <span className={`w-2 h-2 rounded-full flex-shrink-0 ${config.dot}`} />
-        {!displayText && <span className="text-foreground text-xs font-medium truncate flex-1">{task.title}</span>}
+        {!displayText && (
+          <span className="text-foreground text-xs font-medium truncate flex-1">{task.title}</span>
+        )}
         <span>{config.label}</span>
         <span>·</span>
         <span>{timeAgo(task.createdAt)}</span>
@@ -90,12 +107,17 @@ export function TaskCard({ task, collapsed, permissionRequired = false, interrup
           </span>
         )}
         {collapsed && (
-          <button onClick={() => setManualExpand(false)} className="ml-auto text-[10px] text-primary hover:underline">
+          <button
+            onClick={() => setManualExpand(false)}
+            className="ml-auto text-[10px] text-primary hover:underline"
+          >
             Collapse
           </button>
         )}
         {task.toolCount != null && task.toolCount > 0 && (
-          <span className={`${collapsed ? '' : 'ml-auto'} text-[10px] bg-secondary px-1.5 py-0.5 rounded-md`}>
+          <span
+            className={`${collapsed ? '' : 'ml-auto'} text-[10px] bg-secondary px-1.5 py-0.5 rounded-md`}
+          >
             {task.toolCount} tool{task.toolCount > 1 ? 's' : ''}
           </span>
         )}
@@ -123,13 +145,13 @@ export function TaskCard({ task, collapsed, permissionRequired = false, interrup
 
       {/* Context reset notice */}
       {task.contextReset && (
-        <p className="text-xs text-amber-500/90">Context was reset — original conversation was still running.</p>
+        <p className="text-xs text-amber-500/90">
+          Context was reset — original conversation was still running.
+        </p>
       )}
 
       {/* Error display */}
-      {task.error && (
-        <p className="text-xs text-red-400 line-clamp-3">{task.error}</p>
-      )}
+      {task.error && <p className="text-xs text-red-400 line-clamp-3">{task.error}</p>}
 
       {/* Queued state — no content yet */}
       {interrupted && (
@@ -162,7 +184,11 @@ export function TaskCard({ task, collapsed, permissionRequired = false, interrup
             Continue
           </button>
         )}
-        {(task.status === 'running' || task.status === 'queued' || task.status === 'waiting' || permissionRequired || interrupted) && (
+        {(task.status === 'running' ||
+          task.status === 'queued' ||
+          task.status === 'waiting' ||
+          permissionRequired ||
+          interrupted) && (
           <button
             onClick={() => onCancel?.(task)}
             className="text-[11px] text-red-400 hover:underline"

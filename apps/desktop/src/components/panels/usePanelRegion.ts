@@ -1,8 +1,4 @@
-import {
-  selectPluginPanels,
-  usePluginStore,
-  type UIExtension,
-} from '../../stores/pluginStore';
+import { selectPluginPanels, usePluginStore, type UIExtension } from '../../stores/pluginStore';
 
 type PanelRegion = 'bottom' | 'right';
 
@@ -30,11 +26,11 @@ export function usePanelRegion({
   fallbackToActiveTabWhenEmpty = false,
 }: UsePanelRegionOptions): PanelRegionState {
   const allPanels = usePluginStore(selectPluginPanels);
-  const disabledBuiltinPanels = usePluginStore((s) => s.disabledBuiltinPanels);
-  const panelPlacements = usePluginStore((s) => s.panelPlacements);
+  const disabledBuiltinPanels = usePluginStore(s => s.disabledBuiltinPanels);
+  const panelPlacements = usePluginStore(s => s.panelPlacements);
   const platform = isMobile ? 'mobile' : 'desktop';
 
-  const regionPanels = allPanels.filter((panel) => {
+  const regionPanels = allPanels.filter(panel => {
     if (!(panel.platforms ?? ['desktop']).includes(platform)) return false;
     if (disabledBuiltinPanels.includes(panel.id)) return false;
 
@@ -45,13 +41,13 @@ export function usePanelRegion({
     return region === 'right' ? placement === 'right' : placement !== 'right';
   });
 
-  const visiblePanels = regionPanels.filter((panel) => panel.visible !== false);
-  const mountedPanels = regionPanels.filter((panel) => panel.alwaysMount || panel.visible !== false);
+  const visiblePanels = regionPanels.filter(panel => panel.visible !== false);
+  const mountedPanels = regionPanels.filter(panel => panel.alwaysMount || panel.visible !== false);
   const isOpen = visiblePanels.length > 0;
-  const hasAlwaysMount = mountedPanels.some((panel) => panel.alwaysMount);
+  const hasAlwaysMount = mountedPanels.some(panel => panel.alwaysMount);
 
   const effectiveTab = (() => {
-    if (activeTab && visiblePanels.some((panel) => panel.id === activeTab)) return activeTab;
+    if (activeTab && visiblePanels.some(panel => panel.id === activeTab)) return activeTab;
     if (visiblePanels.length > 0) return visiblePanels[0].id;
     return fallbackToActiveTabWhenEmpty ? activeTab : null;
   })();
@@ -62,7 +58,7 @@ export function usePanelRegion({
     isOpen,
     hasAlwaysMount,
     effectiveTab,
-    activePanel: visiblePanels.find((panel) => panel.id === effectiveTab),
+    activePanel: visiblePanels.find(panel => panel.id === effectiveTab),
     showTabs: visiblePanels.length > 1,
   };
 }

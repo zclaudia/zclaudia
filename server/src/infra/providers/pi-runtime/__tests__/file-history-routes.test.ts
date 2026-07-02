@@ -18,7 +18,9 @@ describe('file history routes', () => {
     app.use(express.json());
     app.use('/api/providers', createFileHistoryRoutes());
 
-    const res = await request(app).post(`/api/providers/file-history/backups/${backup.id}/restore`).send({});
+    const res = await request(app)
+      .post(`/api/providers/file-history/backups/${backup.id}/restore`)
+      .send({});
     const restored = readFileSync(filePath, 'utf8');
 
     rmSync(dir, { recursive: true, force: true });

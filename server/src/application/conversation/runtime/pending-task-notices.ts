@@ -14,7 +14,8 @@ const MAX_NOTICES_PER_SESSION = 20;
 export function addPendingTaskNotice(sessionId: string, notice: string): void {
   const queue = noticesBySession.get(sessionId) ?? [];
   queue.push(notice);
-  if (queue.length > MAX_NOTICES_PER_SESSION) queue.splice(0, queue.length - MAX_NOTICES_PER_SESSION);
+  if (queue.length > MAX_NOTICES_PER_SESSION)
+    queue.splice(0, queue.length - MAX_NOTICES_PER_SESSION);
   noticesBySession.set(sessionId, queue);
 }
 

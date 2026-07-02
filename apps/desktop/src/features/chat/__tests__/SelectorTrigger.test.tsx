@@ -15,11 +15,7 @@ describe('SelectorTrigger', () => {
 
   it('calls onClick when clicked', () => {
     const handleClick = vi.fn();
-    render(
-      <SelectorTrigger onClick={handleClick}>
-        Click me
-      </SelectorTrigger>
-    );
+    render(<SelectorTrigger onClick={handleClick}>Click me</SelectorTrigger>);
 
     fireEvent.click(screen.getByRole('button'));
 
@@ -118,11 +114,7 @@ describe('SelectorTrigger', () => {
   });
 
   it('has hover class when not disabled or locked', () => {
-    render(
-      <SelectorTrigger onClick={() => {}}>
-        Test
-      </SelectorTrigger>
-    );
+    render(<SelectorTrigger onClick={() => {}}>Test</SelectorTrigger>);
 
     const button = screen.getByRole('button');
     expect(button.className).toContain('hover:bg-muted');
@@ -130,12 +122,7 @@ describe('SelectorTrigger', () => {
 
   it('prefers lock reason over title when both provided and locked', () => {
     render(
-      <SelectorTrigger
-        onClick={() => {}}
-        locked
-        lockReason="Lock reason"
-        title="Title"
-      >
+      <SelectorTrigger onClick={() => {}} locked lockReason="Lock reason" title="Title">
         Test
       </SelectorTrigger>
     );
@@ -145,11 +132,7 @@ describe('SelectorTrigger', () => {
 
   it('uses title when locked but no lock reason provided', () => {
     render(
-      <SelectorTrigger
-        onClick={() => {}}
-        locked
-        title="Title"
-      >
+      <SelectorTrigger onClick={() => {}} locked title="Title">
         Test
       </SelectorTrigger>
     );

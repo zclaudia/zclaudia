@@ -18,8 +18,10 @@ export const designDocTemplate: PhaseTemplate = {
       `No code change. Use the single-shot pattern: write the document at the path specified in outputs.`,
       ``,
       `Acceptance gates that MUST pass:`,
-      ...phase.acceptanceGates.map((g) => `  - ${g.id}: ${g.command}`),
+      ...phase.acceptanceGates.map(g => `  - ${g.id}: ${g.command}`),
     ].join('\n');
   },
-  defaultGates(_phase: PhaseDef) { return []; },
+  defaultGates(_phase: PhaseDef) {
+    return [];
+  },
 };

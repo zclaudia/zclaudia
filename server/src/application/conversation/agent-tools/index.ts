@@ -15,12 +15,16 @@ import type { ProcessSupervisor } from '../../../infra/services/process-supervis
 /** Resolve the project working directory for a session */
 function resolveProjectCwd(db: Database.Database, sessionId?: string): string | null {
   if (!sessionId) return null;
-  const row = db.prepare(`
+  const row = db
+    .prepare(
+      `
     SELECT COALESCE(s.working_directory, p.root_path) as cwd
     FROM sessions s
     LEFT JOIN projects p ON s.project_id = p.id
     WHERE s.id = ?
-  `).get(sessionId) as { cwd: string | null } | undefined;
+  `
+    )
+    .get(sessionId) as { cwd: string | null } | undefined;
   return row?.cwd ?? null;
 }
 
@@ -62,7 +66,7 @@ async function safePath(filePath: string, baseDir: string): Promise<string | nul
     const existingPath = await findExistingAncestor(resolved);
     const realExistingPath = await realpath(existingPath);
 
-    if (!await isRealPathWithinBase(realExistingPath, realBase)) {
+    if (!(await isRealPathWithinBase(realExistingPath, realBase))) {
       return null;
     }
   } catch {
@@ -108,7 +112,9 @@ export function registerAgentTools(config: {
       }
 
       if (activeShells >= MAX_CONCURRENT_SHELLS) {
-        return JSON.stringify({ error: `Too many concurrent shell commands (limit: ${MAX_CONCURRENT_SHELLS})` });
+        return JSON.stringify({
+          error: `Too many concurrent shell commands (limit: ${MAX_CONCURRENT_SHELLS})`,
+        });
       }
 
       const processSupervisor = config.getProcessSupervisor?.();
@@ -116,25 +122,33 @@ export function registerAgentTools(config: {
       try {
         const shellResult = processSupervisor
           ? await processSupervisor.trackCommand({
-            command: '/bin/sh',
-            args: ['-c', args.command as string],
-            cwd,
-            owner: {
-              sessionId: context?.sessionId as string | undefined,
-            },
-          })
+              command: '/bin/sh',
+              args: ['-c', args.command as string],
+              cwd,
+              owner: {
+                sessionId: context?.sessionId as string | undefined,
+              },
+            })
           : null;
 
         if (!shellResult?.handle.stdout || !shellResult.handle.stderr) {
           const { execFile } = await import('child_process');
           const { promisify } = await import('util');
           const execFileAsync = promisify(execFile);
-          const { stdout, stderr } = await execFileAsync('/bin/sh', ['-c', args.command as string], {
-            cwd,
-            timeout: 30000,
-            maxBuffer: 1024 * 1024,
+          const { stdout, stderr } = await execFileAsync(
+            '/bin/sh',
+            ['-c', args.command as string],
+            {
+              cwd,
+              timeout: 30000,
+              maxBuffer: 1024 * 1024,
+            }
+          );
+          return JSON.stringify({
+            stdout: stdout.slice(0, 4000),
+            stderr: stderr.slice(0, 1000),
+            exitCode: 0,
           });
-          return JSON.stringify({ stdout: stdout.slice(0, 4000), stderr: stderr.slice(0, 1000), exitCode: 0 });
         }
 
         let stdout = '';
@@ -146,9 +160,11 @@ export function registerAgentTools(config: {
           stderr += chunk.toString();
         });
 
-        const timeoutPromise = new Promise<{ code: number | null; signal: string | null }>((resolve) => {
-          setTimeout(() => resolve({ code: 124, signal: 'SIGTERM' }), 30000);
-        });
+        const timeoutPromise = new Promise<{ code: number | null; signal: string | null }>(
+          resolve => {
+            setTimeout(() => resolve({ code: 124, signal: 'SIGTERM' }), 30000);
+          }
+        );
         const result = await Promise.race([shellResult.handle.exitPromise, timeoutPromise]);
         const exitCode = result.code ?? 1;
         if (exitCode === 124) {
@@ -161,9 +177,18 @@ export function registerAgentTools(config: {
             exitCode,
           });
         }
-        return JSON.stringify({ stdout: stdout.slice(0, 4000), stderr: stderr.slice(0, 1000), exitCode: 0 });
+        return JSON.stringify({
+          stdout: stdout.slice(0, 4000),
+          stderr: stderr.slice(0, 1000),
+          exitCode: 0,
+        });
       } catch (err: unknown) {
-        const execErr = err as { stdout?: string; stderr?: string; message?: string; code?: number };
+        const execErr = err as {
+          stdout?: string;
+          stderr?: string;
+          message?: string;
+          code?: number;
+        };
         return JSON.stringify({
           stdout: (execErr.stdout || '').slice(0, 4000),
           stderr: (execErr.stderr || execErr.message || '').slice(0, 1000),
@@ -190,8 +215,15 @@ export function registerAgentTools(config: {
         parameters: {
           type: 'object',
           properties: {
-            operation: { type: 'string', enum: ['read', 'write', 'list'], description: 'File operation type' },
-            path: { type: 'string', description: 'File or directory path (relative to project root)' },
+            operation: {
+              type: 'string',
+              enum: ['read', 'write', 'list'],
+              description: 'File operation type',
+            },
+            path: {
+              type: 'string',
+              description: 'File or directory path (relative to project root)',
+            },
             content: { type: 'string', description: 'Content to write (for write operation)' },
           },
           required: ['operation', 'path'],
@@ -223,10 +255,12 @@ export function registerAgentTools(config: {
             return JSON.stringify({ success: true, path: path.relative(projectCwd, filePath) });
           case 'list': {
             const entries = await fs.readdir(filePath, { withFileTypes: true });
-            return JSON.stringify(entries.map(e => ({
-              name: e.name,
-              type: e.isDirectory() ? 'directory' : 'file',
-            })));
+            return JSON.stringify(
+              entries.map(e => ({
+                name: e.name,
+                type: e.isDirectory() ? 'directory' : 'file',
+              }))
+            );
           }
           default:
             return JSON.stringify({ error: `Unknown operation: ${args.operation}` });
@@ -248,12 +282,17 @@ export function registerAgentTools(config: {
       type: 'function',
       function: {
         name: 'agent_http_request',
-        description: 'Make an HTTP request to an external URL. Internal/private network addresses are blocked.',
+        description:
+          'Make an HTTP request to an external URL. Internal/private network addresses are blocked.',
         parameters: {
           type: 'object',
           properties: {
             url: { type: 'string', description: 'Request URL (must be external)' },
-            method: { type: 'string', enum: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'], description: 'HTTP method (default: GET)' },
+            method: {
+              type: 'string',
+              enum: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+              description: 'HTTP method (default: GET)',
+            },
             headers: { type: 'object', description: 'Request headers' },
             body: { type: 'string', description: 'Request body (for POST/PUT/PATCH)' },
           },
@@ -261,7 +300,7 @@ export function registerAgentTools(config: {
         },
       },
     },
-    handler: async (args) => {
+    handler: async args => {
       const urlStr = args.url as string;
       try {
         const parsed = new URL(urlStr);
@@ -291,7 +330,10 @@ export function registerAgentTools(config: {
             if (done) break;
             bytesRead += value.byteLength;
             if (bytesRead > MAX_RESPONSE_BYTES) {
-              bodyText += decoder.decode(value.slice(0, MAX_RESPONSE_BYTES - (bytesRead - value.byteLength)), { stream: false });
+              bodyText += decoder.decode(
+                value.slice(0, MAX_RESPONSE_BYTES - (bytesRead - value.byteLength)),
+                { stream: false }
+              );
               truncated = true;
               controller.abort();
               break;
@@ -323,12 +365,21 @@ export function registerAgentTools(config: {
       type: 'function',
       function: {
         name: 'agent_memory',
-        description: 'Read and write persistent memories that survive across sessions. Use to remember user preferences, project knowledge, and insights.',
+        description:
+          'Read and write persistent memories that survive across sessions. Use to remember user preferences, project knowledge, and insights.',
         parameters: {
           type: 'object',
           properties: {
-            operation: { type: 'string', enum: ['get', 'set', 'list', 'delete'], description: 'Memory operation' },
-            namespace: { type: 'string', description: 'Memory category (e.g., "preference", "habit", "insight"). Default: "default"' },
+            operation: {
+              type: 'string',
+              enum: ['get', 'set', 'list', 'delete'],
+              description: 'Memory operation',
+            },
+            namespace: {
+              type: 'string',
+              description:
+                'Memory category (e.g., "preference", "habit", "insight"). Default: "default"',
+            },
             key: { type: 'string', description: 'Memory key (required for get/set/delete)' },
             value: { type: 'string', description: 'Memory value (required for set)' },
           },
@@ -341,23 +392,32 @@ export function registerAgentTools(config: {
       const store = new MemoryStore(db);
       const sessionId = context?.sessionId as string | undefined;
       const projectId = sessionId
-        ? (db.prepare('SELECT project_id FROM sessions WHERE id = ?').get(sessionId) as { project_id: string } | undefined)?.project_id ?? null
+        ? ((
+            db.prepare('SELECT project_id FROM sessions WHERE id = ?').get(sessionId) as
+              | { project_id: string }
+              | undefined
+          )?.project_id ?? null)
         : null;
       const namespace = (args.namespace as string) || 'default';
 
       switch (args.operation) {
         case 'get':
           if (!args.key) return JSON.stringify({ error: 'key is required for get' });
-          return store.get(projectId, namespace, args.key as string) ?? JSON.stringify({ found: false });
+          return (
+            store.get(projectId, namespace, args.key as string) ?? JSON.stringify({ found: false })
+          );
         case 'set':
-          if (!args.key || !args.value) return JSON.stringify({ error: 'key and value are required for set' });
+          if (!args.key || !args.value)
+            return JSON.stringify({ error: 'key and value are required for set' });
           store.set(projectId, namespace, args.key as string, args.value as string);
           return JSON.stringify({ success: true, key: args.key, namespace });
         case 'list':
           return JSON.stringify(store.list(projectId, namespace));
         case 'delete':
           if (!args.key) return JSON.stringify({ error: 'key is required for delete' });
-          return JSON.stringify({ deleted: store.delete(projectId, namespace, args.key as string) });
+          return JSON.stringify({
+            deleted: store.delete(projectId, namespace, args.key as string),
+          });
         default:
           return JSON.stringify({ error: `Unknown operation: ${args.operation}` });
       }

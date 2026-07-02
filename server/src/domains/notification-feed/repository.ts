@@ -61,34 +61,46 @@ export class NotificationRepository {
       ...item,
       ownerBackendId: item.ownerBackendId || LOCAL_NOTIFICATION_BACKEND_ID,
     };
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO notifications (id, trigger_id, task_id, session_id, project_id, source, initiator, title, summary, status, error, delegation_context, created_at, completed_at, read_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      id,
-      normalizedItem.triggerId ?? null,
-      normalizedItem.taskId ?? null,
-      normalizedItem.sessionId ?? null,
-      normalizedItem.projectId ?? null,
-      normalizedItem.source,
-      normalizedItem.initiator ?? null,
-      normalizedItem.title,
-      normalizedItem.summary ?? null,
-      normalizedItem.status,
-      normalizedItem.error ?? null,
-      normalizedItem.delegationContext ? JSON.stringify(normalizedItem.delegationContext) : null,
-      now,
-      normalizedItem.completedAt ?? null,
-      normalizedItem.readAt ?? null,
-    );
+    `
+      )
+      .run(
+        id,
+        normalizedItem.triggerId ?? null,
+        normalizedItem.taskId ?? null,
+        normalizedItem.sessionId ?? null,
+        normalizedItem.projectId ?? null,
+        normalizedItem.source,
+        normalizedItem.initiator ?? null,
+        normalizedItem.title,
+        normalizedItem.summary ?? null,
+        normalizedItem.status,
+        normalizedItem.error ?? null,
+        normalizedItem.delegationContext ? JSON.stringify(normalizedItem.delegationContext) : null,
+        now,
+        normalizedItem.completedAt ?? null,
+        normalizedItem.readAt ?? null
+      );
     return { ...normalizedItem, id, createdAt: now };
   }
 
-  updateStatus(id: string, status: NotificationStatus, extra?: { summary?: string; error?: string; completedAt?: number }): void {
-    this.db.prepare(`
+  updateStatus(
+    id: string,
+    status: NotificationStatus,
+    extra?: { summary?: string; error?: string; completedAt?: number }
+  ): void {
+    this.db
+      .prepare(
+        `
       UPDATE notifications SET status = ?, summary = COALESCE(?, summary), error = COALESCE(?, error), completed_at = COALESCE(?, completed_at)
       WHERE id = ?
-    `).run(status, extra?.summary ?? null, extra?.error ?? null, extra?.completedAt ?? null, id);
+    `
+      )
+      .run(status, extra?.summary ?? null, extra?.error ?? null, extra?.completedAt ?? null, id);
   }
 
   list(options?: { limit?: number; before?: number; unreadOnly?: boolean }): NotificationItem[] {
@@ -105,9 +117,9 @@ export class NotificationRepository {
     }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-    const rows = this.db.prepare(
-      `SELECT * FROM notifications ${where} ORDER BY created_at DESC LIMIT ?`
-    ).all(...params, limit) as FeedRow[];
+    const rows = this.db
+      .prepare(`SELECT * FROM notifications ${where} ORDER BY created_at DESC LIMIT ?`)
+      .all(...params, limit) as FeedRow[];
 
     return rows.map(rowToItem);
   }
@@ -116,26 +128,26 @@ export class NotificationRepository {
     if (ids.length === 0) return undefined;
     const now = Date.now();
     const placeholders = ids.map(() => '?').join(',');
-    this.db.prepare(
-      `UPDATE notifications SET read_at = ? WHERE id IN (${placeholders}) AND read_at IS NULL`
-    ).run(now, ...ids);
+    this.db
+      .prepare(
+        `UPDATE notifications SET read_at = ? WHERE id IN (${placeholders}) AND read_at IS NULL`
+      )
+      .run(now, ...ids);
     return now;
   }
 
   markAllRead(): number {
     const now = Date.now();
-    this.db.prepare(
-      'UPDATE notifications SET read_at = ? WHERE read_at IS NULL'
-    ).run(now);
+    this.db.prepare('UPDATE notifications SET read_at = ? WHERE read_at IS NULL').run(now);
     return now;
   }
 
   deleteByIds(ids: string[]): number {
     if (ids.length === 0) return 0;
     const placeholders = ids.map(() => '?').join(',');
-    const result = this.db.prepare(
-      `DELETE FROM notifications WHERE id IN (${placeholders})`
-    ).run(...ids);
+    const result = this.db
+      .prepare(`DELETE FROM notifications WHERE id IN (${placeholders})`)
+      .run(...ids);
     return result.changes;
   }
 
@@ -145,14 +157,18 @@ export class NotificationRepository {
   }
 
   unreadCount(): number {
-    const row = this.db.prepare('SELECT COUNT(*) as count FROM notifications WHERE read_at IS NULL').get() as { count: number };
+    const row = this.db
+      .prepare('SELECT COUNT(*) as count FROM notifications WHERE read_at IS NULL')
+      .get() as { count: number };
     return row.count;
   }
 
   unreadCountsByTab(): NotificationUnreadCountsByTab {
-    const rows = this.db.prepare(
-      'SELECT source, initiator, delegation_context FROM notifications WHERE read_at IS NULL'
-    ).all() as Array<Pick<FeedRow, 'source' | 'initiator' | 'delegation_context'>>;
+    const rows = this.db
+      .prepare(
+        'SELECT source, initiator, delegation_context FROM notifications WHERE read_at IS NULL'
+      )
+      .all() as Array<Pick<FeedRow, 'source' | 'initiator' | 'delegation_context'>>;
 
     const counts: NotificationUnreadCountsByTab = { ...EMPTY_NOTIFICATION_UNREAD_COUNTS_BY_TAB };
     for (const row of rows) {
@@ -170,12 +186,16 @@ export class NotificationRepository {
   }
 
   findById(id: string): NotificationItem | undefined {
-    const row = this.db.prepare('SELECT * FROM notifications WHERE id = ?').get(id) as FeedRow | undefined;
+    const row = this.db.prepare('SELECT * FROM notifications WHERE id = ?').get(id) as
+      | FeedRow
+      | undefined;
     return row ? rowToItem(row) : undefined;
   }
 
   findByTaskId(taskId: string): NotificationItem | undefined {
-    const row = this.db.prepare('SELECT * FROM notifications WHERE task_id = ?').get(taskId) as FeedRow | undefined;
+    const row = this.db.prepare('SELECT * FROM notifications WHERE task_id = ?').get(taskId) as
+      | FeedRow
+      | undefined;
     return row ? rowToItem(row) : undefined;
   }
 }

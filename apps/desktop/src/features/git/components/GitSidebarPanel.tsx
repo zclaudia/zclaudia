@@ -18,13 +18,17 @@ interface GitSidebarPanelProps {
   panelId?: string;
 }
 
-export function GitSidebarPanel({ projectId, projectRoot, workingDirectory }: GitSidebarPanelProps) {
+export function GitSidebarPanel({
+  projectId,
+  projectRoot,
+  workingDirectory,
+}: GitSidebarPanelProps) {
   const [override, setOverride] = useState<string | null>(null);
   const [tab, setTab] = useState<SubTab>('status');
 
-  const worktrees = useGitStore((s) => (projectId ? s.worktrees[projectId] ?? [] : []));
-  const setWorktrees = useGitStore((s) => s.setWorktrees);
-  const setStatus = useGitStore((s) => s.setStatus);
+  const worktrees = useGitStore(s => (projectId ? (s.worktrees[projectId] ?? []) : []));
+  const setWorktrees = useGitStore(s => s.setWorktrees);
+  const setStatus = useGitStore(s => s.setStatus);
 
   // Reset the manual override whenever the active session's worktree changes,
   // so the panel follows the session by default.
@@ -36,10 +40,15 @@ export function GitSidebarPanel({ projectId, projectRoot, workingDirectory }: Gi
   useEffect(() => {
     if (!projectId) return;
     let cancelled = false;
-    api.getProjectWorktrees(projectId)
-      .then((list) => { if (!cancelled) setWorktrees(projectId, list); })
+    api
+      .getProjectWorktrees(projectId)
+      .then(list => {
+        if (!cancelled) setWorktrees(projectId, list);
+      })
       .catch(() => {});
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [projectId, setWorktrees]);
 
   const effectivePath = resolveEffectiveWorktree(override, workingDirectory, projectRoot);
@@ -55,8 +64,8 @@ export function GitSidebarPanel({ projectId, projectRoot, workingDirectory }: Gi
   }, [projectId, effectivePath, setStatus]);
 
   const currentBranch = useMemo(
-    () => worktrees.find((w) => w.path === effectivePath)?.branch,
-    [worktrees, effectivePath],
+    () => worktrees.find(w => w.path === effectivePath)?.branch,
+    [worktrees, effectivePath]
   );
 
   if (!projectId || !effectivePath) {
@@ -80,12 +89,13 @@ export function GitSidebarPanel({ projectId, projectRoot, workingDirectory }: Gi
             <div className="relative min-w-0 flex-1">
               <select
                 value={effectivePath}
-                onChange={(e) => setOverride(e.target.value)}
+                onChange={e => setOverride(e.target.value)}
                 className="w-full appearance-none bg-background border border-border rounded-lg pl-2 pr-7 py-1 text-xs cursor-pointer outline-none transition-colors hover:bg-secondary focus:border-primary"
               >
-                {worktrees.map((w) => (
+                {worktrees.map(w => (
                   <option key={w.path} value={w.path}>
-                    {w.branch}{w.isMain ? ' (main)' : ''}
+                    {w.branch}
+                    {w.isMain ? ' (main)' : ''}
                   </option>
                 ))}
               </select>
@@ -101,7 +111,7 @@ export function GitSidebarPanel({ projectId, projectRoot, workingDirectory }: Gi
       {/* Tabs */}
       <div className="border-b border-border px-3 py-2">
         <div className="inline-flex items-center gap-0.5 rounded-lg bg-secondary/60 p-1">
-          {(['status', 'commits', 'branches', 'stash'] as const).map((t) => (
+          {(['status', 'commits', 'branches', 'stash'] as const).map(t => (
             <button
               key={t}
               type="button"
@@ -123,10 +133,18 @@ export function GitSidebarPanel({ projectId, projectRoot, workingDirectory }: Gi
         {tab === 'status' && <GitStatusView projectId={projectId} worktreePath={effectivePath} />}
         {tab === 'commits' && <GitLogView projectId={projectId} worktreePath={effectivePath} />}
         {tab === 'branches' && (
-          <GitBranchesView projectId={projectId} worktreePath={effectivePath} onAfterMutation={refreshStatus} />
+          <GitBranchesView
+            projectId={projectId}
+            worktreePath={effectivePath}
+            onAfterMutation={refreshStatus}
+          />
         )}
         {tab === 'stash' && (
-          <GitStashView projectId={projectId} worktreePath={effectivePath} onAfterMutation={refreshStatus} />
+          <GitStashView
+            projectId={projectId}
+            worktreePath={effectivePath}
+            onAfterMutation={refreshStatus}
+          />
         )}
       </div>
     </div>

@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeQuotes, findActualString, countOccurrences, applyEdit, findWhitespaceMatch } from '../edit-match.js';
+import {
+  normalizeQuotes,
+  findActualString,
+  countOccurrences,
+  applyEdit,
+  findWhitespaceMatch,
+} from '../edit-match.js';
 
 describe('edit-match', () => {
   it('normalizeQuotes maps curly quotes to straight', () => {
@@ -53,7 +59,8 @@ describe('findWhitespaceMatch', () => {
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     expect(file.slice(res.match.start, res.match.end)).toBe('line two');
-    const spliced = file.slice(0, res.match.start) + res.match.adjustedNewString + file.slice(res.match.end);
+    const spliced =
+      file.slice(0, res.match.start) + res.match.adjustedNewString + file.slice(res.match.end);
     expect(spliced).toBe('line one\r\nLINE TWO\r\nline three\r\n');
   });
 
@@ -107,6 +114,9 @@ describe('findWhitespaceMatch', () => {
   });
 
   it('returns not_found for an empty search (no anchor)', () => {
-    expect(findWhitespaceMatch('a\nb\n', '', 'INS')).toMatchObject({ ok: false, reason: 'not_found' });
+    expect(findWhitespaceMatch('a\nb\n', '', 'INS')).toMatchObject({
+      ok: false,
+      reason: 'not_found',
+    });
   });
 });

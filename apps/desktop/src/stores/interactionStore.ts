@@ -22,24 +22,24 @@ interface InteractionState {
 export const useInteractionStore = create<InteractionState>((set, get) => ({
   interactions: {},
 
-  upsertInteraction: (event) =>
-    set((state) => ({
+  upsertInteraction: event =>
+    set(state => ({
       interactions: { ...state.interactions, [event.interactionId]: event },
     })),
 
-  resolveInteraction: (interactionId) =>
-    set((state) => {
+  resolveInteraction: interactionId =>
+    set(state => {
       const { [interactionId]: _, ...rest } = state.interactions;
       return { interactions: rest };
     }),
 
-  has: (interactionId) => interactionId in get().interactions,
+  has: interactionId => interactionId in get().interactions,
 
-  getBySession: (sessionId) =>
-    Object.values(get().interactions).filter((i) => i.sessionId === sessionId),
+  getBySession: sessionId =>
+    Object.values(get().interactions).filter(i => i.sessionId === sessionId),
 
-  clearSession: (sessionId) =>
-    set((state) => {
+  clearSession: sessionId =>
+    set(state => {
       const filtered: Record<string, InteractionMessage> = {};
       for (const [id, interaction] of Object.entries(state.interactions)) {
         // Different-session interactions: always keep
@@ -63,14 +63,14 @@ export const useInteractionStore = create<InteractionState>((set, get) => ({
       return { interactions: filtered };
     }),
 
-  clearClientSynthPlanReviewsForSession: (sessionId) =>
-    set((state) => {
+  clearClientSynthPlanReviewsForSession: sessionId =>
+    set(state => {
       const filtered: Record<string, InteractionMessage> = {};
       for (const [id, interaction] of Object.entries(state.interactions)) {
         if (
-          interaction.sessionId === sessionId
-          && interaction.type === 'interaction_plan_review'
-          && interaction.source === 'client_synth'
+          interaction.sessionId === sessionId &&
+          interaction.type === 'interaction_plan_review' &&
+          interaction.source === 'client_synth'
         ) {
           continue;
         }

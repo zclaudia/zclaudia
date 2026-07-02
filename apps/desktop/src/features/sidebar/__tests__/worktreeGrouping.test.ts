@@ -37,10 +37,7 @@ describe('groupSessionsByWorktree', () => {
   });
 
   it('returns empty array when all sessions have undefined workingDirectory', () => {
-    const sessions = [
-      makeSession({ id: 's1' }),
-      makeSession({ id: 's2' }),
-    ];
+    const sessions = [makeSession({ id: 's1' }), makeSession({ id: 's2' })];
     const result = groupSessionsByWorktree(sessions, '/project', []);
     expect(result).toEqual([]);
   });
@@ -53,7 +50,11 @@ describe('groupSessionsByWorktree', () => {
     ];
     const worktrees = [
       makeWorktree({ path: '/project', branch: 'main', isMain: true }),
-      makeWorktree({ path: '/project/.worktrees/supervision/slot-0', branch: 'task/fix-login/r1', isMain: false }),
+      makeWorktree({
+        path: '/project/.worktrees/supervision/slot-0',
+        branch: 'task/fix-login/r1',
+        isMain: false,
+      }),
     ];
 
     const result = groupSessionsByWorktree(sessions, '/project', worktrees);
@@ -92,7 +93,11 @@ describe('groupSessionsByWorktree', () => {
   it('treats workingDirectory === rootPath as root', () => {
     const sessions = [
       makeSession({ id: 's1', workingDirectory: '/project', projectRole: 'review' }),
-      makeSession({ id: 's2', workingDirectory: '/project/.worktrees/supervision/slot-0', projectRole: 'task' }),
+      makeSession({
+        id: 's2',
+        workingDirectory: '/project/.worktrees/supervision/slot-0',
+        projectRole: 'task',
+      }),
     ];
 
     const result = groupSessionsByWorktree(sessions, '/project', []);
@@ -144,9 +149,7 @@ describe('groupSessionsByWorktree', () => {
       makeSession({ id: 's1' }),
       makeSession({ id: 's2', workingDirectory: '/project/.worktrees/slot-0' }),
     ];
-    const worktrees = [
-      makeWorktree({ path: '/project', branch: 'develop', isMain: true }),
-    ];
+    const worktrees = [makeWorktree({ path: '/project', branch: 'develop', isMain: true })];
 
     const result = groupSessionsByWorktree(sessions, '/project', worktrees);
     expect(result[0].label).toBe('develop');
@@ -156,9 +159,21 @@ describe('groupSessionsByWorktree', () => {
   it('handles multiple worktree groups', () => {
     const sessions = [
       makeSession({ id: 's1' }),
-      makeSession({ id: 's2', workingDirectory: '/project/.worktrees/supervision/slot-0', projectRole: 'task' }),
-      makeSession({ id: 's3', workingDirectory: '/project/.worktrees/supervision/slot-1', projectRole: 'task' }),
-      makeSession({ id: 's4', workingDirectory: '/project/.worktrees/supervision/slot-0', projectRole: 'task' }),
+      makeSession({
+        id: 's2',
+        workingDirectory: '/project/.worktrees/supervision/slot-0',
+        projectRole: 'task',
+      }),
+      makeSession({
+        id: 's3',
+        workingDirectory: '/project/.worktrees/supervision/slot-1',
+        projectRole: 'task',
+      }),
+      makeSession({
+        id: 's4',
+        workingDirectory: '/project/.worktrees/supervision/slot-0',
+        projectRole: 'task',
+      }),
     ];
 
     const result = groupSessionsByWorktree(sessions, '/project', []);

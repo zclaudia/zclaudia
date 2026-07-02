@@ -1,4 +1,4 @@
-import { Page, Locator } from '@playwright/test';
+import type { Page, Locator } from '@playwright/test';
 
 /**
  * Page Object Model for Project/Session management
@@ -51,7 +51,9 @@ export class ProjectPage {
    */
   async createProject(name: string, path: string): Promise<boolean> {
     // Check if Add Project button is visible and enabled
-    const isButtonVisible = await this.addProjectButton.isVisible({ timeout: 2000 }).catch(() => false);
+    const isButtonVisible = await this.addProjectButton
+      .isVisible({ timeout: 2000 })
+      .catch(() => false);
     if (!isButtonVisible) {
       console.log('  ⚠️ Add Project button not visible');
       return false;
@@ -72,21 +74,27 @@ export class ProjectPage {
     });
 
     // Fill in project name - using placeholder-based selector
-    const nameInput = this.page.locator('input[placeholder*="Project name"], input[placeholder*="Name"]').first();
+    const nameInput = this.page
+      .locator('input[placeholder*="Project name"], input[placeholder*="Name"]')
+      .first();
     const nameVisible = await nameInput.isVisible({ timeout: 2000 }).catch(() => false);
     if (nameVisible) {
       await nameInput.fill(name);
     }
 
     // Fill in project path - using placeholder-based selector
-    const pathInput = this.page.locator('input[placeholder*="Working directory"], input[placeholder*="Path"]').first();
+    const pathInput = this.page
+      .locator('input[placeholder*="Working directory"], input[placeholder*="Path"]')
+      .first();
     const pathVisible = await pathInput.isVisible({ timeout: 2000 }).catch(() => false);
     if (pathVisible) {
       await pathInput.fill(path);
     }
 
     // Click Create button
-    const createButton = this.page.locator('button:has-text("Create"), button:has-text("Add")').first();
+    const createButton = this.page
+      .locator('button:has-text("Create"), button:has-text("Add")')
+      .first();
     const btnVisible = await createButton.isVisible({ timeout: 2000 }).catch(() => false);
     if (btnVisible) {
       await createButton.click();
@@ -104,7 +112,9 @@ export class ProjectPage {
    * Select a session/project
    */
   async selectSession(name: string): Promise<void> {
-    const sessionItem = this.page.locator(`[data-testid="session-item"]:has-text("${name}")`).first();
+    const sessionItem = this.page
+      .locator(`[data-testid="session-item"]:has-text("${name}")`)
+      .first();
     await sessionItem.click();
   }
 
@@ -112,7 +122,9 @@ export class ProjectPage {
    * Delete a session/project
    */
   async deleteSession(name: string): Promise<void> {
-    const sessionItem = this.page.locator(`[data-testid="session-item"]:has-text("${name}")`).first();
+    const sessionItem = this.page
+      .locator(`[data-testid="session-item"]:has-text("${name}")`)
+      .first();
     await sessionItem.hover();
 
     const deleteButton = this.page.locator(`button[title*="Delete"]`).first();
@@ -163,7 +175,9 @@ export class ProjectPage {
    * Rename a session
    */
   async renameSession(oldName: string, newName: string): Promise<void> {
-    const sessionItem = this.page.locator(`[data-testid="session-item"]:has-text("${oldName}")`).first();
+    const sessionItem = this.page
+      .locator(`[data-testid="session-item"]:has-text("${oldName}")`)
+      .first();
     await sessionItem.hover();
 
     const renameButton = this.page.locator(`button[title*="Rename"]`).first();
@@ -192,7 +206,9 @@ export class ProjectPage {
    * Archive a session
    */
   async archiveSession(name: string): Promise<void> {
-    const sessionItem = this.page.locator(`[data-testid="session-item"]:has-text("${name}")`).first();
+    const sessionItem = this.page
+      .locator(`[data-testid="session-item"]:has-text("${name}")`)
+      .first();
     await sessionItem.hover();
 
     const archiveButton = this.page.locator(`button[title*="Archive"]`).first();

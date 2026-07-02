@@ -89,18 +89,24 @@ async function processIcon() {
 
   // Find actual content bounds (pixels with brightness < 100 - the dark blue icon)
   // This excludes the light border pixels around the icon
-  let minX = info.width, maxX = 0, minY = info.height, maxY = 0;
+  let minX = info.width,
+    maxX = 0,
+    minY = info.height,
+    maxY = 0;
 
   for (let y = 0; y < info.height; y++) {
     for (let x = 0; x < info.width; x++) {
       const idx = (y * info.width + x) * 4;
-      const r = data[idx], g = data[idx + 1], b = data[idx + 2], a = data[idx + 3];
+      const r = data[idx],
+        g = data[idx + 1],
+        b = data[idx + 2],
+        a = data[idx + 3];
 
       // Check if this is a 'content' pixel (part of the icon, not transparent background)
       // The icon has dark blue background (#1c1c61, brightness ~36) and gradient ring
       // Gradient goes from purple to cyan, brightness ranges from ~80 to ~220
       // Use threshold < 240 to capture all icon content while excluding white/light border
-      const brightness = (r * 0.299 + g * 0.587 + b * 0.114);
+      const brightness = r * 0.299 + g * 0.587 + b * 0.114;
       if (brightness < 240 && a > 0) {
         minX = Math.min(minX, x);
         maxX = Math.max(maxX, x);
@@ -121,7 +127,7 @@ async function processIcon() {
       left: minX,
       top: minY,
       width: contentWidth,
-      height: contentHeight
+      height: contentHeight,
     })
     .ensureAlpha()
     .raw()
@@ -133,15 +139,15 @@ async function processIcon() {
 
   // Step 1: Mark all transparent pixels that are connected to corners (exterior)
   // Using flood fill from all 4 corners
-  const isExterior = new Uint8Array(width * height);  // 0 = not exterior, 1 = exterior
+  const isExterior = new Uint8Array(width * height); // 0 = not exterior, 1 = exterior
 
   const queue = [];
   // Add corner seeds
   for (let y = 0; y < height; y++) {
-    queue.push([0, y], [width - 1, y]);  // left and right edges
+    queue.push([0, y], [width - 1, y]); // left and right edges
   }
   for (let x = 0; x < width; x++) {
-    queue.push([x, 0], [x, height - 1]);  // top and bottom edges
+    queue.push([x, 0], [x, height - 1]); // top and bottom edges
   }
 
   while (queue.length > 0) {
@@ -149,10 +155,10 @@ async function processIcon() {
     if (x < 0 || x >= width || y < 0 || y >= height) continue;
 
     const pos = y * width + x;
-    if (isExterior[pos]) continue;  // Already visited
+    if (isExterior[pos]) continue; // Already visited
 
     const idx = pos * 4;
-    if (extractedData[idx + 3] !== 0) continue;  // Not transparent, stop
+    if (extractedData[idx + 3] !== 0) continue; // Not transparent, stop
 
     isExterior[pos] = 1;
     queue.push([x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]);
@@ -161,7 +167,8 @@ async function processIcon() {
   // Step 2: Process pixels
   for (let i = 0; i < extractedData.length; i += 4) {
     const pos = i / 4;
-    if (extractedData[i + 3] === 0) {  // Transparent pixel
+    if (extractedData[i + 3] === 0) {
+      // Transparent pixel
       if (isExterior[pos]) {
         // Exterior (corner) - fill with dark blue
         extractedData[i] = bgColor.r;
@@ -180,9 +187,11 @@ async function processIcon() {
     raw: {
       width: width,
       height: height,
-      channels: 4
-    }
-  }).png().toBuffer();
+      channels: 4,
+    },
+  })
+    .png()
+    .toBuffer();
 
   console.log('Generating icons...');
 
@@ -199,7 +208,7 @@ async function processIcon() {
     await sharp(processedBuffer)
       .resize(size, size, {
         fit: 'contain',
-        background: { r: 0, g: 0, b: 0, alpha: 0 }
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
       })
       .png()
       .toFile(outputPath);
@@ -209,31 +218,14 @@ async function processIcon() {
 
   // Generate ICO file for Windows
   console.log('Generating ICO file...');
-  // ICO needs multiple sizes bundled
-  const icoSizes = [16, 24, 32, 48, 64, 128, 256];
-  const icoBuffers = await Promise.all(
-    icoSizes.map(size =>
-      sharp(processedBuffer)
-        .resize(size, size)
-        .png()
-        .toBuffer()
-    )
-  );
-
   // For ICO, we'll just use the 256x256 as the main icon
   // (proper ICO bundling requires additional tools)
-  await sharp(processedBuffer)
-    .resize(256, 256)
-    .png()
-    .toFile(path.join(ICONS_DIR, 'icon.ico.png'));
+  await sharp(processedBuffer).resize(256, 256).png().toFile(path.join(ICONS_DIR, 'icon.ico.png'));
   console.log('  Note: ICO file needs manual conversion or use tauri icon command');
 
   // Generate ICNS for macOS
   console.log('Generating ICNS placeholder...');
-  await sharp(processedBuffer)
-    .resize(512, 512)
-    .png()
-    .toFile(path.join(ICONS_DIR, 'icon.icns.png'));
+  await sharp(processedBuffer).resize(512, 512).png().toFile(path.join(ICONS_DIR, 'icon.icns.png'));
   console.log('  Note: ICNS file needs manual conversion or use tauri icon command');
 
   // Also update the app-icon.svg reference image

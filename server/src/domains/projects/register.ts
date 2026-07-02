@@ -18,6 +18,6 @@ export function registerProjectsDomain(deps: ProjectsDomainDeps): void {
   app.use(
     '/api/projects',
     authMiddleware,
-    createProjectRoutes(db, onProjectChanged, { activityRegistry, agentLoopRunner }),
+    createProjectRoutes(db, onProjectChanged, { activityRegistry, agentLoopRunner })
   );
 }

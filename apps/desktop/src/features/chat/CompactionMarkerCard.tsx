@@ -34,7 +34,7 @@ export function CompactionMarkerCard({ marker }: CompactionMarkerCardProps) {
     >
       <button
         type="button"
-        onClick={() => setExpanded((v) => !v)}
+        onClick={() => setExpanded(v => !v)}
         aria-expanded={expanded}
         aria-controls={`compaction-body-${marker.compactionId}`}
         className="flex items-center gap-2 w-full px-3 py-2 text-muted-foreground hover:text-foreground transition-colors"
@@ -77,25 +77,34 @@ export function CompactionMarkerCard({ marker }: CompactionMarkerCardProps) {
           {(hasReadFiles || hasModifiedFiles) && (
             <details className="rounded bg-background/60 px-2 py-1">
               <summary className="cursor-pointer text-muted-foreground hover:text-foreground select-none">
-                File activity ({marker.readFiles.length} read, {marker.modifiedFiles.length} modified)
+                File activity ({marker.readFiles.length} read, {marker.modifiedFiles.length}{' '}
+                modified)
               </summary>
               <div className="mt-2 space-y-2">
                 {hasReadFiles && (
                   <div>
-                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Read</div>
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">
+                      Read
+                    </div>
                     <ul className="list-disc list-inside text-foreground/80">
-                      {marker.readFiles.map((path) => (
-                        <li key={`r-${path}`} className="font-mono break-all">{path}</li>
+                      {marker.readFiles.map(path => (
+                        <li key={`r-${path}`} className="font-mono break-all">
+                          {path}
+                        </li>
                       ))}
                     </ul>
                   </div>
                 )}
                 {hasModifiedFiles && (
                   <div>
-                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Modified</div>
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">
+                      Modified
+                    </div>
                     <ul className="list-disc list-inside text-foreground/80">
-                      {marker.modifiedFiles.map((path) => (
-                        <li key={`m-${path}`} className="font-mono break-all">{path}</li>
+                      {marker.modifiedFiles.map(path => (
+                        <li key={`m-${path}`} className="font-mono break-all">
+                          {path}
+                        </li>
                       ))}
                     </ul>
                   </div>

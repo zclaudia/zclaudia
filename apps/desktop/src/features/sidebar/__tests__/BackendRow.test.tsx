@@ -7,24 +7,27 @@ describe('BackendRow', () => {
     render(
       <BackendRow name="Local Server" online expanded={false} onToggle={() => {}}>
         <div data-testid="child">projects</div>
-      </BackendRow>,
+      </BackendRow>
     );
     expect(screen.getByText('Local Server')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Local Server/ })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('button', { name: /Local Server/ })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
   });
 
   it('hides children when collapsed and shows them when expanded', () => {
     const { rerender } = render(
       <BackendRow name="Local Server" online expanded={false} onToggle={() => {}}>
         <div data-testid="child">projects</div>
-      </BackendRow>,
+      </BackendRow>
     );
     expect(screen.queryByTestId('child')).toBeNull();
 
     rerender(
       <BackendRow name="Local Server" online expanded onToggle={() => {}}>
         <div data-testid="child">projects</div>
-      </BackendRow>,
+      </BackendRow>
     );
     expect(screen.getByTestId('child')).toBeInTheDocument();
   });
@@ -34,7 +37,7 @@ describe('BackendRow', () => {
     render(
       <BackendRow name="Local Server" online expanded={false} onToggle={onToggle}>
         <div />
-      </BackendRow>,
+      </BackendRow>
     );
     fireEvent.click(screen.getByRole('button', { name: /Local Server/ }));
     expect(onToggle).toHaveBeenCalledTimes(1);
@@ -43,9 +46,15 @@ describe('BackendRow', () => {
   it('calls onNewProject when the + button is clicked', () => {
     const onNewProject = vi.fn();
     render(
-      <BackendRow name="Local Server" online expanded={false} onToggle={() => {}} onNewProject={onNewProject}>
+      <BackendRow
+        name="Local Server"
+        online
+        expanded={false}
+        onToggle={() => {}}
+        onNewProject={onNewProject}
+      >
         <div />
-      </BackendRow>,
+      </BackendRow>
     );
     fireEvent.click(screen.getByRole('button', { name: 'New project' }));
     expect(onNewProject).toHaveBeenCalledTimes(1);

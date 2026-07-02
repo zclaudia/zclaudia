@@ -12,9 +12,7 @@ describe('interaction-dispatcher', () => {
     interactionDispatcher.setSendFunction((sessionId, event) => {
       expect(sessionId).toBe('session-1');
       expect(event.type).toBe('interaction_prompt');
-      expect(
-        interactionDispatcher.resolve('interaction-1', { approved: true }),
-      ).toBe(true);
+      expect(interactionDispatcher.resolve('interaction-1', { approved: true })).toBe(true);
     });
 
     await expect(
@@ -33,8 +31,8 @@ describe('interaction-dispatcher', () => {
           responseMode: 'interaction_response',
           variant: 'form',
         },
-        1000,
-      ),
+        1000
+      )
     ).resolves.toEqual({ approved: true });
   });
 
@@ -59,8 +57,8 @@ describe('interaction-dispatcher', () => {
           responseMode: 'interaction_response',
           variant: 'form',
         },
-        1000,
-      ),
+        1000
+      )
     ).resolves.toEqual({ error: 'send failed' });
 
     expect(interactionDispatcher.pendingCount).toBe(0);

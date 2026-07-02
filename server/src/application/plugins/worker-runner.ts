@@ -4,6 +4,7 @@
 
 import type { MessagePort } from 'worker_threads';
 import { parentPort, workerData } from 'worker_threads';
+import type { CommandHandler } from '@zclaudia/shared/plugins/context';
 
 interface WorkerData {
   pluginId: string;
@@ -24,6 +25,9 @@ interface RPCResponse {
   error?: string;
 }
 
+type WorkerMessage = RPCResponse | HostMessage;
+type EventHandler = (data: unknown) => void | Promise<void>;
+
 interface HostMessage {
   type: 'deactivate' | 'tool_call' | 'command_call' | 'event_forward' | 'scheduler_tick';
   id?: string;
@@ -36,7 +40,10 @@ interface HostMessage {
 }
 
 class RPCClient {
-  private pending = new Map<string, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
+  private pending = new Map<
+    string,
+    { resolve: (v: unknown) => void; reject: (e: Error) => void }
+  >();
   private counter = 0;
 
   constructor(private port: MessagePort) {
@@ -66,11 +73,20 @@ class RPCClient {
 }
 
 const toolHandlers = new Map<string, (args: Record<string, unknown>) => Promise<string> | string>();
-const commandHandlers = new Map<string, (args: string[], ctx?: any) => any>();
-const eventHandlers = new Map<string, Set<(data: unknown) => void | Promise<void>>>();
+const commandHandlers = new Map<string, CommandHandler>();
+const eventHandlers = new Map<string, Set<EventHandler>>();
 const schedulerHandlers = new Map<string, () => Promise<void> | void>();
 
-function createProxyContext(pluginId: string, rpc: RPCClient): any {
+function getEventHandlers(event: string): Set<EventHandler> {
+  let handlers = eventHandlers.get(event);
+  if (!handlers) {
+    handlers = new Set();
+    eventHandlers.set(event, handlers);
+  }
+  return handlers;
+}
+
+function createProxyContext(pluginId: string, rpc: RPCClient): Record<string, unknown> {
   return {
     pluginId,
     storage: {
@@ -82,10 +98,7 @@ function createProxyContext(pluginId: string, rpc: RPCClient): any {
     },
     events: {
       on: (event: string, handler: (data: unknown) => void) => {
-        if (!eventHandlers.has(event)) {
-          eventHandlers.set(event, new Set());
-        }
-        eventHandlers.get(event)!.add(handler);
+        getEventHandlers(event).add(handler);
         void rpc.call('events.on', event).catch((err: unknown) => {
           console.warn('[WorkerRunner] RPC failed:', err instanceof Error ? err.message : err);
         });
@@ -96,7 +109,10 @@ function createProxyContext(pluginId: string, rpc: RPCClient): any {
             if (handlers.size === 0) {
               eventHandlers.delete(event);
               void rpc.call('events.off', event).catch((err: unknown) => {
-                console.warn('[WorkerRunner] RPC failed:', err instanceof Error ? err.message : err);
+                console.warn(
+                  '[WorkerRunner] RPC failed:',
+                  err instanceof Error ? err.message : err
+                );
               });
             }
           }
@@ -113,10 +129,7 @@ function createProxyContext(pluginId: string, rpc: RPCClient): any {
             }
           }
         };
-        if (!eventHandlers.has(event)) {
-          eventHandlers.set(event, new Set());
-        }
-        eventHandlers.get(event)!.add(wrappedHandler);
+        getEventHandlers(event).add(wrappedHandler);
         void rpc.call('events.once', event).catch((err: unknown) => {
           console.warn('[WorkerRunner] RPC failed:', err instanceof Error ? err.message : err);
         });
@@ -130,7 +143,7 @@ function createProxyContext(pluginId: string, rpc: RPCClient): any {
       debug: (...args: unknown[]) => console.debug(`[Worker:${pluginId}]`, ...args),
     },
     commands: {
-      registerCommand: (command: string, handler: (args: string[], ctx?: any) => any) => {
+      registerCommand: (command: string, handler: CommandHandler) => {
         commandHandlers.set(command, handler);
         void rpc.call('commands.register', command).catch((err: unknown) => {
           console.warn('[WorkerRunner] RPC failed:', err instanceof Error ? err.message : err);
@@ -144,11 +157,19 @@ function createProxyContext(pluginId: string, rpc: RPCClient): any {
       },
     },
     tools: {
-      registerTool: (tool: { id: string; name: string; description: string; parameters: unknown; handler: (args: Record<string, unknown>) => Promise<string> | string }) => {
+      registerTool: (tool: {
+        id: string;
+        name: string;
+        description: string;
+        parameters: unknown;
+        handler: (args: Record<string, unknown>) => Promise<string> | string;
+      }) => {
         toolHandlers.set(tool.id, tool.handler);
-        void rpc.call('tools.register', tool.id, tool.name, tool.description, tool.parameters).catch((err: unknown) => {
-          console.warn('[WorkerRunner] RPC failed:', err instanceof Error ? err.message : err);
-        });
+        void rpc
+          .call('tools.register', tool.id, tool.name, tool.description, tool.parameters)
+          .catch((err: unknown) => {
+            console.warn('[WorkerRunner] RPC failed:', err instanceof Error ? err.message : err);
+          });
       },
       unregisterTool: (toolId: string) => {
         toolHandlers.delete(toolId);
@@ -161,7 +182,8 @@ function createProxyContext(pluginId: string, rpc: RPCClient): any {
       hasPermission: (permission: string) => rpc.call('permissions.has', permission),
       hasAllPermissions: (permissions: string[]) => rpc.call('permissions.hasAll', permissions),
       requestPermission: (permission: string) => rpc.call('permissions.request', permission),
-      requestPermissions: (permissions: string[]) => rpc.call('permissions.requestAll', permissions),
+      requestPermissions: (permissions: string[]) =>
+        rpc.call('permissions.requestAll', permissions),
       getGrantedPermissions: () => rpc.call('permissions.getGranted'),
     },
     fs: {
@@ -185,12 +207,14 @@ function createProxyContext(pluginId: string, rpc: RPCClient): any {
     scheduler: {
       register: (
         task: { id: string; name: string; intervalMs: number; immediate?: boolean },
-        handler: () => Promise<void> | void,
+        handler: () => Promise<void> | void
       ) => {
         schedulerHandlers.set(task.id, handler);
-        void rpc.call('scheduler.register', task.id, task.name, task.intervalMs, task.immediate).catch((err: unknown) => {
-          console.warn('[WorkerRunner] RPC failed:', err instanceof Error ? err.message : err);
-        });
+        void rpc
+          .call('scheduler.register', task.id, task.name, task.intervalMs, task.immediate)
+          .catch((err: unknown) => {
+            console.warn('[WorkerRunner] RPC failed:', err instanceof Error ? err.message : err);
+          });
         return () => {
           schedulerHandlers.delete(task.id);
           void rpc.call('scheduler.unregister', task.id).catch((err: unknown) => {
@@ -225,22 +249,27 @@ async function main() {
   if (!parentPort) {
     throw new Error('worker-runner must be run inside a Worker thread');
   }
+  const port = parentPort;
 
   const { pluginId, modulePath } = workerData as WorkerData;
-  const rpc = new RPCClient(parentPort);
+  const rpc = new RPCClient(port);
   const context = createProxyContext(pluginId, rpc);
 
   try {
-    const module = await import(modulePath);
+    const module = (await import(modulePath)) as {
+      activate?: (context: Record<string, unknown>) => Promise<void> | void;
+      deactivate?: () => Promise<void> | void;
+    };
 
     if (typeof module.activate === 'function') {
       await module.activate(context);
     }
 
-    parentPort.postMessage({ type: 'activated' });
+    port.postMessage({ type: 'activated' });
 
-    parentPort.on('message', async (msg: HostMessage) => {
-      if ((msg as any).type === 'rpc_response') {
+    port.on('message', async (rawMessage: unknown) => {
+      const msg = rawMessage as WorkerMessage;
+      if (msg.type === 'rpc_response') {
         return;
       }
 
@@ -250,9 +279,9 @@ async function main() {
             if (typeof module.deactivate === 'function') {
               await module.deactivate();
             }
-            parentPort!.postMessage({ type: 'deactivated' });
+            port.postMessage({ type: 'deactivated' });
           } catch (error) {
-            parentPort!.postMessage({
+            port.postMessage({
               type: 'deactivate_error',
               error: error instanceof Error ? error.message : String(error),
             });
@@ -264,23 +293,27 @@ async function main() {
               const handler = toolHandlers.get(msg.toolId);
               if (handler) {
                 const result = await handler((msg.args as Record<string, unknown>) || {});
-                parentPort!.postMessage({
+                port.postMessage({
                   type: 'tool_result',
                   id: msg.id,
                   result,
                 });
               } else {
-                parentPort!.postMessage({
+                port.postMessage({
                   type: 'tool_result',
                   id: msg.id,
-                  result: JSON.stringify({ error: `Tool handler "${msg.toolId}" not found in worker` }),
+                  result: JSON.stringify({
+                    error: `Tool handler "${msg.toolId}" not found in worker`,
+                  }),
                 });
               }
             } catch (error) {
-              parentPort!.postMessage({
+              port.postMessage({
                 type: 'tool_result',
                 id: msg.id,
-                result: JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
+                result: JSON.stringify({
+                  error: error instanceof Error ? error.message : String(error),
+                }),
               });
             }
           }
@@ -291,23 +324,31 @@ async function main() {
               const handler = commandHandlers.get(msg.command);
               if (handler) {
                 const result = await handler((msg.args as string[]) || []);
-                parentPort!.postMessage({
+                port.postMessage({
                   type: 'command_result',
                   id: msg.id,
                   result,
                 });
               } else {
-                parentPort!.postMessage({
+                port.postMessage({
                   type: 'command_result',
                   id: msg.id,
-                  result: { type: 'builtin', command: msg.command, error: 'Command handler not found in worker' },
+                  result: {
+                    type: 'builtin',
+                    command: msg.command,
+                    error: 'Command handler not found in worker',
+                  },
                 });
               }
             } catch (error) {
-              parentPort!.postMessage({
+              port.postMessage({
                 type: 'command_result',
                 id: msg.id,
-                result: { type: 'builtin', command: msg.command, error: error instanceof Error ? error.message : String(error) },
+                result: {
+                  type: 'builtin',
+                  command: msg.command,
+                  error: error instanceof Error ? error.message : String(error),
+                },
               });
             }
           }
@@ -320,7 +361,10 @@ async function main() {
                 try {
                   await handler(msg.data);
                 } catch (error) {
-                  console.error(`[Worker:${pluginId}] Event handler error for ${msg.event}:`, error);
+                  console.error(
+                    `[Worker:${pluginId}] Event handler error for ${msg.event}:`,
+                    error
+                  );
                 }
               }
             }
@@ -333,12 +377,12 @@ async function main() {
               if (handler) {
                 await handler();
               }
-              parentPort!.postMessage({
+              port.postMessage({
                 type: 'scheduler_tick_result',
                 id: msg.id,
               });
             } catch (error) {
-              parentPort!.postMessage({
+              port.postMessage({
                 type: 'scheduler_tick_result',
                 id: msg.id,
                 error: error instanceof Error ? error.message : String(error),
@@ -349,14 +393,14 @@ async function main() {
       }
     });
   } catch (error) {
-    parentPort.postMessage({
+    port.postMessage({
       type: 'activation_error',
       error: error instanceof Error ? error.message : String(error),
     });
   }
 }
 
-main().catch((error) => {
+main().catch(error => {
   console.error('[WorkerRunner] Fatal error:', error);
   process.exit(1);
 });

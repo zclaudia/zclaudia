@@ -2,6 +2,7 @@ import { usePluginStore, getEffectivePlacement } from '../stores/pluginStore';
 import { useBottomPanelStore } from '../stores/bottomPanelStore';
 import { useIsMobile, isMobileViewport } from '../hooks/useMediaQuery';
 import { useProjectStore } from '../stores/projectStore';
+import { useSelectionStore } from '../stores/selectionStore';
 import { useServerStore } from '../stores/serverStore';
 import { useRightWorkspaceStore, findPaneWithTool } from '../stores/rightWorkspaceStore';
 import { openToolInWorkspace, closeToolInWorkspace } from './workspaceActions';
@@ -20,8 +21,9 @@ function viewportPlacement(panelId: string): 'bottom' | 'right' {
  * Resolve current session context for workspace routing.
  */
 function currentSessionCtx() {
-  const { selectedSessionId, sessions } = useProjectStore.getState();
-  const session = selectedSessionId ? sessions.find((s) => s.id === selectedSessionId) : undefined;
+  const { selectedSessionId } = useSelectionStore.getState();
+  const { sessions } = useProjectStore.getState();
+  const session = selectedSessionId ? sessions.find(s => s.id === selectedSessionId) : undefined;
   return {
     sessionId: selectedSessionId,
     projectId: session?.projectId,
@@ -59,7 +61,7 @@ export function activatePanel(panelId: string): void {
  */
 export function isPanelActive(panelId: string): boolean {
   const pluginState = usePluginStore.getState();
-  const panel = pluginState.panels.find((p) => p.id === panelId);
+  const panel = pluginState.panels.find(p => p.id === panelId);
   if (!panel) return false;
 
   const platform = isMobileViewport() ? 'mobile' : 'desktop';
@@ -69,7 +71,7 @@ export function isPanelActive(panelId: string): boolean {
 
   const placement = viewportPlacement(panelId);
   if (placement === 'right') {
-    const sid = useProjectStore.getState().selectedSessionId;
+    const sid = useSelectionStore.getState().selectedSessionId;
     if (!sid) return false;
     const root = useRightWorkspaceStore.getState().bySession[sid]?.root ?? null;
     return findPaneWithTool(root, panelId, undefined, true) !== null;
@@ -103,14 +105,14 @@ export function deactivatePanel(panelId: string): void {
  */
 export function usePanelIsActive(panelId: string): boolean {
   const isMobile = useIsMobile();
-  const placement = usePluginStore((s) => (isMobile ? 'bottom' : getEffectivePlacement(s, panelId)));
-  const isVisible = usePluginStore((s) => {
-    const panel = s.panels.find((p) => p.id === panelId);
+  const placement = usePluginStore(s => (isMobile ? 'bottom' : getEffectivePlacement(s, panelId)));
+  const isVisible = usePluginStore(s => {
+    const panel = s.panels.find(p => p.id === panelId);
     return panel ? panel.visible !== false : false;
   });
-  const bottomMatches = useBottomPanelStore((s) => s.activeTab === panelId);
-  const sid = useProjectStore((s) => s.selectedSessionId);
-  const rightMatches = useRightWorkspaceStore((s) => {
+  const bottomMatches = useBottomPanelStore(s => s.activeTab === panelId);
+  const sid = useSelectionStore(s => s.selectedSessionId);
+  const rightMatches = useRightWorkspaceStore(s => {
     const root = sid ? (s.bySession[sid]?.root ?? null) : null;
     return findPaneWithTool(root, panelId, undefined, true) !== null;
   });

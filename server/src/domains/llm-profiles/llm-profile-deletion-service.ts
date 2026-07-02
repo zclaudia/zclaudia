@@ -11,10 +11,10 @@ export class LlmProfileNotFoundError extends Error {
 export class LlmProfileInUseError extends Error {
   constructor(
     public readonly agentCount: number,
-    public readonly llmProfileId: string,
+    public readonly llmProfileId: string
   ) {
     super(
-      `LlmProfile ${llmProfileId} is referenced by ${agentCount} agent profile(s) and cannot be deleted`,
+      `LlmProfile ${llmProfileId} is referenced by ${agentCount} agent profile(s) and cannot be deleted`
     );
     this.name = 'LlmProfileInUseError';
   }
@@ -72,25 +72,33 @@ export class LlmProfileDeletionService {
     // referenced by an agent.
 
     if (this.hasColumn('projects', 'review_llm_profile_id')) {
-      this.db.prepare('UPDATE projects SET review_llm_profile_id = NULL WHERE review_llm_profile_id = ?').run(llmProfileId);
+      this.db
+        .prepare('UPDATE projects SET review_llm_profile_id = NULL WHERE review_llm_profile_id = ?')
+        .run(llmProfileId);
     }
 
     if (this.hasColumn('agent_config', 'llm_profile_id')) {
-      this.db.prepare('UPDATE agent_config SET llm_profile_id = NULL WHERE llm_profile_id = ?').run(llmProfileId);
+      this.db
+        .prepare('UPDATE agent_config SET llm_profile_id = NULL WHERE llm_profile_id = ?')
+        .run(llmProfileId);
     }
   }
 
   private hasColumn(table: string, column: string): boolean {
     const columns = this.db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
-    return columns.some((col) => col.name === column);
+    return columns.some(col => col.name === column);
   }
 
   private findReplacementLlmProfileId(): string | null {
-    const replacement = this.db.prepare(`
+    const replacement = this.db
+      .prepare(
+        `
       SELECT id FROM llm_profiles
       ORDER BY created_at ASC
       LIMIT 1
-    `).get() as { id: string } | undefined;
+    `
+      )
+      .get() as { id: string } | undefined;
 
     return replacement?.id ?? null;
   }

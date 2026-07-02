@@ -74,7 +74,9 @@ function isBrokenPipe(error: unknown): boolean {
   return code === 'EPIPE' || code === 'ECONNRESET';
 }
 
-function writeMessage(message: JsonRpcResponse | { jsonrpc: '2.0'; method: string; params?: Record<string, unknown> }): void {
+function writeMessage(
+  message: JsonRpcResponse | { jsonrpc: '2.0'; method: string; params?: Record<string, unknown> }
+): void {
   const json = JSON.stringify(message);
   try {
     if (framingMode === 'newline') {
@@ -86,7 +88,9 @@ function writeMessage(message: JsonRpcResponse | { jsonrpc: '2.0'; method: strin
     }
   } catch (error) {
     if (isBrokenPipe(error)) {
-      requestShutdown(`stdout broken pipe during write (${String((error as { code?: unknown }).code || 'unknown')})`);
+      requestShutdown(
+        `stdout broken pipe during write (${String((error as { code?: unknown }).code || 'unknown')})`
+      );
       return;
     }
     log('stdout write failed', error);
@@ -138,7 +142,7 @@ function parseContentLengthMessage(): string | null {
   const headerText = readBuffer.subarray(0, headerEnd).toString('utf-8');
   const contentLengthLine = headerText
     .split('\r\n')
-    .find((line) => line.toLowerCase().startsWith('content-length:'));
+    .find(line => line.toLowerCase().startsWith('content-length:'));
 
   if (!contentLengthLine) {
     throw new Error('Missing Content-Length header');
@@ -215,9 +219,9 @@ const HTTP_TIMEOUT_MS = 30_000;
 function httpGet(urlPath: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const url = new URL(urlPath, SERVER_URL);
-    const req = http.get({ ...url, timeout: HTTP_TIMEOUT_MS }, (res) => {
+    const req = http.get({ ...url, timeout: HTTP_TIMEOUT_MS }, res => {
       let data = '';
-      res.on('data', (chunk) => {
+      res.on('data', chunk => {
         data += chunk;
       });
       res.on('end', () => resolve(data));
@@ -246,9 +250,9 @@ function httpPost(urlPath: string, body: unknown): Promise<string> {
       },
     };
 
-    const req = http.request(options, (res) => {
+    const req = http.request(options, res => {
       let data = '';
-      res.on('data', (chunk) => {
+      res.on('data', chunk => {
         data += chunk;
       });
       res.on('end', () => resolve(data));
@@ -284,15 +288,24 @@ async function listTools(): Promise<McpTool[]> {
 async function callTool(name: string, args: Record<string, unknown>): Promise<string> {
   const sessionId = getSessionId();
   try {
-    log(`tools/call start name=${name} session=${sessionId || 'none'} args=${Object.keys(args).join(',') || 'none'}`);
-    const raw = await httpPost(`/api/plugins/tools/${encodeURIComponent(name)}/execute`, { arguments: args, sessionId });
+    log(
+      `tools/call start name=${name} session=${sessionId || 'none'} args=${Object.keys(args).join(',') || 'none'}`
+    );
+    const raw = await httpPost(`/api/plugins/tools/${encodeURIComponent(name)}/execute`, {
+      arguments: args,
+      sessionId,
+    });
     const data = JSON.parse(raw);
     const result = data.result || JSON.stringify(data);
-    log(`tools/call ok name=${name} session=${sessionId || 'none'} resultLength=${String(result).length}`);
+    log(
+      `tools/call ok name=${name} session=${sessionId || 'none'} resultLength=${String(result).length}`
+    );
     return result;
   } catch (error) {
     log(`tools/call failed name=${name} session=${sessionId || 'none'}`, error);
-    return JSON.stringify({ error: `Tool execution failed: ${error instanceof Error ? error.message : String(error)}` });
+    return JSON.stringify({
+      error: `Tool execution failed: ${error instanceof Error ? error.message : String(error)}`,
+    });
   }
 }
 
@@ -306,7 +319,8 @@ async function handleRequest(request: JsonRpcRequest): Promise<void> {
 
   switch (request.method) {
     case 'initialize': {
-      const clientVersion = (request.params as { protocolVersion?: string })?.protocolVersion || '2024-11-05';
+      const clientVersion =
+        (request.params as { protocolVersion?: string })?.protocolVersion || '2024-11-05';
       send({
         jsonrpc: '2.0',
         id: request.id,
@@ -331,7 +345,9 @@ async function handleRequest(request: JsonRpcRequest): Promise<void> {
       break;
     }
     case 'tools/call': {
-      const params = request.params as { name: string; arguments?: Record<string, unknown> } | undefined;
+      const params = request.params as
+        | { name: string; arguments?: Record<string, unknown> }
+        | undefined;
       if (!params?.name) {
         send({
           jsonrpc: '2.0',
@@ -366,7 +382,7 @@ async function handleRequest(request: JsonRpcRequest): Promise<void> {
   }
 }
 
-process.stdout.on('error', (error) => {
+process.stdout.on('error', error => {
   if (isBrokenPipe(error)) {
     requestShutdown(`stdout error ${(error as { code?: unknown }).code || 'unknown'}`);
     return;
@@ -375,7 +391,7 @@ process.stdout.on('error', (error) => {
   requestShutdown('stdout stream error', 1);
 });
 
-process.stdin.on('error', (error) => {
+process.stdin.on('error', error => {
   if (isBrokenPipe(error)) {
     requestShutdown(`stdin error ${(error as { code?: unknown }).code || 'unknown'}`);
     return;

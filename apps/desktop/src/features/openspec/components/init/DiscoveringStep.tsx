@@ -14,7 +14,7 @@ interface Props {
 const STUCK_HINT_AFTER_MS = 30_000;
 
 export function DiscoveringStep({ scan }: Props): React.ReactElement {
-  const setInitScan = useOpenSpecStore((s) => s.setInitScan);
+  const setInitScan = useOpenSpecStore(s => s.setInitScan);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showStuckHint, setShowStuckHint] = useState(false);
@@ -25,10 +25,7 @@ export function DiscoveringStep({ scan }: Props): React.ReactElement {
       setShowStuckHint(true);
       return;
     }
-    const timer = setTimeout(
-      () => setShowStuckHint(true),
-      STUCK_HINT_AFTER_MS - elapsedMs,
-    );
+    const timer = setTimeout(() => setShowStuckHint(true), STUCK_HINT_AFTER_MS - elapsedMs);
     return () => clearTimeout(timer);
   }, [scan.startedAt]);
 
@@ -49,9 +46,12 @@ export function DiscoveringStep({ scan }: Props): React.ReactElement {
     <div className="space-y-2">
       <div className="text-sm font-medium">🔍 Scanning project…</div>
       <div className="text-xs text-muted-foreground">
-        AI is reading your codebase to identify capabilities. This usually takes 30 seconds to 2 minutes.
+        AI is reading your codebase to identify capabilities. This usually takes 30 seconds to 2
+        minutes.
       </div>
-      <div className="text-[10px] text-muted-foreground font-mono mt-2">scan {scan.id.slice(0, 8)}</div>
+      <div className="text-[10px] text-muted-foreground font-mono mt-2">
+        scan {scan.id.slice(0, 8)}
+      </div>
       {error && <div className="text-xs text-red-500 mt-1">{error}</div>}
       {showStuckHint && (
         <button

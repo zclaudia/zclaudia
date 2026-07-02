@@ -1,8 +1,18 @@
 import { useState, useEffect } from 'react';
-import { useShortcutStore, MODIFIER_KEYS, MAIN_KEYS, formatShortcutForDisplay, parseShortcut, buildShortcut, type ModifierKey, type MainKey } from '../../stores/shortcutStore';
+import {
+  useShortcutStore,
+  MODIFIER_KEYS,
+  MAIN_KEYS,
+  formatShortcutForDisplay,
+  parseShortcut,
+  buildShortcut,
+  type ModifierKey,
+  type MainKey,
+} from '../../stores/shortcutStore';
 
 export function ShortcutSettings({ disabled = false }: { disabled?: boolean }) {
-  const { shortcut, enabled, isLoading, error, toggleEnabled, updateShortcut, resetToDefault } = useShortcutStore();
+  const { shortcut, enabled, isLoading, error, toggleEnabled, updateShortcut, resetToDefault } =
+    useShortcutStore();
   const [isEditing, setIsEditing] = useState(false);
   const [tempModifiers, setTempModifiers] = useState<ModifierKey[]>([]);
   const [tempMainKey, setTempMainKey] = useState<MainKey | null>(null);
@@ -33,10 +43,8 @@ export function ShortcutSettings({ disabled = false }: { disabled?: boolean }) {
   };
 
   const toggleModifier = (modifier: ModifierKey) => {
-    setTempModifiers(prev => 
-      prev.includes(modifier) 
-        ? prev.filter(m => m !== modifier)
-        : [...prev, modifier]
+    setTempModifiers(prev =>
+      prev.includes(modifier) ? prev.filter(m => m !== modifier) : [...prev, modifier]
     );
   };
 
@@ -47,14 +55,22 @@ export function ShortcutSettings({ disabled = false }: { disabled?: boolean }) {
     <div className="space-y-3">
       <div className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
         <div className="flex items-center gap-2">
-          <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+          <svg
+            className="w-4 h-4 text-muted-foreground"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+            />
           </svg>
           <div>
             <span className="text-sm">Global Shortcut</span>
-            <p className="text-xs text-muted-foreground">
-              Toggle Claudia from anywhere
-            </p>
+            <p className="text-xs text-muted-foreground">Toggle Claudia from anywhere</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -85,11 +101,7 @@ export function ShortcutSettings({ disabled = false }: { disabled?: boolean }) {
         </div>
       </div>
 
-      {error && (
-        <div className="text-xs text-destructive px-3">
-          {error}
-        </div>
-      )}
+      {error && <div className="text-xs text-destructive px-3">{error}</div>}
 
       {disabled && (
         <div className="text-xs text-muted-foreground px-3">
@@ -105,25 +117,32 @@ export function ShortcutSettings({ disabled = false }: { disabled?: boolean }) {
               // Skip platform-specific modifiers
               if (isMac && modifier === 'Ctrl') return null;
               if (!isMac && (modifier === 'Cmd' || modifier === 'Option')) return null;
-              
-              const display = modifier === 'CmdOrCtrl'
-                ? (isMac ? '⌘' : 'Ctrl')
-                : modifier === 'Cmd' ? '⌘'
-                : modifier === 'Ctrl' ? 'Ctrl'
-                : modifier === 'Option' ? '⌥'
-                : modifier === 'Alt' ? 'Alt'
-                : '⇧';
-              
+
+              const display =
+                modifier === 'CmdOrCtrl'
+                  ? isMac
+                    ? '⌘'
+                    : 'Ctrl'
+                  : modifier === 'Cmd'
+                    ? '⌘'
+                    : modifier === 'Ctrl'
+                      ? 'Ctrl'
+                      : modifier === 'Option'
+                        ? '⌥'
+                        : modifier === 'Alt'
+                          ? 'Alt'
+                          : '⇧';
+
               const isSelected = tempModifiers.includes(modifier);
-              
+
               return (
                 <button
                   key={modifier}
                   onClick={() => toggleModifier(modifier)}
                   disabled={disabled}
                   className={`px-2 py-1 text-xs rounded-md transition-colors ${
-                    isSelected 
-                      ? 'bg-muted/60 text-foreground' 
+                    isSelected
+                      ? 'bg-muted/60 text-foreground'
                       : 'bg-secondary hover:bg-secondary/80 text-secondary-foreground'
                   }`}
                 >
@@ -141,8 +160,8 @@ export function ShortcutSettings({ disabled = false }: { disabled?: boolean }) {
                 onClick={() => setTempMainKey(key)}
                 disabled={disabled}
                 className={`px-1 py-1 text-xs rounded-md transition-colors ${
-                  tempMainKey === key 
-                    ? 'bg-muted/60 text-foreground' 
+                  tempMainKey === key
+                    ? 'bg-muted/60 text-foreground'
                     : 'bg-secondary hover:bg-secondary/80 text-secondary-foreground'
                 }`}
               >

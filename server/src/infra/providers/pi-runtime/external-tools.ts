@@ -23,7 +23,19 @@ import { mcpClientManager } from '../../../utils/mcp-client-manager.js';
 import { mcpInventoryCache } from '../../../utils/mcp-inventory-cache.js';
 
 type ToolContent = Array<{ type: 'text'; text: string }>;
+type AgentToolParameters = AgentTool['parameters'];
+
 const MCP_AUTHENTICATE_TOOL = 'authenticate';
+
+const EMPTY_OBJECT_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  properties: {},
+  additionalProperties: true,
+};
+
+function agentToolParameters(schema: Record<string, unknown>): AgentToolParameters {
+  return schema as AgentToolParameters;
+}
 
 export interface LoadedExternalToolSchema {
   description: string;
@@ -34,18 +46,21 @@ export interface LoadedExternalToolSchema {
   sourceServerConfigHash?: string;
 }
 
-function inferMcpToolRisk(tool: {
-  annotations?: Record<string, unknown>;
-  inputSchema?: Record<string, unknown>;
-}, trustPolicy?: McpServerTrustPolicy): ExternalToolRiskPolicy {
+function inferMcpToolRisk(
+  tool: {
+    annotations?: Record<string, unknown>;
+    inputSchema?: Record<string, unknown>;
+  },
+  trustPolicy?: McpServerTrustPolicy
+): ExternalToolRiskPolicy {
   const annotations = tool.annotations ?? {};
   const declaredReadOnly = annotations.readOnlyHint === true || annotations.readOnly === true;
   const destructive = annotations.destructiveHint === true;
   const openWorld = annotations.openWorldHint !== false;
   const trustedReadOnly = !!(
-    declaredReadOnly
-    && trustPolicy?.trustReadOnlyHint
-    && (trustPolicy.trustLevel === 'trusted-readonly' || trustPolicy.trustLevel === 'trusted')
+    declaredReadOnly &&
+    trustPolicy?.trustReadOnlyHint &&
+    (trustPolicy.trustLevel === 'trusted-readonly' || trustPolicy.trustLevel === 'trusted')
   );
   const riskLevel = destructive || openWorld ? 'high' : declaredReadOnly ? 'medium' : 'high';
   return {
@@ -55,7 +70,10 @@ function inferMcpToolRisk(tool: {
     mutatesWorkspace: !declaredReadOnly || destructive,
     requiresNetwork: true,
     riskLevel,
-    providerTrust: trustPolicy?.trustLevel === 'trusted' || trustPolicy?.trustLevel === 'trusted-readonly' ? 'trusted' : 'untrusted',
+    providerTrust:
+      trustPolicy?.trustLevel === 'trusted' || trustPolicy?.trustLevel === 'trusted-readonly'
+        ? 'trusted'
+        : 'untrusted',
     policyDecision: evaluateMcpRiskDecision({ riskLevel, declaredReadOnly }, trustPolicy),
     advisory: trustedReadOnly
       ? 'MCP read-only annotations are trusted for this server by policy.'
@@ -71,14 +89,14 @@ function riskActionToDecision(action: McpRiskAction): 'approve' | 'deny' | 'esca
 
 function evaluateMcpRiskDecision(
   risk: { riskLevel: 'low' | 'medium' | 'high'; declaredReadOnly: boolean },
-  policy?: McpServerTrustPolicy,
+  policy?: McpServerTrustPolicy
 ): 'approve' | 'deny' | 'escalate' {
   const explicit = policy?.riskActions?.[risk.riskLevel];
   if (explicit) return riskActionToDecision(explicit);
   if (
-    risk.declaredReadOnly
-    && policy?.trustReadOnlyHint
-    && (policy.trustLevel === 'trusted-readonly' || policy.trustLevel === 'trusted')
+    risk.declaredReadOnly &&
+    policy?.trustReadOnlyHint &&
+    (policy.trustLevel === 'trusted-readonly' || policy.trustLevel === 'trusted')
   ) {
     return 'approve';
   }
@@ -97,13 +115,12 @@ export interface ExternalToolRuntimeOptions {
   state: ExternalToolRuntimeState;
   // pi Agent keeps a reference to this array, so LoadExternalTool can append
   // concrete tools for subsequent assistant steps in the same session.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  toolsArray?: AgentTool<any>[];
+  toolsArray?: AgentTool[];
 }
 
 function textResult(
   text: string,
-  details: Record<string, unknown> = {},
+  details: Record<string, unknown> = {}
 ): { content: ToolContent; details: Record<string, unknown> } {
   return { content: [{ type: 'text', text }], details };
 }
@@ -116,7 +133,9 @@ export function externalToolKey(ref: ToolRef): string {
 }
 
 function isDiscoverableMcp(state: ExternalToolRuntimeState, server: string): boolean {
-  return state.discoverableProviders.some((provider) => provider.source === 'mcp' && provider.serverId === server);
+  return state.discoverableProviders.some(
+    provider => provider.source === 'mcp' && provider.serverId === server
+  );
 }
 
 function getMcpAuthStatus(server: string): { authRequired: boolean; message: string } | undefined {
@@ -124,7 +143,8 @@ function getMcpAuthStatus(server: string): { authRequired: boolean; message: str
   if (status.state !== 'needs-auth' && !status.authRequired) return undefined;
   return {
     authRequired: true,
-    message: status.authMessage || status.lastError || `MCP server ${server} requires authentication.`,
+    message:
+      status.authMessage || status.lastError || `MCP server ${server} requires authentication.`,
   };
 }
 
@@ -139,8 +159,9 @@ function mcpAuthGuidance(server: string, message: string): string {
 
 function isLoaded(state: ExternalToolRuntimeState, ref: McpToolRef | PluginToolRef): boolean {
   const key = externalToolKey(ref);
-  return [...state.pinnedExternalTools, ...state.loadedExternalTools]
-    .some((item) => externalToolKey(item) === key);
+  return [...state.pinnedExternalTools, ...state.loadedExternalTools].some(
+    item => externalToolKey(item) === key
+  );
 }
 
 function safeLoadMcpServers(db?: Database.Database) {
@@ -152,7 +173,10 @@ function safeLoadMcpServers(db?: Database.Database) {
   }
 }
 
-function loadMcpTrustPolicy(db: Database.Database | undefined, server: string): McpServerTrustPolicy | undefined {
+function loadMcpTrustPolicy(
+  db: Database.Database | undefined,
+  server: string
+): McpServerTrustPolicy | undefined {
   if (!db) return undefined;
   try {
     const row = db.prepare('SELECT trust_policy FROM mcp_servers WHERE name = ?').get(server) as
@@ -207,16 +231,22 @@ async function persistMcpOutput(
   name: string,
   index: number,
   data: string | Buffer,
-  extension: string,
+  extension: string
 ): Promise<string> {
   const dir = mcpOutputDir();
   await mkdir(dir, { recursive: true });
-  const filePath = path.join(dir, `${sanitizeOutputName(name)}-${Date.now()}-${index}.${extension}`);
+  const filePath = path.join(
+    dir,
+    `${sanitizeOutputName(name)}-${Date.now()}-${index}.${extension}`
+  );
   await writeFile(filePath, data);
   return filePath;
 }
 
-async function truncateMcpTextContent(content: ToolContent, name: string): Promise<{
+async function truncateMcpTextContent(
+  content: ToolContent,
+  name: string
+): Promise<{
   content: ToolContent;
   outputTruncated: boolean;
   originalOutputChars?: number;
@@ -226,24 +256,24 @@ async function truncateMcpTextContent(content: ToolContent, name: string): Promi
   let outputTruncated = false;
   let originalOutputChars: number | undefined;
   const outputFiles: string[] = [];
-  const truncated = await Promise.all(content.map(async (item, index) => {
-    if (item.type !== 'text' || typeof item.text !== 'string' || item.text.length <= max) return item;
-    outputTruncated = true;
-    originalOutputChars = Math.max(originalOutputChars ?? 0, item.text.length);
-    const outputPath = await persistMcpOutput(name, index, item.text, 'txt');
-    outputFiles.push(outputPath);
-    return {
-      ...item,
-      text: `${item.text.slice(0, max)}\n\n${MCP_OUTPUT_TRUNCATED_MARKER} ${max} characters]\nFull output saved to ${outputPath}`,
-    };
-  }));
+  const truncated = await Promise.all(
+    content.map(async (item, index) => {
+      if (item.type !== 'text' || typeof item.text !== 'string' || item.text.length <= max)
+        return item;
+      outputTruncated = true;
+      originalOutputChars = Math.max(originalOutputChars ?? 0, item.text.length);
+      const outputPath = await persistMcpOutput(name, index, item.text, 'txt');
+      outputFiles.push(outputPath);
+      return {
+        ...item,
+        text: `${item.text.slice(0, max)}\n\n${MCP_OUTPUT_TRUNCATED_MARKER} ${max} characters]\nFull output saved to ${outputPath}`,
+      };
+    })
+  );
   return { content: truncated, outputTruncated, originalOutputChars, outputFiles };
 }
 
-async function getMcpInventory(
-  server: string,
-  config: McpServerRuntimeConfig,
-) {
+async function getMcpInventory(server: string, config: McpServerRuntimeConfig) {
   return mcpInventoryCache.getInventory(server, config, {
     listTools: () => mcpClientManager.listTools(server, config),
     listResources: () => mcpClientManager.listResources(server, config),
@@ -255,28 +285,40 @@ function schemaHash(value: unknown): string {
   return JSON.stringify(value);
 }
 
-export function buildExternalProviderCatalog(state: ExternalToolRuntimeState, db?: Database.Database): string {
+export function buildExternalProviderCatalog(
+  state: ExternalToolRuntimeState,
+  db?: Database.Database
+): string {
   if (state.discoverableProviders.length === 0) return '';
   const servers = safeLoadMcpServers(db);
-  const providers = [...state.discoverableProviders].sort((a, b) => {
-    const left = a.source === 'mcp' ? `mcp/${a.serverId}` : `plugin/${a.pluginId}/${a.providerId ?? ''}`;
-    const right = b.source === 'mcp' ? `mcp/${b.serverId}` : `plugin/${b.pluginId}/${b.providerId ?? ''}`;
-    return left.localeCompare(right);
-  }).slice(0, PROVIDER_CATALOG_MAX_ROWS);
-  const rows = providers.map((provider) => {
+  const providers = [...state.discoverableProviders]
+    .sort((a, b) => {
+      const left =
+        a.source === 'mcp' ? `mcp/${a.serverId}` : `plugin/${a.pluginId}/${a.providerId ?? ''}`;
+      const right =
+        b.source === 'mcp' ? `mcp/${b.serverId}` : `plugin/${b.pluginId}/${b.providerId ?? ''}`;
+      return left.localeCompare(right);
+    })
+    .slice(0, PROVIDER_CATALOG_MAX_ROWS);
+  const rows = providers.map(provider => {
     if (provider.source === 'mcp') {
       const status = servers[provider.serverId] ? 'configured' : 'unavailable';
       const config = servers[provider.serverId];
       const summary = config
-        ? mcpInventoryCache.getCached(provider.serverId, mcpInventoryCache.configHash(config))?.summary
+        ? mcpInventoryCache.getCached(provider.serverId, mcpInventoryCache.configHash(config))
+            ?.summary
         : undefined;
       const counts = summary
         ? `tools=${summary.tools ?? 0}, resources=${summary.resources ?? 0}, prompts=${summary.prompts ?? 0}`
         : 'tools=unknown, resources=unknown, prompts=unknown';
-      return truncateForCatalog(`- mcp/${provider.serverId}: status=${status}, ${counts}, discover tools via SearchExternalTools, resources via SearchExternalResources, prompts via SearchExternalPrompts`);
+      return truncateForCatalog(
+        `- mcp/${provider.serverId}: status=${status}, ${counts}, discover tools via SearchExternalTools, resources via SearchExternalResources, prompts via SearchExternalPrompts`
+      );
     }
     const providerId = provider.providerId ? `/${provider.providerId}` : '';
-    return truncateForCatalog(`- plugin/${provider.pluginId}${providerId}: status=not-yet-connected`);
+    return truncateForCatalog(
+      `- plugin/${provider.pluginId}${providerId}: status=not-yet-connected`
+    );
   });
   const omitted = state.discoverableProviders.length - providers.length;
   const suffix = omitted > 0 ? `\n- ... ${omitted} more provider(s) omitted by catalog budget` : '';
@@ -290,20 +332,20 @@ export function concreteMcpToolName(ref: McpToolRef): string {
 export function createConcreteMcpTool(
   ref: McpToolRef,
   db?: Database.Database,
-  metadata?: LoadedExternalToolSchema,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): AgentTool<any> {
+  metadata?: LoadedExternalToolSchema
+): AgentTool {
   const name = concreteMcpToolName(ref);
   return {
     name,
     label: name,
     description: metadata?.description || `Loaded MCP tool ${ref.tool} from server ${ref.server}.`,
-    parameters: (metadata?.inputSchema ?? { type: 'object', properties: {}, additionalProperties: true }) as any,
+    parameters: agentToolParameters(metadata?.inputSchema ?? EMPTY_OBJECT_SCHEMA),
     execute: async (_toolCallId: string, params: unknown) => {
       try {
         if (ref.tool === MCP_AUTHENTICATE_TOOL) {
           const authStatus = getMcpAuthStatus(ref.server);
-          const message = authStatus?.message || `MCP server ${ref.server} may require authentication.`;
+          const message =
+            authStatus?.message || `MCP server ${ref.server} may require authentication.`;
           return textResult(mcpAuthGuidance(ref.server, message), {
             ok: false,
             error: 'mcp_auth_required',
@@ -341,10 +383,15 @@ export function createConcreteMcpTool(
             mcpTrust,
           });
         }
-        const result = await mcpClientManager.callTool(ref.server, config, ref.tool, (params as Record<string, unknown>) || {});
+        const result = await mcpClientManager.callTool(
+          ref.server,
+          config,
+          ref.tool,
+          (params as Record<string, unknown>) || {}
+        );
         const output = await truncateMcpTextContent(result.content as ToolContent, ref.tool);
         return {
-          content: output.content as any,
+          content: output.content,
           details: {
             ok: !result.isError,
             server: ref.server,
@@ -368,17 +415,20 @@ export function createConcreteMcpTool(
         });
       }
     },
-  } as AgentTool<any>;
+  };
 }
 
 async function inspectExternalTool(
   state: ExternalToolRuntimeState,
   db: Database.Database | undefined,
-  params: unknown,
+  params: unknown
 ) {
   const ref = (params as { ref?: unknown })?.ref as Partial<McpToolRef> | undefined;
   if (!ref || ref.source !== 'mcp' || !ref.server || !ref.tool) {
-    return textResult('InspectExternalTool requires an MCP ref', { ok: false, error: 'invalid_ref' });
+    return textResult('InspectExternalTool requires an MCP ref', {
+      ok: false,
+      error: 'invalid_ref',
+    });
   }
   if (!isDiscoverableMcp(state, ref.server)) {
     return textResult(`MCP server is not discoverable: ${ref.server}`, {
@@ -400,29 +450,51 @@ async function inspectExternalTool(
   }
   if (ref.tool === MCP_AUTHENTICATE_TOOL) {
     const authStatus = getMcpAuthStatus(ref.server);
-    return textResult(JSON.stringify({
-      ref: { source: 'mcp', server: ref.server, tool: MCP_AUTHENTICATE_TOOL },
-      name: MCP_AUTHENTICATE_TOOL,
-      description: 'Show authentication guidance for this MCP server.',
-      inputSchema: { type: 'object', properties: {} },
-      authRequired: !!authStatus,
-      authMessage: authStatus?.message,
-      loaded: isLoaded(state, { source: 'mcp', server: ref.server, tool: MCP_AUTHENTICATE_TOOL } as McpToolRef),
-    }, null, 2), { ok: true });
+    return textResult(
+      JSON.stringify(
+        {
+          ref: { source: 'mcp', server: ref.server, tool: MCP_AUTHENTICATE_TOOL },
+          name: MCP_AUTHENTICATE_TOOL,
+          description: 'Show authentication guidance for this MCP server.',
+          inputSchema: { type: 'object', properties: {} },
+          authRequired: !!authStatus,
+          authMessage: authStatus?.message,
+          loaded: isLoaded(state, {
+            source: 'mcp',
+            server: ref.server,
+            tool: MCP_AUTHENTICATE_TOOL,
+          } as McpToolRef),
+        },
+        null,
+        2
+      ),
+      { ok: true }
+    );
   }
   const inventory = await getMcpInventory(ref.server, config);
-  const tool = inventory.tools.find((item) => item.name === ref.tool);
-  if (!tool) return textResult(`Tool not found: ${ref.tool}`, { ok: false, error: 'tool_not_found' });
+  const tool = inventory.tools.find(item => item.name === ref.tool);
+  if (!tool)
+    return textResult(`Tool not found: ${ref.tool}`, { ok: false, error: 'tool_not_found' });
   const concrete = { source: 'mcp', server: ref.server, tool: ref.tool } as McpToolRef;
   const trustPolicy = loadMcpTrustPolicy(db, ref.server);
-  return textResult(JSON.stringify({
-    ref: concrete,
-    name: tool.name,
-    description: tool.description ?? '',
-    inputSchema: tool.inputSchema ?? { type: 'object', properties: {} },
-    permissionSummary: inferMcpToolRisk(tool as { annotations?: Record<string, unknown>; inputSchema?: Record<string, unknown> }, trustPolicy),
-    loaded: isLoaded(state, concrete),
-  }, null, 2), { ok: true });
+  return textResult(
+    JSON.stringify(
+      {
+        ref: concrete,
+        name: tool.name,
+        description: tool.description ?? '',
+        inputSchema: tool.inputSchema ?? { type: 'object', properties: {} },
+        permissionSummary: inferMcpToolRisk(
+          tool as { annotations?: Record<string, unknown>; inputSchema?: Record<string, unknown> },
+          trustPolicy
+        ),
+        loaded: isLoaded(state, concrete),
+      },
+      null,
+      2
+    ),
+    { ok: true }
+  );
 }
 
 async function loadExternalTool(options: ExternalToolRuntimeOptions, params: unknown) {
@@ -461,23 +533,36 @@ async function loadExternalTool(options: ExternalToolRuntimeOptions, params: unk
         sourceServerConfigHash: mcpInventoryCache.configHash(config),
       };
       options.state.loadedExternalTools.push(concrete);
-      options.state.loadedExternalTools.sort((a, b) => externalToolKey(a).localeCompare(externalToolKey(b)));
-      options.toolsArray?.push(createConcreteMcpTool(
-        concrete,
-        options.db,
-        options.state.loadedExternalToolSchemas?.[externalToolKey(concrete)],
-      ));
-      return textResult(JSON.stringify({
-        loaded: true,
-        ref: concrete,
-        toolName: concreteMcpToolName(concrete),
-        availability: 'next_model_request',
-        message: 'Authentication helper loaded for this session. It will be available as a callable tool in the next assistant step.',
-      }, null, 2), { ok: true, loaded: true });
+      options.state.loadedExternalTools.sort((a, b) =>
+        externalToolKey(a).localeCompare(externalToolKey(b))
+      );
+      options.toolsArray?.push(
+        createConcreteMcpTool(
+          concrete,
+          options.db,
+          options.state.loadedExternalToolSchemas?.[externalToolKey(concrete)]
+        )
+      );
+      return textResult(
+        JSON.stringify(
+          {
+            loaded: true,
+            ref: concrete,
+            toolName: concreteMcpToolName(concrete),
+            availability: 'next_model_request',
+            message:
+              'Authentication helper loaded for this session. It will be available as a callable tool in the next assistant step.',
+          },
+          null,
+          2
+        ),
+        { ok: true, loaded: true }
+      );
     }
     const inventory = await getMcpInventory(concrete.server, config);
-    const found = inventory.tools.find((tool) => tool.name === concrete.tool);
-    if (!found) return textResult(`Tool not found: ${concrete.tool}`, { ok: false, error: 'tool_not_found' });
+    const found = inventory.tools.find(tool => tool.name === concrete.tool);
+    if (!found)
+      return textResult(`Tool not found: ${concrete.tool}`, { ok: false, error: 'tool_not_found' });
 
     options.state.loadedExternalToolSchemas ??= {};
     options.state.loadedExternalToolSchemas[externalToolKey(concrete)] = {
@@ -489,27 +574,39 @@ async function loadExternalTool(options: ExternalToolRuntimeOptions, params: unk
       sourceServerConfigHash: inventory.configHash,
     };
     options.state.loadedExternalTools.push(concrete);
-    options.state.loadedExternalTools.sort((a, b) => externalToolKey(a).localeCompare(externalToolKey(b)));
-    options.toolsArray?.push(createConcreteMcpTool(
-      concrete,
-      options.db,
-      options.state.loadedExternalToolSchemas?.[externalToolKey(concrete)],
-    ));
+    options.state.loadedExternalTools.sort((a, b) =>
+      externalToolKey(a).localeCompare(externalToolKey(b))
+    );
+    options.toolsArray?.push(
+      createConcreteMcpTool(
+        concrete,
+        options.db,
+        options.state.loadedExternalToolSchemas?.[externalToolKey(concrete)]
+      )
+    );
   }
 
-  return textResult(JSON.stringify({
-    loaded: true,
-    ref: concrete,
-    toolName: concreteMcpToolName(concrete),
-    availability: 'next_model_request',
-    message: 'Tool loaded for this session. It will be available as a callable tool in the next assistant step.',
-  }, null, 2), { ok: true });
+  return textResult(
+    JSON.stringify(
+      {
+        loaded: true,
+        ref: concrete,
+        toolName: concreteMcpToolName(concrete),
+        availability: 'next_model_request',
+        message:
+          'Tool loaded for this session. It will be available as a callable tool in the next assistant step.',
+      },
+      null,
+      2
+    ),
+    { ok: true }
+  );
 }
 
 async function searchExternalResources(
   state: ExternalToolRuntimeState,
   db: Database.Database | undefined,
-  params: unknown,
+  params: unknown
 ) {
   const args = (params && typeof params === 'object' ? params : {}) as Record<string, unknown>;
   const query = String(args.query ?? '').toLowerCase();
@@ -522,10 +619,15 @@ async function searchExternalResources(
     if (!config) continue;
     const inventory = await getMcpInventory(provider.serverId, config);
     for (const resource of inventory.resources) {
-      const haystack = `${provider.serverId} ${resource.uri} ${resource.name ?? ''} ${resource.description ?? ''}`.toLowerCase();
+      const haystack =
+        `${provider.serverId} ${resource.uri} ${resource.name ?? ''} ${resource.description ?? ''}`.toLowerCase();
       if (query && !haystack.includes(query)) continue;
       results.push({
-        ref: { source: 'mcp-resource', server: provider.serverId, uri: resource.uri } as McpResourceRef,
+        ref: {
+          source: 'mcp-resource',
+          server: provider.serverId,
+          uri: resource.uri,
+        } as McpResourceRef,
         name: resource.name ?? resource.uri,
         providerLabel: `mcp/${provider.serverId}`,
         description: resource.description ?? '',
@@ -541,11 +643,14 @@ async function searchExternalResources(
 async function inspectExternalResource(
   state: ExternalToolRuntimeState,
   db: Database.Database | undefined,
-  params: unknown,
+  params: unknown
 ) {
   const ref = (params as { ref?: unknown })?.ref as Partial<McpResourceRef> | undefined;
   if (!ref || ref.source !== 'mcp-resource' || !ref.server || !ref.uri) {
-    return textResult('InspectExternalResource requires an MCP resource ref', { ok: false, error: 'invalid_ref' });
+    return textResult('InspectExternalResource requires an MCP resource ref', {
+      ok: false,
+      error: 'invalid_ref',
+    });
   }
   if (!isDiscoverableMcp(state, ref.server)) {
     return textResult(`MCP server is not discoverable: ${ref.server}`, {
@@ -557,54 +662,78 @@ async function inspectExternalResource(
   }
   const servers = safeLoadMcpServers(db);
   const config = servers[ref.server];
-  if (!config) return textResult(`MCP server is not configured or disabled: ${ref.server}`, { ok: false, error: 'server_unavailable' });
+  if (!config)
+    return textResult(`MCP server is not configured or disabled: ${ref.server}`, {
+      ok: false,
+      error: 'server_unavailable',
+    });
   const inventory = await getMcpInventory(ref.server, config);
-  const resource = inventory.resources.find((item) => item.uri === ref.uri);
-  if (!resource) return textResult(`Resource not found: ${ref.uri}`, { ok: false, error: 'resource_not_found' });
-  return textResult(JSON.stringify({
-    ref: { source: 'mcp-resource', server: ref.server, uri: ref.uri },
-    uri: resource.uri,
-    name: resource.name ?? resource.uri,
-    description: resource.description ?? '',
-    mimeType: resource.mimeType,
-    readOnly: true,
-  }, null, 2), { ok: true });
+  const resource = inventory.resources.find(item => item.uri === ref.uri);
+  if (!resource)
+    return textResult(`Resource not found: ${ref.uri}`, { ok: false, error: 'resource_not_found' });
+  return textResult(
+    JSON.stringify(
+      {
+        ref: { source: 'mcp-resource', server: ref.server, uri: ref.uri },
+        uri: resource.uri,
+        name: resource.name ?? resource.uri,
+        description: resource.description ?? '',
+        mimeType: resource.mimeType,
+        readOnly: true,
+      },
+      null,
+      2
+    ),
+    { ok: true }
+  );
 }
 
 async function readExternalResource(
   state: ExternalToolRuntimeState,
   db: Database.Database | undefined,
-  params: unknown,
+  params: unknown
 ) {
   const ref = (params as { ref?: unknown })?.ref as Partial<McpResourceRef> | undefined;
   if (!ref || ref.source !== 'mcp-resource' || !ref.server || !ref.uri) {
-    return textResult('ReadExternalResource requires an MCP resource ref', { ok: false, error: 'invalid_ref' });
+    return textResult('ReadExternalResource requires an MCP resource ref', {
+      ok: false,
+      error: 'invalid_ref',
+    });
   }
   const resourceUri = ref.uri;
   if (!isDiscoverableMcp(state, ref.server)) {
-    return textResult(`MCP server is not discoverable: ${ref.server}`, { ok: false, error: 'provider_not_discoverable' });
+    return textResult(`MCP server is not discoverable: ${ref.server}`, {
+      ok: false,
+      error: 'provider_not_discoverable',
+    });
   }
   const servers = safeLoadMcpServers(db);
   const config = servers[ref.server];
-  if (!config) return textResult(`MCP server is not configured or disabled: ${ref.server}`, { ok: false, error: 'server_unavailable' });
+  if (!config)
+    return textResult(`MCP server is not configured or disabled: ${ref.server}`, {
+      ok: false,
+      error: 'server_unavailable',
+    });
   const result = await mcpClientManager.readResource(ref.server, config, resourceUri);
   const outputFiles: string[] = [];
-  const content = await Promise.all(result.contents.map(async (item, index) => {
-    if (item.text) {
-      return { type: 'text' as const, text: item.text };
-    }
-    if (item.blob) {
-      const bytes = Buffer.from(item.blob, 'base64');
-      const ext = extensionForMimeType(item.mimeType);
-      const outputPath = await persistMcpOutput(item.uri || resourceUri, index, bytes, ext);
-      outputFiles.push(outputPath);
-      return {
-        type: 'text' as const,
-        text: `Binary content (${item.mimeType || 'application/octet-stream'}, ${bytes.length} bytes) saved to ${outputPath}`,
-      };
-    }
-    return { type: 'text' as const, text: '' };
-  }));
+  const content = await Promise.all(
+    result.contents.map(async (item, index) => {
+      if (item.text) {
+        return { type: 'text' as const, text: item.text };
+      }
+      if (item.blob) {
+        const bytes = Buffer.from(item.blob, 'base64');
+        const ext = extensionForMimeType(item.mimeType);
+        const outputPath = await persistMcpOutput(item.uri || resourceUri, index, bytes, ext);
+        outputFiles.push(outputPath);
+        return {
+          type: 'text' as const,
+          text: `Binary content (${item.mimeType || 'application/octet-stream'}, ${bytes.length} bytes) saved to ${outputPath}`,
+        };
+      }
+      return { type: 'text' as const, text: '' };
+    })
+  );
   return {
     content,
     details: {
@@ -628,7 +757,7 @@ async function readExternalResource(
 async function searchExternalPrompts(
   state: ExternalToolRuntimeState,
   db: Database.Database | undefined,
-  params: unknown,
+  params: unknown
 ) {
   const args = (params && typeof params === 'object' ? params : {}) as Record<string, unknown>;
   const query = String(args.query ?? '').toLowerCase();
@@ -641,7 +770,8 @@ async function searchExternalPrompts(
     if (!config) continue;
     const inventory = await getMcpInventory(provider.serverId, config);
     for (const prompt of inventory.prompts) {
-      const haystack = `${provider.serverId} ${prompt.name} ${prompt.description ?? ''}`.toLowerCase();
+      const haystack =
+        `${provider.serverId} ${prompt.name} ${prompt.description ?? ''}`.toLowerCase();
       if (query && !haystack.includes(query)) continue;
       results.push({
         ref: { source: 'mcp-prompt', server: provider.serverId, name: prompt.name } as McpPromptRef,
@@ -660,52 +790,77 @@ async function searchExternalPrompts(
 async function loadExternalPrompt(
   state: ExternalToolRuntimeState,
   db: Database.Database | undefined,
-  params: unknown,
+  params: unknown
 ) {
-  const args = (params && typeof params === 'object' ? params : {}) as { ref?: Partial<McpPromptRef>; arguments?: Record<string, unknown> };
+  const args = (params && typeof params === 'object' ? params : {}) as {
+    ref?: Partial<McpPromptRef>;
+    arguments?: Record<string, unknown>;
+  };
   const ref = args.ref;
   if (!ref || ref.source !== 'mcp-prompt' || !ref.server || !ref.name) {
-    return textResult('LoadExternalPrompt requires an MCP prompt ref', { ok: false, error: 'invalid_ref' });
+    return textResult('LoadExternalPrompt requires an MCP prompt ref', {
+      ok: false,
+      error: 'invalid_ref',
+    });
   }
   if (!isDiscoverableMcp(state, ref.server)) {
-    return textResult(`MCP server is not discoverable: ${ref.server}`, { ok: false, error: 'provider_not_discoverable' });
+    return textResult(`MCP server is not discoverable: ${ref.server}`, {
+      ok: false,
+      error: 'provider_not_discoverable',
+    });
   }
   const servers = safeLoadMcpServers(db);
   const config = servers[ref.server];
-  if (!config) return textResult(`MCP server is not configured or disabled: ${ref.server}`, { ok: false, error: 'server_unavailable' });
+  if (!config)
+    return textResult(`MCP server is not configured or disabled: ${ref.server}`, {
+      ok: false,
+      error: 'server_unavailable',
+    });
   const prompt = await mcpClientManager.getPrompt(ref.server, config, ref.name, args.arguments);
-  return textResult(JSON.stringify({
-    ref: { source: 'mcp-prompt', server: ref.server, name: ref.name },
-    description: prompt.description ?? '',
-    messages: prompt.messages ?? [],
-  }, null, 2), { ok: true });
+  return textResult(
+    JSON.stringify(
+      {
+        ref: { source: 'mcp-prompt', server: ref.server, name: ref.name },
+        description: prompt.description ?? '',
+        messages: prompt.messages ?? [],
+      },
+      null,
+      2
+    ),
+    { ok: true }
+  );
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function buildExternalMetaTools(options: ExternalToolRuntimeOptions): AgentTool<any>[] {
+export function buildExternalMetaTools(options: ExternalToolRuntimeOptions): AgentTool[] {
   const { state, db } = options;
   return [
     {
       name: 'ListExternalToolProviders',
       label: 'ListExternalToolProviders',
       description: 'List external MCP/plugin providers that this agent is allowed to discover.',
-      parameters: { type: 'object', properties: {} } as any,
-      execute: async () => textResult(JSON.stringify({ providers: state.discoverableProviders }, null, 2), { ok: true }),
+      parameters: agentToolParameters({ type: 'object', properties: {} }),
+      execute: async () =>
+        textResult(JSON.stringify({ providers: state.discoverableProviders }, null, 2), {
+          ok: true,
+        }),
     },
     {
       name: 'SearchExternalTools',
       label: 'SearchExternalTools',
       description: 'Search discoverable external MCP/plugin tools without loading every schema.',
-      parameters: {
+      parameters: agentToolParameters({
         type: 'object',
         properties: {
           query: { type: 'string' },
           provider: { type: 'object' },
           limit: { type: 'number', default: 20 },
         },
-      } as any,
+      }),
       execute: async (_id: string, params: unknown) => {
-        const args = (params && typeof params === 'object' ? params : {}) as Record<string, unknown>;
+        const args = (params && typeof params === 'object' ? params : {}) as Record<
+          string,
+          unknown
+        >;
         const query = String(args.query ?? '').toLowerCase();
         const limit = Math.max(1, Math.min(Number(args.limit ?? 20) || 20, 100));
         const servers = safeLoadMcpServers(db);
@@ -716,8 +871,13 @@ export function buildExternalMetaTools(options: ExternalToolRuntimeOptions): Age
           if (!config) continue;
           const authStatus = getMcpAuthStatus(provider.serverId);
           if (authStatus) {
-            const ref = { source: 'mcp', server: provider.serverId, tool: MCP_AUTHENTICATE_TOOL } as McpToolRef;
-            const haystack = `${provider.serverId} ${MCP_AUTHENTICATE_TOOL} authentication login oauth credentials ${authStatus.message}`.toLowerCase();
+            const ref = {
+              source: 'mcp',
+              server: provider.serverId,
+              tool: MCP_AUTHENTICATE_TOOL,
+            } as McpToolRef;
+            const haystack =
+              `${provider.serverId} ${MCP_AUTHENTICATE_TOOL} authentication login oauth credentials ${authStatus.message}`.toLowerCase();
             if (!query || haystack.includes(query)) {
               results.push({
                 ref,
@@ -735,7 +895,8 @@ export function buildExternalMetaTools(options: ExternalToolRuntimeOptions): Age
           const inventory = await getMcpInventory(provider.serverId, config);
           const trustPolicy = loadMcpTrustPolicy(db, provider.serverId);
           for (const tool of inventory.tools) {
-            const haystack = `${provider.serverId} ${tool.name} ${tool.description ?? ''}`.toLowerCase();
+            const haystack =
+              `${provider.serverId} ${tool.name} ${tool.description ?? ''}`.toLowerCase();
             if (query && !haystack.includes(query)) continue;
             const ref = { source: 'mcp', server: provider.serverId, tool: tool.name } as McpToolRef;
             results.push({
@@ -743,7 +904,13 @@ export function buildExternalMetaTools(options: ExternalToolRuntimeOptions): Age
               name: tool.name,
               providerLabel: `mcp/${provider.serverId}`,
               description: tool.description ?? '',
-              permissionSummary: inferMcpToolRisk(tool as { annotations?: Record<string, unknown>; inputSchema?: Record<string, unknown> }, trustPolicy),
+              permissionSummary: inferMcpToolRisk(
+                tool as {
+                  annotations?: Record<string, unknown>;
+                  inputSchema?: Record<string, unknown>;
+                },
+                trustPolicy
+              ),
               loaded: isLoaded(state, ref),
               blocked: false,
             });
@@ -751,75 +918,96 @@ export function buildExternalMetaTools(options: ExternalToolRuntimeOptions): Age
           }
           if (results.length >= limit) break;
         }
-        return textResult(JSON.stringify({ results }, null, 2), { ok: true, total: results.length });
+        return textResult(JSON.stringify({ results }, null, 2), {
+          ok: true,
+          total: results.length,
+        });
       },
     },
     {
       name: 'InspectExternalTool',
       label: 'InspectExternalTool',
       description: 'Inspect one external tool and return its full description and input schema.',
-      parameters: { type: 'object', properties: { ref: { type: 'object' } }, required: ['ref'] } as any,
+      parameters: agentToolParameters({
+        type: 'object',
+        properties: { ref: { type: 'object' } },
+        required: ['ref'],
+      }),
       execute: async (_id: string, params: unknown) => inspectExternalTool(state, db, params),
     },
     {
       name: 'SearchExternalResources',
       label: 'SearchExternalResources',
-      description: 'Search discoverable MCP resources without exposing every resource in the prompt.',
-      parameters: {
+      description:
+        'Search discoverable MCP resources without exposing every resource in the prompt.',
+      parameters: agentToolParameters({
         type: 'object',
         properties: {
           query: { type: 'string' },
           provider: { type: 'object' },
           limit: { type: 'number', default: 20 },
         },
-      } as any,
+      }),
       execute: async (_id: string, params: unknown) => searchExternalResources(state, db, params),
     },
     {
       name: 'InspectExternalResource',
       label: 'InspectExternalResource',
       description: 'Inspect one MCP resource and return metadata before reading it.',
-      parameters: { type: 'object', properties: { ref: { type: 'object' } }, required: ['ref'] } as any,
+      parameters: agentToolParameters({
+        type: 'object',
+        properties: { ref: { type: 'object' } },
+        required: ['ref'],
+      }),
       execute: async (_id: string, params: unknown) => inspectExternalResource(state, db, params),
     },
     {
       name: 'ReadExternalResource',
       label: 'ReadExternalResource',
       description: 'Read one discoverable MCP resource as read-only content.',
-      parameters: { type: 'object', properties: { ref: { type: 'object' } }, required: ['ref'] } as any,
+      parameters: agentToolParameters({
+        type: 'object',
+        properties: { ref: { type: 'object' } },
+        required: ['ref'],
+      }),
       execute: async (_id: string, params: unknown) => readExternalResource(state, db, params),
     },
     {
       name: 'SearchExternalPrompts',
       label: 'SearchExternalPrompts',
       description: 'Search discoverable MCP prompts without exposing every prompt in the prompt.',
-      parameters: {
+      parameters: agentToolParameters({
         type: 'object',
         properties: {
           query: { type: 'string' },
           provider: { type: 'object' },
           limit: { type: 'number', default: 20 },
         },
-      } as any,
+      }),
       execute: async (_id: string, params: unknown) => searchExternalPrompts(state, db, params),
     },
     {
       name: 'LoadExternalPrompt',
       label: 'LoadExternalPrompt',
       description: 'Load a discoverable MCP prompt and return its rendered messages.',
-      parameters: {
+      parameters: agentToolParameters({
         type: 'object',
         properties: { ref: { type: 'object' }, arguments: { type: 'object' } },
         required: ['ref'],
-      } as any,
+      }),
       execute: async (_id: string, params: unknown) => loadExternalPrompt(state, db, params),
     },
     {
       name: 'LoadExternalTool',
       label: 'LoadExternalTool',
-      description: 'Load one inspected external tool for this session. It becomes callable on the next assistant step.',
-      parameters: { type: 'object', properties: { ref: { type: 'object' } }, required: ['ref'] } as any,
+      description:
+        'Load one inspected external tool for this session. It becomes callable on the next assistant step.',
+      parameters: agentToolParameters({
+        type: 'object',
+        properties: { ref: { type: 'object' } },
+        required: ['ref'],
+      }),
       execute: async (_id: string, params: unknown) => loadExternalTool(options, params),
     },
-  ] as AgentTool<any>[];
+  ];
 }

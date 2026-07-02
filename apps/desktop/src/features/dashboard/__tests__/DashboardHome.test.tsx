@@ -19,13 +19,15 @@ describe('DashboardHome', () => {
     } as any);
     useSupervisionStore.setState({ tasks: {}, agents: {}, lastCheckpoint: {} });
     useLocalPRStore.setState({ prs: {}, loadPRs: vi.fn().mockResolvedValue(undefined) } as any);
-    useWorkflowStore.setState({ workflows: {}, runs: {}, loadWorkflows: vi.fn().mockResolvedValue(undefined) } as any);
+    useWorkflowStore.setState({
+      workflows: {},
+      runs: {},
+      loadWorkflows: vi.fn().mockResolvedValue(undefined),
+    } as any);
   });
 
   it('renders project name in header', () => {
-    const { container } = render(
-      <DashboardHome projectId={projectId} onNavigate={onNavigate} />,
-    );
+    const { container } = render(<DashboardHome projectId={projectId} onNavigate={onNavigate} />);
     expect(container.textContent).toContain('Test Project Dashboard');
   });
 
@@ -35,7 +37,7 @@ describe('DashboardHome', () => {
         projectId={projectId}
         onNavigate={onNavigate}
         onOpenDashboardWindow={onOpenDashboardWindow}
-      />,
+      />
     );
 
     fireEvent.click(getByTitle('Open dashboard in window'));
@@ -45,7 +47,7 @@ describe('DashboardHome', () => {
 
   it('renders summary cards', () => {
     const { container } = render(
-      <DashboardHome projectId={projectId} onNavigate={onNavigate} onOpenAutomations={vi.fn()} />,
+      <DashboardHome projectId={projectId} onNavigate={onNavigate} onOpenAutomations={vi.fn()} />
     );
     expect(container.textContent).toContain('Supervisor');
     expect(container.textContent).toContain('Tasks');
@@ -54,24 +56,18 @@ describe('DashboardHome', () => {
   });
 
   it('hides the workflows and automations cards when onOpenAutomations is omitted', () => {
-    const { container } = render(
-      <DashboardHome projectId={projectId} onNavigate={onNavigate} />,
-    );
+    const { container } = render(<DashboardHome projectId={projectId} onNavigate={onNavigate} />);
     expect(container.textContent).not.toContain('Workflows');
     expect(container.textContent).not.toContain('Automations');
   });
 
   it('shows empty state when no data', () => {
-    const { container } = render(
-      <DashboardHome projectId={projectId} onNavigate={onNavigate} />,
-    );
+    const { container } = render(<DashboardHome projectId={projectId} onNavigate={onNavigate} />);
     expect(container.textContent).toContain('No activity yet');
   });
 
   it('shows Not configured when no agent', () => {
-    const { container } = render(
-      <DashboardHome projectId={projectId} onNavigate={onNavigate} />,
-    );
+    const { container } = render(<DashboardHome projectId={projectId} onNavigate={onNavigate} />);
     expect(container.textContent).toContain('Not configured');
   });
 
@@ -81,32 +77,24 @@ describe('DashboardHome', () => {
       agents: { [projectId]: { phase: 'active', mode: 'full' } },
       lastCheckpoint: {},
     } as any);
-    const { container } = render(
-      <DashboardHome projectId={projectId} onNavigate={onNavigate} />,
-    );
+    const { container } = render(<DashboardHome projectId={projectId} onNavigate={onNavigate} />);
     expect(container.textContent).toContain('Active');
     expect(container.textContent).toContain('Full Supervisor');
   });
 
   it('navigates to supervisor when supervisor card clicked', () => {
-    const { container } = render(
-      <DashboardHome projectId={projectId} onNavigate={onNavigate} />,
-    );
+    const { container } = render(<DashboardHome projectId={projectId} onNavigate={onNavigate} />);
     const buttons = container.querySelectorAll('button');
-    const supervisorBtn = Array.from(buttons).find((b) =>
-      b.textContent?.includes('Supervisor'),
-    );
+    const supervisorBtn = Array.from(buttons).find(b => b.textContent?.includes('Supervisor'));
     expect(supervisorBtn).toBeDefined();
     fireEvent.click(supervisorBtn as HTMLButtonElement);
     expect(onNavigate).toHaveBeenCalledWith('supervisor');
   });
 
   it('navigates to tasks when tasks card clicked', () => {
-    const { container } = render(
-      <DashboardHome projectId={projectId} onNavigate={onNavigate} />,
-    );
+    const { container } = render(<DashboardHome projectId={projectId} onNavigate={onNavigate} />);
     const buttons = container.querySelectorAll('button');
-    const tasksBtn = Array.from(buttons).find((b) => b.textContent?.includes('Tasks'));
+    const tasksBtn = Array.from(buttons).find(b => b.textContent?.includes('Tasks'));
     expect(tasksBtn).toBeDefined();
     fireEvent.click(tasksBtn as HTMLButtonElement);
     expect(onNavigate).toHaveBeenCalledWith('tasks');
@@ -123,9 +111,7 @@ describe('DashboardHome', () => {
       agents: {},
       lastCheckpoint: {},
     } as any);
-    const { container } = render(
-      <DashboardHome projectId={projectId} onNavigate={onNavigate} />,
-    );
+    const { container } = render(<DashboardHome projectId={projectId} onNavigate={onNavigate} />);
     expect(container.textContent).toContain('2');
     expect(container.textContent).toContain('active');
   });
@@ -140,14 +126,10 @@ describe('DashboardHome', () => {
       },
       loadPRs: vi.fn().mockResolvedValue(undefined),
     } as any);
-    const { container } = render(
-      <DashboardHome projectId={projectId} onNavigate={onNavigate} />,
-    );
+    const { container } = render(<DashboardHome projectId={projectId} onNavigate={onNavigate} />);
     // 1 active PR (the merged one doesn't count)
     const buttons = container.querySelectorAll('button');
-    const prBtn = Array.from(buttons).find((b) =>
-      b.textContent?.includes('Local Pull Requests'),
-    );
+    const prBtn = Array.from(buttons).find(b => b.textContent?.includes('Local Pull Requests'));
     expect(prBtn).toBeDefined();
     expect(prBtn?.textContent).toContain('1');
   });
@@ -161,9 +143,7 @@ describe('DashboardHome', () => {
       },
       loadPRs: vi.fn().mockResolvedValue(undefined),
     } as any);
-    const { container } = render(
-      <DashboardHome projectId={projectId} onNavigate={onNavigate} />,
-    );
+    const { container } = render(<DashboardHome projectId={projectId} onNavigate={onNavigate} />);
     expect(container.textContent).toContain('My PR');
     expect(container.textContent).toContain('feat-branch');
   });
@@ -171,15 +151,11 @@ describe('DashboardHome', () => {
   it('shows needs attention count for failed PRs', () => {
     useLocalPRStore.setState({
       prs: {
-        [projectId]: [
-          { id: 'pr1', status: 'review_failed', title: 'Bad PR', branchName: 'fix-1' },
-        ],
+        [projectId]: [{ id: 'pr1', status: 'review_failed', title: 'Bad PR', branchName: 'fix-1' }],
       },
       loadPRs: vi.fn().mockResolvedValue(undefined),
     } as any);
-    const { container } = render(
-      <DashboardHome projectId={projectId} onNavigate={onNavigate} />,
-    );
+    const { container } = render(<DashboardHome projectId={projectId} onNavigate={onNavigate} />);
     expect(container.textContent).toContain('1 needs attention');
   });
 });

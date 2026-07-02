@@ -5,7 +5,9 @@ import { useBottomPanelStore } from '../../stores/bottomPanelStore';
 
 // Mock PluginPanelRenderer (used for iframe panels)
 vi.mock('../notch/PluginPanelRenderer', () => ({
-  PluginPanelRenderer: ({ activePluginPanelId }: any) => <div data-testid="plugin-panel">Plugin:{activePluginPanelId}</div>,
+  PluginPanelRenderer: ({ activePluginPanelId }: any) => (
+    <div data-testid="plugin-panel">Plugin:{activePluginPanelId}</div>
+  ),
 }));
 
 // Mock llmProfileMetaStore (used by projectStore internally)
@@ -19,7 +21,7 @@ const { mockProviderMetaStore } = vi.hoisted(() => {
     setProviderCommands: vi.fn(),
     setProviderCapabilities: vi.fn(),
   };
-  const store: any = (selector?: (s: any) => any) => selector ? selector(state) : state;
+  const store: any = (selector?: (s: any) => any) => (selector ? selector(state) : state);
   store.getState = () => state;
   store.setState = vi.fn();
   store.subscribe = vi.fn(() => vi.fn());
@@ -44,9 +46,15 @@ import { BottomPanel } from '../BottomPanel';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 
 // Helper: register a terminal panel (alwaysMount)
-const TerminalPanel = ({ projectId }: any) => <div data-testid="terminal-panel">Terminal:{projectId}</div>;
-const TerminalActions = ({ projectId }: any) => <div data-testid="terminal-actions">Actions:{projectId}</div>;
-const FileViewerPanel = ({ projectRoot }: any) => <div data-testid="fileviewer-panel">FileViewer:{projectRoot}</div>;
+const TerminalPanel = ({ projectId }: any) => (
+  <div data-testid="terminal-panel">Terminal:{projectId}</div>
+);
+const TerminalActions = ({ projectId }: any) => (
+  <div data-testid="terminal-actions">Actions:{projectId}</div>
+);
+const FileViewerPanel = ({ projectRoot }: any) => (
+  <div data-testid="fileviewer-panel">FileViewer:{projectRoot}</div>
+);
 const FileViewerActions = () => <div data-testid="fileviewer-actions">FileActions</div>;
 
 const mockTerminalOnClose = vi.fn();
@@ -111,23 +119,17 @@ describe('BottomPanel', () => {
   // ── Basic rendering ─────────────────────────────────────────────────────
 
   it('renders without crashing', () => {
-    const { container } = render(
-      <BottomPanel projectId="p1" projectRoot="/test" />
-    );
+    const { container } = render(<BottomPanel projectId="p1" projectRoot="/test" />);
     expect(container).toBeDefined();
   });
 
   it('returns null when no panels are registered', () => {
-    const { container } = render(
-      <BottomPanel projectId="p1" projectRoot="/test" />
-    );
+    const { container } = render(<BottomPanel projectId="p1" projectRoot="/test" />);
     expect(container.firstChild).toBeNull();
   });
 
   it('returns null when projectId is undefined and nothing is registered', () => {
-    const { container } = render(
-      <BottomPanel projectId={undefined} projectRoot={undefined} />
-    );
+    const { container } = render(<BottomPanel projectId={undefined} projectRoot={undefined} />);
     expect(container.firstChild).toBeNull();
   });
 

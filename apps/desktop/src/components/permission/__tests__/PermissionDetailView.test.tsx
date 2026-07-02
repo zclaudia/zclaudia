@@ -5,11 +5,15 @@ import { PermissionDetailView } from '../PermissionDetailView';
 // Mock llmProfileMetaStore
 const { mockProviderMetaStore } = vi.hoisted(() => {
   const state = {
-    providersByBackend: {}, providerCommands: {}, providerCapabilities: {},
-    setProviders: vi.fn(), getProviders: vi.fn().mockReturnValue([]),
-    setProviderCommands: vi.fn(), setProviderCapabilities: vi.fn(),
+    providersByBackend: {},
+    providerCommands: {},
+    providerCapabilities: {},
+    setProviders: vi.fn(),
+    getProviders: vi.fn().mockReturnValue([]),
+    setProviderCommands: vi.fn(),
+    setProviderCapabilities: vi.fn(),
   };
-  const store: any = (selector?: (s: any) => any) => selector ? selector(state) : state;
+  const store: any = (selector?: (s: any) => any) => (selector ? selector(state) : state);
   store.getState = () => state;
   store.setState = vi.fn();
   store.subscribe = vi.fn(() => vi.fn());
@@ -266,7 +270,9 @@ describe('PermissionDetailView', () => {
 
     it('uses custom maxHeightClass', () => {
       const detail = JSON.stringify({ command: 'ls' });
-      const { container } = render(<PermissionDetailView toolName="Bash" detail={detail} maxHeightClass="max-h-96" />);
+      const { container } = render(
+        <PermissionDetailView toolName="Bash" detail={detail} maxHeightClass="max-h-96" />
+      );
       expect(container.querySelector('.max-h-96')).toBeInTheDocument();
     });
   });

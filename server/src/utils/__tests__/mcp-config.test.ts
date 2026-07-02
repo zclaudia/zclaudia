@@ -45,7 +45,11 @@ describe('mcp-config', () => {
   });
 
   it('loads enabled MCP servers', () => {
-    db.prepare('INSERT INTO mcp_servers (name, command, enabled) VALUES (?, ?, ?)').run('test-server', 'node', 1);
+    db.prepare('INSERT INTO mcp_servers (name, command, enabled) VALUES (?, ?, ?)').run(
+      'test-server',
+      'node',
+      1
+    );
 
     const result = loadMcpServersFromDb(db);
     expect(result).toEqual({
@@ -54,43 +58,67 @@ describe('mcp-config', () => {
   });
 
   it('excludes disabled servers', () => {
-    db.prepare('INSERT INTO mcp_servers (name, command, enabled) VALUES (?, ?, ?)').run('disabled', 'node', 0);
+    db.prepare('INSERT INTO mcp_servers (name, command, enabled) VALUES (?, ?, ?)').run(
+      'disabled',
+      'node',
+      0
+    );
 
     const result = loadMcpServersFromDb(db);
     expect(result).toEqual({});
   });
 
   it('includes args when present', () => {
-    db.prepare('INSERT INTO mcp_servers (name, command, args, enabled) VALUES (?, ?, ?, ?)').run('s1', 'node', '["--inspect","server.js"]', 1);
+    db.prepare('INSERT INTO mcp_servers (name, command, args, enabled) VALUES (?, ?, ?, ?)').run(
+      's1',
+      'node',
+      '["--inspect","server.js"]',
+      1
+    );
 
     const result = loadMcpServersFromDb(db);
     expect(result['s1'].args).toEqual(['--inspect', 'server.js']);
   });
 
   it('includes env when present', () => {
-    db.prepare('INSERT INTO mcp_servers (name, command, env, enabled) VALUES (?, ?, ?, ?)').run('s1', 'node', '{"PORT":"3000"}', 1);
+    db.prepare('INSERT INTO mcp_servers (name, command, env, enabled) VALUES (?, ?, ?, ?)').run(
+      's1',
+      'node',
+      '{"PORT":"3000"}',
+      1
+    );
 
     const result = loadMcpServersFromDb(db);
     expect(result['s1'].env).toEqual({ PORT: '3000' });
   });
 
   it('filters by provider scope when providerType is given', () => {
-    db.prepare('INSERT INTO mcp_servers (name, command, provider_scope, enabled) VALUES (?, ?, ?, ?)').run('zclaudia-only', 'node', '["zclaudia"]', 1);
-    db.prepare('INSERT INTO mcp_servers (name, command, provider_scope, enabled) VALUES (?, ?, ?, ?)').run('other-only', 'node', '["other"]', 1);
+    db.prepare(
+      'INSERT INTO mcp_servers (name, command, provider_scope, enabled) VALUES (?, ?, ?, ?)'
+    ).run('zclaudia-only', 'node', '["zclaudia"]', 1);
+    db.prepare(
+      'INSERT INTO mcp_servers (name, command, provider_scope, enabled) VALUES (?, ?, ?, ?)'
+    ).run('other-only', 'node', '["other"]', 1);
 
     const result = loadMcpServersFromDb(db, 'zclaudia');
     expect(Object.keys(result)).toEqual(['zclaudia-only']);
   });
 
   it('includes servers with no scope regardless of providerType filter', () => {
-    db.prepare('INSERT INTO mcp_servers (name, command, enabled) VALUES (?, ?, ?)').run('universal', 'node', 1);
+    db.prepare('INSERT INTO mcp_servers (name, command, enabled) VALUES (?, ?, ?)').run(
+      'universal',
+      'node',
+      1
+    );
 
     const result = loadMcpServersFromDb(db, 'zclaudia');
     expect(Object.keys(result)).toEqual(['universal']);
   });
 
   it('includes servers when provider_scope JSON is invalid', () => {
-    db.prepare('INSERT INTO mcp_servers (name, command, provider_scope, enabled) VALUES (?, ?, ?, ?)').run('bad-scope', 'node', 'not-json', 1);
+    db.prepare(
+      'INSERT INTO mcp_servers (name, command, provider_scope, enabled) VALUES (?, ?, ?, ?)'
+    ).run('bad-scope', 'node', 'not-json', 1);
 
     const result = loadMcpServersFromDb(db, 'zclaudia');
     expect(Object.keys(result)).toEqual(['bad-scope']);
@@ -98,7 +126,11 @@ describe('mcp-config', () => {
 
   it('logs loaded servers when there are results', () => {
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    db.prepare('INSERT INTO mcp_servers (name, command, enabled) VALUES (?, ?, ?)').run('s1', 'node', 1);
+    db.prepare('INSERT INTO mcp_servers (name, command, enabled) VALUES (?, ?, ?)').run(
+      's1',
+      'node',
+      1
+    );
 
     loadMcpServersFromDb(db);
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Loaded 1 MCP server'));
@@ -107,7 +139,11 @@ describe('mcp-config', () => {
 
   it('logs with provider type when filtered', () => {
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    db.prepare('INSERT INTO mcp_servers (name, command, enabled) VALUES (?, ?, ?)').run('s1', 'node', 1);
+    db.prepare('INSERT INTO mcp_servers (name, command, enabled) VALUES (?, ?, ?)').run(
+      's1',
+      'node',
+      1
+    );
 
     loadMcpServersFromDb(db, 'zclaudia');
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('for zclaudia'));
@@ -115,11 +151,13 @@ describe('mcp-config', () => {
   });
 
   it('loads remote MCP server transport, headers, OAuth config, and credentials', () => {
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO mcp_servers (
         name, command, enabled, transport, url, headers, headers_helper, oauth_config, oauth_credentials
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    `
+    ).run(
       'remote',
       '',
       1,
@@ -128,7 +166,7 @@ describe('mcp-config', () => {
       '{"X-Zoom-Region":"us01"}',
       'node ./headers-helper.js',
       '{"enabled":true,"tokenEndpoint":"https://auth.example.com/token","clientId":"client","scopes":["repo"]}',
-      '{"accessToken":"access-token","tokenType":"Bearer"}',
+      '{"accessToken":"access-token","tokenType":"Bearer"}'
     );
 
     const result = loadMcpServersFromDb(db);
@@ -158,27 +196,31 @@ describe('mcp-config', () => {
       refreshToken: 'runtime-refresh-token',
       tokenType: 'Bearer',
     });
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO mcp_servers (
         name, command, enabled, transport, url, oauth_credentials
       ) VALUES (?, ?, ?, ?, ?, ?)
-    `).run(
+    `
+    ).run(
       'secure-remote',
       '',
       1,
       'streamable-http',
       'https://mcp.example.com/mcp',
-      protectedCredentials,
+      protectedCredentials
     );
 
     const result = loadMcpServersFromDb(db);
 
-    expect(result['secure-remote']).toEqual(expect.objectContaining({
-      oauthCredentials: expect.objectContaining({
-        accessToken: 'runtime-access-token',
-        refreshToken: 'runtime-refresh-token',
-        tokenType: 'Bearer',
-      }),
-    }));
+    expect(result['secure-remote']).toEqual(
+      expect.objectContaining({
+        oauthCredentials: expect.objectContaining({
+          accessToken: 'runtime-access-token',
+          refreshToken: 'runtime-refresh-token',
+          tokenType: 'Bearer',
+        }),
+      })
+    );
   });
 });

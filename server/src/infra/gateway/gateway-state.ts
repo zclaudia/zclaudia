@@ -33,13 +33,13 @@ export function createGatewayState({ db }: GatewayStateDeps): GatewayState {
     gatewaySecret: null,
     backendName: null,
     registerAsBackend: true,
-    discoveredBackends: []
+    discoveredBackends: [],
   };
 
-  let gatewayConnector: ((config: GatewayConfig) => Promise<void>) = async () => {
+  let gatewayConnector: (config: GatewayConfig) => Promise<void> = async () => {
     console.warn('[Gateway] Gateway connector not implemented');
   };
-  let gatewayDisconnector: (() => Promise<void>) = async () => {
+  let gatewayDisconnector: () => Promise<void> = async () => {
     console.warn('[Gateway] Gateway disconnector not implemented');
   };
 
@@ -54,7 +54,7 @@ export function createGatewayState({ db }: GatewayStateDeps): GatewayState {
       gatewaySecret: config.gatewaySecret,
       backendName: config.backendName,
       registerAsBackend: config.registerAsBackend !== false,
-      discoveredBackends: []
+      discoveredBackends: [],
     };
     await gatewayConnector(config);
   };
@@ -69,16 +69,18 @@ export function createGatewayState({ db }: GatewayStateDeps): GatewayState {
       gatewaySecret: null,
       backendName: null,
       registerAsBackend: true,
-      discoveredBackends: []
+      discoveredBackends: [],
     };
   };
 
   const updateGatewayBackendId = (backendId: string | null) => {
     gatewayStatus.gatewayBackendId = backendId;
     if (backendId) {
-      db.prepare(`
+      db.prepare(
+        `
         UPDATE gateway_config SET backend_id = ?, updated_at = ? WHERE id = 1
-      `).run(backendId, Date.now());
+      `
+      ).run(backendId, Date.now());
     }
   };
 

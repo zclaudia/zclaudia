@@ -7,7 +7,7 @@ export interface WorkflowTrigger {
   type: WorkflowTriggerType;
   cron?: string;
   intervalMinutes?: number;
-  onceAt?: number;            // epoch ms — for 'once' triggers
+  onceAt?: number; // epoch ms — for 'once' triggers
   event?: string;
   eventFilter?: Record<string, unknown>;
 }
@@ -60,7 +60,13 @@ export type WorkflowStepOnError = 'abort' | 'skip' | 'retry' | 'route';
 
 // ── Workflow Graph Model ──────────────────────────────────────
 
-export type WorkflowEdgeType = 'success' | 'error' | 'condition_true' | 'condition_false' | 'loop' | 'loop_exhausted';
+export type WorkflowEdgeType =
+  | 'success'
+  | 'error'
+  | 'condition_true'
+  | 'condition_false'
+  | 'loop'
+  | 'loop_exhausted';
 
 export interface WorkflowEdgeDef {
   id: string;
@@ -254,7 +260,13 @@ export interface WorkflowRun {
   error?: string;
 }
 
-export type WorkflowStepRunStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped' | 'waiting';
+export type WorkflowStepRunStatus =
+  | 'pending'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'skipped'
+  | 'waiting';
 
 export interface WorkflowStepRun {
   id: string;

@@ -7,10 +7,10 @@ import type {
   ProjectChange,
   SupervisionLogEvent,
 } from '@zclaudia/shared/features/supervision';
-import { ProjectChangeRepository } from './repositories/project-change.js';
-import { ChangeGateReviewRepository } from './repositories/change-gate-review.js';
-import { ChangeSyncRunRepository } from './repositories/change-sync-run.js';
-import { SupervisionTaskRepository } from './repositories/supervision-task.js';
+import { type ProjectChangeRepository } from './repositories/project-change.js';
+import { type ChangeGateReviewRepository } from './repositories/change-gate-review.js';
+import { type ChangeSyncRunRepository } from './repositories/change-sync-run.js';
+import { type SupervisionTaskRepository } from './repositories/supervision-task.js';
 import type { SupervisionProjectPort } from './ports.js';
 import type { ContextManager } from './context-manager.js';
 import {
@@ -28,7 +28,12 @@ export interface ChangeLifecycleDeps {
   gateReviewRepo: ChangeGateReviewRepository;
   syncRunRepo: ChangeSyncRunRepository;
   getContextManager: (projectId: string, rootPath: string) => ContextManager;
-  log: (projectId: string, event: SupervisionLogEvent, detail?: Record<string, unknown>, taskId?: string) => void;
+  log: (
+    projectId: string,
+    event: SupervisionLogEvent,
+    detail?: Record<string, unknown>,
+    taskId?: string
+  ) => void;
 }
 
 /** Reserved slug for the per-project Ad-hoc Change (C3 fallback bucket). */
@@ -68,7 +73,7 @@ export class ChangeLifecycle {
       nonGoals?: string[];
       scope?: string[];
       acceptanceCriteria?: string[];
-    },
+    }
   ): ProjectChange {
     const project = this.projectRepo.findById(projectId);
     if (!project?.rootPath) {
@@ -190,7 +195,11 @@ export class ChangeLifecycle {
     return updated;
   }
 
-  resolveExecutionGate(changeId: string, decision: ExecutionGateDecision, notes?: string): ProjectChange {
+  resolveExecutionGate(
+    changeId: string,
+    decision: ExecutionGateDecision,
+    notes?: string
+  ): ProjectChange {
     const change = this.requireChange(changeId);
     let updated: ProjectChange;
     if (decision === 'approve_execution') {
@@ -289,41 +298,61 @@ export class ChangeLifecycle {
     const latestSyncRun = this.syncRunRepo.findLatest(changeId);
     const now = new Date().toISOString();
 
-    manager.updateStructuredDocument(`changes/${change.id}/execution.md`, {
-      kind: 'execution',
-      changeId: change.id,
-      status: change.status,
-      designVersion: plan.designVersion,
-      updatedAt: now,
-    }, renderExecutionPlanMarkdown(change, plan, tasks));
+    manager.updateStructuredDocument(
+      `changes/${change.id}/execution.md`,
+      {
+        kind: 'execution',
+        changeId: change.id,
+        status: change.status,
+        designVersion: plan.designVersion,
+        updatedAt: now,
+      },
+      renderExecutionPlanMarkdown(change, plan, tasks)
+    );
 
-    manager.updateStructuredDocument(`changes/${change.id}/tasks.md`, {
-      kind: 'tasks',
-      changeId: change.id,
-      status: tasks.length > 0 ? 'planned' : 'draft',
-      updatedAt: now,
-      taskCount: tasks.length,
-    }, renderTasksMarkdown(change, tasks));
+    manager.updateStructuredDocument(
+      `changes/${change.id}/tasks.md`,
+      {
+        kind: 'tasks',
+        changeId: change.id,
+        status: tasks.length > 0 ? 'planned' : 'draft',
+        updatedAt: now,
+        taskCount: tasks.length,
+      },
+      renderTasksMarkdown(change, tasks)
+    );
 
-    manager.updateStructuredDocument(`changes/${change.id}/acceptance.md`, {
-      kind: 'acceptance',
-      changeId: change.id,
-      status: change.status === 'completed'
-        ? 'passed'
-        : change.status === 'syncing'
-          ? 'approved'
-          : change.status === 'accepting'
-            ? 'in_review'
-            : (tasks.length > 0 && tasks.every((t) => ['approved', 'integrated'].includes(t.status)) ? 'ready' : 'pending'),
-      updatedAt: now,
-    }, renderAcceptanceMarkdown(change, tasks));
+    manager.updateStructuredDocument(
+      `changes/${change.id}/acceptance.md`,
+      {
+        kind: 'acceptance',
+        changeId: change.id,
+        status:
+          change.status === 'completed'
+            ? 'passed'
+            : change.status === 'syncing'
+              ? 'approved'
+              : change.status === 'accepting'
+                ? 'in_review'
+                : tasks.length > 0 &&
+                    tasks.every(t => ['approved', 'integrated'].includes(t.status))
+                  ? 'ready'
+                  : 'pending',
+        updatedAt: now,
+      },
+      renderAcceptanceMarkdown(change, tasks)
+    );
 
-    manager.updateStructuredDocument(`changes/${change.id}/sync-log.md`, {
-      kind: 'sync-log',
-      changeId: change.id,
-      status: latestSyncRun?.status ?? (change.status === 'completed' ? 'applied' : 'draft'),
-      updatedAt: now,
-    }, renderSyncLogMarkdown(change, latestSyncRun?.summary ?? syncSummary));
+    manager.updateStructuredDocument(
+      `changes/${change.id}/sync-log.md`,
+      {
+        kind: 'sync-log',
+        changeId: change.id,
+        status: latestSyncRun?.status ?? (change.status === 'completed' ? 'applied' : 'draft'),
+        updatedAt: now,
+      },
+      renderSyncLogMarkdown(change, latestSyncRun?.summary ?? syncSummary)
+    );
   }
 
   // --- Helpers ---

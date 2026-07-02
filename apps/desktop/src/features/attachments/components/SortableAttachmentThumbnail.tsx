@@ -22,14 +22,9 @@ export function SortableAttachmentThumbnail({
   attachment,
   ...rest
 }: SortableAttachmentThumbnailProps) {
-  const {
-    setNodeRef,
-    attributes,
-    listeners,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: attachment.id });
+  const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({
+    id: attachment.id,
+  });
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -45,7 +40,7 @@ export function SortableAttachmentThumbnail({
       className="p-1 rounded-md bg-background/90 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing"
       aria-label={`Reorder ${attachment.name}`}
       data-testid="attachment-drag-handle"
-      onClick={(e) => e.stopPropagation()}
+      onClick={e => e.stopPropagation()}
     >
       <GripVertical className="w-3 h-3" />
     </button>

@@ -4,7 +4,7 @@ import {
   updateServerGatewayConfig,
   getServerGatewayStatus,
   connectServerToGateway,
-  disconnectServerFromGateway
+  disconnectServerFromGateway,
 } from '../../services/api';
 import type { ServerGatewayConfig as GatewayConfig, ServerGatewayStatus } from '@zclaudia/shared';
 import { useGatewayStore, shouldShowNonCurrentInstanceBackend } from '../../stores/gatewayStore';
@@ -27,7 +27,7 @@ export function ServerGatewayConfig() {
   const [proxyPassword, setProxyPassword] = useState('');
 
   const { showLocalBackend, setShowLocalBackend } = useGatewayStore();
-  const visibleDiscoveredBackends = (status?.discoveredBackends || []).filter((b) =>
+  const visibleDiscoveredBackends = (status?.discoveredBackends || []).filter(b =>
     shouldShowNonCurrentInstanceBackend(b, status?.instanceId || null, showLocalBackend)
   );
 
@@ -49,7 +49,7 @@ export function ServerGatewayConfig() {
       setLoading(true);
       const [configData, statusData] = await Promise.all([
         getServerGatewayConfig(),
-        getServerGatewayStatus()
+        getServerGatewayStatus(),
       ]);
 
       setConfig(configData);
@@ -118,7 +118,7 @@ export function ServerGatewayConfig() {
         enabled,
         gatewayUrl: gatewayUrl.trim(),
         backendName: backendName.trim(),
-        registerAsBackend
+        registerAsBackend,
       };
 
       // Only include secret if it's been changed
@@ -195,9 +195,7 @@ export function ServerGatewayConfig() {
   return (
     <div className="p-4 space-y-4">
       <div>
-        <h3 className="text-lg font-semibold mb-2 text-foreground">
-          Gateway Configuration
-        </h3>
+        <h3 className="text-lg font-semibold mb-2 text-foreground">Gateway Configuration</h3>
         <p className="text-sm text-muted-foreground mb-4">
           Connect your server to a Gateway for remote access and to discover other backends.
         </p>
@@ -219,8 +217,8 @@ export function ServerGatewayConfig() {
                 status.connected
                   ? 'bg-success/20 text-success'
                   : status.enabled
-                  ? 'bg-warning/20 text-warning'
-                  : 'bg-muted text-muted-foreground'
+                    ? 'bg-warning/20 text-warning'
+                    : 'bg-muted text-muted-foreground'
               }`}
             >
               {status.connected ? 'Connected' : status.enabled ? 'Connecting...' : 'Disabled'}
@@ -229,7 +227,9 @@ export function ServerGatewayConfig() {
           {status.gatewayBackendId && (
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-foreground">Gateway Backend ID:</span>
-              <span className="text-sm font-mono text-muted-foreground">{status.gatewayBackendId}</span>
+              <span className="text-sm font-mono text-muted-foreground">
+                {status.gatewayBackendId}
+              </span>
             </div>
           )}
         </div>
@@ -241,13 +241,17 @@ export function ServerGatewayConfig() {
           <h4 className="text-sm font-semibold text-foreground">
             Discovered Backends ({visibleDiscoveredBackends.length})
           </h4>
-          {visibleDiscoveredBackends.map((b) => (
+          {visibleDiscoveredBackends.map(b => (
             <div key={b.backendId} className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
-                <span className={`w-1.5 h-1.5 rounded-full ${b.online ? 'bg-success' : 'bg-muted-foreground'}`} />
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${b.online ? 'bg-success' : 'bg-muted-foreground'}`}
+                />
                 <span className="text-foreground">{b.name}</span>
                 {b.backendId === status?.gatewayBackendId && (
-                  <span className="px-1.5 py-0.5 bg-muted text-primary text-xs rounded-md">Local</span>
+                  <span className="px-1.5 py-0.5 bg-muted text-primary text-xs rounded-md">
+                    Local
+                  </span>
                 )}
               </div>
               <span className="text-xs text-muted-foreground font-mono">{b.backendId}</span>
@@ -258,9 +262,7 @@ export function ServerGatewayConfig() {
 
       {/* Enable/Disable Toggle */}
       <div className="flex items-center justify-between">
-        <label className="text-sm font-medium text-foreground">
-          Enable Gateway Connection
-        </label>
+        <label className="text-sm font-medium text-foreground">Enable Gateway Connection</label>
         <button
           type="button"
           onClick={() => setEnabled(!enabled)}
@@ -279,9 +281,7 @@ export function ServerGatewayConfig() {
       {/* Register as Backend Toggle */}
       <div className="flex items-center justify-between">
         <div>
-          <label className="text-sm font-medium text-foreground">
-            Register as Backend
-          </label>
+          <label className="text-sm font-medium text-foreground">Register as Backend</label>
           <p className="text-xs text-muted-foreground">
             Make this server available for other clients through the gateway
           </p>
@@ -306,9 +306,7 @@ export function ServerGatewayConfig() {
       {import.meta.env.DEV && (
         <div className="flex items-center justify-between">
           <div>
-            <label className="text-sm font-medium text-foreground">
-              Show Local Backend
-            </label>
+            <label className="text-sm font-medium text-foreground">Show Local Backend</label>
             <p className="text-xs text-muted-foreground">
               Dev only: show self in backend list for debugging
             </p>
@@ -332,13 +330,11 @@ export function ServerGatewayConfig() {
       {/* Configuration Fields */}
       <div className="space-y-3">
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">
-            Gateway URL
-          </label>
+          <label className="block text-sm font-medium text-foreground mb-1">Gateway URL</label>
           <input
             type="text"
             value={gatewayUrl}
-            onChange={(e) => setGatewayUrl(e.target.value)}
+            onChange={e => setGatewayUrl(e.target.value)}
             placeholder="http://gateway.example.com:3200"
             disabled={!enabled}
             className="w-full px-3 py-2 border border-border rounded-lg
@@ -350,13 +346,11 @@ export function ServerGatewayConfig() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">
-            Gateway Secret
-          </label>
+          <label className="block text-sm font-medium text-foreground mb-1">Gateway Secret</label>
           <input
             type="password"
             value={gatewaySecret}
-            onChange={(e) => setGatewaySecret(e.target.value)}
+            onChange={e => setGatewaySecret(e.target.value)}
             placeholder={config?.gatewaySecret ? '********' : 'Enter gateway secret'}
             disabled={!enabled}
             className="w-full px-3 py-2 border border-border rounded-lg
@@ -365,19 +359,15 @@ export function ServerGatewayConfig() {
                      focus:ring-2 focus:ring-primary focus:border-transparent
                      disabled:opacity-50 disabled:cursor-not-allowed"
           />
-          <p className="text-xs text-muted-foreground mt-1">
-            Leave blank to keep existing secret
-          </p>
+          <p className="text-xs text-muted-foreground mt-1">Leave blank to keep existing secret</p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">
-            Backend Name
-          </label>
+          <label className="block text-sm font-medium text-foreground mb-1">Backend Name</label>
           <input
             type="text"
             value={backendName}
-            onChange={(e) => setBackendName(e.target.value)}
+            onChange={e => setBackendName(e.target.value)}
             placeholder="My Mac"
             disabled={!enabled}
             className="w-full px-3 py-2 border border-border rounded-lg
@@ -393,19 +383,15 @@ export function ServerGatewayConfig() {
 
         {/* Proxy Settings */}
         <div className="pt-4 border-t border-border">
-          <h4 className="text-sm font-semibold text-foreground mb-3">
-            SOCKS5 Proxy (Optional)
-          </h4>
+          <h4 className="text-sm font-semibold text-foreground mb-3">SOCKS5 Proxy (Optional)</h4>
 
           <div className="space-y-3">
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">
-                Proxy URL
-              </label>
+              <label className="block text-sm font-medium text-foreground mb-1">Proxy URL</label>
               <input
                 type="text"
                 value={proxyUrl}
-                onChange={(e) => setProxyUrl(e.target.value)}
+                onChange={e => setProxyUrl(e.target.value)}
                 placeholder="socks5://127.0.0.1:1080"
                 disabled={!enabled}
                 data-testid="proxy-url-input"
@@ -429,7 +415,7 @@ export function ServerGatewayConfig() {
                   <input
                     type="text"
                     value={proxyUsername}
-                    onChange={(e) => setProxyUsername(e.target.value)}
+                    onChange={e => setProxyUsername(e.target.value)}
                     placeholder="Optional"
                     disabled={!enabled}
                     data-testid="proxy-username-input"
@@ -448,7 +434,7 @@ export function ServerGatewayConfig() {
                   <input
                     type="password"
                     value={proxyPassword}
-                    onChange={(e) => setProxyPassword(e.target.value)}
+                    onChange={e => setProxyPassword(e.target.value)}
                     placeholder={config?.proxyPassword ? '********' : 'Optional'}
                     disabled={!enabled}
                     data-testid="proxy-password-input"

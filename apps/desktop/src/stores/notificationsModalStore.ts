@@ -13,9 +13,9 @@ interface NotificationsModalState {
   toggle: () => void;
 }
 
-export const useNotificationsModalStore = create<NotificationsModalState>((set) => ({
+export const useNotificationsModalStore = create<NotificationsModalState>(set => ({
   isOpen: false,
   open: () => set({ isOpen: true }),
   close: () => set({ isOpen: false }),
-  toggle: () => set((s) => ({ isOpen: !s.isOpen })),
+  toggle: () => set(s => ({ isOpen: !s.isOpen })),
 }));

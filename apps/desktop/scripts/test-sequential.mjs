@@ -30,10 +30,7 @@ const CONFIGS = [
       'src/services/terminal/**/*.test.ts',
       'src/plugins/__tests__/builtinPanels.test.ts',
     ],
-    exclude: [
-      '**/node_modules/**',
-      '**/src-tauri/**',
-    ],
+    exclude: ['**/node_modules/**', '**/src-tauri/**'],
   },
   {
     name: 'hooks',
@@ -52,10 +49,7 @@ const CONFIGS = [
       'src/hooks/__tests__/useAgentForSession.test.ts',
       'src/hooks/chat/__tests__/useProviderCapabilities.test.ts',
     ],
-    exclude: [
-      '**/node_modules/**',
-      '**/src-tauri/**',
-    ],
+    exclude: ['**/node_modules/**', '**/src-tauri/**'],
   },
   {
     name: 'ui',
@@ -131,7 +125,7 @@ function globToRegex(glob) {
 }
 
 function matchesAny(patterns, value) {
-  return patterns.some((pattern) => globToRegex(pattern).test(value));
+  return patterns.some(pattern => globToRegex(pattern).test(value));
 }
 
 function isPathFilter(arg) {
@@ -141,14 +135,14 @@ function isPathFilter(arg) {
 function shouldRunConfig(config, pathFilters) {
   if (pathFilters.length === 0) return true;
 
-  return pathFilters.some((filterPath) => (
-    matchesAny(config.include, filterPath) && !matchesAny(config.exclude, filterPath)
-  ));
+  return pathFilters.some(
+    filterPath => matchesAny(config.include, filterPath) && !matchesAny(config.exclude, filterPath)
+  );
 }
 
 const forwardedArgs = process.argv.slice(2).map(normalizeArg);
 const pathFilters = forwardedArgs.filter(isPathFilter);
-const configsToRun = CONFIGS.filter((config) => shouldRunConfig(config, pathFilters));
+const configsToRun = CONFIGS.filter(config => shouldRunConfig(config, pathFilters));
 
 if (configsToRun.length === 0) {
   console.error('No matching Vitest config found for the provided filters.');
@@ -157,13 +151,17 @@ if (configsToRun.length === 0) {
 
 for (const config of configsToRun) {
   const result = spawnSync(
-    process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm',
-    ['exec', 'vitest', 'run', '--config', config.file, ...forwardedArgs],
+    process.platform === 'win32' ? 'corepack.cmd' : 'corepack',
+    ['pnpm', 'exec', 'vitest', 'run', '--config', config.file, ...forwardedArgs],
     {
       cwd: projectRoot,
       stdio: 'inherit',
     }
   );
+
+  if (result.error) {
+    console.error(`[test-sequential] Failed to start ${config.name} test command:`, result.error);
+  }
 
   if (result.status !== 0) {
     process.exit(result.status ?? 1);

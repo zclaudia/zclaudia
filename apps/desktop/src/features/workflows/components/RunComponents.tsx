@@ -3,7 +3,16 @@
  * Used by both WorkflowRunViewer (Zustand-based) and the automations runs view (direct API).
  */
 import { useState } from 'react';
-import { CheckCircle2, XCircle, Loader2, SkipForward, Pause, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  SkipForward,
+  Pause,
+  Clock,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react';
 import type { WorkflowStepRun } from '@zclaudia/shared';
 
 export function StepStatusIcon({ status }: { status: string }) {
@@ -45,13 +54,19 @@ export function RunStatusBadge({ status }: { status: string }) {
   };
 
   return (
-    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${colors[status] ?? colors.pending}`}>
+    <span
+      className={`text-xs font-medium px-2 py-0.5 rounded-full ${colors[status] ?? colors.pending}`}
+    >
       {status}
     </span>
   );
 }
 
-export function StepRunCard({ stepRun, onApprove, onReject }: {
+export function StepRunCard({
+  stepRun,
+  onApprove,
+  onReject,
+}: {
   stepRun: WorkflowStepRun;
   onApprove?: (stepRunId: string) => void;
   onReject?: (stepRunId: string) => void;

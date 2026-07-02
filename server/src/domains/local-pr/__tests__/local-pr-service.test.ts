@@ -55,7 +55,10 @@ import type { LocalPRAIDeps } from '../service.js';
 import { LocalPRRepository } from '../repository.js';
 import type { LocalPR } from '@zclaudia/shared/features/local-pr';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
-import { createAgentProfilesTable, seedDefaultAgent } from '../../../test-helpers/seed-default-agent.js';
+import {
+  createAgentProfilesTable,
+  seedDefaultAgent,
+} from '../../../test-helpers/seed-default-agent.js';
 
 function createAIDeps(overrides?: Partial<LocalPRAIDeps>): LocalPRAIDeps {
   return {
@@ -175,20 +178,25 @@ function createTestDb(): Database.Database {
   return db;
 }
 
-function createTestProject(db: Database.Database, overrides: Partial<{
-  id: string;
-  name: string;
-  rootPath: string;
-  defaultAgentProfileId: string;
-  reviewLlmProfileId: string;
-}> = {}): string {
+function createTestProject(
+  db: Database.Database,
+  overrides: Partial<{
+    id: string;
+    name: string;
+    rootPath: string;
+    defaultAgentProfileId: string;
+    reviewLlmProfileId: string;
+  }> = {}
+): string {
   const id = overrides.id || `test-project-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const now = Date.now();
-  const rootPath = 'rootPath' in overrides ? (overrides.rootPath || null) : '/test/root';
-  db.prepare(`
+  const rootPath = 'rootPath' in overrides ? overrides.rootPath || null : '/test/root';
+  db.prepare(
+    `
     INSERT OR REPLACE INTO projects (id, name, type, default_agent_profile_id, root_path, created_at, updated_at)
     VALUES (?, ?, 'code', ?, ?, ?, ?)
-  `).run(
+  `
+  ).run(
     id,
     overrides.name || 'Test Project',
     overrides.defaultAgentProfileId || 'test-provider',
@@ -201,10 +209,12 @@ function createTestProject(db: Database.Database, overrides: Partial<{
 
 function createTestProvider(db: Database.Database, id = 'test-provider'): void {
   const now = Date.now();
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO llm_profiles (id, name, provider_type, is_default, created_at, updated_at)
     VALUES (?, 'Test Provider', 'anthropic', 1, ?, ?)
-  `).run(id, now, now);
+  `
+  ).run(id, now, now);
 }
 
 function createTestLocalPR(
@@ -214,14 +224,16 @@ function createTestLocalPR(
 ): LocalPR {
   const now = Date.now();
   const id = overrides.id || `pr-${now}-${Math.random().toString(36).slice(2, 8)}`;
-  db.prepare(`
+  db.prepare(
+    `
     INSERT OR REPLACE INTO local_prs (
       id, project_id, worktree_path, branch_name, base_branch, title,
       description, status, commits, diff_summary, auto_triggered, auto_review,
       created_at, updated_at
     )
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
+  `
+  ).run(
     id,
     projectId,
     overrides.worktreePath || '/test/worktree',
@@ -429,20 +441,28 @@ describe('LocalPRService', () => {
 
       // Create sessions
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, 'test', ?, ?)
-      `).run('session-review-1', projectId, now, now);
-      db.prepare(`
+      `
+      ).run('session-review-1', projectId, now, now);
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, 'test', ?, ?)
-      `).run('session-conflict-1', projectId, now, now);
+      `
+      ).run('session-conflict-1', projectId, now, now);
 
       (service as any).archiveRelatedSessions(pr);
 
       // Check sessions are archived
-      const reviewSession = db.prepare('SELECT archived_at FROM sessions WHERE id = ?').get('session-review-1') as { archived_at: number | null };
-      const conflictSession = db.prepare('SELECT archived_at FROM sessions WHERE id = ?').get('session-conflict-1') as { archived_at: number | null };
+      const reviewSession = db
+        .prepare('SELECT archived_at FROM sessions WHERE id = ?')
+        .get('session-review-1') as { archived_at: number | null };
+      const conflictSession = db
+        .prepare('SELECT archived_at FROM sessions WHERE id = ?')
+        .get('session-conflict-1') as { archived_at: number | null };
 
       expect(reviewSession.archived_at).toBeTruthy();
       expect(conflictSession.archived_at).toBeTruthy();
@@ -510,12 +530,15 @@ describe('LocalPRService', () => {
         throw new Error('provider unavailable');
       });
 
-      await expect((service as any).startConflictResolution(pr.id, 'conflict-provider'))
-        .rejects.toThrow('provider unavailable');
+      await expect(
+        (service as any).startConflictResolution(pr.id, 'conflict-provider')
+      ).rejects.toThrow('provider unavailable');
 
       expect((service as any).activeConflictIds.has(pr.id)).toBe(false);
       const updated = service.getRepo().findById(pr.id);
-      expect(updated?.statusMessage).toContain('Failed to start AI conflict resolution: provider unavailable');
+      expect(updated?.statusMessage).toContain(
+        'Failed to start AI conflict resolution: provider unavailable'
+      );
       expect(mockBroadcast).toHaveBeenCalledWith(
         projectId,
         expect.objectContaining({
@@ -564,7 +587,9 @@ describe('LocalPRService', () => {
       // Create project with explicit null rootPath
       const projId = `proj-noroot-${Date.now()}`;
       const now = Date.now();
-      db.prepare(`INSERT INTO projects (id, name, type, default_agent_profile_id, root_path, created_at, updated_at) VALUES (?, 'No Root', 'code', 'test-provider', NULL, ?, ?)`).run(projId, now, now);
+      db.prepare(
+        `INSERT INTO projects (id, name, type, default_agent_profile_id, root_path, created_at, updated_at) VALUES (?, 'No Root', 'code', 'test-provider', NULL, ?, ?)`
+      ).run(projId, now, now);
       await expect(service.createPR(projId, '/test/wt')).rejects.toThrow('has no rootPath');
     });
 
@@ -573,7 +598,9 @@ describe('LocalPRService', () => {
       const wt = `/test/wt-dup-${Date.now()}`;
       createTestLocalPR(db, projectId, { worktreePath: wt, status: 'open' });
 
-      await expect(service.createPR(projectId, wt)).rejects.toThrow('active local PR already exists');
+      await expect(service.createPR(projectId, wt)).rejects.toThrow(
+        'active local PR already exists'
+      );
     });
 
     it('throws when on base branch', async () => {
@@ -673,10 +700,12 @@ describe('LocalPRService', () => {
       const projectId = createTestProject(db, { rootPath: '/test/root' });
       // Insert worktree config
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO worktree_configs (id, project_id, worktree_path, auto_create_pr, auto_review, created_at, updated_at)
         VALUES (?, ?, ?, 1, 0, ?, ?)
-      `).run(`wc-${now}`, projectId, '/test/wt-auto', now, now);
+      `
+      ).run(`wc-${now}`, projectId, '/test/wt-auto', now, now);
 
       const result = await service.maybeAutoCreatePR(projectId, '/test/wt-auto');
       expect(result).toBeNull();
@@ -693,7 +722,10 @@ describe('LocalPRService', () => {
     });
 
     it('starts review session for valid PR', async () => {
-      const projectId = createTestProject(db, { rootPath: '/test/root', defaultAgentProfileId: 'test-provider' });
+      const projectId = createTestProject(db, {
+        rootPath: '/test/root',
+        defaultAgentProfileId: 'test-provider',
+      });
       const pr = createTestLocalPR(db, projectId, {
         worktreePath: `/test/wt-review-${Date.now()}`,
         status: 'open',
@@ -713,10 +745,13 @@ describe('LocalPRService', () => {
       const slotsService = new LocalPRService(
         db,
         mockBroadcast,
-        createAIDeps({ isProjectSlotAvailable: () => false }),
+        createAIDeps({ isProjectSlotAvailable: () => false })
       );
 
-      const projectId = createTestProject(db, { rootPath: '/test/root', defaultAgentProfileId: 'test-provider' });
+      const projectId = createTestProject(db, {
+        rootPath: '/test/root',
+        defaultAgentProfileId: 'test-provider',
+      });
       const pr = createTestLocalPR(db, projectId, {
         worktreePath: `/test/wt-queue-${Date.now()}`,
         status: 'open',
@@ -730,7 +765,10 @@ describe('LocalPRService', () => {
     });
 
     it('skips when review already in progress', async () => {
-      const projectId = createTestProject(db, { rootPath: '/test/root', defaultAgentProfileId: 'test-provider' });
+      const projectId = createTestProject(db, {
+        rootPath: '/test/root',
+        defaultAgentProfileId: 'test-provider',
+      });
       const pr = createTestLocalPR(db, projectId, {
         worktreePath: `/test/wt-dup-review-${Date.now()}`,
         status: 'open',
@@ -803,7 +841,7 @@ describe('LocalPRService', () => {
       const slotsService = new LocalPRService(
         db,
         mockBroadcast,
-        createAIDeps({ isProjectSlotAvailable: () => false }),
+        createAIDeps({ isProjectSlotAvailable: () => false })
       );
 
       const projectId = createTestProject(db, { rootPath: '/test/root' });
@@ -835,7 +873,9 @@ describe('LocalPRService', () => {
         status: 'open',
       });
 
-      await expect(service.cancelMerge(pr.id)).rejects.toThrow("Cannot cancel merge in status 'open'");
+      await expect(service.cancelMerge(pr.id)).rejects.toThrow(
+        "Cannot cancel merge in status 'open'"
+      );
     });
 
     it('cancels a merging PR', async () => {
@@ -868,7 +908,11 @@ describe('LocalPRService', () => {
     });
 
     it('skips undefined and duplicate ids', () => {
-      const result = (service as any).resolveAvailableProviderId(undefined, undefined, 'test-provider');
+      const result = (service as any).resolveAvailableProviderId(
+        undefined,
+        undefined,
+        'test-provider'
+      );
       expect(result).toBe('test-provider');
     });
 
@@ -900,12 +944,24 @@ describe('LocalPRService', () => {
     });
 
     it('returns value from callback', () => {
-      const slotsService = new LocalPRService(db, mockBroadcast, createAIDeps({ isProjectSlotAvailable: () => false }));
+      const slotsService = new LocalPRService(
+        db,
+        mockBroadcast,
+        createAIDeps({ isProjectSlotAvailable: () => false })
+      );
       expect((slotsService as any).hasAvailableSlot('any-project')).toBe(false);
     });
 
     it('returns true when callback throws (fail-open)', () => {
-      const slotsService = new LocalPRService(db, mockBroadcast, createAIDeps({ isProjectSlotAvailable: () => { throw new Error('probe error'); } }));
+      const slotsService = new LocalPRService(
+        db,
+        mockBroadcast,
+        createAIDeps({
+          isProjectSlotAvailable: () => {
+            throw new Error('probe error');
+          },
+        })
+      );
       expect((slotsService as any).hasAvailableSlot('any-project')).toBe(true);
     });
   });
@@ -929,8 +985,12 @@ describe('LocalPRService', () => {
       const projectId = createTestProject(db);
       const now = Date.now();
 
-      db.prepare('INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)').run('del-s1', projectId, 'Rev', now, now);
-      db.prepare('INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)').run('del-s2', projectId, 'Conflict', now, now);
+      db.prepare(
+        'INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
+      ).run('del-s1', projectId, 'Rev', now, now);
+      db.prepare(
+        'INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
+      ).run('del-s2', projectId, 'Conflict', now, now);
 
       const pr = createTestLocalPR(db, projectId, {
         reviewSessionId: 'del-s1',
@@ -978,8 +1038,9 @@ describe('LocalPRService', () => {
 
   describe('triggerConflictResolution', () => {
     it('throws when PR not found', async () => {
-      await expect(service.triggerConflictResolution('nonexistent'))
-        .rejects.toThrow('Local PR not found');
+      await expect(service.triggerConflictResolution('nonexistent')).rejects.toThrow(
+        'Local PR not found'
+      );
     });
 
     it('throws when PR is not in conflict status', async () => {
@@ -989,8 +1050,9 @@ describe('LocalPRService', () => {
         status: 'open',
       });
 
-      await expect(service.triggerConflictResolution(pr.id))
-        .rejects.toThrow("Cannot resolve conflict in status 'open'");
+      await expect(service.triggerConflictResolution(pr.id)).rejects.toThrow(
+        "Cannot resolve conflict in status 'open'"
+      );
     });
   });
 
@@ -1000,8 +1062,7 @@ describe('LocalPRService', () => {
 
   describe('revertMergedPR', () => {
     it('throws when PR not found', async () => {
-      await expect(service.revertMergedPR('nonexistent'))
-        .rejects.toThrow('Local PR not found');
+      await expect(service.revertMergedPR('nonexistent')).rejects.toThrow('Local PR not found');
     });
 
     it('throws when PR is not merged', async () => {
@@ -1011,8 +1072,9 @@ describe('LocalPRService', () => {
         status: 'open',
       });
 
-      await expect(service.revertMergedPR(pr.id))
-        .rejects.toThrow("Cannot revert PR in status 'open'");
+      await expect(service.revertMergedPR(pr.id)).rejects.toThrow(
+        "Cannot revert PR in status 'open'"
+      );
     });
 
     it('throws when main worktree is dirty', async () => {
@@ -1025,25 +1087,28 @@ describe('LocalPRService', () => {
         mergeCommitSha: 'abc123def',
       });
       // Set status to merged in DB (createTestLocalPR doesn't set merged_commit_sha)
-      db.prepare('UPDATE local_prs SET status = ?, merged_commit_sha = ? WHERE id = ?')
-        .run('merged', 'abc123def', pr.id);
+      db.prepare('UPDATE local_prs SET status = ?, merged_commit_sha = ? WHERE id = ?').run(
+        'merged',
+        'abc123def',
+        pr.id
+      );
 
-      await expect(service.revertMergedPR(pr.id))
-        .rejects.toThrow('Main worktree is dirty');
+      await expect(service.revertMergedPR(pr.id)).rejects.toThrow('Main worktree is dirty');
     });
 
     it('throws when project has no rootPath', async () => {
       const projId = `proj-norp-revert-${Date.now()}`;
       const now = Date.now();
-      db.prepare(`INSERT INTO projects (id, name, type, default_agent_profile_id, root_path, created_at, updated_at) VALUES (?, 'No Root', 'code', 'test-provider', NULL, ?, ?)`).run(projId, now, now);
+      db.prepare(
+        `INSERT INTO projects (id, name, type, default_agent_profile_id, root_path, created_at, updated_at) VALUES (?, 'No Root', 'code', 'test-provider', NULL, ?, ?)`
+      ).run(projId, now, now);
       const pr = createTestLocalPR(db, projId, {
         worktreePath: `/test/wt-revert-norp-${Date.now()}`,
         status: 'merged',
       });
       db.prepare('UPDATE local_prs SET status = ? WHERE id = ?').run('merged', pr.id);
 
-      await expect(service.revertMergedPR(pr.id))
-        .rejects.toThrow('has no rootPath');
+      await expect(service.revertMergedPR(pr.id)).rejects.toThrow('has no rootPath');
     });
   });
 
@@ -1063,13 +1128,21 @@ describe('LocalPRService', () => {
       // Insert a review session
       const sessionId = `session-review-pass-${Date.now()}`;
       const now = Date.now();
-      db.prepare('INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
-        .run(sessionId, projectId, 'Review', now, now);
+      db.prepare(
+        'INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
+      ).run(sessionId, projectId, 'Review', now, now);
       db.prepare('UPDATE local_prs SET review_session_id = ? WHERE id = ?').run(sessionId, pr.id);
 
       // Insert assistant message with REVIEW_PASSED
-      db.prepare('INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)')
-        .run(`msg-pass-${Date.now()}`, sessionId, 'assistant', 'Everything looks good. [REVIEW_PASSED]', now);
+      db.prepare(
+        'INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)'
+      ).run(
+        `msg-pass-${Date.now()}`,
+        sessionId,
+        'assistant',
+        'Everything looks good. [REVIEW_PASSED]',
+        now
+      );
 
       await (service as any).onReviewSessionComplete(pr.id, sessionId, false);
 
@@ -1088,11 +1161,19 @@ describe('LocalPRService', () => {
 
       const sessionId = `session-review-fail-${Date.now()}`;
       const now = Date.now();
-      db.prepare('INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
-        .run(sessionId, projectId, 'Review', now, now);
+      db.prepare(
+        'INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
+      ).run(sessionId, projectId, 'Review', now, now);
 
-      db.prepare('INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)')
-        .run(`msg-fail-${Date.now()}`, sessionId, 'assistant', 'Critical bug found. [REVIEW_FAILED]', now);
+      db.prepare(
+        'INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)'
+      ).run(
+        `msg-fail-${Date.now()}`,
+        sessionId,
+        'assistant',
+        'Critical bug found. [REVIEW_FAILED]',
+        now
+      );
 
       await (service as any).onReviewSessionComplete(pr.id, sessionId, false);
 
@@ -1111,11 +1192,19 @@ describe('LocalPRService', () => {
 
       const sessionId = `session-nomarker-${Date.now()}`;
       const now = Date.now();
-      db.prepare('INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
-        .run(sessionId, projectId, 'Review', now, now);
+      db.prepare(
+        'INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
+      ).run(sessionId, projectId, 'Review', now, now);
 
-      db.prepare('INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)')
-        .run(`msg-nomarker-${Date.now()}`, sessionId, 'assistant', 'Code looks fine, no issues found.', now);
+      db.prepare(
+        'INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)'
+      ).run(
+        `msg-nomarker-${Date.now()}`,
+        sessionId,
+        'assistant',
+        'Code looks fine, no issues found.',
+        now
+      );
 
       await (service as any).onReviewSessionComplete(pr.id, sessionId, false);
 
@@ -1133,11 +1222,13 @@ describe('LocalPRService', () => {
 
       const sessionId = `session-runfail-${Date.now()}`;
       const now = Date.now();
-      db.prepare('INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
-        .run(sessionId, projectId, 'Review', now, now);
+      db.prepare(
+        'INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
+      ).run(sessionId, projectId, 'Review', now, now);
 
-      db.prepare('INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)')
-        .run(`msg-runfail-${Date.now()}`, sessionId, 'assistant', 'Looking at the code...', now);
+      db.prepare(
+        'INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)'
+      ).run(`msg-runfail-${Date.now()}`, sessionId, 'assistant', 'Looking at the code...', now);
 
       await (service as any).onReviewSessionComplete(pr.id, sessionId, true);
 
@@ -1159,11 +1250,19 @@ describe('LocalPRService', () => {
 
       const sessionId = `session-commitfail-${Date.now()}`;
       const now = Date.now();
-      db.prepare('INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
-        .run(sessionId, projectId, 'Review', now, now);
+      db.prepare(
+        'INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
+      ).run(sessionId, projectId, 'Review', now, now);
 
-      db.prepare('INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)')
-        .run(`msg-commitfail-${Date.now()}`, sessionId, 'assistant', 'All good. [REVIEW_PASSED]', now);
+      db.prepare(
+        'INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)'
+      ).run(
+        `msg-commitfail-${Date.now()}`,
+        sessionId,
+        'assistant',
+        'All good. [REVIEW_PASSED]',
+        now
+      );
 
       await (service as any).onReviewSessionComplete(pr.id, sessionId, false);
 
@@ -1202,11 +1301,19 @@ describe('LocalPRService', () => {
 
       const sessionId = `session-conflict-resolved-${Date.now()}`;
       const now = Date.now();
-      db.prepare('INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
-        .run(sessionId, projectId, 'Conflict', now, now);
+      db.prepare(
+        'INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
+      ).run(sessionId, projectId, 'Conflict', now, now);
 
-      db.prepare('INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)')
-        .run(`msg-resolved-${Date.now()}`, sessionId, 'assistant', 'Rebase completed. [CONFLICT_RESOLVED]', now);
+      db.prepare(
+        'INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)'
+      ).run(
+        `msg-resolved-${Date.now()}`,
+        sessionId,
+        'assistant',
+        'Rebase completed. [CONFLICT_RESOLVED]',
+        now
+      );
 
       await (service as any).onConflictSessionComplete(pr.id, sessionId);
 
@@ -1225,11 +1332,19 @@ describe('LocalPRService', () => {
 
       const sessionId = `session-conflict-unresolved-${Date.now()}`;
       const now = Date.now();
-      db.prepare('INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
-        .run(sessionId, projectId, 'Conflict', now, now);
+      db.prepare(
+        'INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
+      ).run(sessionId, projectId, 'Conflict', now, now);
 
-      db.prepare('INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)')
-        .run(`msg-unresolved-${Date.now()}`, sessionId, 'assistant', 'Could not resolve. [CONFLICT_UNRESOLVED]', now);
+      db.prepare(
+        'INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)'
+      ).run(
+        `msg-unresolved-${Date.now()}`,
+        sessionId,
+        'assistant',
+        'Could not resolve. [CONFLICT_UNRESOLVED]',
+        now
+      );
 
       await (service as any).onConflictSessionComplete(pr.id, sessionId);
 
@@ -1302,7 +1417,11 @@ describe('LocalPRService', () => {
       const freshPR = service.getRepo().findById(pr.id)!;
 
       const result = await (service as any).maybeRefreshPR(
-        freshPR, '/test/root', [{ sha: 'new123', message: 'new' }], 'main', 'feature'
+        freshPR,
+        '/test/root',
+        [{ sha: 'new123', message: 'new' }],
+        'main',
+        'feature'
       );
       expect(result).toBeNull();
     });
@@ -1316,7 +1435,11 @@ describe('LocalPRService', () => {
       });
 
       const result = await (service as any).maybeRefreshPR(
-        pr, '/test/root', [{ sha: 'abc123', message: 'test' }], 'main', 'feature'
+        pr,
+        '/test/root',
+        [{ sha: 'abc123', message: 'test' }],
+        'main',
+        'feature'
       );
       expect(result).toBeNull();
     });
@@ -1332,7 +1455,14 @@ describe('LocalPRService', () => {
       mockGetDiff.mockResolvedValueOnce('new diff content');
 
       const result = await (service as any).maybeRefreshPR(
-        pr, '/test/root', [{ sha: 'abc123', message: 'test' }, { sha: 'def456', message: 'test2' }], 'main', 'feature'
+        pr,
+        '/test/root',
+        [
+          { sha: 'abc123', message: 'test' },
+          { sha: 'def456', message: 'test2' },
+        ],
+        'main',
+        'feature'
       );
       expect(result).not.toBeNull();
       expect(result.commits).toEqual(['abc123', 'def456']);
@@ -1351,7 +1481,11 @@ describe('LocalPRService', () => {
       mockGetDiff.mockResolvedValueOnce('new diff');
 
       const result = await (service as any).maybeRefreshPR(
-        freshPR, '/test/root', [{ sha: 'new456', message: 'new' }], 'main', 'feature'
+        freshPR,
+        '/test/root',
+        [{ sha: 'new456', message: 'new' }],
+        'main',
+        'feature'
       );
       expect(result?.status).toBe('open');
     });
@@ -1369,7 +1503,11 @@ describe('LocalPRService', () => {
       mockGetDiff.mockResolvedValueOnce('new diff');
 
       const result = await (service as any).maybeRefreshPR(
-        freshPR, '/test/root', [{ sha: 'new456', message: 'new' }], 'main', 'feature',
+        freshPR,
+        '/test/root',
+        [{ sha: 'new456', message: 'new' }],
+        'main',
+        'feature',
         { resetReviewStateOnCommitChange: false }
       );
       expect(result?.status).toBe('approved');
@@ -1389,8 +1527,11 @@ describe('LocalPRService', () => {
       });
       // Set updated_at to 31 minutes ago (beyond STALE_TIMEOUT_MS of 30 min)
       const staleTime = Date.now() - 31 * 60 * 1000;
-      db.prepare('UPDATE local_prs SET status = ?, updated_at = ? WHERE id = ?')
-        .run('reviewing', staleTime, pr.id);
+      db.prepare('UPDATE local_prs SET status = ?, updated_at = ? WHERE id = ?').run(
+        'reviewing',
+        staleTime,
+        pr.id
+      );
 
       await (service as any).processStale();
 
@@ -1406,8 +1547,11 @@ describe('LocalPRService', () => {
         status: 'merging',
       });
       const staleTime = Date.now() - 31 * 60 * 1000;
-      db.prepare('UPDATE local_prs SET status = ?, updated_at = ? WHERE id = ?')
-        .run('merging', staleTime, pr.id);
+      db.prepare('UPDATE local_prs SET status = ?, updated_at = ? WHERE id = ?').run(
+        'merging',
+        staleTime,
+        pr.id
+      );
 
       await (service as any).processStale();
 
@@ -1436,13 +1580,19 @@ describe('LocalPRService', () => {
 
   describe('processQueue', () => {
     it('starts queued review when slot available', async () => {
-      const projectId = createTestProject(db, { rootPath: '/test/root', defaultAgentProfileId: 'test-provider' });
+      const projectId = createTestProject(db, {
+        rootPath: '/test/root',
+        defaultAgentProfileId: 'test-provider',
+      });
       const pr = createTestLocalPR(db, projectId, {
         worktreePath: `/test/wt-queue-review-${Date.now()}`,
         status: 'open',
       });
-      db.prepare('UPDATE local_prs SET execution_state = ?, pending_action = ? WHERE id = ?')
-        .run('queued', 'review', pr.id);
+      db.prepare('UPDATE local_prs SET execution_state = ?, pending_action = ? WHERE id = ?').run(
+        'queued',
+        'review',
+        pr.id
+      );
 
       await (service as any).processQueue();
 
@@ -1450,14 +1600,24 @@ describe('LocalPRService', () => {
     });
 
     it('skips queued PR when no slot available', async () => {
-      const noSlotService = new LocalPRService(db, mockBroadcast, createAIDeps({ isProjectSlotAvailable: () => false }));
-      const projectId = createTestProject(db, { rootPath: '/test/root', defaultAgentProfileId: 'test-provider' });
+      const noSlotService = new LocalPRService(
+        db,
+        mockBroadcast,
+        createAIDeps({ isProjectSlotAvailable: () => false })
+      );
+      const projectId = createTestProject(db, {
+        rootPath: '/test/root',
+        defaultAgentProfileId: 'test-provider',
+      });
       const pr = createTestLocalPR(db, projectId, {
         worktreePath: `/test/wt-queue-noslot-${Date.now()}`,
         status: 'open',
       });
-      db.prepare('UPDATE local_prs SET execution_state = ?, pending_action = ? WHERE id = ?')
-        .run('queued', 'review', pr.id);
+      db.prepare('UPDATE local_prs SET execution_state = ?, pending_action = ? WHERE id = ?').run(
+        'queued',
+        'review',
+        pr.id
+      );
 
       mockStartAISession.mockClear();
       await (noSlotService as any).processQueue();
@@ -1477,8 +1637,9 @@ describe('LocalPRService', () => {
         worktreePath: `/test/wt-failed-retry-${Date.now()}`,
         status: 'approved',
       });
-      db.prepare('UPDATE local_prs SET execution_state = ?, pending_action = ?, execution_error = ? WHERE id = ?')
-        .run('failed', 'merge', 'some error', pr.id);
+      db.prepare(
+        'UPDATE local_prs SET execution_state = ?, pending_action = ?, execution_error = ? WHERE id = ?'
+      ).run('failed', 'merge', 'some error', pr.id);
 
       await (service as any).processFailed();
 
@@ -1487,14 +1648,19 @@ describe('LocalPRService', () => {
     });
 
     it('skips failed PRs when no slot available', async () => {
-      const noSlotService = new LocalPRService(db, mockBroadcast, createAIDeps({ isProjectSlotAvailable: () => false }));
+      const noSlotService = new LocalPRService(
+        db,
+        mockBroadcast,
+        createAIDeps({ isProjectSlotAvailable: () => false })
+      );
       const projectId = createTestProject(db, { rootPath: '/test/root' });
       const pr = createTestLocalPR(db, projectId, {
         worktreePath: `/test/wt-failed-noslot-${Date.now()}`,
         status: 'approved',
       });
-      db.prepare('UPDATE local_prs SET execution_state = ?, pending_action = ?, execution_error = ? WHERE id = ?')
-        .run('failed', 'merge', 'some error', pr.id);
+      db.prepare(
+        'UPDATE local_prs SET execution_state = ?, pending_action = ?, execution_error = ? WHERE id = ?'
+      ).run('failed', 'merge', 'some error', pr.id);
 
       await (noSlotService as any).processFailed();
 
@@ -1611,7 +1777,9 @@ describe('LocalPRService', () => {
     it('throws when project has no rootPath', async () => {
       const projId = `proj-norp-review-${Date.now()}`;
       const now = Date.now();
-      db.prepare(`INSERT INTO projects (id, name, type, default_agent_profile_id, root_path, created_at, updated_at) VALUES (?, 'No Root', 'code', 'test-provider', NULL, ?, ?)`).run(projId, now, now);
+      db.prepare(
+        `INSERT INTO projects (id, name, type, default_agent_profile_id, root_path, created_at, updated_at) VALUES (?, 'No Root', 'code', 'test-provider', NULL, ?, ?)`
+      ).run(projId, now, now);
       const pr = createTestLocalPR(db, projId, {
         worktreePath: `/test/wt-review-norp-${Date.now()}`,
         status: 'open',
@@ -1625,7 +1793,11 @@ describe('LocalPRService', () => {
       const emptyService = new LocalPRService(emptyDb, mockBroadcast, createAIDeps());
       const projId = `proj-noprov-${Date.now()}`;
       const now = Date.now();
-      emptyDb.prepare(`INSERT INTO projects (id, name, type, default_agent_profile_id, root_path, created_at, updated_at) VALUES (?, 'No Prov', 'code', 'missing-provider', '/test/root', ?, ?)`).run(projId, now, now);
+      emptyDb
+        .prepare(
+          `INSERT INTO projects (id, name, type, default_agent_profile_id, root_path, created_at, updated_at) VALUES (?, 'No Prov', 'code', 'missing-provider', '/test/root', ?, ?)`
+        )
+        .run(projId, now, now);
       const pr = createTestLocalPR(emptyDb, projId, {
         worktreePath: `/test/wt-review-noprov-${Date.now()}`,
         status: 'open',
@@ -1644,7 +1816,9 @@ describe('LocalPRService', () => {
     it('throws when project has no rootPath', async () => {
       const projId = `proj-norp-merge-${Date.now()}`;
       const now = Date.now();
-      db.prepare(`INSERT INTO projects (id, name, type, default_agent_profile_id, root_path, created_at, updated_at) VALUES (?, 'No Root', 'code', 'test-provider', NULL, ?, ?)`).run(projId, now, now);
+      db.prepare(
+        `INSERT INTO projects (id, name, type, default_agent_profile_id, root_path, created_at, updated_at) VALUES (?, 'No Root', 'code', 'test-provider', NULL, ?, ?)`
+      ).run(projId, now, now);
       const pr = createTestLocalPR(db, projId, {
         worktreePath: `/test/wt-merge-norp-${Date.now()}`,
         status: 'approved',
@@ -1701,7 +1875,9 @@ describe('LocalPRService', () => {
     it('throws when project has no rootPath', async () => {
       const projId = `proj-norp-conflict-${Date.now()}`;
       const now = Date.now();
-      db.prepare(`INSERT INTO projects (id, name, type, default_agent_profile_id, root_path, created_at, updated_at) VALUES (?, 'No Root', 'code', 'test-provider', NULL, ?, ?)`).run(projId, now, now);
+      db.prepare(
+        `INSERT INTO projects (id, name, type, default_agent_profile_id, root_path, created_at, updated_at) VALUES (?, 'No Root', 'code', 'test-provider', NULL, ?, ?)`
+      ).run(projId, now, now);
       const pr = createTestLocalPR(db, projId, {
         worktreePath: `/test/wt-conflict-norp-${Date.now()}`,
         status: 'conflict',
@@ -1712,7 +1888,11 @@ describe('LocalPRService', () => {
     });
 
     it('queues when no slot available', async () => {
-      const noSlotService = new LocalPRService(db, mockBroadcast, createAIDeps({ isProjectSlotAvailable: () => false }));
+      const noSlotService = new LocalPRService(
+        db,
+        mockBroadcast,
+        createAIDeps({ isProjectSlotAvailable: () => false })
+      );
       const projectId = createTestProject(db, { rootPath: '/test/root' });
       const pr = createTestLocalPR(db, projectId, {
         worktreePath: `/test/wt-conflict-noslot-${Date.now()}`,
@@ -1724,10 +1904,15 @@ describe('LocalPRService', () => {
 
       const updated = noSlotService.getRepo().findById(pr.id);
       expect(updated?.statusMessage).toContain('Queued for AI conflict resolution');
+      expect(updated?.executionState).toBe('queued');
+      expect(updated?.pendingAction).toBe('resolve_conflict');
     });
 
     it('starts conflict resolution when slot available', async () => {
-      const projectId = createTestProject(db, { rootPath: '/test/root', defaultAgentProfileId: 'test-provider' });
+      const projectId = createTestProject(db, {
+        rootPath: '/test/root',
+        defaultAgentProfileId: 'test-provider',
+      });
       const pr = createTestLocalPR(db, projectId, {
         worktreePath: `/test/wt-conflict-start-${Date.now()}`,
         status: 'conflict',
@@ -1746,7 +1931,10 @@ describe('LocalPRService', () => {
 
   describe('startConflictResolution', () => {
     it('skips when already in progress', async () => {
-      const projectId = createTestProject(db, { rootPath: '/test/root', defaultAgentProfileId: 'test-provider' });
+      const projectId = createTestProject(db, {
+        rootPath: '/test/root',
+        defaultAgentProfileId: 'test-provider',
+      });
       const pr = createTestLocalPR(db, projectId, {
         worktreePath: `/test/wt-conflict-dup-${Date.now()}`,
         status: 'conflict',
@@ -1771,7 +1959,11 @@ describe('LocalPRService', () => {
       const emptyService = new LocalPRService(emptyDb, mockBroadcast, createAIDeps());
       const projId = `proj-noprov-conflict-${Date.now()}`;
       const now = Date.now();
-      emptyDb.prepare(`INSERT INTO projects (id, name, type, default_agent_profile_id, root_path, created_at, updated_at) VALUES (?, 'NoProv', 'code', 'missing', '/test/root', ?, ?)`).run(projId, now, now);
+      emptyDb
+        .prepare(
+          `INSERT INTO projects (id, name, type, default_agent_profile_id, root_path, created_at, updated_at) VALUES (?, 'NoProv', 'code', 'missing', '/test/root', ?, ?)`
+        )
+        .run(projId, now, now);
       const pr = createTestLocalPR(emptyDb, projId, {
         worktreePath: `/test/wt-conflict-noprov-${Date.now()}`,
         status: 'conflict',
@@ -1799,8 +1991,11 @@ describe('LocalPRService', () => {
         status: 'reviewing',
       });
       const staleTime = Date.now() - 31 * 60 * 1000;
-      db.prepare('UPDATE local_prs SET status = ?, updated_at = ? WHERE id = ?')
-        .run('reviewing', staleTime, stalePR.id);
+      db.prepare('UPDATE local_prs SET status = ?, updated_at = ? WHERE id = ?').run(
+        'reviewing',
+        staleTime,
+        stalePR.id
+      );
 
       await service.tick();
 
@@ -1827,25 +2022,58 @@ describe('LocalPRService', () => {
       const projectId = createTestProject(db, { rootPath: '/test/root' });
       const wt = `/test/wt-autocreate-${Date.now()}`;
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO worktree_configs (id, project_id, worktree_path, auto_create_pr, auto_review, created_at, updated_at)
         VALUES (?, ?, ?, 1, 0, ?, ?)
-      `).run(`wc-autocreate-${now}`, projectId, wt, now, now);
+      `
+      ).run(`wc-autocreate-${now}`, projectId, wt, now, now);
 
       const result = await service.maybeAutoCreatePR(projectId, wt);
       expect(result).not.toBeNull();
       expect(result?.autoTriggered).toBe(true);
     });
 
+    it('creates PR from a completed regular session with a worktree', async () => {
+      const projectId = createTestProject(db, { rootPath: '/test/root' });
+      const wt = `/test/wt-session-autocreate-${Date.now()}`;
+      const now = Date.now();
+      db.prepare(
+        `
+        INSERT INTO worktree_configs (id, project_id, worktree_path, auto_create_pr, auto_review, created_at, updated_at)
+        VALUES (?, ?, ?, 1, 0, ?, ?)
+      `
+      ).run(`wc-session-autocreate-${now}`, projectId, wt, now, now);
+      db.prepare(
+        `
+        INSERT INTO sessions (
+          id, project_id, name, agent_profile_id, type, working_directory, created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `
+      ).run('session-autocreate', projectId, 'Session', 'test-agent', 'regular', wt, now, now);
+
+      const result = await service.maybeAutoCreatePRForCompletedSession('session-autocreate');
+
+      expect(result).not.toBeNull();
+      expect(result?.projectId).toBe(projectId);
+      expect(result?.worktreePath).toBe(wt);
+      expect(result?.autoTriggered).toBe(true);
+    });
+
     it('returns null when project has no rootPath', async () => {
       const projId = `proj-norp-auto-${Date.now()}`;
       const now = Date.now();
-      db.prepare(`INSERT INTO projects (id, name, type, default_agent_profile_id, root_path, created_at, updated_at) VALUES (?, 'No Root', 'code', 'test-provider', NULL, ?, ?)`).run(projId, now, now);
+      db.prepare(
+        `INSERT INTO projects (id, name, type, default_agent_profile_id, root_path, created_at, updated_at) VALUES (?, 'No Root', 'code', 'test-provider', NULL, ?, ?)`
+      ).run(projId, now, now);
       const wt = `/test/wt-auto-norp-${Date.now()}`;
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO worktree_configs (id, project_id, worktree_path, auto_create_pr, auto_review, created_at, updated_at)
         VALUES (?, ?, ?, 1, 0, ?, ?)
-      `).run(`wc-norp-${now}`, projId, wt, now, now);
+      `
+      ).run(`wc-norp-${now}`, projId, wt, now, now);
 
       const result = await service.maybeAutoCreatePR(projId, wt);
       expect(result).toBeNull();
@@ -1857,10 +2085,12 @@ describe('LocalPRService', () => {
       const projectId = createTestProject(db, { rootPath: '/test/root' });
       const wt = `/test/wt-auto-nocommits-${Date.now()}`;
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO worktree_configs (id, project_id, worktree_path, auto_create_pr, auto_review, created_at, updated_at)
         VALUES (?, ?, ?, 1, 0, ?, ?)
-      `).run(`wc-nocommits-${now}`, projectId, wt, now, now);
+      `
+      ).run(`wc-nocommits-${now}`, projectId, wt, now, now);
 
       const result = await service.maybeAutoCreatePR(projectId, wt);
       expect(result).toBeNull();
@@ -1870,10 +2100,12 @@ describe('LocalPRService', () => {
       const projectId = createTestProject(db, { rootPath: '/test/root' });
       const wt = `/test/wt-auto-refresh-${Date.now()}`;
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO worktree_configs (id, project_id, worktree_path, auto_create_pr, auto_review, created_at, updated_at)
         VALUES (?, ?, ?, 1, 0, ?, ?)
-      `).run(`wc-refresh-${now}`, projectId, wt, now, now);
+      `
+      ).run(`wc-refresh-${now}`, projectId, wt, now, now);
 
       // Create existing active PR with different commits
       createTestLocalPR(db, projectId, {
@@ -1901,10 +2133,12 @@ describe('LocalPRService', () => {
       const projectId = createTestProject(db, { rootPath: '/test/root' });
       const wt = `/test/wt-auto-error-${Date.now()}`;
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO worktree_configs (id, project_id, worktree_path, auto_create_pr, auto_review, created_at, updated_at)
         VALUES (?, ?, ?, 1, 0, ?, ?)
-      `).run(`wc-error-${now}`, projectId, wt, now, now);
+      `
+      ).run(`wc-error-${now}`, projectId, wt, now, now);
 
       const result = await service.maybeAutoCreatePR(projectId, wt);
       expect(result).toBeNull();

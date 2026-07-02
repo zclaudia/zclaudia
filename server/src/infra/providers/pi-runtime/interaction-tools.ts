@@ -8,6 +8,12 @@ import {
 import type { PermissionCallback } from '../types.js';
 import { errorResult, jsonResult, textResult, toolParams } from './tool-common.js';
 
+type AgentToolParameters = AgentTool['parameters'];
+
+function agentToolParameters(schema: Record<string, unknown>): AgentToolParameters {
+  return schema as AgentToolParameters;
+}
+
 function extractAskUserQuestionDetail(args: Record<string, unknown>): string {
   const questions = args.questions;
   if (Array.isArray(questions)) {
@@ -23,12 +29,12 @@ function extractAskUserQuestionDetail(args: Record<string, unknown>): string {
   return 'AskUserQuestion';
 }
 
-export function createTodoWriteTool(): AgentTool<any> {
+export function createTodoWriteTool(): AgentTool {
   return {
     name: 'TodoWrite',
     label: 'TodoWrite',
     description: 'Update the visible task list for the user.',
-    parameters: {
+    parameters: agentToolParameters({
       type: 'object',
       properties: {
         todos: {
@@ -38,14 +44,17 @@ export function createTodoWriteTool(): AgentTool<any> {
             type: 'object',
             properties: {
               content: { type: 'string', maxLength: MAX_TODO_CONTENT_CHARS },
-              status: { type: 'string', enum: ['pending', 'in_progress', 'completed', 'cancelled'] },
+              status: {
+                type: 'string',
+                enum: ['pending', 'in_progress', 'completed', 'cancelled'],
+              },
             },
             required: ['content', 'status'],
           },
         },
       },
       required: ['todos'],
-    } as any,
+    }),
     execute: async (toolCallId: string, params: unknown) => {
       const args = toolParams(toolCallId, params);
       const validation = validateTodoItems(args);
@@ -55,15 +64,15 @@ export function createTodoWriteTool(): AgentTool<any> {
       const todos = validation.todos;
       return jsonResult({ success: true, count: todos.length, todos });
     },
-  } as unknown as AgentTool<any>;
+  };
 }
 
-export function createAskUserQuestionTool(permissionCallback?: PermissionCallback): AgentTool<any> {
+export function createAskUserQuestionTool(permissionCallback?: PermissionCallback): AgentTool {
   return {
     name: 'AskUserQuestion',
     label: 'AskUserQuestion',
     description: 'Ask the user one or more structured questions and wait for an answer.',
-    parameters: {
+    parameters: agentToolParameters({
       type: 'object',
       properties: {
         questions: {
@@ -92,11 +101,14 @@ export function createAskUserQuestionTool(permissionCallback?: PermissionCallbac
         },
       },
       required: ['questions'],
-    } as any,
+    }),
     execute: async (toolCallId: string, params: unknown) => {
       const args = toolParams(toolCallId, params);
       if (!permissionCallback) {
-        return errorResult('missing_interaction_callback', 'AskUserQuestion requires the ZClaudia interaction callback');
+        return errorResult(
+          'missing_interaction_callback',
+          'AskUserQuestion requires the ZClaudia interaction callback'
+        );
       }
       const decision = await permissionCallback({
         requestId: toolCallId,
@@ -111,5 +123,5 @@ export function createAskUserQuestionTool(permissionCallback?: PermissionCallbac
         behavior: decision.behavior,
       });
     },
-  } as unknown as AgentTool<any>;
+  };
 }

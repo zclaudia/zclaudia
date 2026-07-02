@@ -14,7 +14,7 @@ describe('resolveMessageTarget', () => {
   it('routes to the session owner when the message carries a sessionId', () => {
     const target = resolveMessageTarget(
       { type: 'rename_session', sessionId: 's1', name: 'x' } as any,
-      makeResolver({ getSessionBackendId: (id) => (id === 's1' ? 'backend-b' : null) }),
+      makeResolver({ getSessionBackendId: id => (id === 's1' ? 'backend-b' : null) })
     );
     expect(target).toBe('backend-b');
   });
@@ -22,7 +22,7 @@ describe('resolveMessageTarget', () => {
   it('routes to the project owner when there is a projectId but no sessionId', () => {
     const target = resolveMessageTarget(
       { type: 'create_session', projectId: 'p1' } as any,
-      makeResolver({ getProjectBackendId: (id) => (id === 'p1' ? 'backend-c' : null) }),
+      makeResolver({ getProjectBackendId: id => (id === 'p1' ? 'backend-c' : null) })
     );
     expect(target).toBe('backend-c');
   });
@@ -33,7 +33,7 @@ describe('resolveMessageTarget', () => {
       makeResolver({
         getSessionBackendId: () => 'backend-b',
         getProjectBackendId: () => 'backend-c',
-      }),
+      })
     );
     expect(target).toBe('backend-b');
   });
@@ -46,7 +46,7 @@ describe('resolveMessageTarget', () => {
   it('falls back when the owner is unknown', () => {
     const target = resolveMessageTarget(
       { type: 'rename_session', sessionId: 's1', name: 'x' } as any,
-      makeResolver({ getSessionBackendId: () => null }),
+      makeResolver({ getSessionBackendId: () => null })
     );
     expect(target).toBe('backend-a');
   });
@@ -54,7 +54,7 @@ describe('resolveMessageTarget', () => {
   it('returns null when there is no owner and no fallback', () => {
     const target = resolveMessageTarget(
       { type: 'ping' } as any,
-      makeResolver({ fallbackBackendId: null }),
+      makeResolver({ fallbackBackendId: null })
     );
     expect(target).toBeNull();
   });
@@ -62,7 +62,7 @@ describe('resolveMessageTarget', () => {
   it('ignores non-string sessionId/projectId values', () => {
     const target = resolveMessageTarget(
       { type: 'weird', sessionId: 123, projectId: null } as any,
-      makeResolver({ getSessionBackendId: () => 'backend-b' }),
+      makeResolver({ getSessionBackendId: () => 'backend-b' })
     );
     expect(target).toBe('backend-a');
   });

@@ -31,7 +31,7 @@ export function normalizeReviewDecision(value: unknown): AIReviewResult['decisio
 
 export function parseFinalReviewFromText(
   rawOutput: string,
-  errorPrefix: string,
+  errorPrefix: string
 ): Pick<AIReviewResult, 'decision' | 'reasoning' | 'confidence'> {
   const candidates = extractJSONObjects(rawOutput);
 
@@ -40,13 +40,14 @@ export function parseFinalReviewFromText(
       const parsed = JSON.parse(candidates[i]) as Record<string, unknown>;
       const decision = normalizeReviewDecision(parsed.decision ?? parsed.verdict ?? parsed.label);
       if (!decision) continue;
-      const reasoning = typeof parsed.reasoning === 'string'
-        ? parsed.reasoning
-        : typeof parsed.reason === 'string'
-          ? parsed.reason
-          : typeof parsed.explanation === 'string'
-            ? parsed.explanation
-            : 'No reasoning provided';
+      const reasoning =
+        typeof parsed.reasoning === 'string'
+          ? parsed.reasoning
+          : typeof parsed.reason === 'string'
+            ? parsed.reason
+            : typeof parsed.explanation === 'string'
+              ? parsed.explanation
+              : 'No reasoning provided';
       return {
         decision,
         reasoning,

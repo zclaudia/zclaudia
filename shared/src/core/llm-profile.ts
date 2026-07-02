@@ -7,13 +7,9 @@
  * accepts an optional baseUrl; when absent the runtime defaults to
  * `https://api.openai.com/v1`.
  */
-export const LLM_PROVIDER_TYPES = [
-  'anthropic',
-  'openai',
-  'openai-codex',
-] as const;
+export const LLM_PROVIDER_TYPES = ['anthropic', 'openai', 'openai-codex'] as const;
 
-export type LlmProviderType = typeof LLM_PROVIDER_TYPES[number] | string;
+export type LlmProviderType = (typeof LLM_PROVIDER_TYPES)[number] | string;
 
 export type CacheRetentionSetting = 'none' | 'short' | 'long';
 export type ModelInputModality = 'text' | 'image';

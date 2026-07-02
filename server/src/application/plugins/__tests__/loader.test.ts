@@ -85,7 +85,7 @@ function setupSinglePlugin(
 ) {
   const pluginPath = path.join(pluginDir, dirName);
 
-  vi.mocked(fs.existsSync).mockImplementation((p) => {
+  vi.mocked(fs.existsSync).mockImplementation(p => {
     if (p === pluginDir) return true;
     if (p === pluginPath) return true;
     if (p === path.join(pluginPath, manifestFileName)) return true;
@@ -111,7 +111,7 @@ describe('PluginLoader', () => {
     workflowStepRegistry.clear();
     // Clear all plugin permissions
     const allPermissions = permissionManager.getAllPluginPermissions();
-    Object.keys(allPermissions).forEach((pluginId) => {
+    Object.keys(allPermissions).forEach(pluginId => {
       permissionManager.clearPluginPermissions(pluginId);
     });
 
@@ -203,7 +203,7 @@ describe('PluginLoader', () => {
       const directLoader = new PluginLoader({ pluginDirs: [directPluginDir] });
       const manifest = makeManifest({ id: 'com.zclaudia.zcharlie', name: 'ZCharlie' });
 
-      vi.mocked(fs.existsSync).mockImplementation((p) => {
+      vi.mocked(fs.existsSync).mockImplementation(p => {
         if (p === directPluginDir) return true;
         if (p === path.join(directPluginDir, 'plugin.json')) return true;
         return false;
@@ -219,7 +219,7 @@ describe('PluginLoader', () => {
     });
 
     it('should skip non-directory entries', async () => {
-      vi.mocked(fs.existsSync).mockImplementation((p) => {
+      vi.mocked(fs.existsSync).mockImplementation(p => {
         if (p === mockPluginDir) return true;
         if (p === path.join(mockPluginDir, 'plugin.json')) return false;
         if (p === path.join(mockPluginDir, 'manifest.json')) return false;
@@ -237,7 +237,7 @@ describe('PluginLoader', () => {
     it('should skip plugins with invalid manifests', async () => {
       const pluginPath = path.join(mockPluginDir, 'bad-plugin');
 
-      vi.mocked(fs.existsSync).mockImplementation((p) => {
+      vi.mocked(fs.existsSync).mockImplementation(p => {
         if (p === mockPluginDir) return true;
         if (p === pluginPath) return true;
         if (p === path.join(pluginPath, 'plugin.json')) return true;
@@ -277,7 +277,7 @@ describe('PluginLoader', () => {
     });
 
     it('should skip directories with no manifest file', async () => {
-      vi.mocked(fs.existsSync).mockImplementation((p) => {
+      vi.mocked(fs.existsSync).mockImplementation(p => {
         if (p === mockPluginDir) return true;
         // No manifest file exists
         return false;
@@ -290,16 +290,14 @@ describe('PluginLoader', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const manifests = await loader.discover();
       expect(manifests).toHaveLength(0);
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('No manifest found')
-      );
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('No manifest found'));
       warnSpy.mockRestore();
     });
 
     it('should handle JSON parse errors in manifest', async () => {
       const pluginPath = path.join(mockPluginDir, 'bad-json');
 
-      vi.mocked(fs.existsSync).mockImplementation((p) => {
+      vi.mocked(fs.existsSync).mockImplementation(p => {
         if (p === mockPluginDir) return true;
         if (p === path.join(pluginPath, 'plugin.json')) return true;
         return false;
@@ -325,7 +323,7 @@ describe('PluginLoader', () => {
       const pluginPath = path.join(mockPluginDir, 'alt-manifest');
       const manifest = makeManifest({ id: 'com.alt.manifest' });
 
-      vi.mocked(fs.existsSync).mockImplementation((p) => {
+      vi.mocked(fs.existsSync).mockImplementation(p => {
         if (p === mockPluginDir) return true;
         // plugin.json does NOT exist
         if (p === path.join(pluginPath, 'plugin.json')) return false;
@@ -360,7 +358,7 @@ describe('PluginLoader', () => {
         },
       };
 
-      vi.mocked(fs.existsSync).mockImplementation((p) => {
+      vi.mocked(fs.existsSync).mockImplementation(p => {
         if (p === mockPluginDir) return true;
         if (p === path.join(pluginPath, 'plugin.json')) return false;
         if (p === path.join(pluginPath, 'manifest.json')) return false;
@@ -392,7 +390,7 @@ describe('PluginLoader', () => {
         },
       };
 
-      vi.mocked(fs.existsSync).mockImplementation((p) => {
+      vi.mocked(fs.existsSync).mockImplementation(p => {
         if (p === mockPluginDir) return true;
         if (p === path.join(pluginPath, 'plugin.json')) return false;
         if (p === path.join(pluginPath, 'manifest.json')) return false;
@@ -419,23 +417,21 @@ describe('PluginLoader', () => {
       const pluginPath = path.join(categoryDir, 'timer');
       const manifest = makeManifest({ id: 'com.nested.timer' });
 
-      vi.mocked(fs.existsSync).mockImplementation((p) => {
+      vi.mocked(fs.existsSync).mockImplementation(p => {
         if (p === mockPluginDir) return true;
         if (p === categoryDir) return true;
         if (p === path.join(pluginPath, 'plugin.json')) return true;
         return false;
       });
 
-      vi.mocked(fs.readdirSync).mockImplementation((p) => {
+      vi.mocked(fs.readdirSync).mockImplementation(p => {
         if (p === mockPluginDir) {
           return [
             { name: 'productivity', isDirectory: () => true, isFile: () => false } as fs.Dirent,
           ];
         }
         if (p === categoryDir) {
-          return [
-            { name: 'timer', isDirectory: () => true, isFile: () => false } as fs.Dirent,
-          ];
+          return [{ name: 'timer', isDirectory: () => true, isFile: () => false } as fs.Dirent];
         }
         return [];
       });
@@ -454,7 +450,7 @@ describe('PluginLoader', () => {
       const topManifest = makeManifest({ id: 'com.top.plugin' });
       const nestedManifest = makeManifest({ id: 'com.nested.plugin' });
 
-      vi.mocked(fs.existsSync).mockImplementation((p) => {
+      vi.mocked(fs.existsSync).mockImplementation(p => {
         if (p === mockPluginDir) return true;
         if (p === categoryDir) return true;
         if (p === path.join(topPluginPath, 'plugin.json')) return true;
@@ -462,7 +458,7 @@ describe('PluginLoader', () => {
         return false;
       });
 
-      vi.mocked(fs.readdirSync).mockImplementation((p) => {
+      vi.mocked(fs.readdirSync).mockImplementation(p => {
         if (p === mockPluginDir) {
           return [
             { name: 'top-plugin', isDirectory: () => true, isFile: () => false } as fs.Dirent,
@@ -477,7 +473,7 @@ describe('PluginLoader', () => {
         return [];
       });
 
-      vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      vi.mocked(fs.readFileSync).mockImplementation(p => {
         if (typeof p === 'string' && p.includes('top-plugin')) {
           return JSON.stringify(topManifest);
         }
@@ -530,7 +526,7 @@ describe('PluginLoader', () => {
       const m1 = makeManifest({ id: 'com.test.p1', name: 'P1' });
       const m2 = makeManifest({ id: 'com.test.p2', name: 'P2' });
 
-      vi.mocked(fs.existsSync).mockImplementation((p) => {
+      vi.mocked(fs.existsSync).mockImplementation(p => {
         return p === mockPluginDir || String(p).endsWith('plugin.json');
       });
       vi.mocked(fs.readdirSync).mockReturnValue([
@@ -565,7 +561,7 @@ describe('PluginLoader', () => {
   describe('validateManifest (indirect)', () => {
     it('should reject null manifest', async () => {
       const pluginPath = path.join(mockPluginDir, 'null-plugin');
-      vi.mocked(fs.existsSync).mockImplementation((p) => {
+      vi.mocked(fs.existsSync).mockImplementation(p => {
         if (p === mockPluginDir) return true;
         if (p === path.join(pluginPath, 'plugin.json')) return true;
         return false;
@@ -583,7 +579,7 @@ describe('PluginLoader', () => {
 
     it('should reject manifest missing description', async () => {
       const pluginPath = path.join(mockPluginDir, 'no-desc');
-      vi.mocked(fs.existsSync).mockImplementation((p) => {
+      vi.mocked(fs.existsSync).mockImplementation(p => {
         if (p === mockPluginDir) return true;
         if (p === path.join(pluginPath, 'plugin.json')) return true;
         return false;
@@ -603,7 +599,7 @@ describe('PluginLoader', () => {
 
     it('should reject manifest missing version', async () => {
       const pluginPath = path.join(mockPluginDir, 'no-ver');
-      vi.mocked(fs.existsSync).mockImplementation((p) => {
+      vi.mocked(fs.existsSync).mockImplementation(p => {
         if (p === mockPluginDir) return true;
         if (p === path.join(pluginPath, 'plugin.json')) return true;
         return false;
@@ -623,7 +619,7 @@ describe('PluginLoader', () => {
 
     it('should reject manifest with non-string id', async () => {
       const pluginPath = path.join(mockPluginDir, 'bad-id');
-      vi.mocked(fs.existsSync).mockImplementation((p) => {
+      vi.mocked(fs.existsSync).mockImplementation(p => {
         if (p === mockPluginDir) return true;
         if (p === path.join(pluginPath, 'plugin.json')) return true;
         return false;
@@ -722,9 +718,7 @@ describe('PluginLoader', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const result = await loader.activate('com.test.plugin');
       expect(result).toBe(true);
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('already active')
-      );
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('already active'));
       warnSpy.mockRestore();
     });
 
@@ -882,9 +876,7 @@ describe('PluginLoader', () => {
       const pluginPath = path.join(mockPluginDir, 'test-plugin');
       const manifest = makeManifest({
         contributes: {
-          skills: [
-            { path: 'skills/review/SKILL.md' },
-          ],
+          skills: [{ path: 'skills/review/SKILL.md' }],
         },
       });
 
@@ -906,14 +898,12 @@ describe('PluginLoader', () => {
       const pluginPath = path.join(mockPluginDir, 'test-plugin');
       const manifest = makeManifest({
         contributes: {
-          skills: [
-            { path: '../outside/SKILL.md' },
-          ],
+          skills: [{ path: '../outside/SKILL.md' }],
         },
       });
 
       setupSinglePlugin(mockPluginDir, 'test-plugin', manifest);
-      vi.mocked(fs.existsSync).mockImplementation((p) => {
+      vi.mocked(fs.existsSync).mockImplementation(p => {
         if (p === mockPluginDir) return true;
         if (p === pluginPath) return true;
         if (p === path.join(pluginPath, 'plugin.json')) return true;
@@ -957,7 +947,9 @@ describe('PluginLoader', () => {
               toolSelection: {
                 sets: [{ source: 'builtin', id: 'core-coding' }],
                 providers: [],
-                include: [{ source: 'plugin', pluginId: 'com.zclaudia.zcharlie', toolId: 'quote_lookup' }],
+                include: [
+                  { source: 'plugin', pluginId: 'com.zclaudia.zcharlie', toolId: 'quote_lookup' },
+                ],
                 exclude: [{ source: 'builtin', name: 'Bash' }],
               },
               skillSelection: {
@@ -1070,7 +1062,7 @@ describe('PluginLoader', () => {
       const pluginPath = path.join(mockPluginDir, 'worker-plugin');
       const modulePath = path.join(pluginPath, 'index.js');
 
-      vi.mocked(fs.existsSync).mockImplementation((p) => {
+      vi.mocked(fs.existsSync).mockImplementation(p => {
         if (p === mockPluginDir) return true;
         if (p === path.join(pluginPath, 'plugin.json')) return true;
         if (p === modulePath) return true;
@@ -1097,7 +1089,7 @@ describe('PluginLoader', () => {
       setupSinglePlugin(mockPluginDir, 'test-plugin', manifest);
       // Override existsSync so module path returns false
       const pluginPath = path.join(mockPluginDir, 'test-plugin');
-      vi.mocked(fs.existsSync).mockImplementation((p) => {
+      vi.mocked(fs.existsSync).mockImplementation(p => {
         if (p === mockPluginDir) return true;
         if (p === path.join(pluginPath, 'plugin.json')) return true;
         if (p === path.join(pluginPath, 'missing.js')) return false;
@@ -1120,13 +1112,15 @@ describe('PluginLoader', () => {
         main: 'index.js',
         contributes: {
           commands: [{ command: '/rollback-test', title: 'Rollback Test' }],
-          tools: [{ id: 'rollback_tool', name: 'rollback_tool', description: 'Test', parameters: {} }],
+          tools: [
+            { id: 'rollback_tool', name: 'rollback_tool', description: 'Test', parameters: {} },
+          ],
         },
       });
 
       const pluginPath = path.join(mockPluginDir, 'test-plugin');
 
-      vi.mocked(fs.existsSync).mockImplementation((p) => {
+      vi.mocked(fs.existsSync).mockImplementation(p => {
         if (p === mockPluginDir) return true;
         if (p === path.join(pluginPath, 'plugin.json')) return true;
         // Module exists but will fail on import
@@ -1331,9 +1325,7 @@ describe('PluginLoader', () => {
     it('should broadcast workflow_step_types_changed when workflow steps exist', async () => {
       const manifest = makeManifest({
         contributes: {
-          workflowSteps: [
-            { id: 'step1', name: 'Step 1', description: 'A step' },
-          ],
+          workflowSteps: [{ id: 'step1', name: 'Step 1', description: 'A step' }],
         },
       });
 

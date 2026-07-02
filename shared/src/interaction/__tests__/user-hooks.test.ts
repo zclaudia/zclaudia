@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { parseUserHooks, matchesToolRule, clampHookTimeout, DEFAULT_HOOK_TIMEOUT_MS, MAX_HOOK_TIMEOUT_MS, MIN_HOOK_TIMEOUT_MS } from '../user-hooks.js';
+import {
+  parseUserHooks,
+  matchesToolRule,
+  clampHookTimeout,
+  DEFAULT_HOOK_TIMEOUT_MS,
+  MAX_HOOK_TIMEOUT_MS,
+  MIN_HOOK_TIMEOUT_MS,
+} from '../user-hooks.js';
 
 describe('parseUserHooks', () => {
   it('accepts valid hook entries', () => {
@@ -52,8 +59,12 @@ describe('matchesToolRule', () => {
     expect(matchesToolRule({ toolName: 'Bash' }, 'Bash', 'anything')).toBe(true);
     expect(matchesToolRule({ toolName: '*' }, 'Read', 'x')).toBe(true);
     expect(matchesToolRule({ toolName: 'Bash' }, 'Read', 'x')).toBe(false);
-    expect(matchesToolRule({ toolName: 'Bash', pattern: '^git(\\s.*)?$' }, 'Bash', 'git status')).toBe(true);
-    expect(matchesToolRule({ toolName: 'Bash', pattern: '^git(\\s.*)?$' }, 'Bash', 'npm i')).toBe(false);
+    expect(
+      matchesToolRule({ toolName: 'Bash', pattern: '^git(\\s.*)?$' }, 'Bash', 'git status')
+    ).toBe(true);
+    expect(matchesToolRule({ toolName: 'Bash', pattern: '^git(\\s.*)?$' }, 'Bash', 'npm i')).toBe(
+      false
+    );
   });
 
   it('treats invalid regex as non-match', () => {

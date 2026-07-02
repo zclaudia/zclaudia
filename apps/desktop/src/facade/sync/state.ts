@@ -5,9 +5,9 @@ import { useOwnershipStore } from '../../stores/ownershipStore';
 const AUTO_OPEN_MAX_FAILURES = 3;
 
 let facadeServerRuns = new Map<string, Set<string>>();
-let pendingAutoOpenBackends = new Set<string>();
+const pendingAutoOpenBackends = new Set<string>();
 let autoOpenTimer: ReturnType<typeof setTimeout> | null = null;
-let autoOpenFailures = new Map<string, number>();
+const autoOpenFailures = new Map<string, number>();
 
 export function getFacadeServerRuns(): Map<string, Set<string>> {
   return facadeServerRuns;

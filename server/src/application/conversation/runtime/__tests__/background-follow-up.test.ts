@@ -68,18 +68,22 @@ describe('background follow-up consumer', () => {
     await flushPromises();
 
     const startedEvent = startedListener.mock.calls[0][0];
-    expect(startedListener).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'backgroundFollowup.started',
-      runId: startedEvent.runId,
-      sessionId: 'session-1',
-      payload: { followupRunId: startedEvent.runId },
-    }));
-    expect(finishedListener).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'backgroundFollowup.finished',
-      runId: startedEvent.runId,
-      sessionId: 'session-1',
-      payload: { followupRunId: startedEvent.runId },
-    }));
+    expect(startedListener).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'backgroundFollowup.started',
+        runId: startedEvent.runId,
+        sessionId: 'session-1',
+        payload: { followupRunId: startedEvent.runId },
+      })
+    );
+    expect(finishedListener).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'backgroundFollowup.finished',
+        runId: startedEvent.runId,
+        sessionId: 'session-1',
+        payload: { followupRunId: startedEvent.runId },
+      })
+    );
     expect(activeRuns.size).toBe(0);
   });
 });

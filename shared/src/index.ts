@@ -27,16 +27,28 @@
 export * from './core/server.js';
 export * from './core/llm-profile.js';
 export * from './core/agent-profile.js';
+export * from './core/agent-readiness.js';
 export * from './core/tools.js';
 export * from './core/skills.js';
 export * from './core/runtime-capabilities.js';
 export * from './core/session.js';
 export * from './core/message.js';
+export * from './core/attachment-validation.js';
 export * from './core/context-graph.js';
 export * from './core/project.js';
 export * from './core/api.js';
 export * from './core/mcp.js';
 export * from './core/pcp.js';
+export * from './core/provider-policy.js';
+export type {
+  BuiltinTaskType,
+  TaskType,
+  TaskEventType,
+  TaskExecutorRef,
+  TaskArtifact,
+  TaskRecord,
+  TaskEvent,
+} from './core/task.js';
 
 // Feature types
 export * from './features/commands.js';
@@ -44,6 +56,16 @@ export * from './features/supervision.js';
 export * from './features/local-pr.js';
 export * from './features/local-issue.js';
 export * from './features/epic.js';
+export type {
+  ExecutorType,
+  ExecutorStatus,
+  ExecutorInstance,
+  ExecutorInstanceCreate,
+  ExecutorInstanceUpdate,
+  ExecutorInput,
+  ExecutorProgress,
+  IExecutor,
+} from './features/executor.js';
 export * from './features/attachment.js';
 export * from './features/turn-summary.js';
 export * from './features/system-tasks.js';
@@ -51,6 +73,8 @@ export * from './features/workflows.js';
 export * from './features/automations.js';
 export * from './features/notification-feed.js';
 export * from './features/goal.js';
+export * from './features/spec-change.js';
+export * from './features/meta-workflow.js';
 
 // Interaction types
 export * from './interaction/permissions.js';

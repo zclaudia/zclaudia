@@ -28,11 +28,15 @@ describe('ShortcutSettings', () => {
   it('shows a disabled hint and locks controls when Claudia is disabled', () => {
     const { container } = render(<ShortcutSettings disabled />);
 
-    expect(screen.getByText('When Claudia is closed, the desktop orb and global shortcut are disabled together.')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'When Claudia is closed, the desktop orb and global shortcut are disabled together.'
+      )
+    ).toBeTruthy();
 
     const buttons = Array.from(container.querySelectorAll('button'));
     expect(buttons).toHaveLength(2);
-    buttons.forEach((button) => {
+    buttons.forEach(button => {
       expect(button).toBeDisabled();
     });
   });
@@ -42,10 +46,14 @@ describe('ShortcutSettings', () => {
 
     const buttons = Array.from(container.querySelectorAll('button'));
     expect(buttons).toHaveLength(2);
-    buttons.forEach((button) => {
+    buttons.forEach(button => {
       expect(button).not.toBeDisabled();
     });
-    expect(screen.queryByText('When Claudia is closed, the desktop orb and global shortcut are disabled together.')).toBeNull();
+    expect(
+      screen.queryByText(
+        'When Claudia is closed, the desktop orb and global shortcut are disabled together.'
+      )
+    ).toBeNull();
 
     fireEvent.click(screen.getByText('⌘ ⇧ .'));
     expect(container.querySelectorAll('button').length).toBeGreaterThan(2);

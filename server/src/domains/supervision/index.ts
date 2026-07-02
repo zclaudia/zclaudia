@@ -1,5 +1,9 @@
 export { createSupervisionRoutes } from './routes.js';
-export { registerSupervisionDomain, type SupervisionDomainDeps, type SupervisionDomainResult } from './register.js';
+export {
+  registerSupervisionDomain,
+  type SupervisionDomainDeps,
+  type SupervisionDomainResult,
+} from './register.js';
 export { SupervisorService } from './supervisor-service.js';
 export type {
   SupervisionAiRunPort,

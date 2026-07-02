@@ -233,7 +233,7 @@ describe('WorkerHost', () => {
     it('should throw if worker runner file does not exist', async () => {
       vi.mocked(fs.existsSync).mockReturnValueOnce(false);
       await expect(host.startPlugin('test.plugin', '/path/to/module.js')).rejects.toThrow(
-        /Worker runner not found/,
+        /Worker runner not found/
       );
     });
 
@@ -241,7 +241,7 @@ describe('WorkerHost', () => {
       workerState.activateWithError = 'Plugin failed to load';
       workerState.autoActivate = false;
       await expect(host.startPlugin('test.plugin', '/path/to/module.js')).rejects.toThrow(
-        'Plugin failed to load',
+        'Plugin failed to load'
       );
       expect(host.hasWorker('test.plugin')).toBe(false);
       expect(mockWorkerTerminate).toHaveBeenCalled();
@@ -274,12 +274,12 @@ describe('WorkerHost', () => {
 
       expect(errorSpy).toHaveBeenCalledWith(
         expect.stringContaining('Worker error for test.plugin'),
-        'Worker crash',
+        'Worker crash'
       );
       expect(mockPluginEvents.emit).toHaveBeenCalledWith(
         'plugin.error',
         { pluginId: 'test.plugin', error: 'Worker crash' },
-        'test.plugin',
+        'test.plugin'
       );
       errorSpy.mockRestore();
     });
@@ -292,9 +292,7 @@ describe('WorkerHost', () => {
       expect(exitHandlers.length).toBeGreaterThan(0);
       exitHandlers.forEach(h => h(1));
 
-      expect(errorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('exited with code 1'),
-      );
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('exited with code 1'));
       expect(mockPluginScheduler.clearByPlugin).toHaveBeenCalledWith('test.plugin');
       expect(host.hasWorker('test.plugin')).toBe(false);
       errorSpy.mockRestore();
@@ -307,9 +305,7 @@ describe('WorkerHost', () => {
       const exitHandlers = workerState.handlers['exit'] || [];
       exitHandlers.forEach(h => h(0));
 
-      expect(errorSpy).not.toHaveBeenCalledWith(
-        expect.stringContaining('exited with code'),
-      );
+      expect(errorSpy).not.toHaveBeenCalledWith(expect.stringContaining('exited with code'));
       expect(mockPluginScheduler.clearByPlugin).toHaveBeenCalledWith('test.plugin');
       errorSpy.mockRestore();
     });
@@ -348,7 +344,7 @@ describe('WorkerHost', () => {
       await host.stopPlugin('test.plugin');
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('Deactivation error'),
-        'cleanup failed',
+        'cleanup failed'
       );
       expect(mockWorkerTerminate).toHaveBeenCalled();
       warnSpy.mockRestore();
@@ -374,7 +370,7 @@ describe('WorkerHost', () => {
 
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('Error during deactivation'),
-        expect.stringContaining('timed out'),
+        expect.stringContaining('timed out')
       );
       expect(mockWorkerTerminate).toHaveBeenCalled();
       warnSpy.mockRestore();
@@ -410,12 +406,8 @@ describe('WorkerHost', () => {
   // ============================
 
   describe('RPC via setupRPCHandler', () => {
-    async function sendRPC(
-      _hostInst: WorkerHost,
-      method: string,
-      args: unknown[],
-    ): Promise<any> {
-      return new Promise<any>((resolve) => {
+    async function sendRPC(_hostInst: WorkerHost, method: string, args: unknown[]): Promise<any> {
+      return new Promise<any>(resolve => {
         const rpcId = `rpc_${Date.now()}_${Math.random()}`;
 
         const origPostMessage = workerState.lastInstance.postMessage;
@@ -427,9 +419,7 @@ describe('WorkerHost', () => {
         });
 
         const messageHandlers = workerState.handlers['message'] || [];
-        messageHandlers.forEach(h =>
-          h({ type: 'rpc_request', id: rpcId, method, args }),
-        );
+        messageHandlers.forEach(h => h({ type: 'rpc_request', id: rpcId, method, args }));
       });
     }
 
@@ -505,7 +495,7 @@ describe('WorkerHost', () => {
       expect(mockPluginEvents.on).toHaveBeenCalledWith(
         'run.started',
         expect.any(Function),
-        'test.plugin',
+        'test.plugin'
       );
     });
 
@@ -530,7 +520,7 @@ describe('WorkerHost', () => {
       expect(mockPluginEvents.once).toHaveBeenCalledWith(
         'run.completed',
         expect.any(Function),
-        'test.plugin',
+        'test.plugin'
       );
     });
 
@@ -540,7 +530,7 @@ describe('WorkerHost', () => {
       expect(mockPluginEvents.emit).toHaveBeenCalledWith(
         'custom.event',
         { key: 'val' },
-        'test.plugin',
+        'test.plugin'
       );
     });
 
@@ -601,7 +591,7 @@ describe('WorkerHost', () => {
           command: 'my-command',
           source: 'plugin',
           pluginId: 'test.plugin',
-        }),
+        })
       );
     });
 
@@ -634,7 +624,7 @@ describe('WorkerHost', () => {
           },
           source: 'plugin',
           pluginId: 'test.plugin',
-        }),
+        })
       );
     });
 
@@ -757,10 +747,7 @@ describe('WorkerHost', () => {
       });
       globalThis.fetch = mockFetch;
 
-      const resp = await sendRPC(host, 'network.fetch', [
-        'https://example.com',
-        { method: 'GET' },
-      ]);
+      const resp = await sendRPC(host, 'network.fetch', ['https://example.com', { method: 'GET' }]);
       expect(resp.result).toEqual({ ok: true, status: 200, body: 'response-body' });
       expect(mockFetch).toHaveBeenCalledWith('https://example.com', { method: 'GET' });
     });
@@ -792,10 +779,11 @@ describe('WorkerHost', () => {
 
       const resp = await sendRPC(host, 'notification.show', ['Title', 'Body']);
       expect(resp.result).toBeUndefined();
-      expect(mockPluginEvents.emit).toHaveBeenCalledWith(
-        'plugin.notification',
-        { pluginId: 'test.plugin', title: 'Title', body: 'Body' },
-      );
+      expect(mockPluginEvents.emit).toHaveBeenCalledWith('plugin.notification', {
+        pluginId: 'test.plugin',
+        title: 'Title',
+        body: 'Body',
+      });
       expect(broadcastFn).toHaveBeenCalledWith({
         type: 'plugin_notification',
         pluginId: 'test.plugin',
@@ -853,7 +841,7 @@ describe('WorkerHost', () => {
           id: 'reg1',
           method: 'tools.register',
           args: ['my-tool', 'My Tool', 'desc', {}],
-        }),
+        })
       );
       await new Promise(r => setTimeout(r, 10));
 
@@ -890,7 +878,7 @@ describe('WorkerHost', () => {
           id: 'reg2',
           method: 'tools.register',
           args: ['err-tool', 'Err Tool', 'desc', {}],
-        }),
+        })
       );
       await new Promise(r => setTimeout(r, 10));
 
@@ -932,7 +920,7 @@ describe('WorkerHost', () => {
           id: 'reg3',
           method: 'tools.register',
           args: ['slow-tool', 'Slow Tool', 'desc', {}],
-        }),
+        })
       );
       await vi.advanceTimersByTimeAsync(1);
 
@@ -965,7 +953,7 @@ describe('WorkerHost', () => {
           id: 'creg1',
           method: 'commands.register',
           args: ['my-cmd'],
-        }),
+        })
       );
       await new Promise(r => setTimeout(r, 10));
 
@@ -1007,7 +995,7 @@ describe('WorkerHost', () => {
           id: 'creg2',
           method: 'commands.register',
           args: ['slow-cmd'],
-        }),
+        })
       );
       await vi.advanceTimersByTimeAsync(1);
 
@@ -1019,7 +1007,7 @@ describe('WorkerHost', () => {
 
       const result = await resultPromise;
       expect(result).toEqual(
-        expect.objectContaining({ error: expect.stringContaining('timed out') }),
+        expect.objectContaining({ error: expect.stringContaining('timed out') })
       );
 
       vi.useRealTimers();

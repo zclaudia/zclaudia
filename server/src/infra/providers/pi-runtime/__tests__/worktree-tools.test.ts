@@ -29,8 +29,9 @@ describe('EnterWorktree / ExitWorktree tools', () => {
     git(repo, 'add .');
     git(repo, 'commit -m init');
     // FK off: dummy project_id/agent_profile_id satisfy the NOT NULL columns without seeding parent rows.
-    db.prepare('INSERT INTO sessions (id, project_id, agent_profile_id, working_directory, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(sessionId, 'p-test', 'a-test', repo, Date.now(), Date.now());
+    db.prepare(
+      'INSERT INTO sessions (id, project_id, agent_profile_id, working_directory, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(sessionId, 'p-test', 'a-test', repo, Date.now(), Date.now());
   });
 
   afterEach(() => {
@@ -38,14 +39,15 @@ describe('EnterWorktree / ExitWorktree tools', () => {
     db.close();
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function tools(): Record<string, any> {
     const built = buildTools(repo, { enabled: ['EnterWorktree', 'ExitWorktree'], db, sessionId });
-    return Object.fromEntries(built.map((t) => [t.name, t]));
+    return Object.fromEntries(built.map(t => [t.name, t]));
   }
 
   function workingDir(): string | null {
-    const row = db.prepare('SELECT working_directory FROM sessions WHERE id = ?').get(sessionId) as { working_directory: string | null };
+    const row = db
+      .prepare('SELECT working_directory FROM sessions WHERE id = ?')
+      .get(sessionId) as { working_directory: string | null };
     return row.working_directory;
   }
 
@@ -62,7 +64,7 @@ describe('EnterWorktree / ExitWorktree tools', () => {
   it('EnterWorktree refuses when not a git repository', async () => {
     const plain = realpathSync(mkdtempSync(path.join(tmpdir(), 'zc-plain-')));
     const built = buildTools(plain, { enabled: ['EnterWorktree'], db, sessionId });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const res = await (built[0] as any).execute('w1', { name: 'x' });
     rmSync(plain, { recursive: true, force: true });
     expect(res.details.error).toBe('not_a_git_repo');
@@ -73,7 +75,7 @@ describe('EnterWorktree / ExitWorktree tools', () => {
     // Simulate the next run starting in the worktree by rebuilding tools with that cwd.
     const wtPath = workingDir()!;
     const built = buildTools(wtPath, { enabled: ['EnterWorktree'], db, sessionId });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const res = await (built[0] as any).execute('w2', { name: 'second' });
     expect(res.details.error).toBe('already_in_worktree');
   });
@@ -83,7 +85,7 @@ describe('EnterWorktree / ExitWorktree tools', () => {
     const wtPath = workingDir()!;
     // Next run is in the worktree:
     const built = buildTools(wtPath, { enabled: ['ExitWorktree'], db, sessionId });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const res = await (built[0] as any).execute('x1', { action: 'keep' });
     expect(res.details.ok).toBe(true);
     expect(res.details.removed).toBe(false);
@@ -95,7 +97,7 @@ describe('EnterWorktree / ExitWorktree tools', () => {
     await tools().EnterWorktree.execute('w1', { name: 'feature-x' });
     const wtPath = workingDir()!;
     const built = buildTools(wtPath, { enabled: ['ExitWorktree'], db, sessionId });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const res = await (built[0] as any).execute('x1', { action: 'remove' });
     expect(res.details.ok).toBe(true);
     expect(res.details.removed).toBe(true);
@@ -108,7 +110,7 @@ describe('EnterWorktree / ExitWorktree tools', () => {
     const wtPath = workingDir()!;
     writeFileSync(path.join(wtPath, 'wip.txt'), 'in progress\n');
     const built = buildTools(wtPath, { enabled: ['ExitWorktree'], db, sessionId });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const res = await (built[0] as any).execute('x1', { action: 'remove' });
     expect(res.details.ok).toBe(true);
     expect(res.details.removed).toBe(false);

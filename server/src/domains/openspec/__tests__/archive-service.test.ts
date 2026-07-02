@@ -48,9 +48,13 @@ describe('ArchiveService', () => {
     db = new Database(':memory:');
     db.pragma('foreign_keys = ON');
     applyMigrations(db);
-    db.prepare(`INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`).run('proj-1', 'P', 'code', 0, 0);
-    db.prepare(`INSERT INTO local_issues (id, project_id, title, description, status, priority, labels, created_at, updated_at, type, is_anonymous)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run('i', 'proj-1', 't', null, 'open', 'medium', '[]', 0, 0, 'implement', 0);
+    db.prepare(
+      `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
+    ).run('proj-1', 'P', 'code', 0, 0);
+    db.prepare(
+      `INSERT INTO local_issues (id, project_id, title, description, status, priority, labels, created_at, updated_at, type, is_anonymous)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run('i', 'proj-1', 't', null, 'open', 'medium', '[]', 0, 0, 'implement', 0);
     projectRoot = mkdtempSync(path.join(tmpdir(), 'openspec-arch-'));
     scService = new SpecChangeService({ db, getProjectRoot: () => projectRoot });
     archive = new ArchiveService({ db, getProjectRoot: () => projectRoot });
@@ -58,7 +62,11 @@ describe('ArchiveService', () => {
 
   afterEach(() => {
     db.close();
-    try { rmSync(projectRoot, { recursive: true, force: true }); } catch { /* */ }
+    try {
+      rmSync(projectRoot, { recursive: true, force: true });
+    } catch {
+      /* */
+    }
   });
 
   it('merges ADDED requirement into an existing corpus and moves change to archive/', async () => {
@@ -68,7 +76,12 @@ describe('ArchiveService', () => {
     fs.writeFileSync(path.join(corpusDir, 'spec.md'), SAMPLE_CORPUS);
 
     // Create change + delta
-    const sc = scService.createSpecChange({ projectId: 'proj-1', subIssueId: 'i', slug: 'add-2fa', title: 'Add 2FA' });
+    const sc = scService.createSpecChange({
+      projectId: 'proj-1',
+      subIssueId: 'i',
+      slug: 'add-2fa',
+      title: 'Add 2FA',
+    });
     scService.writeDeltaSpec(sc.id, 'auth', SAMPLE_DELTA);
 
     const result = await archive.archive(sc.id);
@@ -89,16 +102,29 @@ describe('ArchiveService', () => {
   });
 
   it('creates a fresh corpus file when capability did not exist', async () => {
-    const sc = scService.createSpecChange({ projectId: 'proj-1', subIssueId: 'i', slug: 'new-cap', title: 'X' });
+    const sc = scService.createSpecChange({
+      projectId: 'proj-1',
+      subIssueId: 'i',
+      slug: 'new-cap',
+      title: 'X',
+    });
     scService.writeDeltaSpec(sc.id, 'newcap', SAMPLE_DELTA);
     const result = await archive.archive(sc.id);
     expect(result.ok).toBe(true);
-    const newCorpus = fs.readFileSync(path.join(projectRoot, 'openspec', 'specs', 'newcap', 'spec.md'), 'utf-8');
+    const newCorpus = fs.readFileSync(
+      path.join(projectRoot, 'openspec', 'specs', 'newcap', 'spec.md'),
+      'utf-8'
+    );
     expect(newCorpus).toContain('### Requirement: 2FA enrollment');
   });
 
   it('aborts archive on validation error and does NOT move folder', async () => {
-    const sc = scService.createSpecChange({ projectId: 'proj-1', subIssueId: 'i', slug: 'bad', title: 'X' });
+    const sc = scService.createSpecChange({
+      projectId: 'proj-1',
+      subIssueId: 'i',
+      slug: 'bad',
+      title: 'X',
+    });
     // Invalid delta: ADDED requirement with no scenarios
     const invalid = `## ADDED Requirements
 ### Requirement: Bad
@@ -112,7 +138,12 @@ System MUST do.
   });
 
   it('handles delta with no spec files (empty change)', async () => {
-    const sc = scService.createSpecChange({ projectId: 'proj-1', subIssueId: 'i', slug: 'empty', title: 'X' });
+    const sc = scService.createSpecChange({
+      projectId: 'proj-1',
+      subIssueId: 'i',
+      slug: 'empty',
+      title: 'X',
+    });
     const result = await archive.archive(sc.id);
     expect(result.ok).toBe(true);
     expect(result.capabilities).toEqual([]);

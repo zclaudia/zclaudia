@@ -37,7 +37,7 @@ export class TurnSummaryService {
   async generate(
     sessionId: string,
     userMessageId: string,
-    options: { model?: string; force?: boolean } = {},
+    options: { model?: string; force?: boolean } = {}
   ): Promise<{ summary: TurnSummary; fromCache: boolean }> {
     const turnMessages = this.loadTurnMessages(sessionId, userMessageId);
     if (turnMessages.length === 0) {
@@ -75,9 +75,10 @@ export class TurnSummaryService {
 
   private loadTurnMessages(sessionId: string, userMessageId: string): TurnMessage[] {
     const start = this.db
-      .prepare<[string, string], { offset: number }>(
-        'SELECT offset FROM messages WHERE session_id = ? AND id = ?',
-      )
+      .prepare<
+        [string, string],
+        { offset: number }
+      >('SELECT offset FROM messages WHERE session_id = ? AND id = ?')
       .get(sessionId, userMessageId);
     if (!start) return [];
 
@@ -85,7 +86,7 @@ export class TurnSummaryService {
       .prepare<[string, number], { offset: number }>(
         `SELECT offset FROM messages
          WHERE session_id = ? AND role = 'user' AND offset > ?
-         ORDER BY offset ASC LIMIT 1`,
+         ORDER BY offset ASC LIMIT 1`
       )
       .get(sessionId, start.offset);
 
@@ -96,7 +97,7 @@ export class TurnSummaryService {
         `SELECT id, role, content, metadata, offset, created_at as createdAt
          FROM messages
          WHERE session_id = ? AND offset >= ? AND offset < ?
-         ORDER BY offset ASC`,
+         ORDER BY offset ASC`
       )
       .all(sessionId, start.offset, upperOffset);
     return rows;
@@ -104,9 +105,10 @@ export class TurnSummaryService {
 
   private loadSessionContext(sessionId: string): SessionContext {
     const row = this.db
-      .prepare<[string], { working_directory: string | null }>(
-        'SELECT working_directory FROM sessions WHERE id = ?',
-      )
+      .prepare<
+        [string],
+        { working_directory: string | null }
+      >('SELECT working_directory FROM sessions WHERE id = ?')
       .get(sessionId);
     return { workingDirectory: row?.working_directory ?? null };
   }
@@ -116,7 +118,8 @@ function buildStubSummary(messages: TurnMessage[]): ParsedSummary {
   const userText = extractUserText(messages[0]?.content ?? '').trim();
   return {
     goal: truncate(userText || 'No user request found.', 240),
-    solved: 'Turn summary generation is running in zclaudia stub mode until pi-agent is integrated.',
+    solved:
+      'Turn summary generation is running in zclaudia stub mode until pi-agent is integrated.',
     openIssues: 'pi-agent-backed summarization is not integrated yet.',
   };
 }
@@ -140,7 +143,7 @@ export function buildSummaryPrompt(messages: TurnMessage[]): string {
     '- goal: 1-2 sentences — what the user asked for.',
     '- solved: 2-3 sentences — the net outcome (not a step-by-step list).',
     '- openIssues: 1-2 sentences — what remains unresolved, failed, or pending. Use "—" if nothing.',
-    '- Match the user\'s language (Chinese, English, etc.).',
+    "- Match the user's language (Chinese, English, etc.).",
     '- Be specific: mention file names / feature names when useful.',
     '',
     '=== TURN MESSAGES ===',

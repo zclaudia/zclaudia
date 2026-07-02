@@ -78,15 +78,17 @@ describe('run-events retry_scheduled', () => {
       providerRegistry: mockProviderRegistry as any,
     });
 
-    expect(sendRunEvent).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'run_retrying',
-      runId: 'run-retry-1',
-      sessionId: 'session-retry-1',
-      attempt: 2,
-      maxAttempts: 5,
-      delayMs: 1000,
-      status: 429,
-    }));
+    expect(sendRunEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'run_retrying',
+        runId: 'run-retry-1',
+        sessionId: 'session-retry-1',
+        attempt: 2,
+        maxAttempts: 5,
+        delayMs: 1000,
+        status: 429,
+      })
+    );
   });
 
   it('omits status field when not provided in retryInfo', async () => {

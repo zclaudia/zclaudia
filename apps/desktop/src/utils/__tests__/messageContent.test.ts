@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  extractThinking,
-  normalizeMarkdownForRender,
-} from '../messageContent';
+import { extractThinking, normalizeMarkdownForRender } from '../messageContent';
 
 describe('extractThinking', () => {
   it('extracts balanced think tags from assistant content', () => {

@@ -34,7 +34,9 @@ export interface IssueOrchestration {
   dispose: () => void;
 }
 
-export function registerIssueOrchestration(deps: RegisterIssueOrchestrationDeps): IssueOrchestration {
+export function registerIssueOrchestration(
+  deps: RegisterIssueOrchestrationDeps
+): IssueOrchestration {
   const dispatcher = new EventDispatcher<IssueDomainEvent>();
   const executorService = new ExecutorService({ db: deps.db, registry: deps.registry, dispatcher });
   const lifecycle = new IssueLifecycle({
@@ -82,7 +84,7 @@ export function registerIssueOrchestration(deps: RegisterIssueOrchestrationDeps)
  * project without an extra type narrow.
  */
 function translateEventToMessage(
-  event: IssueDomainEvent,
+  event: IssueDomainEvent
 ): (ServerMessage & { projectId: string }) | null {
   switch (event.type) {
     case 'executor.status_changed':

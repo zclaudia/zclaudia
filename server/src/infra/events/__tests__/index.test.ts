@@ -147,7 +147,7 @@ describe('PluginEventEmitter', () => {
     it('should wait for async listeners', async () => {
       let resolved = false;
       const listener = vi.fn().mockImplementation(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise(resolve => setTimeout(resolve, 10));
         resolved = true;
       });
 

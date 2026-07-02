@@ -7,8 +7,9 @@ vi.mock('../../../application/plugins/tool-registry.js', () => ({
     getBridgeTools: vi.fn().mockReturnValue([]),
     getDefinitionsByScope: vi.fn().mockImplementation(() => {
       // By default, every bridge tool is in-scope so the route returns them all.
-      return (toolRegistry.getBridgeTools() as Array<{ definition: { function: { name: string } } }>)
-        .map((t) => t.definition);
+      return (
+        toolRegistry.getBridgeTools() as Array<{ definition: { function: { name: string } } }>
+      ).map(t => t.definition);
     }),
     execute: vi.fn(),
     get: vi.fn().mockReturnValue(undefined),
@@ -41,7 +42,9 @@ describe('plugin-tools routes', () => {
       vi.mocked(toolRegistry.getBridgeTools).mockReturnValue([
         {
           source: 'plugin',
-          definition: { function: { name: 'tool1', description: 'desc1', parameters: { type: 'object' } } },
+          definition: {
+            function: { name: 'tool1', description: 'desc1', parameters: { type: 'object' } },
+          },
         },
       ] as any);
 
@@ -55,11 +58,15 @@ describe('plugin-tools routes', () => {
       vi.mocked(toolRegistry.getBridgeTools).mockReturnValue([
         {
           source: 'interaction',
-          definition: { function: { name: 'ask_user_form', description: 'ask', parameters: { type: 'object' } } },
+          definition: {
+            function: { name: 'ask_user_form', description: 'ask', parameters: { type: 'object' } },
+          },
         },
         {
           source: 'interaction',
-          definition: { function: { name: 'push_file', description: 'push', parameters: { type: 'object' } } },
+          definition: {
+            function: { name: 'push_file', description: 'push', parameters: { type: 'object' } },
+          },
         },
       ] as any);
 
@@ -69,15 +76,24 @@ describe('plugin-tools routes', () => {
         negotiatedAt: Date.now(),
         capabilities: [
           { id: 'interaction.form', enabled: false, degradation: 'fallback_to_notice' },
-          { id: 'tool.inject', enabled: true, mode: 'bridged', reliability: 'best_effort', degradation: 'reject' },
+          {
+            id: 'tool.inject',
+            enabled: true,
+            mode: 'bridged',
+            reliability: 'best_effort',
+            degradation: 'reject',
+          },
         ],
       };
 
       app = express();
       app.use(express.json());
-      app.use('/api/plugins', createPluginToolsRoutes({
-        getActiveProfile: () => profile,
-      }));
+      app.use(
+        '/api/plugins',
+        createPluginToolsRoutes({
+          getActiveProfile: () => profile,
+        })
+      );
 
       const res = await request(app).get('/api/plugins/tools').query({ sessionId: 'session-1' });
       expect(res.status).toBe(200);
@@ -97,7 +113,12 @@ describe('plugin-tools routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.result).toBe('result-value');
-      expect(toolRegistry.execute).toHaveBeenCalledWith('my_tool', { key: 'val' }, { sessionId: undefined }, 'plugin-panel');
+      expect(toolRegistry.execute).toHaveBeenCalledWith(
+        'my_tool',
+        { key: 'val' },
+        { sessionId: undefined },
+        'plugin-panel'
+      );
     });
 
     it('handles args field', async () => {
@@ -108,7 +129,12 @@ describe('plugin-tools routes', () => {
         .send({ args: { foo: 'bar' } });
 
       expect(res.status).toBe(200);
-      expect(toolRegistry.execute).toHaveBeenCalledWith('my_tool', { foo: 'bar' }, { sessionId: undefined }, 'plugin-panel');
+      expect(toolRegistry.execute).toHaveBeenCalledWith(
+        'my_tool',
+        { foo: 'bar' },
+        { sessionId: undefined },
+        'plugin-panel'
+      );
     });
 
     it('passes sessionId through execution context', async () => {
@@ -119,7 +145,12 @@ describe('plugin-tools routes', () => {
         .send({ arguments: { foo: 'bar' }, sessionId: 'session-123' });
 
       expect(res.status).toBe(200);
-      expect(toolRegistry.execute).toHaveBeenCalledWith('my_tool', { foo: 'bar' }, { sessionId: 'session-123' }, 'main-session');
+      expect(toolRegistry.execute).toHaveBeenCalledWith(
+        'my_tool',
+        { foo: 'bar' },
+        { sessionId: 'session-123' },
+        'main-session'
+      );
     });
 
     it('returns 500 on execution error', async () => {
@@ -151,9 +182,12 @@ describe('plugin-tools routes', () => {
 
       app = express();
       app.use(express.json());
-      app.use('/api/plugins', createPluginToolsRoutes({
-        getActiveProfile: () => profile,
-      }));
+      app.use(
+        '/api/plugins',
+        createPluginToolsRoutes({
+          getActiveProfile: () => profile,
+        })
+      );
 
       const res = await request(app)
         .post('/api/plugins/tools/ask_user_form/execute')

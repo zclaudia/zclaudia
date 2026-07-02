@@ -41,7 +41,7 @@ describe('SpecCorpusScreen', () => {
     ]);
     render(<SpecCorpusScreen projectId="p1" />);
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: /Re-scan/ })).toBeInTheDocument(),
+      expect(screen.getByRole('button', { name: /Re-scan/ })).toBeInTheDocument()
     );
   });
 
@@ -49,7 +49,7 @@ describe('SpecCorpusScreen', () => {
     vi.spyOn(api, 'listCorpus').mockResolvedValue([]);
     render(<SpecCorpusScreen projectId="p1" />);
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: /Initialize Specs/ })).toBeInTheDocument(),
+      expect(screen.getByRole('button', { name: /Initialize Specs/ })).toBeInTheDocument()
     );
     fireEvent.click(screen.getByRole('button', { name: /Initialize Specs/ }));
     expect(useOpenSpecStore.getState().viewByProject.p1.showInitializeSpecs).toBe(true);

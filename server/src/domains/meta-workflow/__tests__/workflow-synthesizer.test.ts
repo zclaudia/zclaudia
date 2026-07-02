@@ -4,7 +4,9 @@ import { synthesizeWorkflow } from '../workflow-synthesizer.js';
 import type { PhaseDef } from '@zclaudia/shared/features/meta-workflow';
 
 const phase: PhaseDef = {
-  id: 'p1', name: 'Impl X', description: 'Implement X',
+  id: 'p1',
+  name: 'Impl X',
+  description: 'Implement X',
   phaseType: 'code-implement',
   dependsOn: [],
   inputs: [{ kind: 'file', source: 'design/requirements.md' }],
@@ -18,7 +20,7 @@ const phase: PhaseDef = {
 describe('workflow synthesizer', () => {
   it('returns the 5 skeleton nodes in order', () => {
     const def = synthesizeWorkflow(phase);
-    const ids = def.nodes.map((n) => n.id);
+    const ids = def.nodes.map(n => n.id);
     expect(ids).toEqual(['context_load', 'plan', 'execute', 'verify', 'commit']);
     expect(def.entryNodeId).toBe('context_load');
   });
@@ -26,17 +28,17 @@ describe('workflow synthesizer', () => {
   it('plan node is skipped if planRequired=false (single-shot)', () => {
     const designPhase: PhaseDef = { ...phase, phaseType: 'design-doc' };
     const def = synthesizeWorkflow(designPhase);
-    const ids = def.nodes.map((n) => n.id);
-    expect(ids).toContain('plan');  // node still exists but is set up to fast-path
+    const ids = def.nodes.map(n => n.id);
+    expect(ids).toContain('plan'); // node still exists but is set up to fast-path
     // Behavioral check: the design-doc template returns planRequired=false,
     // so the plan node's config should mark it as optional.
-    const planNode = def.nodes.find((n) => n.id === 'plan');
+    const planNode = def.nodes.find(n => n.id === 'plan');
     expect(planNode?.config?.planRequired).toBe(false);
   });
 
   it('verify node embeds acceptanceGates as shell sub-steps', () => {
     const def = synthesizeWorkflow(phase);
-    const verifyNode = def.nodes.find((n) => n.id === 'verify');
+    const verifyNode = def.nodes.find(n => n.id === 'verify');
     expect(verifyNode?.type).toBe('shell');
     const cfg = verifyNode!.config as { gates: { id: string; command: string }[] };
     expect(cfg.gates).toHaveLength(2);
@@ -46,7 +48,7 @@ describe('workflow synthesizer', () => {
 
   it('execute node embeds the phaseType prompt', () => {
     const def = synthesizeWorkflow(phase);
-    const exec = def.nodes.find((n) => n.id === 'execute');
+    const exec = def.nodes.find(n => n.id === 'execute');
     expect(exec?.type).toBe('ai_prompt');
     expect((exec!.config as { prompt: string }).prompt).toMatch(/self-healing/);
     expect((exec!.config as { prompt: string }).prompt).toMatch(/Implement X/);
@@ -54,7 +56,7 @@ describe('workflow synthesizer', () => {
 
   it('linear edges connect all 5 nodes', () => {
     const def = synthesizeWorkflow(phase);
-    expect(def.edges.map((e) => `${e.source}->${e.target}`)).toEqual([
+    expect(def.edges.map(e => `${e.source}->${e.target}`)).toEqual([
       'context_load->plan',
       'plan->execute',
       'execute->verify',
@@ -64,7 +66,7 @@ describe('workflow synthesizer', () => {
 
   it('propagates runtime provider id to ai_prompt nodes', () => {
     const def = synthesizeWorkflow({ ...phase, runtimeLlmProfileId: 'provider-x' });
-    const aiNodes = def.nodes.filter((n) => n.type === 'ai_prompt');
+    const aiNodes = def.nodes.filter(n => n.type === 'ai_prompt');
     for (const n of aiNodes) {
       expect((n.config as { llmProfileId?: string }).llmProfileId).toBe('provider-x');
     }

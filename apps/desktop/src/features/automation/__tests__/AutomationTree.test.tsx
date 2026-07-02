@@ -55,7 +55,9 @@ describe('AutomationTree', () => {
       getProjectsForBackend: (id: string) =>
         id === 'b2' ? [{ id: 'p2', name: 'remote-proj' }] : [{ id: 'p1', name: 'gen-token' }],
     };
-    const { rerender } = render(<AutomationTree {...multiProps} tab="workflows" activeBackendId="b1" />);
+    const { rerender } = render(
+      <AutomationTree {...multiProps} tab="workflows" activeBackendId="b1" />
+    );
     // b2 is not active yet — a single click on its project both selects scope and opens it.
     fireEvent.click(await screen.findByRole('button', { name: 'remote-proj' }));
     expect(onSelectScope).toHaveBeenCalledWith('b2', 'p2');

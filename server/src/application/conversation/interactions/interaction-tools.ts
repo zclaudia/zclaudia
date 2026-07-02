@@ -17,32 +17,51 @@ import { toolRegistry } from '../../../application/plugins/index.js';
 import { interactionDispatcher } from './interaction-dispatcher.js';
 import { MAX_TODO_CONTENT_CHARS, MAX_TODO_ITEMS, validateTodoItems } from './todo-normalizer.js';
 import { trackAndAutoComplete } from './todo-state-tracker.js';
-import type { TodoUpdateInteractionMessage, InteractionPromptMessage, ApprovalInteractionMessage } from '@zclaudia/shared/interaction/forms';
+import type {
+  TodoUpdateInteractionMessage,
+  InteractionPromptMessage,
+  ApprovalInteractionMessage,
+} from '@zclaudia/shared/interaction/forms';
 
 export interface InteractionToolsConfig {
   getServerPort: () => number | null;
 }
 
 /** HTTP POST to self (localhost) — reuses existing route handlers. */
-function selfPost(port: number, path: string, body: Record<string, unknown>, timeoutMs = 30_000): Promise<{ status: number; body: Record<string, unknown> }> {
+function selfPost(
+  port: number,
+  path: string,
+  body: Record<string, unknown>,
+  timeoutMs = 30_000
+): Promise<{ status: number; body: Record<string, unknown> }> {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(body);
-    const req = http.request({
-      hostname: '127.0.0.1',
-      port,
-      path,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) },
-      timeout: timeoutMs,
-    }, (res) => {
-      let raw = '';
-      res.on('data', (c) => { raw += c; });
-      res.on('end', () => {
-        try { resolve({ status: res.statusCode || 500, body: JSON.parse(raw) }); }
-        catch { resolve({ status: res.statusCode || 500, body: { raw } }); }
-      });
+    const req = http.request(
+      {
+        hostname: '127.0.0.1',
+        port,
+        path,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) },
+        timeout: timeoutMs,
+      },
+      res => {
+        let raw = '';
+        res.on('data', c => {
+          raw += c;
+        });
+        res.on('end', () => {
+          try {
+            resolve({ status: res.statusCode || 500, body: JSON.parse(raw) });
+          } catch {
+            resolve({ status: res.statusCode || 500, body: { raw } });
+          }
+        });
+      }
+    );
+    req.on('timeout', () => {
+      req.destroy(new Error('selfPost timeout'));
     });
-    req.on('timeout', () => { req.destroy(new Error('selfPost timeout')); });
     req.on('error', reject);
     req.write(data);
     req.end();
@@ -60,7 +79,8 @@ export function registerInteractionTools(config?: InteractionToolsConfig): void 
       type: 'function',
       function: {
         name: 'update_todo_list',
-        description: 'Update the visible task list for the user. Call this to show progress on multi-step tasks. Each call replaces the previous list.',
+        description:
+          'Update the visible task list for the user. Call this to show progress on multi-step tasks. Each call replaces the previous list.',
         parameters: {
           type: 'object',
           properties: {
@@ -70,8 +90,16 @@ export function registerInteractionTools(config?: InteractionToolsConfig): void 
               items: {
                 type: 'object',
                 properties: {
-                  content: { type: 'string', maxLength: MAX_TODO_CONTENT_CHARS, description: 'Task description' },
-                  status: { type: 'string', enum: ['pending', 'in_progress', 'completed', 'cancelled'], description: 'Task status' },
+                  content: {
+                    type: 'string',
+                    maxLength: MAX_TODO_CONTENT_CHARS,
+                    description: 'Task description',
+                  },
+                  status: {
+                    type: 'string',
+                    enum: ['pending', 'in_progress', 'completed', 'cancelled'],
+                    description: 'Task status',
+                  },
                 },
                 required: ['content', 'status'],
               },
@@ -132,7 +160,8 @@ export function registerInteractionTools(config?: InteractionToolsConfig): void 
       type: 'function',
       function: {
         name: 'ask_user_form',
-        description: 'Present a structured form to the user and wait for their response. Use this when you need specific structured input — multiple fields, choices, or confirmations.',
+        description:
+          'Present a structured form to the user and wait for their response. Use this when you need specific structured input — multiple fields, choices, or confirmations.',
         parameters: {
           type: 'object',
           properties: {
@@ -145,7 +174,11 @@ export function registerInteractionTools(config?: InteractionToolsConfig): void 
                 properties: {
                   id: { type: 'string', description: 'Unique field ID (used as key in response)' },
                   label: { type: 'string', description: 'Display label' },
-                  type: { type: 'string', enum: ['text', 'select', 'multiselect', 'textarea', 'confirm'], description: 'Field type' },
+                  type: {
+                    type: 'string',
+                    enum: ['text', 'select', 'multiselect', 'textarea', 'confirm'],
+                    description: 'Field type',
+                  },
                   options: {
                     type: 'array',
                     items: {
@@ -207,14 +240,24 @@ export function registerInteractionTools(config?: InteractionToolsConfig): void 
       type: 'function',
       function: {
         name: 'request_approval',
-        description: 'Request user approval before proceeding with an action. Blocks until the user approves or rejects. Use this for destructive, irreversible, or high-impact operations.',
+        description:
+          'Request user approval before proceeding with an action. Blocks until the user approves or rejects. Use this for destructive, irreversible, or high-impact operations.',
         parameters: {
           type: 'object',
           properties: {
             title: { type: 'string', description: 'Short title for the approval request' },
-            message: { type: 'string', description: 'Detailed description of what will happen if approved' },
-            approveLabel: { type: 'string', description: 'Custom label for the approve button (default: "Approve")' },
-            rejectLabel: { type: 'string', description: 'Custom label for the reject button (default: "Reject")' },
+            message: {
+              type: 'string',
+              description: 'Detailed description of what will happen if approved',
+            },
+            approveLabel: {
+              type: 'string',
+              description: 'Custom label for the approve button (default: "Approve")',
+            },
+            rejectLabel: {
+              type: 'string',
+              description: 'Custom label for the reject button (default: "Reject")',
+            },
           },
           required: ['title', 'message'],
         },
@@ -243,9 +286,10 @@ export function registerInteractionTools(config?: InteractionToolsConfig): void 
       }
 
       if (response.approved !== true) {
-        const feedback = typeof response.feedback === 'string' && response.feedback.trim()
-          ? response.feedback.trim()
-          : 'Plan rejected by user';
+        const feedback =
+          typeof response.feedback === 'string' && response.feedback.trim()
+            ? response.feedback.trim()
+            : 'Plan rejected by user';
         throw new Error(feedback);
       }
 
@@ -263,12 +307,16 @@ export function registerInteractionTools(config?: InteractionToolsConfig): void 
       type: 'function',
       function: {
         name: 'push_file',
-        description: 'Push a local file to the user\'s device. Use this when you build, generate, or export files (images, APKs, binaries, archives, documents, etc.) that the user needs. Images and small files (<500KB) auto-download; larger files show a download notification.',
+        description:
+          "Push a local file to the user's device. Use this when you build, generate, or export files (images, APKs, binaries, archives, documents, etc.) that the user needs. Images and small files (<500KB) auto-download; larger files show a download notification.",
         parameters: {
           type: 'object',
           properties: {
             filePath: { type: 'string', description: 'Absolute path to the file to push' },
-            description: { type: 'string', description: 'Brief description of the file (shown in notification)' },
+            description: {
+              type: 'string',
+              description: 'Brief description of the file (shown in notification)',
+            },
           },
           required: ['filePath'],
         },
@@ -303,9 +351,13 @@ export function registerInteractionTools(config?: InteractionToolsConfig): void 
             autoDownload: data.autoDownload,
           });
         }
-        return JSON.stringify({ error: (result.body.error as Record<string, unknown>)?.message || 'Push failed' });
+        return JSON.stringify({
+          error: (result.body.error as Record<string, unknown>)?.message || 'Push failed',
+        });
       } catch (err) {
-        return JSON.stringify({ error: `Push failed: ${err instanceof Error ? err.message : String(err)}` });
+        return JSON.stringify({
+          error: `Push failed: ${err instanceof Error ? err.message : String(err)}`,
+        });
       }
     },
   });
@@ -315,5 +367,7 @@ export function registerInteractionTools(config?: InteractionToolsConfig): void 
   // dialog is folded in as ExitPlanMode's optional `plan` flow (same
   // interaction_plan_review event, so the UI is unchanged).
 
-  console.log('[InteractionTools] Registered 4 interaction tools: update_todo_list, ask_user_form, request_approval, push_file');
+  console.log(
+    '[InteractionTools] Registered 4 interaction tools: update_todo_list, ask_user_form, request_approval, push_file'
+  );
 }

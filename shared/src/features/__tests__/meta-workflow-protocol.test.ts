@@ -11,8 +11,13 @@ describe('meta-workflow protocol messages', () => {
       type: 'meta_workflow_run_update',
       projectId: 'proj-1',
       run: {
-        id: 'run-1', projectId: 'proj-1', title: 't', status: 'requirement_draft',
-        rejectCount: 0, createdAt: 0, updatedAt: 0,
+        id: 'run-1',
+        projectId: 'proj-1',
+        title: 't',
+        status: 'requirement_draft',
+        rejectCount: 0,
+        createdAt: 0,
+        updatedAt: 0,
       },
     };
     const asUnion: ServerMessage = msg;
@@ -25,9 +30,14 @@ describe('meta-workflow protocol messages', () => {
       projectId: 'proj-1',
       runId: 'run-1',
       phase: {
-        id: 'pr-1', runId: 'run-1', phaseId: 'p1',
-        phaseType: 'code-implement', status: 'pending',
-        executeEntity: 'workflow', attempt: 0, maxRetries: 3,
+        id: 'pr-1',
+        runId: 'run-1',
+        phaseId: 'p1',
+        phaseType: 'code-implement',
+        status: 'pending',
+        executeEntity: 'workflow',
+        attempt: 0,
+        maxRetries: 3,
         createdAt: 0,
       },
     };
@@ -36,7 +46,9 @@ describe('meta-workflow protocol messages', () => {
 
   it('CreateMetaWorkflowRunMessage is a valid ClientMessage', async () => {
     const { describe, it, expect } = await import('vitest');
-    void describe; void it; void expect;
+    void describe;
+    void it;
+    void expect;
     const _msg: import('../../wire/messages/meta-workflow.js').CreateMetaWorkflowRunMessage = {
       type: 'create_meta_workflow_run',
       projectId: 'p',

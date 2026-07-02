@@ -11,11 +11,11 @@ import { READ_ONLY_TOOL_NAMES, type ToolName } from '@zclaudia/shared/core/tools
 export function resolvePlanModeTools(
   requestedTools: ToolName[],
   isPlanMode: boolean,
-  sandboxAvailable: boolean,
+  sandboxAvailable: boolean
 ): ToolName[] {
   if (!isPlanMode) return requestedTools;
   const allowed = sandboxAvailable
     ? new Set<ToolName>([...READ_ONLY_TOOL_NAMES, 'Bash'])
     : new Set<ToolName>(READ_ONLY_TOOL_NAMES);
-  return requestedTools.filter((t) => allowed.has(t));
+  return requestedTools.filter(t => allowed.has(t));
 }

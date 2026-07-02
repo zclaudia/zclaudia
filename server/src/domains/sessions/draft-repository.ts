@@ -21,26 +21,38 @@ export class SessionDraftRepository {
   }
 
   private findAnyBySessionId(sessionId: string): SessionDraft | null {
-    const row = this.db.prepare(`
+    const row = this.db
+      .prepare(
+        `
       SELECT * FROM session_drafts
       WHERE session_id = ?
-    `).get(sessionId);
+    `
+      )
+      .get(sessionId);
     return row ? this.mapRow(row) : null;
   }
 
   findBySessionId(sessionId: string): SessionDraft | null {
-    const row = this.db.prepare(`
+    const row = this.db
+      .prepare(
+        `
       SELECT * FROM session_drafts
       WHERE session_id = ? AND archived_at IS NULL
-    `).get(sessionId);
+    `
+      )
+      .get(sessionId);
     return row ? this.mapRow(row) : null;
   }
 
   exists(sessionId: string): boolean {
-    const row = this.db.prepare(`
+    const row = this.db
+      .prepare(
+        `
       SELECT 1 FROM session_drafts
       WHERE session_id = ? AND archived_at IS NULL
-    `).get(sessionId) as any;
+    `
+      )
+      .get(sessionId) as any;
     return !!row;
   }
 
@@ -53,33 +65,54 @@ export class SessionDraftRepository {
     const existing = this.findBySessionId(sessionId);
 
     if (existing) {
-      this.db.prepare(`
+      this.db
+        .prepare(
+          `
         UPDATE session_drafts
         SET content = ?, editing_by = ?, editing_at = ?, updated_at = ?
         WHERE id = ?
-      `).run(content, deviceId || existing.editingBy || null, deviceId ? now : existing.editingAt || null, now, existing.id);
+      `
+        )
+        .run(
+          content,
+          deviceId || existing.editingBy || null,
+          deviceId ? now : existing.editingAt || null,
+          now,
+          existing.id
+        );
       return this.findBySessionId(sessionId)!;
     }
 
     const archived = this.findAnyBySessionId(sessionId);
     if (archived) {
-      this.db.prepare(`
+      this.db
+        .prepare(
+          `
         UPDATE session_drafts
         SET content = ?, editing_by = ?, editing_at = ?, updated_at = ?, archived_at = NULL
         WHERE id = ?
-      `).run(content, deviceId || null, deviceId ? now : null, now, archived.id);
+      `
+        )
+        .run(content, deviceId || null, deviceId ? now : null, now, archived.id);
       return this.findBySessionId(sessionId)!;
     }
 
     const id = newId();
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO session_drafts (id, session_id, content, editing_by, editing_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run(id, sessionId, content, deviceId || null, deviceId ? now : null, now);
+    `
+      )
+      .run(id, sessionId, content, deviceId || null, deviceId ? now : null, now);
     return this.mapRow(this.db.prepare('SELECT * FROM session_drafts WHERE id = ?').get(id));
   }
 
-  acquireLock(sessionId: string, deviceId: string): { success: boolean; draft: SessionDraft | null } {
+  acquireLock(
+    sessionId: string,
+    deviceId: string
+  ): { success: boolean; draft: SessionDraft | null } {
     const now = Date.now();
     const draft = this.findBySessionId(sessionId);
 
@@ -95,9 +128,13 @@ export class SessionDraftRepository {
       }
     }
 
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       UPDATE session_drafts SET editing_by = ?, editing_at = ? WHERE id = ?
-    `).run(deviceId, now, draft.id);
+    `
+      )
+      .run(deviceId, now, draft.id);
 
     return { success: true, draft: this.findBySessionId(sessionId) };
   }
@@ -110,9 +147,13 @@ export class SessionDraftRepository {
       return this.upsert(sessionId, '', deviceId);
     }
 
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       UPDATE session_drafts SET editing_by = ?, editing_at = ? WHERE id = ?
-    `).run(deviceId, now, draft.id);
+    `
+      )
+      .run(deviceId, now, draft.id);
 
     return this.findBySessionId(sessionId);
   }
@@ -120,9 +161,13 @@ export class SessionDraftRepository {
   releaseLock(sessionId: string, deviceId: string): void {
     const draft = this.findBySessionId(sessionId);
     if (draft && draft.editingBy === deviceId) {
-      this.db.prepare(`
+      this.db
+        .prepare(
+          `
         UPDATE session_drafts SET editing_by = NULL, editing_at = NULL WHERE id = ?
-      `).run(draft.id);
+      `
+        )
+        .run(draft.id);
     }
   }
 
@@ -131,19 +176,27 @@ export class SessionDraftRepository {
     if (!draft) return null;
 
     const now = Date.now();
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       UPDATE session_drafts
       SET archived_at = ?, editing_by = NULL, editing_at = NULL, updated_at = ?
       WHERE id = ?
-    `).run(now, now, draft.id);
+    `
+      )
+      .run(now, now, draft.id);
 
     return this.mapRow(this.db.prepare('SELECT * FROM session_drafts WHERE id = ?').get(draft.id));
   }
 
   delete(sessionId: string): boolean {
-    const result = this.db.prepare(`
+    const result = this.db
+      .prepare(
+        `
       DELETE FROM session_drafts WHERE session_id = ?
-    `).run(sessionId);
+    `
+      )
+      .run(sessionId);
     return result.changes > 0;
   }
 }

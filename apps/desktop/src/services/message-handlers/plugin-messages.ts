@@ -9,34 +9,38 @@ import { activatePanel } from '../../utils/openPanel';
 
 function resolveOwnerBackendId(backendId: string | null, serverId: string): string {
   const rawBackendId = backendId || parseBackendId(serverId) || serverId;
-  return resolveCanonicalBackendId(rawBackendId, resolveLocalBackendId() ?? rawBackendId) ?? rawBackendId;
+  return (
+    resolveCanonicalBackendId(rawBackendId, resolveLocalBackendId() ?? rawBackendId) ?? rawBackendId
+  );
 }
 
 export function handlePluginMessage(
   msg: ServerMessage,
   serverId: string,
-  backendId: string | null,
+  backendId: string | null
 ): boolean {
   switch (msg.type) {
     case 'plugin_state': {
       const pluginStore = usePluginStore.getState();
       const now = new Date().toISOString();
-      pluginStore.setPlugins(msg.plugins.map((p: any) => ({
-        manifest: {
-          id: p.id,
-          name: p.name,
-          version: p.version,
-          description: p.description,
-          permissions: p.permissions,
-          platform: p.platform,
-        },
-        path: p.path,
-        status: p.status === 'active' ? 'active' : p.status === 'error' ? 'error' : 'idle',
-        enabled: p.enabled,
-        error: p.error,
-        installedAt: now,
-        updatedAt: now,
-      })));
+      pluginStore.setPlugins(
+        msg.plugins.map((p: any) => ({
+          manifest: {
+            id: p.id,
+            name: p.name,
+            version: p.version,
+            description: p.description,
+            permissions: p.permissions,
+            platform: p.platform,
+          },
+          path: p.path,
+          status: p.status === 'active' ? 'active' : p.status === 'error' ? 'error' : 'idle',
+          enabled: p.enabled,
+          error: p.error,
+          installedAt: now,
+          updatedAt: now,
+        }))
+      );
 
       for (const p of msg.plugins as any[]) {
         if (p.status === 'active' && p.panels?.length > 0) {
@@ -87,16 +91,18 @@ export function handlePluginMessage(
 
     case 'plugin_notification': {
       const pluginMsg = msg as import('@zclaudia/shared').PluginNotificationMessage;
-      import('../../stores/notificationFeedStore').then(m => m.useNotificationFeedStore.getState().upsertItem({
-        id: `plugin-${pluginMsg.pluginId}-${Date.now()}`,
-        ownerBackendId: resolveOwnerBackendId(backendId, serverId),
-        source: 'trigger',
-        title: pluginMsg.title,
-        summary: pluginMsg.body,
-        status: 'completed',
-        pluginTab: pluginMsg.notchTab,
-        createdAt: Date.now(),
-      }));
+      import('../../stores/notificationFeedStore').then(m =>
+        m.useNotificationFeedStore.getState().upsertItem({
+          id: `plugin-${pluginMsg.pluginId}-${Date.now()}`,
+          ownerBackendId: resolveOwnerBackendId(backendId, serverId),
+          source: 'trigger',
+          title: pluginMsg.title,
+          summary: pluginMsg.body,
+          status: 'completed',
+          pluginTab: pluginMsg.notchTab,
+          createdAt: Date.now(),
+        })
+      );
       import('../../stores/toastStore').then(m => {
         m.useToastStore.getState().add({
           title: pluginMsg.title,

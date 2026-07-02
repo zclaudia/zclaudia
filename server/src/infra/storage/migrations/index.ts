@@ -1,4 +1,5 @@
 import type { Migration } from './types.js';
+import type { Database } from 'better-sqlite3';
 
 import { migration as m_001_initial_schema } from './001_initial_schema.js';
 import { migration as m_002_request_headers } from './002_request_headers.js';
@@ -71,7 +72,11 @@ export const migrations: Migration[] = [
  * tracking table as production `runMigrations` in db.ts. Intended for tests
  * that need a fully-migrated in-memory DB without going through `initDatabase`.
  */
-export function applyMigrations(db: import('better-sqlite3').Database): void {
+export function applyPendingMigrations(
+  db: Database,
+  migrationList: Migration[] = migrations,
+  options: { log?: boolean } = {}
+): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS migrations (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -81,27 +86,53 @@ export function applyMigrations(db: import('better-sqlite3').Database): void {
   `);
 
   const applied = new Set(
-    (db.prepare('SELECT name FROM migrations').all() as Array<{ name: string }>).map((r) => r.name),
+    (db.prepare('SELECT name FROM migrations').all() as Array<{ name: string }>).map(r => r.name)
   );
 
   const insert = db.prepare('INSERT INTO migrations (name, applied_at) VALUES (?, ?)');
 
-  for (const migration of migrations) {
+  for (const migration of migrationList) {
     if (applied.has(migration.name)) continue;
-    try {
-      db.exec(migration.sql);
-    } catch (error) {
-      if (migration.idempotent) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (message.includes('duplicate column name:')) {
-          // Schema already applied; record and continue.
+    if (options.log) {
+      console.log(`Applying migration: ${migration.name}`);
+    }
+    const apply = () => {
+      try {
+        db.exec(migration.sql);
+      } catch (error) {
+        if (migration.idempotent) {
+          const message = error instanceof Error ? error.message : String(error);
+          if (message.includes('duplicate column name:')) {
+            if (options.log) {
+              console.warn(
+                `Migration ${migration.name} already applied at schema level, marking as applied.`
+              );
+            }
+            // Schema already applied; record and continue.
+          } else {
+            throw error;
+          }
         } else {
           throw error;
         }
-      } else {
-        throw error;
       }
+      insert.run(migration.name, Date.now());
+      applied.add(migration.name);
+    };
+
+    if (/\bBEGIN(?:\s+TRANSACTION)?\b/i.test(migration.sql)) {
+      apply();
+    } else {
+      db.transaction(apply)();
     }
-    insert.run(migration.name, Date.now());
   }
+}
+
+/**
+ * Apply all migrations to a database. Idempotent — uses the same `migrations`
+ * tracking table as production `runMigrations` in db.ts. Intended for tests
+ * that need a fully-migrated in-memory DB without going through `initDatabase`.
+ */
+export function applyMigrations(db: Database): void {
+  applyPendingMigrations(db, migrations);
 }

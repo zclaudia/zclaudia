@@ -29,21 +29,24 @@ export interface ConnectionPlan {
  * already connected. Pure — no side effects.
  */
 export function computeConnectionPlan(input: ConnectionPlanInput): ConnectionPlan {
-  const { expandedBackendIds, foregroundBackendId, localBackendId, managedBackendIds, isConnected } = input;
+  const {
+    expandedBackendIds,
+    foregroundBackendId,
+    localBackendId,
+    managedBackendIds,
+    isConnected,
+  } = input;
 
   const desired = new Set<string>(expandedBackendIds);
   if (foregroundBackendId) desired.add(foregroundBackendId);
 
   // Manageable = desired minus the local backend (never managed).
-  const manageable = [...desired].filter((id) => id !== localBackendId);
+  const manageable = [...desired].filter(id => id !== localBackendId);
   const manageableSet = new Set(manageable);
 
-  const toConnect = manageable.filter((id) => !managedBackendIds.includes(id) && !isConnected(id));
-  const toDisconnect = managedBackendIds.filter((id) => !manageableSet.has(id));
-  const nextManaged = [
-    ...managedBackendIds.filter((id) => manageableSet.has(id)),
-    ...toConnect,
-  ];
+  const toConnect = manageable.filter(id => !managedBackendIds.includes(id) && !isConnected(id));
+  const toDisconnect = managedBackendIds.filter(id => !manageableSet.has(id));
+  const nextManaged = [...managedBackendIds.filter(id => manageableSet.has(id)), ...toConnect];
 
   return { toConnect, toDisconnect, nextManaged };
 }

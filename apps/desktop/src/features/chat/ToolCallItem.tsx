@@ -2,7 +2,14 @@ import { useState, useMemo, useEffect, useRef, memo } from 'react';
 import { type ToolCallState } from '../../stores/runStore';
 import { getToolIcon } from '../../config/icons';
 import { Icon } from '../../components/ui/Icon';
-import { CheckCircle2, XCircle, Loader2, ChevronDown, ChevronRight, SendToBack } from 'lucide-react';
+import {
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  ChevronDown,
+  ChevronRight,
+  SendToBack,
+} from 'lucide-react';
 import { useConnection } from '../../contexts/ConnectionContext';
 import { useSelectionStore } from '../../stores/selectionStore';
 import { useInteractionStore } from '../../stores/interactionStore';
@@ -34,11 +41,12 @@ export const ToolCallItem = memo(function ToolCallItem({ toolCall }: ToolCallIte
   // "Execute plan" button are visible without an extra click. The state is
   // user-toggleable afterwards; `autoExpandedRef` ensures we only auto-expand
   // once per tool call (so user collapses stick).
-  const [isExpanded, setIsExpanded] = useState(() =>
-    isPlanProposalTool(toolCall.toolName, toolCall.semantic) && toolCall.status === 'completed',
+  const [isExpanded, setIsExpanded] = useState(
+    () =>
+      isPlanProposalTool(toolCall.toolName, toolCall.semantic) && toolCall.status === 'completed'
   );
   const autoExpandedRef = useRef(
-    isPlanProposalTool(toolCall.toolName, toolCall.semantic) && toolCall.status === 'completed',
+    isPlanProposalTool(toolCall.toolName, toolCall.semantic) && toolCall.status === 'completed'
   );
   useEffect(() => {
     if (autoExpandedRef.current) return;
@@ -48,15 +56,15 @@ export const ToolCallItem = memo(function ToolCallItem({ toolCall }: ToolCallIte
     setIsExpanded(true);
   }, [toolCall.status, toolCall.toolName, toolCall.semantic]);
   const { toolName, toolInput, status, result, isError, activity, semantic, effect } = toolCall;
-  const selectedSessionId = useSelectionStore((s) => s.selectedSessionId);
+  const selectedSessionId = useSelectionStore(s => s.selectedSessionId);
   const { sendMessage } = useConnection();
   const [backgroundRequested, setBackgroundRequested] = useState(false);
-  const pendingPromptRequest = usePromptRequestStore((s) => {
+  const pendingPromptRequest = usePromptRequestStore(s => {
     if (!selectedSessionId || toolName !== 'AskUserQuestion') return null;
     for (let i = s.pendingRequests.length - 1; i >= 0; i--) {
       if (
-        s.pendingRequests[i].sessionId === selectedSessionId
-        && s.pendingRequests[i].requestId === toolCall.id
+        s.pendingRequests[i].sessionId === selectedSessionId &&
+        s.pendingRequests[i].requestId === toolCall.id
       ) {
         return s.pendingRequests[i];
       }
@@ -77,8 +85,9 @@ export const ToolCallItem = memo(function ToolCallItem({ toolCall }: ToolCallIte
 
   // Phase 1 dedup: render InteractionItem instead of interaction tool when interaction store has it
   const interactionId = extractInteractionId(result);
-  const interaction = useInteractionStore((s) => {
-    const direct = s.interactions[toolCall.id] || (interactionId ? s.interactions[interactionId] : undefined);
+  const interaction = useInteractionStore(s => {
+    const direct =
+      s.interactions[toolCall.id] || (interactionId ? s.interactions[interactionId] : undefined);
     if (direct) return direct;
 
     // A plan-proposal tool creates a separate interaction before the tool
@@ -86,7 +95,9 @@ export const ToolCallItem = memo(function ToolCallItem({ toolCall }: ToolCallIte
     // suffix fallback) instead of provider-specific tool names.
     if (selectedSessionId && isPlanProposalTool(toolName, semantic)) {
       return Object.values(s.interactions)
-        .filter((item) => item.sessionId === selectedSessionId && item.type === 'interaction_plan_review')
+        .filter(
+          item => item.sessionId === selectedSessionId && item.type === 'interaction_plan_review'
+        )
         .sort((a, b) => b.createdAt - a.createdAt)[0];
     }
 
@@ -94,20 +105,31 @@ export const ToolCallItem = memo(function ToolCallItem({ toolCall }: ToolCallIte
   });
   const resolvedInteraction = interaction ?? fallbackPromptInteraction;
   if (resolvedInteraction && isInteractionTool(toolName, semantic)) {
-    if (resolvedInteraction.type === 'interaction_todo_update' && resolvedInteraction.todos.length > 0) {
+    if (
+      resolvedInteraction.type === 'interaction_todo_update' &&
+      resolvedInteraction.todos.length > 0
+    ) {
       return <InteractionItem interaction={resolvedInteraction} />;
     }
-    if (resolvedInteraction.type === 'interaction_prompt' || resolvedInteraction.type === 'interaction_approval' || resolvedInteraction.type === 'interaction_plan_review') {
+    if (
+      resolvedInteraction.type === 'interaction_prompt' ||
+      resolvedInteraction.type === 'interaction_approval' ||
+      resolvedInteraction.type === 'interaction_plan_review'
+    ) {
       return <InteractionItem interaction={resolvedInteraction} />;
     }
   }
 
   const icon = getToolIcon(toolName);
-  const displayName = isTodoTool(toolName) ? 'TodoWrite'
-    : isAskUserFormTool(toolName) ? 'AskUserForm'
-    : isApprovalTool(toolName) ? 'RequestApproval'
-    : isPushFileTool(toolName) ? 'PushFile'
-    : toolName;
+  const displayName = isTodoTool(toolName)
+    ? 'TodoWrite'
+    : isAskUserFormTool(toolName)
+      ? 'AskUserForm'
+      : isApprovalTool(toolName)
+        ? 'RequestApproval'
+        : isPushFileTool(toolName)
+          ? 'PushFile'
+          : toolName;
   const summary = formatToolInput(toolName, toolInput, semantic);
 
   // AskUserQuestion: user answers come back as "deny" (isError=true), but that's expected behavior
@@ -120,8 +142,8 @@ export const ToolCallItem = memo(function ToolCallItem({ toolCall }: ToolCallIte
         status === 'running'
           ? 'border-primary/30 bg-muted/40'
           : showAsError
-          ? 'border-destructive/30 bg-destructive/5'
-          : 'border-success/30 bg-success/5'
+            ? 'border-destructive/30 bg-destructive/5'
+            : 'border-success/30 bg-success/5'
       }`}
     >
       {/* Header - clickable to expand/collapse */}
@@ -140,12 +162,12 @@ export const ToolCallItem = memo(function ToolCallItem({ toolCall }: ToolCallIte
 
         {/* Tool icon and name */}
         <Icon icon={icon} size={14} className="text-muted-foreground" />
-        <span className="text-xs font-medium text-foreground" data-testid="tool-name">{displayName}</span>
+        <span className="text-xs font-medium text-foreground" data-testid="tool-name">
+          {displayName}
+        </span>
 
         {/* Summary */}
-        <span className="flex-1 text-xs text-muted-foreground truncate ml-2">
-          {summary}
-        </span>
+        <span className="flex-1 text-xs text-muted-foreground truncate ml-2">{summary}</span>
 
         {/* Expand/collapse indicator */}
         <span className="text-muted-foreground">
@@ -157,7 +179,7 @@ export const ToolCallItem = memo(function ToolCallItem({ toolCall }: ToolCallIte
       {status === 'running' && toolName === 'Bash' && selectedSessionId && (
         <div className="px-3 pb-2 -mt-1 pl-9">
           <button
-            onClick={(e) => {
+            onClick={e => {
               e.stopPropagation();
               if (backgroundRequested) return;
               setBackgroundRequested(true);
@@ -179,9 +201,7 @@ export const ToolCallItem = memo(function ToolCallItem({ toolCall }: ToolCallIte
       {/* Subagent activity indicator — shows what the Agent is currently doing */}
       {status === 'running' && activity && toolName === 'Agent' && (
         <div className="px-3 pb-2 -mt-1">
-          <div className="text-[11px] text-muted-foreground truncate pl-6">
-            {activity}
-          </div>
+          <div className="text-[11px] text-muted-foreground truncate pl-6">{activity}</div>
         </div>
       )}
 

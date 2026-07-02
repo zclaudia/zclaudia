@@ -80,7 +80,9 @@ test.describe('Background Tasks', () => {
     await page.waitForTimeout(2000);
 
     // Look for background mode toggle or indicator
-    const backgroundToggle = page.locator('[class*="background"], button[title*="Background"]').first();
+    const backgroundToggle = page
+      .locator('[class*="background"], button[title*="Background"]')
+      .first();
     const hasBackground = await backgroundToggle.isVisible({ timeout: 2000 }).catch(() => false);
 
     if (hasBackground) {
@@ -103,7 +105,9 @@ test.describe('Background Tasks', () => {
     }
 
     // Look for running task indicator
-    const taskIndicator = page.locator('[class*="running"], [class*="active-task"], [data-testid="task-indicator"]').first();
+    const taskIndicator = page
+      .locator('[class*="running"], [class*="active-task"], [data-testid="task-indicator"]')
+      .first();
     const hasIndicator = await taskIndicator.isVisible({ timeout: 2000 }).catch(() => false);
 
     if (hasIndicator) {
@@ -132,7 +136,9 @@ test.describe('Background Tasks', () => {
     await page.waitForTimeout(2000);
 
     // Look for progress bar or spinner
-    const progressIndicator = page.locator('[class*="progress"], [class*="spinner"], [class*="loading"]').first();
+    const progressIndicator = page
+      .locator('[class*="progress"], [class*="spinner"], [class*="loading"]')
+      .first();
     const hasProgress = await progressIndicator.isVisible({ timeout: 3000 }).catch(() => false);
 
     if (hasProgress) {
@@ -167,7 +173,9 @@ test.describe('Background Tasks', () => {
       await page.waitForTimeout(500);
 
       // Check if previous task continues
-      const backgroundBadge = page.locator('[class*="background-badge"], text=/Running|Background/i').first();
+      const backgroundBadge = page
+        .locator('[class*="background-badge"], text=/Running|Background/i')
+        .first();
       const hasBadge = await backgroundBadge.isVisible({ timeout: 2000 }).catch(() => false);
 
       if (hasBadge) {
@@ -193,7 +201,9 @@ test.describe('Background Tasks', () => {
     }
 
     // Look for notification indicator
-    const notificationBadge = page.locator('[class*="notification-badge"], [data-testid="notifications"]').first();
+    const notificationBadge = page
+      .locator('[class*="notification-badge"], [data-testid="notifications"]')
+      .first();
     const hasBadge = await notificationBadge.isVisible({ timeout: 1000 }).catch(() => false);
 
     if (hasBadge) {
@@ -222,7 +232,9 @@ test.describe('Background Tasks', () => {
     await page.waitForTimeout(5000);
 
     // Look for completion indicator
-    const completionIndicator = page.locator('[class*="completed"], [class*="done"], [data-status="complete"]').first();
+    const completionIndicator = page
+      .locator('[class*="completed"], [class*="done"], [data-status="complete"]')
+      .first();
     const hasCompletion = await completionIndicator.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (hasCompletion) {

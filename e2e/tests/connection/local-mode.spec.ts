@@ -13,7 +13,7 @@ describe('Local Mode Specific Features', () => {
     }
   });
 
-  test('should not require API key', async () => {
+  test.skipIf(!localMode.enabled)('should not require API key', async () => {
     browser = await createBrowser();
     await browser.goto('/');
     await browser.waitForLoadState('networkidle');
@@ -29,7 +29,7 @@ describe('Local Mode Specific Features', () => {
     console.log('✓ Local connection works without API key');
   });
 
-  test('should have full unrestricted access', async () => {
+  test.skipIf(!localMode.enabled)('should have full unrestricted access', async () => {
     browser = await createBrowser();
     await browser.goto('/');
     await browser.waitForLoadState('networkidle');

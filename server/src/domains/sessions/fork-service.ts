@@ -5,7 +5,11 @@ import { forkSessionAt } from '../../infra/providers/pi-runtime/session-tree/for
 import { readActivePathRows, writeProjectedMessages } from './reproject-messages.js';
 
 export class ForkError extends Error {
-  constructor(readonly status: number, readonly code: string, message: string) {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    message: string
+  ) {
     super(message);
   }
 }
@@ -26,13 +30,25 @@ export interface ForkDeps {
  * broadcast fires only AFTER the DB work commits (so a partial failure never
  * surfaces a half-built session) and carries lineage.
  */
-export async function forkSession(db: Database, input: ForkInput, deps: ForkDeps): Promise<Session> {
+export async function forkSession(
+  db: Database,
+  input: ForkInput,
+  deps: ForkDeps
+): Promise<Session> {
   const repo = new SessionRepository(db);
   const source = repo.findById(input.sourceSessionId);
-  if (!source) throw new ForkError(404, 'NOT_FOUND', `source session not found: ${input.sourceSessionId}`);
+  if (!source)
+    throw new ForkError(404, 'NOT_FOUND', `source session not found: ${input.sourceSessionId}`);
 
-  const owns = db.prepare(`SELECT 1 FROM session_entries WHERE id = ? AND session_id = ?`).get(input.treeEntryId, input.sourceSessionId);
-  if (!owns) throw new ForkError(400, 'INVALID_ENTRY', `entry ${input.treeEntryId} not in session ${input.sourceSessionId}`);
+  const owns = db
+    .prepare(`SELECT 1 FROM session_entries WHERE id = ? AND session_id = ?`)
+    .get(input.treeEntryId, input.sourceSessionId);
+  if (!owns)
+    throw new ForkError(
+      400,
+      'INVALID_ENTRY',
+      `entry ${input.treeEntryId} not in session ${input.sourceSessionId}`
+    );
 
   const trimmed = input.name?.trim();
   const name = trimmed && trimmed.length > 0 ? trimmed : `${source.name ?? 'Session'} (fork)`;

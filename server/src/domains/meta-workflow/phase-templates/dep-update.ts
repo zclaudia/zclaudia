@@ -19,8 +19,10 @@ export const depUpdateTemplate: PhaseTemplate = {
       `Full test suite must pass at the end.`,
       ``,
       `Acceptance gates that MUST pass:`,
-      ...phase.acceptanceGates.map((g) => `  - ${g.id}: ${g.command}`),
+      ...phase.acceptanceGates.map(g => `  - ${g.id}: ${g.command}`),
     ].join('\n');
   },
-  defaultGates(_phase: PhaseDef) { return []; },
+  defaultGates(_phase: PhaseDef) {
+    return [];
+  },
 };

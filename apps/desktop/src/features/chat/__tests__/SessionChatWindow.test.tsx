@@ -8,8 +8,12 @@ const SERIALIZE_TO_IPC_FN = Symbol('SERIALIZE_TO_IPC_FN');
 // Mock Resource class
 class MockResource {
   rid: number;
-  constructor(rid: number) { this.rid = rid; }
-  [SERIALIZE_TO_IPC_FN]() { return { rid: this.rid }; }
+  constructor(rid: number) {
+    this.rid = rid;
+  }
+  [SERIALIZE_TO_IPC_FN]() {
+    return { rid: this.rid };
+  }
 }
 
 vi.mock('@tauri-apps/api/core', () => ({
@@ -77,7 +81,13 @@ vi.mock('../SessionChatLayout', () => ({
 
 // Mock ConnectionContext provider
 vi.mock('../../../contexts/ConnectionContext', () => ({
-  ConnectionProvider: ({ children, standaloneServerUrl, standaloneServerId, standaloneGatewayUrl, standaloneGatewaySecret }: any) => (
+  ConnectionProvider: ({
+    children,
+    standaloneServerUrl,
+    standaloneServerId,
+    standaloneGatewayUrl,
+    standaloneGatewaySecret,
+  }: any) => (
     <div
       data-testid="connection-provider"
       data-server-url={standaloneServerUrl}
@@ -131,38 +141,41 @@ let mockFacadeBackends: Array<{ backendId: string; runtimeState: string }> = [];
 // Mock stores
 vi.mock('../../../stores/serverStore', () => ({
   useServerStore: Object.assign(
-    (selector: any) => selector({
-      activeServerId: 'backend-1',
-      connections: {
-        'backend-1': {
-          isLocalConnection: false,
-          features: [],
+    (selector: any) =>
+      selector({
+        activeServerId: 'backend-1',
+        connections: {
+          'backend-1': {
+            isLocalConnection: false,
+            features: [],
+          },
         },
-      },
-    } as any),
+      } as any),
     {
       getState: () => ({
         setActiveServer: mockSetActiveServer,
       }),
-    },
+    }
   ),
 }));
 
 vi.mock('../../../stores/recoveryStore', () => ({
-  useRecoveryStore: (selector: any) => selector({
-    backends: {
-      'backend-1': {
-        status: mockRecoveryStatus,
+  useRecoveryStore: (selector: any) =>
+    selector({
+      backends: {
+        'backend-1': {
+          status: mockRecoveryStatus,
+        },
       },
-    },
-  } as any),
+    } as any),
 }));
 
 vi.mock('../../../stores/facadeStore', () => ({
-  useFacadeStore: (selector: any) => selector({
-    connectionState: mockFacadeConnectionState,
-    backends: mockFacadeBackends,
-  } as any),
+  useFacadeStore: (selector: any) =>
+    selector({
+      connectionState: mockFacadeConnectionState,
+      backends: mockFacadeBackends,
+    } as any),
 }));
 
 vi.mock('../../../utils/platform', () => ({
@@ -171,11 +184,12 @@ vi.mock('../../../utils/platform', () => ({
 
 vi.mock('../../../stores/projectStore', () => ({
   useProjectStore: Object.assign(
-    (selector: any) => selector({
-      projects: [],
-      sessions: [],
-      providers: [],
-    } as any),
+    (selector: any) =>
+      selector({
+        projects: [],
+        sessions: [],
+        providers: [],
+      } as any),
     {
       getState: () => ({
         setProjects: mockSetProjects,
@@ -185,7 +199,7 @@ vi.mock('../../../stores/projectStore', () => ({
         selectSession: mockSelectSession,
         setActiveServer: mockSetActiveServer,
       }),
-    },
+    }
   ),
 }));
 
@@ -333,9 +347,7 @@ describe('SessionChatWindow', () => {
   it('uses mobile recovery readiness on Android', async () => {
     vi.mocked(isAndroid).mockReturnValue(true);
     mockFacadeConnectionState = 'connected';
-    mockFacadeBackends = [
-      { backendId: 'backend-1', runtimeState: 'ready' },
-    ];
+    mockFacadeBackends = [{ backendId: 'backend-1', runtimeState: 'ready' }];
 
     const { container } = render(
       <SessionChatWindow
@@ -353,9 +365,7 @@ describe('SessionChatWindow', () => {
 
   it('keeps loading spinner when backend is not ready', () => {
     mockFacadeConnectionState = 'connected';
-    mockFacadeBackends = [
-      { backendId: 'backend-1', runtimeState: 'visible' },
-    ];
+    mockFacadeBackends = [{ backendId: 'backend-1', runtimeState: 'visible' }];
 
     const { container } = render(
       <SessionChatWindow

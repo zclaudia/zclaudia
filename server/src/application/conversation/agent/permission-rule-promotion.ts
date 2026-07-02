@@ -1,8 +1,9 @@
 import { parseToolRule } from '@zclaudia/shared/interaction/tool-rule-syntax';
 import type { UnifiedPermissionPolicy } from '@zclaudia/shared/interaction/permissions';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Db = { prepare: (sql: string) => { get: (...a: any[]) => unknown; run: (...a: any[]) => unknown } };
+type Db = {
+  prepare: (sql: string) => { get: (...a: any[]) => unknown; run: (...a: any[]) => unknown };
+};
 
 /**
  * Persist an approval-modal "always allow" rule into the project's permission
@@ -15,9 +16,9 @@ export function promoteRuleToProjectOverride(db: Db, projectId: string, ruleText
     console.warn(`[PermissionPromotion] unparseable rule "${ruleText}": ${parsed.error}`);
     return false;
   }
-  const row = db.prepare('SELECT agent_permission_override FROM projects WHERE id = ?').get(projectId) as
-    | { agent_permission_override: string | null }
-    | undefined;
+  const row = db
+    .prepare('SELECT agent_permission_override FROM projects WHERE id = ?')
+    .get(projectId) as { agent_permission_override: string | null } | undefined;
   let override: Partial<UnifiedPermissionPolicy> = {};
   if (row?.agent_permission_override) {
     try {
@@ -29,15 +30,23 @@ export function promoteRuleToProjectOverride(db: Db, projectId: string, ruleText
   const rules = override.customRules ?? [];
   const pattern = parsed.rule.pattern;
   const exists = rules.some(
-    (r) => r.toolName === parsed.rule.toolName && (r.pattern ?? null) === (pattern ?? null) && r.action === 'approve',
+    r =>
+      r.toolName === parsed.rule.toolName &&
+      (r.pattern ?? null) === (pattern ?? null) &&
+      r.action === 'approve'
   );
   if (!exists) {
     override.customRules = [
       ...rules,
-      { toolName: parsed.rule.toolName, ...(pattern ? { pattern } : {}), action: 'approve' as const },
+      {
+        toolName: parsed.rule.toolName,
+        ...(pattern ? { pattern } : {}),
+        action: 'approve' as const,
+      },
     ];
-    db.prepare('UPDATE projects SET agent_permission_override = ?, updated_at = ? WHERE id = ?')
-      .run(JSON.stringify(override), Date.now(), projectId);
+    db.prepare(
+      'UPDATE projects SET agent_permission_override = ?, updated_at = ? WHERE id = ?'
+    ).run(JSON.stringify(override), Date.now(), projectId);
   }
   return true;
 }

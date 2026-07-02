@@ -10,11 +10,15 @@ interface Props {
   onNewClassicChange: () => void;
 }
 
-export function NewRunDropdown({ projectId, socket, onNewClassicChange }: Props): React.ReactElement {
+export function NewRunDropdown({
+  projectId,
+  socket,
+  onNewClassicChange,
+}: Props): React.ReactElement {
   const [open, setOpen] = useState(false);
   const [titleInput, setTitleInput] = useState('');
   const [showMetaForm, setShowMetaForm] = useState(false);
-  const markPendingSelect = useMetaWorkflowStore((s) => s.markPendingSelect);
+  const markPendingSelect = useMetaWorkflowStore(s => s.markPendingSelect);
 
   const submitMeta = () => {
     if (!titleInput.trim()) return;
@@ -31,7 +35,7 @@ export function NewRunDropdown({ projectId, socket, onNewClassicChange }: Props)
     <div className="relative inline-block">
       <button
         className="px-2.5 py-1.5 text-xs rounded-md bg-secondary hover:bg-secondary/80 inline-flex items-center gap-1"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen(v => !v)}
       >
         New
         <span className="text-[10px] opacity-60">▾</span>
@@ -40,7 +44,10 @@ export function NewRunDropdown({ projectId, socket, onNewClassicChange }: Props)
         <div className="absolute right-0 mt-1 w-64 bg-popover border border-border rounded-xl shadow-lg z-50 overflow-hidden">
           <button
             className="w-full text-left px-3 py-2 text-sm hover:bg-secondary"
-            onClick={() => { onNewClassicChange(); setOpen(false); }}
+            onClick={() => {
+              onNewClassicChange();
+              setOpen(false);
+            }}
           >
             New Classic Change
           </button>
@@ -56,7 +63,7 @@ export function NewRunDropdown({ projectId, socket, onNewClassicChange }: Props)
                 className="w-full px-2 py-1.5 bg-background border border-border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary/50"
                 placeholder="Title"
                 value={titleInput}
-                onChange={(e) => setTitleInput(e.target.value)}
+                onChange={e => setTitleInput(e.target.value)}
                 autoFocus
               />
               <div className="flex gap-2">

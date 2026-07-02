@@ -51,7 +51,11 @@ describe('SchemaForm', () => {
 
   it('renders nothing for empty properties', () => {
     const { container } = render(
-      <SchemaForm schema={{ type: 'object', properties: {}, required: [] }} value={{}} onChange={() => {}} />,
+      <SchemaForm
+        schema={{ type: 'object', properties: {}, required: [] }}
+        value={{}}
+        onChange={() => {}}
+      />
     );
     expect(container.querySelectorAll('input, textarea, select')).toHaveLength(0);
   });

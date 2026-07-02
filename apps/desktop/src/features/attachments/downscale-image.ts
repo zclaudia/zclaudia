@@ -27,7 +27,9 @@ export async function downscaleImageFile(file: File): Promise<File> {
     }
     ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     bitmap.close();
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', JPEG_QUALITY));
+    const blob = await new Promise<Blob | null>(resolve =>
+      canvas.toBlob(resolve, 'image/jpeg', JPEG_QUALITY)
+    );
     if (!blob) return file;
     const jpegName = file.name.replace(/\.[^.]+$/, '') + '.jpg';
     return new File([blob], jpegName, { type: 'image/jpeg' });

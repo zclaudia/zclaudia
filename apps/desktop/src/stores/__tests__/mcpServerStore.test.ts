@@ -91,5 +91,4 @@ describe('mcpServerStore', () => {
       expect(useMcpServerStore.getState().servers[0]).toEqual(toggled);
     });
   });
-
 });

@@ -22,23 +22,41 @@ describe('WorkflowRepository', () => {
   describe('mapRow', () => {
     it('maps row with all fields', () => {
       const row = {
-        id: 'w1', project_id: 'p1', name: 'flow', description: 'desc',
-        status: 'active', definition: '{"nodes":[],"edges":[],"entryNodeId":"","triggers":[]}', template_id: 'tpl1',
-        created_at: 100, updated_at: 200,
+        id: 'w1',
+        project_id: 'p1',
+        name: 'flow',
+        description: 'desc',
+        status: 'active',
+        definition: '{"nodes":[],"edges":[],"entryNodeId":"","triggers":[]}',
+        template_id: 'tpl1',
+        created_at: 100,
+        updated_at: 200,
       };
       const result = repo.mapRow(row);
       expect(result).toMatchObject({
-        id: 'w1', projectId: 'p1', name: 'flow', description: 'desc',
-        status: 'active', definition: { nodes: [], edges: [], entryNodeId: '' }, templateId: 'tpl1',
-        createdAt: 100, updatedAt: 200,
+        id: 'w1',
+        projectId: 'p1',
+        name: 'flow',
+        description: 'desc',
+        status: 'active',
+        definition: { nodes: [], edges: [], entryNodeId: '' },
+        templateId: 'tpl1',
+        createdAt: 100,
+        updatedAt: 200,
       });
     });
 
     it('handles null optional fields', () => {
       const row = {
-        id: 'w1', project_id: 'p1', name: 'flow', description: null,
-        status: 'active', definition: null, template_id: null,
-        created_at: 100, updated_at: 200,
+        id: 'w1',
+        project_id: 'p1',
+        name: 'flow',
+        description: null,
+        status: 'active',
+        definition: null,
+        template_id: null,
+        created_at: 100,
+        updated_at: 200,
       };
       const result = repo.mapRow(row);
       expect(result.description).toBeUndefined();
@@ -66,12 +84,22 @@ describe('WorkflowRepository', () => {
       const result = repo.mapRow(row);
       expect(result.definition).toMatchObject({
         nodes: [
-          { id: 's1', name: 'First', type: 'shell', config: { command: 'echo 1' }, position: { x: 300, y: 0 } },
-          { id: 's2', name: 'Second', type: 'shell', config: { command: 'echo 2' }, position: { x: 300, y: 150 } },
+          {
+            id: 's1',
+            name: 'First',
+            type: 'shell',
+            config: { command: 'echo 1' },
+            position: { x: 300, y: 0 },
+          },
+          {
+            id: 's2',
+            name: 'Second',
+            type: 'shell',
+            config: { command: 'echo 2' },
+            position: { x: 300, y: 150 },
+          },
         ],
-        edges: [
-          { id: 'edge_s1_to_s2', source: 's1', target: 's2', type: 'success' },
-        ],
+        edges: [{ id: 'edge_s1_to_s2', source: 's1', target: 's2', type: 'success' }],
         entryNodeId: 's1',
       });
     });
@@ -80,8 +108,12 @@ describe('WorkflowRepository', () => {
   describe('createQuery', () => {
     it('generates insert SQL', () => {
       const { sql, params } = repo.createQuery({
-        projectId: 'p1', name: 'flow', description: 'desc',
-        status: 'active' as any, definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] } as any, templateId: 'tpl1',
+        projectId: 'p1',
+        name: 'flow',
+        description: 'desc',
+        status: 'active' as any,
+        definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] } as any,
+        templateId: 'tpl1',
       });
       expect(sql).toContain('INSERT INTO workflows');
       expect(params[0]).toBe('mock-uuid');
@@ -91,7 +123,10 @@ describe('WorkflowRepository', () => {
 
     it('handles nullable fields', () => {
       const { params } = repo.createQuery({
-        projectId: 'p1', name: 'flow', status: 'active' as any, definition: {} as any,
+        projectId: 'p1',
+        name: 'flow',
+        status: 'active' as any,
+        definition: {} as any,
       } as any);
       expect(params[3]).toBeNull(); // description
       expect(params[6]).toBeNull(); // templateId
@@ -107,8 +142,12 @@ describe('WorkflowRepository', () => {
     });
 
     it('handles definition serialization', () => {
-      const { params } = repo.updateQuery('w1', { definition: { nodes: [{ id: 'n1' }], edges: [], entryNodeId: 'n1', triggers: [] } as any });
-      expect(params).toContain('{"nodes":[{"id":"n1"}],"edges":[],"entryNodeId":"n1","triggers":[]}');
+      const { params } = repo.updateQuery('w1', {
+        definition: { nodes: [{ id: 'n1' }], edges: [], entryNodeId: 'n1', triggers: [] } as any,
+      });
+      expect(params).toContain(
+        '{"nodes":[{"id":"n1"}],"edges":[],"entryNodeId":"n1","triggers":[]}'
+      );
     });
 
     it('handles templateId', () => {
@@ -132,8 +171,13 @@ describe('WorkflowRepository', () => {
 
     it('returns mapped row when found', () => {
       mockDb.prepare().get.mockReturnValue({
-        id: 'w1', project_id: 'p1', name: 'flow', status: 'active',
-        definition: '{}', created_at: 100, updated_at: 200,
+        id: 'w1',
+        project_id: 'p1',
+        name: 'flow',
+        status: 'active',
+        definition: '{}',
+        created_at: 100,
+        updated_at: 200,
       });
       const result = repo.findByProjectAndTemplate('p1', 'tpl1');
       expect(result).not.toBeNull();
@@ -153,7 +197,9 @@ describe('WorkflowRepository', () => {
 
       const result = repo.findOverrideMetadataById('wf-user');
 
-      expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('SELECT id, is_system FROM workflows WHERE id = ?'));
+      expect(mockDb.prepare).toHaveBeenCalledWith(
+        expect.stringContaining('SELECT id, is_system FROM workflows WHERE id = ?')
+      );
       expect(mockDb.prepare().get).toHaveBeenCalledWith('wf-user');
       expect(result).toEqual({ id: 'wf-user', isSystem: false });
     });

@@ -107,12 +107,16 @@ describe('AIReviewQueue', () => {
       cwd: '/workspace',
     });
 
-    await queue.enqueue('req-2', { ...baseConfig, analysisLlmProfileId: 'provider-2' }, {
-      toolName: 'Bash',
-      toolInput: { command: 'npm run lint' },
-      detail: 'npm run lint',
-      cwd: '/workspace',
-    });
+    await queue.enqueue(
+      'req-2',
+      { ...baseConfig, analysisLlmProfileId: 'provider-2' },
+      {
+        toolName: 'Bash',
+        toolInput: { command: 'npm run lint' },
+        detail: 'npm run lint',
+        cwd: '/workspace',
+      }
+    );
 
     expect(createProvider).toHaveBeenNthCalledWith(1, undefined);
     expect(createProvider).toHaveBeenNthCalledWith(2, 'provider-2');

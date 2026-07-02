@@ -6,6 +6,7 @@ import { usePluginStore } from '../../stores/pluginStore';
 import { useBottomPanelStore } from '../../stores/bottomPanelStore';
 import { useRightWorkspaceStore } from '../../stores/rightWorkspaceStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useSelectionStore } from '../../stores/selectionStore';
 import { useServerStore } from '../../stores/serverStore';
 import { useRightSidebarStore } from '../../stores/rightSidebarStore';
 
@@ -27,6 +28,7 @@ function registerPanel(id: string, defaultPlacement?: 'bottom' | 'right', visibl
 
 /** Seed project/server stores so activatePanel right-path has a session context. */
 function seedSessionCtx() {
+  useSelectionStore.setState({ selectedSessionId: SESSION_ID });
   useProjectStore.setState({
     selectedSessionId: SESSION_ID,
     sessions: [{ id: SESSION_ID, projectId: PROJECT_ID } as any],
@@ -41,6 +43,11 @@ describe('openPanel utility', () => {
     useRightWorkspaceStore.setState({ bySession: {}, order: [] });
     useRightSidebarStore.setState({ collapsed: false, unread: false });
     // Default: no active session — right-path returns early when sessionId is null
+    useSelectionStore.setState({
+      selectedProjectId: null,
+      selectedSessionId: null,
+      dashboardViews: {},
+    });
     useProjectStore.setState({ selectedSessionId: null, sessions: [] } as any);
     useServerStore.setState({ activeServerId: null } as any);
   });
@@ -90,12 +97,32 @@ describe('openPanel utility', () => {
       expect(useRightWorkspaceStore.getState().bySession).toEqual({});
     });
 
+    it('uses selectionStore as the source of truth for the selected session', () => {
+      useProjectStore.setState({
+        selectedSessionId: null,
+        sessions: [{ id: SESSION_ID, projectId: PROJECT_ID } as any],
+      } as any);
+      useSelectionStore.setState({ selectedSessionId: SESSION_ID });
+      useServerStore.setState({ activeServerId: BACKEND_ID } as any);
+      registerPanel('foo', 'right');
+
+      activatePanel('foo');
+
+      const ws = useRightWorkspaceStore.getState().bySession[SESSION_ID];
+      expect((ws!.root as any)?.activeToolId).toBe('foo');
+    });
+
     it('routes right-placed panels to the bottom store on mobile', () => {
       const orig = window.matchMedia;
       window.matchMedia = ((query: string) => ({
-        matches: true, media: query, onchange: null,
-        addEventListener() {}, removeEventListener() {},
-        addListener() {}, removeListener() {}, dispatchEvent: () => false,
+        matches: true,
+        media: query,
+        onchange: null,
+        addEventListener() {},
+        removeEventListener() {},
+        addListener() {},
+        removeListener() {},
+        dispatchEvent: () => false,
       })) as unknown as typeof window.matchMedia;
       try {
         registerPanel('foo', 'right');
@@ -274,6 +301,7 @@ describe('openPanel utility', () => {
       const { act } = await import('@testing-library/react');
       const SESSION_2 = 'sess-2';
       // Seed a second session with 'foo' already in the workspace
+      useSelectionStore.setState({ selectedSessionId: SESSION_2 });
       useProjectStore.setState({
         selectedSessionId: SESSION_2,
         sessions: [{ id: SESSION_2, projectId: PROJECT_ID } as any],
@@ -283,12 +311,14 @@ describe('openPanel utility', () => {
       activatePanel('foo'); // opens in sess-2's workspace
 
       // Start with no session selected — hook should return false
+      useSelectionStore.setState({ selectedSessionId: null });
       useProjectStore.setState({ selectedSessionId: null, sessions: [] } as any);
       const { result } = renderHook(() => usePanelIsActive('foo'));
       expect(result.current).toBe(false);
 
       // Switch to the session that has 'foo' — hook must recompute to true
       act(() => {
+        useSelectionStore.setState({ selectedSessionId: SESSION_2 });
         useProjectStore.setState({
           selectedSessionId: SESSION_2,
           sessions: [{ id: SESSION_2, projectId: PROJECT_ID } as any],

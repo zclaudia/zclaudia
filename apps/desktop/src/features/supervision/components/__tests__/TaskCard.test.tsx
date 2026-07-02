@@ -249,7 +249,7 @@ describe('TaskCard', () => {
           result: { summary: 'Done', filesChanged: [], reviewVerdict: 'approve' },
         })}
         onSelect={onSelect}
-      />,
+      />
     );
     fireEvent.click(screen.getByText('Approve Result'));
 
@@ -270,7 +270,7 @@ describe('TaskCard', () => {
           result: { summary: 'Done', filesChanged: [], reviewVerdict: 'approve' },
         })}
         onSelect={onSelect}
-      />,
+      />
     );
     fireEvent.click(screen.getByText('Reject Result'));
 
@@ -291,7 +291,7 @@ describe('TaskCard', () => {
           result: { summary: 'Done', filesChanged: [], reviewVerdict: 'approve' },
         })}
         onSelect={onSelect}
-      />,
+      />
     );
     fireEvent.click(screen.getByText('Approve Result'));
 
@@ -312,7 +312,7 @@ describe('TaskCard', () => {
           result: { summary: 'Done', filesChanged: [], reviewVerdict: 'approve' },
         })}
         onSelect={onSelect}
-      />,
+      />
     );
     fireEvent.click(screen.getByText('Reject Result'));
 
@@ -331,7 +331,7 @@ describe('TaskCard', () => {
           result: { summary: 'Done', filesChanged: [], reviewVerdict: 'approve' },
         })}
         onSelect={onSelect}
-      />,
+      />
     );
     expect(screen.getByText('Approve Result')).toBeInTheDocument();
     expect(screen.getByText('Reject Result')).toBeInTheDocument();
@@ -345,7 +345,7 @@ describe('TaskCard', () => {
           result: { summary: 'Done', filesChanged: [] },
         })}
         onSelect={onSelect}
-      />,
+      />
     );
     expect(screen.queryByText('Approve Result')).not.toBeInTheDocument();
   });

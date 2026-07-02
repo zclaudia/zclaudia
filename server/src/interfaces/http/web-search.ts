@@ -50,16 +50,17 @@ export function createWebSearchConfigRoutes(db: Database): Router {
         res,
         500,
         'WEB_SEARCH_CONFIG_READ_FAILED',
-        error instanceof Error ? error.message : 'Failed to read Web Search configuration',
+        error instanceof Error ? error.message : 'Failed to read Web Search configuration'
       );
     }
   });
 
   router.put('/config', (req: Request, res: Response) => {
     try {
-      const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body)
-        ? req.body as Record<string, unknown>
-        : {};
+      const body =
+        req.body && typeof req.body === 'object' && !Array.isArray(req.body)
+          ? (req.body as Record<string, unknown>)
+          : {};
       const update = normalizeUpdateBody(body);
       res.json({ success: true, data: updateWebSearchConfig(db, update) });
     } catch (error) {
@@ -67,7 +68,7 @@ export function createWebSearchConfigRoutes(db: Database): Router {
         res,
         400,
         'WEB_SEARCH_CONFIG_INVALID',
-        error instanceof Error ? error.message : 'Invalid Web Search configuration',
+        error instanceof Error ? error.message : 'Invalid Web Search configuration'
       );
     }
   });

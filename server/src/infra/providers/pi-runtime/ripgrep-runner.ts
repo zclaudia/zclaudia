@@ -23,7 +23,10 @@ export interface RipgrepOptions {
 export function runRipgrep(args: string[], options: RipgrepOptions): Promise<RipgrepResult> {
   const { maxLines, signal, timeoutMs = 30_000 } = options;
   return new Promise((resolve, reject) => {
-    if (signal?.aborted) { reject(new Error('Operation aborted')); return; }
+    if (signal?.aborted) {
+      reject(new Error('Operation aborted'));
+      return;
+    }
     const child = spawn('rg', args, { stdio: ['ignore', 'pipe', 'pipe'] });
     const rl = createInterface({ input: child.stdout });
     const lines: string[] = [];
@@ -31,8 +34,13 @@ export function runRipgrep(args: string[], options: RipgrepOptions): Promise<Rip
     let stderr = '';
     let settled = false;
 
-    const timer = setTimeout(() => { truncated = true; child.kill(); }, timeoutMs);
-    const onAbort = () => { child.kill(); };
+    const timer = setTimeout(() => {
+      truncated = true;
+      child.kill();
+    }, timeoutMs);
+    const onAbort = () => {
+      child.kill();
+    };
     signal?.addEventListener('abort', onAbort, { once: true });
 
     const cleanup = () => {
@@ -41,18 +49,31 @@ export function runRipgrep(args: string[], options: RipgrepOptions): Promise<Rip
       rl.close();
     };
 
-    rl.on('line', (line) => {
-      if (lines.length >= maxLines) { truncated = true; child.kill(); return; }
+    rl.on('line', line => {
+      if (lines.length >= maxLines) {
+        truncated = true;
+        child.kill();
+        return;
+      }
       lines.push(line);
     });
-    child.stderr?.on('data', (chunk) => { stderr += chunk.toString(); });
-    child.on('error', (err) => {
-      if (settled) return; settled = true; cleanup();
+    child.stderr?.on('data', chunk => {
+      stderr += chunk.toString();
+    });
+    child.on('error', err => {
+      if (settled) return;
+      settled = true;
+      cleanup();
       reject(new Error(`Failed to run rg: ${err.message}`));
     });
-    child.on('close', (code) => {
-      if (settled) return; settled = true; cleanup();
-      if (signal?.aborted) { reject(new Error('Operation aborted')); return; }
+    child.on('close', code => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (signal?.aborted) {
+        reject(new Error('Operation aborted'));
+        return;
+      }
       resolve({ lines, truncated, exitCode: code, stderr: stderr.trim() });
     });
   });

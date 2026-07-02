@@ -72,7 +72,7 @@ describe('TurnSummaryRepository', () => {
     repo.upsert(makeSummary({ userMessageId: 'u2', generatedAt: 300 }));
     repo.upsert(makeSummary({ userMessageId: 'u3', generatedAt: 200 }));
     const got = repo.listBySession('sess-1');
-    expect(got.map((s) => s.userMessageId)).toEqual(['u2', 'u3', 'u1']);
+    expect(got.map(s => s.userMessageId)).toEqual(['u2', 'u3', 'u1']);
   });
 
   it('deleteBySession removes all rows for a session', () => {
@@ -105,7 +105,8 @@ describe('parseSummaryResponse', () => {
   });
 
   it('picks the last valid candidate when multiple JSON objects appear', () => {
-    const text = '{"goal":"old","solved":"old","openIssues":"old"} and then {"goal":"new","solved":"new","openIssues":"new"}';
+    const text =
+      '{"goal":"old","solved":"old","openIssues":"old"} and then {"goal":"new","solved":"new","openIssues":"new"}';
     expect(parseSummaryResponse(text)).toEqual({ goal: 'new', solved: 'new', openIssues: 'new' });
   });
 });
@@ -135,7 +136,10 @@ describe('buildSummaryPrompt', () => {
         content: 'OK',
         metadata: JSON.stringify({
           toolCalls: [
-            { name: 'Edit', input: { file_path: '/repo/foo.ts', old_string: 'x', new_string: 'y' } },
+            {
+              name: 'Edit',
+              input: { file_path: '/repo/foo.ts', old_string: 'x', new_string: 'y' },
+            },
             { name: 'Write', input: { file_path: '/repo/bar.ts', content: 'line1\nline2\nline3' } },
           ],
         }),
@@ -159,8 +163,18 @@ describe('buildSummaryPrompt', () => {
         content: 'OK',
         metadata: JSON.stringify({
           toolCalls: [
-            { name: 'ReadSymbol', input: { file_path: '/repo/client.ts', symbol: 'Client.connect' } },
-            { name: 'EditSymbol', input: { file_path: '/repo/client.ts', symbol: 'Client.connect', new_body: 'connect() { return true; }' } },
+            {
+              name: 'ReadSymbol',
+              input: { file_path: '/repo/client.ts', symbol: 'Client.connect' },
+            },
+            {
+              name: 'EditSymbol',
+              input: {
+                file_path: '/repo/client.ts',
+                symbol: 'Client.connect',
+                new_body: 'connect() { return true; }',
+              },
+            },
           ],
         }),
         offset: 2,
@@ -182,7 +196,11 @@ describe('buildSummaryPrompt', () => {
         content: '',
         metadata: JSON.stringify({
           toolCalls: [
-            { name: 'Edit', input: { file_path: '/repo/foo.ts', old_string: 'x', new_string: 'y' }, isError: true },
+            {
+              name: 'Edit',
+              input: { file_path: '/repo/foo.ts', old_string: 'x', new_string: 'y' },
+              isError: true,
+            },
           ],
         }),
         offset: 2,
@@ -195,7 +213,14 @@ describe('buildSummaryPrompt', () => {
   it('skips system messages', () => {
     const prompt = buildSummaryPrompt([
       { id: 'u1', role: 'user', content: 'do it', metadata: null, offset: 1, createdAt: 100 },
-      { id: 's1', role: 'system', content: '<<bookkeeping>>', metadata: null, offset: 2, createdAt: 105 },
+      {
+        id: 's1',
+        role: 'system',
+        content: '<<bookkeeping>>',
+        metadata: null,
+        offset: 2,
+        createdAt: 105,
+      },
     ]);
     expect(prompt).not.toContain('<<bookkeeping>>');
   });

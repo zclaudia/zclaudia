@@ -13,8 +13,8 @@ describe('ProjectRepository', () => {
       prepare: vi.fn().mockReturnValue({
         all: vi.fn(),
         get: vi.fn(),
-        run: vi.fn()
-      })
+        run: vi.fn(),
+      }),
     };
 
     repository = new ProjectRepository(mockDb);
@@ -32,7 +32,7 @@ describe('ProjectRepository', () => {
         permission_policy: '{"mode":"autoApprove"}',
         is_internal: 1,
         created_at: 1000,
-        updated_at: 2000
+        updated_at: 2000,
       };
 
       const result = repository.mapRow(row);
@@ -64,7 +64,7 @@ describe('ProjectRepository', () => {
         permission_policy: null,
         is_internal: 0,
         created_at: 1000,
-        updated_at: 2000
+        updated_at: 2000,
       };
 
       const result = repository.mapRow(row);
@@ -78,17 +78,24 @@ describe('ProjectRepository', () => {
 
     it('parses agent JSON', () => {
       const row = {
-        id: 'proj-1', name: 'Test', type: 'code',
-        created_at: 1000, updated_at: 2000,
-        agent: '{"name":"bot"}', context_sync_status: 'synced',
+        id: 'proj-1',
+        name: 'Test',
+        type: 'code',
+        created_at: 1000,
+        updated_at: 2000,
+        agent: '{"name":"bot"}',
+        context_sync_status: 'synced',
       };
       expect(repository.mapRow(row).agent).toEqual({ name: 'bot' });
     });
 
     it('maps context_sync_status error', () => {
       const row = {
-        id: 'proj-1', name: 'Test', type: 'code',
-        created_at: 1000, updated_at: 2000,
+        id: 'proj-1',
+        name: 'Test',
+        type: 'code',
+        created_at: 1000,
+        updated_at: 2000,
         context_sync_status: 'error',
       };
       expect(repository.mapRow(row).contextSyncStatus).toBe('error');
@@ -96,8 +103,11 @@ describe('ProjectRepository', () => {
 
     it('maps reviewLlmProfileId', () => {
       const row = {
-        id: 'proj-1', name: 'Test', type: 'code',
-        created_at: 1000, updated_at: 2000,
+        id: 'proj-1',
+        name: 'Test',
+        type: 'code',
+        created_at: 1000,
+        updated_at: 2000,
         review_llm_profile_id: 'rev-1',
       };
       expect(repository.mapRow(row).reviewLlmProfileId).toBe('rev-1');
@@ -105,8 +115,11 @@ describe('ProjectRepository', () => {
 
     it('maps agentPermissionOverride JSON', () => {
       const row = {
-        id: 'proj-1', name: 'Test', type: 'code',
-        created_at: 1000, updated_at: 2000,
+        id: 'proj-1',
+        name: 'Test',
+        type: 'code',
+        created_at: 1000,
+        updated_at: 2000,
         agent_permission_override: '{"defaultDecision":"deny","rules":[]}',
       };
       expect(repository.mapRow(row).agentPermissionOverride).toEqual({
@@ -124,7 +137,7 @@ describe('ProjectRepository', () => {
         defaultAgentProfileId: 'prov-789',
         rootPath: '/new/path',
         systemPrompt: 'New prompt',
-        permissionPolicy: { mode: 'askUser' }
+        permissionPolicy: { mode: 'askUser' },
       };
 
       const { sql, params } = repository.createQuery(data);
@@ -140,7 +153,7 @@ describe('ProjectRepository', () => {
 
     it('uses default type when not specified', () => {
       const data = {
-        name: 'Default Type'
+        name: 'Default Type',
       } as any;
 
       const { params } = repository.createQuery(data);
@@ -150,7 +163,7 @@ describe('ProjectRepository', () => {
 
     it('generates UUID for id', () => {
       const data = {
-        name: 'UUID Test'
+        name: 'UUID Test',
       } as any;
 
       const { params } = repository.createQuery(data);
@@ -187,7 +200,7 @@ describe('ProjectRepository', () => {
       const { sql, params } = repository.updateQuery('proj-123', {
         name: 'New Name',
         type: 'sdk',
-        defaultAgentProfileId: 'new-prov'
+        defaultAgentProfileId: 'new-prov',
       });
 
       expect(sql).toContain('name = ?');
@@ -200,7 +213,7 @@ describe('ProjectRepository', () => {
 
     it('handles permission_policy JSON serialization', () => {
       const { sql, params } = repository.updateQuery('proj-123', {
-        permissionPolicy: { mode: 'autoApprove' }
+        permissionPolicy: { mode: 'autoApprove' },
       });
 
       expect(sql).toContain('permission_policy = ?');
@@ -209,7 +222,7 @@ describe('ProjectRepository', () => {
 
     it('handles null permission_policy', () => {
       const { params } = repository.updateQuery('proj-123', {
-        permissionPolicy: null
+        permissionPolicy: null,
       });
 
       expect(params).toContain(null);

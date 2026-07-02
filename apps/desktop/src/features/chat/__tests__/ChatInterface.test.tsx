@@ -24,11 +24,15 @@ vi.mock('../../../services/api/agent-profiles', () => ({
 // Mock llmProfileMetaStore
 const { mockProviderMetaStore } = vi.hoisted(() => {
   const state = {
-    providersByBackend: {}, providerCommands: {}, providerCapabilities: {},
-    setProviders: vi.fn(), getProviders: vi.fn().mockReturnValue([]),
-    setProviderCommands: vi.fn(), setProviderCapabilities: vi.fn(),
+    providersByBackend: {},
+    providerCommands: {},
+    providerCapabilities: {},
+    setProviders: vi.fn(),
+    getProviders: vi.fn().mockReturnValue([]),
+    setProviderCommands: vi.fn(),
+    setProviderCapabilities: vi.fn(),
   };
-  const store: any = (selector?: (s: any) => any) => selector ? selector(state) : state;
+  const store: any = (selector?: (s: any) => any) => (selector ? selector(state) : state);
   store.getState = () => state;
   store.setState = vi.fn();
   store.subscribe = vi.fn(() => vi.fn());
@@ -92,16 +96,26 @@ vi.mock('../MessageInput', () => ({
       data-initial-attachments={JSON.stringify(props.initialAttachments || [])}
       data-has-toggle-advanced={props.onToggleAdvanced != null ? 'true' : 'false'}
     >
-      <button data-testid="send-btn" onClick={() => props.onSend?.('hello')}>Send</button>
-      <button data-testid="send-empty-btn" onClick={() => props.onSend?.('')}>SendEmpty</button>
-      <button data-testid="cancel-btn" onClick={() => props.onCancel?.()}>Cancel</button>
-      <button data-testid="command-btn" onClick={() => props.onCommand?.('/help', '')}>Command</button>
+      <button data-testid="send-btn" onClick={() => props.onSend?.('hello')}>
+        Send
+      </button>
+      <button data-testid="send-empty-btn" onClick={() => props.onSend?.('')}>
+        SendEmpty
+      </button>
+      <button data-testid="cancel-btn" onClick={() => props.onCancel?.()}>
+        Cancel
+      </button>
+      <button data-testid="command-btn" onClick={() => props.onCommand?.('/help', '')}>
+        Command
+      </button>
       {props.onToggleAdvanced && (
         <button
           data-testid="toggle-advanced-btn"
           title={props.advancedMode ? 'Normal input' : 'Advanced input (Enter to newline)'}
           onClick={() => props.onToggleAdvanced?.()}
-        >toggle advanced</button>
+        >
+          toggle advanced
+        </button>
       )}
     </div>
   ),
@@ -114,9 +128,13 @@ vi.mock('../LoadingIndicator', () => ({
     isLoading ? (
       <div data-testid="loading">
         loading
-        <button data-testid="loading-cancel" onClick={onCancel}>cancel</button>
+        <button data-testid="loading-cancel" onClick={onCancel}>
+          cancel
+        </button>
       </div>
-    ) : <div data-testid="loading-hidden" />,
+    ) : (
+      <div data-testid="loading-hidden" />
+    ),
 }));
 vi.mock('../InlinePermissionRequest', () => ({
   InlinePermissionRequest: (props: any) => (
@@ -131,19 +149,31 @@ vi.mock('../ModeSelector', () => ({
       data-disabled={String(Boolean(props.disabled))}
       data-locked={String(Boolean(props.locked))}
       onClick={() => props.onChange?.('plan')}
-    >select mode</button>
+    >
+      select mode
+    </button>
   ),
 }));
 vi.mock('../PermissionSelector', () => ({
   PermissionSelector: (props: any) => (
-    <div data-testid="permission-selector" data-value={props.value || ''} data-disabled={props.disabled}>
-      <button data-testid="perm-change" onClick={() => props.onChange?.('auto-approve')}>change perm</button>
+    <div
+      data-testid="permission-selector"
+      data-value={props.value || ''}
+      data-disabled={props.disabled}
+    >
+      <button data-testid="perm-change" onClick={() => props.onChange?.('auto-approve')}>
+        change perm
+      </button>
     </div>
   ),
 }));
 vi.mock('../WorktreeSelector', () => ({
   WorktreeSelector: (props: any) => (
-    <div data-testid="worktree-selector" data-disabled={props.disabled} data-locked={props.locked} />
+    <div
+      data-testid="worktree-selector"
+      data-disabled={props.disabled}
+      data-locked={props.locked}
+    />
   ),
 }));
 vi.mock('../TokenUsageDisplay', () => ({
@@ -157,22 +187,28 @@ vi.mock('../TokenUsageDisplay', () => ({
   ),
 }));
 vi.mock('../../../components/BottomPanel', () => ({
-  BottomPanel: (props: any) => <div data-testid="bottom-panel" data-project-id={props.projectId || ''} />,
+  BottomPanel: (props: any) => (
+    <div data-testid="bottom-panel" data-project-id={props.projectId || ''} />
+  ),
 }));
 vi.mock('../../../features/supervision/components/TaskCardStrip', () => ({
-  TaskCardStrip: (props: any) => <div data-testid="task-card-strip" data-project-id={props.projectId} />,
+  TaskCardStrip: (props: any) => (
+    <div data-testid="task-card-strip" data-project-id={props.projectId} />
+  ),
 }));
 vi.mock('../../../components/BackgroundTaskPanel', () => ({
   BackgroundTaskPanel: (props: any) => (
     <div data-testid="bg-task-panel" data-session-id={props.sessionId}>
       <button
         data-testid="bg-task-stop"
-        onClick={() => props.onStopTask?.({
-          id: 'task-123',
-          cliPid: 456,
-          taskRootPid: 789,
-          taskCommand: 'sleep 30 && echo hello',
-        })}
+        onClick={() =>
+          props.onStopTask?.({
+            id: 'task-123',
+            cliPid: 456,
+            taskRootPid: 789,
+            taskCommand: 'sleep 30 && echo hello',
+          })
+        }
       />
     </div>
   ),
@@ -186,14 +222,16 @@ const mockConnectServer = vi.fn();
 const mockHandlePermissionDecision = vi.fn();
 const mockHandleAskUserAnswer = vi.fn();
 
-vi.mock('../../../services/api', async (importOriginal) => {
+vi.mock('../../../services/api', async importOriginal => {
   const mod = await importOriginal<Record<string, any>>();
   const stubbed: Record<string, any> = {};
   for (const key of Object.keys(mod)) {
     stubbed[key] = typeof mod[key] === 'function' ? vi.fn(() => Promise.resolve(null)) : mod[key];
   }
   stubbed.getMessages = vi.fn(() => Promise.resolve({ messages: [], total: 0 }));
-  stubbed.getSessionMessages = vi.fn(() => Promise.resolve({ messages: [], total: 0, pagination: { total: 0, hasMore: false } }));
+  stubbed.getSessionMessages = vi.fn(() =>
+    Promise.resolve({ messages: [], total: 0, pagination: { total: 0, hasMore: false } })
+  );
   stubbed.getBaseUrl = () => 'http://localhost:3100';
   stubbed.getAuthHeaders = () => ({});
   stubbed.getProviderCommands = vi.fn(() => Promise.resolve([]));
@@ -205,7 +243,9 @@ vi.mock('../../../services/api', async (importOriginal) => {
   stubbed.updateSession = vi.fn(() => Promise.resolve());
   stubbed.exportSession = vi.fn(() => Promise.resolve({ markdown: '# test', sessionName: 'Test' }));
   stubbed.resetSessionSdkSession = vi.fn(() => Promise.resolve());
-  stubbed.executeCommand = vi.fn(() => Promise.resolve({ type: 'builtin', action: 'help', data: { content: 'help text' } }));
+  stubbed.executeCommand = vi.fn(() =>
+    Promise.resolve({ type: 'builtin', action: 'help', data: { content: 'help text' } })
+  );
   stubbed.dismissInterrupted = vi.fn(() => Promise.resolve());
   stubbed.unlockSession = vi.fn(() => Promise.resolve({ isReadOnly: false, planStatus: null }));
   stubbed.getTaskPlanStatus = vi.fn(() => Promise.resolve(null));
@@ -290,9 +330,9 @@ vi.mock('../../../hooks/chat/useMessagePagination', () => ({
 vi.mock('../../../hooks/chat/useProviderCapabilities', () => ({
   useProviderCapabilities: ({ sessionId }: { sessionId: string }) => {
     const projectState = useProjectStore.getState();
-    const currentSession = projectState.sessions.find((session) => session.id === sessionId);
+    const currentSession = projectState.sessions.find(session => session.id === sessionId);
     const currentProject = currentSession
-      ? projectState.projects.find((project) => project.id === currentSession.projectId)
+      ? projectState.projects.find(project => project.id === currentSession.projectId)
       : null;
     // Mirrors useProviderCapabilities post-C: agent profile chain is resolved
     // server-side / via useAgentForSession; tests stub it to null since
@@ -474,7 +514,8 @@ function setDefaultStores(overrides?: {
     removeSessionOwner: vi.fn(),
     removeSessionOwnersByBackend: vi.fn(),
     clearSessionOwners: vi.fn(),
-    getSessionBackendId: (sessionId: string) => useOwnershipStore.getState().sessionBackendIds[sessionId] ?? null,
+    getSessionBackendId: (sessionId: string) =>
+      useOwnershipStore.getState().sessionBackendIds[sessionId] ?? null,
     setProjectOwner: vi.fn(),
     setProjectOwners: vi.fn(),
     removeProjectOwner: vi.fn(),
@@ -632,8 +673,8 @@ describe('ChatInterface', () => {
   const openSessionMenu = (container: HTMLElement) =>
     clickAsync(container.querySelector('button[title="Session actions"]')!);
   const menuItem = (container: HTMLElement, label: string) =>
-    Array.from(container.querySelectorAll('button[role="menuitem"]')).find(
-      (b) => b.textContent?.includes(label),
+    Array.from(container.querySelectorAll('button[role="menuitem"]')).find(b =>
+      b.textContent?.includes(label)
     ) as HTMLButtonElement | undefined;
 
   it('renders reset provider session menu item', async () => {
@@ -848,7 +889,7 @@ describe('ChatInterface', () => {
       expect.objectContaining({
         type: 'run_start',
         sessionId: 'sess-1',
-      }),
+      })
     );
     expect(mockSendMessage).not.toHaveBeenCalled();
   });
@@ -951,7 +992,7 @@ describe('ChatInterface', () => {
       expect.objectContaining({
         type: 'run_cancel',
         runId: 'run-1',
-      }),
+      })
     );
   });
 
@@ -974,9 +1015,7 @@ describe('ChatInterface', () => {
   it('does not render permission requests for other sessions', () => {
     setDefaultStores({
       permissionStore: {
-        pendingRequests: [
-          { requestId: 'perm-1', sessionId: 'sess-other', tool: 'bash' },
-        ],
+        pendingRequests: [{ requestId: 'perm-1', sessionId: 'sess-other', tool: 'bash' }],
       },
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
@@ -1058,7 +1097,9 @@ describe('ChatInterface', () => {
   it('shows interrupted session banner when lastRunStatus is interrupted', () => {
     setDefaultStores({
       projectStore: {
-        sessions: [{ id: 'sess-1', projectId: 'proj-1', name: 'Test', lastRunStatus: 'interrupted' }],
+        sessions: [
+          { id: 'sess-1', projectId: 'proj-1', name: 'Test', lastRunStatus: 'interrupted' },
+        ],
       },
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
@@ -1068,7 +1109,9 @@ describe('ChatInterface', () => {
   it('shows Resume and Dismiss buttons in interrupted banner', () => {
     setDefaultStores({
       projectStore: {
-        sessions: [{ id: 'sess-1', projectId: 'proj-1', name: 'Test', lastRunStatus: 'interrupted' }],
+        sessions: [
+          { id: 'sess-1', projectId: 'proj-1', name: 'Test', lastRunStatus: 'interrupted' },
+        ],
       },
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
@@ -1082,7 +1125,9 @@ describe('ChatInterface', () => {
   it('sends continue run_start on Resume click', async () => {
     setDefaultStores({
       projectStore: {
-        sessions: [{ id: 'sess-1', projectId: 'proj-1', name: 'Test', lastRunStatus: 'interrupted' }],
+        sessions: [
+          { id: 'sess-1', projectId: 'proj-1', name: 'Test', lastRunStatus: 'interrupted' },
+        ],
       },
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
@@ -1102,7 +1147,9 @@ describe('ChatInterface', () => {
   it('calls dismissInterrupted on Dismiss click', async () => {
     setDefaultStores({
       projectStore: {
-        sessions: [{ id: 'sess-1', projectId: 'proj-1', name: 'Test', lastRunStatus: 'interrupted' }],
+        sessions: [
+          { id: 'sess-1', projectId: 'proj-1', name: 'Test', lastRunStatus: 'interrupted' },
+        ],
       },
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
@@ -1132,7 +1179,9 @@ describe('ChatInterface', () => {
   it('shows background session read-only message', () => {
     setDefaultStores({
       projectStore: {
-        sessions: [{ id: 'sess-1', projectId: 'proj-1', name: 'BG', isReadOnly: true, type: 'background' }],
+        sessions: [
+          { id: 'sess-1', projectId: 'proj-1', name: 'BG', isReadOnly: true, type: 'background' },
+        ],
       },
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
@@ -1142,7 +1191,15 @@ describe('ChatInterface', () => {
   it('shows planned status read-only message', () => {
     setDefaultStores({
       projectStore: {
-        sessions: [{ id: 'sess-1', projectId: 'proj-1', name: 'Task', isReadOnly: true, planStatus: 'planned' }],
+        sessions: [
+          {
+            id: 'sess-1',
+            projectId: 'proj-1',
+            name: 'Task',
+            isReadOnly: true,
+            planStatus: 'planned',
+          },
+        ],
       },
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
@@ -1152,7 +1209,15 @@ describe('ChatInterface', () => {
   it('shows executing status read-only message', () => {
     setDefaultStores({
       projectStore: {
-        sessions: [{ id: 'sess-1', projectId: 'proj-1', name: 'Task', isReadOnly: true, planStatus: 'executing' }],
+        sessions: [
+          {
+            id: 'sess-1',
+            projectId: 'proj-1',
+            name: 'Task',
+            isReadOnly: true,
+            planStatus: 'executing',
+          },
+        ],
       },
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
@@ -1197,7 +1262,9 @@ describe('ChatInterface', () => {
   it('shows Cancel button for background read-only session with active run', () => {
     setDefaultStores({
       projectStore: {
-        sessions: [{ id: 'sess-1', projectId: 'proj-1', name: 'BG', isReadOnly: true, type: 'background' }],
+        sessions: [
+          { id: 'sess-1', projectId: 'proj-1', name: 'BG', isReadOnly: true, type: 'background' },
+        ],
       },
       chatStore: {
         activeRuns: { 'run-1': 'sess-1' },
@@ -1255,7 +1322,16 @@ describe('ChatInterface', () => {
     };
     setDefaultStores({
       projectStore: {
-        sessions: [{ id: 'sess-1', projectId: 'proj-1', name: 'Task', projectRole: 'task', planStatus: 'planning', taskId: 'task-1' }],
+        sessions: [
+          {
+            id: 'sess-1',
+            projectId: 'proj-1',
+            name: 'Task',
+            projectRole: 'task',
+            planStatus: 'planning',
+            taskId: 'task-1',
+          },
+        ],
       },
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
@@ -1270,7 +1346,16 @@ describe('ChatInterface', () => {
     };
     setDefaultStores({
       projectStore: {
-        sessions: [{ id: 'sess-1', projectId: 'proj-1', name: 'Task', projectRole: 'task', planStatus: 'planning', taskId: 'task-1' }],
+        sessions: [
+          {
+            id: 'sess-1',
+            projectId: 'proj-1',
+            name: 'Task',
+            projectRole: 'task',
+            planStatus: 'planning',
+            taskId: 'task-1',
+          },
+        ],
       },
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
@@ -1316,7 +1401,15 @@ describe('ChatInterface', () => {
   it('locks mode selector in forced plan session', () => {
     setDefaultStores({
       projectStore: {
-        sessions: [{ id: 'sess-1', projectId: 'proj-1', name: 'Task', projectRole: 'task', planStatus: 'planning' }],
+        sessions: [
+          {
+            id: 'sess-1',
+            projectId: 'proj-1',
+            name: 'Task',
+            projectRole: 'task',
+            planStatus: 'planning',
+          },
+        ],
       },
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
@@ -1440,7 +1533,13 @@ describe('ChatInterface', () => {
         'sess-1': {
           content: '',
           attachments: [
-            { id: 'att-1', type: 'image', name: 'draft.png', data: 'data:image/png;base64,aaa', mimeType: 'image/png' },
+            {
+              id: 'att-1',
+              type: 'image',
+              name: 'draft.png',
+              data: 'data:image/png;base64,aaa',
+              mimeType: 'image/png',
+            },
           ],
         },
       },
@@ -1455,21 +1554,35 @@ describe('ChatInterface', () => {
   it('shows "Load older messages" button when hasMore is true', () => {
     setDefaultStores({
       chatMessageStore: {
-        messages: { 'sess-1': [{ id: 'm1', sessionId: 'sess-1', role: 'user', content: 'hi', createdAt: 1000 }] },
-        pagination: { 'sess-1': { total: 100, hasMore: true, isLoadingMore: false, oldestTimestamp: 1000 } },
+        messages: {
+          'sess-1': [
+            { id: 'm1', sessionId: 'sess-1', role: 'user', content: 'hi', createdAt: 1000 },
+          ],
+        },
+        pagination: {
+          'sess-1': { total: 100, hasMore: true, isLoadingMore: false, oldestTimestamp: 1000 },
+        },
       },
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
     const buttons = container.querySelectorAll('button');
-    const loadMoreBtn = Array.from(buttons).find(b => b.textContent?.includes('Load older messages'));
+    const loadMoreBtn = Array.from(buttons).find(b =>
+      b.textContent?.includes('Load older messages')
+    );
     expect(loadMoreBtn).toBeTruthy();
   });
 
   it('shows "Loading older messages..." when isLoadingMore is true', () => {
     setDefaultStores({
       chatMessageStore: {
-        messages: { 'sess-1': [{ id: 'm1', sessionId: 'sess-1', role: 'user', content: 'hi', createdAt: 1000 }] },
-        pagination: { 'sess-1': { total: 100, hasMore: true, isLoadingMore: true, oldestTimestamp: 1000 } },
+        messages: {
+          'sess-1': [
+            { id: 'm1', sessionId: 'sess-1', role: 'user', content: 'hi', createdAt: 1000 },
+          ],
+        },
+        pagination: {
+          'sess-1': { total: 100, hasMore: true, isLoadingMore: true, oldestTimestamp: 1000 },
+        },
       },
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
@@ -1509,7 +1622,13 @@ describe('ChatInterface', () => {
       loading: false,
     } as any);
     mockProviderMetaStore.getState().getProviders.mockReturnValue([
-      { id: 'prov-1', name: 'TestProvider', providerType: 'zclaudia', createdAt: 0, updatedAt: 0 },
+      {
+        id: 'prov-1',
+        name: 'TestProvider',
+        providerType: 'zclaudia',
+        createdAt: 0,
+        updatedAt: 0,
+      },
     ]);
     setDefaultStores({
       projectStore: {
@@ -1609,7 +1728,9 @@ describe('ChatInterface', () => {
     const input = container.querySelector('[data-testid="message-input"]');
     expect(slot).toBeTruthy();
     expect(input).toBeTruthy();
-    expect(Boolean(slot?.compareDocumentPosition(input!) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+    expect(Boolean(slot?.compareDocumentPosition(input!) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(
+      true
+    );
   });
 
   // ─── BackgroundTaskPanel sessionId ────────────────────────────────────
@@ -1639,8 +1760,12 @@ describe('ChatInterface', () => {
     setDefaultStores({
       chatMessageStore: {
         messages: {
-          'sess-1': [{ id: 'm1', sessionId: 'sess-1', role: 'user', content: 'Hello from 1', createdAt: 1 }],
-          'sess-2': [{ id: 'm2', sessionId: 'sess-2', role: 'user', content: 'Hello from 2', createdAt: 2 }],
+          'sess-1': [
+            { id: 'm1', sessionId: 'sess-1', role: 'user', content: 'Hello from 1', createdAt: 1 },
+          ],
+          'sess-2': [
+            { id: 'm2', sessionId: 'sess-2', role: 'user', content: 'Hello from 2', createdAt: 2 },
+          ],
         },
         pagination: {
           'sess-1': { total: 1, hasMore: false },
@@ -1658,7 +1783,9 @@ describe('ChatInterface', () => {
   it('includes workingDirectory in run_start when session has one', async () => {
     setDefaultStores({
       projectStore: {
-        sessions: [{ id: 'sess-1', projectId: 'proj-1', name: 'Test', workingDirectory: '/test/worktree' }],
+        sessions: [
+          { id: 'sess-1', projectId: 'proj-1', name: 'Test', workingDirectory: '/test/worktree' },
+        ],
       },
       chatMessageStore: {
         messages: {},
@@ -1692,7 +1819,15 @@ describe('ChatInterface', () => {
   it('locks worktree selector in forced plan session', () => {
     setDefaultStores({
       projectStore: {
-        sessions: [{ id: 'sess-1', projectId: 'proj-1', name: 'Task', projectRole: 'task', planStatus: 'planning' }],
+        sessions: [
+          {
+            id: 'sess-1',
+            projectId: 'proj-1',
+            name: 'Task',
+            projectRole: 'task',
+            planStatus: 'planning',
+          },
+        ],
       },
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
@@ -1747,7 +1882,11 @@ describe('ChatInterface', () => {
   it('shows scroll to bottom button when scrolled up', () => {
     setDefaultStores({
       chatMessageStore: {
-        messages: { 'sess-1': [{ id: 'm1', sessionId: 'sess-1', role: 'user', content: 'test', createdAt: 1 }] },
+        messages: {
+          'sess-1': [
+            { id: 'm1', sessionId: 'sess-1', role: 'user', content: 'test', createdAt: 1 },
+          ],
+        },
         pagination: { 'sess-1': { total: 1, hasMore: false } },
       },
     });
@@ -1770,8 +1909,9 @@ describe('ChatInterface', () => {
   it('shows export item in the actions menu', async () => {
     const { container } = render(<ChatInterface sessionId="sess-1" />);
     await clickAsync(container.querySelector('button[title="Session actions"]')!);
-    const exportItem = Array.from(container.querySelectorAll('button[role="menuitem"]'))
-      .find(b => b.textContent?.includes('Export'));
+    const exportItem = Array.from(container.querySelectorAll('button[role="menuitem"]')).find(b =>
+      b.textContent?.includes('Export')
+    );
     expect(exportItem).toBeTruthy();
   });
 
@@ -1780,8 +1920,9 @@ describe('ChatInterface', () => {
   it('shows archive item in the actions menu', async () => {
     const { container } = render(<ChatInterface sessionId="sess-1" />);
     await clickAsync(container.querySelector('button[title="Session actions"]')!);
-    const archiveItem = Array.from(container.querySelectorAll('button[role="menuitem"]'))
-      .find(b => b.textContent?.includes('Archive'));
+    const archiveItem = Array.from(container.querySelectorAll('button[role="menuitem"]')).find(b =>
+      b.textContent?.includes('Archive')
+    );
     expect(archiveItem).toBeTruthy();
   });
 
@@ -1803,10 +1944,12 @@ describe('ChatInterface', () => {
   it('shows resend button when last message is from user', () => {
     setDefaultStores({
       chatMessageStore: {
-        messages: { 'sess-1': [
-          { id: 'm1', sessionId: 'sess-1', role: 'assistant', content: 'Hi', createdAt: 1 },
-          { id: 'm2', sessionId: 'sess-1', role: 'user', content: 'Hello', createdAt: 2 },
-        ]},
+        messages: {
+          'sess-1': [
+            { id: 'm1', sessionId: 'sess-1', role: 'assistant', content: 'Hi', createdAt: 1 },
+            { id: 'm2', sessionId: 'sess-1', role: 'user', content: 'Hello', createdAt: 2 },
+          ],
+        },
         pagination: { 'sess-1': { total: 2, hasMore: false } },
       },
     });
@@ -1837,5 +1980,4 @@ describe('ChatInterface', () => {
     const { container } = render(<ChatInterface sessionId="sess-1" />);
     expect(container.querySelector('[data-testid="loading"]')).toBeTruthy();
   });
-
 });

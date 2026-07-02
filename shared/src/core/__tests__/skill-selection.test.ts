@@ -60,12 +60,17 @@ describe('skill selection', () => {
       { source: 'plugin' },
     ]);
 
-    expect(normalizeSkillSelection({
-      providers: [{ source: 'workspace' }, { source: 'bad' }],
-      include: [{ source: 'external', id: 'audit' }, { source: 'plugin', id: '' }],
-      exclude: [{ source: 'plugin', id: 'reviewer' }],
-      pinned: [{ source: 'workspace', id: 'guidelines' }],
-    })).toEqual({
+    expect(
+      normalizeSkillSelection({
+        providers: [{ source: 'workspace' }, { source: 'bad' }],
+        include: [
+          { source: 'external', id: 'audit' },
+          { source: 'plugin', id: '' },
+        ],
+        exclude: [{ source: 'plugin', id: 'reviewer' }],
+        pinned: [{ source: 'workspace', id: 'guidelines' }],
+      })
+    ).toEqual({
       providers: [{ source: 'workspace' }],
       include: [{ source: 'external', id: 'audit' }],
       exclude: [{ source: 'plugin', id: 'reviewer' }],

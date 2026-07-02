@@ -17,32 +17,44 @@ interface MetaWorkflowPanelProps {
   socket: { send: (msg: string) => void };
 }
 
-export function MetaWorkflowPanel({ projectId, socket }: MetaWorkflowPanelProps): React.ReactElement {
-  const runs = useMetaWorkflowStore((s) => s.runs[projectId] ?? []);
-  const view = useMetaWorkflowStore((s) => s.viewByProject[projectId] ?? INITIAL_VIEW_STATE);
-  const setRuns = useMetaWorkflowStore((s) => s.setRuns);
-  const patchView = useMetaWorkflowStore((s) => s.patchView);
+export function MetaWorkflowPanel({
+  projectId,
+  socket,
+}: MetaWorkflowPanelProps): React.ReactElement {
+  const runs = useMetaWorkflowStore(s => s.runs[projectId] ?? []);
+  const view = useMetaWorkflowStore(s => s.viewByProject[projectId] ?? INITIAL_VIEW_STATE);
+  const setRuns = useMetaWorkflowStore(s => s.setRuns);
+  const patchView = useMetaWorkflowStore(s => s.patchView);
   const [legacyRunIds, setLegacyRunIds] = useState<Set<string>>(new Set());
 
   // Load runs on mount + project change.
   useEffect(() => {
     let cancelled = false;
-    api.listRuns(projectId).then((rs) => {
-      if (!cancelled) setRuns(projectId, rs);
-    }).catch((e) => console.error('[meta-workflow] listRuns failed', e));
-    return () => { cancelled = true; };
+    api
+      .listRuns(projectId)
+      .then(rs => {
+        if (!cancelled) setRuns(projectId, rs);
+      })
+      .catch(e => console.error('[meta-workflow] listRuns failed', e));
+    return () => {
+      cancelled = true;
+    };
   }, [projectId, setRuns]);
 
   // Load legacy run IDs (runs not driven by OpenSpec).
   useEffect(() => {
     let cancelled = false;
     listLegacyMetaWorkflowRunIds(projectId)
-      .then((ids) => { if (!cancelled) setLegacyRunIds(new Set(ids)); })
+      .then(ids => {
+        if (!cancelled) setLegacyRunIds(new Set(ids));
+      })
       .catch(() => undefined);
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [projectId]);
 
-  const selectedRun = view.selectedRunId ? runs.find((r) => r.id === view.selectedRunId) : undefined;
+  const selectedRun = view.selectedRunId ? runs.find(r => r.id === view.selectedRunId) : undefined;
 
   if (view.screen === 'reuse-pool') {
     return (
@@ -59,22 +71,32 @@ export function MetaWorkflowPanel({ projectId, socket }: MetaWorkflowPanelProps)
           <h2 className="text-lg font-semibold">Meta Workflow Runs</h2>
         </header>
         {runs.length === 0 ? (
-          <div className="text-muted-foreground text-sm">No meta workflow runs yet. Click "New ▾ → Meta Workflow Run" above to start.</div>
+          <div className="text-muted-foreground text-sm">
+            No meta workflow runs yet. Click "New ▾ → Meta Workflow Run" above to start.
+          </div>
         ) : (
           <ul className="space-y-2">
-            {runs.map((r) => (
-              <li key={r.id}
-                  className="border border-border rounded-md p-3 cursor-pointer hover:bg-secondary"
-                  onClick={() => patchView(projectId, {
+            {runs.map(r => (
+              <li
+                key={r.id}
+                className="border border-border rounded-md p-3 cursor-pointer hover:bg-secondary"
+                onClick={() =>
+                  patchView(projectId, {
                     selectedRunId: r.id,
-                    screen: r.status === 'requirement_draft' || r.status === 'requirement_review'
-                      ? 'requirements' : 'phase-board',
-                  })}>
+                    screen:
+                      r.status === 'requirement_draft' || r.status === 'requirement_review'
+                        ? 'requirements'
+                        : 'phase-board',
+                  })
+                }
+              >
                 <div className="font-medium">
                   {r.title}
                   {legacyRunIds.has(r.id) && <LegacyBadge />}
                 </div>
-                <div className="text-xs text-muted-foreground">Status: {r.status} · Reject count: {r.rejectCount}</div>
+                <div className="text-xs text-muted-foreground">
+                  Status: {r.status} · Reject count: {r.rejectCount}
+                </div>
               </li>
             ))}
           </ul>
@@ -87,21 +109,51 @@ export function MetaWorkflowPanel({ projectId, socket }: MetaWorkflowPanelProps)
   return (
     <div className="meta-workflow-panel">
       <BreadcrumbBar projectId={projectId} runTitle={selectedRun.title} screen={view.screen} />
-      {view.screen === 'requirements'   && <RequirementsScreen projectId={projectId} run={selectedRun} socket={socket} />}
-      {view.screen === 'phase-graph'    && <PhaseGraphScreen   projectId={projectId} run={selectedRun} socket={socket} />}
-      {view.screen === 'phase-board'    && <PhaseBoardScreen   projectId={projectId} run={selectedRun} socket={socket} />}
-      {view.screen === 'phase-detail'   && <PhaseDetailScreen  projectId={projectId} run={selectedRun} phaseId={view.selectedPhaseId} socket={socket} />}
-      {view.screen === 'promotion'      && <PromotionDialog    projectId={projectId} run={selectedRun} poolItemId={view.promotingPoolItemId} socket={socket} />}
+      {view.screen === 'requirements' && (
+        <RequirementsScreen projectId={projectId} run={selectedRun} socket={socket} />
+      )}
+      {view.screen === 'phase-graph' && (
+        <PhaseGraphScreen projectId={projectId} run={selectedRun} socket={socket} />
+      )}
+      {view.screen === 'phase-board' && (
+        <PhaseBoardScreen projectId={projectId} run={selectedRun} socket={socket} />
+      )}
+      {view.screen === 'phase-detail' && (
+        <PhaseDetailScreen
+          projectId={projectId}
+          run={selectedRun}
+          phaseId={view.selectedPhaseId}
+          socket={socket}
+        />
+      )}
+      {view.screen === 'promotion' && (
+        <PromotionDialog
+          projectId={projectId}
+          run={selectedRun}
+          poolItemId={view.promotingPoolItemId}
+          socket={socket}
+        />
+      )}
     </div>
   );
 }
 
-function BreadcrumbBar({ projectId, runTitle, screen }: { projectId: string; runTitle: string; screen: string }): React.ReactElement {
-  const patchView = useMetaWorkflowStore((s) => s.patchView);
+function BreadcrumbBar({
+  projectId,
+  runTitle,
+  screen,
+}: {
+  projectId: string;
+  runTitle: string;
+  screen: string;
+}): React.ReactElement {
+  const patchView = useMetaWorkflowStore(s => s.patchView);
   return (
     <nav className="text-sm text-muted-foreground mb-3 flex items-center gap-2">
-      <button className="text-primary hover:underline"
-              onClick={() => patchView(projectId, { screen: 'list', selectedRunId: undefined })}>
+      <button
+        className="text-primary hover:underline"
+        onClick={() => patchView(projectId, { screen: 'list', selectedRunId: undefined })}
+      >
         ← All Runs
       </button>
       <span>/</span>

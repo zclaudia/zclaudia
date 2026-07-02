@@ -14,7 +14,9 @@ export function getServerBaseUrl(): string {
 }
 
 export function getGatewayBaseUrl(): string {
-  return process.env.E2E_GATEWAY_URL || `http://localhost:${process.env.E2E_GATEWAY_PORT || '3200'}`;
+  return (
+    process.env.E2E_GATEWAY_URL || `http://localhost:${process.env.E2E_GATEWAY_PORT || '3200'}`
+  );
 }
 
 function getDataRoot(): string {
@@ -49,7 +51,9 @@ export async function setupCleanDB(): Promise<void> {
   try {
     const db = new Database(getDbPath());
 
-    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as Array<{ name: string }>;
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as Array<{
+      name: string;
+    }>;
     const tableNames = tables.map(t => t.name);
 
     if (tableNames.includes('messages')) {
@@ -83,10 +87,12 @@ export async function setupTestProject(): Promise<string> {
   const db = new Database(getDbPath());
   const projectId = 'test-project-' + Date.now();
 
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO projects (id, name, root_path, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?)
-  `).run(projectId, 'Test Project', '/test/path', Date.now(), Date.now());
+  `
+  ).run(projectId, 'Test Project', '/test/path', Date.now(), Date.now());
 
   db.close();
   return projectId;
@@ -110,7 +116,7 @@ export function createApiClient(apiKey: string): ApiClient {
         ...options,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
+          Authorization: `Bearer ${apiKey}`,
           ...options?.headers,
         },
       });
@@ -148,7 +154,7 @@ export async function createGatewayApiClient(apiKey: string): Promise<GatewayApi
         ...options,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer test-secret-zclaudia-2026:${apiKey}`,
+          Authorization: `Bearer test-secret-zclaudia-2026:${apiKey}`,
           ...options?.headers,
         },
       });

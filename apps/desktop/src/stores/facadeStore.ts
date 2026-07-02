@@ -56,44 +56,49 @@ const initialState = {
 export const useFacadeStore = create<FacadeState>((set, get) => ({
   ...initialState,
 
-  setFacade: (facade) => set({ facade }),
+  setFacade: facade => set({ facade }),
 
   clearFacade: () => set({ ...initialState }),
 
-  applySnapshot: (snapshot) =>
-    set((state) => {
+  applySnapshot: snapshot =>
+    set(state => {
       // Reuse existing array/object references if content hasn't changed.
       // This avoids re-rendering components that subscribe to specific fields
       // when periodic snapshot publishes arrive with identical data.
-      const backendsChanged = state.backends.length !== snapshot.backends.length
-        || state.backends.some((b, i) => {
+      const backendsChanged =
+        state.backends.length !== snapshot.backends.length ||
+        state.backends.some((b, i) => {
           const nb = snapshot.backends[i];
-          return b.backendId !== nb.backendId
-            || b.runtimeState !== nb.runtimeState
-            || b.openState !== nb.openState
-            || b.online !== nb.online
-            || b.lastError !== nb.lastError
-            || b.capabilities?.length !== nb.capabilities?.length
-            || b.capabilities?.some((c, j) => c !== nb.capabilities?.[j]);
+          return (
+            b.backendId !== nb.backendId ||
+            b.runtimeState !== nb.runtimeState ||
+            b.openState !== nb.openState ||
+            b.online !== nb.online ||
+            b.lastError !== nb.lastError ||
+            b.capabilities?.length !== nb.capabilities?.length ||
+            b.capabilities?.some((c, j) => c !== nb.capabilities?.[j])
+          );
         });
 
       const stateStreamKeys = Object.keys(state.sessionStreams);
       const snapshotStreamKeys = Object.keys(snapshot.sessionStreams);
-      const streamsChanged = stateStreamKeys.length !== snapshotStreamKeys.length
-        || stateStreamKeys.some(key =>
-          !snapshot.sessionStreams[key]
-          || state.sessionStreams[key].state !== snapshot.sessionStreams[key].state
+      const streamsChanged =
+        stateStreamKeys.length !== snapshotStreamKeys.length ||
+        stateStreamKeys.some(
+          key =>
+            !snapshot.sessionStreams[key] ||
+            state.sessionStreams[key].state !== snapshot.sessionStreams[key].state
         );
 
       // If nothing changed at all, return the existing state to avoid any re-render
       if (
-        !backendsChanged
-        && !streamsChanged
-        && state.connectionState === snapshot.connectionState
-        && state.mode === snapshot.mode
-        && state.localBackendId === snapshot.localBackendId
-        && state.currentInstanceId === snapshot.currentInstanceId
-        && state.currentDeviceId === snapshot.currentDeviceId
+        !backendsChanged &&
+        !streamsChanged &&
+        state.connectionState === snapshot.connectionState &&
+        state.mode === snapshot.mode &&
+        state.localBackendId === snapshot.localBackendId &&
+        state.currentInstanceId === snapshot.currentInstanceId &&
+        state.currentDeviceId === snapshot.currentDeviceId
       ) {
         return state;
       }
@@ -112,10 +117,10 @@ export const useFacadeStore = create<FacadeState>((set, get) => ({
       };
     }),
 
-  applyEvent: (event) => {
+  applyEvent: event => {
     switch (event.type) {
       case 'connection_state_changed':
-        set((state) => ({
+        set(state => ({
           connectionState: event.state,
           connectionError: event.state === 'error' ? (event.error ?? 'Connection failed') : null,
           reconnectGeneration:
@@ -130,10 +135,10 @@ export const useFacadeStore = create<FacadeState>((set, get) => ({
         break;
 
       case 'backend_state_changed': {
-        const backends = get().backends.map((b) =>
+        const backends = get().backends.map(b =>
           b.backendId === event.backendId
             ? { ...b, runtimeState: event.state, lastError: event.error }
-            : b,
+            : b
         );
         set({ backends });
         break;

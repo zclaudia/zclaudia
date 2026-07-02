@@ -25,7 +25,14 @@ interface ConnectionContextValue {
   getConnectedServers: () => string[];
 
   // Permission decision handlers (shared across all components)
-  handlePermissionDecision: (requestId: string, allow: boolean, remember?: boolean, credential?: string, feedback?: string, promoteRule?: string) => Promise<void>;
+  handlePermissionDecision: (
+    requestId: string,
+    allow: boolean,
+    remember?: boolean,
+    credential?: string,
+    feedback?: string,
+    promoteRule?: string
+  ) => Promise<void>;
   handlePromptAnswer: (requestId: string, formattedAnswer: string) => void;
 
   // Embedded server debug info
@@ -88,11 +95,15 @@ export function ConnectionProvider({
   useEffect(() => {
     if (!standaloneServerUrl) return;
     try {
-      const raw = standaloneServerUrl.startsWith('http') ? standaloneServerUrl : `http://${standaloneServerUrl}`;
+      const raw = standaloneServerUrl.startsWith('http')
+        ? standaloneServerUrl
+        : `http://${standaloneServerUrl}`;
       const url = new URL(raw);
       const port = parseInt(url.port);
       if (port) useServerStore.getState().setLocalServerPort(port);
-    } catch { /* ignore malformed URL */ }
+    } catch {
+      /* ignore malformed URL */
+    }
   }, [standaloneServerUrl]);
 
   // Set the active server for standalone windows.
@@ -114,107 +125,122 @@ export function ConnectionProvider({
   // Use the multi-server socket hook that manages multiple connections
   const socket = useMultiServerSocket();
 
-  const handlePermissionDecision = useCallback(async (
-    requestId: string,
-    allow: boolean,
-    remember?: boolean,
-    credential?: string,
-    feedback?: string,
-    promoteRule?: string,
-  ) => {
-    // Find the request to get serverId for routing
-    const request = usePermissionStore.getState().pendingRequests.find(r => r.requestId === requestId);
-    const targetServerId = request?.serverId;
+  const handlePermissionDecision = useCallback(
+    async (
+      requestId: string,
+      allow: boolean,
+      remember?: boolean,
+      credential?: string,
+      feedback?: string,
+      promoteRule?: string
+    ) => {
+      // Find the request to get serverId for routing
+      const request = usePermissionStore
+        .getState()
+        .pendingRequests.find(r => r.requestId === requestId);
+      const targetServerId = request?.serverId;
 
-    let encryptedCredentialValue: string | undefined;
+      let encryptedCredentialValue: string | undefined;
 
-    // Encrypt credential if provided
-    if (credential && allow) {
-      const { activeServerId, getActiveServerConnection, connections } = useServerStore.getState();
-      const connServerId = targetServerId || activeServerId;
-      const conn = connServerId ? connections[connServerId] : getActiveServerConnection();
-      if (conn?.publicKey && isEncryptionAvailable(conn.publicKey)) {
-        try {
-          encryptedCredentialValue = await encryptCredential(credential, conn.publicKey);
-        } catch (err) {
-          console.error('[ConnectionContext] Failed to encrypt credential:', err);
+      // Encrypt credential if provided
+      if (credential && allow) {
+        const { activeServerId, getActiveServerConnection, connections } =
+          useServerStore.getState();
+        const connServerId = targetServerId || activeServerId;
+        const conn = connServerId ? connections[connServerId] : getActiveServerConnection();
+        if (conn?.publicKey && isEncryptionAvailable(conn.publicKey)) {
+          try {
+            encryptedCredentialValue = await encryptCredential(credential, conn.publicKey);
+          } catch (err) {
+            console.error('[ConnectionContext] Failed to encrypt credential:', err);
+          }
         }
       }
-    }
 
-    const message = {
-      type: 'permission_decision' as const,
-      requestId,
-      allow,
-      remember,
-      ...(feedback && { feedback }),
-      ...(encryptedCredentialValue && { encryptedCredential: encryptedCredentialValue }),
-      ...(promoteRule && { promoteRule }),
-    };
+      const message = {
+        type: 'permission_decision' as const,
+        requestId,
+        allow,
+        remember,
+        ...(feedback && { feedback }),
+        ...(encryptedCredentialValue && { encryptedCredential: encryptedCredentialValue }),
+        ...(promoteRule && { promoteRule }),
+      };
 
-    if (targetServerId) {
-      socket.sendToServer(targetServerId, message);
-    } else {
-      socket.sendMessage(message);
-    }
-    usePermissionStore.getState().clearRequestById(requestId);
-  }, [socket]);
-
-  const handlePromptAnswer = useCallback((requestId: string, formattedAnswer: string) => {
-    const request = usePromptRequestStore.getState().pendingRequests.find(r => r.requestId === requestId);
-    const targetServerId = request?.serverId;
-
-    const message = {
-      type: 'prompt_answer' as const,
-      requestId,
-      formattedAnswer,
-    };
-
-    if (targetServerId) {
-      socket.sendToServer(targetServerId, message);
-    } else {
-      socket.sendMessage(message);
-    }
-    usePromptRequestStore.getState().clearRequestById(requestId);
-  }, [socket]);
-
-  const value: ConnectionContextValue = useMemo(() => ({
-    // Active server operations
-    sendMessage: socket.sendMessage,
-    isConnected: socket.isConnected,
-    connect: socket.connect,
-    disconnect: socket.disconnect,
-
-    // Multi-server operations
-    connectServer: socket.connectServer,
-    disconnectServer: socket.disconnectServer,
-    sendToServer: socket.sendToServer,
-    isServerConnected: socket.isServerConnected,
-    getConnectedServers: socket.getConnectedServers,
-
-    // Permission handlers
-    handlePermissionDecision,
-    handlePromptAnswer,
-
-    // Embedded server debug info
-    embeddedServerStatus: embeddedServer.status,
-    embeddedServerError: embeddedServer.error,
-    embeddedServerPort: embeddedServer.port,
-    restartEmbeddedServer: embeddedServer.restart,
-
-    // WSL server
-    wslServer,
-  }), [
-    socket, handlePermissionDecision, handlePromptAnswer,
-    embeddedServer.status, embeddedServer.error, embeddedServer.port, embeddedServer.restart,
-    wslServer,
-  ]);
-
-  return (
-    <ConnectionContext.Provider value={value}>
-      {children}
-    </ConnectionContext.Provider>
+      if (targetServerId) {
+        socket.sendToServer(targetServerId, message);
+      } else {
+        socket.sendMessage(message);
+      }
+      usePermissionStore.getState().clearRequestById(requestId);
+    },
+    [socket]
   );
+
+  const handlePromptAnswer = useCallback(
+    (requestId: string, formattedAnswer: string) => {
+      const request = usePromptRequestStore
+        .getState()
+        .pendingRequests.find(r => r.requestId === requestId);
+      const targetServerId = request?.serverId;
+
+      const message = {
+        type: 'prompt_answer' as const,
+        requestId,
+        formattedAnswer,
+      };
+
+      if (targetServerId) {
+        socket.sendToServer(targetServerId, message);
+      } else {
+        socket.sendMessage(message);
+      }
+      usePromptRequestStore.getState().clearRequestById(requestId);
+    },
+    [socket]
+  );
+
+  const value: ConnectionContextValue = useMemo(
+    () => ({
+      // Active server operations
+      sendMessage: socket.sendMessage,
+      isConnected: socket.isConnected,
+      connect: socket.connect,
+      disconnect: socket.disconnect,
+
+      // Multi-server operations
+      connectServer: socket.connectServer,
+      disconnectServer: socket.disconnectServer,
+      sendToServer: socket.sendToServer,
+      isServerConnected: socket.isServerConnected,
+      getConnectedServers: socket.getConnectedServers,
+
+      // Permission handlers
+      handlePermissionDecision,
+      handlePromptAnswer,
+
+      // Embedded server debug info
+      embeddedServerStatus: embeddedServer.status,
+      embeddedServerError: embeddedServer.error,
+      embeddedServerPort: embeddedServer.port,
+      restartEmbeddedServer: embeddedServer.restart,
+
+      // WSL server
+      wslServer,
+    }),
+    [
+      socket,
+      handlePermissionDecision,
+      handlePromptAnswer,
+      embeddedServer.status,
+      embeddedServer.error,
+      embeddedServer.port,
+      embeddedServer.restart,
+      wslServer,
+    ]
+  );
+
+  return <ConnectionContext.Provider value={value}>{children}</ConnectionContext.Provider>;
 }
 
 export function useConnection() {

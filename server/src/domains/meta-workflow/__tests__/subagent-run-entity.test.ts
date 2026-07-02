@@ -3,7 +3,10 @@ import { describe, it, expect, vi } from 'vitest';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createSubagentRunEntity, createRunVirtualClientFromAiRunPort } from '../run-entities/subagent-run-entity.js';
+import {
+  createSubagentRunEntity,
+  createRunVirtualClientFromAiRunPort,
+} from '../run-entities/subagent-run-entity.js';
 import type { MetaSubagentTemplate } from '@zclaudia/shared/features/meta-workflow';
 
 const baseTemplate: MetaSubagentTemplate = {
@@ -27,7 +30,7 @@ describe('subagent run-entity adapter', () => {
     const runEntity = createSubagentRunEntity({ runVirtualClient });
     const outcome = await runEntity(
       { kind: 'subagent', subagent: baseTemplate },
-      { worktreePath: dir },
+      { worktreePath: dir }
     );
     expect(outcome.exitOk).toBe(true);
     expect(runVirtualClient).toHaveBeenCalledOnce();
@@ -39,7 +42,7 @@ describe('subagent run-entity adapter', () => {
     const runEntity = createSubagentRunEntity({ runVirtualClient });
     const outcome = await runEntity(
       { kind: 'subagent', subagent: baseTemplate },
-      { worktreePath: dir },
+      { worktreePath: dir }
     );
     expect(outcome.exitOk).toBe(false);
   });
@@ -55,10 +58,7 @@ describe('subagent run-entity adapter', () => {
       output: 'I have finished my investigation. [INVESTIGATION_COMPLETE]',
     });
     const runEntity = createSubagentRunEntity({ runVirtualClient });
-    const outcome = await runEntity(
-      { kind: 'subagent', subagent: tmpl },
-      { worktreePath: dir },
-    );
+    const outcome = await runEntity({ kind: 'subagent', subagent: tmpl }, { worktreePath: dir });
     expect(outcome.exitOk).toBe(true);
   });
 
@@ -70,20 +70,19 @@ describe('subagent run-entity adapter', () => {
     const dir = mkdtempSync(join(tmpdir(), 'subagent-test-'));
     const runVirtualClient = vi.fn().mockResolvedValue({ ok: true, output: 'lorem ipsum' });
     const runEntity = createSubagentRunEntity({ runVirtualClient });
-    const outcome = await runEntity(
-      { kind: 'subagent', subagent: tmpl },
-      { worktreePath: dir },
-    );
+    const outcome = await runEntity({ kind: 'subagent', subagent: tmpl }, { worktreePath: dir });
     expect(outcome.exitOk).toBe(false);
   });
 
   it('rejects non-subagent kind', async () => {
     const runVirtualClient = vi.fn();
     const runEntity = createSubagentRunEntity({ runVirtualClient });
-    await expect(runEntity(
-      { kind: 'workflow', workflow: {} as never, workflowId: 'w' },
-      { worktreePath: '/tmp' },
-    )).rejects.toThrow(/subagent/i);
+    await expect(
+      runEntity(
+        { kind: 'workflow', workflow: {} as never, workflowId: 'w' },
+        { worktreePath: '/tmp' }
+      )
+    ).rejects.toThrow(/subagent/i);
   });
 
   it('returns exitOk=false when virtual client itself fails', async () => {
@@ -92,7 +91,7 @@ describe('subagent run-entity adapter', () => {
     const runEntity = createSubagentRunEntity({ runVirtualClient });
     const outcome = await runEntity(
       { kind: 'subagent', subagent: baseTemplate },
-      { worktreePath: dir },
+      { worktreePath: dir }
     );
     expect(outcome.exitOk).toBe(false);
   });
@@ -102,11 +101,15 @@ describe('subagent run-entity adapter', () => {
 
 describe('createRunVirtualClientFromAiRunPort', () => {
   it('invokes the AI run port with system prompt as input', async () => {
-    const startVirtualRun = vi.fn().mockImplementation(async (input: { onMessage?: (m: { kind: string; content?: string }) => void }) => {
-      // Simulate the port emitting an assistant message and then completion.
-      input.onMessage?.({ kind: 'assistant_message', content: 'analysis result' });
-      input.onMessage?.({ kind: 'run_completed' });
-    });
+    const startVirtualRun = vi
+      .fn()
+      .mockImplementation(
+        async (input: { onMessage?: (m: { kind: string; content?: string }) => void }) => {
+          // Simulate the port emitting an assistant message and then completion.
+          input.onMessage?.({ kind: 'assistant_message', content: 'analysis result' });
+          input.onMessage?.({ kind: 'run_completed' });
+        }
+      );
     const runVirtualClient = createRunVirtualClientFromAiRunPort({
       aiRunPort: { startVirtualRun } as never,
       defaultLlmProfileId: 'provider-x',
@@ -131,7 +134,10 @@ describe('createRunVirtualClientFromAiRunPort', () => {
       timeoutMs: 1000,
     });
     const result = await runVirtualClient({
-      systemPrompt: 'p', allowedTools: [], maxTurns: 5, cwd: '/tmp',
+      systemPrompt: 'p',
+      allowedTools: [],
+      maxTurns: 5,
+      cwd: '/tmp',
     });
     expect(result.ok).toBe(false);
   });
@@ -146,7 +152,10 @@ describe('createRunVirtualClientFromAiRunPort', () => {
       timeoutMs: 5,
     });
     const result = await runVirtualClient({
-      systemPrompt: 'p', allowedTools: [], maxTurns: 5, cwd: '/tmp',
+      systemPrompt: 'p',
+      allowedTools: [],
+      maxTurns: 5,
+      cwd: '/tmp',
     });
     expect(result.ok).toBe(false);
   });
@@ -156,18 +165,22 @@ describe('createRunVirtualClientFromAiRunPort — incremental termination', () =
   it('resolves ok=true early when output-file appears mid-conversation', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'subagent-incr-'));
     let messagesSent = 0;
-    const startVirtualRun = vi.fn().mockImplementation(async (input: { onMessage?: (m: { kind: string; content?: string }) => void }) => {
-      input.onMessage?.({ kind: 'assistant_message', content: 'thinking...' });
-      messagesSent += 1;
-      // create the report file mid-conversation
-      writeFileSync(join(dir, 'report.md'), 'done');
-      input.onMessage?.({ kind: 'assistant_message', content: 'wrote report' });
-      messagesSent += 1;
-      // simulate that more messages follow (which we should ignore once terminated)
-      input.onMessage?.({ kind: 'tool_use', content: 'still chatting' });
-      messagesSent += 1;
-      // The adapter should resolve before run_completed fires.
-    });
+    const startVirtualRun = vi
+      .fn()
+      .mockImplementation(
+        async (input: { onMessage?: (m: { kind: string; content?: string }) => void }) => {
+          input.onMessage?.({ kind: 'assistant_message', content: 'thinking...' });
+          messagesSent += 1;
+          // create the report file mid-conversation
+          writeFileSync(join(dir, 'report.md'), 'done');
+          input.onMessage?.({ kind: 'assistant_message', content: 'wrote report' });
+          messagesSent += 1;
+          // simulate that more messages follow (which we should ignore once terminated)
+          input.onMessage?.({ kind: 'tool_use', content: 'still chatting' });
+          messagesSent += 1;
+          // The adapter should resolve before run_completed fires.
+        }
+      );
     const runVirtualClient = createRunVirtualClientFromAiRunPort({
       aiRunPort: { startVirtualRun } as never,
       timeoutMs: 1000,
@@ -181,15 +194,19 @@ describe('createRunVirtualClientFromAiRunPort — incremental termination', () =
     });
     expect(result.ok).toBe(true);
     expect(result.output).toContain('thinking');
-    expect(messagesSent).toBe(3);  // all 3 events fired before we resolved
+    expect(messagesSent).toBe(3); // all 3 events fired before we resolved
   });
 
   it('resolves ok=true early when output-keyword appears mid-conversation', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'subagent-incr-'));
-    const startVirtualRun = vi.fn().mockImplementation(async (input: { onMessage?: (m: { kind: string; content?: string }) => void }) => {
-      input.onMessage?.({ kind: 'assistant_message', content: 'still thinking' });
-      input.onMessage?.({ kind: 'assistant_message', content: '[INVESTIGATION_COMPLETE]' });
-    });
+    const startVirtualRun = vi
+      .fn()
+      .mockImplementation(
+        async (input: { onMessage?: (m: { kind: string; content?: string }) => void }) => {
+          input.onMessage?.({ kind: 'assistant_message', content: 'still thinking' });
+          input.onMessage?.({ kind: 'assistant_message', content: '[INVESTIGATION_COMPLETE]' });
+        }
+      );
     const runVirtualClient = createRunVirtualClientFromAiRunPort({
       aiRunPort: { startVirtualRun } as never,
       timeoutMs: 1000,
@@ -206,16 +223,23 @@ describe('createRunVirtualClientFromAiRunPort — incremental termination', () =
 
   it('still resolves at run_completed when no terminationCondition supplied', async () => {
     // Backward compatibility — Phase D callers that don't pass terminationCondition still work.
-    const startVirtualRun = vi.fn().mockImplementation(async (input: { onMessage?: (m: { kind: string; content?: string }) => void }) => {
-      input.onMessage?.({ kind: 'assistant_message', content: 'hi' });
-      input.onMessage?.({ kind: 'run_completed' });
-    });
+    const startVirtualRun = vi
+      .fn()
+      .mockImplementation(
+        async (input: { onMessage?: (m: { kind: string; content?: string }) => void }) => {
+          input.onMessage?.({ kind: 'assistant_message', content: 'hi' });
+          input.onMessage?.({ kind: 'run_completed' });
+        }
+      );
     const runVirtualClient = createRunVirtualClientFromAiRunPort({
       aiRunPort: { startVirtualRun } as never,
       timeoutMs: 1000,
     });
     const result = await runVirtualClient({
-      systemPrompt: 'p', allowedTools: [], maxTurns: 5, cwd: '/tmp',
+      systemPrompt: 'p',
+      allowedTools: [],
+      maxTurns: 5,
+      cwd: '/tmp',
     });
     expect(result.ok).toBe(true);
   });

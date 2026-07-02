@@ -42,8 +42,12 @@ describe('notification-context', () => {
 
     expect(getBackendDisplayName(db)).toBe('Office Mac Mini');
     expect(getSessionDisplayName(db, 'sess-1')).toBe('Release Train');
-    expect(formatSessionBackendContext(db, 'sess-1')).toBe('Session Release Train on backend Office Mac Mini');
-    expect(buildAppSelectionClickUrl(db, { sessionId: 'sess-1' })).toBe('zclaudia://open?backendId=backend-123&sessionId=sess-1');
+    expect(formatSessionBackendContext(db, 'sess-1')).toBe(
+      'Session Release Train on backend Office Mac Mini'
+    );
+    expect(buildAppSelectionClickUrl(db, { sessionId: 'sess-1' })).toBe(
+      'zclaudia://open?backendId=backend-123&sessionId=sess-1'
+    );
   });
 
   it('falls back to ids and environment-safe defaults when db data is unavailable', () => {

@@ -10,12 +10,14 @@
 export function generateToolSignature(
   toolName: string,
   toolInput?: Record<string, unknown>,
-  _providerType?: string,
+  _providerType?: string
 ): string {
   const normalizedTool = normalizeToolName(toolName);
 
   if (normalizedTool === 'Task') {
-    const subtype = pickString(toolInput, ['subagent_type', 'subagentType', 'agent', 'task_type', 'type']) || 'generic';
+    const subtype =
+      pickString(toolInput, ['subagent_type', 'subagentType', 'agent', 'task_type', 'type']) ||
+      'generic';
     const inBackground = pickBoolean(toolInput, ['run_in_background', 'runInBackground']);
     return `Task:${subtype}${inBackground === true ? ':bg' : inBackground === false ? ':fg' : ''}`;
   }
@@ -40,11 +42,15 @@ export function generateToolSignature(
 
   // For file tools, include file path with parent directory for better disambiguation.
   const filePath = extractFilePath(toolInput);
-  if (['Read', 'Write', 'Edit', 'MultiEdit', 'ReadSymbol', 'EditSymbol'].includes(normalizedTool) && filePath) {
+  if (
+    ['Read', 'Write', 'Edit', 'MultiEdit', 'ReadSymbol', 'EditSymbol'].includes(normalizedTool) &&
+    filePath
+  ) {
     const parts = filePath.split('/');
-    const pathSignature = parts.length > 3
-      ? `${parts[parts.length - 2]}/${parts[parts.length - 1]}`
-      : parts[parts.length - 1] || filePath;
+    const pathSignature =
+      parts.length > 3
+        ? `${parts[parts.length - 2]}/${parts[parts.length - 1]}`
+        : parts[parts.length - 1] || filePath;
     return `${normalizedTool}:${pathSignature}`;
   }
 
@@ -70,7 +76,8 @@ export function generateToolSignature(
 
 function normalizeToolName(toolName: string): string {
   const lower = toolName.toLowerCase();
-  if (['bash', 'execute_command', 'run_terminal_cmd', 'terminal', 'shell'].includes(lower)) return 'Bash';
+  if (['bash', 'execute_command', 'run_terminal_cmd', 'terminal', 'shell'].includes(lower))
+    return 'Bash';
   if (lower === 'read') return 'Read';
   if (['write', 'create'].includes(lower)) return 'Write';
   if (['edit', 'patch'].includes(lower)) return 'Edit';
@@ -83,7 +90,10 @@ function normalizeToolName(toolName: string): string {
   return toolName;
 }
 
-function pickString(input: Record<string, unknown> | undefined, keys: string[]): string | undefined {
+function pickString(
+  input: Record<string, unknown> | undefined,
+  keys: string[]
+): string | undefined {
   if (!input) return undefined;
   for (const k of keys) {
     const value = input[k];
@@ -92,7 +102,10 @@ function pickString(input: Record<string, unknown> | undefined, keys: string[]):
   return undefined;
 }
 
-function pickBoolean(input: Record<string, unknown> | undefined, keys: string[]): boolean | undefined {
+function pickBoolean(
+  input: Record<string, unknown> | undefined,
+  keys: string[]
+): boolean | undefined {
   if (!input) return undefined;
   for (const k of keys) {
     const value = input[k];
@@ -140,8 +153,8 @@ export function detectLoop(toolCalls: string[]): { detected: boolean; pattern?: 
     if (repeats >= 2) {
       // Guard: repeated sequences of *different* Bash/Task sub-signatures are often
       // legitimate workflows, not stuck loops (major false-positive source).
-      const allBash = tail.every((t) => t.startsWith('Bash:'));
-      const allTask = tail.every((t) => t.startsWith('Task:'));
+      const allBash = tail.every(t => t.startsWith('Bash:'));
+      const allTask = tail.every(t => t.startsWith('Task:'));
       const unique = new Set(tail).size;
       if ((allBash || allTask) && unique > 1) {
         continue;

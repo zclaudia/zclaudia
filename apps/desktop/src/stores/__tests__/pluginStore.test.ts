@@ -76,7 +76,9 @@ describe('PluginStore', () => {
       const plugin = createTestPlugin();
       usePluginStore.getState().addPlugin(plugin);
 
-      usePluginStore.getState().updatePlugin('com.test.plugin', { status: 'active', error: 'test error' });
+      usePluginStore
+        .getState()
+        .updatePlugin('com.test.plugin', { status: 'active', error: 'test error' });
 
       const updated = usePluginStore.getState().plugins[0];
       expect(updated.status).toBe('active');
@@ -191,7 +193,9 @@ describe('PluginStore', () => {
       expect(value).toBe('light');
 
       usePluginStore.getState().setPluginSetting('com.test.plugin', 'theme', 'dark');
-      const storedValue = usePluginStore.getState().getPluginSetting('com.test.plugin', 'theme', 'light');
+      const storedValue = usePluginStore
+        .getState()
+        .getPluginSetting('com.test.plugin', 'theme', 'light');
       expect(storedValue).toBe('dark');
     });
 
@@ -248,9 +252,21 @@ describe('PluginStore', () => {
 
   describe('selectors', () => {
     it('should select active plugins', () => {
-      const plugin1 = createTestPlugin({ manifest: { id: 'plugin1', name: 'P1', version: '1.0', description: '' }, status: 'active', enabled: true });
-      const plugin2 = createTestPlugin({ manifest: { id: 'plugin2', name: 'P2', version: '1.0', description: '' }, status: 'idle', enabled: true });
-      const plugin3 = createTestPlugin({ manifest: { id: 'plugin3', name: 'P3', version: '1.0', description: '' }, status: 'active', enabled: false });
+      const plugin1 = createTestPlugin({
+        manifest: { id: 'plugin1', name: 'P1', version: '1.0', description: '' },
+        status: 'active',
+        enabled: true,
+      });
+      const plugin2 = createTestPlugin({
+        manifest: { id: 'plugin2', name: 'P2', version: '1.0', description: '' },
+        status: 'idle',
+        enabled: true,
+      });
+      const plugin3 = createTestPlugin({
+        manifest: { id: 'plugin3', name: 'P3', version: '1.0', description: '' },
+        status: 'active',
+        enabled: false,
+      });
 
       usePluginStore.getState().setPlugins([plugin1, plugin2, plugin3]);
 
@@ -272,8 +288,20 @@ describe('PluginStore', () => {
     });
 
     it('should select panels sorted by order', () => {
-      const panel1: UIExtension = { id: 'panel-1', pluginId: 'p1', type: 'panel', label: 'Panel 1', order: 2 };
-      const panel2: UIExtension = { id: 'panel-2', pluginId: 'p1', type: 'panel', label: 'Panel 2', order: 1 };
+      const panel1: UIExtension = {
+        id: 'panel-1',
+        pluginId: 'p1',
+        type: 'panel',
+        label: 'Panel 1',
+        order: 2,
+      };
+      const panel2: UIExtension = {
+        id: 'panel-2',
+        pluginId: 'p1',
+        type: 'panel',
+        label: 'Panel 2',
+        order: 1,
+      };
 
       usePluginStore.getState().registerPanel(panel1);
       usePluginStore.getState().registerPanel(panel2);
@@ -284,8 +312,20 @@ describe('PluginStore', () => {
     });
 
     it('should select settings tabs sorted by order', () => {
-      const tab1: UIExtension = { id: 'tab-1', pluginId: 'p1', type: 'settings-tab', label: 'Tab 1', order: 3 };
-      const tab2: UIExtension = { id: 'tab-2', pluginId: 'p1', type: 'settings-tab', label: 'Tab 2', order: 1 };
+      const tab1: UIExtension = {
+        id: 'tab-1',
+        pluginId: 'p1',
+        type: 'settings-tab',
+        label: 'Tab 1',
+        order: 3,
+      };
+      const tab2: UIExtension = {
+        id: 'tab-2',
+        pluginId: 'p1',
+        type: 'settings-tab',
+        label: 'Tab 2',
+        order: 1,
+      };
 
       usePluginStore.getState().registerSettingsTab(tab1);
       usePluginStore.getState().registerSettingsTab(tab2);
@@ -298,20 +338,35 @@ describe('PluginStore', () => {
 
   describe('toolbar items', () => {
     it('should register a toolbar item', () => {
-      const item: UIExtension = { id: 'toolbar-1', pluginId: 'com.test.plugin', type: 'toolbar', label: 'Action' };
+      const item: UIExtension = {
+        id: 'toolbar-1',
+        pluginId: 'com.test.plugin',
+        type: 'toolbar',
+        label: 'Action',
+      };
       usePluginStore.getState().registerToolbarItem(item);
       expect(usePluginStore.getState().toolbarItems).toHaveLength(1);
     });
 
     it('should unregister a toolbar item', () => {
-      const item: UIExtension = { id: 'toolbar-1', pluginId: 'com.test.plugin', type: 'toolbar', label: 'Action' };
+      const item: UIExtension = {
+        id: 'toolbar-1',
+        pluginId: 'com.test.plugin',
+        type: 'toolbar',
+        label: 'Action',
+      };
       usePluginStore.getState().registerToolbarItem(item);
       usePluginStore.getState().unregisterToolbarItem('toolbar-1');
       expect(usePluginStore.getState().toolbarItems).toHaveLength(0);
     });
 
     it('clearPluginExtensions removes toolbar items too', () => {
-      const item: UIExtension = { id: 'toolbar-1', pluginId: 'com.test.plugin', type: 'toolbar', label: 'Action' };
+      const item: UIExtension = {
+        id: 'toolbar-1',
+        pluginId: 'com.test.plugin',
+        type: 'toolbar',
+        label: 'Action',
+      };
       usePluginStore.getState().registerToolbarItem(item);
       usePluginStore.getState().clearPluginExtensions('com.test.plugin');
       expect(usePluginStore.getState().toolbarItems).toHaveLength(0);
@@ -320,14 +375,20 @@ describe('PluginStore', () => {
 
   describe('permission request', () => {
     it('should set pending permission request', () => {
-      const req = { pluginId: 'com.test.plugin', pluginName: 'Test', permissions: ['read', 'write'] };
+      const req = {
+        pluginId: 'com.test.plugin',
+        pluginName: 'Test',
+        permissions: ['read', 'write'],
+      };
       usePluginStore.getState().setPendingPermissionRequest(req);
       expect(usePluginStore.getState().pendingPermissionRequest).toEqual(req);
     });
 
     it('should clear pending permission request', () => {
       usePluginStore.getState().setPendingPermissionRequest({
-        pluginId: 'com.test.plugin', pluginName: 'Test', permissions: ['read'],
+        pluginId: 'com.test.plugin',
+        pluginName: 'Test',
+        permissions: ['read'],
       });
       usePluginStore.getState().setPendingPermissionRequest(null);
       expect(usePluginStore.getState().pendingPermissionRequest).toBeNull();
@@ -336,7 +397,12 @@ describe('PluginStore', () => {
 
   describe('unregisterSettingsTab', () => {
     it('should remove a settings tab by id', () => {
-      const tab: UIExtension = { id: 'tab-1', pluginId: 'com.test.plugin', type: 'settings-tab', label: 'Tab' };
+      const tab: UIExtension = {
+        id: 'tab-1',
+        pluginId: 'com.test.plugin',
+        type: 'settings-tab',
+        label: 'Tab',
+      };
       usePluginStore.getState().registerSettingsTab(tab);
       usePluginStore.getState().unregisterSettingsTab('tab-1');
       expect(usePluginStore.getState().settingsTabs).toHaveLength(0);
@@ -346,7 +412,9 @@ describe('PluginStore', () => {
   describe('getEffectivePlacement fallback', () => {
     it('falls back to right when a panel has no placement override or default', () => {
       usePluginStore.setState({
-        panels: [{ id: 'noplace', pluginId: 'com.test.noplace', type: 'panel', label: 'X', order: 0 }],
+        panels: [
+          { id: 'noplace', pluginId: 'com.test.noplace', type: 'panel', label: 'X', order: 0 },
+        ],
         panelPlacements: {},
       });
       expect(getEffectivePlacement(usePluginStore.getState(), 'noplace')).toBe('right');

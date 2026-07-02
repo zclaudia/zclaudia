@@ -19,7 +19,11 @@ export type { ValidationResult, ValidationIssue } from './validator.js';
 export type { ArchiveResult, CapabilityArchiveSummary } from './archive-service.js';
 
 // G4: Bootstrap services + repositories
-export { AiExploreService, buildExplorePrompt, parseExploreResponse } from './ai-explore-service.js';
+export {
+  AiExploreService,
+  buildExplorePrompt,
+  parseExploreResponse,
+} from './ai-explore-service.js';
 export { BootstrapService } from './bootstrap-service.js';
 export { BootstrapReviewService } from './bootstrap-review-service.js';
 export type { ExploreInput, ExploreResult } from './ai-explore-service.js';
@@ -31,7 +35,10 @@ export { SpecChangeDraftingService } from './spec-change-drafting-service.js';
 export type { DraftResult } from './spec-change-drafting-service.js';
 export { BootstrapScanRepository } from './repositories/bootstrap-scan-repository.js';
 export { BootstrapReviewItemRepository } from './repositories/bootstrap-review-item-repository.js';
-export type { BootstrapScan, BootstrapScanStatus } from './repositories/bootstrap-scan-repository.js';
+export type {
+  BootstrapScan,
+  BootstrapScanStatus,
+} from './repositories/bootstrap-scan-repository.js';
 export type {
   BootstrapReviewItem,
   BootstrapReviewOp,

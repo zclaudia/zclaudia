@@ -137,7 +137,7 @@ async function createSession({ projectId, agentProfileId }) {
 function connect() {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(WS_URL);
-    const onErr = (e) => reject(new Error(`WS error: ${e?.message ?? e}`));
+    const onErr = e => reject(new Error(`WS error: ${e?.message ?? e}`));
     ws.addEventListener('open', () => {
       ws.removeEventListener('error', onErr);
       resolve(ws);
@@ -153,7 +153,7 @@ function send(ws, msg) {
 
 function authenticate(ws) {
   return new Promise((resolve, reject) => {
-    const handler = (ev) => {
+    const handler = ev => {
       try {
         const msg = JSON.parse(ev.data);
         if (msg.type === 'auth_result') {
@@ -161,7 +161,9 @@ function authenticate(ws) {
           if (msg.success) resolve(msg);
           else reject(new Error(`auth_result success=false: ${JSON.stringify(msg)}`));
         }
-      } catch { /* non-JSON or unrelated frame — keep listening */ }
+      } catch {
+        /* non-JSON or unrelated frame — keep listening */
+      }
     };
     ws.addEventListener('message', handler);
     send(ws, { type: 'auth' });
@@ -193,19 +195,29 @@ function logEvent(msg) {
       console.log(`${prefix} ${color('magenta', '<think> ' + (msg.content ?? '').slice(0, 80))}`);
       break;
     case 'tool_use':
-      console.log(`${prefix} ${color('blue', msg.toolName ?? '')}  input=${JSON.stringify(msg.input).slice(0, 100)}`);
+      console.log(
+        `${prefix} ${color('blue', msg.toolName ?? '')}  input=${JSON.stringify(msg.input).slice(0, 100)}`
+      );
       break;
     case 'tool_result':
-      console.log(`${prefix} ${color('blue', msg.toolName ?? '')}  ${(msg.output ?? '').toString().slice(0, 100)}`);
+      console.log(
+        `${prefix} ${color('blue', msg.toolName ?? '')}  ${(msg.output ?? '').toString().slice(0, 100)}`
+      );
       break;
     case 'permission_request':
-      console.log(`${prefix} ${color('yellow', '⚠ permission')} toolName=${msg.toolName} requestId=${msg.requestId}`);
+      console.log(
+        `${prefix} ${color('yellow', '⚠ permission')} toolName=${msg.toolName} requestId=${msg.requestId}`
+      );
       break;
     case 'run_completed':
-      console.log(`${prefix} ${color('green', '✓ completed')} runId=${msg.runId} usage=${JSON.stringify(msg.usage ?? null).slice(0, 120)}`);
+      console.log(
+        `${prefix} ${color('green', '✓ completed')} runId=${msg.runId} usage=${JSON.stringify(msg.usage ?? null).slice(0, 120)}`
+      );
       break;
     case 'run_failed':
-      console.log(`${prefix} ${color('red', '✗ failed')} runId=${msg.runId} error=${JSON.stringify(msg.error)}`);
+      console.log(
+        `${prefix} ${color('red', '✗ failed')} runId=${msg.runId} error=${JSON.stringify(msg.error)}`
+      );
       break;
     case 'system_info':
       console.log(`${prefix} ${color('dim', JSON.stringify(msg).slice(0, 160))}`);
@@ -230,7 +242,7 @@ async function main() {
     const ss = await listSessions();
     for (const s of ss) {
       console.log(
-        `${s.id}  type=${s.type}  project=${s.project_id || s.projectId}  agentProfile=${s.agent_profile_id || s.agentProfileId}  name="${s.name ?? ''}"`,
+        `${s.id}  type=${s.type}  project=${s.project_id || s.projectId}  agentProfile=${s.agent_profile_id || s.agentProfileId}  name="${s.name ?? ''}"`
       );
     }
     return;
@@ -242,11 +254,13 @@ async function main() {
 
   // Resolve session
   let sessionId = SESSION_ID;
-  let sessionMeta = null;
   if (!sessionId) {
     if (!flag('--create')) {
       console.error(
-        color('red', 'no --session-id and no --create. Use --list-sessions to find one, or pass --create with --agent-profile-id.'),
+        color(
+          'red',
+          'no --session-id and no --create. Use --list-sessions to find one, or pass --create with --agent-profile-id.'
+        )
       );
       process.exit(2);
     }
@@ -260,9 +274,9 @@ async function main() {
     console.log(`created session ${sessionId}`);
   } else {
     try {
-      sessionMeta = await getSession(sessionId);
+      const sessionMeta = await getSession(sessionId);
       console.log(
-        `reusing session ${sessionId}  type=${sessionMeta.type}  agentProfileId=${sessionMeta.agent_profile_id ?? sessionMeta.agentProfileId}  projectId=${sessionMeta.project_id ?? sessionMeta.projectId}`,
+        `reusing session ${sessionId}  type=${sessionMeta.type}  agentProfileId=${sessionMeta.agent_profile_id ?? sessionMeta.agentProfileId}  projectId=${sessionMeta.project_id ?? sessionMeta.projectId}`
       );
     } catch (err) {
       console.error(color('red', `Failed to GET /api/sessions/${sessionId}: ${err.message}`));
@@ -278,7 +292,9 @@ async function main() {
 
   // Run loop
   const clientRequestId = randomUUID();
-  console.log(color('bold', `\n→ run_start  sessionId=${sessionId}  clientRequestId=${clientRequestId}`));
+  console.log(
+    color('bold', `\n→ run_start  sessionId=${sessionId}  clientRequestId=${clientRequestId}`)
+  );
   console.log(`  permissionMode=${PERMISSION_MODE}`);
   console.log(`  input=${JSON.stringify(INPUT)}`);
   console.log('');
@@ -292,7 +308,7 @@ async function main() {
   let deltaCount = 0;
   let toolUseCount = 0;
 
-  const handler = (ev) => {
+  const handler = ev => {
     let msg;
     try {
       msg = JSON.parse(ev.data);
@@ -342,7 +358,12 @@ async function main() {
   });
 
   const timer = setTimeout(() => {
-    console.log(color('yellow', `\n⏱ TIMEOUT after ${TIMEOUT_MS}ms — never received run_completed or run_failed.`));
+    console.log(
+      color(
+        'yellow',
+        `\n⏱ TIMEOUT after ${TIMEOUT_MS}ms — never received run_completed or run_failed.`
+      )
+    );
     cleanup();
   }, TIMEOUT_MS);
 
@@ -361,39 +382,53 @@ async function main() {
 
   function printSummary() {
     console.log('\n' + color('bold', '── summary ──'));
-    console.log(`  run_started:    ${receivedRunStarted ? color('green', 'yes') : color('red', 'NO')}`);
-    console.log(`  first delta:    ${receivedFirstDelta ? color('green', 'yes') : color('red', 'NO')}`);
+    console.log(
+      `  run_started:    ${receivedRunStarted ? color('green', 'yes') : color('red', 'NO')}`
+    );
+    console.log(
+      `  first delta:    ${receivedFirstDelta ? color('green', 'yes') : color('red', 'NO')}`
+    );
     console.log(`  delta count:    ${deltaCount}`);
     console.log(`  tool_use count: ${toolUseCount}`);
     console.log(`  permission auto-allows: ${permissionAutoAllows}`);
-    console.log(`  run_completed:  ${receivedCompleted ? color('green', 'yes') : color('red', 'NO')}`);
+    console.log(
+      `  run_completed:  ${receivedCompleted ? color('green', 'yes') : color('red', 'NO')}`
+    );
     console.log(`  run_failed:     ${receivedFailed ? color('red', 'YES') : color('green', 'no')}`);
     console.log(`  runId:          ${runId ?? '(none)'}`);
     if (!receivedRunStarted) {
       console.log(
         color(
           'yellow',
-          '\nHint: never saw run_started. Check server logs around POST /run / WS handler — message may have been rejected before the runtime even spun up.',
-        ),
+          '\nHint: never saw run_started. Check server logs around POST /run / WS handler — message may have been rejected before the runtime even spun up.'
+        )
       );
     } else if (receivedRunStarted && !receivedFirstDelta && !receivedCompleted && !receivedFailed) {
       console.log(
         color(
           'yellow',
-          '\nHint: run_started fired but no delta / completion. Provider or llm-profile call is hanging. Check server logs for provider/auth errors, and inspect agent_profiles + llm_profiles rows for the session.',
-        ),
+          '\nHint: run_started fired but no delta / completion. Provider or llm-profile call is hanging. Check server logs for provider/auth errors, and inspect agent_profiles + llm_profiles rows for the session.'
+        )
       );
     } else if (receivedFailed) {
-      console.log(color('yellow', '\nHint: run failed deterministically — error string above is the diagnostic.'));
+      console.log(
+        color(
+          'yellow',
+          '\nHint: run failed deterministically — error string above is the diagnostic.'
+        )
+      );
     } else if (receivedCompleted && !receivedFirstDelta) {
       console.log(
-        color('yellow', '\nHint: run completed without any delta — the model returned empty content. Check provider settings / model id / system prompt.'),
+        color(
+          'yellow',
+          '\nHint: run completed without any delta — the model returned empty content. Check provider settings / model id / system prompt.'
+        )
       );
     }
   }
 }
 
-main().catch((err) => {
+main().catch(err => {
   console.error(color('red', err.stack ?? err.message));
   process.exit(99);
 });

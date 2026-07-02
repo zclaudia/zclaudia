@@ -13,13 +13,13 @@
  * Base correlated message envelope
  */
 export interface CorrelatedMessage<T = unknown> {
-  id: string;              // Unique message ID (correlation ID)
-  type: string;            // Message type
-  payload: T;              // Actual message data
-  timestamp: number;       // Message timestamp
+  id: string; // Unique message ID (correlation ID)
+  type: string; // Message type
+  payload: T; // Actual message data
+  timestamp: number; // Message timestamp
   metadata?: {
-    requestId?: string;    // For responses: ID of the original request
-    timeout?: number;      // Timeout in ms
+    requestId?: string; // For responses: ID of the original request
+    timeout?: number; // Timeout in ms
   };
 }
 
@@ -28,7 +28,7 @@ export interface CorrelatedMessage<T = unknown> {
  */
 export interface Request<T = unknown> extends CorrelatedMessage<T> {
   metadata: {
-    timeout: number;       // Default 30000ms
+    timeout: number; // Default 30000ms
     requiresAuth?: boolean;
   };
 }
@@ -38,7 +38,7 @@ export interface Request<T = unknown> extends CorrelatedMessage<T> {
  */
 export interface Response<T = unknown> extends CorrelatedMessage<T> {
   metadata: {
-    requestId: string;     // Correlation to request
+    requestId: string; // Correlation to request
     success: boolean;
     error?: {
       code: string;
@@ -53,9 +53,9 @@ export interface Response<T = unknown> extends CorrelatedMessage<T> {
  */
 export interface StreamMessage<T = unknown> extends CorrelatedMessage<T> {
   metadata: {
-    requestId: string;     // Correlation to request
-    sequence: number;      // Ordered sequence number
-    final: boolean;        // Is this the last message?
+    requestId: string; // Correlation to request
+    sequence: number; // Ordered sequence number
+    final: boolean; // Is this the last message?
   };
 }
 
@@ -68,22 +68,25 @@ export interface Event<T = unknown> {
   payload: T;
   timestamp: number;
   metadata?: {
-    broadcast?: boolean;   // Broadcast to all clients
+    broadcast?: boolean; // Broadcast to all clients
   };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object';
 }
 
 /**
  * Type guard: Check if message is a Request
  */
-export function isRequest(msg: any): msg is Request {
+export function isRequest(msg: unknown): msg is Request {
+  if (!isRecord(msg) || !isRecord(msg.metadata)) return false;
+
   return (
-    msg &&
-    typeof msg === 'object' &&
     'id' in msg &&
     'type' in msg &&
     'payload' in msg &&
     'timestamp' in msg &&
-    msg.metadata &&
     typeof msg.metadata.timeout === 'number'
   );
 }
@@ -91,12 +94,11 @@ export function isRequest(msg: any): msg is Request {
 /**
  * Type guard: Check if message is a Response
  */
-export function isResponse(msg: any): msg is Response {
+export function isResponse(msg: unknown): msg is Response {
+  if (!isRecord(msg) || !isRecord(msg.metadata)) return false;
+
   return (
-    msg &&
-    typeof msg === 'object' &&
     'metadata' in msg &&
-    msg.metadata &&
     typeof msg.metadata.requestId === 'string' &&
     typeof msg.metadata.success === 'boolean'
   );
@@ -105,12 +107,11 @@ export function isResponse(msg: any): msg is Response {
 /**
  * Type guard: Check if message is a StreamMessage
  */
-export function isStreamMessage(msg: any): msg is StreamMessage {
+export function isStreamMessage(msg: unknown): msg is StreamMessage {
+  if (!isRecord(msg) || !isRecord(msg.metadata)) return false;
+
   return (
-    msg &&
-    typeof msg === 'object' &&
     'metadata' in msg &&
-    msg.metadata &&
     typeof msg.metadata.requestId === 'string' &&
     typeof msg.metadata.sequence === 'number' &&
     typeof msg.metadata.final === 'boolean'
@@ -120,15 +121,16 @@ export function isStreamMessage(msg: any): msg is StreamMessage {
 /**
  * Type guard: Check if message is an Event
  */
-export function isEvent(msg: any): msg is Event {
+export function isEvent(msg: unknown): msg is Event {
+  if (!isRecord(msg)) return false;
+  const metadata = msg.metadata;
+
   return (
-    msg &&
-    typeof msg === 'object' &&
     'id' in msg &&
     'type' in msg &&
     'payload' in msg &&
     !isRequest(msg) &&
-    (!msg.metadata || !msg.metadata.requestId)
+    (!isRecord(metadata) || typeof metadata.requestId !== 'string')
   );
 }
 
@@ -151,8 +153,8 @@ export function createRequest<T>(
     timestamp: Date.now(),
     metadata: {
       timeout: options?.timeout || 30000,
-      requiresAuth: options?.requiresAuth
-    }
+      requiresAuth: options?.requiresAuth,
+    },
   };
 }
 
@@ -179,8 +181,8 @@ export function createResponse<T>(
     metadata: {
       requestId: request.id,
       success: options?.success !== false,
-      error: options?.error
-    }
+      error: options?.error,
+    },
   };
 }
 

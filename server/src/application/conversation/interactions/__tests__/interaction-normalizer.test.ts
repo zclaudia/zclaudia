@@ -67,18 +67,14 @@ describe('normalizeFromToolUse', () => {
       toolName: 'provider_native_todo',
       interactionKind: 'todo_update',
       toolInput: {
-        todos: [
-          { content: 'Keep runtime provider-agnostic', status: 'pending' },
-        ],
+        todos: [{ content: 'Keep runtime provider-agnostic', status: 'pending' }],
       },
     });
 
     expect(result).toMatchObject({
       type: 'interaction_todo_update',
       interactionId: 'tool-3',
-      todos: [
-        { content: 'Keep runtime provider-agnostic', status: 'pending' },
-      ],
+      todos: [{ content: 'Keep runtime provider-agnostic', status: 'pending' }],
     });
   });
 

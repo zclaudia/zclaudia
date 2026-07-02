@@ -34,7 +34,11 @@ export type CapabilityMode = 'native' | 'bridged' | 'emulated';
 export type ReliabilityTier = 'strict' | 'best_effort' | 'display_only';
 
 /** What happens when the capability is unavailable */
-export type DegradationPolicy = 'reject' | 'fallback_to_text' | 'fallback_to_notice' | 'server_emulation';
+export type DegradationPolicy =
+  | 'reject'
+  | 'fallback_to_text'
+  | 'fallback_to_notice'
+  | 'server_emulation';
 
 // === Unified Permission Modes ===
 
@@ -98,7 +102,7 @@ export interface PCPEffectiveProfile {
 export function hasCapability(
   profile: PCPEffectiveProfile,
   id: PCPCapabilityId,
-  minReliability?: ReliabilityTier,
+  minReliability?: ReliabilityTier
 ): boolean {
   const cap = profile.capabilities.find(c => c.id === id);
   if (!cap?.enabled) return false;

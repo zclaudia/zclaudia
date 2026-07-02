@@ -22,11 +22,13 @@ interface ActiveTasksPanelProps {
 function getStatusInfo(
   task: ClaudiaTask,
   interrupted: boolean,
-  permissionRequired: boolean,
+  permissionRequired: boolean
 ): { label: string; dotClass: string } {
   if (interrupted) return { label: 'Interrupted', dotClass: 'bg-red-400 animate-pulse' };
-  if (permissionRequired) return { label: 'Permission Required', dotClass: 'bg-orange-500 animate-pulse' };
-  if (task.status === 'running') return { label: 'Running', dotClass: 'bg-amber-500 animate-pulse' };
+  if (permissionRequired)
+    return { label: 'Permission Required', dotClass: 'bg-orange-500 animate-pulse' };
+  if (task.status === 'running')
+    return { label: 'Running', dotClass: 'bg-amber-500 animate-pulse' };
   if (task.status === 'queued') return { label: 'Queued', dotClass: 'bg-muted-foreground' };
   return { label: 'Waiting', dotClass: 'bg-blue-400 animate-pulse' };
 }
@@ -55,7 +57,7 @@ export function ActiveTasksPanel({
           {tasks.length}
         </span>
         <button
-          onClick={() => setCollapsed((v) => !v)}
+          onClick={() => setCollapsed(v => !v)}
           className="ml-auto text-primary hover:underline"
         >
           {collapsed ? 'Expand' : 'Collapse'}
@@ -64,18 +66,27 @@ export function ActiveTasksPanel({
 
       {!collapsed && (
         <div className="max-h-40 space-y-2 overflow-y-auto pr-1">
-          {visible.map((task) => {
-            const interrupted = Boolean(task.sessionId && interruptedSessionIds.has(task.sessionId));
-            const permissionRequired = Boolean(task.sessionId && permissionSessionIds.has(task.sessionId));
+          {visible.map(task => {
+            const interrupted = Boolean(
+              task.sessionId && interruptedSessionIds.has(task.sessionId)
+            );
+            const permissionRequired = Boolean(
+              task.sessionId && permissionSessionIds.has(task.sessionId)
+            );
             const { label, dotClass } = getStatusInfo(task, interrupted, permissionRequired);
 
             return (
-              <div key={`active-${task.id}`} className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2">
+              <div
+                key={`active-${task.id}`}
+                className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2"
+              >
                 <div className="flex items-start gap-2">
                   <div className={`mt-1 h-2 w-2 flex-shrink-0 rounded-full ${dotClass}`} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                      <span className="truncate text-xs font-medium text-foreground">{task.title}</span>
+                      <span className="truncate text-xs font-medium text-foreground">
+                        {task.title}
+                      </span>
                       <span className="flex-shrink-0">{label}</span>
                       <span>·</span>
                       <span className="flex-shrink-0">{formatElapsedTime(task.createdAt)}</span>

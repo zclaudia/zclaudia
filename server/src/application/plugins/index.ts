@@ -4,7 +4,12 @@ export { createPluginToolsRoutes, type PluginToolsRoutesDeps } from './tools-rou
 export { PluginLoader, pluginLoader, type PluginLoaderOptions } from './loader.js';
 export { PluginManagementError, PluginManagementService } from './management-service.js';
 export { PluginFrontendError, PluginFrontendService } from './frontend-service.js';
-export { permissionManager, type PermissionRequest, type PermissionState, type PermissionStore } from './permissions.js';
+export {
+  permissionManager,
+  type PermissionRequest,
+  type PermissionState,
+  type PermissionStore,
+} from './permissions.js';
 export {
   toolRegistry,
   type ToolHandler,
@@ -27,7 +32,12 @@ export {
 export { workflowStepRegistry, type WorkflowStepMeta } from './workflow-step-registry.js';
 export { workflowTriggerRegistry } from './workflow-trigger-registry.js';
 export { PluginSchedulerService, pluginScheduler } from './scheduler.js';
-export { PluginStorage, PluginStorageManager, pluginStorageManager, type StorageAPI } from './storage.js';
+export {
+  PluginStorage,
+  PluginStorageManager,
+  pluginStorageManager,
+  type StorageAPI,
+} from './storage.js';
 export {
   createProviderAPI,
   PluginProviderAPI,

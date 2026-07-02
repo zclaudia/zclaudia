@@ -64,14 +64,19 @@ interface XTerminalProps {
   mode?: 'open' | 'attach';
 }
 
-export function XTerminal({ terminalId, projectId, workingDirectory, mode = 'open' }: XTerminalProps) {
+export function XTerminal({
+  terminalId,
+  projectId,
+  workingDirectory,
+  mode = 'open',
+}: XTerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { sendMessage, connectServer } = useConnection();
   const { resolvedTheme } = useTheme();
 
-  const activeServerId = useServerStore((s) => s.activeServerId);
-  const facadeConnectionState = useFacadeStore((s) => s.connectionState);
-  const facadeBackends = useFacadeStore((s) => s.backends);
+  const activeServerId = useServerStore(s => s.activeServerId);
+  const facadeConnectionState = useFacadeStore(s => s.connectionState);
+  const facadeBackends = useFacadeStore(s => s.backends);
 
   // sendMessage / connectServer are captured by the controller for its full lifetime.
   // Wrap them in refs so the references seen by the controller stay valid even when the
@@ -85,21 +90,24 @@ export function XTerminal({ terminalId, projectId, workingDirectory, mode = 'ope
    * Wrap outgoing terminal_input with the sticky-Ctrl transform used on mobile, so the controller
    * can keep its onData binding generic. Other message types pass through untouched.
    */
-  const wrappedSend = useCallback((msg: ClientMessage) => {
-    if (msg.type === 'terminal_input' && msg.terminalId === terminalId) {
-      const store = useTerminalStore.getState();
-      if (store.ctrlActive[terminalId] && msg.data.length === 1) {
-        const code = msg.data.charCodeAt(0);
-        let data = msg.data;
-        if (code >= 97 && code <= 122) data = String.fromCharCode(code - 96);
-        else if (code >= 65 && code <= 90) data = String.fromCharCode(code - 64);
-        store.toggleCtrl(terminalId);
-        sendMessageRef.current({ ...msg, data });
-        return;
+  const wrappedSend = useCallback(
+    (msg: ClientMessage) => {
+      if (msg.type === 'terminal_input' && msg.terminalId === terminalId) {
+        const store = useTerminalStore.getState();
+        if (store.ctrlActive[terminalId] && msg.data.length === 1) {
+          const code = msg.data.charCodeAt(0);
+          let data = msg.data;
+          if (code >= 97 && code <= 122) data = String.fromCharCode(code - 96);
+          else if (code >= 65 && code <= 90) data = String.fromCharCode(code - 64);
+          store.toggleCtrl(terminalId);
+          sendMessageRef.current({ ...msg, data });
+          return;
+        }
       }
-    }
-    sendMessageRef.current(msg);
-  }, [terminalId]);
+      sendMessageRef.current(msg);
+    },
+    [terminalId]
+  );
 
   const buildDeps = useCallback(
     () => ({
@@ -107,7 +115,7 @@ export function XTerminal({ terminalId, projectId, workingDirectory, mode = 'ope
       sendMessage: wrappedSend,
       getTheme: getTerminalTheme,
     }),
-    [terminalId, wrappedSend],
+    [terminalId, wrappedSend]
   );
 
   const { controller, state } = useEnsureTerminalController(terminalId, buildDeps);

@@ -17,7 +17,7 @@ import type { WorktreeAllocator } from '../../domains/meta-workflow/service.js';
 
 export function createWorktreeAllocatorFromSupervisor(
   supervisorService: SupervisorService,
-  projectId: string,
+  projectId: string
 ): WorktreeAllocator {
   // Phase E2a: persistent per-run worktree cache.
   //
@@ -35,7 +35,7 @@ export function createWorktreeAllocatorFromSupervisor(
       if (!pool) {
         throw new Error(
           `WorktreeAllocator: project "${projectId}" has no initialized worktree pool. ` +
-          `Run supervision for this project first (or ensure it is started before executing meta-workflow phases).`,
+            `Run supervision for this project first (or ensure it is started before executing meta-workflow phases).`
         );
       }
 

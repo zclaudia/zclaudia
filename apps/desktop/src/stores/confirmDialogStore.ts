@@ -67,14 +67,14 @@ let counter = 0;
 export const useConfirmDialogStore = create<ConfirmDialogState>((set, get) => ({
   current: null,
 
-  _open: (req) => {
+  _open: req => {
     const prev = get().current;
     // Resolve any in-flight dialog as cancelled before showing the new one.
     if (prev) prev.resolve(prev.input ? null : false);
     set({ current: req });
   },
 
-  confirm: (value) => {
+  confirm: value => {
     const cur = get().current;
     if (!cur) return;
     set({ current: null });
@@ -94,7 +94,7 @@ export const useConfirmDialogStore = create<ConfirmDialogState>((set, get) => ({
  * false if they cancel (button, Escape, or backdrop click).
  */
 export function confirm(opts: ConfirmOptions): Promise<boolean> {
-  return new Promise<boolean>((resolve) => {
+  return new Promise<boolean>(resolve => {
     useConfirmDialogStore.getState()._open({
       id: `confirm-${++counter}`,
       title: opts.title,
@@ -102,7 +102,7 @@ export function confirm(opts: ConfirmOptions): Promise<boolean> {
       confirmLabel: opts.confirmLabel ?? 'Confirm',
       cancelLabel: opts.cancelLabel ?? 'Cancel',
       destructive: opts.destructive ?? false,
-      resolve: (r) => resolve(r === true),
+      resolve: r => resolve(r === true),
     });
   });
 }
@@ -112,7 +112,7 @@ export function confirm(opts: ConfirmOptions): Promise<boolean> {
  * (possibly empty) on confirm, or null when cancelled.
  */
 export function promptText(opts: PromptOptions): Promise<string | null> {
-  return new Promise<string | null>((resolve) => {
+  return new Promise<string | null>(resolve => {
     useConfirmDialogStore.getState()._open({
       id: `prompt-${++counter}`,
       title: opts.title,
@@ -121,7 +121,7 @@ export function promptText(opts: PromptOptions): Promise<string | null> {
       cancelLabel: opts.cancelLabel ?? 'Cancel',
       destructive: opts.destructive ?? false,
       input: { placeholder: opts.placeholder, defaultValue: opts.defaultValue },
-      resolve: (r) => resolve(typeof r === 'string' ? r : null),
+      resolve: r => resolve(typeof r === 'string' ? r : null),
     });
   });
 }

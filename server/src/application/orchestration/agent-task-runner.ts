@@ -28,7 +28,9 @@ export interface AgentRunnerTask {
   canonicalTaskId?: string;
   initiator: 'system' | 'claudia';
   llmProfileId?: string;
-  permissionOverride?: Partial<import('@zclaudia/shared/interaction/permissions').UnifiedPermissionPolicy>;
+  permissionOverride?: Partial<
+    import('@zclaudia/shared/interaction/permissions').UnifiedPermissionPolicy
+  >;
   /** Parent workspace root; the subagent runs here unless isolated. */
   cwd?: string | null;
   /** 'worktree': run in an ephemeral git worktree of cwd (removed when clean). */
@@ -41,9 +43,18 @@ export interface AgentRunnerTask {
 
 export interface AgentTaskRunnerDeps {
   db: Database.Database;
-  createVirtualClient: (clientId: string, ws: { send: (msg: ServerMessage) => void }) => VirtualClient;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mirrors run handler boundary
-  handleRunStart: (client: VirtualClient, message: any, db: Database.Database, options?: Record<string, unknown>, clients?: Map<string, VirtualClient>) => Promise<void>;
+  createVirtualClient: (
+    clientId: string,
+    ws: { send: (msg: ServerMessage) => void }
+  ) => VirtualClient;
+
+  handleRunStart: (
+    client: VirtualClient,
+    message: any,
+    db: Database.Database,
+    options?: Record<string, unknown>,
+    clients?: Map<string, VirtualClient>
+  ) => Promise<void>;
   getClients: () => Map<string, VirtualClient>;
   createSession: (opts: { projectId: string | null; name: string; type: string }) => { id: string };
   sessionExists: (id: string) => boolean;
@@ -73,7 +84,11 @@ export function createAgentTaskRunner(deps: AgentTaskRunnerDeps): AgentTaskRunne
       if (branch?.activeSessionId && existingSession) {
         return branch.activeSessionId;
       }
-      const session = deps.createSession({ projectId: task.projectId, name: sessionName, type: 'agent' });
+      const session = deps.createSession({
+        projectId: task.projectId,
+        name: sessionName,
+        type: 'agent',
+      });
       branchService.attachSession(task.branchId, session.id);
       return session.id;
     }
@@ -96,10 +111,15 @@ export function createAgentTaskRunner(deps: AgentTaskRunnerDeps): AgentTaskRunne
             agentWorktree = createAgentWorktree(task.cwd, task.id);
             workingDirectory = agentWorktree.path;
           } catch (err) {
-            console.warn(`[AgentTaskRunner] worktree isolation failed for task ${task.id}; running in place:`, err);
+            console.warn(
+              `[AgentTaskRunner] worktree isolation failed for task ${task.id}; running in place:`,
+              err
+            );
           }
         } else {
-          console.warn(`[AgentTaskRunner] task ${task.id} requested worktree isolation but ${task.cwd} is not a git repository`);
+          console.warn(
+            `[AgentTaskRunner] task ${task.id} requested worktree isolation but ${task.cwd} is not a git repository`
+          );
         }
       }
 
@@ -111,11 +131,14 @@ export function createAgentTaskRunner(deps: AgentTaskRunnerDeps): AgentTaskRunne
         const cleanup = cleanupAgentWorktree(task.cwd, worktree);
         if (cleanup.removed) return undefined;
         if (cleanup.reason === 'error') {
-          console.warn(`[AgentTaskRunner] failed to clean up worktree ${worktree.path} for task ${task.id}`);
+          console.warn(
+            `[AgentTaskRunner] failed to clean up worktree ${worktree.path} for task ${task.id}`
+          );
           return undefined;
         }
         return `Worktree kept at ${worktree.path} (branch ${worktree.branch}) — it contains the agent's ${
-          cleanup.reason === 'has_commits' ? 'commits' : 'uncommitted changes'}.`;
+          cleanup.reason === 'has_commits' ? 'commits' : 'uncommitted changes'
+        }.`;
       }
 
       const clientId = `orchestrator-${task.id}`;
@@ -167,32 +190,37 @@ export function createAgentTaskRunner(deps: AgentTaskRunnerDeps): AgentTaskRunne
               callbacks.onFailed(worktreeNote ? `${baseError} (${worktreeNote})` : baseError);
             }
           } catch (err) {
-            console.error(`[AgentTaskRunner] Error in virtual client send for task ${task.id}:`, err);
+            console.error(
+              `[AgentTaskRunner] Error in virtual client send for task ${task.id}:`,
+              err
+            );
           }
         },
       });
 
       clients.set(clientId, virtualClient);
-      deps.handleRunStart(
-        virtualClient,
-        {
-          type: 'run_start',
-          clientRequestId: newId(),
-          sessionId,
-          input: task.task,
-          llmProfileId: task.llmProfileId,
-          permissionOverride: task.permissionOverride,
-          ...(workingDirectory ? { workingDirectory } : {}),
-          _contextTemplate: task.contextTemplate || 'agent',
-        },
-        deps.db,
-        {},
-        clients,
-      ).catch((err: unknown) => {
-        cleanupVirtualClient();
-        settleWorktree();
-        callbacks.onFailed(err instanceof Error ? err.message : 'Failed to start task');
-      });
+      deps
+        .handleRunStart(
+          virtualClient,
+          {
+            type: 'run_start',
+            clientRequestId: newId(),
+            sessionId,
+            input: task.task,
+            llmProfileId: task.llmProfileId,
+            permissionOverride: task.permissionOverride,
+            ...(workingDirectory ? { workingDirectory } : {}),
+            _contextTemplate: task.contextTemplate || 'agent',
+          },
+          deps.db,
+          {},
+          clients
+        )
+        .catch((err: unknown) => {
+          cleanupVirtualClient();
+          settleWorktree();
+          callbacks.onFailed(err instanceof Error ? err.message : 'Failed to start task');
+        });
     },
   };
 }

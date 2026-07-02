@@ -82,10 +82,12 @@ function createTestApp(db: Database.Database) {
 
 function seedProject(db: Database.Database, id: string): void {
   const now = Date.now();
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO projects (id, name, type, sort_order, created_at, updated_at)
     VALUES (?, ?, 'code', 0, ?, ?)
-  `).run(id, 'Test Project', now, now);
+  `
+  ).run(id, 'Test Project', now, now);
 }
 
 describe('project hooksOverride routes', () => {
@@ -113,14 +115,14 @@ describe('project hooksOverride routes', () => {
       seedProject(db, 'proj-1');
       const hooksOverride = [{ event: 'PostToolUse', command: 'echo done' }];
 
-      const res = await request(app)
-        .put('/api/projects/proj-1')
-        .send({ hooksOverride });
+      const res = await request(app).put('/api/projects/proj-1').send({ hooksOverride });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
 
-      const row = db.prepare('SELECT hooks_override FROM projects WHERE id = ?').get('proj-1') as any;
+      const row = db
+        .prepare('SELECT hooks_override FROM projects WHERE id = ?')
+        .get('proj-1') as any;
       expect(JSON.parse(row.hooks_override)).toEqual(hooksOverride);
     });
 
@@ -129,7 +131,7 @@ describe('project hooksOverride routes', () => {
       const hooksOverride = [{ event: 'PreToolUse', command: 'lint' }];
       db.prepare('UPDATE projects SET hooks_override = ? WHERE id = ?').run(
         JSON.stringify(hooksOverride),
-        'proj-2',
+        'proj-2'
       );
 
       const res = await request(app).get('/api/projects/proj-2');
@@ -141,9 +143,7 @@ describe('project hooksOverride routes', () => {
       seedProject(db, 'proj-3');
       const hooksOverride = [{ event: 'Nope', command: 'bad' }];
 
-      const res = await request(app)
-        .put('/api/projects/proj-3')
-        .send({ hooksOverride });
+      const res = await request(app).put('/api/projects/proj-3').send({ hooksOverride });
 
       expect(res.status).toBe(400);
       expect(res.body.success).toBe(false);
@@ -155,9 +155,7 @@ describe('project hooksOverride routes', () => {
       seedProject(db, 'proj-4');
       const hooksOverride = [{ event: 'PreToolUse' }];
 
-      const res = await request(app)
-        .put('/api/projects/proj-4')
-        .send({ hooksOverride });
+      const res = await request(app).put('/api/projects/proj-4').send({ hooksOverride });
 
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
@@ -168,15 +166,15 @@ describe('project hooksOverride routes', () => {
       seedProject(db, 'proj-5');
       db.prepare('UPDATE projects SET hooks_override = ? WHERE id = ?').run(
         JSON.stringify([{ event: 'PreToolUse', command: 'to-clear' }]),
-        'proj-5',
+        'proj-5'
       );
 
-      const res = await request(app)
-        .put('/api/projects/proj-5')
-        .send({ hooksOverride: null });
+      const res = await request(app).put('/api/projects/proj-5').send({ hooksOverride: null });
 
       expect(res.status).toBe(200);
-      const row = db.prepare('SELECT hooks_override FROM projects WHERE id = ?').get('proj-5') as any;
+      const row = db
+        .prepare('SELECT hooks_override FROM projects WHERE id = ?')
+        .get('proj-5') as any;
       expect(row.hooks_override).toBeNull();
     });
   });

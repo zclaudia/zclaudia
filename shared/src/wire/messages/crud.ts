@@ -117,7 +117,7 @@ export interface GetSessionMessagesMessage {
   type: 'get_session_messages';
   sessionId: string;
   limit?: number;
-  before?: number;  // timestamp
+  before?: number; // timestamp
 }
 
 export interface SessionMessagesMessage {
@@ -242,3 +242,47 @@ export interface ProviderCommandsMessage {
   llmProfileId: string;
   commands: SlashCommand[];
 }
+
+export type CrudClientMessage =
+  | GetProjectsMessage
+  | GetSessionsMessage
+  | GetServersMessage
+  | AddServerMessage
+  | UpdateServerMessage
+  | DeleteServerMessage
+  | AddSessionMessage
+  | UpdateSessionMessage
+  | DeleteSessionMessage
+  | AddProjectMessage
+  | UpdateProjectMessage
+  | DeleteProjectMessage
+  | GetLlmProfilesMessage
+  | AddLlmProfileMessage
+  | UpdateLlmProfileMessage
+  | DeleteLlmProfileMessage
+  | GetSessionMessagesMessage
+  | GetProviderCommandsMessage;
+
+export type CrudServerMessage =
+  | ProjectsListMessage
+  | SessionsListMessage
+  | ServersListMessage
+  | ServerOperationResultMessage
+  | SessionOperationResultMessage
+  | ProjectOperationResultMessage
+  | LlmProfilesListMessage
+  | LlmProfileOperationResultMessage
+  | SessionMessagesMessage
+  | ProviderCommandsMessage
+  | ServersCreatedMessage
+  | ServersUpdatedMessage
+  | ServersDeletedMessage
+  | SessionsCreatedMessage
+  | SessionsUpdatedMessage
+  | SessionsDeletedMessage
+  | ProjectsCreatedMessage
+  | ProjectsUpdatedMessage
+  | ProjectsDeletedMessage
+  | LlmProfilesCreatedMessage
+  | LlmProfilesUpdatedMessage
+  | LlmProfilesDeletedMessage;

@@ -8,7 +8,7 @@ describe('migration 005 — llm_profile_oauth', () => {
     applyMigrations(db);
 
     const cols = db.prepare(`PRAGMA table_info(llm_profiles)`).all() as Array<{ name: string }>;
-    const names = cols.map((c) => c.name);
+    const names = cols.map(c => c.name);
     expect(names).toContain('oauth_credentials');
   });
 
@@ -17,7 +17,7 @@ describe('migration 005 — llm_profile_oauth', () => {
     applyMigrations(db);
 
     const rows = db.prepare(`SELECT name FROM migrations`).all() as Array<{ name: string }>;
-    expect(rows.map((r) => r.name)).toContain('005_llm_profile_oauth');
+    expect(rows.map(r => r.name)).toContain('005_llm_profile_oauth');
   });
 
   it('allows insert/select of oauth_credentials JSON', () => {
@@ -25,12 +25,21 @@ describe('migration 005 — llm_profile_oauth', () => {
     applyMigrations(db);
 
     const creds = JSON.stringify({ access: 'a', refresh: 'r', expires: 1, accountId: 'acct_x' });
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO llm_profiles (id, name, provider_type, oauth_credentials, is_default, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run('p1', 'codex', 'openai-codex', creds, 0, 1, 1);
+    `
+    ).run('p1', 'codex', 'openai-codex', creds, 0, 1, 1);
 
-    const row = db.prepare(`SELECT oauth_credentials FROM llm_profiles WHERE id = ?`).get('p1') as { oauth_credentials: string };
-    expect(JSON.parse(row.oauth_credentials)).toEqual({ access: 'a', refresh: 'r', expires: 1, accountId: 'acct_x' });
+    const row = db.prepare(`SELECT oauth_credentials FROM llm_profiles WHERE id = ?`).get('p1') as {
+      oauth_credentials: string;
+    };
+    expect(JSON.parse(row.oauth_credentials)).toEqual({
+      access: 'a',
+      refresh: 'r',
+      expires: 1,
+      accountId: 'acct_x',
+    });
   });
 });

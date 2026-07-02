@@ -119,18 +119,26 @@ function defineProperty(obj: any, prop: string, value: any) {
 defineProperty(globalThis, 'scrollTo', vi.fn());
 
 // Mock ResizeObserver
-defineProperty(globalThis, 'ResizeObserver', class ResizeObserver {
-  observe = vi.fn();
-  unobserve = vi.fn();
-  disconnect = vi.fn();
-});
+defineProperty(
+  globalThis,
+  'ResizeObserver',
+  class ResizeObserver {
+    observe = vi.fn();
+    unobserve = vi.fn();
+    disconnect = vi.fn();
+  }
+);
 
 // Mock IntersectionObserver
-defineProperty(globalThis, 'IntersectionObserver', class IntersectionObserver {
-  observe = vi.fn();
-  unobserve = vi.fn();
-  disconnect = vi.fn();
-});
+defineProperty(
+  globalThis,
+  'IntersectionObserver',
+  class IntersectionObserver {
+    observe = vi.fn();
+    unobserve = vi.fn();
+    disconnect = vi.fn();
+  }
+);
 
 // Mock Element.prototype methods
 if (typeof globalThis !== 'undefined') {
@@ -151,7 +159,12 @@ const mockDocument = {
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
     getBoundingClientRect: vi.fn(() => ({
-      top: 0, left: 0, bottom: 0, right: 0, width: 0, height: 0,
+      top: 0,
+      left: 0,
+      bottom: 0,
+      right: 0,
+      width: 0,
+      height: 0,
     })),
     scrollTo: vi.fn(),
     scrollIntoView: vi.fn(),
@@ -206,7 +219,9 @@ defineProperty(globalThis, '__TAURI_INTERNALS__', {
 });
 
 // Mock requestAnimationFrame
-defineProperty(globalThis, 'requestAnimationFrame', (cb: FrameRequestCallback) => setTimeout(cb, 16));
+defineProperty(globalThis, 'requestAnimationFrame', (cb: FrameRequestCallback) =>
+  setTimeout(cb, 16)
+);
 defineProperty(globalThis, 'cancelAnimationFrame', clearTimeout);
 
 // Mock navigator

@@ -9,9 +9,7 @@ export function SettingsGroup({ label, children }: { label?: string; children: R
           {label}
         </h4>
       )}
-      <div className="divide-y divide-border rounded-xl bg-secondary/30">
-        {children}
-      </div>
+      <div className="divide-y divide-border rounded-xl bg-secondary/30">{children}</div>
     </section>
   );
 }
@@ -35,12 +33,16 @@ export function SettingsRow({
 }) {
   return (
     <div className="p-4">
-      <div className={`flex ${align === 'start' ? 'items-start' : 'items-center'} justify-between gap-3`}>
+      <div
+        className={`flex ${align === 'start' ? 'items-start' : 'items-center'} justify-between gap-3`}
+      >
         <div className="flex min-w-0 items-center gap-3">
           {icon && <span className="flex-shrink-0 text-muted-foreground">{icon}</span>}
           <div className="min-w-0">
             <div className="text-sm">{title}</div>
-            {description && <div className="mt-0.5 text-xs text-muted-foreground">{description}</div>}
+            {description && (
+              <div className="mt-0.5 text-xs text-muted-foreground">{description}</div>
+            )}
           </div>
         </div>
         {control && <div className="flex flex-shrink-0 items-center gap-2">{control}</div>}

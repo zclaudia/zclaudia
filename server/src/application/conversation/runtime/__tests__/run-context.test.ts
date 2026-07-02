@@ -75,10 +75,13 @@ describe('buildRunContext — workspace prompt merge', () => {
     const { runOptions } = await buildRunContext(createInput());
 
     expect(runOptions.systemPrompt).toBeDefined();
-    expect(runOptions.systemPrompt!.startsWith('You are the profile-defined assistant.')).toBe(true);
+    expect(runOptions.systemPrompt!.startsWith('You are the profile-defined assistant.')).toBe(
+      true
+    );
     expect(runOptions.systemPrompt).toContain('project CLAUDE.md content');
-    expect(runOptions.systemPrompt!.indexOf('You are the profile-defined assistant.'))
-      .toBeLessThan(runOptions.systemPrompt!.indexOf('project CLAUDE.md content'));
+    expect(runOptions.systemPrompt!.indexOf('You are the profile-defined assistant.')).toBeLessThan(
+      runOptions.systemPrompt!.indexOf('project CLAUDE.md content')
+    );
     expect(runOptions.systemPrompt).toContain('<available_skills>hint</available_skills>');
   });
 
@@ -87,7 +90,9 @@ describe('buildRunContext — workspace prompt merge', () => {
 
     const { runOptions } = await buildRunContext(createInput({ sessionType: 'agent' }));
 
-    expect(runOptions.systemPrompt!.startsWith('You are the profile-defined assistant.')).toBe(true);
+    expect(runOptions.systemPrompt!.startsWith('You are the profile-defined assistant.')).toBe(
+      true
+    );
     expect(runOptions.systemPrompt).not.toContain('Agent Assistant for ZClaudia');
     expect(runOptions.systemPrompt).toContain('project CLAUDE.md content');
   });

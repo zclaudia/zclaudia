@@ -85,7 +85,7 @@ describe('AttachmentService', () => {
         ownerKind: 'local_issue',
         ownerId: 'issue-1',
         attachment: expect.objectContaining({ id: att.id }),
-      }),
+      })
     );
   });
 
@@ -137,7 +137,7 @@ describe('AttachmentService', () => {
     expect(store.delete).toHaveBeenCalledTimes(1);
     expect(service.list('local_issue', 'i-1')).toHaveLength(0);
     expect(broadcast).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'attachment_removed', attachmentId: att.id }),
+      expect.objectContaining({ type: 'attachment_removed', attachmentId: att.id })
     );
   });
 

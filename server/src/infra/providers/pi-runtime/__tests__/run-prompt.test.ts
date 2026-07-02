@@ -82,7 +82,10 @@ describe('buildPiRunPrompt — edit tool guidance', () => {
     ['symbol-level changes', ['ReadSymbol', 'EditSymbol', 'expected_body_digest']],
     ['line drift', ['hashline:true', 'hashline_operation']],
     ['structural rewrites', ['Write', 'JSON arrays', 'Markdown tables', 'YAML', 'TOML']],
-    ['post-edit verification loops', ['successful Write, Edit, MultiEdit, or EditSymbol', 'do not call Read again']],
+    [
+      'post-edit verification loops',
+      ['successful Write, Edit, MultiEdit, or EditSymbol', 'do not call Read again'],
+    ],
   ])('covers the %s regression case', (_name, expectedTerms) => {
     for (const term of expectedTerms) {
       expect(EDIT_TOOL_SELECTION_GUIDANCE).toContain(term);

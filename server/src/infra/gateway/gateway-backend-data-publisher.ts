@@ -1,0 +1,230 @@
+import type {
+  BackendResourceEventMessage,
+  BackendResourceSnapshotMessage,
+} from '@zclaudia/protocol/gateway';
+import type { ProjectItem, SessionItem } from '@zclaudia/protocol/zclaudia';
+import type { Database as BetterDatabase } from 'better-sqlite3';
+import type { ActiveRun } from '../../application/conversation/transport/types.js';
+import { hasForegroundActiveRunForSession } from '../../utils/run-state.js';
+
+type ActiveRunsMap = Map<string, ActiveRun>;
+type BackendDataMessage = BackendResourceSnapshotMessage | BackendResourceEventMessage;
+type SendBackendDataMessage = (message: BackendDataMessage) => void;
+
+export interface GatewayBackendDataPublisherOptions {
+  db?: BetterDatabase;
+  activeRuns: ActiveRunsMap;
+  sendMessage: SendBackendDataMessage;
+  namespace?: string;
+  logger?: Pick<Console, 'log' | 'error'>;
+}
+
+export interface GatewaySessionRecord {
+  id: string;
+  name?: string;
+  projectId?: string;
+  createdAt?: number;
+  created_at?: number;
+  updatedAt?: number;
+  updated_at?: number;
+  archivedAt?: number | null;
+  archived_at?: number | null;
+}
+
+export interface GatewayProjectRecord {
+  id: string;
+  name?: string;
+  createdAt?: number;
+  created_at?: number;
+  updatedAt?: number;
+  updated_at?: number;
+}
+
+export class GatewayBackendDataPublisher {
+  private readonly db: BetterDatabase | null;
+  private readonly activeRuns: ActiveRunsMap;
+  private readonly sendMessage: SendBackendDataMessage;
+  private readonly namespace: string;
+  private readonly logger: Pick<Console, 'log' | 'error'>;
+
+  constructor(options: GatewayBackendDataPublisherOptions) {
+    this.db = options.db ?? null;
+    this.activeRuns = options.activeRuns;
+    this.sendMessage = options.sendMessage;
+    this.namespace = options.namespace ?? 'zclaudia';
+    this.logger = options.logger ?? console;
+  }
+
+  publishSnapshot(): boolean {
+    if (!this.db) return false;
+    const db = this.db;
+    try {
+      const sessionItems = this.loadSessionItems(db);
+      const projectItems = this.loadProjectItems(db);
+      const msg: BackendResourceSnapshotMessage = {
+        type: 'backend_resource_snapshot',
+        namespace: this.namespace,
+        resources: [
+          ...sessionItems.map(item => ({
+            resourceType: 'session' as const,
+            resourceId: item.sessionId,
+            resource: item,
+            updatedAt: item.updatedAt,
+          })),
+          ...projectItems.map(item => ({
+            resourceType: 'project' as const,
+            resourceId: item.projectId,
+            resource: item,
+            updatedAt: item.updatedAt,
+          })),
+        ],
+      };
+
+      this.sendMessage(msg);
+      this.logger.log(
+        `[Gateway] Published backend data snapshot: ${sessionItems.length} sessions, ${projectItems.length} projects`
+      );
+      return true;
+    } catch (error) {
+      this.logger.error('[Gateway] Failed to publish backend data snapshot:', error);
+      return false;
+    }
+  }
+
+  publishSessionEvent(eventType: 'upsert' | 'remove', session: GatewaySessionRecord): void {
+    const isArchived = session.archivedAt != null || session.archived_at != null;
+    if (eventType === 'upsert' && !isArchived) {
+      const item = this.mapSessionRecord(session);
+      const msg: BackendResourceEventMessage = {
+        type: 'backend_resource_event',
+        op: 'upsert',
+        resourceType: 'session',
+        resourceId: item.sessionId,
+        resource: item,
+        updatedAt: item.updatedAt,
+      };
+      this.sendMessage(msg);
+      return;
+    }
+
+    const msg: BackendResourceEventMessage = {
+      type: 'backend_resource_event',
+      op: 'remove',
+      resourceType: 'session',
+      resourceId: session.id,
+    };
+    this.sendMessage(msg);
+  }
+
+  broadcastSessionEvent(
+    eventType: 'created' | 'updated' | 'deleted',
+    session: GatewaySessionRecord
+  ): void {
+    this.publishSessionEvent(eventType === 'deleted' ? 'remove' : 'upsert', session);
+  }
+
+  broadcastProjectEvent(
+    eventType: 'created' | 'updated' | 'deleted',
+    project: GatewayProjectRecord
+  ): void {
+    if (eventType === 'deleted') {
+      const msg: BackendResourceEventMessage = {
+        type: 'backend_resource_event',
+        op: 'remove',
+        resourceType: 'project',
+        resourceId: project.id,
+      };
+      this.sendMessage(msg);
+      return;
+    }
+
+    const item = this.mapProjectRecord(project);
+    const msg: BackendResourceEventMessage = {
+      type: 'backend_resource_event',
+      op: 'upsert',
+      resourceType: 'project',
+      resourceId: item.projectId,
+      resource: item,
+    };
+    this.sendMessage(msg);
+  }
+
+  private loadSessionItems(db: BetterDatabase): SessionItem[] {
+    const sessions = db
+      .prepare(
+        `
+        SELECT s.id, s.name, s.project_id as projectId,
+               s.created_at as createdAt, s.updated_at as updatedAt,
+               s.archived_at as archivedAt
+        FROM sessions s
+        LEFT JOIN projects p ON s.project_id = p.id
+        WHERE s.archived_at IS NULL
+          AND (p.is_internal IS NULL OR p.is_internal = 0)
+        ORDER BY s.updated_at DESC
+      `
+      )
+      .all() as Array<Record<string, unknown>>;
+
+    return sessions.map(session => this.mapSessionRow(session));
+  }
+
+  private loadProjectItems(db: BetterDatabase): ProjectItem[] {
+    try {
+      const projects = db
+        .prepare(
+          `
+          SELECT id, name, created_at as createdAt, updated_at as updatedAt
+          FROM projects
+          WHERE is_internal = 0
+          ORDER BY updated_at DESC
+        `
+        )
+        .all() as Array<Record<string, unknown>>;
+
+      return projects.map(project => this.mapProjectRow(project));
+    } catch {
+      return [];
+    }
+  }
+
+  private mapSessionRow(session: Record<string, unknown>): SessionItem {
+    return this.mapSessionRecord({
+      id: session.id as string,
+      projectId: (session.projectId as string) || undefined,
+      name: (session.name as string) || undefined,
+      createdAt: session.createdAt as number,
+      updatedAt: session.updatedAt as number,
+    });
+  }
+
+  private mapProjectRow(project: Record<string, unknown>): ProjectItem {
+    return this.mapProjectRecord({
+      id: project.id as string,
+      name: (project.name as string) || '',
+      createdAt: project.createdAt as number,
+      updatedAt: project.updatedAt as number,
+    });
+  }
+
+  private mapSessionRecord(session: GatewaySessionRecord): SessionItem {
+    const updatedAt = session.updatedAt ?? session.updated_at ?? Date.now();
+    return {
+      sessionId: session.id,
+      projectId: session.projectId || undefined,
+      title: session.name || undefined,
+      createdAt: session.createdAt ?? session.created_at ?? Date.now(),
+      updatedAt,
+      lastMessageAt: updatedAt,
+      runStatus: hasForegroundActiveRunForSession(this.activeRuns, session.id) ? 'running' : 'idle',
+    };
+  }
+
+  private mapProjectRecord(project: GatewayProjectRecord): ProjectItem {
+    return {
+      projectId: project.id,
+      name: project.name || '',
+      createdAt: project.createdAt ?? project.created_at ?? Date.now(),
+      updatedAt: project.updatedAt ?? project.updated_at ?? Date.now(),
+    };
+  }
+}

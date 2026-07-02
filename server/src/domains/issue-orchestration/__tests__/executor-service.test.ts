@@ -21,19 +21,19 @@ describe('ExecutorService', () => {
     db.pragma('foreign_keys = ON');
     applyMigrations(db);
     db.prepare(
-      `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
     ).run('proj-1', 'P', 'code', 0, 0);
     db.prepare(
       `INSERT INTO local_issues (id, project_id, title, description, status, priority, labels, created_at, updated_at, type, is_anonymous)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run('i', 'proj-1', 't', null, 'open', 'medium', '[]', 0, 0, 'implement', 0);
     db.prepare(
       `INSERT INTO spec_changes (id, project_id, sub_issue_id, slug, title, status, proposal_path, design_path, tasks_path, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run('sc', 'proj-1', 'i', 'x', 'X', 'drafting', 'a', 'b', 'c', 0, 0);
 
     const registry = new ExecutorRegistry();
-    registry.register('manual', (instance) => new ManualAdapter(db, instance));
+    registry.register('manual', instance => new ManualAdapter(db, instance));
 
     const repo = new ExecutorInstanceRepository(db);
     const inst = repo.create({ projectId: 'proj-1', specChangeId: 'sc', type: 'manual' });
@@ -45,7 +45,7 @@ describe('ExecutorService', () => {
 
   it('start() advances pending -> executing and dispatches an event', async () => {
     const events: IssueDomainEvent[] = [];
-    dispatcher.on('executor.status_changed', (e) => events.push(e));
+    dispatcher.on('executor.status_changed', e => events.push(e));
     await service.start(executorInstanceId);
     expect(service.getStatus(executorInstanceId)).toBe('executing');
     expect(events).toHaveLength(1);
@@ -58,7 +58,7 @@ describe('ExecutorService', () => {
   it('does NOT dispatch when status unchanged (refresh on stable state)', async () => {
     await service.start(executorInstanceId);
     const events: IssueDomainEvent[] = [];
-    dispatcher.on('executor.status_changed', (e) => events.push(e));
+    dispatcher.on('executor.status_changed', e => events.push(e));
     await service.refresh(executorInstanceId);
     expect(events).toHaveLength(0);
   });
@@ -66,7 +66,7 @@ describe('ExecutorService', () => {
   it('cancel() dispatches executing -> cancelled', async () => {
     await service.start(executorInstanceId);
     const events: IssueDomainEvent[] = [];
-    dispatcher.on('executor.status_changed', (e) => events.push(e));
+    dispatcher.on('executor.status_changed', e => events.push(e));
     await service.cancel(executorInstanceId);
     expect(events).toHaveLength(1);
     if (events[0].type === 'executor.status_changed') {
@@ -78,7 +78,7 @@ describe('ExecutorService', () => {
   it('markCompleted() dispatches executing -> completed for ManualAdapter', async () => {
     await service.start(executorInstanceId);
     const events: IssueDomainEvent[] = [];
-    dispatcher.on('executor.status_changed', (e) => events.push(e));
+    dispatcher.on('executor.status_changed', e => events.push(e));
     await service.markCompleted(executorInstanceId);
     expect(service.getStatus(executorInstanceId)).toBe('completed');
     expect(events).toHaveLength(1);

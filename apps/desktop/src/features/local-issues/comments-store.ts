@@ -37,13 +37,13 @@ export const useLocalIssueCommentStore = create<CommentsState>((set, get) => ({
   loading: {},
   loaded: new Set(),
 
-  loadComments: async (issueId) => {
+  loadComments: async issueId => {
     if (get().loaded.has(issueId)) return;
     if (get().loading[issueId]) return;
-    set((s) => ({ loading: { ...s.loading, [issueId]: true } }));
+    set(s => ({ loading: { ...s.loading, [issueId]: true } }));
     try {
       const list = await listIssueComments(issueId);
-      set((s) => {
+      set(s => {
         const nextLoaded = new Set(s.loaded);
         nextLoaded.add(issueId);
         return {
@@ -53,16 +53,16 @@ export const useLocalIssueCommentStore = create<CommentsState>((set, get) => ({
         };
       });
     } catch (err) {
-      set((s) => ({ loading: { ...s.loading, [issueId]: false } }));
+      set(s => ({ loading: { ...s.loading, [issueId]: false } }));
       throw err;
     }
   },
 
-  refreshComments: async (issueId) => {
-    set((s) => ({ loading: { ...s.loading, [issueId]: true } }));
+  refreshComments: async issueId => {
+    set(s => ({ loading: { ...s.loading, [issueId]: true } }));
     try {
       const list = await listIssueComments(issueId);
-      set((s) => {
+      set(s => {
         const nextLoaded = new Set(s.loaded);
         nextLoaded.add(issueId);
         return {
@@ -72,7 +72,7 @@ export const useLocalIssueCommentStore = create<CommentsState>((set, get) => ({
         };
       });
     } catch (err) {
-      set((s) => ({ loading: { ...s.loading, [issueId]: false } }));
+      set(s => ({ loading: { ...s.loading, [issueId]: false } }));
       throw err;
     }
   },
@@ -89,43 +89,45 @@ export const useLocalIssueCommentStore = create<CommentsState>((set, get) => ({
     return updated;
   },
 
-  removeComment: async (commentId) => {
+  removeComment: async commentId => {
     // Find the issue id from any list so the local delete works even if the
     // WS broadcast hasn't arrived yet.
     let foundIssueId: string | null = null;
     for (const [iid, list] of Object.entries(get().comments)) {
-      if (list.some((c) => c.id === commentId)) { foundIssueId = iid; break; }
+      if (list.some(c => c.id === commentId)) {
+        foundIssueId = iid;
+        break;
+      }
     }
     await deleteIssueComment(commentId);
     if (foundIssueId) get().deleteCommentLocal(foundIssueId, commentId);
   },
 
-  upsertComment: (comment) => {
-    set((s) => {
+  upsertComment: comment => {
+    set(s => {
       const existing = s.comments[comment.issueId] ?? [];
-      const idx = existing.findIndex((c) => c.id === comment.id);
-      const next = idx >= 0
-        ? existing.map((c) => (c.id === comment.id ? comment : c))
-        : [...existing, comment];
+      const idx = existing.findIndex(c => c.id === comment.id);
+      const next =
+        idx >= 0 ? existing.map(c => (c.id === comment.id ? comment : c)) : [...existing, comment];
       return { comments: { ...s.comments, [comment.issueId]: sortComments(next) } };
     });
   },
 
   deleteCommentLocal: (issueId, commentId) => {
-    set((s) => {
+    set(s => {
       const existing = s.comments[issueId];
       if (!existing) return s;
       return {
         comments: {
           ...s.comments,
-          [issueId]: existing.filter((c) => c.id !== commentId),
+          [issueId]: existing.filter(c => c.id !== commentId),
         },
       };
     });
   },
 
-  clearIssue: (issueId) => {
-    set((s) => {
+  clearIssue: issueId => {
+    set(s => {
       if (!(issueId in s.comments) && !s.loaded.has(issueId)) return s;
       const { [issueId]: _removed, ...rest } = s.comments;
       const nextLoaded = new Set(s.loaded);

@@ -6,7 +6,13 @@ import { ImmutableSystemWorkflowError } from '../../../domains/workflows/service
 
 const mockStepRegistry = {
   getAllMeta: vi.fn().mockReturnValue([
-    { type: 'plugin_step', name: 'Plugin Step', description: 'From plugin', category: 'Plugin', source: 'plugin' },
+    {
+      type: 'plugin_step',
+      name: 'Plugin Step',
+      description: 'From plugin',
+      category: 'Plugin',
+      source: 'plugin',
+    },
   ]),
 };
 const mockTriggerRegistry = {
@@ -16,9 +22,28 @@ const mockTriggerRegistry = {
 // GitCommitActivity, GitStageActivity, GenerateCommitMessageActivity.
 const mockActivityRegistry = {
   listMeta: vi.fn().mockReturnValue([
-    { type: 'git_commit', name: 'Git Commit', description: 'Stage (by default) and commit changes', category: 'Git', source: 'activity', supportsLoop: true },
-    { type: 'git_stage', name: 'Git Stage', description: 'Stage changes', category: 'Git', source: 'activity' },
-    { type: 'generate_commit_message', name: 'Generate Commit Message', description: 'Generate a commit message', category: 'Git', source: 'activity' },
+    {
+      type: 'git_commit',
+      name: 'Git Commit',
+      description: 'Stage (by default) and commit changes',
+      category: 'Git',
+      source: 'activity',
+      supportsLoop: true,
+    },
+    {
+      type: 'git_stage',
+      name: 'Git Stage',
+      description: 'Stage changes',
+      category: 'Git',
+      source: 'activity',
+    },
+    {
+      type: 'generate_commit_message',
+      name: 'Generate Commit Message',
+      description: 'Generate a commit message',
+      category: 'Git',
+      source: 'activity',
+    },
   ]),
 };
 
@@ -79,11 +104,14 @@ describe('workflow routes', () => {
     service = createMockService();
     app = express();
     app.use(express.json());
-    app.use('/api', createWorkflowRoutes(service as any, undefined, {
-      stepRegistry: mockStepRegistry as any,
-      triggerRegistry: mockTriggerRegistry as any,
-      activityRegistry: mockActivityRegistry as any,
-    }));
+    app.use(
+      '/api',
+      createWorkflowRoutes(service as any, undefined, {
+        stepRegistry: mockStepRegistry as any,
+        triggerRegistry: mockTriggerRegistry as any,
+        activityRegistry: mockActivityRegistry as any,
+      })
+    );
   });
 
   // ── GET /api/projects/:projectId/workflows ──
@@ -98,7 +126,9 @@ describe('workflow routes', () => {
     });
 
     it('returns 500 on error', async () => {
-      service.listWorkflows.mockImplementation(() => { throw new Error('DB fail'); });
+      service.listWorkflows.mockImplementation(() => {
+        throw new Error('DB fail');
+      });
       const res = await request(app).get('/api/projects/proj-1/workflows');
       expect(res.status).toBe(500);
       expect(res.body.error.code).toBe('INTERNAL_ERROR');
@@ -168,16 +198,30 @@ describe('workflow routes', () => {
       });
 
       expect(res.status).toBe(201);
-      expect(service.createWorkflow).toHaveBeenCalledWith(expect.objectContaining({
-        definition: expect.objectContaining({
-          nodes: [
-            expect.objectContaining({ id: 's1', name: 'First', type: 'shell', config: {}, position: { x: 300, y: 0 } }),
-            expect.objectContaining({ id: 's2', name: 'Second', type: 'shell', config: {}, position: { x: 300, y: 150 } }),
-          ],
-          edges: [{ id: 'edge_s1_to_s2', source: 's1', target: 's2', type: 'success' }],
-          entryNodeId: 's1',
-        }),
-      }));
+      expect(service.createWorkflow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          definition: expect.objectContaining({
+            nodes: [
+              expect.objectContaining({
+                id: 's1',
+                name: 'First',
+                type: 'shell',
+                config: {},
+                position: { x: 300, y: 0 },
+              }),
+              expect.objectContaining({
+                id: 's2',
+                name: 'Second',
+                type: 'shell',
+                config: {},
+                position: { x: 300, y: 150 },
+              }),
+            ],
+            edges: [{ id: 'edge_s1_to_s2', source: 's1', target: 's2', type: 'success' }],
+            entryNodeId: 's1',
+          }),
+        })
+      );
     });
 
     it('returns 400 when name is missing', async () => {
@@ -190,54 +234,64 @@ describe('workflow routes', () => {
     });
 
     it('accepts definition with only triggers (empty draft)', async () => {
-      const res = await request(app).post('/api/projects/proj-1/workflows').send({
-        name: 'Draft',
-        definition: { triggers: [{ type: 'manual' }] },
-      });
+      const res = await request(app)
+        .post('/api/projects/proj-1/workflows')
+        .send({
+          name: 'Draft',
+          definition: { triggers: [{ type: 'manual' }] },
+        });
       // After normalization, empty nodes/edges are valid (draft workflow)
       expect(res.status).toBe(201);
       expect(res.body.success).toBe(true);
     });
 
     it('accepts definition with no triggers (normalized to empty array)', async () => {
-      const res = await request(app).post('/api/projects/proj-1/workflows').send({
-        name: 'No triggers',
-        definition: { nodes: [{ id: 's1' }], edges: [], entryNodeId: 's1' },
-      });
+      const res = await request(app)
+        .post('/api/projects/proj-1/workflows')
+        .send({
+          name: 'No triggers',
+          definition: { nodes: [{ id: 's1' }], edges: [], entryNodeId: 's1' },
+        });
       // Normalization adds empty triggers array, which is valid
       expect(res.status).toBe(201);
       expect(res.body.success).toBe(true);
     });
 
     it('returns 400 when V2 entryNodeId is missing', async () => {
-      const res = await request(app).post('/api/projects/proj-1/workflows').send({
-        name: 'V2 bad',
-        definition: {
-          nodes: [{ id: 'n1' }],
-          edges: [],
-          triggers: [{ type: 'manual' }],
-        },
-      });
+      const res = await request(app)
+        .post('/api/projects/proj-1/workflows')
+        .send({
+          name: 'V2 bad',
+          definition: {
+            nodes: [{ id: 'n1' }],
+            edges: [],
+            triggers: [{ type: 'manual' }],
+          },
+        });
       expect(res.status).toBe(400);
       expect(res.body.error.message).toContain('entryNodeId');
     });
 
     it('returns 400 when V2 entryNodeId references non-existent node', async () => {
-      const res = await request(app).post('/api/projects/proj-1/workflows').send({
-        name: 'V2 bad ref',
-        definition: {
-          nodes: [{ id: 'n1' }],
-          edges: [],
-          entryNodeId: 'n999',
-          triggers: [{ type: 'manual' }],
-        },
-      });
+      const res = await request(app)
+        .post('/api/projects/proj-1/workflows')
+        .send({
+          name: 'V2 bad ref',
+          definition: {
+            nodes: [{ id: 'n1' }],
+            edges: [],
+            entryNodeId: 'n999',
+            triggers: [{ type: 'manual' }],
+          },
+        });
       expect(res.status).toBe(400);
       expect(res.body.error.message).toContain('entryNodeId');
     });
 
     it('returns 500 on service error', async () => {
-      service.createWorkflow.mockImplementation(() => { throw new Error('create fail'); });
+      service.createWorkflow.mockImplementation(() => {
+        throw new Error('create fail');
+      });
       const res = await request(app).post('/api/projects/proj-1/workflows').send(validBody);
       expect(res.status).toBe(500);
     });
@@ -260,7 +314,9 @@ describe('workflow routes', () => {
     });
 
     it('returns 500 on error', async () => {
-      service.getWorkflow.mockImplementation(() => { throw new Error('DB'); });
+      service.getWorkflow.mockImplementation(() => {
+        throw new Error('DB');
+      });
       const res = await request(app).get('/api/workflows/wf-1');
       expect(res.status).toBe(500);
     });
@@ -283,26 +339,34 @@ describe('workflow routes', () => {
     });
 
     it('validates merged definition when updating entryNodeId', async () => {
-      const res = await request(app).patch('/api/workflows/wf-1').send({
-        definition: { entryNodeId: 'missing-node' },
-      });
+      const res = await request(app)
+        .patch('/api/workflows/wf-1')
+        .send({
+          definition: { entryNodeId: 'missing-node' },
+        });
       expect(res.status).toBe(400);
       expect(res.body.error.message).toContain('entryNodeId');
     });
 
     it('skips cron validation when no triggers in body', async () => {
-      const res = await request(app).patch('/api/workflows/wf-1').send({ name: 'No triggers update' });
+      const res = await request(app)
+        .patch('/api/workflows/wf-1')
+        .send({ name: 'No triggers update' });
       expect(res.status).toBe(200);
     });
 
     it('returns 500 on error', async () => {
-      service.updateWorkflow.mockImplementation(() => { throw new Error('update fail'); });
+      service.updateWorkflow.mockImplementation(() => {
+        throw new Error('update fail');
+      });
       const res = await request(app).patch('/api/workflows/wf-1').send({ name: 'X' });
       expect(res.status).toBe(500);
     });
 
     it('returns 403 for immutable system workflows', async () => {
-      service.updateWorkflow.mockImplementation(() => { throw new ImmutableSystemWorkflowError(); });
+      service.updateWorkflow.mockImplementation(() => {
+        throw new ImmutableSystemWorkflowError();
+      });
       const res = await request(app).patch('/api/workflows/wf-1').send({ name: 'X' });
       expect(res.status).toBe(403);
       expect(res.body.error.code).toBe('FORBIDDEN');
@@ -327,13 +391,17 @@ describe('workflow routes', () => {
     });
 
     it('returns 500 on error', async () => {
-      service.deleteWorkflow.mockImplementation(() => { throw new Error('del fail'); });
+      service.deleteWorkflow.mockImplementation(() => {
+        throw new Error('del fail');
+      });
       const res = await request(app).delete('/api/workflows/wf-1');
       expect(res.status).toBe(500);
     });
 
     it('returns 403 for immutable system workflows', async () => {
-      service.deleteWorkflow.mockImplementation(() => { throw new ImmutableSystemWorkflowError(); });
+      service.deleteWorkflow.mockImplementation(() => {
+        throw new ImmutableSystemWorkflowError();
+      });
       const res = await request(app).delete('/api/workflows/wf-1');
       expect(res.status).toBe(403);
       expect(res.body.error.code).toBe('FORBIDDEN');
@@ -361,14 +429,20 @@ describe('workflow routes', () => {
     });
 
     it('returns 403 for immutable permission escalation template', async () => {
-      service.createFromTemplate.mockImplementation(() => { throw new ImmutableSystemWorkflowError(); });
-      const res = await request(app).post('/api/projects/proj-1/workflows/from-template/permission-escalation-default');
+      service.createFromTemplate.mockImplementation(() => {
+        throw new ImmutableSystemWorkflowError();
+      });
+      const res = await request(app).post(
+        '/api/projects/proj-1/workflows/from-template/permission-escalation-default'
+      );
       expect(res.status).toBe(403);
       expect(res.body.error.code).toBe('FORBIDDEN');
     });
 
     it('returns 500 on error', async () => {
-      service.createFromTemplate.mockImplementation(() => { throw new Error('tmpl fail'); });
+      service.createFromTemplate.mockImplementation(() => {
+        throw new Error('tmpl fail');
+      });
       const res = await request(app).post('/api/projects/proj-1/workflows/from-template/tmpl-1');
       expect(res.status).toBe(500);
     });
@@ -408,7 +482,9 @@ describe('workflow routes', () => {
     });
 
     it('returns 500 on error', async () => {
-      service.getRuns.mockImplementation(() => { throw new Error('runs fail'); });
+      service.getRuns.mockImplementation(() => {
+        throw new Error('runs fail');
+      });
       const res = await request(app).get('/api/workflows/wf-1/runs');
       expect(res.status).toBe(500);
     });
@@ -432,7 +508,9 @@ describe('workflow routes', () => {
     });
 
     it('returns 500 on error', async () => {
-      service.getRun.mockImplementation(() => { throw new Error('run fail'); });
+      service.getRun.mockImplementation(() => {
+        throw new Error('run fail');
+      });
       const res = await request(app).get('/api/workflow-runs/run-1');
       expect(res.status).toBe(500);
     });
@@ -456,7 +534,9 @@ describe('workflow routes', () => {
     });
 
     it('returns 500 on error', async () => {
-      service.cancelRun.mockImplementation(() => { throw new Error('cancel fail'); });
+      service.cancelRun.mockImplementation(() => {
+        throw new Error('cancel fail');
+      });
       const res = await request(app).post('/api/workflow-runs/run-1/cancel');
       expect(res.status).toBe(500);
     });
@@ -480,7 +560,9 @@ describe('workflow routes', () => {
     });
 
     it('returns 500 on error', async () => {
-      service.approveStep.mockImplementation(() => { throw new Error('approve fail'); });
+      service.approveStep.mockImplementation(() => {
+        throw new Error('approve fail');
+      });
       const res = await request(app).post('/api/workflow-step-runs/sr-1/approve');
       expect(res.status).toBe(500);
     });
@@ -504,7 +586,9 @@ describe('workflow routes', () => {
     });
 
     it('returns 500 on error', async () => {
-      service.rejectStep.mockImplementation(() => { throw new Error('reject fail'); });
+      service.rejectStep.mockImplementation(() => {
+        throw new Error('reject fail');
+      });
       const res = await request(app).post('/api/workflow-step-runs/sr-1/reject');
       expect(res.status).toBe(500);
     });

@@ -31,10 +31,10 @@ function sanitizeGeometry(value: unknown): WindowGeometry | null {
   const candidate = value as Partial<WindowGeometry>;
 
   if (
-    !isFiniteNumber(candidate.x)
-    || !isFiniteNumber(candidate.y)
-    || !isFiniteNumber(candidate.width)
-    || !isFiniteNumber(candidate.height)
+    !isFiniteNumber(candidate.x) ||
+    !isFiniteNumber(candidate.y) ||
+    !isFiniteNumber(candidate.width) ||
+    !isFiniteNumber(candidate.height)
   ) {
     return null;
   }
@@ -93,7 +93,7 @@ function monitorWorkArea(monitor: Monitor): Rect {
 
 export function resolveRestoredMainWindowBounds(
   geometry: WindowGeometry,
-  monitors: Monitor[],
+  monitors: Monitor[]
 ): WindowGeometry | null {
   if (monitors.length === 0) return null;
 
@@ -151,32 +151,28 @@ export function useMainWindowGeometry() {
 
     (async () => {
       try {
-        const {
-          getCurrentWindow,
-          availableMonitors,
-          PhysicalPosition,
-          PhysicalSize,
-        } = await import('@tauri-apps/api/window');
+        const { getCurrentWindow, availableMonitors, PhysicalPosition, PhysicalSize } =
+          await import('@tauri-apps/api/window');
 
         if (disposed) return;
 
         const win = getCurrentWindow();
         if (
-          typeof win.outerPosition !== 'function'
-          || typeof win.outerSize !== 'function'
-          || typeof win.setPosition !== 'function'
-          || typeof win.setSize !== 'function'
-          || typeof win.isMaximized !== 'function'
-          || typeof win.isMinimized !== 'function'
-          || typeof win.onMoved !== 'function'
-          || typeof win.onResized !== 'function'
+          typeof win.outerPosition !== 'function' ||
+          typeof win.outerSize !== 'function' ||
+          typeof win.setPosition !== 'function' ||
+          typeof win.setSize !== 'function' ||
+          typeof win.isMaximized !== 'function' ||
+          typeof win.isMinimized !== 'function' ||
+          typeof win.onMoved !== 'function' ||
+          typeof win.onResized !== 'function'
         ) {
           return;
         }
 
         const saveCurrentGeometry = async () => {
           try {
-            if (disposed || await win.isMinimized()) return;
+            if (disposed || (await win.isMinimized())) return;
 
             const maximized = await win.isMaximized();
             const previous = readStoredGeometry();
@@ -186,10 +182,7 @@ export function useMainWindowGeometry() {
               return;
             }
 
-            const [position, size] = await Promise.all([
-              win.outerPosition(),
-              win.outerSize(),
-            ]);
+            const [position, size] = await Promise.all([win.outerPosition(), win.outerSize()]);
             const geometry = sanitizeGeometry({
               x: position.x,
               y: position.y,
@@ -214,7 +207,10 @@ export function useMainWindowGeometry() {
         try {
           const storedGeometry = readStoredGeometry();
           if (storedGeometry) {
-            const bounds = resolveRestoredMainWindowBounds(storedGeometry, await availableMonitors());
+            const bounds = resolveRestoredMainWindowBounds(
+              storedGeometry,
+              await availableMonitors()
+            );
             if (bounds && !disposed) {
               await win.setSize(new PhysicalSize(bounds.width, bounds.height));
               await win.setPosition(new PhysicalPosition(bounds.x, bounds.y));
@@ -230,9 +226,11 @@ export function useMainWindowGeometry() {
         unlisteners.push(await win.onMoved(scheduleSave));
         unlisteners.push(await win.onResized(scheduleSave));
         if (typeof win.onCloseRequested === 'function') {
-          unlisteners.push(await win.onCloseRequested(() => {
-            void saveCurrentGeometry();
-          }));
+          unlisteners.push(
+            await win.onCloseRequested(() => {
+              void saveCurrentGeometry();
+            })
+          );
         }
 
         void saveCurrentGeometry();

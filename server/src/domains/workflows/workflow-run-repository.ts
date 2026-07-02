@@ -1,12 +1,22 @@
 import { BaseRepository } from '../../infra/repositories/base.js';
 import type { Database } from 'better-sqlite3';
-import type { WorkflowRun, WorkflowRunStatus, WorkflowRunTriggerSource } from '@zclaudia/shared/features/workflows';
+import type {
+  WorkflowRun,
+  WorkflowRunStatus,
+  WorkflowRunTriggerSource,
+} from '@zclaudia/shared/features/workflows';
 import { newId } from '../../utils/uuid.js';
 
 type WorkflowRunCreate = Omit<WorkflowRun, 'id' | 'completedAt' | 'error'>;
-type WorkflowRunUpdate = Partial<Omit<WorkflowRun, 'id' | 'workflowId' | 'projectId' | 'startedAt'>>;
+type WorkflowRunUpdate = Partial<
+  Omit<WorkflowRun, 'id' | 'workflowId' | 'projectId' | 'startedAt'>
+>;
 
-export class WorkflowRunRepository extends BaseRepository<WorkflowRun, WorkflowRunCreate, WorkflowRunUpdate> {
+export class WorkflowRunRepository extends BaseRepository<
+  WorkflowRun,
+  WorkflowRunCreate,
+  WorkflowRunUpdate
+> {
   constructor(db: Database) {
     super(db, 'workflow_runs');
   }
@@ -57,11 +67,26 @@ export class WorkflowRunRepository extends BaseRepository<WorkflowRun, WorkflowR
     const sets: string[] = [];
     const params: unknown[] = [];
 
-    if (data.status !== undefined) { sets.push('status = ?'); params.push(data.status); }
-    if (data.triggerDetail !== undefined) { sets.push('trigger_detail = ?'); params.push(data.triggerDetail); }
-    if (data.currentStepId !== undefined) { sets.push('current_step_id = ?'); params.push(data.currentStepId); }
-    if (data.completedAt !== undefined) { sets.push('completed_at = ?'); params.push(data.completedAt); }
-    if (data.error !== undefined) { sets.push('error = ?'); params.push(data.error); }
+    if (data.status !== undefined) {
+      sets.push('status = ?');
+      params.push(data.status);
+    }
+    if (data.triggerDetail !== undefined) {
+      sets.push('trigger_detail = ?');
+      params.push(data.triggerDetail);
+    }
+    if (data.currentStepId !== undefined) {
+      sets.push('current_step_id = ?');
+      params.push(data.currentStepId);
+    }
+    if (data.completedAt !== undefined) {
+      sets.push('completed_at = ?');
+      params.push(data.completedAt);
+    }
+    if (data.error !== undefined) {
+      sets.push('error = ?');
+      params.push(data.error);
+    }
 
     if (sets.length === 0) {
       return { sql: `SELECT 1 FROM workflow_runs WHERE id = ?`, params: [id] };
@@ -75,30 +100,32 @@ export class WorkflowRunRepository extends BaseRepository<WorkflowRun, WorkflowR
   }
 
   findByWorkflow(workflowId: string, limit = 20): WorkflowRun[] {
-    const rows = this.db.prepare(
-      'SELECT * FROM workflow_runs WHERE workflow_id = ? ORDER BY started_at DESC LIMIT ?'
-    ).all(workflowId, limit);
+    const rows = this.db
+      .prepare('SELECT * FROM workflow_runs WHERE workflow_id = ? ORDER BY started_at DESC LIMIT ?')
+      .all(workflowId, limit);
     return rows.map(row => this.mapRow(row));
   }
 
   findActiveByWorkflow(workflowId: string): WorkflowRun | null {
-    const row = this.db.prepare(
-      "SELECT * FROM workflow_runs WHERE workflow_id = ? AND status IN ('pending', 'running') LIMIT 1"
-    ).get(workflowId);
+    const row = this.db
+      .prepare(
+        "SELECT * FROM workflow_runs WHERE workflow_id = ? AND status IN ('pending', 'running') LIMIT 1"
+      )
+      .get(workflowId);
     return row ? this.mapRow(row) : null;
   }
 
   findByProject(projectId: string, limit = 50): WorkflowRun[] {
-    const rows = this.db.prepare(
-      'SELECT * FROM workflow_runs WHERE project_id = ? ORDER BY started_at DESC LIMIT ?'
-    ).all(projectId, limit);
+    const rows = this.db
+      .prepare('SELECT * FROM workflow_runs WHERE project_id = ? ORDER BY started_at DESC LIMIT ?')
+      .all(projectId, limit);
     return rows.map(row => this.mapRow(row));
   }
 
   findByInitiator(initiator: string, limit = 50): WorkflowRun[] {
-    const rows = this.db.prepare(
-      'SELECT * FROM workflow_runs WHERE initiator = ? ORDER BY started_at DESC LIMIT ?'
-    ).all(initiator, limit);
+    const rows = this.db
+      .prepare('SELECT * FROM workflow_runs WHERE initiator = ? ORDER BY started_at DESC LIMIT ?')
+      .all(initiator, limit);
     return rows.map(row => this.mapRow(row));
   }
 }

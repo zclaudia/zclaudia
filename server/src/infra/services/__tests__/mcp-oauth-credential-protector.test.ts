@@ -42,21 +42,25 @@ describe('MCP OAuth credential protector', () => {
         accessToken: 'legacy-access-token',
         refreshToken: 'legacy-refresh-token',
         tokenType: 'Bearer',
-      }),
+      })
     );
 
     const changed = backfillProtectedMcpOAuthCredentials(db);
 
     expect(changed).toBe(1);
-    const row = db.prepare('SELECT oauth_credentials FROM mcp_servers WHERE id = ?').get('plain') as { oauth_credentials: string };
+    const row = db
+      .prepare('SELECT oauth_credentials FROM mcp_servers WHERE id = ?')
+      .get('plain') as { oauth_credentials: string };
     expect(row.oauth_credentials).toMatch(/^zclaudia:v1:/);
     expect(row.oauth_credentials).not.toContain('legacy-access-token');
     expect(row.oauth_credentials).not.toContain('legacy-refresh-token');
-    expect(unprotectMcpOAuthCredentials(row.oauth_credentials)).toEqual(expect.objectContaining({
-      accessToken: 'legacy-access-token',
-      refreshToken: 'legacy-refresh-token',
-      tokenType: 'Bearer',
-    }));
+    expect(unprotectMcpOAuthCredentials(row.oauth_credentials)).toEqual(
+      expect.objectContaining({
+        accessToken: 'legacy-access-token',
+        refreshToken: 'legacy-refresh-token',
+        tokenType: 'Bearer',
+      })
+    );
   });
 
   it('does not rewrite already protected or invalid MCP OAuth credential rows', () => {
@@ -64,17 +68,27 @@ describe('MCP OAuth credential protector', () => {
       accessToken: 'already-protected-token',
       tokenType: 'Bearer',
     });
-    db.prepare('INSERT INTO mcp_servers (id, name, oauth_credentials) VALUES (?, ?, ?)').run('protected', 'protected-server', protectedValue);
-    db.prepare('INSERT INTO mcp_servers (id, name, oauth_credentials) VALUES (?, ?, ?)').run('invalid', 'invalid-server', 'not-json');
+    db.prepare('INSERT INTO mcp_servers (id, name, oauth_credentials) VALUES (?, ?, ?)').run(
+      'protected',
+      'protected-server',
+      protectedValue
+    );
+    db.prepare('INSERT INTO mcp_servers (id, name, oauth_credentials) VALUES (?, ?, ?)').run(
+      'invalid',
+      'invalid-server',
+      'not-json'
+    );
 
     const changed = backfillProtectedMcpOAuthCredentials(db);
 
     expect(changed).toBe(0);
-    const rows = db.prepare('SELECT id, oauth_credentials FROM mcp_servers ORDER BY id').all() as Array<{
+    const rows = db
+      .prepare('SELECT id, oauth_credentials FROM mcp_servers ORDER BY id')
+      .all() as Array<{
       id: string;
       oauth_credentials: string;
     }>;
-    expect(rows.find((row) => row.id === 'protected')?.oauth_credentials).toBe(protectedValue);
-    expect(rows.find((row) => row.id === 'invalid')?.oauth_credentials).toBe('not-json');
+    expect(rows.find(row => row.id === 'protected')?.oauth_credentials).toBe(protectedValue);
+    expect(rows.find(row => row.id === 'invalid')?.oauth_credentials).toBe('not-json');
   });
 });

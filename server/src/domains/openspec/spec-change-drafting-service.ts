@@ -64,16 +64,8 @@ export class SpecChangeDraftingService {
     const ctx = this.loadContext(specChangeId);
     const proposal = this.readArtifactSafe(ctx.projectRoot, ctx.slug, 'proposal.md');
     const design = this.readArtifactSafe(ctx.projectRoot, ctx.slug, 'design.md');
-    const corpusFile = path.join(
-      ctx.projectRoot,
-      OPENSPEC_DIR,
-      'specs',
-      capability,
-      'spec.md',
-    );
-    const existingCorpus = fs.existsSync(corpusFile)
-      ? fs.readFileSync(corpusFile, 'utf-8')
-      : null;
+    const corpusFile = path.join(ctx.projectRoot, OPENSPEC_DIR, 'specs', capability, 'spec.md');
+    const existingCorpus = fs.existsSync(corpusFile) ? fs.readFileSync(corpusFile, 'utf-8') : null;
     const corpusSummary = existingCorpus
       ? summarizeCapability(existingCorpus)
       : '(capability does not yet exist in corpus)';
@@ -116,7 +108,7 @@ export class SpecChangeDraftingService {
   private readArtifactSafe(
     projectRoot: string,
     slug: string,
-    name: 'proposal.md' | 'design.md' | 'tasks.md',
+    name: 'proposal.md' | 'design.md' | 'tasks.md'
   ): string {
     const file = path.join(projectRoot, OPENSPEC_DIR, 'changes', slug, name);
     if (!fs.existsSync(file)) return '(not yet written)';
@@ -128,7 +120,7 @@ export class SpecChangeDraftingService {
     let resolved = false;
     const timeoutMs = this.deps.timeoutMs ?? 120_000;
 
-    await new Promise<void>((resolve) => {
+    await new Promise<void>(resolve => {
       const timer = setTimeout(() => {
         if (!resolved) {
           resolved = true;
@@ -140,13 +132,9 @@ export class SpecChangeDraftingService {
           input: prompt,
           workingDirectory,
           llmProfileId: this.deps.llmProfileId,
-          onMessage: (m) => {
+          onMessage: m => {
             if (m.content) collected += m.content;
-            if (
-              m.kind === 'run_completed' ||
-              m.kind === 'completed' ||
-              m.kind === 'final'
-            ) {
+            if (m.kind === 'run_completed' || m.kind === 'completed' || m.kind === 'final') {
               if (!resolved) {
                 resolved = true;
                 clearTimeout(timer);
@@ -275,7 +263,7 @@ export function buildDeltaPrompt(
     design: string;
     capability: string;
     corpusSummary: string;
-  },
+  }
 ): string {
   return [
     `You are drafting a delta spec for the capability "${ctx.capability}" in OpenSpec format.`,
@@ -340,9 +328,7 @@ function summarizeCapability(corpusMarkdown: string): string {
   if (parsed.purpose) lines.push(`Purpose: ${parsed.purpose}`);
   lines.push(`Existing requirements (${parsed.requirements.length}):`);
   for (const r of parsed.requirements) {
-    lines.push(
-      `- ${r.name}${r.scenarios.length > 0 ? ` (${r.scenarios.length} scenarios)` : ''}`,
-    );
+    lines.push(`- ${r.name}${r.scenarios.length > 0 ? ` (${r.scenarios.length} scenarios)` : ''}`);
   }
   return lines.join('\n');
 }

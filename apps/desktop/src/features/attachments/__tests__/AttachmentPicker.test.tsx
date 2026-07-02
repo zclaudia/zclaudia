@@ -31,7 +31,7 @@ describe('AttachmentPicker', () => {
     render(
       <AttachmentPicker onFiles={vi.fn()}>
         <span>custom trigger</span>
-      </AttachmentPicker>,
+      </AttachmentPicker>
     );
     expect(screen.getByText('custom trigger')).toBeInTheDocument();
   });

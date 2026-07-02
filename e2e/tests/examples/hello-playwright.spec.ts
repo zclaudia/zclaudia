@@ -61,7 +61,7 @@ test.describe('Basic Example Tests', () => {
     // Take a screenshot
     await page.screenshot({
       path: 'test-results/example-screenshot.png',
-      fullPage: true
+      fullPage: true,
     });
 
     console.log('✓ Screenshot saved to test-results/example-screenshot.png');

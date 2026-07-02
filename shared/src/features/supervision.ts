@@ -3,13 +3,7 @@
 export type AgentType = 'supervisor';
 export type AgentMode = 'full' | 'lite';
 
-export type SupervisionPhase =
-  | 'initializing'
-  | 'setup'
-  | 'active'
-  | 'paused'
-  | 'idle'
-  | 'archived';
+export type SupervisionPhase = 'initializing' | 'setup' | 'active' | 'paused' | 'idle' | 'archived';
 
 export type TrustLevel = 'low' | 'medium' | 'high';
 
@@ -28,10 +22,7 @@ export type ChangeStatus =
 
 export type GateType = 'design' | 'execution';
 
-export type DesignGateDecision =
-  | 'approve_design'
-  | 'revise_design'
-  | 'revise_change';
+export type DesignGateDecision = 'approve_design' | 'revise_design' | 'revise_change';
 
 export type ExecutionGateDecision =
   | 'approve_execution'
@@ -39,9 +30,7 @@ export type ExecutionGateDecision =
   | 'revise_design'
   | 'split_change';
 
-export type AcceptanceDecision =
-  | 'approve_acceptance'
-  | 'revise_execution';
+export type AcceptanceDecision = 'approve_acceptance' | 'revise_execution';
 
 export interface ProjectChange {
   id: string;

@@ -5,7 +5,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { applyMigrations } from '../../../infra/storage/migrations/index.js';
-import { ExecutorInstanceRepository, ExecutorRegistry, ManualAdapter } from '../../executor/index.js';
+import {
+  ExecutorInstanceRepository,
+  ExecutorRegistry,
+  ManualAdapter,
+} from '../../executor/index.js';
 import { SpecChangeService } from '../../openspec/spec-change-service.js';
 import { EventDispatcher } from '../../supervision/event-dispatcher.js';
 import { ExecutorService } from '../executor-service.js';
@@ -40,11 +44,15 @@ describe('deriveSubIssueStatus (pure)', () => {
   });
 
   it('all terminal mixed (completed + failed) → tracked (awaits human close)', () => {
-    expect(deriveSubIssueStatus([mkInst('completed'), mkInst('failed')], 'tracked')).toBe('tracked');
+    expect(deriveSubIssueStatus([mkInst('completed'), mkInst('failed')], 'tracked')).toBe(
+      'tracked'
+    );
   });
 
   it('all cancelled → cancelled', () => {
-    expect(deriveSubIssueStatus([mkInst('cancelled'), mkInst('cancelled')], 'tracked')).toBe('cancelled');
+    expect(deriveSubIssueStatus([mkInst('cancelled'), mkInst('cancelled')], 'tracked')).toBe(
+      'cancelled'
+    );
   });
 
   it('all completed → tracked (awaits human close)', () => {
@@ -68,27 +76,40 @@ describe('IssueStatusPropagator (integration)', () => {
     db = new Database(':memory:');
     db.pragma('foreign_keys = ON');
     applyMigrations(db);
-    db.prepare(`INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`)
-      .run('proj-1', 'P', 'code', 0, 0);
+    db.prepare(
+      `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
+    ).run('proj-1', 'P', 'code', 0, 0);
     projectRoot = mkdtempSync(join(tmpdir(), 'prop-'));
   });
 
   afterEach(() => {
     db.close();
-    try { rmSync(projectRoot, { recursive: true, force: true }); } catch { /* */ }
+    try {
+      rmSync(projectRoot, { recursive: true, force: true });
+    } catch {
+      /* */
+    }
   });
 
   it('executor start triggers sub_issue → tracked via propagator', async () => {
     const specChangeService = new SpecChangeService({ db, getProjectRoot: () => projectRoot });
     const dispatcher = new EventDispatcher<IssueDomainEvent>();
     const lifecycle = new IssueLifecycle({ db, specChangeService, dispatcher });
-    const { issue, specChange } = lifecycle.createSubIssue({ projectId: 'proj-1', type: 'implement', title: 'A' });
+    const { issue, specChange } = lifecycle.createSubIssue({
+      projectId: 'proj-1',
+      type: 'implement',
+      title: 'A',
+    });
 
     const registry = new ExecutorRegistry();
-    registry.register('manual', (inst) => new ManualAdapter(db, inst));
+    registry.register('manual', inst => new ManualAdapter(db, inst));
     const execService = new ExecutorService({ db, registry, dispatcher });
     const execRepo = new ExecutorInstanceRepository(db);
-    const inst = execRepo.create({ projectId: 'proj-1', specChangeId: specChange.id, type: 'manual' });
+    const inst = execRepo.create({
+      projectId: 'proj-1',
+      specChangeId: specChange.id,
+      type: 'manual',
+    });
 
     const propagator = new IssueStatusPropagator({ db, dispatcher, lifecycle });
     propagator.install();
@@ -101,13 +122,21 @@ describe('IssueStatusPropagator (integration)', () => {
     const specChangeService = new SpecChangeService({ db, getProjectRoot: () => projectRoot });
     const dispatcher = new EventDispatcher<IssueDomainEvent>();
     const lifecycle = new IssueLifecycle({ db, specChangeService, dispatcher });
-    const { issue, specChange } = lifecycle.createSubIssue({ projectId: 'proj-1', type: 'implement', title: 'A' });
+    const { issue, specChange } = lifecycle.createSubIssue({
+      projectId: 'proj-1',
+      type: 'implement',
+      title: 'A',
+    });
 
     const registry = new ExecutorRegistry();
-    registry.register('manual', (inst) => new ManualAdapter(db, inst));
+    registry.register('manual', inst => new ManualAdapter(db, inst));
     const execService = new ExecutorService({ db, registry, dispatcher });
     const execRepo = new ExecutorInstanceRepository(db);
-    const inst = execRepo.create({ projectId: 'proj-1', specChangeId: specChange.id, type: 'manual' });
+    const inst = execRepo.create({
+      projectId: 'proj-1',
+      specChangeId: specChange.id,
+      type: 'manual',
+    });
 
     new IssueStatusPropagator({ db, dispatcher, lifecycle }).install();
 

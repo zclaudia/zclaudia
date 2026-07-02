@@ -7,11 +7,11 @@
  */
 
 interface LogEntry {
-  t: number;         // timestamp (ms)
+  t: number; // timestamp (ms)
   l: 'debug' | 'info' | 'warn' | 'error';
-  tag: string;       // extracted from [Tag] prefix, or 'untagged'
-  msg: string;       // first argument stringified
-  args?: string;     // remaining arguments (truncated)
+  tag: string; // extracted from [Tag] prefix, or 'untagged'
+  msg: string; // first argument stringified
+  args?: string; // remaining arguments (truncated)
 }
 
 const TAG_RE = /^\[([^\]]+)\]\s*/;
@@ -79,10 +79,22 @@ export function initLogger(max?: number): void {
   _error = console.error.bind(console);
   _debug = console.debug.bind(console);
 
-  console.log = (...args: unknown[]) => { capture('info', args); _log(...args); };
-  console.warn = (...args: unknown[]) => { capture('warn', args); _warn(...args); };
-  console.error = (...args: unknown[]) => { capture('error', args); _error(...args); };
-  console.debug = (...args: unknown[]) => { capture('debug', args); _debug(...args); };
+  console.log = (...args: unknown[]) => {
+    capture('info', args);
+    _log(...args);
+  };
+  console.warn = (...args: unknown[]) => {
+    capture('warn', args);
+    _warn(...args);
+  };
+  console.error = (...args: unknown[]) => {
+    capture('error', args);
+    _error(...args);
+  };
+  console.debug = (...args: unknown[]) => {
+    capture('debug', args);
+    _debug(...args);
+  };
 }
 
 export function exportLogs(): string {

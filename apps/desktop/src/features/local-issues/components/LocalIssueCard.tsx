@@ -33,11 +33,15 @@ export function LocalIssueCard({ issue, onOpen }: LocalIssueCardProps) {
       className="w-full text-left border border-border rounded-lg bg-card hover:bg-secondary/50 transition-colors group"
     >
       <div className="flex items-center gap-2 px-3 py-2">
-        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0 ${STATUS_COLORS[issue.status] ?? ''}`}>
+        <span
+          className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0 ${STATUS_COLORS[issue.status] ?? ''}`}
+        >
           {issue.status.replace('_', ' ')}
         </span>
 
-        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0 ${PRIORITY_COLORS[issue.priority] ?? ''}`}>
+        <span
+          className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0 ${PRIORITY_COLORS[issue.priority] ?? ''}`}
+        >
           {issue.priority}
         </span>
 
@@ -55,7 +59,7 @@ export function LocalIssueCard({ issue, onOpen }: LocalIssueCardProps) {
 
         {issue.labels.length > 0 && (
           <div className="flex gap-1 shrink-0">
-            {issue.labels.map((label) => (
+            {issue.labels.map(label => (
               <span
                 key={label}
                 className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-400"

@@ -31,13 +31,21 @@ export function assertTaskTransition(from: TaskStatus, to: TaskStatus): void {
   }
 }
 
-export function assertTaskStatus(taskStatus: TaskStatus, expected: TaskStatus, action: string): void {
+export function assertTaskStatus(
+  taskStatus: TaskStatus,
+  expected: TaskStatus,
+  action: string
+): void {
   if (taskStatus !== expected) {
     throw new Error(`Cannot ${action} task in status '${taskStatus}'; must be '${expected}'`);
   }
 }
 
-export function assertTaskStatusIn(taskStatus: TaskStatus, allowed: TaskStatus[], action: string): void {
+export function assertTaskStatusIn(
+  taskStatus: TaskStatus,
+  allowed: TaskStatus[],
+  action: string
+): void {
   if (!allowed.includes(taskStatus)) {
     throw new Error(`Cannot ${action} task in status '${taskStatus}'`);
   }
@@ -45,7 +53,7 @@ export function assertTaskStatusIn(taskStatus: TaskStatus, allowed: TaskStatus[]
 
 export function getLiteFailureTransition(
   currentAttempt: number,
-  maxRetries: number,
+  maxRetries: number
 ): { nextStatus: 'pending' | 'failed'; nextAttempt: number } {
   const nextAttempt = currentAttempt + 1;
   return nextAttempt > maxRetries + 1

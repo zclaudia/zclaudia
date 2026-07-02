@@ -25,7 +25,9 @@ describe('ToolRuleList', () => {
     const input = screen.getAllByPlaceholderText('Bash(git *)')[0]; // Allow group input (first)
     fireEvent.change(input, { target: { value: 'Read(*.md)' } });
     fireEvent.keyDown(input, { key: 'Enter' });
-    expect(onChange).toHaveBeenCalledWith([{ toolName: 'Read', pattern: '^.*\\.md$', action: 'approve' }]);
+    expect(onChange).toHaveBeenCalledWith([
+      { toolName: 'Read', pattern: '^.*\\.md$', action: 'approve' },
+    ]);
   });
 
   it('shows inline error for invalid syntax and does not call onChange', () => {
@@ -46,7 +48,12 @@ describe('ToolRuleList', () => {
   });
 
   it('renders continue-action rules in a read-only Advanced group', () => {
-    render(<ToolRuleList rules={[{ toolName: 'Bash', pattern: '^x$', action: 'continue' as const }]} onChange={vi.fn()} />);
+    render(
+      <ToolRuleList
+        rules={[{ toolName: 'Bash', pattern: '^x$', action: 'continue' as const }]}
+        onChange={vi.fn()}
+      />
+    );
     expect(screen.getByText('Advanced')).toBeInTheDocument();
     expect(screen.queryAllByLabelText(/remove rule/i)).toHaveLength(0);
   });

@@ -24,7 +24,7 @@ export class TaskLifecycleError extends Error {
   constructor(
     readonly taskId: string,
     readonly from: TaskStatus,
-    readonly to: TaskStatus,
+    readonly to: TaskStatus
   ) {
     super(`Invalid task transition for ${taskId}: ${from} -> ${to}`);
     this.name = 'TaskLifecycleError';
@@ -52,7 +52,10 @@ export class TaskService {
     return task;
   }
 
-  startTask(taskId: string, input?: { executorRef?: TaskExecutorRef; runId?: string; sessionId?: string }): TaskRecord {
+  startTask(
+    taskId: string,
+    input?: { executorRef?: TaskExecutorRef; runId?: string; sessionId?: string }
+  ): TaskRecord {
     return this.transition(taskId, 'running', 'started', {
       executorRef: input?.executorRef,
       runId: input?.runId,
@@ -86,7 +89,7 @@ export class TaskService {
       payload?: unknown;
       runId?: string;
       sessionId?: string;
-    },
+    }
   ): TaskRecord {
     const task = this.repo.findById(taskId);
     if (!task) throw new Error(`Task not found: ${taskId}`);

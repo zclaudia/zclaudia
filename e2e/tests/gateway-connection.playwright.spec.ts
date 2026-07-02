@@ -7,7 +7,6 @@
 import { test, expect } from '../fixtures/test-fixtures';
 
 test.describe('Gateway Connection', () => {
-
   test.beforeEach(async ({ page, cleanDb }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
@@ -16,7 +15,9 @@ test.describe('Gateway Connection', () => {
 
   // Helper: Open gateway settings
   async function openGatewaySettings(page: any): Promise<boolean> {
-    const settingsBtn = page.locator('button[title*="Settings"], button[aria-label*="Settings"]').first();
+    const settingsBtn = page
+      .locator('button[title*="Settings"], button[aria-label*="Settings"]')
+      .first();
     if (await settingsBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
       await settingsBtn.click();
       await page.waitForTimeout(500);
@@ -40,7 +41,9 @@ test.describe('Gateway Connection', () => {
 
     if (opened) {
       // Check for discovered backends list
-      const backendsList = page.locator('[data-testid="backends-list"], .backends-list, [class*="backend"]').first();
+      const backendsList = page
+        .locator('[data-testid="backends-list"], .backends-list, [class*="backend"]')
+        .first();
       const hasList = await backendsList.isVisible({ timeout: 3000 }).catch(() => false);
 
       if (hasList) {
@@ -72,7 +75,9 @@ test.describe('Gateway Connection', () => {
 
     if (opened) {
       // Look for connect button on a backend
-      const connectBtn = page.locator('button:has-text("Connect"), button[title*="Connect"]').first();
+      const connectBtn = page
+        .locator('button:has-text("Connect"), button[title*="Connect"]')
+        .first();
       const hasConnect = await connectBtn.isVisible({ timeout: 2000 }).catch(() => false);
 
       if (hasConnect) {
@@ -80,7 +85,9 @@ test.describe('Gateway Connection', () => {
         await page.waitForTimeout(2000);
 
         // Check for connection status
-        const statusIndicator = page.locator('[class*="connected"], [data-status="connected"]').first();
+        const statusIndicator = page
+          .locator('[class*="connected"], [data-status="connected"]')
+          .first();
         const isConnected = await statusIndicator.isVisible({ timeout: 5000 }).catch(() => false);
 
         if (isConnected) {
@@ -105,7 +112,9 @@ test.describe('Gateway Connection', () => {
 
     if (opened) {
       // Look for disconnect button
-      const disconnectBtn = page.locator('button:has-text("Disconnect"), button[title*="Disconnect"]').first();
+      const disconnectBtn = page
+        .locator('button:has-text("Disconnect"), button[title*="Disconnect"]')
+        .first();
       const hasDisconnect = await disconnectBtn.isVisible({ timeout: 2000 }).catch(() => false);
 
       if (hasDisconnect) {
@@ -129,7 +138,9 @@ test.describe('Gateway Connection', () => {
     console.log('Test GC4: Connection status indicator');
 
     // Look for status indicator in UI
-    const statusIndicator = page.locator('[class*="connection-status"], [data-testid="connection-status"], .status-badge').first();
+    const statusIndicator = page
+      .locator('[class*="connection-status"], [data-testid="connection-status"], .status-badge')
+      .first();
     const hasStatus = await statusIndicator.isVisible({ timeout: 2000 }).catch(() => false);
 
     if (hasStatus) {
@@ -138,7 +149,10 @@ test.describe('Gateway Connection', () => {
 
       // Check for color coding
       const className = await statusIndicator.getAttribute('class').catch(() => '');
-      const hasColorClass = className.includes('connected') || className.includes('disconnected') || className.includes('error');
+      const hasColorClass =
+        className.includes('connected') ||
+        className.includes('disconnected') ||
+        className.includes('error');
       if (hasColorClass) {
         console.log('  ✓ Status color coding present');
       }
@@ -229,7 +243,9 @@ test.describe('Gateway Connection', () => {
       await page.waitForTimeout(500);
 
       // Check for pending/queued indicator
-      const pendingIndicator = page.locator('[class*="pending"], [class*="queued"], text=/pending|queued/i').first();
+      const pendingIndicator = page
+        .locator('[class*="pending"], [class*="queued"], text=/pending|queued/i')
+        .first();
       const hasPending = await pendingIndicator.isVisible({ timeout: 2000 }).catch(() => false);
 
       if (hasPending) {
@@ -254,7 +270,9 @@ test.describe('Gateway Connection', () => {
 
     if (opened) {
       // Look for configuration options
-      const gatewayUrlInput = page.locator('input[placeholder*="gateway"], input[name*="gateway"]').first();
+      const gatewayUrlInput = page
+        .locator('input[placeholder*="gateway"], input[name*="gateway"]')
+        .first();
       const hasUrlInput = await gatewayUrlInput.isVisible({ timeout: 1000 }).catch(() => false);
 
       if (hasUrlInput) {

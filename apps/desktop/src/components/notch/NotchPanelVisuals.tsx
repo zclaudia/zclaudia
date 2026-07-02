@@ -56,7 +56,15 @@ export function LockIcon({ className = '' }: { className?: string }) {
 
 export function CheckIcon({ className = '' }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      className={className}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M3.5 8.5 6.5 11.5 12.5 5" />
     </svg>
   );
@@ -80,7 +88,15 @@ export function InfoIcon({ className = '' }: { className?: string }) {
 
 export function CloseIcon({ className = '' }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      className={className}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M4 4l8 8M12 4 4 12" />
     </svg>
   );
@@ -88,7 +104,15 @@ export function CloseIcon({ className = '' }: { className?: string }) {
 
 export function CollapseChevronIcon({ className = '' }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      className={className}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M4 10 8 6 12 10" />
     </svg>
   );
@@ -96,20 +120,33 @@ export function CollapseChevronIcon({ className = '' }: { className?: string }) 
 
 export function SystemIcon({ icon, className = '' }: { icon: ToastIcon; className?: string }) {
   switch (icon) {
-    case 'permission': return <LockIcon className={className} />;
-    case 'task':       return <CheckIcon className={className} />;
-    case 'error':      return <WarnIcon className={className} />;
+    case 'permission':
+      return <LockIcon className={className} />;
+    case 'task':
+      return <CheckIcon className={className} />;
+    case 'error':
+      return <WarnIcon className={className} />;
     case 'system':
-    default:           return <BellIcon className={className} />;
+    default:
+      return <BellIcon className={className} />;
   }
 }
 
-export function TypeFallbackIcon({ type, className = '' }: { type: Toast['type']; className?: string }) {
+export function TypeFallbackIcon({
+  type,
+  className = '',
+}: {
+  type: Toast['type'];
+  className?: string;
+}) {
   switch (type) {
-    case 'success': return <CheckIcon className={className} />;
-    case 'error':   return <WarnIcon className={className} />;
+    case 'success':
+      return <CheckIcon className={className} />;
+    case 'error':
+      return <WarnIcon className={className} />;
     case 'info':
-    default:        return <InfoIcon className={className} />;
+    default:
+      return <InfoIcon className={className} />;
   }
 }
 
@@ -142,7 +179,11 @@ export function Avatar({ projectId, projectName, icon, type }: AvatarProps) {
     );
   }
 
-  const tintClass = icon ? 'bg-white/10 text-white/85' : (type ? TYPE_TINT[type] : 'bg-white/10 text-white/85');
+  const tintClass = icon
+    ? 'bg-white/10 text-white/85'
+    : type
+      ? TYPE_TINT[type]
+      : 'bg-white/10 text-white/85';
 
   return (
     <div
@@ -150,7 +191,13 @@ export function Avatar({ projectId, projectName, icon, type }: AvatarProps) {
                   shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]`}
       aria-hidden
     >
-      {icon ? <SystemIcon icon={icon} className="w-3.5 h-3.5" /> : type ? <TypeFallbackIcon type={type} className="w-3.5 h-3.5" /> : <BellIcon className="w-3.5 h-3.5" />}
+      {icon ? (
+        <SystemIcon icon={icon} className="w-3.5 h-3.5" />
+      ) : type ? (
+        <TypeFallbackIcon type={type} className="w-3.5 h-3.5" />
+      ) : (
+        <BellIcon className="w-3.5 h-3.5" />
+      )}
     </div>
   );
 }
@@ -174,26 +221,33 @@ export interface ClosedPillProps {
   logoUrl?: string;
 }
 
-export function ClosedPill({ unreadCount, hasPendingAttention, preview, onClick, logoUrl = '/logo.png' }: ClosedPillProps) {
-  const leading = preview?.projectId && preview.projectName ? (
-    <div
-      className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-semibold ${
-        AVATAR_PALETTE[hashToIndex(preview.projectId, AVATAR_PALETTE.length)]
-      }`}
-      aria-hidden
-    >
-      {firstLetter(preview.projectName)}
-    </div>
-  ) : preview?.icon ? (
-    <SystemIcon icon={preview.icon} className="w-3.5 h-3.5 text-white/90" />
-  ) : (
-    <img
-      src={logoUrl}
-      alt=""
-      className="w-5 h-5 rounded-full ring-1 ring-white/15 object-cover"
-      draggable={false}
-    />
-  );
+export function ClosedPill({
+  unreadCount,
+  hasPendingAttention,
+  preview,
+  onClick,
+  logoUrl = '/logo.png',
+}: ClosedPillProps) {
+  const leading =
+    preview?.projectId && preview.projectName ? (
+      <div
+        className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-semibold ${
+          AVATAR_PALETTE[hashToIndex(preview.projectId, AVATAR_PALETTE.length)]
+        }`}
+        aria-hidden
+      >
+        {firstLetter(preview.projectName)}
+      </div>
+    ) : preview?.icon ? (
+      <SystemIcon icon={preview.icon} className="w-3.5 h-3.5 text-white/90" />
+    ) : (
+      <img
+        src={logoUrl}
+        alt=""
+        className="w-5 h-5 rounded-full ring-1 ring-white/15 object-cover"
+        draggable={false}
+      />
+    );
 
   const trailing = hasPendingAttention ? (
     <span className="relative w-1.5 h-1.5 flex-shrink-0">
@@ -255,7 +309,12 @@ export interface NotchTabBarProps {
   pluginTabs?: PluginNotchTab[];
 }
 
-export function NotchTabBar({ activeTab, onTabChange, unreadCounts, pluginTabs = [] }: NotchTabBarProps) {
+export function NotchTabBar({
+  activeTab,
+  onTabChange,
+  unreadCounts,
+  pluginTabs = [],
+}: NotchTabBarProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const hasPluginTabs = pluginTabs.length > 0;
 
@@ -281,21 +340,31 @@ export function NotchTabBar({ activeTab, onTabChange, unreadCounts, pluginTabs =
     updateScrollState();
   }, [pluginTabs.length, hasPluginTabs, updateScrollState]);
 
-  const renderTab = (key: string, label: string, isActive: boolean, count: number, onClick: () => void) => (
+  const renderTab = (
+    key: string,
+    label: string,
+    isActive: boolean,
+    count: number,
+    onClick: () => void
+  ) => (
     <button
       key={key}
       type="button"
       data-active={isActive}
       onClick={onClick}
       className={`${hasPluginTabs ? 'min-w-[60px] shrink-0 px-2' : 'flex-1'} flex items-center justify-center gap-1 h-7 rounded-md text-[11.5px] tracking-tight transition-all duration-150
-                  ${isActive
-                    ? 'bg-white/[0.1] text-white font-semibold shadow-[0_1px_2px_rgba(0,0,0,0.2)]'
-                    : 'text-white/50 hover:text-white/70'}`}
+                  ${
+                    isActive
+                      ? 'bg-white/[0.1] text-white font-semibold shadow-[0_1px_2px_rgba(0,0,0,0.2)]'
+                      : 'text-white/50 hover:text-white/70'
+                  }`}
     >
       <span className="truncate">{label}</span>
       {count > 0 && (
-        <span className={`min-w-[14px] h-3.5 px-1 flex items-center justify-center rounded-full text-[9px] font-semibold leading-none tabular-nums shrink-0
-                         ${isActive ? 'bg-white/15 text-white' : 'bg-white/10 text-white/50'}`}>
+        <span
+          className={`min-w-[14px] h-3.5 px-1 flex items-center justify-center rounded-full text-[9px] font-semibold leading-none tabular-nums shrink-0
+                         ${isActive ? 'bg-white/15 text-white' : 'bg-white/10 text-white/50'}`}
+        >
           {count > 99 ? '99+' : count}
         </span>
       )}
@@ -303,12 +372,13 @@ export function NotchTabBar({ activeTab, onTabChange, unreadCounts, pluginTabs =
   );
 
   // Gradient mask for scroll overflow indicators
-  const maskStyle = hasPluginTabs && (canScroll.left || canScroll.right)
-    ? {
-        maskImage: `linear-gradient(to right, ${canScroll.left ? 'transparent, black 16px' : 'black'}, ${canScroll.right ? 'black calc(100% - 16px), transparent' : 'black'})`,
-        WebkitMaskImage: `linear-gradient(to right, ${canScroll.left ? 'transparent, black 16px' : 'black'}, ${canScroll.right ? 'black calc(100% - 16px), transparent' : 'black'})`,
-      }
-    : undefined;
+  const maskStyle =
+    hasPluginTabs && (canScroll.left || canScroll.right)
+      ? {
+          maskImage: `linear-gradient(to right, ${canScroll.left ? 'transparent, black 16px' : 'black'}, ${canScroll.right ? 'black calc(100% - 16px), transparent' : 'black'})`,
+          WebkitMaskImage: `linear-gradient(to right, ${canScroll.left ? 'transparent, black 16px' : 'black'}, ${canScroll.right ? 'black calc(100% - 16px), transparent' : 'black'})`,
+        }
+      : undefined;
 
   return (
     <div
@@ -317,34 +387,50 @@ export function NotchTabBar({ activeTab, onTabChange, unreadCounts, pluginTabs =
       style={maskStyle}
       className={`flex items-center gap-0.5 mx-2 my-1.5 p-0.5 rounded-lg bg-white/[0.06] ${hasPluginTabs ? 'overflow-x-auto scrollbar-hide' : ''}`}
     >
-      {NOTCH_TABS.map((tab) =>
-        renderTab(tab, NOTCH_TAB_LABELS[tab], tab === activeTab, unreadCounts[tab] ?? 0, () => onTabChange(tab))
+      {NOTCH_TABS.map(tab =>
+        renderTab(tab, NOTCH_TAB_LABELS[tab], tab === activeTab, unreadCounts[tab] ?? 0, () =>
+          onTabChange(tab)
+        )
       )}
-      {pluginTabs.map((pt) => {
+      {pluginTabs.map(pt => {
         const tabKey: NotchTab = `plugin:${pt.id}`;
-        return renderTab(tabKey, pt.label, tabKey === activeTab, unreadCounts[tabKey] ?? 0, () => onTabChange(tabKey));
+        return renderTab(tabKey, pt.label, tabKey === activeTab, unreadCounts[tabKey] ?? 0, () =>
+          onTabChange(tabKey)
+        );
       })}
     </div>
   );
 }
 
 export function OpenedRow({
-  title, description, createdAt,
-  projectId, projectName, icon, type, status, isUnread,
-  onClick, onDismiss,
+  title,
+  description,
+  createdAt,
+  projectId,
+  projectName,
+  icon,
+  type,
+  status,
+  isUnread,
+  onClick,
+  onDismiss,
 }: OpenedRowProps) {
   const label = projectName ?? 'ZClaudia';
-  const statusDot = status === 'running' ? 'bg-amber-400 animate-pulse'
-    : status === 'failed' ? 'bg-rose-400'
-    : status === 'completed' ? 'bg-emerald-400'
-    : null;
+  const statusDot =
+    status === 'running'
+      ? 'bg-amber-400 animate-pulse'
+      : status === 'failed'
+        ? 'bg-rose-400'
+        : status === 'completed'
+          ? 'bg-emerald-400'
+          : null;
 
   return (
     <div
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : -1}
       onClick={onClick}
-      onKeyDown={(e) => {
+      onKeyDown={e => {
         if (onClick && (e.key === 'Enter' || e.key === ' ')) {
           e.preventDefault();
           onClick();
@@ -360,11 +446,15 @@ export function OpenedRow({
         <div className="flex items-center gap-1.5 text-[13px] tracking-tight text-white">
           <span className="text-white/55 truncate max-w-[8rem]">{label}</span>
           <span className="text-white/25">·</span>
-          <span className={`truncate flex-1 ${isUnread ? 'font-semibold' : 'font-medium'}`}>{title}</span>
+          <span className={`truncate flex-1 ${isUnread ? 'font-semibold' : 'font-medium'}`}>
+            {title}
+          </span>
           {statusDot && <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusDot}`} />}
         </div>
         {description && (
-          <p className="mt-0.5 text-[11.5px] leading-snug text-white/55 line-clamp-2">{description}</p>
+          <p className="mt-0.5 text-[11.5px] leading-snug text-white/55 line-clamp-2">
+            {description}
+          </p>
         )}
       </div>
 
@@ -375,7 +465,10 @@ export function OpenedRow({
         {onDismiss && (
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onDismiss(); }}
+            onClick={e => {
+              e.stopPropagation();
+              onDismiss();
+            }}
             aria-label="Dismiss"
             className="absolute right-0 top-0 w-5 h-5 flex items-center justify-center rounded-md
                        text-white/50 hover:text-white hover:bg-white/10

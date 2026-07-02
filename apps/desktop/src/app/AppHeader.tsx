@@ -41,7 +41,12 @@ export function AppHeader({
             aria-label="Close agent"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
             </svg>
           </button>
         ) : isMobile ? (
@@ -51,7 +56,12 @@ export function AppHeader({
             aria-label="Open menu"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 6h16M4 12h16M4 18h16"
+              />
             </svg>
           </button>
         ) : null}
@@ -60,16 +70,25 @@ export function AppHeader({
           <div className="w-7 h-7 rounded-xl border border-border/70 bg-card/80 dark:bg-white/5 dark:border-white/10 shadow-sm backdrop-blur-sm flex items-center justify-center flex-shrink-0">
             <BrandMark className="w-[1.625rem] h-[1.625rem] object-contain pointer-events-none select-none drop-shadow-sm" />
           </div>
-          <span className="font-semibold text-sm text-foreground leading-tight" data-tauri-drag-region>ZClaudia</span>
+          <span
+            className="font-semibold text-sm text-foreground leading-tight"
+            data-tauri-drag-region
+          >
+            ZClaudia
+          </span>
         </div>
 
         {!isMobile && (
           <button
             onClick={onToggleSidebar}
             className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground ml-2"
-            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            {sidebarCollapsed ? <ChevronsRight size={16} strokeWidth={2} /> : <ChevronsLeft size={16} strokeWidth={2} />}
+            {sidebarCollapsed ? (
+              <ChevronsRight size={16} strokeWidth={2} />
+            ) : (
+              <ChevronsLeft size={16} strokeWidth={2} />
+            )}
           </button>
         )}
       </div>
@@ -84,12 +103,19 @@ export function AppHeader({
             {!disableNotifications && (
               <div className="relative">
                 <button
-                  onClick={() => { void emitTauri(NOTCH_EVENT.toggle, {}); }}
+                  onClick={() => {
+                    void emitTauri(NOTCH_EVENT.toggle, {});
+                  }}
                   className="relative p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
                   title="Notifications"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                    />
                   </svg>
                   {notificationUnreadCount > 0 && (
                     <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] flex items-center justify-center bg-muted/60 text-primary-foreground text-[9px] font-medium rounded-full px-0.5">
@@ -100,7 +126,9 @@ export function AppHeader({
               </div>
             )}
             <button
-              onClick={() => { void openWindowManagerWindow(); }}
+              onClick={() => {
+                void openWindowManagerWindow();
+              }}
               className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
               title="Windows"
               aria-label="Open window manager"

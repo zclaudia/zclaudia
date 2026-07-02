@@ -8,18 +8,69 @@ export const DEFAULT_SHORTCUT = 'CmdOrCtrl+Shift+.';
 
 // Supported modifier keys
 export const MODIFIER_KEYS = ['CmdOrCtrl', 'Cmd', 'Ctrl', 'Option', 'Alt', 'Shift'] as const;
-export type ModifierKey = typeof MODIFIER_KEYS[number];
+export type ModifierKey = (typeof MODIFIER_KEYS)[number];
 
 // Supported main keys (common shortcut keys)
 export const MAIN_KEYS = [
-  '.', ',', '/', ';', "'",
-  'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-  'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-  '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
-  'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12',
-  'Space', 'Tab', 'Escape', 'Enter',
+  '.',
+  ',',
+  '/',
+  ';',
+  "'",
+  'A',
+  'B',
+  'C',
+  'D',
+  'E',
+  'F',
+  'G',
+  'H',
+  'I',
+  'J',
+  'K',
+  'L',
+  'M',
+  'N',
+  'O',
+  'P',
+  'Q',
+  'R',
+  'S',
+  'T',
+  'U',
+  'V',
+  'W',
+  'X',
+  'Y',
+  'Z',
+  '1',
+  '2',
+  '3',
+  '4',
+  '5',
+  '6',
+  '7',
+  '8',
+  '9',
+  '0',
+  'F1',
+  'F2',
+  'F3',
+  'F4',
+  'F5',
+  'F6',
+  'F7',
+  'F8',
+  'F9',
+  'F10',
+  'F11',
+  'F12',
+  'Space',
+  'Tab',
+  'Escape',
+  'Enter',
 ] as const;
-export type MainKey = typeof MAIN_KEYS[number];
+export type MainKey = (typeof MAIN_KEYS)[number];
 
 export interface ShortcutConfig {
   shortcut: string; // Full shortcut string like "CmdOrCtrl+Shift+."
@@ -29,7 +80,7 @@ export interface ShortcutConfig {
 interface ShortcutState extends ShortcutConfig {
   isLoading: boolean;
   error: string | null;
-  
+
   // Actions
   loadConfig: () => Promise<void>;
   updateShortcut: (shortcut: string) => Promise<boolean>;
@@ -95,11 +146,14 @@ export function buildShortcut(modifiers: ModifierKey[], mainKey: MainKey): strin
 }
 
 // Parse shortcut string into components
-export function parseShortcut(shortcut: string): { modifiers: ModifierKey[]; mainKey: MainKey | null } {
+export function parseShortcut(shortcut: string): {
+  modifiers: ModifierKey[];
+  mainKey: MainKey | null;
+} {
   const parts = normalizeShortcut(shortcut).split('+');
-  const modifiers = parts.slice(0, -1).filter((p): p is ModifierKey => 
-    MODIFIER_KEYS.includes(p as ModifierKey)
-  );
+  const modifiers = parts
+    .slice(0, -1)
+    .filter((p): p is ModifierKey => MODIFIER_KEYS.includes(p as ModifierKey));
   const lastPart = parts[parts.length - 1];
   const mainKey = MAIN_KEYS.includes(lastPart as MainKey) ? (lastPart as MainKey) : null;
   return { modifiers, mainKey };
@@ -130,18 +184,18 @@ export const useShortcutStore = create<ShortcutState>((set, get) => ({
       enabled: config.enabled,
     };
     set({ ...normalizedConfig, isLoading: true, error: null });
-    
+
     try {
       // Apply the loaded config to the backend
-      await invoke('update_global_shortcut', { 
-        shortcut: normalizedConfig.enabled ? normalizedConfig.shortcut : null 
+      await invoke('update_global_shortcut', {
+        shortcut: normalizedConfig.enabled ? normalizedConfig.shortcut : null,
       });
       saveStoredConfig(normalizedConfig);
       set({ isLoading: false });
     } catch (err) {
-      set({ 
-        isLoading: false, 
-        error: err instanceof Error ? err.message : 'Failed to apply shortcut config' 
+      set({
+        isLoading: false,
+        error: err instanceof Error ? err.message : 'Failed to apply shortcut config',
       });
     }
   },
@@ -149,20 +203,20 @@ export const useShortcutStore = create<ShortcutState>((set, get) => ({
   updateShortcut: async (shortcut: string) => {
     const normalizedShortcut = normalizeShortcut(shortcut);
     set({ isLoading: true, error: null });
-    
+
     try {
-      await invoke('update_global_shortcut', { 
-        shortcut: get().enabled ? normalizedShortcut : null 
+      await invoke('update_global_shortcut', {
+        shortcut: get().enabled ? normalizedShortcut : null,
       });
-      
+
       const newConfig = { ...get(), shortcut: normalizedShortcut, isLoading: false };
       saveStoredConfig(newConfig);
       set(newConfig);
       return true;
     } catch (err) {
-      set({ 
-        isLoading: false, 
-        error: err instanceof Error ? err.message : 'Failed to update shortcut' 
+      set({
+        isLoading: false,
+        error: err instanceof Error ? err.message : 'Failed to update shortcut',
       });
       return false;
     }
@@ -172,20 +226,20 @@ export const useShortcutStore = create<ShortcutState>((set, get) => ({
     const { enabled, shortcut } = get();
     const newEnabled = !enabled;
     set({ isLoading: true, error: null });
-    
+
     try {
-      await invoke('update_global_shortcut', { 
-        shortcut: newEnabled ? shortcut : null 
+      await invoke('update_global_shortcut', {
+        shortcut: newEnabled ? shortcut : null,
       });
-      
+
       const newConfig = { shortcut, enabled: newEnabled, isLoading: false, error: null };
       saveStoredConfig(newConfig);
       set(newConfig);
       return true;
     } catch (err) {
-      set({ 
-        isLoading: false, 
-        error: err instanceof Error ? err.message : 'Failed to toggle shortcut' 
+      set({
+        isLoading: false,
+        error: err instanceof Error ? err.message : 'Failed to toggle shortcut',
       });
       return false;
     }
@@ -193,18 +247,23 @@ export const useShortcutStore = create<ShortcutState>((set, get) => ({
 
   resetToDefault: async () => {
     set({ isLoading: true, error: null });
-    
+
     try {
       await invoke('update_global_shortcut', { shortcut: DEFAULT_SHORTCUT });
-      
-      const newConfig = { shortcut: DEFAULT_SHORTCUT, enabled: true, isLoading: false, error: null };
+
+      const newConfig = {
+        shortcut: DEFAULT_SHORTCUT,
+        enabled: true,
+        isLoading: false,
+        error: null,
+      };
       saveStoredConfig(newConfig);
       set(newConfig);
       return true;
     } catch (err) {
-      set({ 
-        isLoading: false, 
-        error: err instanceof Error ? err.message : 'Failed to reset shortcut' 
+      set({
+        isLoading: false,
+        error: err instanceof Error ? err.message : 'Failed to reset shortcut',
       });
       return false;
     }

@@ -88,7 +88,11 @@ describe('File Reference (@) - Traditional Playwright', () => {
     await browser.waitForTimeout(500);
 
     // Check for file browser popup
-    const fileBrowser = browser.locator('[class*="dropdown"], [class*="menu"], [class*="popover"], [role="menu"], [role="listbox"]').first();
+    const fileBrowser = browser
+      .locator(
+        '[class*="dropdown"], [class*="menu"], [class*="popover"], [role="menu"], [role="listbox"]'
+      )
+      .first();
     const browserVisible = await fileBrowser.isVisible({ timeout: 2000 }).catch(() => false);
 
     console.log(`  File browser visible: ${browserVisible}`);
@@ -174,7 +178,9 @@ describe('File Reference (@) - Traditional Playwright', () => {
       const textareaValue = await textarea.inputValue().catch(() => '');
       const hasFilePath = textareaValue.length > 1 && textareaValue !== '@';
 
-      console.log(`  Textarea value: "${textareaValue.slice(0, 50)}${textareaValue.length > 50 ? '...' : ''}"`);
+      console.log(
+        `  Textarea value: "${textareaValue.slice(0, 50)}${textareaValue.length > 50 ? '...' : ''}"`
+      );
       console.log(`  ✓ File path inserted: ${hasFilePath}`);
       console.log('✅ D3: File selection test passed');
     } else {
@@ -263,7 +269,9 @@ describe('File Reference (@) - Traditional Playwright', () => {
 
       if (firstDirIndex >= 0 && firstFileIndex >= 0) {
         const foldersFirst = firstDirIndex < firstFileIndex;
-        console.log(`  ✓ First directory at index ${firstDirIndex}, first file at ${firstFileIndex}`);
+        console.log(
+          `  ✓ First directory at index ${firstDirIndex}, first file at ${firstFileIndex}`
+        );
         console.log(`  ✓ Folders come first: ${foldersFirst}`);
       } else {
         console.log(`  ⚠️ Could not determine sorting order`);

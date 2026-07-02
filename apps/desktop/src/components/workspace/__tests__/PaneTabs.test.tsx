@@ -115,7 +115,7 @@ describe('PaneTabs', () => {
     expect(actions.className).toContain('ml-auto');
   });
 
-  it('shows only the active tool\'s actions, not an inactive tab\'s', () => {
+  it("shows only the active tool's actions, not an inactive tab's", () => {
     const Actions = () => <button aria-label="Tool action">A</button>;
     usePluginStore.setState({
       panels: [
@@ -135,7 +135,7 @@ describe('PaneTabs', () => {
   it('shows edge scroll chevrons only for the overflowing side, and clicking scrolls', () => {
     const pane = seedPane();
     const { container, getByLabelText, queryByLabelText } = render(
-      <PaneTabs sessionId="A" pane={pane} focused />,
+      <PaneTabs sessionId="A" pane={pane} focused />
     );
     const scroller = container.querySelector('.overflow-x-auto') as HTMLElement;
     const scrollBy = vi.fn();

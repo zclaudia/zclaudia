@@ -4,13 +4,20 @@ import { synthesizeSubagent } from '../subagent-synthesizer.js';
 import type { PhaseDef } from '@zclaudia/shared/features/meta-workflow';
 
 const investigationPhase: PhaseDef = {
-  id: 'p1', name: 'Investigate', description: 'figure out why X is slow',
+  id: 'p1',
+  name: 'Investigate',
+  description: 'figure out why X is slow',
   phaseType: 'investigation',
   dependsOn: [],
   inputs: [],
   outputs: [{ kind: 'file', path: 'investigation-report.md', description: 'report' }],
   acceptanceGates: [
-    { id: 'has-report', description: 'report exists', command: 'test -s investigation-report.md', expect: { exitCode: 0 } },
+    {
+      id: 'has-report',
+      description: 'report exists',
+      command: 'test -s investigation-report.md',
+      expect: { exitCode: 0 },
+    },
   ],
 };
 
@@ -41,7 +48,10 @@ describe('subagent synthesizer', () => {
   });
 
   it('respects maxSubagentTurns override from phase config', () => {
-    const tmpl = synthesizeSubagent({ ...investigationPhase, executeConfig: { maxSubagentTurns: 12 } });
+    const tmpl = synthesizeSubagent({
+      ...investigationPhase,
+      executeConfig: { maxSubagentTurns: 12 },
+    });
     expect(tmpl.maxTurns).toBe(12);
   });
 

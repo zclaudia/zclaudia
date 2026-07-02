@@ -14,11 +14,36 @@ function makeApi(stepTypes: unknown[]) {
 }
 
 const CATALOG = [
-  { type: 'git_commit', name: 'Git Commit', description: 'Commit changes', category: 'Git', source: 'activity' },
-  { type: 'ai_summarize', name: 'AI Summarize', description: 'Summarize', category: 'AI', source: 'activity', supportsLoop: true },
+  {
+    type: 'git_commit',
+    name: 'Git Commit',
+    description: 'Commit changes',
+    category: 'Git',
+    source: 'activity',
+  },
+  {
+    type: 'ai_summarize',
+    name: 'AI Summarize',
+    description: 'Summarize',
+    category: 'AI',
+    source: 'activity',
+    supportsLoop: true,
+  },
   // Non-activity entries must be filtered out of the catalog.
-  { type: 'shell', name: 'Shell Command', description: 'Run shell', category: 'Automation', source: 'builtin' },
-  { type: 'my_plugin_step', name: 'Plugin Step', description: 'From a plugin', category: 'Plugin', source: 'plugin' },
+  {
+    type: 'shell',
+    name: 'Shell Command',
+    description: 'Run shell',
+    category: 'Automation',
+    source: 'builtin',
+  },
+  {
+    type: 'my_plugin_step',
+    name: 'Plugin Step',
+    description: 'From a plugin',
+    category: 'Plugin',
+    source: 'plugin',
+  },
 ];
 
 describe('ActivityTab', () => {
@@ -48,7 +73,9 @@ describe('ActivityTab', () => {
   });
 
   it('shows an empty state when no activities are registered', async () => {
-    const api = makeApi([{ type: 'shell', name: 'Shell', description: '', category: 'Automation', source: 'builtin' }]);
+    const api = makeApi([
+      { type: 'shell', name: 'Shell', description: '', category: 'Automation', source: 'builtin' },
+    ]);
     render(<ActivityTab api={api as never} />);
     expect(await screen.findByText('No activities registered')).toBeDefined();
   });

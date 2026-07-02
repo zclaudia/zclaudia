@@ -9,7 +9,12 @@ import {
   type TouchEvent as ReactTouchEvent,
 } from 'react';
 import { useFileViewerStore } from '../../stores/fileViewerStore';
-import { Highlight, themes as prismThemes, type PrismTheme, type Token } from 'prism-react-renderer';
+import {
+  Highlight,
+  themes as prismThemes,
+  type PrismTheme,
+  type Token,
+} from 'prism-react-renderer';
 import { List, useListRef, type RowComponentProps, type ListImperativeAPI } from 'react-window';
 import {
   Check,
@@ -34,18 +39,44 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useOwnershipStore } from '../../stores/ownershipStore';
 
 const EXT_TO_LANG: Record<string, string> = {
-  ts: 'typescript', tsx: 'tsx', js: 'javascript', jsx: 'jsx',
-  json: 'json', md: 'markdown', py: 'python', rs: 'rust',
-  go: 'go', sh: 'bash', bash: 'bash', zsh: 'bash',
-  yml: 'yaml', yaml: 'yaml', toml: 'toml',
-  css: 'css', scss: 'scss', less: 'less',
-  html: 'html', xml: 'xml', svg: 'xml',
-  sql: 'sql', graphql: 'graphql',
-  rb: 'ruby', java: 'java', kt: 'kotlin',
-  c: 'c', cpp: 'cpp', h: 'c', hpp: 'cpp',
-  cs: 'csharp', swift: 'swift', m: 'objectivec',
-  lua: 'lua', r: 'r', pl: 'perl',
-  dockerfile: 'docker', makefile: 'makefile',
+  ts: 'typescript',
+  tsx: 'tsx',
+  js: 'javascript',
+  jsx: 'jsx',
+  json: 'json',
+  md: 'markdown',
+  py: 'python',
+  rs: 'rust',
+  go: 'go',
+  sh: 'bash',
+  bash: 'bash',
+  zsh: 'bash',
+  yml: 'yaml',
+  yaml: 'yaml',
+  toml: 'toml',
+  css: 'css',
+  scss: 'scss',
+  less: 'less',
+  html: 'html',
+  xml: 'xml',
+  svg: 'xml',
+  sql: 'sql',
+  graphql: 'graphql',
+  rb: 'ruby',
+  java: 'java',
+  kt: 'kotlin',
+  c: 'c',
+  cpp: 'cpp',
+  h: 'c',
+  hpp: 'cpp',
+  cs: 'csharp',
+  swift: 'swift',
+  m: 'objectivec',
+  lua: 'lua',
+  r: 'r',
+  pl: 'perl',
+  dockerfile: 'docker',
+  makefile: 'makefile',
 };
 
 function detectLanguage(filePath: string): string {
@@ -99,8 +130,10 @@ function CodeRow({
   if (!line) return null;
   const lineNumber = index + 1;
   const inRange =
-    highlightStart != null && highlightEnd != null
-      && lineNumber >= highlightStart && lineNumber <= highlightEnd;
+    highlightStart != null &&
+    highlightEnd != null &&
+    lineNumber >= highlightStart &&
+    lineNumber <= highlightEnd;
   const lineProps = getLineProps({ line });
   const themeBg = (lineProps.style?.backgroundColor as string | undefined) ?? undefined;
   return (
@@ -199,7 +232,7 @@ function VirtualizedCodeView({
 
 function resolveProjectBackendId(projectRoot: string): string | null {
   const projects = useProjectStore.getState().projects;
-  const matchingProject = projects.find((project) => project.rootPath === projectRoot);
+  const matchingProject = projects.find(project => project.rootPath === projectRoot);
   if (!matchingProject) return null;
   return useOwnershipStore.getState().getProjectBackendId(matchingProject.id);
 }
@@ -259,18 +292,26 @@ export function FileViewerActions() {
           type="button"
           onClick={toggleTree}
           className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors flex-shrink-0 ${
-            showFileTree ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+            showFileTree
+              ? 'bg-secondary text-foreground'
+              : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
           }`}
           title={showFileTree ? 'Hide file tree' : 'Show file tree'}
           aria-label={showFileTree ? 'Hide file tree' : 'Show file tree'}
         >
-          {showFileTree ? <PanelLeftClose className="w-3.5 h-3.5" aria-hidden="true" /> : <PanelLeftOpen className="w-3.5 h-3.5" aria-hidden="true" />}
+          {showFileTree ? (
+            <PanelLeftClose className="w-3.5 h-3.5" aria-hidden="true" />
+          ) : (
+            <PanelLeftOpen className="w-3.5 h-3.5" aria-hidden="true" />
+          )}
         </button>
       )}
       <button
         onClick={() => setSearchOpen(!searchOpen)}
         className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors flex-shrink-0 ${
-          searchOpen ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'
+          searchOpen
+            ? 'bg-secondary text-foreground'
+            : 'text-muted-foreground hover:text-foreground'
         } hover:bg-secondary`}
         title="Search files (Cmd+P)"
         aria-label="Search files"
@@ -281,12 +322,18 @@ export function FileViewerActions() {
         <button
           onClick={handleCopy}
           className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors flex-shrink-0 ${
-            copied ? 'text-green-500' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+            copied
+              ? 'text-green-500'
+              : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
           }`}
           title={copied ? 'Copied!' : 'Copy file content'}
           aria-label={copied ? 'Copied file content' : 'Copy file content'}
         >
-          {copied ? <Check className="w-3.5 h-3.5" aria-hidden="true" /> : <Copy className="w-3.5 h-3.5" aria-hidden="true" />}
+          {copied ? (
+            <Check className="w-3.5 h-3.5" aria-hidden="true" />
+          ) : (
+            <Copy className="w-3.5 h-3.5" aria-hidden="true" />
+          )}
         </button>
       )}
       {filePath && !isMobile && (
@@ -296,7 +343,11 @@ export function FileViewerActions() {
           title={isDesktopTauri() ? 'Open in new window' : 'Fullscreen'}
           aria-label={isDesktopTauri() ? 'Open in new window' : 'Fullscreen'}
         >
-          {isDesktopTauri() ? <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" /> : <Maximize2 className="w-3.5 h-3.5" aria-hidden="true" />}
+          {isDesktopTauri() ? (
+            <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+          ) : (
+            <Maximize2 className="w-3.5 h-3.5" aria-hidden="true" />
+          )}
         </button>
       )}
     </div>
@@ -308,9 +359,18 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
   const isMobile = useIsMobile();
   const store = useFileViewerStore();
   const {
-    loading, searchOpen,
-    targetLine, targetEndLine, targetNonce,
-    openFile, setContent, setError, setSearchOpen, showTree, treeWidthPx, setTreeWidthPx,
+    loading,
+    searchOpen,
+    targetLine,
+    targetEndLine,
+    targetNonce,
+    openFile,
+    setContent,
+    setError,
+    setSearchOpen,
+    showTree,
+    treeWidthPx,
+    setTreeWidthPx,
   } = store;
   const treeResizeCleanupRef = useRef<(() => void) | null>(null);
   // Guard: when the store still holds state pointing at a different project
@@ -338,14 +398,20 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
 
     (async () => {
       try {
-        const result = await api.getFileContent({ projectRoot, relativePath: filePath, backendId: fileBackendId });
+        const result = await api.getFileContent({
+          projectRoot,
+          relativePath: filePath,
+          backendId: fileBackendId,
+        });
         if (!cancelled) setContent(result.content);
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load file');
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [fileBackendId, filePath, projectRoot, setContent, setError]);
 
   const handleSearchSelect = (relativePath: string) => {
@@ -366,42 +432,43 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
   const highlightStart = targetLine ?? null;
   const highlightEnd = targetEndLine ?? targetLine ?? null;
   const showFileTree = isMobile ? !filePath : showTree;
-  const contentLayoutClass = isMobile
-    ? (showFileTree ? 'flex flex-col' : 'block')
-    : 'flex';
+  const contentLayoutClass = isMobile ? (showFileTree ? 'flex flex-col' : 'block') : 'flex';
 
   useEffect(() => () => treeResizeCleanupRef.current?.(), []);
 
-  const beginTreeResize = useCallback((event: ReactMouseEvent | ReactTouchEvent) => {
-    if (isMobile) return;
-    const startX = 'touches' in event ? event.touches[0]?.clientX : event.clientX;
-    if (typeof startX !== 'number') return;
-    event.preventDefault();
-    treeResizeCleanupRef.current?.();
+  const beginTreeResize = useCallback(
+    (event: ReactMouseEvent | ReactTouchEvent) => {
+      if (isMobile) return;
+      const startX = 'touches' in event ? event.touches[0]?.clientX : event.clientX;
+      if (typeof startX !== 'number') return;
+      event.preventDefault();
+      treeResizeCleanupRef.current?.();
 
-    const startWidth = treeWidthPx;
-    const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
-      const clientX = 'touches' in moveEvent ? moveEvent.touches[0]?.clientX : moveEvent.clientX;
-      if (typeof clientX !== 'number') return;
-      moveEvent.preventDefault();
-      setTreeWidthPx(startWidth + clientX - startX);
-    };
-    const cleanup = () => {
-      window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('mouseup', cleanup);
-      window.removeEventListener('touchmove', handleMove);
-      window.removeEventListener('touchend', cleanup);
-      window.removeEventListener('touchcancel', cleanup);
-      treeResizeCleanupRef.current = null;
-    };
+      const startWidth = treeWidthPx;
+      const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
+        const clientX = 'touches' in moveEvent ? moveEvent.touches[0]?.clientX : moveEvent.clientX;
+        if (typeof clientX !== 'number') return;
+        moveEvent.preventDefault();
+        setTreeWidthPx(startWidth + clientX - startX);
+      };
+      const cleanup = () => {
+        window.removeEventListener('mousemove', handleMove);
+        window.removeEventListener('mouseup', cleanup);
+        window.removeEventListener('touchmove', handleMove);
+        window.removeEventListener('touchend', cleanup);
+        window.removeEventListener('touchcancel', cleanup);
+        treeResizeCleanupRef.current = null;
+      };
 
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', cleanup);
-    window.addEventListener('touchmove', handleMove, { passive: false });
-    window.addEventListener('touchend', cleanup);
-    window.addEventListener('touchcancel', cleanup);
-    treeResizeCleanupRef.current = cleanup;
-  }, [isMobile, setTreeWidthPx, treeWidthPx]);
+      window.addEventListener('mousemove', handleMove);
+      window.addEventListener('mouseup', cleanup);
+      window.addEventListener('touchmove', handleMove, { passive: false });
+      window.addEventListener('touchend', cleanup);
+      window.addEventListener('touchcancel', cleanup);
+      treeResizeCleanupRef.current = cleanup;
+    },
+    [isMobile, setTreeWidthPx, treeWidthPx]
+  );
 
   // Scroll the virtualized list to the target line when one is set / changed.
   useEffect(() => {
@@ -450,23 +517,26 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
           {/* Read: breadcrumb toolbar */}
           <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-background/95 flex-shrink-0 min-w-0">
             {headerIcon}
-            {filePath && (() => {
-              const { dirs, file } = breadcrumbSegments(filePath);
-              return (
-                <span
-                  className="flex min-w-0 items-center gap-1 text-xs font-mono truncate"
-                  title={filePath}
-                >
-                  {dirs.map((dir, i) => (
-                    <span key={i} className="flex items-center gap-1 text-muted-foreground/80">
-                      <span className="truncate">{dir}</span>
-                      <span aria-hidden="true" className="text-muted-foreground/40">/</span>
-                    </span>
-                  ))}
-                  <span className="truncate text-foreground">{file}</span>
-                </span>
-              );
-            })()}
+            {filePath &&
+              (() => {
+                const { dirs, file } = breadcrumbSegments(filePath);
+                return (
+                  <span
+                    className="flex min-w-0 items-center gap-1 text-xs font-mono truncate"
+                    title={filePath}
+                  >
+                    {dirs.map((dir, i) => (
+                      <span key={i} className="flex items-center gap-1 text-muted-foreground/80">
+                        <span className="truncate">{dir}</span>
+                        <span aria-hidden="true" className="text-muted-foreground/40">
+                          /
+                        </span>
+                      </span>
+                    ))}
+                    <span className="truncate text-foreground">{file}</span>
+                  </span>
+                );
+              })()}
           </div>
 
           {searchOpen && (
@@ -483,7 +553,11 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
               <>
                 <div
                   data-testid="file-tree-pane"
-                  className={isMobile ? 'h-2/5 min-h-[180px] flex-shrink-0 border-b border-border' : 'flex-shrink-0 border-r border-border'}
+                  className={
+                    isMobile
+                      ? 'h-2/5 min-h-[180px] flex-shrink-0 border-b border-border'
+                      : 'flex-shrink-0 border-r border-border'
+                  }
                   style={isMobile ? undefined : { width: `${treeWidthPx}px` }}
                 >
                   <FileTree
@@ -519,8 +593,9 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
                   {error}
                 </div>
               )}
-              {content && !loading && (
-                isMarkdown ? (
+              {content &&
+                !loading &&
+                (isMarkdown ? (
                   <div className="h-full overflow-auto">
                     <MarkdownFileContent content={content} />
                   </div>
@@ -533,8 +608,7 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
                     highlightEnd={highlightEnd}
                     listRef={listRef}
                   />
-                )
-              )}
+                ))}
             </div>
           </div>
         </>

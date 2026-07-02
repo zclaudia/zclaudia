@@ -6,7 +6,7 @@ import {
   classify,
   getOutsideWorkspaceRootsToRemember,
   persistProjectAllowedOutsideWorkspaceRoots,
-  persistSessionRememberedDecision
+  persistSessionRememberedDecision,
 } from '../agent/permission-evaluator.js';
 import { writePermissionLog } from '../agent/permission-log-writer.js';
 import { promoteRuleToProjectOverride } from '../agent/permission-rule-promotion.js';
@@ -15,7 +15,11 @@ import type { ConnectedClient, ActiveRun } from '../transport/types.js';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import type { PermissionBridge } from '../agent/permission-bridge.js';
 import { recomputePhase, computeBlockers } from '../runtime/active-run-phase.js';
-import { createRunDomainEvent, type RunDomainEventType, type RunDomainEventPayloadMap } from '../runtime/run-domain-events.js';
+import {
+  createRunDomainEvent,
+  type RunDomainEventType,
+  type RunDomainEventPayloadMap,
+} from '../runtime/run-domain-events.js';
 import {
   runDomainEventListeners,
   type RunDomainEventListenerRegistry,
@@ -24,14 +28,19 @@ import {
 function broadcastPermissionResolved(
   run: ActiveRun,
   requestId: string,
-  decision: 'allow' | 'deny',
+  decision: 'allow' | 'deny'
 ): void {
   const resolvedEvent = {
     type: 'permission_resolved',
     requestId,
     sessionId: run.sessionId,
     decision,
-  } as ServerMessage & { type: 'permission_resolved'; requestId: string; sessionId: string; decision: string };
+  } as ServerMessage & {
+    type: 'permission_resolved';
+    requestId: string;
+    sessionId: string;
+    decision: string;
+  };
   broadcastRunMessage(run, resolvedEvent);
 }
 
@@ -49,14 +58,18 @@ export function handlePermissionDecision(
   connectedClients: Map<string, ConnectedClient>,
   permissionBridge?: PermissionBridge,
   cancelWorkflowRun?: (runId: string) => void,
-  listeners?: RunDomainEventListenerRegistry,
+  listeners?: RunDomainEventListenerRegistry
 ): void {
-  console.log(`[Permission] Received decision for ${message.requestId}: ${message.allow ? 'allow' : 'deny'}`);
+  console.log(
+    `[Permission] Received decision for ${message.requestId}: ${message.allow ? 'allow' : 'deny'}`
+  );
   console.log(`[Permission] Active runs: ${activeRuns.size}`);
 
   // Find the run with this pending permission
   for (const [runId, run] of activeRuns.entries()) {
-    console.log(`[Permission] Checking run ${runId}, pending permissions: ${run.pendingPermissions.size}`);
+    console.log(
+      `[Permission] Checking run ${runId}, pending permissions: ${run.pendingPermissions.size}`
+    );
     const pending = run.pendingPermissions.get(message.requestId);
     if (pending) {
       // Clear timeout if it was set (timeout is null when timeoutSeconds = 0)
@@ -70,7 +83,8 @@ export function handlePermissionDecision(
       recomputePhase(run, computeBlockers(run));
 
       // Revert to running status after permission resolved
-      run.db.prepare('UPDATE sessions SET last_run_status = ?, updated_at = ? WHERE id = ?')
+      run.db
+        .prepare('UPDATE sessions SET last_run_status = ?, updated_at = ? WHERE id = ?')
         .run('running', Date.now(), run.sessionId);
 
       // If credential was provided (e.g. sudo password), decrypt and rewrite the command
@@ -114,11 +128,7 @@ export function handlePermissionDecision(
           detail,
           message.allow ? 'allow' : 'deny'
         );
-        const rememberKey = buildRememberKey(
-          toolName,
-          pending.originalToolInput,
-          detail
-        );
+        const rememberKey = buildRememberKey(toolName, pending.originalToolInput, detail);
         run.rememberedDecisions.set(rememberKey, message.allow ? 'allow' : 'deny');
         if (message.allow && classify(toolName, pending.originalToolInput, detail) === 'fileRead') {
           const outsideRoots = getOutsideWorkspaceRootsToRemember(
@@ -132,10 +142,14 @@ export function handlePermissionDecision(
             run.allowedOutsideWorkspaceRoots.add(root);
           }
           if (outsideRoots.length > 0) {
-            console.log(`[Permission] Remembered outside-workspace roots ${JSON.stringify(outsideRoots)}`);
+            console.log(
+              `[Permission] Remembered outside-workspace roots ${JSON.stringify(outsideRoots)}`
+            );
           }
         }
-        console.log(`[Permission] Remembered ${message.allow ? 'allow' : 'deny'} for key "${rememberKey}"`);
+        console.log(
+          `[Permission] Remembered ${message.allow ? 'allow' : 'deny'} for key "${rememberKey}"`
+        );
       }
 
       // Promote to a persistent project-level allow rule. Policy is re-read
@@ -145,15 +159,15 @@ export function handlePermissionDecision(
       if (message.allow && message.promoteRule) {
         rulePromoted = promoteRuleToProjectOverride(run.db, run.projectId, message.promoteRule);
         if (rulePromoted) {
-          console.log(`[Permission] Promoted rule "${message.promoteRule}" to project ${run.projectId}`);
+          console.log(
+            `[Permission] Promoted rule "${message.promoteRule}" to project ${run.projectId}`
+          );
         }
       }
 
       const decision: PermissionDecision = {
         behavior: message.allow ? 'allow' : 'deny',
-        message: message.allow
-          ? undefined
-          : (message.feedback?.trim() || 'User denied permission'),
+        message: message.allow ? undefined : message.feedback?.trim() || 'User denied permission',
       };
       if (updatedInput !== undefined) {
         decision.updatedInput = updatedInput;
@@ -164,7 +178,7 @@ export function handlePermissionDecision(
         pending.originalRequest?.toolName ?? 'unknown',
         pending.originalRequest?.detail ?? '',
         message.allow ? 'allow' : 'deny',
-        !!message.remember || rulePromoted,
+        !!message.remember || rulePromoted
       );
       pending.resolve(decision);
 
@@ -180,13 +194,17 @@ export function handlePermissionDecision(
         type: 'permission.resolved',
       });
 
-      console.log(`[Permission] ${message.requestId}: ${message.allow ? 'allowed' : 'denied'} - resolved!`);
+      console.log(
+        `[Permission] ${message.requestId}: ${message.allow ? 'allowed' : 'denied'} - resolved!`
+      );
       return;
     }
   }
 
   // requestId not found — already resolved by another device. Broadcast idempotent resolution.
-  console.warn(`[Permission] Request ${message.requestId} not found in any active run — broadcasting permission_resolved`);
+  console.warn(
+    `[Permission] Request ${message.requestId} not found in any active run — broadcasting permission_resolved`
+  );
   // Find any active run's client to broadcast through (they all share the same virtualClient in gateway mode)
   for (const [, run] of activeRuns.entries()) {
     broadcastPermissionResolved(run, message.requestId, message.allow ? 'allow' : 'deny');
@@ -202,7 +220,7 @@ export function handlePromptAnswer(
   },
   activeRuns: Map<string, ActiveRun>,
   connectedClients: Map<string, ConnectedClient>,
-  listeners?: RunDomainEventListenerRegistry,
+  listeners?: RunDomainEventListenerRegistry
 ): void {
   console.log(`[PromptRequest] Received answer for ${message.requestId}`);
 
@@ -215,7 +233,8 @@ export function handlePromptAnswer(
       recomputePhase(run, computeBlockers(run));
 
       // Revert to running status after question answered
-      run.db.prepare('UPDATE sessions SET last_run_status = ?, updated_at = ? WHERE id = ?')
+      run.db
+        .prepare('UPDATE sessions SET last_run_status = ?, updated_at = ? WHERE id = ?')
         .run('running', Date.now(), run.sessionId);
 
       // Resolve with allow + user's formatted answer. AskUserQuestion is now
@@ -249,7 +268,9 @@ export function handlePromptAnswer(
   }
 
   // requestId not found — already resolved by another device. Broadcast idempotent resolution.
-  console.warn(`[PromptRequest] Request ${message.requestId} not found in any active run — broadcasting interaction_resolved`);
+  console.warn(
+    `[PromptRequest] Request ${message.requestId} not found in any active run — broadcasting interaction_resolved`
+  );
   for (const [, run] of activeRuns.entries()) {
     broadcastRunMessage(run, {
       type: 'interaction_resolved',

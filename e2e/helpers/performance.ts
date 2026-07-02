@@ -56,19 +56,13 @@ export const PERFORMANCE_THRESHOLDS = {
 /**
  * Assert performance threshold
  */
-export function assertPerformance(
-  duration: number,
-  threshold: number,
-  operation: string
-): void {
+export function assertPerformance(duration: number, threshold: number, operation: string): void {
   if (duration > threshold) {
     console.warn(
       `⚠️ Performance warning: ${operation} took ${duration.toFixed(2)}ms (threshold: ${threshold}ms)`
     );
   } else {
-    console.log(
-      `✓ ${operation} within threshold: ${duration.toFixed(2)}ms / ${threshold}ms`
-    );
+    console.log(`✓ ${operation} within threshold: ${duration.toFixed(2)}ms / ${threshold}ms`);
   }
 }
 
@@ -153,7 +147,7 @@ export async function waitForCondition(
     if (await condition()) {
       return true;
     }
-    await new Promise((resolve) => setTimeout(resolve, interval));
+    await new Promise(resolve => setTimeout(resolve, interval));
   }
 
   return false;
@@ -173,11 +167,7 @@ export interface MemorySnapshot {
  * Get memory usage snapshot (requires performance.memory API)
  */
 export function getMemorySnapshot(): MemorySnapshot | null {
-  if (
-    typeof window !== 'undefined' &&
-    'performance' in window &&
-    'memory' in performance
-  ) {
+  if (typeof window !== 'undefined' && 'performance' in window && 'memory' in performance) {
     const mem = (performance as any).memory;
     return {
       usedJSHeapSize: mem.usedJSHeapSize,

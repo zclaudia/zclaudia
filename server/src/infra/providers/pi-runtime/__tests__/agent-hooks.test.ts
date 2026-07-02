@@ -26,8 +26,8 @@ describe('truncateContent', () => {
     const result = truncateContent(content, 'read', 1024);
     expect(result.didTruncate).toBe(true);
     const truncatedText = (result.content[0] as { text: string }).text;
-    expect(truncatedText.startsWith('line 0')).toBe(true);   // head kept
-    expect(truncatedText.includes('line 499')).toBe(false);  // tail dropped
+    expect(truncatedText.startsWith('line 0')).toBe(true); // head kept
+    expect(truncatedText.includes('line 499')).toBe(false); // tail dropped
   });
 
   it('ReadSymbol tool: head truncation keeps the symbol digest header', () => {
@@ -51,8 +51,8 @@ describe('truncateContent', () => {
     const result = truncateContent(content, 'bash', 1024);
     expect(result.didTruncate).toBe(true);
     const truncatedText = (result.content[0] as { text: string }).text;
-    expect(truncatedText.includes('line 499')).toBe(true);   // tail kept
-    expect(truncatedText.startsWith('line 0')).toBe(false);  // head dropped
+    expect(truncatedText.includes('line 499')).toBe(true); // tail kept
+    expect(truncatedText.startsWith('line 0')).toBe(false); // head dropped
   });
 
   it('unknown tool: defaults to tail (matches bash behavior)', () => {
@@ -81,8 +81,8 @@ describe('truncateContent', () => {
   });
 
   it('preserves order of multiple text blocks (head — A first, B second)', () => {
-    const a = 'AAAAA\n'.repeat(100);  // 600 bytes, all A's
-    const b = 'BBBBB\n'.repeat(100);  // 600 bytes, all B's
+    const a = 'AAAAA\n'.repeat(100); // 600 bytes, all A's
+    const b = 'BBBBB\n'.repeat(100); // 600 bytes, all B's
     const content = [
       { type: 'text', text: a },
       { type: 'text', text: b },
@@ -93,15 +93,18 @@ describe('truncateContent', () => {
     // Order is preserved AND each block was independently truncated from its own source
     const t0 = (result.content[0] as { text: string }).text;
     const t1 = (result.content[1] as { text: string }).text;
-    expect(t0).toMatch(/^A+/);            // first block still A's
+    expect(t0).toMatch(/^A+/); // first block still A's
     expect(t0.includes('B')).toBe(false); // no cross-contamination
-    expect(t1).toMatch(/^B+/);            // second block still B's
+    expect(t1).toMatch(/^B+/); // second block still B's
     expect(t1.includes('A')).toBe(false);
   });
 
   it('preserves Read truncation across multiple line-aware boundaries', () => {
     // Use lines with known boundaries — head keeps complete lines
-    const longText = Array.from({ length: 200 }, (_, i) => `line ${i.toString().padStart(3, '0')}`).join('\n');
+    const longText = Array.from(
+      { length: 200 },
+      (_, i) => `line ${i.toString().padStart(3, '0')}`
+    ).join('\n');
     const content = [{ type: 'text', text: longText }];
     const result = truncateContent(content, 'read', 500);
     expect(result.didTruncate).toBe(true);
@@ -109,7 +112,7 @@ describe('truncateContent', () => {
     // pi truncateHead guarantees no mid-line cut (line-aware)
     const lines = truncatedText.split('\n').filter(l => l.startsWith('line '));
     for (const line of lines) {
-      expect(line).toMatch(/^line \d{3}$/);  // exactly 8 chars, no truncation mid-line
+      expect(line).toMatch(/^line \d{3}$/); // exactly 8 chars, no truncation mid-line
     }
   });
 });
@@ -120,11 +123,14 @@ describe('buildAgentHooks.beforeToolCall', () => {
   it('returns undefined when permissionCallback allows', async () => {
     const permissionCallback = vi.fn().mockResolvedValue({ behavior: 'allow' });
     const hooks = buildAgentHooks({ permissionCallback });
-    const result = await hooks.beforeToolCall!({ toolCall: fakeToolCall, args: fakeToolCall.arguments } as any);
+    const result = await hooks.beforeToolCall!({
+      toolCall: fakeToolCall,
+      args: fakeToolCall.arguments,
+    } as any);
     expect(result).toBeUndefined();
     expect(permissionCallback).toHaveBeenCalledOnce();
     const sent = permissionCallback.mock.calls[0][0];
-    expect(sent.toolName).toBe('Read');           // canonical name passed through
+    expect(sent.toolName).toBe('Read'); // canonical name passed through
     expect(typeof sent.requestId).toBe('string');
     expect(sent.requestId.length).toBeGreaterThan(0);
     expect(sent.timeoutSeconds).toBe(0);
@@ -132,17 +138,27 @@ describe('buildAgentHooks.beforeToolCall', () => {
   });
 
   it('returns block:true when permissionCallback denies', async () => {
-    const permissionCallback = vi.fn().mockResolvedValue({ behavior: 'deny', message: 'too risky' });
+    const permissionCallback = vi
+      .fn()
+      .mockResolvedValue({ behavior: 'deny', message: 'too risky' });
     const hooks = buildAgentHooks({ permissionCallback });
-    const result = await hooks.beforeToolCall!({ toolCall: fakeToolCall, args: fakeToolCall.arguments } as any);
+    const result = await hooks.beforeToolCall!({
+      toolCall: fakeToolCall,
+      args: fakeToolCall.arguments,
+    } as any);
     expect(result).toEqual({ block: true, reason: 'too risky' });
     expect(permissionCallback.mock.calls[0][0].toolName).toBe('Read');
   });
 
   it('returns args replacement when permissionCallback returns updatedInput', async () => {
-    const permissionCallback = vi.fn().mockResolvedValue({ behavior: 'allow', updatedInput: { path: '/safer/path' } });
+    const permissionCallback = vi
+      .fn()
+      .mockResolvedValue({ behavior: 'allow', updatedInput: { path: '/safer/path' } });
     const hooks = buildAgentHooks({ permissionCallback });
-    const result = await hooks.beforeToolCall!({ toolCall: fakeToolCall, args: fakeToolCall.arguments } as any);
+    const result = await hooks.beforeToolCall!({
+      toolCall: fakeToolCall,
+      args: fakeToolCall.arguments,
+    } as any);
     expect(result).toEqual({ args: { path: '/safer/path' } });
     expect(permissionCallback.mock.calls[0][0].toolName).toBe('Read');
   });
@@ -150,7 +166,10 @@ describe('buildAgentHooks.beforeToolCall', () => {
   it('falls back to a default deny reason when callback gives no message', async () => {
     const permissionCallback = vi.fn().mockResolvedValue({ behavior: 'deny' });
     const hooks = buildAgentHooks({ permissionCallback });
-    const result = await hooks.beforeToolCall!({ toolCall: fakeToolCall, args: fakeToolCall.arguments } as any);
+    const result = await hooks.beforeToolCall!({
+      toolCall: fakeToolCall,
+      args: fakeToolCall.arguments,
+    } as any);
     expect(result).toEqual({ block: true, reason: 'denied by user' });
   });
 
@@ -179,7 +198,9 @@ describe('buildAgentHooks.beforeToolCall', () => {
   });
 
   it('lets AskUserQuestion execute through its dedicated interaction tool', async () => {
-    const permissionCallback = vi.fn().mockResolvedValue({ behavior: 'deny', message: 'Answer: use WebFetch' });
+    const permissionCallback = vi
+      .fn()
+      .mockResolvedValue({ behavior: 'deny', message: 'Answer: use WebFetch' });
     const hooks = buildAgentHooks({ permissionCallback });
     const result = await hooks.beforeToolCall!({
       toolCall: { id: 'q1', name: 'AskUserQuestion', arguments: {} },
@@ -231,7 +252,6 @@ describe('buildAgentHooks.afterToolCall', () => {
 });
 
 describe('buildAgentHooks Edit flood advisory', () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async function callEdit(hooks: any, filePath: string, ok = true) {
     return hooks.afterToolCall({
       toolCall: { id: 't', name: 'Edit', arguments: {} } as any,
@@ -245,7 +265,9 @@ describe('buildAgentHooks Edit flood advisory', () => {
     });
   }
 
-  function adviceText(result: { content?: Array<{ type: string; text?: string }> } | undefined): string {
+  function adviceText(
+    result: { content?: Array<{ type: string; text?: string }> } | undefined
+  ): string {
     return (result?.content ?? [])
       .filter(b => b.type === 'text' && typeof b.text === 'string' && b.text.startsWith('[fix]'))
       .map(b => b.text!)
@@ -300,7 +322,10 @@ describe('buildAgentHooks Edit flood advisory', () => {
     await hooks.afterToolCall!({
       toolCall: { id: 't', name: 'Write', arguments: {} } as any,
       args: { file_path: 'a.md' },
-      result: { content: [{ type: 'text', text: 'Wrote a.md' }], details: { ok: true, path: 'a.md' } },
+      result: {
+        content: [{ type: 'text', text: 'Wrote a.md' }],
+        details: { ok: true, path: 'a.md' },
+      },
       isError: false,
       context: {} as any,
     } as any);
@@ -421,12 +446,21 @@ describe('buildAgentHooks placeholders', () => {
 
 describe('user hooks integration', () => {
   const allow = () => vi.fn().mockResolvedValue({ behavior: 'allow' });
-  const bashCall = { toolCall: { id: 't1', name: 'Bash', arguments: { command: 'git push' } }, args: { command: 'git push' } };
+  const bashCall = {
+    toolCall: { id: 't1', name: 'Bash', arguments: { command: 'git push' } },
+    args: { command: 'git push' },
+  };
 
   it('PreToolUse exit-2 hook blocks the tool call with stderr reason', async () => {
     const hooks = buildAgentHooks({
       permissionCallback: allow(),
-      userHooks: [{ event: 'PreToolUse', matcher: 'Bash(git *)', command: 'echo "use the release script" >&2; exit 2' }],
+      userHooks: [
+        {
+          event: 'PreToolUse',
+          matcher: 'Bash(git *)',
+          command: 'echo "use the release script" >&2; exit 2',
+        },
+      ],
       cwd: process.cwd(),
     });
     const result = await hooks.beforeToolCall!(bashCall as any);
@@ -434,7 +468,10 @@ describe('user hooks integration', () => {
   });
 
   it('user hooks do not run when permission denies (ordering)', async () => {
-    const marker = path.join(os.tmpdir(), `zc-hook-${process.pid}-${Math.random().toString(36).slice(2)}`);
+    const marker = path.join(
+      os.tmpdir(),
+      `zc-hook-${process.pid}-${Math.random().toString(36).slice(2)}`
+    );
     const hooks = buildAgentHooks({
       permissionCallback: vi.fn().mockResolvedValue({ behavior: 'deny', message: 'no' }),
       userHooks: [{ event: 'PreToolUse', command: `touch "${marker}"` }],
@@ -455,17 +492,23 @@ describe('user hooks integration', () => {
   });
 
   it('hooks receive ORIGINAL args, not the credential-rewritten updatedInput', async () => {
-    const capture = path.join(os.tmpdir(), `zc-hook-cap-${process.pid}-${Math.random().toString(36).slice(2)}.json`);
+    const capture = path.join(
+      os.tmpdir(),
+      `zc-hook-cap-${process.pid}-${Math.random().toString(36).slice(2)}.json`
+    );
     const hooks = buildAgentHooks({
-      permissionCallback: vi.fn().mockResolvedValue({ behavior: 'allow', updatedInput: { command: 'echo SECRETPASS | sudo -S x' } }),
+      permissionCallback: vi.fn().mockResolvedValue({
+        behavior: 'allow',
+        updatedInput: { command: 'echo SECRETPASS | sudo -S x' },
+      }),
       userHooks: [{ event: 'PreToolUse', command: `cat - > "${capture}"` }],
       cwd: process.cwd(),
     });
     const result = await hooks.beforeToolCall!(bashCall as any);
     expect(result).toEqual({ args: { command: 'echo SECRETPASS | sudo -S x' } }); // updatedInput still applied to the TOOL
     const seen = fs.readFileSync(capture, 'utf8');
-    expect(seen).toContain('git push');         // hook saw the original
-    expect(seen).not.toContain('SECRETPASS');   // hook never saw the credential
+    expect(seen).toContain('git push'); // hook saw the original
+    expect(seen).not.toContain('SECRETPASS'); // hook never saw the credential
     fs.rmSync(capture, { force: true });
   });
 
@@ -474,7 +517,10 @@ describe('user hooks integration', () => {
     const result = await hooks.afterToolCall!({
       toolCall: { id: 't1', name: 'Edit', arguments: {} },
       args: {},
-      result: { content: [{ type: 'text', text: 'old_string not found in file' }], details: { ok: false, error: 'not_found' } },
+      result: {
+        content: [{ type: 'text', text: 'old_string not found in file' }],
+        details: { ok: false, error: 'not_found' },
+      },
       isError: false,
       context: {} as any,
     } as any);
@@ -499,7 +545,10 @@ describe('user hooks integration', () => {
     const result = await hooks.afterToolCall!({
       toolCall: { id: 't1', name: 'Edit', arguments: {} },
       args: {},
-      result: { content: [{ type: 'text', text: 'old_string not found in file' }], details: { ok: false, error: 'not_found' } },
+      result: {
+        content: [{ type: 'text', text: 'old_string not found in file' }],
+        details: { ok: false, error: 'not_found' },
+      },
       isError: false,
       context: {} as any,
     } as any);
@@ -509,7 +558,9 @@ describe('user hooks integration', () => {
   it('PostToolUse exit-2 stderr is appended to the tool result content', async () => {
     const hooks = buildAgentHooks({
       permissionCallback: allow(),
-      userHooks: [{ event: 'PostToolUse', command: 'echo "lint failed on changed file" >&2; exit 2' }],
+      userHooks: [
+        { event: 'PostToolUse', command: 'echo "lint failed on changed file" >&2; exit 2' },
+      ],
       cwd: process.cwd(),
     });
     const result = await hooks.afterToolCall!({
@@ -580,10 +631,12 @@ describe('afterToolCall — tool failure loop guard', () => {
 
   it('resets the counter on success so a later identical failure does not nudge', async () => {
     const hooks = makeHooks();
-    await hooks.afterToolCall!(failingCtx() as any);   // count 1
-    await hooks.afterToolCall!(failingCtx() as any);   // count 2
-    await hooks.afterToolCall!({                        // success → reset to 0
-      toolCall: { name: 'Grep' }, args: { pattern: 'TODO', path: 'src' },
+    await hooks.afterToolCall!(failingCtx() as any); // count 1
+    await hooks.afterToolCall!(failingCtx() as any); // count 2
+    await hooks.afterToolCall!({
+      // success → reset to 0
+      toolCall: { name: 'Grep' },
+      args: { pattern: 'TODO', path: 'src' },
       result: { content: [{ type: 'text', text: 'ok' }], details: { ok: true } },
     } as any);
     const after = await hooks.afterToolCall!(failingCtx() as any); // count 1 if reset worked
@@ -602,7 +655,14 @@ describe('afterToolCall — tool failure loop guard', () => {
           ok: false,
           exitCode: 1,
           diagnostics: [
-            { path, line: 1, column: 1, severity: 'error', source: 'TS2322', message: 'Type mismatch' },
+            {
+              path,
+              line: 1,
+              column: 1,
+              severity: 'error',
+              source: 'TS2322',
+              message: 'Type mismatch',
+            },
           ],
         },
       },
@@ -611,7 +671,9 @@ describe('afterToolCall — tool failure loop guard', () => {
     await hooks.afterToolCall!(bashCtx('src/a.ts') as any);
     await hooks.afterToolCall!(bashCtx('src/b.ts') as any);
     const secondA = await hooks.afterToolCall!(bashCtx('src/a.ts') as any);
-    expect((secondA?.content ?? []).map((b: any) => b.text ?? '').join('\n')).not.toContain('[loop]');
+    expect((secondA?.content ?? []).map((b: any) => b.text ?? '').join('\n')).not.toContain(
+      '[loop]'
+    );
 
     const thirdA = await hooks.afterToolCall!(bashCtx('src/a.ts') as any);
     const text = (thirdA?.content ?? []).map((b: any) => b.text ?? '').join('\n');

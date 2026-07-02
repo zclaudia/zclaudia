@@ -110,13 +110,9 @@ describe('DiffViewer component', () => {
 });
 
 describe('UnifiedDiffViewer component', () => {
-  const unifiedDiff = [
-    '--- a/src/app.ts',
-    '+++ b/src/app.ts',
-    '@@ -1 +1 @@',
-    '-old',
-    '+new',
-  ].join('\n');
+  const unifiedDiff = ['--- a/src/app.ts', '+++ b/src/app.ts', '@@ -1 +1 @@', '-old', '+new'].join(
+    '\n'
+  );
 
   it('renders unified diff lines with file name', () => {
     render(<UnifiedDiffViewer diff={unifiedDiff} filePath="src/app.ts" />);
@@ -191,17 +187,19 @@ describe('computeDiff (unit)', () => {
 
 describe('parseUnifiedDiff (unit)', () => {
   it('classifies unified diff syntax lines', () => {
-    const result = parseUnifiedDiff([
-      'diff --git a/a.ts b/a.ts',
-      '--- a/a.ts',
-      '+++ b/a.ts',
-      '@@ -1 +1 @@',
-      '-old',
-      '+new',
-      ' context',
-    ].join('\n'));
+    const result = parseUnifiedDiff(
+      [
+        'diff --git a/a.ts b/a.ts',
+        '--- a/a.ts',
+        '+++ b/a.ts',
+        '@@ -1 +1 @@',
+        '-old',
+        '+new',
+        ' context',
+      ].join('\n')
+    );
 
-    expect(result.map((line) => line.type)).toEqual([
+    expect(result.map(line => line.type)).toEqual([
       'meta',
       'file',
       'file',

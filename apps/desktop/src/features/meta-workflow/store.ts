@@ -1,9 +1,6 @@
 // apps/desktop/src/features/meta-workflow/store.ts
 import { create } from 'zustand';
-import type {
-  MetaWorkflowRun,
-  MetaWorkflowPhase,
-} from '@zclaudia/shared/features/meta-workflow';
+import type { MetaWorkflowRun, MetaWorkflowPhase } from '@zclaudia/shared/features/meta-workflow';
 import type { MetaWorkflowViewState } from './view-state.js';
 import { INITIAL_VIEW_STATE } from './view-state.js';
 
@@ -29,7 +26,11 @@ interface MetaWorkflowStore {
   upsertRun: (run: MetaWorkflowRun) => void;
   setPhases: (runId: RunId, phases: MetaWorkflowPhase[]) => void;
   upsertPhase: (runId: RunId, phase: MetaWorkflowPhase) => void;
-  recordRecommendation: (runId: RunId, phaseId: string, rec: { kind: string; reason: string }) => void;
+  recordRecommendation: (
+    runId: RunId,
+    phaseId: string,
+    rec: { kind: string; reason: string }
+  ) => void;
   setNodePosition: (runId: RunId, nodeId: string, pos: { x: number; y: number }) => void;
   // View
   setView: (projectId: ProjectId, view: MetaWorkflowViewState) => void;
@@ -53,13 +54,13 @@ export const useMetaWorkflowStore = create<MetaWorkflowStore>((set, _get) => ({
   layouts: {},
 
   setRuns: (projectId, runs) => {
-    set((state) => ({ runs: { ...state.runs, [projectId]: runs } }));
+    set(state => ({ runs: { ...state.runs, [projectId]: runs } }));
   },
 
-  upsertRun: (run) => {
-    set((state) => {
+  upsertRun: run => {
+    set(state => {
       const list = state.runs[run.projectId] ?? [];
-      const idx = list.findIndex((r) => r.id === run.id);
+      const idx = list.findIndex(r => r.id === run.id);
       const isNew = idx === -1;
       const nextList = isNew
         ? [run, ...list]
@@ -82,22 +83,21 @@ export const useMetaWorkflowStore = create<MetaWorkflowStore>((set, _get) => ({
   },
 
   setPhases: (runId, phases) => {
-    set((state) => ({ phases: { ...state.phases, [runId]: phases } }));
+    set(state => ({ phases: { ...state.phases, [runId]: phases } }));
   },
 
   upsertPhase: (runId, phase) => {
-    set((state) => {
+    set(state => {
       const list = state.phases[runId] ?? [];
-      const idx = list.findIndex((p) => p.id === phase.id);
-      const next = idx >= 0
-        ? [...list.slice(0, idx), phase, ...list.slice(idx + 1)]
-        : [...list, phase];
+      const idx = list.findIndex(p => p.id === phase.id);
+      const next =
+        idx >= 0 ? [...list.slice(0, idx), phase, ...list.slice(idx + 1)] : [...list, phase];
       return { phases: { ...state.phases, [runId]: next } };
     });
   },
 
   recordRecommendation: (runId, phaseId, rec) => {
-    set((state) => ({
+    set(state => ({
       recommendations: {
         ...state.recommendations,
         [recKey(runId, phaseId)]: { runId, phaseId, kind: rec.kind, reason: rec.reason },
@@ -106,7 +106,7 @@ export const useMetaWorkflowStore = create<MetaWorkflowStore>((set, _get) => ({
   },
 
   setNodePosition: (runId, nodeId, pos) => {
-    set((state) => {
+    set(state => {
       const runLayout = state.layouts[runId] ?? {};
       return {
         layouts: {
@@ -118,11 +118,11 @@ export const useMetaWorkflowStore = create<MetaWorkflowStore>((set, _get) => ({
   },
 
   setView: (projectId, view) => {
-    set((state) => ({ viewByProject: { ...state.viewByProject, [projectId]: view } }));
+    set(state => ({ viewByProject: { ...state.viewByProject, [projectId]: view } }));
   },
 
   patchView: (projectId, patch) => {
-    set((state) => {
+    set(state => {
       const current = state.viewByProject[projectId] ?? INITIAL_VIEW_STATE;
       return {
         viewByProject: {
@@ -133,14 +133,14 @@ export const useMetaWorkflowStore = create<MetaWorkflowStore>((set, _get) => ({
     });
   },
 
-  markPendingSelect: (projectId) => {
-    set((state) => ({
+  markPendingSelect: projectId => {
+    set(state => ({
       pendingSelectByProject: { ...state.pendingSelectByProject, [projectId]: true },
     }));
   },
 
-  clearProject: (projectId) => {
-    set((state) => {
+  clearProject: projectId => {
+    set(state => {
       const { [projectId]: _omitRuns, ...restRuns } = state.runs;
       void _omitRuns;
       const { [projectId]: _omitView, ...restView } = state.viewByProject;

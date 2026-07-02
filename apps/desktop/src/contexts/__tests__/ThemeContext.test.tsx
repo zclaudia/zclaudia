@@ -13,11 +13,21 @@ function ThemeConsumer() {
     <div>
       <span data-testid="theme">{theme}</span>
       <span data-testid="resolved">{resolvedTheme}</span>
-      <button data-testid="set-light" onClick={() => setTheme('light')}>Light</button>
-      <button data-testid="set-dark" onClick={() => setTheme('dark-neutral')}>Dark</button>
-      <button data-testid="set-system" onClick={() => setTheme('system')}>System</button>
-      <button data-testid="set-warm" onClick={() => setTheme('dark-warm')}>Warm</button>
-      <button data-testid="set-cool" onClick={() => setTheme('dark-cool')}>Cool</button>
+      <button data-testid="set-light" onClick={() => setTheme('light')}>
+        Light
+      </button>
+      <button data-testid="set-dark" onClick={() => setTheme('dark-neutral')}>
+        Dark
+      </button>
+      <button data-testid="set-system" onClick={() => setTheme('system')}>
+        System
+      </button>
+      <button data-testid="set-warm" onClick={() => setTheme('dark-warm')}>
+        Warm
+      </button>
+      <button data-testid="set-cool" onClick={() => setTheme('dark-cool')}>
+        Cool
+      </button>
     </div>
   );
 }
@@ -29,7 +39,7 @@ describe('ThemeContext', () => {
     // Reset document classes
     document.documentElement.classList.remove('dark', 'dark-neutral', 'dark-warm', 'dark-cool');
     // Ensure matchMedia returns false (light mode) by default
-    vi.mocked(window.matchMedia).mockImplementation((query) => ({
+    vi.mocked(window.matchMedia).mockImplementation(query => ({
       matches: false,
       media: query,
       onchange: null,
@@ -79,7 +89,7 @@ describe('ThemeContext', () => {
     });
 
     it('resolves system theme to light when prefers-color-scheme is light', () => {
-      vi.mocked(window.matchMedia).mockImplementation((query) => ({
+      vi.mocked(window.matchMedia).mockImplementation(query => ({
         matches: false, // light mode
         media: query,
         onchange: null,
@@ -99,7 +109,7 @@ describe('ThemeContext', () => {
     });
 
     it('resolves system theme to dark-neutral when prefers-color-scheme is dark', () => {
-      vi.mocked(window.matchMedia).mockImplementation((query) => ({
+      vi.mocked(window.matchMedia).mockImplementation(query => ({
         matches: true, // dark mode
         media: query,
         onchange: null,

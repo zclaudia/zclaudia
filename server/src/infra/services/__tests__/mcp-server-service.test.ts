@@ -74,8 +74,12 @@ describe('McpServerService', () => {
     const service = new McpServerService(db, () => 1234);
     service.createServer({ name: 'srv', command: 'node' });
 
-    expect(() => service.createServer({ name: 'srv', command: 'node' })).toThrowError(McpServerServiceError);
-    expect(() => service.updateServer('missing', { name: 'x' })).toThrowError(McpServerServiceError);
+    expect(() => service.createServer({ name: 'srv', command: 'node' })).toThrowError(
+      McpServerServiceError
+    );
+    expect(() => service.updateServer('missing', { name: 'x' })).toThrowError(
+      McpServerServiceError
+    );
     expect(() => service.deleteServer('missing')).toThrowError(McpServerServiceError);
   });
 
@@ -144,36 +148,44 @@ describe('McpServerService', () => {
       },
     } as any);
 
-    expect(created).toEqual(expect.objectContaining({
-      name: 'remote-github',
-      command: '',
-      transport: 'streamable-http',
-      url: 'https://mcp.example.com/mcp',
-      headers: { 'X-Zoom-Region': 'us01' },
-      headersHelper: 'node ./headers-helper.js',
-      oauthConfig: expect.objectContaining({
-        enabled: true,
-        authorizationEndpoint: 'https://auth.example.com/oauth/authorize',
-        tokenEndpoint: 'https://auth.example.com/oauth/token',
-        deviceAuthorizationEndpoint: 'https://auth.example.com/oauth/device',
-        clientId: 'zclaudia-client',
-        clientSecret: 'client-secret',
-        scopes: ['repo', 'read:user'],
-      }),
-      oauthCredentials: expect.objectContaining({
+    expect(created).toEqual(
+      expect.objectContaining({
+        name: 'remote-github',
+        command: '',
+        transport: 'streamable-http',
+        url: 'https://mcp.example.com/mcp',
+        headers: { 'X-Zoom-Region': 'us01' },
+        headersHelper: 'node ./headers-helper.js',
+        oauthConfig: expect.objectContaining({
+          enabled: true,
+          authorizationEndpoint: 'https://auth.example.com/oauth/authorize',
+          tokenEndpoint: 'https://auth.example.com/oauth/token',
+          deviceAuthorizationEndpoint: 'https://auth.example.com/oauth/device',
+          clientId: 'zclaudia-client',
+          clientSecret: 'client-secret',
+          scopes: ['repo', 'read:user'],
+        }),
+        oauthCredentials: expect.objectContaining({
+          accessToken: 'access-token',
+          refreshToken: 'refresh-token',
+          tokenType: 'Bearer',
+          expiresAt: 2000,
+          scope: 'repo read:user',
+        }),
+      })
+    );
+
+    expect(
+      service.updateServer(created.id, { description: 'keep oauth' }).oauthCredentials
+    ).toEqual(
+      expect.objectContaining({
         accessToken: 'access-token',
         refreshToken: 'refresh-token',
-        tokenType: 'Bearer',
-        expiresAt: 2000,
-        scope: 'repo read:user',
-      }),
-    }));
-
-    expect(service.updateServer(created.id, { description: 'keep oauth' }).oauthCredentials).toEqual(expect.objectContaining({
-      accessToken: 'access-token',
-      refreshToken: 'refresh-token',
-    }));
-    expect(service.updateServer(created.id, { description: 'keep helper' }).headersHelper).toBe('node ./headers-helper.js');
+      })
+    );
+    expect(service.updateServer(created.id, { description: 'keep helper' }).headersHelper).toBe(
+      'node ./headers-helper.js'
+    );
 
     const updated = service.updateServer(created.id, {
       headersHelper: null,
@@ -211,49 +223,65 @@ describe('McpServerService', () => {
       },
     } as any);
 
-    const raw = db.prepare('SELECT oauth_credentials FROM mcp_servers WHERE id = ?').get(created.id) as { oauth_credentials: string };
+    const raw = db
+      .prepare('SELECT oauth_credentials FROM mcp_servers WHERE id = ?')
+      .get(created.id) as { oauth_credentials: string };
     expect(raw.oauth_credentials).toMatch(/^zclaudia:v1:/);
     expect(raw.oauth_credentials).not.toContain('access-token-at-rest');
     expect(raw.oauth_credentials).not.toContain('refresh-token-at-rest');
 
-    expect(service.listServers().find((server) => server.id === created.id)?.oauthCredentials).toEqual(expect.objectContaining({
-      accessToken: 'access-token-at-rest',
-      refreshToken: 'refresh-token-at-rest',
-      tokenType: 'Bearer',
-      expiresAt: 2000,
-    }));
+    expect(
+      service.listServers().find(server => server.id === created.id)?.oauthCredentials
+    ).toEqual(
+      expect.objectContaining({
+        accessToken: 'access-token-at-rest',
+        refreshToken: 'refresh-token-at-rest',
+        tokenType: 'Bearer',
+        expiresAt: 2000,
+      })
+    );
 
     service.updateOAuthCredentials('secure-remote', {
       accessToken: 'fresh-access-token-at-rest',
       refreshToken: 'fresh-refresh-token-at-rest',
       tokenType: 'Bearer',
     });
-    const refreshed = db.prepare('SELECT oauth_credentials FROM mcp_servers WHERE id = ?').get(created.id) as { oauth_credentials: string };
+    const refreshed = db
+      .prepare('SELECT oauth_credentials FROM mcp_servers WHERE id = ?')
+      .get(created.id) as { oauth_credentials: string };
     expect(refreshed.oauth_credentials).toMatch(/^zclaudia:v1:/);
     expect(refreshed.oauth_credentials).not.toContain('fresh-access-token-at-rest');
     expect(refreshed.oauth_credentials).not.toContain('fresh-refresh-token-at-rest');
-    expect(service.findEnabledServerByName('secure-remote')?.oauthCredentials).toEqual(expect.objectContaining({
-      accessToken: 'fresh-access-token-at-rest',
-      refreshToken: 'fresh-refresh-token-at-rest',
-    }));
+    expect(service.findEnabledServerByName('secure-remote')?.oauthCredentials).toEqual(
+      expect.objectContaining({
+        accessToken: 'fresh-access-token-at-rest',
+        refreshToken: 'fresh-refresh-token-at-rest',
+      })
+    );
   });
 
   it('continues reading legacy plaintext MCP OAuth credentials', () => {
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO mcp_servers (
         id, name, command, enabled, source, transport, url, oauth_credentials, created_at, updated_at
       ) VALUES ('legacy', 'legacy-remote', '', 1, 'user', 'streamable-http', 'https://mcp.example.com/mcp', ?, 1000, 1000)
-    `).run(JSON.stringify({
-      accessToken: 'legacy-access-token',
-      refreshToken: 'legacy-refresh-token',
-      tokenType: 'Bearer',
-    }));
+    `
+    ).run(
+      JSON.stringify({
+        accessToken: 'legacy-access-token',
+        refreshToken: 'legacy-refresh-token',
+        tokenType: 'Bearer',
+      })
+    );
     const service = new McpServerService(db, () => 1234);
 
-    expect(service.findEnabledServerByName('legacy-remote')?.oauthCredentials).toEqual(expect.objectContaining({
-      accessToken: 'legacy-access-token',
-      refreshToken: 'legacy-refresh-token',
-      tokenType: 'Bearer',
-    }));
+    expect(service.findEnabledServerByName('legacy-remote')?.oauthCredentials).toEqual(
+      expect.objectContaining({
+        accessToken: 'legacy-access-token',
+        refreshToken: 'legacy-refresh-token',
+        tokenType: 'Bearer',
+      })
+    );
   });
 });

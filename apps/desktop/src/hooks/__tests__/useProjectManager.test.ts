@@ -74,9 +74,7 @@ describe('hooks/useProjectManager', () => {
 
   describe('internal refresh', () => {
     it('fetches projects and updates store after add', async () => {
-      const mockProjects = [
-        { id: 'project-1', name: 'Project 1', path: '/path/1' },
-      ];
+      const mockProjects = [{ id: 'project-1', name: 'Project 1', path: '/path/1' }];
       mockCreateProject.mockResolvedValueOnce({ id: 'new-project' });
       mockGetProjects.mockResolvedValueOnce(mockProjects);
 
@@ -158,9 +156,9 @@ describe('hooks/useProjectManager', () => {
 
       const { result } = renderHook(() => useProjectManager());
 
-      await expect(
-        result.current.updateProject('project-1', { name: 'Test' })
-      ).rejects.toThrow('Update failed');
+      await expect(result.current.updateProject('project-1', { name: 'Test' })).rejects.toThrow(
+        'Update failed'
+      );
     });
   });
 
@@ -183,9 +181,7 @@ describe('hooks/useProjectManager', () => {
 
       const { result } = renderHook(() => useProjectManager());
 
-      await expect(
-        result.current.deleteProject('project-1')
-      ).rejects.toThrow('Delete failed');
+      await expect(result.current.deleteProject('project-1')).rejects.toThrow('Delete failed');
     });
   });
 

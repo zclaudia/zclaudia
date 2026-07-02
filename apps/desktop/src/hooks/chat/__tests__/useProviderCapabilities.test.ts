@@ -88,10 +88,7 @@ describe('useProviderCapabilities', () => {
         '/test',
         expect.any(Object)
       );
-      expect(api.getProviderTypeCapabilities).toHaveBeenCalledWith(
-        'zclaudia',
-        expect.any(Object)
-      );
+      expect(api.getProviderTypeCapabilities).toHaveBeenCalledWith('zclaudia', expect.any(Object));
     });
 
     expect(result.current.llmProfileId).toBeUndefined();
@@ -102,7 +99,10 @@ describe('useProviderCapabilities', () => {
       expect.objectContaining({ defaultModeId: 'plan' })
     );
     // Capabilities arrive for an unset session → setMode seeded from defaultModeId.
-    expect((useSessionConfigStore.getState() as any).setMode).toHaveBeenCalledWith('sess-1', 'plan');
+    expect((useSessionConfigStore.getState() as any).setMode).toHaveBeenCalledWith(
+      'sess-1',
+      'plan'
+    );
   });
 
   it('loads provider-specific metadata when session resolves to agent → llm-profile', async () => {
@@ -132,7 +132,9 @@ describe('useProviderCapabilities', () => {
 
     useLlmProfileMetaStore.setState({
       providersByBackend: {
-        local: [{ id: 'prov-1', name: 'Claude', providerType: 'claude', createdAt: 0, updatedAt: 0 }],
+        local: [
+          { id: 'prov-1', name: 'Claude', providerType: 'claude', createdAt: 0, updatedAt: 0 },
+        ],
       },
       providerCommands: {},
       providerCapabilities: {},
@@ -143,20 +145,15 @@ describe('useProviderCapabilities', () => {
     );
 
     await waitFor(() => {
-      expect(api.getProviderCommands).toHaveBeenCalledWith(
-        'prov-1',
-        '/test',
-        expect.any(Object)
-      );
-      expect(api.getProviderCapabilities).toHaveBeenCalledWith(
-        'prov-1',
-        expect.any(Object)
-      );
+      expect(api.getProviderCommands).toHaveBeenCalledWith('prov-1', '/test', expect.any(Object));
+      expect(api.getProviderCapabilities).toHaveBeenCalledWith('prov-1', expect.any(Object));
     });
 
     expect(result.current.llmProfileId).toBe('prov-1');
     expect(useLlmProfileMetaStore.getState().providerCommands['local:prov-1']).toEqual(
-      expect.arrayContaining([{ command: '/provider', description: 'provider', source: 'provider' }])
+      expect.arrayContaining([
+        { command: '/provider', description: 'provider', source: 'provider' },
+      ])
     );
     expect(useLlmProfileMetaStore.getState().providerCapabilities['local:prov-1']).toEqual(
       expect.objectContaining({ defaultModeId: 'code' })
@@ -164,9 +161,7 @@ describe('useProviderCapabilities', () => {
   });
 
   it('does not fetch metadata when disconnected', async () => {
-    renderHook(() =>
-      useProviderCapabilities({ sessionId: 'sess-1', isConnected: false })
-    );
+    renderHook(() => useProviderCapabilities({ sessionId: 'sess-1', isConnected: false }));
 
     await Promise.resolve();
 
@@ -177,9 +172,7 @@ describe('useProviderCapabilities', () => {
   it('does not fetch metadata when backend data is stale', async () => {
     useProjectStore.setState({ dataServerId: 'remote' } as any);
 
-    renderHook(() =>
-      useProviderCapabilities({ sessionId: 'sess-1', isConnected: true })
-    );
+    renderHook(() => useProviderCapabilities({ sessionId: 'sess-1', isConnected: true }));
 
     await Promise.resolve();
 

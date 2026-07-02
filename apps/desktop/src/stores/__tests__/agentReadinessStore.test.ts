@@ -16,7 +16,10 @@ describe('agentReadinessStore', () => {
   it('refresh() stores the fetched readiness', async () => {
     getAgentReadiness.mockResolvedValue({ usable: false, reason: 'no_credential' });
     await useAgentReadinessStore.getState().refresh();
-    expect(useAgentReadinessStore.getState().readiness).toEqual({ usable: false, reason: 'no_credential' });
+    expect(useAgentReadinessStore.getState().readiness).toEqual({
+      usable: false,
+      reason: 'no_credential',
+    });
   });
 
   it('refresh() fails open (usable:true) when the API throws', async () => {

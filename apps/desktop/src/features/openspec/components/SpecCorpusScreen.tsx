@@ -14,9 +14,9 @@ interface Props {
 }
 
 export function SpecCorpusScreen({ projectId }: Props): React.ReactElement {
-  const corpus = useOpenSpecStore((s) => s.corpusByProject[projectId] ?? []);
-  const setCorpus = useOpenSpecStore((s) => s.setCorpus);
-  const patchView = useOpenSpecStore((s) => s.patchView);
+  const corpus = useOpenSpecStore(s => s.corpusByProject[projectId] ?? []);
+  const setCorpus = useOpenSpecStore(s => s.setCorpus);
+  const patchView = useOpenSpecStore(s => s.patchView);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,8 +25,8 @@ export function SpecCorpusScreen({ projectId }: Props): React.ReactElement {
     setError(null);
     api
       .listCorpus(projectId)
-      .then((items) => setCorpus(projectId, items))
-      .catch((e) => setError((e as Error).message))
+      .then(items => setCorpus(projectId, items))
+      .catch(e => setError((e as Error).message))
       .finally(() => setLoading(false));
   }, [projectId, setCorpus]);
 
@@ -69,7 +69,7 @@ export function SpecCorpusScreen({ projectId }: Props): React.ReactElement {
       )}
       {corpus.length > 0 && (
         <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {corpus.map((c) => (
+          {corpus.map(c => (
             <li key={c.capability} className="border border-border rounded-md p-3 bg-card">
               <div className="font-medium text-sm">{c.capability}</div>
               <div className="text-xs text-muted-foreground mt-1">

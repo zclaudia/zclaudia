@@ -44,8 +44,8 @@ describe('ContextUsageCard', () => {
     expect(screen.getByText('Skills')).toBeInTheDocument();
     expect(screen.getByText('Messages')).toBeInTheDocument();
     expect(screen.getByText('Free space')).toBeInTheDocument();
-    expect(screen.getByText('~2.9k')).toBeInTheDocument();   // estimated → ~ prefix
-    expect(screen.getByText('174.1k')).toBeInTheDocument();  // free space → no prefix
+    expect(screen.getByText('~2.9k')).toBeInTheDocument(); // estimated → ~ prefix
+    expect(screen.getByText('174.1k')).toBeInTheDocument(); // free space → no prefix
   });
 
   it('drops the translucent inline chrome in the bare variant (opaque host owns the surface)', () => {
@@ -76,7 +76,7 @@ describe('ContextUsageCard', () => {
             messages: { tokens: 0, estimated: true, clamped: true },
           },
         })}
-      />,
+      />
     );
     expect(screen.getByText(/estimates exceeded real usage/i)).toBeInTheDocument();
     expect(screen.getByText(/no completed run yet/i)).toBeInTheDocument();
@@ -88,7 +88,9 @@ describe('ContextUsageCard', () => {
   });
 
   it('shows an actionable hint for the openai-compat default', () => {
-    render(<ContextUsageCard usage={makePayload({ contextWindowSource: 'openai_compat_default' })} />);
+    render(
+      <ContextUsageCard usage={makePayload({ contextWindowSource: 'openai_compat_default' })} />
+    );
     expect(screen.getByText(/openai-compat 128,000 default/i)).toBeInTheDocument();
   });
 

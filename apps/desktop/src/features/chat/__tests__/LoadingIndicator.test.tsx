@@ -15,11 +15,7 @@ describe('LoadingIndicator Time Display', () => {
 
   it('should not render when isLoading is false', () => {
     const { container } = render(
-      <LoadingIndicator
-        isLoading={false}
-        startedAt={Date.now()}
-        lastActivityAt={Date.now()}
-      />
+      <LoadingIndicator isLoading={false} startedAt={Date.now()} lastActivityAt={Date.now()} />
     );
 
     expect(container.firstChild).toBeNull();
@@ -27,11 +23,7 @@ describe('LoadingIndicator Time Display', () => {
 
   it('should render when isLoading is true', () => {
     render(
-      <LoadingIndicator
-        isLoading={true}
-        startedAt={Date.now()}
-        lastActivityAt={Date.now()}
-      />
+      <LoadingIndicator isLoading={true} startedAt={Date.now()} lastActivityAt={Date.now()} />
     );
 
     expect(screen.getByText(/Thinking/)).toBeInTheDocument();
@@ -40,13 +32,7 @@ describe('LoadingIndicator Time Display', () => {
   it('should display total time correctly', () => {
     const now = Date.now();
     const startedAt = now - 5000; // 5 seconds ago
-    render(
-      <LoadingIndicator
-        isLoading={true}
-        startedAt={startedAt}
-        lastActivityAt={now}
-      />
-    );
+    render(<LoadingIndicator isLoading={true} startedAt={startedAt} lastActivityAt={now} />);
 
     // Initial render shows 5s — both total and idle may match, use getAllByText
     expect(screen.getAllByText(/5s/).length).toBeGreaterThanOrEqual(1);
@@ -57,11 +43,7 @@ describe('LoadingIndicator Time Display', () => {
     const startedAt = now - 10000;
     const lastActivityAt = now - 5000; // 5 seconds idle
     render(
-      <LoadingIndicator
-        isLoading={true}
-        startedAt={startedAt}
-        lastActivityAt={lastActivityAt}
-      />
+      <LoadingIndicator isLoading={true} startedAt={startedAt} lastActivityAt={lastActivityAt} />
     );
 
     // Initial render shows idle: 5s (no need to advance timers)
@@ -72,11 +54,7 @@ describe('LoadingIndicator Time Display', () => {
     const startedAt = Date.now() - 2000;
     const lastActivityAt = Date.now() - 2000;
     render(
-      <LoadingIndicator
-        isLoading={true}
-        startedAt={startedAt}
-        lastActivityAt={lastActivityAt}
-      />
+      <LoadingIndicator isLoading={true} startedAt={startedAt} lastActivityAt={lastActivityAt} />
     );
 
     act(() => {
@@ -89,13 +67,7 @@ describe('LoadingIndicator Time Display', () => {
   it('should format minutes and seconds correctly', () => {
     const now = Date.now();
     const startedAt = now - 65000; // 1m 5s ago
-    render(
-      <LoadingIndicator
-        isLoading={true}
-        startedAt={startedAt}
-        lastActivityAt={now}
-      />
-    );
+    render(<LoadingIndicator isLoading={true} startedAt={startedAt} lastActivityAt={now} />);
 
     // Initial render shows 1m 5s — both total and idle may match, use getAllByText
     expect(screen.getAllByText(/1m 5s/).length).toBeGreaterThanOrEqual(1);
@@ -106,11 +78,7 @@ describe('LoadingIndicator Time Display', () => {
     const startedAt = now - 125000; // 2m 5s ago
     const lastActivityAt = now - 65000; // 1m 5s idle
     render(
-      <LoadingIndicator
-        isLoading={true}
-        startedAt={startedAt}
-        lastActivityAt={lastActivityAt}
-      />
+      <LoadingIndicator isLoading={true} startedAt={startedAt} lastActivityAt={lastActivityAt} />
     );
 
     // Initial render shows idle: 1m 5s (no need to advance timers)
@@ -119,13 +87,7 @@ describe('LoadingIndicator Time Display', () => {
 
   it('should update time every second', () => {
     const startedAt = Date.now();
-    render(
-      <LoadingIndicator
-        isLoading={true}
-        startedAt={startedAt}
-        lastActivityAt={startedAt}
-      />
-    );
+    render(<LoadingIndicator isLoading={true} startedAt={startedAt} lastActivityAt={startedAt} />);
 
     act(() => {
       vi.advanceTimersByTime(1000);
@@ -229,11 +191,7 @@ describe('LoadingIndicator Time Display', () => {
   it('should clear timers when unmounted', () => {
     const startedAt = Date.now();
     const { unmount } = render(
-      <LoadingIndicator
-        isLoading={true}
-        startedAt={startedAt}
-        lastActivityAt={startedAt}
-      />
+      <LoadingIndicator isLoading={true} startedAt={startedAt} lastActivityAt={startedAt} />
     );
 
     unmount();
@@ -245,14 +203,37 @@ describe('LoadingIndicator Time Display', () => {
   });
 
   it('shows retry banner with status text and attempt counter', () => {
-    render(<LoadingIndicator isLoading retryStatus={{ sessionId: 's', attempt: 2, maxAttempts: 5, delayMs: 8000, status: 429, receivedAt: Date.now() }} />);
+    render(
+      <LoadingIndicator
+        isLoading
+        retryStatus={{
+          sessionId: 's',
+          attempt: 2,
+          maxAttempts: 5,
+          delayMs: 8000,
+          status: 429,
+          receivedAt: Date.now(),
+        }}
+      />
+    );
     const banner = screen.getByRole('status');
     expect(banner.textContent).toMatch(/Rate limited \(429\)/);
     expect(banner.textContent).toMatch(/\(2\/5\)/);
   });
 
   it('shows connection-failure wording when status is absent', () => {
-    render(<LoadingIndicator isLoading retryStatus={{ sessionId: 's', attempt: 3, maxAttempts: 5, delayMs: 2000, receivedAt: Date.now() }} />);
+    render(
+      <LoadingIndicator
+        isLoading
+        retryStatus={{
+          sessionId: 's',
+          attempt: 3,
+          maxAttempts: 5,
+          delayMs: 2000,
+          receivedAt: Date.now(),
+        }}
+      />
+    );
     const banner = screen.getByRole('status');
     expect(banner.textContent).toMatch(/Connection failed/);
     expect(banner.textContent).toMatch(/\(3\/5\)/);

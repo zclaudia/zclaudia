@@ -76,9 +76,9 @@ describe('search-history', () => {
         saveSearchHistory(db, `query-${i}`, i, 'user1');
       }
 
-      const count = db.prepare(
-        'SELECT COUNT(*) as cnt FROM search_history WHERE user_id = ?'
-      ).get('user1') as { cnt: number };
+      const count = db
+        .prepare('SELECT COUNT(*) as cnt FROM search_history WHERE user_id = ?')
+        .get('user1') as { cnt: number };
       expect(count.cnt).toBe(50);
     });
 
@@ -88,9 +88,9 @@ describe('search-history', () => {
       }
       saveSearchHistory(db, 'other-query', 1, 'user2');
 
-      const countUser2 = db.prepare(
-        'SELECT COUNT(*) as cnt FROM search_history WHERE user_id = ?'
-      ).get('user2') as { cnt: number };
+      const countUser2 = db
+        .prepare('SELECT COUNT(*) as cnt FROM search_history WHERE user_id = ?')
+        .get('user2') as { cnt: number };
       expect(countUser2.cnt).toBe(1);
     });
   });

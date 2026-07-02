@@ -18,7 +18,12 @@ import { WorkflowStepRunRepository } from './workflow-step-run-repository.js';
 import { ProjectRepository } from '../projects/repository.js';
 import { resolveAgentForSession, NoAgentAvailableError } from '../agent-profiles/agent-resolver.js';
 import { renderConfig, type RenderContext } from './template-renderer.js';
-import type { StepExecutorPort, StepResult, StepContext, ApprovalPort } from './ports/step-executor.js';
+import type {
+  StepExecutorPort,
+  StepResult,
+  StepContext,
+  ApprovalPort,
+} from './ports/step-executor.js';
 import type { Database } from 'better-sqlite3';
 import { WorkflowRunAggregate } from './run-aggregate.js';
 import { EventDispatcher } from '../supervision/event-dispatcher.js';
@@ -49,17 +54,23 @@ export class WorkflowEngine implements ApprovalPort {
   private projectRepo: ProjectRepository;
   private activeRuns = new Map<string, Set<string>>();
   private runEventPayloads = new Map<string, Record<string, unknown>>();
-  private pendingApprovals = new Map<string, {
-    resolve: (approved: boolean) => void;
-    timeout: NodeJS.Timeout;
-  }>();
+  private pendingApprovals = new Map<
+    string,
+    {
+      resolve: (approved: boolean) => void;
+      timeout: NodeJS.Timeout;
+    }
+  >();
   readonly dispatcher: EventDispatcher<WorkflowRunEvent>;
 
   constructor(
     private db: Database,
-    private broadcastFn: (projectId: string | undefined, message: ServerMessage | { type: string; [key: string]: unknown }) => void,
+    private broadcastFn: (
+      projectId: string | undefined,
+      message: ServerMessage | { type: string; [key: string]: unknown }
+    ) => void,
     private stepExecutor: StepExecutorPort,
-    dispatcher?: EventDispatcher<WorkflowRunEvent>,
+    dispatcher?: EventDispatcher<WorkflowRunEvent>
   ) {
     this.runRepo = new WorkflowRunRepository(db);
     this.stepRunRepo = new WorkflowStepRunRepository(db);
@@ -67,7 +78,7 @@ export class WorkflowEngine implements ApprovalPort {
     this.dispatcher = dispatcher ?? new EventDispatcher<WorkflowRunEvent>();
 
     // Register broadcastRunUpdate as a wildcard event handler
-    this.dispatcher.onAny((event) => {
+    this.dispatcher.onAny(event => {
       this.broadcastRunUpdate(event.projectId, event.runId);
     });
   }
@@ -104,7 +115,7 @@ export class WorkflowEngine implements ApprovalPort {
   async waitForApproval(stepRunId: string, timeoutMs: number): Promise<boolean> {
     this.stepRunRepo.update(stepRunId, { status: 'waiting' });
 
-    return new Promise<boolean>((resolve) => {
+    return new Promise<boolean>(resolve => {
       const timeout = setTimeout(() => {
         this.pendingApprovals.delete(stepRunId);
         resolve(false);
@@ -123,15 +134,24 @@ export class WorkflowEngine implements ApprovalPort {
 
   // ── DAG Validation ───────────────────────────────────────────
 
-  validateDAG(nodes: WorkflowNodeDef[], edges: WorkflowEdgeDef[]): { valid: boolean; error?: string } {
+  validateDAG(
+    nodes: WorkflowNodeDef[],
+    edges: WorkflowEdgeDef[]
+  ): { valid: boolean; error?: string } {
     const nodeIds = new Set(nodes.map(n => n.id));
 
     for (const edge of edges) {
       if (!nodeIds.has(edge.source)) {
-        return { valid: false, error: `Edge "${edge.id}" references unknown source node "${edge.source}"` };
+        return {
+          valid: false,
+          error: `Edge "${edge.id}" references unknown source node "${edge.source}"`,
+        };
       }
       if (!nodeIds.has(edge.target)) {
-        return { valid: false, error: `Edge "${edge.id}" references unknown target node "${edge.target}"` };
+        return {
+          valid: false,
+          error: `Edge "${edge.id}" references unknown target node "${edge.target}"`,
+        };
       }
       if (edge.source === edge.target) {
         return { valid: false, error: `Edge "${edge.id}" is a self-loop on node "${edge.source}"` };
@@ -188,7 +208,7 @@ export class WorkflowEngine implements ApprovalPort {
     currentNodeId: string,
     result: StepResult,
     adjacency: Map<string, WorkflowEdgeDef[]>,
-    nodeDef: WorkflowNodeDef,
+    nodeDef: WorkflowNodeDef
   ): string | null {
     const edges = adjacency.get(currentNodeId) ?? [];
 
@@ -204,7 +224,10 @@ export class WorkflowEngine implements ApprovalPort {
       return errorEdge?.target ?? null;
     }
 
-    if (result.status === 'completed' || (result.status === 'failed' && nodeDef.onError === 'skip')) {
+    if (
+      result.status === 'completed' ||
+      (result.status === 'failed' && nodeDef.onError === 'skip')
+    ) {
       const nextEdge = edges.find(e => e.type === 'success') ?? edges.find(e => e.type === 'loop');
       return nextEdge?.target ?? null;
     }
@@ -215,7 +238,7 @@ export class WorkflowEngine implements ApprovalPort {
   private getMaxVisitsForNode(
     targetNodeId: string,
     sourceNodeId: string | null,
-    adjacency: Map<string, WorkflowEdgeDef[]>,
+    adjacency: Map<string, WorkflowEdgeDef[]>
   ): number {
     if (!sourceNodeId) return 1;
     const edges = adjacency.get(sourceNodeId) ?? [];
@@ -268,7 +291,7 @@ export class WorkflowEngine implements ApprovalPort {
         actionKind: opts.actionKind,
         actionRef: opts.actionRef,
         triggerDetail: opts.triggerDetail,
-      },
+      }
     );
     const run = agg.snapshot;
 
@@ -302,7 +325,7 @@ export class WorkflowEngine implements ApprovalPort {
       }
     }
     this.executeGraph(agg, definition, project?.rootPath, traceLlmId, triggerData)
-      .catch((err) => {
+      .catch(err => {
         console.error(`[Workflow] Run ${run.id} failed:`, err);
         const currentRun = this.runRepo.findById(run.id);
         if (currentRun && currentRun.status === 'running') {
@@ -329,7 +352,7 @@ export class WorkflowEngine implements ApprovalPort {
     definition: WorkflowDefinition,
     projectRootPath?: string,
     llmProfileId?: string,
-    triggerData?: RunTriggerContext,
+    triggerData?: RunTriggerContext
   ): Promise<void> {
     const run = agg.snapshot;
     const ctx: ExecutionContext = {
@@ -360,8 +383,9 @@ export class WorkflowEngine implements ApprovalPort {
       const maxAllowedVisits = this.getMaxVisitsForNode(currentNodeId, previousNodeId, adjacency);
       if (currentVisits >= maxAllowedVisits) {
         if (maxAllowedVisits > 1 && previousNodeId) {
-          const exhaustedEdge = (adjacency.get(previousNodeId) ?? [])
-            .find(e => e.type === 'loop_exhausted');
+          const exhaustedEdge = (adjacency.get(previousNodeId) ?? []).find(
+            e => e.type === 'loop_exhausted'
+          );
           if (exhaustedEdge) {
             previousNodeId = currentNodeId;
             currentNodeId = exhaustedEdge.target;
@@ -420,7 +444,7 @@ export class WorkflowEngine implements ApprovalPort {
   private async executeStep(
     nodeDef: WorkflowNodeDef,
     ctx: ExecutionContext,
-    runId: string,
+    runId: string
   ): Promise<StepResult> {
     const { agg } = ctx;
     const stepRun = this.stepRunRepo.findByRunAndStep(runId, nodeDef.id);
@@ -514,7 +538,7 @@ export class WorkflowEngine implements ApprovalPort {
   resolveConfig(
     config: Record<string, unknown>,
     results: Map<string, StepResult>,
-    ctx?: ExecutionContext,
+    ctx?: ExecutionContext
   ): Record<string, unknown> {
     const resolvedLegacy = this.deepResolveTemplate(config, results);
 
@@ -533,7 +557,7 @@ export class WorkflowEngine implements ApprovalPort {
 
   private deepResolveTemplate(
     obj: Record<string, unknown>,
-    results: Map<string, StepResult>,
+    results: Map<string, StepResult>
   ): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj)) {
@@ -543,10 +567,11 @@ export class WorkflowEngine implements ApprovalPort {
         result[key] = this.deepResolveTemplate(value as Record<string, unknown>, results);
       } else if (Array.isArray(value)) {
         result[key] = value.map(item =>
-          typeof item === 'string' ? this.resolveTemplate(item, results)
-          : item != null && typeof item === 'object' && !Array.isArray(item)
-            ? this.deepResolveTemplate(item as Record<string, unknown>, results)
-            : item
+          typeof item === 'string'
+            ? this.resolveTemplate(item, results)
+            : item != null && typeof item === 'object' && !Array.isArray(item)
+              ? this.deepResolveTemplate(item as Record<string, unknown>, results)
+              : item
         );
       } else {
         result[key] = value;

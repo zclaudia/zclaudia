@@ -45,7 +45,11 @@ describe('AgentLoopContextRepository', () => {
       policy: 'step-local',
       key: 'permission:req-1',
     });
-    repo.appendEvent({ contextId: first.contextId, kind: 'assistant_message', payload: { text: 'old' } });
+    repo.appendEvent({
+      contextId: first.contextId,
+      kind: 'assistant_message',
+      payload: { text: 'old' },
+    });
 
     const second = repo.resolveContextForRun({
       owner: { type: 'workflow_run', id: 'run-1' },
@@ -80,7 +84,7 @@ describe('AgentLoopContextRepository', () => {
     repo.appendEvent({ contextId: resolved.contextId, kind: 'input', payload: { seq: 1 } });
     repo.appendEvent({ contextId: resolved.contextId, kind: 'input', payload: { seq: 2 } });
 
-    expect(repo.loadEvents(resolved.contextId).map((event) => event.payload.seq)).toEqual([1, 2]);
+    expect(repo.loadEvents(resolved.contextId).map(event => event.payload.seq)).toEqual([1, 2]);
   });
 
   it('loads the latest event window in insertion order', () => {
@@ -102,6 +106,6 @@ describe('AgentLoopContextRepository', () => {
       maxEvents: 2,
     });
 
-    expect(replay.loadedEvents.map((event) => event.payload.seq)).toEqual([3, 4]);
+    expect(replay.loadedEvents.map(event => event.payload.seq)).toEqual([3, 4]);
   });
 });

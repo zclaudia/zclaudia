@@ -57,7 +57,12 @@ describe('isValidTransition', () => {
 
   it('terminal phases have no valid transitions', () => {
     for (const from of ['completed', 'cancelled', 'failed'] as RunPhase[]) {
-      for (const to of ['running', 'awaiting_permission', 'cancelling', 'completed'] as RunPhase[]) {
+      for (const to of [
+        'running',
+        'awaiting_permission',
+        'cancelling',
+        'completed',
+      ] as RunPhase[]) {
         expect(isValidTransition(from, to)).toBe(false);
       }
     }
@@ -86,18 +91,25 @@ describe('PhaseEmitter', () => {
     const e = new PhaseEmitter();
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const good = vi.fn();
-    e.onChange(() => { throw new Error('boom'); });
+    e.onChange(() => {
+      throw new Error('boom');
+    });
     e.onChange(good);
     e.emit('completed', 'running');
     expect(good).toHaveBeenCalled();
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('PhaseEmitter'), expect.any(Error));
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('PhaseEmitter'),
+      expect.any(Error)
+    );
     warnSpy.mockRestore();
   });
 });
 
 describe('setPhase', () => {
   const originalNodeEnv = process.env.NODE_ENV;
-  afterEach(() => { process.env.NODE_ENV = originalNodeEnv; });
+  afterEach(() => {
+    process.env.NODE_ENV = originalNodeEnv;
+  });
 
   it('same phase is a noop (no emit)', () => {
     const h = makeHolder('running');
@@ -128,7 +140,7 @@ describe('setPhase', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const h = makeHolder('completed');
     setPhase(h, 'running');
-    expect(h.phase).toBe('completed');  // unchanged
+    expect(h.phase).toBe('completed'); // unchanged
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('illegal phase transition'));
     warnSpy.mockRestore();
   });
@@ -147,32 +159,52 @@ describe('setPhase', () => {
 describe('recomputePhase', () => {
   it('prefers cancelling over everything else', () => {
     const h = makeHolder('running');
-    recomputePhase(h, { isCancelling: true, hasPendingPermissions: true, hasPendingFollowups: true });
+    recomputePhase(h, {
+      isCancelling: true,
+      hasPendingPermissions: true,
+      hasPendingFollowups: true,
+    });
     expect(h.phase).toBe('cancelling');
   });
 
   it('prefers awaiting_permission over followup', () => {
     const h = makeHolder('running');
-    recomputePhase(h, { isCancelling: false, hasPendingPermissions: true, hasPendingFollowups: true });
+    recomputePhase(h, {
+      isCancelling: false,
+      hasPendingPermissions: true,
+      hasPendingFollowups: true,
+    });
     expect(h.phase).toBe('awaiting_permission');
   });
 
   it('falls back to running when no blockers', () => {
     const h = makeHolder('awaiting_permission');
-    recomputePhase(h, { isCancelling: false, hasPendingPermissions: false, hasPendingFollowups: false });
+    recomputePhase(h, {
+      isCancelling: false,
+      hasPendingPermissions: false,
+      hasPendingFollowups: false,
+    });
     expect(h.phase).toBe('running');
   });
 
   it('terminal phases are sticky (no-op)', () => {
     const h = makeHolder('completed');
-    recomputePhase(h, { isCancelling: true, hasPendingPermissions: true, hasPendingFollowups: true });
+    recomputePhase(h, {
+      isCancelling: true,
+      hasPendingPermissions: true,
+      hasPendingFollowups: true,
+    });
     expect(h.phase).toBe('completed');
   });
 });
 
 describe('waitForIdle', () => {
-  beforeEach(() => { vi.useFakeTimers(); });
-  afterEach(() => { vi.useRealTimers(); });
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it('resolves synchronously if already terminal', async () => {
     const h = makeHolder('completed');

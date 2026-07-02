@@ -18,20 +18,20 @@ function freshDb(): Database.Database {
   db.prepare(`INSERT INTO projects (id) VALUES (?)`).run('proj-1');
   db.prepare(
     `INSERT INTO meta_workflow_runs (id, project_id, title, status, reject_count, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
   ).run('run-1', 'proj-1', 't', 'executing', 0, 0, 0);
   return db;
 }
 
 const phaseDef: PhaseDef = {
-  id: 'p1', name: 'Echo', description: 'echo something',
+  id: 'p1',
+  name: 'Echo',
+  description: 'echo something',
   phaseType: 'code-implement',
   dependsOn: [],
   inputs: [],
   outputs: [{ kind: 'commit', description: 'commit' }],
-  acceptanceGates: [
-    { id: 'g1', description: 'ok', command: 'true', expect: { exitCode: 0 } },
-  ],
+  acceptanceGates: [{ id: 'g1', description: 'ok', command: 'true', expect: { exitCode: 0 } }],
 };
 
 describe('MetaPhaseExecutor', () => {
@@ -49,7 +49,7 @@ describe('MetaPhaseExecutor', () => {
     const phase = agg.instantiate('run-1', phaseDef);
     const executor = new MetaPhaseExecutor({
       aggregate: agg,
-      runEntity: async () => ({ exitOk: true }),  // pretend the workflow ran fine
+      runEntity: async () => ({ exitOk: true }), // pretend the workflow ran fine
     });
     const result = await executor.execute(phase.id, phaseDef, workdir);
     expect(result.phase.status).toBe('done');
@@ -94,13 +94,20 @@ describe('MetaPhaseExecutor', () => {
   });
 
   it('uses subagent path for investigation phaseType', async () => {
-    const invDef: PhaseDef = { ...phaseDef, id: 'p2', phaseType: 'investigation',
-                               outputs: [{ kind: 'file', path: 'rep.md', description: 'rep' }] };
+    const invDef: PhaseDef = {
+      ...phaseDef,
+      id: 'p2',
+      phaseType: 'investigation',
+      outputs: [{ kind: 'file', path: 'rep.md', description: 'rep' }],
+    };
     const phase = agg.instantiate('run-1', invDef);
     let seenEntityKind: string | undefined;
     const executor = new MetaPhaseExecutor({
       aggregate: agg,
-      runEntity: async (entity) => { seenEntityKind = entity.kind; return { exitOk: true }; },
+      runEntity: async entity => {
+        seenEntityKind = entity.kind;
+        return { exitOk: true };
+      },
     });
     await executor.execute(phase.id, invDef, workdir);
     expect(seenEntityKind).toBe('subagent');
@@ -113,7 +120,7 @@ describe('MetaPhaseExecutor', () => {
     const phase = agg.instantiate('run-1', phaseDef);
     const artifactRepo = {
       findLatestByPhase: vi.fn().mockReturnValue(null),
-      create: vi.fn().mockImplementation((data) => ({ id: 'a1', ...data })),
+      create: vi.fn().mockImplementation(data => ({ id: 'a1', ...data })),
     };
     const executor = new MetaPhaseExecutor({
       aggregate: agg,
@@ -137,7 +144,7 @@ describe('MetaPhaseExecutor', () => {
     const phase = agg.instantiate('run-1', failPhase);
     const artifactRepo = {
       findLatestByPhase: vi.fn().mockReturnValue(null),
-      create: vi.fn().mockImplementation((data) => ({ id: 'a1', ...data })),
+      create: vi.fn().mockImplementation(data => ({ id: 'a1', ...data })),
     };
     const executor = new MetaPhaseExecutor({
       aggregate: agg,

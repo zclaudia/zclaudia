@@ -24,13 +24,13 @@ export const usePromptRequestStore = create<PromptRequestState>((set, get) => ({
   pendingRequests: [],
   pendingRequest: null,
 
-  setPendingRequest: (request) => {
+  setPendingRequest: request => {
     if (!request) {
       set({ pendingRequests: [], pendingRequest: null });
       return;
     }
-    set((state) => {
-      if (state.pendingRequests.some((r) => r.requestId === request.requestId)) {
+    set(state => {
+      if (state.pendingRequests.some(r => r.requestId === request.requestId)) {
         return state;
       }
       const updated = [...state.pendingRequests, request];
@@ -41,30 +41,29 @@ export const usePromptRequestStore = create<PromptRequestState>((set, get) => ({
     });
   },
 
-  clearAllRequests: () =>
-    set({ pendingRequests: [], pendingRequest: null }),
+  clearAllRequests: () => set({ pendingRequests: [], pendingRequest: null }),
 
-  clearRequestById: (requestId) =>
-    set((state) => {
-      const remaining = state.pendingRequests.filter((r) => r.requestId !== requestId);
+  clearRequestById: requestId =>
+    set(state => {
+      const remaining = state.pendingRequests.filter(r => r.requestId !== requestId);
       return {
         pendingRequests: remaining,
         pendingRequest: remaining[0] || null,
       };
     }),
 
-  clearRequestsForServer: (serverId) =>
-    set((state) => {
-      const remaining = state.pendingRequests.filter((r) => r.serverId !== serverId);
+  clearRequestsForServer: serverId =>
+    set(state => {
+      const remaining = state.pendingRequests.filter(r => r.serverId !== serverId);
       return {
         pendingRequests: remaining,
         pendingRequest: remaining[0] || null,
       };
     }),
 
-  clearRequestsForSession: (sessionId) =>
-    set((state) => {
-      const remaining = state.pendingRequests.filter((r) => r.sessionId !== sessionId);
+  clearRequestsForSession: sessionId =>
+    set(state => {
+      const remaining = state.pendingRequests.filter(r => r.sessionId !== sessionId);
       return {
         pendingRequests: remaining,
         pendingRequest: remaining[0] || null,
@@ -72,13 +71,13 @@ export const usePromptRequestStore = create<PromptRequestState>((set, get) => ({
     }),
 
   clearStaleRequests: (serverId, validIds) =>
-    set((state) => {
+    set(state => {
       const hasStale = state.pendingRequests.some(
-        (r) => r.serverId === serverId && !validIds.has(r.requestId),
+        r => r.serverId === serverId && !validIds.has(r.requestId)
       );
       if (!hasStale) return state;
       const remaining = state.pendingRequests.filter(
-        (r) => r.serverId !== serverId || validIds.has(r.requestId),
+        r => r.serverId !== serverId || validIds.has(r.requestId)
       );
       return {
         pendingRequests: remaining,

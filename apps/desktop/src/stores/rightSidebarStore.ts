@@ -10,8 +10,7 @@ const MIN_WIDTH_FRACTION = 0.15;
 const MAX_WIDTH_FRACTION = 0.5;
 const MIN_WIDTH_PX = 240; // usability floor, applied as CSS min-width
 
-const clampFraction = (f: number) =>
-  Math.max(MIN_WIDTH_FRACTION, Math.min(MAX_WIDTH_FRACTION, f));
+const clampFraction = (f: number) => Math.max(MIN_WIDTH_FRACTION, Math.min(MAX_WIDTH_FRACTION, f));
 
 interface RightSidebarState {
   /** Panel width as a fraction (0..1) of the container width. */
@@ -36,8 +35,8 @@ export const useRightSidebarStore = create<RightSidebarState>()(
       // or a pinned tool tab, keeping the chat full-width until the user wants tools.
       collapsed: true,
       unread: false,
-      setWidthFraction: (fraction) => set({ widthFraction: clampFraction(fraction) }),
-      setCollapsed: (collapsed) => set(collapsed ? { collapsed } : { collapsed, unread: false }),
+      setWidthFraction: fraction => set({ widthFraction: clampFraction(fraction) }),
+      setCollapsed: collapsed => set(collapsed ? { collapsed } : { collapsed, unread: false }),
       toggleCollapsed: () => {
         const next = !get().collapsed;
         set(next ? { collapsed: next } : { collapsed: next, unread: false });
@@ -53,7 +52,10 @@ export const useRightSidebarStore = create<RightSidebarState>()(
       // window width so existing users keep a comparable starting size.
       // v2 drops the obsolete `activeTab` field (now handled by rightWorkspaceStore).
       migrate: (persisted, version) => {
-        const state = (persisted ?? {}) as Partial<RightSidebarState> & { widthPx?: number; activeTab?: unknown };
+        const state = (persisted ?? {}) as Partial<RightSidebarState> & {
+          widthPx?: number;
+          activeTab?: unknown;
+        };
         let result = { ...state };
         if (version < 1 && typeof state.widthPx === 'number') {
           const ref = typeof window !== 'undefined' ? window.innerWidth : 1460;
@@ -64,12 +66,12 @@ export const useRightSidebarStore = create<RightSidebarState>()(
         const { activeTab: _dropped, ...clean } = result as typeof result & { activeTab?: unknown };
         return clean as RightSidebarState;
       },
-      partialize: (state) => ({
+      partialize: state => ({
         widthFraction: state.widthFraction,
         collapsed: state.collapsed,
       }),
-    },
-  ),
+    }
+  )
 );
 
 export const RIGHT_SIDEBAR_LIMITS = {

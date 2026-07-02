@@ -15,7 +15,7 @@ export interface PhaseDomainEventRun {
 
 export function attachRunPhaseDomainEventEmitter(
   run: PhaseDomainEventRun,
-  listeners: RunDomainEventListenerRegistry = runDomainEventListeners,
+  listeners: RunDomainEventListenerRegistry = runDomainEventListeners
 ): () => void {
   return run.phaseEmitter.onChange((next: RunPhase, prev: RunPhase) => {
     const event = createRunDomainEvent({

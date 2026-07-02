@@ -1,5 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { Project, LlmProfileConfig, UnifiedPermissionPolicy, PermissionCategory, CategoryAction, CategoryProfile, Workflow, UserHookDefinition } from '@zclaudia/shared';
+import type {
+  Project,
+  LlmProfileConfig,
+  UnifiedPermissionPolicy,
+  PermissionCategory,
+  CategoryAction,
+  CategoryProfile,
+  Workflow,
+  UserHookDefinition,
+} from '@zclaudia/shared';
 import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -24,7 +33,12 @@ const CATEGORY_LABELS: Record<PermissionCategory, { label: string; description: 
 };
 
 const CATEGORY_ORDER: PermissionCategory[] = [
-  'fileRead', 'fileWrite', 'shellSafe', 'networkOps', 'destructiveOps', 'userQuestions',
+  'fileRead',
+  'fileWrite',
+  'shellSafe',
+  'networkOps',
+  'destructiveOps',
+  'userQuestions',
 ];
 
 const ACTION_OPTIONS: Array<{ value: CategoryAction | 'inherit'; label: string }> = [
@@ -43,36 +57,39 @@ interface ProjectSettingsProps {
 }
 
 export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsProps) {
-  const activeServerId = useServerStore((s) => s.activeServerId);
-  const facadeConnectionState = useFacadeStore((s) => s.connectionState);
-  const facadeBackends = useFacadeStore((s) => s.backends);
+  const activeServerId = useServerStore(s => s.activeServerId);
+  const facadeConnectionState = useFacadeStore(s => s.connectionState);
+  const facadeBackends = useFacadeStore(s => s.backends);
   const isConnected = isMobileBackendUsable({
     backendId: activeServerId,
     connectionState: facadeConnectionState,
     backends: facadeBackends,
   });
-  const legacyProviders = useProjectStore((s) => s.providers);
+  const legacyProviders = useProjectStore(s => s.providers);
   const { updateProject } = useProjectStore();
 
   // Supervisor state
-  const supervisorAgent = useSupervisionStore((s) => project ? s.agents[project.id] : undefined);
-  const setAgent = useSupervisionStore((s) => s.setAgent);
-  const removeAgent = useSupervisionStore((s) => s.removeAgent);
+  const supervisorAgent = useSupervisionStore(s => (project ? s.agents[project.id] : undefined));
+  const setAgent = useSupervisionStore(s => s.setAgent);
+  const removeAgent = useSupervisionStore(s => s.removeAgent);
   const [projectWorkspaceLoading, setProjectWorkspaceLoading] = useState(false);
 
-  const scopedProviders = useLlmProfileMetaStore((s) => s.getProviders(activeServerId));
+  const scopedProviders = useLlmProfileMetaStore(s => s.getProviders(activeServerId));
   const storeProviders = scopedProviders.length > 0 ? scopedProviders : legacyProviders;
   const [providers, setProviders] = useState<LlmProfileConfig[]>(storeProviders ?? []);
 
   // Agent profiles for the Default Agent picker
-  const agentProfilesById = useAgentProfileMetaStore((s) => s.profiles);
-  const agentLoaded = useAgentProfileMetaStore((s) => s.loaded);
-  const agentLoading = useAgentProfileMetaStore((s) => s.loading);
-  const loadAllAgents = useAgentProfileMetaStore((s) => s.loadAll);
+  const agentProfilesById = useAgentProfileMetaStore(s => s.profiles);
+  const agentLoaded = useAgentProfileMetaStore(s => s.loaded);
+  const agentLoading = useAgentProfileMetaStore(s => s.loading);
+  const loadAllAgents = useAgentProfileMetaStore(s => s.loadAll);
   const agents = Object.values(agentProfilesById);
 
   const [saving, setSaving] = useState(false);
-  const [saveFeedback, setSaveFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [saveFeedback, setSaveFeedback] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
   const closeTimeoutRef = useRef<number | null>(null);
 
   // Form state
@@ -205,12 +222,13 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
     try {
       const workflows = await listAllWorkflows();
       setWorkflowOptions(
-        workflows.filter((workflow) =>
-          workflow.status === 'active'
-          && !workflow.isSystem
-          && workflow.templateId !== PERMISSION_FALLBACK_TEMPLATE_ID
-          && (!workflow.projectId || workflow.projectId === project.id)
-        ),
+        workflows.filter(
+          workflow =>
+            workflow.status === 'active' &&
+            !workflow.isSystem &&
+            workflow.templateId !== PERMISSION_FALLBACK_TEMPLATE_ID &&
+            (!workflow.projectId || workflow.projectId === project.id)
+        )
       );
     } catch (error) {
       console.error('Failed to load permission workflows:', error);
@@ -306,7 +324,12 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
             className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -321,7 +344,7 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
             <input
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={e => setName(e.target.value)}
               className="w-full px-3 py-2 bg-input border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary"
             />
           </div>
@@ -334,7 +357,7 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
             <input
               type="text"
               value={rootPath}
-              onChange={(e) => setRootPath(e.target.value)}
+              onChange={e => setRootPath(e.target.value)}
               placeholder="/path/to/project"
               className="w-full px-3 py-2 bg-input border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary font-mono"
             />
@@ -355,14 +378,15 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
               size="lg"
               options={[
                 { value: '', label: 'No default — use global default' },
-                ...agents.map((agent) => ({
+                ...agents.map(agent => ({
                   value: agent.id,
                   label: `${agent.name}${agent.isDefault ? ' (global default)' : ''}`,
                 })),
               ]}
             />
             <p className="text-xs text-muted-foreground mt-1">
-              New sessions in this project will use this agent by default. Leave blank to use the global default agent.
+              New sessions in this project will use this agent by default. Leave blank to use the
+              global default agent.
             </p>
           </div>
 
@@ -378,14 +402,15 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
               size="lg"
               options={[
                 { value: '', label: 'Same as Project Provider' },
-                ...(providers ?? []).map((provider) => ({
+                ...(providers ?? []).map(provider => ({
                   value: provider.id,
                   label: `${provider.name} (${provider.providerType})${provider.isDefault ? ' - Default' : ''}`,
                 })),
               ]}
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Provider used for AI review of Local Pull Requests. Defaults to the project provider above.
+              Provider used for AI review of Local Pull Requests. Defaults to the project provider
+              above.
             </p>
           </div>
 
@@ -396,7 +421,7 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
             </label>
             <textarea
               value={systemPrompt}
-              onChange={(e) => setSystemPrompt(e.target.value)}
+              onChange={e => setSystemPrompt(e.target.value)}
               placeholder="You are a helpful assistant..."
               rows={4}
               className="w-full px-3 py-2 bg-input border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary resize-none"
@@ -417,14 +442,17 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
               size="lg"
               options={[
                 { value: '', label: 'Inherit global or system fallback' },
-                ...workflowOptions.map((workflow) => ({
+                ...workflowOptions.map(workflow => ({
                   value: workflow.id,
-                  label: workflow.projectId ? `[Project] ${workflow.name}` : `[Global] ${workflow.name}`,
+                  label: workflow.projectId
+                    ? `[Project] ${workflow.name}`
+                    : `[Global] ${workflow.name}`,
                 })),
               ]}
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Project override takes precedence over the global override. If unavailable, the system fallback still runs.
+              Project override takes precedence over the global override. If unavailable, the system
+              fallback still runs.
             </p>
           </div>
 
@@ -460,16 +488,16 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
             </div>
 
             {!hasOverride && (
-              <p className="text-xs text-muted-foreground/70 italic">
-                Using global default policy
-              </p>
+              <p className="text-xs text-muted-foreground/70 italic">Using global default policy</p>
             )}
 
             {hasOverride && (
               <div className="space-y-2 mt-3 pl-3 border-l-2 border-primary/30">
-                <p className="text-xs font-medium text-muted-foreground mb-1">Permission Categories</p>
+                <p className="text-xs font-medium text-muted-foreground mb-1">
+                  Permission Categories
+                </p>
                 <div className="border border-border rounded-lg px-3 pb-2 pt-0.5 space-y-0.5">
-                  {CATEGORY_ORDER.map((cat) => {
+                  {CATEGORY_ORDER.map(cat => {
                     const info = CATEGORY_LABELS[cat];
                     const isLocked = cat === 'userQuestions';
                     const currentValue = permOverride.profile?.[cat];
@@ -478,22 +506,33 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
                       <div key={cat} className="flex items-center justify-between py-1">
                         <div className="min-w-0 mr-3">
                           <span className="text-xs font-medium">{info.label}</span>
-                          <p className="text-[10px] text-muted-foreground truncate">{info.description}</p>
+                          <p className="text-[10px] text-muted-foreground truncate">
+                            {info.description}
+                          </p>
                         </div>
                         <Select
                           value={isLocked ? 'ask' : (currentValue ?? 'inherit')}
-                          onChange={(val) => {
+                          onChange={val => {
                             if (val === 'inherit') {
-                              const newProfile = { ...permOverride.profile } as Record<string, CategoryAction>;
+                              const newProfile = { ...permOverride.profile } as Record<
+                                string,
+                                CategoryAction
+                              >;
                               delete newProfile[cat];
                               setPermOverride(prev => ({
                                 ...prev,
-                                profile: Object.keys(newProfile).length > 0 ? newProfile as CategoryProfile : undefined,
+                                profile:
+                                  Object.keys(newProfile).length > 0
+                                    ? (newProfile as CategoryProfile)
+                                    : undefined,
                               }));
                             } else {
                               setPermOverride(prev => ({
                                 ...prev,
-                                profile: { ...prev.profile, [cat]: val as CategoryAction } as CategoryProfile,
+                                profile: {
+                                  ...prev.profile,
+                                  [cat]: val as CategoryAction,
+                                } as CategoryProfile,
                               }));
                             }
                           }}
@@ -511,11 +550,13 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
                 <div className="mt-3">
                   <p className="text-xs font-medium text-muted-foreground mb-1">
                     Tool Rules
-                    <span className="ml-1 font-normal">(project rules replace global rules entirely)</span>
+                    <span className="ml-1 font-normal">
+                      (project rules replace global rules entirely)
+                    </span>
                   </p>
                   <ToolRuleList
                     rules={permOverride.customRules ?? []}
-                    onChange={(customRules) => setPermOverride((prev) => ({ ...prev, customRules }))}
+                    onChange={customRules => setPermOverride(prev => ({ ...prev, customRules }))}
                   />
                 </div>
               </div>
@@ -525,7 +566,9 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
           {/* Hooks (project-level additive) */}
           <div className="border-t border-border pt-4">
             <label className="block text-sm font-medium text-muted-foreground">Hooks</label>
-            <p className="text-xs text-muted-foreground mt-0.5 mb-2">Project hooks run in addition to global hooks.</p>
+            <p className="text-xs text-muted-foreground mt-0.5 mb-2">
+              Project hooks run in addition to global hooks.
+            </p>
             <HookList hooks={projHooks} onChange={setProjHooks} />
           </div>
 
@@ -565,11 +608,15 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
               <div className="space-y-2 mt-3 pl-3 border-l-2 border-primary/30">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium text-muted-foreground">Status:</span>
-                  <span className={`text-xs font-medium ${
-                    effectiveAgent.phase === 'active' ? 'text-green-500' :
-                    effectiveAgent.phase === 'paused' ? 'text-yellow-500' :
-                    'text-muted-foreground'
-                  }`}>
+                  <span
+                    className={`text-xs font-medium ${
+                      effectiveAgent.phase === 'active'
+                        ? 'text-green-500'
+                        : effectiveAgent.phase === 'paused'
+                          ? 'text-yellow-500'
+                          : 'text-muted-foreground'
+                    }`}
+                  >
                     {effectiveAgent.phase.charAt(0).toUpperCase() + effectiveAgent.phase.slice(1)}
                   </span>
                   {effectiveAgent.phase === 'active' && (
@@ -577,7 +624,10 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
                   )}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Mode: {(effectiveAgent.mode ?? 'full') === 'lite' ? 'Workflow Runner' : 'Full Supervisor'}
+                  Mode:{' '}
+                  {(effectiveAgent.mode ?? 'full') === 'lite'
+                    ? 'Workflow Runner'
+                    : 'Full Supervisor'}
                 </div>
               </div>
             )}

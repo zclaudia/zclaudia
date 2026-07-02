@@ -46,8 +46,8 @@ describe('handleOpenSpecMessage', () => {
     await vi.waitFor(() => expect(spy).toHaveBeenCalledWith('sc1'));
     await vi.waitFor(() =>
       expect(useOpenSpecStore.getState().executorsBySpecChange.sc1?.[0]?.statusSummary).toBe(
-        'executing',
-      ),
+        'executing'
+      )
     );
   });
 
@@ -75,7 +75,7 @@ describe('handleOpenSpecMessage', () => {
     expect(handleOpenSpecMessage(msg)).toBe(true);
     await vi.waitFor(() => expect(spy).toHaveBeenCalledWith('i1'));
     await vi.waitFor(() =>
-      expect(useOpenSpecStore.getState().issuesByProject.p1?.[0]?.status).toBe('planning'),
+      expect(useOpenSpecStore.getState().issuesByProject.p1?.[0]?.status).toBe('planning')
     );
   });
 
@@ -106,7 +106,7 @@ describe('handleOpenSpecMessage', () => {
     expect(handleOpenSpecMessage(msg)).toBe(true);
     await vi.waitFor(() => expect(spy).toHaveBeenCalledWith('sc1'));
     await vi.waitFor(() =>
-      expect(useOpenSpecStore.getState().specChangesById.sc1?.status).toBe('tasks_ready'),
+      expect(useOpenSpecStore.getState().specChangesById.sc1?.status).toBe('tasks_ready')
     );
   });
 

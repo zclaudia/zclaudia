@@ -29,14 +29,14 @@ export function shouldRegenerateTitle(input: {
 export function pickTitleWindow(messages: Message[], maxRecent = 8): Message[] {
   if (messages.length <= maxRecent + 1) return messages;
   const recent = messages.slice(-maxRecent);
-  const firstUser = messages.find((m) => m.role === 'user');
+  const firstUser = messages.find(m => m.role === 'user');
   return firstUser && !recent.includes(firstUser) ? [firstUser, ...recent] : recent;
 }
 
 export function extractTitle(content: AssistantMessage['content']): string {
   return content
     .filter((c): c is TextContent => c.type === 'text')
-    .map((c) => c.text)
+    .map(c => c.text)
     .join(' ')
     .replace(/\s+/g, ' ')
     .trim()

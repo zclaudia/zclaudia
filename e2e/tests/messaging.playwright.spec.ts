@@ -34,7 +34,10 @@ test.describe('Messaging Functionality', () => {
     // Create project if needed
     const noProjects = page.locator('text=No projects yet').first();
     if (await noProjects.isVisible({ timeout: 2000 }).catch(() => false)) {
-      const success = await projectPage.createProject('Messaging Test Project', '/tmp/messaging-test');
+      const success = await projectPage.createProject(
+        'Messaging Test Project',
+        '/tmp/messaging-test'
+      );
       if (!success) {
         console.log('  ⚠️ Could not create project (server may not be connected)');
         return false;
@@ -187,14 +190,18 @@ test.describe('Messaging Functionality', () => {
     await page.waitForTimeout(3000);
 
     // Look for permission dialog
-    const permissionDialog = page.locator('[data-testid="permission-dialog"], .permission-request, [class*="permission"]').first();
+    const permissionDialog = page
+      .locator('[data-testid="permission-dialog"], .permission-request, [class*="permission"]')
+      .first();
     const hasDialog = await permissionDialog.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (hasDialog) {
       console.log('  ✓ Permission dialog appeared');
 
       // Look for approve/deny buttons
-      const approveBtn = page.locator('button:has-text("Approve"), button:has-text("Allow")').first();
+      const approveBtn = page
+        .locator('button:has-text("Approve"), button:has-text("Allow")')
+        .first();
       const denyBtn = page.locator('button:has-text("Deny"), button:has-text("Reject")').first();
 
       if (await denyBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
@@ -294,7 +301,9 @@ test.describe('Messaging Functionality', () => {
     await page.waitForTimeout(3000);
 
     // Look for regenerate button
-    const regenerateBtn = page.locator('button[title*="Regenerate"], button:has-text("Regenerate")').first();
+    const regenerateBtn = page
+      .locator('button[title*="Regenerate"], button:has-text("Regenerate")')
+      .first();
     const hasRegenerate = await regenerateBtn.isVisible({ timeout: 2000 }).catch(() => false);
 
     if (hasRegenerate) {
@@ -362,7 +371,9 @@ test.describe('Messaging Functionality', () => {
     }
 
     // Look for token/context indicator
-    const contextIndicator = page.locator('[data-testid="context-indicator"], .token-count, [class*="context"]').first();
+    const contextIndicator = page
+      .locator('[data-testid="context-indicator"], .token-count, [class*="context"]')
+      .first();
     const hasIndicator = await contextIndicator.isVisible({ timeout: 2000 }).catch(() => false);
 
     if (hasIndicator) {
@@ -395,11 +406,15 @@ test.describe('Messaging Functionality', () => {
     }
 
     // Send a message that will take time
-    await chatPage.sendMessage('Write a very detailed essay about the history of computing, covering all major milestones.');
+    await chatPage.sendMessage(
+      'Write a very detailed essay about the history of computing, covering all major milestones.'
+    );
 
     // Immediately look for cancel button
     await page.waitForTimeout(500);
-    const cancelBtn = page.locator('button[title*="Cancel"], button[title*="Stop"], button[aria-label*="Cancel"]').first();
+    const cancelBtn = page
+      .locator('button[title*="Cancel"], button[title*="Stop"], button[aria-label*="Cancel"]')
+      .first();
     const hasCancel = await cancelBtn.isVisible({ timeout: 3000 }).catch(() => false);
 
     if (hasCancel) {

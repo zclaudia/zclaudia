@@ -13,9 +13,8 @@ function assertInside(realWorkspace: string, candidate: string, rawPath: string)
 }
 
 export function resolveInsideWorkspace(cwd: string, requestedPath: unknown): string {
-  const rawPath = typeof requestedPath === 'string' && requestedPath.trim()
-    ? requestedPath.trim()
-    : '.';
+  const rawPath =
+    typeof requestedPath === 'string' && requestedPath.trim() ? requestedPath.trim() : '.';
   const workspace = path.resolve(cwd);
   const resolved = path.resolve(workspace, rawPath);
   const relative = path.relative(workspace, resolved);
@@ -36,9 +35,8 @@ export function resolveInsideWorkspace(cwd: string, requestedPath: unknown): str
   }
   const realExistingPrefix = realpath(probe);
   assertInside(realWorkspace, realExistingPrefix, rawPath);
-  const realCandidate = missingParts.length > 0
-    ? path.join(realExistingPrefix, ...missingParts)
-    : realExistingPrefix;
+  const realCandidate =
+    missingParts.length > 0 ? path.join(realExistingPrefix, ...missingParts) : realExistingPrefix;
   assertInside(realWorkspace, realCandidate, rawPath);
   return resolved;
 }

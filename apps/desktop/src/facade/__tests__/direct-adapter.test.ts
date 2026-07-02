@@ -26,11 +26,21 @@ const { MockGatewayTransport, transportState } = vi.hoisted(() => {
     }
     sendToBackend(): void {}
     catchUpContent(): void {}
-    isConnected(): boolean { return true; }
-    isBackendSubscribed(backendId: string): boolean { return this.subscribedBackends.has(backendId); }
-    getRegistryItems(): Map<string, never> { return new Map(); }
-    getPeerSessionId(): string | null { return 'peer-1'; }
-    getResolvedUrl(): string | null { return 'ws://gateway.example.com/ws'; }
+    isConnected(): boolean {
+      return true;
+    }
+    isBackendSubscribed(backendId: string): boolean {
+      return this.subscribedBackends.has(backendId);
+    }
+    getRegistryItems(): Map<string, never> {
+      return new Map();
+    }
+    getPeerSessionId(): string | null {
+      return 'peer-1';
+    }
+    getResolvedUrl(): string | null {
+      return 'ws://gateway.example.com/ws';
+    }
   }
 
   return {
@@ -58,7 +68,7 @@ describe('DirectGatewayAdapter', () => {
     });
 
     const events: any[] = [];
-    adapter.events.subscribe((event) => events.push(event));
+    adapter.events.subscribe(event => events.push(event));
     adapter.commands.connection.connect();
     transportState.instance.subscribedBackends.add('backend-1');
     transportState.instance.subscribedBackends.add('backend-2');
@@ -93,7 +103,7 @@ describe('DirectGatewayAdapter', () => {
     });
 
     const events: any[] = [];
-    adapter.events.subscribe((event) => events.push(event));
+    adapter.events.subscribe(event => events.push(event));
     adapter.commands.connection.connect();
     transportState.instance.subscribedBackends.add('backend-1');
 
@@ -119,7 +129,7 @@ describe('DirectGatewayAdapter', () => {
     });
 
     const events: any[] = [];
-    adapter.events.subscribe((event) => events.push(event));
+    adapter.events.subscribe(event => events.push(event));
     adapter.commands.connection.connect();
 
     transportState.config.onBackendDataEvent('backend-1', {

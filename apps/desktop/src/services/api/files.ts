@@ -1,4 +1,8 @@
-import type { DirectoryBrowseResponse, DirectoryListingResponse, FileContentResponse } from '@zclaudia/shared';
+import type {
+  DirectoryBrowseResponse,
+  DirectoryListingResponse,
+  FileContentResponse,
+} from '@zclaudia/shared';
 import { apiCall, apiCallForBackend } from './unwrap';
 
 export async function browseDirectories(params: {
@@ -11,7 +15,10 @@ export async function browseDirectories(params: {
   const suffix = queryParams.toString() ? `?${queryParams}` : '';
 
   return params.backendId
-    ? apiCallForBackend<DirectoryBrowseResponse>(params.backendId, `/api/files/browse-dirs${suffix}`)
+    ? apiCallForBackend<DirectoryBrowseResponse>(
+        params.backendId,
+        `/api/files/browse-dirs${suffix}`
+      )
     : apiCall<DirectoryBrowseResponse>(`/api/files/browse-dirs${suffix}`);
 }
 
@@ -26,11 +33,14 @@ export async function listDirectory(params: {
     projectRoot: params.projectRoot,
     ...(params.relativePath && { relativePath: params.relativePath }),
     ...(params.query && { query: params.query }),
-    ...(params.maxResults !== undefined && { maxResults: String(params.maxResults) })
+    ...(params.maxResults !== undefined && { maxResults: String(params.maxResults) }),
   });
 
   return params.backendId
-    ? apiCallForBackend<DirectoryListingResponse>(params.backendId, `/api/files/list?${queryParams}`)
+    ? apiCallForBackend<DirectoryListingResponse>(
+        params.backendId,
+        `/api/files/list?${queryParams}`
+      )
     : apiCall<DirectoryListingResponse>(`/api/files/list?${queryParams}`);
 }
 

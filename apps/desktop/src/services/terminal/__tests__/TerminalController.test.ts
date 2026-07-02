@@ -85,21 +85,27 @@ describe('TerminalController — actions and transitions', () => {
     c.open({ projectId: 'proj-1', workingDirectory: '/tmp' });
 
     expect(c.getState()).toEqual({ kind: 'opening' });
-    expect(sendMessage).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'terminal_open',
-      terminalId: 't-1',
-      projectId: 'proj-1',
-      workingDirectory: '/tmp',
-      cols: 80,
-      rows: 24,
-    }));
+    expect(sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'terminal_open',
+        terminalId: 't-1',
+        projectId: 'proj-1',
+        workingDirectory: '/tmp',
+        cols: 80,
+        rows: 24,
+      })
+    );
   });
 
   it('terminal_opened(success) transitions opening -> open', () => {
     const { deps } = buildDeps();
     const c = new TerminalController(deps);
     c.open({ projectId: 'p' });
-    c.handleServerMessage({ type: 'terminal_opened', terminalId: 't-1', success: true } as ServerMessage);
+    c.handleServerMessage({
+      type: 'terminal_opened',
+      terminalId: 't-1',
+      success: true,
+    } as ServerMessage);
     expect(c.getState()).toEqual({ kind: 'open' });
   });
 
@@ -108,7 +114,10 @@ describe('TerminalController — actions and transitions', () => {
     const c = new TerminalController(deps);
     c.open({ projectId: 'p' });
     c.handleServerMessage({
-      type: 'terminal_opened', terminalId: 't-1', success: false, error: 'spawn failed',
+      type: 'terminal_opened',
+      terminalId: 't-1',
+      success: false,
+      error: 'spawn failed',
     } as ServerMessage);
     expect(c.getState()).toEqual({ kind: 'failed', error: 'spawn failed' });
   });
@@ -178,7 +187,11 @@ describe('TerminalController — actions and transitions', () => {
     const { deps, sendMessage } = buildDeps();
     const c = new TerminalController(deps);
     c.open({ projectId: 'p' });
-    c.handleServerMessage({ type: 'terminal_opened', terminalId: 't-1', success: true } as ServerMessage);
+    c.handleServerMessage({
+      type: 'terminal_opened',
+      terminalId: 't-1',
+      success: true,
+    } as ServerMessage);
 
     sendMessage.mockClear();
     c.detach('backend_offline');
@@ -199,7 +212,11 @@ describe('TerminalController — actions and transitions', () => {
     const { deps, sendMessage, xterm } = buildDeps();
     const c = new TerminalController(deps);
     c.open({ projectId: 'p' });
-    c.handleServerMessage({ type: 'terminal_opened', terminalId: 't-1', success: true } as ServerMessage);
+    c.handleServerMessage({
+      type: 'terminal_opened',
+      terminalId: 't-1',
+      success: true,
+    } as ServerMessage);
     sendMessage.mockClear();
 
     c.release();
@@ -214,7 +231,11 @@ describe('TerminalController — actions and transitions', () => {
     const c = new TerminalController(deps);
     // Drive into detached(popout) via release()
     c.open({ projectId: 'p' });
-    c.handleServerMessage({ type: 'terminal_opened', terminalId: 't-1', success: true } as ServerMessage);
+    c.handleServerMessage({
+      type: 'terminal_opened',
+      terminalId: 't-1',
+      success: true,
+    } as ServerMessage);
     c.release();
     sendMessage.mockClear();
 
@@ -239,11 +260,21 @@ describe('TerminalController — actions and transitions', () => {
     const { deps, xterm } = buildDeps();
     const c = new TerminalController(deps);
     c.open({ projectId: 'p' });
-    c.handleServerMessage({ type: 'terminal_opened', terminalId: 't-1', success: true } as ServerMessage);
+    c.handleServerMessage({
+      type: 'terminal_opened',
+      terminalId: 't-1',
+      success: true,
+    } as ServerMessage);
 
-    c.handleServerMessage({ type: 'terminal_exited', terminalId: 't-1', exitCode: 137 } as ServerMessage);
+    c.handleServerMessage({
+      type: 'terminal_exited',
+      terminalId: 't-1',
+      exitCode: 137,
+    } as ServerMessage);
 
-    expect(xterm.write).toHaveBeenCalledWith(expect.stringContaining('Process exited with code 137'));
+    expect(xterm.write).toHaveBeenCalledWith(
+      expect.stringContaining('Process exited with code 137')
+    );
     expect(c.getState()).toEqual({ kind: 'exited', code: 137 });
   });
 
@@ -257,7 +288,9 @@ describe('TerminalController — actions and transitions', () => {
     c.open({ projectId: 'p' });
 
     expect(c.getState()).toEqual({ kind: 'attaching' }); // unchanged
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('illegal transition attaching -> opening'));
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('illegal transition attaching -> opening')
+    );
   });
 
   it('dispose() is idempotent and clears subscribers', () => {
@@ -281,10 +314,18 @@ describe('TerminalController — onData binding', () => {
     const c = new TerminalController(deps);
 
     c.open({ projectId: 'p' });
-    c.handleServerMessage({ type: 'terminal_opened', terminalId: 't-1', success: true } as ServerMessage);
+    c.handleServerMessage({
+      type: 'terminal_opened',
+      terminalId: 't-1',
+      success: true,
+    } as ServerMessage);
     c.detach('backend_offline');
     c.attach();
-    c.handleServerMessage({ type: 'terminal_attached', terminalId: 't-1', success: true } as ServerMessage);
+    c.handleServerMessage({
+      type: 'terminal_attached',
+      terminalId: 't-1',
+      success: true,
+    } as ServerMessage);
 
     expect(xterm.onData).toHaveBeenCalledTimes(1);
 
@@ -324,8 +365,16 @@ describe('TerminalController — server message routing', () => {
     const c = new TerminalController(deps);
     c.open({ projectId: 'p' });
 
-    c.handleServerMessage({ type: 'terminal_opened', terminalId: 'other', success: true } as ServerMessage);
-    c.handleServerMessage({ type: 'terminal_output', terminalId: 'other', data: 'x' } as ServerMessage);
+    c.handleServerMessage({
+      type: 'terminal_opened',
+      terminalId: 'other',
+      success: true,
+    } as ServerMessage);
+    c.handleServerMessage({
+      type: 'terminal_output',
+      terminalId: 'other',
+      data: 'x',
+    } as ServerMessage);
 
     expect(c.getState()).toEqual({ kind: 'opening' });
     expect(xterm.write).not.toHaveBeenCalled();
@@ -335,7 +384,11 @@ describe('TerminalController — server message routing', () => {
     const { deps } = buildDeps();
     const c = new TerminalController(deps);
     // idle, no open() called
-    c.handleServerMessage({ type: 'terminal_opened', terminalId: 't-1', success: true } as ServerMessage);
+    c.handleServerMessage({
+      type: 'terminal_opened',
+      terminalId: 't-1',
+      success: true,
+    } as ServerMessage);
     expect(c.getState()).toEqual({ kind: 'idle' });
   });
 
@@ -343,9 +396,17 @@ describe('TerminalController — server message routing', () => {
     const { deps, xterm } = buildDeps();
     const c = new TerminalController(deps);
     c.open({ projectId: 'p' });
-    c.handleServerMessage({ type: 'terminal_opened', terminalId: 't-1', success: true } as ServerMessage);
+    c.handleServerMessage({
+      type: 'terminal_opened',
+      terminalId: 't-1',
+      success: true,
+    } as ServerMessage);
 
-    c.handleServerMessage({ type: 'terminal_output', terminalId: 't-1', data: 'shell$ ' } as ServerMessage);
+    c.handleServerMessage({
+      type: 'terminal_output',
+      terminalId: 't-1',
+      data: 'shell$ ',
+    } as ServerMessage);
     expect(xterm.write).toHaveBeenCalledWith('shell$ ');
   });
 });
@@ -355,10 +416,14 @@ describe('TerminalController — subscriptions', () => {
     const { deps } = buildDeps();
     const c = new TerminalController(deps);
     const seen: string[] = [];
-    c.subscribe((s) => seen.push(s.kind));
+    c.subscribe(s => seen.push(s.kind));
 
     c.open({ projectId: 'p' });
-    c.handleServerMessage({ type: 'terminal_opened', terminalId: 't-1', success: true } as ServerMessage);
+    c.handleServerMessage({
+      type: 'terminal_opened',
+      terminalId: 't-1',
+      success: true,
+    } as ServerMessage);
     c.detach('ws_reconnect');
 
     expect(seen).toEqual(['opening', 'open', 'detached']);
@@ -373,7 +438,11 @@ describe('TerminalController — subscriptions', () => {
     expect(listener).toHaveBeenCalledTimes(1);
 
     unsub();
-    c.handleServerMessage({ type: 'terminal_opened', terminalId: 't-1', success: true } as ServerMessage);
+    c.handleServerMessage({
+      type: 'terminal_opened',
+      terminalId: 't-1',
+      success: true,
+    } as ServerMessage);
 
     expect(listener).toHaveBeenCalledTimes(1);
   });

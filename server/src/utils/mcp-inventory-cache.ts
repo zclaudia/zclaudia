@@ -33,17 +33,21 @@ export class McpInventoryCache {
     private readonly options: {
       ttlMs?: number;
       now?: () => number;
-    } = {},
+    } = {}
   ) {}
 
   configHash(config: McpServerRuntimeConfig): string {
     return JSON.stringify({
       transport: config.transport ?? 'stdio',
       command: config.command,
-      args: 'args' in config ? config.args ?? [] : [],
-      env: Object.entries('env' in config ? config.env ?? {} : {}).sort(([a], [b]) => a.localeCompare(b)),
+      args: 'args' in config ? (config.args ?? []) : [],
+      env: Object.entries('env' in config ? (config.env ?? {}) : {}).sort(([a], [b]) =>
+        a.localeCompare(b)
+      ),
       url: 'url' in config ? config.url : undefined,
-      headers: Object.entries('headers' in config ? config.headers ?? {} : {}).sort(([a], [b]) => a.localeCompare(b)),
+      headers: Object.entries('headers' in config ? (config.headers ?? {}) : {}).sort(([a], [b]) =>
+        a.localeCompare(b)
+      ),
       headersHelper: 'headersHelper' in config ? config.headersHelper : undefined,
       oauthConfig: 'oauthConfig' in config ? config.oauthConfig : undefined,
       oauthCredentials: 'oauthCredentials' in config ? config.oauthCredentials : undefined,
@@ -53,7 +57,7 @@ export class McpInventoryCache {
   async getInventory(
     server: string,
     config: McpServerRuntimeConfig,
-    loaders: McpInventoryLoaders,
+    loaders: McpInventoryLoaders
   ): Promise<McpInventory> {
     const configHash = this.configHash(config);
     const key = this.key(server, configHash);

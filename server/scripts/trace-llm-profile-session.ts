@@ -36,7 +36,8 @@ function parseArgs(argv: string[]): Args {
   }
   if (!args.projectId) throw new Error('--projectId is required');
   if (!args.out) throw new Error('--out is required');
-  if (!args.prompt && !args.promptFile) throw new Error('one of --prompt or --promptFile is required');
+  if (!args.prompt && !args.promptFile)
+    throw new Error('one of --prompt or --promptFile is required');
   return args as Args;
 }
 
@@ -44,7 +45,12 @@ function buildHeaders(token?: string): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-async function fetchJson<T>(api: string, pathname: string, init: RequestInit = {}, token?: string): Promise<T> {
+async function fetchJson<T>(
+  api: string,
+  pathname: string,
+  init: RequestInit = {},
+  token?: string
+): Promise<T> {
   const response = await fetch(`${api}${pathname}`, {
     ...init,
     headers: {
@@ -53,33 +59,56 @@ async function fetchJson<T>(api: string, pathname: string, init: RequestInit = {
       ...(init.headers || {}),
     },
   });
-  const body = await response.json() as { success?: boolean; data?: T; error?: { message?: string } };
+  const body = (await response.json()) as {
+    success?: boolean;
+    data?: T;
+    error?: { message?: string };
+  };
   if (!response.ok || body.success === false || body.data === undefined) {
     throw new Error(body.error?.message || `HTTP ${response.status}`);
   }
   return body.data;
 }
 
-async function resolveLlmProfileId(api: string, providerType: string, token?: string): Promise<string> {
-  const profiles = await fetchJson<LlmProfileConfig[]>(api, '/api/llm-profiles', { method: 'GET' }, token);
-  const match = profiles.find((profile) => profile.providerType === providerType);
+async function resolveLlmProfileId(
+  api: string,
+  providerType: string,
+  token?: string
+): Promise<string> {
+  const profiles = await fetchJson<LlmProfileConfig[]>(
+    api,
+    '/api/llm-profiles',
+    { method: 'GET' },
+    token
+  );
+  const match = profiles.find(profile => profile.providerType === providerType);
   if (!match) throw new Error(`No llm profile found for providerType "${providerType}"`);
   return match.id;
 }
 
 async function ensureSession(args: Args, llmProfileId: string | undefined): Promise<Session> {
   if (args.sessionId) {
-    return fetchJson<Session>(args.api, `/api/sessions/${args.sessionId}`, { method: 'GET' }, args.token);
+    return fetchJson<Session>(
+      args.api,
+      `/api/sessions/${args.sessionId}`,
+      { method: 'GET' },
+      args.token
+    );
   }
-  return fetchJson<Session>(args.api, '/api/sessions', {
-    method: 'POST',
-    body: JSON.stringify({
-      projectId: args.projectId,
-      llmProfileId,
-      name: args.sessionName || `trace-${args.providerType || llmProfileId || 'llm-profile'}`,
-      workingDirectory: args.cwd,
-    }),
-  }, args.token);
+  return fetchJson<Session>(
+    args.api,
+    '/api/sessions',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        projectId: args.projectId,
+        llmProfileId,
+        name: args.sessionName || `trace-${args.providerType || llmProfileId || 'llm-profile'}`,
+        workingDirectory: args.cwd,
+      }),
+    },
+    args.token
+  );
 }
 
 function toWsUrl(api: string): string {
@@ -88,7 +117,7 @@ function toWsUrl(api: string): string {
 
 function writeJsonl(outPath: string, records: unknown[]): void {
   mkdirSync(path.dirname(outPath), { recursive: true });
-  writeFileSync(outPath, `${records.map((record) => JSON.stringify(record)).join('\n')}\n`, 'utf8');
+  writeFileSync(outPath, `${records.map(record => JSON.stringify(record)).join('\n')}\n`, 'utf8');
 }
 
 function summarize(messages: ServerMessage[]) {
@@ -100,7 +129,8 @@ function summarize(messages: ServerMessage[]) {
   for (const message of messages) {
     counts.set(message.type, (counts.get(message.type) || 0) + 1);
     if ('runId' in message && typeof message.runId === 'string') runId = message.runId;
-    if ('sessionId' in message && typeof message.sessionId === 'string') sessionId = message.sessionId;
+    if ('sessionId' in message && typeof message.sessionId === 'string')
+      sessionId = message.sessionId;
     if (message.type === 'tool_use') toolUses.add(message.toolUseId);
     if (message.type === 'tool_result') toolResults.add(message.toolUseId);
   }
@@ -111,15 +141,22 @@ function summarize(messages: ServerMessage[]) {
     counts: Object.fromEntries(counts.entries()),
     toolUseCount: toolUses.size,
     toolResultCount: toolResults.size,
-    unmatchedToolUses: [...toolUses].filter((id) => !toolResults.has(id)),
-    hasSystemInfo: messages.some((message) => message.type === 'system_info'),
-    terminalEvent: messages.findLast((message) => message.type === 'run_completed' || message.type === 'run_failed')?.type || null,
+    unmatchedToolUses: [...toolUses].filter(id => !toolResults.has(id)),
+    hasSystemInfo: messages.some(message => message.type === 'system_info'),
+    terminalEvent:
+      messages.findLast(
+        message => message.type === 'run_completed' || message.type === 'run_failed'
+      )?.type || null,
   };
 }
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const llmProfileId = args.llmProfileId || (args.providerType ? await resolveLlmProfileId(args.api, args.providerType, args.token) : undefined);
+  const llmProfileId =
+    args.llmProfileId ||
+    (args.providerType
+      ? await resolveLlmProfileId(args.api, args.providerType, args.token)
+      : undefined);
   const session = await ensureSession(args, llmProfileId);
   const prompt = args.promptFile ? readFileSync(args.promptFile, 'utf8') : args.prompt!;
   const wsUrl = toWsUrl(args.api);
@@ -136,7 +173,7 @@ async function main() {
       ws.send(JSON.stringify({ type: 'auth' }));
     });
 
-    ws.on('message', (raw) => {
+    ws.on('message', raw => {
       const message = JSON.parse(raw.toString()) as ServerMessage;
       events.push({ ts: Date.now(), message });
       if (message.type === 'auth_result') {
@@ -159,7 +196,7 @@ async function main() {
       }
     });
 
-    ws.on('error', (error) => {
+    ws.on('error', error => {
       clearTimeout(timeout);
       reject(error);
     });
@@ -171,28 +208,39 @@ async function main() {
 
   const wsTracePath = args.out.endsWith('.jsonl') ? args.out : `${args.out}.jsonl`;
   const summaryPath = wsTracePath.replace(/\.jsonl$/, '.summary.json');
-  writeJsonl(wsTracePath, events.map((event, index) => ({
-    seq: index + 1,
-    ts: event.ts,
-    isoTime: new Date(event.ts).toISOString(),
-    layer: 'script_ws',
-    event: event.message.type,
-    message: event.message,
-  })));
-  writeFileSync(summaryPath, `${JSON.stringify({
-    api: args.api,
-    llmProfileId,
-    providerType: args.providerType,
-    sessionId: session.id,
-    cwd: args.cwd || session.workingDirectory || null,
-    summary: summarize(events.map((event) => event.message)),
-  }, null, 2)}\n`, 'utf8');
+  writeJsonl(
+    wsTracePath,
+    events.map((event, index) => ({
+      seq: index + 1,
+      ts: event.ts,
+      isoTime: new Date(event.ts).toISOString(),
+      layer: 'script_ws',
+      event: event.message.type,
+      message: event.message,
+    }))
+  );
+  writeFileSync(
+    summaryPath,
+    `${JSON.stringify(
+      {
+        api: args.api,
+        llmProfileId,
+        providerType: args.providerType,
+        sessionId: session.id,
+        cwd: args.cwd || session.workingDirectory || null,
+        summary: summarize(events.map(event => event.message)),
+      },
+      null,
+      2
+    )}\n`,
+    'utf8'
+  );
 
   console.log(`WS trace written to ${wsTracePath}`);
   console.log(`Summary written to ${summaryPath}`);
 }
 
-main().catch((error) => {
+main().catch(error => {
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 1;
 });

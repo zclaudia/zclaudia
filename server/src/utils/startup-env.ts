@@ -25,7 +25,7 @@ export interface SanitizedEnvResult {
  * still rely on them when no explicit per-provider env override is configured.
  */
 export function sanitizeInheritedProviderEnv(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = process.env
 ): SanitizedEnvResult {
   const removedKeys: string[] = [];
 

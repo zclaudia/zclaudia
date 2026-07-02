@@ -56,9 +56,11 @@ export function handleProviderInit(input: HandleProviderInitInput): void {
 
   if (msg.sessionId && msg.sessionId !== state.sdkSessionId) {
     state.sdkSessionId = msg.sessionId;
-    db.prepare(`
+    db.prepare(
+      `
           UPDATE sessions SET sdk_session_id = ?, updated_at = ? WHERE id = ?
-        `).run(state.sdkSessionId, Date.now(), sessionId);
+        `
+    ).run(state.sdkSessionId, Date.now(), sessionId);
 
     activeRun.providerSessionId = state.sdkSessionId;
 

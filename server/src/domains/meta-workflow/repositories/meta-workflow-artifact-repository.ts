@@ -16,7 +16,11 @@ type Update = {
   status?: MetaWorkflowArtifact['status'];
 };
 
-export class MetaWorkflowArtifactRepository extends BaseRepository<MetaWorkflowArtifact, Create, Update> {
+export class MetaWorkflowArtifactRepository extends BaseRepository<
+  MetaWorkflowArtifact,
+  Create,
+  Update
+> {
   constructor(db: Database) {
     super(db, 'meta_workflow_artifacts');
   }
@@ -48,7 +52,9 @@ export class MetaWorkflowArtifactRepository extends BaseRepository<MetaWorkflowA
         gate_results, ai_review_notes_path, status, created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       params: [
-        id, data.phaseRecordId, data.version,
+        id,
+        data.phaseRecordId,
+        data.version,
         data.commitSha ?? null,
         data.artifactFiles ? JSON.stringify(data.artifactFiles) : null,
         data.gateResults ? JSON.stringify(data.gateResults) : null,
@@ -62,7 +68,10 @@ export class MetaWorkflowArtifactRepository extends BaseRepository<MetaWorkflowA
   updateQuery(id: string, data: Update): { sql: string; params: unknown[] } {
     const sets: string[] = [];
     const params: unknown[] = [];
-    if (data.commitSha !== undefined) { sets.push('commit_sha = ?'); params.push(data.commitSha ?? null); }
+    if (data.commitSha !== undefined) {
+      sets.push('commit_sha = ?');
+      params.push(data.commitSha ?? null);
+    }
     if (data.artifactFiles !== undefined) {
       sets.push('artifact_files = ?');
       params.push(data.artifactFiles ? JSON.stringify(data.artifactFiles) : null);
@@ -71,8 +80,14 @@ export class MetaWorkflowArtifactRepository extends BaseRepository<MetaWorkflowA
       sets.push('gate_results = ?');
       params.push(data.gateResults ? JSON.stringify(data.gateResults) : null);
     }
-    if (data.aiReviewNotesPath !== undefined) { sets.push('ai_review_notes_path = ?'); params.push(data.aiReviewNotesPath ?? null); }
-    if (data.status !== undefined) { sets.push('status = ?'); params.push(data.status); }
+    if (data.aiReviewNotesPath !== undefined) {
+      sets.push('ai_review_notes_path = ?');
+      params.push(data.aiReviewNotesPath ?? null);
+    }
+    if (data.status !== undefined) {
+      sets.push('status = ?');
+      params.push(data.status);
+    }
 
     if (sets.length === 0) {
       return { sql: `SELECT 1 FROM meta_workflow_artifacts WHERE id = ?`, params: [id] };
@@ -82,23 +97,29 @@ export class MetaWorkflowArtifactRepository extends BaseRepository<MetaWorkflowA
   }
 
   findByPhase(phaseRecordId: string): MetaWorkflowArtifact[] {
-    const rows = this.db.prepare(
-      `SELECT * FROM meta_workflow_artifacts WHERE phase_record_id = ? ORDER BY version DESC`,
-    ).all(phaseRecordId);
-    return rows.map((r) => this.mapRow(r));
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM meta_workflow_artifacts WHERE phase_record_id = ? ORDER BY version DESC`
+      )
+      .all(phaseRecordId);
+    return rows.map(r => this.mapRow(r));
   }
 
   findLatestByPhase(phaseRecordId: string): MetaWorkflowArtifact | null {
-    const row = this.db.prepare(
-      `SELECT * FROM meta_workflow_artifacts WHERE phase_record_id = ? ORDER BY version DESC LIMIT 1`,
-    ).get(phaseRecordId);
+    const row = this.db
+      .prepare(
+        `SELECT * FROM meta_workflow_artifacts WHERE phase_record_id = ? ORDER BY version DESC LIMIT 1`
+      )
+      .get(phaseRecordId);
     return row ? this.mapRow(row) : null;
   }
 
   markAllStaleForPhase(phaseRecordId: string): void {
-    this.db.prepare(
-      `UPDATE meta_workflow_artifacts SET status = 'stale'
-         WHERE phase_record_id = ? AND status = 'active'`,
-    ).run(phaseRecordId);
+    this.db
+      .prepare(
+        `UPDATE meta_workflow_artifacts SET status = 'stale'
+         WHERE phase_record_id = ? AND status = 'active'`
+      )
+      .run(phaseRecordId);
   }
 }

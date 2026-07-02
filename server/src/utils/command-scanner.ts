@@ -102,7 +102,11 @@ async function discoverPluginCommandInputs(env: ExecutionEnv): Promise<CommandTe
 }
 
 /** Read a plugin's author name (for display suffix), or fall back to bare. */
-async function readPluginAuthor(env: ExecutionEnv, installPath: string, pluginName: string): Promise<string> {
+async function readPluginAuthor(
+  env: ExecutionEnv,
+  installPath: string,
+  pluginName: string
+): Promise<string> {
   const manifestPath = path.join(installPath, '.claude-plugin', 'plugin.json');
   const exists = await env.exists(manifestPath);
   if (!exists.ok || !exists.value) return ` (plugin:${pluginName})`;
@@ -122,7 +126,7 @@ async function readPluginAuthor(env: ExecutionEnv, installPath: string, pluginNa
  */
 function classifyTemplates(
   templates: SourcedPromptTemplate[],
-  pluginDescriptionByName: Map<string, string>,
+  pluginDescriptionByName: Map<string, string>
 ): SlashCommand[] {
   const byBase = new Map<string, SourcedPromptTemplate[]>();
   for (const t of templates) {
@@ -148,12 +152,12 @@ function classifyTemplates(
       if (!shouldEmitPrefixed) continue;
 
       const description = t.template.description ?? 'Custom command';
-      const pluginSuffix = isPlugin && t.plugin
-        ? pluginDescriptionByName.get(t.plugin.pluginName) ?? ` (plugin:${t.plugin.pluginName})`
-        : '';
-      const prefixedName = isPlugin && t.plugin
-        ? `/${t.plugin.pluginName}:${base}`
-        : `/${t.source}:${base}`;
+      const pluginSuffix =
+        isPlugin && t.plugin
+          ? (pluginDescriptionByName.get(t.plugin.pluginName) ?? ` (plugin:${t.plugin.pluginName})`)
+          : '';
+      const prefixedName =
+        isPlugin && t.plugin ? `/${t.plugin.pluginName}:${base}` : `/${t.source}:${base}`;
 
       if (prefixedEmitted.has(prefixedName)) continue;
       prefixedEmitted.add(prefixedName);
@@ -169,15 +173,17 @@ function classifyTemplates(
 
     // Bare name: priority project > user > plugin.
     const winner =
-      group.find((t) => t.source === 'project')
-      ?? group.find((t) => t.source === 'user')
-      ?? group.find((t) => t.source === 'plugin');
+      group.find(t => t.source === 'project') ??
+      group.find(t => t.source === 'user') ??
+      group.find(t => t.source === 'plugin');
     if (winner) {
       const description = winner.template.description ?? 'Custom command';
       const isPlugin = winner.source === 'plugin';
-      const pluginSuffix = isPlugin && winner.plugin
-        ? pluginDescriptionByName.get(winner.plugin.pluginName) ?? ` (plugin:${winner.plugin.pluginName})`
-        : '';
+      const pluginSuffix =
+        isPlugin && winner.plugin
+          ? (pluginDescriptionByName.get(winner.plugin.pluginName) ??
+            ` (plugin:${winner.plugin.pluginName})`)
+          : '';
       result.push({
         command: `/${base}`,
         description: description + (isPlugin ? pluginSuffix : ''),
@@ -193,7 +199,7 @@ function classifyTemplates(
 
 export async function scanCustomCommands(
   env: ExecutionEnv,
-  options: ScanOptions = {},
+  options: ScanOptions = {}
 ): Promise<SlashCommand[]> {
   const includePlugins = options.includePlugins !== false;
 
@@ -225,10 +231,7 @@ export async function scanCustomCommands(
       }
     }
     for (const [pluginName, installPath] of uniquePlugins) {
-      pluginDescriptionByName.set(
-        pluginName,
-        await readPluginAuthor(env, installPath, pluginName),
-      );
+      pluginDescriptionByName.set(pluginName, await readPluginAuthor(env, installPath, pluginName));
     }
   }
 
@@ -240,7 +243,7 @@ export async function scanCustomCommands(
 
   // Drop excluded plugin doc files (README.md etc) — pi loads them as
   // templates, but we don't want them showing as commands.
-  const filtered = templates.filter((t) => {
+  const filtered = templates.filter(t => {
     if (t.source !== 'plugin') return true;
     const base = path.basename(t.filePath).toLowerCase();
     return !EXCLUDED_PLUGIN_FILES.has(base);

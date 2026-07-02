@@ -28,7 +28,11 @@ describe('Corpus routes', () => {
   });
 
   afterEach(() => {
-    try { rmSync(projectRoot, { recursive: true, force: true }); } catch { /* */ }
+    try {
+      rmSync(projectRoot, { recursive: true, force: true });
+    } catch {
+      /* */
+    }
   });
 
   it('GET /corpus requires projectId', async () => {
@@ -75,7 +79,14 @@ describe('Corpus routes', () => {
 
   it('returns 400 when getProjectRoot throws', async () => {
     const app2 = express();
-    app2.use('/api/openspec', createCorpusRoutes({ getProjectRoot: () => { throw new Error('no root'); } }));
+    app2.use(
+      '/api/openspec',
+      createCorpusRoutes({
+        getProjectRoot: () => {
+          throw new Error('no root');
+        },
+      })
+    );
     const res = await request(app2).get('/api/openspec/corpus?projectId=p1');
     expect(res.status).toBe(400);
     expect(res.body.error.message).toMatch(/no root/);

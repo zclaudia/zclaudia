@@ -9,11 +9,27 @@ function normalizeSearchPreview(content: string): string {
 
 export function SidebarSearch({ search, isMobile, sessions, onResultSelect }: SidebarSearchProps) {
   const {
-    searchQuery, setSearchQuery, searchResults, setSearchResults, isSearching,
-    searchHistory, showSearchHistory, showFilters, setShowFilters, searchFilters,
-    hasMoreResults, isLoadingMore, searchInputRef, searchResultsContainerRef,
-    handleSearch, handleLoadMore, handleSelectHistoryItem, handleSearchFocus,
-    handleSearchBlur, handleClearHistory, handleFiltersChange,
+    searchQuery,
+    setSearchQuery,
+    searchResults,
+    setSearchResults,
+    isSearching,
+    searchHistory,
+    showSearchHistory,
+    showFilters,
+    setShowFilters,
+    searchFilters,
+    hasMoreResults,
+    isLoadingMore,
+    searchInputRef,
+    searchResultsContainerRef,
+    handleSearch,
+    handleLoadMore,
+    handleSelectHistoryItem,
+    handleSearchFocus,
+    handleSearchBlur,
+    handleClearHistory,
+    handleFiltersChange,
   } = search;
 
   if (isMobile) {
@@ -24,7 +40,7 @@ export function SidebarSearch({ search, isMobile, sessions, onResultSelect }: Si
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => handleSearch(e.target.value)}
+            onChange={e => handleSearch(e.target.value)}
             onFocus={handleSearchFocus}
             onBlur={handleSearchBlur}
             placeholder="Search messages..."
@@ -48,7 +64,7 @@ export function SidebarSearch({ search, isMobile, sessions, onResultSelect }: Si
                 Clear
               </button>
             </div>
-            {searchHistory.map((entry) => (
+            {searchHistory.map(entry => (
               <button
                 key={entry.id}
                 onClick={() => handleSelectHistoryItem(entry.query)}
@@ -67,14 +83,17 @@ export function SidebarSearch({ search, isMobile, sessions, onResultSelect }: Si
 
         {/* Search Results */}
         {searchQuery.trim() && (
-          <div ref={searchResultsContainerRef} className="border-b border-border max-h-60 overflow-y-auto">
+          <div
+            ref={searchResultsContainerRef}
+            className="border-b border-border max-h-60 overflow-y-auto"
+          >
             {isSearching ? (
               <div className="px-3 py-2 text-xs text-muted-foreground">Searching...</div>
             ) : searchResults.length === 0 ? (
               <div className="px-3 py-2 text-xs text-muted-foreground">No results</div>
             ) : (
               <>
-                {searchResults.map((r) => (
+                {searchResults.map(r => (
                   <button
                     key={r.id}
                     onClick={() => {
@@ -84,13 +103,23 @@ export function SidebarSearch({ search, isMobile, sessions, onResultSelect }: Si
                     }}
                     className="w-full text-left px-3 py-2.5 text-xs hover:bg-secondary active:bg-secondary border-b border-border/50 last:border-0"
                   >
-                    <div className="font-medium text-foreground truncate">{r.sessionName || 'Untitled'}</div>
+                    <div className="font-medium text-foreground truncate">
+                      {r.sessionName || 'Untitled'}
+                    </div>
                     <div className="text-muted-foreground mt-0.5 line-clamp-2 whitespace-normal break-words">
                       {normalizeSearchPreview(r.content)}
                     </div>
                     {r.resultType && r.resultType !== 'message' && (
                       <div className="text-xs text-primary mt-1">
-                        {r.resultType === 'file' ? <span className="inline-flex items-center gap-1"><FileText size={11} strokeWidth={1.75} /> File</span> : <span className="inline-flex items-center gap-1"><Wrench size={11} strokeWidth={1.75} /> Tool</span>}
+                        {r.resultType === 'file' ? (
+                          <span className="inline-flex items-center gap-1">
+                            <FileText size={11} strokeWidth={1.75} /> File
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1">
+                            <Wrench size={11} strokeWidth={1.75} /> Tool
+                          </span>
+                        )}
                       </div>
                     )}
                   </button>
@@ -122,7 +151,7 @@ export function SidebarSearch({ search, isMobile, sessions, onResultSelect }: Si
             ref={searchInputRef}
             type="text"
             value={searchQuery}
-            onChange={(e) => handleSearch(e.target.value)}
+            onChange={e => handleSearch(e.target.value)}
             onFocus={handleSearchFocus}
             onBlur={handleSearchBlur}
             placeholder="Search messages..."
@@ -138,7 +167,12 @@ export function SidebarSearch({ search, isMobile, sessions, onResultSelect }: Si
             title="Filters"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+              />
             </svg>
           </button>
         </div>
@@ -155,7 +189,7 @@ export function SidebarSearch({ search, isMobile, sessions, onResultSelect }: Si
                 Clear
               </button>
             </div>
-            {searchHistory.map((entry) => (
+            {searchHistory.map(entry => (
               <button
                 key={entry.id}
                 onClick={() => handleSelectHistoryItem(entry.query)}
@@ -185,14 +219,17 @@ export function SidebarSearch({ search, isMobile, sessions, onResultSelect }: Si
 
       {/* Search Results */}
       {searchQuery.trim() && (
-        <div ref={searchResultsContainerRef} className="border-b border-border max-h-48 overflow-y-auto mx-2">
+        <div
+          ref={searchResultsContainerRef}
+          className="border-b border-border max-h-48 overflow-y-auto mx-2"
+        >
           {isSearching ? (
             <div className="px-2 py-1.5 text-xs text-muted-foreground">Searching...</div>
           ) : searchResults.length === 0 ? (
             <div className="px-2 py-1.5 text-xs text-muted-foreground">No results</div>
           ) : (
             <>
-              {searchResults.map((r) => (
+              {searchResults.map(r => (
                 <button
                   key={r.id}
                   onClick={() => {
@@ -202,13 +239,23 @@ export function SidebarSearch({ search, isMobile, sessions, onResultSelect }: Si
                   }}
                   className="w-full text-left px-2 py-1.5 text-xs hover:bg-secondary border-b border-border/50 last:border-0"
                 >
-                  <div className="font-medium text-foreground truncate">{r.sessionName || 'Untitled'}</div>
+                  <div className="font-medium text-foreground truncate">
+                    {r.sessionName || 'Untitled'}
+                  </div>
                   <div className="text-muted-foreground mt-0.5 line-clamp-2 whitespace-normal break-words">
                     {normalizeSearchPreview(r.content)}
                   </div>
                   {r.resultType && r.resultType !== 'message' && (
                     <div className="text-xs text-primary mt-0.5">
-                      {r.resultType === 'file' ? <span className="inline-flex items-center gap-1"><FileText size={11} strokeWidth={1.75} /> File</span> : <span className="inline-flex items-center gap-1"><Wrench size={11} strokeWidth={1.75} /> Tool</span>}
+                      {r.resultType === 'file' ? (
+                        <span className="inline-flex items-center gap-1">
+                          <FileText size={11} strokeWidth={1.75} /> File
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1">
+                          <Wrench size={11} strokeWidth={1.75} /> Tool
+                        </span>
+                      )}
                     </div>
                   )}
                 </button>

@@ -28,7 +28,10 @@ describe('handlers/factory', () => {
     describe('list handler', () => {
       it('returns all entities from repository', async () => {
         const mockRepo = createMockRepository();
-        const mockItems = [{ id: '1', name: 'Item 1' }, { id: '2', name: 'Item 2' }];
+        const mockItems = [
+          { id: '1', name: 'Item 1' },
+          { id: '2', name: 'Item 2' },
+        ];
         vi.mocked(mockRepo.findAll).mockResolvedValue(mockItems as any);
 
         const handlers = createCrudHandlers('items', mockRepo);
@@ -291,7 +294,7 @@ describe('handlers/factory', () => {
       const ctx = createMockContext({ id: '1' });
       const customResult = { custom: 'data', count: 42 };
 
-      const handler = createHandler('custom', async (c) => {
+      const handler = createHandler('custom', async c => {
         expect(c).toBe(ctx);
         return customResult;
       });

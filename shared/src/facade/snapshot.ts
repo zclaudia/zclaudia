@@ -29,7 +29,7 @@ export function assembleSnapshot(params: {
   streams: SessionStreamSnapshot[];
 }): BackendFacadeSnapshot {
   const backendSnapshots: BackendSnapshot[] = params.backends
-    .filter(r => r.presence !== null)
+    .filter(hasPresence)
     .map(r => recordToBackendSnapshot(r, params.currentInstanceId, params.currentDeviceId));
 
   const sessionStreams: Record<string, SessionStreamSnapshot> = {};
@@ -50,12 +50,20 @@ export function assembleSnapshot(params: {
   };
 }
 
+type BackendRuntimeRecordWithPresence = BackendRuntimeRecord & {
+  presence: NonNullable<BackendRuntimeRecord['presence']>;
+};
+
+function hasPresence(record: BackendRuntimeRecord): record is BackendRuntimeRecordWithPresence {
+  return record.presence !== null;
+}
+
 function recordToBackendSnapshot(
-  record: BackendRuntimeRecord,
+  record: BackendRuntimeRecordWithPresence,
   currentInstanceId: string | null,
-  currentDeviceId: string | null,
+  currentDeviceId: string | null
 ): BackendSnapshot {
-  const presence = record.presence!;
+  const { presence } = record;
   return {
     backendId: record.backendId,
     name: presence.name,

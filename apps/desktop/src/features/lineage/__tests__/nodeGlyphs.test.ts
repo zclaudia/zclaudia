@@ -4,10 +4,22 @@ import { glyphFor, laneColor, LANE_PALETTE } from '../nodeGlyphs';
 
 function g(p: Partial<GraphNode>): GraphNode {
   return {
-    nodeId: 'x', sessionId: 'S', entryId: 'e', entryType: 'message',
-    isRoot: false, isBranchPoint: false, isForkPoint: false, isForkBase: false,
-    isActiveLeaf: false, isBranchTip: false, onActivePath: true, parentNodeId: null,
-    incomingMessageCount: 0, timestamp: 't', jump: { messageId: null, compactionId: null }, ...p,
+    nodeId: 'x',
+    sessionId: 'S',
+    entryId: 'e',
+    entryType: 'message',
+    isRoot: false,
+    isBranchPoint: false,
+    isForkPoint: false,
+    isForkBase: false,
+    isActiveLeaf: false,
+    isBranchTip: false,
+    onActivePath: true,
+    parentNodeId: null,
+    incomingMessageCount: 0,
+    timestamp: 't',
+    jump: { messageId: null, compactionId: null },
+    ...p,
   };
 }
 

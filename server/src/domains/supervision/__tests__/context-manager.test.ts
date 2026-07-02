@@ -102,7 +102,7 @@ describe('ContextManager', () => {
       cm.scaffold('TestProj');
 
       const { documents } = cm.loadAll();
-      const ids = documents.map((d) => d.id);
+      const ids = documents.map(d => d.id);
 
       expect(ids).toContain('goal.md');
       expect(ids).toContain('project-summary.md');
@@ -115,10 +115,10 @@ describe('ContextManager', () => {
       cm.writeTaskResult('task-1', '# Result\nSome result');
 
       const { documents } = cm.loadAll();
-      const ids = documents.map((d) => d.id);
+      const ids = documents.map(d => d.id);
 
       // results/task-task-1.md should not be in documents
-      expect(ids.every((id) => !id.startsWith('results/'))).toBe(true);
+      expect(ids.every(id => !id.startsWith('results/'))).toBe(true);
     });
   });
 
@@ -187,15 +187,18 @@ describe('ContextManager', () => {
       cm.scaffold('TestProj');
       const goalPath = path.join((cm as any).rootPath, '.supervision', 'goal.md');
 
-      fs.writeFileSync(goalPath, [
-        '---',
-        'category: goal',
-        'source: user',
-        'version: 7',
-        'updated: broken',
-        '',
-        '# Corrupted frontmatter body',
-      ].join('\n'));
+      fs.writeFileSync(
+        goalPath,
+        [
+          '---',
+          'category: goal',
+          'source: user',
+          'version: 7',
+          'updated: broken',
+          '',
+          '# Corrupted frontmatter body',
+        ].join('\n')
+      );
 
       cm.updateDocument('goal.md', '# Recovered Goal');
 
@@ -352,7 +355,7 @@ describe('ContextManager', () => {
       const reviewPath = path.join(
         (cm as any).supervisionPath,
         'results',
-        'task-task-42.review.md',
+        'task-task-42.review.md'
       );
       expect(fs.existsSync(reviewPath)).toBe(true);
 

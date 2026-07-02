@@ -13,15 +13,20 @@ describe('plan mode toggle', () => {
     db = new Database(':memory:');
     applyMigrations(db);
     db.pragma('foreign_keys = OFF');
-    db.prepare('INSERT INTO sessions (id, project_id, agent_profile_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
-      .run(id, 'p', 'a', Date.now(), Date.now());
+    db.prepare(
+      'INSERT INTO sessions (id, project_id, agent_profile_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
+    ).run(id, 'p', 'a', Date.now(), Date.now());
     repo = new SessionRepository(db);
   });
 
   afterEach(() => db.close());
 
   function planStatus(): string | null {
-    return (db.prepare('SELECT plan_status FROM sessions WHERE id = ?').get(id) as { plan_status: string | null }).plan_status;
+    return (
+      db.prepare('SELECT plan_status FROM sessions WHERE id = ?').get(id) as {
+        plan_status: string | null;
+      }
+    ).plan_status;
   }
 
   it('enterPlanMode sets planning status', () => {

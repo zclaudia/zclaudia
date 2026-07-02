@@ -17,7 +17,7 @@ export interface ContinueTurnDeps {
     message: Record<string, unknown>,
     db: unknown,
     recoveryState?: Record<string, unknown>,
-    clients?: Map<string, ConnectedClient>,
+    clients?: Map<string, ConnectedClient>
   ) => Promise<void>;
   db: unknown;
   clients: Map<string, ConnectedClient>;
@@ -31,7 +31,7 @@ export class ContinueTurnPortImpl implements ContinueTurnPort {
   async appendAndRun(
     sessionId: string,
     text: string,
-    metadata: { source: 'goal-auto'; goalId: string },
+    metadata: { source: 'goal-auto'; goalId: string }
   ): Promise<void> {
     const syntheticClient: ConnectedClient = {
       id: `goal-auto-${sessionId}`,
@@ -54,12 +54,6 @@ export class ContinueTurnPortImpl implements ContinueTurnPort {
       ...(llmProfileId != null ? { llmProfileId } : {}),
     };
 
-    await this.deps.handleRunStart(
-      syntheticClient,
-      message,
-      this.deps.db,
-      {},
-      this.deps.clients,
-    );
+    await this.deps.handleRunStart(syntheticClient, message, this.deps.db, {}, this.deps.clients);
   }
 }

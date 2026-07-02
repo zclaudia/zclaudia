@@ -79,7 +79,7 @@ describe('MessageRouter', () => {
 
     it('passes correct MessageContext to handler', async () => {
       let capturedCtx: MessageContext | undefined;
-      const handler: MessageHandler = vi.fn().mockImplementation(async (ctx) => {
+      const handler: MessageHandler = vi.fn().mockImplementation(async ctx => {
         capturedCtx = ctx;
         return undefined;
       });
@@ -181,7 +181,11 @@ describe('MessageRouter', () => {
         type: 'blocked',
         payload: null,
         timestamp: Date.now(),
-        metadata: { requestId: 'req-1', success: false, error: { code: 'BLOCKED', message: 'Blocked' } },
+        metadata: {
+          requestId: 'req-1',
+          success: false,
+          error: { code: 'BLOCKED', message: 'Blocked' },
+        },
       };
 
       const blockingMiddleware: Middleware = async (_ctx, _next) => {

@@ -61,8 +61,8 @@ describe('MemoryPanel', () => {
     render(<MemoryPanel />);
     await waitFor(() =>
       expect(
-        screen.getByText(/No memories yet — the agent saves project memory here as it works\./),
-      ).toBeInTheDocument(),
+        screen.getByText(/No memories yet — the agent saves project memory here as it works\./)
+      ).toBeInTheDocument()
     );
   });
 });

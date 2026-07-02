@@ -13,7 +13,10 @@ function tmpDir() {
 describe('gate runner', () => {
   it('passes when exit code matches', async () => {
     const gate: AcceptanceGate = {
-      id: 'echo', description: 'echo ok', command: 'echo hello', expect: { exitCode: 0 },
+      id: 'echo',
+      description: 'echo ok',
+      command: 'echo hello',
+      expect: { exitCode: 0 },
     };
     const result = await runGate(gate, tmpDir());
     expect(result.passed).toBe(true);
@@ -23,7 +26,10 @@ describe('gate runner', () => {
 
   it('fails when exit code does not match', async () => {
     const gate: AcceptanceGate = {
-      id: 'fail', description: 'exit 1', command: 'exit 1', expect: { exitCode: 0 },
+      id: 'fail',
+      description: 'exit 1',
+      command: 'exit 1',
+      expect: { exitCode: 0 },
     };
     const result = await runGate(gate, tmpDir());
     expect(result.passed).toBe(false);
@@ -32,7 +38,9 @@ describe('gate runner', () => {
 
   it('checks stdoutMatches regex', async () => {
     const gate: AcceptanceGate = {
-      id: 'm', description: 'm', command: 'echo SUCCESS-42',
+      id: 'm',
+      description: 'm',
+      command: 'echo SUCCESS-42',
       expect: { exitCode: 0, stdoutMatches: 'SUCCESS-\\d+' },
     };
     const result = await runGate(gate, tmpDir());
@@ -41,7 +49,9 @@ describe('gate runner', () => {
 
   it('fails when stdoutMatches does not match', async () => {
     const gate: AcceptanceGate = {
-      id: 'm', description: 'm', command: 'echo something',
+      id: 'm',
+      description: 'm',
+      command: 'echo something',
       expect: { exitCode: 0, stdoutMatches: 'NOPE' },
     };
     const result = await runGate(gate, tmpDir());
@@ -52,7 +62,9 @@ describe('gate runner', () => {
     const dir = tmpDir();
     writeFileSync(join(dir, 'created.txt'), 'x');
     const gate: AcceptanceGate = {
-      id: 'fe', description: 'file exists', command: 'true',
+      id: 'fe',
+      description: 'file exists',
+      command: 'true',
       expect: { exitCode: 0, fileExists: ['created.txt'] },
     };
     const result = await runGate(gate, dir);
@@ -63,7 +75,9 @@ describe('gate runner', () => {
     const dir = tmpDir();
     writeFileSync(join(dir, 'should-be-gone.txt'), 'x');
     const gate: AcceptanceGate = {
-      id: 'fne', description: 'file is gone', command: 'true',
+      id: 'fne',
+      description: 'file is gone',
+      command: 'true',
       expect: { exitCode: 0, fileNotExists: ['should-be-gone.txt'] },
     };
     const result = await runGate(gate, dir);
@@ -72,7 +86,10 @@ describe('gate runner', () => {
 
   it('respects durationMaxMs (fast command passes)', async () => {
     const gate: AcceptanceGate = {
-      id: 'fast', description: 'quick', command: 'true', expect: { exitCode: 0, durationMaxMs: 5000 },
+      id: 'fast',
+      description: 'quick',
+      command: 'true',
+      expect: { exitCode: 0, durationMaxMs: 5000 },
     };
     const result = await runGate(gate, tmpDir());
     expect(result.passed).toBe(true);
@@ -85,7 +102,7 @@ describe('gate runner', () => {
       { id: 'c', description: 'c', command: 'true', expect: { exitCode: 0 } },
     ];
     const results = await runGates(gates, tmpDir(), { stopOnFirstFailure: true });
-    expect(results.map((r) => r.gateId)).toEqual(['a', 'b']);
+    expect(results.map(r => r.gateId)).toEqual(['a', 'b']);
     expect(results[0].passed).toBe(true);
     expect(results[1].passed).toBe(false);
   });

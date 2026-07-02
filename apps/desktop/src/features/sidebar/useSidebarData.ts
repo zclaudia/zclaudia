@@ -20,53 +20,60 @@ import { selectProjectIdsForBackend } from './projectGrouping';
  * Keeps the Sidebar component focused on rendering.
  */
 export function useSidebarData() {
-  const projects = useProjectStore((s) => s.projects) ?? [];
-  const sessions = useProjectStore((s) => s.sessions) ?? [];
-  const legacyProviders = useProjectStore((s) => s.providers) ?? [];
-  const selectedSessionId = useSelectionStore((s) => s.selectedSessionId);
-  const addProject = useProjectStore((s) => s.addProject);
-  const addSession = useProjectStore((s) => s.addSession);
-  const deleteProject = useProjectStore((s) => s.deleteProject);
-  const storeReorderProjects = useProjectStore((s) => s.reorderProjects);
-  const storeReorderSessions = useProjectStore((s) => s.reorderSessions);
+  const projects = useProjectStore(s => s.projects) ?? [];
+  const sessions = useProjectStore(s => s.sessions) ?? [];
+  const legacyProviders = useProjectStore(s => s.providers) ?? [];
+  const selectedSessionId = useSelectionStore(s => s.selectedSessionId);
+  const addProject = useProjectStore(s => s.addProject);
+  const addSession = useProjectStore(s => s.addSession);
+  const deleteProject = useProjectStore(s => s.deleteProject);
+  const storeReorderProjects = useProjectStore(s => s.reorderProjects);
+  const storeReorderSessions = useProjectStore(s => s.reorderSessions);
 
-  const activeServerId = useServerStore((s) => s.activeServerId);
-  const facadeConnectionState = useFacadeStore((s) => s.connectionState);
-  const facadeBackends = useFacadeStore((s) => s.backends);
+  const activeServerId = useServerStore(s => s.activeServerId);
+  const facadeConnectionState = useFacadeStore(s => s.connectionState);
+  const facadeBackends = useFacadeStore(s => s.backends);
   const isConnected = isMobileBackendUsable({
     backendId: activeServerId,
     connectionState: facadeConnectionState,
     backends: facadeBackends,
   });
-  const scopedProviders = useLlmProfileMetaStore((s) => s.getProviders(activeServerId));
+  const scopedProviders = useLlmProfileMetaStore(s => s.getProviders(activeServerId));
   const providers = scopedProviders.length > 0 ? scopedProviders : legacyProviders;
 
-  const storeSupervisorAgents = useSupervisionStore((s) => s.agents);
-  const setSupervisionAgent = useSupervisionStore((s) => s.setAgent);
-  const notificationUnreadCount = useNotificationFeedStore((s) => s.unreadCount);
-  const { hasUnread: hasClaudiaUnread, hasRunning: hasClaudiaRunning, hasPermissionPending: hasClaudiaPermissionPending } = useClaudiaStatus();
-  const isClaudiaExpanded = useClaudiaStore((s) => s.isExpanded);
-  const setClaudiaExpanded = useClaudiaStore((s) => s.setExpanded);
+  const storeSupervisorAgents = useSupervisionStore(s => s.agents);
+  const setSupervisionAgent = useSupervisionStore(s => s.setAgent);
+  const notificationUnreadCount = useNotificationFeedStore(s => s.unreadCount);
+  const {
+    hasUnread: hasClaudiaUnread,
+    hasRunning: hasClaudiaRunning,
+    hasPermissionPending: hasClaudiaPermissionPending,
+  } = useClaudiaStatus();
+  const isClaudiaExpanded = useClaudiaStore(s => s.isExpanded);
+  const setClaudiaExpanded = useClaudiaStore(s => s.setExpanded);
 
   const permSessionIds = usePermissionStore(s => new Set(s.pendingRequests.map(r => r.sessionId)));
-  const interactionSessionIds = useInteractionStore((s) => {
+  const interactionSessionIds = useInteractionStore(s => {
     const ids = new Set<string>();
     for (const interaction of Object.values(s.interactions)) {
       if (
-        interaction.type === 'interaction_plan_review'
-        || interaction.type === 'interaction_approval'
-        || interaction.type === 'interaction_prompt'
+        interaction.type === 'interaction_plan_review' ||
+        interaction.type === 'interaction_approval' ||
+        interaction.type === 'interaction_prompt'
       ) {
         ids.add(interaction.sessionId);
       }
     }
     return ids;
   });
-  const hasPendingForSession = useCallback((sessionId: string) => {
-    return permSessionIds.has(sessionId) || interactionSessionIds.has(sessionId);
-  }, [permSessionIds, interactionSessionIds]);
+  const hasPendingForSession = useCallback(
+    (sessionId: string) => {
+      return permSessionIds.has(sessionId) || interactionSessionIds.has(sessionId);
+    },
+    [permSessionIds, interactionSessionIds]
+  );
 
-  const sessionRunRecords = useSessionRunStateStore((s) => s.records);
+  const sessionRunRecords = useSessionRunStateStore(s => s.records);
   const activeRunSessionIds = useMemo(() => {
     const ids = new Set<string>();
     for (const record of Object.values(sessionRunRecords)) {
@@ -76,7 +83,7 @@ export function useSidebarData() {
   }, [sessionRunRecords]);
 
   const ownershipStore = useOwnershipStore();
-  const localBackendId = useFacadeStore((s) => s.localBackendId);
+  const localBackendId = useFacadeStore(s => s.localBackendId);
 
   const visibleProjects = projects;
 
@@ -99,12 +106,12 @@ export function useSidebarData() {
   }, [visibleProjects, storeSupervisorAgents]);
 
   const visibleProjectIds = useMemo(
-    () => new Set(visibleProjects.map((project) => project.id)),
+    () => new Set(visibleProjects.map(project => project.id)),
     [visibleProjects]
   );
 
   const visibleSessions = useMemo(() => {
-    return sessions.filter((session) => visibleProjectIds.has(session.projectId));
+    return sessions.filter(session => visibleProjectIds.has(session.projectId));
   }, [sessions, visibleProjectIds]);
 
   const internalProjectIds = useMemo(
@@ -114,7 +121,9 @@ export function useSidebarData() {
 
   const sessionsByProject = useMemo(() => {
     const grouped = new Map<string, typeof sessions>();
-    const filteredSessions = visibleSessions.filter(s => s.type !== 'background' && !internalProjectIds.has(s.projectId));
+    const filteredSessions = visibleSessions.filter(
+      s => s.type !== 'background' && !internalProjectIds.has(s.projectId)
+    );
     filteredSessions.forEach(session => {
       const projectSessions = grouped.get(session.projectId) || [];
       projectSessions.push(session);
@@ -125,35 +134,47 @@ export function useSidebarData() {
 
   const filteredProjects = visibleProjects.filter(p => !p.isInternal);
 
-  const getFilteredSessionsForProject = useCallback((projectId: string) => {
-    return sessionsByProject.get(projectId) || [];
-  }, [sessionsByProject]);
+  const getFilteredSessionsForProject = useCallback(
+    (projectId: string) => {
+      return sessionsByProject.get(projectId) || [];
+    },
+    [sessionsByProject]
+  );
 
   // Per spec §4.4 sub-project C: sidebar session rows no longer display a
   // provider/agent label — the new SessionHeader exposes it instead. We keep
   // a no-op `getProviderName` for now to avoid touching every Sidebar consumer
   // in this task (the next task removes the prop drilling altogether).
-  const getProviderName = useCallback((_session: typeof sessions[0]): string | undefined => undefined, []);
+  const getProviderName = useCallback(
+    (_session: (typeof sessions)[0]): string | undefined => undefined,
+    []
+  );
 
-  const getWorktreeBranch = useCallback((session: typeof sessions[0], project: typeof projects[0] | undefined) => {
-    const wd = session.workingDirectory;
-    if (!wd || !project?.rootPath) return undefined;
-    if (wd === project.rootPath) return undefined;
-    const parts = wd.split('/');
-    return parts[parts.length - 1] || undefined;
-  }, []);
+  const getWorktreeBranch = useCallback(
+    (session: (typeof sessions)[0], project: (typeof projects)[0] | undefined) => {
+      const wd = session.workingDirectory;
+      if (!wd || !project?.rootPath) return undefined;
+      if (wd === project.rootPath) return undefined;
+      const parts = wd.split('/');
+      return parts[parts.length - 1] || undefined;
+    },
+    []
+  );
 
-  const getProjectsForBackend = useCallback((backendId: string) => {
-    const ids = new Set(
-      selectProjectIdsForBackend(
-        filteredProjects,
-        backendId,
-        (projectId) => ownershipStore.getProjectBackendId(projectId),
-        localBackendId,
-      ),
-    );
-    return filteredProjects.filter((p) => ids.has(p.id));
-  }, [filteredProjects, ownershipStore, localBackendId]);
+  const getProjectsForBackend = useCallback(
+    (backendId: string) => {
+      const ids = new Set(
+        selectProjectIdsForBackend(
+          filteredProjects,
+          backendId,
+          projectId => ownershipStore.getProjectBackendId(projectId),
+          localBackendId
+        )
+      );
+      return filteredProjects.filter(p => ids.has(p.id));
+    },
+    [filteredProjects, ownershipStore, localBackendId]
+  );
 
   return {
     projects,

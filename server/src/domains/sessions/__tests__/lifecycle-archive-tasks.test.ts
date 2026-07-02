@@ -32,16 +32,16 @@ beforeEach(() => {
   // before we can insert a session.
   const now = Date.now();
   db.prepare(
-    'INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+    'INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
   ).run('project-1', 'Test Project', 'code', now, now);
   db.prepare(
-    'INSERT INTO llm_profiles (id, name, provider_type, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+    'INSERT INTO llm_profiles (id, name, provider_type, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
   ).run('llm-1', 'Default LLM', 'anthropic', 1, now, now);
   db.prepare(
-    'INSERT INTO agent_profiles (id, name, llm_profile_id, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+    'INSERT INTO agent_profiles (id, name, llm_profile_id, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
   ).run('agent-1', 'Default Agent', 'llm-1', 1, now, now);
   db.prepare(
-    'INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+    'INSERT INTO sessions (id, project_id, name, agent_profile_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
   ).run('session-1', 'project-1', 'Session 1', 'agent-1', now, now);
 });
 
@@ -78,7 +78,7 @@ describe('SessionLifecycleService.archiveSessions — command task cleanup', () 
 
     const lifecycleService = new SessionLifecycleService(db);
     lifecycleService.archiveSessions(['session-1']);
-    await new Promise<void>((r) => setTimeout(r, 400));
+    await new Promise<void>(r => setTimeout(r, 400));
 
     try {
       expect(repo.findById(task.id)!.status).toBe('stopped');

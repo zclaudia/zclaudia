@@ -18,7 +18,7 @@ interface AutomationsTabProps {
 export function AutomationsTab({ api, projectName, projectId }: AutomationsTabProps) {
   const [automations, setAutomations] = useState<Automation[]>([]);
   const [loading, setLoading] = useState(true);
-  const selectedItemId = useTopLevelViewStore((s) => s.selectedAutomationItemId);
+  const selectedItemId = useTopLevelViewStore(s => s.selectedAutomationItemId);
 
   // Create form state
   const [showCreate, setShowCreate] = useState(false);
@@ -36,63 +36,79 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
   const [actionConfig, setActionConfig] = useState<Record<string, unknown>>({});
 
   const effectiveProjectId = projectId ?? '';
-  const projectQuery = effectiveProjectId ? `?projectId=${encodeURIComponent(effectiveProjectId)}` : '';
+  const projectQuery = effectiveProjectId
+    ? `?projectId=${encodeURIComponent(effectiveProjectId)}`
+    : '';
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const allAutomations: Automation[] = await api.get(`/api/automations${projectQuery}`).catch(() => []);
+      const allAutomations: Automation[] = await api
+        .get(`/api/automations${projectQuery}`)
+        .catch(() => []);
       setAutomations(allAutomations);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     setLoading(false);
   }, [api, projectQuery]);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   useEffect(() => {
     // Fetch all workflows (unfiltered) for the picker: bindable workflows are global/system
     // workflows (e.g. the seeded Auto-Commit), which /api/workflows?projectId=X would exclude.
-    api.get('/api/workflows').then(setAvailableWorkflows).catch(() => setAvailableWorkflows([]));
+    api
+      .get('/api/workflows')
+      .then(setAvailableWorkflows)
+      .catch(() => setAvailableWorkflows([]));
   }, [api]);
 
   useEffect(() => {
-    api.get('/api/workflow-step-types')
-      .then((res: { success?: boolean; data?: WorkflowStepTypeMeta[] } | WorkflowStepTypeMeta[]) => {
-        const data = Array.isArray(res) ? res : (res.data ?? []);
-        setStepTypes(data);
-      })
+    api
+      .get('/api/workflow-step-types')
+      .then(
+        (res: { success?: boolean; data?: WorkflowStepTypeMeta[] } | WorkflowStepTypeMeta[]) => {
+          const data = Array.isArray(res) ? res : (res.data ?? []);
+          setStepTypes(data);
+        }
+      )
       .catch(() => setStepTypes([]));
   }, [api]);
 
   const workflowNameMap = useMemo(
-    () => new Map(availableWorkflows.map((w) => [w.id, w.name])),
-    [availableWorkflows],
+    () => new Map(availableWorkflows.map(w => [w.id, w.name])),
+    [availableWorkflows]
   );
 
   const inlineActionOptions = useMemo(
     () =>
       stepTypes
-        .filter((m) => m.category !== 'Flow Control' && m.category !== 'Permission')
-        .map((m) => ({ value: m.type, label: m.name })),
-    [stepTypes],
+        .filter(m => m.category !== 'Flow Control' && m.category !== 'Permission')
+        .map(m => ({ value: m.type, label: m.name })),
+    [stepTypes]
   );
   const selectedStepType = useMemo(
-    () => stepTypes.find((m) => m.type === newActionType),
-    [stepTypes, newActionType],
+    () => stepTypes.find(m => m.type === newActionType),
+    [stepTypes, newActionType]
   );
 
   // Build unified list
   const items: AutomationItem[] = useMemo(() => {
-    return automations.map((a) => automationToItem(a, workflowNameMap)).sort((a, b) =>
-      (b.enabled ? 1 : 0) - (a.enabled ? 1 : 0)
-    );
+    return automations
+      .map(a => automationToItem(a, workflowNameMap))
+      .sort((a, b) => (b.enabled ? 1 : 0) - (a.enabled ? 1 : 0));
   }, [automations, workflowNameMap]);
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
     if (newActionType === 'workflow' && !workflowRef) return;
 
-    let action: { kind: 'workflow'; ref: string } | { kind: 'activity'; ref: string; input: Record<string, unknown> };
+    let action:
+      | { kind: 'workflow'; ref: string }
+      | { kind: 'activity'; ref: string; input: Record<string, unknown> };
     if (newActionType === 'workflow') {
       action = { kind: 'workflow', ref: workflowRef };
     } else {
@@ -174,7 +190,11 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
             <Plus size={12} />
             New
           </button>
-          <button onClick={refresh} className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground" title="Refresh">
+          <button
+            onClick={refresh}
+            className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
+            title="Refresh"
+          >
             <RefreshCw size={14} />
           </button>
         </div>
@@ -185,7 +205,7 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
         <div className="rounded-lg border border-primary/30 bg-muted/40 p-3 space-y-2">
           <input
             value={newName}
-            onChange={(e) => setNewName(e.target.value)}
+            onChange={e => setNewName(e.target.value)}
             placeholder="Automation name"
             className="w-full px-2 py-1.5 text-xs rounded-md border border-border bg-background text-foreground"
           />
@@ -209,30 +229,48 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
             {newTriggerType === 'interval' && (
               <div className="flex items-center gap-1">
                 <span className="text-[10px] text-muted-foreground">every</span>
-                <input value={newIntervalMinutes} onChange={(e) => setNewIntervalMinutes(e.target.value)} placeholder="60" className="w-16 px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground" />
+                <input
+                  value={newIntervalMinutes}
+                  onChange={e => setNewIntervalMinutes(e.target.value)}
+                  placeholder="60"
+                  className="w-16 px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground"
+                />
                 <span className="text-[10px] text-muted-foreground">min</span>
               </div>
             )}
             {newTriggerType === 'cron' && (
-              <input value={newCron} onChange={(e) => setNewCron(e.target.value)} placeholder="0 9 * * *" className="flex-1 px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground font-mono" />
+              <input
+                value={newCron}
+                onChange={e => setNewCron(e.target.value)}
+                placeholder="0 9 * * *"
+                className="flex-1 px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground font-mono"
+              />
             )}
             {newTriggerType === 'once' && (
               <input
                 type="datetime-local"
                 value={newOnceAt}
-                onChange={(e) => setNewOnceAt(e.target.value)}
+                onChange={e => setNewOnceAt(e.target.value)}
                 className="px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground"
               />
             )}
             {newTriggerType === 'event' && (
-              <input value={newEvent} onChange={(e) => setNewEvent(e.target.value)} placeholder="plugin.event.name" className="flex-1 px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground" />
+              <input
+                value={newEvent}
+                onChange={e => setNewEvent(e.target.value)}
+                placeholder="plugin.event.name"
+                className="flex-1 px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground"
+              />
             )}
           </div>
           <div className="flex items-center gap-1">
             <span className="text-[10px] text-muted-foreground">Action:</span>
             <Select
               value={newActionType}
-              onChange={(v) => { setNewActionType(v); setActionConfig({}); }}
+              onChange={v => {
+                setNewActionType(v);
+                setActionConfig({});
+              }}
               size="md"
               triggerClassName="min-w-[140px]"
               options={[...inlineActionOptions, { value: 'workflow', label: 'Workflow' }]}
@@ -245,7 +283,7 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
               size="md"
               block
               placeholder="Select workflow…"
-              options={availableWorkflows.map((w) => ({ value: w.id, label: w.name }))}
+              options={availableWorkflows.map(w => ({ value: w.id, label: w.name }))}
             />
           ) : (
             <SchemaForm
@@ -254,9 +292,7 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
               onChange={setActionConfig}
             />
           )}
-          {createError && (
-            <div className="text-[11px] text-destructive">{createError}</div>
-          )}
+          {createError && <div className="text-[11px] text-destructive">{createError}</div>}
           <div className="flex justify-end gap-2">
             <button
               onClick={() => {
@@ -267,7 +303,13 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
             >
               Cancel
             </button>
-            <button onClick={handleCreate} disabled={!newName.trim() || (newActionType === 'workflow' && !workflowRef)} className="px-2 py-1 text-xs rounded-md bg-muted/60 text-foreground hover:bg-muted disabled:opacity-50">Create</button>
+            <button
+              onClick={handleCreate}
+              disabled={!newName.trim() || (newActionType === 'workflow' && !workflowRef)}
+              className="px-2 py-1 text-xs rounded-md bg-muted/60 text-foreground hover:bg-muted disabled:opacity-50"
+            >
+              Create
+            </button>
           </div>
         </div>
       )}
@@ -275,10 +317,20 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
       {/* Enabled Automations */}
       {enabledItems.length > 0 && (
         <div>
-          <h3 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Active ({enabledItems.length})</h3>
+          <h3 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
+            Active ({enabledItems.length})
+          </h3>
           <div className="space-y-1.5">
             {enabledItems.map(item => (
-              <AutomationCard key={item.id} item={item} projectName={projectName} onToggle={() => handleToggle(item)} onTrigger={() => handleTriggerNow(item)} onDelete={() => handleDelete(item)} selected={item.id === selectedItemId} />
+              <AutomationCard
+                key={item.id}
+                item={item}
+                projectName={projectName}
+                onToggle={() => handleToggle(item)}
+                onTrigger={() => handleTriggerNow(item)}
+                onDelete={() => handleDelete(item)}
+                selected={item.id === selectedItemId}
+              />
             ))}
           </div>
         </div>
@@ -287,23 +339,43 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
       {/* Disabled Automations */}
       {disabledItems.length > 0 && (
         <div>
-          <h3 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Disabled ({disabledItems.length})</h3>
+          <h3 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
+            Disabled ({disabledItems.length})
+          </h3>
           <div className="space-y-1.5">
             {disabledItems.map(item => (
-              <AutomationCard key={item.id} item={item} projectName={projectName} onToggle={() => handleToggle(item)} onTrigger={() => handleTriggerNow(item)} onDelete={() => handleDelete(item)} selected={item.id === selectedItemId} />
+              <AutomationCard
+                key={item.id}
+                item={item}
+                projectName={projectName}
+                onToggle={() => handleToggle(item)}
+                onTrigger={() => handleTriggerNow(item)}
+                onDelete={() => handleDelete(item)}
+                selected={item.id === selectedItemId}
+              />
             ))}
           </div>
         </div>
       )}
 
       {items.length === 0 && !showCreate && (
-        <EmptyState message="No automations yet" subtitle="Create one or enable a template to get started" />
+        <EmptyState
+          message="No automations yet"
+          subtitle="Create one or enable a template to get started"
+        />
       )}
     </div>
   );
 }
 
-function AutomationCard({ item, projectName, onToggle, onTrigger, onDelete, selected }: {
+function AutomationCard({
+  item,
+  projectName,
+  onToggle,
+  onTrigger,
+  onDelete,
+  selected,
+}: {
   item: AutomationItem;
   projectName: (id?: string) => string;
   onToggle: () => void;
@@ -316,11 +388,17 @@ function AutomationCard({ item, projectName, onToggle, onTrigger, onDelete, sele
       data-automation-card
       className={`rounded-lg border p-3 flex items-center gap-3 ${selected ? 'ring-2 ring-primary ' : ''}${item.enabled ? 'border-border bg-card/50' : 'border-border/50 bg-muted/30 opacity-60'}`}
     >
-      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-        item.status === 'running' ? 'bg-amber-500 animate-pulse' :
-        item.status === 'error' ? 'bg-red-500' :
-        item.enabled ? 'bg-green-500' : 'bg-muted-foreground'
-      }`} />
+      <span
+        className={`w-2 h-2 rounded-full flex-shrink-0 ${
+          item.status === 'running'
+            ? 'bg-amber-500 animate-pulse'
+            : item.status === 'error'
+              ? 'bg-red-500'
+              : item.enabled
+                ? 'bg-green-500'
+                : 'bg-muted-foreground'
+        }`}
+      />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium truncate">{item.name}</span>
@@ -334,20 +412,39 @@ function AutomationCard({ item, projectName, onToggle, onTrigger, onDelete, sele
           <span>{item.triggerSummary}</span>
           <span>·</span>
           <span>{item.actionSummary}</span>
-          {item.runCount > 0 && <><span>·</span><span>{item.runCount} runs</span></>}
+          {item.runCount > 0 && (
+            <>
+              <span>·</span>
+              <span>{item.runCount} runs</span>
+            </>
+          )}
           {item.lastError && (
-            <span className="text-destructive truncate max-w-[120px]" title={item.lastError}>· {item.lastError.slice(0, 30)}</span>
+            <span className="text-destructive truncate max-w-[120px]" title={item.lastError}>
+              · {item.lastError.slice(0, 30)}
+            </span>
           )}
         </div>
       </div>
       <div className="flex items-center gap-1">
-        <button onClick={onTrigger} className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground" title="Run now">
+        <button
+          onClick={onTrigger}
+          className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
+          title="Run now"
+        >
           <Play size={12} />
         </button>
-        <button onClick={onToggle} className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground" title={item.enabled ? 'Disable' : 'Enable'}>
+        <button
+          onClick={onToggle}
+          className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
+          title={item.enabled ? 'Disable' : 'Enable'}
+        >
           {item.enabled ? <Pause size={12} /> : <Play size={12} />}
         </button>
-        <button onClick={onDelete} className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-red-400" title="Delete">
+        <button
+          onClick={onDelete}
+          className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-red-400"
+          title="Delete"
+        >
           <Trash2 size={12} />
         </button>
       </div>

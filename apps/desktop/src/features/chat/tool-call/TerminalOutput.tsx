@@ -19,7 +19,7 @@ function RunInTerminalButton({ command }: { command: string }) {
 
   return (
     <button
-      onClick={async (e) => {
+      onClick={async e => {
         e.stopPropagation();
         const { selectedSessionId } = useSelectionStore.getState();
         const { sessions } = useProjectStore.getState();
@@ -43,7 +43,12 @@ function RunInTerminalButton({ command }: { command: string }) {
       title="Paste to terminal"
     >
       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+        />
       </svg>
     </button>
   );
@@ -54,9 +59,8 @@ function TerminalOutput({ content, isError }: { content: string; isError?: boole
   const [isFullyExpanded, setIsFullyExpanded] = useState(false);
   const lines = content.split('\n');
   const needsCollapse = lines.length > TERMINAL_PREVIEW_LINES;
-  const displayContent = needsCollapse && !isFullyExpanded
-    ? lines.slice(0, TERMINAL_PREVIEW_LINES).join('\n')
-    : content;
+  const displayContent =
+    needsCollapse && !isFullyExpanded ? lines.slice(0, TERMINAL_PREVIEW_LINES).join('\n') : content;
 
   const html = useMemo(() => ansiToHtml(displayContent), [displayContent]);
 
@@ -65,9 +69,7 @@ function TerminalOutput({ content, isError }: { content: string; isError?: boole
       <pre
         data-testid="tool-result"
         className={`text-xs font-mono p-3 overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch] whitespace-pre ${
-          isError
-            ? 'bg-red-950 text-red-300'
-            : 'bg-zinc-900 text-zinc-200'
+          isError ? 'bg-red-950 text-red-300' : 'bg-zinc-900 text-zinc-200'
         }`}
         dangerouslySetInnerHTML={{ __html: html }}
       />
@@ -76,9 +78,7 @@ function TerminalOutput({ content, isError }: { content: string; isError?: boole
           onClick={() => setIsFullyExpanded(!isFullyExpanded)}
           className="w-full px-3 py-1.5 text-xs text-zinc-400 bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 transition-colors text-center"
         >
-          {isFullyExpanded
-            ? 'Collapse'
-            : `Show all ${lines.length} lines`}
+          {isFullyExpanded ? 'Collapse' : `Show all ${lines.length} lines`}
         </button>
       )}
     </div>

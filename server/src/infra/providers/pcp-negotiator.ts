@@ -37,7 +37,7 @@ export interface NegotiationContext {
  */
 export function negotiateProfile(
   manifest: PCPProviderManifest,
-  context: NegotiationContext,
+  context: NegotiationContext
 ): PCPEffectiveProfile {
   const normalizedMode = normalizePermissionMode(context.mode);
   const capabilities: PCPEffectiveCapability[] = manifest.capabilities.map(cap => {

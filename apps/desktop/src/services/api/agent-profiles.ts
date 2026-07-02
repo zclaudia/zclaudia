@@ -2,7 +2,10 @@ import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import { apiCall, apiCallVoid } from './unwrap';
 
 const BASE = '/api/agent-profiles';
-type AgentProfileWriteInput = Omit<AgentProfileConfig, 'id' | 'createdAt' | 'updatedAt' | 'multimodalFallback'> & {
+type AgentProfileWriteInput = Omit<
+  AgentProfileConfig,
+  'id' | 'createdAt' | 'updatedAt' | 'multimodalFallback'
+> & {
   multimodalFallback?: AgentProfileConfig['multimodalFallback'] | null;
 };
 

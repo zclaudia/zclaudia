@@ -1,22 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import {
-  normalizeSkillExecutionSelection,
-  type SkillExecutionSelection,
-} from '../skills.js';
+import { normalizeSkillExecutionSelection, type SkillExecutionSelection } from '../skills.js';
 import type { AgentProfileConfig } from '../agent-profile.js';
 
 describe('skill execution selection', () => {
   it('normalizes valid execution overrides', () => {
-    expect(normalizeSkillExecutionSelection({
-      overrides: [
-        {
-          ref: { source: 'workspace', id: 'guidelines' },
-          allowedModes: ['inline', 'fork'],
-          defaultMode: 'fork',
-          forkToolPolicy: 'web',
-        },
-      ],
-    })).toEqual({
+    expect(
+      normalizeSkillExecutionSelection({
+        overrides: [
+          {
+            ref: { source: 'workspace', id: 'guidelines' },
+            allowedModes: ['inline', 'fork'],
+            defaultMode: 'fork',
+            forkToolPolicy: 'web',
+          },
+        ],
+      })
+    ).toEqual({
       overrides: [
         {
           ref: { source: 'workspace', id: 'guidelines' },
@@ -29,16 +28,18 @@ describe('skill execution selection', () => {
   });
 
   it('drops invalid modes and fork tool policies', () => {
-    expect(normalizeSkillExecutionSelection({
-      overrides: [
-        {
-          ref: { source: 'external', id: 'audit' },
-          allowedModes: ['fork', 'bad', 'fork'],
-          defaultMode: 'bad',
-          forkToolPolicy: 'dangerous',
-        },
-      ],
-    })).toEqual({
+    expect(
+      normalizeSkillExecutionSelection({
+        overrides: [
+          {
+            ref: { source: 'external', id: 'audit' },
+            allowedModes: ['fork', 'bad', 'fork'],
+            defaultMode: 'bad',
+            forkToolPolicy: 'dangerous',
+          },
+        ],
+      })
+    ).toEqual({
       overrides: [
         {
           ref: { source: 'external', id: 'audit' },
@@ -53,20 +54,22 @@ describe('skill execution selection', () => {
   });
 
   it('dedupes overrides by skill ref with the last override winning', () => {
-    expect(normalizeSkillExecutionSelection({
-      overrides: [
-        {
-          ref: { source: 'plugin', id: 'reviewer' },
-          defaultMode: 'fork',
-        },
-        {
-          ref: { source: 'plugin', id: 'reviewer' },
-          allowedModes: ['inline'],
-          defaultMode: 'inline',
-          forkToolPolicy: 'read-only',
-        },
-      ],
-    })).toEqual({
+    expect(
+      normalizeSkillExecutionSelection({
+        overrides: [
+          {
+            ref: { source: 'plugin', id: 'reviewer' },
+            defaultMode: 'fork',
+          },
+          {
+            ref: { source: 'plugin', id: 'reviewer' },
+            allowedModes: ['inline'],
+            defaultMode: 'inline',
+            forkToolPolicy: 'read-only',
+          },
+        ],
+      })
+    ).toEqual({
       overrides: [
         {
           ref: { source: 'plugin', id: 'reviewer' },

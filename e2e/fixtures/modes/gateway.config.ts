@@ -25,8 +25,10 @@ export const gatewayMode: ModeConfig = {
 
   // Optional proxy
   proxyUrl: process.env.SOCKS5_PROXY_URL,
-  proxyAuth: process.env.SOCKS5_PROXY_USER ? {
-    username: process.env.SOCKS5_PROXY_USER,
-    password: process.env.SOCKS5_PROXY_PASS || ''
-  } : undefined,
+  proxyAuth: process.env.SOCKS5_PROXY_USER
+    ? {
+        username: process.env.SOCKS5_PROXY_USER,
+        password: process.env.SOCKS5_PROXY_PASS || '',
+      }
+    : undefined,
 };

@@ -16,6 +16,7 @@ import { useServerStore } from '../../stores/serverStore';
 describe('MobileSetup', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.history.pushState({}, '', '/');
 
     useGatewayStore.setState({
       gatewayUrl: null,
@@ -42,12 +43,12 @@ describe('MobileSetup', () => {
       snapshotVersion: 0,
     });
 
-    useServerStore.setState((state) => ({
+    useServerStore.setState(state => ({
       ...state,
       activeServerId: null,
     }));
 
-    useRecoveryStore.setState((state) => ({
+    useRecoveryStore.setState(state => ({
       ...state,
       transport: {
         ...state.transport,
@@ -60,7 +61,7 @@ describe('MobileSetup', () => {
   });
 
   it('shows the real facade connection error instead of waiting for timeout', async () => {
-    render(<MobileSetup />);
+    const { rerender } = render(<MobileSetup />);
 
     fireEvent.change(screen.getByPlaceholderText('http://gateway.example.com:3200'), {
       target: { value: 'https://gateway.example.com' },
@@ -75,7 +76,7 @@ describe('MobileSetup', () => {
         connectionState: 'error',
         connectionError: 'UNAUTHORIZED: Invalid gateway secret',
       });
-      useRecoveryStore.setState((state) => ({
+      useRecoveryStore.setState(state => ({
         ...state,
         transport: {
           ...state.transport,
@@ -84,6 +85,7 @@ describe('MobileSetup', () => {
         },
       }));
     });
+    rerender(<MobileSetup />);
 
     await waitFor(() => {
       expect(screen.getByText('UNAUTHORIZED: Invalid gateway secret')).toBeInTheDocument();
@@ -91,7 +93,7 @@ describe('MobileSetup', () => {
   });
 
   it('renders the mobile debug panel when mobileDebug=1 is present', () => {
-    window.history.replaceState({}, '', '/?mobileDebug=1');
+    window.history.pushState({}, '', '/?mobileDebug=1');
 
     useGatewayStore.setState({
       showLocalBackend: false,
@@ -125,7 +127,7 @@ describe('MobileSetup', () => {
     expect(screen.getByText('backends: 1')).toBeInTheDocument();
     expect(screen.getByText(/Backend 1 \(backend-1\)/)).toBeInTheDocument();
 
-    window.history.replaceState({}, '', '/');
+    window.history.pushState({}, '', '/');
   });
 
   it('toggles the mobile debug panel after tapping the logo five times', () => {

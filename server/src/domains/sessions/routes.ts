@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, type Request, type Response } from 'express';
 import type Database from 'better-sqlite3';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import type { Message } from '@zclaudia/shared/core/message';
@@ -12,7 +12,11 @@ import { SessionExportError, SessionExportService } from './export-service.js';
 import { SessionQueryError, SessionQueryService } from './query-service.js';
 import { buildSessionUpdatePatch, isSessionValidationError } from './model.js';
 import type { SessionEventPublisherPort } from './session-event-port.js';
-import { hasForegroundActiveRunForSession, findForegroundActiveRunIdForSession, hasAnyActiveRunForSession } from '../../utils/run-state.js';
+import {
+  hasForegroundActiveRunForSession,
+  findForegroundActiveRunIdForSession,
+  hasAnyActiveRunForSession,
+} from '../../utils/run-state.js';
 import { branchSessionAt, BranchError } from './branch-service.js';
 import { forkSession, ForkError } from './fork-service.js';
 import { buildContextGraph } from './context-graph-read.js';
@@ -26,7 +30,7 @@ type ActiveRunsMap = Map<string, ActiveRun>;
 export function createSessionRoutes(
   db: Database.Database,
   activeRuns: ActiveRunsMap,
-  sessionEvents?: SessionEventPublisherPort,
+  sessionEvents?: SessionEventPublisherPort
 ): Router {
   const router = Router();
   const repo = new SessionRepository(db);
@@ -34,7 +38,7 @@ export function createSessionRoutes(
     broadcastSessionEvent: (type, session) => {
       sessionEvents?.publishSessionEvent(type, session);
     },
-    isSessionRunning: (sessionId) => hasAnyActiveRunForSession(activeRuns, sessionId),
+    isSessionRunning: sessionId => hasAnyActiveRunForSession(activeRuns, sessionId),
   });
   const exportService = new SessionExportService(db);
   const queryService = new SessionQueryService(db, activeRuns);
@@ -42,7 +46,10 @@ export function createSessionRoutes(
   // Get all sessions (optionally filtered by project, excludes archived by default)
   router.get('/', (req: Request, res: Response) => {
     try {
-      const { projectId, includeArchived } = req.query as { projectId?: string; includeArchived?: string };
+      const { projectId, includeArchived } = req.query as {
+        projectId?: string;
+        includeArchived?: string;
+      };
       const sessions = queryService.listSessions(projectId, includeArchived === 'true');
       res.json({ success: true, data: sessions } as ApiResponse<Session[]>);
     } catch (error) {
@@ -125,7 +132,7 @@ export function createSessionRoutes(
       console.error('Error fetching run state:', error);
       res.status(500).json({
         success: false,
-        error: { code: 'DB_ERROR', message: 'Failed to fetch run state' }
+        error: { code: 'DB_ERROR', message: 'Failed to fetch run state' },
       });
     }
   });
@@ -170,9 +177,13 @@ export function createSessionRoutes(
         sendApiError(res, 409, 'SESSION_RUNNING', 'Cannot fork a running session');
         return;
       }
-      const session = await forkSession(db, { sourceSessionId, treeEntryId, name }, {
-        broadcastSessionEvent: (type, s) => sessionEvents?.publishSessionEvent(type, s),
-      });
+      const session = await forkSession(
+        db,
+        { sourceSessionId, treeEntryId, name },
+        {
+          broadcastSessionEvent: (type, s) => sessionEvents?.publishSessionEvent(type, s),
+        }
+      );
       res.status(201).json({ success: true, data: session } as ApiResponse<Session>);
     } catch (error) {
       if (error instanceof ForkError) {
@@ -207,7 +218,7 @@ export function createSessionRoutes(
       if (!session) {
         res.status(404).json({
           success: false,
-          error: { code: 'NOT_FOUND', message: 'Session not found' }
+          error: { code: 'NOT_FOUND', message: 'Session not found' },
         });
         return;
       }
@@ -217,7 +228,7 @@ export function createSessionRoutes(
       console.error('Error fetching session:', error);
       res.status(500).json({
         success: false,
-        error: { code: 'DB_ERROR', message: 'Failed to fetch session' }
+        error: { code: 'DB_ERROR', message: 'Failed to fetch session' },
       });
     }
   });
@@ -226,10 +237,12 @@ export function createSessionRoutes(
   router.post('/', (req: Request, res: Response) => {
     try {
       const requestedType = req.body?.type;
-      const sessionType = requestedType === 'background' || requestedType === 'agent' ? requestedType : 'regular';
+      const sessionType =
+        requestedType === 'background' || requestedType === 'agent' ? requestedType : 'regular';
       if (sessionType === 'regular') {
         const readiness = resolveAgentReadinessForSession(db, {
-          explicitAgentId: typeof req.body?.agentProfileId === 'string' ? req.body.agentProfileId : undefined,
+          explicitAgentId:
+            typeof req.body?.agentProfileId === 'string' ? req.body.agentProfileId : undefined,
           projectId: typeof req.body?.projectId === 'string' ? req.body.projectId : undefined,
         });
         if (!readiness.usable) {
@@ -238,7 +251,7 @@ export function createSessionRoutes(
             409,
             'AGENT_NOT_READY',
             'No usable agent profile is available. Create an agent or configure an LLM profile first.',
-            readiness,
+            readiness
           );
           return;
         }
@@ -278,7 +291,7 @@ export function createSessionRoutes(
       console.error('Error updating session:', error);
       res.status(500).json({
         success: false,
-        error: { code: 'DB_ERROR', message: 'Failed to update session' }
+        error: { code: 'DB_ERROR', message: 'Failed to update session' },
       });
     }
   });
@@ -288,7 +301,7 @@ export function createSessionRoutes(
     try {
       const updatedSession = lifecycleService.updateWorkingDirectory(
         req.params.id,
-        req.body?.workingDirectory,
+        req.body?.workingDirectory
       );
       res.json({ success: true, data: updatedSession } as ApiResponse<Session>);
     } catch (error) {
@@ -321,7 +334,10 @@ export function createSessionRoutes(
   router.post('/:id/reset-sdk-session', (req: Request, res: Response) => {
     try {
       const result = lifecycleService.resetSdkSession(req.params.id);
-      res.json({ success: true, data: result } as ApiResponse<{ sessionId: string; reset: boolean }>);
+      res.json({ success: true, data: result } as ApiResponse<{
+        sessionId: string;
+        reset: boolean;
+      }>);
     } catch (error) {
       if (error instanceof SessionLifecycleError) {
         sendApiError(res, error.status, error.code, error.message);
@@ -375,7 +391,10 @@ export function createSessionRoutes(
   router.get('/:id/export', (req: Request, res: Response) => {
     try {
       const result = exportService.exportSession(req.params.id);
-      res.json({ success: true, data: result } as ApiResponse<{ markdown: string; sessionName: string }>);
+      res.json({ success: true, data: result } as ApiResponse<{
+        markdown: string;
+        sessionName: string;
+      }>);
     } catch (error) {
       if (error instanceof SessionExportError) {
         sendApiError(res, error.status, error.code, error.message);
@@ -385,7 +404,6 @@ export function createSessionRoutes(
       sendApiError(res, 500, 'DB_ERROR', 'Failed to export session');
     }
   });
-
 
   // Reorder sessions within a project
   router.post('/reorder', (req: Request, res: Response) => {

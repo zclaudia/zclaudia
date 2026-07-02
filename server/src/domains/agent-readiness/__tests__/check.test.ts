@@ -10,7 +10,10 @@ const SAVED: Record<string, string | undefined> = {};
 const ENV = ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'OPENAI_BASE_URL'];
 
 beforeEach(() => {
-  for (const k of ENV) { SAVED[k] = process.env[k]; delete process.env[k]; }
+  for (const k of ENV) {
+    SAVED[k] = process.env[k];
+    delete process.env[k];
+  }
   db = new Database(':memory:');
   db.pragma('foreign_keys = ON');
   applyMigrations(db);
@@ -18,12 +21,21 @@ beforeEach(() => {
 
 afterEach(() => {
   db.close();
-  for (const k of ENV) { if (SAVED[k] === undefined) delete process.env[k]; else process.env[k] = SAVED[k]; }
+  for (const k of ENV) {
+    if (SAVED[k] === undefined) delete process.env[k];
+    else process.env[k] = SAVED[k];
+  }
 });
 
 function seedLlm(apiKey?: string, models?: { modelId: string }[]): string {
   const llmRepo = new LlmProfileRepository(db);
-  const lp = llmRepo.create({ name: 'test-llm', providerType: 'anthropic', apiKey, isDefault: true, models });
+  const lp = llmRepo.create({
+    name: 'test-llm',
+    providerType: 'anthropic',
+    apiKey,
+    isDefault: true,
+    models,
+  });
   return lp.id;
 }
 

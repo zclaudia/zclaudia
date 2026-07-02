@@ -2,10 +2,10 @@ import { execSync } from 'child_process';
 import * as path from 'path';
 
 export interface GitWorktree {
-  path: string;      // 绝对路径
-  branch: string;    // 分支名，如 'main' 或 'feat/foo'
-  isMain: boolean;   // 是否是主 worktree（第一个）
-  commit?: string;   // HEAD commit hash（短）
+  path: string; // 绝对路径
+  branch: string; // 分支名，如 'main' 或 'feat/foo'
+  isMain: boolean; // 是否是主 worktree（第一个）
+  commit?: string; // HEAD commit hash（短）
 }
 
 /**
@@ -56,7 +56,10 @@ function parseWorktreeOutput(output: string): GitWorktree[] {
         commit = line.slice('HEAD '.length).trim().slice(0, 7);
       } else if (line.startsWith('branch ')) {
         // 'refs/heads/main' → 'main'
-        branch = line.slice('branch '.length).trim().replace(/^refs\/heads\//, '');
+        branch = line
+          .slice('branch '.length)
+          .trim()
+          .replace(/^refs\/heads\//, '');
       } else if (line === 'detached') {
         branch = `detached@${commit}`;
       }
@@ -86,7 +89,7 @@ function parseWorktreeOutput(output: string): GitWorktree[] {
 export function createGitWorktree(
   repoPath: string,
   worktreePath: string,
-  branch: string,
+  branch: string
 ): GitWorktree {
   const absWorktreePath = path.isAbsolute(worktreePath)
     ? worktreePath

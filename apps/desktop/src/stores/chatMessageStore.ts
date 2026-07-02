@@ -7,7 +7,7 @@ export interface PaginationInfo {
   hasMore: boolean;
   oldestTimestamp?: number;
   newestTimestamp?: number;
-  maxOffset?: number;  // Highest message offset loaded (for gap detection)
+  maxOffset?: number; // Highest message offset loaded (for gap detection)
   isLoadingMore: boolean;
 }
 
@@ -15,7 +15,7 @@ export interface PaginationInfo {
 export interface MessageWithToolCalls extends Message {
   toolCalls?: ToolCallState[];
   contentBlocks?: ContentBlock[];
-  clientMessageId?: string;  // Client-generated message ID for dual dedup
+  clientMessageId?: string; // Client-generated message ID for dual dedup
 }
 
 const DEFAULT_PAGINATION: PaginationInfo = {
@@ -35,12 +35,32 @@ interface ChatMessageState {
   messages: Record<string, MessageWithToolCalls[]>;
   pagination: Record<string, PaginationInfo>;
 
-  setMessages: (sessionId: string, messages: MessageWithToolCalls[], pagination?: Partial<Omit<PaginationInfo, 'isLoadingMore'>>) => void;
-  prependMessages: (sessionId: string, messages: MessageWithToolCalls[], pagination?: Partial<Omit<PaginationInfo, 'isLoadingMore'>>) => void;
-  appendMessages: (sessionId: string, messages: MessageWithToolCalls[], pagination?: Partial<Omit<PaginationInfo, 'isLoadingMore'>>) => void;
-  mergeMessages: (sessionId: string, messages: MessageWithToolCalls[], pagination?: Partial<Omit<PaginationInfo, 'isLoadingMore'>>) => void;
+  setMessages: (
+    sessionId: string,
+    messages: MessageWithToolCalls[],
+    pagination?: Partial<Omit<PaginationInfo, 'isLoadingMore'>>
+  ) => void;
+  prependMessages: (
+    sessionId: string,
+    messages: MessageWithToolCalls[],
+    pagination?: Partial<Omit<PaginationInfo, 'isLoadingMore'>>
+  ) => void;
+  appendMessages: (
+    sessionId: string,
+    messages: MessageWithToolCalls[],
+    pagination?: Partial<Omit<PaginationInfo, 'isLoadingMore'>>
+  ) => void;
+  mergeMessages: (
+    sessionId: string,
+    messages: MessageWithToolCalls[],
+    pagination?: Partial<Omit<PaginationInfo, 'isLoadingMore'>>
+  ) => void;
   addMessage: (sessionId: string, message: MessageWithToolCalls) => void;
-  updateMessageIdByClientMessageId: (sessionId: string, clientMessageId: string, newId: string) => void;
+  updateMessageIdByClientMessageId: (
+    sessionId: string,
+    clientMessageId: string,
+    newId: string
+  ) => void;
   appendToLastMessage: (sessionId: string, content: string) => void;
   clearMessages: (sessionId: string) => void;
   setLoadingMore: (sessionId: string, loading: boolean) => void;
@@ -52,15 +72,22 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
   pagination: {},
 
   setMessages: (sessionId, messages, pagination) =>
-    set((state) => ({
+    set(state => ({
       messages: { ...state.messages, [sessionId]: messages },
       pagination: pagination
-        ? { ...state.pagination, [sessionId]: { ...(state.pagination[sessionId] || DEFAULT_PAGINATION), ...pagination, isLoadingMore: false } }
+        ? {
+            ...state.pagination,
+            [sessionId]: {
+              ...(state.pagination[sessionId] || DEFAULT_PAGINATION),
+              ...pagination,
+              isLoadingMore: false,
+            },
+          }
         : state.pagination,
     })),
 
   prependMessages: (sessionId, newMessages, pagination) =>
-    set((state) => {
+    set(state => {
       const existingMessages = state.messages[sessionId] || [];
       // Prepend new messages (older) to the beginning
       const combined = [...newMessages, ...existingMessages];
@@ -68,17 +95,24 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
       return {
         messages: { ...state.messages, [sessionId]: combined },
         pagination: pagination
-          ? { ...state.pagination, [sessionId]: { ...(state.pagination[sessionId] || DEFAULT_PAGINATION), ...pagination, isLoadingMore: false } }
+          ? {
+              ...state.pagination,
+              [sessionId]: {
+                ...(state.pagination[sessionId] || DEFAULT_PAGINATION),
+                ...pagination,
+                isLoadingMore: false,
+              },
+            }
           : state.pagination,
       };
     }),
 
   appendMessages: (sessionId, newMessages, pagination) =>
-    set((state) => {
+    set(state => {
       const existingMessages = state.messages[sessionId] || [];
       // Deduplicate by message ID
-      const existingIds = new Set(existingMessages.map((m) => m.id));
-      const deduped = newMessages.filter((m) => !existingIds.has(m.id));
+      const existingIds = new Set(existingMessages.map(m => m.id));
+      const deduped = newMessages.filter(m => !existingIds.has(m.id));
       if (deduped.length === 0) return state;
 
       const combined = [...existingMessages, ...deduped];
@@ -95,9 +129,10 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
             // by gap-fill or sync responses)
             total: pagination?.total ?? existingPagination.total,
             newestTimestamp: pagination?.newestTimestamp ?? existingPagination.newestTimestamp,
-            maxOffset: pagination?.maxOffset != null
-              ? Math.max(pagination.maxOffset, existingPagination.maxOffset ?? 0)
-              : existingPagination.maxOffset,
+            maxOffset:
+              pagination?.maxOffset != null
+                ? Math.max(pagination.maxOffset, existingPagination.maxOffset ?? 0)
+                : existingPagination.maxOffset,
             isLoadingMore: false,
           },
         },
@@ -105,9 +140,9 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
     }),
 
   mergeMessages: (sessionId, incomingMessages, pagination) =>
-    set((state) => {
+    set(state => {
       const existingMessages = state.messages[sessionId] || [];
-      const byId = new Map(existingMessages.map((message) => [message.id, message]));
+      const byId = new Map(existingMessages.map(message => [message.id, message]));
       let changed = false;
 
       for (const incoming of incomingMessages) {
@@ -128,19 +163,19 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
       const existingPagination = state.pagination[sessionId] || DEFAULT_PAGINATION;
       const nextPagination = pagination
         ? {
-          ...existingPagination,
-          ...pagination,
-          maxOffset: pagination.maxOffset != null
-            ? Math.max(pagination.maxOffset, existingPagination.maxOffset ?? 0)
-            : existingPagination.maxOffset,
-          isLoadingMore: false,
-        }
+            ...existingPagination,
+            ...pagination,
+            maxOffset:
+              pagination.maxOffset != null
+                ? Math.max(pagination.maxOffset, existingPagination.maxOffset ?? 0)
+                : existingPagination.maxOffset,
+            isLoadingMore: false,
+          }
         : existingPagination;
 
       if (!changed && nextPagination === existingPagination) return state;
 
-      const mergedMessages = Array.from(byId.values())
-        .sort((a, b) => a.createdAt - b.createdAt);
+      const mergedMessages = Array.from(byId.values()).sort((a, b) => a.createdAt - b.createdAt);
 
       return {
         messages: { ...state.messages, [sessionId]: mergedMessages },
@@ -149,13 +184,18 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
     }),
 
   addMessage: (sessionId, message) =>
-    set((state) => {
+    set(state => {
       const existingMessages = state.messages[sessionId] || [];
       // Dual dedup: check both server ID and client-generated message ID
-      if (existingMessages.some((m) =>
-        m.id === message.id ||
-        (message.clientMessageId && m.clientMessageId && m.clientMessageId === message.clientMessageId)
-      )) {
+      if (
+        existingMessages.some(
+          m =>
+            m.id === message.id ||
+            (message.clientMessageId &&
+              m.clientMessageId &&
+              m.clientMessageId === message.clientMessageId)
+        )
+      ) {
         return state;
       }
       const existingPagination = state.pagination[sessionId] || DEFAULT_PAGINATION;
@@ -178,9 +218,9 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
 
   // Update a message's server ID by matching its clientMessageId
   updateMessageIdByClientMessageId: (sessionId: string, clientMessageId: string, newId: string) =>
-    set((state) => {
+    set(state => {
       const sessionMessages = state.messages[sessionId] || [];
-      const idx = sessionMessages.findIndex((m) => m.clientMessageId === clientMessageId);
+      const idx = sessionMessages.findIndex(m => m.clientMessageId === clientMessageId);
       if (idx === -1) return state;
       const updated = [...sessionMessages];
       updated[idx] = { ...updated[idx], id: newId };
@@ -188,7 +228,7 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
     }),
 
   appendToLastMessage: (sessionId, content) =>
-    set((state) => {
+    set(state => {
       const sessionMessages = state.messages[sessionId] || [];
       if (sessionMessages.length === 0) return state;
 
@@ -207,14 +247,14 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
       };
     }),
 
-  clearMessages: (sessionId) =>
-    set((state) => ({
+  clearMessages: sessionId =>
+    set(state => ({
       messages: { ...state.messages, [sessionId]: [] },
       pagination: { ...state.pagination, [sessionId]: DEFAULT_PAGINATION },
     })),
 
   setLoadingMore: (sessionId, loading) =>
-    set((state) => ({
+    set(state => ({
       pagination: {
         ...state.pagination,
         [sessionId]: {
@@ -224,5 +264,5 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
       },
     })),
 
-  getPagination: (sessionId) => get().pagination[sessionId],
+  getPagination: sessionId => get().pagination[sessionId],
 }));

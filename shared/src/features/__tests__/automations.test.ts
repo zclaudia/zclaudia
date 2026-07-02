@@ -3,7 +3,11 @@ import type { Automation, AutomationAction, AutomationTrigger } from '../automat
 
 describe('Automation types', () => {
   it('models a single-activity automation', () => {
-    const action: AutomationAction = { kind: 'activity', ref: 'git_commit', input: { messageMode: 'ai' } };
+    const action: AutomationAction = {
+      kind: 'activity',
+      ref: 'git_commit',
+      input: { messageMode: 'ai' },
+    };
     const trigger: AutomationTrigger = { type: 'interval', intervalMinutes: 30 };
     const automation: Automation = {
       id: 'a1',

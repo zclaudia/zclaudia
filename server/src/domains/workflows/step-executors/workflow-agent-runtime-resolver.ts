@@ -5,7 +5,10 @@ import { buildMemoryContext } from '../../../application/conversation/context/me
 import { workspaceService } from '../../../application/services/workspace.js';
 import { resolveUserHooks } from '../../../application/conversation/runtime/resolve-user-hooks.js';
 import { resolveProjectMemoryDir } from '../../../utils/memory-paths.js';
-import { NoAgentAvailableError, resolveAgentForSession } from '../../agent-profiles/agent-resolver.js';
+import {
+  NoAgentAvailableError,
+  resolveAgentForSession,
+} from '../../agent-profiles/agent-resolver.js';
 import { LlmProfileRepository } from '../../llm-profiles/repository.js';
 import type {
   WorkflowAgentRuntime,
@@ -25,7 +28,7 @@ export class DefaultWorkflowAgentRuntimeResolver implements WorkflowAgentRuntime
 
   constructor(
     private readonly db: Database.Database,
-    private readonly options: DefaultWorkflowAgentRuntimeResolverOptions = {},
+    private readonly options: DefaultWorkflowAgentRuntimeResolverOptions = {}
   ) {
     this.llmProfileRepository = new LlmProfileRepository(db);
   }
@@ -36,15 +39,15 @@ export class DefaultWorkflowAgentRuntimeResolver implements WorkflowAgentRuntime
     const explicitLlmProfile = explicitLlmProfileId
       ? this.llmProfileRepository.findById(explicitLlmProfileId)
       : undefined;
-    const llmProfileId = explicitLlmProfileId
-      ?? resolved.llmProfileId
-      ?? this.llmProfileRepository.findDefault()?.id;
+    const llmProfileId =
+      explicitLlmProfileId ?? resolved.llmProfileId ?? this.llmProfileRepository.findDefault()?.id;
     if (!llmProfileId) {
       throw new Error('No LLM profile configured for workflow agent runtime');
     }
 
-    const model = normalizeOptionalString(request.model)
-      ?? (explicitLlmProfileId && explicitLlmProfileId !== resolved.llmProfileId
+    const model =
+      normalizeOptionalString(request.model) ??
+      (explicitLlmProfileId && explicitLlmProfileId !== resolved.llmProfileId
         ? undefined
         : normalizeOptionalString(resolved.model));
 
@@ -52,7 +55,9 @@ export class DefaultWorkflowAgentRuntimeResolver implements WorkflowAgentRuntime
       llmProfileId,
       model,
       systemPrompt: await this.buildSystemPrompt(request, resolved.systemPrompt),
-      userHooks: request.projectId ? resolveUserHooks(this.db as unknown as UserHookDb, request.projectId) : undefined,
+      userHooks: request.projectId
+        ? resolveUserHooks(this.db as unknown as UserHookDb, request.projectId)
+        : undefined,
       toolSessionId: request.runId,
       permissionCallback: this.options.permissionCallbackFactory?.({
         projectId: request.projectId,
@@ -88,7 +93,7 @@ export class DefaultWorkflowAgentRuntimeResolver implements WorkflowAgentRuntime
 
   private async buildSystemPrompt(
     request: WorkflowAgentRuntimeRequest,
-    agentSystemPrompt?: string,
+    agentSystemPrompt?: string
   ): Promise<string> {
     const workspacePrompt = await workspaceService.assembleSystemPrompt({
       projectId: request.projectId,
@@ -102,7 +107,9 @@ export class DefaultWorkflowAgentRuntimeResolver implements WorkflowAgentRuntime
       sessionId: request.runId,
       projectId: request.projectId,
       cwd: request.cwd,
-      baseSystemPrompt: normalizeOptionalString(request.baseSystemPrompt) ?? normalizeOptionalString(agentSystemPrompt),
+      baseSystemPrompt:
+        normalizeOptionalString(request.baseSystemPrompt) ??
+        normalizeOptionalString(agentSystemPrompt),
       workspacePrompt,
       skillDirectoryHint: buildSkillDirectoryHint(),
       memoryContext,

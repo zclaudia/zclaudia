@@ -1,7 +1,7 @@
 export interface ModeConfig {
-  id: string;  // Changed: Allow any string ID to support multiple gateway backends
+  id: string; // Changed: Allow any string ID to support multiple gateway backends
   name: string;
-  enabled: boolean;  // Can skip modes if not available in environment
+  enabled: boolean; // Can skip modes if not available in environment
 
   // Server connection details
   serverAddress: string;
@@ -37,6 +37,24 @@ export const ALL_MODES: Record<string, ModeConfig> = {
   gateway: gatewayMode,
 };
 
+export function parseRequestedModeIds(value = process.env.TEST_MODES): Set<string> | null {
+  if (!value?.trim()) return null;
+  const requested = value
+    .split(',')
+    .map(modeId => modeId.trim())
+    .filter(Boolean);
+  return requested.length > 0 ? new Set(requested) : null;
+}
+
+function withRequestedModeEnabled(mode: ModeConfig): ModeConfig {
+  const requestedModeIds = parseRequestedModeIds();
+  if (!requestedModeIds) return mode;
+  return {
+    ...mode,
+    enabled: mode.enabled && requestedModeIds.has(mode.id),
+  };
+}
+
 /**
  * Register a new mode dynamically
  * Useful for adding multiple gateway backends or custom modes
@@ -50,7 +68,9 @@ export function registerMode(mode: ModeConfig): void {
 
 // Get only enabled modes
 export function getEnabledModes(): ModeConfig[] {
-  return Object.values(ALL_MODES).filter(mode => mode.enabled);
+  return Object.values(ALL_MODES)
+    .map(withRequestedModeEnabled)
+    .filter(mode => mode.enabled);
 }
 
 // Get mode by ID
@@ -59,5 +79,5 @@ export function getMode(id: string): ModeConfig {
   if (!mode) {
     throw new Error(`Unknown mode: ${id}`);
   }
-  return mode;
+  return withRequestedModeEnabled(mode);
 }

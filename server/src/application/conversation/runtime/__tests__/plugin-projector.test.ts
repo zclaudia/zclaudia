@@ -4,7 +4,7 @@ import { projectRunDomainEventToPluginEvents } from '../plugin-projector.js';
 
 function event<TType extends Parameters<typeof createRunDomainEvent>[0]['type']>(
   type: TType,
-  payload: Parameters<typeof createRunDomainEvent<TType>>[0]['payload'],
+  payload: Parameters<typeof createRunDomainEvent<TType>>[0]['payload']
 ) {
   return createRunDomainEvent({
     eventId: `event-${type}`,
@@ -21,15 +21,19 @@ function event<TType extends Parameters<typeof createRunDomainEvent>[0]['type']>
 
 describe('plugin projector', () => {
   it('projects run.started to the legacy run.started plugin event', () => {
-    expect(projectRunDomainEventToPluginEvents(event('run.started', {
-      clientRequestId: 'req-1',
-      assistantMessageId: 'assistant-1',
-      userMessageId: 'user-1',
-      sessionType: 'background',
-      input: 'hello',
-      llmProfileId: 'provider-1',
-      providerType: 'claude',
-    }))).toEqual([
+    expect(
+      projectRunDomainEventToPluginEvents(
+        event('run.started', {
+          clientRequestId: 'req-1',
+          assistantMessageId: 'assistant-1',
+          userMessageId: 'user-1',
+          sessionType: 'background',
+          input: 'hello',
+          llmProfileId: 'provider-1',
+          providerType: 'claude',
+        })
+      )
+    ).toEqual([
       {
         name: 'run.started',
         payload: {
@@ -44,11 +48,15 @@ describe('plugin projector', () => {
   });
 
   it('projects tool.started to the legacy run.toolCall plugin event', () => {
-    expect(projectRunDomainEventToPluginEvents(event('tool.started', {
-      toolUseId: 'tool-1',
-      toolName: 'Read',
-      input: { file_path: 'README.md' },
-    }))).toEqual([
+    expect(
+      projectRunDomainEventToPluginEvents(
+        event('tool.started', {
+          toolUseId: 'tool-1',
+          toolName: 'Read',
+          input: { file_path: 'README.md' },
+        })
+      )
+    ).toEqual([
       {
         name: 'run.toolCall',
         payload: {
@@ -63,12 +71,16 @@ describe('plugin projector', () => {
   });
 
   it('projects tool.finished to the legacy run.toolResult plugin event', () => {
-    expect(projectRunDomainEventToPluginEvents(event('tool.finished', {
-      toolUseId: 'tool-1',
-      toolName: 'Read',
-      output: 'contents',
-      isError: false,
-    }))).toEqual([
+    expect(
+      projectRunDomainEventToPluginEvents(
+        event('tool.finished', {
+          toolUseId: 'tool-1',
+          toolName: 'Read',
+          output: 'contents',
+          isError: false,
+        })
+      )
+    ).toEqual([
       {
         name: 'run.toolResult',
         payload: {
@@ -84,8 +96,12 @@ describe('plugin projector', () => {
   });
 
   it('does not project internal assistant deltas to plugin events by default', () => {
-    expect(projectRunDomainEventToPluginEvents(event('assistant.textDelta', {
-      content: 'streaming',
-    }))).toEqual([]);
+    expect(
+      projectRunDomainEventToPluginEvents(
+        event('assistant.textDelta', {
+          content: 'streaming',
+        })
+      )
+    ).toEqual([]);
   });
 });

@@ -6,17 +6,27 @@ import { scheduleDeferredDiagnostics, getDeferredDiagnosticsResult } from '../wr
 
 describe('deferred diagnostics routes', () => {
   it('returns completed deferred diagnostics by id', async () => {
-    const scheduled = scheduleDeferredDiagnostics(async () => [
-      { path: 'f.ts', line: 2, column: 4, severity: 'warning', message: 'late warning', source: 'tsc' },
-    ], {
-      operation: 'write',
-      type: 'create',
-      path: 'f.ts',
-      absolutePath: '/tmp/f.ts',
-      originalContent: null,
-      updatedContent: 'const a = 1;\n',
-      diff: '',
-    });
+    const scheduled = scheduleDeferredDiagnostics(
+      async () => [
+        {
+          path: 'f.ts',
+          line: 2,
+          column: 4,
+          severity: 'warning',
+          message: 'late warning',
+          source: 'tsc',
+        },
+      ],
+      {
+        operation: 'write',
+        type: 'create',
+        path: 'f.ts',
+        absolutePath: '/tmp/f.ts',
+        originalContent: null,
+        updatedContent: 'const a = 1;\n',
+        diff: '',
+      }
+    );
     const id = scheduled?.deferredDiagnostics?.id;
     expect(id).toBeTruthy();
 
@@ -34,7 +44,16 @@ describe('deferred diagnostics routes', () => {
       success: true,
       data: {
         status: 'completed',
-        diagnostics: [{ path: 'f.ts', line: 2, column: 4, severity: 'warning', message: 'late warning', source: 'tsc' }],
+        diagnostics: [
+          {
+            path: 'f.ts',
+            line: 2,
+            column: 4,
+            severity: 'warning',
+            message: 'late warning',
+            source: 'tsc',
+          },
+        ],
       },
     });
   });

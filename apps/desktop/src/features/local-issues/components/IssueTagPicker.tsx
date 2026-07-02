@@ -26,7 +26,8 @@ function normalizeIssueTag(value: string): string {
 export function IssueTagPicker({ value, onChange }: IssueTagPickerProps) {
   const [customTag, setCustomTag] = useState('');
 
-  const hasTag = (tag: string) => value.some((item) => normalizeIssueTag(item) === normalizeIssueTag(tag));
+  const hasTag = (tag: string) =>
+    value.some(item => normalizeIssueTag(item) === normalizeIssueTag(tag));
 
   const addTag = (tag: string) => {
     const normalized = normalizeIssueTag(tag);
@@ -37,7 +38,7 @@ export function IssueTagPicker({ value, onChange }: IssueTagPickerProps) {
 
   const removeTag = (tag: string) => {
     const normalized = normalizeIssueTag(tag);
-    onChange(value.filter((item) => normalizeIssueTag(item) !== normalized));
+    onChange(value.filter(item => normalizeIssueTag(item) !== normalized));
   };
 
   const toggleTag = (tag: string) => {
@@ -54,7 +55,7 @@ export function IssueTagPicker({ value, onChange }: IssueTagPickerProps) {
   return (
     <div className="mt-1 space-y-2">
       <div className="flex flex-wrap gap-1.5">
-        {BUILT_IN_TAGS.map((tag) => {
+        {BUILT_IN_TAGS.map(tag => {
           const selected = hasTag(tag);
           return (
             <button
@@ -63,9 +64,11 @@ export function IssueTagPicker({ value, onChange }: IssueTagPickerProps) {
               onClick={() => toggleTag(tag)}
               aria-pressed={selected}
               aria-label={`Toggle ${tag} tag`}
-              className={selected
-                ? 'text-[11px] px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-500 dark:text-purple-300 border border-purple-500/30'
-                : 'text-[11px] px-2 py-0.5 rounded-full bg-background border border-border text-muted-foreground hover:text-foreground hover:border-primary/40'}
+              className={
+                selected
+                  ? 'text-[11px] px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-500 dark:text-purple-300 border border-purple-500/30'
+                  : 'text-[11px] px-2 py-0.5 rounded-full bg-background border border-border text-muted-foreground hover:text-foreground hover:border-primary/40'
+              }
             >
               {tag}
             </button>
@@ -75,7 +78,7 @@ export function IssueTagPicker({ value, onChange }: IssueTagPickerProps) {
 
       {value.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {value.map((tag) => (
+          {value.map(tag => (
             <span
               key={tag}
               className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-secondary text-foreground"
@@ -98,7 +101,7 @@ export function IssueTagPicker({ value, onChange }: IssueTagPickerProps) {
         <input
           type="text"
           value={customTag}
-          onChange={(event) => setCustomTag(event.target.value)}
+          onChange={event => setCustomTag(event.target.value)}
           onKeyDown={handleCustomKeyDown}
           className="flex-1 rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
           placeholder="Add custom tag..."

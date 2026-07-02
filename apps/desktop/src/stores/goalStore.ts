@@ -25,11 +25,11 @@ const emptySlot: GoalSlot = {
   lastVerdictReason: null,
 };
 
-export const useGoalStore = create<GoalState>((set) => ({
+export const useGoalStore = create<GoalState>(set => ({
   bySession: {},
 
   setGoal: (sessionId, goal) =>
-    set((state) => ({
+    set(state => ({
       bySession: {
         ...state.bySession,
         [sessionId]: {
@@ -43,7 +43,7 @@ export const useGoalStore = create<GoalState>((set) => ({
     })),
 
   applyBudget: (sessionId, tokensUsed, turnsUsed) =>
-    set((state) => ({
+    set(state => ({
       bySession: {
         ...state.bySession,
         [sessionId]: {
@@ -55,7 +55,7 @@ export const useGoalStore = create<GoalState>((set) => ({
     })),
 
   applyVerdict: (sessionId, kind, reason) =>
-    set((state) => ({
+    set(state => ({
       bySession: {
         ...state.bySession,
         [sessionId]: {
@@ -66,8 +66,8 @@ export const useGoalStore = create<GoalState>((set) => ({
       },
     })),
 
-  clearSession: (sessionId) =>
-    set((state) => {
+  clearSession: sessionId =>
+    set(state => {
       const { [sessionId]: _, ...rest } = state.bySession;
       return { bySession: rest };
     }),

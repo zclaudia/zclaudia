@@ -5,11 +5,14 @@ import { useWorkflowStore } from '../../store';
 import type { WorkflowNodeDef } from '@zclaudia/shared';
 
 vi.mock('../../store', () => ({
-  useWorkflowStore: Object.assign(vi.fn(() => ({ stepTypes: [] })), {
-    getState: vi.fn(() => ({ stepTypes: [] })),
-    setState: vi.fn(),
-    subscribe: vi.fn(),
-  }),
+  useWorkflowStore: Object.assign(
+    vi.fn(() => ({ stepTypes: [] })),
+    {
+      getState: vi.fn(() => ({ stepTypes: [] })),
+      setState: vi.fn(),
+      subscribe: vi.fn(),
+    }
+  ),
 }));
 
 vi.mock('../JsonSchemaConfigForm', () => ({
@@ -38,7 +41,7 @@ describe('StepConfigForm', () => {
   it('renders the header and delete button', () => {
     const step = makeStep();
     const { container } = render(
-      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />,
+      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />
     );
     expect(container.textContent).toContain('Node Configuration');
     expect(container.textContent).toContain('Delete Node');
@@ -47,15 +50,11 @@ describe('StepConfigForm', () => {
   it('renders name and id inputs with step values', () => {
     const step = makeStep({ name: 'Test Step', id: 'node_42' });
     const { container } = render(
-      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />,
+      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />
     );
     const inputs = container.querySelectorAll('input[type="text"]');
-    const nameInput = Array.from(inputs).find(
-      (el) => (el as HTMLInputElement).value === 'Test Step',
-    );
-    const idInput = Array.from(inputs).find(
-      (el) => (el as HTMLInputElement).value === 'node_42',
-    );
+    const nameInput = Array.from(inputs).find(el => (el as HTMLInputElement).value === 'Test Step');
+    const idInput = Array.from(inputs).find(el => (el as HTMLInputElement).value === 'node_42');
     expect(nameInput).toBeTruthy();
     expect(idInput).toBeTruthy();
   });
@@ -63,11 +62,11 @@ describe('StepConfigForm', () => {
   it('calls onChange when name is updated', () => {
     const step = makeStep({ name: 'Old' });
     const { container } = render(
-      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />,
+      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />
     );
     const inputs = container.querySelectorAll('input[type="text"]');
     const nameInput = Array.from(inputs).find(
-      (el) => (el as HTMLInputElement).value === 'Old',
+      el => (el as HTMLInputElement).value === 'Old'
     ) as HTMLInputElement;
     fireEvent.change(nameInput, { target: { value: 'New' } });
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ name: 'New' }));
@@ -76,10 +75,10 @@ describe('StepConfigForm', () => {
   it('calls onDelete when delete button clicked', () => {
     const step = makeStep();
     const { container } = render(
-      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />,
+      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />
     );
     const deleteBtn = Array.from(container.querySelectorAll('button')).find(
-      (b) => b.textContent === 'Delete Node',
+      b => b.textContent === 'Delete Node'
     );
     fireEvent.click(deleteBtn!);
     expect(onDelete).toHaveBeenCalled();
@@ -88,7 +87,7 @@ describe('StepConfigForm', () => {
   it('displays step type label for shell', () => {
     const step = makeStep({ type: 'shell' });
     const { container } = render(
-      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />,
+      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />
     );
     expect(container.textContent).toContain('Shell Command');
   });
@@ -96,7 +95,7 @@ describe('StepConfigForm', () => {
   it('renders command textarea for shell type', () => {
     const step = makeStep({ type: 'shell', config: { command: 'echo hi' } });
     const { container } = render(
-      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />,
+      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />
     );
     const textarea = container.querySelector('textarea');
     expect(textarea).toBeTruthy();
@@ -106,7 +105,7 @@ describe('StepConfigForm', () => {
   it('renders prompt textarea for ai_prompt type', () => {
     const step = makeStep({ type: 'ai_prompt', config: { prompt: 'review code' } });
     const { container } = render(
-      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />,
+      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />
     );
     const textarea = container.querySelector('textarea');
     expect(textarea).toBeTruthy();
@@ -116,7 +115,7 @@ describe('StepConfigForm', () => {
   it('renders ai_prompt runtime controls without the legacy session name field', () => {
     const step = makeStep({ type: 'ai_prompt', config: { prompt: 'review code' } });
     const { container } = render(
-      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />,
+      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />
     );
 
     expect(container.textContent).toContain('Toolset');
@@ -127,7 +126,7 @@ describe('StepConfigForm', () => {
   it('renders on-error options', () => {
     const step = makeStep();
     const { container } = render(
-      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />,
+      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />
     );
     expect(container.textContent).toContain('abort');
     expect(container.textContent).toContain('skip');
@@ -138,7 +137,7 @@ describe('StepConfigForm', () => {
   it('shows error route message when onError is route', () => {
     const step = makeStep({ onError: 'route' });
     const { container } = render(
-      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />,
+      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />
     );
     expect(container.textContent).toContain('Connect the red Error handle');
   });
@@ -146,10 +145,12 @@ describe('StepConfigForm', () => {
   it('shows retry count input when onError is retry', () => {
     const step = makeStep({ onError: 'retry', retryCount: 3 });
     const { container } = render(
-      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />,
+      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />
     );
     expect(container.textContent).toContain('Max Retries');
-    const numberInput = container.querySelector('input[type="number"][min="1"]') as HTMLInputElement;
+    const numberInput = container.querySelector(
+      'input[type="number"][min="1"]'
+    ) as HTMLInputElement;
     expect(numberInput).toBeTruthy();
     expect(numberInput.value).toBe('3');
   });
@@ -157,18 +158,23 @@ describe('StepConfigForm', () => {
   it('renders timeout input', () => {
     const step = makeStep({ timeoutMs: 120000 });
     const { container } = render(
-      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />,
+      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />
     );
     expect(container.textContent).toContain('Timeout (seconds)');
-    const numberInput = container.querySelector('input[type="number"][min="5"]') as HTMLInputElement;
+    const numberInput = container.querySelector(
+      'input[type="number"][min="5"]'
+    ) as HTMLInputElement;
     expect(numberInput).toBeTruthy();
     expect(numberInput.value).toBe('120');
   });
 
   it('renders webhook config with url and method select', () => {
-    const step = makeStep({ type: 'webhook', config: { url: 'https://example.com', method: 'POST' } });
+    const step = makeStep({
+      type: 'webhook',
+      config: { url: 'https://example.com', method: 'POST' },
+    });
     const { container } = render(
-      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />,
+      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />
     );
     expect(container.textContent).toContain('URL');
     expect(container.textContent).toContain('Method');
@@ -180,20 +186,18 @@ describe('StepConfigForm', () => {
   it('renders condition expression input', () => {
     const step = makeStep({ type: 'condition', config: {}, condition: { expression: 'x == 1' } });
     const { container } = render(
-      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />,
+      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />
     );
     expect(container.textContent).toContain('Expression');
     const inputs = container.querySelectorAll('input[type="text"]');
-    const exprInput = Array.from(inputs).find(
-      (el) => (el as HTMLInputElement).value === 'x == 1',
-    );
+    const exprInput = Array.from(inputs).find(el => (el as HTMLInputElement).value === 'x == 1');
     expect(exprInput).toBeTruthy();
   });
 
   it('renders wait type selector', () => {
     const step = makeStep({ type: 'wait', config: { type: 'approval' } });
     const { container } = render(
-      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />,
+      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />
     );
     expect(container.textContent).toContain('Wait Type');
     const trigger = container.querySelector('button[aria-haspopup="listbox"]');
@@ -204,7 +208,7 @@ describe('StepConfigForm', () => {
   it('shows no configuration message for unknown type without schema', () => {
     const step = makeStep({ type: 'unknown_plugin_step' as any, config: {} });
     const { container } = render(
-      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />,
+      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />
     );
     expect(container.textContent).toContain('No configuration available');
   });

@@ -101,7 +101,9 @@ export function CodexOAuthLoginModal({ profileId, method, isTauri, onClose, onSu
       <div className="w-full max-w-md rounded-lg border border-border bg-background p-6 shadow-lg">
         <h2 className="mb-3 text-lg font-medium">Sign in with ChatGPT</h2>
 
-        {!session && !error && <div className="text-sm text-muted-foreground">Starting the OAuth flow…</div>}
+        {!session && !error && (
+          <div className="text-sm text-muted-foreground">Starting the OAuth flow…</div>
+        )}
 
         {session && session.method === 'browser' && (
           <div className="text-sm">
@@ -114,15 +116,21 @@ export function CodexOAuthLoginModal({ profileId, method, isTauri, onClose, onSu
             >
               Open authorization page
             </a>
-            <p className="mt-2 text-xs text-muted-foreground">If the button doesn’t open, visit this URL manually:</p>
-            <code className="mt-1 block break-all rounded bg-secondary p-2 text-xs">{session.authUrl}</code>
+            <p className="mt-2 text-xs text-muted-foreground">
+              If the button doesn’t open, visit this URL manually:
+            </p>
+            <code className="mt-1 block break-all rounded bg-secondary p-2 text-xs">
+              {session.authUrl}
+            </code>
           </div>
         )}
 
         {session && session.method === 'device_code' && (
           <div className="text-sm">
             <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-muted-foreground">
-              <p className="font-medium text-foreground">Device code authorization must be enabled for Codex.</p>
+              <p className="font-medium text-foreground">
+                Device code authorization must be enabled for Codex.
+              </p>
               <p className="mt-1">
                 If OpenAI blocks this page, enable device code login in ChatGPT security settings,
                 or ask your workspace admin to enable it, then retry.
@@ -136,7 +144,10 @@ export function CodexOAuthLoginModal({ profileId, method, isTauri, onClose, onSu
                 View OpenAI authentication docs
               </a>
             </div>
-            <p className="mb-2">Open the authorization page, then enter this code when prompted. Sign in to ChatGPT, then click Allow:</p>
+            <p className="mb-2">
+              Open the authorization page, then enter this code when prompted. Sign in to ChatGPT,
+              then click Allow:
+            </p>
             <a
               href={session.verificationUri}
               target="_blank"
@@ -145,12 +156,22 @@ export function CodexOAuthLoginModal({ profileId, method, isTauri, onClose, onSu
             >
               Open authorization page
             </a>
-            <p className="mt-3 text-xs text-muted-foreground">Enter this code on the authorization page:</p>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Enter this code on the authorization page:
+            </p>
             <div className="mt-1 rounded bg-secondary p-3 text-center font-mono text-2xl tracking-widest">
               {session.userCode}
             </div>
             <p className="mt-2 text-xs text-muted-foreground break-all">
-              Or visit: <a href={session.verificationUri} target="_blank" rel="noreferrer" className="underline">{session.verificationUri}</a>
+              Or visit:{' '}
+              <a
+                href={session.verificationUri}
+                target="_blank"
+                rel="noreferrer"
+                className="underline"
+              >
+                {session.verificationUri}
+              </a>
             </p>
             <button
               type="button"
@@ -179,6 +200,6 @@ export function CodexOAuthLoginModal({ profileId, method, isTauri, onClose, onSu
         </div>
       </div>
     </div>,
-    document.body,
+    document.body
   );
 }

@@ -26,14 +26,14 @@ export function WorktreeList({
   const [creating, setCreating] = useState(false);
   const [newBranch, setNewBranch] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const removeWorktreeFromCache = useGitStore((s) => s.removeWorktreeFromCache);
+  const removeWorktreeFromCache = useGitStore(s => s.removeWorktreeFromCache);
 
   const handleCreate = async () => {
     const branch = newBranch.trim();
     if (!branch || submitting) return;
     setSubmitting(true);
     const result = await runWithToast(`Create worktree '${branch}'`, projectId, () =>
-      api.createProjectWorktree(projectId, branch),
+      api.createProjectWorktree(projectId, branch)
     );
     setSubmitting(false);
     if (result) {
@@ -54,7 +54,7 @@ export function WorktreeList({
     });
     if (!confirmed) return;
     const result = await runWithToast(`Remove worktree '${wt.branch}'`, projectId, () =>
-      api.deleteProjectWorktree(projectId, wt.path),
+      api.deleteProjectWorktree(projectId, wt.path)
     );
     if (result !== null) {
       removeWorktreeFromCache(projectId, wt.path);
@@ -80,7 +80,7 @@ export function WorktreeList({
           </button>
           <button
             type="button"
-            onClick={() => setCreating((v) => !v)}
+            onClick={() => setCreating(v => !v)}
             className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
             title="New worktree"
           >
@@ -94,8 +94,8 @@ export function WorktreeList({
           <input
             type="text"
             value={newBranch}
-            onChange={(e) => setNewBranch(e.target.value)}
-            onKeyDown={(e) => {
+            onChange={e => setNewBranch(e.target.value)}
+            onKeyDown={e => {
               if (e.key === 'Enter') {
                 e.preventDefault();
                 handleCreate();
@@ -137,7 +137,7 @@ export function WorktreeList({
             {loading ? 'Loading…' : 'No worktrees.'}
           </div>
         ) : (
-          worktrees.map((wt) => (
+          worktrees.map(wt => (
             <WorktreeRow
               key={wt.path}
               projectId={projectId}
@@ -197,7 +197,10 @@ function WorktreeRow({
             </span>
           )}
         </div>
-        <div className="text-[10px] text-muted-foreground truncate font-mono mt-0.5" title={worktree.path}>
+        <div
+          className="text-[10px] text-muted-foreground truncate font-mono mt-0.5"
+          title={worktree.path}
+        >
           {worktree.path}
         </div>
         {status && (
@@ -213,7 +216,7 @@ function WorktreeRow({
       {canDelete && (
         <button
           type="button"
-          onClick={(e) => {
+          onClick={e => {
             e.stopPropagation();
             onDelete();
           }}

@@ -45,11 +45,7 @@ export function ProjectWorkspaceItem({
       </button>
 
       {/* Task sessions — shown directly under supervisor */}
-      {taskCount > 0 && (
-        <div className="mt-0.5 pl-2">
-          {taskChildren}
-        </div>
-      )}
+      {taskCount > 0 && <div className="mt-0.5 pl-2">{taskChildren}</div>}
     </div>
   );
 }

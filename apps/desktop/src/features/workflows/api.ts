@@ -15,14 +15,22 @@ function getProjectOwnerBackendId(projectId: string): string | null {
 }
 
 export async function listWorkflows(projectId: string): Promise<Workflow[]> {
-  return apiCallForBackend<Workflow[]>(getProjectOwnerBackendId(projectId), `/api/projects/${projectId}/workflows`);
+  return apiCallForBackend<Workflow[]>(
+    getProjectOwnerBackendId(projectId),
+    `/api/projects/${projectId}/workflows`
+  );
 }
 
 export async function listAllWorkflows(): Promise<Workflow[]> {
   return apiCall<Workflow[]>('/api/workflows');
 }
 
-export async function createGlobalWorkflow(data: { name: string; description?: string; definition: WorkflowDefinition; status?: string }): Promise<Workflow> {
+export async function createGlobalWorkflow(data: {
+  name: string;
+  description?: string;
+  definition: WorkflowDefinition;
+  status?: string;
+}): Promise<Workflow> {
   return apiCall<Workflow>('/api/workflows', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -33,14 +41,24 @@ export async function getWorkflow(workflowId: string): Promise<Workflow> {
   return apiCall<Workflow>(`/api/workflows/${workflowId}`);
 }
 
-export async function createWorkflow(projectId: string, data: { name: string; description?: string; definition: WorkflowDefinition; status?: string }): Promise<Workflow> {
-  return apiCallForBackend<Workflow>(getProjectOwnerBackendId(projectId), `/api/projects/${projectId}/workflows`, {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
+export async function createWorkflow(
+  projectId: string,
+  data: { name: string; description?: string; definition: WorkflowDefinition; status?: string }
+): Promise<Workflow> {
+  return apiCallForBackend<Workflow>(
+    getProjectOwnerBackendId(projectId),
+    `/api/projects/${projectId}/workflows`,
+    {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }
+  );
 }
 
-export async function updateWorkflow(workflowId: string, data: Partial<Workflow>): Promise<Workflow> {
+export async function updateWorkflow(
+  workflowId: string,
+  data: Partial<Workflow>
+): Promise<Workflow> {
   return apiCall<Workflow>(`/api/workflows/${workflowId}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
@@ -63,11 +81,14 @@ export async function listTriggerSources(): Promise<WorkflowTriggerSourceMeta[]>
   return apiCall<WorkflowTriggerSourceMeta[]>('/api/workflow-trigger-sources');
 }
 
-export async function createWorkflowFromTemplate(projectId: string, templateId: string): Promise<Workflow> {
+export async function createWorkflowFromTemplate(
+  projectId: string,
+  templateId: string
+): Promise<Workflow> {
   return apiCallForBackend<Workflow>(
     getProjectOwnerBackendId(projectId),
     `/api/projects/${projectId}/workflows/from-template/${templateId}`,
-    { method: 'POST' },
+    { method: 'POST' }
   );
 }
 
@@ -76,11 +97,15 @@ export async function triggerWorkflow(workflowId: string): Promise<WorkflowRun> 
 }
 
 export async function listWorkflowRuns(workflowId: string, limit?: number): Promise<WorkflowRun[]> {
-  const url = limit ? `/api/workflows/${workflowId}/runs?limit=${limit}` : `/api/workflows/${workflowId}/runs`;
+  const url = limit
+    ? `/api/workflows/${workflowId}/runs?limit=${limit}`
+    : `/api/workflows/${workflowId}/runs`;
   return apiCall<WorkflowRun[]>(url);
 }
 
-export async function getWorkflowRun(runId: string): Promise<{ run: WorkflowRun; stepRuns: WorkflowStepRun[] }> {
+export async function getWorkflowRun(
+  runId: string
+): Promise<{ run: WorkflowRun; stepRuns: WorkflowStepRun[] }> {
   return apiCall<{ run: WorkflowRun; stepRuns: WorkflowStepRun[] }>(`/api/workflow-runs/${runId}`);
 }
 
@@ -109,23 +134,23 @@ export interface WorkflowGenerateResult {
 export async function generateWorkflowFromNL(
   projectId: string,
   description: string,
-  llmProfileId: string,
+  llmProfileId: string
 ): Promise<WorkflowGenerateResult> {
   return apiCallForBackend<WorkflowGenerateResult>(
     getProjectOwnerBackendId(projectId),
     `/api/projects/${projectId}/workflows/generate`,
-    { method: 'POST', body: JSON.stringify({ description, llmProfileId }) },
+    { method: 'POST', body: JSON.stringify({ description, llmProfileId }) }
   );
 }
 
 export async function refineGeneratedWorkflow(
   projectId: string,
   generationId: string,
-  instruction: string,
+  instruction: string
 ): Promise<WorkflowGenerateResult> {
   return apiCallForBackend<WorkflowGenerateResult>(
     getProjectOwnerBackendId(projectId),
     `/api/projects/${projectId}/workflows/generate/refine`,
-    { method: 'POST', body: JSON.stringify({ generationId, instruction }) },
+    { method: 'POST', body: JSON.stringify({ generationId, instruction }) }
   );
 }

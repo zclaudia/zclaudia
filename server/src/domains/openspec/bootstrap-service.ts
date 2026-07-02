@@ -6,8 +6,15 @@ import type { DeltaDoc, ParsedRequirement, ParsedSpec } from './markdown/types.j
 import { parseSpec } from './markdown/spec-parser.js';
 import { formatSpec } from './markdown/spec-formatter.js';
 import { applyDelta } from './delta-merger.js';
-import { AiExploreService, type ExploreInput, type ExploreResult } from './ai-explore-service.js';
-import { BootstrapScanRepository, type BootstrapScan } from './repositories/bootstrap-scan-repository.js';
+import {
+  type AiExploreService,
+  type ExploreInput,
+  type ExploreResult,
+} from './ai-explore-service.js';
+import {
+  BootstrapScanRepository,
+  type BootstrapScan,
+} from './repositories/bootstrap-scan-repository.js';
 import { BootstrapReviewItemRepository } from './repositories/bootstrap-review-item-repository.js';
 import {
   BootstrapCandidateRepository,
@@ -76,7 +83,7 @@ export class BootstrapService {
       });
     }
     console.warn(
-      `[BootstrapService] reclaimed ${orphans.length} orphaned 'running' scan(s) on startup`,
+      `[BootstrapService] reclaimed ${orphans.length} orphaned 'running' scan(s) on startup`
     );
   }
 
@@ -88,7 +95,7 @@ export class BootstrapService {
     }
     this.scanRepo.update(scanId, { initPhase: 'generating', status: 'running' });
     this.generationRunners.set(scanId, false);
-    void this.runPhase2(scanId).catch((e) => {
+    void this.runPhase2(scanId).catch(e => {
       console.error(`[BootstrapService] Phase 2 unhandled error for scan ${scanId}:`, e);
     });
   }
@@ -110,7 +117,7 @@ export class BootstrapService {
       });
 
       try {
-        const onStream = makeThrottledStreamCallback((contentSoFar) => {
+        const onStream = makeThrottledStreamCallback(contentSoFar => {
           this.deps.broadcast?.(scanId, {
             kind: 'candidate_generation_progress',
             candidateId: cand.id,
@@ -127,14 +134,21 @@ export class BootstrapService {
           generated_md: result.specMd,
           generation_attempts: result.attempts,
         });
-        this.deps.broadcast?.(scanId, { kind: 'candidate_generation_completed', candidate: updated });
+        this.deps.broadcast?.(scanId, {
+          kind: 'candidate_generation_completed',
+          candidate: updated,
+        });
       } catch (e) {
         const msg = (e as Error).message;
         const updated = this.candidateRepo.update(cand.id, {
           phase: 'failed',
           error_message: msg,
         });
-        this.deps.broadcast?.(scanId, { kind: 'candidate_generation_failed', candidate: updated, error: msg });
+        this.deps.broadcast?.(scanId, {
+          kind: 'candidate_generation_failed',
+          candidate: updated,
+          error: msg,
+        });
       }
     }
 
@@ -147,7 +161,7 @@ export class BootstrapService {
     const active = this.scanRepo.findActiveByProject(input.projectId);
     if (active) {
       throw new Error(
-        `A bootstrap scan is already active for project ${input.projectId} (id=${active.id})`,
+        `A bootstrap scan is already active for project ${input.projectId} (id=${active.id})`
       );
     }
 
@@ -163,11 +177,11 @@ export class BootstrapService {
     const updated = this.scanRepo.findById(scan.id)!;
 
     console.log(
-      `[BootstrapService] starting initial scan ${updated.id} (project=${input.projectId}, root=${this.deps.getProjectRoot(input.projectId)})`,
+      `[BootstrapService] starting initial scan ${updated.id} (project=${input.projectId}, root=${this.deps.getProjectRoot(input.projectId)})`
     );
 
     // Kick off Phase 1 in the background. Returns immediately.
-    void this.runPhase1(updated).catch((e) => {
+    void this.runPhase1(updated).catch(e => {
       console.error(`[BootstrapService] Phase 1 unhandled error for scan ${updated.id}:`, e);
     });
 
@@ -232,7 +246,7 @@ export class BootstrapService {
     const projectRoot = this.deps.getProjectRoot(input.projectId);
 
     console.log(
-      `[BootstrapService] starting scan ${scan.id} (project=${input.projectId}, mode=${input.mode}, root=${projectRoot})`,
+      `[BootstrapService] starting scan ${scan.id} (project=${input.projectId}, mode=${input.mode}, root=${projectRoot})`
     );
 
     let exploreResult: ExploreResult;
@@ -241,8 +255,7 @@ export class BootstrapService {
         projectId: input.projectId,
         workingDirectory: projectRoot,
         mode: input.mode,
-        existingCorpusSummary:
-          input.mode === 'rescan' ? summarizeCorpus(projectRoot) : undefined,
+        existingCorpusSummary: input.mode === 'rescan' ? summarizeCorpus(projectRoot) : undefined,
       };
       exploreResult = await this.deps.explore.explore(exploreInput);
     } catch (e) {
@@ -325,7 +338,7 @@ export class BootstrapService {
     }
 
     console.log(
-      `[BootstrapService] scan ${scan.id} ${finalStatus} (capabilities=${Object.keys(exploreResult.perCapability).length}, applied=${appliedCount}, pending=${pendingCount})`,
+      `[BootstrapService] scan ${scan.id} ${finalStatus} (capabilities=${Object.keys(exploreResult.perCapability).length}, applied=${appliedCount}, pending=${pendingCount})`
     );
 
     return { scan: updated, exploreResult, appliedSummary, pendingSummary };
@@ -340,11 +353,7 @@ export class BootstrapService {
   cancelScan(scanId: string): BootstrapScan {
     const scan = this.scanRepo.findById(scanId);
     if (!scan) throw new Error(`Scan not found: ${scanId}`);
-    if (
-      scan.status === 'completed' ||
-      scan.status === 'cancelled' ||
-      scan.status === 'failed'
-    ) {
+    if (scan.status === 'completed' || scan.status === 'cancelled' || scan.status === 'failed') {
       return scan; // already terminal — idempotent
     }
     return this.scanRepo.update(scanId, { status: 'cancelled', finishedAt: Date.now() });
@@ -355,7 +364,7 @@ export class BootstrapService {
     if (!/^[a-z][a-z0-9-]*$/.test(input.name)) {
       throw new Error(`Capability name must be kebab-case: got "${input.name}"`);
     }
-    const existing = this.candidateRepo.listByScan(scanId).find((c) => c.capability === input.name);
+    const existing = this.candidateRepo.listByScan(scanId).find(c => c.capability === input.name);
     if (existing) throw new Error(`Capability "${input.name}" already exists in this scan`);
     const c = this.candidateRepo.create({
       scanId,
@@ -370,7 +379,7 @@ export class BootstrapService {
 
   patchCandidate(
     id: string,
-    patch: Partial<{ title: string; description: string; selected: boolean }>,
+    patch: Partial<{ title: string; description: string; selected: boolean }>
   ): BootstrapCandidate {
     const before = this.candidateRepo.findById(id);
     if (!before) throw new Error(`Candidate not found: ${id}`);
@@ -440,7 +449,7 @@ export class BootstrapService {
     this.deps.broadcast?.(cand.scanId, { kind: 'candidate_updated', candidate: reset });
 
     // Generate just this cap in the background.
-    void this.regenerateSingle(cand.scanId, id).catch((e) => {
+    void this.regenerateSingle(cand.scanId, id).catch(e => {
       console.error(`[BootstrapService] retry unhandled error candidate=${id}:`, e);
     });
     return reset;
@@ -452,11 +461,19 @@ export class BootstrapService {
     const projectRoot = this.deps.getProjectRoot(this.scanRepo.findById(scanId)!.projectId);
 
     this.candidateRepo.update(candidateId, { phase: 'generating' });
-    this.deps.broadcast?.(scanId, { kind: 'candidate_generation_started', candidateId, capability: cand.capability });
+    this.deps.broadcast?.(scanId, {
+      kind: 'candidate_generation_started',
+      candidateId,
+      capability: cand.capability,
+    });
 
     try {
-      const onStream = makeThrottledStreamCallback((contentSoFar) => {
-        this.deps.broadcast?.(scanId, { kind: 'candidate_generation_progress', candidateId, contentSoFar });
+      const onStream = makeThrottledStreamCallback(contentSoFar => {
+        this.deps.broadcast?.(scanId, {
+          kind: 'candidate_generation_progress',
+          candidateId,
+          contentSoFar,
+        });
       });
       const result = await this.deps.explore.generateCapabilitySpec({
         capability: { name: cand.capability, description: cand.description },
@@ -471,8 +488,15 @@ export class BootstrapService {
       this.deps.broadcast?.(scanId, { kind: 'candidate_generation_completed', candidate: updated });
     } catch (e) {
       const msg = (e as Error).message;
-      const updated = this.candidateRepo.update(candidateId, { phase: 'failed', error_message: msg });
-      this.deps.broadcast?.(scanId, { kind: 'candidate_generation_failed', candidate: updated, error: msg });
+      const updated = this.candidateRepo.update(candidateId, {
+        phase: 'failed',
+        error_message: msg,
+      });
+      this.deps.broadcast?.(scanId, {
+        kind: 'candidate_generation_failed',
+        candidate: updated,
+        error: msg,
+      });
     }
   }
 
@@ -497,11 +521,9 @@ function summarizeCorpus(projectRoot: string): string {
     const specFile = path.join(dir, entry.name, 'spec.md');
     if (fs.existsSync(specFile)) {
       const text = fs.readFileSync(specFile, 'utf-8');
-      const reqNames = [...text.matchAll(/^###\s+Requirement:\s*(.+)$/gm)].map((m) =>
-        m[1].trim(),
-      );
+      const reqNames = [...text.matchAll(/^###\s+Requirement:\s*(.+)$/gm)].map(m => m[1].trim());
       caps.push(
-        `- ${entry.name}: ${reqNames.length} requirements [${reqNames.slice(0, 5).join(', ')}${reqNames.length > 5 ? ', ...' : ''}]`,
+        `- ${entry.name}: ${reqNames.length} requirements [${reqNames.slice(0, 5).join(', ')}${reqNames.length > 5 ? ', ...' : ''}]`
       );
     }
   }
@@ -513,8 +535,8 @@ function readExistingCapabilityFolders(projectRoot: string): string[] {
   if (!fs.existsSync(dir)) return [];
   return fs
     .readdirSync(dir, { withFileTypes: true })
-    .filter((e) => e.isDirectory())
-    .map((e) => e.name);
+    .filter(e => e.isDirectory())
+    .map(e => e.name);
 }
 
 function readOrEmptyCorpus(projectRoot: string, capability: string): ParsedSpec {
@@ -533,7 +555,7 @@ function bumpCorpusMeta(db: Database, projectId: string): void {
   db.prepare(
     `INSERT INTO project_spec_corpus_meta (project_id, initialized, last_bootstrap_at, capabilities_json)
      VALUES (?, 1, ?, '[]')
-     ON CONFLICT(project_id) DO UPDATE SET initialized = 1, last_bootstrap_at = excluded.last_bootstrap_at`,
+     ON CONFLICT(project_id) DO UPDATE SET initialized = 1, last_bootstrap_at = excluded.last_bootstrap_at`
   ).run(projectId, Date.now());
 }
 

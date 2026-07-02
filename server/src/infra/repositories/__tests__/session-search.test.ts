@@ -59,10 +59,12 @@ describe('SessionSearchRepository', () => {
     repo = new SessionSearchRepository(db);
 
     const now = Date.now();
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO sessions (id, project_id, name, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
-    `).run('s1', 'project-1', 'Session 1', now, now);
+    `
+    ).run('s1', 'project-1', 'Session 1', now, now);
   });
 
   afterEach(() => {
@@ -71,10 +73,12 @@ describe('SessionSearchRepository', () => {
 
   it('searches indexed session messages', () => {
     const now = Date.now();
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO messages (id, session_id, role, content, created_at)
       VALUES (?, ?, ?, ?, ?)
-    `).run('m1', 's1', 'user', 'authentication request', now);
+    `
+    ).run('m1', 's1', 'user', 'authentication request', now);
 
     const results = repo.search({
       q: 'authentication',
@@ -91,14 +95,18 @@ describe('SessionSearchRepository', () => {
 
   it('filters search results by role', () => {
     const now = Date.now();
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO messages (id, session_id, role, content, created_at)
       VALUES (?, ?, ?, ?, ?)
-    `).run('m1', 's1', 'user', 'authentication request', now);
-    db.prepare(`
+    `
+    ).run('m1', 's1', 'user', 'authentication request', now);
+    db.prepare(
+      `
       INSERT INTO messages (id, session_id, role, content, created_at)
       VALUES (?, ?, ?, ?, ?)
-    `).run('m2', 's1', 'assistant', 'authentication response', now + 1);
+    `
+    ).run('m2', 's1', 'assistant', 'authentication response', now + 1);
 
     const results = repo.search({
       q: 'authentication',

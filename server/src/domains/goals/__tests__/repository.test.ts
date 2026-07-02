@@ -9,19 +9,19 @@ function makeDb() {
   const now = Date.now();
   db.prepare(
     `INSERT INTO projects (id, name, created_at, updated_at)
-     VALUES (?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?)`
   ).run('p1', 'p', now, now);
   db.prepare(
     `INSERT INTO llm_profiles (id, name, created_at, updated_at)
-     VALUES (?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?)`
   ).run('lp1', 'lp', now, now);
   db.prepare(
     `INSERT INTO agent_profiles (id, name, llm_profile_id, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?)`
   ).run('ap1', 'ap', 'lp1', now, now);
   db.prepare(
     `INSERT INTO sessions (id, project_id, agent_profile_id, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?)`
   ).run('s1', 'p1', 'ap1', now, now);
   return db;
 }

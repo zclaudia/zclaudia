@@ -2,7 +2,11 @@ import { useOwnershipStore } from '../stores/ownershipStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useSessionsStore } from '../stores/sessionsStore';
 import { useServerStore } from '../stores/serverStore';
-import { getControlPlaneMode, resolveCanonicalBackendId, resolveLocalBackendId } from '../utils/controlPlane';
+import {
+  getControlPlaneMode,
+  resolveCanonicalBackendId,
+  resolveLocalBackendId,
+} from '../utils/controlPlane';
 import { isMobileBackendUsable } from './mobileConnectionState';
 import { resolveSessionOwnerBackendId } from '../utils/sessionOwnership';
 
@@ -24,13 +28,17 @@ export function createSelectionCoordinator(deps: SelectionCoordinatorDeps) {
     connectionState,
     backends,
     connectServer,
-    schedule = (callback) => {
+    schedule = callback => {
       window.setTimeout(callback, 0);
     },
   } = deps;
 
-  const resolveSessionSelection = (sessionId: string): { projectId: string | null; ownerBackendId: string | null } => {
-    const localSession = useProjectStore.getState().sessions.find((session) => session.id === sessionId);
+  const resolveSessionSelection = (
+    sessionId: string
+  ): { projectId: string | null; ownerBackendId: string | null } => {
+    const localSession = useProjectStore
+      .getState()
+      .sessions.find(session => session.id === sessionId);
     if (localSession) {
       return {
         projectId: localSession.projectId,
@@ -39,7 +47,7 @@ export function createSelectionCoordinator(deps: SelectionCoordinatorDeps) {
     }
 
     for (const [backendId, sessions] of useSessionsStore.getState().remoteSessions) {
-      const remoteSession = sessions.find((session) => session.id === sessionId);
+      const remoteSession = sessions.find(session => session.id === sessionId);
       if (remoteSession) {
         return {
           projectId: remoteSession.projectId,
@@ -58,7 +66,10 @@ export function createSelectionCoordinator(deps: SelectionCoordinatorDeps) {
   };
 
   const selectBackend = (backendId: string | null | undefined) => {
-    const canonicalBackendId = resolveCanonicalBackendId(backendId, resolveLocalBackendId() ?? backendId ?? null);
+    const canonicalBackendId = resolveCanonicalBackendId(
+      backendId,
+      resolveLocalBackendId() ?? backendId ?? null
+    );
     if (!canonicalBackendId) return;
 
     if (activeServerId === canonicalBackendId) {
@@ -87,8 +98,8 @@ export function createSelectionCoordinator(deps: SelectionCoordinatorDeps) {
     }
 
     const ownerBackendId =
-      useOwnershipStore.getState().getProjectBackendId(projectId)
-      ?? (getControlPlaneMode() === 'embedded-local'
+      useOwnershipStore.getState().getProjectBackendId(projectId) ??
+      (getControlPlaneMode() === 'embedded-local'
         ? resolveLocalBackendId()
         : useServerStore.getState().activeServerId);
 
@@ -114,9 +125,7 @@ export function createSelectionCoordinator(deps: SelectionCoordinatorDeps) {
     }
 
     const resolvedSession = resolveSessionSelection(sessionId);
-    const ownerBackendId =
-      options?.backendId
-      ?? resolvedSession.ownerBackendId;
+    const ownerBackendId = options?.backendId ?? resolvedSession.ownerBackendId;
 
     const currentBackendId = useServerStore.getState().activeServerId;
     if (ownerBackendId) {

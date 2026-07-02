@@ -5,7 +5,7 @@ export interface ChatActionsContextValue {
   handleSendMessage: (
     content: string,
     attachments?: Attachment[],
-    overrideMode?: string,
+    overrideMode?: string
   ) => Promise<void>;
   setMode: (sessionId: string, mode: string) => void;
 }

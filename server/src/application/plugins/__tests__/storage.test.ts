@@ -45,63 +45,67 @@ describe('PluginStorage', () => {
 
   describe('set', () => {
     it('should set a value and persist', async () => {
-    vi.mocked(fs.existsSync).mockReturnValue(false);
-    vi.mocked(fs.mkdirSync).mockReturnValue(undefined);
-    vi.mocked(fs.writeFileSync).mockImplementation(() => {});
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.mkdirSync).mockReturnValue(undefined);
+      vi.mocked(fs.writeFileSync).mockImplementation(() => {});
 
-    await storage.set('newKey', 'newValue');
+      await storage.set('newKey', 'newValue');
 
-    expect(vi.mocked(fs.writeFileSync)).toHaveBeenCalled();
-  });
+      expect(vi.mocked(fs.writeFileSync)).toHaveBeenCalled();
+    });
 
-  it('should overwrite existing value', async () => {
-    vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ existingKey: 'oldValue' }));
-    vi.mocked(fs.writeFileSync).mockImplementation(() => {});
+    it('should overwrite existing value', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ existingKey: 'oldValue' }));
+      vi.mocked(fs.writeFileSync).mockImplementation(() => {});
 
-    await storage.set('existingKey', 'newValue');
+      await storage.set('existingKey', 'newValue');
 
-    const cache = storage.getCache();
-    expect(cache.get('existingKey')).toBe('newValue');
-  });
+      const cache = storage.getCache();
+      expect(cache.get('existingKey')).toBe('newValue');
+    });
   });
 
   describe('delete', () => {
     it('should delete a key', async () => {
-    vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ toDelete: 'value' }));
-    vi.mocked(fs.writeFileSync).mockImplementation(() => {});
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ toDelete: 'value' }));
+      vi.mocked(fs.writeFileSync).mockImplementation(() => {});
 
-    await storage.delete('toDelete');
+      await storage.delete('toDelete');
 
-    const cache = storage.getCache();
-    expect(cache.has('toDelete')).toBe(false);
-  });
+      const cache = storage.getCache();
+      expect(cache.has('toDelete')).toBe(false);
+    });
   });
 
   describe('clear', () => {
     it('should clear all keys', async () => {
-    vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ key1: 'value1', key2: 'value2' }));
-    vi.mocked(fs.writeFileSync).mockImplementation(() => {});
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(
+        JSON.stringify({ key1: 'value1', key2: 'value2' })
+      );
+      vi.mocked(fs.writeFileSync).mockImplementation(() => {});
 
-    await storage.clear();
+      await storage.clear();
 
-    const cache = storage.getCache();
-    expect(cache.size).toBe(0);
-  });
+      const cache = storage.getCache();
+      expect(cache.size).toBe(0);
+    });
   });
 
   describe('keys', () => {
     it('should return all keys', async () => {
-    vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ key1: 'value1', key2: 'value2', key3: 'value3' }));
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(
+        JSON.stringify({ key1: 'value1', key2: 'value2', key3: 'value3' })
+      );
 
-    const keys = await storage.keys();
-    expect(keys).toContain('key1');
-    expect(keys).toContain('key2');
-    expect(keys).toContain('key3');
-  });
+      const keys = await storage.keys();
+      expect(keys).toContain('key1');
+      expect(keys).toContain('key2');
+      expect(keys).toContain('key3');
+    });
   });
 });
 
@@ -114,31 +118,31 @@ describe('PluginStorageManager', () => {
 
   describe('getStorage', () => {
     it('should create storage for new plugin', () => {
-    const storage = manager.getStorage('plugin.a');
-    expect(storage).toBeDefined();
-  });
+      const storage = manager.getStorage('plugin.a');
+      expect(storage).toBeDefined();
+    });
 
-  it('should return same storage for same plugin', () => {
-    const storage1 = manager.getStorage('plugin.a');
-    const storage2 = manager.getStorage('plugin.a');
-    expect(storage1).toBe(storage2);
-  });
+    it('should return same storage for same plugin', () => {
+      const storage1 = manager.getStorage('plugin.a');
+      const storage2 = manager.getStorage('plugin.a');
+      expect(storage1).toBe(storage2);
+    });
   });
 
   describe('clearStorage', () => {
     it('should clear storage for plugin', () => {
-    manager.getStorage('plugin.a');
-    manager.clearStorage('plugin.a');
-    // Storage should be removed
-    manager.getStorage('plugin.a');
-  });
+      manager.getStorage('plugin.a');
+      manager.clearStorage('plugin.a');
+      // Storage should be removed
+      manager.getStorage('plugin.a');
+    });
   });
 
   describe('clearAll', () => {
     it('should clear all storages', () => {
-    manager.getStorage('plugin.a');
-    manager.getStorage('plugin.b');
-    manager.clearAll();
-  });
+      manager.getStorage('plugin.a');
+      manager.getStorage('plugin.b');
+      manager.clearAll();
+    });
   });
 });

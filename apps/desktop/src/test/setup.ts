@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import React from 'react';
+import type React from 'react';
 import { afterEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 
@@ -94,7 +94,10 @@ if (typeof window !== 'undefined') {
 class MockIDBDatabase {
   name: string;
   version: number;
-  objectStoreNames = { contains: vi.fn().mockReturnValue(false), length: 0 } as unknown as DOMStringList;
+  objectStoreNames = {
+    contains: vi.fn().mockReturnValue(false),
+    length: 0,
+  } as unknown as DOMStringList;
 
   constructor(name: string) {
     this.name = name;

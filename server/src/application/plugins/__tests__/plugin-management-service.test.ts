@@ -30,7 +30,14 @@ describe('PluginManagementService', () => {
   it('lists plugins with merged registry data', () => {
     loader.getPlugins.mockReturnValue([
       {
-        manifest: { id: 'plugin-1', name: 'Plugin 1', version: '1.0.0', description: 'Desc', author: 'Auth', permissions: ['fs:read'] },
+        manifest: {
+          id: 'plugin-1',
+          name: 'Plugin 1',
+          version: '1.0.0',
+          description: 'Desc',
+          author: 'Auth',
+          permissions: ['fs:read'],
+        },
         isActive: true,
         error: undefined,
         pendingPermissions: [],
@@ -41,7 +48,12 @@ describe('PluginManagementService', () => {
     tools.getByPlugin.mockReturnValue([{ definition: { function: { name: 'tool-a' } } }]);
     commands.getByPlugin.mockReturnValue([{ command: '/cmd-a' }]);
 
-    const service = new PluginManagementService({ loader: loader as never, permissions: permissions as never, tools: tools as never, commands: commands as never });
+    const service = new PluginManagementService({
+      loader: loader as never,
+      permissions: permissions as never,
+      tools: tools as never,
+      commands: commands as never,
+    });
     const result = service.listPlugins();
 
     expect(result).toHaveLength(1);
@@ -60,7 +72,12 @@ describe('PluginManagementService', () => {
     loader.remove.mockResolvedValue(undefined);
     loader.deactivate.mockResolvedValue(undefined);
 
-    const service = new PluginManagementService({ loader: loader as never, permissions: permissions as never, tools: tools as never, commands: commands as never });
+    const service = new PluginManagementService({
+      loader: loader as never,
+      permissions: permissions as never,
+      tools: tools as never,
+      commands: commands as never,
+    });
 
     await expect(service.activatePlugin('plugin-1')).resolves.toEqual({ activated: true });
     await expect(service.deactivatePlugin('plugin-1')).resolves.toEqual({ deactivated: true });
@@ -74,7 +91,12 @@ describe('PluginManagementService', () => {
     loader.getPlugin.mockReturnValue({ isActive: false });
     loader.activate.mockResolvedValue(true);
 
-    const service = new PluginManagementService({ loader: loader as never, permissions: permissions as never, tools: tools as never, commands: commands as never });
+    const service = new PluginManagementService({
+      loader: loader as never,
+      permissions: permissions as never,
+      tools: tools as never,
+      commands: commands as never,
+    });
     const updated = service.updatePluginDirs([' /extra ', '', '/extra']);
     expect(loader.saveExtraDirs).toHaveBeenCalledWith(['/extra']);
     expect(updated).toEqual({ dirs: ['/plugins/default', '/extra'] });
@@ -88,9 +110,16 @@ describe('PluginManagementService', () => {
 
   it('throws structured validation errors', () => {
     loader.hasPlugin.mockReturnValue(false);
-    const service = new PluginManagementService({ loader: loader as never, permissions: permissions as never, tools: tools as never, commands: commands as never });
+    const service = new PluginManagementService({
+      loader: loader as never,
+      permissions: permissions as never,
+      tools: tools as never,
+      commands: commands as never,
+    });
 
-    expect(() => service.grantPermissions('plugin-1', 'fs:read')).toThrowError(PluginManagementError);
+    expect(() => service.grantPermissions('plugin-1', 'fs:read')).toThrowError(
+      PluginManagementError
+    );
     expect(() => service.updatePluginDirs('bad')).toThrowError(PluginManagementError);
   });
 });

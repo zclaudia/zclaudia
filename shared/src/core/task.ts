@@ -3,7 +3,14 @@ export type TaskType = BuiltinTaskType | (string & {});
 
 export type TaskStatus = 'queued' | 'running' | 'paused' | 'completed' | 'failed' | 'stopped';
 
-export type TaskEventType = 'created' | 'started' | 'paused' | 'completed' | 'failed' | 'stopped' | 'updated';
+export type TaskEventType =
+  | 'created'
+  | 'started'
+  | 'paused'
+  | 'completed'
+  | 'failed'
+  | 'stopped'
+  | 'updated';
 
 export interface TaskExecutorRef {
   providerType?: string;

@@ -38,7 +38,7 @@ export class BackendFacadeRuntimeCore implements BackendFacade {
   private readonly mode: BackendFacadeMode;
   private readonly localBackendMatcher?: (
     presence: BackendPresence,
-    identity: { instanceId: string; deviceId: string },
+    identity: { instanceId: string; deviceId: string }
   ) => boolean;
   private readonly onLocalBackendIdChanged?: (backendId: string | null) => void;
 
@@ -84,8 +84,9 @@ export class BackendFacadeRuntimeCore implements BackendFacade {
     // 1. Subscribe to adapter events — buffer during initialization
     this.eventBuffer = [];
     this.unsubscribeAdapter = this.adapter.events.subscribe(event => {
-      if (!this.initialized) {
-        this.eventBuffer!.push(event);
+      const buffer = this.eventBuffer;
+      if (!this.initialized && buffer) {
+        buffer.push(event);
       } else {
         this.handleAdapterEvent(event);
       }
@@ -106,7 +107,10 @@ export class BackendFacadeRuntimeCore implements BackendFacade {
     // 5. Identify local backend
     this.localBackendId = null;
     if (this.localBackendMatcher) {
-      const identity = { instanceId: bootstrap.identity.instanceId, deviceId: bootstrap.identity.deviceId };
+      const identity = {
+        instanceId: bootstrap.identity.instanceId,
+        deviceId: bootstrap.identity.deviceId,
+      };
       for (const item of bootstrap.registry.items) {
         if (this.localBackendMatcher(item, identity)) {
           this.localBackendId = item.backendId;
@@ -119,7 +123,7 @@ export class BackendFacadeRuntimeCore implements BackendFacade {
     }
 
     // 6. Replay buffered events
-    const buffer = this.eventBuffer!;
+    const buffer = this.eventBuffer ?? [];
     this.eventBuffer = null;
     this.initialized = true;
     for (const event of buffer) {
@@ -217,9 +221,9 @@ export class BackendFacadeRuntimeCore implements BackendFacade {
     this.emitBackendDiffs(diffs);
 
     // Notify stream manager
-    const streamResult = this.streamManager.handleBackendUnsubscribed(
-      backendId, 'user_closed', { willAutoRecover: false },
-    );
+    const streamResult = this.streamManager.handleBackendUnsubscribed(backendId, 'user_closed', {
+      willAutoRecover: false,
+    });
     this.executeStreamResult(streamResult);
   }
 
@@ -287,6 +291,9 @@ export class BackendFacadeRuntimeCore implements BackendFacade {
       case 'registry_snapshot_received':
         this.handleRegistrySnapshot(event);
         break;
+      case 'backends_removed':
+        this.handleBackendsRemoved(event);
+        break;
       case 'backend_subscribed':
         this.handleBackendSubscribed(event);
         break;
@@ -321,7 +328,9 @@ export class BackendFacadeRuntimeCore implements BackendFacade {
   // Connection
   // --------------------------------------------------------------------------
 
-  private handleConnectionStateChanged(event: Extract<FacadeAdapterEvent, { type: 'connection_state_changed' }>): void {
+  private handleConnectionStateChanged(
+    event: Extract<FacadeAdapterEvent, { type: 'connection_state_changed' }>
+  ): void {
     const newState = event.state as BackendConnectionState;
     if (this.connectionState === newState) return; // Skip if unchanged
     this.connectionState = newState;
@@ -336,7 +345,9 @@ export class BackendFacadeRuntimeCore implements BackendFacade {
   // Registry
   // --------------------------------------------------------------------------
 
-  private handleRegistrySnapshot(event: Extract<FacadeAdapterEvent, { type: 'registry_snapshot_received' }>): void {
+  private handleRegistrySnapshot(
+    event: Extract<FacadeAdapterEvent, { type: 'registry_snapshot_received' }>
+  ): void {
     const diffs = this.registryStore.applyRegistrySnapshot(event.items);
 
     // Re-evaluate local backend
@@ -348,13 +359,24 @@ export class BackendFacadeRuntimeCore implements BackendFacade {
     this.reopenDesiredBackends();
   }
 
+  private handleBackendsRemoved(
+    event: Extract<FacadeAdapterEvent, { type: 'backends_removed' }>
+  ): void {
+    if (event.backendIds.length === 0) return;
+    this.emitFacadeEvent({ type: 'backends_removed', backendIds: event.backendIds });
+  }
+
   // --------------------------------------------------------------------------
   // Subscription
   // --------------------------------------------------------------------------
 
-  private handleBackendSubscribed(event: Extract<FacadeAdapterEvent, { type: 'backend_subscribed' }>): void {
+  private handleBackendSubscribed(
+    event: Extract<FacadeAdapterEvent, { type: 'backend_subscribed' }>
+  ): void {
     const diffs = this.registryStore.markSubscribed(
-      event.backendId, event.epoch, event.capabilities,
+      event.backendId,
+      event.epoch,
+      event.capabilities
     );
 
     // Backend data snapshot will be pushed automatically by the backend
@@ -366,17 +388,19 @@ export class BackendFacadeRuntimeCore implements BackendFacade {
     }
   }
 
-  private handleBackendUnsubscribed(event: Extract<FacadeAdapterEvent, { type: 'backend_unsubscribed' }>): void {
+  private handleBackendUnsubscribed(
+    event: Extract<FacadeAdapterEvent, { type: 'backend_unsubscribed' }>
+  ): void {
     const backend = this.registryStore.getBackend(event.backendId);
 
-    const diffs = this.registryStore.markUnsubscribed(
-      event.backendId, event.reason,
-    );
+    const diffs = this.registryStore.markUnsubscribed(event.backendId, event.reason);
 
     // Notify stream manager
     const willAutoRecover = backend?.presence !== null;
     const streamResult = this.streamManager.handleBackendUnsubscribed(
-      event.backendId, event.reason, { willAutoRecover },
+      event.backendId,
+      event.reason,
+      { willAutoRecover }
     );
     this.executeStreamResult(streamResult);
 
@@ -387,7 +411,9 @@ export class BackendFacadeRuntimeCore implements BackendFacade {
   // Backend Data
   // --------------------------------------------------------------------------
 
-  private handleBackendDataSnapshot(event: Extract<FacadeAdapterEvent, { type: 'backend_data_snapshot_received' }>): void {
+  private handleBackendDataSnapshot(
+    event: Extract<FacadeAdapterEvent, { type: 'backend_data_snapshot_received' }>
+  ): void {
     const diffs = this.registryStore.markDataInitialized(event.backendId);
 
     // Emit backend data snapshot event
@@ -408,7 +434,9 @@ export class BackendFacadeRuntimeCore implements BackendFacade {
     this.emitBackendDiffs(diffs);
   }
 
-  private handleBackendDataEvent(event: Extract<FacadeAdapterEvent, { type: 'backend_data_event_received' }>): void {
+  private handleBackendDataEvent(
+    event: Extract<FacadeAdapterEvent, { type: 'backend_data_event_received' }>
+  ): void {
     this.emitFacadeEvent({
       type: 'backend_data_event',
       backendId: event.backendId,
@@ -420,22 +448,32 @@ export class BackendFacadeRuntimeCore implements BackendFacade {
   // Session Stream Events
   // --------------------------------------------------------------------------
 
-  private handleSessionStreamClosed(event: Extract<FacadeAdapterEvent, { type: 'session_stream_closed' }>): void {
+  private handleSessionStreamClosed(
+    event: Extract<FacadeAdapterEvent, { type: 'session_stream_closed' }>
+  ): void {
     const result = this.streamManager.handleSessionStreamClosed(
-      event.backendId, event.sessionId, event.reason,
+      event.backendId,
+      event.sessionId,
+      event.reason
     );
     this.executeStreamResult(result);
   }
 
-  private handleContentPatch(event: Extract<FacadeAdapterEvent, { type: 'content_patch_received' }>): void {
+  private handleContentPatch(
+    event: Extract<FacadeAdapterEvent, { type: 'content_patch_received' }>
+  ): void {
     const result = this.streamManager.handleContentPatch(
-      event.backendId, event.sessionId,
-      event.messages, event.latestOffset,
+      event.backendId,
+      event.sessionId,
+      event.messages,
+      event.latestOffset
     );
     this.executeStreamResult(result);
   }
 
-  private handleContentPatchFailed(event: Extract<FacadeAdapterEvent, { type: 'content_patch_failed' }>): void {
+  private handleContentPatchFailed(
+    event: Extract<FacadeAdapterEvent, { type: 'content_patch_failed' }>
+  ): void {
     this.emitFacadeEvent({
       type: 'content_patch_failed',
       backendId: event.backendId,
@@ -446,13 +484,13 @@ export class BackendFacadeRuntimeCore implements BackendFacade {
   }
 
   private handleRunEvent(event: Extract<FacadeAdapterEvent, { type: 'run_event_received' }>): void {
-    const result = this.streamManager.handleRunEvent(
-      event.backendId, event.sessionId, event.event,
-    );
+    const result = this.streamManager.handleRunEvent(event.backendId, event.sessionId, event.event);
     this.executeStreamResult(result);
   }
 
-  private handleBackendMessage(event: Extract<FacadeAdapterEvent, { type: 'backend_message_received' }>): void {
+  private handleBackendMessage(
+    event: Extract<FacadeAdapterEvent, { type: 'backend_message_received' }>
+  ): void {
     // Pass through as run_event so the UI message handler can process it.
     // This covers system_info, permission_request, interaction_prompt, and other
     // non-stream messages that arrive via channel_server_message.

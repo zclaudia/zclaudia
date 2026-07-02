@@ -9,14 +9,17 @@ export class ApiError extends Error {
   constructor(
     message: string,
     readonly code?: string,
-    readonly details?: unknown,
+    readonly details?: unknown
   ) {
     super(message);
     this.name = 'ApiError';
   }
 }
 
-function throwApiError(result: { error?: { code?: string; message?: string; details?: unknown } }, fallback: string): never {
+function throwApiError(
+  result: { error?: { code?: string; message?: string; details?: unknown } },
+  fallback: string
+): never {
   throw new ApiError(result.error?.message || fallback, result.error?.code, result.error?.details);
 }
 

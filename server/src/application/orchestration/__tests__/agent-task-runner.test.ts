@@ -99,7 +99,7 @@ describe('AgentTaskRunner', () => {
       }),
       db,
       {},
-      clients,
+      clients
     );
     expect(clients.has('orchestrator-task-1')).toBe(false);
   });

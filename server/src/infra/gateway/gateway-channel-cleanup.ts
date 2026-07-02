@@ -9,10 +9,7 @@ import { isTerminalPhase } from '../../application/conversation/runtime/active-r
  *
  * Only log orphaned runs for observability.
  */
-export function handleChannelClosed(
-  channelId: string,
-  activeRuns: Map<string, ActiveRun>,
-): void {
+export function handleChannelClosed(channelId: string, activeRuns: Map<string, ActiveRun>): void {
   const orphanedRunIds: string[] = [];
   for (const [runId, run] of activeRuns) {
     if (run.clientId === channelId && !isTerminalPhase(run.phase)) {
@@ -21,7 +18,7 @@ export function handleChannelClosed(
   }
   if (orphanedRunIds.length > 0) {
     console.log(
-      `[Gateway] Channel ${channelId} closed with ${orphanedRunIds.length} active run(s) — keeping alive for reconnect`,
+      `[Gateway] Channel ${channelId} closed with ${orphanedRunIds.length} active run(s) — keeping alive for reconnect`
     );
   }
 }

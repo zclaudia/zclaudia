@@ -90,9 +90,7 @@ describe('interaction coordinator', () => {
   it('emits finalized todo updates when a run completes', async () => {
     const sendRunEvent = vi.fn();
     const finalizedTodos = [{ content: 'A', status: 'completed' }];
-    finalizeSessionMock.mockReturnValueOnce([
-      { interactionId: 'tool-1', todos: finalizedTodos },
-    ]);
+    finalizeSessionMock.mockReturnValueOnce([{ interactionId: 'tool-1', todos: finalizedTodos }]);
 
     const { finalizeRunInteractions } = await import('../interaction-coordinator.js');
 

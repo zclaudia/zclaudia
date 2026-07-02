@@ -40,7 +40,11 @@ describe('interaction tools', () => {
     });
 
     expect(tooMany.details).toMatchObject({ ok: false, error: 'too_many_todos', max: 100 });
-    expect(tooLong.details).toMatchObject({ ok: false, error: 'todo_content_too_large', maxChars: 1000 });
+    expect(tooLong.details).toMatchObject({
+      ok: false,
+      error: 'todo_content_too_large',
+      maxChars: 1000,
+    });
   });
 
   it('AskUserQuestion waits through the interaction callback and returns the answer', async () => {
@@ -60,11 +64,13 @@ describe('interaction tools', () => {
       ],
     });
 
-    expect(permissionCallback).toHaveBeenCalledWith(expect.objectContaining({
-      requestId: 'question-1',
-      toolName: 'AskUserQuestion',
-      detail: 'Which tool should the agent use next?',
-    }));
+    expect(permissionCallback).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestId: 'question-1',
+        toolName: 'AskUserQuestion',
+        detail: 'Which tool should the agent use next?',
+      })
+    );
     expect(result.details).toMatchObject({ ok: true, answered: true });
     expect(result.content[0].text).toContain('Use WebFetch first.');
   });

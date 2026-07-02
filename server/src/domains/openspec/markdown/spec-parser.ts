@@ -1,6 +1,14 @@
 import type { ParsedSpec, ParsedRequirement, ParsedScenario, RfcKeyword } from './types.js';
 
-const RFC_KEYWORDS: RfcKeyword[] = ['MUST NOT', 'MUST', 'SHALL NOT', 'SHALL', 'SHOULD NOT', 'SHOULD', 'MAY'];
+const RFC_KEYWORDS: RfcKeyword[] = [
+  'MUST NOT',
+  'MUST',
+  'SHALL NOT',
+  'SHALL',
+  'SHOULD NOT',
+  'SHOULD',
+  'MAY',
+];
 
 function detectRfcKeywords(body: string): RfcKeyword[] {
   const seen = new Set<RfcKeyword>();
@@ -16,7 +24,10 @@ function detectRfcKeywords(body: string): RfcKeyword[] {
     }
     // Strip every occurrence (whether or not it triggered first-add) so longer keywords
     // can't seed shorter false-positives like detecting "MUST" inside "MUST NOT".
-    scratch = scratch.replace(new RegExp(`\\b${kw.replace(' ', '\\s+')}\\b`, 'g'), ' '.repeat(kw.length));
+    scratch = scratch.replace(
+      new RegExp(`\\b${kw.replace(' ', '\\s+')}\\b`, 'g'),
+      ' '.repeat(kw.length)
+    );
   }
   return out;
 }
@@ -44,13 +55,19 @@ export function parseSpec(markdown: string): ParsedSpec {
     // Try a softer fallback: first `# <something>` heading.
     for (let i = 0; i < lines.length; i += 1) {
       const m = lines[i].match(/^#\s+(.+?)\s*$/);
-      if (m) { capability = m[1].trim().replace(/\s+Specification$/i, ''); capabilityLineIdx = i; break; }
+      if (m) {
+        capability = m[1].trim().replace(/\s+Specification$/i, '');
+        capabilityLineIdx = i;
+        break;
+      }
     }
   }
 
   // 2. Find `## Purpose` section (optional)
   let purpose: string | undefined;
-  const purposeIdx = lines.findIndex((l, i) => i > capabilityLineIdx && /^##\s+Purpose\s*$/i.test(l));
+  const purposeIdx = lines.findIndex(
+    (l, i) => i > capabilityLineIdx && /^##\s+Purpose\s*$/i.test(l)
+  );
   if (purposeIdx >= 0) {
     const nextH2 = lines.findIndex((l, i) => i > purposeIdx && /^##\s+/.test(l));
     const endIdx = nextH2 >= 0 ? nextH2 : lines.length;
@@ -58,7 +75,7 @@ export function parseSpec(markdown: string): ParsedSpec {
   }
 
   // 3. Find `## Requirements` section
-  const reqsHeadingIdx = lines.findIndex((l) => /^##\s+Requirements\s*$/i.test(l));
+  const reqsHeadingIdx = lines.findIndex(l => /^##\s+Requirements\s*$/i.test(l));
   if (reqsHeadingIdx === -1) {
     return { capability, purpose, requirements: [] };
   }
@@ -66,14 +83,13 @@ export function parseSpec(markdown: string): ParsedSpec {
   // 4. Within Requirements section, find each `### Requirement: <name>` block
   const requirementHeadingIdxs: number[] = [];
   for (let i = reqsHeadingIdx + 1; i < lines.length; i += 1) {
-    if (/^##\s+/.test(lines[i])) break;  // next h2 ends the Requirements section
+    if (/^##\s+/.test(lines[i])) break; // next h2 ends the Requirements section
     if (/^###\s+Requirement:\s*/.test(lines[i])) requirementHeadingIdxs.push(i);
   }
 
   const requirements: ParsedRequirement[] = requirementHeadingIdxs.map((startIdx, k) => {
-    const endIdx = requirementHeadingIdxs[k + 1] ?? (
-      lines.findIndex((l, i) => i > startIdx && /^##\s+/.test(l))
-    );
+    const endIdx =
+      requirementHeadingIdxs[k + 1] ?? lines.findIndex((l, i) => i > startIdx && /^##\s+/.test(l));
     const finalEnd = endIdx >= 0 ? endIdx : lines.length;
 
     const nameMatch = lines[startIdx].match(/^###\s+Requirement:\s*(.+?)\s*$/);
@@ -93,8 +109,7 @@ export function parseSpec(markdown: string): ParsedSpec {
       const sEnd = scenarioIdxs[j + 1] ?? finalEnd;
       const sNameMatch = lines[sIdx].match(/^####\s+Scenario:\s*(.+?)\s*$/);
       const scenarioName = sNameMatch ? sNameMatch[1].trim() : '';
-      const bodyLines = sliceLines(lines, sIdx, sEnd)
-        .filter((l) => l.trim().length > 0);
+      const bodyLines = sliceLines(lines, sIdx, sEnd).filter(l => l.trim().length > 0);
       return { name: scenarioName, bodyLines };
     });
 

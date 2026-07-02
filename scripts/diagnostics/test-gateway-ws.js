@@ -15,13 +15,15 @@ client1.on('open', () => {
   console.log('✅ WebSocket connected');
 
   // Send auth message
-  client1.send(JSON.stringify({
-    type: 'gateway_auth',
-    gatewaySecret: GATEWAY_SECRET
-  }));
+  client1.send(
+    JSON.stringify({
+      type: 'gateway_auth',
+      gatewaySecret: GATEWAY_SECRET,
+    })
+  );
 });
 
-client1.on('message', (data) => {
+client1.on('message', data => {
   const message = JSON.parse(data.toString());
   console.log('📨 Received:', message);
 
@@ -30,9 +32,11 @@ client1.on('message', (data) => {
 
     // Test list backends
     console.log('Test 2: List backends');
-    client1.send(JSON.stringify({
-      type: 'list_backends'
-    }));
+    client1.send(
+      JSON.stringify({
+        type: 'list_backends',
+      })
+    );
   }
 
   if (message.type === 'backends_list') {
@@ -47,7 +51,7 @@ client1.on('message', (data) => {
   }
 });
 
-client1.on('error', (error) => {
+client1.on('error', error => {
   console.error('❌ WebSocket error:', error);
   process.exit(1);
 });
@@ -60,13 +64,15 @@ function testWrongSecret() {
   client2.on('open', () => {
     console.log('✅ WebSocket connected');
 
-    client2.send(JSON.stringify({
-      type: 'gateway_auth',
-      gatewaySecret: 'wrong-secret'
-    }));
+    client2.send(
+      JSON.stringify({
+        type: 'gateway_auth',
+        gatewaySecret: 'wrong-secret',
+      })
+    );
   });
 
-  client2.on('message', (data) => {
+  client2.on('message', data => {
     const message = JSON.parse(data.toString());
     console.log('📨 Received:', message);
 

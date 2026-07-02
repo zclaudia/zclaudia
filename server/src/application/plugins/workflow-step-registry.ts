@@ -25,9 +25,7 @@ class WorkflowStepRegistry {
 
   register(meta: WorkflowStepMeta): void {
     if (this.steps.has(meta.type)) {
-      console.warn(
-        `[WorkflowStepRegistry] Step "${meta.type}" already registered. Overwriting.`
-      );
+      console.warn(`[WorkflowStepRegistry] Step "${meta.type}" already registered. Overwriting.`);
     }
     this.steps.set(meta.type, meta);
   }
@@ -49,7 +47,7 @@ class WorkflowStepRegistry {
   }
 
   getAllMeta(): WorkflowStepTypeMeta[] {
-    return this.getAll().map((step) => ({
+    return this.getAll().map(step => ({
       type: step.type,
       name: step.name,
       description: step.description,
@@ -61,7 +59,7 @@ class WorkflowStepRegistry {
   }
 
   getByPlugin(pluginId: string): WorkflowStepMeta[] {
-    return Array.from(this.steps.values()).filter((step) => step.pluginId === pluginId);
+    return Array.from(this.steps.values()).filter(step => step.pluginId === pluginId);
   }
 
   clearByPlugin(pluginId: string): number {
@@ -84,7 +82,7 @@ class WorkflowStepRegistry {
       llmProfileId?: string;
       stepRunId: string;
       runId: string;
-    },
+    }
   ): Promise<{ status: 'completed' | 'failed'; output: Record<string, unknown>; error?: string }> {
     const step = this.steps.get(type);
     if (!step) {
@@ -94,7 +92,11 @@ class WorkflowStepRegistry {
     if (step.pluginId) {
       const permitted = await pluginLoader.checkPermissions(step.pluginId);
       if (!permitted) {
-        return { status: 'failed', output: {}, error: `Plugin "${step.pluginId}" permissions denied` };
+        return {
+          status: 'failed',
+          output: {},
+          error: `Plugin "${step.pluginId}" permissions denied`,
+        };
       }
     }
 

@@ -23,5 +23,8 @@ test-results/
 # 数据目录
 .zclaudia/
 
+# 本地审计输入
+docs/quality-audit/
+
 # 锁文件
 pnpm-lock.yaml

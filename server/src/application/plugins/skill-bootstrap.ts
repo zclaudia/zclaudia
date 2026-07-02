@@ -12,7 +12,11 @@
  */
 
 import { loadAllSkills, type SkillSource } from './skill-loader.js';
-import { addPluginSkills, addSkillLoadDiagnostics, type PluginSkillReloader } from './skill-tools.js';
+import {
+  addPluginSkills,
+  addSkillLoadDiagnostics,
+  type PluginSkillReloader,
+} from './skill-tools.js';
 import type { ExecutionEnv } from '../../infra/execution-env.js';
 
 /** Minimal contract the bootstrap needs from PluginLoader. */
@@ -30,7 +34,7 @@ export interface PluginSkillDirProvider {
  */
 export async function loadAndCachePluginSkills(
   env: ExecutionEnv,
-  loader: PluginSkillDirProvider,
+  loader: PluginSkillDirProvider
 ): Promise<number> {
   const inputs = loader.getPluginSkillDirs();
   if (inputs.length === 0) return 0;
@@ -52,6 +56,6 @@ export async function loadAndCachePluginSkills(
  */
 export function pluginSkillReloader(loader: PluginSkillDirProvider): PluginSkillReloader {
   return {
-    reload: (env) => loadAndCachePluginSkills(env, loader),
+    reload: env => loadAndCachePluginSkills(env, loader),
   };
 }

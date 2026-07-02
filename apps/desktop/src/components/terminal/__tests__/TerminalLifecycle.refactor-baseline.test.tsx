@@ -58,10 +58,17 @@ vi.mock('@xterm/xterm', () => {
   return { Terminal: MockTerminal };
 });
 vi.mock('@xterm/addon-fit', () => ({
-  FitAddon: class { fit = vi.fn(); dispose = vi.fn(); activate = vi.fn(); },
+  FitAddon: class {
+    fit = vi.fn();
+    dispose = vi.fn();
+    activate = vi.fn();
+  },
 }));
 vi.mock('@xterm/addon-web-links', () => ({
-  WebLinksAddon: class { dispose = vi.fn(); activate = vi.fn(); },
+  WebLinksAddon: class {
+    dispose = vi.fn();
+    activate = vi.fn();
+  },
 }));
 vi.mock('@xterm/xterm/css/xterm.css', () => ({}));
 
@@ -74,14 +81,17 @@ globalThis.ResizeObserver = class {
 
 // Force non-zero container size so attach() proceeds past the early return
 Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => 800 });
-Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, get: () => 400 });
+Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+  configurable: true,
+  get: () => 400,
+});
 
 // Real XTerminal — exercise the actual lifecycle effect
 import { XTerminal } from '../XTerminal';
 
 async function flushAttach() {
   await act(async () => {
-    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await new Promise(resolve => requestAnimationFrame(resolve));
   });
 }
 
@@ -122,24 +132,28 @@ describe('Terminal lifecycle — refactor baseline', () => {
     render(<XTerminal terminalId="t-open" projectId="proj-1" workingDirectory="/tmp" />);
     await flushAttach();
 
-    expect(mockSendMessage).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'terminal_open',
-      terminalId: 't-open',
-      projectId: 'proj-1',
-      workingDirectory: '/tmp',
-    }));
+    expect(mockSendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'terminal_open',
+        terminalId: 't-open',
+        projectId: 'proj-1',
+        workingDirectory: '/tmp',
+      })
+    );
   });
 
   it('2. mount with mode="attach" sends terminal_attach (no project)', async () => {
     render(<XTerminal terminalId="t-attach" projectId="proj-1" mode="attach" />);
     await flushAttach();
 
-    expect(mockSendMessage).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'terminal_attach',
-      terminalId: 't-attach',
-    }));
+    expect(mockSendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'terminal_attach',
+        terminalId: 't-attach',
+      })
+    );
     const attachCall = mockSendMessage.mock.calls.find(
-      (c) => c[0]?.type === 'terminal_attach' && c[0]?.terminalId === 't-attach'
+      c => c[0]?.type === 'terminal_attach' && c[0]?.terminalId === 't-attach'
     );
     expect(attachCall?.[0]?.projectId).toBeUndefined();
   });
@@ -156,10 +170,12 @@ describe('Terminal lifecycle — refactor baseline', () => {
     render(<XTerminal terminalId="t-cold" projectId="proj-1" />);
     await flushAttach();
 
-    expect(mockSendMessage).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'terminal_open',
-      terminalId: 't-cold',
-    }));
+    expect(mockSendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'terminal_open',
+        terminalId: 't-cold',
+      })
+    );
   });
 
   it('4. pop-out close path claims the controller and clears popped-out flag', async () => {
@@ -170,7 +186,9 @@ describe('Terminal lifecycle — refactor baseline', () => {
     const controller = terminalRegistry.get('t-popout');
     expect(controller).toBeDefined();
     controller!.handleServerMessage({
-      type: 'terminal_opened', terminalId: 't-popout', success: true,
+      type: 'terminal_opened',
+      terminalId: 't-popout',
+      success: true,
     } as any);
     expect(controller!.getState().kind).toBe('open');
 

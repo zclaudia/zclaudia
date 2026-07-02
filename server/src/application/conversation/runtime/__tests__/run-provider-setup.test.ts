@@ -73,17 +73,37 @@ describe('run-provider-setup', () => {
   it('parses the envelope, resolves images, and appends notices for failures', async () => {
     const { prepareProviderRun } = await import('../run-provider-setup.js');
 
-    const goodAtt = { fileId: 'file-good', name: 'a.png', mimeType: 'image/png', type: 'image' as const };
-    const missingAtt = { fileId: 'file-missing', name: 'b.png', mimeType: 'image/png', type: 'image' as const };
+    const goodAtt = {
+      fileId: 'file-good',
+      name: 'a.png',
+      mimeType: 'image/png',
+      type: 'image' as const,
+    };
+    const missingAtt = {
+      fileId: 'file-missing',
+      name: 'b.png',
+      mimeType: 'image/png',
+      type: 'image' as const,
+    };
 
-    mockGetFile.mockImplementation((id) => {
+    mockGetFile.mockImplementation(id => {
       if (id === 'file-good') {
-        return { id: 'file-good', name: 'a.png', mimeType: 'image/png', size: 10, data: 'QQ==', createdAt: 0 };
+        return {
+          id: 'file-good',
+          name: 'a.png',
+          mimeType: 'image/png',
+          size: 10,
+          data: 'QQ==',
+          createdAt: 0,
+        };
       }
       return null;
     });
 
-    const envelopeInput = JSON.stringify({ text: 'check this', attachments: [goodAtt, missingAtt] });
+    const envelopeInput = JSON.stringify({
+      text: 'check this',
+      attachments: [goodAtt, missingAtt],
+    });
     const prepared = prepareProviderRun(makeInput(envelopeInput));
 
     expect(prepared.processedInput).toContain('check this');

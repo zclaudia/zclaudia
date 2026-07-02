@@ -169,7 +169,9 @@ describe('Tool Persistence & Diff Viewer', () => {
     await browser.waitForTimeout(8000);
 
     // Look for terminal-style output (dark background, monospace)
-    const terminalOutput = browser.locator('[class*="bg-gray-900"], [class*="bg-zinc-900"], [class*="font-mono"]').first();
+    const terminalOutput = browser
+      .locator('[class*="bg-gray-900"], [class*="bg-zinc-900"], [class*="font-mono"]')
+      .first();
     const termVisible = await terminalOutput.isVisible({ timeout: 10000 }).catch(() => false);
 
     if (termVisible) {
@@ -198,7 +200,9 @@ describe('Tool Persistence & Diff Viewer', () => {
     await browser.waitForTimeout(8000);
 
     // Look for "Show all" / expand button
-    const expandButton = browser.locator('button:has-text("Show all"), button:has-text("lines")').first();
+    const expandButton = browser
+      .locator('button:has-text("Show all"), button:has-text("lines")')
+      .first();
     const expandVisible = await expandButton.isVisible({ timeout: 10000 }).catch(() => false);
 
     if (expandVisible) {
@@ -207,7 +211,9 @@ describe('Tool Persistence & Diff Viewer', () => {
       await browser.waitForTimeout(500);
       console.log('  ✓ Expand button found and clicked');
     } else {
-      console.log('  ⚠ No collapsible output found (output may be < 10 lines or CLI not available)');
+      console.log(
+        '  ⚠ No collapsible output found (output may be < 10 lines or CLI not available)'
+      );
     }
 
     console.log('✅ N4: Collapse/expand test completed');
@@ -231,7 +237,9 @@ describe('Tool Persistence & Diff Viewer', () => {
     await browser.waitForTimeout(10000);
 
     // Check for completed status indicator (checkmark or "completed" text)
-    const completedIcon = browser.locator('[class*="text-green"], [class*="text-emerald"], svg[class*="green"]').first();
+    const completedIcon = browser
+      .locator('[class*="text-green"], [class*="text-emerald"], svg[class*="green"]')
+      .first();
     const hasCompletedStatus = await completedIcon.isVisible({ timeout: 10000 }).catch(() => false);
 
     if (hasCompletedStatus) {

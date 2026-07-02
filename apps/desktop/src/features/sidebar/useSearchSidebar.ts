@@ -1,6 +1,10 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import * as api from '../../services/api';
-import type { SearchResult, SearchHistoryEntry, SearchFilters as Filters } from '../../services/api';
+import type {
+  SearchResult,
+  SearchHistoryEntry,
+  SearchFilters as Filters,
+} from '../../services/api';
 
 export interface SearchSidebarState {
   searchQuery: string;
@@ -54,38 +58,45 @@ export function useSearchSidebar(): SearchSidebarState {
     loadSearchHistory();
   }, []);
 
-  const handleSearch = useCallback((query: string, filters?: Filters) => {
-    setSearchQuery(query);
-    setShowSearchHistory(false);
-    setSearchOffset(0);
-    if (searchTimerRef.current) {
-      clearTimeout(searchTimerRef.current);
-    }
-    if (!query.trim()) {
-      setSearchResults([]);
-      setIsSearching(false);
-      setHasMoreResults(false);
-      return;
-    }
-    setIsSearching(true);
-    searchTimerRef.current = window.setTimeout(async () => {
-      try {
-        const filtersToUse = filters || searchFilters;
-        const pageSize = 50;
-        const results = await api.searchMessages(query.trim(), { ...filtersToUse, limit: pageSize, offset: 0 });
-        setSearchResults(results);
-        setHasMoreResults(results.length === pageSize);
-        const history = await api.getSearchHistory();
-        setSearchHistory(history);
-      } catch (error) {
-        console.error('Search failed:', error);
-        setSearchResults([]);
-        setHasMoreResults(false);
-      } finally {
-        setIsSearching(false);
+  const handleSearch = useCallback(
+    (query: string, filters?: Filters) => {
+      setSearchQuery(query);
+      setShowSearchHistory(false);
+      setSearchOffset(0);
+      if (searchTimerRef.current) {
+        clearTimeout(searchTimerRef.current);
       }
-    }, 300);
-  }, [searchFilters]);
+      if (!query.trim()) {
+        setSearchResults([]);
+        setIsSearching(false);
+        setHasMoreResults(false);
+        return;
+      }
+      setIsSearching(true);
+      searchTimerRef.current = window.setTimeout(async () => {
+        try {
+          const filtersToUse = filters || searchFilters;
+          const pageSize = 50;
+          const results = await api.searchMessages(query.trim(), {
+            ...filtersToUse,
+            limit: pageSize,
+            offset: 0,
+          });
+          setSearchResults(results);
+          setHasMoreResults(results.length === pageSize);
+          const history = await api.getSearchHistory();
+          setSearchHistory(history);
+        } catch (error) {
+          console.error('Search failed:', error);
+          setSearchResults([]);
+          setHasMoreResults(false);
+        } finally {
+          setIsSearching(false);
+        }
+      }, 300);
+    },
+    [searchFilters]
+  );
 
   const handleLoadMore = useCallback(async () => {
     if (!searchQuery.trim() || isLoadingMore) return;
@@ -97,7 +108,7 @@ export function useSearchSidebar(): SearchSidebarState {
       const results = await api.searchMessages(searchQuery.trim(), {
         ...searchFilters,
         limit: pageSize,
-        offset: newOffset
+        offset: newOffset,
       });
 
       setSearchResults(prev => [...prev, ...results]);
@@ -110,10 +121,13 @@ export function useSearchSidebar(): SearchSidebarState {
     }
   }, [searchQuery, searchFilters, searchOffset, isLoadingMore]);
 
-  const handleSelectHistoryItem = useCallback((query: string) => {
-    handleSearch(query);
-    setShowSearchHistory(false);
-  }, [handleSearch]);
+  const handleSelectHistoryItem = useCallback(
+    (query: string) => {
+      handleSearch(query);
+      setShowSearchHistory(false);
+    },
+    [handleSearch]
+  );
 
   const handleSearchFocus = useCallback(() => {
     if (!searchQuery.trim() && searchHistory.length > 0) {
@@ -135,12 +149,15 @@ export function useSearchSidebar(): SearchSidebarState {
     }
   }, []);
 
-  const handleFiltersChange = useCallback((filters: Filters) => {
-    setSearchFilters(filters);
-    if (searchQuery.trim()) {
-      handleSearch(searchQuery, filters);
-    }
-  }, [searchQuery, handleSearch]);
+  const handleFiltersChange = useCallback(
+    (filters: Filters) => {
+      setSearchFilters(filters);
+      if (searchQuery.trim()) {
+        handleSearch(searchQuery, filters);
+      }
+    },
+    [searchQuery, handleSearch]
+  );
 
   // Scroll to top on new search
   useEffect(() => {

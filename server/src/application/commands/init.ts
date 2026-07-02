@@ -46,8 +46,8 @@ const clearHandler = (_args: string[], _context?: CommandContext): CommandExecut
   command: '/clear',
   action: 'clear',
   data: {
-    message: 'Conversation history cleared'
-  }
+    message: 'Conversation history cleared',
+  },
 });
 
 const helpHandler = (_args: string[], _context?: CommandContext): CommandExecuteResponse => {
@@ -68,8 +68,8 @@ ${LOCAL_COMMANDS.map(cmd => `- \`${cmd.command}\` — ${cmd.description}`).join(
     action: 'help',
     data: {
       content: helpText,
-      format: 'markdown'
-    }
+      format: 'markdown',
+    },
   };
 };
 
@@ -90,8 +90,8 @@ const statusHandler = (_args: string[], context?: CommandContext): CommandExecut
       provider: context?.provider || 'zclaudia',
       nodeVersion: process.version,
       platform: process.platform,
-      projectPath: context?.projectPath || 'N/A'
-    }
+      projectPath: context?.projectPath || 'N/A',
+    },
   };
 };
 
@@ -106,15 +106,14 @@ const modelHandler = (_args: string[], context?: CommandContext): CommandExecute
     type: 'builtin',
     command: '/model',
     action: 'model',
-    data: { model, provider, message }
+    data: { model, provider, message },
   };
 };
 
 const costHandler = (_args: string[], context?: CommandContext): CommandExecuteResponse => {
   const tokenUsage = context?.tokenUsage || { used: 0, total: 160000 };
-  const percentage = tokenUsage.total > 0
-    ? ((tokenUsage.used / tokenUsage.total) * 100).toFixed(1)
-    : '0';
+  const percentage =
+    tokenUsage.total > 0 ? ((tokenUsage.used / tokenUsage.total) * 100).toFixed(1) : '0';
 
   return {
     type: 'builtin',
@@ -124,10 +123,10 @@ const costHandler = (_args: string[], context?: CommandContext): CommandExecuteR
       tokenUsage: {
         used: tokenUsage.used,
         total: tokenUsage.total,
-        percentage
+        percentage,
       },
-      model: context?.model || 'unknown'
-    }
+      model: context?.model || 'unknown',
+    },
   };
 };
 
@@ -141,8 +140,8 @@ const memoryHandler = (_args: string[], context?: CommandContext): CommandExecut
       action: 'memory',
       data: {
         error: true,
-        message: 'No project selected. Please select a project to access its CLAUDE.md file.'
-      }
+        message: 'No project selected. Please select a project to access its CLAUDE.md file.',
+      },
     };
   }
 
@@ -158,8 +157,8 @@ const memoryHandler = (_args: string[], context?: CommandContext): CommandExecut
       exists,
       message: exists
         ? `CLAUDE.md found at ${claudeMdPath}`
-        : `CLAUDE.md not found at ${claudeMdPath}. Create it to store project-specific instructions.`
-    }
+        : `CLAUDE.md not found at ${claudeMdPath}. Create it to store project-specific instructions.`,
+    },
   };
 };
 
@@ -168,8 +167,8 @@ const configHandler = (_args: string[], _context?: CommandContext): CommandExecu
   command: '/config',
   action: 'config',
   data: {
-    message: 'Opening settings...'
-  }
+    message: 'Opening settings...',
+  },
 });
 
 const newSessionHandler = (_args: string[], _context?: CommandContext): CommandExecuteResponse => ({
@@ -177,8 +176,8 @@ const newSessionHandler = (_args: string[], _context?: CommandContext): CommandE
   command: '/new-session',
   action: 'new-session',
   data: {
-    message: 'Creating new session...'
-  }
+    message: 'Creating new session...',
+  },
 });
 
 const reloadHandler = (_args: string[], _context?: CommandContext): CommandExecuteResponse => {
@@ -187,8 +186,8 @@ const reloadHandler = (_args: string[], _context?: CommandContext): CommandExecu
     command: '/reload',
     action: 'reload',
     data: {
-      message: 'Commands reloaded'
-    }
+      message: 'Commands reloaded',
+    },
   };
 };
 
@@ -235,7 +234,9 @@ const compactHandler: CommandHandler = async (args, context) => {
   });
 
   if (outcome.compacted) {
-    console.log(`[Compaction] manual session=${context.sessionId} id=${outcome.compactionId} tokens=${outcome.tokensBefore}`);
+    console.log(
+      `[Compaction] manual session=${context.sessionId} id=${outcome.compactionId} tokens=${outcome.tokensBefore}`
+    );
     if (context.sendEvent) {
       context.sendEvent({
         type: 'compaction_completed',
@@ -274,7 +275,12 @@ export function registerBuiltinCommands(): void {
     { command: '/config', description: 'Open settings', handler: configHandler },
     { command: '/new-session', description: 'Create a new session', handler: newSessionHandler },
     { command: '/reload', description: 'Reload custom commands', handler: reloadHandler },
-    { command: '/compact', description: 'Compact this session\'s history into a summary. Optional instructions guide the summary.', handler: compactHandler },
+    {
+      command: '/compact',
+      description:
+        "Compact this session's history into a summary. Optional instructions guide the summary.",
+      handler: compactHandler,
+    },
   ];
 
   for (const cmd of commands) {

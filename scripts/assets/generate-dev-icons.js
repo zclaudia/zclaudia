@@ -11,10 +11,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const RES_DIR = path.join(
-  __dirname,
-  '../../apps/desktop/src-tauri/gen/android/app/src/main/res'
-);
+const RES_DIR = path.join(__dirname, '../../apps/desktop/src-tauri/gen/android/app/src/main/res');
 
 const DENSITIES = ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi'];
 

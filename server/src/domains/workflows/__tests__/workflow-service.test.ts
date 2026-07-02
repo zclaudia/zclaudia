@@ -27,13 +27,25 @@ const mockEngine = {
 };
 
 vi.mock('../repository.js', () => ({
-  WorkflowRepository: class { constructor() { Object.assign(this, mockWorkflowRepo); } },
+  WorkflowRepository: class {
+    constructor() {
+      Object.assign(this, mockWorkflowRepo);
+    }
+  },
 }));
 vi.mock('../workflow-run-repository.js', () => ({
-  WorkflowRunRepository: class { constructor() { Object.assign(this, mockRunRepo); } },
+  WorkflowRunRepository: class {
+    constructor() {
+      Object.assign(this, mockRunRepo);
+    }
+  },
 }));
 vi.mock('../workflow-step-run-repository.js', () => ({
-  WorkflowStepRunRepository: class { constructor() { Object.assign(this, mockStepRunRepo); } },
+  WorkflowStepRunRepository: class {
+    constructor() {
+      Object.assign(this, mockStepRunRepo);
+    }
+  },
 }));
 vi.mock('../engine.js', () => ({}));
 vi.mock('../templates.js', () => ({
@@ -42,8 +54,18 @@ vi.mock('../templates.js', () => ({
   AI_AUTO_COMMIT_TEMPLATE_ID: 'ai-auto-commit',
   SYSTEM_AI_AUTO_COMMIT_KEY: 'ai_auto_commit',
   BUILTIN_WORKFLOW_TEMPLATES: [
-    { id: 'permission-escalation-default', name: 'Template 1', description: 'desc', definition: { triggers: [], nodes: [], edges: [], entryNodeId: '' } },
-    { id: 'tpl1', name: 'Template 1', description: 'desc', definition: { triggers: [], nodes: [], edges: [], entryNodeId: '' } },
+    {
+      id: 'permission-escalation-default',
+      name: 'Template 1',
+      description: 'desc',
+      definition: { triggers: [], nodes: [], edges: [], entryNodeId: '' },
+    },
+    {
+      id: 'tpl1',
+      name: 'Template 1',
+      description: 'desc',
+      definition: { triggers: [], nodes: [], edges: [], entryNodeId: '' },
+    },
     {
       id: 'ai-auto-commit',
       name: 'AI Auto Commit',
@@ -55,7 +77,12 @@ vi.mock('../templates.js', () => ({
         nodes: [
           { id: 'stage', name: 'Stage Changes', type: 'git_stage', config: {} },
           { id: 'check', name: 'Has Staged Changes?', type: 'condition', config: {} },
-          { id: 'generate', name: 'Generate Commit Message', type: 'generate_commit_message', config: {} },
+          {
+            id: 'generate',
+            name: 'Generate Commit Message',
+            type: 'generate_commit_message',
+            config: {},
+          },
           { id: 'commit', name: 'Commit', type: 'git_commit', config: {} },
         ],
       },
@@ -63,7 +90,11 @@ vi.mock('../templates.js', () => ({
   ],
 }));
 
-import { SYSTEM_AI_AUTO_COMMIT_KEY, AI_AUTO_COMMIT_TEMPLATE_ID, BUILTIN_WORKFLOW_TEMPLATES } from '../templates.js';
+import {
+  SYSTEM_AI_AUTO_COMMIT_KEY,
+  AI_AUTO_COMMIT_TEMPLATE_ID,
+  BUILTIN_WORKFLOW_TEMPLATES,
+} from '../templates.js';
 import { ImmutableSystemWorkflowError, WorkflowService } from '../service.js';
 
 describe('WorkflowService', () => {
@@ -108,27 +139,48 @@ describe('WorkflowService', () => {
 
   describe('createWorkflow', () => {
     it('creates workflow and broadcasts update', () => {
-      const mockWorkflow = { id: 'w1', projectId: 'p1', status: 'active', definition: { triggers: [] } };
+      const mockWorkflow = {
+        id: 'w1',
+        projectId: 'p1',
+        status: 'active',
+        definition: { triggers: [] },
+      };
       mockWorkflowRepo.create.mockReturnValue(mockWorkflow);
 
       const result = service.createWorkflow({
-        projectId: 'p1', name: 'flow', definition: { triggers: [], nodes: [], edges: [], entryNodeId: '' } as any,
+        projectId: 'p1',
+        name: 'flow',
+        definition: { triggers: [], nodes: [], edges: [], entryNodeId: '' } as any,
       });
 
       expect(result).toEqual(mockWorkflow);
-      expect(mockBroadcast).toHaveBeenCalledWith('p1', expect.objectContaining({ type: 'workflow_update' }));
+      expect(mockBroadcast).toHaveBeenCalledWith(
+        'p1',
+        expect.objectContaining({ type: 'workflow_update' })
+      );
     });
 
     it('creates and broadcasts a disabled workflow without scheduling side effects', () => {
-      const mockWorkflow = { id: 'w1', projectId: 'p1', status: 'disabled', definition: { triggers: [] } };
+      const mockWorkflow = {
+        id: 'w1',
+        projectId: 'p1',
+        status: 'disabled',
+        definition: { triggers: [] },
+      };
       mockWorkflowRepo.create.mockReturnValue(mockWorkflow);
 
       const result = service.createWorkflow({
-        projectId: 'p1', name: 'flow', definition: { triggers: [], nodes: [], edges: [], entryNodeId: '' } as any, status: 'disabled',
+        projectId: 'p1',
+        name: 'flow',
+        definition: { triggers: [], nodes: [], edges: [], entryNodeId: '' } as any,
+        status: 'disabled',
       });
 
       expect(result).toEqual(mockWorkflow);
-      expect(mockBroadcast).toHaveBeenCalledWith('p1', expect.objectContaining({ type: 'workflow_update' }));
+      expect(mockBroadcast).toHaveBeenCalledWith(
+        'p1',
+        expect.objectContaining({ type: 'workflow_update' })
+      );
     });
   });
 
@@ -144,7 +196,9 @@ describe('WorkflowService', () => {
 
     it('rejects updates to system workflows', () => {
       mockWorkflowRepo.findById.mockReturnValue({ id: 'sys-1', isSystem: true });
-      expect(() => service.updateWorkflow('sys-1', { name: 'new name' })).toThrow(ImmutableSystemWorkflowError);
+      expect(() => service.updateWorkflow('sys-1', { name: 'new name' })).toThrow(
+        ImmutableSystemWorkflowError
+      );
     });
   });
 
@@ -153,7 +207,10 @@ describe('WorkflowService', () => {
       mockWorkflowRepo.delete.mockReturnValue(true);
       const result = service.deleteWorkflow('w1', 'p1');
       expect(result).toBe(true);
-      expect(mockBroadcast).toHaveBeenCalledWith('p1', expect.objectContaining({ type: 'workflow_deleted' }));
+      expect(mockBroadcast).toHaveBeenCalledWith(
+        'p1',
+        expect.objectContaining({ type: 'workflow_deleted' })
+      );
     });
 
     it('returns false when not found', () => {
@@ -170,7 +227,11 @@ describe('WorkflowService', () => {
   describe('getTemplates', () => {
     it('returns builtin templates', () => {
       const templates = service.getTemplates();
-      expect(templates.map((t) => t.id)).toEqual(['permission-escalation-default', 'tpl1', 'ai-auto-commit']);
+      expect(templates.map(t => t.id)).toEqual([
+        'permission-escalation-default',
+        'tpl1',
+        'ai-auto-commit',
+      ]);
     });
   });
 
@@ -180,27 +241,45 @@ describe('WorkflowService', () => {
     });
 
     it('rejects permission escalation template instantiation', () => {
-      expect(() => service.createFromTemplate('p1', 'permission-escalation-default')).toThrow(ImmutableSystemWorkflowError);
+      expect(() => service.createFromTemplate('p1', 'permission-escalation-default')).toThrow(
+        ImmutableSystemWorkflowError
+      );
     });
 
     it('toggles existing workflow from active to disabled', () => {
-      const existing = { id: 'w1', status: 'active', projectId: 'p1', definition: { triggers: [] } };
+      const existing = {
+        id: 'w1',
+        status: 'active',
+        projectId: 'p1',
+        definition: { triggers: [] },
+      };
       mockWorkflowRepo.findByProjectAndTemplate.mockReturnValue(existing);
       mockWorkflowRepo.findById.mockReturnValue(undefined);
       mockWorkflowRepo.update.mockReturnValue({ ...existing, status: 'disabled' });
 
       service.createFromTemplate('p1', 'tpl1');
-      expect(mockWorkflowRepo.update).toHaveBeenCalledWith('w1', expect.objectContaining({ status: 'disabled' }));
+      expect(mockWorkflowRepo.update).toHaveBeenCalledWith(
+        'w1',
+        expect.objectContaining({ status: 'disabled' })
+      );
     });
 
     it('toggles existing workflow from disabled to active', () => {
-      const existing = { id: 'w1', status: 'disabled', projectId: 'p1', definition: { triggers: [] } };
+      const existing = {
+        id: 'w1',
+        status: 'disabled',
+        projectId: 'p1',
+        definition: { triggers: [] },
+      };
       mockWorkflowRepo.findByProjectAndTemplate.mockReturnValue(existing);
       mockWorkflowRepo.findById.mockReturnValue(undefined);
       mockWorkflowRepo.update.mockReturnValue({ ...existing, status: 'active' });
 
       service.createFromTemplate('p1', 'tpl1');
-      expect(mockWorkflowRepo.update).toHaveBeenCalledWith('w1', expect.objectContaining({ status: 'active' }));
+      expect(mockWorkflowRepo.update).toHaveBeenCalledWith(
+        'w1',
+        expect.objectContaining({ status: 'active' })
+      );
     });
 
     it('creates new workflow from template when not existing', () => {
@@ -225,31 +304,45 @@ describe('WorkflowService', () => {
     });
 
     it('delegates to engine.startRun with the options object', async () => {
-      const wf = { id: 'w1', projectId: 'p1', status: 'active', definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] } };
+      const wf = {
+        id: 'w1',
+        projectId: 'p1',
+        status: 'active',
+        definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] },
+      };
       mockWorkflowRepo.findById.mockReturnValue(wf);
       mockEngine.startRun.mockResolvedValue({ id: 'r1' });
 
       await service.triggerWorkflow('w1', 'manual', 'detail');
-      expect(mockEngine.startRun).toHaveBeenCalledWith(expect.objectContaining({
-        workflowId: 'w1',
-        projectId: 'p1',
-        definition: wf.definition,
-        triggerSource: 'manual',
-        initiator: 'manual',
-        actionKind: 'workflow',
-        actionRef: 'w1',
-        triggerDetail: 'detail',
-        trackingKey: 'w1',
-      }));
+      expect(mockEngine.startRun).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workflowId: 'w1',
+          projectId: 'p1',
+          definition: wf.definition,
+          triggerSource: 'manual',
+          initiator: 'manual',
+          actionKind: 'workflow',
+          actionRef: 'w1',
+          triggerDetail: 'detail',
+          trackingKey: 'w1',
+        })
+      );
     });
 
     it('uses the supplied initiator when provided', async () => {
-      const wf = { id: 'w1', projectId: 'p1', status: 'active', definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] } };
+      const wf = {
+        id: 'w1',
+        projectId: 'p1',
+        status: 'active',
+        definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] },
+      };
       mockWorkflowRepo.findById.mockReturnValue(wf);
       mockEngine.startRun.mockResolvedValue({ id: 'r1' });
 
       await service.triggerWorkflow('w1', 'event', 'detail', undefined, 'automation:abc');
-      expect(mockEngine.startRun).toHaveBeenCalledWith(expect.objectContaining({ initiator: 'automation:abc' }));
+      expect(mockEngine.startRun).toHaveBeenCalledWith(
+        expect.objectContaining({ initiator: 'automation:abc' })
+      );
     });
   });
 
@@ -313,43 +406,53 @@ describe('WorkflowService', () => {
   describe('auto-commit workflow seeding', () => {
     it('creates the system auto-commit workflow on initialize', () => {
       mockWorkflowRepo.findBySystemKey.mockImplementation((key: string) =>
-        key === SYSTEM_AI_AUTO_COMMIT_KEY ? null : null,
+        key === SYSTEM_AI_AUTO_COMMIT_KEY ? null : null
       );
 
       service.initialize();
 
-      expect(mockWorkflowRepo.create).toHaveBeenCalledWith(expect.objectContaining({
-        templateId: AI_AUTO_COMMIT_TEMPLATE_ID,
-        isSystem: true,
-        systemKey: SYSTEM_AI_AUTO_COMMIT_KEY,
-        status: 'active',
-        sourceType: 'template',
-        definition: expect.objectContaining({
-          nodes: expect.arrayContaining([
-            expect.objectContaining({ type: 'git_stage' }),
-            expect.objectContaining({ type: 'condition' }),
-            expect.objectContaining({ type: 'generate_commit_message' }),
-            expect.objectContaining({ type: 'git_commit' }),
-          ]),
-        }),
-      }));
+      expect(mockWorkflowRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          templateId: AI_AUTO_COMMIT_TEMPLATE_ID,
+          isSystem: true,
+          systemKey: SYSTEM_AI_AUTO_COMMIT_KEY,
+          status: 'active',
+          sourceType: 'template',
+          definition: expect.objectContaining({
+            nodes: expect.arrayContaining([
+              expect.objectContaining({ type: 'git_stage' }),
+              expect.objectContaining({ type: 'condition' }),
+              expect.objectContaining({ type: 'generate_commit_message' }),
+              expect.objectContaining({ type: 'git_commit' }),
+            ]),
+          }),
+        })
+      );
     });
 
     it('is idempotent — does not recreate when a healthy system workflow exists', () => {
-      const autoTemplate = BUILTIN_WORKFLOW_TEMPLATES.find((t) => t.id === AI_AUTO_COMMIT_TEMPLATE_ID)!;
+      const autoTemplate = BUILTIN_WORKFLOW_TEMPLATES.find(
+        t => t.id === AI_AUTO_COMMIT_TEMPLATE_ID
+      )!;
       mockWorkflowRepo.findBySystemKey.mockImplementation((key: string) =>
         key === SYSTEM_AI_AUTO_COMMIT_KEY
-          ? { id: 'auto-1', status: 'active', templateId: AI_AUTO_COMMIT_TEMPLATE_ID, isSystem: true, definition: autoTemplate.definition }
-          : null,
+          ? {
+              id: 'auto-1',
+              status: 'active',
+              templateId: AI_AUTO_COMMIT_TEMPLATE_ID,
+              isSystem: true,
+              definition: autoTemplate.definition,
+            }
+          : null
       );
 
       service.initialize();
 
       const autoCommitCreates = mockWorkflowRepo.create.mock.calls.filter(
-        (c) => c[0]?.systemKey === SYSTEM_AI_AUTO_COMMIT_KEY,
+        c => c[0]?.systemKey === SYSTEM_AI_AUTO_COMMIT_KEY
       );
       const autoCommitUpdates = mockWorkflowRepo.update.mock.calls.filter(
-        (c) => c[1]?.systemKey === SYSTEM_AI_AUTO_COMMIT_KEY,
+        c => c[1]?.systemKey === SYSTEM_AI_AUTO_COMMIT_KEY
       );
       expect(autoCommitCreates).toHaveLength(0);
       expect(autoCommitUpdates).toHaveLength(0);
@@ -358,19 +461,28 @@ describe('WorkflowService', () => {
     it('repairs an unhealthy system auto-commit workflow', () => {
       mockWorkflowRepo.findBySystemKey.mockImplementation((key: string) =>
         key === SYSTEM_AI_AUTO_COMMIT_KEY
-          ? { id: 'auto-1', status: 'disabled', templateId: AI_AUTO_COMMIT_TEMPLATE_ID, isSystem: true, definition: { broken: true } }
-          : null,
+          ? {
+              id: 'auto-1',
+              status: 'disabled',
+              templateId: AI_AUTO_COMMIT_TEMPLATE_ID,
+              isSystem: true,
+              definition: { broken: true },
+            }
+          : null
       );
 
       service.initialize();
 
-      expect(mockWorkflowRepo.update).toHaveBeenCalledWith('auto-1', expect.objectContaining({
-        status: 'active',
-        isSystem: true,
-        systemKey: SYSTEM_AI_AUTO_COMMIT_KEY,
-        templateId: AI_AUTO_COMMIT_TEMPLATE_ID,
-        sourceType: 'template',
-      }));
+      expect(mockWorkflowRepo.update).toHaveBeenCalledWith(
+        'auto-1',
+        expect.objectContaining({
+          status: 'active',
+          isSystem: true,
+          systemKey: SYSTEM_AI_AUTO_COMMIT_KEY,
+          templateId: AI_AUTO_COMMIT_TEMPLATE_ID,
+          sourceType: 'template',
+        })
+      );
     });
   });
 
@@ -381,12 +493,14 @@ describe('WorkflowService', () => {
 
       service.initialize();
 
-      expect(mockWorkflowRepo.create).toHaveBeenCalledWith(expect.objectContaining({
-        templateId: 'permission-escalation-default',
-        isSystem: true,
-        systemKey: 'permission_escalation_fallback',
-        status: 'active',
-      }));
+      expect(mockWorkflowRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          templateId: 'permission-escalation-default',
+          isSystem: true,
+          systemKey: 'permission_escalation_fallback',
+          status: 'active',
+        })
+      );
     });
 
     it('adopts legacy global fallback when system fallback is missing', () => {
@@ -395,11 +509,14 @@ describe('WorkflowService', () => {
 
       service.initialize();
 
-      expect(mockWorkflowRepo.update).toHaveBeenCalledWith('legacy-1', expect.objectContaining({
-        status: 'active',
-        isSystem: true,
-        systemKey: 'permission_escalation_fallback',
-      }));
+      expect(mockWorkflowRepo.update).toHaveBeenCalledWith(
+        'legacy-1',
+        expect.objectContaining({
+          status: 'active',
+          isSystem: true,
+          systemKey: 'permission_escalation_fallback',
+        })
+      );
     });
 
     it('repairs disabled system fallback', () => {
@@ -413,11 +530,14 @@ describe('WorkflowService', () => {
 
       service.initialize();
 
-      expect(mockWorkflowRepo.update).toHaveBeenCalledWith('sys-1', expect.objectContaining({
-        status: 'active',
-        isSystem: true,
-        systemKey: 'permission_escalation_fallback',
-      }));
+      expect(mockWorkflowRepo.update).toHaveBeenCalledWith(
+        'sys-1',
+        expect.objectContaining({
+          status: 'active',
+          isSystem: true,
+          systemKey: 'permission_escalation_fallback',
+        })
+      );
     });
   });
 });

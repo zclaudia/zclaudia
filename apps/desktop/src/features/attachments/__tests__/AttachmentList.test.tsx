@@ -41,11 +41,8 @@ describe('AttachmentList', () => {
   it('renders a thumbnail per item', async () => {
     render(
       <AttachmentList
-        items={[
-          att({ id: 'a' }),
-          att({ id: 'b', kind: 'document', mimeType: 'application/pdf' }),
-        ]}
-      />,
+        items={[att({ id: 'a' }), att({ id: 'b', kind: 'document', mimeType: 'application/pdf' })]}
+      />
     );
     expect(screen.getAllByTestId('attachment-thumbnail')).toHaveLength(2);
     await waitFor(() => screen.getByRole('img', { name: 'pic.png' }));
@@ -57,11 +54,11 @@ describe('AttachmentList', () => {
     fireEvent.click(screen.getByRole('button', { name: /open pic\.png/i }));
 
     await waitFor(() =>
-      expect(screen.getByRole('dialog', { name: /preview pic\.png/i })).toBeInTheDocument(),
+      expect(screen.getByRole('dialog', { name: /preview pic\.png/i })).toBeInTheDocument()
     );
     // Wait for lightbox's own image src effect to settle to avoid act() warnings.
     await waitFor(() =>
-      expect(screen.getAllByRole('img', { name: 'pic.png' }).length).toBeGreaterThanOrEqual(2),
+      expect(screen.getAllByRole('img', { name: 'pic.png' }).length).toBeGreaterThanOrEqual(2)
     );
   });
 
@@ -69,7 +66,7 @@ describe('AttachmentList', () => {
     render(
       <AttachmentList
         items={[att({ id: 'doc-1', kind: 'document', mimeType: 'application/pdf', name: 'a.pdf' })]}
-      />,
+      />
     );
     fireEvent.click(screen.getByRole('button', { name: /open a\.pdf/i }));
     expect(downloadAttachment).toHaveBeenCalledWith('doc-1', 'a.pdf');
@@ -90,9 +87,7 @@ describe('AttachmentList', () => {
       att({ id: 'a', kind: 'document', mimeType: 'application/pdf' }),
       att({ id: 'b', kind: 'document', mimeType: 'application/pdf' }),
     ];
-    render(
-      <AttachmentList items={docs} sortable ownerKind="local_issue" ownerId="issue-1" />,
-    );
+    render(<AttachmentList items={docs} sortable ownerKind="local_issue" ownerId="issue-1" />);
     expect(screen.getAllByTestId('attachment-drag-handle')).toHaveLength(2);
   });
 
@@ -101,7 +96,7 @@ describe('AttachmentList', () => {
       <AttachmentList
         items={[att({ id: 'a', kind: 'document', mimeType: 'application/pdf' })]}
         sortable
-      />,
+      />
     );
     // No owner => can't persist order => render static (no handles).
     expect(screen.queryAllByTestId('attachment-drag-handle')).toHaveLength(0);

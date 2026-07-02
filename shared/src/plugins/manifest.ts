@@ -61,6 +61,10 @@ export interface PluginValidationResult {
   warnings: string[];
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object';
+}
+
 export function validatePluginManifest(manifest: unknown): PluginValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -103,10 +107,10 @@ export function validatePluginManifest(manifest: unknown): PluginValidationResul
 
     if (contributes.commands && Array.isArray(contributes.commands)) {
       for (const cmd of contributes.commands) {
-        if (!cmd.command || typeof cmd.command !== 'string') {
+        if (!isRecord(cmd) || !cmd.command || typeof cmd.command !== 'string') {
           errors.push('Command contribution missing "command" field');
         }
-        if (!cmd.title || typeof cmd.title !== 'string') {
+        if (!isRecord(cmd) || !cmd.title || typeof cmd.title !== 'string') {
           errors.push('Command contribution missing "title" field');
         }
       }
@@ -114,13 +118,13 @@ export function validatePluginManifest(manifest: unknown): PluginValidationResul
 
     if (contributes.tools && Array.isArray(contributes.tools)) {
       for (const tool of contributes.tools) {
-        if (!tool.id || typeof tool.id !== 'string') {
+        if (!isRecord(tool) || !tool.id || typeof tool.id !== 'string') {
           errors.push('Tool contribution missing "id" field');
         }
-        if (!tool.name || typeof tool.name !== 'string') {
+        if (!isRecord(tool) || !tool.name || typeof tool.name !== 'string') {
           errors.push('Tool contribution missing "name" field');
         }
-        if (!tool.description || typeof tool.description !== 'string') {
+        if (!isRecord(tool) || !tool.description || typeof tool.description !== 'string') {
           errors.push('Tool contribution missing "description" field');
         }
       }
@@ -128,10 +132,10 @@ export function validatePluginManifest(manifest: unknown): PluginValidationResul
 
     if (contributes.notchTabs && Array.isArray(contributes.notchTabs)) {
       for (const tab of contributes.notchTabs) {
-        if (!tab.id || typeof tab.id !== 'string') {
+        if (!isRecord(tab) || !tab.id || typeof tab.id !== 'string') {
           errors.push('NotchTab contribution missing "id" field');
         }
-        if (!tab.label || typeof tab.label !== 'string') {
+        if (!isRecord(tab) || !tab.label || typeof tab.label !== 'string') {
           errors.push('NotchTab contribution missing "label" field');
         }
       }
@@ -139,13 +143,13 @@ export function validatePluginManifest(manifest: unknown): PluginValidationResul
 
     if (contributes.workflowSteps && Array.isArray(contributes.workflowSteps)) {
       for (const step of contributes.workflowSteps) {
-        if (!step.id || typeof step.id !== 'string') {
+        if (!isRecord(step) || !step.id || typeof step.id !== 'string') {
           errors.push('WorkflowStep contribution missing "id" field');
         }
-        if (!step.name || typeof step.name !== 'string') {
+        if (!isRecord(step) || !step.name || typeof step.name !== 'string') {
           errors.push('WorkflowStep contribution missing "name" field');
         }
-        if (!step.description || typeof step.description !== 'string') {
+        if (!isRecord(step) || !step.description || typeof step.description !== 'string') {
           errors.push('WorkflowStep contribution missing "description" field');
         }
       }
@@ -153,10 +157,10 @@ export function validatePluginManifest(manifest: unknown): PluginValidationResul
 
     if (contributes.agentProfiles && Array.isArray(contributes.agentProfiles)) {
       for (const profile of contributes.agentProfiles) {
-        if (!profile.id || typeof profile.id !== 'string') {
+        if (!isRecord(profile) || !profile.id || typeof profile.id !== 'string') {
           errors.push('AgentProfile contribution missing "id" field');
         }
-        if (!profile.name || typeof profile.name !== 'string') {
+        if (!isRecord(profile) || !profile.name || typeof profile.name !== 'string') {
           errors.push('AgentProfile contribution missing "name" field');
         }
       }
@@ -174,16 +178,17 @@ export function validatePluginManifest(manifest: unknown): PluginValidationResul
  */
 export function resolvePluginPlatform(manifest: PluginManifest): PluginPlatform {
   if (manifest.platform) return manifest.platform;
+  if (manifest.frontend) return 'desktop';
 
   const c = manifest.contributes;
   if (!c) return 'universal';
 
-  const hasUI = (c.panels && c.panels.length > 0)
-    || (c.uiExtensions && c.uiExtensions.length > 0)
-    || (c.menus && c.menus.length > 0)
-    || (c.keybindings && c.keybindings.length > 0)
-    || (c.notchTabs && c.notchTabs.length > 0)
-    || !!manifest.frontend;
+  const hasUI =
+    (c.panels && c.panels.length > 0) ||
+    (c.uiExtensions && c.uiExtensions.length > 0) ||
+    (c.menus && c.menus.length > 0) ||
+    (c.keybindings && c.keybindings.length > 0) ||
+    (c.notchTabs && c.notchTabs.length > 0);
 
   return hasUI ? 'desktop' : 'universal';
 }

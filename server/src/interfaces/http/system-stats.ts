@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, type Request, type Response } from 'express';
 import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -18,14 +18,15 @@ export function createSystemStatsRoutes(): Router {
     const usedMem = totalMem - freeMem;
 
     // Calculate aggregate CPU usage from idle/total times
-    let totalIdle = 0, totalTick = 0;
+    let totalIdle = 0,
+      totalTick = 0;
     for (const cpu of cpus) {
       for (const type of Object.values(cpu.times)) {
         totalTick += type;
       }
       totalIdle += cpu.times.idle;
     }
-    const cpuUsagePercent = Math.round(100 - (100 * totalIdle / totalTick));
+    const cpuUsagePercent = Math.round(100 - (100 * totalIdle) / totalTick);
 
     res.json({
       success: true,
@@ -46,7 +47,7 @@ export function createSystemStatsRoutes(): Router {
         platform: os.platform(),
         hostname: os.hostname(),
         nodeVersion: process.version,
-      }
+      },
     });
   });
 
@@ -55,7 +56,9 @@ export function createSystemStatsRoutes(): Router {
     const { pluginId } = req.params;
     // Validate pluginId — only allow alphanumeric, dots, hyphens
     if (!/^[\w.-]+$/.test(pluginId)) {
-      res.status(400).json({ success: false, error: { code: 'INVALID_ID', message: 'Invalid plugin ID' } });
+      res
+        .status(400)
+        .json({ success: false, error: { code: 'INVALID_ID', message: 'Invalid plugin ID' } });
       return;
     }
 
@@ -69,7 +72,10 @@ export function createSystemStatsRoutes(): Router {
       const content = fs.readFileSync(storagePath, 'utf-8');
       res.json({ success: true, data: JSON.parse(content) });
     } catch {
-      res.status(500).json({ success: false, error: { code: 'READ_ERROR', message: 'Failed to read plugin storage' } });
+      res.status(500).json({
+        success: false,
+        error: { code: 'READ_ERROR', message: 'Failed to read plugin storage' },
+      });
     }
   });
 
@@ -77,13 +83,18 @@ export function createSystemStatsRoutes(): Router {
   router.get('/process-info/:pid', async (req: Request, res: Response) => {
     const pid = Number(req.params.pid);
     if (!Number.isInteger(pid) || pid <= 0) {
-      res.status(400).json({ success: false, error: { code: 'INVALID_PID', message: 'Invalid PID' } });
+      res
+        .status(400)
+        .json({ success: false, error: { code: 'INVALID_PID', message: 'Invalid PID' } });
       return;
     }
 
     try {
       const { stdout } = await execFileAsync('ps', [
-        '-p', String(pid), '-o', 'pid=,ppid=,etimes=,comm=,args=',
+        '-p',
+        String(pid),
+        '-o',
+        'pid=,ppid=,etimes=,comm=,args=',
       ]);
 
       const trimmed = stdout.trim();

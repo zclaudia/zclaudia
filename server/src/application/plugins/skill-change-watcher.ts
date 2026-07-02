@@ -20,11 +20,14 @@ function isSkillFile(filename: string | Buffer | null): boolean {
   return path.basename(normalized) === 'SKILL.md';
 }
 
-export function startSkillChangeWatcher(options: StartSkillChangeWatcherOptions): SkillChangeWatcher {
+export function startSkillChangeWatcher(
+  options: StartSkillChangeWatcherOptions
+): SkillChangeWatcher {
   const watch = options.watch ?? fsWatch;
   const exists = options.exists ?? existsSync;
   const debounceMs = options.debounceMs ?? 300;
-  const onError = options.onError ?? ((error) => console.warn('[SkillWatcher] refresh failed:', error));
+  const onError =
+    options.onError ?? (error => console.warn('[SkillWatcher] refresh failed:', error));
   const watchers: FSWatcher[] = [];
   let timer: NodeJS.Timeout | undefined;
   let refreshing = false;
@@ -36,7 +39,8 @@ export function startSkillChangeWatcher(options: StartSkillChangeWatcherOptions)
       return;
     }
     refreshing = true;
-    void options.refresh()
+    void options
+      .refresh()
       .catch(onError)
       .finally(() => {
         refreshing = false;

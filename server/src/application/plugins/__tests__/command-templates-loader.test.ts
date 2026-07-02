@@ -7,8 +7,12 @@ import { createExecutionEnv } from '../../../infra/execution-env.js';
 
 describe('loadAllCommandTemplates', () => {
   let tmpRoot: string;
-  beforeEach(() => { tmpRoot = mkdtempSync(path.join(tmpdir(), 'zc-ct-')); });
-  afterEach(() => { rmSync(tmpRoot, { recursive: true, force: true }); });
+  beforeEach(() => {
+    tmpRoot = mkdtempSync(path.join(tmpdir(), 'zc-ct-'));
+  });
+  afterEach(() => {
+    rmSync(tmpRoot, { recursive: true, force: true });
+  });
 
   function writeCmd(dir: string, name: string, body: string, frontmatter = '') {
     mkdirSync(dir, { recursive: true });
@@ -20,9 +24,7 @@ describe('loadAllCommandTemplates', () => {
     const userDir = path.join(tmpRoot, 'user-cmds');
     writeCmd(userDir, 'review', '# Review code\nReview body');
     const env = createExecutionEnv(tmpRoot);
-    const result = await loadAllCommandTemplates(env, [
-      { path: userDir, source: 'user' },
-    ]);
+    const result = await loadAllCommandTemplates(env, [{ path: userDir, source: 'user' }]);
     expect(result.templates).toHaveLength(1);
     expect(result.templates[0].source).toBe('user');
     expect(result.templates[0].template.name).toBe('review');
@@ -38,7 +40,7 @@ describe('loadAllCommandTemplates', () => {
       { path: userDir, source: 'user' },
       { path: projectDir, source: 'project' },
     ]);
-    const sources = result.templates.map((t) => t.source).sort();
+    const sources = result.templates.map(t => t.source).sort();
     expect(sources).toEqual(['project', 'user']);
   });
 
@@ -54,9 +56,7 @@ describe('loadAllCommandTemplates', () => {
     const userDir = path.join(tmpRoot, 'user-cmds');
     writeCmd(userDir, 'fm', '# fm body', 'description: My custom desc');
     const env = createExecutionEnv(tmpRoot);
-    const result = await loadAllCommandTemplates(env, [
-      { path: userDir, source: 'user' },
-    ]);
+    const result = await loadAllCommandTemplates(env, [{ path: userDir, source: 'user' }]);
     expect(result.templates[0].template.description).toBe('My custom desc');
   });
 
@@ -82,12 +82,12 @@ describe('loadAllCommandTemplates', () => {
     ]);
     expect(result.templates).toHaveLength(2);
 
-    const pluginNames = result.templates.map((t) => t.plugin?.pluginName).sort();
+    const pluginNames = result.templates.map(t => t.plugin?.pluginName).sort();
     expect(pluginNames).toEqual(['plugin-a', 'plugin-b']);
 
     // Each template's filePath points at its own plugin dir
-    const a = result.templates.find((t) => t.plugin?.pluginName === 'plugin-a')!;
-    const b = result.templates.find((t) => t.plugin?.pluginName === 'plugin-b')!;
+    const a = result.templates.find(t => t.plugin?.pluginName === 'plugin-a')!;
+    const b = result.templates.find(t => t.plugin?.pluginName === 'plugin-b')!;
     expect(a.filePath).toBe(path.join(pluginADir, 'foo.md'));
     expect(b.filePath).toBe(path.join(pluginBDir, 'foo.md'));
   });

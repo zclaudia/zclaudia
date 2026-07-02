@@ -77,7 +77,11 @@ describe('Developer Efficiency Tools', () => {
     await ensureSession();
 
     // Find model selector button in toolbar
-    const modelSelector = browser.locator('button:has-text("Default"), button:has-text("Opus"), button:has-text("Sonnet"), button:has-text("Haiku")').first();
+    const modelSelector = browser
+      .locator(
+        'button:has-text("Default"), button:has-text("Opus"), button:has-text("Sonnet"), button:has-text("Haiku")'
+      )
+      .first();
     const selectorVisible = await modelSelector.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (selectorVisible) {
@@ -137,7 +141,9 @@ describe('Developer Efficiency Tools', () => {
     });
 
     // Switch to Opus model
-    const modelSelector = browser.locator('button:has-text("Default"), button:has-text("Opus"), button:has-text("Sonnet")').first();
+    const modelSelector = browser
+      .locator('button:has-text("Default"), button:has-text("Opus"), button:has-text("Sonnet")')
+      .first();
     if (await modelSelector.isVisible({ timeout: 3000 }).catch(() => false)) {
       await modelSelector.click();
       await browser.waitForTimeout(300);
@@ -157,9 +163,9 @@ describe('Developer Efficiency Tools', () => {
     await browser.waitForTimeout(2000);
 
     // Check WebSocket messages for model field
-    const messages = await browser.evaluate(() => {
+    const messages = (await browser.evaluate(() => {
       return (window as unknown as Record<string, string[]>).__wsMessages || [];
-    }) as string[];
+    })) as string[];
 
     const runStartMsg = messages.find((m: string) => m.includes('run_start'));
     if (runStartMsg) {
@@ -232,10 +238,12 @@ describe('Developer Efficiency Tools', () => {
       if (chatStore && typeof chatStore === 'object' && 'getState' in chatStore) {
         const state = (chatStore as { getState: () => Record<string, unknown> }).getState();
         if ('addSessionUsage' in state) {
-          (state.addSessionUsage as (id: string, usage: { inputTokens: number; outputTokens: number }) => void)(
-            'test-session',
-            { inputTokens: 170000, outputTokens: 10000 }
-          );
+          (
+            state.addSessionUsage as (
+              id: string,
+              usage: { inputTokens: number; outputTokens: number }
+            ) => void
+          )('test-session', { inputTokens: 170000, outputTokens: 10000 });
         }
       }
     });
@@ -303,7 +311,9 @@ describe('Developer Efficiency Tools', () => {
 
       // Verify font CSS variable changed
       const fontSize = await browser.evaluate(() => {
-        return getComputedStyle(document.documentElement).getPropertyValue('--chat-font-prose').trim();
+        return getComputedStyle(document.documentElement)
+          .getPropertyValue('--chat-font-prose')
+          .trim();
       });
 
       console.log(`  Font size after clicking large: ${fontSize}`);
@@ -314,7 +324,9 @@ describe('Developer Efficiency Tools', () => {
       await browser.waitForTimeout(300);
 
       const smallFontSize = await browser.evaluate(() => {
-        return getComputedStyle(document.documentElement).getPropertyValue('--chat-font-prose').trim();
+        return getComputedStyle(document.documentElement)
+          .getPropertyValue('--chat-font-prose')
+          .trim();
       });
 
       console.log(`  Font size after clicking small: ${smallFontSize}`);

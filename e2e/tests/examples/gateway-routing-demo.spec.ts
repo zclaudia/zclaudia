@@ -16,7 +16,7 @@ describe('Gateway Backend 路由演示', () => {
     const backendA = {
       id: 'backend-laptop-001',
       apiKey: 'laptop-api-key',
-      url: 'http://localhost:3200/api/proxy/backend-laptop-001/api/projects'
+      url: 'http://localhost:3200/api/proxy/backend-laptop-001/api/projects',
       //                                        ↑
       //                                        backendId 在 URL 路径中
     };
@@ -25,7 +25,7 @@ describe('Gateway Backend 路由演示', () => {
     const backendB = {
       id: 'backend-desktop-002',
       apiKey: 'desktop-api-key',
-      url: 'http://localhost:3200/api/proxy/backend-desktop-002/api/projects'
+      url: 'http://localhost:3200/api/proxy/backend-desktop-002/api/projects',
       //                                        ↑
       //                                        不同的 backendId
     };
@@ -42,7 +42,7 @@ describe('Gateway Backend 路由演示', () => {
   test('演示认证头格式', async () => {
     console.log('\n=== 认证机制演示 ===\n');
 
-    const gatewaySecret = 'team-gateway-secret';  // 所有 Backend 共享
+    const gatewaySecret = 'team-gateway-secret'; // 所有 Backend 共享
 
     // Backend A 的认证
     const backendAAuth = `Bearer ${gatewaySecret}:laptop-api-key`;
@@ -75,26 +75,26 @@ describe('Gateway Backend 路由演示', () => {
     console.log('2. 发送 Gateway 认证消息:');
     const gatewayAuthMsg = {
       type: 'gateway_auth',
-      gatewaySecret: 'team-gateway-secret'
+      gatewaySecret: 'team-gateway-secret',
     };
     console.log('   ' + JSON.stringify(gatewayAuthMsg, null, 2).replace(/\n/g, '\n   '));
 
     console.log('\n3. Gateway 认证成功后，连接到特定 Backend:');
     const connectBackendMsg = {
       type: 'connect_backend',
-      backendId: 'backend-laptop-001',  // ← 指定要连接的 Backend
-      apiKey: 'laptop-api-key'
+      backendId: 'backend-laptop-001', // ← 指定要连接的 Backend
+      apiKey: 'laptop-api-key',
     };
     console.log('   ' + JSON.stringify(connectBackendMsg, null, 2).replace(/\n/g, '\n   '));
 
     console.log('\n4. 发送消息时，每次都包含 backendId:');
     const sendMsg = {
       type: 'send_to_backend',
-      backendId: 'backend-laptop-001',  // ← 每次都要指定
+      backendId: 'backend-laptop-001', // ← 每次都要指定
       message: {
         type: 'create_session',
-        projectId: 'proj-001'
-      }
+        projectId: 'proj-001',
+      },
     };
     console.log('   ' + JSON.stringify(sendMsg, null, 2).replace(/\n/g, '\n   '));
 
@@ -116,7 +116,7 @@ describe('Gateway Backend 路由演示', () => {
     const msgToA = {
       type: 'send_to_backend',
       backendId: 'backend-laptop-001',
-      message: { type: 'get_sessions' }
+      message: { type: 'get_sessions' },
     };
     console.log('  ' + JSON.stringify(msgToA, null, 2).replace(/\n/g, '\n  '));
     console.log('  → Gateway 路由到 Backend A');
@@ -125,8 +125,8 @@ describe('Gateway Backend 路由演示', () => {
     console.log('切换到 Backend B (desktop-002):');
     const switchMsg = {
       type: 'connect_backend',
-      backendId: 'backend-desktop-002',  // ← 新的 Backend
-      apiKey: 'desktop-api-key'
+      backendId: 'backend-desktop-002', // ← 新的 Backend
+      apiKey: 'desktop-api-key',
     };
     console.log('  ' + JSON.stringify(switchMsg, null, 2).replace(/\n/g, '\n  '));
     console.log('  → Gateway 断开与 Backend A 的代理');
@@ -135,8 +135,8 @@ describe('Gateway Backend 路由演示', () => {
     console.log('发送消息到 Backend B:');
     const msgToB = {
       type: 'send_to_backend',
-      backendId: 'backend-desktop-002',  // ← 已更新
-      message: { type: 'get_sessions' }
+      backendId: 'backend-desktop-002', // ← 已更新
+      message: { type: 'get_sessions' },
     };
     console.log('  ' + JSON.stringify(msgToB, null, 2).replace(/\n/g, '\n  '));
     console.log('  → Gateway 路由到 Backend B');
@@ -160,23 +160,23 @@ describe('Gateway Backend 路由演示', () => {
           status: 'online',
           apiKey: 'laptop-api-key',
           lastSeen: new Date('2026-02-03T10:00:00Z'),
-          connection: 'WebSocket (connected)'
+          connection: 'WebSocket (connected)',
         },
         'backend-desktop-002': {
           id: 'backend-desktop-002',
           status: 'online',
           apiKey: 'desktop-api-key',
           lastSeen: new Date('2026-02-03T10:01:00Z'),
-          connection: 'WebSocket (connected)'
+          connection: 'WebSocket (connected)',
         },
         'backend-cloud-003': {
           id: 'backend-cloud-003',
           status: 'offline',
           apiKey: 'cloud-api-key',
           lastSeen: new Date('2026-02-03T09:50:00Z'),
-          connection: 'WebSocket (disconnected)'
-        }
-      }
+          connection: 'WebSocket (disconnected)',
+        },
+      },
     };
 
     console.log(JSON.stringify(gatewayState, null, 2));
@@ -198,7 +198,7 @@ describe('Gateway Backend 路由演示', () => {
     console.log('响应:');
     const error1 = {
       error: 'Backend not available',
-      backendId: 'non-existent-backend'
+      backendId: 'non-existent-backend',
     };
     console.log('  ' + JSON.stringify(error1, null, 2).replace(/\n/g, '\n  '));
     console.log('  Status: 502 Bad Gateway\n');
@@ -209,7 +209,7 @@ describe('Gateway Backend 路由演示', () => {
     const error2 = {
       error: 'Backend is offline',
       backendId: 'backend-offline',
-      status: 'offline'
+      status: 'offline',
     };
     console.log('  ' + JSON.stringify(error2, null, 2).replace(/\n/g, '\n  '));
     console.log('  Status: 502 Bad Gateway\n');
@@ -218,7 +218,7 @@ describe('Gateway Backend 路由演示', () => {
     console.log('请求: Authorization: Bearer wrong-secret:laptop-api-key');
     console.log('响应:');
     const error3 = {
-      error: 'Invalid gateway secret'
+      error: 'Invalid gateway secret',
     };
     console.log('  ' + JSON.stringify(error3, null, 2).replace(/\n/g, '\n  '));
     console.log('  Status: 401 Unauthorized\n');
@@ -227,7 +227,7 @@ describe('Gateway Backend 路由演示', () => {
     console.log('请求: Authorization: Bearer gateway-secret:wrong-api-key');
     console.log('响应:');
     const error4 = {
-      error: 'Invalid backend API key'
+      error: 'Invalid backend API key',
     };
     console.log('  ' + JSON.stringify(error4, null, 2).replace(/\n/g, '\n  '));
     console.log('  Status: 401 Unauthorized\n');

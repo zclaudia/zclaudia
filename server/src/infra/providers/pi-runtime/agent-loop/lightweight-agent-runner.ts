@@ -15,7 +15,11 @@ import { LlmProfileRepository } from '../../../../domains/llm-profiles/repositor
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import { buildAgentHooks } from '../agent-hooks.js';
 import { buildModel } from '../build-model.js';
-import { AgentLoopTimeoutError, runPiAgentLoop, type AgentLoopExecutor } from './pi-agent-loop-executor.js';
+import {
+  AgentLoopTimeoutError,
+  runPiAgentLoop,
+  type AgentLoopExecutor,
+} from './pi-agent-loop-executor.js';
 import { buildAgentLoopTools, getAgentLoopToolsetDescriptor } from './toolsets.js';
 
 export type { AgentLoopExecutor } from './pi-agent-loop-executor.js';
@@ -57,7 +61,7 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
       }
       if (permissionMode !== descriptor.permissionMode) {
         throw new Error(
-          `Permission mode ${permissionMode} does not match toolset ${descriptor.id} (${descriptor.permissionMode})`,
+          `Permission mode ${permissionMode} does not match toolset ${descriptor.id} (${descriptor.permissionMode})`
         );
       }
 
@@ -70,19 +74,24 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
 
       const modelOverride = resolveModelOverride(llmProfile, request.model);
       const modelEntry = modelOverride
-        ? llmProfile.models?.find((entry) => entry.modelId === modelOverride)
+        ? llmProfile.models?.find(entry => entry.modelId === modelOverride)
         : undefined;
       const modelInfo = buildModel(llmProfile, modelOverride, modelEntry);
       const runtimePermissionCallback = request.permissions?.permissionCallback;
-      const permissionCallback = async (permissionRequest: Parameters<NonNullable<typeof runtimePermissionCallback>>[0]) => {
+      const permissionCallback = async (
+        permissionRequest: Parameters<NonNullable<typeof runtimePermissionCallback>>[0]
+      ) => {
         if (permissionMode === 'deny-external') {
-          return { behavior: 'deny', message: 'Lightweight agent run does not allow external tools' } as const;
+          return {
+            behavior: 'deny',
+            message: 'Lightweight agent run does not allow external tools',
+          } as const;
         }
 
         const declaredPermissionTools = descriptor.permissionTools ?? [];
         if (
-          !descriptor.tools.includes(permissionRequest.toolName as never)
-          && !declaredPermissionTools.includes(permissionRequest.toolName)
+          !descriptor.tools.includes(permissionRequest.toolName as never) &&
+          !declaredPermissionTools.includes(permissionRequest.toolName)
         ) {
           return {
             behavior: 'deny',
@@ -130,9 +139,10 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
       for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
         const agentResult = await this.executeAgentLoop({
           systemPrompt: request.systemPrompt,
-          userInput: attempt === 0
-            ? contractedInput
-            : buildJsonRepairPrompt(latestText, [latestParseError], outputContract),
+          userInput:
+            attempt === 0
+              ? contractedInput
+              : buildJsonRepairPrompt(latestText, [latestParseError], outputContract),
           history: [],
           modelInfo,
           tools,
@@ -222,7 +232,7 @@ function renderInput(currentInput: string, loadedEvents: AgentLoopEvent[]): stri
   }
 
   const renderedHistory = loadedEvents
-    .map((event) => `${event.kind}: ${JSON.stringify(event.payload)}`)
+    .map(event => `${event.kind}: ${JSON.stringify(event.payload)}`)
     .join('\n');
 
   return `# Prior Agent Loop Context\n${renderedHistory}\n\n# Current Input\n${currentInput}`;
@@ -233,10 +243,15 @@ function validateInput(input: unknown): string {
     return input;
   }
 
-  throw new Error('Structured agent messages are not supported by LightweightAgentRunner; pass a plain string input.');
+  throw new Error(
+    'Structured agent messages are not supported by LightweightAgentRunner; pass a plain string input.'
+  );
 }
 
-function resolveModelOverride(profile: LlmProfileConfig, requestModel: string | undefined): string | undefined {
+function resolveModelOverride(
+  profile: LlmProfileConfig,
+  requestModel: string | undefined
+): string | undefined {
   if (requestModel) {
     return requestModel;
   }
@@ -268,7 +283,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function accumulateUsage(
   current: Record<string, unknown> | undefined,
-  next: unknown,
+  next: unknown
 ): Record<string, unknown> | undefined {
   if (!isRecord(next)) {
     return current;
@@ -279,7 +294,7 @@ function accumulateUsage(
 
 function addNumericUsage(
   current: Record<string, unknown>,
-  next: Record<string, unknown>,
+  next: Record<string, unknown>
 ): Record<string, unknown> {
   const result: Record<string, unknown> = { ...current };
   for (const [key, value] of Object.entries(next)) {
@@ -287,10 +302,7 @@ function addNumericUsage(
       const previous = typeof result[key] === 'number' ? result[key] : 0;
       result[key] = previous + value;
     } else if (isRecord(value)) {
-      result[key] = addNumericUsage(
-        isRecord(result[key]) ? result[key] : {},
-        value,
-      );
+      result[key] = addNumericUsage(isRecord(result[key]) ? result[key] : {}, value);
     }
   }
   return result;

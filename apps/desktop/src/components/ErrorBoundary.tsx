@@ -27,7 +27,11 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     this.setState({ componentStack: info.componentStack || '' });
-    console.error(`[ErrorBoundary${this.props.label ? `: ${this.props.label}` : ''}]`, error, info.componentStack);
+    console.error(
+      `[ErrorBoundary${this.props.label ? `: ${this.props.label}` : ''}]`,
+      error,
+      info.componentStack
+    );
   }
 
   private handleRetry = () => {

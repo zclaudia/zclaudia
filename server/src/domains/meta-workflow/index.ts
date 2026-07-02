@@ -59,7 +59,11 @@ export {
 } from './run-entities/subagent-run-entity.js';
 
 // Service + routes + register factory
-export { MetaWorkflowService, type MetaWorkflowServiceOptions, type CreateRunInput } from './service.js';
+export {
+  MetaWorkflowService,
+  type MetaWorkflowServiceOptions,
+  type CreateRunInput,
+} from './service.js';
 export { createMetaWorkflowRoutes } from './routes.js';
 export {
   registerMetaWorkflow,

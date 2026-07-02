@@ -1,9 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { PHASE_TYPES } from '@zclaudia/shared/features/meta-workflow';
-import {
-  PHASE_TEMPLATES,
-  getPhaseTemplate,
-} from '../phase-templates/index.js';
+import { PHASE_TEMPLATES, getPhaseTemplate } from '../phase-templates/index.js';
 
 describe('phase template registry', () => {
   it('registers exactly 6 templates', () => {
@@ -11,7 +8,7 @@ describe('phase template registry', () => {
   });
 
   it('covers every PhaseType in the shared enum', () => {
-    const registered = new Set(PHASE_TEMPLATES.map((t) => t.phaseType));
+    const registered = new Set(PHASE_TEMPLATES.map(t => t.phaseType));
     for (const pt of PHASE_TYPES) {
       expect(registered).toContain(pt);
     }
@@ -41,9 +38,16 @@ describe('phase template registry', () => {
 
   it('buildSynthesizerPrompt mentions the phaseType-specific pattern', () => {
     const phase = {
-      id: 'p1', name: 'X', description: 'do x', phaseType: 'code-implement' as const,
-      dependsOn: [], inputs: [], outputs: [],
-      acceptanceGates: [{ id: 'g1', description: 'compile', command: 'mvn compile', expect: { exitCode: 0 } }],
+      id: 'p1',
+      name: 'X',
+      description: 'do x',
+      phaseType: 'code-implement' as const,
+      dependsOn: [],
+      inputs: [],
+      outputs: [],
+      acceptanceGates: [
+        { id: 'g1', description: 'compile', command: 'mvn compile', expect: { exitCode: 0 } },
+      ],
     };
     const prompt = getPhaseTemplate('code-implement').buildSynthesizerPrompt(phase);
     expect(prompt).toMatch(/self-healing/);
@@ -52,9 +56,21 @@ describe('phase template registry', () => {
 
   it('investigation prompt mentions report file + read-only constraint', () => {
     const phase = {
-      id: 'p1', name: 'X', description: 'investigate y', phaseType: 'investigation' as const,
-      dependsOn: [], inputs: [], outputs: [],
-      acceptanceGates: [{ id: 'g1', description: 'report exists', command: 'test -f report.md', expect: { exitCode: 0 } }],
+      id: 'p1',
+      name: 'X',
+      description: 'investigate y',
+      phaseType: 'investigation' as const,
+      dependsOn: [],
+      inputs: [],
+      outputs: [],
+      acceptanceGates: [
+        {
+          id: 'g1',
+          description: 'report exists',
+          command: 'test -f report.md',
+          expect: { exitCode: 0 },
+        },
+      ],
     };
     const prompt = getPhaseTemplate('investigation').buildSynthesizerPrompt(phase);
     expect(prompt).toMatch(/report/i);
@@ -63,8 +79,13 @@ describe('phase template registry', () => {
 
   it('defaultGates returns empty array (Phase B stub behavior)', () => {
     const phase = {
-      id: 'p1', name: 'X', description: 'x', phaseType: 'code-implement' as const,
-      dependsOn: [], inputs: [], outputs: [],
+      id: 'p1',
+      name: 'X',
+      description: 'x',
+      phaseType: 'code-implement' as const,
+      dependsOn: [],
+      inputs: [],
+      outputs: [],
       acceptanceGates: [{ id: 'g1', description: 'g', command: 'c', expect: {} }],
     };
     expect(getPhaseTemplate('code-implement').defaultGates(phase)).toEqual([]);

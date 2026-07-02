@@ -33,8 +33,8 @@ function extractHosts(command: string): string[] {
     let host = m[1];
     const at = host.lastIndexOf('@');
     if (at >= 0) host = host.slice(at + 1); // strip user:pw@
-    host = host.replace(/:\d+$/, '');        // strip :port
-    host = host.replace(/\.+$/, '');         // strip trailing dot(s)
+    host = host.replace(/:\d+$/, ''); // strip :port
+    host = host.replace(/\.+$/, ''); // strip trailing dot(s)
     if (host) hosts.push(host.toLowerCase());
   }
   return hosts;
@@ -55,10 +55,12 @@ function isDomainAllowed(host: string, allowed: ReadonlySet<string>): boolean {
 export function detectSandboxDenial(
   command: string,
   output: string,
-  allowedDomains: ReadonlySet<string>,
+  allowedDomains: ReadonlySet<string>
 ): { hosts: string[] } | null {
-  if (!NETWORK_FAILURE_PATTERNS.some((re) => re.test(output))) return null;
-  const unallowed = [...new Set(extractHosts(command))].filter((h) => !isDomainAllowed(h, allowedDomains));
+  if (!NETWORK_FAILURE_PATTERNS.some(re => re.test(output))) return null;
+  const unallowed = [...new Set(extractHosts(command))].filter(
+    h => !isDomainAllowed(h, allowedDomains)
+  );
   if (unallowed.length === 0) return null;
   return { hosts: unallowed };
 }

@@ -84,7 +84,9 @@ describe('findBashFileBypass', () => {
       kind: 'file_write',
       suggestedTool: 'Edit',
     });
-    expect(findBashFileBypass('node -e "require(\'fs\').writeFileSync(\'src/app.ts\', \'x\')"')).toMatchObject({
+    expect(
+      findBashFileBypass("node -e \"require('fs').writeFileSync('src/app.ts', 'x')\"")
+    ).toMatchObject({
       kind: 'file_write',
       suggestedTool: 'Edit',
     });
@@ -100,13 +102,17 @@ describe('findBashFileBypass', () => {
 
 describe('findBashSensitivePathAccess', () => {
   it('flags direct reads of sensitive home credential paths', () => {
-    const findBashSensitivePathAccess = (bashGuards as any).findBashSensitivePathAccess as undefined | ((command: string) => any);
+    const findBashSensitivePathAccess = (bashGuards as any).findBashSensitivePathAccess as
+      | undefined
+      | ((command: string) => any);
     expect(typeof findBashSensitivePathAccess).toBe('function');
     expect(findBashSensitivePathAccess('cat ~/.ssh/id_rsa')).toMatchObject({
       path: '~/.ssh/id_rsa',
       reason: expect.stringContaining('sensitive'),
     });
-    expect(findBashSensitivePathAccess('python3 -c "print(open(\\"~/.aws/credentials\\").read())"')).toMatchObject({
+    expect(
+      findBashSensitivePathAccess('python3 -c "print(open(\\"~/.aws/credentials\\").read())"')
+    ).toMatchObject({
       path: '~/.aws/credentials',
     });
   });
@@ -114,7 +120,9 @@ describe('findBashSensitivePathAccess', () => {
   it('flags absolute paths under the current home directory', () => {
     const previousHome = process.env.HOME;
     process.env.HOME = '/tmp/zclaudia-test-home';
-    const findBashSensitivePathAccess = (bashGuards as any).findBashSensitivePathAccess as undefined | ((command: string) => any);
+    const findBashSensitivePathAccess = (bashGuards as any).findBashSensitivePathAccess as
+      | undefined
+      | ((command: string) => any);
 
     const result = findBashSensitivePathAccess?.('cat /tmp/zclaudia-test-home/.ssh/id_rsa');
 
@@ -124,7 +132,9 @@ describe('findBashSensitivePathAccess', () => {
   });
 
   it('does not flag allowed public ssh metadata or workspace paths', () => {
-    const findBashSensitivePathAccess = (bashGuards as any).findBashSensitivePathAccess as undefined | ((command: string) => any);
+    const findBashSensitivePathAccess = (bashGuards as any).findBashSensitivePathAccess as
+      | undefined
+      | ((command: string) => any);
     expect(typeof findBashSensitivePathAccess).toBe('function');
     expect(findBashSensitivePathAccess('cat ~/.ssh/known_hosts')).toBeUndefined();
     expect(findBashSensitivePathAccess('cat ~/.ssh/id_rsa.pub')).toBeUndefined();

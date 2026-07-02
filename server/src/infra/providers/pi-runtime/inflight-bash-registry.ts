@@ -19,7 +19,8 @@ export interface InflightForegroundCommand {
 const commandsBySession = new Map<string, Map<string, InflightForegroundCommand>>();
 
 export function registerInflightForegroundCommand(entry: InflightForegroundCommand): () => void {
-  const sessionCommands = commandsBySession.get(entry.sessionId) ?? new Map<string, InflightForegroundCommand>();
+  const sessionCommands =
+    commandsBySession.get(entry.sessionId) ?? new Map<string, InflightForegroundCommand>();
   sessionCommands.set(entry.toolUseId, entry);
   commandsBySession.set(entry.sessionId, sessionCommands);
   return () => {
@@ -35,7 +36,7 @@ export function listInflightForegroundCommands(sessionId: string): InflightForeg
 
 export function requestBackgroundForCommand(
   sessionId: string,
-  toolUseId?: string,
+  toolUseId?: string
 ): { ok: true; command: string } | { ok: false; reason: string } {
   const sessionCommands = commandsBySession.get(sessionId);
   if (!sessionCommands || sessionCommands.size === 0) {
@@ -44,7 +45,8 @@ export function requestBackgroundForCommand(
   let target: InflightForegroundCommand | undefined;
   if (toolUseId) {
     target = sessionCommands.get(toolUseId);
-    if (!target) return { ok: false, reason: `No running foreground command with toolUseId ${toolUseId}.` };
+    if (!target)
+      return { ok: false, reason: `No running foreground command with toolUseId ${toolUseId}.` };
   } else {
     target = [...sessionCommands.values()].sort((a, b) => a.startedAt - b.startedAt)[0];
   }

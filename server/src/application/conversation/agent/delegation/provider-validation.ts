@@ -13,11 +13,13 @@ interface ProviderRow {
  */
 export function validateAIReviewProviderId(
   db: Database.Database,
-  llmProfileId: string | undefined,
+  llmProfileId: string | undefined
 ): string | null {
   if (!llmProfileId) return null;
 
-  const row = db.prepare('SELECT id FROM llm_profiles WHERE id = ?').get(llmProfileId) as ProviderRow | undefined;
+  const row = db.prepare('SELECT id FROM llm_profiles WHERE id = ?').get(llmProfileId) as
+    | ProviderRow
+    | undefined;
   if (!row) {
     return 'Selected AI review provider was not found.';
   }

@@ -1,10 +1,18 @@
 import type { Session } from '@zclaudia/shared/core/session';
 import type { RunFailedMessage, ServerMessage } from '@zclaudia/shared/wire/messages';
-import type { ProjectAgent, SupervisionLogEvent } from '@zclaudia/shared/features/supervision';
-import { SupervisionTaskRepository } from './repositories/supervision-task.js';
-import type { SupervisionProjectPort, SupervisionSessionPort, SupervisionSessionModelPort } from './ports.js';
-import { TaskRunner } from './task-runner.js';
-import { WorktreeManager } from './worktree-manager.js';
+import type {
+  ProjectAgent,
+  SupervisionLogEvent,
+  SupervisionTask,
+} from '@zclaudia/shared/features/supervision';
+import { type SupervisionTaskRepository } from './repositories/supervision-task.js';
+import type {
+  SupervisionProjectPort,
+  SupervisionSessionPort,
+  SupervisionSessionModelPort,
+} from './ports.js';
+import { type TaskRunner } from './task-runner.js';
+import { type WorktreeManager } from './worktree-manager.js';
 import type { CheckpointEngine } from './checkpoint-engine.js';
 import { shouldTransitionAgentToActive } from './model.js';
 import { TaskAggregate } from './task-aggregate.js';
@@ -33,22 +41,18 @@ interface TaskLifecycleDeps {
     projectId: string,
     event: SupervisionLogEvent,
     detail?: Record<string, unknown>,
-    taskId?: string,
+    taskId?: string
   ) => void;
 }
 
 export class TaskLifecycle {
   constructor(private deps: TaskLifecycleDeps) {}
 
-  handleTaskRunMessage(
-    taskId: string,
-    projectId: string,
-    msg: ServerMessage,
-  ): void {
+  handleTaskRunMessage(taskId: string, projectId: string, msg: ServerMessage): void {
     if (msg.type === 'run_completed') {
       this.clearTaskSessionReadOnly(taskId);
 
-      this.deps.taskRunner.onTaskComplete(taskId, projectId).catch((err) => {
+      this.deps.taskRunner.onTaskComplete(taskId, projectId).catch(err => {
         console.error(`[Supervisor] TaskRunner.onTaskComplete failed for ${taskId}:`, err);
         const task = this.deps.taskRepo.findById(taskId);
         if (task) {
@@ -62,7 +66,7 @@ export class TaskLifecycle {
 
       const checkpointEngine = this.deps.getCheckpointEngine();
       if (checkpointEngine?.shouldTrigger(projectId, 'task_complete')) {
-        checkpointEngine.runCheckpoint(projectId).catch((err) => {
+        checkpointEngine.runCheckpoint(projectId).catch(err => {
           console.error(`[Supervisor] Checkpoint failed after task ${taskId}:`, err);
         });
       }
@@ -84,12 +88,17 @@ export class TaskLifecycle {
       const agg = new TaskAggregate(task, this.deps.taskRepo);
       agg.markRunFailed(errorMsg);
       this.deps.broadcastTaskUpdate(taskId, projectId);
-      this.deps.log(projectId, 'task_status_changed', {
-        taskId,
-        from: 'running',
-        to: 'failed',
-        error: errorMsg,
-      }, taskId);
+      this.deps.log(
+        projectId,
+        'task_status_changed',
+        {
+          taskId,
+          from: 'running',
+          to: 'failed',
+          error: errorMsg,
+        },
+        taskId
+      );
       this.deps.dispatcher.dispatchAll(agg.releaseEvents());
 
       const failedTask = this.deps.taskRepo.findById(taskId);
@@ -103,22 +112,23 @@ export class TaskLifecycle {
     }
   }
 
-  handleLiteTaskMessage(
-    taskId: string,
-    projectId: string,
-    msg: ServerMessage,
-  ): void {
+  handleLiteTaskMessage(taskId: string, projectId: string, msg: ServerMessage): void {
     if (msg.type === 'run_completed') {
       const task = this.deps.taskRepo.findById(taskId);
       if (task) {
         const agg = new TaskAggregate(task, this.deps.taskRepo);
         agg.markLiteCompleted();
         this.deps.broadcastTaskUpdate(taskId, projectId);
-        this.deps.log(projectId, 'task_status_changed', {
-          taskId,
-          from: 'running',
-          to: 'completed',
-        }, taskId);
+        this.deps.log(
+          projectId,
+          'task_status_changed',
+          {
+            taskId,
+            from: 'running',
+            to: 'completed',
+          },
+          taskId
+        );
         this.deps.dispatcher.dispatchAll(agg.releaseEvents());
       }
       this.deps.virtualClients.delete(taskId);
@@ -138,28 +148,36 @@ export class TaskLifecycle {
       const agg = new TaskAggregate(task, this.deps.taskRepo);
       agg.markLiteFailed(errorMsg);
 
-      // Read back the updated snapshot for logging
-      const updated = agg.snapshot;
       const events = agg.releaseEvents();
-      const liteFailed = events.find((e) => e.type === 'lite_task_failed') as
+      const liteFailed = events.find(e => e.type === 'lite_task_failed') as
         | Extract<SupervisionTaskEvent, { type: 'lite_task_failed' }>
         | undefined;
 
       if (liteFailed?.nextStatus === 'failed') {
-        this.deps.log(projectId, 'task_status_changed', {
-          taskId,
-          from: 'running',
-          to: 'failed',
-          error: errorMsg,
-        }, taskId);
+        this.deps.log(
+          projectId,
+          'task_status_changed',
+          {
+            taskId,
+            from: 'running',
+            to: 'failed',
+            error: errorMsg,
+          },
+          taskId
+        );
       } else {
-        this.deps.log(projectId, 'task_status_changed', {
-          taskId,
-          from: 'running',
-          to: 'pending',
-          reason: 'retry',
-          attempt: liteFailed?.nextAttempt,
-        }, taskId);
+        this.deps.log(
+          projectId,
+          'task_status_changed',
+          {
+            taskId,
+            from: 'running',
+            to: 'pending',
+            reason: 'retry',
+            attempt: liteFailed?.nextAttempt,
+          },
+          taskId
+        );
       }
 
       this.deps.broadcastTaskUpdate(taskId, projectId);
@@ -177,7 +195,9 @@ export class TaskLifecycle {
       if (task?.sessionId) {
         this.deps.sessionRepo.update(
           task.sessionId,
-          this.deps.sessionModel.buildTaskUnlockedSessionPatch() as Partial<Omit<Session, 'id' | 'createdAt' | 'updatedAt'>>,
+          this.deps.sessionModel.buildTaskUnlockedSessionPatch() as Partial<
+            Omit<Session, 'id' | 'createdAt' | 'updatedAt'>
+          >
         );
       }
     } catch (err) {
@@ -185,7 +205,10 @@ export class TaskLifecycle {
     }
   }
 
-  submitTaskPlan(taskId: string): { task: import('@zclaudia/shared/features/supervision').SupervisionTask; sessionId: string } {
+  submitTaskPlan(taskId: string): {
+    task: SupervisionTask;
+    sessionId: string;
+  } {
     const task = this.deps.taskRepo.findById(taskId);
     if (!task) {
       throw new Error(`Task not found: ${taskId}`);
@@ -207,7 +230,9 @@ export class TaskLifecycle {
     // Side effect: update session
     this.deps.sessionRepo.update(
       session.id,
-      this.deps.sessionModel.buildTaskPlannedSessionPatch() as Partial<Omit<Session, 'id' | 'createdAt' | 'updatedAt'>>,
+      this.deps.sessionModel.buildTaskPlannedSessionPatch() as Partial<
+        Omit<Session, 'id' | 'createdAt' | 'updatedAt'>
+      >
     );
 
     // Aggregate command
@@ -216,18 +241,23 @@ export class TaskLifecycle {
 
     // Side effects
     this.deps.broadcastTaskUpdate(task.id, task.projectId);
-    this.deps.log(task.projectId, 'task_plan_submitted', {
-      taskId: task.id,
-      sessionId: session.id,
-      planPath: planStatus.path,
-    }, task.id);
+    this.deps.log(
+      task.projectId,
+      'task_plan_submitted',
+      {
+        taskId: task.id,
+        sessionId: session.id,
+        planPath: planStatus.path,
+      },
+      task.id
+    );
     this.deps.dispatcher.dispatchAll(agg.releaseEvents());
 
     this.deps.tick();
-    return { task: this.deps.taskRepo.findById(task.id)!, sessionId: session.id };
+    return { task: this.requireTask(task.id), sessionId: session.id };
   }
 
-  retryTask(taskId: string): import('@zclaudia/shared/features/supervision').SupervisionTask {
+  retryTask(taskId: string): SupervisionTask {
     const task = this.deps.taskRepo.findById(taskId);
     if (!task) {
       throw new Error(`Task not found: ${taskId}`);
@@ -238,19 +268,24 @@ export class TaskLifecycle {
 
     // Side effects
     this.deps.broadcastTaskUpdate(taskId, task.projectId);
-    this.deps.log(task.projectId, 'task_status_changed', {
-      taskId,
-      from: task.status,
-      to: 'pending',
-      reason: 'manual_retry',
-    }, taskId);
+    this.deps.log(
+      task.projectId,
+      'task_status_changed',
+      {
+        taskId,
+        from: task.status,
+        to: 'pending',
+        reason: 'manual_retry',
+      },
+      taskId
+    );
     this.deps.dispatcher.dispatchAll(agg.releaseEvents());
 
     this.transitionAgentToActive(task.projectId, 'manual_retry');
     return agg.snapshot;
   }
 
-  cancelTask(taskId: string): import('@zclaudia/shared/features/supervision').SupervisionTask {
+  cancelTask(taskId: string): SupervisionTask {
     const task = this.deps.taskRepo.findById(taskId);
     if (!task) {
       throw new Error(`Task not found: ${taskId}`);
@@ -265,18 +300,23 @@ export class TaskLifecycle {
 
     // Side effects
     this.deps.broadcastTaskUpdate(taskId, task.projectId);
-    this.deps.log(task.projectId, 'task_status_changed', {
-      taskId,
-      from: task.status,
-      to: 'cancelled',
-      reason: 'manual_cancel',
-    }, taskId);
+    this.deps.log(
+      task.projectId,
+      'task_status_changed',
+      {
+        taskId,
+        from: task.status,
+        to: 'cancelled',
+        reason: 'manual_cancel',
+      },
+      taskId
+    );
     this.deps.dispatcher.dispatchAll(agg.releaseEvents());
 
     return agg.snapshot;
   }
 
-  runTaskNow(taskId: string): import('@zclaudia/shared/features/supervision').SupervisionTask {
+  runTaskNow(taskId: string): SupervisionTask {
     const task = this.deps.taskRepo.findById(taskId);
     if (!task) {
       throw new Error(`Task not found: ${taskId}`);
@@ -287,19 +327,24 @@ export class TaskLifecycle {
 
     // Side effects
     this.deps.broadcastTaskUpdate(taskId, task.projectId);
-    this.deps.log(task.projectId, 'task_status_changed', {
-      taskId,
-      from: task.status,
-      to: 'pending',
-      reason: 'run_now',
-    }, taskId);
+    this.deps.log(
+      task.projectId,
+      'task_status_changed',
+      {
+        taskId,
+        from: task.status,
+        to: 'pending',
+        reason: 'run_now',
+      },
+      taskId
+    );
     this.deps.dispatcher.dispatchAll(agg.releaseEvents());
 
     this.transitionAgentToActive(task.projectId, 'run_now');
     return agg.snapshot;
   }
 
-  async approveTaskResult(taskId: string): Promise<import('@zclaudia/shared/features/supervision').SupervisionTask> {
+  async approveTaskResult(taskId: string): Promise<SupervisionTask> {
     const task = this.deps.taskRepo.findById(taskId);
     if (!task) {
       throw new Error(`Task not found: ${taskId}`);
@@ -307,60 +352,72 @@ export class TaskLifecycle {
 
     const project = this.deps.projectRepo.findById(task.projectId);
     const session = task.sessionId ? this.deps.sessionRepo.findById(task.sessionId) : undefined;
-    const isWorktreeTask =
-      session?.workingDirectory && project?.rootPath &&
-      session.workingDirectory !== project.rootPath;
+    const worktreePath =
+      session?.workingDirectory &&
+      project?.rootPath &&
+      session.workingDirectory !== project.rootPath
+        ? session.workingDirectory
+        : undefined;
 
-    if (isWorktreeTask) {
+    if (worktreePath) {
       const pool = this.deps.worktreeManager.getWorktreePool(task.projectId);
       this.deps.log(task.projectId, 'merge_started', { taskId }, taskId);
 
-      const result = await pool.mergeBack(task.id, task.attempt, session!.workingDirectory!);
+      const result = await pool.mergeBack(task.id, task.attempt, worktreePath);
 
       if (result.success) {
-        pool.release(session!.workingDirectory!);
-        const agg = new TaskAggregate(
-          this.deps.taskRepo.findById(taskId)!,
-          this.deps.taskRepo,
-        );
+        pool.release(worktreePath);
+        const agg = new TaskAggregate(this.requireTask(taskId), this.deps.taskRepo);
         agg.markIntegrated();
         this.deps.broadcastTaskUpdate(taskId, task.projectId);
         this.deps.log(task.projectId, 'merge_completed', { taskId }, taskId);
-        this.deps.log(task.projectId, 'worktree_released', {
-          taskId,
-          worktreePath: session!.workingDirectory,
-        }, taskId);
+        this.deps.log(
+          task.projectId,
+          'worktree_released',
+          {
+            taskId,
+            worktreePath,
+          },
+          taskId
+        );
         this.deps.dispatcher.dispatchAll(agg.releaseEvents());
       } else {
-        const agg = new TaskAggregate(
-          this.deps.taskRepo.findById(taskId)!,
-          this.deps.taskRepo,
-        );
+        const agg = new TaskAggregate(this.requireTask(taskId), this.deps.taskRepo);
         agg.markMergeConflict(result.conflicts ?? []);
         this.deps.broadcastTaskUpdate(taskId, task.projectId);
-        this.deps.log(task.projectId, 'merge_conflict', {
-          taskId,
-          conflicts: result.conflicts,
-        }, taskId);
+        this.deps.log(
+          task.projectId,
+          'merge_conflict',
+          {
+            taskId,
+            conflicts: result.conflicts,
+          },
+          taskId
+        );
         this.deps.dispatcher.dispatchAll(agg.releaseEvents());
       }
     } else {
       const agg = new TaskAggregate(task, this.deps.taskRepo);
       agg.markIntegrated();
       this.deps.broadcastTaskUpdate(taskId, task.projectId);
-      this.deps.log(task.projectId, 'task_status_changed', {
-        taskId,
-        from: 'reviewing',
-        to: 'integrated',
-      }, taskId);
+      this.deps.log(
+        task.projectId,
+        'task_status_changed',
+        {
+          taskId,
+          from: 'reviewing',
+          to: 'integrated',
+        },
+        taskId
+      );
       this.deps.dispatcher.dispatchAll(agg.releaseEvents());
     }
 
     this.deps.tick();
-    return this.deps.taskRepo.findById(taskId)!;
+    return this.requireTask(taskId);
   }
 
-  rejectTaskResult(taskId: string, reviewNotes: string): import('@zclaudia/shared/features/supervision').SupervisionTask {
+  rejectTaskResult(taskId: string, reviewNotes: string): SupervisionTask {
     const task = this.deps.taskRepo.findById(taskId);
     if (!task) {
       throw new Error(`Task not found: ${taskId}`);
@@ -373,25 +430,35 @@ export class TaskLifecycle {
     agg.rejectResult(reviewNotes);
 
     const events = agg.releaseEvents();
-    const rejected = events.find((e) => e.type === 'task_result_rejected') as
+    const rejected = events.find(e => e.type === 'task_result_rejected') as
       | Extract<SupervisionTaskEvent, { type: 'task_result_rejected' }>
       | undefined;
 
     if (rejected?.nextStatus === 'failed') {
-      this.deps.log(task.projectId, 'task_status_changed', {
-        taskId,
-        from: 'reviewing',
-        to: 'failed',
-        reason: 'max_retries_exceeded',
-      }, taskId);
+      this.deps.log(
+        task.projectId,
+        'task_status_changed',
+        {
+          taskId,
+          from: 'reviewing',
+          to: 'failed',
+          reason: 'max_retries_exceeded',
+        },
+        taskId
+      );
     } else {
-      this.deps.log(task.projectId, 'task_status_changed', {
-        taskId,
-        from: 'reviewing',
-        to: 'queued',
-        attempt: rejected?.nextAttempt,
-        reviewNotes,
-      }, taskId);
+      this.deps.log(
+        task.projectId,
+        'task_status_changed',
+        {
+          taskId,
+          from: 'reviewing',
+          to: 'queued',
+          attempt: rejected?.nextAttempt,
+          reviewNotes,
+        },
+        taskId
+      );
     }
 
     this.deps.broadcastTaskUpdate(taskId, task.projectId);
@@ -400,7 +467,7 @@ export class TaskLifecycle {
     return agg.snapshot;
   }
 
-  async resolveConflict(taskId: string): Promise<import('@zclaudia/shared/features/supervision').SupervisionTask> {
+  async resolveConflict(taskId: string): Promise<SupervisionTask> {
     const task = this.deps.taskRepo.findById(taskId);
     if (!task) {
       throw new Error('Task not found');
@@ -419,22 +486,32 @@ export class TaskLifecycle {
       throw new Error(`Still has conflicts: ${result.conflicts?.join(', ')}`);
     }
 
-    const agg = new TaskAggregate(
-      this.deps.taskRepo.findById(taskId)!,
-      this.deps.taskRepo,
-    );
+    const agg = new TaskAggregate(this.requireTask(taskId), this.deps.taskRepo);
     agg.markConflictResolved();
     pool.release(session.workingDirectory);
     this.deps.broadcastTaskUpdate(taskId, task.projectId);
     this.deps.log(task.projectId, 'merge_completed', { taskId }, taskId);
-    this.deps.log(task.projectId, 'worktree_released', {
-      taskId,
-      worktreePath: session.workingDirectory,
-    }, taskId);
+    this.deps.log(
+      task.projectId,
+      'worktree_released',
+      {
+        taskId,
+        worktreePath: session.workingDirectory,
+      },
+      taskId
+    );
     this.deps.dispatcher.dispatchAll(agg.releaseEvents());
 
     this.deps.tick();
-    return this.deps.taskRepo.findById(taskId)!;
+    return this.requireTask(taskId);
+  }
+
+  private requireTask(taskId: string): SupervisionTask {
+    const task = this.deps.taskRepo.findById(taskId);
+    if (!task) {
+      throw new Error(`Task not found: ${taskId}`);
+    }
+    return task;
   }
 
   private transitionAgentToActive(projectId: string, reason: 'manual_retry' | 'run_now'): void {

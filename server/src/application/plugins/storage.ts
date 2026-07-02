@@ -22,12 +22,7 @@ export class PluginStorage implements StorageAPI {
   private loaded = false;
 
   constructor(private pluginId: string) {
-    this.storagePath = path.join(
-      os.homedir(),
-      '.claudia',
-      'plugin-storage',
-      `${pluginId}.json`
-    );
+    this.storagePath = path.join(os.homedir(), '.claudia', 'plugin-storage', `${pluginId}.json`);
   }
 
   private async ensureLoaded(): Promise<void> {
@@ -76,7 +71,9 @@ export class PluginStorage implements StorageAPI {
     const data = JSON.stringify(Object.fromEntries(this.cache));
     if (Buffer.byteLength(data, 'utf-8') > MAX_STORAGE_BYTES) {
       this.cache.delete(key);
-      throw new Error(`Storage limit exceeded for plugin ${this.pluginId} (max ${MAX_STORAGE_BYTES / 1024 / 1024}MB)`);
+      throw new Error(
+        `Storage limit exceeded for plugin ${this.pluginId} (max ${MAX_STORAGE_BYTES / 1024 / 1024}MB)`
+      );
     }
 
     await this.persist();

@@ -6,7 +6,8 @@
 import { test } from 'vitest';
 import { getEnabledModes, type ModeConfig } from './modes';
 import { switchToMode, verifyMode, ensureActiveSession } from './connection';
-import { BrowserAdapter, createBrowser } from './browser-adapter';
+import { createBrowser } from './browser-adapter';
+import type { BrowserAdapter } from './browser-adapter';
 
 /**
  * Wait for the app to be fully loaded and ready

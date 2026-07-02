@@ -45,7 +45,7 @@ async function importPublicKey(pem: string): Promise<CryptoKey> {
       hash: 'SHA-256',
     },
     false, // not extractable
-    ['encrypt'],
+    ['encrypt']
   );
 
   cachedPublicKey = key;
@@ -65,11 +65,7 @@ export async function encryptCredential(plaintext: string, publicKeyPem: string)
 
   const encoded = new TextEncoder().encode(plaintext);
 
-  const encrypted = await crypto.subtle.encrypt(
-    { name: 'RSA-OAEP' },
-    key,
-    encoded,
-  );
+  const encrypted = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, key, encoded);
 
   // Convert ArrayBuffer to base64
   const bytes = new Uint8Array(encrypted);

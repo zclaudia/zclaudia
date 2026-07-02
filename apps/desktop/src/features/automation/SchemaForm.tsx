@@ -23,10 +23,10 @@ function asObjectSchema(schema: Record<string, unknown> | undefined): ObjectSche
 /** Required keys whose value is missing or an empty string. */
 export function missingRequiredKeys(
   schema: Record<string, unknown> | undefined,
-  value: Record<string, unknown>,
+  value: Record<string, unknown>
 ): string[] {
   const { required } = asObjectSchema(schema);
-  return (required ?? []).filter((k) => {
+  return (required ?? []).filter(k => {
     const v = value[k];
     return v === undefined || v === null || v === '';
   });
@@ -62,7 +62,7 @@ export function SchemaForm({ schema, value, onChange }: SchemaFormProps) {
                 type="checkbox"
                 aria-label={key}
                 checked={current === true}
-                onChange={(e) => set(key, e.target.checked)}
+                onChange={e => set(key, e.target.checked)}
               />
               {label}
             </label>
@@ -77,11 +77,15 @@ export function SchemaForm({ schema, value, onChange }: SchemaFormProps) {
                 aria-label={key}
                 className={inputClass}
                 value={typeof current === 'string' ? current : ''}
-                onChange={(e) => set(key, e.target.value)}
+                onChange={e => set(key, e.target.value)}
               >
-                <option value="" disabled>Select…</option>
-                {field.enum.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
+                <option value="" disabled>
+                  Select…
+                </option>
+                {field.enum.map(opt => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
                 ))}
               </select>
             </label>
@@ -97,7 +101,7 @@ export function SchemaForm({ schema, value, onChange }: SchemaFormProps) {
                 aria-label={key}
                 className={inputClass}
                 value={typeof current === 'number' ? current : ''}
-                onChange={(e) => set(key, e.target.value === '' ? undefined : Number(e.target.value))}
+                onChange={e => set(key, e.target.value === '' ? undefined : Number(e.target.value))}
               />
             </label>
           );
@@ -112,7 +116,7 @@ export function SchemaForm({ schema, value, onChange }: SchemaFormProps) {
                 rows={3}
                 className={`${inputClass} resize-y`}
                 value={typeof current === 'string' ? current : ''}
-                onChange={(e) => set(key, e.target.value)}
+                onChange={e => set(key, e.target.value)}
               />
             </label>
           );
@@ -127,7 +131,7 @@ export function SchemaForm({ schema, value, onChange }: SchemaFormProps) {
               aria-label={key}
               className={inputClass}
               value={typeof current === 'string' ? current : ''}
-              onChange={(e) => set(key, e.target.value)}
+              onChange={e => set(key, e.target.value)}
             />
           </label>
         );

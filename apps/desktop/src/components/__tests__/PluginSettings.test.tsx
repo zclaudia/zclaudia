@@ -4,8 +4,8 @@ import { PluginSettings } from '../../features/settings/PluginSettings';
 import { usePluginStore } from '../../stores/pluginStore';
 
 // Mock api
-vi.mock('../../services/api', async (importOriginal) => ({
-  ...(await importOriginal() as object),
+vi.mock('../../services/api', async importOriginal => ({
+  ...((await importOriginal()) as object),
   getBaseUrl: () => 'http://localhost:3100',
 }));
 
@@ -67,16 +67,18 @@ describe('PluginSettings', () => {
 
   it('renders plugin cards', async () => {
     usePluginStore.setState({
-      plugins: [{
-        manifest: {
-          id: 'com.test.plugin',
-          name: 'Test Plugin',
-          version: '1.0.0',
-          description: 'A test plugin',
+      plugins: [
+        {
+          manifest: {
+            id: 'com.test.plugin',
+            name: 'Test Plugin',
+            version: '1.0.0',
+            description: 'A test plugin',
+          },
+          status: 'active',
+          enabled: true,
         },
-        status: 'active',
-        enabled: true,
-      }],
+      ],
       isLoading: false,
       error: null,
       removePlugin: vi.fn(),

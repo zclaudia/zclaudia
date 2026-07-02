@@ -14,7 +14,7 @@ describe('newId', () => {
 
   it('produces lexicographically increasing ids across time', async () => {
     const first = newId();
-    await new Promise((r) => setTimeout(r, 2));
+    await new Promise(r => setTimeout(r, 2));
     const second = newId();
     expect(second > first).toBe(true);
   });

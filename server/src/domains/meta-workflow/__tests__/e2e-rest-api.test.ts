@@ -50,16 +50,40 @@ describe('Phase F e2e — REST API integration', () => {
   });
 
   it('GET /reuse-pool?phaseType=X applies the filter', async () => {
-    h.db.prepare(
-      `INSERT INTO meta_workflow_reuse_pool
+    h.db
+      .prepare(
+        `INSERT INTO meta_workflow_reuse_pool
         (id, kind, entity_id, phase_type, description, tags, source_type, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run('p1', 'workflow', 'w1', 'code-implement', 'A', JSON.stringify(['x']), 'auto', JSON.stringify({ usageCount: 0 }), Date.now());
-    h.db.prepare(
-      `INSERT INTO meta_workflow_reuse_pool
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        'p1',
+        'workflow',
+        'w1',
+        'code-implement',
+        'A',
+        JSON.stringify(['x']),
+        'auto',
+        JSON.stringify({ usageCount: 0 }),
+        Date.now()
+      );
+    h.db
+      .prepare(
+        `INSERT INTO meta_workflow_reuse_pool
         (id, kind, entity_id, phase_type, description, tags, source_type, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run('p2', 'workflow', 'w2', 'code-test-write', 'B', JSON.stringify([]), 'auto', JSON.stringify({ usageCount: 0 }), Date.now());
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        'p2',
+        'workflow',
+        'w2',
+        'code-test-write',
+        'B',
+        JSON.stringify([]),
+        'auto',
+        JSON.stringify({ usageCount: 0 }),
+        Date.now()
+      );
 
     const res = await request(app).get('/api/meta-workflow/reuse-pool?phaseType=code-test-write');
     expect(res.status).toBe(200);
@@ -69,11 +93,23 @@ describe('Phase F e2e — REST API integration', () => {
 
   it('POST /runs/:runId/promote-item promotes an auto item', async () => {
     const run = h.service.createRun({ projectId: 'proj-1', title: 'rest-promote' });
-    h.db.prepare(
-      `INSERT INTO meta_workflow_reuse_pool
+    h.db
+      .prepare(
+        `INSERT INTO meta_workflow_reuse_pool
         (id, kind, entity_id, phase_type, description, tags, source_type, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run('to-promote', 'workflow', 'w1', 'code-implement', 'P', JSON.stringify(['auto-generated']), 'auto', JSON.stringify({ usageCount: 0 }), Date.now());
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        'to-promote',
+        'workflow',
+        'w1',
+        'code-implement',
+        'P',
+        JSON.stringify(['auto-generated']),
+        'auto',
+        JSON.stringify({ usageCount: 0 }),
+        Date.now()
+      );
 
     const res = await request(app)
       .post(`/api/meta-workflow/runs/${run.id}/promote-item`)

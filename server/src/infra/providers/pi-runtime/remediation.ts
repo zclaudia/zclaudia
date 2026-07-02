@@ -56,14 +56,19 @@ function pathArg(args: Record<string, unknown> | undefined): string | undefined 
 }
 
 function isEditTool(toolName: string): boolean {
-  return toolName === 'Edit' || toolName === 'MultiEdit' || toolName === 'EditSymbol' || toolName === 'Write';
+  return (
+    toolName === 'Edit' ||
+    toolName === 'MultiEdit' ||
+    toolName === 'EditSymbol' ||
+    toolName === 'Write'
+  );
 }
 
 export function loopRecoveryForFailure(
   toolName: string,
   args: Record<string, unknown> | undefined,
   details: ToolDetails,
-  attempts: number,
+  attempts: number
 ): ToolFailureLoopRecovery | undefined {
   if (!details || details.ok !== false) return undefined;
   const code = typeof details.error === 'string' ? details.error : undefined;
@@ -245,7 +250,11 @@ export function remediationForResult(toolName: string, details: ToolDetails): st
   if (toolName === 'Bash') {
     const hint = bashHint(details);
     if (hint) return hint;
-    if (details.fullOutputPath && (details.timedOut === true || (typeof details.exitCode === 'number' && details.exitCode !== 0))) {
+    if (
+      details.fullOutputPath &&
+      (details.timedOut === true ||
+        (typeof details.exitCode === 'number' && details.exitCode !== 0))
+    ) {
       return `The command failed; full output is at ${details.fullOutputPath} if the tail above is not enough.`;
     }
   }

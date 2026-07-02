@@ -20,7 +20,15 @@ describe('WorkflowEngine.startRun (action runs)', () => {
 
   it('starts an activity run (no workflowId) and records action metadata', async () => {
     const def: WorkflowDefinition = {
-      nodes: [{ id: 'n1', name: 'Echo', type: 'shell', config: { command: 'echo hi' }, position: { x: 0, y: 0 } }],
+      nodes: [
+        {
+          id: 'n1',
+          name: 'Echo',
+          type: 'shell',
+          config: { command: 'echo hi' },
+          position: { x: 0, y: 0 },
+        },
+      ],
       edges: [],
       entryNodeId: 'n1',
     };

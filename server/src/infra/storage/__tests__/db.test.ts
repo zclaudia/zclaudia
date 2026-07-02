@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const mockDb = {
   pragma: vi.fn(),
   exec: vi.fn(),
+  transaction: vi.fn((fn: () => void) => () => fn()),
   prepare: vi.fn(() => ({
     run: vi.fn(),
     get: vi.fn(),
@@ -13,7 +14,7 @@ const mockDb = {
 };
 
 vi.mock('better-sqlite3', () => {
-  const MockDatabase = vi.fn(function(this: typeof mockDb) {
+  const MockDatabase = vi.fn(function (this: typeof mockDb) {
     Object.assign(this, mockDb);
     return this;
   });
@@ -56,6 +57,8 @@ describe('storage/db', () => {
     // Reset db mock implementations - use mockReset to clear all implementations
     mockDb.pragma.mockReset();
     mockDb.exec.mockReset();
+    mockDb.transaction.mockReset();
+    mockDb.transaction.mockImplementation((fn: () => void) => () => fn());
     mockDb.prepare.mockReset();
     mockDb.prepare.mockImplementation(() => ({
       run: vi.fn(),
@@ -98,10 +101,9 @@ describe('storage/db', () => {
 
       initDatabase();
 
-      expect(mockFsMethods.mkdirSync).toHaveBeenCalledWith(
-        expect.stringContaining('.zclaudia'),
-        { recursive: true }
-      );
+      expect(mockFsMethods.mkdirSync).toHaveBeenCalledWith(expect.stringContaining('.zclaudia'), {
+        recursive: true,
+      });
     });
 
     it('uses ZCLAUDIA_DATA_DIR environment variable', async () => {
@@ -116,10 +118,7 @@ describe('storage/db', () => {
 
       initDatabase();
 
-      expect(mockFsMethods.mkdirSync).toHaveBeenCalledWith(
-        '/custom/data/dir',
-        { recursive: true }
-      );
+      expect(mockFsMethods.mkdirSync).toHaveBeenCalledWith('/custom/data/dir', { recursive: true });
 
       if (originalEnv === undefined) {
         delete process.env.ZCLAUDIA_DATA_DIR;
@@ -142,12 +141,14 @@ describe('storage/db', () => {
 
       const db = initDatabase();
 
-      expect(db).toEqual(expect.objectContaining({
-        pragma: expect.any(Function),
-        exec: expect.any(Function),
-        prepare: expect.any(Function),
-        close: expect.any(Function),
-      }));
+      expect(db).toEqual(
+        expect.objectContaining({
+          pragma: expect.any(Function),
+          exec: expect.any(Function),
+          prepare: expect.any(Function),
+          close: expect.any(Function),
+        })
+      );
     });
   });
 
@@ -168,8 +169,8 @@ describe('storage/db', () => {
       initDatabase();
 
       // Find the call that creates providers table
-      const providersCall = mockDb.exec.mock.calls.find(
-        call => call[0].includes('CREATE TABLE IF NOT EXISTS llm_profiles')
+      const providersCall = mockDb.exec.mock.calls.find(call =>
+        call[0].includes('CREATE TABLE IF NOT EXISTS llm_profiles')
       );
       expect(providersCall).toBeDefined();
     });
@@ -179,8 +180,8 @@ describe('storage/db', () => {
 
       initDatabase();
 
-      const projectsCall = mockDb.exec.mock.calls.find(
-        call => call[0].includes('CREATE TABLE IF NOT EXISTS projects')
+      const projectsCall = mockDb.exec.mock.calls.find(call =>
+        call[0].includes('CREATE TABLE IF NOT EXISTS projects')
       );
       expect(projectsCall).toBeDefined();
     });
@@ -190,8 +191,8 @@ describe('storage/db', () => {
 
       initDatabase();
 
-      const sessionsCall = mockDb.exec.mock.calls.find(
-        call => call[0].includes('CREATE TABLE IF NOT EXISTS sessions')
+      const sessionsCall = mockDb.exec.mock.calls.find(call =>
+        call[0].includes('CREATE TABLE IF NOT EXISTS sessions')
       );
       expect(sessionsCall).toBeDefined();
     });
@@ -201,8 +202,8 @@ describe('storage/db', () => {
 
       initDatabase();
 
-      const messagesCall = mockDb.exec.mock.calls.find(
-        call => call[0].includes('CREATE TABLE IF NOT EXISTS messages')
+      const messagesCall = mockDb.exec.mock.calls.find(call =>
+        call[0].includes('CREATE TABLE IF NOT EXISTS messages')
       );
       expect(messagesCall).toBeDefined();
     });
@@ -212,8 +213,8 @@ describe('storage/db', () => {
 
       initDatabase();
 
-      const serversCall = mockDb.exec.mock.calls.find(
-        call => call[0].includes('CREATE TABLE IF NOT EXISTS servers')
+      const serversCall = mockDb.exec.mock.calls.find(call =>
+        call[0].includes('CREATE TABLE IF NOT EXISTS servers')
       );
       expect(serversCall).toBeDefined();
     });
@@ -223,8 +224,8 @@ describe('storage/db', () => {
 
       initDatabase();
 
-      const gatewayCall = mockDb.exec.mock.calls.find(
-        call => call[0].includes('CREATE TABLE IF NOT EXISTS gateway_config')
+      const gatewayCall = mockDb.exec.mock.calls.find(call =>
+        call[0].includes('CREATE TABLE IF NOT EXISTS gateway_config')
       );
       expect(gatewayCall).toBeDefined();
     });
@@ -234,8 +235,8 @@ describe('storage/db', () => {
 
       initDatabase();
 
-      const searchCall = mockDb.exec.mock.calls.find(
-        call => call[0].includes('CREATE TABLE IF NOT EXISTS search_history')
+      const searchCall = mockDb.exec.mock.calls.find(call =>
+        call[0].includes('CREATE TABLE IF NOT EXISTS search_history')
       );
       expect(searchCall).toBeDefined();
     });
@@ -245,8 +246,8 @@ describe('storage/db', () => {
 
       initDatabase();
 
-      const ftsCall = mockDb.exec.mock.calls.find(
-        call => call[0].includes('messages_fts USING fts5')
+      const ftsCall = mockDb.exec.mock.calls.find(call =>
+        call[0].includes('messages_fts USING fts5')
       );
       expect(ftsCall).toBeDefined();
     });
@@ -256,8 +257,8 @@ describe('storage/db', () => {
 
       initDatabase();
 
-      const filesFtsCall = mockDb.exec.mock.calls.find(
-        call => call[0].includes('files_fts USING fts5')
+      const filesFtsCall = mockDb.exec.mock.calls.find(call =>
+        call[0].includes('files_fts USING fts5')
       );
       expect(filesFtsCall).toBeDefined();
     });
@@ -267,8 +268,8 @@ describe('storage/db', () => {
 
       initDatabase();
 
-      const toolCallsFtsCall = mockDb.exec.mock.calls.find(
-        call => call[0].includes('tool_calls_fts USING fts5')
+      const toolCallsFtsCall = mockDb.exec.mock.calls.find(call =>
+        call[0].includes('tool_calls_fts USING fts5')
       );
       expect(toolCallsFtsCall).toBeDefined();
     });
@@ -278,8 +279,8 @@ describe('storage/db', () => {
 
       initDatabase();
 
-      const triggerCalls = mockDb.exec.mock.calls.filter(
-        call => call[0].includes('CREATE TRIGGER')
+      const triggerCalls = mockDb.exec.mock.calls.filter(call =>
+        call[0].includes('CREATE TRIGGER')
       );
       expect(triggerCalls.length).toBeGreaterThan(0);
     });
@@ -289,9 +290,7 @@ describe('storage/db', () => {
 
       initDatabase();
 
-      const indexCalls = mockDb.exec.mock.calls.filter(
-        call => call[0].includes('CREATE INDEX')
-      );
+      const indexCalls = mockDb.exec.mock.calls.filter(call => call[0].includes('CREATE INDEX'));
       expect(indexCalls.length).toBeGreaterThan(0);
     });
   });
@@ -303,8 +302,7 @@ describe('storage/db', () => {
       initDatabase();
 
       const localServerCall = mockDb.exec.mock.calls.find(
-        call => call[0].includes("INSERT OR IGNORE INTO servers") &&
-                call[0].includes("'local'")
+        call => call[0].includes('INSERT OR IGNORE INTO servers') && call[0].includes("'local'")
       );
       expect(localServerCall).toBeDefined();
     });
@@ -314,8 +312,8 @@ describe('storage/db', () => {
 
       initDatabase();
 
-      const gatewayConfigCall = mockDb.exec.mock.calls.find(
-        call => call[0].includes("INSERT OR IGNORE INTO gateway_config")
+      const gatewayConfigCall = mockDb.exec.mock.calls.find(call =>
+        call[0].includes('INSERT OR IGNORE INTO gateway_config')
       );
       expect(gatewayConfigCall).toBeDefined();
     });
@@ -342,7 +340,6 @@ describe('storage/db', () => {
 
       expect(() => initDatabase()).toThrow('Permission denied');
     });
-
   });
 
   describe('database path', () => {
@@ -375,7 +372,7 @@ describe('storage/db', () => {
         ...mockFsMethods,
       }));
       vi.doMock('better-sqlite3', () => ({
-        default: vi.fn(function(this: typeof mockDb) {
+        default: vi.fn(function (this: typeof mockDb) {
           Object.assign(this, mockDb);
           return this;
         }),
@@ -399,16 +396,22 @@ describe('storage/db', () => {
 
 describe('migration 025: messages tree_entry_id', () => {
   it('025: messages has tree_entry_id column and index', async () => {
-    const { default: Database } = await vi.importActual<typeof import('better-sqlite3')>('better-sqlite3');
-    const { applyMigrations } = await vi.importActual<typeof import('../migrations/index.js')>('../migrations/index.js');
+    const { default: Database } =
+      await vi.importActual<typeof import('better-sqlite3')>('better-sqlite3');
+    const { applyMigrations } =
+      await vi.importActual<typeof import('../migrations/index.js')>('../migrations/index.js');
 
     const db = new Database(':memory:');
     applyMigrations(db);
 
-    const cols = (db.prepare(`PRAGMA table_info(messages)`).all() as Array<{ name: string }>).map((c) => c.name);
+    const cols = (db.prepare(`PRAGMA table_info(messages)`).all() as Array<{ name: string }>).map(
+      c => c.name
+    );
     expect(cols).toContain('tree_entry_id');
 
-    const idx = (db.prepare(`PRAGMA index_list(messages)`).all() as Array<{ name: string }>).map((i) => i.name);
+    const idx = (db.prepare(`PRAGMA index_list(messages)`).all() as Array<{ name: string }>).map(
+      i => i.name
+    );
     expect(idx).toContain('idx_messages_tree_entry');
     db.close();
   });
@@ -416,25 +419,41 @@ describe('migration 025: messages tree_entry_id', () => {
 
 describe('migration 024: session fork lineage', () => {
   it('024: sessions has fork lineage columns with ON DELETE SET NULL', async () => {
-    const { default: Database } = await vi.importActual<typeof import('better-sqlite3')>('better-sqlite3');
-    const { applyMigrations } = await vi.importActual<typeof import('../migrations/index.js')>('../migrations/index.js');
+    const { default: Database } =
+      await vi.importActual<typeof import('better-sqlite3')>('better-sqlite3');
+    const { applyMigrations } =
+      await vi.importActual<typeof import('../migrations/index.js')>('../migrations/index.js');
 
     const db = new Database(':memory:');
     db.pragma('foreign_keys = ON');
     applyMigrations(db);
 
-    const cols = (db.prepare(`PRAGMA table_info(sessions)`).all() as Array<{ name: string }>).map((c) => c.name);
+    const cols = (db.prepare(`PRAGMA table_info(sessions)`).all() as Array<{ name: string }>).map(
+      c => c.name
+    );
     expect(cols).toContain('forked_from_session_id');
     expect(cols).toContain('fork_entry_id');
 
-    db.prepare(`INSERT INTO llm_profiles (id, name, provider_type, created_at, updated_at) VALUES ('l1','default','anthropic',1,1)`).run();
-    db.prepare(`INSERT INTO projects (id, name, created_at, updated_at) VALUES ('p1','p',1,1)`).run();
-    db.prepare(`INSERT INTO agent_profiles (id, name, llm_profile_id, created_at, updated_at) VALUES ('a1','a','l1',1,1)`).run();
-    db.prepare(`INSERT INTO sessions (id, project_id, agent_profile_id, type, created_at, updated_at) VALUES ('parent','p1','a1','regular',1,1)`).run();
-    db.prepare(`INSERT INTO sessions (id, project_id, agent_profile_id, type, forked_from_session_id, fork_entry_id, created_at, updated_at) VALUES ('child','p1','a1','regular','parent','e1',1,1)`).run();
+    db.prepare(
+      `INSERT INTO llm_profiles (id, name, provider_type, created_at, updated_at) VALUES ('l1','default','anthropic',1,1)`
+    ).run();
+    db.prepare(
+      `INSERT INTO projects (id, name, created_at, updated_at) VALUES ('p1','p',1,1)`
+    ).run();
+    db.prepare(
+      `INSERT INTO agent_profiles (id, name, llm_profile_id, created_at, updated_at) VALUES ('a1','a','l1',1,1)`
+    ).run();
+    db.prepare(
+      `INSERT INTO sessions (id, project_id, agent_profile_id, type, created_at, updated_at) VALUES ('parent','p1','a1','regular',1,1)`
+    ).run();
+    db.prepare(
+      `INSERT INTO sessions (id, project_id, agent_profile_id, type, forked_from_session_id, fork_entry_id, created_at, updated_at) VALUES ('child','p1','a1','regular','parent','e1',1,1)`
+    ).run();
 
     db.prepare(`DELETE FROM sessions WHERE id = 'parent'`).run();
-    const child = db.prepare(`SELECT forked_from_session_id AS f FROM sessions WHERE id = 'child'`).get() as { f: string | null };
+    const child = db
+      .prepare(`SELECT forked_from_session_id AS f FROM sessions WHERE id = 'child'`)
+      .get() as { f: string | null };
     expect(child).toBeTruthy();
     expect(child.f).toBeNull();
     db.close();

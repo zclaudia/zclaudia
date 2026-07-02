@@ -10,7 +10,5 @@ import { useOwnershipStore } from '../../stores/ownershipStore';
 export async function fetchContextGraph(sessionId: string): Promise<ContextGraph> {
   const url = `/api/sessions/${sessionId}/context-graph`;
   const backendId = useOwnershipStore.getState().getSessionBackendId(sessionId);
-  return backendId
-    ? apiCallForBackend<ContextGraph>(backendId, url)
-    : apiCall<ContextGraph>(url);
+  return backendId ? apiCallForBackend<ContextGraph>(backendId, url) : apiCall<ContextGraph>(url);
 }

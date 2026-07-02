@@ -10,9 +10,8 @@ interface InlineResponseProps {
 }
 
 export function InlineResponse({ response, collapsed, onDismiss }: InlineResponseProps) {
-  const rawText = response.status === 'completed'
-    ? response.responseText || ''
-    : response.streamingText;
+  const rawText =
+    response.status === 'completed' ? response.responseText || '' : response.streamingText;
   const text = extractThinking(rawText).content.trim();
   const [manualExpand, setManualExpand] = useState(false);
 
@@ -53,7 +52,10 @@ export function InlineResponse({ response, collapsed, onDismiss }: InlineRespons
   return (
     <div className="rounded-lg bg-secondary/30 px-3 py-2">
       {collapsed && manualExpand && (
-        <button onClick={() => setManualExpand(false)} className="text-[10px] text-primary hover:underline mb-1">
+        <button
+          onClick={() => setManualExpand(false)}
+          className="text-[10px] text-primary hover:underline mb-1"
+        >
           Collapse
         </button>
       )}

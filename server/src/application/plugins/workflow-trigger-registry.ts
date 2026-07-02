@@ -36,7 +36,7 @@ class WorkflowTriggerSourceRegistry {
   }
 
   getByPlugin(pluginId: string): WorkflowTriggerSourceMeta[] {
-    return Array.from(this.sources.values()).filter((source) => source.source === pluginId);
+    return Array.from(this.sources.values()).filter(source => source.source === pluginId);
   }
 
   clearByPlugin(pluginId: string): number {

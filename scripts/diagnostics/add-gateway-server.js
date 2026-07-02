@@ -48,7 +48,7 @@
       connectionMode: 'gateway',
       gatewayUrl: GATEWAY_CONFIG.gatewayUrl,
       gatewaySecret: GATEWAY_CONFIG.gatewaySecret,
-      createdAt: Date.now()
+      createdAt: Date.now(),
     };
 
     // 添加可选字段

@@ -14,15 +14,19 @@ vi.mock('../gateway-client.js', () => ({
         disconnect: vi.fn(),
       },
       channel: {
-        onIncomingMessage: vi.fn((listener: (channelId: string, message: unknown) => Promise<void>) => {
-          this.onIncomingMessage = listener;
-        }),
+        onIncomingMessage: vi.fn(
+          (listener: (channelId: string, message: unknown) => Promise<void>) => {
+            this.onIncomingMessage = listener;
+          }
+        ),
         onIncomingClosed: vi.fn((listener: (channelId: string) => void) => {
           this.onIncomingClosed = listener;
         }),
-        onCatchUp: vi.fn((listener: (sessionId: string, afterOffset: number) => Promise<unknown[]>) => {
-          this.onCatchUp = listener;
-        }),
+        onCatchUp: vi.fn(
+          (listener: (sessionId: string, afterOffset: number) => Promise<unknown[]>) => {
+            this.onCatchUp = listener;
+          }
+        ),
         sendToIncoming: vi.fn(),
       },
     };
@@ -42,9 +46,11 @@ vi.mock('../gateway-client.js', () => ({
     };
 
     public readonly events = {
-      setOutgoingEvents: vi.fn((events: { onConnectionStateChanged?: (connected: boolean) => void }) => {
-        this.outgoingEvents = events;
-      }),
+      setOutgoingEvents: vi.fn(
+        (events: { onConnectionStateChanged?: (connected: boolean) => void }) => {
+          this.outgoingEvents = events;
+        }
+      ),
     };
 
     public onIncomingMessage?: (channelId: string, message: unknown) => Promise<void>;
@@ -69,19 +75,23 @@ vi.mock('../gateway-channel-cleanup.js', () => ({
 }));
 
 vi.mock('../embedded-provider.js', () => ({
-  EmbeddedBackendFacadeProvider: vi.fn(class MockEmbeddedBackendFacadeProvider {
-    connect = vi.fn();
-    disconnect = vi.fn();
-    getWsHub = vi.fn(() => ({}) as any);
-  }),
+  EmbeddedBackendFacadeProvider: vi.fn(
+    class MockEmbeddedBackendFacadeProvider {
+      connect = vi.fn();
+      disconnect = vi.fn();
+      getWsHub = vi.fn(() => ({}) as any);
+    }
+  ),
 }));
 
 vi.mock('../standalone-provider.js', () => ({
-  StandaloneBackendFacadeProvider: vi.fn(class MockStandaloneBackendFacadeProvider {
-    connect = vi.fn();
-    disconnect = vi.fn();
-    getWsHub = vi.fn(() => ({}) as any);
-  }),
+  StandaloneBackendFacadeProvider: vi.fn(
+    class MockStandaloneBackendFacadeProvider {
+      connect = vi.fn();
+      disconnect = vi.fn();
+      getWsHub = vi.fn(() => ({}) as any);
+    }
+  ),
 }));
 
 vi.mock('../../../storage/db.js', () => ({
@@ -105,7 +115,12 @@ describe('GatewayManager', () => {
     const serverContext = {
       db: { prepare: vi.fn() },
       handleMessage: vi.fn(),
-      getStateHeartbeat: vi.fn(() => ({ type: 'state_heartbeat', activeRuns: [], pendingPermissions: [], pendingQuestions: [] })),
+      getStateHeartbeat: vi.fn(() => ({
+        type: 'state_heartbeat',
+        activeRuns: [],
+        pendingPermissions: [],
+        pendingQuestions: [],
+      })),
       setFacadeHub: vi.fn(),
       updateGatewayIdentity: vi.fn(),
       updateGatewayConnected: vi.fn(),
@@ -247,7 +262,9 @@ describe('GatewayManager', () => {
 
     const client = gatewayClientInstances.at(-1)!;
     expect(typeof client.config?.getStateHeartbeat).toBe('function');
-    expect((client.config?.getStateHeartbeat as () => unknown)()).toEqual(serverContext.getStateHeartbeat());
+    expect((client.config?.getStateHeartbeat as () => unknown)()).toEqual(
+      serverContext.getStateHeartbeat()
+    );
     expect(serverContext.getStateHeartbeat).toHaveBeenCalled();
   });
 });

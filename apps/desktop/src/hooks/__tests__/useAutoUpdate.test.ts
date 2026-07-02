@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { compareVersionCore, hasDesktopUpdateCandidate, isDevAppIdentity, isDevBuild } from '../useAutoUpdate';
+import {
+  compareVersionCore,
+  hasDesktopUpdateCandidate,
+  isDevAppIdentity,
+  isDevBuild,
+} from '../useAutoUpdate';
 
 describe('useAutoUpdate helpers', () => {
   it('identifies dev builds with extended suffixes', () => {

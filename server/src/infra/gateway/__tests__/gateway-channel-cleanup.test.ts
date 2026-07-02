@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { handleChannelClosed } from '../gateway-channel-cleanup.js';
 import type { ActiveRun } from '../../../application/conversation/transport/types.js';
-import { PhaseEmitter, type RunPhase } from '../../../application/conversation/runtime/active-run-phase.js';
+import {
+  PhaseEmitter,
+  type RunPhase,
+} from '../../../application/conversation/runtime/active-run-phase.js';
 
 function createRun(clientId: string, phase: RunPhase = 'running'): ActiveRun {
   return {
@@ -54,23 +57,17 @@ describe('handleChannelClosed', () => {
 
   it('logs orphaned runs', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const activeRuns = new Map<string, ActiveRun>([
-      ['run-1', createRun('channel-1')],
-    ]);
+    const activeRuns = new Map<string, ActiveRun>([['run-1', createRun('channel-1')]]);
 
     handleChannelClosed('channel-1', activeRuns);
 
-    expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining('keeping alive for reconnect'),
-    );
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('keeping alive for reconnect'));
     logSpy.mockRestore();
   });
 
   it('does not log when no active runs for channel', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const activeRuns = new Map<string, ActiveRun>([
-      ['run-1', createRun('channel-2')],
-    ]);
+    const activeRuns = new Map<string, ActiveRun>([['run-1', createRun('channel-2')]]);
 
     handleChannelClosed('channel-1', activeRuns);
 
@@ -80,9 +77,7 @@ describe('handleChannelClosed', () => {
 
   it('ignores completed runs', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const activeRuns = new Map<string, ActiveRun>([
-      ['run-1', createRun('channel-1', 'completed')],
-    ]);
+    const activeRuns = new Map<string, ActiveRun>([['run-1', createRun('channel-1', 'completed')]]);
 
     handleChannelClosed('channel-1', activeRuns);
 

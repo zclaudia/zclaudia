@@ -74,7 +74,9 @@ describe('local-prs routes', () => {
     });
 
     it('returns 500 on error', async () => {
-      service._repo.findByProjectId.mockImplementation(() => { throw new Error('DB error'); });
+      service._repo.findByProjectId.mockImplementation(() => {
+        throw new Error('DB error');
+      });
       const res = await request(app).get('/api/projects/proj-1/local-prs');
       expect(res.status).toBe(500);
     });
@@ -116,15 +118,15 @@ describe('local-prs routes', () => {
 
   describe('GET /api/projects/:projectId/local-prs/precheck', () => {
     it('returns precheck result', async () => {
-      const res = await request(app)
-        .get('/api/projects/proj-1/local-prs/precheck?worktreePath=/path');
+      const res = await request(app).get(
+        '/api/projects/proj-1/local-prs/precheck?worktreePath=/path'
+      );
       expect(res.status).toBe(200);
       expect(res.body.data.canCreate).toBe(true);
     });
 
     it('returns 400 without worktreePath', async () => {
-      const res = await request(app)
-        .get('/api/projects/proj-1/local-prs/precheck');
+      const res = await request(app).get('/api/projects/proj-1/local-prs/precheck');
       expect(res.status).toBe(400);
     });
   });
@@ -267,7 +269,9 @@ describe('local-prs routes', () => {
     });
 
     it('returns 400 for invalid status', async () => {
-      service.triggerConflictResolution.mockRejectedValue(new Error('Cannot resolve conflict in status open'));
+      service.triggerConflictResolution.mockRejectedValue(
+        new Error('Cannot resolve conflict in status open')
+      );
       const res = await request(app).post('/api/local-prs/pr-1/resolve-conflict');
       expect(res.status).toBe(400);
     });
@@ -309,9 +313,7 @@ describe('local-prs routes', () => {
     });
 
     it('returns 400 without llmProfileId', async () => {
-      const res = await request(app)
-        .patch('/api/projects/proj-1/review-provider')
-        .send({});
+      const res = await request(app).patch('/api/projects/proj-1/review-provider').send({});
       expect(res.status).toBe(400);
       expect(onProjectChanged).not.toHaveBeenCalled();
     });

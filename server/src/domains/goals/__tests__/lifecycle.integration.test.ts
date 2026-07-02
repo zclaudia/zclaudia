@@ -10,20 +10,26 @@ describe('Goal lifecycle (integration)', () => {
   it('runs evaluator → continue → continue → done within budget', async () => {
     const db = new Database(':memory:');
     applyMigrations(db);
-    db.prepare(`INSERT INTO projects (id, name, root_path, created_at, updated_at)
-                VALUES ('p1', 'p', '/tmp/p', ?, ?)`).run(Date.now(), Date.now());
-    db.prepare(`INSERT INTO llm_profiles (id, name, created_at, updated_at)
-                VALUES ('lp1', 'lp', ?, ?)`).run(Date.now(), Date.now());
-    db.prepare(`INSERT INTO agent_profiles (id, name, llm_profile_id, created_at, updated_at)
-                VALUES ('ap1', 'ap', 'lp1', ?, ?)`).run(Date.now(), Date.now());
+    db.prepare(
+      `INSERT INTO projects (id, name, root_path, created_at, updated_at)
+                VALUES ('p1', 'p', '/tmp/p', ?, ?)`
+    ).run(Date.now(), Date.now());
+    db.prepare(
+      `INSERT INTO llm_profiles (id, name, created_at, updated_at)
+                VALUES ('lp1', 'lp', ?, ?)`
+    ).run(Date.now(), Date.now());
+    db.prepare(
+      `INSERT INTO agent_profiles (id, name, llm_profile_id, created_at, updated_at)
+                VALUES ('ap1', 'ap', 'lp1', ?, ?)`
+    ).run(Date.now(), Date.now());
     db.prepare(
       `INSERT INTO sessions (id, project_id, agent_profile_id, created_at, updated_at)
-       VALUES ('s1', 'p1', 'ap1', ?, ?)`,
+       VALUES ('s1', 'p1', 'ap1', ?, ?)`
     ).run(Date.now(), Date.now());
 
     const events: any[] = [];
     const repo = new GoalRepository(db);
-    const svc = new GoalService(repo, { publish: (e) => events.push(e) });
+    const svc = new GoalService(repo, { publish: e => events.push(e) });
 
     let call = 0;
     const evaluator = new GoalEvaluator({
@@ -41,7 +47,9 @@ describe('Goal lifecycle (integration)', () => {
       evaluator,
       transcript: { read: async () => [] },
       continuer: {
-        appendAndRun: async (sid, text) => { continues.push(text); },
+        appendAndRun: async (sid, text) => {
+          continues.push(text);
+        },
       },
       resolveLlmProfile: () => 'lp1',
     });
@@ -53,6 +61,8 @@ describe('Goal lifecycle (integration)', () => {
 
     expect(continues).toHaveLength(2);
     expect(svc.listActive()).toHaveLength(0);
-    expect(events.some((e) => e.type === 'goal:state-changed' && e.goal.status === 'completed')).toBe(true);
+    expect(events.some(e => e.type === 'goal:state-changed' && e.goal.status === 'completed')).toBe(
+      true
+    );
   });
 });

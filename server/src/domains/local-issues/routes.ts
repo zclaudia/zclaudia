@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, type Request, type Response } from 'express';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import type { LocalIssue, LocalIssueComment } from '@zclaudia/shared/features/local-issue';
 import type { LocalIssueService } from './service.js';
@@ -6,7 +6,7 @@ import type { LocalIssueCommentService } from './comment-service.js';
 
 export function createLocalIssueRoutes(
   service: LocalIssueService,
-  commentService: LocalIssueCommentService,
+  commentService: LocalIssueCommentService
 ): Router {
   const router = Router();
 
@@ -128,7 +128,9 @@ export function createLocalIssueRoutes(
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create comment';
       const code = message.includes('not found') ? 'NOT_FOUND' : 'CREATE_ERROR';
-      res.status(code === 'NOT_FOUND' ? 404 : 500).json({ success: false, error: { code, message } });
+      res
+        .status(code === 'NOT_FOUND' ? 404 : 500)
+        .json({ success: false, error: { code, message } });
     }
   });
 

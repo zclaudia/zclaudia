@@ -6,13 +6,17 @@ afterEach(() => cleanup());
 
 describe('ResizeDivider', () => {
   it('renders with ew-resize cursor for dir row', () => {
-    const { container } = render(<ResizeDivider dir="row" containerSize={1000} onDrag={() => {}} />);
+    const { container } = render(
+      <ResizeDivider dir="row" containerSize={1000} onDrag={() => {}} />
+    );
     const handle = container.firstElementChild as HTMLElement;
     expect(handle.className).toContain('cursor-ew-resize');
   });
 
   it('renders with ns-resize cursor for dir col', () => {
-    const { container } = render(<ResizeDivider dir="col" containerSize={1000} onDrag={() => {}} />);
+    const { container } = render(
+      <ResizeDivider dir="col" containerSize={1000} onDrag={() => {}} />
+    );
     const handle = container.firstElementChild as HTMLElement;
     expect(handle.className).toContain('cursor-ns-resize');
   });
@@ -70,14 +74,18 @@ describe('ResizeDivider', () => {
   });
 
   it('renders a gutter with a handle child (row)', () => {
-    const { container } = render(<ResizeDivider dir="row" containerSize={1000} onDrag={() => {}} />);
+    const { container } = render(
+      <ResizeDivider dir="row" containerSize={1000} onDrag={() => {}} />
+    );
     const divider = container.firstElementChild as HTMLElement;
-    expect(divider.className).toContain('w-1');           // gutter width
-    expect(divider.querySelector('div')).not.toBeNull();  // handle pill
+    expect(divider.className).toContain('w-1'); // gutter width
+    expect(divider.querySelector('div')).not.toBeNull(); // handle pill
   });
 
   it('renders a gutter (col)', () => {
-    const { container } = render(<ResizeDivider dir="col" containerSize={1000} onDrag={() => {}} />);
+    const { container } = render(
+      <ResizeDivider dir="col" containerSize={1000} onDrag={() => {}} />
+    );
     const divider = container.firstElementChild as HTMLElement;
     expect(divider.className).toContain('h-1');
   });

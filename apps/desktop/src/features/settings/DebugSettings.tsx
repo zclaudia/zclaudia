@@ -13,7 +13,11 @@ interface DebugSettingsProps {
   embeddedServerStatus: string;
 }
 
-export function DebugSettings({ isConnected, sendMessage, embeddedServerStatus }: DebugSettingsProps) {
+export function DebugSettings({
+  isConnected,
+  sendMessage,
+  embeddedServerStatus,
+}: DebugSettingsProps) {
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold">Debug</h3>

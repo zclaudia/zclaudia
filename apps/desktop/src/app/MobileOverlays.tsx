@@ -26,10 +26,14 @@ export function MobileOverlays({
   return (
     <>
       {/* Dim overlay */}
-      {(isAgentExpanded || agentSwipePreview.mode === 'open' || agentSwipePreview.mode === 'close') && (
+      {(isAgentExpanded ||
+        agentSwipePreview.mode === 'open' ||
+        agentSwipePreview.mode === 'close') && (
         <div
           className={`absolute inset-0 z-10 bg-black/100 ${
-            agentSwipePreview.mode ? 'transition-none' : 'transition-opacity duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]'
+            agentSwipePreview.mode
+              ? 'transition-none'
+              : 'transition-opacity duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]'
           }`}
           style={{
             opacity: claudiaOverlayOpacity,
@@ -44,16 +48,19 @@ export function MobileOverlays({
         className={`absolute inset-0 z-20 bg-background will-change-transform ${
           isAgentExpanded || agentSwipePreview.mode === 'open' ? '' : 'hidden'
         } ${
-          agentSwipePreview.mode ? 'transition-none' : 'transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]'
+          agentSwipePreview.mode
+            ? 'transition-none'
+            : 'transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]'
         }`}
         style={{
           transform: isAgentExpanded
             ? `translateX(${agentSwipePreview.mode === 'close' ? claudiaSwipePreviewProgress * 100 : 0}%)`
             : `translateX(${(1 - (agentSwipePreview.mode === 'open' ? claudiaSwipePreviewProgress : 0)) * 100}%)`,
           pointerEvents: isAgentExpanded ? 'auto' : 'none',
-          boxShadow: isAgentExpanded || agentSwipePreview.mode === 'open'
-            ? `-16px 0 40px rgba(0, 0, 0, ${0.14 + claudiaSwipePreviewProgress * 0.08})`
-            : 'none',
+          boxShadow:
+            isAgentExpanded || agentSwipePreview.mode === 'open'
+              ? `-16px 0 40px rgba(0, 0, 0, ${0.14 + claudiaSwipePreviewProgress * 0.08})`
+              : 'none',
         }}
       >
         <button
@@ -90,7 +97,12 @@ export function MobileOverlays({
             title="Close Feed"
           >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2.5}
+                d="M9 5l7 7-7 7"
+              />
             </svg>
           </button>
           <NotificationsPanel />

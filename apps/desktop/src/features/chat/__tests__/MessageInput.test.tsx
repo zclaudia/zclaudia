@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MessageInput } from '../MessageInput';
+import { MAX_MESSAGE_ATTACHMENT_BYTES } from '@zclaudia/shared';
 import type { SlashCommand } from '@zclaudia/shared';
 
 // Mock hooks
@@ -51,6 +52,12 @@ describe('MessageInput', () => {
     mockGetWorkspaceSkillsResult.mockResolvedValue({ skills: [], diagnostics: [] });
   });
 
+  function makeFile(name: string, type: string, size: number): File {
+    const file = new File(['x'], name, { type });
+    Object.defineProperty(file, 'size', { configurable: true, value: size });
+    return file;
+  }
+
   // ── Basic rendering ─────────────────────────────────────────────────────
 
   it('renders textarea with default placeholder', () => {
@@ -95,7 +102,9 @@ describe('MessageInput', () => {
 
   it('calls onToggleAdvanced when the multiline toggle is clicked', () => {
     const onToggleAdvanced = vi.fn();
-    const { getByTestId } = render(<MessageInput {...defaultProps} onToggleAdvanced={onToggleAdvanced} />);
+    const { getByTestId } = render(
+      <MessageInput {...defaultProps} onToggleAdvanced={onToggleAdvanced} />
+    );
     fireEvent.click(getByTestId('advanced-toggle'));
     expect(onToggleAdvanced).toHaveBeenCalledTimes(1);
   });
@@ -121,7 +130,10 @@ describe('MessageInput', () => {
     const textarea = screen.getByPlaceholderText(/Type a message/);
     fireEvent.change(textarea, { target: { value: 'draft text' } });
     vi.advanceTimersByTime(300);
-    expect(mockSetDraft).toHaveBeenCalledWith('session-1', { content: 'draft text', attachments: [] });
+    expect(mockSetDraft).toHaveBeenCalledWith('session-1', {
+      content: 'draft text',
+      attachments: [],
+    });
     vi.useRealTimers();
   });
 
@@ -469,7 +481,14 @@ describe('MessageInput', () => {
           },
         ],
       });
-      render(<MessageInput {...defaultProps} onSend={onSend} onCommand={vi.fn()} commands={mockCommands} />);
+      render(
+        <MessageInput
+          {...defaultProps}
+          onSend={onSend}
+          onCommand={vi.fn()}
+          commands={mockCommands}
+        />
+      );
       const textarea = screen.getByPlaceholderText(/Type a message/);
       await waitFor(() => expect(mockGetWorkspaceSkillsResult).toHaveBeenCalledTimes(1));
 
@@ -492,7 +511,14 @@ describe('MessageInput', () => {
     it('sends unknown /command as regular message if not known and no colon', () => {
       const onSend = vi.fn();
       const onCommand = vi.fn();
-      render(<MessageInput {...defaultProps} onSend={onSend} onCommand={onCommand} commands={mockCommands} />);
+      render(
+        <MessageInput
+          {...defaultProps}
+          onSend={onSend}
+          onCommand={onCommand}
+          commands={mockCommands}
+        />
+      );
       const textarea = screen.getByPlaceholderText(/Type a message/);
       fireEvent.change(textarea, { target: { value: '/unknowncmd arg' } });
       fireEvent.keyDown(textarea, { key: 'Enter' });
@@ -596,7 +622,9 @@ describe('MessageInput', () => {
 
     it('restores vertical scrolling when switching to advanced mode', () => {
       const { rerender } = render(<MessageInput {...defaultProps} />);
-      const collapsedTextarea = screen.getByPlaceholderText(/Type a message/) as HTMLTextAreaElement;
+      const collapsedTextarea = screen.getByPlaceholderText(
+        /Type a message/
+      ) as HTMLTextAreaElement;
       fireEvent.change(collapsedTextarea, { target: { value: 'short' } });
       expect(collapsedTextarea.style.overflowY).toBe('hidden');
       rerender(<MessageInput {...defaultProps} advancedMode />);
@@ -630,7 +658,13 @@ describe('MessageInput', () => {
 
     it('shows remove button for attachments via initialAttachments', () => {
       const initialAttachments = [
-        { id: 'att-1', type: 'image' as const, name: 'photo.png', data: 'data:image/png;base64,abc', mimeType: 'image/png' },
+        {
+          id: 'att-1',
+          type: 'image' as const,
+          name: 'photo.png',
+          data: 'data:image/png;base64,abc',
+          mimeType: 'image/png',
+        },
       ];
       render(<MessageInput {...defaultProps} initialAttachments={initialAttachments} />);
       expect(screen.getByLabelText('Remove attachment photo.png')).toBeInTheDocument();
@@ -638,7 +672,13 @@ describe('MessageInput', () => {
 
     it('removes attachment when remove button is clicked', () => {
       const initialAttachments = [
-        { id: 'att-1', type: 'image' as const, name: 'photo.png', data: 'data:image/png;base64,abc', mimeType: 'image/png' },
+        {
+          id: 'att-1',
+          type: 'image' as const,
+          name: 'photo.png',
+          data: 'data:image/png;base64,abc',
+          mimeType: 'image/png',
+        },
       ];
       render(<MessageInput {...defaultProps} initialAttachments={initialAttachments} />);
       fireEvent.click(screen.getByLabelText('Remove attachment photo.png'));
@@ -647,7 +687,13 @@ describe('MessageInput', () => {
 
     it('shows file attachment with file icon', () => {
       const initialAttachments = [
-        { id: 'att-1', type: 'file' as const, name: 'report.pdf', data: 'data:application/pdf;base64,abc', mimeType: 'application/pdf' },
+        {
+          id: 'att-1',
+          type: 'file' as const,
+          name: 'report.pdf',
+          data: 'data:application/pdf;base64,abc',
+          mimeType: 'application/pdf',
+        },
       ];
       render(<MessageInput {...defaultProps} initialAttachments={initialAttachments} />);
       expect(screen.getByText('report.pdf')).toBeInTheDocument();
@@ -655,9 +701,17 @@ describe('MessageInput', () => {
 
     it('shows image attachment as thumbnail', () => {
       const initialAttachments = [
-        { id: 'att-1', type: 'image' as const, name: 'photo.png', data: 'data:image/png;base64,abc', mimeType: 'image/png' },
+        {
+          id: 'att-1',
+          type: 'image' as const,
+          name: 'photo.png',
+          data: 'data:image/png;base64,abc',
+          mimeType: 'image/png',
+        },
       ];
-      const { container } = render(<MessageInput {...defaultProps} initialAttachments={initialAttachments} />);
+      const { container } = render(
+        <MessageInput {...defaultProps} initialAttachments={initialAttachments} />
+      );
       const img = container.querySelector('img');
       expect(img).toBeInTheDocument();
       expect(img?.alt).toBe('photo.png');
@@ -666,9 +720,17 @@ describe('MessageInput', () => {
     it('sends with attachments', () => {
       const onSend = vi.fn();
       const initialAttachments = [
-        { id: 'att-1', type: 'image' as const, name: 'photo.png', data: 'data:image/png;base64,abc', mimeType: 'image/png' },
+        {
+          id: 'att-1',
+          type: 'image' as const,
+          name: 'photo.png',
+          data: 'data:image/png;base64,abc',
+          mimeType: 'image/png',
+        },
       ];
-      render(<MessageInput {...defaultProps} onSend={onSend} initialAttachments={initialAttachments} />);
+      render(
+        <MessageInput {...defaultProps} onSend={onSend} initialAttachments={initialAttachments} />
+      );
       const textarea = screen.getByPlaceholderText(/Type a message/);
       fireEvent.change(textarea, { target: { value: 'with image' } });
       fireEvent.keyDown(textarea, { key: 'Enter' });
@@ -678,9 +740,17 @@ describe('MessageInput', () => {
     it('clears attachments after sending', () => {
       const onSend = vi.fn();
       const initialAttachments = [
-        { id: 'att-1', type: 'image' as const, name: 'photo.png', data: 'data:image/png;base64,abc', mimeType: 'image/png' },
+        {
+          id: 'att-1',
+          type: 'image' as const,
+          name: 'photo.png',
+          data: 'data:image/png;base64,abc',
+          mimeType: 'image/png',
+        },
       ];
-      render(<MessageInput {...defaultProps} onSend={onSend} initialAttachments={initialAttachments} />);
+      render(
+        <MessageInput {...defaultProps} onSend={onSend} initialAttachments={initialAttachments} />
+      );
       const textarea = screen.getByPlaceholderText(/Type a message/);
       fireEvent.change(textarea, { target: { value: 'msg' } });
       fireEvent.keyDown(textarea, { key: 'Enter' });
@@ -691,9 +761,17 @@ describe('MessageInput', () => {
     it('can send with only attachments and no text', () => {
       const onSend = vi.fn();
       const initialAttachments = [
-        { id: 'att-1', type: 'image' as const, name: 'photo.png', data: 'data:image/png;base64,abc', mimeType: 'image/png' },
+        {
+          id: 'att-1',
+          type: 'image' as const,
+          name: 'photo.png',
+          data: 'data:image/png;base64,abc',
+          mimeType: 'image/png',
+        },
       ];
-      render(<MessageInput {...defaultProps} onSend={onSend} initialAttachments={initialAttachments} />);
+      render(
+        <MessageInput {...defaultProps} onSend={onSend} initialAttachments={initialAttachments} />
+      );
       // Send button should be enabled because attachments exist
       const sendBtn = screen.getByTestId('send-button');
       expect(sendBtn).not.toBeDisabled();
@@ -704,13 +782,55 @@ describe('MessageInput', () => {
     it('persists attachment-only draft after removing attachments', () => {
       vi.useFakeTimers();
       const initialAttachments = [
-        { id: 'att-1', type: 'image' as const, name: 'photo.png', data: 'data:image/png;base64,abc', mimeType: 'image/png' },
+        {
+          id: 'att-1',
+          type: 'image' as const,
+          name: 'photo.png',
+          data: 'data:image/png;base64,abc',
+          mimeType: 'image/png',
+        },
       ];
       render(<MessageInput {...defaultProps} initialAttachments={initialAttachments} />);
       fireEvent.click(screen.getByLabelText('Remove attachment photo.png'));
       vi.advanceTimersByTime(300);
       expect(mockSetDraft).toHaveBeenLastCalledWith('session-1', { content: '', attachments: [] });
       vi.useRealTimers();
+    });
+
+    it('rejects oversized selected files before reading them into memory', async () => {
+      const readAsDataURL = vi.spyOn(FileReader.prototype, 'readAsDataURL');
+      const { container } = render(<MessageInput {...defaultProps} />);
+      const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+      const file = makeFile('huge.pdf', 'application/pdf', MAX_MESSAGE_ATTACHMENT_BYTES + 1);
+
+      fireEvent.change(fileInput, { target: { files: [file] } });
+
+      expect(readAsDataURL).not.toHaveBeenCalled();
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        '"huge.pdf" is too large. Attachments must be 10 MB or smaller.'
+      );
+      expect(screen.queryByText('huge.pdf')).not.toBeInTheDocument();
+      readAsDataURL.mockRestore();
+    });
+
+    it('rejects oversized pasted images before reading them into memory', async () => {
+      const readAsDataURL = vi.spyOn(FileReader.prototype, 'readAsDataURL');
+      render(<MessageInput {...defaultProps} />);
+      const textarea = screen.getByTestId('message-input');
+      const file = makeFile('huge.png', 'image/png', MAX_MESSAGE_ATTACHMENT_BYTES + 1);
+
+      fireEvent.paste(textarea, {
+        clipboardData: {
+          items: [{ type: 'image/png', getAsFile: () => file }],
+        },
+      });
+
+      expect(readAsDataURL).not.toHaveBeenCalled();
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        '"huge.png" is too large. Attachments must be 10 MB or smaller.'
+      );
+      expect(screen.queryByLabelText('Remove attachment huge.png')).not.toBeInTheDocument();
+      readAsDataURL.mockRestore();
     });
   });
 

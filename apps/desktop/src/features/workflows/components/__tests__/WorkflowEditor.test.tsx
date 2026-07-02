@@ -7,7 +7,14 @@ vi.mock('@xyflow/react', () => ({
   ReactFlow: (props: any) => <div data-testid="reactflow">{props.children}</div>,
   useNodesState: () => [[], vi.fn(), vi.fn()],
   useEdgesState: () => [[], vi.fn(), vi.fn()],
-  useReactFlow: () => ({ getNodes: vi.fn(() => []), getEdges: vi.fn(() => []), setNodes: vi.fn(), setEdges: vi.fn(), fitView: vi.fn(), screenToFlowPosition: vi.fn(() => ({ x: 0, y: 0 })) }),
+  useReactFlow: () => ({
+    getNodes: vi.fn(() => []),
+    getEdges: vi.fn(() => []),
+    setNodes: vi.fn(),
+    setEdges: vi.fn(),
+    fitView: vi.fn(),
+    screenToFlowPosition: vi.fn(() => ({ x: 0, y: 0 })),
+  }),
   ReactFlowProvider: ({ children }: any) => <div>{children}</div>,
   Background: () => <div />,
   Controls: () => <div />,
@@ -42,19 +49,21 @@ vi.mock('../WorkflowGraphEditor', () => ({
       GraphEditor
     </div>
   ),
-  fromFlowNodes: (nodes: any[]) => nodes.map((n: any) => ({
-    id: n.id,
-    name: n.data?.label || '',
-    type: n.data?.stepType || '',
-    config: n.data?.config || {},
-    position: n.position || { x: 0, y: 0 },
-  })),
-  fromFlowEdges: (edges: any[]) => edges.map((e: any) => ({
-    id: e.id,
-    source: e.source,
-    target: e.target,
-    type: e.data?.edgeType || 'success',
-  })),
+  fromFlowNodes: (nodes: any[]) =>
+    nodes.map((n: any) => ({
+      id: n.id,
+      name: n.data?.label || '',
+      type: n.data?.stepType || '',
+      config: n.data?.config || {},
+      position: n.position || { x: 0, y: 0 },
+    })),
+  fromFlowEdges: (edges: any[]) =>
+    edges.map((e: any) => ({
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      type: e.data?.edgeType || 'success',
+    })),
 }));
 
 // Mock shared utilities
@@ -96,56 +105,28 @@ describe('WorkflowEditor', () => {
 
   it('renders without crashing for new workflow', () => {
     const { container } = render(
-      <WorkflowEditor
-        projectId="proj-1"
-        onBack={mockOnBack}
-        onSaved={mockOnSaved}
-      />
+      <WorkflowEditor projectId="proj-1" onBack={mockOnBack} onSaved={mockOnSaved} />
     );
     expect(container).toBeTruthy();
   });
 
   it('renders name input with placeholder', () => {
-    render(
-      <WorkflowEditor
-        projectId="proj-1"
-        onBack={mockOnBack}
-        onSaved={mockOnSaved}
-      />
-    );
+    render(<WorkflowEditor projectId="proj-1" onBack={mockOnBack} onSaved={mockOnSaved} />);
     expect(screen.getByPlaceholderText('Workflow name...')).toBeTruthy();
   });
 
   it('renders description input', () => {
-    render(
-      <WorkflowEditor
-        projectId="proj-1"
-        onBack={mockOnBack}
-        onSaved={mockOnSaved}
-      />
-    );
+    render(<WorkflowEditor projectId="proj-1" onBack={mockOnBack} onSaved={mockOnSaved} />);
     expect(screen.getByPlaceholderText('Description (optional)')).toBeTruthy();
   });
 
   it('renders Save button', () => {
-    render(
-      <WorkflowEditor
-        projectId="proj-1"
-        onBack={mockOnBack}
-        onSaved={mockOnSaved}
-      />
-    );
+    render(<WorkflowEditor projectId="proj-1" onBack={mockOnBack} onSaved={mockOnSaved} />);
     expect(screen.getByText('Save')).toBeTruthy();
   });
 
   it('Save button is disabled when name is empty', () => {
-    render(
-      <WorkflowEditor
-        projectId="proj-1"
-        onBack={mockOnBack}
-        onSaved={mockOnSaved}
-      />
-    );
+    render(<WorkflowEditor projectId="proj-1" onBack={mockOnBack} onSaved={mockOnSaved} />);
     const saveBtn = screen.getByText('Save');
     expect(saveBtn.closest('button')).toBeDisabled();
   });
@@ -180,13 +161,7 @@ describe('WorkflowEditor', () => {
   });
 
   it('updates name input value', () => {
-    render(
-      <WorkflowEditor
-        projectId="proj-1"
-        onBack={mockOnBack}
-        onSaved={mockOnSaved}
-      />
-    );
+    render(<WorkflowEditor projectId="proj-1" onBack={mockOnBack} onSaved={mockOnSaved} />);
 
     const nameInput = screen.getByPlaceholderText('Workflow name...') as HTMLInputElement;
     fireEvent.change(nameInput, { target: { value: 'New Name' } });
@@ -194,13 +169,7 @@ describe('WorkflowEditor', () => {
   });
 
   it('calls loadStepTypes on mount (non-standalone)', () => {
-    render(
-      <WorkflowEditor
-        projectId="proj-1"
-        onBack={mockOnBack}
-        onSaved={mockOnSaved}
-      />
-    );
+    render(<WorkflowEditor projectId="proj-1" onBack={mockOnBack} onSaved={mockOnSaved} />);
     expect(mockLoadStepTypes).toHaveBeenCalled();
   });
 
@@ -218,13 +187,7 @@ describe('WorkflowEditor', () => {
   });
 
   it('renders breadcrumb navigation (non-standalone)', () => {
-    render(
-      <WorkflowEditor
-        projectId="proj-1"
-        onBack={mockOnBack}
-        onSaved={mockOnSaved}
-      />
-    );
+    render(<WorkflowEditor projectId="proj-1" onBack={mockOnBack} onSaved={mockOnSaved} />);
     expect(screen.getByText('Dashboard')).toBeTruthy();
     expect(screen.getByText('Workflows')).toBeTruthy();
     expect(screen.getByText('Editor')).toBeTruthy();
@@ -267,37 +230,19 @@ describe('WorkflowEditor', () => {
   });
 
   it('calls onBack when back button is clicked', () => {
-    render(
-      <WorkflowEditor
-        projectId="proj-1"
-        onBack={mockOnBack}
-        onSaved={mockOnSaved}
-      />
-    );
+    render(<WorkflowEditor projectId="proj-1" onBack={mockOnBack} onSaved={mockOnSaved} />);
     fireEvent.click(screen.getByTitle('Back to Workflows'));
     expect(mockOnBack).toHaveBeenCalled();
   });
 
   it('renders Toolbox panel by default', () => {
-    render(
-      <WorkflowEditor
-        projectId="proj-1"
-        onBack={mockOnBack}
-        onSaved={mockOnSaved}
-      />
-    );
+    render(<WorkflowEditor projectId="proj-1" onBack={mockOnBack} onSaved={mockOnSaved} />);
     expect(screen.getByText('Toolbox')).toBeTruthy();
     expect(screen.getByTestId('node-palette')).toBeTruthy();
   });
 
   it('collapses left panel', () => {
-    render(
-      <WorkflowEditor
-        projectId="proj-1"
-        onBack={mockOnBack}
-        onSaved={mockOnSaved}
-      />
-    );
+    render(<WorkflowEditor projectId="proj-1" onBack={mockOnBack} onSaved={mockOnSaved} />);
 
     fireEvent.click(screen.getByTitle('Collapse panel'));
     expect(screen.queryByText('Toolbox')).toBeNull();
@@ -305,13 +250,7 @@ describe('WorkflowEditor', () => {
   });
 
   it('expands left panel after collapsing', () => {
-    render(
-      <WorkflowEditor
-        projectId="proj-1"
-        onBack={mockOnBack}
-        onSaved={mockOnSaved}
-      />
-    );
+    render(<WorkflowEditor projectId="proj-1" onBack={mockOnBack} onSaved={mockOnSaved} />);
 
     fireEvent.click(screen.getByTitle('Collapse panel'));
     fireEvent.click(screen.getByTitle('Expand panel'));
@@ -319,24 +258,12 @@ describe('WorkflowEditor', () => {
   });
 
   it('renders graph editor', () => {
-    render(
-      <WorkflowEditor
-        projectId="proj-1"
-        onBack={mockOnBack}
-        onSaved={mockOnSaved}
-      />
-    );
+    render(<WorkflowEditor projectId="proj-1" onBack={mockOnBack} onSaved={mockOnSaved} />);
     expect(screen.getByTestId('graph-editor')).toBeTruthy();
   });
 
   it('calls createWorkflow when saving new workflow', async () => {
-    render(
-      <WorkflowEditor
-        projectId="proj-1"
-        onBack={mockOnBack}
-        onSaved={mockOnSaved}
-      />
-    );
+    render(<WorkflowEditor projectId="proj-1" onBack={mockOnBack} onSaved={mockOnSaved} />);
 
     const nameInput = screen.getByPlaceholderText('Workflow name...');
     fireEvent.change(nameInput, { target: { value: 'Test Workflow' } });
@@ -384,13 +311,7 @@ describe('WorkflowEditor', () => {
   });
 
   it('calls onSaved after successful save (non-standalone)', async () => {
-    render(
-      <WorkflowEditor
-        projectId="proj-1"
-        onBack={mockOnBack}
-        onSaved={mockOnSaved}
-      />
-    );
+    render(<WorkflowEditor projectId="proj-1" onBack={mockOnBack} onSaved={mockOnSaved} />);
 
     fireEvent.change(screen.getByPlaceholderText('Workflow name...'), {
       target: { value: 'Name' },
@@ -480,7 +401,9 @@ describe('WorkflowEditor', () => {
       id: 'wf-existing',
       name: 'Existing',
       definition: {
-        nodes: [{ id: 'n1', name: 'Step 1', type: 'ai_prompt', config: {}, position: { x: 0, y: 0 } }],
+        nodes: [
+          { id: 'n1', name: 'Step 1', type: 'ai_prompt', config: {}, position: { x: 0, y: 0 } },
+        ],
         edges: [],
         entryNodeId: 'n1',
         triggers: [{ type: 'manual' }],

@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import { UnifiedDiffViewer } from '../../../components/renderers/DiffViewer';
-import { getDeferredDiagnostics, restoreFileBackup, type DeferredDiagnosticsResult } from '../../../services/api';
+import {
+  getDeferredDiagnostics,
+  restoreFileBackup,
+  type DeferredDiagnosticsResult,
+} from '../../../services/api';
 
 type Diagnostic = {
   path?: string;
@@ -29,7 +33,7 @@ type FileMutationDetails = {
 };
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return value && typeof value === 'object' ? value as Record<string, unknown> : undefined;
+  return value && typeof value === 'object' ? (value as Record<string, unknown>) : undefined;
 }
 
 export function getToolResultDetails(result: unknown): FileMutationDetails | undefined {
@@ -49,9 +53,13 @@ function DiagnosticList({ diagnostics }: { diagnostics: Diagnostic[] }) {
             <span className="font-medium">{diagnostic.severity ?? 'info'}</span>
             {diagnostic.path && <span className="text-muted-foreground"> {diagnostic.path}</span>}
             {diagnostic.line && <span className="text-muted-foreground">:{diagnostic.line}</span>}
-            {diagnostic.column && <span className="text-muted-foreground">:{diagnostic.column}</span>}
+            {diagnostic.column && (
+              <span className="text-muted-foreground">:{diagnostic.column}</span>
+            )}
             <span> {diagnostic.message}</span>
-            {diagnostic.source && <span className="text-muted-foreground"> ({diagnostic.source})</span>}
+            {diagnostic.source && (
+              <span className="text-muted-foreground"> ({diagnostic.source})</span>
+            )}
           </div>
         ))}
       </div>
@@ -60,11 +68,16 @@ function DiagnosticList({ diagnostics }: { diagnostics: Diagnostic[] }) {
 }
 
 export function FileMutationResult({ details }: { details: FileMutationDetails }) {
-  const perFileResults = details.perFileResults?.filter(file => typeof file.diff === 'string' && file.diff.trim().length > 0) ?? [];
+  const perFileResults =
+    details.perFileResults?.filter(
+      file => typeof file.diff === 'string' && file.diff.trim().length > 0
+    ) ?? [];
   const deferredId = details.lifecycle?.deferredDiagnostics?.id;
   const initialDeferredStatus = details.lifecycle?.deferredDiagnostics?.status ?? 'pending';
   const [deferredResult, setDeferredResult] = useState<DeferredDiagnosticsResult | undefined>();
-  const [restoreStatus, setRestoreStatus] = useState<'idle' | 'restoring' | 'restored' | 'failed'>('idle');
+  const [restoreStatus, setRestoreStatus] = useState<'idle' | 'restoring' | 'restored' | 'failed'>(
+    'idle'
+  );
   const deferredStatus = deferredResult?.status ?? initialDeferredStatus;
   const diagnostics = [
     ...(details.lifecycle?.diagnostics ?? []),
@@ -87,7 +100,8 @@ export function FileMutationResult({ details }: { details: FileMutationDetails }
           timer = setTimeout(refresh, 500);
         }
       } catch {
-        if (!cancelled) setDeferredResult({ status: 'failed', error: 'Failed to load deferred diagnostics' });
+        if (!cancelled)
+          setDeferredResult({ status: 'failed', error: 'Failed to load deferred diagnostics' });
       }
     };
 
@@ -112,19 +126,28 @@ export function FileMutationResult({ details }: { details: FileMutationDetails }
   return (
     <div className="px-3 pb-3 border-t border-border/50">
       <div className="mt-2 space-y-3">
-        {(details.preview || details.backup || details.symbol || details.lifecycle?.deferredDiagnostics) && (
+        {(details.preview ||
+          details.backup ||
+          details.symbol ||
+          details.lifecycle?.deferredDiagnostics) && (
           <div className="flex flex-wrap gap-1.5">
             {details.preview && (
-              <span className="rounded-md border border-primary/30 bg-muted/60 px-2 py-0.5 text-[11px] text-primary">Preview only</span>
+              <span className="rounded-md border border-primary/30 bg-muted/60 px-2 py-0.5 text-[11px] text-primary">
+                Preview only
+              </span>
             )}
             {details.backup && (
-              <span className="rounded-md border border-success/30 bg-success/10 px-2 py-0.5 text-[11px] text-success" title={details.backup.path}>
+              <span
+                className="rounded-md border border-success/30 bg-success/10 px-2 py-0.5 text-[11px] text-success"
+                title={details.backup.path}
+              >
                 Backup created
               </span>
             )}
             {details.symbol && (
               <span className="rounded-md border border-border bg-muted/60 px-2 py-0.5 text-[11px] text-muted-foreground">
-                {details.symbolKind ? `${details.symbolKind} ` : ''}{details.symbol}
+                {details.symbolKind ? `${details.symbolKind} ` : ''}
+                {details.symbol}
               </span>
             )}
             {details.lifecycle?.deferredDiagnostics && (
@@ -143,7 +166,11 @@ export function FileMutationResult({ details }: { details: FileMutationDetails }
               disabled={restoreStatus === 'restoring' || restoreStatus === 'restored'}
               onClick={handleRestoreBackup}
             >
-              {restoreStatus === 'restoring' ? 'Restoring backup...' : restoreStatus === 'restored' ? 'Backup restored' : 'Restore backup'}
+              {restoreStatus === 'restoring'
+                ? 'Restoring backup...'
+                : restoreStatus === 'restored'
+                  ? 'Backup restored'
+                  : 'Restore backup'}
             </button>
             {restoreStatus === 'failed' && (
               <span className="text-[11px] text-destructive">Backup restore failed</span>
@@ -155,7 +182,9 @@ export function FileMutationResult({ details }: { details: FileMutationDetails }
           <div className="space-y-3">
             {perFileResults.map((file, index) => (
               <div key={`${file.path ?? 'file'}:${index}`} className="space-y-1.5">
-                {file.path && <div className="text-xs font-mono text-muted-foreground">{file.path}</div>}
+                {file.path && (
+                  <div className="text-xs font-mono text-muted-foreground">{file.path}</div>
+                )}
                 <UnifiedDiffViewer diff={file.diff ?? ''} filePath={file.path} />
               </div>
             ))}
@@ -166,9 +195,14 @@ export function FileMutationResult({ details }: { details: FileMutationDetails }
 
         <DiagnosticList diagnostics={diagnostics} />
 
-        {(details.lifecycle?.warnings?.length || details.lifecycle?.errors?.length) ? (
+        {details.lifecycle?.warnings?.length || details.lifecycle?.errors?.length ? (
           <div className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
-            {[...(details.lifecycle.warnings ?? []), ...(details.lifecycle.errors ?? []).map(error => error.message ?? error.code ?? 'error')]
+            {[
+              ...(details.lifecycle.warnings ?? []),
+              ...(details.lifecycle.errors ?? []).map(
+                error => error.message ?? error.code ?? 'error'
+              ),
+            ]
               .filter(Boolean)
               .join('\n')}
           </div>

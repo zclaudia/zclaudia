@@ -26,8 +26,11 @@ const statusConfig: Record<TaskStatus, { label: string; color: string }> = {
 };
 
 export function TaskCard({ task, onSelect }: TaskCardProps) {
-  const upsertTask = useSupervisionStore((s) => s.upsertTask);
-  const status = statusConfig[task.status] ?? { label: task.status, color: 'bg-gray-500/10 text-gray-400' };
+  const upsertTask = useSupervisionStore(s => s.upsertTask);
+  const status = statusConfig[task.status] ?? {
+    label: task.status,
+    color: 'bg-gray-500/10 text-gray-400',
+  };
 
   const handleApproveProposed = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -87,7 +90,9 @@ export function TaskCard({ task, onSelect }: TaskCardProps) {
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full shrink-0 ${status.color}`}>
+            <span
+              className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full shrink-0 ${status.color}`}
+            >
               {status.label}
             </span>
             {task.status === 'running' && (
@@ -106,7 +111,9 @@ export function TaskCard({ task, onSelect }: TaskCardProps) {
               <span className="text-[10px] text-muted-foreground">Attempt {task.attempt}</span>
             )}
             {task.dependencies.length > 0 && (
-              <span className="text-[10px] text-muted-foreground">{task.dependencies.length} deps</span>
+              <span className="text-[10px] text-muted-foreground">
+                {task.dependencies.length} deps
+              </span>
             )}
           </div>
         </div>

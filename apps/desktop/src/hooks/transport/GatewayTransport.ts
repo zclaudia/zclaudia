@@ -9,10 +9,7 @@
  * - Content catch-up for disconnect recovery
  */
 
-import type {
-  ClientMessage,
-  ServerMessage,
-} from '@zclaudia/shared';
+import type { ClientMessage, ServerMessage } from '@zclaudia/shared';
 import type {
   BackendPresence,
   RegistrySyncPayload,
@@ -35,9 +32,6 @@ import type {
   GatewayErrorMessage,
 } from '@zclaudia/protocol/gateway';
 import type { ProjectItem, SessionItem, SessionMessage } from '@zclaudia/protocol/zclaudia';
-import { useSessionsStore } from '../../stores/sessionsStore';
-import { useProjectStore } from '../../stores/projectStore';
-import { useOwnershipStore } from '../../stores/ownershipStore';
 
 // ============================================================================
 // Config & Callbacks
@@ -53,14 +47,29 @@ export interface GatewayTransportConfig {
   onDisconnected: () => void;
   onError: (error: Event | string) => void;
   onRegistryChanged: (items: BackendPresence[]) => void;
-  onBackendDataSnapshot: (backendId: string, sessions: SessionItem[], projects: ProjectItem[]) => void;
+  onBackendDataSnapshot: (
+    backendId: string,
+    sessions: SessionItem[],
+    projects: ProjectItem[]
+  ) => void;
   onBackendDataEvent: (backendId: string, event: BackendResourceEventMessage) => void;
   onBackendSubscribed: (backendId: string, epoch: number, capabilities: string[]) => void;
   onBackendUnsubscribed: (backendId: string, reason: string) => void;
   onBackendServerMessage: (backendId: string, message: ServerMessage) => void;
   onRunStreamEvent: (backendId: string, sessionId: string, event: GatewayStreamEvent) => void;
-  onContentPatch: (backendId: string, sessionId: string, messages: SessionMessage[], latestOffset: number) => void;
-  onContentPatchError: (backendId: string, sessionId: string, afterOffset: number, error: string) => void;
+  onContentPatch: (
+    backendId: string,
+    sessionId: string,
+    messages: SessionMessage[],
+    latestOffset: number
+  ) => void;
+  onContentPatchError: (
+    backendId: string,
+    sessionId: string,
+    afterOffset: number,
+    error: string
+  ) => void;
+  onBackendsRemoved?: (backendIds: string[]) => void;
 }
 
 // ============================================================================
@@ -142,7 +151,10 @@ export class GatewayTransport {
 
   // --- Backend Data ---
   requestBackendDataSnapshot(backendId: string): void {
-    this.send({ type: 'request_backend_resource_snapshot', backendId } satisfies RequestBackendResourceSnapshotMessage);
+    this.send({
+      type: 'request_backend_resource_snapshot',
+      backendId,
+    } satisfies RequestBackendResourceSnapshotMessage);
   }
 
   // --- Backend Subscription ---
@@ -160,7 +172,11 @@ export class GatewayTransport {
       console.error('[GatewayTransport] Cannot send: not subscribed to backend', backendId);
       return;
     }
-    this.send({ type: 'backend_client_message', backendId, message } satisfies BackendClientMessage);
+    this.send({
+      type: 'backend_client_message',
+      backendId,
+      message,
+    } satisfies BackendClientMessage);
   }
 
   isBackendSubscribed(backendId: string): boolean {
@@ -169,7 +185,12 @@ export class GatewayTransport {
 
   // --- Content ---
   catchUpContent(backendId: string, sessionId: string, afterOffset: number): void {
-    this.send({ type: 'catch_up_content', backendId, contentStreamId: sessionId, afterOffset } satisfies CatchUpContentMessage);
+    this.send({
+      type: 'catch_up_content',
+      backendId,
+      contentStreamId: sessionId,
+      afterOffset,
+    } satisfies CatchUpContentMessage);
   }
 
   // --- Reconnect & Health ---
@@ -207,11 +228,19 @@ export class GatewayTransport {
   }
 
   // --- Accessors ---
-  getRegistryItems(): Map<string, BackendPresence> { return this.registryItems; }
-  getPeerSessionId(): string | null { return this.peerSessionId; }
-  getRecoveryToken(): string | null { return this.recoveryToken; }
+  getRegistryItems(): Map<string, BackendPresence> {
+    return this.registryItems;
+  }
+  getPeerSessionId(): string | null {
+    return this.peerSessionId;
+  }
+  getRecoveryToken(): string | null {
+    return this.recoveryToken;
+  }
   /** The actual WebSocket URL used in the last connect() call (after normalization). */
-  getResolvedUrl(): string | null { return this.resolvedUrl; }
+  getResolvedUrl(): string | null {
+    return this.resolvedUrl;
+  }
 
   /** Request an immediate full registry snapshot from the gateway (e.g. on mobile resume). */
   requestRegistrySnapshot(): void {
@@ -224,15 +253,23 @@ export class GatewayTransport {
 
   private setupWebSocket(ws: WebSocket): void {
     const currentWs = ws;
-    ws.onopen = () => { console.log('[GatewayTransport] WebSocket opened'); if (this.ws !== currentWs) return; this.sendPeerHello(); };
-    ws.onclose = (event) => { console.log(`[GatewayTransport] WebSocket closed: code=${event.code} reason=${event.reason} wasClean=${event.wasClean}`);
+    ws.onopen = () => {
+      console.log('[GatewayTransport] WebSocket opened');
+      if (this.ws !== currentWs) return;
+      this.sendPeerHello();
+    };
+    ws.onclose = event => {
+      console.log(
+        `[GatewayTransport] WebSocket closed: code=${event.code} reason=${event.reason} wasClean=${event.wasClean}`
+      );
       this.clearHealthProbe();
       const expectedClose = this.expectedCloseWs === currentWs;
       if (expectedClose) {
         this.expectedCloseWs = null;
       }
       if (this.ws !== null && this.ws !== currentWs) return;
-      this.ws = null; this.authenticated = false;
+      this.ws = null;
+      this.authenticated = false;
       if (!expectedClose) {
         this.config.onDisconnected();
         this.subscribedBackends.clear();
@@ -241,10 +278,16 @@ export class GatewayTransport {
         this.subscribedBackends.clear();
       }
     };
-    ws.onerror = (error) => { console.error('[GatewayTransport] WebSocket error:', error); this.config.onError(error); };
+    ws.onerror = error => {
+      console.error('[GatewayTransport] WebSocket error:', error);
+      this.config.onError(error);
+    };
     ws.onmessage = (event: MessageEvent) => {
-      try { this.handleMessage(JSON.parse(event.data)); }
-      catch (error) { console.error('[GatewayTransport] Failed to parse message:', error); }
+      try {
+        this.handleMessage(JSON.parse(event.data));
+      } catch (error) {
+        console.error('[GatewayTransport] Failed to parse message:', error);
+      }
     };
   }
 
@@ -257,7 +300,9 @@ export class GatewayTransport {
     const jitter = delay * 0.25 * (Math.random() * 2 - 1);
     const finalDelay = Math.max(500, delay + jitter);
     this.reconnectAttempt++;
-    console.log(`[GatewayTransport] Reconnecting in ${Math.round(finalDelay)}ms (attempt ${this.reconnectAttempt})`);
+    console.log(
+      `[GatewayTransport] Reconnecting in ${Math.round(finalDelay)}ms (attempt ${this.reconnectAttempt})`
+    );
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       if (!this.intentionalClose && !this.ws) {
@@ -285,26 +330,53 @@ export class GatewayTransport {
 
   private handleMessage(message: any): void {
     switch (message.type) {
-      case 'peer_ready': this.handlePeerReady(message); break;
-      case 'registry_snapshot': this.handleRegistrySnapshot(message); break;
-      case 'backend_resource_snapshot': this.handleBackendDataSnapshot(message); break;
-      case 'backend_resource_event': this.handleBackendDataEvent(message); break;
-      case 'backend_subscribed': this.handleBackendSubscribed(message); break;
-      case 'backend_unsubscribed': this.handleBackendUnsubscribed(message); break;
-      case 'backend_server_message': this.handleBackendServerMessage(message); break;
-      case 'backend_stream_event': this.handleRunStreamEvent(message); break;
-      case 'content_patch': this.handleContentPatch(message); break;
-      case 'content_patch_error': this.handleContentPatchError(message); break;
-      case 'pong': this.handlePong(message); break;
-      case 'gateway_error': this.handleGatewayError(message); break;
-      default: console.warn('[GatewayTransport] Unknown message type:', message.type);
+      case 'peer_ready':
+        this.handlePeerReady(message);
+        break;
+      case 'registry_snapshot':
+        this.handleRegistrySnapshot(message);
+        break;
+      case 'backend_resource_snapshot':
+        this.handleBackendDataSnapshot(message);
+        break;
+      case 'backend_resource_event':
+        this.handleBackendDataEvent(message);
+        break;
+      case 'backend_subscribed':
+        this.handleBackendSubscribed(message);
+        break;
+      case 'backend_unsubscribed':
+        this.handleBackendUnsubscribed(message);
+        break;
+      case 'backend_server_message':
+        this.handleBackendServerMessage(message);
+        break;
+      case 'backend_stream_event':
+        this.handleRunStreamEvent(message);
+        break;
+      case 'content_patch':
+        this.handleContentPatch(message);
+        break;
+      case 'content_patch_error':
+        this.handleContentPatchError(message);
+        break;
+      case 'pong':
+        this.handlePong(message);
+        break;
+      case 'gateway_error':
+        this.handleGatewayError(message);
+        break;
+      default:
+        console.warn('[GatewayTransport] Unknown message type:', message.type);
     }
   }
 
   // --- Handshake ---
   private handlePeerReady(msg: PeerReadyMessage): void {
     this.reconnectAttempt = 0;
-    this.authenticated = true; this.peerSessionId = msg.peerSessionId; this.recoveryToken = msg.recoveryToken;
+    this.authenticated = true;
+    this.peerSessionId = msg.peerSessionId;
+    this.recoveryToken = msg.recoveryToken;
     this.applyRegistrySync(msg.registrySync);
     this.config.onConnected(msg.peerSessionId, msg.recoveryToken);
   }
@@ -319,41 +391,49 @@ export class GatewayTransport {
   }
 
   private applyRegistryItems(items: BackendPresence[]): void {
-    // Detect removed backends and clean up related state
+    // Detect removed backends, but keep business-store cleanup outside the transport layer.
     const newIds = new Set(items.map(i => i.backendId));
+    const removedBackendIds: string[] = [];
     for (const [backendId] of this.registryItems) {
       if (!newIds.has(backendId)) {
         this.subscribedBackends.delete(backendId);
-        useSessionsStore.getState().clearBackendSessions(backendId);
-        useProjectStore.getState().replaceProjectsForBackend(backendId, []);
-        useOwnershipStore.getState().removeProjectOwnersByBackend(backendId);
+        removedBackendIds.push(backendId);
       }
     }
     this.registryItems.clear();
     for (const item of items) this.registryItems.set(item.backendId, item);
     this.config.onRegistryChanged(Array.from(this.registryItems.values()));
+    if (removedBackendIds.length > 0) {
+      this.config.onBackendsRemoved?.(removedBackendIds);
+    }
   }
 
   // --- Backend Data ---
-  private handleBackendDataSnapshot(msg: BackendResourceSnapshotMessage & { backendId?: string }): void {
+  private handleBackendDataSnapshot(
+    msg: BackendResourceSnapshotMessage & { backendId?: string }
+  ): void {
     const backendId = msg.backendId;
     if (!backendId) {
-      console.warn('[GatewayTransport] Received backend_resource_snapshot without backendId, ignoring');
+      console.warn(
+        '[GatewayTransport] Received backend_resource_snapshot without backendId, ignoring'
+      );
       return;
     }
     const sessions = msg.resources
-      .filter((resource) => resource.resourceType === 'session')
-      .map((resource) => resource.resource as SessionItem);
+      .filter(resource => resource.resourceType === 'session')
+      .map(resource => resource.resource as SessionItem);
     const projects = msg.resources
-      .filter((resource) => resource.resourceType === 'project')
-      .map((resource) => resource.resource as ProjectItem);
+      .filter(resource => resource.resourceType === 'project')
+      .map(resource => resource.resource as ProjectItem);
     this.config.onBackendDataSnapshot(backendId, sessions, projects);
   }
 
   private handleBackendDataEvent(msg: BackendResourceEventMessage & { backendId?: string }): void {
     const backendId = msg.backendId;
     if (!backendId) {
-      console.warn('[GatewayTransport] Received backend_resource_event without backendId, ignoring');
+      console.warn(
+        '[GatewayTransport] Received backend_resource_event without backendId, ignoring'
+      );
       return;
     }
     this.config.onBackendDataEvent(backendId, msg);
@@ -384,11 +464,21 @@ export class GatewayTransport {
   // --- Content ---
   private handleContentPatch(msg: ContentPatchMessage): void {
     if (!this.subscribedBackends.has(msg.backendId)) return;
-    this.config.onContentPatch(msg.backendId, msg.contentStreamId, msg.patches as SessionMessage[], msg.latestOffset);
+    this.config.onContentPatch(
+      msg.backendId,
+      msg.contentStreamId,
+      msg.patches as SessionMessage[],
+      msg.latestOffset
+    );
   }
   private handleContentPatchError(msg: ContentPatchErrorMessage): void {
     if (!this.subscribedBackends.has(msg.backendId)) return;
-    this.config.onContentPatchError(msg.backendId, msg.contentStreamId, msg.afterOffset, msg.message);
+    this.config.onContentPatchError(
+      msg.backendId,
+      msg.contentStreamId,
+      msg.afterOffset,
+      msg.message
+    );
   }
 
   // --- Pong ---
@@ -409,7 +499,9 @@ export class GatewayTransport {
           }
           break;
         }
-        case 'reconnect': this.ws?.close(); break;
+        case 'reconnect':
+          this.ws?.close();
+          break;
       }
       // Recovery action was taken — don't escalate to a connection-level error.
       // Only log it for diagnostics.
@@ -419,6 +511,14 @@ export class GatewayTransport {
   }
 
   // --- Helpers ---
-  private send(msg: unknown): void { if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(msg)); }
-  private cleanup(): void { this.authenticated = false; this.peerSessionId = null; this.recoveryToken = null; this.subscribedBackends.clear(); this.clearHealthProbe(); }
+  private send(msg: unknown): void {
+    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(msg));
+  }
+  private cleanup(): void {
+    this.authenticated = false;
+    this.peerSessionId = null;
+    this.recoveryToken = null;
+    this.subscribedBackends.clear();
+    this.clearHealthProbe();
+  }
 }

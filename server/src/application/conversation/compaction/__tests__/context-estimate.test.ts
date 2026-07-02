@@ -9,11 +9,11 @@ import {
 } from '../context-estimate.js';
 
 // Minimal message shapes — the helpers only read role / stopReason / usage.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 function asst(usage: Record<string, number> | undefined, stopReason = 'stop'): any {
   return { role: 'assistant', stopReason, usage, content: [] };
 }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 function user(): any {
   return { role: 'user', content: [] };
 }
@@ -23,7 +23,7 @@ const WINDOW = 262_144;
 describe('compactionTriggerThreshold', () => {
   it('subtracts summary reserve + trigger buffer from the window', () => {
     expect(compactionTriggerThreshold(WINDOW)).toBe(
-      WINDOW - COMPACTION_SUMMARY_RESERVE_TOKENS - COMPACTION_TRIGGER_BUFFER_TOKENS,
+      WINDOW - COMPACTION_SUMMARY_RESERVE_TOKENS - COMPACTION_TRIGGER_BUFFER_TOKENS
     );
     // ~85% of the window, not ~94%.
     expect(compactionTriggerThreshold(WINDOW)).toBe(221_760);
@@ -32,7 +32,9 @@ describe('compactionTriggerThreshold', () => {
 
 describe('lastAssistantPromptTokens', () => {
   it('sums input + cacheRead + cacheWrite (prompt only, excludes output)', () => {
-    const msgs = [asst({ input: 1000, output: 9999, cacheRead: 500, cacheWrite: 200, totalTokens: 11699 })];
+    const msgs = [
+      asst({ input: 1000, output: 9999, cacheRead: 500, cacheWrite: 200, totalTokens: 11699 }),
+    ];
     expect(lastAssistantPromptTokens(msgs)).toBe(1700);
   });
 
@@ -70,7 +72,9 @@ describe('estimateContextTokensForThreshold', () => {
 
   it('rejects a bogus anchor that exceeds the window and falls back to the chars estimate', () => {
     // 282614 + 281728 = 564342 — impossible for one request on a 262k model.
-    const msgs = [asst({ input: 282_614, cacheRead: 281_728, cacheWrite: 0, totalTokens: 564_986 })];
+    const msgs = [
+      asst({ input: 282_614, cacheRead: 281_728, cacheWrite: 0, totalTokens: 564_986 }),
+    ];
     expect(estimateContextTokensForThreshold(msgs, WINDOW, chars(261_000))).toBe(261_000);
   });
 
@@ -97,7 +101,7 @@ describe('estimateContextTokensForThreshold', () => {
       asst({ input: 134_180, cacheRead: 11_262_848, cacheWrite: 0, totalTokens: 11_409_032 }),
     ];
     // No injected estimator — exercises the real default.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const estimate = estimateContextTokensForThreshold(msgs as any, window);
     expect(estimate).toBeLessThan(compactionTriggerThreshold(window));
   });

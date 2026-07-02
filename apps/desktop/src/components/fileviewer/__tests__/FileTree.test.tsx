@@ -44,7 +44,9 @@ describe('FileTree', () => {
         hasMore: false,
       })
       .mockResolvedValueOnce({
-        entries: [{ name: 'App.tsx', path: 'src/App.tsx', type: 'file', extension: '.tsx', size: 200 }],
+        entries: [
+          { name: 'App.tsx', path: 'src/App.tsx', type: 'file', extension: '.tsx', size: 200 },
+        ],
         currentPath: 'src',
         hasMore: false,
       });

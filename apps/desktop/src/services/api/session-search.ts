@@ -27,7 +27,10 @@ export interface SearchFilters {
   offset?: number;
 }
 
-export async function searchMessages(query: string, filters?: SearchFilters): Promise<SearchResult[]> {
+export async function searchMessages(
+  query: string,
+  filters?: SearchFilters
+): Promise<SearchResult[]> {
   const params = new URLSearchParams({ q: query });
 
   if (filters) {
@@ -46,12 +49,14 @@ export async function searchMessages(query: string, filters?: SearchFilters): Pr
     if (filters.offset !== undefined) params.set('offset', filters.offset.toString());
   }
 
-  const data = await apiCall<{ results: SearchResult[] }>(`/api/sessions/search/messages?${params}`);
+  const data = await apiCall<{ results: SearchResult[] }>(
+    `/api/sessions/search/messages?${params}`
+  );
   const activeBackendId = resolveSearchOwnerBackendId();
   if (!activeBackendId) {
     throw new Error('No active backend available for search');
   }
-  return data.results.map((result) => ({
+  return data.results.map(result => ({
     ...result,
     ownerBackendId: result.ownerBackendId ?? activeBackendId,
   }));
@@ -65,12 +70,17 @@ export interface SearchHistoryEntry {
   createdAt: number;
 }
 
-export async function getSearchHistory(userId?: string, limit?: number): Promise<SearchHistoryEntry[]> {
+export async function getSearchHistory(
+  userId?: string,
+  limit?: number
+): Promise<SearchHistoryEntry[]> {
   const params = new URLSearchParams();
   if (userId) params.set('userId', userId);
   if (limit) params.set('limit', limit.toString());
 
-  const data = await apiCall<{ history: SearchHistoryEntry[] }>(`/api/sessions/search/history?${params}`);
+  const data = await apiCall<{ history: SearchHistoryEntry[] }>(
+    `/api/sessions/search/history?${params}`
+  );
   return data.history;
 }
 
@@ -81,12 +91,18 @@ export async function clearSearchHistory(userId?: string): Promise<void> {
   return apiCallVoid(`/api/sessions/search/history?${params}`, { method: 'DELETE' });
 }
 
-export async function getSearchSuggestions(prefix: string, userId?: string, limit?: number): Promise<string[]> {
+export async function getSearchSuggestions(
+  prefix: string,
+  userId?: string,
+  limit?: number
+): Promise<string[]> {
   const params = new URLSearchParams({ prefix });
   if (userId) params.set('userId', userId);
   if (limit) params.set('limit', limit.toString());
 
-  const data = await apiCall<{ suggestions: string[] }>(`/api/sessions/search/suggestions?${params}`);
+  const data = await apiCall<{ suggestions: string[] }>(
+    `/api/sessions/search/suggestions?${params}`
+  );
   return data.suggestions;
 }
 

@@ -45,33 +45,41 @@ interface ChatInterfaceProps {
   beforeComposer?: ReactNode;
 }
 
-export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, beforeComposer }: ChatInterfaceProps) {
+export function ChatInterface({
+  sessionId,
+  onReturnToDashboard,
+  onOpenSidebar,
+  beforeComposer,
+}: ChatInterfaceProps) {
   const {
     sendMessage: activeServerSendMessage,
     sendToServer,
     handlePermissionDecision,
   } = useConnection();
   const isMobile = useIsMobile();
-  const activeServerId = useServerStore((s) => s.activeServerId);
-  const setDrawerOpen = useTerminalStore((s) => s.setDrawerOpen);
-  const advancedInput = useUIStore((s) => s.advancedInput);
-  const poppedOutSessions = useUIStore((s) => s.poppedOutSessions);
+  const activeServerId = useServerStore(s => s.activeServerId);
+  const setDrawerOpen = useTerminalStore(s => s.setDrawerOpen);
+  const advancedInput = useUIStore(s => s.advancedInput);
+  const poppedOutSessions = useUIStore(s => s.poppedOutSessions);
   const route = useSessionRoute(sessionId);
   const routedBackendId = route.backendId;
   const isConnected = route.canSend;
 
-  const wsSendMessage = useCallback((message: ClientMessage) => {
-    if (routedBackendId) {
-      sendToServer(routedBackendId, message);
-      return;
-    }
-    activeServerSendMessage(message);
-  }, [activeServerSendMessage, routedBackendId, sendToServer]);
+  const wsSendMessage = useCallback(
+    (message: ClientMessage) => {
+      if (routedBackendId) {
+        sendToServer(routedBackendId, message);
+        return;
+      }
+      activeServerSendMessage(message);
+    },
+    [activeServerSendMessage, routedBackendId, sendToServer]
+  );
 
   // Draft editor state
-  const draftShowLockPrompt = useDraftEditorStore((s) => s.showLockPrompt);
-  const draftExists = useDraftEditorStore((s) => s.draftExists[sessionId] ?? false);
-  const checkDraftExists = useDraftEditorStore((s) => s.checkDraftExists);
+  const draftShowLockPrompt = useDraftEditorStore(s => s.showLockPrompt);
+  const draftExists = useDraftEditorStore(s => s.draftExists[sessionId] ?? false);
+  const checkDraftExists = useDraftEditorStore(s => s.checkDraftExists);
 
   useEffect(() => {
     checkDraftExists(sessionId);
@@ -80,13 +88,36 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
   // ── Core hooks ──
   const session = useChatSession({ sessionId, isConnected });
   const {
-    sessionMessages, lastSessionMessage, sessionRunId, isSessionRunning, isLoading, sessionHealth, sessionRetryStatus,
-    sessionToolCalls, sessionContentBlocks, sessionToolCallHistory, useStreamingSegmented,
-    lastStreamingBlock, streamingContentSignature,
-    currentSession, currentProject, isForcedPlanSession, fileReferenceRoot, fileReferenceBackendId,
-    llmProfileId, capabilities, commands, commandsCacheKey,
-    effectiveMode, permissionOverride, currentUsage, currentSystemInfo,
-    addMessage, clearMessages, setMode, setPermissionOverride,
+    sessionMessages,
+    lastSessionMessage,
+    sessionRunId,
+    isSessionRunning,
+    isLoading,
+    sessionHealth,
+    sessionRetryStatus,
+    sessionToolCalls,
+    sessionContentBlocks,
+    sessionToolCallHistory,
+    useStreamingSegmented,
+    lastStreamingBlock,
+    streamingContentSignature,
+    currentSession,
+    currentProject,
+    isForcedPlanSession,
+    fileReferenceRoot,
+    fileReferenceBackendId,
+    llmProfileId,
+    capabilities,
+    commands,
+    commandsCacheKey,
+    effectiveMode,
+    permissionOverride,
+    currentUsage,
+    currentSystemInfo,
+    addMessage,
+    clearMessages,
+    setMode,
+    setPermissionOverride,
   } = session;
 
   // Mobile viewport management
@@ -94,13 +125,16 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
   useMobileViewport(chatRootRef, isMobile);
 
   // Keyboard shortcuts
-  useKeyboardShortcuts({ projectId: currentSession?.projectId, projectRoot: currentProject?.rootPath });
+  useKeyboardShortcuts({
+    projectId: currentSession?.projectId,
+    projectRoot: currentProject?.rootPath,
+  });
 
   // Per-session pending permission/question requests — memoize to avoid new array reference each render
   const allPendingRequests = usePermissionStore(state => state.pendingRequests);
   const permissionRequests = useMemo(
     () => allPendingRequests.filter(r => r.sessionId === sessionId || !r.sessionId),
-    [allPendingRequests, sessionId],
+    [allPendingRequests, sessionId]
   );
   // Message pagination & scroll management
   const pagination = useMessagePagination({ sessionId, isConnected, isMobile });
@@ -108,13 +142,32 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
 
   // Message sending
   const send = useSendMessage({
-    sessionId, isConnected, isLoading, sessionRunId, isSessionRunning, lastSessionMessage,
-    mode: effectiveMode, permissionOverride, currentSession, addMessage, scrollToBottom, wsSendMessage,
+    sessionId,
+    isConnected,
+    isLoading,
+    sessionRunId,
+    isSessionRunning,
+    lastSessionMessage,
+    mode: effectiveMode,
+    permissionOverride,
+    currentSession,
+    addMessage,
+    scrollToBottom,
+    wsSendMessage,
   });
   const {
-    handleSendMessage, handleCancelRun, handleResendLastMessage,
-    startRun, sendAsNewRun, steerNow, clearInterruptedStatus,
-    restoreMessage, uploadError, resendTargetMessage, resendText, resendChecking,
+    handleSendMessage,
+    handleCancelRun,
+    handleResendLastMessage,
+    startRun,
+    sendAsNewRun,
+    steerNow,
+    clearInterruptedStatus,
+    restoreMessage,
+    uploadError,
+    resendTargetMessage,
+    resendText,
+    resendChecking,
     resetSendState,
   } = send;
 
@@ -122,19 +175,25 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
   // only if the steer actually dispatched. If the run ended between render and
   // click (steerNow returns false), the item stays queued to ship next instead
   // of being silently lost.
-  const handleSteerQueueItem = useCallback((item: QueueItem) => {
-    if (steerNow(item.content)) {
-      useSendQueueStore.getState().removeItem(item.sessionId, item.id);
-    }
-  }, [steerNow]);
+  const handleSteerQueueItem = useCallback(
+    (item: QueueItem) => {
+      if (steerNow(item.content)) {
+        useSendQueueStore.getState().removeItem(item.sessionId, item.id);
+      }
+    },
+    [steerNow]
+  );
 
   // Auto-ship queued messages one at a time as the session's run cycles.
   useSendQueueConsumer({ sessionId, sendAsNewRun });
 
-  const chatActionsValue = useMemo<ChatActionsContextValue>(() => ({
-    handleSendMessage,
-    setMode: useSessionConfigStore.getState().setMode,
-  }), [handleSendMessage]);
+  const chatActionsValue = useMemo<ChatActionsContextValue>(
+    () => ({
+      handleSendMessage,
+      setMode: useSessionConfigStore.getState().setMode,
+    }),
+    [handleSendMessage]
+  );
 
   // UI state
   const [showSessionMenu, setShowSessionMenu] = useState(false);
@@ -160,88 +219,129 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
 
   // Command handler
   const { handleCommand, handleResetProviderSession, handleWorktreeChange } = useCommandHandler({
-    sessionId, commands, currentSession, currentProject, isForcedPlanSession,
-    mode: effectiveMode, addMessage, clearMessages, scrollToBottom, startRun,
-    llmProfileId, commandsCacheKey, setDrawerOpen,
+    sessionId,
+    commands,
+    currentSession,
+    currentProject,
+    isForcedPlanSession,
+    mode: effectiveMode,
+    addMessage,
+    clearMessages,
+    scrollToBottom,
+    startRun,
+    llmProfileId,
+    commandsCacheKey,
+    setDrawerOpen,
   });
 
   // Plan status
   const {
-    taskPlanStatus, planStatusLoading, submitPlanLoading, discardPlanLoading,
-    handleRestorePlan, handleDiscardPlan, handleSubmitPlan,
+    taskPlanStatus,
+    planStatusLoading,
+    submitPlanLoading,
+    discardPlanLoading,
+    handleRestorePlan,
+    handleDiscardPlan,
+    handleSubmitPlan,
   } = usePlanStatus({
-    sessionId, isConnected, isForcedPlanSession, currentSession,
-    currentProjectId: currentProject?.id, messagesLength: sessionMessages.length,
-    addMessage, scrollToBottom, handleSendMessage,
+    sessionId,
+    isConnected,
+    isForcedPlanSession,
+    currentSession,
+    currentProjectId: currentProject?.id,
+    messagesLength: sessionMessages.length,
+    addMessage,
+    scrollToBottom,
+    handleSendMessage,
   });
 
   // Session actions
   const {
-    handleSessionRename, handleExportSession, handleArchiveSession,
-    handlePopOut, handleFocusPoppedOutWindow, handleBringBackHere,
+    handleSessionRename,
+    handleExportSession,
+    handleArchiveSession,
+    handlePopOut,
+    handleFocusPoppedOutWindow,
+    handleBringBackHere,
   } = useSessionActions({
-    sessionId, isConnected, currentSession, currentProject,
-    activeServerId, renameValue, setIsRenamingSession, isSessionRunning,
+    sessionId,
+    isConnected,
+    currentSession,
+    currentProject,
+    activeServerId,
+    renameValue,
+    setIsRenamingSession,
+    isSessionRunning,
   });
 
   const poppedOutLabel = poppedOutSessions.get(sessionId);
 
   // ── SP-A fork/branch handlers ──
 
-  const handleFork = useCallback(async (treeEntryId: string) => {
-    // NOTE: not window.prompt — in the webview it returns null without showing a
-    // dialog, so the name field was silently dead (every fork was auto-named).
-    // promptText renders an in-app input; null means the user cancelled.
-    const input = await promptText({
-      title: 'Fork session',
-      message: 'Name for the forked session (leave blank for auto):',
-      placeholder: 'New session name',
-      confirmLabel: 'Fork',
-    });
-    if (input === null) return;
-    const name = input.trim() || undefined;
-    try {
-      const newSession = await forkSession(sessionId, treeEntryId, name);
-      // Register the new session in the project store and switch to it
-      useProjectStore.getState().addSession(newSession);
-      useProjectStore.getState().selectSession(newSession.id, newSession.projectId);
-      useToastStore.getState().add({
-        title: 'Session forked',
-        message: newSession.name || 'New session created from this point',
-        type: 'success',
-        sessionId: newSession.id,
+  const handleFork = useCallback(
+    async (treeEntryId: string) => {
+      // NOTE: not window.prompt — in the webview it returns null without showing a
+      // dialog, so the name field was silently dead (every fork was auto-named).
+      // promptText renders an in-app input; null means the user cancelled.
+      const input = await promptText({
+        title: 'Fork session',
+        message: 'Name for the forked session (leave blank for auto):',
+        placeholder: 'New session name',
+        confirmLabel: 'Fork',
       });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      useToastStore.getState().add({ title: 'Fork failed', message: msg, type: 'error', icon: 'error' });
-      console.error('[ChatInterface] fork failed:', err);
-    }
-  }, [sessionId]);
+      if (input === null) return;
+      const name = input.trim() || undefined;
+      try {
+        const newSession = await forkSession(sessionId, treeEntryId, name);
+        // Register the new session in the project store and switch to it
+        useProjectStore.getState().addSession(newSession);
+        useProjectStore.getState().selectSession(newSession.id, newSession.projectId);
+        useToastStore.getState().add({
+          title: 'Session forked',
+          message: newSession.name || 'New session created from this point',
+          type: 'success',
+          sessionId: newSession.id,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
+        useToastStore
+          .getState()
+          .add({ title: 'Fork failed', message: msg, type: 'error', icon: 'error' });
+        console.error('[ChatInterface] fork failed:', err);
+      }
+    },
+    [sessionId]
+  );
 
-  const handleBranch = useCallback(async (treeEntryId: string) => {
-    // NOTE: no window.confirm here — in the webview it returns falsy without showing
-    // a dialog, which silently blocked the whole action (no API call, no toast).
-    // Branch is reversible (the old tip is kept in the tree and shown in the Lineage
-    // panel) and the menu item is labelled "(rewind)", so we execute directly and
-    // report the outcome via toast.
-    try {
-      await branchSession(sessionId, treeEntryId);
-      // Reload messages for this session (full replace) — mirrors the initial-load path in useMessagePagination
-      const result = await api.getSessionMessages(sessionId, { limit: 50 });
-      const restoredMessages = restoreToolCalls(result.messages);
-      useChatMessageStore.getState().setMessages(sessionId, restoredMessages, result.pagination);
-      useToastStore.getState().add({
-        title: 'Session rewound',
-        message: 'The conversation has been branched from this point.',
-        type: 'success',
-        sessionId,
-      });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      useToastStore.getState().add({ title: 'Branch failed', message: msg, type: 'error', icon: 'error' });
-      console.error('[ChatInterface] branch failed:', err);
-    }
-  }, [sessionId]);
+  const handleBranch = useCallback(
+    async (treeEntryId: string) => {
+      // NOTE: no window.confirm here — in the webview it returns falsy without showing
+      // a dialog, which silently blocked the whole action (no API call, no toast).
+      // Branch is reversible (the old tip is kept in the tree and shown in the Lineage
+      // panel) and the menu item is labelled "(rewind)", so we execute directly and
+      // report the outcome via toast.
+      try {
+        await branchSession(sessionId, treeEntryId);
+        // Reload messages for this session (full replace) — mirrors the initial-load path in useMessagePagination
+        const result = await api.getSessionMessages(sessionId, { limit: 50 });
+        const restoredMessages = restoreToolCalls(result.messages);
+        useChatMessageStore.getState().setMessages(sessionId, restoredMessages, result.pagination);
+        useToastStore.getState().add({
+          title: 'Session rewound',
+          message: 'The conversation has been branched from this point.',
+          type: 'success',
+          sessionId,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
+        useToastStore
+          .getState()
+          .add({ title: 'Branch failed', message: msg, type: 'error', icon: 'error' });
+        console.error('[ChatInterface] branch failed:', err);
+      }
+    },
+    [sessionId]
+  );
 
   // Brand-new session with no messages and nothing running: center the composer
   // in the viewport (Cursor-style) instead of pinning it to the bottom.
@@ -255,188 +355,210 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
 
   return (
     <ChatActionsProvider value={chatActionsValue}>
-    <div ref={chatRootRef} className="flex flex-col flex-1 min-w-0 h-full bg-background">
-      {/* Popped-out placeholder */}
-      {poppedOutLabel && (
-        <PoppedOutPlaceholder
-          label={poppedOutLabel}
-          onFocus={handleFocusPoppedOutWindow}
-          onBringBack={handleBringBackHere}
-        />
-      )}
-      {!poppedOutLabel && <>
-      {/* Task card strip for supervisor main session */}
-      {currentSession?.projectRole === 'main' && currentProject?.id && (
-        <TaskCardStrip projectId={currentProject.id} />
-      )}
+      <div ref={chatRootRef} className="flex flex-col flex-1 min-w-0 h-full bg-background">
+        {/* Popped-out placeholder */}
+        {poppedOutLabel && (
+          <PoppedOutPlaceholder
+            label={poppedOutLabel}
+            onFocus={handleFocusPoppedOutWindow}
+            onBringBack={handleBringBackHere}
+          />
+        )}
+        {!poppedOutLabel && (
+          <>
+            {/* Task card strip for supervisor main session */}
+            {currentSession?.projectRole === 'main' && currentProject?.id && (
+              <TaskCardStrip projectId={currentProject.id} />
+            )}
 
-      {/* Interrupted session banner */}
-      {currentSession?.lastRunStatus === 'interrupted' && (
-        <InterruptedBanner
-          onResume={async () => {
-            await startRun({
-              type: 'run_start',
-              clientRequestId: crypto.randomUUID(),
-              sessionId,
-              input: 'continue',
-              mode: effectiveMode || undefined,
-              workingDirectory: currentSession?.workingDirectory || undefined,
-            });
-          }}
-          onDismiss={async () => {
-            try { await clearInterruptedStatus(); } catch {
-              // Ignore transient backend errors while dismissing the local banner.
-            }
-          }}
-        />
-      )}
+            {/* Interrupted session banner */}
+            {currentSession?.lastRunStatus === 'interrupted' && (
+              <InterruptedBanner
+                onResume={async () => {
+                  await startRun({
+                    type: 'run_start',
+                    clientRequestId: crypto.randomUUID(),
+                    sessionId,
+                    input: 'continue',
+                    mode: effectiveMode || undefined,
+                    workingDirectory: currentSession?.workingDirectory || undefined,
+                  });
+                }}
+                onDismiss={async () => {
+                  try {
+                    await clearInterruptedStatus();
+                  } catch {
+                    // Ignore transient backend errors while dismissing the local banner.
+                  }
+                }}
+              />
+            )}
 
-      {/* Session action bar */}
-      {currentSession && (
-        <SessionHeader
-          currentSession={currentSession}
-          currentProject={currentProject}
-          isMobile={isMobile}
-          isLoading={isLoading}
-          isRenamingSession={isRenamingSession}
-          renameValue={renameValue}
-          showSessionMenu={showSessionMenu}
-          onOpenSidebar={onOpenSidebar}
-          onReturnToDashboard={onReturnToDashboard}
-          onRenameStart={(name) => { setRenameValue(name); setIsRenamingSession(true); }}
-          onRenameChange={setRenameValue}
-          onRenameConfirm={handleSessionRename}
-          onRenameCancel={() => setIsRenamingSession(false)}
-          onResetProviderSession={handleResetProviderSession}
-          onExport={handleExportSession}
-          onArchive={handleArchiveSession}
-          archiveDisabled={isSessionRunning}
-          onPopOut={handlePopOut}
-          onToggleSessionMenu={() => setShowSessionMenu(!showSessionMenu)}
-          systemInfo={currentSystemInfo}
-          contextPercent={
-            currentUsage.contextWindow && currentUsage.contextWindow > 0
-              ? Math.min(100, Math.round(((currentUsage.contextUsedTokens ?? currentUsage.latestInputTokens ?? 0) / currentUsage.contextWindow) * 100))
-              : null
-          }
-        />
-      )}
+            {/* Session action bar */}
+            {currentSession && (
+              <SessionHeader
+                currentSession={currentSession}
+                currentProject={currentProject}
+                isMobile={isMobile}
+                isLoading={isLoading}
+                isRenamingSession={isRenamingSession}
+                renameValue={renameValue}
+                showSessionMenu={showSessionMenu}
+                onOpenSidebar={onOpenSidebar}
+                onReturnToDashboard={onReturnToDashboard}
+                onRenameStart={name => {
+                  setRenameValue(name);
+                  setIsRenamingSession(true);
+                }}
+                onRenameChange={setRenameValue}
+                onRenameConfirm={handleSessionRename}
+                onRenameCancel={() => setIsRenamingSession(false)}
+                onResetProviderSession={handleResetProviderSession}
+                onExport={handleExportSession}
+                onArchive={handleArchiveSession}
+                archiveDisabled={isSessionRunning}
+                onPopOut={handlePopOut}
+                onToggleSessionMenu={() => setShowSessionMenu(!showSessionMenu)}
+                systemInfo={currentSystemInfo}
+                contextPercent={
+                  currentUsage.contextWindow && currentUsage.contextWindow > 0
+                    ? Math.min(
+                        100,
+                        Math.round(
+                          ((currentUsage.contextUsedTokens ?? currentUsage.latestInputTokens ?? 0) /
+                            currentUsage.contextWindow) *
+                            100
+                        )
+                      )
+                    : null
+                }
+              />
+            )}
 
-      {/* Plan status indicator */}
-      {currentSession?.projectRole === 'task' && currentSession.planStatus === 'planning' && (
-        <PlanStatusBar
-          taskPlanStatus={taskPlanStatus}
-          planStatusLoading={planStatusLoading}
-          submitPlanLoading={submitPlanLoading}
-          discardPlanLoading={discardPlanLoading}
-          isLoading={isLoading}
-          onRestorePlan={handleRestorePlan}
-          onDiscardPlan={handleDiscardPlan}
-          onSubmitPlan={handleSubmitPlan}
-        />
-      )}
+            {/* Plan status indicator */}
+            {currentSession?.projectRole === 'task' && currentSession.planStatus === 'planning' && (
+              <PlanStatusBar
+                taskPlanStatus={taskPlanStatus}
+                planStatusLoading={planStatusLoading}
+                submitPlanLoading={submitPlanLoading}
+                discardPlanLoading={discardPlanLoading}
+                isLoading={isLoading}
+                onRestorePlan={handleRestorePlan}
+                onDiscardPlan={handleDiscardPlan}
+                onSubmitPlan={handleSubmitPlan}
+              />
+            )}
 
-      {/* Messages — memo'd to isolate from input re-renders */}
-      <ChatMessagePane
-        sessionId={sessionId}
-        messagesEndRef={pagination.messagesEndRef}
-        messagesContainerRef={pagination.messagesContainerRef}
-        initialLoadDone={pagination.initialLoadDone}
-        showScrollToBottom={pagination.showScrollToBottom}
-        scrollMetrics={pagination.scrollMetrics}
-        highlightedMessageId={pagination.highlightedMessageId}
-        loadError={pagination.loadError}
-        sessionPagination={pagination.sessionPagination}
-        scrollToBottom={scrollToBottom}
-        jumpToBottomInstant={pagination.jumpToBottomInstant}
-        loadMoreMessages={pagination.loadMoreMessages}
-        handleScroll={pagination.handleScroll}
-        handleMessageWheel={pagination.handleMessageWheel}
-        retryLoad={pagination.retryLoad}
-        sessionMessages={sessionMessages}
-        lastSessionMessage={lastSessionMessage}
-        lastStreamingBlock={lastStreamingBlock}
-        streamingContentSignature={streamingContentSignature}
-        useStreamingSegmented={useStreamingSegmented}
-        sessionContentBlocks={sessionContentBlocks}
-        sessionToolCallHistory={sessionToolCallHistory}
-        sessionToolCalls={sessionToolCalls}
-        sessionHealth={sessionHealth}
-        sessionRetryStatus={sessionRetryStatus}
-        isLoading={isLoading}
-        resendTargetMessageId={resendTargetMessage?.id}
-        resendDisabled={!resendText || resendChecking}
-        onResendTarget={handleResendLastMessage}
-        onCancelRun={handleCancelRun}
-        permissionRequests={permissionRequests}
-        onPermissionDecision={handlePermissionDecision}
-        fileReferenceRoot={fileReferenceRoot}
-        fileReferenceBackendId={fileReferenceBackendId}
-        onFork={handleFork}
-        onBranch={handleBranch}
-        collapsed={isEmptySession}
-      />
+            {/* Messages — memo'd to isolate from input re-renders */}
+            <ChatMessagePane
+              sessionId={sessionId}
+              messagesEndRef={pagination.messagesEndRef}
+              messagesContainerRef={pagination.messagesContainerRef}
+              initialLoadDone={pagination.initialLoadDone}
+              showScrollToBottom={pagination.showScrollToBottom}
+              scrollMetrics={pagination.scrollMetrics}
+              highlightedMessageId={pagination.highlightedMessageId}
+              loadError={pagination.loadError}
+              sessionPagination={pagination.sessionPagination}
+              scrollToBottom={scrollToBottom}
+              jumpToBottomInstant={pagination.jumpToBottomInstant}
+              loadMoreMessages={pagination.loadMoreMessages}
+              handleScroll={pagination.handleScroll}
+              handleMessageWheel={pagination.handleMessageWheel}
+              retryLoad={pagination.retryLoad}
+              sessionMessages={sessionMessages}
+              lastSessionMessage={lastSessionMessage}
+              lastStreamingBlock={lastStreamingBlock}
+              streamingContentSignature={streamingContentSignature}
+              useStreamingSegmented={useStreamingSegmented}
+              sessionContentBlocks={sessionContentBlocks}
+              sessionToolCallHistory={sessionToolCallHistory}
+              sessionToolCalls={sessionToolCalls}
+              sessionHealth={sessionHealth}
+              sessionRetryStatus={sessionRetryStatus}
+              isLoading={isLoading}
+              resendTargetMessageId={resendTargetMessage?.id}
+              resendDisabled={!resendText || resendChecking}
+              onResendTarget={handleResendLastMessage}
+              onCancelRun={handleCancelRun}
+              permissionRequests={permissionRequests}
+              onPermissionDecision={handlePermissionDecision}
+              fileReferenceRoot={fileReferenceRoot}
+              fileReferenceBackendId={fileReferenceBackendId}
+              onFork={handleFork}
+              onBranch={handleBranch}
+              collapsed={isEmptySession}
+            />
 
-      {/* Background Tasks Panel */}
-      <BackgroundTaskPanel sessionId={sessionId} onStopTask={(task) => {
-        wsSendMessage({
-          type: 'stop_background_task',
-          sessionId,
-          taskId: task.id,
-          cliPid: task.cliPid,
-          taskRootPid: task.taskRootPid,
-          taskCommand: task.taskCommand,
-        });
-      }} />
+            {/* Background Tasks Panel */}
+            <BackgroundTaskPanel
+              sessionId={sessionId}
+              onStopTask={task => {
+                wsSendMessage({
+                  type: 'stop_background_task',
+                  sessionId,
+                  taskId: task.id,
+                  cliPid: task.cliPid,
+                  taskRootPid: task.taskRootPid,
+                  taskCommand: task.taskCommand,
+                });
+              }}
+            />
 
-      {beforeComposer}
+            {beforeComposer}
 
-      {/* Upload error banner */}
-      {uploadError && (
-        <div className="mx-2 md:mx-4 mt-2 px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-xs flex items-center gap-2">
-          <AlertTriangle size={16} strokeWidth={2} className="flex-shrink-0" />
-          <span className="flex-1">{uploadError}</span>
-          <button onClick={() => send.resetSendState()} className="text-destructive hover:text-destructive/80 font-medium">Dismiss</button>
-        </div>
-      )}
+            {/* Upload error banner */}
+            {uploadError && (
+              <div className="mx-2 md:mx-4 mt-2 px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-xs flex items-center gap-2">
+                <AlertTriangle size={16} strokeWidth={2} className="flex-shrink-0" />
+                <span className="flex-1">{uploadError}</span>
+                <button
+                  onClick={() => send.resetSendState()}
+                  className="text-destructive hover:text-destructive/80 font-medium"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
 
-      {/* Input area */}
-      {currentSession && (
-        <ChatInputArea
-          sessionId={sessionId}
-          currentSession={currentSession}
-          currentProject={currentProject}
-          isMobile={isMobile}
-          isLoading={isLoading}
-          isConnected={isConnected}
-          isForcedPlanSession={isForcedPlanSession}
-          mode={effectiveMode}
-          capabilities={capabilities}
-          permissionOverride={permissionOverride}
-          commands={commands}
-          fileReferenceRoot={fileReferenceRoot}
-          fileReferenceBackendId={fileReferenceBackendId}
-          sessionRunId={sessionRunId}
-          currentUsage={currentUsage}
-          advancedInput={advancedInput}
-          restoreMessage={restoreMessage}
-          initialDraft={initialDraft}
-          draftExists={draftExists}
-          onSetMode={setMode}
-          onSetPermissionOverride={setPermissionOverride}
-          onWorktreeChange={handleWorktreeChange}
-          onSendMessage={handleSendMessage}
-          onCancelRun={handleCancelRun}
-          onCommand={handleCommand}
-          onSteerQueueItem={handleSteerQueueItem}
-          centered={isEmptySession}
-        />
-      )}
-      </>}
+            {/* Input area */}
+            {currentSession && (
+              <ChatInputArea
+                sessionId={sessionId}
+                currentSession={currentSession}
+                currentProject={currentProject}
+                isMobile={isMobile}
+                isLoading={isLoading}
+                isConnected={isConnected}
+                isForcedPlanSession={isForcedPlanSession}
+                mode={effectiveMode}
+                capabilities={capabilities}
+                permissionOverride={permissionOverride}
+                commands={commands}
+                fileReferenceRoot={fileReferenceRoot}
+                fileReferenceBackendId={fileReferenceBackendId}
+                sessionRunId={sessionRunId}
+                currentUsage={currentUsage}
+                advancedInput={advancedInput}
+                restoreMessage={restoreMessage}
+                initialDraft={initialDraft}
+                draftExists={draftExists}
+                onSetMode={setMode}
+                onSetPermissionOverride={setPermissionOverride}
+                onWorktreeChange={handleWorktreeChange}
+                onSendMessage={handleSendMessage}
+                onCancelRun={handleCancelRun}
+                onCommand={handleCommand}
+                onSteerQueueItem={handleSteerQueueItem}
+                centered={isEmptySession}
+              />
+            )}
+          </>
+        )}
 
-      {/* Draft lock conflict dialog */}
-      {draftShowLockPrompt && <DraftLockPrompt />}
-    </div>
+        {/* Draft lock conflict dialog */}
+        {draftShowLockPrompt && <DraftLockPrompt />}
+      </div>
     </ChatActionsProvider>
   );
 }

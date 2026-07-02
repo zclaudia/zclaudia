@@ -1,6 +1,6 @@
 // server/src/domains/meta-workflow/run-aggregate.ts
 import type { MetaWorkflowRun } from '@zclaudia/shared/features/meta-workflow';
-import { MetaWorkflowRunRepository } from './repositories/meta-workflow-run-repository.js';
+import { type MetaWorkflowRunRepository } from './repositories/meta-workflow-run-repository.js';
 import { assertRunTransition, assertRunStatusIn } from './status-machine.js';
 
 export interface CreateRunInput {

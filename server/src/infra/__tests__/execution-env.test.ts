@@ -6,8 +6,12 @@ import { createExecutionEnv, unwrapResult } from '../execution-env.js';
 
 describe('createExecutionEnv', () => {
   let tmpRoot: string;
-  beforeEach(() => { tmpRoot = mkdtempSync(path.join(tmpdir(), 'zc-env-')); });
-  afterEach(() => { rmSync(tmpRoot, { recursive: true, force: true }); });
+  beforeEach(() => {
+    tmpRoot = mkdtempSync(path.join(tmpdir(), 'zc-env-'));
+  });
+  afterEach(() => {
+    rmSync(tmpRoot, { recursive: true, force: true });
+  });
 
   it('readTextFile returns ok on success', async () => {
     const file = path.join(tmpRoot, 'hello.txt');

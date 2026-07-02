@@ -35,8 +35,8 @@ describe('SessionRepository', () => {
           if (typeof args[0] === 'string') lastQueriedId = args[0];
           return lastQueriedId ? buildAgentRow(lastQueriedId) : buildAgentRow('agent-default');
         }),
-        run: vi.fn()
-      })
+        run: vi.fn(),
+      }),
     };
 
     repository = new SessionRepository(mockDb);
@@ -55,7 +55,7 @@ describe('SessionRepository', () => {
         working_directory: '/path/to/work',
         created_at: 1000,
         updated_at: 2000,
-        archived_at: 3000
+        archived_at: 3000,
       };
 
       const result = repository.mapRow(row);
@@ -91,7 +91,7 @@ describe('SessionRepository', () => {
         working_directory: null,
         created_at: 1000,
         updated_at: 2000,
-        archived_at: null
+        archived_at: null,
       };
 
       const result = repository.mapRow(row);
@@ -110,12 +110,32 @@ describe('SessionRepository', () => {
         project_id: 'proj-456',
         type: null,
         created_at: 1000,
-        updated_at: 2000
+        updated_at: 2000,
       };
 
       const result = repository.mapRow(row);
 
       expect(result.type).toBe('regular');
+    });
+  });
+
+  describe('archiveIfActive', () => {
+    it('archives only sessions that are not already archived', () => {
+      mockDb.prepare().run.mockReturnValue({ changes: 1 });
+
+      const archived = repository.archiveIfActive('session-1', 1234);
+
+      expect(archived).toBe(true);
+      expect(mockDb.prepare).toHaveBeenCalledWith(
+        'UPDATE sessions SET archived_at = ?, updated_at = ? WHERE id = ? AND archived_at IS NULL'
+      );
+      expect(mockDb.prepare().run).toHaveBeenCalledWith(1234, 1234, 'session-1');
+    });
+
+    it('returns false when the session is missing or already archived', () => {
+      mockDb.prepare().run.mockReturnValue({ changes: 0 });
+
+      expect(repository.archiveIfActive('session-1', 1234)).toBe(false);
     });
   });
 
@@ -128,7 +148,7 @@ describe('SessionRepository', () => {
         sdkSessionId: 'sdk-789',
         type: 'agent',
         parentSessionId: 'parent-123',
-        workingDirectory: '/work/path'
+        workingDirectory: '/work/path',
       };
 
       const { sql, params } = repository.createQuery(data);
@@ -196,7 +216,7 @@ describe('SessionRepository', () => {
       const { sql, params } = repository.updateQuery('sess-123', {
         name: 'New Name',
         agentProfileId: 'new-agent',
-        sdkSessionId: 'new-sdk'
+        sdkSessionId: 'new-sdk',
       });
 
       expect(sql).toContain('name = ?');
@@ -210,7 +230,7 @@ describe('SessionRepository', () => {
     it('handles archivedAt field', () => {
       const timestamp = Date.now();
       const { sql, params } = repository.updateQuery('sess-123', {
-        archivedAt: timestamp
+        archivedAt: timestamp,
       });
 
       expect(sql).toContain('archived_at = ?');
@@ -219,7 +239,7 @@ describe('SessionRepository', () => {
 
     it('handles workingDirectory with null', () => {
       const { params } = repository.updateQuery('sess-123', {
-        workingDirectory: null
+        workingDirectory: null,
       });
 
       expect(params).toContain(null);
@@ -275,7 +295,7 @@ describe('SessionRepository', () => {
     it('returns sessions for a project ordered by updated_at DESC', () => {
       const mockRows = [
         { id: 'sess-1', project_id: 'proj-123', created_at: 1000, updated_at: 3000 },
-        { id: 'sess-2', project_id: 'proj-123', created_at: 2000, updated_at: 2000 }
+        { id: 'sess-2', project_id: 'proj-123', created_at: 2000, updated_at: 2000 },
       ];
       mockDb.prepare().all.mockReturnValue(mockRows);
 
@@ -289,15 +309,29 @@ describe('SessionRepository', () => {
   describe('findByProjectRole', () => {
     it('returns sessions matching project and role', () => {
       const mockRows = [
-        { id: 'sess-1', project_id: 'proj-123', project_role: 'checkpoint', created_at: 2000, updated_at: 2000 },
-        { id: 'sess-2', project_id: 'proj-123', project_role: 'checkpoint', created_at: 1000, updated_at: 1000 }
+        {
+          id: 'sess-1',
+          project_id: 'proj-123',
+          project_role: 'checkpoint',
+          created_at: 2000,
+          updated_at: 2000,
+        },
+        {
+          id: 'sess-2',
+          project_id: 'proj-123',
+          project_role: 'checkpoint',
+          created_at: 1000,
+          updated_at: 1000,
+        },
       ];
       mockDb.prepare().all.mockReturnValue(mockRows);
 
       const result = repository.findByProjectRole('proj-123', 'checkpoint');
 
       expect(result).toHaveLength(2);
-      expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('WHERE project_id = ? AND project_role = ?'));
+      expect(mockDb.prepare).toHaveBeenCalledWith(
+        expect.stringContaining('WHERE project_id = ? AND project_role = ?')
+      );
     });
 
     it('returns empty array when no sessions match', () => {
@@ -313,7 +347,9 @@ describe('SessionRepository', () => {
 
       repository.findByProjectRole('proj-123', 'task');
 
-      expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('ORDER BY created_at DESC'));
+      expect(mockDb.prepare).toHaveBeenCalledWith(
+        expect.stringContaining('ORDER BY created_at DESC')
+      );
     });
   });
 
@@ -324,7 +360,7 @@ describe('SessionRepository', () => {
         project_id: 'proj-456',
         sdk_session_id: 'sdk-789',
         created_at: 1000,
-        updated_at: 2000
+        updated_at: 2000,
       };
       mockDb.prepare().get.mockReturnValue(mockRow);
 
@@ -332,7 +368,9 @@ describe('SessionRepository', () => {
 
       expect(result).not.toBeNull();
       expect(result?.id).toBe('sess-123');
-      expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('WHERE sdk_session_id = ?'));
+      expect(mockDb.prepare).toHaveBeenCalledWith(
+        expect.stringContaining('WHERE sdk_session_id = ?')
+      );
     });
 
     it('returns null when SDK session ID not found', () => {

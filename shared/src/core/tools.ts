@@ -31,7 +31,7 @@ export const ALL_TOOL_NAMES = [
   'Memory',
 ] as const;
 
-export type ToolName = typeof ALL_TOOL_NAMES[number];
+export type ToolName = (typeof ALL_TOOL_NAMES)[number];
 
 export type ToolSource = 'builtin' | 'plugin' | 'mcp' | 'interaction';
 
@@ -69,7 +69,13 @@ export interface InteractionToolRef {
   toolId: string;
 }
 
-export type ToolRef = BuiltinToolRef | PluginToolRef | McpToolRef | McpResourceRef | McpPromptRef | InteractionToolRef;
+export type ToolRef =
+  | BuiltinToolRef
+  | PluginToolRef
+  | McpToolRef
+  | McpResourceRef
+  | McpPromptRef
+  | InteractionToolRef;
 
 export type ToolSetRef =
   | { source: 'builtin'; id: BuiltinToolSetId }
@@ -482,7 +488,8 @@ export const BUILTIN_TOOL_METADATA: Readonly<Record<ToolName, ToolMetadata>> = {
   ExitPlanMode: {
     ref: { source: 'builtin', name: 'ExitPlanMode' },
     label: 'ExitPlanMode',
-    description: 'Leave plan mode (optionally presenting a plan for approval) and resume execution.',
+    description:
+      'Leave plan mode (optionally presenting a plan for approval) and resume execution.',
     setIds: ['core-coding'],
     declaredReadOnly: true,
     mutatesWorkspace: false,
@@ -493,7 +500,8 @@ export const BUILTIN_TOOL_METADATA: Readonly<Record<ToolName, ToolMetadata>> = {
   Memory: {
     ref: { source: 'builtin', name: 'Memory' },
     label: 'Memory',
-    description: 'Read and maintain persistent project memory files under /memories (survives across sessions).',
+    description:
+      'Read and maintain persistent project memory files under /memories (survives across sessions).',
     setIds: ['core-coding'],
     declaredReadOnly: false,
     mutatesWorkspace: false,
@@ -507,7 +515,22 @@ export const BUILTIN_TOOL_SETS = {
   'core-coding': {
     id: 'core-coding',
     label: 'Core Coding',
-    tools: ['Read', 'Write', 'Edit', 'MultiEdit', 'ReadSymbol', 'EditSymbol', 'Bash', 'Eval', 'Grep', 'Glob', 'LS', 'EnterPlanMode', 'ExitPlanMode', 'Memory'],
+    tools: [
+      'Read',
+      'Write',
+      'Edit',
+      'MultiEdit',
+      'ReadSymbol',
+      'EditSymbol',
+      'Bash',
+      'Eval',
+      'Grep',
+      'Glob',
+      'LS',
+      'EnterPlanMode',
+      'ExitPlanMode',
+      'Memory',
+    ],
   },
   interaction: {
     id: 'interaction',
@@ -539,7 +562,9 @@ export const BUILTIN_TOOL_SETS = {
     label: 'All Built-in Tools',
     tools: [...ALL_TOOL_NAMES],
   },
-} as const satisfies Readonly<Record<string, { id: string; label: string; tools: readonly ToolName[] }>>;
+} as const satisfies Readonly<
+  Record<string, { id: string; label: string; tools: readonly ToolName[] }>
+>;
 
 export type BuiltinToolSetId = keyof typeof BUILTIN_TOOL_SETS;
 
@@ -585,7 +610,7 @@ export function toolRefKey(ref: ToolRef): string {
 }
 
 export function legacyEnabledToolsToSelection(tools: string[]): ToolSelection {
-  const include = tools.flatMap((tool) => {
+  const include = tools.flatMap(tool => {
     const name = normalizeToolName(tool);
     return name ? [builtinToolRef(name)] : [];
   });
@@ -613,17 +638,18 @@ function expandToolSet(set: ToolSetRef): ToolRef[] {
 export function resolveToolSelection(selection: ToolSelection): ResolvedToolSelection {
   const expanded = (selection.sets ?? []).flatMap(expandToolSet);
   const excluded = new Set((selection.exclude ?? []).map(toolRefKey));
-  const refs = uniqueToolRefs([...expanded, ...(selection.include ?? [])])
-    .filter((ref) => !excluded.has(toolRefKey(ref)));
+  const refs = uniqueToolRefs([...expanded, ...(selection.include ?? [])]).filter(
+    ref => !excluded.has(toolRefKey(ref))
+  );
   return {
     refs,
-    builtinTools: refs.flatMap((ref) => ref.source === 'builtin' ? [ref.name] : []),
+    builtinTools: refs.flatMap(ref => (ref.source === 'builtin' ? [ref.name] : [])),
   };
 }
 
 export function getEffectiveReadOnly(
   metadata: ToolMetadata,
-  options: { pluginTrust?: PluginTrustLevel } = {},
+  options: { pluginTrust?: PluginTrustLevel } = {}
 ): boolean {
   if (metadata.mutatesWorkspace || metadata.riskLevel === 'high') return false;
   if (!metadata.declaredReadOnly) return false;

@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRightWorkspaceStore, type LayoutNode, type GroupNode } from '../../stores/rightWorkspaceStore';
+import {
+  useRightWorkspaceStore,
+  type LayoutNode,
+  type GroupNode,
+} from '../../stores/rightWorkspaceStore';
 import { PaneView } from './PaneView';
 import { ResizeDivider } from './ResizeDivider';
 
@@ -10,17 +14,22 @@ interface WorkspaceViewProps {
   workingDirectory?: string;
 }
 
-export function WorkspaceView({ sessionId, projectId, projectRoot, workingDirectory }: WorkspaceViewProps) {
-  const root = useRightWorkspaceStore((s) => s.bySession[sessionId]?.root ?? null);
-  const focusedPaneId = useRightWorkspaceStore((s) => s.bySession[sessionId]?.focusedPaneId ?? null);
-  const setRatio = useRightWorkspaceStore((s) => s.setRatio);
+export function WorkspaceView({
+  sessionId,
+  projectId,
+  projectRoot,
+  workingDirectory,
+}: WorkspaceViewProps) {
+  const root = useRightWorkspaceStore(s => s.bySession[sessionId]?.root ?? null);
+  const focusedPaneId = useRightWorkspaceStore(s => s.bySession[sessionId]?.focusedPaneId ?? null);
+  const setRatio = useRightWorkspaceStore(s => s.setRatio);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   useEffect(() => {
     const el = containerRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver((entries) => {
+    const ro = new ResizeObserver(entries => {
       const r = entries[0]?.contentRect;
       if (r) setSize({ width: r.width, height: r.height });
     });
@@ -47,7 +56,7 @@ export function WorkspaceView({ sessionId, projectId, projectRoot, workingDirect
       return renderGroup(node);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [focusedPaneId, projectId, projectRoot, workingDirectory, sessionId, size],
+    [focusedPaneId, projectId, projectRoot, workingDirectory, sessionId, size]
   );
 
   const renderGroup = (group: GroupNode): React.ReactNode => {
@@ -59,14 +68,18 @@ export function WorkspaceView({ sessionId, projectId, projectRoot, workingDirect
         className={isRow ? 'flex flex-row min-w-0 min-h-0' : 'flex flex-col min-w-0 min-h-0'}
         style={{ flex: '1 1 0%', minWidth: 0, minHeight: 0 }}
       >
-        <div className="flex min-w-0 min-h-0" style={{ flex: `${group.ratio} 1 0%` }}>{renderNode(group.children[0])}</div>
+        <div className="flex min-w-0 min-h-0" style={{ flex: `${group.ratio} 1 0%` }}>
+          {renderNode(group.children[0])}
+        </div>
         <ResizeDivider
           groupId={group.id}
           dir={group.dir}
           containerSize={containerSize}
-          onDrag={(delta) => setRatio(sessionId, group.id, group.ratio + delta)}
+          onDrag={delta => setRatio(sessionId, group.id, group.ratio + delta)}
         />
-        <div className="flex min-w-0 min-h-0" style={{ flex: `${1 - group.ratio} 1 0%` }}>{renderNode(group.children[1])}</div>
+        <div className="flex min-w-0 min-h-0" style={{ flex: `${1 - group.ratio} 1 0%` }}>
+          {renderNode(group.children[1])}
+        </div>
       </div>
     );
   };

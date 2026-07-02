@@ -22,34 +22,30 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
-    
+
     // 减少并发以稳定运行
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: true,
-      },
-    },
-    
+    fileParallelism: false,
+
     // 增加超时
     testTimeout: 30000,
     hookTimeout: 30000,
-    
+
     server: {
       deps: {
         inline: [/@tauri-apps\/.*/],
       },
     },
-    
+
     coverage: {
       provider: 'istanbul',
       reporter: ['text', 'text-summary', 'json', 'html'],
       all: true,
       include: ['src/**/*.{ts,tsx}'],
       exclude: [
-        'src/test/**', 
-        '**/*.d.ts', 
-        'src/main.tsx', 
+        'src/test/**',
+        '**/*.d.ts',
+        'src/main.tsx',
         'src/**/__tests__/**',
         'src/hooks/useAutoUpdate.ts',
         'src/components/UpdateBanner.tsx',

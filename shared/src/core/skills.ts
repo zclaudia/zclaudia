@@ -42,11 +42,7 @@ export interface ResolvedSkillSelection<T extends SkillCatalogEntry = SkillCatal
 }
 
 export const defaultSkillSelection: SkillSelection = {
-  providers: [
-    { source: 'workspace' },
-    { source: 'external' },
-    { source: 'plugin' },
-  ],
+  providers: [{ source: 'workspace' }, { source: 'external' }, { source: 'plugin' }],
   include: [],
   exclude: [],
   pinned: [],
@@ -76,9 +72,9 @@ function normalizeSkillRef(ref: unknown): SkillRef | undefined {
   if (!ref || typeof ref !== 'object') return undefined;
   const row = ref as Record<string, unknown>;
   if (
-    (row.source === 'workspace' || row.source === 'external' || row.source === 'plugin')
-    && typeof row.id === 'string'
-    && row.id.trim()
+    (row.source === 'workspace' || row.source === 'external' || row.source === 'plugin') &&
+    typeof row.id === 'string' &&
+    row.id.trim()
   ) {
     return { source: row.source, id: row.id.trim() };
   }
@@ -87,7 +83,7 @@ function normalizeSkillRef(ref: unknown): SkillRef | undefined {
 
 function uniqueByKey<T extends SkillSourceRef | SkillRef>(
   refs: T[],
-  keyFn: (ref: T) => string,
+  keyFn: (ref: T) => string
 ): T[] {
   const seen = new Set<string>();
   const out: T[] = [];
@@ -108,28 +104,40 @@ export function normalizeSkillSelection(value: unknown): SkillSelection | undefi
   if (!value || typeof value !== 'object') return undefined;
   const candidate = value as Record<string, unknown>;
   const providers = Array.isArray(candidate.providers)
-    ? uniqueByKey(candidate.providers.flatMap((ref) => {
-      const normalized = normalizeSkillSourceRef(ref);
-      return normalized ? [normalized] : [];
-    }), (ref) => ref.source === 'plugin' ? `plugin:${ref.pluginId ?? '*'}` : ref.source)
+    ? uniqueByKey(
+        candidate.providers.flatMap(ref => {
+          const normalized = normalizeSkillSourceRef(ref);
+          return normalized ? [normalized] : [];
+        }),
+        ref => (ref.source === 'plugin' ? `plugin:${ref.pluginId ?? '*'}` : ref.source)
+      )
     : [];
   const include = Array.isArray(candidate.include)
-    ? uniqueByKey(candidate.include.flatMap((ref) => {
-      const normalized = normalizeSkillRef(ref);
-      return normalized ? [normalized] : [];
-    }), skillRefKey)
+    ? uniqueByKey(
+        candidate.include.flatMap(ref => {
+          const normalized = normalizeSkillRef(ref);
+          return normalized ? [normalized] : [];
+        }),
+        skillRefKey
+      )
     : [];
   const exclude = Array.isArray(candidate.exclude)
-    ? uniqueByKey(candidate.exclude.flatMap((ref) => {
-      const normalized = normalizeSkillRef(ref);
-      return normalized ? [normalized] : [];
-    }), skillRefKey)
+    ? uniqueByKey(
+        candidate.exclude.flatMap(ref => {
+          const normalized = normalizeSkillRef(ref);
+          return normalized ? [normalized] : [];
+        }),
+        skillRefKey
+      )
     : [];
   const pinned = Array.isArray(candidate.pinned)
-    ? uniqueByKey(candidate.pinned.flatMap((ref) => {
-      const normalized = normalizeSkillRef(ref);
-      return normalized ? [normalized] : [];
-    }), skillRefKey)
+    ? uniqueByKey(
+        candidate.pinned.flatMap(ref => {
+          const normalized = normalizeSkillRef(ref);
+          return normalized ? [normalized] : [];
+        }),
+        skillRefKey
+      )
     : [];
   return { providers, include, exclude, pinned };
 }
@@ -139,7 +147,10 @@ function normalizeExecutionMode(value: unknown): SkillExecutionMode | undefined 
 }
 
 function normalizeForkToolPolicy(value: unknown): SkillForkToolPolicy | undefined {
-  return value === 'read-only' || value === 'web' || value === 'workspace-edit' || value === 'agent-default'
+  return value === 'read-only' ||
+    value === 'web' ||
+    value === 'workspace-edit' ||
+    value === 'agent-default'
     ? value
     : undefined;
 }
@@ -151,10 +162,12 @@ function normalizeExecutionOverride(value: unknown): SkillExecutionOverride | un
   if (!ref) return undefined;
 
   const allowedModes = Array.isArray(row.allowedModes)
-    ? uniqueStrings(row.allowedModes.flatMap((mode) => {
-      const normalized = normalizeExecutionMode(mode);
-      return normalized ? [normalized] : [];
-    }))
+    ? uniqueStrings(
+        row.allowedModes.flatMap(mode => {
+          const normalized = normalizeExecutionMode(mode);
+          return normalized ? [normalized] : [];
+        })
+      )
     : undefined;
   const defaultMode = normalizeExecutionMode(row.defaultMode);
   const forkToolPolicy = normalizeForkToolPolicy(row.forkToolPolicy);
@@ -167,7 +180,9 @@ function normalizeExecutionOverride(value: unknown): SkillExecutionOverride | un
   };
 }
 
-export function normalizeSkillExecutionSelection(value: unknown): SkillExecutionSelection | undefined {
+export function normalizeSkillExecutionSelection(
+  value: unknown
+): SkillExecutionSelection | undefined {
   if (!value || typeof value !== 'object') return undefined;
   const candidate = value as Record<string, unknown>;
   const byRef = new Map<string, SkillExecutionOverride>();
@@ -187,7 +202,7 @@ function providerMatches<T extends SkillCatalogEntry>(skill: T, provider: SkillS
 
 export function resolveSkillSelection<T extends SkillCatalogEntry>(
   discoveredSkills: T[],
-  selection?: SkillSelection,
+  selection?: SkillSelection
 ): ResolvedSkillSelection<T> {
   if (!selection) {
     return { discoverable: [...discoveredSkills], pinned: [] };
@@ -196,7 +211,7 @@ export function resolveSkillSelection<T extends SkillCatalogEntry>(
   const providers = selection.providers ?? [];
   const includeKeys = new Set((selection.include ?? []).map(skillRefKey));
   const excludeKeys = new Set((selection.exclude ?? []).map(skillRefKey));
-  const byKey = new Map(discoveredSkills.map((skill) => [skillRefKey(skill), skill]));
+  const byKey = new Map(discoveredSkills.map(skill => [skillRefKey(skill), skill]));
   const selected = new Map<string, T>();
 
   if (providers.length === 0) {
@@ -205,7 +220,7 @@ export function resolveSkillSelection<T extends SkillCatalogEntry>(
     }
   } else {
     for (const skill of discoveredSkills) {
-      if (providers.some((provider) => providerMatches(skill, provider))) {
+      if (providers.some(provider => providerMatches(skill, provider))) {
         selected.set(skillRefKey(skill), skill);
       }
     }
@@ -221,10 +236,10 @@ export function resolveSkillSelection<T extends SkillCatalogEntry>(
   }
 
   const visibleKeys = new Set(selected.keys());
-  const pinned = (selection.pinned ?? []).filter((ref) => visibleKeys.has(skillRefKey(ref)));
+  const pinned = (selection.pinned ?? []).filter(ref => visibleKeys.has(skillRefKey(ref)));
 
   return {
-    discoverable: discoveredSkills.filter((skill) => visibleKeys.has(skillRefKey(skill))),
+    discoverable: discoveredSkills.filter(skill => visibleKeys.has(skillRefKey(skill))),
     pinned,
   };
 }

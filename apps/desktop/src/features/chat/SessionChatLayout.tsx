@@ -10,6 +10,7 @@ import { useFileViewerStore } from '../../stores/fileViewerStore';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { useServerStore } from '../../stores/serverStore';
 import { useIsMobile } from '../../hooks/useMediaQuery';
+import { useGitStore } from '../git/store';
 
 interface SessionChatLayoutProps {
   sessionId: string;
@@ -26,22 +27,31 @@ export function SessionChatLayout({
   onReturnToDashboard,
   onOpenSidebar,
 }: SessionChatLayoutProps) {
-  const currentSession = useProjectStore((s) => s.sessions.find((session) => session.id === sessionId) ?? null);
-  const currentProject = useProjectStore((s) =>
-    currentSession ? s.projects.find((project) => project.id === currentSession.projectId) ?? null : null
+  const currentSession = useProjectStore(
+    s => s.sessions.find(session => session.id === sessionId) ?? null
   );
-  const poppedOutLabel = useUIStore((s) => s.poppedOutSessions.get(sessionId));
+  const currentProject = useProjectStore(s =>
+    currentSession
+      ? (s.projects.find(project => project.id === currentSession.projectId) ?? null)
+      : null
+  );
+  const poppedOutLabel = useUIStore(s => s.poppedOutSessions.get(sessionId));
 
   const projectRoot = currentSession?.workingDirectory || currentProject?.rootPath;
   const workingDirectory = currentSession?.workingDirectory;
   const projectId = currentSession?.projectId;
+  const branchName = useGitStore(s => {
+    if (!projectId) return undefined;
+    const selectedPath = s.selectedWorktree[projectId];
+    return (s.worktrees[projectId] ?? []).find(w => w.path === selectedPath)?.branch;
+  });
 
   // Draft is session-scoped: when the draft panel is visible but the store's
   // activeSessionId doesn't match the current session, re-open against this
   // session. openEditor handles flushing the previous session's save and
   // releasing its lock in the background.
-  const draftPanelVisible = usePluginStore((s) =>
-    s.panels.find((p) => p.id === 'draft')?.visible === true
+  const draftPanelVisible = usePluginStore(
+    s => s.panels.find(p => p.id === 'draft')?.visible === true
   );
   useEffect(() => {
     if (!draftPanelVisible) return;
@@ -67,13 +77,13 @@ export function SessionChatLayout({
   // visible after switching to project B (which shows "No terminal session").
   // Re-sync visibility to match whether *the current project* has an open
   // drawer, so the tab only appears when it has real content.
-  const activeServerId = useServerStore((s) => s.activeServerId);
+  const activeServerId = useServerStore(s => s.activeServerId);
   useEffect(() => {
     if (!projectId) return;
     const term = useTerminalStore.getState();
     const open = term.isDrawerOpen(projectId, activeServerId);
     const panels = usePluginStore.getState().panels;
-    const current = panels.find((p) => p.id === 'terminal')?.visible === true;
+    const current = panels.find(p => p.id === 'terminal')?.visible === true;
     if (current !== open) {
       usePluginStore.getState().updatePanelVisibility('terminal', open);
     }
@@ -107,6 +117,7 @@ export function SessionChatLayout({
           projectId={projectId}
           projectRoot={projectRoot}
           workingDirectory={workingDirectory}
+          branchName={branchName}
         />
       )}
     </div>

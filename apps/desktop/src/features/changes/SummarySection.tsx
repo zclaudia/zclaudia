@@ -1,11 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  AlertTriangle,
-  CirclePlus,
-  Loader2,
-  RefreshCw,
-  Sparkles,
-} from 'lucide-react';
+import { AlertTriangle, CirclePlus, Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import type { TurnSummary } from '@zclaudia/shared';
 import { useSummaryStore } from '../../stores/summaryStore';
 import { useToastStore } from '../../stores/toastStore';
@@ -38,11 +32,11 @@ export function SummarySection({
   relatedFiles = [],
   affectedCommands = [],
 }: SummarySectionProps) {
-  const entry = useSummaryStore((s) =>
-    turn ? s.entries[`${sessionId}:${turn.userMessageId}`] : undefined,
+  const entry = useSummaryStore(s =>
+    turn ? s.entries[`${sessionId}:${turn.userMessageId}`] : undefined
   );
-  const hydrate = useSummaryStore((s) => s.hydrateSession);
-  const generate = useSummaryStore((s) => s.generate);
+  const hydrate = useSummaryStore(s => s.hydrateSession);
+  const generate = useSummaryStore(s => s.generate);
 
   const [issueDialogOpen, setIssueDialogOpen] = useState(false);
 
@@ -123,9 +117,7 @@ export function SummarySection({
           </div>
         ) : (
           <div className="px-2 py-2 space-y-1.5">
-            <p className="text-[11px] text-muted-foreground">
-              No summary yet for this turn.
-            </p>
+            <p className="text-[11px] text-muted-foreground">No summary yet for this turn.</p>
             <button
               type="button"
               onClick={() => handleGenerate(false)}
@@ -148,7 +140,7 @@ export function SummarySection({
             labels: ['from-summary'],
           }}
           onClose={() => setIssueDialogOpen(false)}
-          onCreated={(issue) => {
+          onCreated={issue => {
             useToastStore.getState().add({
               title: 'Issue created',
               message: issue.title,

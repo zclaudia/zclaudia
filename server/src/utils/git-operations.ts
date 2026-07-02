@@ -108,7 +108,10 @@ export async function commitAllChanges(repoPath: string): Promise<string> {
   if (lines.length > 0) {
     // Last line is summary like "3 files changed, 42 insertions(+), 5 deletions(-)"
     const summary = lines[lines.length - 1].trim();
-    const fileLines = lines.slice(0, -1).map((l) => l.split('|')[0].trim()).filter(Boolean);
+    const fileLines = lines
+      .slice(0, -1)
+      .map(l => l.split('|')[0].trim())
+      .filter(Boolean);
     if (fileLines.length === 1) {
       message = `chore: update ${fileLines[0]}`;
     } else if (fileLines.length > 1) {
@@ -128,24 +131,19 @@ export async function commitAllChanges(repoPath: string): Promise<string> {
 export async function getNewCommits(
   repoPath: string,
   branch: string,
-  baseBranch: string,
+  baseBranch: string
 ): Promise<CommitInfo[]> {
   // Format: sha\x1fmessage\x1fauthor\x1fdate
   const SEP = '\x1f';
   const output = await git(
-    [
-      'log',
-      `${baseBranch}..${branch}`,
-      `--format=%H${SEP}%s${SEP}%an${SEP}%at`,
-      '--no-merges',
-    ],
-    repoPath,
+    ['log', `${baseBranch}..${branch}`, `--format=%H${SEP}%s${SEP}%an${SEP}%at`, '--no-merges'],
+    repoPath
   );
 
   return output
     .split('\n')
     .filter(Boolean)
-    .map((line) => {
+    .map(line => {
       const [sha, message, author, dateStr] = line.split(SEP);
       return { sha, message, author, date: parseInt(dateStr, 10) * 1000 };
     });
@@ -159,7 +157,7 @@ export async function getDiff(
   repoPath: string,
   from: string,
   to: string,
-  maxBytes = 100 * 1024,
+  maxBytes = 100 * 1024
 ): Promise<string> {
   const diff = await git(['diff', from, to], repoPath);
   if (diff.length <= maxBytes) return diff;
@@ -180,12 +178,15 @@ export interface StagedDiffResult {
  */
 export async function getStagedDiff(
   repoPath: string,
-  maxBytes = 60 * 1024,
+  maxBytes = 60 * 1024
 ): Promise<StagedDiffResult> {
   const raw = await git(['diff', '--cached'], repoPath);
   const stat = await git(['diff', '--cached', '--stat'], repoPath);
   const nameOnly = await git(['diff', '--cached', '--name-only'], repoPath);
-  const files = nameOnly.split('\n').map((line) => line.trim()).filter(Boolean);
+  const files = nameOnly
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean);
   const truncated = raw.length > maxBytes;
   const diff = truncated ? raw.slice(0, maxBytes) + '\n\n[diff truncated]' : raw;
   return { diff, stat: stat.trim(), files, truncated };
@@ -209,18 +210,19 @@ function resolveRepoFile(repoPath: string, filePath: string): string {
 }
 
 function renderUntrackedFileDiff(filePath: string, content: string): string {
-  const lines = content.length === 0
-    ? []
-    : content.endsWith('\n')
-    ? content.slice(0, -1).split('\n')
-    : content.split('\n');
+  const lines =
+    content.length === 0
+      ? []
+      : content.endsWith('\n')
+        ? content.slice(0, -1).split('\n')
+        : content.split('\n');
   return [
     `diff --git a/${filePath} b/${filePath}`,
     'new file mode 100644',
     '--- /dev/null',
     `+++ b/${filePath}`,
     `@@ -0,0 +1,${lines.length} @@`,
-    ...lines.map((line) => `+${line}`),
+    ...lines.map(line => `+${line}`),
   ].join('\n');
 }
 
@@ -228,7 +230,7 @@ export async function getFileDiff(
   repoPath: string,
   filePath: string,
   kind: GitFileDiffKind,
-  maxBytes = 200 * 1024,
+  maxBytes = 200 * 1024
 ): Promise<string> {
   if (kind === 'staged') {
     return truncateDiff(await git(['diff', '--cached', '--', filePath], repoPath), maxBytes);
@@ -248,10 +250,7 @@ export async function getFileDiff(
 export async function getMainBranch(repoPath: string): Promise<string> {
   // Try to read from symbolic ref HEAD of remote origin
   try {
-    const ref = await git(
-      ['rev-parse', '--abbrev-ref', 'origin/HEAD'],
-      repoPath,
-    );
+    const ref = await git(['rev-parse', '--abbrev-ref', 'origin/HEAD'], repoPath);
     const branch = ref.trim().replace(/^origin\//, '');
     if (branch && branch !== 'HEAD') return branch;
   } catch {
@@ -304,7 +303,7 @@ export async function hasCommits(repoPath: string): Promise<boolean> {
 export async function mergeBranch(
   repoPath: string,
   branch: string,
-  mergeMessage?: string,
+  mergeMessage?: string
 ): Promise<GitMergeResult> {
   try {
     const msg = mergeMessage ?? `Merge branch '${branch}'`;
@@ -339,13 +338,13 @@ export async function abortMerge(repoPath: string): Promise<void> {
 export async function removeWorktree(
   mainRepoPath: string,
   worktreePath: string,
-  branchName?: string,
+  branchName?: string
 ): Promise<void> {
-  await git(['worktree', 'remove', '--force', worktreePath], mainRepoPath).catch((err) => {
+  await git(['worktree', 'remove', '--force', worktreePath], mainRepoPath).catch(err => {
     console.warn(`[git] Failed to remove worktree ${worktreePath}:`, err.message);
   });
   if (branchName) {
-    await git(['branch', '-D', branchName], mainRepoPath).catch((err) => {
+    await git(['branch', '-D', branchName], mainRepoPath).catch(err => {
       console.warn(`[git] Failed to delete branch ${branchName}:`, err.message);
     });
   }
@@ -365,12 +364,8 @@ export async function listBranches(repoPath: string): Promise<BranchInfo[]> {
   const SEP = '\x1f';
   // %(HEAD) = '*' for current, ' ' otherwise. %(refname:short) e.g. main, origin/main.
   const output = await git(
-    [
-      'branch',
-      '-a',
-      `--format=%(HEAD)${SEP}%(refname:short)${SEP}%(upstream:short)`,
-    ],
-    repoPath,
+    ['branch', '-a', `--format=%(HEAD)${SEP}%(refname:short)${SEP}%(upstream:short)`],
+    repoPath
   );
 
   const branches: BranchInfo[] = [];
@@ -396,21 +391,16 @@ export async function listBranches(repoPath: string): Promise<BranchInfo[]> {
 export async function getCommitLog(
   repoPath: string,
   limit: number = 50,
-  branch?: string,
+  branch?: string
 ): Promise<Array<CommitInfo & { shortSha: string }>> {
   const SEP = '\x1f';
-  const args = [
-    'log',
-    `-n`,
-    String(limit),
-    `--format=%H${SEP}%h${SEP}%s${SEP}%an${SEP}%at`,
-  ];
+  const args = ['log', `-n`, String(limit), `--format=%H${SEP}%h${SEP}%s${SEP}%an${SEP}%at`];
   if (branch) args.push(branch);
   const output = await git(args, repoPath).catch(() => '');
   return output
     .split('\n')
     .filter(Boolean)
-    .map((line) => {
+    .map(line => {
       const [sha, shortSha, message, author, dateStr] = line.split(SEP);
       return {
         sha,
@@ -429,15 +419,18 @@ export async function getCommitLog(
 export async function getAheadBehind(
   repoPath: string,
   branch: string,
-  baseBranch: string,
+  baseBranch: string
 ): Promise<{ ahead: number; behind: number }> {
   try {
     const out = await git(
       ['rev-list', '--left-right', '--count', `${baseBranch}...${branch}`],
-      repoPath,
+      repoPath
     );
     // Output is "behind\tahead"
-    const [behind, ahead] = out.trim().split(/\s+/).map((n) => parseInt(n, 10));
+    const [behind, ahead] = out
+      .trim()
+      .split(/\s+/)
+      .map(n => parseInt(n, 10));
     return {
       ahead: Number.isFinite(ahead) ? ahead : 0,
       behind: Number.isFinite(behind) ? behind : 0,
@@ -455,10 +448,9 @@ export interface StashEntry {
 
 export async function listStash(repoPath: string): Promise<StashEntry[]> {
   const SEP = '\x1f';
-  const output = await git(
-    ['stash', 'list', `--format=%gd${SEP}%s${SEP}%at`],
-    repoPath,
-  ).catch(() => '');
+  const output = await git(['stash', 'list', `--format=%gd${SEP}%s${SEP}%at`], repoPath).catch(
+    () => ''
+  );
   const entries: StashEntry[] = [];
   for (const line of output.split('\n')) {
     if (!line.trim()) continue;
@@ -523,7 +515,7 @@ export async function fetchRemote(repoPath: string, remote: string = 'origin'): 
 export async function pullRemote(
   repoPath: string,
   remote: string = 'origin',
-  branch?: string,
+  branch?: string
 ): Promise<void> {
   const args = ['pull', '--ff-only', remote];
   if (branch) args.push(branch);
@@ -534,7 +526,7 @@ export async function pushRemote(
   repoPath: string,
   remote: string = 'origin',
   branch?: string,
-  force: boolean = false,
+  force: boolean = false
 ): Promise<void> {
   const args = ['push'];
   if (force) args.push('--force-with-lease');
@@ -562,7 +554,7 @@ export async function checkoutBranch(repoPath: string, branch: string): Promise<
 export async function createBranch(
   repoPath: string,
   name: string,
-  opts: { checkout?: boolean; startPoint?: string } = {},
+  opts: { checkout?: boolean; startPoint?: string } = {}
 ): Promise<void> {
   const branch = name.trim();
   if (!branch) {
@@ -581,7 +573,7 @@ export async function createBranch(
 export async function deleteBranch(
   repoPath: string,
   name: string,
-  opts: { force?: boolean } = {},
+  opts: { force?: boolean } = {}
 ): Promise<void> {
   const branch = name.trim();
   if (!branch) {

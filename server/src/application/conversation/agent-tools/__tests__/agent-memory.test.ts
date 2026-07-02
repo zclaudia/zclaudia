@@ -40,19 +40,19 @@ describe('agent-tools/agent_memory', () => {
       'agent_memory',
       { operation: 'set', namespace: 'prefs', key: 'editor', value: 'vim' },
       { sessionId: 'session-1' },
-      'agent-assistant',
+      'agent-assistant'
     );
     const getResult = await toolRegistry.execute(
       'agent_memory',
       { operation: 'get', namespace: 'prefs', key: 'editor' },
       { sessionId: 'session-1' },
-      'agent-assistant',
+      'agent-assistant'
     );
     const listResult = await toolRegistry.execute(
       'agent_memory',
       { operation: 'list', namespace: 'prefs' },
       { sessionId: 'session-1' },
-      'agent-assistant',
+      'agent-assistant'
     );
 
     expect(JSON.parse(setResult)).toEqual({
@@ -76,16 +76,14 @@ describe('agent-tools/agent_memory', () => {
       'agent_memory',
       { operation: 'set', namespace: 'prefs', key: 'theme', value: 'dark' },
       undefined,
-      'agent-assistant',
+      'agent-assistant'
     );
 
-    const rawRows = db.prepare(
-      'SELECT project_id, key, value FROM agent_memory WHERE namespace = ?'
-    ).all('prefs') as Array<{ project_id: string | null; key: string; value: string }>;
+    const rawRows = db
+      .prepare('SELECT project_id, key, value FROM agent_memory WHERE namespace = ?')
+      .all('prefs') as Array<{ project_id: string | null; key: string; value: string }>;
 
-    expect(rawRows).toEqual([
-      { project_id: null, key: 'theme', value: 'dark' },
-    ]);
+    expect(rawRows).toEqual([{ project_id: null, key: 'theme', value: 'dark' }]);
   });
 
   it('deletes only the matching memory entry', async () => {
@@ -93,20 +91,20 @@ describe('agent-tools/agent_memory', () => {
       'agent_memory',
       { operation: 'set', namespace: 'prefs', key: 'shell', value: 'zsh' },
       { sessionId: 'session-1' },
-      'agent-assistant',
+      'agent-assistant'
     );
 
     const deleteResult = await toolRegistry.execute(
       'agent_memory',
       { operation: 'delete', namespace: 'prefs', key: 'shell' },
       { sessionId: 'session-1' },
-      'agent-assistant',
+      'agent-assistant'
     );
     const getResult = await toolRegistry.execute(
       'agent_memory',
       { operation: 'get', namespace: 'prefs', key: 'shell' },
       { sessionId: 'session-1' },
-      'agent-assistant',
+      'agent-assistant'
     );
 
     expect(JSON.parse(deleteResult)).toEqual({ deleted: true });

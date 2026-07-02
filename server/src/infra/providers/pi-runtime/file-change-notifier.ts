@@ -19,18 +19,22 @@ export interface FileChangeNotifier {
   timeoutMs?: number;
 }
 
-export function createFileChangeLifecycleHooks(notifier: FileChangeNotifier | undefined): WriteLifecycleHooks | undefined {
+export function createFileChangeLifecycleHooks(
+  notifier: FileChangeNotifier | undefined
+): WriteLifecycleHooks | undefined {
   if (!notifier) return undefined;
   return {
     timeoutMs: notifier.timeoutMs,
-    afterWrite: async (input) => {
+    afterWrite: async input => {
       await notifier.notifyFileChanged({
         path: input.path,
         absolutePath: input.absolutePath,
         changeKind: input.type === 'create' ? 'create' : 'modify',
         operation: input.operation,
         diff: input.diff,
-        ...(input.firstChangedLine !== undefined ? { firstChangedLine: input.firstChangedLine } : {}),
+        ...(input.firstChangedLine !== undefined
+          ? { firstChangedLine: input.firstChangedLine }
+          : {}),
       });
       return { notifications: [`file_change_notified:${input.path}`] };
     },
@@ -39,7 +43,7 @@ export function createFileChangeLifecycleHooks(notifier: FileChangeNotifier | un
 
 export function composeWriteLifecycleHooks(
   first: WriteLifecycleHooks | undefined,
-  second: WriteLifecycleHooks | undefined,
+  second: WriteLifecycleHooks | undefined
 ): WriteLifecycleHooks | undefined {
   if (!first) return second;
   if (!second) return first;

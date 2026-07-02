@@ -30,11 +30,18 @@ export interface NormalizeToolUseArgs {
  * If the tool_use is a TodoWrite, normalize it into a TodoUpdateInteractionMessage.
  * Returns null for all other tools.
  */
-export function normalizeFromToolUse(args: NormalizeToolUseArgs): TodoUpdateInteractionMessage | null {
+export function normalizeFromToolUse(
+  args: NormalizeToolUseArgs
+): TodoUpdateInteractionMessage | null {
   if (args.interactionKind !== 'todo_update') {
     // Fallback for providers not migrated to ProviderEventNormalizer yet.
     const name = args.toolName.replace(/[^a-z0-9]/gi, '').toLowerCase();
-    if (name !== 'todowrite' && name !== 'updatetodos' && name !== 'todolist' && name !== 'todolistwrite') {
+    if (
+      name !== 'todowrite' &&
+      name !== 'updatetodos' &&
+      name !== 'todolist' &&
+      name !== 'todolistwrite'
+    ) {
       return null;
     }
   }
@@ -91,7 +98,7 @@ export function normalizeFromAskUser(args: NormalizeAskUserArgs): InteractionPro
       label: question.question,
       description: question.header,
       type: question.multiSelect ? 'multiselect' : 'select',
-      options: question.options.map((option) => ({
+      options: question.options.map(option => ({
         value: option.label,
         label: option.label,
         description: option.description,

@@ -1,4 +1,12 @@
-import type { LlmProfileConfig, LlmProfileCompat, LlmProfileModelEntry, ProviderCapabilities, SlashCommand, ContextWindowSource, CacheRetentionSetting } from '@zclaudia/shared';
+import type {
+  LlmProfileConfig,
+  LlmProfileCompat,
+  LlmProfileModelEntry,
+  ProviderCapabilities,
+  SlashCommand,
+  ContextWindowSource,
+  CacheRetentionSetting,
+} from '@zclaudia/shared';
 import { fetchApi, fetchLocalApi, activeServerSupports } from './base';
 import { apiCall, apiCallVoid } from './unwrap';
 
@@ -56,14 +64,17 @@ export async function createLlmProfile(data: {
 }): Promise<LlmProfileConfig> {
   return apiCall<LlmProfileConfig>('/api/llm-profiles', {
     method: 'POST',
-    body: JSON.stringify(data)
+    body: JSON.stringify(data),
   });
 }
 
 export async function updateLlmProfile(
   id: string,
   // `cacheRetention: null` is meaningful on PUT: it clears the stored value.
-  data: Omit<Partial<LlmProfileConfig>, 'baseUrl' | 'apiKey' | 'compat' | 'requestHeaders' | 'models' | 'cacheRetention'> & {
+  data: Omit<
+    Partial<LlmProfileConfig>,
+    'baseUrl' | 'apiKey' | 'compat' | 'requestHeaders' | 'models' | 'cacheRetention'
+  > & {
     baseUrl?: string | null;
     apiKey?: string | null;
     compat?: LlmProfileCompat | null;
@@ -74,7 +85,7 @@ export async function updateLlmProfile(
 ): Promise<LlmProfileConfig> {
   return apiCall<LlmProfileConfig>(`/api/llm-profiles/${id}`, {
     method: 'PUT',
-    body: JSON.stringify(data)
+    body: JSON.stringify(data),
   });
 }
 
@@ -82,7 +93,9 @@ export async function deleteLlmProfile(id: string): Promise<DeleteLlmProfileResu
   try {
     const response = await fetchApi<unknown>(`/api/llm-profiles/${id}`, { method: 'DELETE' });
     if (response.success) return { ok: true };
-    const err = response.error as { code?: string; message?: string; agentCount?: number } | undefined;
+    const err = response.error as
+      | { code?: string; message?: string; agentCount?: number }
+      | undefined;
     return {
       ok: false,
       code: err?.code ?? 'UNKNOWN',
@@ -126,7 +139,7 @@ export interface LlmProfilePreviewInput {
  * for brand-new profiles and reflects baseUrl/apiKey edits without saving.
  */
 export async function fetchModelsForLlmProfilePreview(
-  profile: LlmProfilePreviewInput,
+  profile: LlmProfilePreviewInput
 ): Promise<FetchLlmProfileModelsResult> {
   try {
     const data = await apiCall<{ models: string[] }>(`/api/llm-profiles/models/fetch-preview`, {
@@ -146,13 +159,16 @@ export async function fetchModelsForLlmProfilePreview(
  */
 export async function probeLlmProfileModelPreview(
   profile: LlmProfilePreviewInput,
-  modelId: string,
+  modelId: string
 ): Promise<ProbeLlmProfileModelResult> {
   try {
-    const data = await apiCall<ProbeLlmProfileModelResult>(`/api/llm-profiles/models/probe-preview`, {
-      method: 'POST',
-      body: JSON.stringify({ ...profile, modelId }),
-    });
+    const data = await apiCall<ProbeLlmProfileModelResult>(
+      `/api/llm-profiles/models/probe-preview`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ ...profile, modelId }),
+      }
+    );
     return data;
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
@@ -180,17 +196,23 @@ export async function resolveContextWindowPreview(input: {
   models?: LlmProfileModelEntry[];
   modelId: string;
 }): Promise<ResolveContextWindowPreviewResult> {
-  return apiCall<ResolveContextWindowPreviewResult>(
-    '/api/llm-profiles/models/resolve-preview',
-    { method: 'POST', body: JSON.stringify(input) },
-  );
+  return apiCall<ResolveContextWindowPreviewResult>('/api/llm-profiles/models/resolve-preview', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 }
 
 // ── Codex OAuth ────────────────────────────────────────────────────────────────
 
 export type CodexOAuthStartResult =
   | { sessionId: string; method: 'browser'; authUrl: string; instructions?: string }
-  | { sessionId: string; method: 'device_code'; userCode: string; verificationUri: string; expiresAt: number };
+  | {
+      sessionId: string;
+      method: 'device_code';
+      userCode: string;
+      verificationUri: string;
+      expiresAt: number;
+    };
 
 export type CodexOAuthStatus =
   | { state: 'pending' }
@@ -213,7 +235,7 @@ export interface CodexModelsResponse {
 
 export async function startCodexOAuth(
   profileId: string,
-  method: 'browser' | 'device_code',
+  method: 'browser' | 'device_code'
 ): Promise<CodexOAuthStartResult> {
   return apiCall<CodexOAuthStartResult>(`/api/llm-profiles/${profileId}/oauth/start`, {
     method: 'POST',
@@ -223,21 +245,20 @@ export async function startCodexOAuth(
 
 export async function pollCodexOAuthStatus(
   profileId: string,
-  sessionId: string,
+  sessionId: string
 ): Promise<CodexOAuthStatus> {
   return apiCall<CodexOAuthStatus>(`/api/llm-profiles/${profileId}/oauth/status/${sessionId}`);
 }
 
-export async function cancelCodexOAuth(
-  profileId: string,
-  sessionId: string,
-): Promise<void> {
-  return apiCallVoid(`/api/llm-profiles/${profileId}/oauth/cancel/${sessionId}`, { method: 'POST' });
+export async function cancelCodexOAuth(profileId: string, sessionId: string): Promise<void> {
+  return apiCallVoid(`/api/llm-profiles/${profileId}/oauth/cancel/${sessionId}`, {
+    method: 'POST',
+  });
 }
 
 export async function fetchCodexModels(
   profileId: string,
-  opts?: { refresh?: boolean },
+  opts?: { refresh?: boolean }
 ): Promise<CodexModelsResponse> {
   const query = opts?.refresh ? '?refresh=true' : '';
   return apiCall<CodexModelsResponse>(`/api/llm-profiles/${profileId}/codex-models${query}`);
@@ -257,10 +278,15 @@ export async function getProviderCommands(
 ): Promise<SlashCommand[]> {
   const query = projectRoot ? `?projectRoot=${encodeURIComponent(projectRoot)}` : '';
   if (activeServerSupports('providerCommands')) {
-    const result = await fetchApi<SlashCommand[]>(`/api/providers/${llmProfileId}/commands${query}`, options);
+    const result = await fetchApi<SlashCommand[]>(
+      `/api/providers/${llmProfileId}/commands${query}`,
+      options
+    );
     if (result.success && result.data) return result.data;
   }
-  const localResult = await fetchLocalApi<SlashCommand[]>(`/api/providers/type/zclaudia/commands${query}`);
+  const localResult = await fetchLocalApi<SlashCommand[]>(
+    `/api/providers/type/zclaudia/commands${query}`
+  );
   if (!localResult.success || !localResult.data) {
     throw new Error(localResult.error?.message || 'Failed to fetch provider commands');
   }
@@ -274,10 +300,15 @@ export async function getProviderTypeCommands(
 ): Promise<SlashCommand[]> {
   const query = projectRoot ? `?projectRoot=${encodeURIComponent(projectRoot)}` : '';
   if (activeServerSupports('providerCommands')) {
-    const result = await fetchApi<SlashCommand[]>(`/api/providers/type/${providerType}/commands${query}`, options);
+    const result = await fetchApi<SlashCommand[]>(
+      `/api/providers/type/${providerType}/commands${query}`,
+      options
+    );
     if (result.success && result.data) return result.data;
   }
-  const localResult = await fetchLocalApi<SlashCommand[]>(`/api/providers/type/${providerType}/commands${query}`);
+  const localResult = await fetchLocalApi<SlashCommand[]>(
+    `/api/providers/type/${providerType}/commands${query}`
+  );
   if (!localResult.success || !localResult.data) {
     throw new Error(localResult.error?.message || 'Failed to fetch provider type commands');
   }
@@ -289,10 +320,15 @@ export async function getProviderCapabilities(
   options?: RequestInit
 ): Promise<ProviderCapabilities> {
   if (activeServerSupports('providerCapabilities')) {
-    const result = await fetchApi<ProviderCapabilities>(`/api/providers/${llmProfileId}/capabilities`, options);
+    const result = await fetchApi<ProviderCapabilities>(
+      `/api/providers/${llmProfileId}/capabilities`,
+      options
+    );
     if (result.success && result.data) return result.data;
   }
-  const localResult = await fetchLocalApi<ProviderCapabilities>(`/api/providers/type/zclaudia/capabilities`);
+  const localResult = await fetchLocalApi<ProviderCapabilities>(
+    `/api/providers/type/zclaudia/capabilities`
+  );
   if (!localResult.success || !localResult.data) {
     throw new Error(localResult.error?.message || 'Failed to fetch provider capabilities');
   }
@@ -304,10 +340,15 @@ export async function getProviderTypeCapabilities(
   options?: RequestInit
 ): Promise<ProviderCapabilities> {
   if (activeServerSupports('providerCapabilities')) {
-    const result = await fetchApi<ProviderCapabilities>(`/api/providers/type/${providerType}/capabilities`, options);
+    const result = await fetchApi<ProviderCapabilities>(
+      `/api/providers/type/${providerType}/capabilities`,
+      options
+    );
     if (result.success && result.data) return result.data;
   }
-  const localResult = await fetchLocalApi<ProviderCapabilities>(`/api/providers/type/${providerType}/capabilities`);
+  const localResult = await fetchLocalApi<ProviderCapabilities>(
+    `/api/providers/type/${providerType}/capabilities`
+  );
   if (!localResult.success || !localResult.data) {
     throw new Error(localResult.error?.message || 'Failed to fetch provider type capabilities');
   }

@@ -44,7 +44,7 @@ export function PluginSettings({ onOpenPluginSettings }: PluginSettingsProps) {
   const allPanels = usePluginStore(selectPluginPanels);
   // Built-in panels self-identify via the `builtin` flag set at registration in
   // builtinPanels.ts, so newly-added tools appear here automatically (no separate list).
-  const builtinPanels = allPanels.filter((p) => p.builtin);
+  const builtinPanels = allPanels.filter(p => p.builtin);
 
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -53,56 +53,66 @@ export function PluginSettings({ onOpenPluginSettings }: PluginSettingsProps) {
     fetchAndSyncPlugins().catch(() => {});
   }, []);
 
-  const togglePlugin = useCallback(async (pluginId: string) => {
-    const plugin = plugins.find(p => p.manifest.id === pluginId);
-    if (!plugin) return;
+  const togglePlugin = useCallback(
+    async (pluginId: string) => {
+      const plugin = plugins.find(p => p.manifest.id === pluginId);
+      if (!plugin) return;
 
-    try {
-      const action = plugin.status === 'active' ? 'deactivate' : 'activate';
-      const baseUrl = getBaseUrl();
-      const res = await fetch(`${baseUrl}/api/plugins/${encodeURIComponent(pluginId)}/${action}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.error?.message || `Failed to ${action} plugin`);
-      } else {
-        await fetchAndSyncPlugins();
+      try {
+        const action = plugin.status === 'active' ? 'deactivate' : 'activate';
+        const baseUrl = getBaseUrl();
+        const res = await fetch(
+          `${baseUrl}/api/plugins/${encodeURIComponent(pluginId)}/${action}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setError(data.error?.message || `Failed to ${action} plugin`);
+        } else {
+          await fetchAndSyncPlugins();
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to toggle plugin');
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to toggle plugin');
-    }
-  }, [plugins, setError]);
+    },
+    [plugins, setError]
+  );
 
-  const reloadPlugin = useCallback(async (pluginId: string) => {
-    try {
-      const baseUrl = getBaseUrl();
-      const res = await fetch(`${baseUrl}/api/plugins/${encodeURIComponent(pluginId)}/reload`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.error?.message || 'Failed to reload plugin');
-      } else {
-        await fetchAndSyncPlugins();
+  const reloadPlugin = useCallback(
+    async (pluginId: string) => {
+      try {
+        const baseUrl = getBaseUrl();
+        const res = await fetch(`${baseUrl}/api/plugins/${encodeURIComponent(pluginId)}/reload`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setError(data.error?.message || 'Failed to reload plugin');
+        } else {
+          await fetchAndSyncPlugins();
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to reload plugin');
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reload plugin');
-    }
-  }, [setError]);
+    },
+    [setError]
+  );
 
   // Filter plugins by search query
-  const filteredPlugins = plugins.filter((plugin) =>
-    plugin.manifest.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    plugin.manifest.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    plugin.manifest.description.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredPlugins = plugins.filter(
+    plugin =>
+      plugin.manifest.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      plugin.manifest.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      plugin.manifest.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Group plugins by status
-  const activePlugins = filteredPlugins.filter((p) => p.status === 'active' && p.enabled);
-  const inactivePlugins = filteredPlugins.filter((p) => p.status !== 'active' || !p.enabled);
+  const activePlugins = filteredPlugins.filter(p => p.status === 'active' && p.enabled);
+  const inactivePlugins = filteredPlugins.filter(p => p.status !== 'active' || !p.enabled);
 
   if (isLoading) {
     return (
@@ -146,7 +156,7 @@ export function PluginSettings({ onOpenPluginSettings }: PluginSettingsProps) {
           type="text"
           placeholder="Search plugins..."
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={e => setSearchQuery(e.target.value)}
           className="w-full pl-10 pr-4 py-2 bg-input border border-border rounded-lg text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
         />
       </div>
@@ -177,7 +187,7 @@ export function PluginSettings({ onOpenPluginSettings }: PluginSettingsProps) {
             Built-in ({builtinPanels.length})
           </h4>
           <div className="space-y-2">
-            {builtinPanels.map((panel) => (
+            {builtinPanels.map(panel => (
               <BuiltinPanelCard
                 key={panel.id}
                 panel={panel}
@@ -219,7 +229,7 @@ export function PluginSettings({ onOpenPluginSettings }: PluginSettingsProps) {
                 Active ({activePlugins.length})
               </h4>
               <div className="space-y-2">
-                {activePlugins.map((plugin) => (
+                {activePlugins.map(plugin => (
                   <PluginCard
                     key={plugin.manifest.id}
                     plugin={plugin}
@@ -240,7 +250,7 @@ export function PluginSettings({ onOpenPluginSettings }: PluginSettingsProps) {
                 Inactive ({inactivePlugins.length})
               </h4>
               <div className="space-y-2">
-                {inactivePlugins.map((plugin) => (
+                {inactivePlugins.map(plugin => (
                   <PluginCard
                     key={plugin.manifest.id}
                     plugin={plugin}
@@ -298,7 +308,9 @@ function PluginCard({ plugin, onToggle, onRemove, onReload, onOpenSettings }: Pl
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-medium text-sm truncate">{plugin.manifest.name}</span>
-            <span className={`px-1.5 py-0.5 rounded-md text-xs font-medium ${statusColors[plugin.status]}`}>
+            <span
+              className={`px-1.5 py-0.5 rounded-md text-xs font-medium ${statusColors[plugin.status]}`}
+            >
               {statusLabels[plugin.status]}
             </span>
           </div>
@@ -306,9 +318,7 @@ function PluginCard({ plugin, onToggle, onRemove, onReload, onOpenSettings }: Pl
             {plugin.manifest.description}
           </p>
           <div className="flex items-center gap-2 mt-1">
-            <span className="text-xs text-muted-foreground/70 font-mono">
-              {plugin.manifest.id}
-            </span>
+            <span className="text-xs text-muted-foreground/70 font-mono">{plugin.manifest.id}</span>
             <span className="text-xs text-muted-foreground/70">v{plugin.manifest.version}</span>
           </div>
         </div>
@@ -343,7 +353,12 @@ function PluginCard({ plugin, onToggle, onRemove, onReload, onOpenSettings }: Pl
                   strokeWidth={2}
                   d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
                 />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                />
               </svg>
             </button>
           )}
@@ -355,7 +370,12 @@ function PluginCard({ plugin, onToggle, onRemove, onReload, onOpenSettings }: Pl
             className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
             title="Reload plugin"
           >
-            <svg className={`w-4 h-4 ${reloading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              className={`w-4 h-4 ${reloading ? 'animate-spin' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -390,7 +410,7 @@ function PluginCard({ plugin, onToggle, onRemove, onReload, onOpenSettings }: Pl
       {/* Permissions */}
       {plugin.manifest.permissions && plugin.manifest.permissions.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">
-          {plugin.manifest.permissions.map((perm) => (
+          {plugin.manifest.permissions.map(perm => (
             <span
               key={perm}
               className="px-1.5 py-0.5 rounded-md text-xs bg-warning/10 text-warning font-mono"
@@ -425,15 +445,17 @@ function BuiltinPanelCard({ panel, disabled, onToggle }: BuiltinPanelCardProps) 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-medium text-sm">{panel.label}</span>
-            <span className={`px-1.5 py-0.5 rounded-md text-xs font-medium ${
-              disabled ? 'bg-muted-foreground/20 text-muted-foreground' : 'bg-success/20 text-success'
-            }`}>
+            <span
+              className={`px-1.5 py-0.5 rounded-md text-xs font-medium ${
+                disabled
+                  ? 'bg-muted-foreground/20 text-muted-foreground'
+                  : 'bg-success/20 text-success'
+              }`}
+            >
               {disabled ? 'Disabled' : 'Active'}
             </span>
           </div>
-          <p className="text-xs text-muted-foreground/70 font-mono mt-0.5">
-            {panel.pluginId}
-          </p>
+          <p className="text-xs text-muted-foreground/70 font-mono mt-0.5">{panel.pluginId}</p>
         </div>
         <button
           onClick={() => onToggle(panel.id)}
@@ -478,7 +500,9 @@ function PluginDirsManager() {
     }
   }, []);
 
-  useEffect(() => { fetchDirs(); }, [fetchDirs]);
+  useEffect(() => {
+    fetchDirs();
+  }, [fetchDirs]);
 
   const saveDirs = async (dirs: string[]) => {
     setError(null);
@@ -527,7 +551,9 @@ function PluginDirsManager() {
       >
         <svg
           className={`w-3 h-3 transition-transform ${collapsed ? '' : 'rotate-90'}`}
-          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
         >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
@@ -540,7 +566,10 @@ function PluginDirsManager() {
           <div className="bg-muted rounded-lg p-2 space-y-1">
             {/* Default dirs (read-only) */}
             {defaultDirs.map(dir => (
-              <div key={dir} className="flex items-center gap-2 px-3 py-2 rounded-md text-xs font-mono text-muted-foreground">
+              <div
+                key={dir}
+                className="flex items-center gap-2 px-3 py-2 rounded-md text-xs font-mono text-muted-foreground"
+              >
                 <span className="flex-1 truncate">{dir}</span>
                 <span className="text-xs text-muted-foreground/50 shrink-0">default</span>
               </div>
@@ -548,15 +577,28 @@ function PluginDirsManager() {
 
             {/* Extra dirs (removable) */}
             {extraDirs.map(dir => (
-              <div key={dir} className="flex items-center gap-2 px-3 py-2 rounded-md text-xs font-mono text-foreground bg-secondary/50">
+              <div
+                key={dir}
+                className="flex items-center gap-2 px-3 py-2 rounded-md text-xs font-mono text-foreground bg-secondary/50"
+              >
                 <span className="flex-1 truncate">{dir}</span>
                 <button
                   onClick={() => handleRemove(dir)}
                   className="p-1 rounded-md hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors shrink-0"
                   title="Remove directory"
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                 </button>
               </div>
@@ -569,8 +611,8 @@ function PluginDirsManager() {
               type="text"
               placeholder="/path/to/plugins"
               value={newDir}
-              onChange={(e) => setNewDir(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+              onChange={e => setNewDir(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAdd()}
               className="flex-1 px-3 py-2 bg-input border border-border rounded-lg text-sm font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
             />
             <button
@@ -582,9 +624,7 @@ function PluginDirsManager() {
             </button>
           </div>
 
-          {error && (
-            <p className="text-xs text-destructive">{error}</p>
-          )}
+          {error && <p className="text-xs text-destructive">{error}</p>}
 
           <p className="text-xs text-muted-foreground">
             After adding a directory, use Discover to scan for new plugins.

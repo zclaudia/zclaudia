@@ -1,4 +1,7 @@
-import { isTerminalPhase, type RunPhase } from '../application/conversation/runtime/active-run-phase.js';
+import {
+  isTerminalPhase,
+  type RunPhase,
+} from '../application/conversation/runtime/active-run-phase.js';
 
 type RunLike = {
   sessionId?: string;

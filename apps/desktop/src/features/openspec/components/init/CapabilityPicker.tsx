@@ -11,14 +11,14 @@ interface Props {
 }
 
 export function CapabilityPicker({ scan, onClose }: Props): React.ReactElement {
-  const candidates = useOpenSpecStore((s) => s.initCandidatesByScan[scan.id] ?? []);
-  const upsert = useOpenSpecStore((s) => s.upsertInitCandidate);
+  const candidates = useOpenSpecStore(s => s.initCandidatesByScan[scan.id] ?? []);
+  const upsert = useOpenSpecStore(s => s.upsertInitCandidate);
   const [adding, setAdding] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const visible = candidates.filter((c) => c.phase !== 'excluded');
-  const selectedCount = visible.filter((c) => c.selected).length;
+  const visible = candidates.filter(c => c.phase !== 'excluded');
+  const selectedCount = visible.filter(c => c.selected).length;
 
   const addCap = async (name: string, description: string): Promise<void> => {
     const c = await api.addCandidate(scan.id, { name, description });
@@ -44,10 +44,14 @@ export function CapabilityPicker({ scan, onClose }: Props): React.ReactElement {
         ✓ Discovered {visible.length} capabilities. Pick which to document.
       </div>
       <ul className="space-y-2">
-        {visible.map((c) => <CapabilityRow key={c.id} candidate={c} />)}
+        {visible.map(c => (
+          <CapabilityRow key={c.id} candidate={c} />
+        ))}
       </ul>
       {!adding ? (
-        <button className="text-xs px-2 py-1 rounded bg-secondary" onClick={() => setAdding(true)}>+ Add capability manually</button>
+        <button className="text-xs px-2 py-1 rounded bg-secondary" onClick={() => setAdding(true)}>
+          + Add capability manually
+        </button>
       ) : (
         <EditCapabilityForm
           initialName=""
@@ -59,7 +63,9 @@ export function CapabilityPicker({ scan, onClose }: Props): React.ReactElement {
       )}
       {error && <div className="text-xs text-red-500">{error}</div>}
       <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
-        <button className="px-3 py-1.5 text-sm rounded-md bg-secondary" onClick={onClose}>Cancel</button>
+        <button className="px-3 py-1.5 text-sm rounded-md bg-secondary" onClick={onClose}>
+          Cancel
+        </button>
         <button
           className="px-3 py-1.5 text-sm rounded-md bg-muted/60 text-foreground disabled:opacity-50"
           disabled={selectedCount === 0 || generating}

@@ -101,9 +101,7 @@ describe('plugin routes', () => {
       vi.mocked(toolRegistry.getByPlugin).mockReturnValue([
         { definition: { function: { name: 'tool1' } } },
       ] as any);
-      vi.mocked(commandRegistry.getByPlugin).mockReturnValue([
-        { command: '/test-cmd' },
-      ] as any);
+      vi.mocked(commandRegistry.getByPlugin).mockReturnValue([{ command: '/test-cmd' }] as any);
 
       const res = await request(app).get('/api/plugins');
 
@@ -297,9 +295,7 @@ describe('plugin routes', () => {
 
   describe('POST /api/plugins/:id/permissions/grant', () => {
     it('returns 400 when permissions not provided', async () => {
-      const res = await request(app)
-        .post('/api/plugins/test-plugin/permissions/grant')
-        .send({});
+      const res = await request(app).post('/api/plugins/test-plugin/permissions/grant').send({});
 
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
@@ -329,9 +325,7 @@ describe('plugin routes', () => {
 
   describe('POST /api/plugins/:id/permissions/revoke', () => {
     it('returns 400 when permissions not provided', async () => {
-      const res = await request(app)
-        .post('/api/plugins/test-plugin/permissions/revoke')
-        .send({});
+      const res = await request(app).post('/api/plugins/test-plugin/permissions/revoke').send({});
 
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
@@ -401,7 +395,10 @@ describe('plugin routes', () => {
 
   describe('GET /api/plugins/dirs', () => {
     it('returns current plugin directories', async () => {
-      vi.mocked(pluginLoader.getPluginDirs).mockReturnValue(['/plugins/default', '/plugins/custom']);
+      vi.mocked(pluginLoader.getPluginDirs).mockReturnValue([
+        '/plugins/default',
+        '/plugins/custom',
+      ]);
       vi.mocked(pluginLoader.getExtraDirsFromDb).mockReturnValue(['/plugins/custom']);
 
       const res = await request(app).get('/api/plugins/dirs');
@@ -426,7 +423,10 @@ describe('plugin routes', () => {
     });
 
     it('normalizes and saves extra dirs', async () => {
-      vi.mocked(pluginLoader.getPluginDirs).mockReturnValue(['/plugins/default', '/plugins/custom']);
+      vi.mocked(pluginLoader.getPluginDirs).mockReturnValue([
+        '/plugins/default',
+        '/plugins/custom',
+      ]);
       vi.mocked(pluginLoader.discover).mockResolvedValue([]);
 
       const res = await request(app)

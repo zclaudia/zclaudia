@@ -23,7 +23,7 @@ function stringField(message: ClientMessage, key: 'sessionId' | 'projectId'): st
  */
 export function resolveMessageTarget(
   message: ClientMessage,
-  resolver: MessageTargetResolver,
+  resolver: MessageTargetResolver
 ): string | null {
   const sessionId = stringField(message, 'sessionId');
   const projectId = stringField(message, 'projectId');

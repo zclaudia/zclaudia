@@ -11,7 +11,7 @@ vi.mock('../../services/api', () => ({
   probeServerLatency: vi.fn().mockResolvedValue(25),
 }));
 
-vi.mock('../../utils/platform', async (importOriginal) => {
+vi.mock('../../utils/platform', async importOriginal => {
   const mod = await importOriginal<Record<string, any>>();
   return {
     ...mod,

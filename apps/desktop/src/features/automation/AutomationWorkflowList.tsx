@@ -28,27 +28,32 @@ export function AutomationWorkflowList({ api, projects, projectId }: AutomationW
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const query = selectedIsGlobal || !effectiveProjectId
-        ? ''
-        : `?projectId=${encodeURIComponent(effectiveProjectId)}`;
+      const query =
+        selectedIsGlobal || !effectiveProjectId
+          ? ''
+          : `?projectId=${encodeURIComponent(effectiveProjectId)}`;
       const wfs = await api.get(`/api/workflows${query}`);
-      const scoped = selectedIsGlobal
-        ? wfs.filter((w: Workflow) => !w.projectId)
-        : wfs;
+      const scoped = selectedIsGlobal ? wfs.filter((w: Workflow) => !w.projectId) : wfs;
       setWorkflows(scoped);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     setLoading(false);
   }, [api, effectiveProjectId, selectedIsGlobal]);
 
-  useEffect(() => { refresh(); }, [refresh, refreshNonce]);
+  useEffect(() => {
+    refresh();
+  }, [refresh, refreshNonce]);
 
   const handleCreate = async () => {
     if (!effectiveProjectId) return;
     const name = `New Workflow ${new Date().toLocaleTimeString()}`;
-    const result = await api.post(`/api/projects/${effectiveProjectId}/workflows`, {
-      name,
-      definition: { nodes: [], edges: [], entryNodeId: '' },
-    }).catch(() => null);
+    const result = await api
+      .post(`/api/projects/${effectiveProjectId}/workflows`, {
+        name,
+        definition: { nodes: [], edges: [], entryNodeId: '' },
+      })
+      .catch(() => null);
     await refresh();
     if (result && result.id) {
       selectItem(result.id);
@@ -74,7 +79,9 @@ export function AutomationWorkflowList({ api, projects, projectId }: AutomationW
       <div className="flex items-center justify-between px-2 py-1.5 shrink-0">
         <span className="text-xs font-medium text-muted-foreground">
           Workflows
-          {workflows.length > 0 && <span className="ml-1 text-[10px] opacity-60">({workflows.length})</span>}
+          {workflows.length > 0 && (
+            <span className="ml-1 text-[10px] opacity-60">({workflows.length})</span>
+          )}
         </span>
         <div className="flex items-center gap-0.5">
           <button
@@ -108,7 +115,8 @@ export function AutomationWorkflowList({ api, projects, projectId }: AutomationW
             const showTrigger = w.status === 'active';
             const showDelete = !isSystem;
             // Reserve right padding for the action buttons so they don't overlap the name.
-            const actionPadding = showTrigger && showDelete ? 'pr-12' : (showTrigger || showDelete) ? 'pr-7' : '';
+            const actionPadding =
+              showTrigger && showDelete ? 'pr-12' : showTrigger || showDelete ? 'pr-7' : '';
             return (
               <div key={w.id} className="relative group">
                 <button
@@ -131,7 +139,11 @@ export function AutomationWorkflowList({ api, projects, projectId }: AutomationW
                   <span className="flex-1 min-w-0 flex items-center gap-1.5">
                     <span className="text-xs truncate">{w.name}</span>
                     {isSystem && (
-                      <Shield size={9} className="shrink-0 text-muted-foreground" aria-label="System Default" />
+                      <Shield
+                        size={9}
+                        className="shrink-0 text-muted-foreground"
+                        aria-label="System Default"
+                      />
                     )}
                   </span>
                 </button>
@@ -143,7 +155,10 @@ export function AutomationWorkflowList({ api, projects, projectId }: AutomationW
                       <button
                         type="button"
                         aria-label="Trigger"
-                        onClick={e => { e.stopPropagation(); handleTrigger(w.id); }}
+                        onClick={e => {
+                          e.stopPropagation();
+                          handleTrigger(w.id);
+                        }}
                         className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
                         title="Trigger"
                       >
@@ -154,7 +169,10 @@ export function AutomationWorkflowList({ api, projects, projectId }: AutomationW
                       <button
                         type="button"
                         aria-label="Delete"
-                        onClick={e => { e.stopPropagation(); handleDelete(w.id); }}
+                        onClick={e => {
+                          e.stopPropagation();
+                          handleDelete(w.id);
+                        }}
                         className="p-0.5 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-colors"
                         title="Delete"
                       >

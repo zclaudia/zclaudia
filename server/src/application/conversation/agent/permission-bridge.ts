@@ -45,7 +45,7 @@ export class PermissionBridge implements PermissionBridgePort {
   register(
     requestId: string,
     resolve: (decision: PermissionDecision) => void,
-    context: PermissionEscalationContext,
+    context: PermissionEscalationContext
   ): void {
     this.pending.set(requestId, { resolve, context });
   }
@@ -88,7 +88,7 @@ export class PermissionBridge implements PermissionBridgePort {
     }
     entry.resolve({
       behavior: decision,
-      message: decision === 'deny' ? (reason || 'Denied by permission workflow') : undefined,
+      message: decision === 'deny' ? reason || 'Denied by permission workflow' : undefined,
       updatedInput: decision === 'allow' ? entry.context.toolInput : undefined,
     });
     return true;

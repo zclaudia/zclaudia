@@ -24,7 +24,9 @@ describe('extractThinking', () => {
   });
 
   it('extracts a later dangling think block after visible content', () => {
-    expect(extractThinking('<think>first thought</think>\nVisible answer.\n<think>second thought')).toEqual({
+    expect(
+      extractThinking('<think>first thought</think>\nVisible answer.\n<think>second thought')
+    ).toEqual({
       thinking: 'first thought\n\nsecond thought',
       content: 'Visible answer.',
     });

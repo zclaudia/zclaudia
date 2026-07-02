@@ -33,15 +33,15 @@ const mockFacadeState = {
 };
 
 vi.mock('../../stores/serverStore', () => ({
-  useServerStore: vi.fn((selector?: (state: typeof mockServerState) => unknown) => (
+  useServerStore: vi.fn((selector?: (state: typeof mockServerState) => unknown) =>
     typeof selector === 'function' ? selector(mockServerState) : mockServerState
-  )),
+  ),
 }));
 
 vi.mock('../../stores/facadeStore', () => ({
-  useFacadeStore: vi.fn((selector?: (state: typeof mockFacadeState) => unknown) => (
+  useFacadeStore: vi.fn((selector?: (state: typeof mockFacadeState) => unknown) =>
     typeof selector === 'function' ? selector(mockFacadeState) : mockFacadeState
-  )),
+  ),
 }));
 
 vi.mock('../../hooks/useAndroidBack', () => ({
@@ -71,10 +71,7 @@ describe('AgentManager', () => {
       isDefault: true,
       // F2: the LLM-profile Save validator now requires at least one model
       // entry. Reflect that in fixtures so the agent dropdown has options.
-      models: [
-        { modelId: 'claude-sonnet-4-5' },
-        { modelId: 'claude-haiku-4-5' },
-      ],
+      models: [{ modelId: 'claude-sonnet-4-5' }, { modelId: 'claude-haiku-4-5' }],
       createdAt: Date.now(),
       updatedAt: Date.now(),
     },
@@ -105,7 +102,11 @@ describe('AgentManager', () => {
         exclude: [],
       },
       skillSelection: {
-        providers: [{ source: 'workspace' as const }, { source: 'external' as const }, { source: 'plugin' as const }],
+        providers: [
+          { source: 'workspace' as const },
+          { source: 'external' as const },
+          { source: 'plugin' as const },
+        ],
         include: [],
         exclude: [],
         pinned: [],
@@ -224,14 +225,22 @@ describe('AgentManager', () => {
     expect(screen.getByText('Tool Sets')).toBeInTheDocument();
     expect(screen.getByText('Core Coding')).toBeInTheDocument();
     expect(screen.getByText('14 tools')).toBeInTheDocument();
-    expect(screen.queryByText('Read a text file with line pagination, size limits, and binary-file protection.')).toBeNull();
+    expect(
+      screen.queryByText(
+        'Read a text file with line pagination, size limits, and binary-file protection.'
+      )
+    ).toBeNull();
     await clickAsync(screen.getByLabelText('expand tool set core-coding'));
     expect(screen.getByText('Read')).toBeInTheDocument();
     expect(screen.getByText('MultiEdit')).toBeInTheDocument();
     expect(screen.getByText('ReadSymbol')).toBeInTheDocument();
     expect(screen.getByText('EditSymbol')).toBeInTheDocument();
     expect(screen.getByText('Bash')).toBeInTheDocument();
-    expect(screen.getByText('Read a text file with line pagination, size limits, and binary-file protection.')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Read a text file with line pagination, size limits, and binary-file protection.'
+      )
+    ).toBeInTheDocument();
     expect(screen.getByLabelText('customize tool set core-coding')).toBeInTheDocument();
     expect(screen.queryByLabelText('select tool Bash')).toBeNull();
     expect(screen.getByText('Thinking Level')).toBeInTheDocument();
@@ -293,7 +302,21 @@ describe('AgentManager', () => {
             ],
             exclude: [],
           },
-          enabledTools: ['Read', 'Write', 'Edit', 'MultiEdit', 'ReadSymbol', 'EditSymbol', 'Eval', 'Grep', 'Glob', 'LS', 'EnterPlanMode', 'ExitPlanMode', 'Memory'],
+          enabledTools: [
+            'Read',
+            'Write',
+            'Edit',
+            'MultiEdit',
+            'ReadSymbol',
+            'EditSymbol',
+            'Eval',
+            'Grep',
+            'Glob',
+            'LS',
+            'EnterPlanMode',
+            'ExitPlanMode',
+            'Memory',
+          ],
           thinkingLevel: 'low',
           isDefault: true,
         })
@@ -356,7 +379,7 @@ describe('AgentManager', () => {
           toolSelection: expect.objectContaining({
             providers: [{ source: 'mcp', serverId: 'github' }],
           }),
-        }),
+        })
       );
     });
   });
@@ -386,7 +409,7 @@ describe('AgentManager', () => {
         'agent-1',
         expect.objectContaining({
           multimodalFallback: { llmProfileId: 'llm-2', model: 'gpt-4o' },
-        }),
+        })
       );
     });
   });
@@ -416,7 +439,7 @@ describe('AgentManager', () => {
         'agent-1',
         expect.objectContaining({
           multimodalFallback: null,
-        }),
+        })
       );
     });
   });
@@ -492,7 +515,7 @@ describe('AgentManager', () => {
             exclude: [],
             pinned: [{ source: 'external', id: 'security-audit' }],
           },
-        }),
+        })
       );
     });
   });
@@ -548,7 +571,7 @@ describe('AgentManager', () => {
               },
             ],
           },
-        }),
+        })
       );
     });
   });
@@ -623,9 +646,11 @@ describe('AgentManager', () => {
       await clickAsync(screen.getByText('Add Agent'));
 
       expect(
-        screen.getByText(/No models available — declare models on the LLM profile/i),
+        screen.getByText(/No models available — declare models on the LLM profile/i)
       ).toBeInTheDocument();
-      const modelBtn = screen.getByText(/No models available — declare models on the LLM profile/i).closest('button');
+      const modelBtn = screen
+        .getByText(/No models available — declare models on the LLM profile/i)
+        .closest('button');
       expect(modelBtn).toBeDisabled();
     });
 
@@ -635,13 +660,13 @@ describe('AgentManager', () => {
       vi.mocked(api.listAgentProfiles).mockResolvedValue([
         {
           ...mockAgents[0],
-          model: 'claude-haiku-4-5',  // declared on llm-1
+          model: 'claude-haiku-4-5', // declared on llm-1
         },
       ]);
       vi.mocked(api.listLlmProfiles).mockResolvedValue([
         {
           ...mockLlmProfiles[0],
-          models: [{ modelId: 'claude-opus-4-7' }],  // doesn't contain haiku
+          models: [{ modelId: 'claude-opus-4-7' }], // doesn't contain haiku
         },
         mockLlmProfiles[1],
       ]);
@@ -656,9 +681,7 @@ describe('AgentManager', () => {
       await clickAsync(screen.getAllByTitle('Edit')[0]);
 
       await waitForFast(() => {
-        expect(
-          screen.getByText(/not declared on the selected LLM profile/i),
-        ).toBeInTheDocument();
+        expect(screen.getByText(/not declared on the selected LLM profile/i)).toBeInTheDocument();
       });
     });
   });

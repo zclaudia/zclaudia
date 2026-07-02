@@ -9,7 +9,7 @@ describe('computeMcpInstructionsDelta', () => {
         { name: 'filesystem', instructions: 'Read local files.' },
       ],
       [],
-      1234,
+      1234
     );
 
     expect(delta).toEqual({
@@ -21,30 +21,36 @@ describe('computeMcpInstructionsDelta', () => {
   });
 
   it('returns null when current instructions have already been announced', () => {
-    const previous = [{
-      addedNames: ['github'],
-      addedBlocks: ['## github\nUse GitHub safely.'],
-      removedNames: [],
-      createdAt: 1000,
-    }];
+    const previous = [
+      {
+        addedNames: ['github'],
+        addedBlocks: ['## github\nUse GitHub safely.'],
+        removedNames: [],
+        createdAt: 1000,
+      },
+    ];
 
-    expect(computeMcpInstructionsDelta(
-      [{ name: 'github', instructions: 'Use GitHub safely.' }],
-      previous,
-      1234,
-    )).toBeNull();
+    expect(
+      computeMcpInstructionsDelta(
+        [{ name: 'github', instructions: 'Use GitHub safely.' }],
+        previous,
+        1234
+      )
+    ).toBeNull();
   });
 
   it('announces removals for previously announced servers that are no longer connected', () => {
     const delta = computeMcpInstructionsDelta(
       [{ name: 'filesystem', instructions: 'Read local files.' }],
-      [{
-        addedNames: ['filesystem', 'github'],
-        addedBlocks: ['## filesystem\nRead local files.', '## github\nUse GitHub safely.'],
-        removedNames: [],
-        createdAt: 1000,
-      }],
-      1234,
+      [
+        {
+          addedNames: ['filesystem', 'github'],
+          addedBlocks: ['## filesystem\nRead local files.', '## github\nUse GitHub safely.'],
+          removedNames: [],
+          createdAt: 1000,
+        },
+      ],
+      1234
     );
 
     expect(delta).toEqual({
@@ -72,7 +78,7 @@ describe('computeMcpInstructionsDelta', () => {
           createdAt: 1100,
         },
       ],
-      1234,
+      1234
     );
 
     expect(delta?.addedNames).toEqual(['github']);

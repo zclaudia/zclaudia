@@ -9,7 +9,12 @@ export interface SupervisorGuardsDeps {
   taskRepo: SupervisionTaskRepository;
   projectRepo: SupervisionProjectPort;
   broadcastAgentUpdate: (projectId: string, agent: ProjectAgent) => void;
-  log: (projectId: string, event: SupervisionLogEvent, detail?: Record<string, unknown>, taskId?: string) => void;
+  log: (
+    projectId: string,
+    event: SupervisionLogEvent,
+    detail?: Record<string, unknown>,
+    taskId?: string
+  ) => void;
 }
 
 export class SupervisorGuards {
@@ -48,10 +53,7 @@ export class SupervisorGuards {
     return true;
   }
 
-  pauseAgent(
-    projectId: string,
-    reason: 'user' | 'budget' | 'sync_error',
-  ): void {
+  pauseAgent(projectId: string, reason: 'user' | 'budget' | 'sync_error'): void {
     const project = this.deps.projectRepo.findById(projectId);
     if (!project?.agent) return;
     if (!canPauseAgentPhase(project.agent.phase)) return;
@@ -74,7 +76,9 @@ export class SupervisorGuards {
   }
 
   getTokenUsage(projectId: string): number {
-    const row = this.deps.db.prepare(`
+    const row = this.deps.db
+      .prepare(
+        `
       SELECT COALESCE(SUM(
         COALESCE(json_extract(metadata, '$.usage.input_tokens'), 0) +
         COALESCE(json_extract(metadata, '$.usage.output_tokens'), 0)
@@ -83,7 +87,9 @@ export class SupervisorGuards {
       WHERE session_id IN (
         SELECT id FROM sessions WHERE project_id = ?
       )
-    `).get(projectId) as { total: number };
+    `
+      )
+      .get(projectId) as { total: number };
     return row.total;
   }
 }

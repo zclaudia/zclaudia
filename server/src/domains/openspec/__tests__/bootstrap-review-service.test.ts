@@ -46,7 +46,7 @@ async function setupAwaitingReview(db: Database.Database, projectRoot: string) {
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(
     join(dir, 'spec.md'),
-    `# auth Specification\n\n## Requirements\n\n### Requirement: Login\n\nSystem SHALL authenticate.\n\n#### Scenario: Valid\n- **WHEN** valid\n- **THEN** SHALL return token\n\n### Requirement: Legacy guest login\n\nUsers MAY browse as guest.\n\n#### Scenario: Guest\n- **WHEN** anon\n- **THEN** allow read-only\n`,
+    `# auth Specification\n\n## Requirements\n\n### Requirement: Login\n\nSystem SHALL authenticate.\n\n#### Scenario: Valid\n- **WHEN** valid\n- **THEN** SHALL return token\n\n### Requirement: Legacy guest login\n\nUsers MAY browse as guest.\n\n#### Scenario: Guest\n- **WHEN** anon\n- **THEN** allow read-only\n`
   );
   const explore = new AiExploreService({ aiRunPort: mkPort(RESCAN_DELTA) });
   const svc = new BootstrapService({ db, explore, getProjectRoot: () => projectRoot });
@@ -65,7 +65,7 @@ describe('BootstrapReviewService', () => {
     db.pragma('foreign_keys = ON');
     applyMigrations(db);
     db.prepare(
-      `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
     ).run('proj-1', 'P', 'code', 0, 0);
     projectRoot = mkdtempSync(join(tmpdir(), 'review-'));
     reviewSvc = new BootstrapReviewService({ db, getProjectRoot: () => projectRoot });
@@ -108,7 +108,7 @@ describe('BootstrapReviewService', () => {
     // Corpus reflects merge
     const corpus = fs.readFileSync(
       join(projectRoot, 'openspec', 'specs', 'auth', 'spec.md'),
-      'utf-8',
+      'utf-8'
     );
     expect(corpus).toContain('prompt 2FA');
     expect(corpus).not.toContain('Legacy guest login');
@@ -123,7 +123,7 @@ describe('BootstrapReviewService', () => {
     expect(Object.keys(result!.mergedSummary)).toEqual([]);
     const corpus = fs.readFileSync(
       join(projectRoot, 'openspec', 'specs', 'auth', 'spec.md'),
-      'utf-8',
+      'utf-8'
     );
     expect(corpus).toContain('System SHALL authenticate.'); // unchanged
     expect(corpus).toContain('Legacy guest login'); // unchanged

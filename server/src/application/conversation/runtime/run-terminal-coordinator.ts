@@ -4,16 +4,16 @@ import type { ProviderRegistryPort } from '../../../infra/providers/registry.js'
 import type { ProviderRuntimeEvent, SystemInfo } from '../../../infra/providers/types.js';
 import type { NotificationSender } from '../../../infra/push/notification-sender.js';
 import type { NotificationService } from '../../../domains/notification-feed/index.js';
-import {
-  buildStatusOutput,
-  SYSTEM_INFO_COMMANDS,
-} from '../../../utils/server-utils.js';
+import { buildStatusOutput, SYSTEM_INFO_COMMANDS } from '../../../utils/server-utils.js';
 import { maybeCompact } from '../compaction/compaction-service.js';
 import { clearSession } from '../interactions/todo-state-tracker.js';
 import { cleanupPendingPermissions, upsertAssistantMessage } from './run-lifecycle.js';
 import { compactionDomainEventFor } from './compaction-events.js';
 import { isTerminalPhase, setPhase } from './active-run-phase.js';
-import { postRunCompletedNotification, postRunFailedNotification } from './run-terminal-notifications.js';
+import {
+  postRunCompletedNotification,
+  postRunFailedNotification,
+} from './run-terminal-notifications.js';
 import { finalizeRunInteractions } from './interaction-coordinator.js';
 import {
   createRunDomainEvent,
@@ -92,7 +92,8 @@ export function completeProviderTurn(input: CompleteProviderTurnInput): void {
   });
 
   if (msg.usage) {
-    input.state.lastTurnTotalTokens = (input.state.lastTurnTotalTokens ?? 0) + msg.usage.totalTokens;
+    input.state.lastTurnTotalTokens =
+      (input.state.lastTurnTotalTokens ?? 0) + msg.usage.totalTokens;
   }
 
   finalizeRunInteractions({
@@ -103,10 +104,11 @@ export function completeProviderTurn(input: CompleteProviderTurnInput): void {
     sessionId,
   });
 
-  const shouldRunCompaction = !isTerminalPhase(activeRun.phase)
-    && Boolean(msg.usage)
-    && Boolean(activeRun.agentProfile)
-    && Boolean(activeRun.llmProfile);
+  const shouldRunCompaction =
+    !isTerminalPhase(activeRun.phase) &&
+    Boolean(msg.usage) &&
+    Boolean(activeRun.agentProfile) &&
+    Boolean(activeRun.llmProfile);
 
   const wasAlreadyCompleted = isTerminalPhase(activeRun.phase);
   const emitRunCompleted = () => {
@@ -156,7 +158,7 @@ export function completeProviderTurn(input: CompleteProviderTurnInput): void {
       sessionId,
       agentProfile: activeRun.agentProfile,
       llmProfile: activeRun.llmProfile,
-      broadcast: (m) => broadcastRunMessage(activeRun, m),
+      broadcast: m => broadcastRunMessage(activeRun, m),
     });
   };
 
@@ -170,41 +172,55 @@ export function completeProviderTurn(input: CompleteProviderTurnInput): void {
       lastAssistantUsage: msg.usage,
       source: 'auto',
       signal: activeRun.abortController?.signal,
-    }).then((outcome) => {
-      if (outcome.outcome === 'compacted') {
-        console.log(`[Compaction] auto session=${activeRun.sessionId} id=${outcome.compactionId} tokens=${outcome.tokensBefore}`);
-      } else if (outcome.outcome === 'failed') {
-        console.warn(`[Compaction] auto FAILED session=${activeRun.sessionId} reason=${outcome.reason} tokens=${outcome.tokensBefore ?? 'n/a'} breakerOpen=${outcome.breaker?.breakerOpen}`);
-      } else if (outcome.reason === 'circuit_open') {
-        console.log(`[Compaction] auto skipped session=${activeRun.sessionId} (circuit open until ${outcome.breaker?.nextRetryAtMs})`);
-      } else {
-        console.log(`[Compaction] auto skipped session=${activeRun.sessionId} reason=${outcome.reason} tokens=${outcome.tokensBefore ?? 'n/a'}`);
-      }
-      const event = compactionDomainEventFor({
-        outcome,
-        providerType: activeRun.providerType,
-        runId,
-        seq: (activeRun.eventSeq ?? 0) + 1,
-        sessionId: activeRun.sessionId,
+    })
+      .then(outcome => {
+        if (outcome.outcome === 'compacted') {
+          console.log(
+            `[Compaction] auto session=${activeRun.sessionId} id=${outcome.compactionId} tokens=${outcome.tokensBefore}`
+          );
+        } else if (outcome.outcome === 'failed') {
+          console.warn(
+            `[Compaction] auto FAILED session=${activeRun.sessionId} reason=${outcome.reason} tokens=${outcome.tokensBefore ?? 'n/a'} breakerOpen=${outcome.breaker?.breakerOpen}`
+          );
+        } else if (outcome.reason === 'circuit_open') {
+          console.log(
+            `[Compaction] auto skipped session=${activeRun.sessionId} (circuit open until ${outcome.breaker?.nextRetryAtMs})`
+          );
+        } else {
+          console.log(
+            `[Compaction] auto skipped session=${activeRun.sessionId} reason=${outcome.reason} tokens=${outcome.tokensBefore ?? 'n/a'}`
+          );
+        }
+        const event = compactionDomainEventFor({
+          outcome,
+          providerType: activeRun.providerType,
+          runId,
+          seq: (activeRun.eventSeq ?? 0) + 1,
+          sessionId: activeRun.sessionId,
+        });
+        if (event)
+          emitTerminalDomainEvent({
+            event,
+            listeners,
+            sendRunEvent,
+          });
+      })
+      .catch((err: unknown) => {
+        console.warn(
+          '[Compaction] auto-trigger unexpected error:',
+          err instanceof Error ? err.message : err
+        );
+      })
+      .finally(() => {
+        emitRunCompleted();
+        emitBackgroundUpdate();
+        triggerSessionTitle();
       });
-      if (event) emitTerminalDomainEvent({
-        event,
-        listeners,
-        sendRunEvent,
-      });
-    }).catch((err: unknown) => {
-      console.warn('[Compaction] auto-trigger unexpected error:', err instanceof Error ? err.message : err);
-    }).finally(() => {
-      emitRunCompleted();
-      emitBackgroundUpdate();
-      triggerSessionTitle();
-    });
   } else {
     emitRunCompleted();
     emitBackgroundUpdate();
     triggerSessionTitle();
   }
-
 }
 
 export function failProviderTurn(input: FailProviderTurnInput): void {
@@ -330,11 +346,7 @@ function applyTerminalContentFallbacks(input: CompleteProviderTurnInput): void {
     }
   }
 
-  if (
-    !activeRun.fullContent &&
-    activeRun.collectedToolCalls.length > 0 &&
-    activeRun.providerType
-  ) {
+  if (!activeRun.fullContent && activeRun.collectedToolCalls.length > 0 && activeRun.providerType) {
     const fallback = providerRegistry.getPolicy(activeRun.providerType)?.emptyResultFallback;
     if (fallback) {
       activeRun.fullContent = fallback;
@@ -349,11 +361,14 @@ function applyTerminalContentFallbacks(input: CompleteProviderTurnInput): void {
   }
 
   const lastBlock = activeRun.contentBlocks[activeRun.contentBlocks.length - 1];
-  const endsWithThinking = lastBlock?.type === 'text' &&
-    lastBlock.content.trimEnd().endsWith('</think>');
+  const endsWithThinking =
+    lastBlock?.type === 'text' && lastBlock.content.trimEnd().endsWith('</think>');
   if (endsWithThinking) {
-    console.warn(`[Truncation] Run ${runId} ended with a thinking block as last output. Possible provider truncation.`);
-    const warning = '\n\n⚠️ *The model appeared to stop mid-thought without producing a response. This may be caused by output token limits or provider compatibility issues. Try sending "continue" or starting a new session.*';
+    console.warn(
+      `[Truncation] Run ${runId} ended with a thinking block as last output. Possible provider truncation.`
+    );
+    const warning =
+      '\n\n⚠️ *The model appeared to stop mid-thought without producing a response. This may be caused by output token limits or provider compatibility issues. Try sending "continue" or starting a new session.*';
     activeRun.fullContent += warning;
     activeRun.contentBlocks.push({ type: 'text', content: warning });
     sendRunEvent({

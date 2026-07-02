@@ -12,6 +12,7 @@ import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { PermissionBridge } from '../agent/permission-bridge.js';
 import type { PermissionWorkflowResolver } from '../../../domains/workflows/index.js';
 import type { UserHookDefinition } from '@zclaudia/shared/interaction/user-hooks';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 
 interface PrepareProviderRunInput {
   activeRun: ActiveRun;
@@ -19,7 +20,7 @@ interface PrepareProviderRunInput {
   broadcastToOtherAuthenticatedClients: (
     clients: Map<string, ConnectedClient>,
     originClientId: string,
-    message: import('@zclaudia/shared/wire/messages').ServerMessage,
+    message: ServerMessage
   ) => void;
   connectedClients: Map<string, ConnectedClient>;
   cwd: string;
@@ -30,8 +31,8 @@ interface PrepareProviderRunInput {
   llmProfileId: string | null;
   providerType: string;
   runId: string;
-  sendMessage: (ws: ConnectedClient['ws'], message: import('@zclaudia/shared/wire/messages').ServerMessage) => void;
-  sendRunEvent: (event: import('@zclaudia/shared/wire/messages').ServerMessage) => void;
+  sendMessage: (ws: ConnectedClient['ws'], message: ServerMessage) => void;
+  sendRunEvent: (event: ServerMessage) => void;
   session: RunSessionRecord;
   sessionType: 'regular' | 'background' | 'agent';
   markPendingResolutionResumed: () => void;
@@ -51,9 +52,6 @@ export interface PreparedProviderRun {
 export function prepareProviderRun(input: PrepareProviderRunInput): PreparedProviderRun {
   const {
     activeRun,
-    client,
-    broadcastToOtherAuthenticatedClients,
-    connectedClients,
     cwd,
     db,
     markPendingResolutionResumed,
@@ -72,7 +70,8 @@ export function prepareProviderRun(input: PrepareProviderRunInput): PreparedProv
   // Background tasks that settled while the session was idle surface here.
   const taskNotices = drainPendingTaskNotices(message.sessionId);
   const allNotices = [...notices, ...taskNotices];
-  const processedInput = allNotices.length > 0 ? `${mentionProcessed}\n\n${allNotices.join('\n')}` : mentionProcessed;
+  const processedInput =
+    allNotices.length > 0 ? `${mentionProcessed}\n\n${allNotices.join('\n')}` : mentionProcessed;
   console.log('[@ Mention] Original input:', parsedInput.text);
   if (mentionProcessed !== parsedInput.text) {
     console.log('[@ Mention] Processed input:', mentionProcessed);
@@ -85,6 +84,14 @@ export function prepareProviderRun(input: PrepareProviderRunInput): PreparedProv
   const modeValue = forcedPlanBySession ? 'plan' : requestedMode;
   if (forcedPlanBySession && modeValue !== requestedMode) {
     console.log(`[Mode] Forced plan mode for planning session ${message.sessionId}`);
+  }
+
+  const { permissionBridge, permissionWorkflowResolver } = input;
+  if (!permissionBridge) {
+    throw new Error('prepareProviderRun requires a permissionBridge');
+  }
+  if (!permissionWorkflowResolver) {
+    throw new Error('prepareProviderRun requires a permissionWorkflowResolver');
   }
 
   const permissionCallback = createPermissionCallback({
@@ -106,8 +113,8 @@ export function prepareProviderRun(input: PrepareProviderRunInput): PreparedProv
       project_id: session.project_id,
     },
     sessionType,
-    permissionBridge: input.permissionBridge!,
-    permissionWorkflowResolver: input.permissionWorkflowResolver!,
+    permissionBridge,
+    permissionWorkflowResolver,
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -29,7 +29,7 @@ describe('Permission Workflow Resolution', () => {
               status: response.status,
               statusText: response.statusText,
               body: raw.slice(0, 300),
-            }),
+            })
           );
         }
       }
@@ -40,7 +40,7 @@ describe('Permission Workflow Resolution', () => {
             status: response.status,
             statusText: response.statusText,
             body: json ?? raw,
-          }),
+          })
         );
       }
       return json.data as T;

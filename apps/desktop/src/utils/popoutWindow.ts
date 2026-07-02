@@ -36,10 +36,17 @@ function resolveTargetBackendId(options?: ConnectionTargetOptions): string {
 export function getConnectionParams(options?: ConnectionTargetOptions): ConnectionParams {
   const targetBackendId = resolveTargetBackendId(options);
   let serverUrl = '';
-  try { serverUrl = getBaseUrlForBackend(targetBackendId); } catch { /* no server */ }
-  const authToken = (getAuthHeadersForBackend(targetBackendId) as Record<string, string>)['Authorization'] || '';
+  try {
+    serverUrl = getBaseUrlForBackend(targetBackendId);
+  } catch {
+    /* no server */
+  }
+  const authToken =
+    (getAuthHeadersForBackend(targetBackendId) as Record<string, string>)['Authorization'] || '';
 
-  const activeBackend = useFacadeStore.getState().backends.find(b => b.backendId === targetBackendId);
+  const activeBackend = useFacadeStore
+    .getState()
+    .backends.find(b => b.backendId === targetBackendId);
   const serverName = activeBackend?.name || '';
   const gatewayState = useGatewayStore.getState();
 
@@ -52,12 +59,17 @@ export function getConnectionParams(options?: ConnectionTargetOptions): Connecti
 }
 
 /** Build a pop-out window URL with connection params + custom params. */
-export function buildPopoutUrl(windowParams: Record<string, string>, options?: ConnectionTargetOptions): string {
+export function buildPopoutUrl(
+  windowParams: Record<string, string>,
+  options?: ConnectionTargetOptions
+): string {
   const conn = getConnectionParams(options);
   // Prefer resolved serverUrl; fall back to caller-provided serverUrl if resolution failed
   const resolvedServerUrl = conn.serverUrl || windowParams.serverUrl || '';
   if (!resolvedServerUrl) {
-    console.warn('[popoutWindow] No serverUrl resolved — pop-out window may not be able to connect to a backend.');
+    console.warn(
+      '[popoutWindow] No serverUrl resolved — pop-out window may not be able to connect to a backend.'
+    );
   }
   const params = new URLSearchParams({ ...windowParams, serverUrl: resolvedServerUrl });
   if (conn.authToken) params.set('authToken', conn.authToken);
@@ -111,5 +123,8 @@ export function buildWindowTitle(name: string, ...contextParts: (string | undefi
 function canonicalizeBackendId(backendId: string | null | undefined): string {
   if (!backendId) return '';
   const parsedBackendId = parseBackendId(backendId) ?? backendId;
-  return resolveCanonicalBackendId(parsedBackendId, resolveLocalBackendId() ?? parsedBackendId) ?? parsedBackendId;
+  return (
+    resolveCanonicalBackendId(parsedBackendId, resolveLocalBackendId() ?? parsedBackendId) ??
+    parsedBackendId
+  );
 }

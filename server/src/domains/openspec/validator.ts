@@ -35,7 +35,7 @@ export function validateSpec(spec: ParsedSpec): ValidationResult {
   for (const req of spec.requirements) {
     issues.push(...validateRequirement(req));
   }
-  return { ok: issues.every((i) => i.severity !== 'error'), issues };
+  return { ok: issues.every(i => i.severity !== 'error'), issues };
 }
 
 /** Validate a delta document. ADDED/MODIFIED requirements must satisfy the same rules. */
@@ -59,7 +59,7 @@ export function validateDelta(delta: DeltaDoc): ValidationResult {
       message: 'delta is empty (no ADDED/MODIFIED/REMOVED)',
     });
   }
-  return { ok: issues.every((i) => i.severity !== 'error'), issues };
+  return { ok: issues.every(i => i.severity !== 'error'), issues };
 }
 
 function validateRequirement(req: ParsedRequirement, prefix = ''): ValidationIssue[] {

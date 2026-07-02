@@ -55,13 +55,20 @@ export function WorkflowEditorWindow({
   );
 }
 
-function WorkflowEditorWindowContent({ projectId, workflowId, serverUrl, authToken, initialMode, readOnly }: Omit<WorkflowEditorWindowProps, 'serverId' | 'serverName' | 'gatewayUrl' | 'gatewaySecret'>) {
+function WorkflowEditorWindowContent({
+  projectId,
+  workflowId,
+  serverUrl,
+  authToken,
+  initialMode,
+  readOnly,
+}: Omit<WorkflowEditorWindowProps, 'serverId' | 'serverName' | 'gatewayUrl' | 'gatewaySecret'>) {
   const [workflow, setWorkflow] = useState<Workflow | undefined>(undefined);
   const [loading, setLoading] = useState(!!workflowId);
   const [error, setError] = useState<string | null>(null);
-  const activeServerId = useServerStore((s) => s.activeServerId);
-  const facadeConnectionState = useFacadeStore((s) => s.connectionState);
-  const facadeBackends = useFacadeStore((s) => s.backends);
+  const activeServerId = useServerStore(s => s.activeServerId);
+  const facadeConnectionState = useFacadeStore(s => s.connectionState);
+  const facadeBackends = useFacadeStore(s => s.backends);
   const isConnected = isMobileBackendUsable({
     backendId: activeServerId,
     connectionState: facadeConnectionState,
@@ -74,21 +81,21 @@ function WorkflowEditorWindowContent({ projectId, workflowId, serverUrl, authTok
     let cancelled = false;
     (async () => {
       try {
-        const [projects, providers] = await Promise.all([
-          api.getProjects(),
-          api.listLlmProfiles(),
-        ]);
+        const [projects, providers] = await Promise.all([api.getProjects(), api.listLlmProfiles()]);
         if (cancelled) return;
         const store = useProjectStore.getState();
         store.setProjects(projects);
         store.setProviders(providers);
         store.selectProject(projectId);
       } catch (err) {
-        if (!cancelled) console.warn('[WorkflowEditorWindow] Failed to load workflow editor context:', err);
+        if (!cancelled)
+          console.warn('[WorkflowEditorWindow] Failed to load workflow editor context:', err);
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [isConnected, projectId]);
 
   useEffect(() => {
@@ -111,7 +118,8 @@ function WorkflowEditorWindowContent({ projectId, workflowId, serverUrl, authTok
         const resp = await fetch(`${serverUrl}/api/workflows/${workflowId}`, { headers });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const json = await resp.json();
-        if (!json.success || !json.data) throw new Error(json.error?.message || 'Failed to load workflow');
+        if (!json.success || !json.data)
+          throw new Error(json.error?.message || 'Failed to load workflow');
         if (!cancelled) {
           setWorkflow(json.data);
           setLoading(false);
@@ -124,7 +132,9 @@ function WorkflowEditorWindowContent({ projectId, workflowId, serverUrl, authTok
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [workflowId, serverUrl, authToken]);
 
   if (loading) {

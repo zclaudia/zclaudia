@@ -77,9 +77,7 @@ describe('FileViewerWindow', () => {
 
   it('does not render close button when onClose is not provided', async () => {
     await mockPendingApiLoad();
-    const { container } = render(
-      <FileViewerWindow filePath="src/app.ts" projectRoot="/project" />
-    );
+    const { container } = render(<FileViewerWindow filePath="src/app.ts" projectRoot="/project" />);
     const buttons = container.querySelectorAll('button');
     expect(buttons.length).toBe(0);
   });

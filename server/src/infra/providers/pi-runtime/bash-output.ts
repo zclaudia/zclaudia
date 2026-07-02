@@ -37,9 +37,7 @@ const DIAGNOSTIC_PATH_EXTENSIONS = String.raw`(?:ts|tsx|js|jsx|mjs|cjs|json|md|m
 
 function trimMessage(message: string): string {
   const trimmed = message.trim();
-  return trimmed.length > MAX_MESSAGE_CHARS
-    ? `${trimmed.slice(0, MAX_MESSAGE_CHARS)}...`
-    : trimmed;
+  return trimmed.length > MAX_MESSAGE_CHARS ? `${trimmed.slice(0, MAX_MESSAGE_CHARS)}...` : trimmed;
 }
 
 function toSeverity(value: string | undefined): BashDiagnosticSeverity {
@@ -57,14 +55,16 @@ function parseInteger(value: string | undefined): number | undefined {
 
 function pushDiagnostic(
   diagnostics: BashOutputDiagnostic[],
-  diagnostic: BashOutputDiagnostic,
+  diagnostic: BashOutputDiagnostic
 ): void {
   if (diagnostics.length >= MAX_DIAGNOSTICS) return;
-  const duplicate = diagnostics.some(existing =>
-    existing.path === diagnostic.path
-    && existing.line === diagnostic.line
-    && existing.column === diagnostic.column
-    && existing.message === diagnostic.message);
+  const duplicate = diagnostics.some(
+    existing =>
+      existing.path === diagnostic.path &&
+      existing.line === diagnostic.line &&
+      existing.column === diagnostic.column &&
+      existing.message === diagnostic.message
+  );
   if (!duplicate) diagnostics.push(diagnostic);
 }
 
@@ -82,14 +82,18 @@ export function extractBashOutputInsights(output: string): BashOutputInsights {
 
   const colonDiagnostic = new RegExp(
     String.raw`^(.+?\.${DIAGNOSTIC_PATH_EXTENSIONS}):(\d+):(\d+)\s*(?:-|:)?\s*(error|warning|warn|info)?\s*([A-Z]+[A-Z0-9_-]*\d*)?\s*:?\s*(.+)$`,
-    'i',
+    'i'
   );
   const parenDiagnostic = new RegExp(
     String.raw`^(.+?\.${DIAGNOSTIC_PATH_EXTENSIONS})\((\d+),(\d+)\):\s*(error|warning|warn|info)\s*([A-Z]+[A-Z0-9_-]*\d*)?\s*:?\s*(.+)$`,
-    'i',
+    'i'
   );
-  const eslintFileHeader = new RegExp(String.raw`^\s*(.+?\.${DIAGNOSTIC_PATH_EXTENSIONS})\s*$`, 'i');
-  const eslintStylishLine = /^\s*(\d+):(\d+)\s+(error|warning|warn)\s+(.+?)(?:\s{2,}([@\w/-]+(?:\/[\w.-]+)?))?\s*$/i;
+  const eslintFileHeader = new RegExp(
+    String.raw`^\s*(.+?\.${DIAGNOSTIC_PATH_EXTENSIONS})\s*$`,
+    'i'
+  );
+  const eslintStylishLine =
+    /^\s*(\d+):(\d+)\s+(error|warning|warn)\s+(.+?)(?:\s{2,}([@\w/-]+(?:\/[\w.-]+)?))?\s*$/i;
 
   for (const rawLine of output.split(/\r?\n/)) {
     const line = rawLine.trimEnd();
@@ -154,23 +158,30 @@ function formatDiagnostic(diagnostic: BashOutputDiagnostic): string {
     diagnostic.path,
     diagnostic.line !== undefined ? diagnostic.line : undefined,
     diagnostic.column !== undefined ? diagnostic.column : undefined,
-  ].filter(value => value !== undefined).join(':');
+  ]
+    .filter(value => value !== undefined)
+    .join(':');
   const source = diagnostic.source ? ` ${diagnostic.source}` : '';
   return `- ${location} ${diagnostic.severity}${source}: ${diagnostic.message}`;
 }
 
-export function formatBashResultText(input: FormatBashResultInput, insights = extractBashOutputInsights(input.fullOutput)): string {
-  const statusBase = input.status
-    ?? (input.aborted
-    ? 'aborted'
-    : input.timedOut
-      ? 'timed out'
-      : input.exitCode === 0
-        ? 'success'
-        : 'failed');
-  const status = (statusBase === 'failed' && input.exitCode !== null)
-    ? `failed (Exit code: ${input.exitCode})`
-    : statusBase;
+export function formatBashResultText(
+  input: FormatBashResultInput,
+  insights = extractBashOutputInsights(input.fullOutput)
+): string {
+  const statusBase =
+    input.status ??
+    (input.aborted
+      ? 'aborted'
+      : input.timedOut
+        ? 'timed out'
+        : input.exitCode === 0
+          ? 'success'
+          : 'failed');
+  const status =
+    statusBase === 'failed' && input.exitCode !== null
+      ? `failed (Exit code: ${input.exitCode})`
+      : statusBase;
   const lines = [
     `Command: ${input.command}`,
     `Cwd: ${input.cwd}`,

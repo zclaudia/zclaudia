@@ -51,7 +51,13 @@ describe('middleware/base', () => {
 
       const finalHandler: MessageHandler = async () => {
         order.push(5);
-        return { id: 'resp-1', type: 'test.response', payload: 'done', timestamp: Date.now(), metadata: { success: true } };
+        return {
+          id: 'resp-1',
+          type: 'test.response',
+          payload: 'done',
+          timestamp: Date.now(),
+          metadata: { success: true },
+        };
       };
 
       const composed = composeMiddleware(middleware1, middleware2);
@@ -72,10 +78,16 @@ describe('middleware/base', () => {
         return next(ctx);
       };
 
-      const finalHandler: MessageHandler = async (ctx) => {
+      const finalHandler: MessageHandler = async ctx => {
         expect(ctx.metadata.get('step1')).toBe('value1');
         expect(ctx.metadata.get('step2')).toBe('value2');
-        return { id: 'resp-1', type: 'test.response', payload: 'done', timestamp: Date.now(), metadata: { success: true } };
+        return {
+          id: 'resp-1',
+          type: 'test.response',
+          payload: 'done',
+          timestamp: Date.now(),
+          metadata: { success: true },
+        };
       };
 
       const composed = composeMiddleware(middleware1, middleware2);
@@ -92,7 +104,10 @@ describe('middleware/base', () => {
             type: 'error.response',
             payload: null,
             timestamp: Date.now(),
-            metadata: { success: false, error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } },
+            metadata: {
+              success: false,
+              error: { code: 'UNAUTHORIZED', message: 'Not authenticated' },
+            },
           };
         }
         return next(ctx);
@@ -105,7 +120,13 @@ describe('middleware/base', () => {
 
       const finalHandler: MessageHandler = async () => {
         order.push('final');
-        return { id: 'resp-1', type: 'test.response', payload: 'done', timestamp: Date.now(), metadata: { success: true } };
+        return {
+          id: 'resp-1',
+          type: 'test.response',
+          payload: 'done',
+          timestamp: Date.now(),
+          metadata: { success: true },
+        };
       };
 
       // Test with authenticated client - full chain executes
@@ -131,7 +152,11 @@ describe('middleware/base', () => {
       };
 
       const finalHandler: MessageHandler = async () => ({
-        id: 'resp-1', type: 'test.response', payload: 'done', timestamp: Date.now(), metadata: { success: true }
+        id: 'resp-1',
+        type: 'test.response',
+        payload: 'done',
+        timestamp: Date.now(),
+        metadata: { success: true },
       });
 
       const composed = composeMiddleware(badMiddleware);
@@ -144,7 +169,11 @@ describe('middleware/base', () => {
       };
 
       const finalHandler: MessageHandler = async () => ({
-        id: 'resp-1', type: 'test.response', payload: 'done', timestamp: Date.now(), metadata: { success: true }
+        id: 'resp-1',
+        type: 'test.response',
+        payload: 'done',
+        timestamp: Date.now(),
+        metadata: { success: true },
       });
 
       const composed = composeMiddleware(errorMiddleware);
@@ -177,7 +206,11 @@ describe('middleware/base', () => {
       };
 
       const finalHandler: MessageHandler = async () => ({
-        id: 'resp-1', type: 'test.response', payload: 'done', timestamp: Date.now(), metadata: { success: true }
+        id: 'resp-1',
+        type: 'test.response',
+        payload: 'done',
+        timestamp: Date.now(),
+        metadata: { success: true },
       });
 
       const composed = composeMiddleware(catchErrorMiddleware, errorMiddleware);
@@ -190,7 +223,11 @@ describe('middleware/base', () => {
 
     it('works with empty middleware array', async () => {
       const finalHandler: MessageHandler = async () => ({
-        id: 'resp-1', type: 'test.response', payload: 'done', timestamp: Date.now(), metadata: { success: true }
+        id: 'resp-1',
+        type: 'test.response',
+        payload: 'done',
+        timestamp: Date.now(),
+        metadata: { success: true },
       });
 
       const composed = composeMiddleware();
@@ -205,9 +242,15 @@ describe('middleware/base', () => {
         return next(ctx);
       };
 
-      const finalHandler: MessageHandler = async (ctx) => {
+      const finalHandler: MessageHandler = async ctx => {
         expect(ctx.metadata.get('called')).toBe(true);
-        return { id: 'resp-1', type: 'test.response', payload: 'done', timestamp: Date.now(), metadata: { success: true } };
+        return {
+          id: 'resp-1',
+          type: 'test.response',
+          payload: 'done',
+          timestamp: Date.now(),
+          metadata: { success: true },
+        };
       };
 
       const composed = composeMiddleware(middleware);

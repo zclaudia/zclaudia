@@ -23,7 +23,10 @@ export const changeStatusLabel: Record<string, string> = {
   cancelled: 'Cancelled',
 };
 
-export function extractWorkspaceDocs(changeId: string | undefined, docs: Array<{ id: string; version?: number; content?: string }>): ContextDocumentPreview[] {
+export function extractWorkspaceDocs(
+  changeId: string | undefined,
+  docs: Array<{ id: string; version?: number; content?: string }>
+): ContextDocumentPreview[] {
   if (!changeId) return [];
   const targetIds = [
     `changes/${changeId}/design.md`,
@@ -33,9 +36,9 @@ export function extractWorkspaceDocs(changeId: string | undefined, docs: Array<{
     `changes/${changeId}/sync-log.md`,
   ];
   return targetIds
-    .map((id) => docs.find((doc) => doc.id === id))
+    .map(id => docs.find(doc => doc.id === id))
     .filter((doc): doc is { id: string; version?: number; content?: string } => Boolean(doc))
-    .map((doc) => ({
+    .map(doc => ({
       id: doc.id,
       version: typeof doc.version === 'number' ? doc.version : 1,
       content: doc.content ?? '',
@@ -70,12 +73,15 @@ export function getEditableDocType(docId: string): EditableDocType | null {
 export function extractDocSummary(content: string, fallback: string): string {
   const lines = content
     .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0 && !line.startsWith('#'));
+    .map(line => line.trim())
+    .filter(line => line.length > 0 && !line.startsWith('#'));
   return lines[0] ?? fallback;
 }
 
-export function getNextAction(status: ProjectChange['status']): { title: string; description: string } {
+export function getNextAction(status: ProjectChange['status']): {
+  title: string;
+  description: string;
+} {
   switch (status) {
     case 'draft':
     case 'designing':
@@ -106,12 +112,14 @@ export function getNextAction(status: ProjectChange['status']): { title: string;
     case 'accepting':
       return {
         title: 'Review acceptance',
-        description: 'Approve acceptance to move into sync, or reopen execution if more work is needed.',
+        description:
+          'Approve acceptance to move into sync, or reopen execution if more work is needed.',
       };
     case 'syncing':
       return {
         title: 'Complete the change',
-        description: 'Review the sync summary and mark the change completed when specs are aligned.',
+        description:
+          'Review the sync summary and mark the change completed when specs are aligned.',
       };
     case 'completed':
       return {

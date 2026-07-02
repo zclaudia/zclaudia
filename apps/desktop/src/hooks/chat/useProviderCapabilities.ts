@@ -13,15 +13,18 @@ interface UseProviderCapabilitiesOptions {
   isConnected: boolean;
 }
 
-export function useProviderCapabilities({ sessionId, isConnected }: UseProviderCapabilitiesOptions) {
-  const providerCommands = useLlmProfileMetaStore((s) => s.providerCommands);
-  const providerCapabilities = useLlmProfileMetaStore((s) => s.providerCapabilities);
-  const setProviderCapabilities = useLlmProfileMetaStore((s) => s.setProviderCapabilities);
-  const setProviderCommands = useLlmProfileMetaStore((s) => s.setProviderCommands);
-  const dataServerId = useProjectStore((s) => s.dataServerId);
-  const sessions = useProjectStore((s) => s.sessions);
-  const projects = useProjectStore((s) => s.projects);
-  const activeServerId = useServerStore((s) => s.activeServerId);
+export function useProviderCapabilities({
+  sessionId,
+  isConnected,
+}: UseProviderCapabilitiesOptions) {
+  const providerCommands = useLlmProfileMetaStore(s => s.providerCommands);
+  const providerCapabilities = useLlmProfileMetaStore(s => s.providerCapabilities);
+  const setProviderCapabilities = useLlmProfileMetaStore(s => s.setProviderCapabilities);
+  const setProviderCommands = useLlmProfileMetaStore(s => s.setProviderCommands);
+  const dataServerId = useProjectStore(s => s.dataServerId);
+  const sessions = useProjectStore(s => s.sessions);
+  const projects = useProjectStore(s => s.projects);
+  const activeServerId = useServerStore(s => s.activeServerId);
 
   const currentSession = sessions.find(s => s.id === sessionId);
   const currentProject = currentSession
@@ -32,8 +35,8 @@ export function useProviderCapabilities({ sessionId, isConnected }: UseProviderC
   const llmProfileId = llm?.id;
   const isBackendDataReady = dataServerId != null && dataServerId === activeServerId;
   const providerScopeKey =
-    resolveCanonicalBackendId(activeServerId ?? LEGACY_LOCAL_SERVER_ID, LEGACY_LOCAL_SERVER_ID)
-    || LEGACY_LOCAL_SERVER_ID;
+    resolveCanonicalBackendId(activeServerId ?? LEGACY_LOCAL_SERVER_ID, LEGACY_LOCAL_SERVER_ID) ||
+    LEGACY_LOCAL_SERVER_ID;
   const capsCacheKey = `${providerScopeKey}:${llmProfileId || '_default'}`;
   const commandsCacheKey = `${providerScopeKey}:${llmProfileId || '_default'}`;
 
@@ -47,7 +50,8 @@ export function useProviderCapabilities({ sessionId, isConnected }: UseProviderC
     }
 
     if (llmProfileId) {
-      api.getProviderCommands(llmProfileId, projectRoot || undefined, { signal: controller.signal })
+      api
+        .getProviderCommands(llmProfileId, projectRoot || undefined, { signal: controller.signal })
         .then(commands => {
           setProviderCommands(commandsCacheKey, commands);
         })
@@ -56,7 +60,10 @@ export function useProviderCapabilities({ sessionId, isConnected }: UseProviderC
           console.error('Failed to load provider commands:', err);
         });
     } else {
-      api.getProviderTypeCommands('zclaudia', projectRoot || undefined, { signal: controller.signal })
+      api
+        .getProviderTypeCommands('zclaudia', projectRoot || undefined, {
+          signal: controller.signal,
+        })
         .then(commands => {
           setProviderCommands(commandsCacheKey, commands);
         })
@@ -67,7 +74,15 @@ export function useProviderCapabilities({ sessionId, isConnected }: UseProviderC
     }
 
     return () => controller.abort();
-  }, [llm?.id, currentProject?.rootPath, isConnected, isBackendDataReady, commandsCacheKey, llmProfileId, setProviderCommands]);
+  }, [
+    llm?.id,
+    currentProject?.rootPath,
+    isConnected,
+    isBackendDataReady,
+    commandsCacheKey,
+    llmProfileId,
+    setProviderCommands,
+  ]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -87,7 +102,14 @@ export function useProviderCapabilities({ sessionId, isConnected }: UseProviderC
         console.error('Failed to load provider capabilities:', err);
       });
     return () => controller.abort();
-  }, [capsCacheKey, llmProfileId, isConnected, isBackendDataReady, providerCapabilities, setProviderCapabilities]);
+  }, [
+    capsCacheKey,
+    llmProfileId,
+    isConnected,
+    isBackendDataReady,
+    providerCapabilities,
+    setProviderCapabilities,
+  ]);
 
   const capabilities: ProviderCapabilities | null = providerCapabilities[capsCacheKey] || null;
 
@@ -123,7 +145,7 @@ export function useProviderCapabilities({ sessionId, isConnected }: UseProviderC
       },
     ];
 
-    const seen = new Set(base.map((c) => c.command));
+    const seen = new Set(base.map(c => c.command));
     const merged = [...base];
     for (const cmd of extras) {
       if (!seen.has(cmd.command)) merged.push(cmd);

@@ -21,9 +21,9 @@ interface Props {
 }
 
 export function OpenSpecPanel({ projectId }: Props): React.ReactElement {
-  const view = useOpenSpecStore((s) => s.viewByProject[projectId] ?? INITIAL_VIEW_STATE);
-  const corpus = useOpenSpecStore((s) => s.corpusByProject[projectId] ?? []);
-  const patchView = useOpenSpecStore((s) => s.patchView);
+  const view = useOpenSpecStore(s => s.viewByProject[projectId] ?? INITIAL_VIEW_STATE);
+  const corpus = useOpenSpecStore(s => s.corpusByProject[projectId] ?? []);
+  const patchView = useOpenSpecStore(s => s.patchView);
 
   useEffect(() => {
     // Initial issue load handled inside IssueListScreen (Task 7 wires this).
@@ -35,9 +35,7 @@ export function OpenSpecPanel({ projectId }: Props): React.ReactElement {
         <NewIssueDialog
           projectId={projectId}
           parentEpicId={view.selectedEpicId}
-          onClose={() =>
-            patchView(projectId, { showNewIssue: false, selectedEpicId: undefined })
-          }
+          onClose={() => patchView(projectId, { showNewIssue: false, selectedEpicId: undefined })}
         />
       )}
       {view.showArchiveConfirm && view.selectedSubIssueId && (

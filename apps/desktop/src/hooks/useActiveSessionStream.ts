@@ -8,6 +8,6 @@ import { useSessionRoute } from './chat/useSessionRoute';
  * run completion.
  */
 export function useActiveSessionStream(): void {
-  const selectedSessionId = useSelectionStore((s) => s.selectedSessionId);
+  const selectedSessionId = useSelectionStore(s => s.selectedSessionId);
   useSessionRoute(selectedSessionId, { maintainDesiredState: true });
 }

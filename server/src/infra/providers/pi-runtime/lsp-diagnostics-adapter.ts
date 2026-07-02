@@ -1,7 +1,11 @@
 import { readFile } from 'fs/promises';
 import * as path from 'path';
 import type { FileChangeNotifier } from './file-change-notifier.js';
-import type { WriteDiagnosticsProvider, WriteLifecycleDiagnostic, WriteLifecycleInput } from './write-lifecycle.js';
+import type {
+  WriteDiagnosticsProvider,
+  WriteLifecycleDiagnostic,
+  WriteLifecycleInput,
+} from './write-lifecycle.js';
 
 export interface LspTransport {
   notify(method: string, params: unknown): Promise<void> | void;
@@ -61,10 +65,14 @@ function toRelativePath(cwd: string, filePath: string): string {
   return path.relative(cwd, path.resolve(filePath)).split(path.sep).join('/');
 }
 
-function mapDiagnostics(cwd: string, uri: string, diagnostics: LspDiagnostic[]): WriteLifecycleDiagnostic[] {
+function mapDiagnostics(
+  cwd: string,
+  uri: string,
+  diagnostics: LspDiagnostic[]
+): WriteLifecycleDiagnostic[] {
   const filePath = uriToPath(uri);
   const relPath = toRelativePath(cwd, filePath);
-  return diagnostics.map((diagnostic) => ({
+  return diagnostics.map(diagnostic => ({
     path: relPath,
     line: (diagnostic.range?.start?.line ?? 0) + 1,
     column: (diagnostic.range?.start?.character ?? 0) + 1,
@@ -74,14 +82,16 @@ function mapDiagnostics(cwd: string, uri: string, diagnostics: LspDiagnostic[]):
   }));
 }
 
-export function createLspDiagnosticsAdapter(options: LspDiagnosticsAdapterOptions): LspDiagnosticsAdapter {
+export function createLspDiagnosticsAdapter(
+  options: LspDiagnosticsAdapterOptions
+): LspDiagnosticsAdapter {
   const diagnosticsByUri = new Map<string, WriteLifecycleDiagnostic[]>();
   const waitersByUri = new Map<string, Array<(diagnostics: WriteLifecycleDiagnostic[]) => void>>();
   const languageIdForPath = options.languageIdForPath ?? defaultLanguageIdForPath;
   const timeoutMs = Math.max(1, options.diagnosticsTimeoutMs ?? DEFAULT_DIAGNOSTICS_TIMEOUT_MS);
   const openedUris = new Set<string>();
 
-  const unsubscribe = options.transport.onNotification?.('textDocument/publishDiagnostics', (raw) => {
+  const unsubscribe = options.transport.onNotification?.('textDocument/publishDiagnostics', raw => {
     const params = raw as PublishDiagnosticsParams;
     if (!params.uri) return;
     const diagnostics = mapDiagnostics(options.cwd, params.uri, params.diagnostics ?? []);
@@ -91,7 +101,9 @@ export function createLspDiagnosticsAdapter(options: LspDiagnosticsAdapterOption
     for (const resolve of waiters) resolve(diagnostics);
   });
 
-  async function notifyDocumentSaved(input: Pick<WriteLifecycleInput, 'absolutePath' | 'path'>): Promise<void> {
+  async function notifyDocumentSaved(
+    input: Pick<WriteLifecycleInput, 'absolutePath' | 'path'>
+  ): Promise<void> {
     const uri = filePathToUri(input.absolutePath);
     const text = await readFile(input.absolutePath, 'utf8');
     if (!openedUris.has(uri)) {
@@ -112,19 +124,19 @@ export function createLspDiagnosticsAdapter(options: LspDiagnosticsAdapterOption
   }
 
   const fileChangeNotifier: FileChangeNotifier = {
-    notifyFileChanged: async (event) => {
+    notifyFileChanged: async event => {
       await notifyDocumentSaved(event);
     },
   };
 
-  const diagnosticsProvider: WriteDiagnosticsProvider = async (input) => {
+  const diagnosticsProvider: WriteDiagnosticsProvider = async input => {
     const uri = filePathToUri(input.absolutePath);
     const existing = diagnosticsByUri.get(uri);
     if (existing) return existing;
-    return await new Promise<WriteLifecycleDiagnostic[]>((resolve) => {
+    return await new Promise<WriteLifecycleDiagnostic[]>(resolve => {
       const timer = setTimeout(() => resolve(diagnosticsByUri.get(uri) ?? []), timeoutMs);
       const waiters = waitersByUri.get(uri) ?? [];
-      waiters.push((diagnostics) => {
+      waiters.push(diagnostics => {
         clearTimeout(timer);
         resolve(diagnostics);
       });

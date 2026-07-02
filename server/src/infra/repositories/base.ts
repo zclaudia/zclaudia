@@ -24,7 +24,11 @@ export interface Repository<T, TCreate, TUpdate> {
  * - Testable: Can test in isolation
  * - Maintainable: Single place to update DB logic
  */
-export abstract class BaseRepository<T, TCreate, TUpdate> implements Repository<T, TCreate, TUpdate> {
+export abstract class BaseRepository<T, TCreate, TUpdate> implements Repository<
+  T,
+  TCreate,
+  TUpdate
+> {
   constructor(
     protected db: Database,
     protected tableName: string

@@ -16,7 +16,7 @@ import { useFacadeStore } from '../stores/facadeStore';
 import { isMobileBackendUsable } from '../services/mobileConnectionState';
 
 export function useGatewayConnection() {
-  const facade = useFacadeStore((s) => s.facade);
+  const facade = useFacadeStore(s => s.facade);
 
   // Poll server gateway status and sync to store
   // Skip when direct config is active (mobile mode — no local server to poll)
@@ -58,36 +58,51 @@ export function useGatewayConnection() {
     syncFromServer();
     const interval = setInterval(syncFromServer, 30000);
 
-    return () => { mounted = false; clearInterval(interval); };
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   // Public API — delegates to facade
-  const openChannel = useCallback((backendId: string) => {
-    facade?.openBackend(backendId);
-  }, [facade]);
+  const openChannel = useCallback(
+    (backendId: string) => {
+      facade?.openBackend(backendId);
+    },
+    [facade]
+  );
 
-  const sendToBackend = useCallback((backendId: string, message: ClientMessage) => {
-    facade?.sendToBackend(backendId, message);
-  }, [facade]);
+  const sendToBackend = useCallback(
+    (backendId: string, message: ClientMessage) => {
+      facade?.sendToBackend(backendId, message);
+    },
+    [facade]
+  );
 
-  const isBackendConnected = useCallback((backendId: string) => {
-    if (!facade) return false;
-    return isMobileBackendUsable({
-      backendId,
-      connectionState: useFacadeStore.getState().connectionState,
-      backends: useFacadeStore.getState().backends,
-    });
-  }, [facade]);
+  const isBackendConnected = useCallback(
+    (backendId: string) => {
+      if (!facade) return false;
+      return isMobileBackendUsable({
+        backendId,
+        connectionState: useFacadeStore.getState().connectionState,
+        backends: useFacadeStore.getState().backends,
+      });
+    },
+    [facade]
+  );
 
   const disconnectGateway = useCallback(() => {
     facade?.disconnect();
   }, [facade]);
 
-  return useMemo(() => ({
-    openChannel,
-    sendToBackend,
-    isBackendAuthenticated: isBackendConnected,
-    isBackendConnected,
-    disconnectGateway,
-  }), [openChannel, sendToBackend, isBackendConnected, disconnectGateway]);
+  return useMemo(
+    () => ({
+      openChannel,
+      sendToBackend,
+      isBackendAuthenticated: isBackendConnected,
+      isBackendConnected,
+      disconnectGateway,
+    }),
+    [openChannel, sendToBackend, isBackendConnected, disconnectGateway]
+  );
 }

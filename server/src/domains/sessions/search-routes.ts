@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { type Router, type Request, type Response } from 'express';
 import type Database from 'better-sqlite3';
 import { SessionSearchRepository } from './search-repository.js';
 
@@ -44,7 +44,7 @@ export function mountSearchRoutes(router: Router, db: Database.Database): void {
         offset,
       });
 
-      const truncated = results.map((result) => ({
+      const truncated = results.map(result => ({
         ...result,
         content: (() => {
           const preview = buildSearchPreview(result.content);
@@ -61,7 +61,10 @@ export function mountSearchRoutes(router: Router, db: Database.Database): void {
       res.json({ success: true, data: { results: truncated } });
     } catch (error) {
       console.error('Error searching messages:', error);
-      res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: 'Failed to search messages' } });
+      res.status(500).json({
+        success: false,
+        error: { code: 'DB_ERROR', message: 'Failed to search messages' },
+      });
     }
   });
 
@@ -74,7 +77,10 @@ export function mountSearchRoutes(router: Router, db: Database.Database): void {
       res.json({ success: true, data: { history } });
     } catch (error) {
       console.error('Error fetching search history:', error);
-      res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: 'Failed to fetch search history' } });
+      res.status(500).json({
+        success: false,
+        error: { code: 'DB_ERROR', message: 'Failed to fetch search history' },
+      });
     }
   });
 
@@ -86,7 +92,10 @@ export function mountSearchRoutes(router: Router, db: Database.Database): void {
       res.json({ success: true, data: { cleared: true } });
     } catch (error) {
       console.error('Error clearing search history:', error);
-      res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: 'Failed to clear search history' } });
+      res.status(500).json({
+        success: false,
+        error: { code: 'DB_ERROR', message: 'Failed to clear search history' },
+      });
     }
   });
 
@@ -100,7 +109,10 @@ export function mountSearchRoutes(router: Router, db: Database.Database): void {
       res.json({ success: true, data: { suggestions } });
     } catch (error) {
       console.error('Error fetching search suggestions:', error);
-      res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: 'Failed to fetch search suggestions' } });
+      res.status(500).json({
+        success: false,
+        error: { code: 'DB_ERROR', message: 'Failed to fetch search suggestions' },
+      });
     }
   });
 }

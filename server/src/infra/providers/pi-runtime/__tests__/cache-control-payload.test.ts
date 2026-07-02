@@ -11,9 +11,8 @@ import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 const SENTINEL = new Error('payload captured — abort before network');
 
 async function capturePayload(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   model: any,
-  streamOpts: Record<string, unknown> = {},
+  streamOpts: Record<string, unknown> = {}
 ): Promise<Record<string, unknown>> {
   let captured: Record<string, unknown> | undefined;
   const context = {
@@ -29,15 +28,27 @@ async function capturePayload(
         throw SENTINEL;
       },
     });
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    for await (const _event of stream) { /* drain until error */ }
-  } catch { /* sentinel (possibly provider-wrapped) expected */ }
+
+    for await (const _event of stream) {
+      /* drain until error */
+    }
+  } catch {
+    /* sentinel (possibly provider-wrapped) expected */
+  }
   if (!captured) throw new Error('onPayload was never invoked');
   return captured;
 }
 
 function profile(extra: Partial<LlmProfileConfig>): LlmProfileConfig {
-  return { id: 'p', name: 'p', isDefault: false, createdAt: 0, updatedAt: 0, providerType: 'anthropic', ...extra } as LlmProfileConfig;
+  return {
+    id: 'p',
+    name: 'p',
+    isDefault: false,
+    createdAt: 0,
+    updatedAt: 0,
+    providerType: 'anthropic',
+    ...extra,
+  } as LlmProfileConfig;
 }
 
 // Save and restore PI_CACHE_RETENTION env so a developer's env can't flip outcomes.
@@ -58,7 +69,10 @@ afterEach(() => {
 
 describe('cache_control payload serialization (real pi-ai)', () => {
   it('anthropic path applies ephemeral cache_control by default', async () => {
-    const { model } = buildModel(profile({ providerType: 'anthropic', apiKey: 'k' }), 'claude-sonnet-4-6');
+    const { model } = buildModel(
+      profile({ providerType: 'anthropic', apiKey: 'k' }),
+      'claude-sonnet-4-6'
+    );
     const payload = await capturePayload(model);
     expect(JSON.stringify(payload)).toContain('"cache_control"');
     expect(JSON.stringify(payload)).toContain('"ephemeral"');
@@ -66,13 +80,19 @@ describe('cache_control payload serialization (real pi-ai)', () => {
   });
 
   it('cacheRetention long adds ttl 1h', async () => {
-    const { model } = buildModel(profile({ providerType: 'anthropic', apiKey: 'k' }), 'claude-sonnet-4-6');
+    const { model } = buildModel(
+      profile({ providerType: 'anthropic', apiKey: 'k' }),
+      'claude-sonnet-4-6'
+    );
     const payload = await capturePayload(model, { cacheRetention: 'long' });
     expect(JSON.stringify(payload)).toContain('"ttl":"1h"');
   });
 
   it('cacheRetention none omits all cache_control markers', async () => {
-    const { model } = buildModel(profile({ providerType: 'anthropic', apiKey: 'k' }), 'claude-sonnet-4-6');
+    const { model } = buildModel(
+      profile({ providerType: 'anthropic', apiKey: 'k' }),
+      'claude-sonnet-4-6'
+    );
     const payload = await capturePayload(model, { cacheRetention: 'none' });
     expect(JSON.stringify(payload)).not.toContain('cache_control');
   });
@@ -80,7 +100,10 @@ describe('cache_control payload serialization (real pi-ai)', () => {
   it('openai-compat path adds markers only with compat.cacheControlFormat anthropic', async () => {
     const base = { providerType: 'openai', baseUrl: 'http://127.0.0.1:9/v1', apiKey: 'k' };
     const without = buildModel(profile(base), 'unregistered-claude-proxy');
-    const withCompat = buildModel(profile({ ...base, compat: { cacheControlFormat: 'anthropic' } }), 'unregistered-claude-proxy');
+    const withCompat = buildModel(
+      profile({ ...base, compat: { cacheControlFormat: 'anthropic' } }),
+      'unregistered-claude-proxy'
+    );
     const p1 = await capturePayload(without.model);
     const p2 = await capturePayload(withCompat.model);
     expect(JSON.stringify(p1)).not.toContain('cache_control');

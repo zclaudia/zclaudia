@@ -10,7 +10,13 @@ export interface SystemTaskRegistration {
 
 /** Port interface consumed by domain modules that need to report system task health. */
 export interface SystemTaskRegistryPort {
-  register(info: { id: string; name: string; description: string; category: string; intervalMs: number }): void;
+  register(info: {
+    id: string;
+    name: string;
+    description: string;
+    category: string;
+    intervalMs: number;
+  }): void;
   markRunStart(id: string): void;
   markRunComplete(id: string, durationMs: number, error?: string): void;
 }

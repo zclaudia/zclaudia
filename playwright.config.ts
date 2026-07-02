@@ -20,14 +20,11 @@ export default defineConfig({
   // Timeout settings
   timeout: 30000,
   expect: {
-    timeout: 5000
+    timeout: 5000,
   },
 
   // Reporters
-  reporter: [
-    ['html', { outputFolder: 'playwright-report' }],
-    ['list']
-  ],
+  reporter: [['html', { outputFolder: 'playwright-report' }], ['list']],
 
   // Global use settings
   use: {

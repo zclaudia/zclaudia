@@ -44,7 +44,7 @@ export class GoalRepository {
       .prepare(
         `INSERT INTO session_goals
          (id, session_id, objective_text, status, token_budget, tokens_used, max_turns, turns_used, started_at)
-         VALUES (?, ?, ?, 'active', ?, 0, ?, 0, ?)`,
+         VALUES (?, ?, ?, 'active', ?, 0, ?, 0, ?)`
       )
       .run(id, input.sessionId, input.objective, input.tokenBudget, input.maxTurns, now);
     const created = this.findById(id);
@@ -53,9 +53,9 @@ export class GoalRepository {
   }
 
   findById(id: string): Goal | null {
-    const row = this.db
-      .prepare('SELECT * FROM session_goals WHERE id = ?')
-      .get(id) as GoalRow | undefined;
+    const row = this.db.prepare('SELECT * FROM session_goals WHERE id = ?').get(id) as
+      | GoalRow
+      | undefined;
     return row ? mapRow(row) : null;
   }
 
@@ -64,7 +64,7 @@ export class GoalRepository {
       .prepare(
         `SELECT * FROM session_goals
          WHERE session_id = ? AND status IN ('active', 'paused')
-         ORDER BY started_at DESC LIMIT 1`,
+         ORDER BY started_at DESC LIMIT 1`
       )
       .get(sessionId) as GoalRow | undefined;
     return row ? mapRow(row) : null;

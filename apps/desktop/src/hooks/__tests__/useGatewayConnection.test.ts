@@ -57,12 +57,10 @@ const {
 // ---------------------------------------------------------------------------
 vi.mock('../../stores/facadeStore', () => ({
   useFacadeStore: Object.assign(
-    vi.fn((selector?: any) =>
-      selector ? selector(mockFacadeStoreState) : mockFacadeStoreState,
-    ),
+    vi.fn((selector?: any) => (selector ? selector(mockFacadeStoreState) : mockFacadeStoreState)),
     {
       getState: () => mockFacadeStoreState,
-    },
+    }
   ),
 }));
 
@@ -73,7 +71,7 @@ vi.mock('../../stores/gatewayStore', () => ({
       getState: () => mockGatewayStoreState,
       setState: mockSetState,
       subscribe: vi.fn(() => vi.fn()),
-    },
+    }
   ),
   toGatewayServerId: vi.fn((id: string) => `gw:${id}`),
   isGatewayTarget: vi.fn((id: string) => id.startsWith('gw:')),
@@ -88,14 +86,13 @@ vi.mock('../../services/api', () => ({
       gatewayUrl: null,
       gatewaySecret: null,
       connected: false,
-    }),
+    })
   ),
 }));
 
 vi.mock('../../stores/recoveryStore', () => ({
   isBackendReady: (...args: any[]) => mockIsBackendReady(...args),
 }));
-
 
 vi.mock('../../utils/platform', () => ({
   isAndroid: mockIsAndroid,
@@ -424,9 +421,9 @@ describe('hooks/useGatewayConnection', () => {
     const mockGetStatus = vi.mocked(getServerGatewayStatus);
     mockGetStatus.mockImplementation(
       () =>
-        new Promise((resolve) => {
+        new Promise(resolve => {
           resolvePromise = resolve;
-        }),
+        })
     );
 
     const { unmount } = renderHook(() => useGatewayConnection());

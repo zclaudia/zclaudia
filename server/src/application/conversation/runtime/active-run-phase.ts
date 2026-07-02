@@ -9,13 +9,13 @@
  * crash the process).
  */
 export type RunPhase =
-  | 'running'              // active turn: agent emitting deltas / tool calls
-  | 'awaiting_permission'  // permission request enqueued, waiting for user
-  | 'awaiting_followup'    // pendingBackgroundTasks > 0, pi will emit follow-up
-  | 'cancelling'           // user abort triggered, cleanup pending
-  | 'completed'            // terminal: normal completion (success)
-  | 'cancelled'            // terminal: user-initiated cancel, cleanup OK
-  | 'failed';              // terminal: error termination (provider / runtime / cleanup-itself-errored)
+  | 'running' // active turn: agent emitting deltas / tool calls
+  | 'awaiting_permission' // permission request enqueued, waiting for user
+  | 'awaiting_followup' // pendingBackgroundTasks > 0, pi will emit follow-up
+  | 'cancelling' // user abort triggered, cleanup pending
+  | 'completed' // terminal: normal completion (success)
+  | 'cancelled' // terminal: user-initiated cancel, cleanup OK
+  | 'failed'; // terminal: error termination (provider / runtime / cleanup-itself-errored)
 
 export const TERMINAL_PHASES: ReadonlySet<RunPhase> = new Set(['completed', 'cancelled', 'failed']);
 
@@ -31,13 +31,13 @@ export function isTerminalPhase(p: RunPhase): boolean {
  * - terminal states are sinks
  */
 const VALID_TRANSITIONS: Record<RunPhase, ReadonlyArray<RunPhase>> = {
-  running:             ['awaiting_permission', 'awaiting_followup', 'cancelling', 'completed', 'failed'],
+  running: ['awaiting_permission', 'awaiting_followup', 'cancelling', 'completed', 'failed'],
   awaiting_permission: ['running', 'awaiting_followup', 'cancelling', 'completed', 'failed'],
-  awaiting_followup:   ['running', 'awaiting_permission', 'cancelling', 'completed', 'failed'],
-  cancelling:          ['cancelled', 'failed'],
-  completed:           [],
-  cancelled:           [],
-  failed:              [],
+  awaiting_followup: ['running', 'awaiting_permission', 'cancelling', 'completed', 'failed'],
+  cancelling: ['cancelled', 'failed'],
+  completed: [],
+  cancelled: [],
+  failed: [],
 };
 
 export function isValidTransition(from: RunPhase, to: RunPhase): boolean {
@@ -58,7 +58,9 @@ export class PhaseEmitter {
 
   onChange(fn: PhaseListener): () => void {
     this.listeners.add(fn);
-    return () => { this.listeners.delete(fn); };
+    return () => {
+      this.listeners.delete(fn);
+    };
   }
 
   emit(next: RunPhase, prev: RunPhase): void {
@@ -154,10 +156,7 @@ export function computeBlockers(run: {
  * Promise that resolves with the terminal phase when reached.
  * Rejects on timeout. If already terminal, resolves synchronously.
  */
-export function waitForIdle(
-  run: PhaseHolder,
-  options?: { timeoutMs?: number },
-): Promise<RunPhase> {
+export function waitForIdle(run: PhaseHolder, options?: { timeoutMs?: number }): Promise<RunPhase> {
   return new Promise((resolve, reject) => {
     if (isTerminalPhase(run.phase)) {
       resolve(run.phase);
@@ -165,7 +164,7 @@ export function waitForIdle(
     }
 
     let timer: NodeJS.Timeout | null = null;
-    const off = run.phaseEmitter.onChange((next) => {
+    const off = run.phaseEmitter.onChange(next => {
       if (isTerminalPhase(next)) {
         if (timer) clearTimeout(timer);
         off();

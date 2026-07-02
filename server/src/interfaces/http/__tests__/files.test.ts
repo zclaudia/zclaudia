@@ -16,7 +16,7 @@ vi.mock('fs', () => ({
   readFileSync: vi.fn(),
   unlinkSync: vi.fn(),
   createReadStream: vi.fn(),
-  openSync: vi.fn(() => 3),  // return mock fd
+  openSync: vi.fn(() => 3), // return mock fd
   readSync: vi.fn(),
   closeSync: vi.fn(),
 }));
@@ -35,7 +35,7 @@ vi.mock('../../../infra/storage/fileStore.js', () => {
           mimeType,
           size: Buffer.from(data, 'base64').length,
           data,
-          createdAt: Date.now()
+          createdAt: Date.now(),
         };
         mockFiles.set(fileId, file);
         return fileId;
@@ -50,14 +50,16 @@ vi.mock('../../../infra/storage/fileStore.js', () => {
           data = buffer.toString('base64');
           size = buffer.length;
           realFs.unlinkSync(sourcePath); // Clean up temp file
-        } catch { /* ignore in tests */ }
+        } catch {
+          /* ignore in tests */
+        }
         const file: StoredFile = {
           id: fileId,
           name,
           mimeType,
           size,
           data,
-          createdAt: Date.now()
+          createdAt: Date.now(),
         };
         mockFiles.set(fileId, file);
         return fileId;
@@ -70,7 +72,7 @@ vi.mock('../../../infra/storage/fileStore.js', () => {
           mimeType,
           size: 0,
           data: '',
-          createdAt: Date.now()
+          createdAt: Date.now(),
         };
         mockFiles.set(fileId, file);
         return fileId;
@@ -83,7 +85,7 @@ vi.mock('../../../infra/storage/fileStore.js', () => {
           mimeType,
           size: buffer.length,
           data: buffer.toString('base64'),
-          createdAt: Date.now()
+          createdAt: Date.now(),
         };
         mockFiles.set(fileId, file);
         return fileId;
@@ -94,7 +96,13 @@ vi.mock('../../../infra/storage/fileStore.js', () => {
       getFileMetadata: vi.fn((fileId: string) => {
         const file = mockFiles.get(fileId);
         if (!file) return null;
-        return { id: file.id, name: file.name, mimeType: file.mimeType, size: file.size, createdAt: file.createdAt };
+        return {
+          id: file.id,
+          name: file.name,
+          mimeType: file.mimeType,
+          size: file.size,
+          createdAt: file.createdAt,
+        };
       }),
       getFilePath: vi.fn((_fileId: string) => null),
       deleteFile: vi.fn((fileId: string) => {
@@ -104,10 +112,10 @@ vi.mock('../../../infra/storage/fileStore.js', () => {
       getStats: vi.fn(() => ({
         count: mockFiles.size,
         totalSize: 0,
-        totalSizeMB: '0.00'
+        totalSizeMB: '0.00',
       })),
-      _mockFiles: mockFiles // Expose for test cleanup
-    }
+      _mockFiles: mockFiles, // Expose for test cleanup
+    },
   };
 });
 
@@ -119,6 +127,37 @@ function createTestApp() {
   app.use(express.json());
   app.use('/api/files', createFilesRoutes());
   return app;
+}
+
+function createScopedPushApp(options: { workingDirectory?: string; rootPath?: string } = {}) {
+  const mockDb = {
+    prepare: vi.fn((sql: string) => {
+      if (sql.includes('SELECT s.working_directory')) {
+        return {
+          get: vi.fn().mockReturnValue({
+            working_directory: options.workingDirectory ?? '/some',
+            root_path: options.rootPath ?? '/project',
+          }),
+        };
+      }
+      return {
+        get: vi.fn().mockReturnValue({ id: 'sess-1' }),
+        run: vi.fn(),
+      };
+    }),
+  };
+  const scopedApp = express();
+  scopedApp.use(express.json());
+  scopedApp.use(
+    '/api/files',
+    createFilesRoutes({
+      db: mockDb as any,
+      sendMessage: vi.fn(),
+      getAuthenticatedClients: vi.fn().mockReturnValue([]),
+      getNextOffset: vi.fn().mockReturnValue(1),
+    })
+  );
+  return scopedApp;
 }
 
 function clearMockFileStore() {
@@ -145,7 +184,9 @@ describe('files routes', () => {
     });
 
     it('returns 403 for path traversal attempts', async () => {
-      const res = await request(app).get('/api/files/list?projectRoot=/project&relativePath=../../../etc');
+      const res = await request(app).get(
+        '/api/files/list?projectRoot=/project&relativePath=../../../etc'
+      );
 
       expect(res.status).toBe(403);
       expect(res.body.success).toBe(false);
@@ -177,7 +218,7 @@ describe('files routes', () => {
 
     it('lists directory contents', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockImplementation((path) => {
+      vi.mocked(fs.statSync).mockImplementation(path => {
         if (typeof path === 'string') {
           // First call is for checking if /project is a directory
           if (path === '/project' || path.endsWith('src')) {
@@ -251,7 +292,9 @@ describe('files routes', () => {
       ] as unknown as ReturnType<typeof fs.readdirSync>);
 
       // Use relativePath to go through non-recursive listing path (recursive search with directories-only mocks causes infinite recursion)
-      const res = await request(app).get('/api/files/list?projectRoot=/project&relativePath=.&query=comp');
+      const res = await request(app).get(
+        '/api/files/list?projectRoot=/project&relativePath=.&query=comp'
+      );
 
       expect(res.status).toBe(200);
       expect(res.body.data.entries).toHaveLength(1);
@@ -269,7 +312,9 @@ describe('files routes', () => {
         isDirectory: () => true,
         isFile: () => false,
       }));
-      vi.mocked(fs.readdirSync).mockReturnValue(entries as unknown as ReturnType<typeof fs.readdirSync>);
+      vi.mocked(fs.readdirSync).mockReturnValue(
+        entries as unknown as ReturnType<typeof fs.readdirSync>
+      );
 
       const res = await request(app).get('/api/files/list?projectRoot=/project&maxResults=10');
 
@@ -280,7 +325,7 @@ describe('files routes', () => {
 
     it('sorts directories first, then alphabetically', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockImplementation((path) => {
+      vi.mocked(fs.statSync).mockImplementation(path => {
         if (typeof path === 'string') {
           // First call is for checking if /project is a directory
           if (path === '/project' || path.endsWith('components') || path.endsWith('utils')) {
@@ -309,7 +354,7 @@ describe('files routes', () => {
 
     it('includes file size for files', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockImplementation((path) => {
+      vi.mocked(fs.statSync).mockImplementation(path => {
         if (typeof path === 'string' && path.endsWith('index.ts')) {
           return { isDirectory: () => false, isFile: () => true, size: 2048 } as fs.Stats;
         }
@@ -336,7 +381,9 @@ describe('files routes', () => {
     });
 
     it('returns 403 for path traversal attempts', async () => {
-      const res = await request(app).get('/api/files/content?projectRoot=/project&relativePath=../../../etc/passwd');
+      const res = await request(app).get(
+        '/api/files/content?projectRoot=/project&relativePath=../../../etc/passwd'
+      );
 
       expect(res.status).toBe(403);
       expect(res.body.success).toBe(false);
@@ -346,7 +393,9 @@ describe('files routes', () => {
     it('returns 404 for non-existent file', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(false);
 
-      const res = await request(app).get('/api/files/content?projectRoot=/project&relativePath=missing.ts');
+      const res = await request(app).get(
+        '/api/files/content?projectRoot=/project&relativePath=missing.ts'
+      );
 
       expect(res.status).toBe(404);
       expect(res.body.success).toBe(false);
@@ -360,7 +409,9 @@ describe('files routes', () => {
         size: 0,
       } as fs.Stats);
 
-      const res = await request(app).get('/api/files/content?projectRoot=/project&relativePath=src');
+      const res = await request(app).get(
+        '/api/files/content?projectRoot=/project&relativePath=src'
+      );
 
       expect(res.status).toBe(400);
       expect(res.body.success).toBe(false);
@@ -374,7 +425,9 @@ describe('files routes', () => {
         size: 2 * 1024 * 1024, // 2MB
       } as fs.Stats);
 
-      const res = await request(app).get('/api/files/content?projectRoot=/project&relativePath=large-file.bin');
+      const res = await request(app).get(
+        '/api/files/content?projectRoot=/project&relativePath=large-file.bin'
+      );
 
       expect(res.status).toBe(400);
       expect(res.body.success).toBe(false);
@@ -396,7 +449,9 @@ describe('files routes', () => {
         return bytes.length;
       });
 
-      const res = await request(app).get('/api/files/content?projectRoot=/project&relativePath=index.ts');
+      const res = await request(app).get(
+        '/api/files/content?projectRoot=/project&relativePath=index.ts'
+      );
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
@@ -431,15 +486,11 @@ describe('files routes', () => {
     it('should upload image file', async () => {
       // Create a small PNG buffer (1x1 red pixel)
       const pngBuffer = Buffer.from([
-        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
-        0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
-        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-        0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
-        0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41,
-        0x54, 0x08, 0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00,
-        0x00, 0x03, 0x01, 0x01, 0x00, 0x18, 0xDD, 0x8D,
-        0xB4, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E,
-        0x44, 0xAE, 0x42, 0x60, 0x82
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44,
+        0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x02, 0x00, 0x00, 0x00, 0x90,
+        0x77, 0x53, 0xde, 0x00, 0x00, 0x00, 0x0c, 0x49, 0x44, 0x41, 0x54, 0x08, 0xd7, 0x63, 0xf8,
+        0xcf, 0xc0, 0x00, 0x00, 0x03, 0x01, 0x01, 0x00, 0x18, 0xdd, 0x8d, 0xb4, 0x00, 0x00, 0x00,
+        0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
       ]);
 
       const response = await request(app)
@@ -453,9 +504,7 @@ describe('files routes', () => {
     });
 
     it('should reject request without file', async () => {
-      const response = await request(app)
-        .post('/api/files/upload')
-        .expect(400);
+      const response = await request(app).post('/api/files/upload').expect(400);
 
       expect(response.body.success).toBe(false);
       expect(response.body.error.code).toBe('NO_FILE');
@@ -502,7 +551,7 @@ describe('files routes', () => {
     it('should handle path traversal attempts in filename securely', async () => {
       const maliciousFilenames = [
         '../../../etc/passwd',
-        '..\\..\\..\\windows\\system32\\config\\sam'
+        '..\\..\\..\\windows\\system32\\config\\sam',
       ];
 
       for (const filename of maliciousFilenames) {
@@ -559,9 +608,7 @@ describe('files routes', () => {
 
       const fileId = uploadResponse.body.data.fileId;
 
-      const response = await request(app)
-        .get(`/api/files/${fileId}`)
-        .expect(200);
+      const response = await request(app).get(`/api/files/${fileId}`).expect(200);
 
       expect(response.body.success).toBe(true);
       expect(response.body.data.fileId).toBe(fileId);
@@ -574,18 +621,14 @@ describe('files routes', () => {
     });
 
     it('should return 404 for non-existent fileId', async () => {
-      const response = await request(app)
-        .get('/api/files/non-existent-id')
-        .expect(404);
+      const response = await request(app).get('/api/files/non-existent-id').expect(404);
 
       expect(response.body.success).toBe(false);
       expect(response.body.error.code).toBe('NOT_FOUND');
     });
 
     it('should retrieve image file correctly', async () => {
-      const pngBuffer = Buffer.from([
-        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A
-      ]);
+      const pngBuffer = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
       const uploadResponse = await request(app)
         .post('/api/files/upload')
@@ -594,9 +637,7 @@ describe('files routes', () => {
 
       const fileId = uploadResponse.body.data.fileId;
 
-      const response = await request(app)
-        .get(`/api/files/${fileId}`)
-        .expect(200);
+      const response = await request(app).get(`/api/files/${fileId}`).expect(200);
 
       expect(response.body.success).toBe(true);
       expect(response.body.data.mimeType).toBe('image/png');
@@ -608,29 +649,36 @@ describe('files routes', () => {
 
   describe('POST /api/files/push', () => {
     it('returns 400 when filePath is missing', async () => {
-      const res = await request(app)
-        .post('/api/files/push')
-        .send({ sessionId: 'sess-1' });
+      const res = await request(app).post('/api/files/push').send({ sessionId: 'sess-1' });
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
       expect(res.body.error.message).toContain('filePath');
     });
 
     it('returns 400 when sessionId is missing', async () => {
-      const res = await request(app)
-        .post('/api/files/push')
-        .send({ filePath: '/some/file.txt' });
+      const res = await request(app).post('/api/files/push').send({ filePath: '/some/file.txt' });
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
       expect(res.body.error.message).toContain('sessionId');
     });
 
-    it('returns 404 when file does not exist', async () => {
-      vi.mocked(fs.existsSync).mockReturnValue(false);
+    it('returns 403 without a session-scoped server context', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
 
       const res = await request(app)
         .post('/api/files/push')
-        .send({ filePath: '/nonexistent/file.txt', sessionId: 'sess-1' });
+        .send({ filePath: '/some/file.txt', sessionId: 'sess-1' });
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('FILE_PUSH_FORBIDDEN');
+    });
+
+    it('returns 404 when file does not exist', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      const scopedApp = createScopedPushApp();
+
+      const res = await request(scopedApp)
+        .post('/api/files/push')
+        .send({ filePath: '/some/missing.txt', sessionId: 'sess-1' });
       expect(res.status).toBe(404);
       expect(res.body.error.code).toBe('FILE_NOT_FOUND');
     });
@@ -642,22 +690,39 @@ describe('files routes', () => {
         isDirectory: () => true,
         size: 0,
       } as any);
+      const scopedApp = createScopedPushApp();
 
-      const res = await request(app)
+      const res = await request(scopedApp)
         .post('/api/files/push')
         .send({ filePath: '/some/directory', sessionId: 'sess-1' });
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('NOT_A_FILE');
     });
 
-    it('pushes file successfully without broadcast context', async () => {
+    it('returns 403 when file is outside the session working directory and project root', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      const scopedApp = createScopedPushApp({
+        workingDirectory: '/workspace',
+        rootPath: '/project',
+      });
+
+      const res = await request(scopedApp)
+        .post('/api/files/push')
+        .send({ filePath: '/etc/passwd', sessionId: 'sess-1' });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('FILE_PUSH_FORBIDDEN');
+    });
+
+    it('pushes a file successfully when scoped to the session working directory', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
       vi.mocked(fs.statSync).mockReturnValue({
         isFile: () => true,
         size: 1024,
       } as any);
+      const scopedApp = createScopedPushApp();
 
-      const res = await request(app)
+      const res = await request(scopedApp)
         .post('/api/files/push')
         .send({ filePath: '/some/file.txt', sessionId: 'sess-1', description: 'Test file' });
 
@@ -674,8 +739,9 @@ describe('files routes', () => {
         isFile: () => true,
         size: 600 * 1024, // 600KB > 500KB threshold
       } as any);
+      const scopedApp = createScopedPushApp();
 
-      const res = await request(app)
+      const res = await request(scopedApp)
         .post('/api/files/push')
         .send({ filePath: '/some/large.zip', sessionId: 'sess-1' });
 
@@ -689,8 +755,9 @@ describe('files routes', () => {
         isFile: () => true,
         size: 2 * 1024 * 1024, // 2MB
       } as any);
+      const scopedApp = createScopedPushApp();
 
-      const res = await request(app)
+      const res = await request(scopedApp)
         .post('/api/files/push')
         .send({ filePath: '/some/large.png', sessionId: 'sess-1' });
 
@@ -702,9 +769,16 @@ describe('files routes', () => {
   describe('POST /api/files/push with broadcast context', () => {
     it('broadcasts to connected clients and persists message', async () => {
       const mockDb = {
-        prepare: vi.fn().mockReturnValue({
-          get: vi.fn().mockReturnValue({ id: 'sess-1' }), // session exists
-          run: vi.fn(),
+        prepare: vi.fn((sql: string) => {
+          if (sql.includes('SELECT s.working_directory')) {
+            return {
+              get: vi.fn().mockReturnValue({ working_directory: '/some', root_path: '/project' }),
+            };
+          }
+          return {
+            get: vi.fn().mockReturnValue({ id: 'sess-1' }), // session exists
+            run: vi.fn(),
+          };
         }),
       };
       const mockSendMessage = vi.fn();
@@ -714,12 +788,15 @@ describe('files routes', () => {
 
       const broadcastApp = express();
       broadcastApp.use(express.json());
-      broadcastApp.use('/api/files', createFilesRoutes({
-        db: mockDb as any,
-        sendMessage: mockSendMessage,
-        getAuthenticatedClients: mockGetAuthenticatedClients,
-        getNextOffset: mockGetNextOffset,
-      }));
+      broadcastApp.use(
+        '/api/files',
+        createFilesRoutes({
+          db: mockDb as any,
+          sendMessage: mockSendMessage,
+          getAuthenticatedClients: mockGetAuthenticatedClients,
+          getNextOffset: mockGetNextOffset,
+        })
+      );
 
       vi.mocked(fs.existsSync).mockReturnValue(true);
       vi.mocked(fs.statSync).mockReturnValue({
@@ -738,7 +815,7 @@ describe('files routes', () => {
           type: 'file_push',
           sessionId: 'sess-1',
           fileName: 'file.txt',
-        }),
+        })
       );
       expect(mockGetNextOffset).toHaveBeenCalledWith('sess-1');
     });
@@ -761,7 +838,7 @@ describe('files routes', () => {
       expect(fileStore.storeFileFromBuffer).toHaveBeenCalledWith(
         'test.txt',
         'text/plain',
-        expect.any(Buffer),
+        expect.any(Buffer)
       );
     });
 
@@ -928,12 +1005,14 @@ describe('files routes', () => {
       vi.mocked(fs.readSync).mockImplementationOnce((_fd, buf: Buffer) => {
         // Fill entire buffer with non-zero then add a null byte
         buf.fill(0x41); // 'A'
-        buf[4] = 0x00;  // null byte
+        buf[4] = 0x00; // null byte
         return buf.length;
       });
       vi.mocked(fs.closeSync).mockReturnValueOnce(undefined);
 
-      const res = await request(app).get('/api/files/content?projectRoot=/project&relativePath=image.dat');
+      const res = await request(app).get(
+        '/api/files/content?projectRoot=/project&relativePath=image.dat'
+      );
 
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('BINARY_FILE');
@@ -946,7 +1025,9 @@ describe('files routes', () => {
         throw new Error('filesystem error');
       });
 
-      const res = await request(app).get('/api/files/content?projectRoot=/project&relativePath=file.ts');
+      const res = await request(app).get(
+        '/api/files/content?projectRoot=/project&relativePath=file.ts'
+      );
 
       expect(res.status).toBe(500);
       expect(res.body.error.code).toBe('SERVER_ERROR');
@@ -956,7 +1037,7 @@ describe('files routes', () => {
   describe('GET /api/files/list - recursive search', () => {
     it('performs recursive search when query is provided at project root', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockImplementation((p) => {
+      vi.mocked(fs.statSync).mockImplementation(p => {
         const pathStr = String(p);
         if (pathStr === '/project' || pathStr.endsWith('src')) {
           return { isDirectory: () => true, isFile: () => false } as fs.Stats;
@@ -994,7 +1075,7 @@ describe('files routes', () => {
 
     it('skips hidden files and ignored directories in recursive search', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockImplementation((p) => {
+      vi.mocked(fs.statSync).mockImplementation(p => {
         const pathStr = String(p);
         if (pathStr === '/project') {
           return { isDirectory: () => true, isFile: () => false } as fs.Stats;
@@ -1018,7 +1099,7 @@ describe('files routes', () => {
 
     it('skips binary extensions in recursive search', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockImplementation((p) => {
+      vi.mocked(fs.statSync).mockImplementation(p => {
         const pathStr = String(p);
         if (pathStr === '/project') {
           return { isDirectory: () => true, isFile: () => false } as fs.Stats;
@@ -1043,7 +1124,7 @@ describe('files routes', () => {
 
     it('limits recursive search results and sets hasMore', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockImplementation((p) => {
+      vi.mocked(fs.statSync).mockImplementation(p => {
         const pathStr = String(p);
         if (pathStr === '/project') {
           return { isDirectory: () => true, isFile: () => false } as fs.Stats;
@@ -1056,10 +1137,14 @@ describe('files routes', () => {
         isDirectory: () => false,
         isFile: () => true,
       }));
-      vi.mocked(fs.readdirSync).mockReturnValue(entries as unknown as ReturnType<typeof fs.readdirSync>);
+      vi.mocked(fs.readdirSync).mockReturnValue(
+        entries as unknown as ReturnType<typeof fs.readdirSync>
+      );
 
       // query must be non-empty and no relativePath to trigger recursive search
-      const res = await request(app).get('/api/files/list?projectRoot=/project&query=file&maxResults=3');
+      const res = await request(app).get(
+        '/api/files/list?projectRoot=/project&query=file&maxResults=3'
+      );
 
       expect(res.status).toBe(200);
       expect(res.body.data.entries.length).toBe(3);
@@ -1068,7 +1153,7 @@ describe('files routes', () => {
 
     it('handles unreadable directories gracefully in recursive search', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockImplementation((p) => {
+      vi.mocked(fs.statSync).mockImplementation(p => {
         const pathStr = String(p);
         if (pathStr === '/project') {
           return { isDirectory: () => true, isFile: () => false } as fs.Stats;
@@ -1101,7 +1186,7 @@ describe('files routes', () => {
   describe('GET /api/files/list - directory listing edge cases', () => {
     it('filters binary files when query is provided in non-recursive listing', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockImplementation((p) => {
+      vi.mocked(fs.statSync).mockImplementation(p => {
         const pathStr = String(p);
         if (pathStr === '/project' || pathStr.endsWith('subdir')) {
           return { isDirectory: () => true, isFile: () => false } as fs.Stats;
@@ -1115,7 +1200,9 @@ describe('files routes', () => {
       ] as unknown as ReturnType<typeof fs.readdirSync>);
 
       // Use relativePath to stay in non-recursive path
-      const res = await request(app).get('/api/files/list?projectRoot=/project&relativePath=subdir&query=p');
+      const res = await request(app).get(
+        '/api/files/list?projectRoot=/project&relativePath=subdir&query=p'
+      );
 
       expect(res.status).toBe(200);
       // photo.png is binary, should be filtered when query is present
@@ -1135,7 +1222,7 @@ describe('files routes', () => {
 
     it('builds correct relative path when relativePath is provided', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockImplementation((p) => {
+      vi.mocked(fs.statSync).mockImplementation(p => {
         const pathStr = String(p);
         if (pathStr === '/project' || pathStr.endsWith('src')) {
           return { isDirectory: () => true, isFile: () => false } as fs.Stats;
@@ -1193,8 +1280,9 @@ describe('files routes', () => {
       vi.mocked(fileStore.storeFileFromPath).mockImplementationOnce(() => {
         throw new Error('store error');
       });
+      const scopedApp = createScopedPushApp();
 
-      const res = await request(app)
+      const res = await request(scopedApp)
         .post('/api/files/push')
         .send({ filePath: '/some/file.txt', sessionId: 'sess-1' });
 

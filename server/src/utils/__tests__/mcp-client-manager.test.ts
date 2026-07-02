@@ -86,18 +86,22 @@ describe('McpClientManager', () => {
 
     expect(manager.getStatus('test').state).toBe('configured');
     await manager.connect('test', config);
-    expect(manager.getStatus('test')).toEqual(expect.objectContaining({
-      name: 'test',
-      state: 'connected',
-      lastConnectedAt: expect.any(Number),
-    }));
+    expect(manager.getStatus('test')).toEqual(
+      expect.objectContaining({
+        name: 'test',
+        state: 'connected',
+        lastConnectedAt: expect.any(Number),
+      })
+    );
 
     await manager.disconnect('test');
-    expect(manager.getStatus('test')).toEqual(expect.objectContaining({
-      name: 'test',
-      state: 'idle-disconnected',
-      lastDisconnectedAt: expect.any(Number),
-    }));
+    expect(manager.getStatus('test')).toEqual(
+      expect.objectContaining({
+        name: 'test',
+        state: 'idle-disconnected',
+        lastDisconnectedAt: expect.any(Number),
+      })
+    );
   });
 
   it('reports failed status when connection fails', async () => {
@@ -106,11 +110,13 @@ describe('McpClientManager', () => {
     const manager = new McpClientManager();
 
     await expect(manager.connect('broken', { command: 'node' })).rejects.toThrow('boom');
-    expect(manager.getStatus('broken')).toEqual(expect.objectContaining({
-      name: 'broken',
-      state: 'failed',
-      lastError: 'boom',
-    }));
+    expect(manager.getStatus('broken')).toEqual(
+      expect.objectContaining({
+        name: 'broken',
+        state: 'failed',
+        lastError: 'boom',
+      })
+    );
   });
 
   it('reports needs-auth status when connection fails with unauthorized/auth-required error', async () => {
@@ -118,14 +124,18 @@ describe('McpClientManager', () => {
     const { McpClientManager } = await import('../mcp-client-manager.js');
     const manager = new McpClientManager();
 
-    await expect(manager.connect('private-github', { command: 'node' })).rejects.toThrow('authentication required');
-    expect(manager.getStatus('private-github')).toEqual(expect.objectContaining({
-      name: 'private-github',
-      state: 'needs-auth',
-      lastError: '401 Unauthorized: authentication required',
-      authRequired: true,
-      authMessage: expect.stringContaining('authentication'),
-    }));
+    await expect(manager.connect('private-github', { command: 'node' })).rejects.toThrow(
+      'authentication required'
+    );
+    expect(manager.getStatus('private-github')).toEqual(
+      expect.objectContaining({
+        name: 'private-github',
+        state: 'needs-auth',
+        lastError: '401 Unauthorized: authentication required',
+        authRequired: true,
+        authMessage: expect.stringContaining('authentication'),
+      })
+    );
   });
 
   it('exposes MCP server instructions metadata on connected status', async () => {
@@ -135,12 +145,14 @@ describe('McpClientManager', () => {
 
     await manager.connect('github', { command: 'node' });
 
-    expect(manager.getStatus('github')).toEqual(expect.objectContaining({
-      name: 'github',
-      state: 'connected',
-      hasInstructions: true,
-      instructions: 'Use this server for GitHub operations.',
-    }));
+    expect(manager.getStatus('github')).toEqual(
+      expect.objectContaining({
+        name: 'github',
+        state: 'connected',
+        hasInstructions: true,
+        instructions: 'Use this server for GitHub operations.',
+      })
+    );
   });
 
   it('uses remote MCP client for streamable-http servers with OAuth bearer token', async () => {
@@ -159,34 +171,38 @@ describe('McpClientManager', () => {
     } as any);
 
     expect(ctorMock).not.toHaveBeenCalled();
-    expect(remoteCtorMock).toHaveBeenCalledWith(expect.objectContaining({
-      serverName: 'remote-github',
-      transport: 'streamable-http',
-      url: 'https://mcp.example.com/mcp',
-      headers: { 'X-Zoom-Region': 'us01' },
-      oauthConfig: { enabled: true, tokenEndpoint: 'https://auth.example.com/token' },
-      oauthCredentials: { accessToken: 'access-token', tokenType: 'Bearer' },
-      onOAuthCredentials,
-    }));
+    expect(remoteCtorMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        serverName: 'remote-github',
+        transport: 'streamable-http',
+        url: 'https://mcp.example.com/mcp',
+        headers: { 'X-Zoom-Region': 'us01' },
+        oauthConfig: { enabled: true, tokenEndpoint: 'https://auth.example.com/token' },
+        oauthCredentials: { accessToken: 'access-token', tokenType: 'Bearer' },
+        onOAuthCredentials,
+      })
+    );
     expect(remoteConnectMock).toHaveBeenCalledTimes(1);
-    expect(manager.getStatus('remote-github')).toEqual(expect.objectContaining({
-      state: 'connected',
-      hasInstructions: true,
-      instructions: 'Use remote GitHub MCP.',
-    }));
+    expect(manager.getStatus('remote-github')).toEqual(
+      expect.objectContaining({
+        state: 'connected',
+        hasInstructions: true,
+        instructions: 'Use remote GitHub MCP.',
+      })
+    );
   });
 
   it('reconnects and retries once when a remote MCP session expires during tool call', async () => {
     const sessionExpired = Object.assign(
-      new Error('Streamable HTTP error: Error POSTing to endpoint: {"error":{"code":-32001,"message":"Session not found"}}'),
-      { code: 404 },
+      new Error(
+        'Streamable HTTP error: Error POSTing to endpoint: {"error":{"code":-32001,"message":"Session not found"}}'
+      ),
+      { code: 404 }
     );
-    callToolMock
-      .mockRejectedValueOnce(sessionExpired)
-      .mockResolvedValueOnce({
-        content: [{ type: 'text', text: 'retried ok' }],
-        isError: false,
-      });
+    callToolMock.mockRejectedValueOnce(sessionExpired).mockResolvedValueOnce({
+      content: [{ type: 'text', text: 'retried ok' }],
+      isError: false,
+    });
     const { McpClientManager } = await import('../mcp-client-manager.js');
     const manager = new McpClientManager();
     const config = {
@@ -205,9 +221,11 @@ describe('McpClientManager', () => {
     expect(remoteCtorMock).toHaveBeenCalledTimes(2);
     expect(remoteConnectMock).toHaveBeenCalledTimes(2);
     expect(remoteDisconnectMock).toHaveBeenCalledTimes(1);
-    expect(manager.getStatus('remote-github')).toEqual(expect.objectContaining({
-      state: 'connected',
-      lastError: undefined,
-    }));
+    expect(manager.getStatus('remote-github')).toEqual(
+      expect.objectContaining({
+        state: 'connected',
+        lastError: undefined,
+      })
+    );
   });
 });

@@ -43,7 +43,7 @@ export class SessionLifecycleError extends Error {
   constructor(
     readonly status: number,
     readonly code: string,
-    message: string,
+    message: string
   ) {
     super(message);
   }
@@ -60,15 +60,18 @@ export class SessionLifecycleService {
 
   constructor(
     private readonly db: Database.Database,
-    deps: SessionLifecycleDependencies = {},
+    deps: SessionLifecycleDependencies = {}
   ) {
     this.repo = new SessionRepository(db);
     this.now = deps.now ?? (() => Date.now());
     this.pathExists = deps.pathExists ?? ((targetPath: string) => fs.existsSync(targetPath));
-    this.broadcastSessionEvent = deps.broadcastSessionEvent ?? (() => {
-      /* no-op — caller should inject a concrete broadcast function */
-    });
-    this.emitPluginEvent = deps.emitPluginEvent ?? ((event, payload) => pluginEvents.emit(event, payload));
+    this.broadcastSessionEvent =
+      deps.broadcastSessionEvent ??
+      (() => {
+        /* no-op — caller should inject a concrete broadcast function */
+      });
+    this.emitPluginEvent =
+      deps.emitPluginEvent ?? ((event, payload) => pluginEvents.emit(event, payload));
     this.domainEvents = deps.eventDispatcher;
     this.isSessionRunning = deps.isSessionRunning ?? (() => false);
   }
@@ -79,7 +82,9 @@ export class SessionLifecycleService {
       throw new SessionLifecycleError(400, 'VALIDATION_ERROR', 'Project ID is required');
     }
 
-    const project = this.db.prepare('SELECT id FROM projects WHERE id = ?').get(normalizedInput.projectId);
+    const project = this.db
+      .prepare('SELECT id FROM projects WHERE id = ?')
+      .get(normalizedInput.projectId);
     if (!project) {
       throw new SessionLifecycleError(400, 'VALIDATION_ERROR', 'Project not found');
     }
@@ -127,12 +132,14 @@ export class SessionLifecycleService {
       throw new SessionLifecycleError(
         409,
         'SESSION_RUNNING',
-        `Cannot archive a running session: ${runningIds.join(', ')}`,
+        `Cannot archive a running session: ${runningIds.join(', ')}`
       );
     }
 
     const now = this.now();
-    const stmt = this.db.prepare('UPDATE sessions SET archived_at = ?, updated_at = ? WHERE id = ?');
+    const stmt = this.db.prepare(
+      'UPDATE sessions SET archived_at = ?, updated_at = ? WHERE id = ?'
+    );
     this.db.transaction(() => {
       for (const id of sessionIds) {
         stmt.run(now, now, id);
@@ -145,10 +152,14 @@ export class SessionLifecycleService {
       const commandExecutor = new CommandTaskExecutor(taskRepo);
       for (const id of sessionIds) {
         for (const task of taskRepo.listByTypeAndStatuses('command', ['queued', 'running'], id)) {
-          void commandExecutor.stop(task.id, 'Session archived').catch(() => { /* best-effort */ });
+          void commandExecutor.stop(task.id, 'Session archived').catch(() => {
+            /* best-effort */
+          });
         }
       }
-    } catch { /* best-effort */ }
+    } catch {
+      /* best-effort */
+    }
 
     for (const id of sessionIds) {
       const session = this.repo.findById(id);
@@ -171,7 +182,9 @@ export class SessionLifecycleService {
     this.assertSessionIds(sessionIds);
 
     const now = this.now();
-    const stmt = this.db.prepare('UPDATE sessions SET archived_at = NULL, updated_at = ? WHERE id = ?');
+    const stmt = this.db.prepare(
+      'UPDATE sessions SET archived_at = NULL, updated_at = ? WHERE id = ?'
+    );
     this.db.transaction(() => {
       for (const id of sessionIds) {
         stmt.run(now, id);
@@ -202,11 +215,15 @@ export class SessionLifecycleService {
     }
 
     if (isSessionArchived(existing)) {
-      throw new SessionLifecycleError(409, 'ARCHIVED', 'Cannot update metadata of an archived session');
+      throw new SessionLifecycleError(
+        409,
+        'ARCHIVED',
+        'Cannot update metadata of an archived session'
+      );
     }
 
     const repoPatch = Object.fromEntries(
-      Object.entries(patch).filter(([, v]) => v !== undefined),
+      Object.entries(patch).filter(([, v]) => v !== undefined)
     ) as Partial<Omit<Session, 'id' | 'createdAt' | 'updatedAt'>>;
     this.repo.update(sessionId, repoPatch);
     const updatedSession = this.repo.findById(sessionId);
@@ -232,7 +249,11 @@ export class SessionLifecycleService {
     }
 
     if (isPlanningTaskSession(existing)) {
-      throw new SessionLifecycleError(409, 'LOCKED', 'Worktree is locked during Supervisor planning mode');
+      throw new SessionLifecycleError(
+        409,
+        'LOCKED',
+        'Worktree is locked during Supervisor planning mode'
+      );
     }
 
     if (workingDirectory && !this.pathExists(workingDirectory)) {
@@ -308,10 +329,9 @@ export class SessionLifecycleService {
       throw new SessionLifecycleError(404, 'NOT_FOUND', 'Session not found');
     }
 
-    this.repo.update(
-      sessionId,
-      ({ sdkSessionId: null } as unknown) as Partial<Omit<Session, 'id' | 'createdAt' | 'updatedAt'>>,
-    );
+    this.repo.update(sessionId, { sdkSessionId: null } as unknown as Partial<
+      Omit<Session, 'id' | 'createdAt' | 'updatedAt'>
+    >);
     const updatedSession = this.repo.findById(sessionId);
     if (updatedSession) {
       this.publishUpdatedSession(updatedSession);
@@ -340,7 +360,11 @@ export class SessionLifecycleService {
     }
 
     if (session.isReadOnly) {
-      throw new SessionLifecycleError(409, 'LOCKED', 'Cannot delete a read-only session with active task execution');
+      throw new SessionLifecycleError(
+        409,
+        'LOCKED',
+        'Cannot delete a read-only session with active task execution'
+      );
     }
 
     if (this.isSessionRunning(sessionId)) {
@@ -373,7 +397,9 @@ export class SessionLifecycleService {
       throw new SessionLifecycleError(400, 'BAD_REQUEST', 'projectId and orderedIds are required');
     }
 
-    const update = this.db.prepare('UPDATE sessions SET sort_order = ? WHERE id = ? AND project_id = ?');
+    const update = this.db.prepare(
+      'UPDATE sessions SET sort_order = ? WHERE id = ? AND project_id = ?'
+    );
     this.db.transaction(() => {
       for (let i = 0; i < orderedIds.length; i++) {
         update.run(i, orderedIds[i], projectId);

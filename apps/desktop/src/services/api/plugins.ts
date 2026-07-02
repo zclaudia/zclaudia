@@ -32,7 +32,7 @@ export async function fetchAndSyncPlugins(options?: RequestInit): Promise<void> 
   const pluginStore = usePluginStore.getState();
   const now = new Date().toISOString();
 
-  const mapped: InstalledPlugin[] = plugins.map((p) => ({
+  const mapped: InstalledPlugin[] = plugins.map(p => ({
     manifest: {
       id: p.id,
       name: p.name,
@@ -55,7 +55,7 @@ export async function fetchAndSyncPlugins(options?: RequestInit): Promise<void> 
   for (const p of plugins) {
     if (p.status === 'active' && p.panels?.length) {
       for (const panel of p.panels) {
-        const existing = pluginStore.panels.find((ep) => ep.id === panel.id);
+        const existing = pluginStore.panels.find(ep => ep.id === panel.id);
         if (!existing) {
           pluginStore.registerPanel({
             id: panel.id,

@@ -1,5 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Bot, Monitor, ChevronRight, Terminal, RefreshCw, ExternalLink, Copy, Check, AlertCircle, Globe, ArrowLeft } from 'lucide-react';
+import {
+  Bot,
+  Monitor,
+  ChevronRight,
+  Terminal,
+  RefreshCw,
+  ExternalLink,
+  Copy,
+  Check,
+  AlertCircle,
+  Globe,
+  ArrowLeft,
+} from 'lucide-react';
 import { useWslDiscovery } from '../../hooks/useWslDiscovery';
 import { useServerStore } from '../../stores/serverStore';
 import { useRecoveryStore } from '../../stores/recoveryStore';
@@ -8,7 +20,11 @@ import { useFacadeStore } from '../../stores/facadeStore';
 import { useConnection } from '../../contexts/ConnectionContext';
 import { open } from '@tauri-apps/plugin-shell';
 import type { BackendSnapshot } from '@zclaudia/shared';
-import { LEGACY_LOCAL_SERVER_ID, resolveCanonicalBackendId, resolveLocalBackendId } from '../../utils/controlPlane';
+import {
+  LEGACY_LOCAL_SERVER_ID,
+  resolveCanonicalBackendId,
+  resolveLocalBackendId,
+} from '../../utils/controlPlane';
 
 type SetupPath = 'choose' | 'wsl' | 'gateway' | 'manual';
 
@@ -19,7 +35,11 @@ function Spinner({ className = 'w-4 h-4' }: { className?: string }) {
   return (
     <svg className={`${className} animate-spin`} fill="none" viewBox="0 0 24 24">
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+      />
     </svg>
   );
 }
@@ -27,8 +47,8 @@ function Spinner({ className = 'w-4 h-4' }: { className?: string }) {
 export function WindowsSetup() {
   const { wslAvailable, distros, runDiscovery } = useWslDiscovery();
   const { wslServer, connectServer } = useConnection();
-  const setActiveServer = useServerStore((s) => s.setActiveServer);
-  const setLocalServerPort = useServerStore((s) => s.setLocalServerPort);
+  const setActiveServer = useServerStore(s => s.setActiveServer);
+  const setLocalServerPort = useServerStore(s => s.setLocalServerPort);
 
   const {
     directGatewayUrl,
@@ -38,10 +58,12 @@ export function WindowsSetup() {
     setLastActiveBackend,
     showLocalBackend,
   } = useGatewayStore();
-  const backends = useFacadeStore((s) => s.backends);
-  const currentInstanceId = useFacadeStore((s) => s.currentInstanceId);
+  const backends = useFacadeStore(s => s.backends);
+  const currentInstanceId = useFacadeStore(s => s.currentInstanceId);
 
-  const [path, setPath] = useState<SetupPath>(directGatewayUrl && directGatewaySecret ? 'gateway' : 'choose');
+  const [path, setPath] = useState<SetupPath>(
+    directGatewayUrl && directGatewaySecret ? 'gateway' : 'choose'
+  );
   const [manualAddress, setManualAddress] = useState(`localhost:${DEFAULT_PORT}`);
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
@@ -89,46 +111,51 @@ export function WindowsSetup() {
     return trimmed;
   }, []);
 
-  const handleConnect = useCallback(async (address: string = `localhost:${DEFAULT_PORT}`) => {
-    setConnecting(true);
-    setConnectError(null);
+  const handleConnect = useCallback(
+    async (address: string = `localhost:${DEFAULT_PORT}`) => {
+      setConnecting(true);
+      setConnectError(null);
 
-    try {
-      const normalizedAddress = normalizeAddress(address);
-      const port = parseInt(normalizedAddress.split(':')[1]) || DEFAULT_PORT;
-      setLocalServerPort(port);
-      const initialLocalBackendId = resolveCanonicalBackendId(
-        resolveLocalBackendId(LEGACY_LOCAL_SERVER_ID) ?? LEGACY_LOCAL_SERVER_ID,
-        LEGACY_LOCAL_SERVER_ID,
-      ) || LEGACY_LOCAL_SERVER_ID;
-      setActiveServer(initialLocalBackendId);
-      connectServer(initialLocalBackendId);
-
-      // Poll for connection
-      let attempts = 0;
-      await new Promise<void>((resolve, reject) => {
-        const interval = setInterval(() => {
-          attempts++;
-          const localBackendId = resolveCanonicalBackendId(
+      try {
+        const normalizedAddress = normalizeAddress(address);
+        const port = parseInt(normalizedAddress.split(':')[1]) || DEFAULT_PORT;
+        setLocalServerPort(port);
+        const initialLocalBackendId =
+          resolveCanonicalBackendId(
             resolveLocalBackendId(LEGACY_LOCAL_SERVER_ID) ?? LEGACY_LOCAL_SERVER_ID,
-            LEGACY_LOCAL_SERVER_ID,
+            LEGACY_LOCAL_SERVER_ID
           ) || LEGACY_LOCAL_SERVER_ID;
-          const backendState = useRecoveryStore.getState().backends[localBackendId];
-          if (backendState?.status === 'ready') {
-            useServerStore.getState().setActiveServer(localBackendId);
-            clearInterval(interval);
-            resolve();
-          } else if (attempts >= 20) {
-            clearInterval(interval);
-            reject(new Error('Connection timed out'));
-          }
-        }, 500);
-      });
-    } catch (err) {
-      setConnectError(err instanceof Error ? err.message : 'Connection failed');
-      setConnecting(false);
-    }
-  }, [connectServer, normalizeAddress, setActiveServer, setLocalServerPort]);
+        setActiveServer(initialLocalBackendId);
+        connectServer(initialLocalBackendId);
+
+        // Poll for connection
+        let attempts = 0;
+        await new Promise<void>((resolve, reject) => {
+          const interval = setInterval(() => {
+            attempts++;
+            const localBackendId =
+              resolveCanonicalBackendId(
+                resolveLocalBackendId(LEGACY_LOCAL_SERVER_ID) ?? LEGACY_LOCAL_SERVER_ID,
+                LEGACY_LOCAL_SERVER_ID
+              ) || LEGACY_LOCAL_SERVER_ID;
+            const backendState = useRecoveryStore.getState().backends[localBackendId];
+            if (backendState?.status === 'ready') {
+              useServerStore.getState().setActiveServer(localBackendId);
+              clearInterval(interval);
+              resolve();
+            } else if (attempts >= 20) {
+              clearInterval(interval);
+              reject(new Error('Connection timed out'));
+            }
+          }, 500);
+        });
+      } catch (err) {
+        setConnectError(err instanceof Error ? err.message : 'Connection failed');
+        setConnecting(false);
+      }
+    },
+    [connectServer, normalizeAddress, setActiveServer, setLocalServerPort]
+  );
 
   const handleGatewayConnect = useCallback(() => {
     const url = gatewayUrl.trim();
@@ -158,13 +185,16 @@ export function WindowsSetup() {
     }, 15000);
   }, [gatewayUrl, gatewaySecret, setDirectGatewayConfig]);
 
-  const handleBackendSelect = useCallback((backend: BackendSnapshot) => {
-    if (useRecoveryStore.getState().getBackendViewState(backend.backendId) === 'offline') return;
-    const serverId = backend.backendId;
-    setActiveServer(serverId);
-    setLastActiveBackend(serverId);
-    connectServer(serverId);
-  }, [connectServer, setActiveServer, setLastActiveBackend]);
+  const handleBackendSelect = useCallback(
+    (backend: BackendSnapshot) => {
+      if (useRecoveryStore.getState().getBackendViewState(backend.backendId) === 'offline') return;
+      const serverId = backend.backendId;
+      setActiveServer(serverId);
+      setLastActiveBackend(serverId);
+      connectServer(serverId);
+    },
+    [connectServer, setActiveServer, setLastActiveBackend]
+  );
 
   const copyToClipboard = useCallback((text: string) => {
     navigator.clipboard.writeText(text);
@@ -181,19 +211,18 @@ export function WindowsSetup() {
   }, []);
 
   const runningDistros = distros.filter(d => d.state === 'Running');
-  const isGatewayConnected = useRecoveryStore((s) => s.transport.status) === 'connected';
+  const isGatewayConnected = useRecoveryStore(s => s.transport.status) === 'connected';
   const onlineBackends = backends.filter(
-    b => useRecoveryStore.getState().getBackendViewState(b.backendId) !== 'offline'
-      && shouldShowNonCurrentInstanceBackend(b, currentInstanceId, showLocalBackend)
+    b =>
+      useRecoveryStore.getState().getBackendViewState(b.backendId) !== 'offline' &&
+      shouldShowNonCurrentInstanceBackend(b, currentInstanceId, showLocalBackend)
   );
 
   // --- Layout wrapper ---
   const PageWrapper = ({ children }: { children: React.ReactNode }) => (
     <div className="flex flex-col h-dvh bg-background text-foreground">
       <div className="safe-top-spacer bg-background flex-shrink-0" data-tauri-drag-region />
-      <div className="flex-1 flex items-center justify-center p-6">
-        {children}
-      </div>
+      <div className="flex-1 flex items-center justify-center p-6">{children}</div>
     </div>
   );
 
@@ -238,9 +267,7 @@ export function WindowsSetup() {
               </div>
               <div>
                 <div className="font-medium text-sm text-foreground">WSL Server</div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  Run locally in WSL
-                </div>
+                <div className="text-xs text-muted-foreground mt-1">Run locally in WSL</div>
               </div>
               {wslAvailable && (
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-success/10 text-success font-medium">
@@ -259,9 +286,7 @@ export function WindowsSetup() {
               </div>
               <div>
                 <div className="font-medium text-sm text-foreground">Gateway</div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  Connect to remote server
-                </div>
+                <div className="text-xs text-muted-foreground mt-1">Connect to remote server</div>
               </div>
             </button>
           </div>
@@ -308,7 +333,11 @@ export function WindowsSetup() {
                   className="p-2 hover:bg-background rounded-lg transition-colors"
                   title="Copy command"
                 >
-                  {copied ? <Check size={16} className="text-success" /> : <Copy size={16} className="text-muted-foreground" />}
+                  {copied ? (
+                    <Check size={16} className="text-success" />
+                  ) : (
+                    <Copy size={16} className="text-muted-foreground" />
+                  )}
                 </button>
               </div>
               <p className="text-xs text-muted-foreground">
@@ -339,7 +368,10 @@ export function WindowsSetup() {
     }
 
     // Sub-case: WSL available — show deploy + start flow
-    const isWslBusy = wslServer.status === 'checking' || wslServer.status === 'deploying' || wslServer.status === 'starting';
+    const isWslBusy =
+      wslServer.status === 'checking' ||
+      wslServer.status === 'deploying' ||
+      wslServer.status === 'starting';
 
     return (
       <PageWrapper>
@@ -349,9 +381,7 @@ export function WindowsSetup() {
               <Terminal size={32} strokeWidth={1.5} className="text-primary" />
             </div>
             <h1 className="text-xl font-bold text-foreground">WSL Server</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Deploy and start the server in WSL
-            </p>
+            <p className="text-sm text-muted-foreground mt-1">Deploy and start the server in WSL</p>
           </div>
 
           {/* Running distros */}
@@ -372,9 +402,7 @@ export function WindowsSetup() {
           )}
 
           {/* Terminal output */}
-          {wslServer.outputLines.length > 0 && (
-            <TerminalOutput lines={wslServer.outputLines} />
-          )}
+          {wslServer.outputLines.length > 0 && <TerminalOutput lines={wslServer.outputLines} />}
 
           {/* Start button */}
           <button
@@ -427,13 +455,11 @@ export function WindowsSetup() {
                 <Globe size={32} strokeWidth={1.5} className="text-primary" />
               </div>
               <h1 className="text-xl font-bold text-foreground">Select a Server</h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Choose a backend to connect to
-              </p>
+              <p className="text-sm text-muted-foreground mt-1">Choose a backend to connect to</p>
             </div>
 
             <div className="space-y-2">
-              {onlineBackends.map((backend) => {
+              {onlineBackends.map(backend => {
                 const authStatus = backendAuthStatus[backend.backendId];
                 const isAuthenticating = authStatus === 'pending';
 
@@ -455,7 +481,11 @@ export function WindowsSetup() {
                         {isAuthenticating ? 'Connecting...' : backend.backendId}
                       </div>
                     </div>
-                    <ChevronRight size={20} strokeWidth={1.75} className="text-muted-foreground flex-shrink-0" />
+                    <ChevronRight
+                      size={20}
+                      strokeWidth={1.75}
+                      className="text-muted-foreground flex-shrink-0"
+                    />
                   </button>
                 );
               })}
@@ -500,7 +530,7 @@ export function WindowsSetup() {
               <input
                 type="text"
                 value={gatewayUrl}
-                onChange={(e) => setGatewayUrl(e.target.value)}
+                onChange={e => setGatewayUrl(e.target.value)}
                 placeholder="http://gateway.example.com:3200"
                 disabled={gatewayConnecting}
                 className="w-full px-4 py-3 border border-border rounded-xl bg-input text-foreground text-sm placeholder:text-muted-foreground focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
@@ -514,7 +544,7 @@ export function WindowsSetup() {
               <input
                 type="password"
                 value={gatewaySecret}
-                onChange={(e) => setGatewaySecret(e.target.value)}
+                onChange={e => setGatewaySecret(e.target.value)}
                 placeholder="Enter gateway secret"
                 disabled={gatewayConnecting}
                 className="w-full px-4 py-3 border border-border rounded-xl bg-input text-foreground text-sm placeholder:text-muted-foreground focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"
@@ -541,7 +571,9 @@ export function WindowsSetup() {
           {isGatewayConnected && onlineBackends.length === 0 && (
             <div className="text-center text-sm text-muted-foreground">
               <p>Gateway connected. Waiting for backends...</p>
-              <p className="text-xs mt-1">Make sure your server is running and connected to the gateway.</p>
+              <p className="text-xs mt-1">
+                Make sure your server is running and connected to the gateway.
+              </p>
             </div>
           )}
 
@@ -563,9 +595,7 @@ export function WindowsSetup() {
               <Bot size={32} strokeWidth={1.5} className="text-primary" />
             </div>
             <h1 className="text-xl font-bold text-foreground">Manual Connection</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Enter the server address directly
-            </p>
+            <p className="text-sm text-muted-foreground mt-1">Enter the server address directly</p>
           </div>
 
           {connectError && (
@@ -581,7 +611,7 @@ export function WindowsSetup() {
             <input
               type="text"
               value={manualAddress}
-              onChange={(e) => setManualAddress(e.target.value)}
+              onChange={e => setManualAddress(e.target.value)}
               placeholder="localhost:3100 or 192.168.1.100:3100"
               disabled={connecting}
               className="w-full px-4 py-3 border border-border rounded-xl bg-input text-foreground text-sm placeholder:text-muted-foreground focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50"

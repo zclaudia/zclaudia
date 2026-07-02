@@ -4,7 +4,17 @@ import { WorkflowRunViewer } from '../WorkflowRunViewer';
 import { useWorkflowStore } from '../../store';
 
 vi.mock('../../api', () => ({
-  getWorkflowRun: vi.fn().mockResolvedValue({ run: { id: 'run-1', workflowId: 'w1', status: 'pending', trigger: 'manual', startedAt: Date.now(), stepRuns: [] }, stepRuns: [] }),
+  getWorkflowRun: vi.fn().mockResolvedValue({
+    run: {
+      id: 'run-1',
+      workflowId: 'w1',
+      status: 'pending',
+      trigger: 'manual',
+      startedAt: Date.now(),
+      stepRuns: [],
+    },
+    stepRuns: [],
+  }),
   getWorkflowRuns: vi.fn().mockResolvedValue([]),
   listWorkflows: vi.fn().mockResolvedValue([]),
   listWorkflowRuns: vi.fn().mockResolvedValue([]),
@@ -24,9 +34,7 @@ describe('WorkflowRunViewer', () => {
   });
 
   it('renders the component', () => {
-    const { container } = render(
-      <WorkflowRunViewer runId="run-1" onBack={() => {}} />
-    );
+    const { container } = render(<WorkflowRunViewer runId="run-1" onBack={() => {}} />);
     expect(container.innerHTML).toBeTruthy();
   });
 
@@ -44,9 +52,7 @@ describe('WorkflowRunViewer', () => {
         },
       },
     } as any);
-    const { container } = render(
-      <WorkflowRunViewer runId="run-1" onBack={() => {}} />
-    );
+    const { container } = render(<WorkflowRunViewer runId="run-1" onBack={() => {}} />);
     expect(container.textContent).toContain('completed');
   });
 });

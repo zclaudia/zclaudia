@@ -1,4 +1,9 @@
-import type { StepExecutorPort, StepResult, StepContext, ApprovalPort } from '../ports/step-executor.js';
+import type {
+  StepExecutorPort,
+  StepResult,
+  StepContext,
+  ApprovalPort,
+} from '../ports/step-executor.js';
 import type { WorkflowNodeDef } from '@zclaudia/shared/features/workflows';
 
 export class WaitStepExecutor implements StepExecutorPort {
@@ -9,9 +14,9 @@ export class WaitStepExecutor implements StepExecutorPort {
   async execute(
     node: WorkflowNodeDef,
     config: Record<string, unknown>,
-    ctx: StepContext,
+    ctx: StepContext
   ): Promise<StepResult> {
-    const waitType = config.type as string ?? 'timeout';
+    const waitType = (config.type as string) ?? 'timeout';
 
     if (waitType === 'timeout') {
       const waitMs = (config.timeoutMs as number) ?? 5000;

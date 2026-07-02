@@ -24,7 +24,7 @@ vi.mock('../../../../services/api', () => ({
   listLlmProfiles: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock('../../../../utils/platform', async (importOriginal) => {
+vi.mock('../../../../utils/platform', async importOriginal => {
   const mod = await importOriginal<Record<string, any>>();
   return {
     ...mod,
@@ -61,11 +61,7 @@ describe('WorkflowEditorWindow', () => {
 
   it('renders WorkflowEditor when no workflowId (new workflow)', () => {
     const { container } = render(
-      <WorkflowEditorWindow
-        projectId="p1"
-        serverUrl="http://localhost:3100"
-        authToken="tok"
-      />,
+      <WorkflowEditorWindow projectId="p1" serverUrl="http://localhost:3100" authToken="tok" />
     );
     expect(container.textContent).toContain('p1');
     expect(container.textContent).toContain('standalone');
@@ -80,7 +76,7 @@ describe('WorkflowEditorWindow', () => {
         workflowId="w1"
         serverUrl="http://localhost:3100"
         authToken="tok"
-      />,
+      />
     );
     // Loader2 is rendered (spinning icon), no editor content yet
     expect(container.querySelector('.animate-spin')).toBeTruthy();
@@ -91,7 +87,11 @@ describe('WorkflowEditorWindow', () => {
       ok: true,
       json: async () => ({
         success: true,
-        data: { id: 'w1', name: 'My Workflow', definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] } },
+        data: {
+          id: 'w1',
+          name: 'My Workflow',
+          definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] },
+        },
       }),
     });
 
@@ -101,7 +101,7 @@ describe('WorkflowEditorWindow', () => {
         workflowId="w1"
         serverUrl="http://localhost:3100"
         authToken="tok"
-      />,
+      />
     );
 
     await waitFor(() => {
@@ -122,7 +122,7 @@ describe('WorkflowEditorWindow', () => {
         workflowId="w1"
         serverUrl="http://localhost:3100"
         authToken="tok"
-      />,
+      />
     );
 
     await waitFor(() => {
@@ -146,7 +146,7 @@ describe('WorkflowEditorWindow', () => {
         workflowId="w1"
         serverUrl="http://localhost:3100"
         authToken="tok"
-      />,
+      />
     );
 
     await waitFor(() => {
@@ -166,7 +166,7 @@ describe('WorkflowEditorWindow', () => {
         workflowId="w1"
         serverUrl="http://localhost:3100"
         authToken="my-token"
-      />,
+      />
     );
 
     await waitFor(() => {
@@ -174,7 +174,7 @@ describe('WorkflowEditorWindow', () => {
         'http://localhost:3100/api/workflows/w1',
         expect.objectContaining({
           headers: expect.objectContaining({ Authorization: 'my-token' }),
-        }),
+        })
       );
     });
   });
@@ -186,11 +186,7 @@ describe('WorkflowEditorWindow', () => {
     } as any);
 
     render(
-      <WorkflowEditorWindow
-        projectId="p1"
-        serverUrl="http://localhost:3100"
-        authToken="tok"
-      />,
+      <WorkflowEditorWindow projectId="p1" serverUrl="http://localhost:3100" authToken="tok" />
     );
 
     await Promise.resolve();

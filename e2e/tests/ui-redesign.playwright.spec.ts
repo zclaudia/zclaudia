@@ -8,7 +8,6 @@
 import { test, expect } from '../fixtures/test-fixtures';
 
 test.describe('UI Redesign - Apple Style', () => {
-
   test.beforeEach(async ({ page, cleanDb }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
@@ -22,7 +21,9 @@ test.describe('UI Redesign - Apple Style', () => {
     console.log('Test UI1: Theme support');
 
     // Check for theme toggle
-    const themeToggle = page.locator('button[title*="Theme"], button[aria-label*="Theme"], [data-testid="theme-toggle"]').first();
+    const themeToggle = page
+      .locator('button[title*="Theme"], button[aria-label*="Theme"], [data-testid="theme-toggle"]')
+      .first();
     const hasToggle = await themeToggle.isVisible({ timeout: 2000 }).catch(() => false);
 
     if (hasToggle) {
@@ -83,7 +84,9 @@ test.describe('UI Redesign - Apple Style', () => {
     let foundIcons = 0;
 
     for (const iconName of commonIcons) {
-      const icon = page.locator(`svg[class*="${iconName}"], button[title*="${iconName}" i]`).first();
+      const icon = page
+        .locator(`svg[class*="${iconName}"], button[title*="${iconName}" i]`)
+        .first();
       if (await icon.isVisible({ timeout: 500 }).catch(() => false)) {
         foundIcons++;
       }
@@ -124,7 +127,9 @@ test.describe('UI Redesign - Apple Style', () => {
     await page.waitForTimeout(500);
 
     // Mobile menu button should appear
-    const mobileMenuBtn = page.locator('button[aria-label*="menu"], button[title*="menu"], .mobile-menu').first();
+    const mobileMenuBtn = page
+      .locator('button[aria-label*="menu"], button[title*="menu"], .mobile-menu')
+      .first();
     const hasMobileMenu = await mobileMenuBtn.isVisible({ timeout: 1000 }).catch(() => false);
 
     if (hasMobileMenu) {
@@ -143,7 +148,9 @@ test.describe('UI Redesign - Apple Style', () => {
     console.log('Test UI4: Animation effects');
 
     // Check for CSS transitions/animations
-    const animatedElements = page.locator('[class*="transition"], [class*="animate"], [style*="transition"]');
+    const animatedElements = page.locator(
+      '[class*="transition"], [class*="animate"], [style*="transition"]'
+    );
     const count = await animatedElements.count();
 
     if (count > 0) {
@@ -161,7 +168,9 @@ test.describe('UI Redesign - Apple Style', () => {
     }
 
     // Test fade-in animations
-    const fadeInElements = page.locator('[class*="fade-in"], [class*="fadeIn"], [style*="opacity"]');
+    const fadeInElements = page.locator(
+      '[class*="fade-in"], [class*="fadeIn"], [style*="opacity"]'
+    );
     const fadeInCount = await fadeInElements.count();
 
     if (fadeInCount > 0) {
@@ -198,7 +207,10 @@ test.describe('UI Redesign - Apple Style', () => {
     if (imageCount > 0) {
       let withAlt = 0;
       for (let i = 0; i < Math.min(imageCount, 10); i++) {
-        const alt = await images.nth(i).getAttribute('alt').catch(() => null);
+        const alt = await images
+          .nth(i)
+          .getAttribute('alt')
+          .catch(() => null);
         if (alt !== null) withAlt++;
       }
       console.log(`  ✓ ${withAlt}/${Math.min(imageCount, 10)} images have alt text`);
@@ -214,7 +226,7 @@ test.describe('UI Redesign - Apple Style', () => {
       await page.waitForTimeout(100);
 
       const focusedElement = page.locator(':focus');
-      const hasFocus = await focusedElement.count() > 0;
+      const hasFocus = (await focusedElement.count()) > 0;
 
       if (hasFocus) {
         console.log('  ✓ Focus navigation works');
@@ -231,7 +243,9 @@ test.describe('UI Redesign - Apple Style', () => {
     console.log('Test UI6: Button styling');
 
     // Check for primary button styling
-    const primaryButtons = page.locator('button[class*="primary"], button.primary, [class*="btn-primary"]');
+    const primaryButtons = page.locator(
+      'button[class*="primary"], button.primary, [class*="btn-primary"]'
+    );
     const primaryCount = await primaryButtons.count();
 
     if (primaryCount > 0) {
@@ -239,14 +253,16 @@ test.describe('UI Redesign - Apple Style', () => {
 
       // Check styling
       const firstPrimary = primaryButtons.first();
-      const bgColor = await firstPrimary.evaluate(el =>
-        window.getComputedStyle(el).backgroundColor
+      const bgColor = await firstPrimary.evaluate(
+        el => window.getComputedStyle(el).backgroundColor
       );
       console.log(`  Primary button background: ${bgColor}`);
     }
 
     // Check for secondary/ghost buttons
-    const secondaryButtons = page.locator('button[class*="secondary"], button[class*="ghost"], button.secondary, button.ghost');
+    const secondaryButtons = page.locator(
+      'button[class*="secondary"], button[class*="ghost"], button.secondary, button.ghost'
+    );
     const secondaryCount = await secondaryButtons.count();
 
     if (secondaryCount > 0) {
@@ -258,8 +274,8 @@ test.describe('UI Redesign - Apple Style', () => {
     const firstButton = allButtons.first();
 
     if (await firstButton.isVisible({ timeout: 1000 }).catch(() => false)) {
-      const borderRadius = await firstButton.evaluate(el =>
-        window.getComputedStyle(el).borderRadius
+      const borderRadius = await firstButton.evaluate(
+        el => window.getComputedStyle(el).borderRadius
       );
       console.log(`  Button border-radius: ${borderRadius}`);
     }
@@ -381,7 +397,7 @@ test.describe('UI Redesign - Apple Style', () => {
 
     // Check for breadcrumbs
     const breadcrumbs = page.locator('[class*="breadcrumb"], nav[aria-label*="breadcrumb"]');
-    const hasBreadcrumbs = await breadcrumbs.count() > 0;
+    const hasBreadcrumbs = (await breadcrumbs.count()) > 0;
 
     if (hasBreadcrumbs) {
       console.log('  ✓ Breadcrumbs present');
@@ -397,7 +413,9 @@ test.describe('UI Redesign - Apple Style', () => {
     console.log('Test UI10: Loading states');
 
     // Look for loading indicators
-    const loadingIndicators = page.locator('[class*="loading"], [class*="spinner"], [class*="skeleton"]');
+    const loadingIndicators = page.locator(
+      '[class*="loading"], [class*="spinner"], [class*="skeleton"]'
+    );
     const loadingCount = await loadingIndicators.count();
 
     if (loadingCount > 0) {
@@ -418,7 +436,9 @@ test.describe('UI Redesign - Apple Style', () => {
 
     // Check for immediate loading indicators
     const immediateLoading = page.locator('[class*="loading"]').first();
-    const hasImmediateLoading = await immediateLoading.isVisible({ timeout: 500 }).catch(() => false);
+    const hasImmediateLoading = await immediateLoading
+      .isVisible({ timeout: 500 })
+      .catch(() => false);
 
     if (hasImmediateLoading) {
       console.log('  ✓ Loading state shown on navigation');

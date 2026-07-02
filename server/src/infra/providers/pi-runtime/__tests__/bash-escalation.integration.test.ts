@@ -14,10 +14,9 @@ function makeDb(): Database.Database {
   return db;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getBash(db: Database.Database, permissionCallback: any) {
   const tools = buildTools(process.cwd(), { sessionId: 's1', db, permissionCallback });
-  return tools.find((t) => t.name === 'Bash')!;
+  return tools.find(t => t.name === 'Bash')!;
 }
 
 describe('Bash escalate-on-denial (integration, sandbox-gated)', () => {
@@ -27,7 +26,9 @@ describe('Bash escalate-on-denial (integration, sandbox-gated)', () => {
     if (!isSandboxAvailable()) return;
     const db = makeDb();
     const bash = getBash(db, async () => ({ behavior: 'deny', message: 'no' }));
-    const res: any = await bash.execute('call1', { command: 'curl -sS https://denied.example.com -o /dev/null' });
+    const res: any = await bash.execute('call1', {
+      command: 'curl -sS https://denied.example.com -o /dev/null',
+    });
     expect(res.details.ok).not.toBe(true); // tool returns { content, details: { ok, exitCode, ... } }
     expect(loadSessionSandboxDomains(db, 's1')).toEqual([]);
   });
@@ -55,10 +56,13 @@ describe('Bash escalate-on-denial (integration, sandbox-gated)', () => {
       sessionId: 's1',
       db,
       sandboxAllowedDomains: ['denied.example.com'],
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      permissionCallback: (async () => { asked++; return { behavior: 'allow' }; }) as any,
+
+      permissionCallback: (async () => {
+        asked++;
+        return { behavior: 'allow' };
+      }) as any,
     });
-    const bash = tools.find((t) => t.name === 'Bash')!;
+    const bash = tools.find(t => t.name === 'Bash')!;
     await bash.execute('call1', { command: 'curl -sS https://denied.example.com -o /dev/null' });
     // The seeded domain is on the allow-list, so detectSandboxDenial filters it out → no escalation prompt.
     expect(asked).toBe(0);
@@ -75,7 +79,8 @@ describe('Bash escalate-on-denial (integration, sandbox-gated)', () => {
       return { behavior: 'allow' };
     });
     await bash.execute('call1', {
-      command: 'curl -sS https://a.denied.example -o /dev/null; curl -sS https://b.denied.example -o /dev/null',
+      command:
+        'curl -sS https://a.denied.example -o /dev/null; curl -sS https://b.denied.example -o /dev/null',
     });
     expect(asked).toBe(1); // one batched prompt, not one per host
     expect(promptedHosts).toEqual(expect.arrayContaining(['a.denied.example', 'b.denied.example']));

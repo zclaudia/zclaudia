@@ -11,7 +11,7 @@ export function FontSizeSelector() {
 
   return (
     <div className="flex items-center gap-0.5 p-0.5 bg-muted rounded-md" title="Font size">
-      {PRESETS.map((preset) => (
+      {PRESETS.map(preset => (
         <button
           key={preset.key}
           onClick={() => setFontSize(preset.key)}

@@ -3,8 +3,12 @@ import type { WorktreeGroup } from './worktreeGrouping';
 function BranchIcon({ className = 'w-3.5 h-3.5' }: { className?: string }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-        d="M6 3v12m0 0a3 3 0 100 6 3 3 0 000-6zm0 0c3.314 0 6-2.686 6-6m0-6a3 3 0 100 6 3 3 0 000-6z" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M6 3v12m0 0a3 3 0 100 6 3 3 0 000-6zm0 0c3.314 0 6-2.686 6-6m0-6a3 3 0 100 6 3 3 0 000-6z"
+      />
     </svg>
   );
 }
@@ -43,16 +47,16 @@ export function WorktreeGroupItem({
           {/* Chevron */}
           <svg
             className={`w-3 h-3 shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
 
           <BranchIcon className="w-3 h-3 shrink-0" />
 
-          <span className="truncate font-medium">
-            {group.label}
-          </span>
+          <span className="truncate font-medium">{group.label}</span>
 
           <span className="ml-auto text-[10px] text-muted-foreground/60 shrink-0">
             {group.sessions.length}
@@ -62,7 +66,7 @@ export function WorktreeGroupItem({
         {canDelete && onDelete && (
           <button
             type="button"
-            onClick={(e) => {
+            onClick={e => {
               e.stopPropagation();
               onDelete();
             }}
@@ -74,8 +78,18 @@ export function WorktreeGroupItem({
             title={deleteTitle}
             aria-label={deleteTitle}
           >
-            <svg className="w-3.5 h-3.5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            <svg
+              className="w-3.5 h-3.5 mx-auto"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
             </svg>
           </button>
         )}

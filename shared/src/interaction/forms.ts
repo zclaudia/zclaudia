@@ -23,10 +23,10 @@ export type InteractionSource = 'provider_native' | 'tool_call' | 'text_inferred
 
 /** Base fields shared by all interaction events */
 export interface InteractionBase {
-  interactionId: string;   // Reuses requestId or toolUseId
+  interactionId: string; // Reuses requestId or toolUseId
   sessionId: string;
   runId?: string;
-  provider?: string;       // Provider-specific runtime identifier
+  provider?: string; // Provider-specific runtime identifier
   source: InteractionSource;
   createdAt: number;
 }
@@ -116,4 +116,8 @@ export interface InteractionResponseMessage {
 }
 
 /** Union of all interaction message types */
-export type InteractionMessage = InteractionPromptMessage | TodoUpdateInteractionMessage | ApprovalInteractionMessage | PlanReviewInteractionMessage;
+export type InteractionMessage =
+  | InteractionPromptMessage
+  | TodoUpdateInteractionMessage
+  | ApprovalInteractionMessage
+  | PlanReviewInteractionMessage;

@@ -3,22 +3,49 @@
  * Max 5 buttons, scrollable.
  */
 import { useMemo } from 'react';
-import { Bot, MessageSquare, Activity, Clock, Cloud, Gauge, StickyNote, Puzzle, type LucideIcon } from 'lucide-react';
+import {
+  Bot,
+  MessageSquare,
+  Activity,
+  Clock,
+  Cloud,
+  Gauge,
+  StickyNote,
+  Puzzle,
+  type LucideIcon,
+} from 'lucide-react';
 import { usePluginStore, selectPluginPanels } from '../stores/pluginStore';
 import { useServerStore } from '../stores/serverStore';
 import { isDesktopTauri } from '../utils/platform';
 
 // Icon name → Lucide component mapping for plugin-declared icons.
 const PLUGIN_ICON_MAP: Record<string, LucideIcon> = {
-  MessageSquare, Activity, Clock, Cloud, Gauge, StickyNote, Puzzle, Bot,
+  MessageSquare,
+  Activity,
+  Clock,
+  Cloud,
+  Gauge,
+  StickyNote,
+  Puzzle,
+  Bot,
 };
 
-export function PluginIcon({ name, pluginId, size = 16 }: { name?: string; pluginId?: string; size?: number }) {
+export function PluginIcon({
+  name,
+  pluginId,
+  size = 16,
+}: {
+  name?: string;
+  pluginId?: string;
+  size?: number;
+}) {
   const localServerPort = useServerStore(s => s.localServerPort);
   if (name && pluginId && /\.\w+$/.test(name)) {
     const baseUrl = `http://localhost:${localServerPort || 3100}`;
     const src = `${baseUrl}/api/plugins/${encodeURIComponent(pluginId)}/frontend/${name}`;
-    return <img src={src} alt="" style={{ width: size, height: size }} className="object-contain" />;
+    return (
+      <img src={src} alt="" style={{ width: size, height: size }} className="object-contain" />
+    );
   }
   const Icon = name ? PLUGIN_ICON_MAP[name] : undefined;
   if (Icon) return <Icon size={size} />;
@@ -27,14 +54,14 @@ export function PluginIcon({ name, pluginId, size = 16 }: { name?: string; plugi
 
 export function useActivePluginPanels() {
   const allPanels = usePluginStore(selectPluginPanels);
-  const activeIds = usePluginStore(
-    (s) => s.plugins.filter(p => p.status === 'active').map(p => p.manifest.id),
+  const activeIds = usePluginStore(s =>
+    s.plugins.filter(p => p.status === 'active').map(p => p.manifest.id)
   );
   const activeIdsKey = useMemo(() => JSON.stringify(activeIds), [activeIds]);
   const activeSet = useMemo(() => new Set(JSON.parse(activeIdsKey)), [activeIdsKey]);
   return useMemo(
     () => allPanels.filter(p => p.iframeUrl && p.pluginId && activeSet.has(p.pluginId)),
-    [allPanels, activeSet],
+    [allPanels, activeSet]
   );
 }
 
@@ -43,7 +70,7 @@ export function PluginWindowButtons() {
 
   if (pluginPanels.length === 0 || !isDesktopTauri()) return null;
 
-  const openWindow = async (panel: typeof pluginPanels[0]) => {
+  const openWindow = async (panel: (typeof pluginPanels)[0]) => {
     try {
       const { openPluginWindow } = await import('../utils/pluginWindow');
       await openPluginWindow({

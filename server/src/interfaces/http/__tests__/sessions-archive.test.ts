@@ -102,10 +102,12 @@ describe('sessions archive/restore/sync routes', () => {
 
     // Create a test project
     const now = Date.now();
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO projects (id, name, type, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
-    `).run('project-1', 'Test Project', 'code', now, now);
+    `
+    ).run('project-1', 'Test Project', 'code', now, now);
 
     // Reset activeRuns
     activeRuns.clear();
@@ -117,10 +119,12 @@ describe('sessions archive/restore/sync routes', () => {
   describe('POST /api/sessions/archive', () => {
     it('archives a single session', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Session 1', now, now);
+      `
+      ).run('s1', 'project-1', 'Session 1', now, now);
 
       const res = await request(app)
         .post('/api/sessions/archive')
@@ -133,18 +137,24 @@ describe('sessions archive/restore/sync routes', () => {
 
     it('archives multiple sessions', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Session 1', now, now);
-      db.prepare(`
+      `
+      ).run('s1', 'project-1', 'Session 1', now, now);
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s2', 'project-1', 'Session 2', now, now);
-      db.prepare(`
+      `
+      ).run('s2', 'project-1', 'Session 2', now, now);
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s3', 'project-1', 'Session 3', now, now);
+      `
+      ).run('s3', 'project-1', 'Session 3', now, now);
 
       const res = await request(app)
         .post('/api/sessions/archive')
@@ -156,9 +166,7 @@ describe('sessions archive/restore/sync routes', () => {
     });
 
     it('returns 400 when sessionIds is empty', async () => {
-      const res = await request(app)
-        .post('/api/sessions/archive')
-        .send({ sessionIds: [] });
+      const res = await request(app).post('/api/sessions/archive').send({ sessionIds: [] });
 
       expect(res.status).toBe(400);
       expect(res.body.success).toBe(false);
@@ -166,9 +174,7 @@ describe('sessions archive/restore/sync routes', () => {
     });
 
     it('returns 400 when sessionIds is missing', async () => {
-      const res = await request(app)
-        .post('/api/sessions/archive')
-        .send({});
+      const res = await request(app).post('/api/sessions/archive').send({});
 
       expect(res.status).toBe(400);
       expect(res.body.success).toBe(false);
@@ -177,26 +183,32 @@ describe('sessions archive/restore/sync routes', () => {
 
     it('sets archived_at timestamp on archived sessions', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Session 1', now, now);
+      `
+      ).run('s1', 'project-1', 'Session 1', now, now);
 
       await request(app)
         .post('/api/sessions/archive')
         .send({ sessionIds: ['s1'] });
 
-      const row = db.prepare('SELECT archived_at FROM sessions WHERE id = ?').get('s1') as { archived_at: number | null };
+      const row = db.prepare('SELECT archived_at FROM sessions WHERE id = ?').get('s1') as {
+        archived_at: number | null;
+      };
       expect(row.archived_at).not.toBeNull();
       expect(row.archived_at).toBeGreaterThan(0);
     });
 
     it('returns 409 SESSION_RUNNING when target has an active run', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s-running', 'project-1', 'Running Session', now, now);
+      `
+      ).run('s-running', 'project-1', 'Running Session', now, now);
 
       activeRuns.set('run-1', { sessionId: 's-running', phase: 'running' });
 
@@ -208,7 +220,9 @@ describe('sessions archive/restore/sync routes', () => {
       expect(res.body.success).toBe(false);
       expect(res.body.error.code).toBe('SESSION_RUNNING');
 
-      const row = db.prepare('SELECT archived_at FROM sessions WHERE id = ?').get('s-running') as { archived_at: number | null };
+      const row = db.prepare('SELECT archived_at FROM sessions WHERE id = ?').get('s-running') as {
+        archived_at: number | null;
+      };
       expect(row.archived_at).toBeNull();
     });
   });
@@ -219,10 +233,12 @@ describe('sessions archive/restore/sync routes', () => {
   describe('POST /api/sessions/restore', () => {
     it('restores a single archived session', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Archived Session', now, now, now);
+      `
+      ).run('s1', 'project-1', 'Archived Session', now, now, now);
 
       const res = await request(app)
         .post('/api/sessions/restore')
@@ -235,14 +251,18 @@ describe('sessions archive/restore/sync routes', () => {
 
     it('restores multiple archived sessions', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Archived 1', now, now, now);
-      db.prepare(`
+      `
+      ).run('s1', 'project-1', 'Archived 1', now, now, now);
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s2', 'project-1', 'Archived 2', now, now, now);
+      `
+      ).run('s2', 'project-1', 'Archived 2', now, now, now);
 
       const res = await request(app)
         .post('/api/sessions/restore')
@@ -254,9 +274,7 @@ describe('sessions archive/restore/sync routes', () => {
     });
 
     it('returns 400 when sessionIds is empty', async () => {
-      const res = await request(app)
-        .post('/api/sessions/restore')
-        .send({ sessionIds: [] });
+      const res = await request(app).post('/api/sessions/restore').send({ sessionIds: [] });
 
       expect(res.status).toBe(400);
       expect(res.body.success).toBe(false);
@@ -265,20 +283,26 @@ describe('sessions archive/restore/sync routes', () => {
 
     it('clears archived_at after restore', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Archived Session', now, now, now);
+      `
+      ).run('s1', 'project-1', 'Archived Session', now, now, now);
 
       // Verify archived_at is set before restore
-      const before = db.prepare('SELECT archived_at FROM sessions WHERE id = ?').get('s1') as { archived_at: number | null };
+      const before = db.prepare('SELECT archived_at FROM sessions WHERE id = ?').get('s1') as {
+        archived_at: number | null;
+      };
       expect(before.archived_at).not.toBeNull();
 
       await request(app)
         .post('/api/sessions/restore')
         .send({ sessionIds: ['s1'] });
 
-      const after = db.prepare('SELECT archived_at FROM sessions WHERE id = ?').get('s1') as { archived_at: number | null };
+      const after = db.prepare('SELECT archived_at FROM sessions WHERE id = ?').get('s1') as {
+        archived_at: number | null;
+      };
       expect(after.archived_at).toBeNull();
     });
   });
@@ -290,14 +314,18 @@ describe('sessions archive/restore/sync routes', () => {
     it('returns only archived sessions', async () => {
       const now = Date.now();
       // One archived, one not
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s-archived', 'project-1', 'Archived', now, now, now);
-      db.prepare(`
+      `
+      ).run('s-archived', 'project-1', 'Archived', now, now, now);
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s-active', 'project-1', 'Active', now, now);
+      `
+      ).run('s-active', 'project-1', 'Active', now, now);
 
       const res = await request(app).get('/api/sessions/archived');
 
@@ -309,10 +337,12 @@ describe('sessions archive/restore/sync routes', () => {
 
     it('returns empty array when no archived sessions exist', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Active Session', now, now);
+      `
+      ).run('s1', 'project-1', 'Active Session', now, now);
 
       const res = await request(app).get('/api/sessions/archived');
 
@@ -323,14 +353,18 @@ describe('sessions archive/restore/sync routes', () => {
 
     it('orders archived sessions by archived_at DESC', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s-old', 'project-1', 'Archived First', now - 2000, now - 5000, now - 2000);
-      db.prepare(`
+      `
+      ).run('s-old', 'project-1', 'Archived First', now - 2000, now - 5000, now - 2000);
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s-new', 'project-1', 'Archived Second', now, now - 3000, now);
+      `
+      ).run('s-new', 'project-1', 'Archived Second', now, now - 3000, now);
 
       const res = await request(app).get('/api/sessions/archived');
 
@@ -348,14 +382,18 @@ describe('sessions archive/restore/sync routes', () => {
   describe('GET /api/sessions (archived filtering)', () => {
     it('excludes archived sessions by default', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s-active', 'project-1', 'Active', now, now);
-      db.prepare(`
+      `
+      ).run('s-active', 'project-1', 'Active', now, now);
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s-archived', 'project-1', 'Archived', now, now, now);
+      `
+      ).run('s-archived', 'project-1', 'Archived', now, now, now);
 
       const res = await request(app).get('/api/sessions');
 
@@ -366,14 +404,18 @@ describe('sessions archive/restore/sync routes', () => {
 
     it('includes archived sessions when includeArchived=true', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s-active', 'project-1', 'Active', now, now);
-      db.prepare(`
+      `
+      ).run('s-active', 'project-1', 'Active', now, now);
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s-archived', 'project-1', 'Archived', now, now, now);
+      `
+      ).run('s-archived', 'project-1', 'Archived', now, now, now);
 
       const res = await request(app).get('/api/sessions?includeArchived=true');
 
@@ -383,26 +425,34 @@ describe('sessions archive/restore/sync routes', () => {
 
     it('filters by projectId and still excludes archived', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('project-2', 'Other Project', 'code', now, now);
+      `
+      ).run('project-2', 'Other Project', 'code', now, now);
 
       // project-1: one active, one archived
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s1-active', 'project-1', 'P1 Active', now, now);
-      db.prepare(`
+      `
+      ).run('s1-active', 'project-1', 'P1 Active', now, now);
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s1-archived', 'project-1', 'P1 Archived', now, now, now);
+      `
+      ).run('s1-archived', 'project-1', 'P1 Archived', now, now, now);
 
       // project-2: one active
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s2-active', 'project-2', 'P2 Active', now, now);
+      `
+      ).run('s2-active', 'project-2', 'P2 Active', now, now);
 
       const res = await request(app).get('/api/sessions?projectId=project-1');
 
@@ -420,15 +470,19 @@ describe('sessions archive/restore/sync routes', () => {
     it('returns sessions updated after the since timestamp', async () => {
       const base = Date.now() - 10000;
       // Old session (should NOT appear)
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s-old', 'project-1', 'Old Session', base, base);
+      `
+      ).run('s-old', 'project-1', 'Old Session', base, base);
       // Recent session (should appear)
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s-new', 'project-1', 'New Session', base + 5000, base + 5000);
+      `
+      ).run('s-new', 'project-1', 'New Session', base + 5000, base + 5000);
 
       const res = await request(app).get(`/api/sessions/sync?since=${base + 1000}`);
 
@@ -443,15 +497,19 @@ describe('sessions archive/restore/sync routes', () => {
     it('excludes archived sessions from sync results', async () => {
       const base = Date.now() - 10000;
       // Non-archived recent session
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s-active', 'project-1', 'Active', base + 5000, base + 5000);
+      `
+      ).run('s-active', 'project-1', 'Active', base + 5000, base + 5000);
       // Archived recent session
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run('s-archived', 'project-1', 'Archived', base + 5000, base + 5000, base + 5000);
+      `
+      ).run('s-archived', 'project-1', 'Archived', base + 5000, base + 5000, base + 5000);
 
       const res = await request(app).get(`/api/sessions/sync?since=${base}`);
 
@@ -462,14 +520,18 @@ describe('sessions archive/restore/sync routes', () => {
 
     it('includes isActive status from activeRuns', async () => {
       const base = Date.now() - 10000;
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s-running', 'project-1', 'Running Session', base + 5000, base + 5000);
-      db.prepare(`
+      `
+      ).run('s-running', 'project-1', 'Running Session', base + 5000, base + 5000);
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('s-idle', 'project-1', 'Idle Session', base + 5000, base + 5000);
+      `
+      ).run('s-idle', 'project-1', 'Idle Session', base + 5000, base + 5000);
 
       // Mark one session as actively running (activeRuns is keyed by runId, not sessionId)
       activeRuns.set('run-1', { sessionId: 's-running' });

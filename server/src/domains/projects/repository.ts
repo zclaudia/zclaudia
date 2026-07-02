@@ -3,6 +3,12 @@ import type { Database } from 'better-sqlite3';
 import type { Project } from '@zclaudia/shared/core/project';
 import { newId } from '../../utils/uuid.js';
 
+export interface ProjectContextSummary {
+  id: string;
+  name: string;
+  rootPath: string | null;
+}
+
 export class ProjectRepository extends BaseRepository<
   Project,
   Omit<Project, 'id' | 'createdAt' | 'updatedAt'>,
@@ -21,7 +27,9 @@ export class ProjectRepository extends BaseRepository<
       rootPath: row.root_path || undefined,
       systemPrompt: row.system_prompt || undefined,
       permissionPolicy: row.permission_policy ? JSON.parse(row.permission_policy) : undefined,
-      agentPermissionOverride: row.agent_permission_override ? JSON.parse(row.agent_permission_override) : undefined,
+      agentPermissionOverride: row.agent_permission_override
+        ? JSON.parse(row.agent_permission_override)
+        : undefined,
       hooksOverride: row.hooks_override ? JSON.parse(row.hooks_override) : undefined,
       isInternal: row.is_internal === 1,
       reviewLlmProfileId: row.review_llm_profile_id || undefined,
@@ -34,7 +42,10 @@ export class ProjectRepository extends BaseRepository<
     };
   }
 
-  createQuery(data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): { sql: string; params: any[] } {
+  createQuery(data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): {
+    sql: string;
+    params: any[];
+  } {
     const id = newId();
     const now = Date.now();
 
@@ -67,7 +78,10 @@ export class ProjectRepository extends BaseRepository<
     };
   }
 
-  updateQuery(id: string, data: Partial<Omit<Project, 'id' | 'createdAt' | 'updatedAt'>>): { sql: string; params: any[] } {
+  updateQuery(
+    id: string,
+    data: Partial<Omit<Project, 'id' | 'createdAt' | 'updatedAt'>>
+  ): { sql: string; params: any[] } {
     const updates: string[] = [];
     const params: any[] = [];
 
@@ -97,7 +111,9 @@ export class ProjectRepository extends BaseRepository<
     }
     if (data.agentPermissionOverride !== undefined) {
       updates.push('agent_permission_override = ?');
-      params.push(data.agentPermissionOverride ? JSON.stringify(data.agentPermissionOverride) : null);
+      params.push(
+        data.agentPermissionOverride ? JSON.stringify(data.agentPermissionOverride) : null
+      );
     }
     if (data.hooksOverride !== undefined) {
       updates.push('hooks_override = ?');
@@ -135,25 +151,64 @@ export class ProjectRepository extends BaseRepository<
   }
 
   findAllOrdered(): Project[] {
-    const rows = this.db.prepare(`
+    const rows = this.db
+      .prepare(
+        `
       SELECT * FROM projects
       ORDER BY sort_order ASC, updated_at DESC
-    `).all();
-    return rows.map((row) => this.mapRow(row));
+    `
+      )
+      .all();
+    return rows.map(row => this.mapRow(row));
   }
 
   findNextSortOrder(): number {
-    const row = this.db.prepare(
-      'SELECT COALESCE(MAX(sort_order), -1) + 1 as sortOrder FROM projects'
-    ).get() as { sortOrder: number };
+    const row = this.db
+      .prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 as sortOrder FROM projects')
+      .get() as { sortOrder: number };
     return row.sortOrder;
   }
 
+  hasAgentReadinessSchema(): boolean {
+    const llmTable = this.db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'llm_profiles'")
+      .get();
+    if (!llmTable) return false;
+    const agentCols = this.db.prepare('PRAGMA table_info(agent_profiles)').all() as Array<{
+      name: string;
+    }>;
+    return agentCols.some(col => col.name === 'llm_profile_id');
+  }
+
   exists(id: string): boolean {
-    const row = this.db
-      .prepare('SELECT 1 FROM projects WHERE id = ?')
-      .get(id) as { 1: number } | undefined;
+    const row = this.db.prepare('SELECT 1 FROM projects WHERE id = ?').get(id) as
+      | { 1: number }
+      | undefined;
     return Boolean(row);
+  }
+
+  findContextSummariesByIds(ids: string[]): ProjectContextSummary[] {
+    if (ids.length === 0) return [];
+    const placeholders = ids.map(() => '?').join(',');
+    const rows = this.db
+      .prepare(
+        `
+        SELECT id, name, root_path
+        FROM projects
+        WHERE id IN (${placeholders})
+      `
+      )
+      .all(...ids) as Array<{ id: string; name: string; root_path: string | null }>;
+    const byId = new Map(
+      rows.map(row => [
+        row.id,
+        { id: row.id, name: row.name, rootPath: row.root_path } satisfies ProjectContextSummary,
+      ])
+    );
+    return ids.flatMap(id => {
+      const row = byId.get(id);
+      return row ? [row] : [];
+    });
   }
 
   deleteById(id: string): boolean {

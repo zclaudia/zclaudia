@@ -11,7 +11,12 @@ interface FileSearchInputProps {
   onClose: () => void;
 }
 
-export function FileSearchInput({ projectRoot, backendId, onSelect, onClose }: FileSearchInputProps) {
+export function FileSearchInput({
+  projectRoot,
+  backendId,
+  onSelect,
+  onClose,
+}: FileSearchInputProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<FileEntry[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -55,9 +60,12 @@ export function FileSearchInput({ projectRoot, backendId, onSelect, onClose }: F
     };
   }, [backendId, query, projectRoot]);
 
-  const handleSelect = useCallback((entry: FileEntry) => {
-    onSelect(entry.path);
-  }, [onSelect]);
+  const handleSelect = useCallback(
+    (entry: FileEntry) => {
+      onSelect(entry.path);
+    },
+    [onSelect]
+  );
 
   const handleQueryChange = (value: string) => {
     setQuery(value);
@@ -98,7 +106,7 @@ export function FileSearchInput({ projectRoot, backendId, onSelect, onClose }: F
           ref={inputRef}
           type="text"
           value={query}
-          onChange={(e) => handleQueryChange(e.target.value)}
+          onChange={e => handleQueryChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Search files by name..."
           className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
@@ -109,13 +117,9 @@ export function FileSearchInput({ projectRoot, backendId, onSelect, onClose }: F
           </kbd>
         )}
         {query && !loading && results.length > 0 && (
-          <span className="text-[11px] text-muted-foreground">
-            {results.length}
-          </span>
+          <span className="text-[11px] text-muted-foreground">{results.length}</span>
         )}
-        {loading && (
-          <span className="text-xs text-muted-foreground">...</span>
-        )}
+        {loading && <span className="text-xs text-muted-foreground">...</span>}
       </div>
 
       {/* Results */}
@@ -133,7 +137,10 @@ export function FileSearchInput({ projectRoot, backendId, onSelect, onClose }: F
                     : 'text-foreground hover:bg-secondary/80'
                 }`}
               >
-                <FileTypeIcon name={name} className="flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center [&>svg]:h-3.5 [&>svg]:w-3.5" />
+                <FileTypeIcon
+                  name={name}
+                  className="flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center [&>svg]:h-3.5 [&>svg]:w-3.5"
+                />
                 <span className="sr-only">{entry.path}</span>
                 <span className="min-w-0 flex-1 truncate" aria-hidden="true">
                   <span>{directory ? `${directory}/` : ''}</span>

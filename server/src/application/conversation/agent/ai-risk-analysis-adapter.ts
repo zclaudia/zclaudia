@@ -20,7 +20,7 @@ export interface AIReviewProviderFactoryContext {
 
 export type AIReviewProviderFactory = (
   analysisLlmProfileId: string | undefined,
-  ctx: AIReviewProviderFactoryContext,
+  ctx: AIReviewProviderFactoryContext
 ) => AIReviewProvider | undefined;
 
 export interface AIRiskAnalysisAdapterOptions {
@@ -36,7 +36,7 @@ export interface AIRiskAnalysisAdapterOptions {
 export class AIRiskAnalysisAdapter implements AIRiskAnalysisPort {
   constructor(
     private readonly db: Database.Database,
-    private readonly options: AIRiskAnalysisAdapterOptions = {},
+    private readonly options: AIRiskAnalysisAdapterOptions = {}
   ) {
     void this.db;
   }
@@ -88,7 +88,7 @@ export class AIRiskAnalysisAdapter implements AIRiskAnalysisPort {
 
 export function createWorkflowAIReviewProviderFactory(
   db: Database.Database,
-  aiRunPort: WorkflowAiRunPort,
+  aiRunPort: WorkflowAiRunPort
 ): AIReviewProviderFactory {
   const runner = new VirtualClientAIRunner(db, aiRunPort);
 
@@ -107,7 +107,7 @@ export function createWorkflowAIReviewProviderFactory(
           sessionName: 'AI Permission Review',
           sessionId: sessionId ?? reviewSessionId,
           timeoutMs: 2 * 60 * 1000,
-          onSessionCreated: (createdSessionId) => {
+          onSessionCreated: createdSessionId => {
             reviewSessionId = createdSessionId;
           },
         });

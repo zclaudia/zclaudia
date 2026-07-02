@@ -52,16 +52,19 @@ describe('permission-handler', () => {
       clientId: 'client-1',
       client,
       pendingPermissions: new Map([
-        ['req-1', {
-          resolve,
-          timeout: null,
-          originalToolInput: { command: 'sudo ls' },
-          originalRequest: {
-            toolName: 'Bash',
-            detail: 'sudo ls',
-            timeoutSeconds: 30,
+        [
+          'req-1',
+          {
+            resolve,
+            timeout: null,
+            originalToolInput: { command: 'sudo ls' },
+            originalRequest: {
+              toolName: 'Bash',
+              detail: 'sudo ls',
+              timeoutSeconds: 30,
+            },
           },
-        }],
+        ],
       ]),
       db: { prepare: vi.fn(() => ({ run: vi.fn() })) } as any,
       sessionId: 'session-1',
@@ -99,12 +102,19 @@ describe('permission-handler', () => {
     const listeners = new RunDomainEventListenerRegistry();
     const permissionResolvedListener = vi.fn();
     listeners.on('permission.resolved', permissionResolvedListener);
-    handlePermissionDecision({
-      type: 'permission_decision',
-      requestId: 'req-1',
-      allow: true,
-      encryptedCredential: 'bad',
-    }, activeRuns, connectedClients, undefined, undefined, listeners);
+    handlePermissionDecision(
+      {
+        type: 'permission_decision',
+        requestId: 'req-1',
+        allow: true,
+        encryptedCredential: 'bad',
+      },
+      activeRuns,
+      connectedClients,
+      undefined,
+      undefined,
+      listeners
+    );
 
     expect(resolve).toHaveBeenCalledWith({
       behavior: 'deny',
@@ -114,31 +124,37 @@ describe('permission-handler', () => {
     const primaryMessages = sendPrimary.mock.calls.map(([payload]) => JSON.parse(payload));
     const secondaryMessages = sendSecondary.mock.calls.map(([payload]) => JSON.parse(payload));
 
-    expect(primaryMessages).toEqual(expect.arrayContaining([
+    expect(primaryMessages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'permission_resolved',
+          requestId: 'req-1',
+          sessionId: 'session-1',
+          decision: 'deny',
+        }),
+      ])
+    );
+    expect(secondaryMessages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'permission_resolved',
+          requestId: 'req-1',
+          sessionId: 'session-1',
+          decision: 'deny',
+        }),
+      ])
+    );
+    expect(permissionResolvedListener).toHaveBeenCalledWith(
       expect.objectContaining({
-        type: 'permission_resolved',
-        requestId: 'req-1',
+        type: 'permission.resolved',
+        runId: 'run-1',
         sessionId: 'session-1',
-        decision: 'deny',
-      }),
-    ]));
-    expect(secondaryMessages).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        type: 'permission_resolved',
-        requestId: 'req-1',
-        sessionId: 'session-1',
-        decision: 'deny',
-      }),
-    ]));
-    expect(permissionResolvedListener).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'permission.resolved',
-      runId: 'run-1',
-      sessionId: 'session-1',
-      payload: {
-        requestId: 'req-1',
-        behavior: 'deny',
-      },
-    }));
+        payload: {
+          requestId: 'req-1',
+          behavior: 'deny',
+        },
+      })
+    );
   });
 
   it('emits interaction.resolved when a prompt answer resolves AskUserQuestion', () => {
@@ -156,24 +172,31 @@ describe('permission-handler', () => {
       },
     });
 
-    handlePromptAnswer({
-      type: 'prompt_answer',
-      requestId: 'question-1',
-      formattedAnswer: 'Yes',
-    }, activeRuns, connectedClients, listeners);
+    handlePromptAnswer(
+      {
+        type: 'prompt_answer',
+        requestId: 'question-1',
+        formattedAnswer: 'Yes',
+      },
+      activeRuns,
+      connectedClients,
+      listeners
+    );
 
     expect(resolve).toHaveBeenCalledWith({
       behavior: 'allow',
       message: 'Yes',
     });
-    expect(interactionResolvedListener).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'interaction.resolved',
-      runId: 'run-1',
-      sessionId: 'session-1',
-      payload: {
-        interactionId: 'question-1',
-        resolution: { formattedAnswer: 'Yes' },
-      },
-    }));
+    expect(interactionResolvedListener).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'interaction.resolved',
+        runId: 'run-1',
+        sessionId: 'session-1',
+        payload: {
+          interactionId: 'question-1',
+          resolution: { formattedAnswer: 'Yes' },
+        },
+      })
+    );
   });
 });

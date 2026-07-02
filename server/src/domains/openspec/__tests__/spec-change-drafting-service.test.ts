@@ -32,11 +32,11 @@ describe('SpecChangeDraftingService', () => {
     db.pragma('foreign_keys = ON');
     applyMigrations(db);
     db.prepare(
-      `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
     ).run('proj-1', 'P', 'code', 0, 0);
     db.prepare(
       `INSERT INTO local_issues (id, project_id, title, description, status, priority, labels, created_at, updated_at, type, is_anonymous)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       'i',
       'proj-1',
@@ -48,11 +48,11 @@ describe('SpecChangeDraftingService', () => {
       0,
       0,
       'implement',
-      0,
+      0
     );
     db.prepare(
       `INSERT INTO spec_changes (id, project_id, sub_issue_id, slug, title, status, proposal_path, design_path, tasks_path, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       'sc',
       'proj-1',
@@ -64,7 +64,7 @@ describe('SpecChangeDraftingService', () => {
       'openspec/changes/add-2fa/design.md',
       'openspec/changes/add-2fa/tasks.md',
       0,
-      0,
+      0
     );
     specChangeId = 'sc';
     projectRoot = mkdtempSync(join(tmpdir(), 'draft-'));
@@ -135,7 +135,7 @@ describe('SpecChangeDraftingService', () => {
     mkdirSync(corpusDir, { recursive: true });
     writeFileSync(
       join(corpusDir, 'spec.md'),
-      `# auth Specification\n\n## Requirements\n\n### Requirement: Login\n\nMUST authenticate.\n\n#### Scenario: Valid\n- **WHEN** valid\n- **THEN** SHALL return token\n`,
+      `# auth Specification\n\n## Requirements\n\n### Requirement: Login\n\nMUST authenticate.\n\n#### Scenario: Valid\n- **WHEN** valid\n- **THEN** SHALL return token\n`
     );
     let capturedPrompt = '';
     const port = {
@@ -208,7 +208,7 @@ describe('SpecChangeDraftingService', () => {
     // Reinsert spec_change without FK enforcement to exercise the service-level guard.
     db.prepare(
       `INSERT INTO spec_changes (id, project_id, sub_issue_id, slug, title, status, proposal_path, design_path, tasks_path, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run('orphan', 'proj-1', 'ghost', 'x', 'X', 'drafting', 'a', 'b', 'c', 0, 0);
     const port = mkPort('');
     const svc = new SpecChangeDraftingService({

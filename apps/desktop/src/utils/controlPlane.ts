@@ -21,7 +21,7 @@ export function isLocalBackendId(backendId: string | null | undefined): boolean 
   const { localBackendId, backends } = useFacadeStore.getState();
   if (localBackendId && backendId === localBackendId) return true;
 
-  const backend = backends.find((item) => item.backendId === backendId);
+  const backend = backends.find(item => item.backendId === backendId);
   return backend?.isThisInstance === true || backend?.channel === 'local';
 }
 
@@ -29,13 +29,15 @@ export function resolveLocalBackendId(fallback: string | null = null): string | 
   const { localBackendId, backends } = useFacadeStore.getState();
   if (localBackendId) return localBackendId;
 
-  const localBackend = backends.find((item) => item.isThisInstance === true || item.channel === 'local');
+  const localBackend = backends.find(
+    item => item.isThisInstance === true || item.channel === 'local'
+  );
   return localBackend?.backendId ?? fallback;
 }
 
 export function resolveCanonicalBackendId(
   backendId: string | null | undefined,
-  fallback: string | null = null,
+  fallback: string | null = null
 ): string | null {
   if (!backendId) return fallback;
   if (isLegacyLocalBackendId(backendId)) {

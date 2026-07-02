@@ -81,7 +81,7 @@ export class StandaloneFacadeAdapter implements FacadeRuntimeGatewayAdapter {
       },
     },
     backend: {
-      subscribe: (backendId) => {
+      subscribe: backendId => {
         if (backendId === this.backendId) {
           this.localSubscribed = true;
           this.emit({
@@ -101,7 +101,7 @@ export class StandaloneFacadeAdapter implements FacadeRuntimeGatewayAdapter {
           }
         }
       },
-      unsubscribe: (backendId) => {
+      unsubscribe: backendId => {
         if (backendId === this.backendId) {
           this.localSubscribed = false;
           this.emit({
@@ -156,7 +156,7 @@ export class StandaloneFacadeAdapter implements FacadeRuntimeGatewayAdapter {
       },
     },
     backend: {
-      isSubscribed: (backendId) => backendId === this.backendId && this.localSubscribed,
+      isSubscribed: backendId => backendId === this.backendId && this.localSubscribed,
     },
     http: {
       getBaseUrl: () => `http://localhost:${this.serverPort}`,
@@ -169,7 +169,7 @@ export class StandaloneFacadeAdapter implements FacadeRuntimeGatewayAdapter {
   // --------------------------------------------------------------------------
 
   readonly events: FacadeAdapterEventBus = {
-    subscribe: (listener) => {
+    subscribe: listener => {
       this.listeners.push(listener);
       return () => {
         const idx = this.listeners.indexOf(listener);
@@ -184,17 +184,24 @@ export class StandaloneFacadeAdapter implements FacadeRuntimeGatewayAdapter {
 
   private emit(event: FacadeAdapterEvent): void {
     for (const listener of this.listeners) {
-      try { listener(event); } catch { /* ignore */ }
+      try {
+        listener(event);
+      } catch {
+        /* ignore */
+      }
     }
   }
 
-  private async handleLocalCatchUp(backendId: string, sessionId: string, afterOffset: number): Promise<void> {
+  private async handleLocalCatchUp(
+    backendId: string,
+    sessionId: string,
+    afterOffset: number
+  ): Promise<void> {
     if (!this.localHandler) return;
     try {
       const messages = await this.localHandler.onCatchUp(sessionId, afterOffset);
-      const maxOffset = messages.length > 0
-        ? Math.max(...messages.map(m => m.offset))
-        : afterOffset;
+      const maxOffset =
+        messages.length > 0 ? Math.max(...messages.map(m => m.offset)) : afterOffset;
       this.emit({
         type: 'content_patch_received',
         backendId,
@@ -216,7 +223,7 @@ export class StandaloneFacadeAdapter implements FacadeRuntimeGatewayAdapter {
 
   private wireLocalHandlerEvents(): void {
     if (!this.localHandler) return;
-    this.localHandler.onServerEvent((message) => {
+    this.localHandler.onServerEvent(message => {
       const sessionId = this.getSessionId(message);
       if (sessionId) {
         this.emit({

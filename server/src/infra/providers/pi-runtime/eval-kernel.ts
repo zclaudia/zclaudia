@@ -150,7 +150,16 @@ export class EvalKernel {
   private scriptPath: string | undefined;
   private sandboxed = false;
   private buffer = '';
-  private readonly pending = new Map<string, (result: { ok: boolean; output: string; error?: string; outputTruncated?: boolean; fullOutputPath?: string }) => void>();
+  private readonly pending = new Map<
+    string,
+    (result: {
+      ok: boolean;
+      output: string;
+      error?: string;
+      outputTruncated?: boolean;
+      fullOutputPath?: string;
+    }) => void
+  >();
   lastUsedAt = Date.now();
 
   constructor(private readonly options: EvalKernelOptions) {}
@@ -168,7 +177,14 @@ export class EvalKernel {
       newlineIndex = this.buffer.indexOf('\n');
       if (!line.trim()) continue;
       try {
-        const msg = JSON.parse(line) as { id: string; ok: boolean; output: string; error?: string; outputTruncated?: boolean; fullOutputPath?: string };
+        const msg = JSON.parse(line) as {
+          id: string;
+          ok: boolean;
+          output: string;
+          error?: string;
+          outputTruncated?: boolean;
+          fullOutputPath?: string;
+        };
         const resolve = this.pending.get(msg.id);
         if (resolve) {
           this.pending.delete(msg.id);
@@ -191,7 +207,10 @@ export class EvalKernel {
       readOnly: this.options.readOnly === true,
     });
     if (!wrap.sandboxed && this.options.readOnly === true) {
-      return { ok: false, error: 'Eval in read-only mode requires the sandbox, which is not available.' };
+      return {
+        ok: false,
+        error: 'Eval in read-only mode requires the sandbox, which is not available.',
+      };
     }
     this.child = wrap.sandboxed
       ? spawn(wrap.argv![0], wrap.argv!.slice(1), {
@@ -208,23 +227,31 @@ export class EvalKernel {
     this.sandboxed = wrap.sandboxed;
     this.buffer = '';
     this.child.stdout?.on('data', (chunk: Buffer) => this.onStdout(chunk.toString('utf8')));
-    this.child.stderr?.on('data', () => { /* diagnostics only; protocol uses stdout */ });
+    this.child.stderr?.on('data', () => {
+      /* diagnostics only; protocol uses stdout */
+    });
     this.child.on('error', () => this.shutdown());
     return { ok: true };
   }
 
-  async exec(code: string, opts?: { timeoutMs?: number; reset?: boolean }): Promise<EvalExecResult> {
+  async exec(
+    code: string,
+    opts?: { timeoutMs?: number; reset?: boolean }
+  ): Promise<EvalExecResult> {
     this.lastUsedAt = Date.now();
     if (opts?.reset) this.shutdown();
     const ensured = await this.ensureChild();
     if (!ensured.ok) return { ok: false, output: '', error: ensured.error };
 
     const id = randomUUID();
-    const timeoutMs = Math.min(Math.max(1000, opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS), MAX_TIMEOUT_MS);
+    const timeoutMs = Math.min(
+      Math.max(1000, opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+      MAX_TIMEOUT_MS
+    );
     const child = this.child!;
     const fullOutputPath = evalLogPath();
 
-    return await new Promise<EvalExecResult>((resolve) => {
+    return await new Promise<EvalExecResult>(resolve => {
       let settled = false;
       const finish = (result: EvalExecResult) => {
         if (settled) return;
@@ -245,16 +272,23 @@ export class EvalKernel {
         });
       }, timeoutMs);
       const onExit = () => {
-        finish({ ok: false, output: '', error: 'Eval kernel exited unexpectedly; it will restart on the next call.', kernelRestarted: true });
+        finish({
+          ok: false,
+          output: '',
+          error: 'Eval kernel exited unexpectedly; it will restart on the next call.',
+          kernelRestarted: true,
+        });
       };
       child.once('exit', onExit);
-      this.pending.set(id, (msg) => finish({
-        ok: msg.ok,
-        output: msg.output,
-        error: msg.error,
-        ...(msg.outputTruncated ? { outputTruncated: true } : {}),
-        ...(msg.fullOutputPath ? { fullOutputPath: msg.fullOutputPath } : {}),
-      }));
+      this.pending.set(id, msg =>
+        finish({
+          ok: msg.ok,
+          output: msg.output,
+          error: msg.error,
+          ...(msg.outputTruncated ? { outputTruncated: true } : {}),
+          ...(msg.fullOutputPath ? { fullOutputPath: msg.fullOutputPath } : {}),
+        })
+      );
       child.stdin?.write(`${JSON.stringify({ id, code, fullOutputPath })}\n`);
     });
   }

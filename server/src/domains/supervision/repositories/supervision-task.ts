@@ -1,5 +1,9 @@
 import type { Database } from 'better-sqlite3';
-import type { SupervisionTask, TaskStatus, TaskResult } from '@zclaudia/shared/features/supervision';
+import type {
+  SupervisionTask,
+  TaskStatus,
+  TaskResult,
+} from '@zclaudia/shared/features/supervision';
 import { newId } from '../../../utils/uuid.js';
 
 export class SupervisionTaskRepository {
@@ -13,14 +17,18 @@ export class SupervisionTaskRepository {
 
   private hasColumn(name: 'change_id' | 'change_task_ref' | 'phase_id'): boolean {
     const cacheKey =
-      name === 'change_id' ? 'hasChangeId' :
-      name === 'change_task_ref' ? 'hasChangeTaskRef' :
-      'hasPhaseId';
+      name === 'change_id'
+        ? 'hasChangeId'
+        : name === 'change_task_ref'
+          ? 'hasChangeTaskRef'
+          : 'hasPhaseId';
     if (this.schemaCache[cacheKey] !== undefined) {
       return this.schemaCache[cacheKey]!;
     }
-    const columns = this.db.prepare('PRAGMA table_info(supervision_tasks)').all() as Array<{ name: string }>;
-    const exists = columns.some((column) => column.name === name);
+    const columns = this.db.prepare('PRAGMA table_info(supervision_tasks)').all() as Array<{
+      name: string;
+    }>;
+    const exists = columns.some(column => column.name === name);
     this.schemaCache[cacheKey] = exists;
     return exists;
   }
@@ -82,11 +90,27 @@ export class SupervisionTaskRepository {
     const now = Date.now();
 
     const columns = [
-      'id', 'project_id', 'title', 'description', 'source', 'status', 'priority',
-      'dependencies', 'dependency_mode', 'relevant_doc_ids', 'task_specific_context',
-      'scope', 'acceptance_criteria', 'max_retries', 'attempt',
-      'schedule_cron', 'schedule_next_run', 'schedule_enabled', 'retry_delay_ms',
-      'created_at', 'updated_at',
+      'id',
+      'project_id',
+      'title',
+      'description',
+      'source',
+      'status',
+      'priority',
+      'dependencies',
+      'dependency_mode',
+      'relevant_doc_ids',
+      'task_specific_context',
+      'scope',
+      'acceptance_criteria',
+      'max_retries',
+      'attempt',
+      'schedule_cron',
+      'schedule_next_run',
+      'schedule_enabled',
+      'retry_delay_ms',
+      'created_at',
+      'updated_at',
     ];
     const params: unknown[] = [
       id,
@@ -126,10 +150,14 @@ export class SupervisionTaskRepository {
     }
 
     const placeholders = columns.map(() => '?').join(', ');
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO supervision_tasks (${columns.join(', ')})
       VALUES (${placeholders})
-    `).run(...params);
+    `
+      )
+      .run(...params);
 
     return this.findById(id)!;
   }
@@ -140,9 +168,11 @@ export class SupervisionTaskRepository {
   }
 
   findByProjectId(projectId: string): SupervisionTask[] {
-    const rows = this.db.prepare(
-      'SELECT * FROM supervision_tasks WHERE project_id = ? ORDER BY priority ASC, created_at ASC'
-    ).all(projectId);
+    const rows = this.db
+      .prepare(
+        'SELECT * FROM supervision_tasks WHERE project_id = ? ORDER BY priority ASC, created_at ASC'
+      )
+      .all(projectId);
     return rows.map(r => this.mapRow(r));
   }
 
@@ -151,26 +181,34 @@ export class SupervisionTaskRepository {
     if (!hasChangeId) {
       return this.findByProjectId(projectId);
     }
-    const rows = this.db.prepare(
-      'SELECT * FROM supervision_tasks WHERE project_id = ? AND change_id = ? ORDER BY priority ASC, created_at ASC'
-    ).all(projectId, changeId);
+    const rows = this.db
+      .prepare(
+        'SELECT * FROM supervision_tasks WHERE project_id = ? AND change_id = ? ORDER BY priority ASC, created_at ASC'
+      )
+      .all(projectId, changeId);
     return rows.map(r => this.mapRow(r));
   }
 
   findByStatus(projectId: string, ...statuses: TaskStatus[]): SupervisionTask[] {
     const placeholders = statuses.map(() => '?').join(',');
-    const rows = this.db.prepare(
-      `SELECT * FROM supervision_tasks WHERE project_id = ? AND status IN (${placeholders}) ORDER BY priority ASC, created_at ASC`
-    ).all(projectId, ...statuses);
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM supervision_tasks WHERE project_id = ? AND status IN (${placeholders}) ORDER BY priority ASC, created_at ASC`
+      )
+      .all(projectId, ...statuses);
     return rows.map(r => this.mapRow(r));
   }
 
-  updateStatus(id: string, status: TaskStatus, extra?: {
-    result?: TaskResult;
-    sessionId?: string;
-    attempt?: number;
-    baseCommit?: string;
-  }): void {
+  updateStatus(
+    id: string,
+    status: TaskStatus,
+    extra?: {
+      result?: TaskResult;
+      sessionId?: string;
+      attempt?: number;
+      baseCommit?: string;
+    }
+  ): void {
     const updates = ['status = ?', 'updated_at = ?'];
     const params: any[] = [status, Date.now()];
 
@@ -200,35 +238,100 @@ export class SupervisionTaskRepository {
     }
 
     params.push(id);
-    this.db.prepare(
-      `UPDATE supervision_tasks SET ${updates.join(', ')} WHERE id = ?`
-    ).run(...params);
+    this.db
+      .prepare(`UPDATE supervision_tasks SET ${updates.join(', ')} WHERE id = ?`)
+      .run(...params);
   }
 
-  update(id: string, data: Partial<Pick<SupervisionTask,
-    'title' | 'description' | 'priority' | 'dependencies' | 'dependencyMode' |
-    'acceptanceCriteria' | 'relevantDocIds' | 'scope' | 'taskSpecificContext' |
-    'scheduleCron' | 'scheduleEnabled' | 'scheduleNextRun' | 'retryDelayMs' |
-    'changeTaskRef' | 'phaseId'
-  >>): SupervisionTask | undefined {
+  update(
+    id: string,
+    data: Partial<
+      Pick<
+        SupervisionTask,
+        | 'title'
+        | 'description'
+        | 'priority'
+        | 'dependencies'
+        | 'dependencyMode'
+        | 'acceptanceCriteria'
+        | 'relevantDocIds'
+        | 'scope'
+        | 'taskSpecificContext'
+        | 'scheduleCron'
+        | 'scheduleEnabled'
+        | 'scheduleNextRun'
+        | 'retryDelayMs'
+        | 'changeTaskRef'
+        | 'phaseId'
+      >
+    >
+  ): SupervisionTask | undefined {
     const updates: string[] = [];
     const params: any[] = [];
 
-    if (data.title !== undefined) { updates.push('title = ?'); params.push(data.title); }
-    if (data.description !== undefined) { updates.push('description = ?'); params.push(data.description); }
-    if (data.priority !== undefined) { updates.push('priority = ?'); params.push(data.priority); }
-    if (data.dependencies !== undefined) { updates.push('dependencies = ?'); params.push(JSON.stringify(data.dependencies)); }
-    if (data.dependencyMode !== undefined) { updates.push('dependency_mode = ?'); params.push(data.dependencyMode); }
-    if (data.acceptanceCriteria !== undefined) { updates.push('acceptance_criteria = ?'); params.push(JSON.stringify(data.acceptanceCriteria)); }
-    if (data.relevantDocIds !== undefined) { updates.push('relevant_doc_ids = ?'); params.push(JSON.stringify(data.relevantDocIds)); }
-    if (data.scope !== undefined) { updates.push('scope = ?'); params.push(JSON.stringify(data.scope)); }
-    if (data.taskSpecificContext !== undefined) { updates.push('task_specific_context = ?'); params.push(data.taskSpecificContext); }
-    if (data.scheduleCron !== undefined) { updates.push('schedule_cron = ?'); params.push(data.scheduleCron); }
-    if (data.scheduleEnabled !== undefined) { updates.push('schedule_enabled = ?'); params.push(data.scheduleEnabled ? 1 : 0); }
-    if (data.scheduleNextRun !== undefined) { updates.push('schedule_next_run = ?'); params.push(data.scheduleNextRun); }
-    if (data.retryDelayMs !== undefined) { updates.push('retry_delay_ms = ?'); params.push(data.retryDelayMs); }
-    if (this.hasColumn('change_task_ref') && (data as Partial<SupervisionTask>).changeTaskRef !== undefined) { updates.push('change_task_ref = ?'); params.push((data as Partial<SupervisionTask>).changeTaskRef); }
-    if (this.hasColumn('phase_id') && (data as Partial<SupervisionTask>).phaseId !== undefined) { updates.push('phase_id = ?'); params.push((data as Partial<SupervisionTask>).phaseId); }
+    if (data.title !== undefined) {
+      updates.push('title = ?');
+      params.push(data.title);
+    }
+    if (data.description !== undefined) {
+      updates.push('description = ?');
+      params.push(data.description);
+    }
+    if (data.priority !== undefined) {
+      updates.push('priority = ?');
+      params.push(data.priority);
+    }
+    if (data.dependencies !== undefined) {
+      updates.push('dependencies = ?');
+      params.push(JSON.stringify(data.dependencies));
+    }
+    if (data.dependencyMode !== undefined) {
+      updates.push('dependency_mode = ?');
+      params.push(data.dependencyMode);
+    }
+    if (data.acceptanceCriteria !== undefined) {
+      updates.push('acceptance_criteria = ?');
+      params.push(JSON.stringify(data.acceptanceCriteria));
+    }
+    if (data.relevantDocIds !== undefined) {
+      updates.push('relevant_doc_ids = ?');
+      params.push(JSON.stringify(data.relevantDocIds));
+    }
+    if (data.scope !== undefined) {
+      updates.push('scope = ?');
+      params.push(JSON.stringify(data.scope));
+    }
+    if (data.taskSpecificContext !== undefined) {
+      updates.push('task_specific_context = ?');
+      params.push(data.taskSpecificContext);
+    }
+    if (data.scheduleCron !== undefined) {
+      updates.push('schedule_cron = ?');
+      params.push(data.scheduleCron);
+    }
+    if (data.scheduleEnabled !== undefined) {
+      updates.push('schedule_enabled = ?');
+      params.push(data.scheduleEnabled ? 1 : 0);
+    }
+    if (data.scheduleNextRun !== undefined) {
+      updates.push('schedule_next_run = ?');
+      params.push(data.scheduleNextRun);
+    }
+    if (data.retryDelayMs !== undefined) {
+      updates.push('retry_delay_ms = ?');
+      params.push(data.retryDelayMs);
+    }
+    if (
+      this.hasColumn('change_task_ref') &&
+      (data as Partial<SupervisionTask>).changeTaskRef !== undefined
+    ) {
+      updates.push('change_task_ref = ?');
+      params.push((data as Partial<SupervisionTask>).changeTaskRef);
+    }
+    if (this.hasColumn('phase_id') && (data as Partial<SupervisionTask>).phaseId !== undefined) {
+      updates.push('phase_id = ?');
+      params.push((data as Partial<SupervisionTask>).phaseId);
+    }
 
     if (updates.length === 0) return this.findById(id);
 
@@ -236,17 +339,17 @@ export class SupervisionTaskRepository {
     params.push(Date.now());
     params.push(id);
 
-    this.db.prepare(
-      `UPDATE supervision_tasks SET ${updates.join(', ')} WHERE id = ?`
-    ).run(...params);
+    this.db
+      .prepare(`UPDATE supervision_tasks SET ${updates.join(', ')} WHERE id = ?`)
+      .run(...params);
 
     return this.findById(id);
   }
 
   countByProject(projectId: string): number {
-    const row = this.db.prepare(
-      'SELECT COUNT(*) as count FROM supervision_tasks WHERE project_id = ?'
-    ).get(projectId) as { count: number };
+    const row = this.db
+      .prepare('SELECT COUNT(*) as count FROM supervision_tasks WHERE project_id = ?')
+      .get(projectId) as { count: number };
     return row.count;
   }
 

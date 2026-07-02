@@ -7,10 +7,10 @@ interface ProcessMonitorState {
   clearCleanupResult: () => void;
 }
 
-export const useProcessMonitorStore = create<ProcessMonitorState>((set) => ({
+export const useProcessMonitorStore = create<ProcessMonitorState>(set => ({
   lastCleanupResult: null,
 
-  setCleanupResult: (result) => set({ lastCleanupResult: result }),
+  setCleanupResult: result => set({ lastCleanupResult: result }),
 
   clearCleanupResult: () => set({ lastCleanupResult: null }),
 }));

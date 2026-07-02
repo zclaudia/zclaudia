@@ -153,11 +153,7 @@ describe('errorHandlingMiddleware', () => {
 
       const result = await errorHandlingMiddleware(mockCtx, mockNext);
 
-      expect(errorResponse).toHaveBeenCalledWith(
-        mockCtx.request,
-        'CUSTOM_CODE',
-        'Custom error'
-      );
+      expect(errorResponse).toHaveBeenCalledWith(mockCtx.request, 'CUSTOM_CODE', 'Custom error');
       expect(result).toEqual(createMockErrorResponse());
     });
 
@@ -339,10 +335,9 @@ describe('validationErrorMiddleware', () => {
 
     await validationErrorMiddleware(mockCtx, mockNext);
 
-    expect(consoleLogSpy).toHaveBeenCalledWith(
-      '[ValidationError] Invalid input',
-      { field: 'email' }
-    );
+    expect(consoleLogSpy).toHaveBeenCalledWith('[ValidationError] Invalid input', {
+      field: 'email',
+    });
   });
 
   it('重新抛出非验证错误', async () => {

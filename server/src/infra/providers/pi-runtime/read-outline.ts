@@ -18,7 +18,23 @@ export const OUTLINE_MIN_BODY_LINES = 4;
 export const OUTLINE_MIN_COMMENT_LINES = 6;
 
 const AST_EXTS = new Set(['.js', '.mjs', '.cjs', '.jsx', '.ts', '.mts', '.cts', '.tsx']);
-const BRACE_EXTS = new Set(['.go', '.rs', '.java', '.c', '.h', '.cc', '.cpp', '.hpp', '.cs', '.php', '.m', '.mm', '.kt', '.swift', '.scala']);
+const BRACE_EXTS = new Set([
+  '.go',
+  '.rs',
+  '.java',
+  '.c',
+  '.h',
+  '.cc',
+  '.cpp',
+  '.hpp',
+  '.cs',
+  '.php',
+  '.m',
+  '.mm',
+  '.kt',
+  '.swift',
+  '.scala',
+]);
 const INDENT_EXTS = new Set(['.py', '.pyi', '.rb', '.coffee']);
 
 // tree-sitter (JS/TS) node kinds whose interior is a collapsible body.
@@ -112,13 +128,16 @@ function indentFolds(lines: string[]): FoldSpan[] {
     let j = i + 1;
     let lastNonBlank = i;
     while (j < lines.length) {
-      if (lines[j].trim() === '') { j++; continue; }
+      if (lines[j].trim() === '') {
+        j++;
+        continue;
+      }
       const indent = lines[j].length - lines[j].trimStart().length;
       if (indent <= headerIndent) break;
       lastNonBlank = j;
       j++;
     }
-    const startLine = i + 2;          // header is line i+1; body starts next
+    const startLine = i + 2; // header is line i+1; body starts next
     const endLine = lastNonBlank + 1;
     if (endLine - startLine + 1 >= OUTLINE_MIN_BODY_LINES) {
       folds.push({ startLine, endLine });

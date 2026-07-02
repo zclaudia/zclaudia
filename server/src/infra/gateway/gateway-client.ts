@@ -6,7 +6,7 @@
  */
 
 import WebSocket from 'ws';
-import { SocksProxyAgent } from 'socks-proxy-agent';
+import type { SocksProxyAgent } from 'socks-proxy-agent';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -44,7 +44,8 @@ import type {
 import type { ProjectItem, SessionItem, SessionMessage } from '@zclaudia/protocol/zclaudia';
 import type { GatewayBackendInfo } from '@zclaudia/shared/core/server';
 import type { ClientMessage, ServerMessage } from '@zclaudia/shared/wire/messages';
-import { hasForegroundActiveRunForSession } from '../../utils/run-state.js';
+import { GatewayBackendDataPublisher } from './gateway-backend-data-publisher.js';
+import { createSocksProxyAgent } from './gateway-proxy-agent.js';
 
 // ============================================================================
 // Config & Device ID
@@ -68,10 +69,15 @@ function getOrCreateDeviceId(): string {
     try {
       const config: DeviceConfig = JSON.parse(fs.readFileSync(DEVICE_CONFIG_PATH, 'utf-8'));
       return config.deviceId;
-    } catch { /* fall through */ }
+    } catch {
+      /* fall through */
+    }
   }
   const deviceId = newId();
-  fs.writeFileSync(DEVICE_CONFIG_PATH, JSON.stringify({ deviceId, createdAt: Date.now() }, null, 2));
+  fs.writeFileSync(
+    DEVICE_CONFIG_PATH,
+    JSON.stringify({ deviceId, createdAt: Date.now() }, null, 2)
+  );
   console.log(`[Gateway] Generated new device ID: ${deviceId}`);
   return deviceId;
 }
@@ -114,13 +120,27 @@ type RunStreamEventType = string;
 export interface GatewayClientOutgoingEvents {
   onOutgoingBackendSubscribed?: (backendId: string, epoch: number, capabilities: string[]) => void;
   onOutgoingBackendUnsubscribed?: (backendId: string, reason: string) => void;
-  onOutgoingBackendDataSnapshot?: (backendId: string, sessions: SessionItem[], projects: ProjectItem[]) => void;
+  onOutgoingBackendDataSnapshot?: (
+    backendId: string,
+    sessions: SessionItem[],
+    projects: ProjectItem[]
+  ) => void;
   onOutgoingBackendDataEvent?: (event: BackendDataEventMessage) => void;
   onOutgoingRunEvent?: (backendId: string, sessionId: string, event: ServerMessage) => void;
   /** Generic backend message (no sessionId) — terminal output, heartbeats, etc. */
   onOutgoingBackendMessage?: (backendId: string, message: ServerMessage) => void;
-  onOutgoingContentPatch?: (backendId: string, sessionId: string, messages: SessionMessage[], latestOffset: number) => void;
-  onOutgoingContentPatchError?: (backendId: string, sessionId: string, afterOffset: number, error: string) => void;
+  onOutgoingContentPatch?: (
+    backendId: string,
+    sessionId: string,
+    messages: SessionMessage[],
+    latestOffset: number
+  ) => void;
+  onOutgoingContentPatchError?: (
+    backendId: string,
+    sessionId: string,
+    afterOffset: number,
+    error: string
+  ) => void;
   onRegistrySnapshotChanged?: (items: BackendPresence[]) => void;
   onConnectionStateChanged?: (connected: boolean) => void;
 }
@@ -156,15 +176,53 @@ export interface GatewayClientCommands {
     /** Publish a full backend data snapshot (sessions + projects). */
     publishSnapshot(): void;
     /** Publish a backend data event. */
-    publishEvent(eventType: 'upsert' | 'remove', session: { id: string; name?: string; projectId?: string; createdAt?: number; created_at?: number; updatedAt?: number; updated_at?: number }): void;
+    publishEvent(
+      eventType: 'upsert' | 'remove',
+      session: {
+        id: string;
+        name?: string;
+        projectId?: string;
+        createdAt?: number;
+        created_at?: number;
+        updatedAt?: number;
+        updated_at?: number;
+      }
+    ): void;
     /** Compatibility alias for publishEvent. */
-    broadcastSessionEvent(eventType: 'created' | 'updated' | 'deleted', session: { id: string; name?: string; projectId?: string; createdAt?: number; created_at?: number; updatedAt?: number; updated_at?: number }): void;
+    broadcastSessionEvent(
+      eventType: 'created' | 'updated' | 'deleted',
+      session: {
+        id: string;
+        name?: string;
+        projectId?: string;
+        createdAt?: number;
+        created_at?: number;
+        updatedAt?: number;
+        updated_at?: number;
+      }
+    ): void;
     /** Publish an incremental project event. */
-    broadcastProjectEvent(eventType: 'created' | 'updated' | 'deleted', project: { id: string; name?: string; createdAt?: number; created_at?: number; updatedAt?: number; updated_at?: number }): void;
+    broadcastProjectEvent(
+      eventType: 'created' | 'updated' | 'deleted',
+      project: {
+        id: string;
+        name?: string;
+        createdAt?: number;
+        created_at?: number;
+        updatedAt?: number;
+        updated_at?: number;
+      }
+    ): void;
   };
   stream: {
     /** Emit a run stream event (backend-peer role). */
-    emitRunEvent(sessionId: string, runId: string, eventType: RunStreamEventType, seq: number, payload: unknown): void;
+    emitRunEvent(
+      sessionId: string,
+      runId: string,
+      eventType: RunStreamEventType,
+      seq: number,
+      payload: unknown
+    ): void;
     /** Request content catch-up on a subscribed backend stream (facade client role). */
     catchUpOutgoing(backendId: string, sessionId: string, afterOffset: number): void;
   };
@@ -231,10 +289,11 @@ export class GatewayClient {
 
   private backendDataPushInterval: NodeJS.Timeout | null = null;
 
-  private db: Database | null = null;
-  private activeRuns: ActiveRunsMap | null = null;
+  private backendDataPublisher: GatewayBackendDataPublisher;
 
-  private onCatchUpHandler: ((sessionId: string, afterOffset: number) => Promise<SessionMessage[]>) | null = null;
+  private onCatchUpHandler:
+    | ((sessionId: string, afterOffset: number) => Promise<SessionMessage[]>)
+    | null = null;
   private onBackendMessageHandler: BackendMessageHandler | null = null;
   private onBackendClosedHandler: BackendClosedHandler | null = null;
 
@@ -258,12 +317,16 @@ export class GatewayClient {
     this.config = config;
     this.deviceId = getOrCreateDeviceId();
     this.channel = config.channel || 'prod';
-    this.instanceId = crypto.createHash('sha256')
+    this.instanceId = crypto
+      .createHash('sha256')
       .update(this.deviceId + ':' + this.channel)
       .digest('hex')
       .slice(0, 16);
-    this.db = db || null;
-    this.activeRuns = activeRuns || null;
+    this.backendDataPublisher = new GatewayBackendDataPublisher({
+      db,
+      activeRuns: activeRuns ?? new Map(),
+      sendMessage: message => this.sendWs(message),
+    });
     console.log(`[Gateway] Instance ID: ${this.instanceId} (channel=${this.channel})`);
 
     // Wire CQE properties
@@ -274,13 +337,13 @@ export class GatewayClient {
       },
       channel: {
         sendToIncoming: (channelId, message) => this.sendToChannel(channelId, message),
-        onIncomingMessage: (handler) => this.onChannelMessage(handler),
-        onIncomingClosed: (handler) => this.onChannelClosed(handler),
-        onCatchUp: (handler) => this.onCatchUp(handler),
+        onIncomingMessage: handler => this.onChannelMessage(handler),
+        onIncomingClosed: handler => this.onChannelClosed(handler),
+        onCatchUp: handler => this.onCatchUp(handler),
       },
       backend: {
-        subscribe: (bid) => this.subscribeBackend(bid),
-        unsubscribe: (bid) => this.unsubscribeBackend(bid),
+        subscribe: bid => this.subscribeBackend(bid),
+        unsubscribe: bid => this.unsubscribeBackend(bid),
         sendToBackend: (bid, msg) => this.sendToBackend(bid, msg),
       },
       backendData: {
@@ -314,12 +377,12 @@ export class GatewayClient {
         getDiscoveredBackends: () => this.getDiscoveredBackends(),
       },
       backend: {
-        isSubscribed: (bid) => this.isBackendSubscribed(bid),
+        isSubscribed: bid => this.isBackendSubscribed(bid),
       },
     };
 
     this.events = {
-      setOutgoingEvents: (e) => this.setOutgoingEvents(e),
+      setOutgoingEvents: e => this.setOutgoingEvents(e),
     };
   }
 
@@ -329,28 +392,25 @@ export class GatewayClient {
 
   connect(): void {
     this.intentionalDisconnect = false;
-    if (this.reconnectTimeout) { clearTimeout(this.reconnectTimeout); this.reconnectTimeout = null; }
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
     this.clearConnectTimeout();
-    if (this.ws) { this.ws.removeAllListeners(); this.ws.close(); this.ws = null; }
+    if (this.ws) {
+      this.ws.removeAllListeners();
+      this.ws.close();
+      this.ws = null;
+    }
 
     const wsUrl = this.config.gatewayUrl.replace(/^http/, 'ws');
     console.log(`[Gateway] Connecting to ${wsUrl}...`);
 
     const wsOptions: { agent?: SocksProxyAgent } = {};
-    if (this.config.proxyUrl) {
-      try {
-        let proxyUrl = this.config.proxyUrl;
-        if (this.config.proxyAuth) {
-          const url = new URL(proxyUrl);
-          url.username = this.config.proxyAuth.username;
-          url.password = this.config.proxyAuth.password;
-          proxyUrl = url.toString();
-        }
-        wsOptions.agent = new SocksProxyAgent(proxyUrl);
-      } catch (error) {
-        console.error('[Gateway] Failed to configure proxy:', error);
-      }
-    }
+    const proxyAgent = createSocksProxyAgent(this.config, {
+      failureMessage: '[Gateway] Failed to configure proxy:',
+    });
+    if (proxyAgent) wsOptions.agent = proxyAgent;
 
     this.ws = new WebSocket(`${wsUrl}/ws`, wsOptions);
     const currentWs = this.ws;
@@ -365,11 +425,17 @@ export class GatewayClient {
       this.scheduleReconnect();
     }, this.connectTimeoutMs);
 
-    this.ws.on('open', () => { if (this.ws !== currentWs) return; this.sendPeerHello(); });
+    this.ws.on('open', () => {
+      if (this.ws !== currentWs) return;
+      this.sendPeerHello();
+    });
     this.ws.on('message', (data: Buffer) => {
       if (this.ws !== currentWs) return;
-      try { this.handleMessage(JSON.parse(data.toString())); }
-      catch (error) { console.error('[Gateway] Failed to parse message:', error); }
+      try {
+        this.handleMessage(JSON.parse(data.toString()));
+      } catch (error) {
+        console.error('[Gateway] Failed to parse message:', error);
+      }
     });
     this.ws.on('close', (code: number) => {
       if (this.ws !== currentWs) return;
@@ -378,7 +444,7 @@ export class GatewayClient {
       this.cleanup();
       if (code !== 4000) this.scheduleReconnect();
     });
-    this.ws.on('error', (error) => {
+    this.ws.on('error', error => {
       if (this.ws !== currentWs) return;
       this.clearConnectTimeout();
       console.error('[Gateway] Connection error:', error);
@@ -389,46 +455,62 @@ export class GatewayClient {
 
   disconnect(): void {
     this.intentionalDisconnect = true;
-    if (this.reconnectTimeout) { clearTimeout(this.reconnectTimeout); this.reconnectTimeout = null; }
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
     this.clearConnectTimeout();
     this.cleanup();
-    if (this.ws) { this.ws.removeAllListeners(); this.ws.close(); this.ws = null; }
+    if (this.ws) {
+      this.ws.removeAllListeners();
+      this.ws.close();
+      this.ws = null;
+    }
   }
 
-  getBackendId(): string | null { return this.backendId; }
-  getEpoch(): number | null { return this.epoch; }
-  isGatewayConnected(): boolean { return this.isConnected; }
-  getInstanceId(): string { return this.instanceId; }
-  getDeviceId(): string { return this.deviceId; }
-  getStreamDemandActive(): boolean { return this.streamDemandActive; }
-  getGatewayUrl(): string { return this.config.gatewayUrl; }
-  getGatewaySecret(): string { return this.config.gatewaySecret; }
+  getBackendId(): string | null {
+    return this.backendId;
+  }
+  getEpoch(): number | null {
+    return this.epoch;
+  }
+  isGatewayConnected(): boolean {
+    return this.isConnected;
+  }
+  getInstanceId(): string {
+    return this.instanceId;
+  }
+  getDeviceId(): string {
+    return this.deviceId;
+  }
+  getStreamDemandActive(): boolean {
+    return this.streamDemandActive;
+  }
+  getGatewayUrl(): string {
+    return this.config.gatewayUrl;
+  }
+  getGatewaySecret(): string {
+    return this.config.gatewaySecret;
+  }
 
   createHttpAgent(): SocksProxyAgent | undefined {
-    if (!this.config.proxyUrl) return undefined;
-    try {
-      let proxyUrl = this.config.proxyUrl;
-      if (this.config.proxyAuth) {
-        const url = new URL(proxyUrl);
-        url.username = this.config.proxyAuth.username;
-        url.password = this.config.proxyAuth.password;
-        proxyUrl = url.toString();
-      }
-      return new SocksProxyAgent(proxyUrl);
-    } catch (error) {
-      console.error('[Gateway] Failed to configure HTTP proxy agent:', error);
-      return undefined;
-    }
+    return createSocksProxyAgent(this.config, {
+      failureMessage: '[Gateway] Failed to configure HTTP proxy agent:',
+    });
   }
 
   getDiscoveredBackends(): GatewayBackendInfo[] {
     return Array.from(this.registryItems.values())
       .filter(entry => entry.visible)
       .map(entry => ({
-        backendId: entry.backendId, name: entry.name, online: true,
+        backendId: entry.backendId,
+        name: entry.name,
+        online: true,
         isThisInstance: entry.instanceId === this.instanceId,
         isThisDevice: entry.deviceId === this.deviceId,
-        instanceId: entry.instanceId, deviceId: entry.deviceId, channel: entry.channel,
+        instanceId: entry.instanceId,
+        deviceId: entry.deviceId,
+        channel: entry.channel,
       }));
   }
 
@@ -447,7 +529,15 @@ export class GatewayClient {
   /** Send a message to a subscribing client via backend_server_message. */
   sendToChannel(targetPeerSessionId: string, message: ServerMessage): void {
     const backendId = this.backendId || targetPeerSessionId;
-    this.sendWs({ type: 'backend_server_message', backendId, targetPeerSessionId, message } satisfies BackendServerMessage, true);
+    this.sendWs(
+      {
+        type: 'backend_server_message',
+        backendId,
+        targetPeerSessionId,
+        message,
+      } satisfies BackendServerMessage,
+      true
+    );
   }
 
   // ==========================================================================
@@ -460,7 +550,9 @@ export class GatewayClient {
     // both receive callbacks without overwriting each other.
     const prev = { ...this.outgoingEvents };
     const merged: GatewayClientOutgoingEvents = { ...prev, ...events };
-    const mergedHandlers = merged as unknown as Partial<Record<keyof GatewayClientOutgoingEvents, GenericEventHandler>>;
+    const mergedHandlers = merged as unknown as Partial<
+      Record<keyof GatewayClientOutgoingEvents, GenericEventHandler>
+    >;
     for (const key of Object.keys(events) as Array<keyof GatewayClientOutgoingEvents>) {
       const prevHandler = prev[key] as GenericEventHandler | undefined;
       const nextHandler = events[key] as GenericEventHandler | undefined;
@@ -474,7 +566,9 @@ export class GatewayClient {
     this.outgoingEvents = merged;
   }
 
-  getRegistryItems(): Map<string, BackendPresence> { return this.registryItems; }
+  getRegistryItems(): Map<string, BackendPresence> {
+    return this.registryItems;
+  }
 
   subscribeBackend(targetBackendId: string): void {
     if (!this.ws || !this.isConnected) return;
@@ -522,74 +616,9 @@ export class GatewayClient {
 
   publishBackendDataSnapshot(targetPeerSessionId?: string): void {
     if (!this.ws || !this.isConnected || !this.epoch) return;
-    if (!this.db || !this.activeRuns) return;
-    const activeRuns = this.activeRuns;
-    try {
-      const sessions = this.db.prepare(`
-        SELECT s.id, s.name, s.project_id as projectId,
-               s.created_at as createdAt, s.updated_at as updatedAt,
-               s.archived_at as archivedAt
-        FROM sessions s
-        LEFT JOIN projects p ON s.project_id = p.id
-        WHERE s.archived_at IS NULL
-          AND (p.is_internal IS NULL OR p.is_internal = 0)
-        ORDER BY s.updated_at DESC
-      `).all() as Array<Record<string, unknown>>;
-      const sessionItems: SessionItem[] = sessions.map((s) => ({
-        sessionId: s.id as string,
-        projectId: (s.projectId as string) || undefined,
-        title: (s.name as string) || undefined,
-        createdAt: s.createdAt as number,
-        updatedAt: s.updatedAt as number,
-        lastMessageAt: s.updatedAt as number,
-        runStatus: hasForegroundActiveRunForSession(activeRuns, s.id as string) ? 'running' as const : 'idle' as const,
-      }));
-
-      // Query projects
-      let projectItems: ProjectItem[] = [];
-      try {
-        const projects = this.db.prepare(`
-          SELECT id, name, created_at as createdAt, updated_at as updatedAt
-          FROM projects
-          WHERE is_internal = 0
-          ORDER BY updated_at DESC
-        `).all() as Array<Record<string, unknown>>;
-        projectItems = projects.map((p) => ({
-          projectId: p.id as string,
-          name: (p.name as string) || '',
-          createdAt: p.createdAt as number,
-          updatedAt: p.updatedAt as number,
-        }));
-      } catch {
-        // projects table may not exist yet
-      }
-
-      const msg: BackendResourceSnapshotMessage = {
-        type: 'backend_resource_snapshot',
-        namespace: 'zclaudia',
-        resources: [
-          ...sessionItems.map((item) => ({
-            resourceType: 'session',
-            resourceId: item.sessionId,
-            resource: item,
-            updatedAt: item.updatedAt,
-          })),
-          ...projectItems.map((item) => ({
-            resourceType: 'project',
-            resourceId: item.projectId,
-            resource: item,
-            updatedAt: item.updatedAt,
-          })),
-        ],
-      };
-      this.sendWs(msg);
-      console.log(`[Gateway] Published backend data snapshot: ${sessionItems.length} sessions, ${projectItems.length} projects`);
-
-      if (targetPeerSessionId && this.config.getStateHeartbeat) {
-        this.sendToChannel(targetPeerSessionId, this.config.getStateHeartbeat());
-      }
-    } catch (error) {
-      console.error('[Gateway] Failed to publish backend data snapshot:', error);
+    const published = this.backendDataPublisher.publishSnapshot();
+    if (published && targetPeerSessionId && this.config.getStateHeartbeat) {
+      this.sendToChannel(targetPeerSessionId, this.config.getStateHeartbeat());
     }
   }
 
@@ -608,23 +637,7 @@ export class GatewayClient {
     }
   ): void {
     if (!this.ws || !this.isConnected || !this.epoch) return;
-    const isArchived = session.archivedAt != null || session.archived_at != null;
-    if (eventType === 'upsert' && !isArchived) {
-      const item: SessionItem = {
-        sessionId: session.id,
-        projectId: session.projectId || undefined,
-        title: session.name || undefined,
-        createdAt: session.createdAt ?? session.created_at ?? Date.now(),
-        updatedAt: session.updatedAt ?? session.updated_at ?? Date.now(),
-        lastMessageAt: session.updatedAt ?? session.updated_at ?? Date.now(),
-        runStatus: this.activeRuns && hasForegroundActiveRunForSession(this.activeRuns, session.id) ? 'running' : 'idle',
-      };
-      const msg: BackendDataEventMessage = { type: 'backend_resource_event', op: 'upsert', resourceType: 'session', resourceId: item.sessionId, resource: item, updatedAt: item.updatedAt };
-      this.sendWs(msg);
-    } else {
-      const msg: BackendDataEventMessage = { type: 'backend_resource_event', op: 'remove', resourceType: 'session', resourceId: session.id };
-      this.sendWs(msg);
-    }
+    this.backendDataPublisher.publishSessionEvent(eventType, session);
   }
 
   // ==========================================================================
@@ -661,48 +674,50 @@ export class GatewayClient {
     }
   ): void {
     if (!this.ws || !this.isConnected || !this.epoch) return;
-    if (eventType === 'deleted') {
-      const msg: BackendDataEventMessage = {
-        type: 'backend_resource_event',
-        op: 'remove',
-        resourceType: 'project',
-        resourceId: project.id,
-      };
-      this.sendWs(msg);
-      return;
-    }
-
-    const item: ProjectItem = {
-      projectId: project.id,
-      name: project.name || '',
-      createdAt: project.createdAt ?? project.created_at ?? Date.now(),
-      updatedAt: project.updatedAt ?? project.updated_at ?? Date.now(),
-    };
-    const msg: BackendDataEventMessage = { type: 'backend_resource_event', op: 'upsert', resourceType: 'project', resourceId: item.projectId, resource: item };
-    this.sendWs(msg);
+    this.backendDataPublisher.broadcastProjectEvent(eventType, project);
   }
 
-  emitRunStreamEvent(sessionId: string, runId: string, eventType: RunStreamEventType, seq: number, payload: unknown): void {
+  emitRunStreamEvent(
+    sessionId: string,
+    runId: string,
+    eventType: RunStreamEventType,
+    seq: number,
+    payload: unknown
+  ): void {
     if (!this.ws || !this.isConnected || !this.streamDemandActive) return;
-    const msg: BackendStreamEvent = { type: 'backend_stream_event', streamId: runId, eventName: `zclaudia.${eventType}`, channel: sessionId, seq, payload };
+    const msg: BackendStreamEvent = {
+      type: 'backend_stream_event',
+      streamId: runId,
+      eventName: `zclaudia.${eventType}`,
+      channel: sessionId,
+      seq,
+      payload,
+    };
     this.sendWs(msg);
   }
 
   sendPushNotificationRequest(event: {
-    type?: string; name?: string; title: string; body: string;
-    severity?: 'info' | 'success' | 'warning' | 'error'; tags?: string[]; clickUrl?: string;
+    type?: string;
+    name?: string;
+    title: string;
+    body: string;
+    severity?: 'info' | 'success' | 'warning' | 'error';
+    tags?: string[];
+    clickUrl?: string;
   }): void {
     if (!this.ws || !this.isConnected) return;
     this.sendWs({
       type: 'push_notification_request',
       event: {
-        name: event.name ?? (event.type ? `zclaudia.${event.type.replace(/_/g, '.')}` : 'zclaudia.notification'),
+        name:
+          event.name ??
+          (event.type ? `zclaudia.${event.type.replace(/_/g, '.')}` : 'zclaudia.notification'),
         title: event.title,
         body: event.body,
         severity: event.severity,
         tags: event.tags,
         clickUrl: event.clickUrl,
-      }
+      },
     });
   }
 
@@ -719,7 +734,12 @@ export class GatewayClient {
       clientProtocolVersion: this.config.clientProtocolVersion ?? 1,
       peerType: 'client+backend',
       gatewaySecret: this.config.gatewaySecret,
-      identity: { deviceId: this.deviceId, instanceId: this.instanceId, channel: this.channel, name: this.config.name },
+      identity: {
+        deviceId: this.deviceId,
+        instanceId: this.instanceId,
+        channel: this.channel,
+        name: this.config.name,
+      },
       backend: {
         visible: this.config.visible !== false,
         capabilities: this.config.capabilities ?? [],
@@ -737,21 +757,45 @@ export class GatewayClient {
   private handleMessage(message: Record<string, unknown>): void {
     const msg = message as Record<string, unknown> & { type: string };
     switch (msg.type) {
-      case 'peer_ready': this.handlePeerReady(msg as unknown as PeerReadyMessage); break;
-      case 'registry_snapshot': this.handleRegistrySnapshot(msg as unknown as RegistrySnapshotMessage); break;
-      case 'heartbeat_ack': this.handleHeartbeatAck(msg as unknown as HeartbeatAckMessage); break;
-      case 'backend_stream_demand': this.handleStreamDemand(msg as unknown as StreamDemandMessage); break;
+      case 'peer_ready':
+        this.handlePeerReady(msg as unknown as PeerReadyMessage);
+        break;
+      case 'registry_snapshot':
+        this.handleRegistrySnapshot(msg as unknown as RegistrySnapshotMessage);
+        break;
+      case 'heartbeat_ack':
+        this.handleHeartbeatAck(msg as unknown as HeartbeatAckMessage);
+        break;
+      case 'backend_stream_demand':
+        this.handleStreamDemand(msg as unknown as StreamDemandMessage);
+        break;
       // Incoming messages (backend-peer role)
-      case 'backend_client_message': void this.handleBackendClientMsg(msg as unknown as BackendClientMessage); break;
-      case 'subscriber_disconnected': this.handleSubscriberDisconnected(msg as unknown as { peerSessionId: string }); break;
-      case 'catch_up_content': this.handleCatchUpRequest(msg as unknown as CatchUpContentMessage); break;
-      case 'http_proxy_request': this.handleHttpProxyRequest(msg as unknown as GatewayHttpProxyRequest); break;
+      case 'backend_client_message':
+        void this.handleBackendClientMsg(msg as unknown as BackendClientMessage);
+        break;
+      case 'subscriber_disconnected':
+        this.handleSubscriberDisconnected(msg as unknown as { peerSessionId: string });
+        break;
+      case 'catch_up_content':
+        this.handleCatchUpRequest(msg as unknown as CatchUpContentMessage);
+        break;
+      case 'http_proxy_request':
+        this.handleHttpProxyRequest(msg as unknown as GatewayHttpProxyRequest);
+        break;
       // Backend subscription events (facade client role)
-      case 'backend_subscribed': this.handleBackendSubscribed(msg as unknown as BackendSubscribedMessage); break;
-      case 'backend_unsubscribed': this.handleBackendUnsubscribed(msg as unknown as BackendUnsubscribedMessage); break;
+      case 'backend_subscribed':
+        this.handleBackendSubscribed(msg as unknown as BackendSubscribedMessage);
+        break;
+      case 'backend_unsubscribed':
+        this.handleBackendUnsubscribed(msg as unknown as BackendUnsubscribedMessage);
+        break;
       // Backend data (subscribed to remote backend)
-      case 'backend_resource_snapshot': this.handleOutgoingBackendDataSnapshot(msg as unknown as BackendResourceSnapshotMessage); break;
-      case 'backend_resource_event': this.handleOutgoingBackendDataEvent(msg as unknown as BackendDataEventMessage); break;
+      case 'backend_resource_snapshot':
+        this.handleOutgoingBackendDataSnapshot(msg as unknown as BackendResourceSnapshotMessage);
+        break;
+      case 'backend_resource_event':
+        this.handleOutgoingBackendDataEvent(msg as unknown as BackendDataEventMessage);
+        break;
       // Handle request_backend_resource_snapshot from gateway (backend-peer role)
       case 'request_backend_resource_snapshot': {
         const request = msg as unknown as RequestBackendResourceSnapshotMessage;
@@ -759,11 +803,21 @@ export class GatewayClient {
         break;
       }
       // Outgoing stream events (from subscribed backends)
-      case 'backend_server_message': this.handleOutgoingBackendServerMessage(msg as unknown as BackendServerMessage); break;
-      case 'backend_stream_event': this.handleOutgoingRunStreamEvent(msg as unknown as GatewayStreamEvent); break;
-      case 'content_patch': this.handleOutgoingContentPatch(msg as unknown as ContentPatchMessage); break;
-      case 'content_patch_error': this.handleOutgoingContentPatchError(msg as unknown as ContentPatchErrorMessage); break;
-      case 'gateway_error': console.error(`[Gateway] Error: ${msg.code} — ${msg.message}`); break;
+      case 'backend_server_message':
+        this.handleOutgoingBackendServerMessage(msg as unknown as BackendServerMessage);
+        break;
+      case 'backend_stream_event':
+        this.handleOutgoingRunStreamEvent(msg as unknown as GatewayStreamEvent);
+        break;
+      case 'content_patch':
+        this.handleOutgoingContentPatch(msg as unknown as ContentPatchMessage);
+        break;
+      case 'content_patch_error':
+        this.handleOutgoingContentPatchError(msg as unknown as ContentPatchErrorMessage);
+        break;
+      case 'gateway_error':
+        console.error(`[Gateway] Error: ${msg.code} — ${msg.message}`);
+        break;
     }
   }
 
@@ -776,7 +830,9 @@ export class GatewayClient {
     if (msg.backend) {
       this.backendId = msg.backend.backendId;
       this.epoch = msg.backend.epoch;
-      console.log(`[Gateway] Connected: peerSessionId=${this.peerSessionId} backendId=${this.backendId} epoch=${this.epoch}`);
+      console.log(
+        `[Gateway] Connected: peerSessionId=${this.peerSessionId} backendId=${this.backendId} epoch=${this.epoch}`
+      );
     } else {
       console.log(`[Gateway] Connected: peerSessionId=${this.peerSessionId} (no backend)`);
     }
@@ -796,13 +852,20 @@ export class GatewayClient {
     this.stopHeartbeat();
     this.heartbeatInterval = setInterval(() => {
       if (!this.ws || !this.isConnected || !this.epoch) return;
-      const msg: BackendHeartbeatMessage = { type: 'backend_heartbeat', epoch: this.epoch, observedAt: Date.now() };
+      const msg: BackendHeartbeatMessage = {
+        type: 'backend_heartbeat',
+        epoch: this.epoch,
+        observedAt: Date.now(),
+      };
       this.sendWs(msg);
     }, this.heartbeatIntervalMs);
   }
 
   private stopHeartbeat(): void {
-    if (this.heartbeatInterval) { clearInterval(this.heartbeatInterval); this.heartbeatInterval = null; }
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
   }
 
   private handleHeartbeatAck(msg: HeartbeatAckMessage): void {
@@ -813,7 +876,8 @@ export class GatewayClient {
   private handleStreamDemand(msg: StreamDemandMessage): void {
     const prev = this.streamDemandActive;
     this.streamDemandActive = msg.active;
-    if (prev !== msg.active) console.log(`[Gateway] Stream demand: ${msg.active ? 'active' : 'inactive'}`);
+    if (prev !== msg.active)
+      console.log(`[Gateway] Stream demand: ${msg.active ? 'active' : 'inactive'}`);
   }
 
   // ==========================================================================
@@ -861,8 +925,15 @@ export class GatewayClient {
     const sessionId = msg.contentStreamId;
     try {
       const messages = await this.onCatchUpHandler(sessionId, msg.afterOffset);
-      const maxOffset = messages.length > 0 ? Math.max(...messages.map(m => m.offset)) : msg.afterOffset;
-      const patch: ContentPatchMessage = { type: 'content_patch', backendId: msg.backendId, contentStreamId: sessionId, patches: messages, latestOffset: maxOffset };
+      const maxOffset =
+        messages.length > 0 ? Math.max(...messages.map(m => m.offset)) : msg.afterOffset;
+      const patch: ContentPatchMessage = {
+        type: 'content_patch',
+        backendId: msg.backendId,
+        contentStreamId: sessionId,
+        patches: messages,
+        latestOffset: maxOffset,
+      };
       this.sendWs(patch);
     } catch (error) {
       console.error('[Gateway] Catch-up error:', error);
@@ -913,11 +984,11 @@ export class GatewayClient {
       return;
     }
     const sessions = msg.resources
-      .filter((resource) => resource.resourceType === 'session')
-      .map((resource) => resource.resource as SessionItem);
+      .filter(resource => resource.resourceType === 'session')
+      .map(resource => resource.resource as SessionItem);
     const projects = msg.resources
-      .filter((resource) => resource.resourceType === 'project')
-      .map((resource) => resource.resource as ProjectItem);
+      .filter(resource => resource.resourceType === 'project')
+      .map(resource => resource.resource as ProjectItem);
     this.outgoingEvents.onOutgoingBackendDataSnapshot?.(backendId, sessions, projects);
   }
 
@@ -930,20 +1001,29 @@ export class GatewayClient {
     const sessionId = (payload?.sessionId as string) ?? '';
     if (sessionId) {
       // Session-specific message — route as run event
-      this.outgoingEvents.onOutgoingRunEvent?.(msg.backendId, sessionId, msg.message as unknown as ServerMessage);
+      this.outgoingEvents.onOutgoingRunEvent?.(
+        msg.backendId,
+        sessionId,
+        msg.message as unknown as ServerMessage
+      );
     } else {
       // Non-session message (terminal output, heartbeats, etc.) — emit as
       // generic backend message so the adapter can forward it to the UI.
-      this.outgoingEvents.onOutgoingBackendMessage?.(msg.backendId, msg.message as unknown as ServerMessage);
+      this.outgoingEvents.onOutgoingBackendMessage?.(
+        msg.backendId,
+        msg.message as unknown as ServerMessage
+      );
     }
   }
 
   private handleOutgoingRunStreamEvent(msg: GatewayStreamEvent): void {
-    this.outgoingEvents.onOutgoingRunEvent?.(
-      msg.backendId,
-      msg.channel ?? '',
-      { type: msg.type, eventName: msg.eventName, streamId: msg.streamId, seq: msg.seq, payload: msg.payload } as unknown as ServerMessage,
-    );
+    this.outgoingEvents.onOutgoingRunEvent?.(msg.backendId, msg.channel ?? '', {
+      type: msg.type,
+      eventName: msg.eventName,
+      streamId: msg.streamId,
+      seq: msg.seq,
+      payload: msg.payload,
+    } as unknown as ServerMessage);
   }
 
   private handleOutgoingContentPatch(msg: ContentPatchMessage): void {
@@ -951,7 +1031,7 @@ export class GatewayClient {
       msg.backendId,
       msg.contentStreamId,
       msg.patches as SessionMessage[],
-      msg.latestOffset,
+      msg.latestOffset
     );
   }
 
@@ -960,7 +1040,7 @@ export class GatewayClient {
       msg.backendId,
       msg.contentStreamId,
       msg.afterOffset,
-      msg.message,
+      msg.message
     );
   }
 
@@ -1007,33 +1087,60 @@ export class GatewayClient {
     const url = `http://localhost:${port}${msg.path}`;
     try {
       const resp = await fetch(url, {
-        method: msg.method, headers: msg.headers,
+        method: msg.method,
+        headers: msg.headers,
         body: !['GET', 'HEAD'].includes(msg.method)
-          ? (msg.bodyEncoding === 'base64' && typeof msg.body === 'string'
+          ? msg.bodyEncoding === 'base64' && typeof msg.body === 'string'
             ? Buffer.from(msg.body, 'base64')
-            : GatewayClient.normalizeProxyRequestBody(msg.body))
+            : GatewayClient.normalizeProxyRequestBody(msg.body)
           : undefined,
       });
       const responseHeaders: Record<string, string> = {};
-      resp.headers.forEach((value, key) => { responseHeaders[key] = value; });
+      resp.headers.forEach((value, key) => {
+        responseHeaders[key] = value;
+      });
 
       if (GatewayClient.shouldStream(responseHeaders) && resp.body) {
-        this.sendWs({ type: 'http_proxy_response_start', requestId: msg.requestId, statusCode: resp.status, headers: responseHeaders } satisfies GatewayHttpProxyResponseStart);
+        this.sendWs({
+          type: 'http_proxy_response_start',
+          requestId: msg.requestId,
+          statusCode: resp.status,
+          headers: responseHeaders,
+        } satisfies GatewayHttpProxyResponseStart);
         const reader = resp.body.getReader();
         try {
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-            this.sendWs({ type: 'http_proxy_response_chunk', requestId: msg.requestId, data: Buffer.from(value).toString('base64') } satisfies GatewayHttpProxyResponseChunk);
+            this.sendWs({
+              type: 'http_proxy_response_chunk',
+              requestId: msg.requestId,
+              data: Buffer.from(value).toString('base64'),
+            } satisfies GatewayHttpProxyResponseChunk);
           }
-        } finally { reader.releaseLock(); }
-        this.sendWs({ type: 'http_proxy_response_end', requestId: msg.requestId } satisfies GatewayHttpProxyResponseEnd);
+        } finally {
+          reader.releaseLock();
+        }
+        this.sendWs({
+          type: 'http_proxy_response_end',
+          requestId: msg.requestId,
+        } satisfies GatewayHttpProxyResponseEnd);
       } else {
-        const bodyEncoding = GatewayClient.isUtf8Response(responseHeaders) ? 'utf8' as const : 'base64' as const;
-        const body = bodyEncoding === 'utf8'
-          ? await resp.text()
-          : Buffer.from(await resp.arrayBuffer()).toString('base64');
-        this.sendWs({ type: 'http_proxy_response', requestId: msg.requestId, statusCode: resp.status, headers: responseHeaders, bodyEncoding, body } satisfies GatewayHttpProxyResponse);
+        const bodyEncoding = GatewayClient.isUtf8Response(responseHeaders)
+          ? ('utf8' as const)
+          : ('base64' as const);
+        const body =
+          bodyEncoding === 'utf8'
+            ? await resp.text()
+            : Buffer.from(await resp.arrayBuffer()).toString('base64');
+        this.sendWs({
+          type: 'http_proxy_response',
+          requestId: msg.requestId,
+          statusCode: resp.status,
+          headers: responseHeaders,
+          bodyEncoding,
+          body,
+        } satisfies GatewayHttpProxyResponse);
       }
     } catch (error) {
       console.error('[Gateway] HTTP proxy error:', error);
@@ -1043,7 +1150,10 @@ export class GatewayClient {
         statusCode: 502,
         headers: { 'content-type': 'application/json' },
         bodyEncoding: 'utf8',
-        body: JSON.stringify({ success: false, error: { code: 'PROXY_ERROR', message: 'Failed to reach local server' } })
+        body: JSON.stringify({
+          success: false,
+          error: { code: 'PROXY_ERROR', message: 'Failed to reach local server' },
+        }),
       } satisfies GatewayHttpProxyResponse);
     }
   }
@@ -1076,8 +1186,12 @@ export class GatewayClient {
 
   private cleanup(): void {
     const wasConnected = this.isConnected;
-    this.isConnected = false; this.backendId = null; this.epoch = null;
-    this.peerSessionId = null; this.recoveryToken = null; this.streamDemandActive = false;
+    this.isConnected = false;
+    this.backendId = null;
+    this.epoch = null;
+    this.peerSessionId = null;
+    this.recoveryToken = null;
+    this.streamDemandActive = false;
     // Fire unsubscribed events before clearing, so adapter can update state
     for (const backendId of this.subscribedBackends) {
       this.outgoingEvents.onOutgoingBackendUnsubscribed?.(backendId, 'peer_disconnected');
@@ -1098,8 +1212,14 @@ export class GatewayClient {
   private scheduleReconnect(): void {
     if (this.intentionalDisconnect || this.reconnectTimeout) return;
     this.reconnectAttempts++;
-    const delay = Math.min(this.reconnectBaseInterval * Math.pow(2, this.reconnectAttempts - 1), this.reconnectMaxInterval);
+    const delay = Math.min(
+      this.reconnectBaseInterval * Math.pow(2, this.reconnectAttempts - 1),
+      this.reconnectMaxInterval
+    );
     console.log(`[Gateway] Reconnecting in ${delay / 1000}s (attempt ${this.reconnectAttempts})`);
-    this.reconnectTimeout = setTimeout(() => { this.reconnectTimeout = null; this.connect(); }, delay);
+    this.reconnectTimeout = setTimeout(() => {
+      this.reconnectTimeout = null;
+      this.connect();
+    }, delay);
   }
 }

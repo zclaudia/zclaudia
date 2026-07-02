@@ -20,9 +20,8 @@ type StreamContext = {
 };
 
 async function capturePayload(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   model: any,
-  context: StreamContext,
+  context: StreamContext
 ): Promise<Record<string, unknown>> {
   let captured: Record<string, unknown> | undefined;
   try {
@@ -33,31 +32,48 @@ async function capturePayload(
         throw SENTINEL;
       },
     });
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    for await (const _event of stream) { /* drain until error */ }
-  } catch { /* sentinel (possibly provider-wrapped) expected */ }
+
+    for await (const _event of stream) {
+      /* drain until error */
+    }
+  } catch {
+    /* sentinel (possibly provider-wrapped) expected */
+  }
   if (!captured) throw new Error('onPayload was never invoked');
   return captured;
 }
 
 function profile(extra: Partial<LlmProfileConfig>): LlmProfileConfig {
-  return { id: 'p', name: 'p', isDefault: false, createdAt: 0, updatedAt: 0, providerType: 'anthropic', ...extra } as LlmProfileConfig;
+  return {
+    id: 'p',
+    name: 'p',
+    isDefault: false,
+    createdAt: 0,
+    updatedAt: 0,
+    providerType: 'anthropic',
+    ...extra,
+  } as LlmProfileConfig;
 }
 
 describe('vision payload serialization (real pi-ai)', () => {
   it('serializes image content blocks for a vision model', async () => {
-    const { model } = buildModel(profile({ providerType: 'anthropic', apiKey: 'k' }), 'claude-sonnet-4-6');
+    const { model } = buildModel(
+      profile({ providerType: 'anthropic', apiKey: 'k' }),
+      'claude-sonnet-4-6'
+    );
     expect((model as { input?: string[] }).input).toContain('image'); // registry model declares vision
     const context: StreamContext = {
       systemPrompt: 'test',
-      messages: [{
-        role: 'user' as const,
-        content: [
-          { type: 'text' as const, text: 'what is this' },
-          { type: 'image' as const, data: 'QkFTRTY0', mimeType: 'image/png' },
-        ],
-        timestamp: 0,
-      }],
+      messages: [
+        {
+          role: 'user' as const,
+          content: [
+            { type: 'text' as const, text: 'what is this' },
+            { type: 'image' as const, data: 'QkFTRTY0', mimeType: 'image/png' },
+          ],
+          timestamp: 0,
+        },
+      ],
     };
     const payload = await capturePayload(model, context);
     expect(JSON.stringify(payload)).toContain('"type":"image"');

@@ -2,10 +2,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Database } from 'better-sqlite3';
-import type {
-  SpecChange,
-  SpecChangeStatus,
-} from '@zclaudia/shared/features/spec-change';
+import type { SpecChange, SpecChangeStatus } from '@zclaudia/shared/features/spec-change';
 import { SpecChangeRepository } from '../spec-change/spec-change-repository.js';
 
 const OPENSPEC_DIR = 'openspec';
@@ -45,9 +42,12 @@ export class SpecChangeService {
     // Scaffold files on disk.
     const dir = this.changeDir(input.projectId, input.slug);
     fs.mkdirSync(dir, { recursive: true });
-    if (!fs.existsSync(path.join(dir, 'proposal.md'))) fs.writeFileSync(path.join(dir, 'proposal.md'), SKELETON_PROPOSAL);
-    if (!fs.existsSync(path.join(dir, 'design.md')))   fs.writeFileSync(path.join(dir, 'design.md'),   SKELETON_DESIGN);
-    if (!fs.existsSync(path.join(dir, 'tasks.md')))    fs.writeFileSync(path.join(dir, 'tasks.md'),    SKELETON_TASKS);
+    if (!fs.existsSync(path.join(dir, 'proposal.md')))
+      fs.writeFileSync(path.join(dir, 'proposal.md'), SKELETON_PROPOSAL);
+    if (!fs.existsSync(path.join(dir, 'design.md')))
+      fs.writeFileSync(path.join(dir, 'design.md'), SKELETON_DESIGN);
+    if (!fs.existsSync(path.join(dir, 'tasks.md')))
+      fs.writeFileSync(path.join(dir, 'tasks.md'), SKELETON_TASKS);
     return sc;
   }
 
@@ -106,7 +106,12 @@ export class SpecChangeService {
 
   /** Internal helpers */
 
-  private writeArtifact(specChangeId: string, filename: 'proposal.md' | 'design.md' | 'tasks.md', content: string, nextStatus: SpecChangeStatus): SpecChange {
+  private writeArtifact(
+    specChangeId: string,
+    filename: 'proposal.md' | 'design.md' | 'tasks.md',
+    content: string,
+    nextStatus: SpecChangeStatus
+  ): SpecChange {
     const sc = this.requireChange(specChangeId);
     const target = path.join(this.changeDir(sc.projectId, sc.slug), filename);
     fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -115,7 +120,7 @@ export class SpecChangeService {
     const order: SpecChangeStatus[] = ['drafting', 'proposing', 'designing', 'tasks_ready'];
     const currentIdx = order.indexOf(sc.status);
     const nextIdx = order.indexOf(nextStatus);
-    const status = (currentIdx >= 0 && nextIdx > currentIdx) ? nextStatus : sc.status;
+    const status = currentIdx >= 0 && nextIdx > currentIdx ? nextStatus : sc.status;
     return this.repo.update(specChangeId, { status });
   }
 

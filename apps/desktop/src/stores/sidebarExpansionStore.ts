@@ -18,23 +18,25 @@ export const useSidebarExpansionStore = create<SidebarExpansionState>()(
   persist(
     (set, get) => ({
       expandedBackendIds: [],
-      toggleBackend: (backendId) =>
-        set((s) => ({
+      toggleBackend: backendId =>
+        set(s => ({
           expandedBackendIds: s.expandedBackendIds.includes(backendId)
-            ? s.expandedBackendIds.filter((id) => id !== backendId)
+            ? s.expandedBackendIds.filter(id => id !== backendId)
             : [...s.expandedBackendIds, backendId],
         })),
-      expandBackend: (backendId) =>
-        set((s) => (s.expandedBackendIds.includes(backendId)
-          ? s
-          : { expandedBackendIds: [...s.expandedBackendIds, backendId] })),
-      collapseBackend: (backendId) =>
-        set((s) => ({ expandedBackendIds: s.expandedBackendIds.filter((id) => id !== backendId) })),
-      isBackendExpanded: (backendId) => get().expandedBackendIds.includes(backendId),
+      expandBackend: backendId =>
+        set(s =>
+          s.expandedBackendIds.includes(backendId)
+            ? s
+            : { expandedBackendIds: [...s.expandedBackendIds, backendId] }
+        ),
+      collapseBackend: backendId =>
+        set(s => ({ expandedBackendIds: s.expandedBackendIds.filter(id => id !== backendId) })),
+      isBackendExpanded: backendId => get().expandedBackendIds.includes(backendId),
     }),
     {
       name: 'claudia-sidebar-expansion',
-      partialize: (state) => ({ expandedBackendIds: state.expandedBackendIds }),
-    },
-  ),
+      partialize: state => ({ expandedBackendIds: state.expandedBackendIds }),
+    }
+  )
 );

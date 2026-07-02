@@ -34,9 +34,9 @@ async function diagnose() {
       const verifyRes = await fetch(`${baseUrl}/api/auth/verify`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        }
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
       });
       if (verifyRes.ok) {
         console.log('   ✅ API Key 验证成功');
@@ -49,9 +49,9 @@ async function diagnose() {
       console.log('\n4. 测试 Projects API...');
       const projectsRes = await fetch(`${baseUrl}/api/projects`, {
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        }
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
       });
       const projectsData = await projectsRes.json();
       if (projectsData.success) {
@@ -67,9 +67,9 @@ async function diagnose() {
       console.log('\n5. 测试 Providers API...');
       const providersRes = await fetch(`${baseUrl}/api/providers`, {
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        }
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
       });
       const providersData = await providersRes.json();
       if (providersData.success) {
@@ -80,7 +80,6 @@ async function diagnose() {
       } else {
         console.log('   ❌ Providers 失败:', providersData.error);
       }
-
     } else {
       console.log('   ❌ 无法获取 API Key:', keyData.error);
     }
@@ -94,7 +93,9 @@ async function diagnose() {
   console.log('2. 打开开发者工具 Console 标签');
   console.log('3. 检查是否有认证相关的错误');
   console.log('4. 如果看到 API Key，在 Console 中执行：');
-  console.log('   localStorage.setItem("zclaudia-servers", JSON.stringify({...JSON.parse(localStorage.getItem("zclaudia-servers")), state: {...JSON.parse(localStorage.getItem("zclaudia-servers")).state, servers: JSON.parse(localStorage.getItem("zclaudia-servers")).state.servers.map(s => s.name === "Local Server" ? {...s, apiKey: "<API_KEY>"} : s)}}))');
+  console.log(
+    '   localStorage.setItem("zclaudia-servers", JSON.stringify({...JSON.parse(localStorage.getItem("zclaudia-servers")), state: {...JSON.parse(localStorage.getItem("zclaudia-servers")).state, servers: JSON.parse(localStorage.getItem("zclaudia-servers")).state.servers.map(s => s.name === "Local Server" ? {...s, apiKey: "<API_KEY>"} : s)}}))'
+  );
 }
 
 diagnose().catch(console.error);

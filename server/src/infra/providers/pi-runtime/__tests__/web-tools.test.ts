@@ -10,13 +10,17 @@ describe('web tools', () => {
   });
 
   it('WebFetch converts HTML to markdown by default and drops scripts', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      statusText: 'OK',
-      headers: new Headers({ 'content-type': 'text/html' }),
-      text: async () => '<html><body><h1>Hello</h1><script>bad()</script><p>World &amp; Friends</p></body></html>',
-    })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: new Headers({ 'content-type': 'text/html' }),
+        text: async () =>
+          '<html><body><h1>Hello</h1><script>bad()</script><p>World &amp; Friends</p></body></html>',
+      }))
+    );
     const webFetch = createWebFetchTool() as any;
 
     const result = await webFetch.execute('fetch-1', { url: 'https://example.com' });
@@ -39,10 +43,13 @@ describe('web tools', () => {
   });
 
   it('WebFetch rejects redirects to private network URLs before following them', async () => {
-    const fetchMock = vi.fn(async () => new Response('', {
-      status: 302,
-      headers: { location: 'http://127.0.0.1:3000/admin' },
-    }));
+    const fetchMock = vi.fn(
+      async () =>
+        new Response('', {
+          status: 302,
+          headers: { location: 'http://127.0.0.1:3000/admin' },
+        })
+    );
     vi.stubGlobal('fetch', fetchMock);
     const webFetch = createWebFetchTool() as any;
 
@@ -82,14 +89,23 @@ describe('web tools', () => {
   });
 
   it('WebFetch caps response reads before returning content', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('abcdef', {
-      status: 200,
-      statusText: 'OK',
-      headers: { 'content-type': 'text/plain' },
-    })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response('abcdef', {
+            status: 200,
+            statusText: 'OK',
+            headers: { 'content-type': 'text/plain' },
+          })
+      )
+    );
     const webFetch = createWebFetchTool() as any;
 
-    const result = await webFetch.execute('fetch-1', { url: 'https://example.com/large.txt', max_bytes: 3 });
+    const result = await webFetch.execute('fetch-1', {
+      url: 'https://example.com/large.txt',
+      max_bytes: 3,
+    });
 
     expect(result.details).toMatchObject({ ok: true, bodyTruncated: true, bytesRead: 3 });
     expect(result.content[0].text).toContain('Body: truncated after 3 bytes');
@@ -141,17 +157,20 @@ describe('web tools', () => {
       ok: true,
       status: 200,
       statusText: 'OK',
-      text: async () => JSON.stringify({
-        web: {
-          results: [{
-            title: 'Fresh Result',
-            url: 'https://docs.example.com/post',
-            description: 'Fresh snippet',
-            age: 'June 21, 2026',
-            extra_snippets: ['More context'],
-          }],
-        },
-      }),
+      text: async () =>
+        JSON.stringify({
+          web: {
+            results: [
+              {
+                title: 'Fresh Result',
+                url: 'https://docs.example.com/post',
+                description: 'Fresh snippet',
+                age: 'June 21, 2026',
+                extra_snippets: ['More context'],
+              },
+            ],
+          },
+        }),
     }));
     vi.stubGlobal('fetch', fetchMock);
     const webSearch = createWebSearchTool() as any;
@@ -202,15 +221,18 @@ describe('web tools', () => {
       ok: true,
       status: 200,
       statusText: 'OK',
-      text: async () => JSON.stringify({
-        web: {
-          results: [{
-            title: 'Stored Config Result',
-            url: 'https://docs.example.com/from-db',
-            description: 'Database key was used',
-          }],
-        },
-      }),
+      text: async () =>
+        JSON.stringify({
+          web: {
+            results: [
+              {
+                title: 'Stored Config Result',
+                url: 'https://docs.example.com/from-db',
+                description: 'Database key was used',
+              },
+            ],
+          },
+        }),
     }));
     vi.stubGlobal('fetch', fetchMock);
 

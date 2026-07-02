@@ -13,7 +13,10 @@ async function readJson(req: IncomingMessage): Promise<unknown> {
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   const json = JSON.stringify(body);
-  res.writeHead(status, { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(json) });
+  res.writeHead(status, {
+    'Content-Type': 'application/json',
+    'Content-Length': Buffer.byteLength(json),
+  });
   res.end(json);
 }
 
@@ -35,11 +38,13 @@ function handleRpcMessage(body: { id?: unknown; method?: string }): unknown {
       jsonrpc: '2.0',
       id: body.id,
       result: {
-        tools: [{
-          name: 'ping',
-          description: 'Ping tool',
-          inputSchema: { type: 'object', properties: {} },
-        }],
+        tools: [
+          {
+            name: 'ping',
+            description: 'Ping tool',
+            inputSchema: { type: 'object', properties: {} },
+          },
+        ],
       },
     };
   }
@@ -71,7 +76,9 @@ describe('RemoteMcpClient OAuth E2E', () => {
     for (const server of servers) {
       server.closeAllConnections();
     }
-    await Promise.all(servers.map((server) => new Promise<void>((resolve) => server.close(() => resolve()))));
+    await Promise.all(
+      servers.map(server => new Promise<void>(resolve => server.close(() => resolve())))
+    );
     servers.length = 0;
   });
 
@@ -100,11 +107,20 @@ describe('RemoteMcpClient OAuth E2E', () => {
           res.end();
           return;
         }
-        const body = req.method === 'POST' ? await readJson(req) as { id?: unknown; method?: string } | Array<{ id?: unknown; method?: string }> : undefined;
+        const body =
+          req.method === 'POST'
+            ? ((await readJson(req)) as
+                | { id?: unknown; method?: string }
+                | Array<{ id?: unknown; method?: string }>)
+            : undefined;
         for (const item of Array.isArray(body) ? body : body ? [body] : []) {
           observedMethods.push(`${req.method} ${item.method ?? 'notification'}`);
         }
-        const result = Array.isArray(body) ? body.map(handleRpcMessage).filter(Boolean) : body ? handleRpcMessage(body) : null;
+        const result = Array.isArray(body)
+          ? body.map(handleRpcMessage).filter(Boolean)
+          : body
+            ? handleRpcMessage(body)
+            : null;
         if (!result || (Array.isArray(result) && result.length === 0)) {
           res.writeHead(202);
           res.end();
@@ -116,9 +132,10 @@ describe('RemoteMcpClient OAuth E2E', () => {
       sendJson(res, 404, { error: 'not_found' });
     });
     servers.push(app);
-    await new Promise<void>((resolve) => app.listen(0, '127.0.0.1', () => resolve()));
+    await new Promise<void>(resolve => app.listen(0, '127.0.0.1', () => resolve()));
     const address = app.address();
-    if (!address || typeof address === 'string') throw new Error('failed to bind local test server');
+    if (!address || typeof address === 'string')
+      throw new Error('failed to bind local test server');
     const baseUrl = `http://127.0.0.1:${address.port}`;
     const onOAuthCredentials = vi.fn();
 
@@ -139,14 +156,20 @@ describe('RemoteMcpClient OAuth E2E', () => {
       onOAuthCredentials,
     });
 
-    await withTimeout(client.connect(), 2000, () => `connect timed out: ${observedMethods.join(', ')}`);
+    await withTimeout(
+      client.connect(),
+      2000,
+      () => `connect timed out: ${observedMethods.join(', ')}`
+    );
     const tools = await client.listTools();
 
     expect(observedAuthHeaders).toContain('Bearer fresh-e2e-token');
-    expect(onOAuthCredentials).toHaveBeenCalledWith(expect.objectContaining({
-      accessToken: 'fresh-e2e-token',
-      refreshToken: 'rotated-e2e-refresh',
-    }));
+    expect(onOAuthCredentials).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accessToken: 'fresh-e2e-token',
+        refreshToken: 'rotated-e2e-refresh',
+      })
+    );
     expect(tools).toEqual([expect.objectContaining({ name: 'ping', description: 'Ping tool' })]);
     await client.disconnect();
   });

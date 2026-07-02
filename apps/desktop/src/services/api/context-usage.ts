@@ -7,6 +7,6 @@ export type SessionContextUsage =
 
 export async function getSessionContextUsage(sessionId: string): Promise<SessionContextUsage> {
   return apiCall<SessionContextUsage>(
-    `/api/providers/sessions/${encodeURIComponent(sessionId)}/context-usage`,
+    `/api/providers/sessions/${encodeURIComponent(sessionId)}/context-usage`
   );
 }

@@ -37,8 +37,12 @@ export function stripHtmlToText(html: string): string {
     .replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/<\/?(p|div|br|h[1-6]|li|tr|article|section)[^>]*>/gi, '\n')
     .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
     .replace(/[ \t]+/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
@@ -100,7 +104,9 @@ export function isHtmlContentType(contentType: string): boolean {
 
 /** Sniff a body for HTML markers — used when the response has no content-type. */
 export function looksLikeHtml(body: string): boolean {
-  return /<(!doctype html|html|head|body|div|p|h[1-6]|article|main|table)\b/i.test(body.slice(0, 4096));
+  return /<(!doctype html|html|head|body|div|p|h[1-6]|article|main|table)\b/i.test(
+    body.slice(0, 4096)
+  );
 }
 
 /**

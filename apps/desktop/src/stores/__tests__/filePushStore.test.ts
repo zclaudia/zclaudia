@@ -46,9 +46,9 @@ describe('filePushStore', () => {
     });
 
     it('preserves optional fields like description and serverId', () => {
-      useFilePushStore.getState().addItem(
-        createItemInput({ description: 'A test file', serverId: 'server-1' })
-      );
+      useFilePushStore
+        .getState()
+        .addItem(createItemInput({ description: 'A test file', serverId: 'server-1' }));
 
       const item = useFilePushStore.getState().items[0];
       expect(item.description).toBe('A test file');
@@ -162,9 +162,15 @@ describe('filePushStore', () => {
 
   describe('getItemsForSession', () => {
     it('returns items matching the session ID', () => {
-      useFilePushStore.getState().addItem(createItemInput({ fileId: 'file-1', sessionId: 'session-a' }));
-      useFilePushStore.getState().addItem(createItemInput({ fileId: 'file-2', sessionId: 'session-b' }));
-      useFilePushStore.getState().addItem(createItemInput({ fileId: 'file-3', sessionId: 'session-a' }));
+      useFilePushStore
+        .getState()
+        .addItem(createItemInput({ fileId: 'file-1', sessionId: 'session-a' }));
+      useFilePushStore
+        .getState()
+        .addItem(createItemInput({ fileId: 'file-2', sessionId: 'session-b' }));
+      useFilePushStore
+        .getState()
+        .addItem(createItemInput({ fileId: 'file-3', sessionId: 'session-a' }));
 
       const result = useFilePushStore.getState().getItemsForSession('session-a');
       expect(result).toHaveLength(2);

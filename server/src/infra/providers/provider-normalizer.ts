@@ -29,5 +29,7 @@ export interface ProviderPermissionNormalization {
 
 export interface ProviderEventNormalizer {
   normalizeToolUse?(event: ProviderToolUseEvent): ProviderToolUseNormalization;
-  normalizePermissionRequest?(event: ProviderPermissionRequestEvent): ProviderPermissionNormalization;
+  normalizePermissionRequest?(
+    event: ProviderPermissionRequestEvent
+  ): ProviderPermissionNormalization;
 }

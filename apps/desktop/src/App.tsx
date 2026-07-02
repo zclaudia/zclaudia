@@ -5,7 +5,7 @@ import { SidebarCollapsedBar } from './features/sidebar/SidebarCollapsedBar';
 import { SessionChatLayout } from './features/chat/SessionChatLayout';
 import { MobileSetup } from './components/setup/MobileSetup';
 import { WindowsSetup } from './components/setup/WindowsSetup';
-import { SettingsPanel } from './components/SettingsPanel';
+import { SettingsPanel } from './features/settings/SettingsPanel';
 import { ToastContainer } from './components/ToastContainer';
 import { UpdateBanner } from './components/UpdateBanner';
 import { WindowRouter } from './app/WindowRouter';
@@ -45,10 +45,17 @@ import { initBuiltinPanels } from './plugins/builtinPanels';
 import { shouldShowDirectGatewaySetup } from './utils/directGatewaySetup';
 import { getMobileControlPlaneState } from './services/mobileConnectionState';
 
-const FileViewerWindow = lazy(() => import('./components/fileviewer/FileViewerWindow').then(m => ({ default: m.FileViewerWindow })));
-const ProjectDashboard = lazy(() => import('./features/dashboard/ProjectDashboard').then(m => ({ default: m.ProjectDashboard })));
-const AutomationContent = lazy(() => import('./features/automation/AutomationContent').then(m => ({ default: m.AutomationContent })));
-const MOBILE_TOAST_CONTAINER_CLASS = 'fixed top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2';
+const FileViewerWindow = lazy(() =>
+  import('./components/fileviewer/FileViewerWindow').then(m => ({ default: m.FileViewerWindow }))
+);
+const ProjectDashboard = lazy(() =>
+  import('./features/dashboard/ProjectDashboard').then(m => ({ default: m.ProjectDashboard }))
+);
+const AutomationContent = lazy(() =>
+  import('./features/automation/AutomationContent').then(m => ({ default: m.AutomationContent }))
+);
+const MOBILE_TOAST_CONTAINER_CLASS =
+  'fixed top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2';
 
 const LazyFallback = () => (
   <div className="flex items-center justify-center h-full">
@@ -61,38 +68,42 @@ function AppContent() {
   const isMobile = useIsMobile();
 
   // --- Store selectors ---
-  const activeServerId = useServerStore((s) => s.activeServerId);
-  const setActiveServer = useServerStore((s) => s.setActiveServer);
-  const transportStatus = useRecoveryStore((s) => s.transport.status);
-  const facadeConnectionState = useFacadeStore((s) => s.connectionState);
-  const facadeSnapshotVersion = useFacadeStore((s) => s.snapshotVersion);
-  const facadeBackends = useFacadeStore((s) => s.backends);
-  const localBackendId = useFacadeStore((s) => s.localBackendId);
-  const selectedSessionId = useSelectionStore((s) => s.selectedSessionId);
-  const selectedProjectId = useSelectionStore((s) => s.selectedProjectId);
-  const sessions = useProjectStore((s) => s.sessions);
-  const projects = useProjectStore((s) => s.projects);
-  const selectSession = useProjectStore((s) => s.selectSession);
-  const setDashboardView = useSelectionStore((s) => s.setDashboardView);
-  const isAgentExpanded = useClaudiaStore((s) => s.isExpanded);
-  const setAgentExpanded = useClaudiaStore((s) => s.setExpanded);
-  const disabledBuiltinPanels = usePluginStore((s) => s.disabledBuiltinPanels);
-  const notificationUnreadCount = useNotificationFeedStore((s) => s.unreadCount);
-  const notificationsModalOpen = useNotificationsModalStore((s) => s.isOpen);
-  const directGatewayUrl = useGatewayStore((s) => s.directGatewayUrl);
-  const fileViewerFullscreen = useFileViewerStore((s) => s.fullscreen);
-  const fileViewerFilePath = useFileViewerStore((s) => s.filePath);
-  const fileViewerProjectRoot = useFileViewerStore((s) => s.projectRoot);
-  const setFileViewerFullscreen = useFileViewerStore((s) => s.setFullscreen);
-  const topLevelView = useTopLevelViewStore((s) => s.view);
-  const openSettings = useTopLevelViewStore((s) => s.openSettings);
-  const returnToApp = useTopLevelViewStore((s) => s.returnToApp);
-  const openAutomations = useTopLevelViewStore((s) => s.openAutomations);
-  const setAutomationTab = useTopLevelViewStore((s) => s.setAutomationTab);
-  const setAutomationProjectFilter = useTopLevelViewStore((s) => s.setAutomationProjectFilter);
-  const refreshReadiness = useAgentReadinessStore((s) => s.refresh);
+  const activeServerId = useServerStore(s => s.activeServerId);
+  const setActiveServer = useServerStore(s => s.setActiveServer);
+  const transportStatus = useRecoveryStore(s => s.transport.status);
+  const facadeConnectionState = useFacadeStore(s => s.connectionState);
+  const facadeSnapshotVersion = useFacadeStore(s => s.snapshotVersion);
+  const facadeBackends = useFacadeStore(s => s.backends);
+  const localBackendId = useFacadeStore(s => s.localBackendId);
+  const selectedSessionId = useSelectionStore(s => s.selectedSessionId);
+  const selectedProjectId = useSelectionStore(s => s.selectedProjectId);
+  const sessions = useProjectStore(s => s.sessions);
+  const projects = useProjectStore(s => s.projects);
+  const selectSession = useProjectStore(s => s.selectSession);
+  const setDashboardView = useSelectionStore(s => s.setDashboardView);
+  const isAgentExpanded = useClaudiaStore(s => s.isExpanded);
+  const setAgentExpanded = useClaudiaStore(s => s.setExpanded);
+  const disabledBuiltinPanels = usePluginStore(s => s.disabledBuiltinPanels);
+  const notificationUnreadCount = useNotificationFeedStore(s => s.unreadCount);
+  const notificationsModalOpen = useNotificationsModalStore(s => s.isOpen);
+  const directGatewayUrl = useGatewayStore(s => s.directGatewayUrl);
+  const fileViewerFullscreen = useFileViewerStore(s => s.fullscreen);
+  const fileViewerFilePath = useFileViewerStore(s => s.filePath);
+  const fileViewerProjectRoot = useFileViewerStore(s => s.projectRoot);
+  const setFileViewerFullscreen = useFileViewerStore(s => s.setFullscreen);
+  const topLevelView = useTopLevelViewStore(s => s.view);
+  const openSettings = useTopLevelViewStore(s => s.openSettings);
+  const returnToApp = useTopLevelViewStore(s => s.returnToApp);
+  const openAutomations = useTopLevelViewStore(s => s.openAutomations);
+  const setAutomationTab = useTopLevelViewStore(s => s.setAutomationTab);
+  const setAutomationProjectFilter = useTopLevelViewStore(s => s.setAutomationProjectFilter);
+  const refreshReadiness = useAgentReadinessStore(s => s.refresh);
 
-  const { selectBackend: _selectBackend, selectProject: selectProjectRoute, selectSession: _selectSessionRoute } = useSelectionCoordinator();
+  const {
+    selectBackend: _selectBackend,
+    selectProject: selectProjectRoute,
+    selectSession: _selectSessionRoute,
+  } = useSelectionCoordinator();
 
   // --- Local state ---
   const [dashboardProjectId, setDashboardProjectId] = useState<string | null>(null);
@@ -110,22 +121,29 @@ function AppContent() {
   // --- Derived state ---
   const controlPlaneState = isMobile
     ? getMobileControlPlaneState(facadeConnectionState, facadeSnapshotVersion)
-    : (transportStatus === 'connected' ? 'ready' : transportStatus === 'error' ? 'error' : 'connecting');
+    : transportStatus === 'connected'
+      ? 'ready'
+      : transportStatus === 'error'
+        ? 'error'
+        : 'connecting';
 
   if (controlPlaneState === 'ready') {
     hasConnected.current = true;
   }
 
-  const selectedSession = selectedSessionId ? sessions.find((s) => s.id === selectedSessionId) ?? null : null;
+  const selectedSession = selectedSessionId
+    ? (sessions.find(s => s.id === selectedSessionId) ?? null)
+    : null;
   const dashboardProject = dashboardProjectId
-    ? projects.find((p) => p.id === dashboardProjectId) || null
+    ? projects.find(p => p.id === dashboardProjectId) || null
     : null;
   const isAppTopLevelView = topLevelView.kind === 'app';
   const mobileToastContainer = isMobile ? (
     <ToastContainer className={MOBILE_TOAST_CONTAINER_CLASS} />
   ) : null;
 
-  const currentContextProjectId = selectedSession?.projectId || dashboardProjectId || selectedProjectId || null;
+  const currentContextProjectId =
+    selectedSession?.projectId || dashboardProjectId || selectedProjectId || null;
 
   const claudiaSwipePreviewProgress = useMemo(() => {
     const progress = Math.max(0, Math.min(1, agentSwipePreview.progress));
@@ -142,18 +160,20 @@ function AppContent() {
   const openNotifications = useCallback(() => {
     setAgentExpanded(false);
     if (isMobile) {
-      setFeedOpen((current) => !current);
+      setFeedOpen(current => !current);
     } else {
       useNotificationsModalStore.getState().toggle();
     }
   }, [isMobile, setAgentExpanded]);
 
   const openProjectDashboardWindowFn = useCallback((projectId: string) => {
-    const project = useProjectStore.getState().projects.find((item) => item.id === projectId);
-    import('./features/dashboard/openProjectDashboardWindow').then(m => m.openProjectDashboardWindow({
-      projectId,
-      projectName: project?.name,
-    }));
+    const project = useProjectStore.getState().projects.find(item => item.id === projectId);
+    import('./features/dashboard/openProjectDashboardWindow').then(m =>
+      m.openProjectDashboardWindow({
+        projectId,
+        projectName: project?.name,
+      })
+    );
   }, []);
 
   const closeTopLevelView = useCallback(() => {
@@ -161,19 +181,20 @@ function AppContent() {
     void refreshReadiness();
   }, [returnToApp, refreshReadiness]);
 
-  const automationMode = topLevelView.kind === 'automations'
-    ? {
-        tab: topLevelView.tab,
-        projectId: topLevelView.projectId,
-        activeBackendId: activeServerId ?? localBackendId,
-        onSelectTab: setAutomationTab,
-        onBack: closeTopLevelView,
-        onSelectScope: (backendId: string, projectId?: string) => {
-          setActiveServer(backendId);
-          setAutomationProjectFilter(projectId);
-        },
-      }
-    : undefined;
+  const automationMode =
+    topLevelView.kind === 'automations'
+      ? {
+          tab: topLevelView.tab,
+          projectId: topLevelView.projectId,
+          activeBackendId: activeServerId ?? localBackendId,
+          onSelectTab: setAutomationTab,
+          onBack: closeTopLevelView,
+          onSelectScope: (backendId: string, projectId?: string) => {
+            setActiveServer(backendId);
+            setAutomationProjectFilter(projectId);
+          },
+        }
+      : undefined;
 
   // --- Extracted hooks ---
   useClaudiaDesktop({
@@ -193,7 +214,9 @@ function AppContent() {
   useDataLoader();
 
   // Register builtin plugin panels once
-  useEffect(() => { initBuiltinPanels(); }, []);
+  useEffect(() => {
+    initBuiltinPanels();
+  }, []);
 
   // Initialize global shortcut config (desktop only)
   useEffect(() => {
@@ -214,23 +237,37 @@ function AppContent() {
   // Reset swipe preview on expand/collapse
   useEffect(() => {
     if (isAgentExpanded) {
-      setAgentSwipePreview((c) => c.mode === 'open' ? { mode: null, progress: 0 } : c);
+      setAgentSwipePreview(c => (c.mode === 'open' ? { mode: null, progress: 0 } : c));
       return;
     }
-    setAgentSwipePreview((c) => c.mode === 'close' ? { mode: null, progress: 0 } : c);
+    setAgentSwipePreview(c => (c.mode === 'close' ? { mode: null, progress: 0 } : c));
   }, [isAgentExpanded]);
 
   // --- Android back gestures ---
-  useAndroidBack(() => setFileViewerFullscreen(false), isAppTopLevelView && fileViewerFullscreen, 25);
-  useAndroidBack(() => setAgentExpanded(false), isAppTopLevelView && isMobile && isAgentExpanded, 20);
+  useAndroidBack(
+    () => setFileViewerFullscreen(false),
+    isAppTopLevelView && fileViewerFullscreen,
+    25
+  );
+  useAndroidBack(
+    () => setAgentExpanded(false),
+    isAppTopLevelView && isMobile && isAgentExpanded,
+    20
+  );
   useAndroidBack(() => setSidebarOpen(false), isAppTopLevelView && isMobile && sidebarOpen, 10);
-  useAndroidBack(() => setSidebarOpen(true), isAppTopLevelView && isMobile && !sidebarOpen && !isAgentExpanded && !fileViewerFullscreen, 5);
+  useAndroidBack(
+    () => setSidebarOpen(true),
+    isAppTopLevelView && isMobile && !sidebarOpen && !isAgentExpanded && !fileViewerFullscreen,
+    5
+  );
 
   // --- Mobile swipe gestures ---
   const swipeOpenClaudiaRef = useSwipeBack<HTMLElement>({
     onSwipe: () => setAgentExpanded(true),
-    onProgress: (progress) => setAgentSwipePreview(progress > 0 ? { mode: 'open', progress } : { mode: null, progress: 0 }),
-    enabled: isAppTopLevelView && isMobile && !isAgentExpanded && !sidebarOpen && !fileViewerFullscreen,
+    onProgress: progress =>
+      setAgentSwipePreview(progress > 0 ? { mode: 'open', progress } : { mode: null, progress: 0 }),
+    enabled:
+      isAppTopLevelView && isMobile && !isAgentExpanded && !sidebarOpen && !fileViewerFullscreen,
     direction: 'left',
     startZone: { startRatio: 0.25, endRatio: 0.75 },
     threshold: 60,
@@ -238,7 +275,10 @@ function AppContent() {
 
   const swipeCloseClaudiaRef = useSwipeBack({
     onSwipe: () => setAgentExpanded(false),
-    onProgress: (progress) => setAgentSwipePreview(progress > 0 ? { mode: 'close', progress } : { mode: null, progress: 0 }),
+    onProgress: progress =>
+      setAgentSwipePreview(
+        progress > 0 ? { mode: 'close', progress } : { mode: null, progress: 0 }
+      ),
     enabled: isAppTopLevelView && isMobile && isAgentExpanded,
     direction: 'right',
     fullWidth: true,
@@ -250,7 +290,7 @@ function AppContent() {
   const requiresDirectGatewaySetup = shouldShowDirectGatewaySetup({
     directGatewayUrl,
     activeServerId,
-    availableBackendIds: facadeBackends.map((b) => b.backendId),
+    availableBackendIds: facadeBackends.map(b => b.backendId),
   });
 
   if (isMobile && requiresDirectGatewaySetup) {
@@ -259,9 +299,10 @@ function AppContent() {
 
   const isWindows = typeof navigator !== 'undefined' && navigator.userAgent.includes('Windows');
   const hasConnectedServer = controlPlaneState === 'ready' || hasConnected.current;
-  const shouldRenderWindowsSetup = isWindows
-    && embeddedServerStatus === 'wsl-mode'
-    && (!hasConnectedServer || (directGatewayUrl ? requiresDirectGatewaySetup : false));
+  const shouldRenderWindowsSetup =
+    isWindows &&
+    embeddedServerStatus === 'wsl-mode' &&
+    (!hasConnectedServer || (directGatewayUrl ? requiresDirectGatewaySetup : false));
 
   if (shouldRenderWindowsSetup) {
     return <WindowsSetup />;
@@ -283,14 +324,26 @@ function AppContent() {
           <div className="text-center">
             {isError ? (
               <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
-                <svg className="w-5 h-5 text-destructive" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="w-5 h-5 text-destructive"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </div>
             ) : (
               <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
             )}
-            <p className={`text-sm ${isError ? 'text-destructive' : 'text-muted-foreground'}`}>{statusText}</p>
+            <p className={`text-sm ${isError ? 'text-destructive' : 'text-muted-foreground'}`}>
+              {statusText}
+            </p>
           </div>
         </div>
       </div>
@@ -329,7 +382,10 @@ function AppContent() {
       {!isMobile && sidebarCollapsed && (
         <SidebarCollapsedBar
           onExpand={() => setSidebarCollapsed(false)}
-          onOpenSearch={() => { setSidebarCollapsed(false); setSidebarSearchOpen(true); }}
+          onOpenSearch={() => {
+            setSidebarCollapsed(false);
+            setSidebarSearchOpen(true);
+          }}
           onOpenNotifications={openNotifications}
           notificationUnreadCount={notificationUnreadCount}
           disableNotifications={disabledBuiltinPanels.includes('notifications')}
@@ -366,7 +422,7 @@ function AppContent() {
           onSearchOpenChange={!isMobile ? setSidebarSearchOpen : undefined}
           isNotificationsOpen={isMobile ? isFeedOpen : notificationsModalOpen}
           onOpenSettings={openSettings}
-          onOpenDashboard={(projectId) => {
+          onOpenDashboard={projectId => {
             selectProjectRoute(projectId);
             selectSession(null);
             setDashboardView(projectId, 'home');
@@ -416,7 +472,9 @@ function AppContent() {
                 <ProjectDashboard
                   projectId={dashboardProject.id}
                   projectRootPath={dashboardProject.rootPath}
-                  onOpenAutomations={(opts) => openAutomations({ tab: opts.tab, projectId: opts.projectId })}
+                  onOpenAutomations={opts =>
+                    openAutomations({ tab: opts.tab, projectId: opts.projectId })
+                  }
                   onOpenDashboardWindow={openProjectDashboardWindowFn}
                 />
               </Suspense>
@@ -425,7 +483,7 @@ function AppContent() {
                 key={selectedSessionId}
                 sessionId={selectedSessionId}
                 onOpenSidebar={() => setSidebarOpen(true)}
-                onReturnToDashboard={(projectId) => {
+                onReturnToDashboard={projectId => {
                   selectProjectRoute(projectId);
                   selectSession(null);
                   setDashboardProjectId(projectId);

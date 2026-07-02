@@ -21,9 +21,7 @@ describe('Integration: full backend lifecycle', () => {
   beforeEach(() => {
     const mock = createMockAdapter({
       instanceId: 'local-inst',
-      registryItems: [
-        makePresence({ backendId: 'remote-1', instanceId: 'remote-inst', epoch: 1 }),
-      ],
+      registryItems: [makePresence({ backendId: 'remote-1', instanceId: 'remote-inst', epoch: 1 })],
     });
     emit = mock.emit;
     commandLog = mock.commandLog;
@@ -99,8 +97,22 @@ describe('Integration: full backend lifecycle', () => {
       backendId: 'remote-1',
       sessionId: 's1',
       messages: [
-        { messageId: 'm1', sessionId: 's1', offset: 1, role: 'user', createdAt: 1000, content: 'hello' },
-        { messageId: 'm2', sessionId: 's1', offset: 2, role: 'assistant', createdAt: 1001, content: 'hi' },
+        {
+          messageId: 'm1',
+          sessionId: 's1',
+          offset: 1,
+          role: 'user',
+          createdAt: 1000,
+          content: 'hello',
+        },
+        {
+          messageId: 'm2',
+          sessionId: 's1',
+          offset: 2,
+          role: 'assistant',
+          createdAt: 1001,
+          content: 'hi',
+        },
       ],
       latestOffset: 2,
     });
@@ -149,9 +161,7 @@ describe('Integration: backend disconnect and auto-resume', () => {
 
   beforeEach(() => {
     const mock = createMockAdapter({
-      registryItems: [
-        makePresence({ backendId: 'b1', epoch: 1 }),
-      ],
+      registryItems: [makePresence({ backendId: 'b1', epoch: 1 })],
     });
     emit = mock.emit;
     commandLog = mock.commandLog;
@@ -171,7 +181,13 @@ describe('Integration: backend disconnect and auto-resume', () => {
 
     // Open a session stream
     core.openSessionStream('b1', 's1');
-    emit({ type: 'content_patch_received', backendId: 'b1', sessionId: 's1', messages: [], latestOffset: 0 });
+    emit({
+      type: 'content_patch_received',
+      backendId: 'b1',
+      sessionId: 's1',
+      messages: [],
+      latestOffset: 0,
+    });
 
     commandLog.length = 0;
     events = [];
@@ -284,8 +300,20 @@ describe('Integration: multi-backend multi-session', () => {
     core.openSessionStream('b2', 's2');
 
     // Promote both to open
-    emit({ type: 'content_patch_received', backendId: 'b1', sessionId: 's1', messages: [], latestOffset: 0 });
-    emit({ type: 'content_patch_received', backendId: 'b2', sessionId: 's2', messages: [], latestOffset: 0 });
+    emit({
+      type: 'content_patch_received',
+      backendId: 'b1',
+      sessionId: 's1',
+      messages: [],
+      latestOffset: 0,
+    });
+    emit({
+      type: 'content_patch_received',
+      backendId: 'b2',
+      sessionId: 's2',
+      messages: [],
+      latestOffset: 0,
+    });
 
     // b1 disconnects
     emit({ type: 'backend_unsubscribed', backendId: 'b1', reason: 'backend_offline' });
@@ -331,9 +359,7 @@ describe('Integration: local backend identification', () => {
 
   it('has no local backend in direct mode', () => {
     const mock = createMockAdapter({
-      registryItems: [
-        makePresence({ backendId: 'b1' }),
-      ],
+      registryItems: [makePresence({ backendId: 'b1' })],
     });
 
     const core = new BackendFacadeRuntimeCore({
@@ -369,7 +395,13 @@ describe('Integration: epoch change invalidation', () => {
     emit({ type: 'backend_subscribed', backendId: 'b1', epoch: 1, capabilities: [] });
     emit({ type: 'backend_data_snapshot_received', backendId: 'b1', sessions: [], projects: [] });
     core.openSessionStream('b1', 's1');
-    emit({ type: 'content_patch_received', backendId: 'b1', sessionId: 's1', messages: [], latestOffset: 0 });
+    emit({
+      type: 'content_patch_received',
+      backendId: 'b1',
+      sessionId: 's1',
+      messages: [],
+      latestOffset: 0,
+    });
   });
 
   it('invalidates subscription and catalog on epoch change', () => {
@@ -489,7 +521,12 @@ describe('Integration: GC cleanup', () => {
     // Bring to ready
     core.openBackend('b1');
     mock.emit({ type: 'backend_subscribed', backendId: 'b1', epoch: 1, capabilities: [] });
-    mock.emit({ type: 'backend_data_snapshot_received', backendId: 'b1', sessions: [], projects: [] });
+    mock.emit({
+      type: 'backend_data_snapshot_received',
+      backendId: 'b1',
+      sessions: [],
+      projects: [],
+    });
 
     // Receive a run event for an unknown session → creates ephemeral stream
     mock.emit({

@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useSupervisionStore } from '../supervisionStore';
-import type { ChangeExecutionPlan, ProjectAgent, ProjectChange, SupervisionTask } from '@zclaudia/shared';
+import type {
+  ChangeExecutionPlan,
+  ProjectAgent,
+  ProjectChange,
+  SupervisionTask,
+} from '@zclaudia/shared';
 
 // Helper to create mock task
 function makeTask(overrides: Partial<SupervisionTask> = {}): SupervisionTask {

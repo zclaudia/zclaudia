@@ -6,7 +6,7 @@ import { ActivityRegistry } from '../../activities/index.js';
 import type { Activity } from '../../activities/index.js';
 
 // Stub the worktree service so resolveWorktreeForGitOp returns a fixed path.
-vi.mock('../worktree-service.js', async (importOriginal) => {
+vi.mock('../worktree-service.js', async importOriginal => {
   const actual = await importOriginal<typeof import('../worktree-service.js')>();
   return {
     ...actual,
@@ -22,7 +22,10 @@ function appWith(registry?: ActivityRegistry) {
   const app = express();
   app.use(express.json());
   const runner = { run: async () => ({ status: 'completed' as const, output: {} }) };
-  app.use('/api/projects', createGitRoutes({} as never, { activityRegistry: registry, agentLoopRunner: runner }));
+  app.use(
+    '/api/projects',
+    createGitRoutes({} as never, { activityRegistry: registry, agentLoopRunner: runner })
+  );
   return app;
 }
 
@@ -36,7 +39,10 @@ describe('POST /:id/git/generate-commit-message', () => {
   it('returns the generated message on success', async () => {
     const registry = registryWith({
       type: 'generate_commit_message',
-      invoke: async () => ({ status: 'completed', output: { subject: 'feat: x', message: 'feat: x' } }),
+      invoke: async () => ({
+        status: 'completed',
+        output: { subject: 'feat: x', message: 'feat: x' },
+      }),
     } as Activity);
     const res = await request(appWith(registry))
       .post('/api/projects/p1/git/generate-commit-message')

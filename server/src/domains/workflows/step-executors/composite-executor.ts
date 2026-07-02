@@ -38,7 +38,7 @@ export class CompositeStepExecutor implements StepExecutorPort {
   async execute(
     node: WorkflowNodeDef,
     config: Record<string, unknown>,
-    ctx: StepContext,
+    ctx: StepContext
   ): Promise<StepResult> {
     const executor = this.findExecutor(node.type);
     if (!executor) {
@@ -50,7 +50,7 @@ export class CompositeStepExecutor implements StepExecutorPort {
     return Promise.race([
       executor.execute(node, config, ctx),
       new Promise<StepResult>((_, reject) =>
-        setTimeout(() => reject(new Error(`Step timed out after ${timeoutMs}ms`)), timeoutMs),
+        setTimeout(() => reject(new Error(`Step timed out after ${timeoutMs}ms`)), timeoutMs)
       ),
     ]);
   }

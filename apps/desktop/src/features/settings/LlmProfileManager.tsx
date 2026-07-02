@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Check, AlertTriangle } from 'lucide-react';
-import type { LlmProfileConfig, LlmProfileCompat, LlmProfileModelEntry, ContextWindowSource } from '@zclaudia/shared';
+import type { LlmProfileConfig, LlmProfileCompat, ContextWindowSource } from '@zclaudia/shared';
 import { LLM_PROVIDER_TYPES } from '@zclaudia/shared';
 import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
@@ -11,6 +11,13 @@ import type { LlmProfilePreviewInput } from '../../services/api/llm-profiles';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { isMobileBackendUsable } from '../../services/mobileConnectionState';
 import { CodexOAuthSection } from './CodexOAuthSection';
+import {
+  draftsToEntries,
+  entryToDraft,
+  generateRowUid,
+  validateModelDraftRow,
+  type ModelRowDraft,
+} from './llmProfileModelDraft';
 
 /** Lightweight PCP capability summary for UI display (mirrors server manifests) */
 type CapLevel = 'strict' | 'best_effort' | 'none';
@@ -26,114 +33,18 @@ const PROVIDER_CAPABILITIES: Record<string, CapabilitySummary> = {
 
 const RESERVED_HEADER_KEYS = new Set(['authorization', 'content-type', 'host']);
 
-/**
- * Draft shape used by the Models repeater. We keep contextWindow / maxTokens as
- * raw strings so the editor can distinguish "empty (no override)" from
- * "0/non-numeric (validation error)" without lossy coercion on every keystroke.
- */
-interface ModelRowDraft {
-  /**
-   * Stable per-row identifier independent of array index. Used as the key for
-   * the testStatus auto-clear timer Map so reordering / row deletion above the
-   * probed row can't clear the wrong row's status when the timer fires.
-   */
-  rowUid: string;
-  modelId: string;
-  displayName: string;
-  contextWindowStr: string;
-  maxTokensStr: string;
-  supportsImage: boolean;
-  inputModalitiesTouched: boolean;
-  /** Last probe result; cleared after a few seconds via a setTimeout. */
-  testStatus?:
-    | { kind: 'running' }
-    | { kind: 'ok'; latencyMs: number }
-    | { kind: 'fail'; error: string };
-}
-
-function generateRowUid(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-}
-
-function entryToDraft(entry: LlmProfileModelEntry): ModelRowDraft {
-  return {
-    rowUid: generateRowUid(),
-    modelId: entry.modelId,
-    displayName: entry.displayName ?? '',
-    contextWindowStr: entry.contextWindow != null ? String(entry.contextWindow) : '',
-    maxTokensStr: entry.maxTokens != null ? String(entry.maxTokens) : '',
-    supportsImage: entry.inputModalities?.includes('image') ?? false,
-    inputModalitiesTouched: entry.inputModalities !== undefined,
-  };
-}
-
-function parsePositiveInteger(raw: string): { value: number | undefined; error: string | null } {
-  const trimmed = raw.trim();
-  if (!trimmed) return { value: undefined, error: null };
-  const n = Number(trimmed);
-  if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) {
-    return { value: undefined, error: 'must be a positive integer' };
-  }
-  return { value: n, error: null };
-}
-
-interface ModelRowError {
-  modelId?: string;
-  contextWindow?: string;
-  maxTokens?: string;
-}
-
-function validateModelDraftRow(draft: ModelRowDraft, allDrafts: ModelRowDraft[], index: number): ModelRowError {
-  const err: ModelRowError = {};
-  const id = draft.modelId.trim();
-  if (!id) {
-    err.modelId = 'required';
-  } else {
-    const dup = allDrafts.findIndex((d, i) => i !== index && d.modelId.trim() === id);
-    if (dup !== -1) err.modelId = 'duplicate';
-  }
-  const cw = parsePositiveInteger(draft.contextWindowStr);
-  if (cw.error) err.contextWindow = cw.error;
-  const mt = parsePositiveInteger(draft.maxTokensStr);
-  if (mt.error) err.maxTokens = mt.error;
-  return err;
-}
-
-/**
- * Serialize draft rows into the wire shape. Drops rows with empty modelId so a
- * half-typed "Add model" row never blocks save.
- */
-function draftsToEntries(drafts: ModelRowDraft[]): LlmProfileModelEntry[] {
-  const out: LlmProfileModelEntry[] = [];
-  for (const d of drafts) {
-    const id = d.modelId.trim();
-    if (!id) continue;
-    const entry: LlmProfileModelEntry = { modelId: id };
-    const display = d.displayName.trim();
-    if (display) entry.displayName = display;
-    const cw = parsePositiveInteger(d.contextWindowStr);
-    if (cw.value !== undefined) entry.contextWindow = cw.value;
-    const mt = parsePositiveInteger(d.maxTokensStr);
-    if (mt.value !== undefined) entry.maxTokens = mt.value;
-    if (d.supportsImage) entry.inputModalities = ['text', 'image'];
-    else if (d.inputModalitiesTouched) entry.inputModalities = ['text'];
-    out.push(entry);
-  }
-  return out;
-}
-
-function upsertSavedProfile(profiles: LlmProfileConfig[], saved: LlmProfileConfig): LlmProfileConfig[] {
-  const index = profiles.findIndex((profile) => profile.id === saved.id);
+function upsertSavedProfile(
+  profiles: LlmProfileConfig[],
+  saved: LlmProfileConfig
+): LlmProfileConfig[] {
+  const index = profiles.findIndex(profile => profile.id === saved.id);
   const next = saved.isDefault
-    ? profiles.map((profile) => (profile.id === saved.id ? saved : { ...profile, isDefault: false }))
-    : profiles.map((profile) => (profile.id === saved.id ? saved : profile));
+    ? profiles.map(profile => (profile.id === saved.id ? saved : { ...profile, isDefault: false }))
+    : profiles.map(profile => (profile.id === saved.id ? saved : profile));
 
   if (index >= 0) return next;
   return saved.isDefault
-    ? [saved, ...profiles.map((profile) => ({ ...profile, isDefault: false }))]
+    ? [saved, ...profiles.map(profile => ({ ...profile, isDefault: false }))]
     : [...profiles, saved];
 }
 
@@ -145,7 +56,9 @@ function CapabilityTags({ providerType }: { providerType: string }) {
     { label: 'Stream', level: caps.stream },
     { label: 'Tools', level: caps.tools },
     { label: 'Interactions', level: caps.interactions },
-    ...(caps.backgroundTask !== 'none' ? [{ label: 'Background', level: caps.backgroundTask }] : []),
+    ...(caps.backgroundTask !== 'none'
+      ? [{ label: 'Background', level: caps.backgroundTask }]
+      : []),
   ];
 
   return (
@@ -159,7 +72,9 @@ function CapabilityTags({ providerType }: { providerType: string }) {
               : 'border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/5'
           }`}
         >
-          <span className={`inline-block w-1 h-1 rounded-full ${level === 'strict' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+          <span
+            className={`inline-block w-1 h-1 rounded-full ${level === 'strict' ? 'bg-emerald-500' : 'bg-amber-500'}`}
+          />
           {label}
         </span>
       ))}
@@ -170,20 +85,25 @@ function CapabilityTags({ providerType }: { providerType: string }) {
 interface LlmProfileManagerProps {
   isOpen: boolean;
   onClose: () => void;
-  inline?: boolean;  // When true, renders without modal wrapper
+  inline?: boolean; // When true, renders without modal wrapper
   readOnly?: boolean;
 }
 
-export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = false }: LlmProfileManagerProps) {
-  const activeServerId = useServerStore((s) => s.activeServerId);
-  const facadeConnectionState = useFacadeStore((s) => s.connectionState);
-  const facadeBackends = useFacadeStore((s) => s.backends);
+export function LlmProfileManager({
+  isOpen,
+  onClose,
+  inline = false,
+  readOnly = false,
+}: LlmProfileManagerProps) {
+  const activeServerId = useServerStore(s => s.activeServerId);
+  const facadeConnectionState = useFacadeStore(s => s.connectionState);
+  const facadeBackends = useFacadeStore(s => s.backends);
   const isConnected = isMobileBackendUsable({
     backendId: activeServerId,
     connectionState: facadeConnectionState,
     backends: facadeBackends,
   });
-  const storeProfiles = useLlmProfileMetaStore((s) => s.getProviders(activeServerId));
+  const storeProfiles = useLlmProfileMetaStore(s => s.getProviders(activeServerId));
 
   const [profiles, setProfiles] = useState<LlmProfileConfig[]>([]);
   const [loading, setLoading] = useState(false);
@@ -201,13 +121,18 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
   const [formRequestHeaders, setFormRequestHeaders] = useState('');
   const [formRequestHeadersError, setFormRequestHeadersError] = useState<string | null>(null);
   const [formIsDefault, setFormIsDefault] = useState(false);
-  const [formCacheRetention, setFormCacheRetention] = useState<'default' | 'none' | 'short' | 'long'>('default');
+  const [formCacheRetention, setFormCacheRetention] = useState<
+    'default' | 'none' | 'short' | 'long'
+  >('default');
   const [formCacheMarkers, setFormCacheMarkers] = useState(false);
   const [formModels, setFormModels] = useState<ModelRowDraft[]>([]);
   const [formModelsSaveError, setFormModelsSaveError] = useState<string | null>(null);
   const [fetchingModels, setFetchingModels] = useState(false);
   const [fetchModelsError, setFetchModelsError] = useState<string | null>(null);
-  const [fetchPicker, setFetchPicker] = useState<{ candidates: string[]; selected: Set<string> } | null>(null);
+  const [fetchPicker, setFetchPicker] = useState<{
+    candidates: string[];
+    selected: Set<string>;
+  } | null>(null);
   const [saving, setSaving] = useState(false);
   const [pendingDeleteProfileId, setPendingDeleteProfileId] = useState<string | null>(null);
   const [deletingProfileId, setDeletingProfileId] = useState<string | null>(null);
@@ -236,9 +161,9 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     try {
       const data = await api.listLlmProfiles();
       setProfiles(data);
-      setEditingProfile((current) => (
-        current ? data.find((p) => p.id === current.id) ?? current : current
-      ));
+      setEditingProfile(current =>
+        current ? (data.find(p => p.id === current.id) ?? current) : current
+      );
       // Sync to global store so Sidebar's profile dropdown stays current
       useLlmProfileMetaStore.getState().setProviders(data, activeServerId);
     } catch (error) {
@@ -249,7 +174,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
   };
 
   const applySavedProfile = (saved: LlmProfileConfig) => {
-    setProfiles((current) => upsertSavedProfile(current, saved));
+    setProfiles(current => upsertSavedProfile(current, saved));
 
     const metaStore = useLlmProfileMetaStore.getState();
     const currentStoreProfiles = metaStore.getProviders(activeServerId);
@@ -326,7 +251,9 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     setFormCompat(hasCompat ? JSON.stringify(profile.compat, null, 2) : '');
     setFormCompatError(null);
     setShowAdvanced(Boolean(hasCompat));
-    setFormRequestHeaders(profile.requestHeaders ? JSON.stringify(profile.requestHeaders, null, 2) : '');
+    setFormRequestHeaders(
+      profile.requestHeaders ? JSON.stringify(profile.requestHeaders, null, 2) : ''
+    );
     setFormRequestHeadersError(null);
     setFormIsDefault(profile.isDefault || false);
     setFormCacheRetention(profile.cacheRetention ?? 'default');
@@ -357,7 +284,8 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       try {
         const parsed = JSON.parse(formRequestHeaders);
         if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          requestHeadersObj = Object.keys(parsed).length > 0 ? (parsed as Record<string, string>) : undefined;
+          requestHeadersObj =
+            Object.keys(parsed).length > 0 ? (parsed as Record<string, string>) : undefined;
         }
       } catch {
         // Surfaced separately by Save validation; leave headers undefined here.
@@ -381,7 +309,9 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
   const hasAtLeastOneModelEntry = draftsToEntries(formModels).length > 0;
   const isCodexProvider = formProviderType === 'openai-codex';
 
-  const handleSubmit = async (opts: { keepEditing?: boolean; targetId?: string } = {}): Promise<LlmProfileConfig | null> => {
+  const handleSubmit = async (
+    opts: { keepEditing?: boolean; targetId?: string } = {}
+  ): Promise<LlmProfileConfig | null> => {
     if (!formName.trim()) return null;
 
     setSaving(true);
@@ -404,15 +334,20 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
               return null;
             }
             if (RESERVED_HEADER_KEYS.has(key.toLowerCase())) {
-              setFormRequestHeadersError(`Header "${key}" is reserved (managed by API key); remove it from Request Headers`);
+              setFormRequestHeadersError(
+                `Header "${key}" is reserved (managed by API key); remove it from Request Headers`
+              );
               setSaving(false);
               return null;
             }
           }
-          requestHeadersObj = Object.keys(parsed).length > 0 ? parsed as Record<string, string> : undefined;
+          requestHeadersObj =
+            Object.keys(parsed).length > 0 ? (parsed as Record<string, string>) : undefined;
           setFormRequestHeadersError(null);
         } catch (err) {
-          setFormRequestHeadersError(`Invalid JSON: ${err instanceof Error ? err.message : String(err)}`);
+          setFormRequestHeadersError(
+            `Invalid JSON: ${err instanceof Error ? err.message : String(err)}`
+          );
           setSaving(false);
           return null;
         }
@@ -449,7 +384,8 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       const compatMerged: Record<string, unknown> = { ...(compatObj ?? {}) };
       if (formCacheMarkers) compatMerged.cacheControlFormat = 'anthropic';
       else delete compatMerged.cacheControlFormat;
-      const compatOut = !isCodexProvider && Object.keys(compatMerged).length > 0 ? compatMerged : undefined;
+      const compatOut =
+        !isCodexProvider && Object.keys(compatMerged).length > 0 ? compatMerged : undefined;
 
       // Models — block save if any row has an inline error (duplicate / empty
       // id / non-positive-integer override). Empty rows are silently dropped.
@@ -459,7 +395,13 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       if (!isCodexProvider) {
         for (let i = 0; i < formModels.length; i += 1) {
           const row = formModels[i];
-          if (!row.modelId.trim() && !row.displayName.trim() && !row.contextWindowStr.trim() && !row.maxTokensStr.trim() && !row.supportsImage) {
+          if (
+            !row.modelId.trim() &&
+            !row.displayName.trim() &&
+            !row.contextWindowStr.trim() &&
+            !row.maxTokensStr.trim() &&
+            !row.supportsImage
+          ) {
             continue; // fully empty — drop on serialize
           }
           const errs = validateModelDraftRow(row, formModels, i);
@@ -517,7 +459,9 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
         // POST ignores null server-side; only send a defined value.
         saved = await api.createLlmProfile({
           ...baseData,
-          ...(!isCodexProvider && cacheRetentionValue !== null ? { cacheRetention: cacheRetentionValue } : {}),
+          ...(!isCodexProvider && cacheRetentionValue !== null
+            ? { cacheRetention: cacheRetentionValue }
+            : {}),
         });
       }
 
@@ -545,19 +489,27 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
 
   const addEmptyModelRow = () => {
     if (formModelsSaveError) setFormModelsSaveError(null);
-    setFormModels((rows) => [
+    setFormModels(rows => [
       ...rows,
-      { rowUid: generateRowUid(), modelId: '', displayName: '', contextWindowStr: '', maxTokensStr: '', supportsImage: false, inputModalitiesTouched: false },
+      {
+        rowUid: generateRowUid(),
+        modelId: '',
+        displayName: '',
+        contextWindowStr: '',
+        maxTokensStr: '',
+        supportsImage: false,
+        inputModalitiesTouched: false,
+      },
     ]);
   };
 
   const updateModelRow = (index: number, patch: Partial<ModelRowDraft>) => {
     if (formModelsSaveError) setFormModelsSaveError(null);
-    setFormModels((rows) => rows.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+    setFormModels(rows => rows.map((r, i) => (i === index ? { ...r, ...patch } : r)));
   };
 
   const updateModelRowByUid = (rowUid: string, patch: Partial<ModelRowDraft>) => {
-    setFormModels((rows) => rows.map((r) => (r.rowUid === rowUid ? { ...r, ...patch } : r)));
+    setFormModels(rows => rows.map(r => (r.rowUid === rowUid ? { ...r, ...patch } : r)));
   };
 
   const removeModelRow = (index: number) => {
@@ -570,7 +522,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
         testStatusTimersRef.current.delete(row.rowUid);
       }
     }
-    setFormModels((rows) => rows.filter((_, i) => i !== index));
+    setFormModels(rows => rows.filter((_, i) => i !== index));
   };
 
   const scheduleClearTestStatus = (rowUid: string) => {
@@ -578,7 +530,9 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     if (existing != null) window.clearTimeout(existing);
     const id = window.setTimeout(() => {
       testStatusTimersRef.current.delete(rowUid);
-      setFormModels((rows) => rows.map((r) => (r.rowUid === rowUid ? { ...r, testStatus: undefined } : r)));
+      setFormModels(rows =>
+        rows.map(r => (r.rowUid === rowUid ? { ...r, testStatus: undefined } : r))
+      );
     }, 6000);
     testStatusTimersRef.current.set(rowUid, id);
   };
@@ -601,8 +555,8 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
         return;
       }
       // Filter out ids already in the form so the picker is just net-new.
-      const existing = new Set(formModels.map((r) => r.modelId.trim()).filter(Boolean));
-      const candidates = result.models.filter((id) => !existing.has(id));
+      const existing = new Set(formModels.map(r => r.modelId.trim()).filter(Boolean));
+      const candidates = result.models.filter(id => !existing.has(id));
       if (candidates.length === 0) {
         setFetchModelsError('No new model ids returned (all candidates are already in the list).');
         return;
@@ -617,12 +571,12 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
 
   const confirmFetchPicker = () => {
     if (!fetchPicker) return;
-    const existing = new Set(formModels.map((r) => r.modelId.trim()).filter(Boolean));
-    const toAdd = Array.from(fetchPicker.selected).filter((id) => !existing.has(id));
+    const existing = new Set(formModels.map(r => r.modelId.trim()).filter(Boolean));
+    const toAdd = Array.from(fetchPicker.selected).filter(id => !existing.has(id));
     if (toAdd.length > 0) {
-      setFormModels((rows) => [
+      setFormModels(rows => [
         ...rows,
-        ...toAdd.map<ModelRowDraft>((modelId) => ({
+        ...toAdd.map<ModelRowDraft>(modelId => ({
           rowUid: generateRowUid(),
           modelId,
           displayName: '',
@@ -652,7 +606,9 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
         updateModelRowByUid(rowUid, { testStatus: { kind: 'fail', error: result.error } });
       }
     } catch (err) {
-      updateModelRowByUid(rowUid, { testStatus: { kind: 'fail', error: err instanceof Error ? err.message : String(err) } });
+      updateModelRowByUid(rowUid, {
+        testStatus: { kind: 'fail', error: err instanceof Error ? err.message : String(err) },
+      });
     } finally {
       scheduleClearTestStatus(rowUid);
     }
@@ -665,14 +621,14 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       clearDeleteConfirmation();
       setPendingDeleteProfileId(id);
       deleteConfirmTimeoutRef.current = window.setTimeout(() => {
-        setPendingDeleteProfileId((current) => (current === id ? null : current));
+        setPendingDeleteProfileId(current => (current === id ? null : current));
         deleteConfirmTimeoutRef.current = null;
       }, 3000);
       return;
     }
 
     clearDeleteConfirmation();
-    setDeleteErrorByProfileId((prev) => {
+    setDeleteErrorByProfileId(prev => {
       if (!(id in prev)) return prev;
       const next = { ...prev };
       delete next[id];
@@ -680,18 +636,18 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     });
 
     // Snapshot for optimistic rollback if the DELETE fails.
-    const snapshot = profiles.find((p) => p.id === id);
-    const originalIndex = profiles.findIndex((p) => p.id === id);
+    const snapshot = profiles.find(p => p.id === id);
+    const originalIndex = profiles.findIndex(p => p.id === id);
     if (!snapshot) return;
     const wasDefault = snapshot.isDefault === true;
 
     // Optimistic local + meta-store removal — list update is instant; the
     // DELETE round-trip + (sometimes) follow-up sync runs in the background.
-    setProfiles((prev) => prev.filter((p) => p.id !== id));
+    setProfiles(prev => prev.filter(p => p.id !== id));
     const metaStore = useLlmProfileMetaStore.getState();
     metaStore.setProviders(
-      metaStore.getProviders(activeServerId).filter((p) => p.id !== id),
-      activeServerId,
+      metaStore.getProviders(activeServerId).filter(p => p.id !== id),
+      activeServerId
     );
 
     setDeletingProfileId(id);
@@ -707,7 +663,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     }
 
     // Rollback: restore the row at its original index + the meta store.
-    setProfiles((prev) => {
+    setProfiles(prev => {
       const next = [...prev];
       const insertAt = Math.max(0, Math.min(originalIndex, next.length));
       next.splice(insertAt, 0, snapshot);
@@ -716,7 +672,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     const metaStoreAfter = useLlmProfileMetaStore.getState();
     metaStoreAfter.setProviders(
       [...metaStoreAfter.getProviders(activeServerId), snapshot],
-      activeServerId,
+      activeServerId
     );
 
     let message = result.message;
@@ -726,7 +682,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       message = `This LLM profile is used by ${count} ${noun}. Edit those agents to bind a different profile before deleting.`;
     }
     console.error('Failed to delete provider:', result);
-    setDeleteErrorByProfileId((prev) => ({ ...prev, [id]: message }));
+    setDeleteErrorByProfileId(prev => ({ ...prev, [id]: message }));
   };
 
   const handleSetDefault = async (id: string) => {
@@ -764,7 +720,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
         <input
           type="text"
           value={formName}
-          onChange={(e) => setFormName(e.target.value)}
+          onChange={e => setFormName(e.target.value)}
           placeholder="e.g., Local ZClaudia Agent"
           className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary"
         />
@@ -775,25 +731,30 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       {formProviderType !== 'openai-codex' && (
         <>
           <div>
-            <label className="block text-sm font-medium text-muted-foreground mb-1">Base URL (optional)</label>
+            <label className="block text-sm font-medium text-muted-foreground mb-1">
+              Base URL (optional)
+            </label>
             <input
               type="text"
               value={formBaseUrl}
-              onChange={(e) => setFormBaseUrl(e.target.value)}
+              onChange={e => setFormBaseUrl(e.target.value)}
               placeholder="http://api.example.com/v1"
               className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary font-mono"
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Override default endpoint. Required for OpenAI-compatible third-party proxies (e.g. DeepSeek, Moonshot, local gateways).
+              Override default endpoint. Required for OpenAI-compatible third-party proxies (e.g.
+              DeepSeek, Moonshot, local gateways).
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-muted-foreground mb-1">API Key (optional)</label>
+            <label className="block text-sm font-medium text-muted-foreground mb-1">
+              API Key (optional)
+            </label>
             <input
               type="password"
               value={formApiKey}
-              onChange={(e) => setFormApiKey(e.target.value)}
+              onChange={e => setFormApiKey(e.target.value)}
               placeholder="sk-..."
               autoComplete="off"
               className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary font-mono"
@@ -804,10 +765,14 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-muted-foreground mb-1">Prompt cache retention</label>
+            <label className="block text-sm font-medium text-muted-foreground mb-1">
+              Prompt cache retention
+            </label>
             <select
               value={formCacheRetention}
-              onChange={(e) => setFormCacheRetention(e.target.value as 'default' | 'none' | 'short' | 'long')}
+              onChange={e =>
+                setFormCacheRetention(e.target.value as 'default' | 'none' | 'short' | 'long')
+              }
               aria-label="Prompt cache retention"
               className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary"
             >
@@ -817,7 +782,8 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
               <option value="short">Short (explicit 5 min TTL)</option>
             </select>
             <p className="text-xs text-muted-foreground mt-1">
-              Anthropic prompt caching. "Off" is an escape hatch for proxies that reject cache_control.
+              Anthropic prompt caching. "Off" is an escape hatch for proxies that reject
+              cache_control.
             </p>
           </div>
         </>
@@ -827,18 +793,22 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
         <CodexOAuthSection
           profile={codexOAuthProfile}
           onCredentialsChanged={loadProfiles}
-          onBeforeSignIn={!editingProfile || editingProfile.providerType !== 'openai-codex'
-            ? () => handleSubmit({ keepEditing: true, targetId: editingProfile?.id })
-            : undefined}
+          onBeforeSignIn={
+            !editingProfile || editingProfile.providerType !== 'openai-codex'
+              ? () => handleSubmit({ keepEditing: true, targetId: editingProfile?.id })
+              : undefined
+          }
         />
       )}
 
       {!isCodexProvider && (
         <div>
-          <label className="block text-sm font-medium text-muted-foreground mb-1">Request Headers (JSON)</label>
+          <label className="block text-sm font-medium text-muted-foreground mb-1">
+            Request Headers (JSON)
+          </label>
           <textarea
             value={formRequestHeaders}
-            onChange={(e) => {
+            onChange={e => {
               setFormRequestHeaders(e.target.value);
               if (formRequestHeadersError) setFormRequestHeadersError(null);
             }}
@@ -853,7 +823,8 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
             <p className="text-xs text-destructive mt-1">{formRequestHeadersError}</p>
           ) : (
             <p className="text-xs text-muted-foreground mt-1">
-              Extra HTTP headers added to LLM API requests. Authorization / Content-Type / Host are reserved.
+              Extra HTTP headers added to LLM API requests. Authorization / Content-Type / Host are
+              reserved.
             </p>
           )}
         </div>
@@ -879,7 +850,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
         <div>
           <button
             type="button"
-            onClick={() => setShowAdvanced((v) => !v)}
+            onClick={() => setShowAdvanced(v => !v)}
             className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
           >
             <ChevronDown
@@ -895,16 +866,17 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
                   type="checkbox"
                   id="cacheMarkers"
                   checked={formCacheMarkers}
-                  onChange={(e) => setFormCacheMarkers(e.target.checked)}
+                  onChange={e => setFormCacheMarkers(e.target.checked)}
                   aria-label="Anthropic-style cache markers"
                 />
                 <label htmlFor="cacheMarkers" className="text-sm">
-                  Anthropic-style cache markers (enable when routing Claude through an OpenAI-compatible proxy)
+                  Anthropic-style cache markers (enable when routing Claude through an
+                  OpenAI-compatible proxy)
                 </label>
               </div>
               <textarea
                 value={formCompat}
-                onChange={(e) => {
+                onChange={e => {
                   setFormCompat(e.target.value);
                   if (formCompatError) setFormCompatError(null);
                 }}
@@ -933,7 +905,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
           type="checkbox"
           id="isDefault"
           checked={formIsDefault}
-          onChange={(e) => setFormIsDefault(e.target.checked)}
+          onChange={e => setFormIsDefault(e.target.checked)}
           className="rounded-md border-border bg-secondary"
         />
         <label htmlFor="isDefault" className="text-sm">
@@ -943,9 +915,20 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
 
       <div className="flex gap-2 pt-2">
         <button
-          onClick={() => { void handleSubmit(); }}
-          disabled={!formName.trim() || saving || (!isCodexProvider && !!formRequestHeadersError) || (!isCodexProvider && !hasAtLeastOneModelEntry)}
-          title={(!isCodexProvider && !hasAtLeastOneModelEntry) ? 'Add at least one model before saving' : undefined}
+          onClick={() => {
+            void handleSubmit();
+          }}
+          disabled={
+            !formName.trim() ||
+            saving ||
+            (!isCodexProvider && !!formRequestHeadersError) ||
+            (!isCodexProvider && !hasAtLeastOneModelEntry)
+          }
+          title={
+            !isCodexProvider && !hasAtLeastOneModelEntry
+              ? 'Add at least one model before saving'
+              : undefined
+          }
           className="flex-1 px-4 py-2 bg-muted/60 text-foreground hover:bg-muted rounded-lg text-sm font-medium disabled:opacity-50"
         >
           {saving ? 'Saving...' : editingProfile ? 'Update' : 'Create'}
@@ -963,99 +946,122 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     <div className="space-y-2">
       {(profiles ?? []).length === 0 ? (
         <p className="text-muted-foreground text-center py-8">
-          No providers configured.<br />
+          No providers configured.
+          <br />
           Add a provider to get started.
         </p>
       ) : (
-        (profiles ?? []).map((profile) => (
+        (profiles ?? []).map(profile => (
           <div key={profile.id} className="space-y-1">
-          <div
-            className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg hover:bg-secondary"
-          >
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="font-medium truncate">{profile.name}</span>
-                {profile.isDefault && (
-                  <span className="px-1.5 py-0.5 bg-muted text-primary text-xs rounded-md">
-                    Default
+            <div className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg hover:bg-secondary">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium truncate">{profile.name}</span>
+                  {profile.isDefault && (
+                    <span className="px-1.5 py-0.5 bg-muted text-primary text-xs rounded-md">
+                      Default
+                    </span>
+                  )}
+                  <span className="px-1.5 py-0.5 bg-secondary text-muted-foreground text-xs rounded-md">
+                    {profile.providerType || 'anthropic'}
                   </span>
+                </div>
+                {profile.baseUrl && (
+                  <div className="text-xs text-muted-foreground truncate font-mono mt-1">
+                    {profile.baseUrl}
+                  </div>
                 )}
-                <span className="px-1.5 py-0.5 bg-secondary text-muted-foreground text-xs rounded-md">
-                  {profile.providerType || 'anthropic'}
-                </span>
+                <CapabilityTags providerType={profile.providerType || 'anthropic'} />
               </div>
-              {profile.baseUrl && (
-                <div className="text-xs text-muted-foreground truncate font-mono mt-1">
-                  {profile.baseUrl}
+              {!readOnly && (
+                <div className="flex items-center gap-1 ml-2">
+                  {!profile.isDefault && (
+                    <button
+                      onClick={() => handleSetDefault(profile.id)}
+                      className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
+                      title="Set as default"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => openEditForm(profile)}
+                    className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
+                    title="Edit"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => handleDelete(profile.id)}
+                    disabled={deletingProfileId !== null}
+                    className={`p-1.5 rounded-md transition-colors disabled:opacity-50 ${
+                      pendingDeleteProfileId === profile.id
+                        ? 'bg-destructive/15 text-destructive hover:bg-destructive/25'
+                        : 'hover:bg-secondary text-destructive hover:text-destructive'
+                    }`}
+                    title={
+                      pendingDeleteProfileId === profile.id
+                        ? 'Click again to confirm delete'
+                        : 'Delete'
+                    }
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                      />
+                    </svg>
+                  </button>
                 </div>
               )}
-              <CapabilityTags providerType={profile.providerType || 'anthropic'} />
             </div>
-            {!readOnly && (
-            <div className="flex items-center gap-1 ml-2">
-              {!profile.isDefault && (
-                <button
-                  onClick={() => handleSetDefault(profile.id)}
-                  className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
-                  title="Set as default"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </button>
-              )}
-              <button
-                onClick={() => openEditForm(profile)}
-                className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
-                title="Edit"
+            {deleteErrorByProfileId[profile.id] && (
+              <div
+                role="alert"
+                className="flex items-start gap-1.5 px-3 py-1.5 text-xs text-destructive"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-              </button>
-              <button
-                onClick={() => handleDelete(profile.id)}
-                disabled={deletingProfileId !== null}
-                className={`p-1.5 rounded-md transition-colors disabled:opacity-50 ${
-                  pendingDeleteProfileId === profile.id
-                    ? 'bg-destructive/15 text-destructive hover:bg-destructive/25'
-                    : 'hover:bg-secondary text-destructive hover:text-destructive'
-                }`}
-                title={pendingDeleteProfileId === profile.id ? 'Click again to confirm delete' : 'Delete'}
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
-            </div>
+                <AlertTriangle size={12} className="shrink-0 mt-0.5" aria-hidden="true" />
+                <span>{deleteErrorByProfileId[profile.id]}</span>
+              </div>
             )}
-          </div>
-          {deleteErrorByProfileId[profile.id] && (
-            <div
-              role="alert"
-              className="flex items-start gap-1.5 px-3 py-1.5 text-xs text-destructive"
-            >
-              <AlertTriangle size={12} className="shrink-0 mt-0.5" aria-hidden="true" />
-              <span>{deleteErrorByProfileId[profile.id]}</span>
-            </div>
-          )}
           </div>
         ))
       )}
 
       {!readOnly && (
-      <button
-        onClick={() => {
-          clearDeleteConfirmation();
-          setShowAddForm(true);
-        }}
-        className="w-full py-2 border-2 border-dashed border-border rounded-lg text-muted-foreground hover:border-muted-foreground hover:text-foreground flex items-center justify-center gap-2"
-      >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
-        Add Provider
-      </button>
+        <button
+          onClick={() => {
+            clearDeleteConfirmation();
+            setShowAddForm(true);
+          }}
+          className="w-full py-2 border-2 border-dashed border-border rounded-lg text-muted-foreground hover:border-muted-foreground hover:text-foreground flex items-center justify-center gap-2"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Add Provider
+        </button>
       )}
     </div>
   );
@@ -1064,8 +1070,8 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     <FetchModelsPickerDialog
       candidates={fetchPicker.candidates}
       selected={fetchPicker.selected}
-      onToggle={(id) => {
-        setFetchPicker((cur) => {
+      onToggle={id => {
+        setFetchPicker(cur => {
           if (!cur) return cur;
           const next = new Set(cur.selected);
           if (next.has(id)) next.delete(id);
@@ -1073,8 +1079,10 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
           return { ...cur, selected: next };
         });
       }}
-      onSelectAll={() => setFetchPicker((cur) => (cur ? { ...cur, selected: new Set(cur.candidates) } : cur))}
-      onSelectNone={() => setFetchPicker((cur) => (cur ? { ...cur, selected: new Set() } : cur))}
+      onSelectAll={() =>
+        setFetchPicker(cur => (cur ? { ...cur, selected: new Set(cur.candidates) } : cur))
+      }
+      onSelectNone={() => setFetchPicker(cur => (cur ? { ...cur, selected: new Set() } : cur))}
       onCancel={() => setFetchPicker(null)}
       onConfirm={confirmFetchPicker}
     />
@@ -1106,15 +1114,18 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
             className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {content}
-        </div>
+        <div className="flex-1 overflow-y-auto p-4">{content}</div>
       </div>
       {fetchPickerOverlay}
     </>
@@ -1127,7 +1138,7 @@ const PROVIDER_TYPE_LABELS: Record<string, string> = {
   'openai-codex': 'OpenAI Codex (ChatGPT Plus/Pro)',
 };
 
-const PROVIDER_TYPE_OPTIONS: { value: string; label: string }[] = LLM_PROVIDER_TYPES.map((value) => ({
+const PROVIDER_TYPE_OPTIONS: { value: string; label: string }[] = LLM_PROVIDER_TYPES.map(value => ({
   value,
   label: PROVIDER_TYPE_LABELS[value] ?? value,
 }));
@@ -1167,9 +1178,7 @@ function ModelsSection({
   // F2: Fetch/Test now hit the preview endpoints, so neither needs the profile
   // to be saved or the form to be pristine. The only remaining hard gate is
   // providerType (the preview validator requires it).
-  const fetchDisabledReason = !providerType
-    ? 'Pick a provider type first'
-    : undefined;
+  const fetchDisabledReason = !providerType ? 'Pick a provider type first' : undefined;
   const fetchDisabled = !providerType || fetching;
   return (
     <div>
@@ -1194,15 +1203,12 @@ function ModelsSection({
           </button>
         </div>
       </div>
-      {fetchError && (
-        <p className="text-xs text-destructive mb-2">{fetchError}</p>
-      )}
-      {saveError && (
-        <p className="text-xs text-destructive mb-2">{saveError}</p>
-      )}
+      {fetchError && <p className="text-xs text-destructive mb-2">{fetchError}</p>}
+      {saveError && <p className="text-xs text-destructive mb-2">{saveError}</p>}
       {models.length === 0 ? (
         <p className="text-xs text-muted-foreground">
-          No models declared. Add at least one model entry before saving — agent profiles bound to this LLM profile pick their model id from this list.
+          No models declared. Add at least one model entry before saving — agent profiles bound to
+          this LLM profile pick their model id from this list.
         </p>
       ) : (
         <div className="space-y-2">
@@ -1213,7 +1219,7 @@ function ModelsSection({
               row={row}
               allRows={models}
               providerType={providerType}
-              onChange={(patch) => onUpdate(idx, patch)}
+              onChange={patch => onUpdate(idx, patch)}
               onRemove={() => onRemove(idx)}
               onProbe={() => onProbe(idx)}
               buildPreviewInput={buildPreviewInput}
@@ -1248,11 +1254,19 @@ interface ResolvedPreviewState {
   matchedProvider?: string;
 }
 
-function ModelRow({ index, row, allRows, providerType, onChange, onRemove, onProbe, buildPreviewInput }: ModelRowProps) {
+function ModelRow({
+  index,
+  row,
+  allRows,
+  providerType,
+  onChange,
+  onRemove,
+  onProbe,
+  buildPreviewInput,
+}: ModelRowProps) {
   const errs = validateModelDraftRow(row, allRows, index);
   const isRunning = row.testStatus?.kind === 'running';
-  const testDisabled =
-    !providerType || isRunning || !row.modelId.trim() || !!errs.modelId;
+  const testDisabled = !providerType || isRunning || !row.modelId.trim() || !!errs.modelId;
   const testDisabledReason = !providerType
     ? 'Pick a provider type first'
     : !row.modelId.trim()
@@ -1305,7 +1319,7 @@ function ModelRow({ index, row, allRows, providerType, onChange, onRemove, onPro
       // contextWindow). This way `resolveContextWindow` walks past the
       // profile_entry layer for *this* model id and reports what the next
       // layer (pi_ai_registry / openai_compat_default / fallback) would supply.
-      const sanitizedModels = (previewInput.models ?? []).map((entry) => {
+      const sanitizedModels = (previewInput.models ?? []).map(entry => {
         if (entry.modelId !== modelIdInput) return entry;
         const { contextWindow: _omitContextWindow, ...rest } = entry;
         void _omitContextWindow;
@@ -1319,7 +1333,7 @@ function ModelRow({ index, row, allRows, providerType, onChange, onRemove, onPro
           models: sanitizedModels,
           modelId: modelIdInput,
         })
-        .then((data) => {
+        .then(data => {
           if (myRequestId !== requestIdRef.current) return; // stale
           setResolved({
             status: 'ok',
@@ -1361,21 +1375,23 @@ function ModelRow({ index, row, allRows, providerType, onChange, onRemove, onPro
           <input
             type="text"
             value={row.modelId}
-            onChange={(e) => onChange({ modelId: e.target.value })}
+            onChange={e => onChange({ modelId: e.target.value })}
             placeholder="model id (e.g. claude-opus-4-7)"
             aria-label="model id"
             className={`w-full px-2 py-1.5 bg-background border ${errs.modelId ? 'border-destructive' : 'border-border'} rounded-md text-sm focus:outline-none focus:border-primary font-mono`}
           />
           {errs.modelId && (
             <p className="text-[10px] text-destructive mt-0.5">
-              {errs.modelId === 'duplicate' ? 'duplicate model id in this profile' : 'model id is required'}
+              {errs.modelId === 'duplicate'
+                ? 'duplicate model id in this profile'
+                : 'model id is required'}
             </p>
           )}
         </div>
         <input
           type="text"
           value={row.displayName}
-          onChange={(e) => onChange({ displayName: e.target.value })}
+          onChange={e => onChange({ displayName: e.target.value })}
           placeholder="display name (optional)"
           aria-label="display name"
           className="w-full px-2 py-1.5 bg-background border border-border rounded-md text-sm focus:outline-none focus:border-primary"
@@ -1385,22 +1401,28 @@ function ModelRow({ index, row, allRows, providerType, onChange, onRemove, onPro
             type="text"
             inputMode="numeric"
             value={row.contextWindowStr}
-            onChange={(e) => onChange({ contextWindowStr: e.target.value })}
+            onChange={e => onChange({ contextWindowStr: e.target.value })}
             placeholder="context window (optional override)"
             aria-label="context window"
             className={`w-full px-2 py-1.5 bg-background border ${errs.contextWindow ? 'border-destructive' : 'border-border'} rounded-md text-sm focus:outline-none focus:border-primary font-mono`}
           />
           {errs.contextWindow && (
-            <p className="text-[10px] text-destructive mt-0.5">contextWindow {errs.contextWindow}</p>
+            <p className="text-[10px] text-destructive mt-0.5">
+              contextWindow {errs.contextWindow}
+            </p>
           )}
-          <ResolvedContextWindowHint state={resolved} eligible={helperEligible} modelId={modelIdInput} />
+          <ResolvedContextWindowHint
+            state={resolved}
+            eligible={helperEligible}
+            modelId={modelIdInput}
+          />
         </div>
         <div>
           <input
             type="text"
             inputMode="numeric"
             value={row.maxTokensStr}
-            onChange={(e) => onChange({ maxTokensStr: e.target.value })}
+            onChange={e => onChange({ maxTokensStr: e.target.value })}
             placeholder="max tokens (optional override)"
             aria-label="max tokens"
             className={`w-full px-2 py-1.5 bg-background border ${errs.maxTokens ? 'border-destructive' : 'border-border'} rounded-md text-sm focus:outline-none focus:border-primary font-mono`}
@@ -1417,7 +1439,9 @@ function ModelRow({ index, row, allRows, providerType, onChange, onRemove, onPro
             <input
               type="checkbox"
               checked={row.supportsImage}
-              onChange={(e) => onChange({ supportsImage: e.target.checked, inputModalitiesTouched: true })}
+              onChange={e =>
+                onChange({ supportsImage: e.target.checked, inputModalitiesTouched: true })
+              }
               aria-label={`model ${row.modelId.trim() || index + 1} supports image input`}
               className="h-3.5 w-3.5 rounded border-border"
             />
@@ -1497,7 +1521,8 @@ function ResolvedContextWindowHint({
       // "pi-ai" in user-facing copy.
       return (
         <p className="text-[10px] text-muted-foreground mt-0.5">
-          Using {formatted} from registry{state.matchedProvider ? ` (${state.matchedProvider})` : ''}
+          Using {formatted} from registry
+          {state.matchedProvider ? ` (${state.matchedProvider})` : ''}
         </p>
       );
     case 'openai_compat_default':
@@ -1509,7 +1534,8 @@ function ResolvedContextWindowHint({
         <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 flex items-start gap-1">
           <AlertTriangle size={11} className="shrink-0 mt-0.5" aria-hidden="true" />
           <span>
-            Using {formatted} default for openai-compat. No registry match for "{modelId}" — declare contextWindow above or use a known model id.
+            Using {formatted} default for openai-compat. No registry match for "{modelId}" — declare
+            contextWindow above or use a known model id.
           </span>
         </p>
       );
@@ -1518,7 +1544,8 @@ function ResolvedContextWindowHint({
         <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 flex items-start gap-1">
           <AlertTriangle size={11} className="shrink-0 mt-0.5" aria-hidden="true" />
           <span>
-            Falls back to {formatted} — no spec found. Declare contextWindow above or add to LLM profile.
+            Falls back to {formatted} — no spec found. Declare contextWindow above or add to LLM
+            profile.
           </span>
         </p>
       );
@@ -1529,8 +1556,14 @@ function ResolvedContextWindowHint({
 
 function ModelTestStatus({ status }: { status: ModelRowDraft['testStatus'] }) {
   if (!status) return <span className="text-[11px] text-muted-foreground" />;
-  if (status.kind === 'running') return <span className="text-[11px] text-muted-foreground">Probing…</span>;
-  if (status.kind === 'ok') return <span className="text-[11px] text-emerald-600 dark:text-emerald-400">✓ {status.latencyMs} ms</span>;
+  if (status.kind === 'running')
+    return <span className="text-[11px] text-muted-foreground">Probing…</span>;
+  if (status.kind === 'ok')
+    return (
+      <span className="text-[11px] text-emerald-600 dark:text-emerald-400">
+        ✓ {status.latencyMs} ms
+      </span>
+    );
   return (
     <span className="text-[11px] text-destructive truncate max-w-[280px]" title={status.error}>
       ✗ {status.error}
@@ -1569,20 +1602,34 @@ function FetchModelsPickerDialog({
             aria-label="Close picker"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
         <div className="flex items-center justify-between px-4 py-2 border-b border-border text-xs text-muted-foreground">
-          <span>{candidates.length} candidates — {selected.size} selected</span>
+          <span>
+            {candidates.length} candidates — {selected.size} selected
+          </span>
           <div className="flex gap-2">
-            <button onClick={onSelectAll} className="hover:text-foreground">All</button>
-            <button onClick={onSelectNone} className="hover:text-foreground">None</button>
+            <button onClick={onSelectAll} className="hover:text-foreground">
+              All
+            </button>
+            <button onClick={onSelectNone} className="hover:text-foreground">
+              None
+            </button>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto px-2 py-2">
-          {candidates.map((id) => (
-            <label key={id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-secondary cursor-pointer">
+          {candidates.map(id => (
+            <label
+              key={id}
+              className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-secondary cursor-pointer"
+            >
               <input
                 type="checkbox"
                 checked={selected.has(id)}
@@ -1613,7 +1660,13 @@ function FetchModelsPickerDialog({
   );
 }
 
-function ProviderTypeSelector({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function ProviderTypeSelector({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -1637,7 +1690,10 @@ function ProviderTypeSelector({ value, onChange }: { value: string; onChange: (v
         className="w-full flex items-center justify-between px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary text-left"
       >
         <span>{selected?.label ?? value}</span>
-        <ChevronDown size={14} className={`text-muted-foreground transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown
+          size={14}
+          className={`text-muted-foreground transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+        />
       </button>
       {open && (
         <div className="absolute left-0 right-0 top-full mt-1 bg-popover/95 glass border border-border/50 rounded-xl shadow-apple-xl animate-apple-fade-in z-50 py-1 overflow-hidden">
@@ -1645,9 +1701,14 @@ function ProviderTypeSelector({ value, onChange }: { value: string; onChange: (v
             <button
               key={opt.value}
               type="button"
-              onClick={() => { onChange(opt.value); setOpen(false); }}
+              onClick={() => {
+                onChange(opt.value);
+                setOpen(false);
+              }}
               className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
-                opt.value === value ? 'text-primary font-medium bg-muted/40' : 'text-foreground hover:bg-secondary/80'
+                opt.value === value
+                  ? 'text-primary font-medium bg-muted/40'
+                  : 'text-foreground hover:bg-secondary/80'
               }`}
             >
               <span className="w-4 flex-shrink-0">

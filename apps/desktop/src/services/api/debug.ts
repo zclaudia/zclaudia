@@ -61,8 +61,13 @@ export interface ManagedProcessRecord {
   metadata: Record<string, unknown> | null;
 }
 
-export async function getCrashReports(): Promise<{ reports: CrashReportEntry[]; filePath: string }> {
-  const result = await fetchLocalApi<{ reports: CrashReportEntry[]; filePath: string }>('/api/debug/crashes');
+export async function getCrashReports(): Promise<{
+  reports: CrashReportEntry[];
+  filePath: string;
+}> {
+  const result = await fetchLocalApi<{ reports: CrashReportEntry[]; filePath: string }>(
+    '/api/debug/crashes'
+  );
   if (!result.success || !result.data) {
     throw new Error(result.error?.message || 'Failed to fetch crash reports');
   }
@@ -140,7 +145,9 @@ export interface SimulateAIReviewResponse {
   pendingPiAgent?: boolean;
 }
 
-export async function simulateAIReview(req: SimulateAIReviewRequest): Promise<SimulateAIReviewResponse> {
+export async function simulateAIReview(
+  req: SimulateAIReviewRequest
+): Promise<SimulateAIReviewResponse> {
   const result = await fetchLocalApi<SimulateAIReviewResponse>('/api/debug/simulate-ai-review', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

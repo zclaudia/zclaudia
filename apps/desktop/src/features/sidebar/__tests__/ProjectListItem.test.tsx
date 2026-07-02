@@ -109,9 +109,7 @@ describe('ProjectListItem', () => {
 
     it('flattens a single-session worktree into a plain row with no group toggle', () => {
       render(
-        <ProjectListItem
-          {...makeProps({ sessions: [rootSession, wtSessionA], worktrees })}
-        />
+        <ProjectListItem {...makeProps({ sessions: [rootSession, wtSessionA], worktrees })} />
       );
       // The session shows directly...
       expect(screen.getByText('Worktree A Session')).toBeDefined();

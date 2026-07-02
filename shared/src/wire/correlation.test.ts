@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  createRequest,
-  isEvent,
-  isRequest,
-  isResponse,
-  isStreamMessage,
-} from './correlation.js';
+import { createRequest, isEvent, isRequest, isResponse, isStreamMessage } from './correlation.js';
 
 describe('correlation guards', () => {
   it('does not classify a request as an event', () => {

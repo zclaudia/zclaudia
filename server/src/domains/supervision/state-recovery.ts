@@ -1,20 +1,21 @@
 import type { Database } from 'better-sqlite3';
 import type { TaskStatus } from '@zclaudia/shared/features/supervision';
-import { SupervisionTaskRepository } from './repositories/supervision-task.js';
+import { type SupervisionTaskRepository } from './repositories/supervision-task.js';
 import type { SupervisionProjectPort, SupervisionSessionPort } from './ports.js';
 import type { SupervisorService } from './supervisor-service.js';
-import {
-  assertTaskTransition,
-  TERMINAL_TASK_STATUSES,
-} from './status-machine.js';
-import {
-  getActiveTaskStatuses,
-  holdsTaskWorktree,
-} from './model.js';
+import { assertTaskTransition, TERMINAL_TASK_STATUSES } from './status-machine.js';
+import { getActiveTaskStatuses, holdsTaskWorktree } from './model.js';
 import { shouldTransitionAgentToIdle } from './model.js';
 
 export interface RecoveryAction {
-  type: 'task_requeued' | 'task_failed' | 'worktree_released' | 'session_archived' | 'agent_idle' | 'run_interrupted' | 'recovery_error';
+  type:
+    | 'task_requeued'
+    | 'task_failed'
+    | 'worktree_released'
+    | 'session_archived'
+    | 'agent_idle'
+    | 'run_interrupted'
+    | 'recovery_error';
   id: string;
   detail?: string;
 }
@@ -31,16 +32,22 @@ export class StateRecovery {
     private sessionRepo: SupervisionSessionPort,
     private projectRepo: SupervisionProjectPort,
     private supervisorService: SupervisorService,
-    private activeRuns: Map<string, unknown>,
+    private activeRuns: Map<string, unknown>
   ) {}
 
   recover(): RecoveryReport {
     const actions: RecoveryAction[] = [];
 
-    actions.push(...this.safeRecover('recoverInterruptedRuns', () => this.recoverInterruptedRuns()));
+    actions.push(
+      ...this.safeRecover('recoverInterruptedRuns', () => this.recoverInterruptedRuns())
+    );
     actions.push(...this.safeRecover('recoverStuckTasks', () => this.recoverStuckTasks()));
-    actions.push(...this.safeRecover('releaseOrphanedWorktrees', () => this.releaseOrphanedWorktrees()));
-    actions.push(...this.safeRecover('archiveOrphanedSessions', () => this.archiveOrphanedSessions()));
+    actions.push(
+      ...this.safeRecover('releaseOrphanedWorktrees', () => this.releaseOrphanedWorktrees())
+    );
+    actions.push(
+      ...this.safeRecover('archiveOrphanedSessions', () => this.archiveOrphanedSessions())
+    );
     actions.push(...this.safeRecover('fixIdleAgents', () => this.fixIdleAgents()));
 
     const report: RecoveryReport = {
@@ -49,8 +56,10 @@ export class StateRecovery {
     };
 
     if (actions.length > 0) {
-      console.log(`[StateRecovery] Recovered ${actions.length} items:`,
-        actions.map(a => `${a.type}:${a.id}`).join(', '));
+      console.log(
+        `[StateRecovery] Recovered ${actions.length} items:`,
+        actions.map(a => `${a.type}:${a.id}`).join(', ')
+      );
     }
 
     return report;
@@ -59,14 +68,19 @@ export class StateRecovery {
   private recoverInterruptedRuns(): RecoveryAction[] {
     const actions: RecoveryAction[] = [];
 
-    const stuck = this.db.prepare(`
+    const stuck = this.db
+      .prepare(
+        `
       SELECT id, last_run_status FROM sessions
       WHERE last_run_status IN ('running', 'waiting') AND archived_at IS NULL
-    `).all() as Array<{ id: string; last_run_status: string }>;
+    `
+      )
+      .all() as Array<{ id: string; last_run_status: string }>;
 
     const now = Date.now();
     for (const s of stuck) {
-      this.db.prepare('UPDATE sessions SET last_run_status = ?, updated_at = ? WHERE id = ?')
+      this.db
+        .prepare('UPDATE sessions SET last_run_status = ?, updated_at = ? WHERE id = ?')
         .run('interrupted', now, s.id);
       actions.push({
         type: 'run_interrupted',
@@ -229,18 +243,17 @@ export class StateRecovery {
     return actions;
   }
 
-  private safeRecover(
-    step: string,
-    fn: () => RecoveryAction[],
-  ): RecoveryAction[] {
+  private safeRecover(step: string, fn: () => RecoveryAction[]): RecoveryAction[] {
     try {
       return fn();
     } catch (err) {
-      return [{
-        type: 'recovery_error',
-        id: step,
-        detail: err instanceof Error ? err.message : String(err),
-      }];
+      return [
+        {
+          type: 'recovery_error',
+          id: step,
+          detail: err instanceof Error ? err.message : String(err),
+        },
+      ];
     }
   }
 }

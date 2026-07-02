@@ -49,7 +49,9 @@ function baseInput(overrides: Record<string, unknown> = {}) {
   };
 }
 
-beforeEach(() => { compactForOverflow.mockReset(); });
+beforeEach(() => {
+  compactForOverflow.mockReset();
+});
 
 describe('handleRunException — overflow recovery', () => {
   it('compacts and retries when overflow compaction succeeds', async () => {
@@ -57,12 +59,19 @@ describe('handleRunException — overflow recovery', () => {
     const { input, handleRetry } = baseInput();
     const result = await handleRunException(input as any);
     expect(compactForOverflow).toHaveBeenCalledOnce();
-    expect(handleRetry).toHaveBeenCalledWith({ overflowRetryCount: 1, sessionResetRetryCount: undefined });
+    expect(handleRetry).toHaveBeenCalledWith({
+      overflowRetryCount: 1,
+      sessionResetRetryCount: undefined,
+    });
     expect(result.handedOffToRetry).toBe(true);
   });
 
   it('falls through to failure when compaction cannot cut (no_cut_point)', async () => {
-    compactForOverflow.mockResolvedValue({ outcome: 'skipped', compacted: false, reason: 'no_cut_point' });
+    compactForOverflow.mockResolvedValue({
+      outcome: 'skipped',
+      compacted: false,
+      reason: 'no_cut_point',
+    });
     const { input, handleRetry, sendRunEvent } = baseInput();
     const result = await handleRunException(input as any);
     expect(handleRetry).not.toHaveBeenCalled();

@@ -17,10 +17,19 @@ describe('Phase F e2e — stale propagation + cascade + impact', () => {
     // calling startVirtualRun, so the queue only drains when evaluateImpact runs.
     h = buildHarness({
       aiResponses: [
-        { fragments: ['{"kind":"minor-fix","reason":"only comment changed"}'], terminalKind: 'run_completed' },
-        { fragments: ['{"kind":"rerun","reason":"behavior change"}'], terminalKind: 'run_completed' },
+        {
+          fragments: ['{"kind":"minor-fix","reason":"only comment changed"}'],
+          terminalKind: 'run_completed',
+        },
+        {
+          fragments: ['{"kind":"rerun","reason":"behavior change"}'],
+          terminalKind: 'run_completed',
+        },
       ],
-      fallbackResponse: { fragments: ['{"kind":"rerun","reason":"fallback default"}'], terminalKind: 'run_completed' },
+      fallbackResponse: {
+        fragments: ['{"kind":"rerun","reason":"fallback default"}'],
+        terminalKind: 'run_completed',
+      },
     });
   });
 
@@ -35,7 +44,7 @@ describe('Phase F e2e — stale propagation + cascade + impact', () => {
     h.service.setPhasesJson(run.id, buildLinearPhasesJson(3));
 
     await runEachOf(h, run.id, ['A', 'B', 'C']);
-    expect(h.service.listPhases(run.id).every((p) => p.status === 'done')).toBe(true);
+    expect(h.service.listPhases(run.id).every(p => p.status === 'done')).toBe(true);
 
     // Rerun A. Stale propagation is "lazy + soft" (see stale-propagator.ts):
     // only DIRECT downstream phases of A that are currently 'done' get marked stale.
@@ -43,7 +52,7 @@ describe('Phase F e2e — stale propagation + cascade + impact', () => {
     // the fresh artifact whenever it's eventually re-run.
     await h.service.rerunPhase(run.id, 'A');
     const phases = h.service.listPhases(run.id);
-    const byId = Object.fromEntries(phases.map((p) => [p.phaseId, p]));
+    const byId = Object.fromEntries(phases.map(p => [p.phaseId, p]));
     expect(byId.A.status).toBe('done');
     expect(byId.B.status).toBe('stale');
     expect(byId.C.status).toBe('done'); // lazy: not cascaded transitively
@@ -62,10 +71,10 @@ describe('Phase F e2e — stale propagation + cascade + impact', () => {
     // { phase, gateResults } per entry; no top-level `ok`). Success = phase.status === 'done'.
     const results = await h.service.cascadeRerun(run.id, 'B');
     expect(results.length).toBe(2); // B and C
-    expect(results.every((r) => r.phase.status === 'done')).toBe(true);
+    expect(results.every(r => r.phase.status === 'done')).toBe(true);
 
     const phases = h.service.listPhases(run.id);
-    const byId = Object.fromEntries(phases.map((p) => [p.phaseId, p]));
+    const byId = Object.fromEntries(phases.map(p => [p.phaseId, p]));
     expect(byId.A.status).toBe('done');
     expect(byId.B.status).toBe('done');
     expect(byId.C.status).toBe('done');

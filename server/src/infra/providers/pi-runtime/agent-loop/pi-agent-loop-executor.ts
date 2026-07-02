@@ -43,11 +43,12 @@ export class AgentLoopTimeoutError extends Error {
   }
 }
 
-export const runPiAgentLoop: AgentLoopExecutor = async (input) => {
+export const runPiAgentLoop: AgentLoopExecutor = async input => {
   const baseStreamFn: StreamFn = input.hooks.streamFn ?? input.streamFn ?? streamSimple;
   const cacheRetention = input.cacheRetention;
   const cachedStreamFn: StreamFn = cacheRetention
-    ? (((model, context, options) => baseStreamFn(model, context, { ...options, cacheRetention })) as StreamFn)
+    ? (((model, context, options) =>
+        baseStreamFn(model, context, { ...options, cacheRetention })) as StreamFn)
     : baseStreamFn;
 
   let completedTurns = 0;
@@ -60,10 +61,13 @@ export const runPiAgentLoop: AgentLoopExecutor = async (input) => {
     model: input.modelInfo.model,
     beforeToolCall: input.hooks.beforeToolCall,
     afterToolCall: input.hooks.afterToolCall,
-    shouldStopAfterTurn: async (context) => {
+    shouldStopAfterTurn: async context => {
       completedTurns += 1;
       const hookStop = await input.hooks.shouldStopAfterTurn?.(context);
-      return Boolean(hookStop) || (typeof input.maxTurns === 'number' && completedTurns >= input.maxTurns);
+      return (
+        Boolean(hookStop) ||
+        (typeof input.maxTurns === 'number' && completedTurns >= input.maxTurns)
+      );
     },
     sessionId: input.sessionId,
     convertToLlm,
@@ -97,10 +101,10 @@ export const runPiAgentLoop: AgentLoopExecutor = async (input) => {
       config,
       emit,
       abortController.signal,
-      withStreamRetry(cachedStreamFn),
+      withStreamRetry(cachedStreamFn)
     ),
     input.timeoutMs,
-    () => abortController.abort(),
+    () => abortController.abort()
   );
   if (finalMessages.length === 0) {
     finalMessages = returnedMessages;
@@ -123,7 +127,7 @@ export const runPiAgentLoop: AgentLoopExecutor = async (input) => {
 async function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
-  onTimeout: () => void,
+  onTimeout: () => void
 ): Promise<T> {
   let timeout: NodeJS.Timeout | undefined;
   try {
@@ -150,7 +154,7 @@ function createUserMessage(input: string): AgentMessage {
 }
 
 function extractAssistantText(messages: AgentMessage[]): string {
-  const lastAssistant = [...messages].reverse().find((message) => message.role === 'assistant');
+  const lastAssistant = [...messages].reverse().find(message => message.role === 'assistant');
   if (!lastAssistant) return '';
 
   const content = lastAssistant.content;
@@ -158,7 +162,7 @@ function extractAssistantText(messages: AgentMessage[]): string {
   if (!Array.isArray(content)) return '';
 
   return content
-    .map((part) => {
+    .map(part => {
       if (typeof part === 'object' && part && 'text' in part) {
         return String((part as { text: unknown }).text ?? '');
       }

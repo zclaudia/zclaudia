@@ -1,14 +1,17 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useSessionOverridesStore } from '../sessionOverridesStore';
 
-const reset = () => useSessionOverridesStore.setState({ permissionOverrides: {}, worktreeOverrides: {} });
+const reset = () =>
+  useSessionOverridesStore.setState({ permissionOverrides: {}, worktreeOverrides: {} });
 
 describe('sessionOverridesStore', () => {
   beforeEach(reset);
 
   it('sets and reads a permission override', () => {
     useSessionOverridesStore.getState().setPermissionOverride('s1', { mode: 'plan' } as never);
-    expect(useSessionOverridesStore.getState().getPermissionOverride('s1')).toEqual({ mode: 'plan' });
+    expect(useSessionOverridesStore.getState().getPermissionOverride('s1')).toEqual({
+      mode: 'plan',
+    });
   });
 
   it('clears a permission override when passed null', () => {

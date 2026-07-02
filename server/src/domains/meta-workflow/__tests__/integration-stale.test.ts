@@ -20,20 +20,32 @@ const threePhases = JSON.stringify({
   version: '1',
   phases: [
     {
-      id: 'A', name: 'A', description: 'A',
-      phaseType: 'code-implement', dependsOn: [], inputs: [],
+      id: 'A',
+      name: 'A',
+      description: 'A',
+      phaseType: 'code-implement',
+      dependsOn: [],
+      inputs: [],
       outputs: [{ kind: 'commit', description: 'a' }],
       acceptanceGates: [{ id: 'g', description: 'g', command: 'true', expect: { exitCode: 0 } }],
     },
     {
-      id: 'B', name: 'B', description: 'B',
-      phaseType: 'code-implement', dependsOn: ['A'], inputs: [],
+      id: 'B',
+      name: 'B',
+      description: 'B',
+      phaseType: 'code-implement',
+      dependsOn: ['A'],
+      inputs: [],
       outputs: [{ kind: 'commit', description: 'b' }],
       acceptanceGates: [{ id: 'g', description: 'g', command: 'true', expect: { exitCode: 0 } }],
     },
     {
-      id: 'C', name: 'C', description: 'C',
-      phaseType: 'code-implement', dependsOn: ['B'], inputs: [],
+      id: 'C',
+      name: 'C',
+      description: 'C',
+      phaseType: 'code-implement',
+      dependsOn: ['B'],
+      inputs: [],
       outputs: [{ kind: 'commit', description: 'c' }],
       acceptanceGates: [{ id: 'g', description: 'g', command: 'true', expect: { exitCode: 0 } }],
     },
@@ -73,12 +85,12 @@ describe('Phase D integration: stale propagation through full flow', () => {
     await service.runPhase(run.id, 'C');
 
     let phases = service.listPhases(run.id);
-    expect(phases.every((p) => p.status === 'done')).toBe(true);
+    expect(phases.every(p => p.status === 'done')).toBe(true);
 
     await service.rerunPhase(run.id, 'A');
     phases = service.listPhases(run.id);
-    const b = phases.find((p) => p.phaseId === 'B')!;
-    const c = phases.find((p) => p.phaseId === 'C')!;
+    const b = phases.find(p => p.phaseId === 'B')!;
+    const c = phases.find(p => p.phaseId === 'C')!;
     expect(b.status).toBe('stale');
     expect(c.status).toBe('done'); // lazy: not cascaded
   });
@@ -95,7 +107,7 @@ describe('Phase D integration: stale propagation through full flow', () => {
 
     const results = await service.cascadeRerun(run.id, 'B');
     expect(results.length).toBeGreaterThanOrEqual(2);
-    const ids = results.map((r) => r.phase.phaseId);
+    const ids = results.map(r => r.phase.phaseId);
     expect(ids).toContain('B');
     expect(ids).toContain('C');
   });

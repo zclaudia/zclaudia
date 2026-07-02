@@ -37,20 +37,25 @@ export interface CompactionContext {
 
 export interface CompactionOutcome {
   outcome: 'compacted' | 'skipped' | 'failed' | 'aborted';
-  compacted: boolean;        // === (outcome === 'compacted'); kept for existing readers
+  compacted: boolean; // === (outcome === 'compacted'); kept for existing readers
   compactionId?: string;
   tokensBefore?: number;
   reason?: string;
   breaker?: { consecutiveFailures: number; breakerOpen: boolean; nextRetryAtMs?: number };
 }
 
-function skipped(reason: string, tokensBefore?: number, extra?: Partial<CompactionOutcome>): CompactionOutcome {
+function skipped(
+  reason: string,
+  tokensBefore?: number,
+  extra?: Partial<CompactionOutcome>
+): CompactionOutcome {
   return { outcome: 'skipped', compacted: false, reason, tokensBefore, ...extra };
 }
 
 function classifyFailure(ctx: CompactionContext, err: unknown, now: number): CompactionOutcome {
   const message = err instanceof Error ? err.message : String(err);
-  const aborted = ctx.signal?.aborted === true || (err instanceof Error && err.name === 'AbortError');
+  const aborted =
+    ctx.signal?.aborted === true || (err instanceof Error && err.name === 'AbortError');
   if (aborted) {
     return { outcome: 'aborted', compacted: false, reason: `aborted: ${message}` };
   }
@@ -94,7 +99,9 @@ export async function maybeCompact(ctx: CompactionContext): Promise<CompactionOu
     // Diagnostic: one line per turn showing the proactive-compaction decision
     // inputs. Lets us tell "estimate never crossed the threshold" apart from
     // "threshold tripped but the cut/summary failed" when a session overflows.
-    console.log(`[Compaction] auto eval session=${ctx.sessionId} estimate=${tokens} window=${window} threshold=${threshold} willCompact=${willCompact}`);
+    console.log(
+      `[Compaction] auto eval session=${ctx.sessionId} estimate=${tokens} window=${window} threshold=${threshold} willCompact=${willCompact}`
+    );
     if (!willCompact) {
       return skipped('below_threshold', tokens);
     }
@@ -188,7 +195,12 @@ export interface TreeCompactionInput {
   summary: string;
   firstKeptEntryId: string;
   tokensBefore: number;
-  details: { source: string; customInstructions: string | null; readFiles: string[]; modifiedFiles: string[] };
+  details: {
+    source: string;
+    customInstructions: string | null;
+    readFiles: string[];
+    modifiedFiles: string[];
+  };
 }
 
 /**
@@ -198,16 +210,27 @@ export interface TreeCompactionInput {
  * pre-boundary history, prepends the summary). Replaces the old
  * `session_compactions` table write.
  */
-export async function appendCompactionToTree(session: Session, input: TreeCompactionInput): Promise<string> {
-  return session.appendCompaction(input.summary, input.firstKeptEntryId, input.tokensBefore, input.details, false);
+export async function appendCompactionToTree(
+  session: Session,
+  input: TreeCompactionInput
+): Promise<string> {
+  return session.appendCompaction(
+    input.summary,
+    input.firstKeptEntryId,
+    input.tokensBefore,
+    input.details,
+    false
+  );
 }
 
 /** Mirror of pi's (non-exported) computeFileLists: modified = written ∪ edited; read-only excludes modified. */
-function computeFileLists(
-  fileOps: { read: Set<string>; written: Set<string>; edited: Set<string> },
-): { readFiles: string[]; modifiedFiles: string[] } {
+function computeFileLists(fileOps: {
+  read: Set<string>;
+  written: Set<string>;
+  edited: Set<string>;
+}): { readFiles: string[]; modifiedFiles: string[] } {
   const modified = new Set([...fileOps.edited, ...fileOps.written]);
-  const readFiles = [...fileOps.read].filter((f) => !modified.has(f)).sort();
+  const readFiles = [...fileOps.read].filter(f => !modified.has(f)).sort();
   const modifiedFiles = [...modified].sort();
   return { readFiles, modifiedFiles };
 }
@@ -216,7 +239,7 @@ async function runCompaction(
   ctx: CompactionContext,
   session: Session,
   branch: SessionTreeEntry[],
-  tokens: number,
+  tokens: number
 ): Promise<CompactionOutcome> {
   // pi resolves the cut point natively over the tree entries — no fake-entry
   // wrapping or DB-id parallel array. `undefined` means no meaningful cut point
@@ -229,7 +252,10 @@ async function runCompaction(
   // pi returns a preparation even when the cut sits at the branch start (nothing
   // to summarize) — e.g. the recent-token budget already covers the whole
   // history. Treat that as no cut point, matching the prior findCutPoint<=0 gate.
-  if (!preparation || (preparation.messagesToSummarize.length === 0 && preparation.turnPrefixMessages.length === 0)) {
+  if (
+    !preparation ||
+    (preparation.messagesToSummarize.length === 0 && preparation.turnPrefixMessages.length === 0)
+  ) {
     return skipped('no_cut_point', tokens);
   }
   const toSummarize = preparation.messagesToSummarize;
@@ -253,17 +279,18 @@ async function runCompaction(
     // Seed the rollup with any prior compaction's summary so iterative
     // compactions UPDATE rather than re-summarize from scratch (pi semantics).
     previousSummary: preparation.previousSummary,
-    generate: (chunk, previousSummary) => generateSummary(
-      chunk,
-      built.model,
-      DEFAULT_COMPACTION_SETTINGS.reserveTokens,
-      ctx.llmProfile.apiKey ?? '',
-      undefined,                          // headers
-      ctx.signal,
-      ctx.customInstructions,
-      previousSummary,
-      ctx.agentProfile.thinkingLevel,
-    ),
+    generate: (chunk, previousSummary) =>
+      generateSummary(
+        chunk,
+        built.model,
+        DEFAULT_COMPACTION_SETTINGS.reserveTokens,
+        ctx.llmProfile.apiKey ?? '',
+        undefined, // headers
+        ctx.signal,
+        ctx.customInstructions,
+        previousSummary,
+        ctx.agentProfile.thinkingLevel
+      ),
   });
 
   // pi extracts real file operations from the summarized history; project them

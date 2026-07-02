@@ -80,11 +80,11 @@ export class PermissionManager {
   }
 
   hasAllPermissions(pluginId: string, permissions: Permission[]): boolean {
-    return permissions.every((permission) => this.hasPermission(pluginId, permission));
+    return permissions.every(permission => this.hasPermission(pluginId, permission));
   }
 
   hasAnyPermission(pluginId: string, permissions: Permission[]): boolean {
-    return permissions.some((permission) => this.hasPermission(pluginId, permission));
+    return permissions.some(permission => this.hasPermission(pluginId, permission));
   }
 
   getGrantedPermissions(pluginId: string): Permission[] {
@@ -99,7 +99,9 @@ export class PermissionManager {
 
   getPermissionState(pluginId: string): PermissionState {
     const state = this.store[pluginId];
-    return state ? { granted: [...state.granted], denied: [...state.denied] } : { granted: [], denied: [] };
+    return state
+      ? { granted: [...state.granted], denied: [...state.denied] }
+      : { granted: [], denied: [] };
   }
 
   grant(pluginId: string, permission: Permission): void {
@@ -112,20 +114,20 @@ export class PermissionManager {
       state.granted.push(permission);
     }
 
-    state.denied = state.denied.filter((entry) => entry !== permission);
+    state.denied = state.denied.filter(entry => entry !== permission);
     this.saveStore();
     pluginEvents.emit('permission.granted', { pluginId, permission }).catch(() => {});
   }
 
   grantAll(pluginId: string, permissions: Permission[]): void {
-    permissions.forEach((permission) => this.grant(pluginId, permission));
+    permissions.forEach(permission => this.grant(pluginId, permission));
   }
 
   revoke(pluginId: string, permission: Permission): void {
     const state = this.store[pluginId];
     if (!state) return;
 
-    state.granted = state.granted.filter((entry) => entry !== permission);
+    state.granted = state.granted.filter(entry => entry !== permission);
     this.saveStore();
     pluginEvents.emit('permission.revoked', { pluginId, permission }).catch(() => {});
   }
@@ -140,7 +142,7 @@ export class PermissionManager {
       state.denied.push(permission);
     }
 
-    state.granted = state.granted.filter((entry) => entry !== permission);
+    state.granted = state.granted.filter(entry => entry !== permission);
     this.saveStore();
     pluginEvents.emit('permission.denied', { pluginId, permission }).catch(() => {});
   }
@@ -151,18 +153,25 @@ export class PermissionManager {
     pluginEvents.emit('permission.cleared', { pluginId }).catch(() => {});
   }
 
-  async request(pluginId: string, permissions: Permission[], manifest: PluginManifest): Promise<boolean> {
+  async request(
+    pluginId: string,
+    permissions: Permission[],
+    manifest: PluginManifest
+  ): Promise<boolean> {
     if (this.hasAllPermissions(pluginId, permissions)) {
       return true;
     }
 
-    const permanentlyDenied = permissions.filter((permission) => {
+    const permanentlyDenied = permissions.filter(permission => {
       const state = this.store[pluginId];
       return state && state.denied.includes(permission);
     });
 
     if (permanentlyDenied.length > 0) {
-      console.warn(`[PermissionManager] Some permissions permanently denied for ${pluginId}:`, permanentlyDenied);
+      console.warn(
+        `[PermissionManager] Some permissions permanently denied for ${pluginId}:`,
+        permanentlyDenied
+      );
       return false;
     }
 
@@ -182,11 +191,13 @@ export class PermissionManager {
 
       this.notifyHandlers(request);
 
-      pluginEvents.emit('permission.request', {
-        pluginId,
-        pluginName: manifest.name,
-        permissions,
-      }).catch(() => {});
+      pluginEvents
+        .emit('permission.request', {
+          pluginId,
+          pluginName: manifest.name,
+          permissions,
+        })
+        .catch(() => {});
     });
   }
 
@@ -200,7 +211,7 @@ export class PermissionManager {
     if (granted) {
       const allPermissions = new Set<Permission>();
       for (const request of allRequests) {
-        request.permissions.forEach((permission) => allPermissions.add(permission));
+        request.permissions.forEach(permission => allPermissions.add(permission));
       }
       this.grantAll(pluginId, Array.from(allPermissions));
       for (const request of allRequests) {
@@ -212,9 +223,9 @@ export class PermissionManager {
     if (permanently) {
       const allPermissions = new Set<Permission>();
       for (const request of allRequests) {
-        request.permissions.forEach((permission) => allPermissions.add(permission));
+        request.permissions.forEach(permission => allPermissions.add(permission));
       }
-      allPermissions.forEach((permission) => this.deny(pluginId, permission));
+      allPermissions.forEach(permission => this.deny(pluginId, permission));
     }
     for (const request of allRequests) {
       request.resolve(false);
@@ -227,7 +238,7 @@ export class PermissionManager {
   }
 
   private notifyHandlers(request: PermissionRequest): void {
-    this.requestHandlers.forEach((handler) => {
+    this.requestHandlers.forEach(handler => {
       try {
         handler(request);
       } catch (error) {
@@ -248,7 +259,10 @@ export class PermissionManager {
     });
   }
 
-  getPermissionSummary(pluginId: string, required: Permission[]): {
+  getPermissionSummary(
+    pluginId: string,
+    required: Permission[]
+  ): {
     granted: Permission[];
     pending: Permission[];
     denied: Permission[];
@@ -256,14 +270,16 @@ export class PermissionManager {
     const state = this.store[pluginId] || { granted: [], denied: [] };
 
     return {
-      granted: required.filter((permission) => state.granted.includes(permission)),
-      pending: required.filter((permission) => !state.granted.includes(permission) && !state.denied.includes(permission)),
-      denied: required.filter((permission) => state.denied.includes(permission)),
+      granted: required.filter(permission => state.granted.includes(permission)),
+      pending: required.filter(
+        permission => !state.granted.includes(permission) && !state.denied.includes(permission)
+      ),
+      denied: required.filter(permission => state.denied.includes(permission)),
     };
   }
 
   isSafeToAutoGrant(permissions: Permission[]): boolean {
-    return permissions.every((permission) => PERMISSION_LEVELS[permission] === 1);
+    return permissions.every(permission => PERMISSION_LEVELS[permission] === 1);
   }
 
   getAllPluginPermissions(): PermissionStore {

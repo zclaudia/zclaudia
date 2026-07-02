@@ -24,34 +24,37 @@ import { FileMutationResult, getToolResultDetails } from './FileMutationResult';
 
 function looksLikeUnifiedDiff(value: string): boolean {
   return (
-    (/^---\s/m.test(value) && /^\+\+\+\s/m.test(value))
-    || (/^@@\s/m.test(value) && /^[+-](?![+-])/m.test(value))
-    || /^diff --git\s/m.test(value)
+    (/^---\s/m.test(value) && /^\+\+\+\s/m.test(value)) ||
+    (/^@@\s/m.test(value) && /^[+-](?![+-])/m.test(value)) ||
+    /^diff --git\s/m.test(value)
   );
 }
 
 function getFileChangeDiffs(effect?: ToolEffect): Array<{ path: string; diff: string }> {
   if (effect?.kind !== 'file_change') return [];
   return effect.files
-    .map((file) => ({
+    .map(file => ({
       path: file.path,
       diff: typeof file.summary === 'string' ? file.summary : '',
     }))
-    .filter((file) => file.diff.trim().length > 0 && looksLikeUnifiedDiff(file.diff));
+    .filter(file => file.diff.trim().length > 0 && looksLikeUnifiedDiff(file.diff));
 }
 
 function extractToolResultText(result: unknown): string {
   if (result && typeof result === 'object') {
     const record = result as Record<string, unknown>;
-    const details = record.details && typeof record.details === 'object'
-      ? record.details as Record<string, unknown>
-      : undefined;
+    const details =
+      record.details && typeof record.details === 'object'
+        ? (record.details as Record<string, unknown>)
+        : undefined;
     if (typeof details?.text === 'string') return details.text;
     if (Array.isArray(record.content)) {
       return record.content
-        .filter((block): block is Record<string, unknown> => block !== null && typeof block === 'object')
-        .filter((block) => block.type === 'text')
-        .map((block) => String(block.text ?? ''))
+        .filter(
+          (block): block is Record<string, unknown> => block !== null && typeof block === 'object'
+        )
+        .filter(block => block.type === 'text')
+        .map(block => String(block.text ?? ''))
         .join('');
     }
   }
@@ -59,7 +62,15 @@ function extractToolResultText(result: unknown): string {
 }
 
 // Render expanded content based on tool type
-function ToolExpandedContent({ toolName, toolInput, status, result, isError, semantic, effect }: {
+function ToolExpandedContent({
+  toolName,
+  toolInput,
+  status,
+  result,
+  isError,
+  semantic,
+  effect,
+}: {
   toolName: string;
   toolInput: unknown;
   status: ToolCallState['status'];
@@ -86,15 +97,19 @@ function ToolExpandedContent({ toolName, toolInput, status, result, isError, sem
 
   const input = normalizeToolInput(toolInput) as Record<string, unknown> | undefined;
   const fileChangeDiffs = getFileChangeDiffs(effect);
-  const isFileMutationTool = toolName === 'Edit' || toolName === 'MultiEdit' || toolName === 'Write' || toolName === 'EditSymbol';
+  const isFileMutationTool =
+    toolName === 'Edit' ||
+    toolName === 'MultiEdit' ||
+    toolName === 'Write' ||
+    toolName === 'EditSymbol';
   const fileMutationDetails = isFileMutationTool ? getToolResultDetails(result) : undefined;
   const hasFileMutationResult = Boolean(
-    fileMutationDetails?.diff
-    || fileMutationDetails?.perFileResults?.length
-    || fileMutationDetails?.lifecycle?.diagnostics?.length
-    || fileMutationDetails?.lifecycle?.deferredDiagnostics
-    || fileMutationDetails?.backup
-    || fileMutationDetails?.preview
+    fileMutationDetails?.diff ||
+    fileMutationDetails?.perFileResults?.length ||
+    fileMutationDetails?.lifecycle?.diagnostics?.length ||
+    fileMutationDetails?.lifecycle?.deferredDiagnostics ||
+    fileMutationDetails?.backup ||
+    fileMutationDetails?.preview
   );
 
   if (isFileMutationTool && fileMutationDetails && hasFileMutationResult) {
@@ -103,12 +118,19 @@ function ToolExpandedContent({ toolName, toolInput, status, result, isError, sem
 
   // Provider file-change tools may only provide a unified diff summary
   // (Cursor editToolCall, Codex fileChange, etc.).
-  if ((toolName === 'Edit' || toolName === 'MultiEdit' || toolName === 'EditSymbol') && fileChangeDiffs.length > 0) {
+  if (
+    (toolName === 'Edit' || toolName === 'MultiEdit' || toolName === 'EditSymbol') &&
+    fileChangeDiffs.length > 0
+  ) {
     return (
       <div className="px-3 pb-3 border-t border-border/50">
         <div className="mt-2 space-y-3">
-          {fileChangeDiffs.map((file) => (
-            <UnifiedDiffViewer key={`${file.path}:${file.diff.slice(0, 40)}`} diff={file.diff} filePath={file.path} />
+          {fileChangeDiffs.map(file => (
+            <UnifiedDiffViewer
+              key={`${file.path}:${file.diff.slice(0, 40)}`}
+              diff={file.diff}
+              filePath={file.path}
+            />
           ))}
         </div>
         {status !== 'running' && isError && result !== undefined && (
@@ -176,7 +198,11 @@ function ToolExpandedContent({ toolName, toolInput, status, result, isError, sem
   }
 
   // Read tool: show file content with syntax highlighting
-  if ((toolName === 'Read' || toolName === 'ReadSymbol') && status !== 'running' && result !== undefined) {
+  if (
+    (toolName === 'Read' || toolName === 'ReadSymbol') &&
+    status !== 'running' &&
+    result !== undefined
+  ) {
     const filePath = input?.file_path ?? input?.path;
     return (
       <div className="px-3 pb-3 border-t border-border/50">
@@ -200,7 +226,8 @@ function ToolExpandedContent({ toolName, toolInput, status, result, isError, sem
           <div className="mt-2">
             <div className="rounded-lg overflow-hidden border border-border">
               <pre className="text-xs font-mono p-2 bg-secondary text-success overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch] whitespace-pre relative group/cmd">
-                <span className="text-muted-foreground select-none">$ </span>{command}
+                <span className="text-muted-foreground select-none">$ </span>
+                {command}
                 <RunInTerminalButton command={command} />
               </pre>
             </div>
@@ -232,9 +259,11 @@ function ToolExpandedContent({ toolName, toolInput, status, result, isError, sem
                 <span className="text-xs text-foreground">{q.question}</span>
               </div>
               <div className="ml-2 space-y-1">
-                {(Array.isArray(q.options) ? q.options : []).map((opt) => (
+                {(Array.isArray(q.options) ? q.options : []).map(opt => (
                   <div key={opt.label} className="flex items-start gap-2 text-xs">
-                    <span className="text-muted-foreground flex-shrink-0">{q.multiSelect ? '☐' : '○'}</span>
+                    <span className="text-muted-foreground flex-shrink-0">
+                      {q.multiSelect ? '☐' : '○'}
+                    </span>
                     <div>
                       <span className="text-foreground">{opt.label}</span>
                       {opt.description && (
@@ -245,7 +274,9 @@ function ToolExpandedContent({ toolName, toolInput, status, result, isError, sem
                 ))}
                 {(q.allowCustomValue ?? true) && (
                   <div className="flex items-start gap-2 text-xs">
-                    <span className="text-muted-foreground flex-shrink-0">{q.multiSelect ? '☐' : '○'}</span>
+                    <span className="text-muted-foreground flex-shrink-0">
+                      {q.multiSelect ? '☐' : '○'}
+                    </span>
                     <div>
                       <span className="text-foreground">{q.customValuePlaceholder || 'Other'}</span>
                     </div>
@@ -309,9 +340,21 @@ function ToolExpandedContent({ toolName, toolInput, status, result, isError, sem
           {todos.map((todo, idx) => (
             <div key={idx} className="flex items-center gap-2 text-xs">
               <span className="flex-shrink-0">
-                {todo.status === 'completed' ? <CheckCircle2 size={12} className="text-success" /> : todo.status === 'in_progress' ? <Loader2 size={12} className="animate-spin text-primary" /> : <Square size={12} className="text-muted-foreground" />}
+                {todo.status === 'completed' ? (
+                  <CheckCircle2 size={12} className="text-success" />
+                ) : todo.status === 'in_progress' ? (
+                  <Loader2 size={12} className="animate-spin text-primary" />
+                ) : (
+                  <Square size={12} className="text-muted-foreground" />
+                )}
               </span>
-              <span className={todo.status === 'completed' ? 'text-muted-foreground line-through' : 'text-foreground'}>
+              <span
+                className={
+                  todo.status === 'completed'
+                    ? 'text-muted-foreground line-through'
+                    : 'text-foreground'
+                }
+              >
                 {todo.content}
               </span>
             </div>
@@ -323,9 +366,11 @@ function ToolExpandedContent({ toolName, toolInput, status, result, isError, sem
 
   // MCP ask_user_form: show form fields summary
   if (isAskUserFormTool(toolName) && input) {
-    const title = input.title as string || 'Form';
+    const title = (input.title as string) || 'Form';
     const description = input.description as string | undefined;
-    const fields = (input.fields as Array<{ id: string; label: string; type: string; required?: boolean }>) || [];
+    const fields =
+      (input.fields as Array<{ id: string; label: string; type: string; required?: boolean }>) ||
+      [];
     return (
       <div className="px-3 pb-3 border-t border-border/50">
         <div className="mt-2">
@@ -334,7 +379,9 @@ function ToolExpandedContent({ toolName, toolInput, status, result, isError, sem
           <div className="space-y-1">
             {fields.map((field, idx) => (
               <div key={idx} className="flex items-center gap-2 text-xs">
-                <span className="text-muted-foreground">{field.type === 'confirm' ? '☐' : '•'}</span>
+                <span className="text-muted-foreground">
+                  {field.type === 'confirm' ? '☐' : '•'}
+                </span>
                 <span className="text-foreground">{field.label}</span>
                 {field.required && <span className="text-destructive text-[10px]">*</span>}
                 <span className="text-muted-foreground text-[10px]">({field.type})</span>
@@ -345,7 +392,9 @@ function ToolExpandedContent({ toolName, toolInput, status, result, isError, sem
         {status !== 'running' && result !== undefined && (
           <div className="mt-2">
             <div className="text-xs text-muted-foreground mb-1">Response:</div>
-            <pre className={`text-xs rounded-md p-2 overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch] whitespace-pre ${isError ? 'bg-destructive/20 text-destructive' : 'bg-muted/60 text-foreground'}`}>
+            <pre
+              className={`text-xs rounded-md p-2 overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch] whitespace-pre ${isError ? 'bg-destructive/20 text-destructive' : 'bg-muted/60 text-foreground'}`}
+            >
               {formatToolResult(result)}
             </pre>
           </div>
@@ -356,17 +405,21 @@ function ToolExpandedContent({ toolName, toolInput, status, result, isError, sem
 
   // MCP request_approval: show approval details
   if (isApprovalTool(toolName) && input) {
-    const title = input.title as string || 'Approval Required';
-    const message = input.message as string || '';
+    const title = (input.title as string) || 'Approval Required';
+    const message = (input.message as string) || '';
     return (
       <div className="px-3 pb-3 border-t border-border/50">
         <div className="mt-2">
           <div className="text-xs font-medium text-foreground mb-1">{title}</div>
-          {message && <div className="text-xs text-muted-foreground whitespace-pre-wrap">{message}</div>}
+          {message && (
+            <div className="text-xs text-muted-foreground whitespace-pre-wrap">{message}</div>
+          )}
         </div>
         {status !== 'running' && result !== undefined && (
           <div className="mt-2">
-            <pre className={`text-xs rounded-md p-2 overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch] whitespace-pre ${isError ? 'bg-destructive/20 text-destructive' : 'bg-muted/60 text-foreground'}`}>
+            <pre
+              className={`text-xs rounded-md p-2 overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch] whitespace-pre ${isError ? 'bg-destructive/20 text-destructive' : 'bg-muted/60 text-foreground'}`}
+            >
               {formatToolResult(result)}
             </pre>
           </div>
@@ -377,7 +430,7 @@ function ToolExpandedContent({ toolName, toolInput, status, result, isError, sem
 
   // MCP push_file: show file info
   if (isPushFileTool(toolName) && input) {
-    const filePath = input.filePath as string || '';
+    const filePath = (input.filePath as string) || '';
     const description = input.description as string | undefined;
     return (
       <div className="px-3 pb-3 border-t border-border/50">
@@ -387,7 +440,9 @@ function ToolExpandedContent({ toolName, toolInput, status, result, isError, sem
         </div>
         {status !== 'running' && result !== undefined && (
           <div className="mt-2">
-            <pre className={`text-xs rounded-md p-2 overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch] whitespace-pre ${isError ? 'bg-destructive/20 text-destructive' : 'bg-muted/60 text-foreground'}`}>
+            <pre
+              className={`text-xs rounded-md p-2 overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch] whitespace-pre ${isError ? 'bg-destructive/20 text-destructive' : 'bg-muted/60 text-foreground'}`}
+            >
               {formatToolResult(result)}
             </pre>
           </div>
@@ -410,15 +465,11 @@ function ToolExpandedContent({ toolName, toolInput, status, result, isError, sem
       {/* Result */}
       {status !== 'running' && result !== undefined && (
         <div className="mt-2">
-          <div className="text-xs text-muted-foreground mb-1">
-            {isError ? 'Error:' : 'Result:'}
-          </div>
+          <div className="text-xs text-muted-foreground mb-1">{isError ? 'Error:' : 'Result:'}</div>
           <pre
             data-testid="tool-result"
             className={`text-xs rounded-md p-2 overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch] max-h-96 overflow-y-auto whitespace-pre ${
-              isError
-                ? 'bg-destructive/20 text-destructive'
-                : 'bg-muted/50 text-foreground'
+              isError ? 'bg-destructive/20 text-destructive' : 'bg-muted/50 text-foreground'
             }`}
           >
             {formatToolResult(result)}

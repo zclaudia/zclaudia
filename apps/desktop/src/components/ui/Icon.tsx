@@ -7,7 +7,12 @@ interface IconProps {
   strokeWidth?: number;
 }
 
-export function Icon({ icon: LucideComponent, size = 16, className = '', strokeWidth = 1.75 }: IconProps) {
+export function Icon({
+  icon: LucideComponent,
+  size = 16,
+  className = '',
+  strokeWidth = 1.75,
+}: IconProps) {
   return (
     <LucideComponent
       size={size}

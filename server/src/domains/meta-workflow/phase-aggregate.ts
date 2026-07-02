@@ -4,7 +4,7 @@ import type {
   PhaseDef,
   ExecuteEntity,
 } from '@zclaudia/shared/features/meta-workflow';
-import { MetaWorkflowPhaseRepository } from './repositories/meta-workflow-phase-repository.js';
+import { type MetaWorkflowPhaseRepository } from './repositories/meta-workflow-phase-repository.js';
 import { assertPhaseTransition, assertPhaseStatusIn } from './status-machine.js';
 import { getPhaseTemplate } from './phase-templates/index.js';
 
@@ -52,11 +52,14 @@ export class MetaWorkflowPhaseAggregate {
     });
   }
 
-  enterReadyToRun(phaseId: string, opts?: {
-    generatedWorkflowId?: string;
-    generatedSubagentId?: string;
-    reusedFromPoolId?: string;
-  }): MetaWorkflowPhase {
+  enterReadyToRun(
+    phaseId: string,
+    opts?: {
+      generatedWorkflowId?: string;
+      generatedSubagentId?: string;
+      reusedFromPoolId?: string;
+    }
+  ): MetaWorkflowPhase {
     const phase = this.requirePhase(phaseId);
     assertPhaseStatusIn(phase.status, ['searching_reuse', 'generating'], 'enter ready_to_run');
     assertPhaseTransition(phase.status, 'ready_to_run');
@@ -68,10 +71,13 @@ export class MetaWorkflowPhaseAggregate {
     });
   }
 
-  enterRunning(phaseId: string, opts?: {
-    currentRunId?: string;
-    worktreePath?: string;
-  }): MetaWorkflowPhase {
+  enterRunning(
+    phaseId: string,
+    opts?: {
+      currentRunId?: string;
+      worktreePath?: string;
+    }
+  ): MetaWorkflowPhase {
     const phase = this.requirePhase(phaseId);
     assertPhaseStatusIn(phase.status, ['ready_to_run'], 'enter running');
     assertPhaseTransition(phase.status, 'running');
@@ -103,7 +109,7 @@ export class MetaWorkflowPhaseAggregate {
     assertPhaseStatusIn(
       phase.status,
       ['searching_reuse', 'generating', 'ready_to_run', 'running', 'verifying_gates'],
-      'mark failed',
+      'mark failed'
     );
     assertPhaseTransition(phase.status, 'failed');
     return this.repo.update(phaseId, { status: 'failed', completedAt: Date.now() });

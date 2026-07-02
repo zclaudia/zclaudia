@@ -8,12 +8,11 @@ import { __resetSandboxCacheForTests } from '../sandbox.js';
 
 let counter = 0;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function makeEval(options: Record<string, unknown> = {}): { tool: any; dir: string } {
   const dir = mkdtempSync(path.join(tmpdir(), 'zc-eval-'));
   const sessionId = `eval-test-${process.pid}-${counter++}`;
   const tools = buildTools(dir, { enabled: ['Eval'], sessionId, ...options });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   return { tool: tools.find((t: any) => t.name === 'Eval'), dir };
 }
 
@@ -160,7 +159,7 @@ describe('Eval tool', () => {
     });
     expect(res.content[0].text.length).toBeLessThan(90_000);
     expect(fullOutputPath).toContain('zclaudia-eval-logs');
-    expect((fullOutputStat.mode & 0o777)).toBe(0o600);
+    expect(fullOutputStat.mode & 0o777).toBe(0o600);
     expect(fullOutput).toContain('x'.repeat(1000));
     expect(fullOutput).toContain('done');
   });

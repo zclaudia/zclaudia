@@ -10,7 +10,7 @@ interface PluginFrontendDependencies {
 export class PluginFrontendError extends Error {
   constructor(
     readonly status: number,
-    message: string,
+    message: string
   ) {
     super(message);
   }

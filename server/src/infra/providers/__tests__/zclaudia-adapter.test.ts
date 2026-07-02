@@ -25,10 +25,17 @@ vi.mock('../pi-runtime/sandbox.js', () => ({
 // returns the known providers so cross-provider sweep can iterate; getModels
 // returns the entry only when the provider+id pair would have hit getModel.
 vi.mock('@earendil-works/pi-ai', async () => {
-  const actual = await vi.importActual<typeof import('@earendil-works/pi-ai')>('@earendil-works/pi-ai');
+  const actual =
+    await vi.importActual<typeof import('@earendil-works/pi-ai')>('@earendil-works/pi-ai');
   const KNOWN_PROVIDERS = ['anthropic', 'openai', 'deepseek'];
   function buildEntry(provider: string, model: string) {
-    return { provider, id: model, contextWindow: 200000, maxTokens: 8000, input: ['text', 'image'] };
+    return {
+      provider,
+      id: model,
+      contextWindow: 200000,
+      maxTokens: 8000,
+      input: ['text', 'image'],
+    };
   }
   return {
     getModel: vi.fn((provider: string, model: string) => {
@@ -56,7 +63,11 @@ vi.mock('@earendil-works/pi-ai', async () => {
     createAssistantMessageEventStream: actual.createAssistantMessageEventStream,
     streamSimple: vi.fn(() => {
       const stream = actual.createAssistantMessageEventStream();
-      stream.push({ type: 'done', reason: 'stop', message: { role: 'assistant', content: [], stopReason: 'stop' } } as never);
+      stream.push({
+        type: 'done',
+        reason: 'stop',
+        message: { role: 'assistant', content: [], stopReason: 'stop' },
+      } as never);
       stream.end();
       return stream;
     }),
@@ -64,34 +75,43 @@ vi.mock('@earendil-works/pi-ai', async () => {
 });
 
 // Hoisted collections used inside vi.mock factory.
-const { mockAgentInstances, scriptQueue, mockSessionContextQueue, mockSessionErrorQueue } = vi.hoisted(() => ({
-  mockAgentInstances: [] as Array<{
-    initialState: { systemPrompt: string; model: unknown; messages: unknown[]; tools?: unknown[] };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    constructorOpts: any;
-    promptCalls: Array<{ input: string; images?: unknown[] }>;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    steerCalls: any[];
-  }>,
-  // `waitForPromise` lets tests gate agent.prompt() resolution until an
-  // async condition is satisfied (e.g. waiting for a retry timer to fire).
-  scriptQueue: [] as Array<{ events: AgentEvent[]; rejectWith?: Error; waitForPromise?: Promise<void> }>,
-  // Queue of AgentMessage[] arrays for MockSession.buildContext() to return.
-  // Each entry is consumed once. If empty, buildContext returns { messages: [] }.
-  mockSessionContextQueue: [] as AgentMessage[][],
-  // Queue of errors for MockSession.buildContext() to throw.
-  // Each entry is consumed once before checking mockSessionContextQueue.
-  mockSessionErrorQueue: [] as Error[],
-}));
+const { mockAgentInstances, scriptQueue, mockSessionContextQueue, mockSessionErrorQueue } =
+  vi.hoisted(() => ({
+    mockAgentInstances: [] as Array<{
+      initialState: {
+        systemPrompt: string;
+        model: unknown;
+        messages: unknown[];
+        tools?: unknown[];
+      };
+
+      constructorOpts: any;
+      promptCalls: Array<{ input: string; images?: unknown[] }>;
+
+      steerCalls: any[];
+    }>,
+    // `waitForPromise` lets tests gate agent.prompt() resolution until an
+    // async condition is satisfied (e.g. waiting for a retry timer to fire).
+    scriptQueue: [] as Array<{
+      events: AgentEvent[];
+      rejectWith?: Error;
+      waitForPromise?: Promise<void>;
+    }>,
+    // Queue of AgentMessage[] arrays for MockSession.buildContext() to return.
+    // Each entry is consumed once. If empty, buildContext returns { messages: [] }.
+    mockSessionContextQueue: [] as AgentMessage[][],
+    // Queue of errors for MockSession.buildContext() to throw.
+    // Each entry is consumed once before checking mockSessionContextQueue.
+    mockSessionErrorQueue: [] as Error[],
+  }));
 
 vi.mock('@earendil-works/pi-agent-core', () => {
   class MockAgent {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     initialState: any;
     private listener?: (event: AgentEvent) => void;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     private slot: any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     constructor(opts: { initialState: any; [k: string]: any }) {
       this.initialState = opts.initialState;
       this.slot = {
@@ -104,7 +124,9 @@ vi.mock('@earendil-works/pi-agent-core', () => {
     }
     subscribe(listener: (event: AgentEvent) => void): () => void {
       this.listener = listener;
-      return () => { this.listener = undefined; };
+      return () => {
+        this.listener = undefined;
+      };
     }
     async prompt(input: string, images?: unknown[]): Promise<void> {
       this.slot.promptCalls.push({ input, images });
@@ -121,7 +143,7 @@ vi.mock('@earendil-works/pi-agent-core', () => {
       if (script.waitForPromise) await script.waitForPromise;
       if (script.rejectWith) throw script.rejectWith;
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     steer(message: any): void {
       this.slot.steerCalls.push(message);
     }
@@ -131,7 +153,6 @@ vi.mock('@earendil-works/pi-agent-core', () => {
   }
 
   class MockSession {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     constructor(_storage: any) {}
     async buildContext() {
       const err = mockSessionErrorQueue.shift();
@@ -145,11 +166,19 @@ vi.mock('@earendil-works/pi-agent-core', () => {
 });
 
 // Helper to enqueue the script that the next `new Agent()` will play back.
-function scriptNextAgent(events: AgentEvent[], options?: { rejectWith?: Error; waitForPromise?: Promise<void> }) {
-  scriptQueue.push({ events, rejectWith: options?.rejectWith, waitForPromise: options?.waitForPromise });
+function scriptNextAgent(
+  events: AgentEvent[],
+  options?: { rejectWith?: Error; waitForPromise?: Promise<void> }
+) {
+  scriptQueue.push({
+    events,
+    rejectWith: options?.rejectWith,
+    waitForPromise: options?.waitForPromise,
+  });
 }
 
-const { AsyncQueue, buildModel, translateEvent, extractErrorStop, extractLastCallUsage } = __testables;
+const { AsyncQueue, buildModel, translateEvent, extractErrorStop, extractLastCallUsage } =
+  __testables;
 
 function createTestDb(): Database.Database {
   const db = new Database(':memory:');
@@ -179,9 +208,20 @@ function createTestDb(): Database.Database {
   return db;
 }
 
-function insertMessage(db: Database.Database, row: { id: string; sessionId: string; role: string; content: string; createdAt: number; offset: number }) {
-  db.prepare(`INSERT INTO messages (id, session_id, role, content, created_at, offset) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(row.id, row.sessionId, row.role, row.content, row.createdAt, row.offset);
+function insertMessage(
+  db: Database.Database,
+  row: {
+    id: string;
+    sessionId: string;
+    role: string;
+    content: string;
+    createdAt: number;
+    offset: number;
+  }
+) {
+  db.prepare(
+    `INSERT INTO messages (id, session_id, role, content, created_at, offset) VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(row.id, row.sessionId, row.role, row.content, row.createdAt, row.offset);
 }
 
 describe('AsyncQueue', () => {
@@ -238,23 +278,45 @@ describe('extractErrorStop', () => {
   it('returns errorMessage when final assistant message stopReason is error', () => {
     const out = extractErrorStop([
       { role: 'user', content: 'hi', timestamp: 0 } as any,
-      { role: 'assistant', content: [], stopReason: 'error', errorMessage: 'HTTP 503 model_not_found', timestamp: 0 } as any,
+      {
+        role: 'assistant',
+        content: [],
+        stopReason: 'error',
+        errorMessage: 'HTTP 503 model_not_found',
+        timestamp: 0,
+      } as any,
     ]);
     expect(out).toBe('HTTP 503 model_not_found');
   });
 
   it('returns undefined when final assistant message stopped normally', () => {
     const out = extractErrorStop([
-      { role: 'assistant', content: [{ type: 'text', text: 'ok' }], stopReason: 'stop', timestamp: 0 } as any,
+      {
+        role: 'assistant',
+        content: [{ type: 'text', text: 'ok' }],
+        stopReason: 'stop',
+        timestamp: 0,
+      } as any,
     ]);
     expect(out).toBeUndefined();
   });
 
   it('only inspects the LAST assistant message (mid-turn tool errors stay invisible)', () => {
     const out = extractErrorStop([
-      { role: 'assistant', content: [], stopReason: 'error', errorMessage: 'first call failed', timestamp: 0 } as any,
+      {
+        role: 'assistant',
+        content: [],
+        stopReason: 'error',
+        errorMessage: 'first call failed',
+        timestamp: 0,
+      } as any,
       { role: 'tool', content: [], timestamp: 0 } as any,
-      { role: 'assistant', content: [{ type: 'text', text: 'recovered' }], stopReason: 'stop', timestamp: 0 } as any,
+      {
+        role: 'assistant',
+        content: [{ type: 'text', text: 'recovered' }],
+        stopReason: 'stop',
+        timestamp: 0,
+      } as any,
     ]);
     expect(out).toBeUndefined();
   });
@@ -268,16 +330,28 @@ describe('extractErrorStop', () => {
 
   it('returns undefined for empty / no-assistant message list', () => {
     expect(extractErrorStop([])).toBeUndefined();
-    expect(extractErrorStop([{ role: 'user', content: 'hi', timestamp: 0 } as any])).toBeUndefined();
+    expect(
+      extractErrorStop([{ role: 'user', content: 'hi', timestamp: 0 } as any])
+    ).toBeUndefined();
   });
 });
 
 describe('extractLastCallUsage', () => {
   it('returns the LAST assistant message usage on a multi-call turn', () => {
     const messages = [
-      { role: 'assistant', content: [], usage: { input: 1000, output: 100, cacheRead: 0, cacheWrite: 0, totalTokens: 1100 }, timestamp: 0 } as any,
+      {
+        role: 'assistant',
+        content: [],
+        usage: { input: 1000, output: 100, cacheRead: 0, cacheWrite: 0, totalTokens: 1100 },
+        timestamp: 0,
+      } as any,
       { role: 'tool', content: [], timestamp: 0 } as any,
-      { role: 'assistant', content: [], usage: { input: 1200, output: 80, cacheRead: 300, cacheWrite: 0, totalTokens: 1580 }, timestamp: 0 } as any,
+      {
+        role: 'assistant',
+        content: [],
+        usage: { input: 1200, output: 80, cacheRead: 300, cacheWrite: 0, totalTokens: 1580 },
+        timestamp: 0,
+      } as any,
     ];
     const result = extractLastCallUsage(messages);
     expect(result).toMatchObject({ input: 1200, cacheRead: 300 });
@@ -287,7 +361,12 @@ describe('extractLastCallUsage', () => {
 
   it('skips assistant messages without a usage block and returns an earlier one that has it', () => {
     const messages = [
-      { role: 'assistant', content: [], usage: { input: 500, output: 50, cacheRead: 10, cacheWrite: 0, totalTokens: 560 }, timestamp: 0 } as any,
+      {
+        role: 'assistant',
+        content: [],
+        usage: { input: 500, output: 50, cacheRead: 10, cacheWrite: 0, totalTokens: 560 },
+        timestamp: 0,
+      } as any,
       { role: 'tool', content: [], timestamp: 0 } as any,
       // Last assistant message has no usage block
       { role: 'assistant', content: [{ type: 'text', text: 'done' }], timestamp: 0 } as any,
@@ -329,7 +408,9 @@ describe('withContextUsedTokens', () => {
 
 describe('buildModel', () => {
   const originalEnv = { ...process.env };
-  afterEach(() => { process.env = { ...originalEnv }; });
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
 
   it('uses defaults when env vars unset', () => {
     delete process.env.PI_PROVIDER;
@@ -379,9 +460,13 @@ describe('buildModel', () => {
     process.env.OPENAI_BASE_URL = 'https://example.com/v1';
     process.env.OPENAI_API_KEY = 'sk-env-should-be-ignored';
     const { getApiKey } = buildModel({
-      id: 'p1', name: 'P', providerType: 'openai',
-      baseUrl: 'https://example.com/v1', apiKey: 'sk-from-profile',
-      createdAt: 0, updatedAt: 0,
+      id: 'p1',
+      name: 'P',
+      providerType: 'openai',
+      baseUrl: 'https://example.com/v1',
+      apiKey: 'sk-from-profile',
+      createdAt: 0,
+      updatedAt: 0,
     } as any);
     expect(await getApiKey!('whatever')).toBe('sk-from-profile');
   });
@@ -428,33 +513,47 @@ describe('translateEvent', () => {
   });
 
   it('translates message_update text_delta to assistant chunk', () => {
-    const out = translateEvent({
-      type: 'message_update',
-      message: { role: 'assistant', content: [] },
-      assistantMessageEvent: { type: 'text_delta', delta: 'Hello' },
-    }, ctx);
+    const out = translateEvent(
+      {
+        type: 'message_update',
+        message: { role: 'assistant', content: [] },
+        assistantMessageEvent: { type: 'text_delta', delta: 'Hello' },
+      },
+      ctx
+    );
     expect(out).toEqual({ type: 'assistant', content: 'Hello' });
   });
 
   it('ignores unknown message_update sub-event types', () => {
-    const out = translateEvent({
-      type: 'message_update',
-      message: { role: 'assistant', content: [] },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      assistantMessageEvent: { type: '_unknown_sub_event_' as any, delta: 'x' },
-    }, ctx);
+    const out = translateEvent(
+      {
+        type: 'message_update',
+        message: { role: 'assistant', content: [] },
+
+        assistantMessageEvent: { type: '_unknown_sub_event_' as any, delta: 'x' },
+      },
+      ctx
+    );
     expect(out).toBeUndefined();
   });
 
   it('translates agent_end with usage to result', () => {
     const usage = {
-      input: 42, output: 17, cacheRead: 0, cacheWrite: 0, totalTokens: 59,
+      input: 42,
+      output: 17,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 59,
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
     };
-    const out = translateEvent({
-      type: 'agent_end',
-      messages: [],
-    }, ctx, usage);
+    const out = translateEvent(
+      {
+        type: 'agent_end',
+        messages: [],
+      },
+      ctx,
+      usage
+    );
     expect(out).toMatchObject({
       type: 'result',
       isComplete: true,
@@ -472,10 +571,25 @@ describe('translateEvent', () => {
   });
 
   it('ignores message_start, message_end, turn_start, turn_end', () => {
-    expect(translateEvent({ type: 'message_start', message: { role: 'user', content: 'x', timestamp: 0 } }, ctx)).toBeUndefined();
-    expect(translateEvent({ type: 'message_end', message: { role: 'user', content: 'x', timestamp: 0 } }, ctx)).toBeUndefined();
+    expect(
+      translateEvent(
+        { type: 'message_start', message: { role: 'user', content: 'x', timestamp: 0 } },
+        ctx
+      )
+    ).toBeUndefined();
+    expect(
+      translateEvent(
+        { type: 'message_end', message: { role: 'user', content: 'x', timestamp: 0 } },
+        ctx
+      )
+    ).toBeUndefined();
     expect(translateEvent({ type: 'turn_start' }, ctx)).toBeUndefined();
-    expect(translateEvent({ type: 'turn_end', message: { role: 'assistant', content: [] }, toolResults: [] }, ctx)).toBeUndefined();
+    expect(
+      translateEvent(
+        { type: 'turn_end', message: { role: 'assistant', content: [] }, toolResults: [] },
+        ctx
+      )
+    ).toBeUndefined();
   });
 
   it('ignores unknown event types without throwing', () => {
@@ -484,12 +598,32 @@ describe('translateEvent', () => {
   });
 
   it('ignores tool_execution_* events in MVP', () => {
-    expect(translateEvent({ type: 'tool_execution_start', toolCallId: 't1', toolName: 'read', args: {} }, ctx)).toBeUndefined();
-    expect(translateEvent({ type: 'tool_execution_end', toolCallId: 't1', toolName: 'read', result: {}, isError: false }, ctx)).toBeUndefined();
+    expect(
+      translateEvent(
+        { type: 'tool_execution_start', toolCallId: 't1', toolName: 'read', args: {} },
+        ctx
+      )
+    ).toBeUndefined();
+    expect(
+      translateEvent(
+        {
+          type: 'tool_execution_end',
+          toolCallId: 't1',
+          toolName: 'read',
+          result: {},
+          isError: false,
+        },
+        ctx
+      )
+    ).toBeUndefined();
   });
 });
 
-async function collect(adapter: PiAgentProviderAdapter, input: string, options: Partial<RunOptions>): Promise<ProviderRuntimeEvent[]> {
+async function collect(
+  adapter: PiAgentProviderAdapter,
+  input: string,
+  options: Partial<RunOptions>
+): Promise<ProviderRuntimeEvent[]> {
   const opts: RunOptions = {
     cwd: '/tmp',
     sessionId: 'sess-test',
@@ -513,9 +647,21 @@ describe('PiAgentProviderAdapter.run', () => {
   it('happy path: emits init, streamed assistant chunks, and result', async () => {
     scriptNextAgent([
       { type: 'agent_start' },
-      { type: 'message_update', message: { role: 'assistant', content: [] }, assistantMessageEvent: { type: 'text_delta', delta: 'Hel' } },
-      { type: 'message_update', message: { role: 'assistant', content: [] }, assistantMessageEvent: { type: 'text_delta', delta: 'lo' } },
-      { type: 'message_update', message: { role: 'assistant', content: [] }, assistantMessageEvent: { type: 'text_delta', delta: '!' } },
+      {
+        type: 'message_update',
+        message: { role: 'assistant', content: [] },
+        assistantMessageEvent: { type: 'text_delta', delta: 'Hel' },
+      },
+      {
+        type: 'message_update',
+        message: { role: 'assistant', content: [] },
+        assistantMessageEvent: { type: 'text_delta', delta: 'lo' },
+      },
+      {
+        type: 'message_update',
+        message: { role: 'assistant', content: [] },
+        assistantMessageEvent: { type: 'text_delta', delta: '!' },
+      },
       { type: 'agent_end', messages: [] },
     ]);
 
@@ -530,12 +676,45 @@ describe('PiAgentProviderAdapter.run', () => {
   it('sums usage across all assistant messages in agent_end', async () => {
     scriptNextAgent([
       { type: 'agent_start' },
-      { type: 'message_update', message: { role: 'assistant', content: [] }, assistantMessageEvent: { type: 'text_delta', delta: 'reply' } },
-      { type: 'agent_end', messages: [
-        { role: 'user', content: 'hi', timestamp: 0 },
-        { role: 'assistant', content: [{ type: 'text', text: 'first' }], stopReason: 'toolUse', usage: { input: 100, output: 50, cacheRead: 5, cacheWrite: 0, totalTokens: 155, cost: { input: 0.001, output: 0.002, cacheRead: 0, cacheWrite: 0, total: 0.003 } }, timestamp: 0 } as any,
-        { role: 'assistant', content: [{ type: 'text', text: 'final' }], stopReason: 'stop', usage: { input: 30, output: 20, cacheRead: 0, cacheWrite: 2, totalTokens: 52, cost: { input: 0.0003, output: 0.0008, cacheRead: 0, cacheWrite: 0, total: 0.0011 } }, timestamp: 0 } as any,
-      ] },
+      {
+        type: 'message_update',
+        message: { role: 'assistant', content: [] },
+        assistantMessageEvent: { type: 'text_delta', delta: 'reply' },
+      },
+      {
+        type: 'agent_end',
+        messages: [
+          { role: 'user', content: 'hi', timestamp: 0 },
+          {
+            role: 'assistant',
+            content: [{ type: 'text', text: 'first' }],
+            stopReason: 'toolUse',
+            usage: {
+              input: 100,
+              output: 50,
+              cacheRead: 5,
+              cacheWrite: 0,
+              totalTokens: 155,
+              cost: { input: 0.001, output: 0.002, cacheRead: 0, cacheWrite: 0, total: 0.003 },
+            },
+            timestamp: 0,
+          } as any,
+          {
+            role: 'assistant',
+            content: [{ type: 'text', text: 'final' }],
+            stopReason: 'stop',
+            usage: {
+              input: 30,
+              output: 20,
+              cacheRead: 0,
+              cacheWrite: 2,
+              totalTokens: 52,
+              cost: { input: 0.0003, output: 0.0008, cacheRead: 0, cacheWrite: 0, total: 0.0011 },
+            },
+            timestamp: 0,
+          } as any,
+        ],
+      },
     ]);
 
     const adapter = new PiAgentProviderAdapter();
@@ -562,14 +741,14 @@ describe('PiAgentProviderAdapter.run', () => {
       { role: 'user', content: 'follow up' } as AgentMessage, // trailing user turn — adapter pops this
     ]);
 
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const adapter = new PiAgentProviderAdapter();
     // db must be truthy to enter the history-load branch; MockSession ignores the actual db.
-    await collect(adapter, 'follow up', { db: {} as Database.Database, claudiaSessionId: 'sess-test' });
+    await collect(adapter, 'follow up', {
+      db: {} as Database.Database,
+      claudiaSessionId: 'sess-test',
+    });
 
     expect(mockAgentInstances.length).toBe(1);
     const initialMessages = mockAgentInstances[0].initialState.messages;
@@ -601,15 +780,15 @@ describe('PiAgentProviderAdapter.run', () => {
       // The badge must reflect the model that actually failed, not claude-sonnet-4-6.
       expect(out[0].systemInfo?.model).toBe('invalid-model');
     } finally {
-      if (prevPi === undefined) delete process.env.PI_MODEL; else process.env.PI_MODEL = prevPi;
-      if (prevOpenai === undefined) delete process.env.OPENAI_MODEL; else process.env.OPENAI_MODEL = prevOpenai;
+      if (prevPi === undefined) delete process.env.PI_MODEL;
+      else process.env.PI_MODEL = prevPi;
+      if (prevOpenai === undefined) delete process.env.OPENAI_MODEL;
+      else process.env.OPENAI_MODEL = prevOpenai;
     }
   });
 
   it('LLM error: yields error(isComplete) at end of stream', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-    ], { rejectWith: new Error('Anthropic 429') });
+    scriptNextAgent([{ type: 'agent_start' }], { rejectWith: new Error('Anthropic 429') });
 
     const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', {});
@@ -628,13 +807,20 @@ describe('PiAgentProviderAdapter.run', () => {
 
     scriptNextAgent([
       { type: 'agent_start' },
-      { type: 'message_update', message: { role: 'assistant', content: [] }, assistantMessageEvent: { type: 'text_delta', delta: 'ok' } },
+      {
+        type: 'message_update',
+        message: { role: 'assistant', content: [] },
+        assistantMessageEvent: { type: 'text_delta', delta: 'ok' },
+      },
       { type: 'agent_end', messages: [] },
     ]);
 
     const adapter = new PiAgentProviderAdapter();
     // db must be truthy to enter the history-load branch; MockSession ignores the actual db.
-    const out = await collect(adapter, 'hi', { db: {} as Database.Database, claudiaSessionId: 'sess-test' });
+    const out = await collect(adapter, 'hi', {
+      db: {} as Database.Database,
+      claudiaSessionId: 'sess-test',
+    });
 
     const errors = out.filter(m => m.type === 'error');
     expect(errors.length).toBe(1);
@@ -651,10 +837,26 @@ describe('PiAgentProviderAdapter.run', () => {
     // empty in 120ms".
     scriptNextAgent([
       { type: 'agent_start' },
-      { type: 'agent_end', messages: [
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { role: 'assistant', content: [], stopReason: 'error', errorMessage: 'HTTP 503 model_not_found', usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, timestamp: 0 } as any,
-      ] },
+      {
+        type: 'agent_end',
+        messages: [
+          {
+            role: 'assistant',
+            content: [],
+            stopReason: 'error',
+            errorMessage: 'HTTP 503 model_not_found',
+            usage: {
+              input: 0,
+              output: 0,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 0,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            },
+            timestamp: 0,
+          } as any,
+        ],
+      },
     ]);
 
     const adapter = new PiAgentProviderAdapter();
@@ -671,7 +873,11 @@ describe('PiAgentProviderAdapter.run', () => {
     scriptNextAgent([
       { type: 'agent_start' },
       { type: '_future_' as any },
-      { type: 'message_update', message: { role: 'assistant', content: [] }, assistantMessageEvent: { type: 'text_delta', delta: 'a' } },
+      {
+        type: 'message_update',
+        message: { role: 'assistant', content: [] },
+        assistantMessageEvent: { type: 'text_delta', delta: 'a' },
+      },
       { type: 'agent_end', messages: [] },
     ]);
 
@@ -682,10 +888,7 @@ describe('PiAgentProviderAdapter.run', () => {
   });
 
   it('translates mode "plan" to systemInfo.permissionMode "plan"', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', { mode: 'plan' });
@@ -695,10 +898,7 @@ describe('PiAgentProviderAdapter.run', () => {
   });
 
   it('defaults permissionMode to "default" when mode is missing / non-plan', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', {});
@@ -708,10 +908,7 @@ describe('PiAgentProviderAdapter.run', () => {
   });
 
   it('emits the model registry context window in init systemInfo', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', {
@@ -732,10 +929,7 @@ describe('PiAgentProviderAdapter.run', () => {
   });
 
   it('reports the agent profile model in init systemInfo (not the env/default fallback)', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const prevEnv = process.env.PI_MODEL;
     delete process.env.PI_MODEL;
@@ -748,9 +942,12 @@ describe('PiAgentProviderAdapter.run', () => {
           enabledTools: [],
         } as any,
         llmProfileConfig: {
-          id: 'lp', name: 'p', providerType: 'openai',
+          id: 'lp',
+          name: 'p',
+          providerType: 'openai',
           baseUrl: 'http://example.local/v1',
-          createdAt: 0, updatedAt: 0,
+          createdAt: 0,
+          updatedAt: 0,
         } as any,
       });
       const init = out.find(m => m.type === 'init');
@@ -761,10 +958,7 @@ describe('PiAgentProviderAdapter.run', () => {
   });
 
   it('reports contextWindowSource=profile_entry when models[*].contextWindow is set', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', {
@@ -774,9 +968,12 @@ describe('PiAgentProviderAdapter.run', () => {
         enabledTools: [],
       } as any,
       llmProfileConfig: {
-        id: 'lp', name: 'p', providerType: 'anthropic',
+        id: 'lp',
+        name: 'p',
+        providerType: 'anthropic',
         models: [{ modelId: 'claude-sonnet-4-6', contextWindow: 1_000_000 }],
-        createdAt: 0, updatedAt: 0,
+        createdAt: 0,
+        updatedAt: 0,
       } as any,
     });
 
@@ -786,10 +983,7 @@ describe('PiAgentProviderAdapter.run', () => {
   });
 
   it('reports contextWindowSource=pi_ai_registry when only the registry resolves', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', {
@@ -809,10 +1003,7 @@ describe('PiAgentProviderAdapter.run', () => {
   });
 
   it('plan mode filters enabledTools to read-only subset', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', {
@@ -858,8 +1049,10 @@ describe('PiAgentProviderAdapter.run', () => {
     ]);
 
     // Agent should have been constructed with only the RO tools too.
-    const constructed = mockAgentInstances[0]?.initialState?.tools as Array<{ name: string }> | undefined;
-    const toolNames = (constructed ?? []).map((t) => t.name);
+    const constructed = mockAgentInstances[0]?.initialState?.tools as
+      | Array<{ name: string }>
+      | undefined;
+    const toolNames = (constructed ?? []).map(t => t.name);
     expect(toolNames).toEqual([
       'Read',
       'Grep',
@@ -878,10 +1071,7 @@ describe('PiAgentProviderAdapter.run', () => {
   });
 
   it('non-plan mode passes enabledTools through unfiltered', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', {
@@ -893,15 +1083,12 @@ describe('PiAgentProviderAdapter.run', () => {
   });
 
   it('plan mode preserves intersection with restrictive agent profile (read-only ∩ enabled)', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', {
       mode: 'plan',
-      enabledTools: ['read', 'write'] as ToolName[],  // agent only allows read + write
+      enabledTools: ['read', 'write'] as ToolName[], // agent only allows read + write
     });
 
     const init = out.find(m => m.type === 'init');
@@ -910,10 +1097,7 @@ describe('PiAgentProviderAdapter.run', () => {
   });
 
   it('plan mode appends PLAN mode suffix to systemPrompt', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', {
@@ -928,10 +1112,7 @@ describe('PiAgentProviderAdapter.run', () => {
   });
 
   it('non-plan mode appends edit tool guidance without plan-mode instructions', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', {
@@ -954,7 +1135,11 @@ describe('PiAgentProviderAdapter.run — thinking', () => {
   it('translates thinking_delta into ProviderRuntimeEvent.thinking_delta', async () => {
     scriptNextAgent([
       { type: 'agent_start' },
-      { type: 'message_update', message: { role: 'assistant', content: [] }, assistantMessageEvent: { type: 'thinking_delta', contentIndex: 0, delta: 'reasoning step' } },
+      {
+        type: 'message_update',
+        message: { role: 'assistant', content: [] },
+        assistantMessageEvent: { type: 'thinking_delta', contentIndex: 0, delta: 'reasoning step' },
+      },
       { type: 'agent_end', messages: [] },
     ]);
 
@@ -969,12 +1154,26 @@ describe('PiAgentProviderAdapter.run — thinking', () => {
   it('captures thinkingSignature from thinking_end content', async () => {
     scriptNextAgent([
       { type: 'agent_start' },
-      { type: 'message_update', message: { role: 'assistant', content: [] }, assistantMessageEvent: { type: 'thinking_delta', contentIndex: 0, delta: 'reasoning' } },
-      { type: 'message_update',
-        message: { role: 'assistant', content: [{ type: 'thinking', thinking: 'reasoning', thinkingSignature: 'sig-abc' }] },
-        assistantMessageEvent: { type: 'thinking_end', contentIndex: 0, content: 'reasoning',
-          partial: { role: 'assistant', content: [{ type: 'thinking', thinking: 'reasoning', thinkingSignature: 'sig-abc' }] }
-        }
+      {
+        type: 'message_update',
+        message: { role: 'assistant', content: [] },
+        assistantMessageEvent: { type: 'thinking_delta', contentIndex: 0, delta: 'reasoning' },
+      },
+      {
+        type: 'message_update',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'thinking', thinking: 'reasoning', thinkingSignature: 'sig-abc' }],
+        },
+        assistantMessageEvent: {
+          type: 'thinking_end',
+          contentIndex: 0,
+          content: 'reasoning',
+          partial: {
+            role: 'assistant',
+            content: [{ type: 'thinking', thinking: 'reasoning', thinkingSignature: 'sig-abc' }],
+          },
+        },
       },
       { type: 'agent_end', messages: [] },
     ]);
@@ -998,17 +1197,40 @@ describe('PiAgentProviderAdapter.run — tool loop integration', () => {
   it('full single-tool turn: emits tool_use, tool_activity, tool_result, then assistant + result', async () => {
     scriptNextAgent([
       { type: 'agent_start' },
-      { type: 'message_update', message: { role: 'assistant', content: [] }, assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: 'calling read' } },
-      { type: 'message_end', message: {
-        role: 'assistant',
-        content: [
-          { type: 'text', text: 'calling read' },
-          { type: 'toolCall', id: 't1', name: 'read', arguments: { path: '/x' } },
-        ],
-      } },
-      { type: 'tool_execution_update', toolCallId: 't1', toolName: 'read', args: {}, partialResult: { content: [{ type: 'text', text: 'reading...' }] } },
-      { type: 'tool_execution_end', toolCallId: 't1', toolName: 'read', result: { content: [{ type: 'text', text: 'file body' }] }, isError: false },
-      { type: 'message_update', message: { role: 'assistant', content: [] }, assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: 'it says foo' } },
+      {
+        type: 'message_update',
+        message: { role: 'assistant', content: [] },
+        assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: 'calling read' },
+      },
+      {
+        type: 'message_end',
+        message: {
+          role: 'assistant',
+          content: [
+            { type: 'text', text: 'calling read' },
+            { type: 'toolCall', id: 't1', name: 'read', arguments: { path: '/x' } },
+          ],
+        },
+      },
+      {
+        type: 'tool_execution_update',
+        toolCallId: 't1',
+        toolName: 'read',
+        args: {},
+        partialResult: { content: [{ type: 'text', text: 'reading...' }] },
+      },
+      {
+        type: 'tool_execution_end',
+        toolCallId: 't1',
+        toolName: 'read',
+        result: { content: [{ type: 'text', text: 'file body' }] },
+        isError: false,
+      },
+      {
+        type: 'message_update',
+        message: { role: 'assistant', content: [] },
+        assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: 'it says foo' },
+      },
       { type: 'agent_end', messages: [] },
     ]);
 
@@ -1025,10 +1247,7 @@ describe('PiAgentProviderAdapter.run — tool loop integration', () => {
   });
 
   it('passes tools array to pi Agent constructor', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', { cwd: '/tmp' });
@@ -1037,14 +1256,13 @@ describe('PiAgentProviderAdapter.run — tool loop integration', () => {
     expect((mockAgentInstances[0].initialState as any).tools).toBeDefined();
     // Memory is skipped when memoryDir is absent (no project context here), so
     // the built tool count is one less than the full canonical list.
-    expect((mockAgentInstances[0].initialState as any).tools.length).toBe(ALL_TOOL_NAMES.length - 1);
+    expect((mockAgentInstances[0].initialState as any).tools.length).toBe(
+      ALL_TOOL_NAMES.length - 1
+    );
   });
 
   it('adds external discovery meta tools when external tool state is present', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', {
@@ -1059,21 +1277,22 @@ describe('PiAgentProviderAdapter.run — tool loop integration', () => {
       },
     } as RunOptions);
 
-    const toolNames = ((mockAgentInstances.at(-1)?.initialState as any).tools ?? []).map((tool: any) => tool.name);
-    expect(toolNames).toEqual(expect.arrayContaining([
-      'Read',
-      'ListExternalToolProviders',
-      'SearchExternalTools',
-      'InspectExternalTool',
-      'LoadExternalTool',
-    ]));
+    const toolNames = ((mockAgentInstances.at(-1)?.initialState as any).tools ?? []).map(
+      (tool: any) => tool.name
+    );
+    expect(toolNames).toEqual(
+      expect.arrayContaining([
+        'Read',
+        'ListExternalToolProviders',
+        'SearchExternalTools',
+        'InspectExternalTool',
+        'LoadExternalTool',
+      ])
+    );
   });
 
   it('adds skill meta tools and active skill context when skill state is present', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', {
@@ -1101,32 +1320,33 @@ describe('PiAgentProviderAdapter.run — tool loop integration', () => {
     const instance = mockAgentInstances.at(-1);
     const toolNames = ((instance?.initialState as any).tools ?? []).map((tool: any) => tool.name);
     const initTools = (out[0] as any).systemInfo.tools;
-    expect(toolNames).toEqual(expect.arrayContaining([
-      'Read',
-      'ListSkills',
-      'SearchSkills',
-      'InspectSkill',
-      'LoadSkill',
-      'RunSkill',
-    ]));
-    expect(initTools).toEqual(expect.arrayContaining([
-      'Read',
-      'ListSkills',
-      'SearchSkills',
-      'InspectSkill',
-      'LoadSkill',
-      'RunSkill',
-    ]));
+    expect(toolNames).toEqual(
+      expect.arrayContaining([
+        'Read',
+        'ListSkills',
+        'SearchSkills',
+        'InspectSkill',
+        'LoadSkill',
+        'RunSkill',
+      ])
+    );
+    expect(initTools).toEqual(
+      expect.arrayContaining([
+        'Read',
+        'ListSkills',
+        'SearchSkills',
+        'InspectSkill',
+        'LoadSkill',
+        'RunSkill',
+      ])
+    );
     expect((instance?.initialState as any).systemPrompt).toContain('Discoverable skills');
     expect((instance?.initialState as any).systemPrompt).toContain('Active session skills');
     expect((instance?.initialState as any).systemPrompt).toContain('Follow the TDS workflow.');
   });
 
   it('passes 3 hooks to pi Agent constructor', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', {});
@@ -1141,8 +1361,12 @@ describe('PiAgentProviderAdapter.run — tool loop integration', () => {
 
 describe('buildModel — modelOverride', () => {
   const originalEnv = { ...process.env };
-  beforeEach(() => { process.env = { ...originalEnv }; });
-  afterEach(() => { process.env = { ...originalEnv }; });
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+  });
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
 
   it('uses modelOverride when provided (openai-compatible path)', () => {
     process.env.OPENAI_BASE_URL = 'http://localhost:3000/v1';
@@ -1171,13 +1395,12 @@ describe('PiAgentProviderAdapter.run — agent profile fields wired into Agent',
     mockAgentInstances.length = 0;
     scriptQueue.length = 0;
   });
-  afterEach(() => { process.env = { ...originalEnv }; });
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
 
   it('passes options.thinkingLevel into Agent initialState', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', { thinkingLevel: 'medium' as ThinkingLevel });
@@ -1186,29 +1409,31 @@ describe('PiAgentProviderAdapter.run — agent profile fields wired into Agent',
   });
 
   it('passes options.enabledTools to buildTools (filters to subset)', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', { enabledTools: ['read', 'bash'] as ToolName[] });
 
     expect((mockAgentInstances[0].initialState as any).tools).toBeDefined();
     expect((mockAgentInstances[0].initialState as any).tools.length).toBe(2);
-    expect((mockAgentInstances[0].initialState as any).tools.map((t: any) => t.name).sort()).toEqual(['Bash', 'Read']);
+    expect(
+      (mockAgentInstances[0].initialState as any).tools.map((t: any) => t.name).sort()
+    ).toEqual(['Bash', 'Read']);
   });
 
   it('passes options.agentProfile.model into buildModel as override', async () => {
     process.env.OPENAI_BASE_URL = 'http://localhost:3000/v1';
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const agentProfile: AgentProfileConfig = {
-      id: 'a1', name: 'coder', llmProfileId: 'lp1', model: 'kimi-k2.6',
-      systemPrompt: '', enabledTools: ['read'], createdAt: 0, updatedAt: 0,
+      id: 'a1',
+      name: 'coder',
+      llmProfileId: 'lp1',
+      model: 'kimi-k2.6',
+      systemPrompt: '',
+      enabledTools: ['read'],
+      createdAt: 0,
+      updatedAt: 0,
     };
     const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', { agentProfile });
@@ -1219,8 +1444,12 @@ describe('PiAgentProviderAdapter.run — agent profile fields wired into Agent',
 
 describe('buildModel — modelEntry overrides', () => {
   const originalEnv = { ...process.env };
-  beforeEach(() => { process.env = { ...originalEnv }; });
-  afterEach(() => { process.env = { ...originalEnv }; });
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+  });
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
 
   it('overrides contextWindow on openai-compat literal path (unregistered id)', () => {
     const profile = {
@@ -1231,7 +1460,10 @@ describe('buildModel — modelEntry overrides', () => {
     // `unregistered-*` ids miss both same-provider and cross-provider
     // lookups in the mock, so buildModel falls back to the openai-compat
     // literal — and the modelEntry override still wins.
-    const built = buildModel(profile, 'unregistered-x', { modelId: 'unregistered-x', contextWindow: 999_999 });
+    const built = buildModel(profile, 'unregistered-x', {
+      modelId: 'unregistered-x',
+      contextWindow: 999_999,
+    });
     expect(built.model.contextWindow).toBe(999_999);
   });
 
@@ -1239,7 +1471,7 @@ describe('buildModel — modelEntry overrides', () => {
     const built = buildModel(
       { providerType: 'openai', baseUrl: 'http://x/v1' } as any,
       'unregistered-m',
-      { modelId: 'unregistered-m', maxTokens: 2048 },
+      { modelId: 'unregistered-m', maxTokens: 2048 }
     );
     expect(built.model.maxTokens).toBe(2048);
   });
@@ -1248,7 +1480,7 @@ describe('buildModel — modelEntry overrides', () => {
     const built = buildModel(
       { providerType: 'openai', baseUrl: 'http://x/v1' } as any,
       'unregistered-raw-id',
-      { modelId: 'unregistered-raw-id', displayName: 'Pretty Name' },
+      { modelId: 'unregistered-raw-id', displayName: 'Pretty Name' }
     );
     expect(built.model.name).toBe('Pretty Name');
   });
@@ -1257,14 +1489,17 @@ describe('buildModel — modelEntry overrides', () => {
     const built = buildModel(
       { providerType: 'openai', baseUrl: 'http://x/v1' } as any,
       'unregistered-vision',
-      { modelId: 'unregistered-vision', inputModalities: ['text', 'image'] },
+      { modelId: 'unregistered-vision', inputModalities: ['text', 'image'] }
     );
     expect((built.model as { input?: string[] }).input).toEqual(['text', 'image']);
   });
 
   it('overrides registry-resolved Model.contextWindow', () => {
     delete process.env.OPENAI_BASE_URL;
-    const built = buildModel(undefined, 'claude-opus-4-7', { modelId: 'claude-opus-4-7', contextWindow: 1_000_000 });
+    const built = buildModel(undefined, 'claude-opus-4-7', {
+      modelId: 'claude-opus-4-7',
+      contextWindow: 1_000_000,
+    });
     expect(built.model.contextWindow).toBe(1_000_000);
   });
 
@@ -1313,8 +1548,11 @@ describe('buildModel — profile overrides', () => {
     const { model, getApiKey } = buildModel(profile);
     expect(model.baseUrl).toBe('http://127.0.0.1:3000/v1');
     expect(model.api).toBe('openai-completions');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((model as any).compat).toEqual({ supportsDeveloperRole: false, supportsReasoningEffort: false });
+
+    expect((model as any).compat).toEqual({
+      supportsDeveloperRole: false,
+      supportsReasoningEffort: false,
+    });
     expect(getApiKey).toBeDefined();
   });
 
@@ -1454,39 +1692,39 @@ describe('PiAgentProviderAdapter.run — steering wiring', () => {
     mockAgentInstances.length = 0;
     scriptQueue.length = 0;
   });
-  afterEach(() => { process.env = { ...originalEnv }; });
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
 
   it('constructs Agent with steeringMode: "all"', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
     const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', {});
     expect(mockAgentInstances[0].constructorOpts.steeringMode).toBe('all');
   });
 
   it('invokes options.onAgentReady once synchronously after Agent construction with a SteerHandle', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
     const adapter = new PiAgentProviderAdapter();
     const handles: SteerHandle[] = [];
-    await collect(adapter, 'hi', { onAgentReady: (h) => handles.push(h) });
+    await collect(adapter, 'hi', { onAgentReady: h => handles.push(h) });
     expect(handles).toHaveLength(1);
     expect(typeof handles[0].steer).toBe('function');
   });
 
   it('handle.steer forwards to the live pi Agent.steer', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
     const adapter = new PiAgentProviderAdapter();
     let handle: SteerHandle | undefined;
-    await collect(adapter, 'hi', { onAgentReady: (h) => { handle = h; } });
-    const msg: AgentMessage = { role: 'user', content: [{ type: 'text', text: 'also fix typo' }] } as AgentMessage;
+    await collect(adapter, 'hi', {
+      onAgentReady: h => {
+        handle = h;
+      },
+    });
+    const msg: AgentMessage = {
+      role: 'user',
+      content: [{ type: 'text', text: 'also fix typo' }],
+    } as AgentMessage;
     handle!.steer(msg);
     expect(mockAgentInstances[0].steerCalls).toContainEqual(msg);
   });
@@ -1505,7 +1743,7 @@ describe('PiAgentProviderAdapter.run — steering wiring', () => {
 
   it('declares session.steer capability', () => {
     const adapter = new PiAgentProviderAdapter();
-    const cap = adapter.manifest.capabilities.find((c) => c.id === 'session.steer');
+    const cap = adapter.manifest.capabilities.find(c => c.id === 'session.steer');
     expect(cap).toBeDefined();
     expect(cap?.supported).toBe(true);
   });
@@ -1518,20 +1756,22 @@ describe('prompt cache wiring', () => {
     mockAgentInstances.length = 0;
     scriptQueue.length = 0;
   });
-  afterEach(() => { process.env = { ...originalEnv }; });
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
 
   it('wraps streamFn to inject cacheRetention from llm profile', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', {
       llmProfileConfig: {
-        id: 'lp1', name: 'p1', providerType: 'anthropic',
+        id: 'lp1',
+        name: 'p1',
+        providerType: 'anthropic',
         cacheRetention: 'long',
-        createdAt: 0, updatedAt: 0,
+        createdAt: 0,
+        updatedAt: 0,
       } as any,
     });
 
@@ -1542,41 +1782,43 @@ describe('prompt cache wiring', () => {
     expect(vi.mocked(streamSimple)).toHaveBeenCalledWith(
       { id: 'm' },
       { messages: [] },
-      expect.objectContaining({ temperature: 0, cacheRetention: 'long' }),
+      expect.objectContaining({ temperature: 0, cacheRetention: 'long' })
     );
   });
 
   it('wraps streamFn without cacheRetention injection when profile has none', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', {
       llmProfileConfig: {
-        id: 'lp2', name: 'p2', providerType: 'anthropic',
-        createdAt: 0, updatedAt: 0,
+        id: 'lp2',
+        name: 'p2',
+        providerType: 'anthropic',
+        createdAt: 0,
+        updatedAt: 0,
       } as any,
     });
 
     // streamFn is now always set (retry wrapper is unconditional).
     expect(typeof mockAgentInstances[0].constructorOpts.streamFn).toBe('function');
     const { streamSimple } = await import('@earendil-works/pi-ai');
-    mockAgentInstances[0].constructorOpts.streamFn({ id: 'm' }, { messages: [] }, { temperature: 0 });
+    mockAgentInstances[0].constructorOpts.streamFn(
+      { id: 'm' },
+      { messages: [] },
+      { temperature: 0 }
+    );
     await vi.waitFor(() => {
       expect(vi.mocked(streamSimple)).toHaveBeenCalledWith(
-        expect.anything(), expect.anything(),
-        expect.not.objectContaining({ cacheRetention: expect.anything() }),
+        expect.anything(),
+        expect.anything(),
+        expect.not.objectContaining({ cacheRetention: expect.anything() })
       );
     });
   });
 
   it('passes the zclaudia session id to the Agent for cache routing', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', {
@@ -1587,17 +1829,17 @@ describe('prompt cache wiring', () => {
   });
 
   it('wraps streamFn to inject cacheRetention "none" as explicit opt-out', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', {
       llmProfileConfig: {
-        id: 'lp3', name: 'p3', providerType: 'anthropic',
+        id: 'lp3',
+        name: 'p3',
+        providerType: 'anthropic',
         cacheRetention: 'none',
-        createdAt: 0, updatedAt: 0,
+        createdAt: 0,
+        updatedAt: 0,
       } as any,
     });
 
@@ -1608,7 +1850,7 @@ describe('prompt cache wiring', () => {
     expect(vi.mocked(streamSimple)).toHaveBeenCalledWith(
       { id: 'm' },
       { messages: [] },
-      expect.objectContaining({ temperature: 0, cacheRetention: 'none' }),
+      expect.objectContaining({ temperature: 0, cacheRetention: 'none' })
     );
   });
 });
@@ -1627,16 +1869,16 @@ describe('stream retry wiring', () => {
   });
 
   it('always wraps streamFn (even without cacheRetention)', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', {
       llmProfileConfig: {
-        id: 'lp-no-cache', name: 'p', providerType: 'anthropic',
-        createdAt: 0, updatedAt: 0,
+        id: 'lp-no-cache',
+        name: 'p',
+        providerType: 'anthropic',
+        createdAt: 0,
+        updatedAt: 0,
       } as any,
     });
 
@@ -1644,17 +1886,17 @@ describe('stream retry wiring', () => {
   });
 
   it('injects cacheRetention through the retry wrapper when configured', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', {
       llmProfileConfig: {
-        id: 'lp-cache', name: 'p', providerType: 'anthropic',
+        id: 'lp-cache',
+        name: 'p',
+        providerType: 'anthropic',
         cacheRetention: 'long',
-        createdAt: 0, updatedAt: 0,
+        createdAt: 0,
+        updatedAt: 0,
       } as any,
     });
 
@@ -1663,23 +1905,24 @@ describe('stream retry wiring', () => {
     opts.streamFn({ id: 'm' }, { messages: [] }, { temperature: 0 });
     await vi.waitFor(() => {
       expect(vi.mocked(streamSimple)).toHaveBeenCalledWith(
-        expect.anything(), expect.anything(),
-        expect.objectContaining({ cacheRetention: 'long' }),
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({ cacheRetention: 'long' })
       );
     });
   });
 
   it('does not inject cacheRetention when profile has none', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', {
       llmProfileConfig: {
-        id: 'lp-no-cache2', name: 'p', providerType: 'anthropic',
-        createdAt: 0, updatedAt: 0,
+        id: 'lp-no-cache2',
+        name: 'p',
+        providerType: 'anthropic',
+        createdAt: 0,
+        updatedAt: 0,
       } as any,
     });
 
@@ -1711,14 +1954,19 @@ describe('stream retry wiring', () => {
     vi.useFakeTimers();
     vi.spyOn(Math, 'random').mockReturnValue(0);
 
-    const { createAssistantMessageEventStream, streamSimple } = await import('@earendil-works/pi-ai');
+    const { createAssistantMessageEventStream, streamSimple } =
+      await import('@earendil-works/pi-ai');
 
     // First streamSimple call: fire onResponse(429) then push an error event.
     vi.mocked(streamSimple).mockImplementationOnce((_model, _ctx, opts) => {
       const stream = createAssistantMessageEventStream();
       void (async () => {
         await opts?.onResponse?.({ status: 429, headers: {} }, _model as never);
-        stream.push({ type: 'error', reason: 'error', error: { role: 'assistant', content: [], stopReason: 'error' } } as never);
+        stream.push({
+          type: 'error',
+          reason: 'error',
+          error: { role: 'assistant', content: [], stopReason: 'error' },
+        } as never);
         stream.end();
       })();
       return stream;
@@ -1726,19 +1974,24 @@ describe('stream retry wiring', () => {
     // Second streamSimple call: normal done stream.
     vi.mocked(streamSimple).mockImplementationOnce((_model, _ctx, _opts) => {
       const stream = createAssistantMessageEventStream();
-      stream.push({ type: 'done', reason: 'stop', message: { role: 'assistant', content: [], stopReason: 'stop' } } as never);
+      stream.push({
+        type: 'done',
+        reason: 'stop',
+        message: { role: 'assistant', content: [], stopReason: 'stop' },
+      } as never);
       stream.end();
       return stream;
     });
 
     // Gate: the MockAgent will await this before closing the queue.
     let resolveGate!: () => void;
-    const gate = new Promise<void>(resolve => { resolveGate = resolve; });
+    const gate = new Promise<void>(resolve => {
+      resolveGate = resolve;
+    });
 
-    scriptNextAgent(
-      [{ type: 'agent_start' }, { type: 'agent_end', messages: [] }],
-      { waitForPromise: gate },
-    );
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }], {
+      waitForPromise: gate,
+    });
 
     const adapter = new PiAgentProviderAdapter();
 
@@ -1788,10 +2041,7 @@ describe('vision gating', () => {
   });
 
   it('passes images to agent.prompt when the model supports vision', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'what is this', {
@@ -1808,13 +2058,16 @@ describe('vision gating', () => {
     const piAi = await import('@earendil-works/pi-ai');
     vi.mocked(piAi.getModel).mockImplementationOnce((provider: string, model: string) => {
       if (provider === 'unknown') throw new Error(`unknown provider: ${provider}`);
-      return { provider, id: model, contextWindow: 200000, maxTokens: 8000, input: ['text'] } as never;
+      return {
+        provider,
+        id: model,
+        contextWindow: 200000,
+        maxTokens: 8000,
+        input: ['text'],
+      } as never;
     });
 
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'what is this', {
@@ -1827,10 +2080,7 @@ describe('vision gating', () => {
   });
 
   it('plain runs without images behave exactly as before', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
+    scriptNextAgent([{ type: 'agent_start' }, { type: 'agent_end', messages: [] }]);
 
     const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hello', {});

@@ -26,7 +26,22 @@ import type { GatewayTransportConfig } from '../hooks/transport/GatewayTransport
 export class DirectGatewayAdapter implements FacadeRuntimeGatewayAdapter {
   private listeners: Array<(event: FacadeAdapterEvent) => void> = [];
   private transport: GatewayTransport | null = null;
-  private transportConfig: Omit<GatewayTransportConfig, 'onConnected' | 'onDisconnected' | 'onError' | 'onRegistryChanged' | 'onBackendDataSnapshot' | 'onBackendDataEvent' | 'onBackendSubscribed' | 'onBackendUnsubscribed' | 'onBackendServerMessage' | 'onRunStreamEvent' | 'onContentPatch' | 'onContentPatchError'>;
+  private transportConfig: Omit<
+    GatewayTransportConfig,
+    | 'onConnected'
+    | 'onDisconnected'
+    | 'onError'
+    | 'onRegistryChanged'
+    | 'onBackendDataSnapshot'
+    | 'onBackendDataEvent'
+    | 'onBackendSubscribed'
+    | 'onBackendUnsubscribed'
+    | 'onBackendServerMessage'
+    | 'onRunStreamEvent'
+    | 'onContentPatch'
+    | 'onContentPatchError'
+    | 'onBackendsRemoved'
+  >;
   private gatewayHttpUrl: string;
   private gatewaySecret: string;
 
@@ -67,7 +82,7 @@ export class DirectGatewayAdapter implements FacadeRuntimeGatewayAdapter {
             }
             this.emit({ type: 'connection_state_changed', state: 'reconnecting' });
           },
-          onError: (error) => {
+          onError: error => {
             const resolvedUrl = this.transport?.getResolvedUrl() ?? this.transportConfig.url;
             const errorMsg = typeof error === 'string' ? error : 'connection_error';
             this.emit({
@@ -76,10 +91,16 @@ export class DirectGatewayAdapter implements FacadeRuntimeGatewayAdapter {
               error: `${errorMsg} (url: ${resolvedUrl})`,
             });
           },
-          onRegistryChanged: (items) => {
+          onRegistryChanged: items => {
             this.emit({
               type: 'registry_snapshot_received',
               items,
+            });
+          },
+          onBackendsRemoved: backendIds => {
+            this.emit({
+              type: 'backends_removed',
+              backendIds,
             });
           },
           onBackendDataSnapshot: (backendId, sessions, projects) => {
@@ -112,7 +133,13 @@ export class DirectGatewayAdapter implements FacadeRuntimeGatewayAdapter {
             });
           },
           onContentPatch: (backendId, sessionId, messages, latestOffset) => {
-            this.emit({ type: 'content_patch_received', backendId, sessionId, messages, latestOffset });
+            this.emit({
+              type: 'content_patch_received',
+              backendId,
+              sessionId,
+              messages,
+              latestOffset,
+            });
           },
           onContentPatchError: (backendId, sessionId, afterOffset, error) => {
             this.emit({ type: 'content_patch_failed', backendId, sessionId, afterOffset, error });
@@ -131,10 +158,10 @@ export class DirectGatewayAdapter implements FacadeRuntimeGatewayAdapter {
       },
     },
     backend: {
-      subscribe: (backendId) => {
+      subscribe: backendId => {
         this.transport?.subscribe(backendId);
       },
-      unsubscribe: (backendId) => {
+      unsubscribe: backendId => {
         this.transport?.unsubscribe(backendId);
       },
       sendToBackend: (backendId, message) => {
@@ -151,16 +178,14 @@ export class DirectGatewayAdapter implements FacadeRuntimeGatewayAdapter {
   readonly queries: FacadeAdapterQueries = {
     bootstrap: {
       getInitialState: (): FacadeAdapterBootstrapState => {
-        const items = this.transport
-          ? Array.from(this.transport.getRegistryItems().values())
-          : [];
-        const backendIds = this.transport
-          ? Array.from(this.transport.subscribedBackends)
-          : [];
+        const items = this.transport ? Array.from(this.transport.getRegistryItems().values()) : [];
+        const backendIds = this.transport ? Array.from(this.transport.subscribedBackends) : [];
         return {
           capturedAt: Date.now(),
           connection: {
-            state: (this.transport?.isConnected() ? 'connected' : 'idle') as FacadeAdapterConnectionState,
+            state: (this.transport?.isConnected()
+              ? 'connected'
+              : 'idle') as FacadeAdapterConnectionState,
           },
           identity: {
             instanceId: this.transportConfig.instanceId,
@@ -174,7 +199,10 @@ export class DirectGatewayAdapter implements FacadeRuntimeGatewayAdapter {
       },
     },
     connection: {
-      getState: () => (this.transport?.isConnected() ? 'connected' : 'disconnected') as FacadeAdapterConnectionState,
+      getState: () =>
+        (this.transport?.isConnected()
+          ? 'connected'
+          : 'disconnected') as FacadeAdapterConnectionState,
     },
     identity: {
       getInstanceId: () => this.transportConfig.instanceId,
@@ -184,10 +212,10 @@ export class DirectGatewayAdapter implements FacadeRuntimeGatewayAdapter {
       getSnapshot: () => this.transport?.getRegistryItems() ?? new Map(),
     },
     backend: {
-      isSubscribed: (backendId) => this.transport?.isBackendSubscribed(backendId) ?? false,
+      isSubscribed: backendId => this.transport?.isBackendSubscribed(backendId) ?? false,
     },
     http: {
-      getBaseUrl: (backendId) => {
+      getBaseUrl: backendId => {
         return `${this.gatewayHttpUrl}/api/proxy/${backendId}`;
       },
       getHeaders: () => ({
@@ -198,7 +226,7 @@ export class DirectGatewayAdapter implements FacadeRuntimeGatewayAdapter {
   };
 
   readonly events: FacadeAdapterEventBus = {
-    subscribe: (listener) => {
+    subscribe: listener => {
       this.listeners.push(listener);
       return () => {
         const idx = this.listeners.indexOf(listener);

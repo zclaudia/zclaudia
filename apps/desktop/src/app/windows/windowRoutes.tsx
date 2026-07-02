@@ -1,18 +1,52 @@
 import { lazy, type ReactNode } from 'react';
 import { WindowShell } from './WindowShell';
 
-const FileViewerWindow = lazy(() => import('../../components/fileviewer/FileViewerWindow').then(m => ({ default: m.FileViewerWindow })));
-const ProjectDashboardWindow = lazy(() => import('../../features/dashboard/ProjectDashboardWindow').then(m => ({ default: m.ProjectDashboardWindow })));
-const WorkflowEditorWindow = lazy(() => import('../../features/workflows/components/WorkflowEditorWindow').then(m => ({ default: m.WorkflowEditorWindow })));
-const AIReviewLogsWindow = lazy(() => import('../../features/permissions/AIReviewLogsWindow').then(m => ({ default: m.AIReviewLogsWindow })));
-const SessionChatWindow = lazy(() => import('../../features/chat/SessionChatWindow').then(m => ({ default: m.SessionChatWindow })));
-const TerminalWindow = lazy(() => import('../../components/terminal/TerminalWindow').then(m => ({ default: m.TerminalWindow })));
-const DraftWindow = lazy(() => import('../../components/draft/DraftWindow').then(m => ({ default: m.DraftWindow })));
-const PluginWindow = lazy(() => import('../../components/notch/PluginWindow').then(m => ({ default: m.PluginWindow })));
-const ClaudiaBallWindow = lazy(() => import('../../features/claudia/ClaudiaBallWindow').then(m => ({ default: m.ClaudiaBallWindow })));
-const NotchWindowLazy = lazy(() => import('../../components/notch/NotchWindow').then(m => ({ default: m.NotchWindow })));
-const ClaudiaChatWindow = lazy(() => import('../../features/claudia/ClaudiaChatWindow').then(m => ({ default: m.ClaudiaChatWindow })));
-const WindowManagerWindow = lazy(() => import('../../components/windowmanager/WindowManagerWindow').then(m => ({ default: m.WindowManagerWindow })));
+const FileViewerWindow = lazy(() =>
+  import('../../components/fileviewer/FileViewerWindow').then(m => ({
+    default: m.FileViewerWindow,
+  }))
+);
+const ProjectDashboardWindow = lazy(() =>
+  import('../../features/dashboard/ProjectDashboardWindow').then(m => ({
+    default: m.ProjectDashboardWindow,
+  }))
+);
+const WorkflowEditorWindow = lazy(() =>
+  import('../../features/workflows/components/WorkflowEditorWindow').then(m => ({
+    default: m.WorkflowEditorWindow,
+  }))
+);
+const AIReviewLogsWindow = lazy(() =>
+  import('../../features/permissions/AIReviewLogsWindow').then(m => ({
+    default: m.AIReviewLogsWindow,
+  }))
+);
+const SessionChatWindow = lazy(() =>
+  import('../../features/chat/SessionChatWindow').then(m => ({ default: m.SessionChatWindow }))
+);
+const TerminalWindow = lazy(() =>
+  import('../../components/terminal/TerminalWindow').then(m => ({ default: m.TerminalWindow }))
+);
+const DraftWindow = lazy(() =>
+  import('../../components/draft/DraftWindow').then(m => ({ default: m.DraftWindow }))
+);
+const PluginWindow = lazy(() =>
+  import('../../components/notch/PluginWindow').then(m => ({ default: m.PluginWindow }))
+);
+const ClaudiaBallWindow = lazy(() =>
+  import('../../features/claudia/ClaudiaBallWindow').then(m => ({ default: m.ClaudiaBallWindow }))
+);
+const NotchWindowLazy = lazy(() =>
+  import('../../components/notch/NotchWindow').then(m => ({ default: m.NotchWindow }))
+);
+const ClaudiaChatWindow = lazy(() =>
+  import('../../features/claudia/ClaudiaChatWindow').then(m => ({ default: m.ClaudiaChatWindow }))
+);
+const WindowManagerWindow = lazy(() =>
+  import('../../components/windowmanager/WindowManagerWindow').then(m => ({
+    default: m.WindowManagerWindow,
+  }))
+);
 
 interface StandaloneWindowRoute {
   id: string;
@@ -26,7 +60,7 @@ function optionalParam(params: URLSearchParams, key: string): string | undefined
 export const standaloneWindowRoutes: StandaloneWindowRoute[] = [
   {
     id: 'file-viewer',
-    render: (params) => {
+    render: params => {
       const fileViewerPath = params.get('fileViewer');
       const projectRoot = params.get('projectRoot');
       if (!fileViewerPath || !projectRoot) return null;
@@ -45,7 +79,7 @@ export const standaloneWindowRoutes: StandaloneWindowRoute[] = [
   },
   {
     id: 'project-dashboard',
-    render: (params) => {
+    render: params => {
       const projectId = params.get('projectDashboard');
       if (!projectId) return null;
       return (
@@ -72,7 +106,7 @@ export const standaloneWindowRoutes: StandaloneWindowRoute[] = [
   },
   {
     id: 'workflow-editor',
-    render: (params) => {
+    render: params => {
       const projectId = params.get('workflowEditor');
       if (!projectId) return null;
       return (
@@ -95,7 +129,7 @@ export const standaloneWindowRoutes: StandaloneWindowRoute[] = [
   },
   {
     id: 'ai-review-logs',
-    render: (params) => {
+    render: params => {
       const runId = params.get('aiReviewLogs');
       if (!runId) return null;
       return (
@@ -112,7 +146,7 @@ export const standaloneWindowRoutes: StandaloneWindowRoute[] = [
   },
   {
     id: 'session-chat',
-    render: (params) => {
+    render: params => {
       const sessionId = params.get('sessionWindow');
       if (!sessionId) return null;
       return (
@@ -133,7 +167,7 @@ export const standaloneWindowRoutes: StandaloneWindowRoute[] = [
   },
   {
     id: 'draft',
-    render: (params) => {
+    render: params => {
       const sessionId = params.get('draftWindow');
       if (!sessionId) return null;
       return (
@@ -153,7 +187,7 @@ export const standaloneWindowRoutes: StandaloneWindowRoute[] = [
   },
   {
     id: 'terminal',
-    render: (params) => {
+    render: params => {
       const terminalId = params.get('terminalWindow');
       if (!terminalId) return null;
       return (
@@ -174,19 +208,25 @@ export const standaloneWindowRoutes: StandaloneWindowRoute[] = [
   },
   {
     id: 'claudia-ball',
-    render: (params) => params.get('claudiaBall')
-      ? <WindowShell withTheme={false}><ClaudiaBallWindow /></WindowShell>
-      : null,
+    render: params =>
+      params.get('claudiaBall') ? (
+        <WindowShell withTheme={false}>
+          <ClaudiaBallWindow />
+        </WindowShell>
+      ) : null,
   },
   {
     id: 'notch',
-    render: (params) => params.get('notchWindow')
-      ? <WindowShell withTheme={false}><NotchWindowLazy /></WindowShell>
-      : null,
+    render: params =>
+      params.get('notchWindow') ? (
+        <WindowShell withTheme={false}>
+          <NotchWindowLazy />
+        </WindowShell>
+      ) : null,
   },
   {
     id: 'claudia-chat',
-    render: (params) => {
+    render: params => {
       if (!params.get('claudiaChat')) return null;
       return (
         <WindowShell withTheme={false}>
@@ -206,13 +246,16 @@ export const standaloneWindowRoutes: StandaloneWindowRoute[] = [
   },
   {
     id: 'window-manager',
-    render: (params) => params.get('windowManager')
-      ? <WindowShell label="WindowManager"><WindowManagerWindow /></WindowShell>
-      : null,
+    render: params =>
+      params.get('windowManager') ? (
+        <WindowShell label="WindowManager">
+          <WindowManagerWindow />
+        </WindowShell>
+      ) : null,
   },
   {
     id: 'plugin',
-    render: (params) => {
+    render: params => {
       const pluginId = params.get('pluginWindow');
       if (!pluginId) return null;
       return (
@@ -225,7 +268,7 @@ export const standaloneWindowRoutes: StandaloneWindowRoute[] = [
 ];
 
 export function resolveStandaloneWindowRoute(
-  params: URLSearchParams,
+  params: URLSearchParams
 ): { id: string; element: ReactNode } | null {
   for (const route of standaloneWindowRoutes) {
     const element = route.render(params);

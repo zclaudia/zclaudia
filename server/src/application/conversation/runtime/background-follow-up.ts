@@ -55,7 +55,7 @@ export interface BackgroundFollowUpContext {
  */
 export function spawnBackgroundFollowUpConsumer(
   iterator: AsyncIterator<ProviderRuntimeEvent>,
-  ctx: BackgroundFollowUpContext,
+  ctx: BackgroundFollowUpContext
 ): void {
   consumeBackgroundStream(iterator, ctx).catch(err => {
     console.error('[BackgroundFollowUp] Unhandled error:', err);
@@ -64,7 +64,7 @@ export function spawnBackgroundFollowUpConsumer(
 
 async function consumeBackgroundStream(
   iterator: AsyncIterator<ProviderRuntimeEvent>,
-  ctx: BackgroundFollowUpContext,
+  ctx: BackgroundFollowUpContext
 ): Promise<void> {
   let pendingTasks = ctx.initialPendingTasks;
   let followUpRun: ActiveRun | null = null;
@@ -122,7 +122,9 @@ async function consumeBackgroundStream(
         const created = createFollowUpRun(ctx);
         followUpRun = created.activeRun;
         followUpSendRunEvent = created.sendRunEvent;
-        console.log(`[BackgroundFollowUp] Follow-up run ${followUpRun.runId} started for session ${ctx.sessionId}`);
+        console.log(
+          `[BackgroundFollowUp] Follow-up run ${followUpRun.runId} started for session ${ctx.sessionId}`
+        );
       }
 
       if (followUpRun && followUpSendRunEvent) {
@@ -279,7 +281,7 @@ function finalizeFollowUpRun(run: ActiveRun, ctx: BackgroundFollowUpContext): vo
 function emitBackgroundFollowUpDomainEvent(
   ctx: BackgroundFollowUpContext,
   run: ActiveRun,
-  type: 'backgroundFollowup.started' | 'backgroundFollowup.finished',
+  type: 'backgroundFollowup.started' | 'backgroundFollowup.finished'
 ): RunDomainEvent<typeof type> {
   const event = createRunDomainEvent({
     type,

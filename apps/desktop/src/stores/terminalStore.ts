@@ -2,7 +2,10 @@ import { create } from 'zustand';
 import { usePluginStore } from './pluginStore';
 import { useServerStore } from './serverStore';
 
-export function getTerminalScopeKey(projectId: string, backendId: string | null | undefined): string {
+export function getTerminalScopeKey(
+  projectId: string,
+  backendId: string | null | undefined
+): string {
   return `${backendId ?? 'no-backend'}::${projectId}`;
 }
 
@@ -40,18 +43,21 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   ctrlActive: {},
   poppedOutTerminals: {},
   openTerminal: (projectId: string, backendId) => {
-    const scopeKey = getTerminalScopeKey(projectId, backendId ?? useServerStore.getState().activeServerId);
+    const scopeKey = getTerminalScopeKey(
+      projectId,
+      backendId ?? useServerStore.getState().activeServerId
+    );
     const existing = get().terminals[scopeKey];
     if (existing) return existing;
     const terminalId = crypto.randomUUID();
-    set((state) => ({
+    set(state => ({
       terminals: { ...state.terminals, [scopeKey]: terminalId },
     }));
     return terminalId;
   },
 
   closeTerminal: (terminalId: string) => {
-    set((state) => {
+    set(state => {
       const terminals = { ...state.terminals };
       for (const [pid, tid] of Object.entries(terminals)) {
         if (tid === terminalId) {
@@ -66,21 +72,28 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   },
 
   setDrawerOpen: (projectId: string, open: boolean, backendId) => {
-    const scopeKey = getTerminalScopeKey(projectId, backendId ?? useServerStore.getState().activeServerId);
-    set((state) => ({ drawerOpen: { ...state.drawerOpen, [scopeKey]: open } }));
+    const scopeKey = getTerminalScopeKey(
+      projectId,
+      backendId ?? useServerStore.getState().activeServerId
+    );
+    set(state => ({ drawerOpen: { ...state.drawerOpen, [scopeKey]: open } }));
     // Sync terminal panel visibility in pluginStore
     usePluginStore.getState().updatePanelVisibility('terminal', open);
   },
 
   isDrawerOpen: (projectId: string, backendId) =>
-    !!get().drawerOpen[getTerminalScopeKey(projectId, backendId ?? useServerStore.getState().activeServerId)],
+    !!get().drawerOpen[
+      getTerminalScopeKey(projectId, backendId ?? useServerStore.getState().activeServerId)
+    ],
 
   toggleCtrl: (terminalId: string) =>
-    set((state) => ({ ctrlActive: { ...state.ctrlActive, [terminalId]: !state.ctrlActive[terminalId] } })),
+    set(state => ({
+      ctrlActive: { ...state.ctrlActive, [terminalId]: !state.ctrlActive[terminalId] },
+    })),
 
   handleTerminalExited: (terminalId: string) => {
     // Remove the terminal mapping so next open creates a fresh one
-    set((state) => {
+    set(state => {
       const terminals = { ...state.terminals };
       for (const [pid, tid] of Object.entries(terminals)) {
         if (tid === terminalId) {
@@ -95,7 +108,9 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   },
 
   getTerminalId: (projectId: string, backendId) =>
-    get().terminals[getTerminalScopeKey(projectId, backendId ?? useServerStore.getState().activeServerId)],
+    get().terminals[
+      getTerminalScopeKey(projectId, backendId ?? useServerStore.getState().activeServerId)
+    ],
 
   markReady: (terminalId: string) => {
     const ready = get().readyTerminals;
@@ -112,12 +127,12 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 
   waitForReady: (terminalId: string, timeoutMs = 5000) => {
     if (get().readyTerminals.has(terminalId)) return Promise.resolve(true);
-    return new Promise<boolean>((resolve) => {
+    return new Promise<boolean>(resolve => {
       const timeout = setTimeout(() => {
         unsub();
         resolve(false);
       }, timeoutMs);
-      const unsub = useTerminalStore.subscribe((state) => {
+      const unsub = useTerminalStore.subscribe(state => {
         if (state.readyTerminals.has(terminalId)) {
           clearTimeout(timeout);
           unsub();
@@ -128,13 +143,13 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   },
 
   addPoppedOutTerminal: (terminalId: string, windowLabel: string) => {
-    set((state) => ({
+    set(state => ({
       poppedOutTerminals: { ...state.poppedOutTerminals, [terminalId]: windowLabel },
     }));
   },
 
   removePoppedOutTerminal: (terminalId: string) => {
-    set((state) => {
+    set(state => {
       const poppedOutTerminals = { ...state.poppedOutTerminals };
       delete poppedOutTerminals[terminalId];
       return { poppedOutTerminals };

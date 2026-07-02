@@ -13,8 +13,8 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(
       process.env.APP_VERSION ||
-      (process.env.TAURI_CONFIG ? JSON.parse(process.env.TAURI_CONFIG).version : null) ||
-      pkg.version
+        (process.env.TAURI_CONFIG ? JSON.parse(process.env.TAURI_CONFIG).version : null) ||
+        pkg.version
     ),
     __UPDATES_ENABLED__: JSON.stringify(process.env.UPDATES_ENABLED !== 'false'),
   },
@@ -34,16 +34,20 @@ export default defineConfig({
         manualChunks(id) {
           if (id.includes('node_modules')) {
             if (id.includes('@tauri-apps')) return 'vendor-tauri';
-            if (id.includes('react-syntax-highlighter') || id.includes('/prismjs/') || id.includes('/refractor/')) {
+            if (
+              id.includes('react-syntax-highlighter') ||
+              id.includes('/prismjs/') ||
+              id.includes('/refractor/')
+            ) {
               return 'vendor-code';
             }
             if (
-              id.includes('react-markdown')
-              || id.includes('remark-gfm')
-              || id.includes('/micromark')
-              || id.includes('/mdast')
-              || id.includes('/hast')
-              || id.includes('/unist')
+              id.includes('react-markdown') ||
+              id.includes('remark-gfm') ||
+              id.includes('/micromark') ||
+              id.includes('/mdast') ||
+              id.includes('/hast') ||
+              id.includes('/unist')
             ) {
               return 'vendor-markdown';
             }
@@ -53,14 +57,14 @@ export default defineConfig({
           }
 
           if (
-            id.includes('/src/components/chat/')
-            || id.includes('/src/components/fileviewer/')
-            || id.includes('/src/components/supervision/')
+            id.includes('/src/features/chat/') ||
+            id.includes('/src/components/fileviewer/') ||
+            id.includes('/src/features/supervision/')
           ) {
             return 'feature-interactive';
           }
-          if (id.includes('/src/components/workflows/')) return 'feature-workflows';
-          if (id.includes('/src/components/local-prs/')) return 'feature-local-prs';
+          if (id.includes('/src/features/workflows/')) return 'feature-workflows';
+          if (id.includes('/src/features/local-pr/')) return 'feature-local-prs';
         },
       },
     },
@@ -81,9 +85,7 @@ export default defineConfig({
     // Pure logic tests (.test.ts) run in node — no jsdom overhead.
     // Component tests (.test.tsx) keep jsdom. The 15 .test.ts files that
     // need DOM opt in via `// @vitest-environment jsdom` docblock.
-    environmentMatchGlobs: [
-      ['src/**/*.test.ts', 'node'],
-    ],
+    environmentMatchGlobs: [['src/**/*.test.ts', 'node']],
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['src-tauri/**', 'node_modules/**', 'dist/**'],
@@ -99,7 +101,10 @@ export default defineConfig({
       all: true,
       include: ['src/**/*.{ts,tsx}'],
       exclude: [
-        'src/test/**', '**/*.d.ts', 'src/main.tsx', 'src/**/__tests__/**',
+        'src/test/**',
+        '**/*.d.ts',
+        'src/main.tsx',
+        'src/**/__tests__/**',
         // Tauri-only files — use @tauri-apps/plugin-updater or @tauri-apps/plugin-process
         // which are not installed as npm deps (only available in Tauri runtime)
         'src/hooks/useAutoUpdate.ts',

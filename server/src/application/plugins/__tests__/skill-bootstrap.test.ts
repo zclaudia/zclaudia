@@ -23,9 +23,7 @@ const WORKSPACE_SKILLS_DIR = path.join(workspaceService.getWorkspaceDir(), 'skil
 function writeSkill(dir: string, name: string, frontmatter = '', body = `# ${name}\n`) {
   const skillDir = path.join(dir, name);
   mkdirSync(skillDir, { recursive: true });
-  const content = frontmatter
-    ? `---\n${frontmatter}\n---\n\n${body}`
-    : body;
+  const content = frontmatter ? `---\n${frontmatter}\n---\n\n${body}` : body;
   writeFileSync(path.join(skillDir, 'SKILL.md'), content);
 }
 
@@ -75,7 +73,7 @@ describe('loadAndCachePluginSkills', () => {
     };
     const count = await loadAndCachePluginSkills(env, fakeLoader as never);
     expect(count).toBe(1);
-    const plugin = getDiscoveredSkills().find((s) => s.source === 'plugin');
+    const plugin = getDiscoveredSkills().find(s => s.source === 'plugin');
     expect(plugin?.name).toBe('plugin-skill-1');
   });
 
@@ -92,7 +90,7 @@ describe('loadAndCachePluginSkills', () => {
       getPluginSkillDirs: () => [{ path: pluginDir, source: 'plugin' }],
     };
     await loadAndCachePluginSkills(env, fakeLoader as never);
-    const shared = getDiscoveredSkills().filter((s) => s.id === 'shared');
+    const shared = getDiscoveredSkills().filter(s => s.id === 'shared');
     expect(shared).toHaveLength(1);
     expect(shared[0].source).toBe('workspace');
     expect(shared[0].name).toBe('ws-shared');
@@ -101,12 +99,16 @@ describe('loadAndCachePluginSkills', () => {
   it('plugin skill is cached even when its requirements fail (just hidden from buildSkillDirectoryHint)', async () => {
     const pluginDir = path.join(tmpRoot, 'plugin-y');
     mkdirSync(pluginDir, { recursive: true });
-    writeSkill(pluginDir, 'gated', 'name: gated\ndescription: needs win32\nrequires:\n  os:\n    - win32');
+    writeSkill(
+      pluginDir,
+      'gated',
+      'name: gated\ndescription: needs win32\nrequires:\n  os:\n    - win32'
+    );
     const env = createExecutionEnv(tmpRoot);
     const fakeLoader: FakePluginLoader = {
       getPluginSkillDirs: () => [{ path: pluginDir, source: 'plugin' }],
     };
     await loadAndCachePluginSkills(env, fakeLoader as never);
-    expect(getDiscoveredSkills().find((s) => s.id === 'gated')).toBeDefined();
+    expect(getDiscoveredSkills().find(s => s.id === 'gated')).toBeDefined();
   });
 });

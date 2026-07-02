@@ -21,7 +21,15 @@ const THINKING_MESSAGES = [
   'Working on it...',
 ];
 
-export function LoadingIndicator({ isLoading, health, loopPattern, startedAt, lastActivityAt, onCancel, retryStatus }: LoadingIndicatorProps) {
+export function LoadingIndicator({
+  isLoading,
+  health,
+  loopPattern,
+  startedAt,
+  lastActivityAt,
+  onCancel,
+  retryStatus,
+}: LoadingIndicatorProps) {
   const [messageIndex, setMessageIndex] = useState(0);
   const [dots, setDots] = useState('');
   const [idleTime, setIdleTime] = useState(0);
@@ -36,7 +44,7 @@ export function LoadingIndicator({ isLoading, health, loopPattern, startedAt, la
     }
 
     const interval = setInterval(() => {
-      setMessageIndex((prev) => (prev + 1) % THINKING_MESSAGES.length);
+      setMessageIndex(prev => (prev + 1) % THINKING_MESSAGES.length);
     }, 3000);
 
     return () => clearInterval(interval);
@@ -50,7 +58,7 @@ export function LoadingIndicator({ isLoading, health, loopPattern, startedAt, la
     }
 
     const interval = setInterval(() => {
-      setDots((prev) => (prev.length >= 3 ? '' : prev + '.'));
+      setDots(prev => (prev.length >= 3 ? '' : prev + '.'));
     }, 500);
 
     return () => clearInterval(interval);
@@ -81,7 +89,10 @@ export function LoadingIndicator({ isLoading, health, loopPattern, startedAt, la
   }, [isLoading, startedAt, lastActivityAt]);
 
   useEffect(() => {
-    if (!retryStatus) { setRetryCountdown(0); return; }
+    if (!retryStatus) {
+      setRetryCountdown(0);
+      return;
+    }
     const update = () => {
       const remaining = Math.max(0, retryStatus.delayMs - (Date.now() - retryStatus.receivedAt));
       setRetryCountdown(Math.ceil(remaining / 1000));
@@ -92,21 +103,22 @@ export function LoadingIndicator({ isLoading, health, loopPattern, startedAt, la
   }, [retryStatus]);
 
   const retryReason = retryStatus
-    ? retryStatus.status === 429 ? 'Rate limited (429)'
-      : retryStatus.status === 529 || retryStatus.status === 503 ? `Service overloaded (${retryStatus.status})`
-      : retryStatus.status ? `Server error (${retryStatus.status})`
-      : 'Connection failed'
+    ? retryStatus.status === 429
+      ? 'Rate limited (429)'
+      : retryStatus.status === 529 || retryStatus.status === 503
+        ? `Service overloaded (${retryStatus.status})`
+        : retryStatus.status
+          ? `Server error (${retryStatus.status})`
+          : 'Connection failed'
     : '';
 
   if (!isLoading) return null;
 
   // Determine warning state based on idle time
-  const showWarning = health === 'idle' || health === 'loop' || (health === 'healthy' && idleTime > 30);
+  const showWarning =
+    health === 'idle' || health === 'loop' || (health === 'healthy' && idleTime > 30);
   const warningLevel: 'none' | 'slow' | 'idle' | 'loop' =
-    health === 'loop' ? 'loop' :
-    health === 'idle' ? 'idle' :
-    idleTime > 30 ? 'slow' :
-    'none';
+    health === 'loop' ? 'loop' : health === 'idle' ? 'idle' : idleTime > 30 ? 'slow' : 'none';
 
   const warningColors = {
     none: '',
@@ -122,15 +134,23 @@ export function LoadingIndicator({ isLoading, health, loopPattern, startedAt, la
     loop: 'bg-red-500/10 border-red-500/20',
   };
 
-  const dotColor = warningLevel === 'loop' ? 'bg-red-500' :
-    warningLevel === 'idle' ? 'bg-amber-500' :
-    warningLevel === 'slow' ? 'bg-yellow-500' :
-    'bg-primary';
+  const dotColor =
+    warningLevel === 'loop'
+      ? 'bg-red-500'
+      : warningLevel === 'idle'
+        ? 'bg-amber-500'
+        : warningLevel === 'slow'
+          ? 'bg-yellow-500'
+          : 'bg-primary';
 
-  const barColor = warningLevel === 'loop' ? 'bg-red-500' :
-    warningLevel === 'idle' ? 'bg-amber-500' :
-    warningLevel === 'slow' ? 'bg-yellow-500' :
-    'bg-primary';
+  const barColor =
+    warningLevel === 'loop'
+      ? 'bg-red-500'
+      : warningLevel === 'idle'
+        ? 'bg-amber-500'
+        : warningLevel === 'slow'
+          ? 'bg-yellow-500'
+          : 'bg-primary';
 
   return (
     <div className="flex items-start gap-3 px-4 py-3 animate-fade-in">
@@ -144,14 +164,24 @@ export function LoadingIndicator({ isLoading, health, loopPattern, startedAt, la
         <div className="flex items-center gap-3">
           {/* Pulsing dots animation */}
           <div className="flex gap-1">
-            <span className={`w-2 h-2 rounded-full ${dotColor} animate-bounce`} style={{ animationDelay: '0ms' }} />
-            <span className={`w-2 h-2 rounded-full ${dotColor} animate-bounce`} style={{ animationDelay: '150ms' }} />
-            <span className={`w-2 h-2 rounded-full ${dotColor} animate-bounce`} style={{ animationDelay: '300ms' }} />
+            <span
+              className={`w-2 h-2 rounded-full ${dotColor} animate-bounce`}
+              style={{ animationDelay: '0ms' }}
+            />
+            <span
+              className={`w-2 h-2 rounded-full ${dotColor} animate-bounce`}
+              style={{ animationDelay: '150ms' }}
+            />
+            <span
+              className={`w-2 h-2 rounded-full ${dotColor} animate-bounce`}
+              style={{ animationDelay: '300ms' }}
+            />
           </div>
 
           {/* Thinking message */}
           <span className="text-sm text-muted-foreground">
-            {THINKING_MESSAGES[messageIndex].replace('...', '')}{dots}
+            {THINKING_MESSAGES[messageIndex].replace('...', '')}
+            {dots}
           </span>
 
           {/* Time display: total time and idle time */}
@@ -159,13 +189,17 @@ export function LoadingIndicator({ isLoading, health, loopPattern, startedAt, la
             {/* Total time */}
             {totalTime > 0 && (
               <span>
-                {totalTime < 60 ? `${totalTime}s` : `${Math.floor(totalTime / 60)}m ${totalTime % 60}s`}
+                {totalTime < 60
+                  ? `${totalTime}s`
+                  : `${Math.floor(totalTime / 60)}m ${totalTime % 60}s`}
               </span>
             )}
             {/* Idle time (only show if > 3 seconds) */}
             {idleTime > 3 && (
               <span className="text-muted-foreground/40">
-                (idle: {idleTime < 60 ? `${idleTime}s` : `${Math.floor(idleTime / 60)}m ${idleTime % 60}s`})
+                (idle:{' '}
+                {idleTime < 60 ? `${idleTime}s` : `${Math.floor(idleTime / 60)}m ${idleTime % 60}s`}
+                )
               </span>
             )}
           </div>
@@ -178,7 +212,9 @@ export function LoadingIndicator({ isLoading, health, loopPattern, startedAt, la
 
         {/* Warning banner */}
         {showWarning && (
-          <div className={`mt-2 px-3 py-2 rounded-md border text-xs flex items-center gap-2 ${warningBgColors[warningLevel]}`}>
+          <div
+            className={`mt-2 px-3 py-2 rounded-md border text-xs flex items-center gap-2 ${warningBgColors[warningLevel]}`}
+          >
             <span className={warningColors[warningLevel]}>
               {warningLevel === 'loop' && `Loop detected: ${loopPattern || 'repeating pattern'}`}
               {warningLevel === 'idle' && 'No activity — task may be stuck'}
@@ -202,7 +238,8 @@ export function LoadingIndicator({ isLoading, health, loopPattern, startedAt, la
             className="mt-2 px-3 py-2 rounded-md border bg-amber-500/10 border-amber-500/20 text-xs flex items-center gap-2 text-amber-600"
           >
             <span>
-              {retryReason} — retrying{retryCountdown > 0 ? ` in ${retryCountdown}s` : '…'} ({retryStatus.attempt}/{retryStatus.maxAttempts})
+              {retryReason} — retrying{retryCountdown > 0 ? ` in ${retryCountdown}s` : '…'} (
+              {retryStatus.attempt}/{retryStatus.maxAttempts})
             </span>
           </div>
         )}

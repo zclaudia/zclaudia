@@ -1,7 +1,6 @@
 import { GitBranch, FileDiff } from 'lucide-react';
 import { TOOL_ICONS } from './rightSidebarToolIcons';
 import { usePluginStore, selectPluginPanels } from '../stores/pluginStore';
-import { useGitStore } from '../features/git/store';
 import { useChangesData } from './changes/useSessionChanges';
 import { useServerStore } from '../stores/serverStore';
 import { openToolInWorkspace } from '../utils/workspaceActions';
@@ -10,9 +9,14 @@ interface RightSidebarEmptyStateProps {
   sessionId: string;
   projectId: string | undefined;
   projectRoot: string | undefined;
+  branchName?: string;
 }
 
-type EmptyTile = { id: string; label: string; iconKey: 'draft' | 'file' | 'changes' | 'terminal' | 'lineage' | 'git' };
+type EmptyTile = {
+  id: string;
+  label: string;
+  iconKey: 'draft' | 'file' | 'changes' | 'terminal' | 'lineage' | 'git';
+};
 
 /** Maps panel id → iconKey for the known built-in tool tiles. */
 const PANEL_ICON_MAP: Record<string, EmptyTile['iconKey']> = {
@@ -40,33 +44,37 @@ const SUBTITLES = {
  * open. Shows a compact git-branch + session-changes status line and a
  * launcher tile per known built-in panel, calling openToolInWorkspace on click.
  */
-export function RightSidebarEmptyState({ sessionId, projectId, projectRoot }: RightSidebarEmptyStateProps) {
+export function RightSidebarEmptyState({
+  sessionId,
+  projectId,
+  projectRoot,
+  branchName,
+}: RightSidebarEmptyStateProps) {
   const panels = usePluginStore(selectPluginPanels);
-  const disabled = usePluginStore((s) => s.disabledBuiltinPanels);
-  const backendId = useServerStore((s) => s.activeServerId);
-  const branch = useGitStore((s) => {
-    if (!projectId) return undefined;
-    const selectedPath = s.selectedWorktree[projectId];
-    return (s.worktrees[projectId] ?? []).find((w) => w.path === selectedPath)?.branch;
-  });
+  const disabled = usePluginStore(s => s.disabledBuiltinPanels);
+  const backendId = useServerStore(s => s.activeServerId);
   const { result } = useChangesData(sessionId, null, projectRoot);
   const changedCount = result.modified.length;
 
   // Build tiles from the registry: desktop panels, not disabled, with a known iconKey.
   const tiles: EmptyTile[] = panels
     .filter(
-      (p) =>
+      p =>
         (p.platforms ?? ['desktop']).includes('desktop') &&
         !disabled.includes(p.id) &&
-        PANEL_ICON_MAP[p.id] !== undefined,
+        PANEL_ICON_MAP[p.id] !== undefined
     )
-    .map((p) => ({ id: p.id, label: p.label, iconKey: PANEL_ICON_MAP[p.id] }));
+    .map(p => ({ id: p.id, label: p.label, iconKey: PANEL_ICON_MAP[p.id] }));
 
-  const orderedTiles: EmptyTile[] = changedCount > 0
-    ? [...tiles.filter((t) => t.iconKey === 'changes'), ...tiles.filter((t) => t.iconKey !== 'changes')]
-    : tiles;
+  const orderedTiles: EmptyTile[] =
+    changedCount > 0
+      ? [
+          ...tiles.filter(t => t.iconKey === 'changes'),
+          ...tiles.filter(t => t.iconKey !== 'changes'),
+        ]
+      : tiles;
 
-  const showStatus = !!branch || changedCount > 0;
+  const showStatus = !!branchName || changedCount > 0;
 
   const subtitleFor = (tile: EmptyTile): string | undefined => {
     if (tile.iconKey === 'changes') {
@@ -81,10 +89,10 @@ export function RightSidebarEmptyState({ sessionId, projectId, projectRoot }: Ri
     <div className="h-full overflow-y-auto p-3 flex flex-col">
       {showStatus && (
         <div className="flex items-center gap-2 mb-3 px-2.5 py-1.5 rounded-md bg-secondary text-xs text-muted-foreground">
-          {branch && (
+          {branchName && (
             <span className="flex items-center gap-1.5 min-w-0">
               <GitBranch className="w-3.5 h-3.5 flex-shrink-0" />
-              <span className="text-foreground font-medium truncate">{branch}</span>
+              <span className="text-foreground font-medium truncate">{branchName}</span>
             </span>
           )}
           {changedCount > 0 && (
@@ -99,9 +107,11 @@ export function RightSidebarEmptyState({ sessionId, projectId, projectRoot }: Ri
       <div className="flex-1 flex flex-col items-center justify-center gap-1.5">
         <div className="mb-2 text-center px-2">
           <p className="text-sm font-medium text-foreground">Open a tool</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">Pick a tool below to open it in the workspace</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Pick a tool below to open it in the workspace
+          </p>
         </div>
-        {orderedTiles.map((tile) => {
+        {orderedTiles.map(tile => {
           const Icon = TOOL_ICONS[tile.iconKey];
           const subtitle = subtitleFor(tile);
           return (
@@ -112,7 +122,10 @@ export function RightSidebarEmptyState({ sessionId, projectId, projectRoot }: Ri
               className="flex items-center justify-center gap-1.5 w-full max-w-[220px] px-2.5 py-1.5 rounded-md border border-border hover:bg-secondary"
             >
               {Icon && <Icon className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />}
-              <span data-testid="empty-tile-label" className="text-xs font-medium text-foreground truncate">
+              <span
+                data-testid="empty-tile-label"
+                className="text-xs font-medium text-foreground truncate"
+              >
                 {tile.label}
               </span>
             </button>

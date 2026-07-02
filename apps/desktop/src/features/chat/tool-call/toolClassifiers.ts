@@ -1,10 +1,12 @@
 import type { ToolSemantic } from '@zclaudia/shared';
 
 function hasInteractionToolSuffix(toolName: string, suffix: string): boolean {
-  return toolName === suffix
-    || toolName.endsWith(`_${suffix}`)
-    || toolName.endsWith(`-${suffix}`)
-    || toolName.endsWith(`:${suffix}`);
+  return (
+    toolName === suffix ||
+    toolName.endsWith(`_${suffix}`) ||
+    toolName.endsWith(`-${suffix}`) ||
+    toolName.endsWith(`:${suffix}`)
+  );
 }
 
 function normalizeToolName(toolName: string): string {
@@ -14,11 +16,13 @@ function normalizeToolName(toolName: string): string {
 // Check if tool is a todo-list tool (built-in TodoWrite or MCP update_todo_list)
 function isTodoTool(toolName: string): boolean {
   const normalized = normalizeToolName(toolName);
-  return toolName === 'TodoWrite'
-    || hasInteractionToolSuffix(toolName, 'update_todo_list')
-    || normalized === 'updatetodos'
-    || normalized === 'todolist'
-    || normalized === 'todolistwrite';
+  return (
+    toolName === 'TodoWrite' ||
+    hasInteractionToolSuffix(toolName, 'update_todo_list') ||
+    normalized === 'updatetodos' ||
+    normalized === 'todolist' ||
+    normalized === 'todolistwrite'
+  );
 }
 
 // Check if tool is an ask_user_form tool (MCP)
@@ -49,8 +53,10 @@ function isPlanModeTool(toolName: string, semantic?: ToolSemantic): boolean {
     return true;
   }
   if (toolName === 'EnterPlanMode' || toolName === 'ExitPlanMode') return true;
-  return hasInteractionToolSuffix(toolName, 'enter_plan_mode')
-    || hasInteractionToolSuffix(toolName, 'exit_plan_mode');
+  return (
+    hasInteractionToolSuffix(toolName, 'enter_plan_mode') ||
+    hasInteractionToolSuffix(toolName, 'exit_plan_mode')
+  );
 }
 
 // Whether a tool carries a plan proposal that should be rendered as a plan
@@ -64,12 +70,14 @@ function isPlanProposalTool(toolName: string, semantic?: ToolSemantic): boolean 
 
 // Check if tool is any MCP interaction tool
 function isInteractionTool(toolName: string, semantic?: ToolSemantic): boolean {
-  return isTodoTool(toolName)
-    || isAskUserFormTool(toolName)
-    || isAskUserQuestionTool(toolName)
-    || isApprovalTool(toolName)
-    || isPushFileTool(toolName)
-    || isPlanModeTool(toolName, semantic);
+  return (
+    isTodoTool(toolName) ||
+    isAskUserFormTool(toolName) ||
+    isAskUserQuestionTool(toolName) ||
+    isApprovalTool(toolName) ||
+    isPushFileTool(toolName) ||
+    isPlanModeTool(toolName, semantic)
+  );
 }
 
 export {

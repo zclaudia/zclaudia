@@ -22,25 +22,49 @@ describe('WorkflowStepRunRepository', () => {
   describe('mapRow', () => {
     it('maps row with all fields', () => {
       const result = repo.mapRow({
-        id: 'sr1', run_id: 'r1', step_id: 's1', step_type: 'ai_prompt',
-        status: 'completed', input: '{"x":1}', output: '{"y":2}',
-        error: 'err', attempt: 2, session_id: 'sess1',
-        started_at: 100, completed_at: 200,
+        id: 'sr1',
+        run_id: 'r1',
+        step_id: 's1',
+        step_type: 'ai_prompt',
+        status: 'completed',
+        input: '{"x":1}',
+        output: '{"y":2}',
+        error: 'err',
+        attempt: 2,
+        session_id: 'sess1',
+        started_at: 100,
+        completed_at: 200,
       });
       expect(result).toEqual({
-        id: 'sr1', runId: 'r1', stepId: 's1', stepType: 'ai_prompt',
-        status: 'completed', input: { x: 1 }, output: { y: 2 },
-        error: 'err', attempt: 2, sessionId: 'sess1',
-        startedAt: 100, completedAt: 200,
+        id: 'sr1',
+        runId: 'r1',
+        stepId: 's1',
+        stepType: 'ai_prompt',
+        status: 'completed',
+        input: { x: 1 },
+        output: { y: 2 },
+        error: 'err',
+        attempt: 2,
+        sessionId: 'sess1',
+        startedAt: 100,
+        completedAt: 200,
       });
     });
 
     it('handles null optional fields', () => {
       const result = repo.mapRow({
-        id: 'sr1', run_id: 'r1', step_id: 's1', step_type: 'ai_prompt',
-        status: 'pending', input: null, output: null,
-        error: null, attempt: 1, session_id: null,
-        started_at: null, completed_at: null,
+        id: 'sr1',
+        run_id: 'r1',
+        step_id: 's1',
+        step_type: 'ai_prompt',
+        status: 'pending',
+        input: null,
+        output: null,
+        error: null,
+        attempt: 1,
+        session_id: null,
+        started_at: null,
+        completed_at: null,
       });
       expect(result.input).toBeUndefined();
       expect(result.output).toBeUndefined();
@@ -52,8 +76,12 @@ describe('WorkflowStepRunRepository', () => {
   describe('createQuery', () => {
     it('generates insert SQL', () => {
       const { sql, params } = repo.createQuery({
-        runId: 'r1', stepId: 's1', stepType: 'ai_prompt' as any,
-        status: 'pending' as any, attempt: 1, sessionId: 'sess1',
+        runId: 'r1',
+        stepId: 's1',
+        stepType: 'ai_prompt' as any,
+        status: 'pending' as any,
+        attempt: 1,
+        sessionId: 'sess1',
       });
       expect(sql).toContain('INSERT INTO workflow_step_runs');
       expect(params[0]).toBe('mock-uuid');
@@ -62,7 +90,9 @@ describe('WorkflowStepRunRepository', () => {
 
     it('defaults nullable fields', () => {
       const { params } = repo.createQuery({
-        runId: 'r1', stepId: 's1', stepType: 'ai_prompt' as any,
+        runId: 'r1',
+        stepId: 's1',
+        stepType: 'ai_prompt' as any,
         status: 'pending' as any,
       } as any);
       expect(params[5]).toBe(1); // default attempt
@@ -73,7 +103,8 @@ describe('WorkflowStepRunRepository', () => {
   describe('updateQuery', () => {
     it('generates update SQL', () => {
       const { sql, params } = repo.updateQuery('sr1', {
-        status: 'completed' as any, error: 'fail',
+        status: 'completed' as any,
+        error: 'fail',
       });
       expect(sql).toContain('UPDATE workflow_step_runs SET');
       expect(params).toContain('completed');
@@ -87,7 +118,8 @@ describe('WorkflowStepRunRepository', () => {
 
     it('serializes input and output', () => {
       const { params } = repo.updateQuery('sr1', {
-        input: { x: 1 } as any, output: { y: 2 } as any,
+        input: { x: 1 } as any,
+        output: { y: 2 } as any,
       });
       expect(params).toContain('{"x":1}');
       expect(params).toContain('{"y":2}');
@@ -95,7 +127,10 @@ describe('WorkflowStepRunRepository', () => {
 
     it('handles all optional fields', () => {
       const { sql } = repo.updateQuery('sr1', {
-        attempt: 2, sessionId: 's', startedAt: 1, completedAt: 2,
+        attempt: 2,
+        sessionId: 's',
+        startedAt: 1,
+        completedAt: 2,
       });
       expect(sql).toContain('attempt = ?');
       expect(sql).toContain('session_id = ?');
@@ -120,8 +155,12 @@ describe('WorkflowStepRunRepository', () => {
 
     it('returns mapped row when found', () => {
       mockDb.prepare().get.mockReturnValue({
-        id: 'sr1', run_id: 'r1', step_id: 's1', step_type: 'ai_prompt',
-        status: 'completed', attempt: 1,
+        id: 'sr1',
+        run_id: 'r1',
+        step_id: 's1',
+        step_type: 'ai_prompt',
+        status: 'completed',
+        attempt: 1,
       });
       expect(repo.findByRunAndStep('r1', 's1')).not.toBeNull();
     });

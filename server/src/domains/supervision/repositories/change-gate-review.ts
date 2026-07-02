@@ -23,7 +23,9 @@ export class ChangeGateReviewRepository {
 
   private hasTable(): boolean {
     const row = this.db
-      .prepare("SELECT 1 as ok FROM sqlite_master WHERE type = 'table' AND name = 'change_gate_reviews'")
+      .prepare(
+        "SELECT 1 as ok FROM sqlite_master WHERE type = 'table' AND name = 'change_gate_reviews'"
+      )
       .get() as { ok?: number } | undefined;
     return Boolean(row?.ok);
   }
@@ -42,15 +44,23 @@ export class ChangeGateReviewRepository {
     };
   }
 
-  request(changeId: string, gateType: GateType, notes?: string): ChangeGateReviewRecord | undefined {
+  request(
+    changeId: string,
+    gateType: GateType,
+    notes?: string
+  ): ChangeGateReviewRecord | undefined {
     if (!this.hasTable()) return undefined;
     const now = Date.now();
     const id = newId();
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO change_gate_reviews
       (id, change_id, gate_type, status, notes, created_at)
       VALUES (?, ?, ?, 'pending', ?, ?)
-    `).run(id, changeId, gateType, notes ?? null, now);
+    `
+      )
+      .run(id, changeId, gateType, notes ?? null, now);
     return this.findById(id);
   }
 
@@ -59,29 +69,41 @@ export class ChangeGateReviewRepository {
     gateType: GateType,
     status: 'approved' | 'revision_requested',
     decision: DesignGateDecision | ExecutionGateDecision,
-    notes?: string,
+    notes?: string
   ): ChangeGateReviewRecord | undefined {
     if (!this.hasTable()) return undefined;
-    const pending = this.db.prepare(`
+    const pending = this.db
+      .prepare(
+        `
       SELECT id FROM change_gate_reviews
       WHERE change_id = ? AND gate_type = ? AND status = 'pending'
       ORDER BY created_at DESC
       LIMIT 1
-    `).get(changeId, gateType) as { id: string } | undefined;
+    `
+      )
+      .get(changeId, gateType) as { id: string } | undefined;
     const id = pending?.id ?? newId();
     const now = Date.now();
     if (pending) {
-      this.db.prepare(`
+      this.db
+        .prepare(
+          `
         UPDATE change_gate_reviews
         SET status = ?, decision = ?, notes = ?, resolved_at = ?
         WHERE id = ?
-      `).run(status, decision, notes ?? null, now, id);
+      `
+        )
+        .run(status, decision, notes ?? null, now, id);
     } else {
-      this.db.prepare(`
+      this.db
+        .prepare(
+          `
         INSERT INTO change_gate_reviews
         (id, change_id, gate_type, status, decision, notes, created_at, resolved_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(id, changeId, gateType, status, decision, notes ?? null, now, now);
+      `
+        )
+        .run(id, changeId, gateType, status, decision, notes ?? null, now, now);
     }
     return this.findById(id);
   }

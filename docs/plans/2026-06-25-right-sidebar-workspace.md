@@ -25,6 +25,7 @@
 ## File Structure
 
 **New files:**
+
 - `src/stores/rightWorkspaceStore.ts` — the session-scoped workspace store: types, tree helpers, actions, persistence + LRU.
 - `src/stores/__tests__/rightWorkspaceStore.test.ts` — unit tests for tree ops, openTool routing, session isolation, LRU.
 - `src/components/workspace/WorkspaceView.tsx` — recursive tree renderer (ported from `SplitLayoutView`), reads the current session's workspace.
@@ -34,11 +35,13 @@
 - `src/utils/__tests__/workspaceActions.test.ts` — tests for registry resolution + instanceKey building.
 
 **Moved/ported in Phase 2:**
+
 - `src/components/workspace/dragSplit.ts` — ported from `src/components/split/dragSplit.ts` (operates on `ToolRef`).
 - `src/components/workspace/ResizeDivider.tsx` — ported (near-verbatim) from `src/components/split/ResizeDivider.tsx`.
 - `src/components/workspace/DropOverlay.tsx` — ported (verbatim) from `src/components/split/DropOverlay.tsx`.
 
 **Modified:**
+
 - `src/stores/pluginStore.ts` — add `openMode?: 'shared' | 'dedicated'` to `UIExtension`.
 - `src/plugins/builtinPanels.ts` — set `openMode` per panel; drop `visible`/`onClose` reliance for right region (see Task 9).
 - `src/components/RightSidebar.tsx` — slim to chrome + `WorkspaceView` + header `+` launcher; remove `hasPinned`/`showTabs`/overlap-layer/old split wiring.
@@ -49,6 +52,7 @@
 - `src/stores/rightSidebarStore.ts` — remove `activeTab`/`setActiveTab` (bump persist version).
 
 **Deleted (end of Phase 2):**
+
 - `src/stores/splitLayoutStore.ts` + `__tests__/splitLayoutStore.test.ts`
 - `src/stores/sessionToolsStore.ts` + consumers
 - `src/components/split/SplitLayoutView.tsx`, `PaneView.tsx`, `dragSplit.ts`, `ResizeDivider.tsx`, `DropOverlay.tsx` (and their tests) — after porting to `workspace/`.
@@ -61,11 +65,13 @@
 ## Task 1: Add `openMode` to the tool registry
 
 **Files:**
+
 - Modify: `src/stores/pluginStore.ts` (the `UIExtension` interface, ~line 57)
 - Modify: `src/plugins/builtinPanels.ts` (each `registerPanel` call)
 - Test: `src/plugins/__tests__/builtinPanels.test.ts` (existing)
 
 **Interfaces:**
+
 - Produces: `UIExtension.openMode?: 'shared' | 'dedicated'` (default treated as `'shared'`). Consumed by `workspaceActions.ts` (Task 7).
 
 - [ ] **Step 1: Write the failing test** — append to `src/plugins/__tests__/builtinPanels.test.ts`:
@@ -83,7 +89,7 @@ describe('builtinPanels openMode', () => {
 
   it('marks terminal / notifications / lineage as dedicated', () => {
     const panels = usePluginStore.getState().panels;
-    const byId = (id: string) => panels.find((p) => p.id === id);
+    const byId = (id: string) => panels.find(p => p.id === id);
     expect(byId('terminal')?.openMode).toBe('dedicated');
     expect(byId('notifications')?.openMode).toBe('dedicated');
     expect(byId('lineage')?.openMode).toBe('dedicated');
@@ -91,7 +97,7 @@ describe('builtinPanels openMode', () => {
 
   it('marks file-viewer / draft / session-changes / memory as shared', () => {
     const panels = usePluginStore.getState().panels;
-    const byId = (id: string) => panels.find((p) => p.id === id);
+    const byId = (id: string) => panels.find(p => p.id === id);
     expect(byId('file-viewer')?.openMode).toBe('shared');
     expect(byId('draft')?.openMode).toBe('shared');
     expect(byId('session-changes')?.openMode).toBe('shared');
@@ -132,10 +138,12 @@ git commit -m "feat(desktop): add openMode to tool registry for workspace routin
 ## Task 2: `rightWorkspaceStore` — types + tree helpers
 
 **Files:**
+
 - Create: `src/stores/rightWorkspaceStore.ts`
 - Test: `src/stores/__tests__/rightWorkspaceStore.test.ts`
 
 **Interfaces:**
+
 - Produces (pure helpers, exported for tests + Phase 2): `genId`, `newPane`, `activeToolRef`, `pathTo`, `findPane`, `findPaneWithTool`, `findToolConflict`, `replaceChild`, `removePane`, `setRatioAt`, `pickFirstPane`, `isSafeTree`, `isSplitWorkspace`.
 - Produces types: `SplitDir`, `ToolRef`, `PaneNode`, `GroupNode`, `LayoutNode`, `SessionWorkspace`, `SplitResult`.
 
@@ -144,8 +152,15 @@ git commit -m "feat(desktop): add openMode to tool registry for workspace routin
 ```ts
 import { describe, it, expect } from 'vitest';
 import {
-  newPane, findPane, findPaneWithTool, findToolConflict,
-  removePane, setRatioAt, pickFirstPane, isSafeTree, isSplitWorkspace,
+  newPane,
+  findPane,
+  findPaneWithTool,
+  findToolConflict,
+  removePane,
+  setRatioAt,
+  pickFirstPane,
+  isSafeTree,
+  isSplitWorkspace,
   type LayoutNode,
 } from '../rightWorkspaceStore';
 
@@ -245,23 +260,23 @@ export interface ToolRef {
 export interface PaneNode {
   id: string;
   kind: 'pane';
-  tools: ToolRef[];      // always length 1 in Phases 1–2
-  activeToolId: string;  // == tools[0].toolId today
+  tools: ToolRef[]; // always length 1 in Phases 1–2
+  activeToolId: string; // == tools[0].toolId today
 }
 
 export interface GroupNode {
   id: string;
   kind: 'group';
   dir: SplitDir;
-  ratio: number;         // share of the FIRST child, clamped [MIN_RATIO, MAX_RATIO]
+  ratio: number; // share of the FIRST child, clamped [MIN_RATIO, MAX_RATIO]
   children: [LayoutNode, LayoutNode];
 }
 
 export type LayoutNode = PaneNode | GroupNode;
 
 export interface SessionWorkspace {
-  root: LayoutNode | null;        // null = empty → launcher
-  primaryPaneId: string | null;   // default landing pane for openTool
+  root: LayoutNode | null; // null = empty → launcher
+  primaryPaneId: string | null; // default landing pane for openTool
   focusedPaneId: string | null;
 }
 
@@ -281,12 +296,17 @@ export function genId(prefix: string): string {
 }
 
 export function newPane(toolId: string, instanceKey?: string): PaneNode {
-  return { id: genId('pane'), kind: 'pane', tools: [{ toolId, instanceKey }], activeToolId: toolId };
+  return {
+    id: genId('pane'),
+    kind: 'pane',
+    tools: [{ toolId, instanceKey }],
+    activeToolId: toolId,
+  };
 }
 
 /** The pane's currently-active tool ref (falls back to the first slot). */
 export function activeToolRef(pane: PaneNode): ToolRef {
-  return pane.tools.find((t) => t.toolId === pane.activeToolId) ?? pane.tools[0];
+  return pane.tools.find(t => t.toolId === pane.activeToolId) ?? pane.tools[0];
 }
 
 export function pathTo(root: LayoutNode | null, paneId: string): string[] | null {
@@ -314,7 +334,7 @@ export function findPaneWithTool(
   root: LayoutNode | null,
   toolId: string,
   instanceKey: string | undefined,
-  singleton: boolean,
+  singleton: boolean
 ): string | null {
   let hit: string | null = null;
   const visit = (node: LayoutNode | null) => {
@@ -322,7 +342,10 @@ export function findPaneWithTool(
     if (node.kind === 'pane') {
       for (const t of node.tools) {
         if (t.toolId !== toolId) continue;
-        if (singleton || t.instanceKey === instanceKey) { hit = node.id; return; }
+        if (singleton || t.instanceKey === instanceKey) {
+          hit = node.id;
+          return;
+        }
       }
       return;
     }
@@ -339,7 +362,7 @@ export function findToolConflict(
   toolId: string,
   instanceKey: string | undefined,
   singleton: boolean,
-  excludePaneId: string,
+  excludePaneId: string
 ): string | null {
   let conflict: string | null = null;
   const visit = (node: LayoutNode | null) => {
@@ -348,7 +371,10 @@ export function findToolConflict(
       if (node.id === excludePaneId) return;
       for (const t of node.tools) {
         if (t.toolId !== toolId) continue;
-        if (singleton || t.instanceKey === instanceKey) { conflict = node.id; return; }
+        if (singleton || t.instanceKey === instanceKey) {
+          conflict = node.id;
+          return;
+        }
       }
       return;
     }
@@ -362,7 +388,10 @@ export function findToolConflict(
 export function replaceChild(node: LayoutNode, oldId: string, replacement: LayoutNode): LayoutNode {
   if (node.id === oldId) return replacement;
   if (node.kind === 'pane') return node;
-  const children = node.children.map((c) => replaceChild(c, oldId, replacement)) as [LayoutNode, LayoutNode];
+  const children = node.children.map(c => replaceChild(c, oldId, replacement)) as [
+    LayoutNode,
+    LayoutNode,
+  ];
   return { ...node, children };
 }
 
@@ -378,8 +407,13 @@ export function removePane(root: LayoutNode, paneId: string): LayoutNode | null 
 
 export function setRatioAt(root: LayoutNode, groupId: string, ratio: number): LayoutNode {
   if (root.kind === 'pane') return root;
-  const children = root.children.map((c) => setRatioAt(c, groupId, ratio)) as [LayoutNode, LayoutNode];
-  return root.id === groupId ? { ...root, ratio: clampRatio(ratio), children } : { ...root, children };
+  const children = root.children.map(c => setRatioAt(c, groupId, ratio)) as [
+    LayoutNode,
+    LayoutNode,
+  ];
+  return root.id === groupId
+    ? { ...root, ratio: clampRatio(ratio), children }
+    : { ...root, children };
 }
 
 export function pickFirstPane(root: LayoutNode | null): string | null {
@@ -395,9 +429,11 @@ export function isSafeTree(node: unknown): node is LayoutNode {
     const p = node as PaneNode;
     return (
       typeof p.id === 'string' &&
-      Array.isArray(p.tools) && p.tools.length > 0 &&
-      p.tools.every((t) => t && typeof t.toolId === 'string') &&
-      typeof p.activeToolId === 'string' && p.activeToolId.length > 0
+      Array.isArray(p.tools) &&
+      p.tools.length > 0 &&
+      p.tools.every(t => t && typeof t.toolId === 'string') &&
+      typeof p.activeToolId === 'string' &&
+      p.activeToolId.length > 0
     );
   }
   if (n.kind === 'group') {
@@ -406,8 +442,10 @@ export function isSafeTree(node: unknown): node is LayoutNode {
       typeof g.id === 'string' &&
       (g.dir === 'row' || g.dir === 'col') &&
       typeof g.ratio === 'number' &&
-      Array.isArray(g.children) && g.children.length === 2 &&
-      isSafeTree(g.children[0]) && isSafeTree(g.children[1])
+      Array.isArray(g.children) &&
+      g.children.length === 2 &&
+      isSafeTree(g.children[0]) &&
+      isSafeTree(g.children[1])
     );
   }
   return false;
@@ -435,10 +473,12 @@ git commit -m "feat(desktop): rightWorkspaceStore types + tree helpers"
 ## Task 3: Store object + simple actions (ensureSession / focusPane / setRatio / closePane / resetSession / removeSession)
 
 **Files:**
+
 - Modify: `src/stores/rightWorkspaceStore.ts`
 - Test: `src/stores/__tests__/rightWorkspaceStore.test.ts`
 
 **Interfaces:**
+
 - Produces store hook `useRightWorkspaceStore` with state `{ bySession: Record<string, SessionWorkspace>; order: string[] }` and actions:
   - `ensureSession(sessionId: string): void`
   - `focusPane(sessionId: string, paneId: string): void`
@@ -462,8 +502,11 @@ describe('rightWorkspaceStore — simple actions', () => {
   it('ensureSession creates an empty workspace once', () => {
     const s = useRightWorkspaceStore.getState();
     s.ensureSession('A');
-    expect(useRightWorkspaceStore.getState().bySession.A)
-      .toEqual({ root: null, primaryPaneId: null, focusedPaneId: null });
+    expect(useRightWorkspaceStore.getState().bySession.A).toEqual({
+      root: null,
+      primaryPaneId: null,
+      focusedPaneId: null,
+    });
     s.ensureSession('A'); // idempotent
     expect(useRightWorkspaceStore.getState().order).toEqual(['A']);
   });
@@ -471,7 +514,11 @@ describe('rightWorkspaceStore — simple actions', () => {
   it('closePane collapses the group and reassigns primary/focus', () => {
     const s = useRightWorkspaceStore.getState();
     s.openTool('A', 'file-viewer', { openMode: 'shared' });
-    s.openTool('A', 'terminal', { openMode: 'dedicated', instanceKey: 'be::p', multiInstance: true });
+    s.openTool('A', 'terminal', {
+      openMode: 'dedicated',
+      instanceKey: 'be::p',
+      multiInstance: true,
+    });
     const ws = useRightWorkspaceStore.getState().bySession.A;
     const root = ws.root!;
     expect(root.kind).toBe('group');
@@ -530,8 +577,21 @@ interface RightWorkspaceState {
   ensureSession: (sessionId: string) => void;
   openTool: (sessionId: string, toolId: string, opts?: OpenToolOpts) => void;
   closePane: (sessionId: string, paneId: string) => void;
-  splitPane: (sessionId: string, fromPaneId: string, dir: SplitDir, toolId: string, instanceKey?: string, multiInstance?: boolean) => SplitResult;
-  replaceTool: (sessionId: string, paneId: string, toolId: string, instanceKey?: string, multiInstance?: boolean) => SplitResult;
+  splitPane: (
+    sessionId: string,
+    fromPaneId: string,
+    dir: SplitDir,
+    toolId: string,
+    instanceKey?: string,
+    multiInstance?: boolean
+  ) => SplitResult;
+  replaceTool: (
+    sessionId: string,
+    paneId: string,
+    toolId: string,
+    instanceKey?: string,
+    multiInstance?: boolean
+  ) => SplitResult;
   setRatio: (sessionId: string, groupId: string, ratio: number) => void;
   focusPane: (sessionId: string, paneId: string) => void;
   resetSession: (sessionId: string) => void;
@@ -540,7 +600,7 @@ interface RightWorkspaceState {
 
 /** Bump a sessionId to the front of MRU order and evict the oldest beyond MAX. */
 function touch(order: string[], bySession: Record<string, SessionWorkspace>, sessionId: string) {
-  const next = [sessionId, ...order.filter((id) => id !== sessionId)];
+  const next = [sessionId, ...order.filter(id => id !== sessionId)];
   while (next.length > MAX_SESSIONS) {
     const victim = next.pop()!;
     delete bySession[victim];
@@ -553,7 +613,7 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
     (set, get) => {
       /** Apply `mut` to a fresh copy of the session's workspace, then persist + touch MRU. */
       const update = (sessionId: string, mut: (ws: SessionWorkspace) => SessionWorkspace) =>
-        set((s) => {
+        set(s => {
           const bySession = { ...s.bySession };
           const current = bySession[sessionId] ?? { ...EMPTY };
           bySession[sessionId] = mut({ ...current });
@@ -565,8 +625,8 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
         bySession: {},
         order: [],
 
-        ensureSession: (sessionId) =>
-          set((s) => {
+        ensureSession: sessionId =>
+          set(s => {
             if (s.bySession[sessionId]) return {};
             const bySession = { ...s.bySession, [sessionId]: { ...EMPTY } };
             return { bySession, order: touch([...s.order], bySession, sessionId) };
@@ -580,7 +640,7 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
         replaceTool: () => ({ ok: false, conflictPaneId: '' }),
 
         closePane: (sessionId, paneId) =>
-          update(sessionId, (ws) => {
+          update(sessionId, ws => {
             if (!ws.root) return ws;
             const next = removePane(ws.root, paneId);
             if (next === ws.root) return ws; // not found
@@ -592,26 +652,30 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
           }),
 
         setRatio: (sessionId, groupId, ratio) =>
-          update(sessionId, (ws) => (ws.root ? { ...ws, root: setRatioAt(ws.root, groupId, ratio) } : ws)),
+          update(sessionId, ws =>
+            ws.root ? { ...ws, root: setRatioAt(ws.root, groupId, ratio) } : ws
+          ),
 
         focusPane: (sessionId, paneId) =>
-          update(sessionId, (ws) => (findPane(ws.root, paneId) ? { ...ws, focusedPaneId: paneId } : ws)),
+          update(sessionId, ws =>
+            findPane(ws.root, paneId) ? { ...ws, focusedPaneId: paneId } : ws
+          ),
 
-        resetSession: (sessionId) => update(sessionId, () => ({ ...EMPTY })),
+        resetSession: sessionId => update(sessionId, () => ({ ...EMPTY })),
 
-        removeSession: (sessionId) =>
-          set((s) => {
+        removeSession: sessionId =>
+          set(s => {
             if (!s.bySession[sessionId]) return {};
             const bySession = { ...s.bySession };
             delete bySession[sessionId];
-            return { bySession, order: s.order.filter((id) => id !== sessionId) };
+            return { bySession, order: s.order.filter(id => id !== sessionId) };
           }),
       };
     },
     {
       name: 'claudia-right-workspace',
       version: 1,
-      partialize: (s) => ({ bySession: s.bySession, order: s.order }),
+      partialize: s => ({ bySession: s.bySession, order: s.order }),
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<RightWorkspaceState>;
         const bySession: Record<string, SessionWorkspace> = {};
@@ -619,20 +683,24 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
           const root = ws && isSafeTree(ws.root) ? ws.root : ws?.root === null ? null : null;
           bySession[id] = {
             root,
-            primaryPaneId: root ? ws?.primaryPaneId ?? null : null,
-            focusedPaneId: root ? ws?.focusedPaneId ?? null : null,
+            primaryPaneId: root ? (ws?.primaryPaneId ?? null) : null,
+            focusedPaneId: root ? (ws?.focusedPaneId ?? null) : null,
           };
         }
-        const order = (p.order ?? []).filter((id) => id in bySession);
+        const order = (p.order ?? []).filter(id => id in bySession);
         return { ...current, bySession, order };
       },
-    },
-  ),
+    }
+  )
 );
 
 // One-time cleanup of the retired global split-layout persistence.
 if (typeof localStorage !== 'undefined') {
-  try { localStorage.removeItem('claudia-split-layout'); } catch { /* ignore */ }
+  try {
+    localStorage.removeItem('claudia-split-layout');
+  } catch {
+    /* ignore */
+  }
 }
 ```
 
@@ -653,10 +721,12 @@ git commit -m "feat(desktop): rightWorkspaceStore skeleton + simple session acti
 ## Task 4: `openTool` routing (primary reuse / dedicated own-pane / dedupe)
 
 **Files:**
+
 - Modify: `src/stores/rightWorkspaceStore.ts` (replace the `openTool: () => {}` stub)
 - Test: `src/stores/__tests__/rightWorkspaceStore.test.ts`
 
 **Interfaces:**
+
 - Implements `openTool(sessionId, toolId, opts?: OpenToolOpts)`. Resolution: `target ?? (openMode === 'dedicated' ? 'new-split' : 'primary')`. Dedupe via `findPaneWithTool`. Empty workspace → seed single pane as primary+focused. `primary` → set the primary pane's `tools=[ref]`, `activeToolId`, focus it. `new-split`/`focused` → see below.
 
 - [ ] **Step 1:** Un-skip the two openTool tests in the `simple actions` block, and add a dedicated `describe`:
@@ -688,7 +758,11 @@ describe('rightWorkspaceStore — openTool', () => {
   it('dedicated tool opens its own pane and does not hijack the primary', () => {
     const s = useRightWorkspaceStore.getState();
     s.openTool('A', 'file-viewer', { openMode: 'shared' });
-    s.openTool('A', 'terminal', { openMode: 'dedicated', instanceKey: 'be::p', multiInstance: true });
+    s.openTool('A', 'terminal', {
+      openMode: 'dedicated',
+      instanceKey: 'be::p',
+      multiInstance: true,
+    });
     const ws = useRightWorkspaceStore.getState().bySession.A;
     expect(ws.root!.kind).toBe('group');
     // primary still shows file-viewer
@@ -699,7 +773,11 @@ describe('rightWorkspaceStore — openTool', () => {
   it('opening an already-open singleton focuses it instead of duplicating', () => {
     const s = useRightWorkspaceStore.getState();
     s.openTool('A', 'memory', { openMode: 'dedicated' });
-    s.openTool('A', 'terminal', { openMode: 'dedicated', instanceKey: 'be::p', multiInstance: true });
+    s.openTool('A', 'terminal', {
+      openMode: 'dedicated',
+      instanceKey: 'be::p',
+      multiInstance: true,
+    });
     const before = useRightWorkspaceStore.getState().bySession.A.root;
     s.openTool('A', 'memory', { openMode: 'dedicated' }); // already open
     const ws = useRightWorkspaceStore.getState().bySession.A;
@@ -712,8 +790,12 @@ describe('rightWorkspaceStore — openTool', () => {
     const s = useRightWorkspaceStore.getState();
     s.openTool('A', 'file-viewer', { openMode: 'shared' });
     s.openTool('B', 'terminal', { openMode: 'dedicated' });
-    expect((useRightWorkspaceStore.getState().bySession.A.root as any).activeToolId).toBe('file-viewer');
-    expect((useRightWorkspaceStore.getState().bySession.B.root as any).activeToolId).toBe('terminal');
+    expect((useRightWorkspaceStore.getState().bySession.A.root as any).activeToolId).toBe(
+      'file-viewer'
+    );
+    expect((useRightWorkspaceStore.getState().bySession.B.root as any).activeToolId).toBe(
+      'terminal'
+    );
   });
 });
 
@@ -811,10 +893,12 @@ git commit -m "feat(desktop): rightWorkspaceStore openTool routing (shared/dedic
 ## Task 5: `splitPane` + `replaceTool` (for Phase 2 drag; store-level so tested here)
 
 **Files:**
+
 - Modify: `src/stores/rightWorkspaceStore.ts` (replace the two stubs)
 - Test: `src/stores/__tests__/rightWorkspaceStore.test.ts`
 
 **Interfaces:**
+
 - `splitPane(sessionId, fromPaneId, dir, toolId, instanceKey?, multiInstance?)` → `SplitResult`. Inserts a new pane as the SECOND child of a new group wrapping `fromPaneId`; new pane is non-primary, focused. Conflict (singleton already elsewhere) → returns `{ ok:false }` without mutating (UI focuses the conflict instead — Phase 2).
 - `replaceTool(sessionId, paneId, toolId, instanceKey?, multiInstance?)` → `SplitResult`. Swaps the pane's active tool (center-drop); conflict excludes the target pane itself.
 
@@ -914,6 +998,7 @@ git commit -m "feat(desktop): rightWorkspaceStore splitPane + replaceTool with c
 ## Task 6: LRU eviction test (locks the bound)
 
 **Files:**
+
 - Test: `src/stores/__tests__/rightWorkspaceStore.test.ts`
 
 **Interfaces:** Consumes `openTool`, `bySession`, `order`, `MAX_SESSIONS` (50).
@@ -930,15 +1015,15 @@ describe('rightWorkspaceStore — LRU eviction', () => {
     const { bySession, order } = useRightWorkspaceStore.getState();
     expect(order.length).toBe(50);
     expect(Object.keys(bySession).length).toBe(50);
-    expect(bySession.S0).toBeUndefined();   // oldest evicted
-    expect(bySession.S54).toBeDefined();    // newest kept
-    expect(order[0]).toBe('S54');           // MRU front
+    expect(bySession.S0).toBeUndefined(); // oldest evicted
+    expect(bySession.S54).toBeDefined(); // newest kept
+    expect(order[0]).toBe('S54'); // MRU front
   });
 });
 ```
 
 - [ ] **Step 2: Run test** — Run: `npx vitest run --config=vitest.unit.config.ts src/stores/__tests__/rightWorkspaceStore.test.ts -t "LRU"`
-Expected: PASS (the bound is already implemented in Task 3's `touch`). If it FAILS, fix `touch`/`MAX_SESSIONS` until green.
+      Expected: PASS (the bound is already implemented in Task 3's `touch`). If it FAILS, fix `touch`/`MAX_SESSIONS` until green.
 
 - [ ] **Step 3: Commit**
 
@@ -952,10 +1037,12 @@ git commit -m "test(desktop): lock rightWorkspaceStore 50-session LRU bound"
 ## Task 7: `workspaceActions.ts` — registry-aware open/close + active-state hook
 
 **Files:**
+
 - Create: `src/utils/workspaceActions.ts`
 - Test: `src/utils/__tests__/workspaceActions.test.ts`
 
 **Interfaces:**
+
 - Produces:
   - `openToolInWorkspace(sessionId: string, toolId: string, ctx?: { projectId?: string; backendId?: string | null; target?: 'primary' | 'focused' | 'new-split' }): void` — resolves `openMode`/`multiInstance`/`instanceKey` from `pluginStore` + `MULTI_INSTANCE_PANELS`, then calls `useRightWorkspaceStore.getState().openTool`.
   - `closeToolInWorkspace(sessionId: string, toolId: string): void` — finds the pane holding `toolId` (singleton match) and calls `closePane`; runs the panel's `onClose` if present (preserves store cleanup like terminal/file-viewer/draft).
@@ -1007,7 +1094,7 @@ describe('closeToolInWorkspace', () => {
 ```
 
 - [ ] **Step 2: Run test** — Run: `npx vitest run --config=vitest.unit.config.ts src/utils/__tests__/workspaceActions.test.ts`
-Expected: FAIL — module not found.
+      Expected: FAIL — module not found.
 
 - [ ] **Step 3: Implement** — create `src/utils/workspaceActions.ts`:
 
@@ -1031,8 +1118,12 @@ function resolveInstanceKey(toolId: string, ctx: OpenToolCtx): string | undefine
   return undefined;
 }
 
-export function openToolInWorkspace(sessionId: string, toolId: string, ctx: OpenToolCtx = {}): void {
-  const panel = usePluginStore.getState().panels.find((p) => p.id === toolId);
+export function openToolInWorkspace(
+  sessionId: string,
+  toolId: string,
+  ctx: OpenToolCtx = {}
+): void {
+  const panel = usePluginStore.getState().panels.find(p => p.id === toolId);
   const openMode = panel?.openMode ?? 'shared';
   const multiInstance = MULTI_INSTANCE_PANELS.has(toolId);
   useRightWorkspaceStore.getState().openTool(sessionId, toolId, {
@@ -1050,12 +1141,15 @@ export function closeToolInWorkspace(sessionId: string, toolId: string): void {
   if (!paneId) return;
   useRightWorkspaceStore.getState().closePane(sessionId, paneId);
   // Preserve panel-specific cleanup (terminal drawer, file viewer, draft store).
-  usePluginStore.getState().panels.find((p) => p.id === toolId)?.onClose?.();
+  usePluginStore
+    .getState()
+    .panels.find(p => p.id === toolId)
+    ?.onClose?.();
 }
 
 /** Reactive: is `toolId` present anywhere in the session's workspace tree? */
 export function useToolOpenState(sessionId: string, toolId: string): boolean {
-  return useRightWorkspaceStore((s) => {
+  return useRightWorkspaceStore(s => {
     const root = s.bySession[sessionId]?.root ?? null;
     return findPaneWithTool(root, toolId, undefined, true) !== null;
   });
@@ -1063,7 +1157,7 @@ export function useToolOpenState(sessionId: string, toolId: string): boolean {
 ```
 
 - [ ] **Step 4: Run test** — Run: `npx vitest run --config=vitest.unit.config.ts src/utils/__tests__/workspaceActions.test.ts`
-Expected: PASS.
+      Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
@@ -1077,11 +1171,13 @@ git commit -m "feat(desktop): workspaceActions — registry-aware open/close + a
 ## Task 8: `WorkspaceView` + `PaneView` (single-pane render path)
 
 **Files:**
+
 - Create: `src/components/workspace/PaneView.tsx`
 - Create: `src/components/workspace/WorkspaceView.tsx`
 - Create: `src/components/workspace/__tests__/WorkspaceView.test.tsx`
 
 **Interfaces:**
+
 - `WorkspaceView` props: `{ sessionId: string; projectId?: string; projectRoot?: string; workingDirectory?: string }`. Renders the session's tree; null root renders nothing (the host shows the launcher).
 - `PaneView` props: `{ sessionId: string; paneId: string; focused: boolean; projectId?: string; projectRoot?: string; workingDirectory?: string }`. Renders the active tool via `PanelContent`; header shows tool label + `PanelActions` + close (`closePane`). Terminal pane decodes its `instanceKey` into projectId (port of existing `decodeTerminalProjectId`).
 - Consumes: `useRightWorkspaceStore`, `activeToolRef`, `findPane`, `usePluginStore`, `PanelContent`/`PanelActions`. In Phase 2, `PaneView` also gets the drag handle + `DropOverlay`.
@@ -1134,14 +1230,19 @@ describe('WorkspaceView', () => {
 ```
 
 - [ ] **Step 2: Run test** — Run: `npx vitest run --config=vitest.ui.config.ts src/components/workspace/__tests__/WorkspaceView.test.tsx`
-Expected: FAIL — modules not found.
+      Expected: FAIL — modules not found.
 
 - [ ] **Step 3: Implement `PaneView`** — create `src/components/workspace/PaneView.tsx` (ported from `split/PaneView.tsx`, store swapped, tools-aware; the drag handle + DropOverlay are added in Phase 2 Task 13):
 
 ```tsx
 import { useCallback } from 'react';
 import { X } from 'lucide-react';
-import { useRightWorkspaceStore, findPane, activeToolRef, type PaneNode } from '../../stores/rightWorkspaceStore';
+import {
+  useRightWorkspaceStore,
+  findPane,
+  activeToolRef,
+  type PaneNode,
+} from '../../stores/rightWorkspaceStore';
 import { usePluginStore, type UIExtension } from '../../stores/pluginStore';
 import { PanelContent, PanelActions } from '../panels/PanelRenderer';
 
@@ -1162,15 +1263,22 @@ function decodeTerminalProjectId(instanceKey: string | undefined): string | unde
   return instanceKey.slice(sep + 2) || undefined;
 }
 
-export function PaneView({ sessionId, paneId, focused, projectId, projectRoot, workingDirectory }: PaneViewProps) {
-  const root = useRightWorkspaceStore((s) => s.bySession[sessionId]?.root ?? null);
-  const closePane = useRightWorkspaceStore((s) => s.closePane);
-  const focusPane = useRightWorkspaceStore((s) => s.focusPane);
+export function PaneView({
+  sessionId,
+  paneId,
+  focused,
+  projectId,
+  projectRoot,
+  workingDirectory,
+}: PaneViewProps) {
+  const root = useRightWorkspaceStore(s => s.bySession[sessionId]?.root ?? null);
+  const closePane = useRightWorkspaceStore(s => s.closePane);
+  const focusPane = useRightWorkspaceStore(s => s.focusPane);
 
   const pane = findPane(root, paneId) as PaneNode | null;
-  const panels = usePluginStore((s) => s.panels);
+  const panels = usePluginStore(s => s.panels);
   const ref = pane ? activeToolRef(pane) : null;
-  const panel: UIExtension | undefined = ref ? panels.find((p) => p.id === ref.toolId) : undefined;
+  const panel: UIExtension | undefined = ref ? panels.find(p => p.id === ref.toolId) : undefined;
 
   const onFocus = useCallback(() => focusPane(sessionId, paneId), [focusPane, sessionId, paneId]);
   const onClose = useCallback(() => closePane(sessionId, paneId), [closePane, sessionId, paneId]);
@@ -1184,7 +1292,7 @@ export function PaneView({ sessionId, paneId, focused, projectId, projectRoot, w
   }
 
   const effectiveProjectId =
-    ref.toolId === 'terminal' ? decodeTerminalProjectId(ref.instanceKey) ?? projectId : projectId;
+    ref.toolId === 'terminal' ? (decodeTerminalProjectId(ref.instanceKey) ?? projectId) : projectId;
 
   return (
     <div
@@ -1206,7 +1314,12 @@ export function PaneView({ sessionId, paneId, focused, projectId, projectRoot, w
         </button>
       </div>
       <div className="flex-1 min-h-0 overflow-hidden relative">
-        <PanelContent panel={panel} projectId={effectiveProjectId} projectRoot={projectRoot} workingDirectory={workingDirectory} />
+        <PanelContent
+          panel={panel}
+          projectId={effectiveProjectId}
+          projectRoot={projectRoot}
+          workingDirectory={workingDirectory}
+        />
       </div>
     </div>
   );
@@ -1217,7 +1330,11 @@ Then create `src/components/workspace/WorkspaceView.tsx` (ported from `split/Spl
 
 ```tsx
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRightWorkspaceStore, type LayoutNode, type GroupNode } from '../../stores/rightWorkspaceStore';
+import {
+  useRightWorkspaceStore,
+  type LayoutNode,
+  type GroupNode,
+} from '../../stores/rightWorkspaceStore';
 import { PaneView } from './PaneView';
 
 interface WorkspaceViewProps {
@@ -1227,16 +1344,21 @@ interface WorkspaceViewProps {
   workingDirectory?: string;
 }
 
-export function WorkspaceView({ sessionId, projectId, projectRoot, workingDirectory }: WorkspaceViewProps) {
-  const root = useRightWorkspaceStore((s) => s.bySession[sessionId]?.root ?? null);
-  const focusedPaneId = useRightWorkspaceStore((s) => s.bySession[sessionId]?.focusedPaneId ?? null);
+export function WorkspaceView({
+  sessionId,
+  projectId,
+  projectRoot,
+  workingDirectory,
+}: WorkspaceViewProps) {
+  const root = useRightWorkspaceStore(s => s.bySession[sessionId]?.root ?? null);
+  const focusedPaneId = useRightWorkspaceStore(s => s.bySession[sessionId]?.focusedPaneId ?? null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [, setSize] = useState({ width: 0, height: 0 });
   useEffect(() => {
     const el = containerRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver((entries) => {
+    const ro = new ResizeObserver(entries => {
       const r = entries[0]?.contentRect;
       if (r) setSize({ width: r.width, height: r.height });
     });
@@ -1261,7 +1383,7 @@ export function WorkspaceView({ sessionId, projectId, projectRoot, workingDirect
       }
       return renderGroup(node);
     },
-    [focusedPaneId, projectId, projectRoot, workingDirectory, sessionId],
+    [focusedPaneId, projectId, projectRoot, workingDirectory, sessionId]
   );
 
   const renderGroup = (group: GroupNode): React.ReactNode => {
@@ -1272,9 +1394,13 @@ export function WorkspaceView({ sessionId, projectId, projectRoot, workingDirect
         className={isRow ? 'flex flex-row min-w-0 min-h-0' : 'flex flex-col min-w-0 min-h-0'}
         style={{ flex: '1 1 0%', minWidth: 0, minHeight: 0 }}
       >
-        <div style={{ flex: `${group.ratio} 1 0%`, minWidth: 0, minHeight: 0 }}>{renderNode(group.children[0])}</div>
+        <div style={{ flex: `${group.ratio} 1 0%`, minWidth: 0, minHeight: 0 }}>
+          {renderNode(group.children[0])}
+        </div>
         <div className={isRow ? 'w-px bg-border flex-shrink-0' : 'h-px bg-border flex-shrink-0'} />
-        <div style={{ flex: `${1 - group.ratio} 1 0%`, minWidth: 0, minHeight: 0 }}>{renderNode(group.children[1])}</div>
+        <div style={{ flex: `${1 - group.ratio} 1 0%`, minWidth: 0, minHeight: 0 }}>
+          {renderNode(group.children[1])}
+        </div>
       </div>
     );
   };
@@ -1289,7 +1415,7 @@ export function WorkspaceView({ sessionId, projectId, projectRoot, workingDirect
 ```
 
 - [ ] **Step 4: Run test** — Run: `npx vitest run --config=vitest.ui.config.ts src/components/workspace/__tests__/WorkspaceView.test.tsx`
-Expected: PASS.
+      Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
@@ -1303,12 +1429,14 @@ git commit -m "feat(desktop): WorkspaceView + PaneView single render path (sessi
 ## Task 9: Rewire `RightSidebar` to render `WorkspaceView`; add header `+` launcher; thread `sessionId`
 
 **Files:**
+
 - Modify: `src/components/RightSidebar.tsx`
 - Modify: `src/features/chat/SessionChatLayout.tsx:104-110`
 - Modify: `src/components/RightSidebarEmptyState.tsx`
 - Test: `src/components/__tests__/RightSidebar.test.tsx` (rewrite affected cases)
 
 **Interfaces:**
+
 - `RightSidebar` gains a required `sessionId: string` prop.
 - Consumes `useRightWorkspaceStore` (for `isOpen = root !== null`), `WorkspaceView`, `openToolInWorkspace` (launcher + `+`).
 - Empty-state launcher tiles call `openToolInWorkspace(sessionId, toolId)`.
@@ -1316,12 +1444,12 @@ git commit -m "feat(desktop): WorkspaceView + PaneView single render path (sessi
 - [ ] **Step 1: Thread `sessionId`** — in `SessionChatLayout.tsx` (line 104-110), add the prop:
 
 ```tsx
-        <RightSidebar
-          sessionId={sessionId}
-          projectId={projectId}
-          projectRoot={projectRoot}
-          workingDirectory={workingDirectory}
-        />
+<RightSidebar
+  sessionId={sessionId}
+  projectId={projectId}
+  projectRoot={projectRoot}
+  workingDirectory={workingDirectory}
+/>
 ```
 
 Also add cleanup so closed sessions don't leak workspaces. Find where a session is removed/closed in this component's effects (the existing `draft.closeEditor()` effect around line 56) and add, in the unmount/teardown for a removed session:
@@ -1353,46 +1481,56 @@ interface RightSidebarProps {
   workingDirectory?: string;
 }
 
-export function RightSidebar({ sessionId, projectId, projectRoot, workingDirectory }: RightSidebarProps) {
+export function RightSidebar({
+  sessionId,
+  projectId,
+  projectRoot,
+  workingDirectory,
+}: RightSidebarProps) {
   const isMobile = useIsMobile();
-  const widthFraction = useRightSidebarStore((s) => s.widthFraction);
-  const collapsed = useRightSidebarStore((s) => s.collapsed);
-  const setWidthFraction = useRightSidebarStore((s) => s.setWidthFraction);
+  const widthFraction = useRightSidebarStore(s => s.widthFraction);
+  const collapsed = useRightSidebarStore(s => s.collapsed);
+  const setWidthFraction = useRightSidebarStore(s => s.setWidthFraction);
 
-  const hasContent = useRightWorkspaceStore((s) => (s.bySession[sessionId]?.root ?? null) !== null);
+  const hasContent = useRightWorkspaceStore(s => (s.bySession[sessionId]?.root ?? null) !== null);
   const [launcherOpen, setLauncherOpen] = useState(false);
 
   // Ensure a workspace entry exists for this session (no-op if present).
-  useEffect(() => { useRightWorkspaceStore.getState().ensureSession(sessionId); }, [sessionId]);
+  useEffect(() => {
+    useRightWorkspaceStore.getState().ensureSession(sessionId);
+  }, [sessionId]);
 
   const rootRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
   const startX = useRef(0);
   const startWidth = useRef(0);
 
-  const onDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault();
-    dragging.current = true;
-    startX.current = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    startWidth.current = widthFraction;
-    const onMove = (ev: MouseEvent | TouchEvent) => {
-      if (!dragging.current) return;
-      const clientX = 'touches' in ev ? ev.touches[0].clientX : ev.clientX;
-      const container = rootRef.current?.parentElement?.clientWidth || window.innerWidth;
-      setWidthFraction(startWidth.current + (startX.current - clientX) / container);
-    };
-    const cleanup = () => {
-      dragging.current = false;
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', cleanup);
-      document.removeEventListener('touchmove', onMove);
-      document.removeEventListener('touchend', cleanup);
-    };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', cleanup);
-    document.addEventListener('touchmove', onMove);
-    document.addEventListener('touchend', cleanup);
-  }, [widthFraction, setWidthFraction]);
+  const onDragStart = useCallback(
+    (e: React.MouseEvent | React.TouchEvent) => {
+      e.preventDefault();
+      dragging.current = true;
+      startX.current = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      startWidth.current = widthFraction;
+      const onMove = (ev: MouseEvent | TouchEvent) => {
+        if (!dragging.current) return;
+        const clientX = 'touches' in ev ? ev.touches[0].clientX : ev.clientX;
+        const container = rootRef.current?.parentElement?.clientWidth || window.innerWidth;
+        setWidthFraction(startWidth.current + (startX.current - clientX) / container);
+      };
+      const cleanup = () => {
+        dragging.current = false;
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', cleanup);
+        document.removeEventListener('touchmove', onMove);
+        document.removeEventListener('touchend', cleanup);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', cleanup);
+      document.addEventListener('touchmove', onMove);
+      document.addEventListener('touchend', cleanup);
+    },
+    [widthFraction, setWidthFraction]
+  );
 
   const expanded = !collapsed && hasContent;
   if (isMobile) return null;
@@ -1418,12 +1556,15 @@ export function RightSidebar({ sessionId, projectId, projectRoot, workingDirecto
         />
       )}
 
-      <div className="flex min-h-9 items-center gap-1 px-2 py-1 select-none border-b border-border flex-shrink-0" data-tauri-drag-region>
+      <div
+        className="flex min-h-9 items-center gap-1 px-2 py-1 select-none border-b border-border flex-shrink-0"
+        data-tauri-drag-region
+      >
         <span className="text-xs font-medium text-muted-foreground px-1">Workspace</span>
         <div className="flex-1" />
         <div className="relative">
           <button
-            onClick={() => setLauncherOpen((v) => !v)}
+            onClick={() => setLauncherOpen(v => !v)}
             title="Add tool"
             aria-label="Add tool"
             className="p-1 rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"
@@ -1442,7 +1583,12 @@ export function RightSidebar({ sessionId, projectId, projectRoot, workingDirecto
 
       <div className="flex-1 overflow-hidden relative [contain:layout_paint]">
         {hasContent ? (
-          <WorkspaceView sessionId={sessionId} projectId={projectId} projectRoot={projectRoot} workingDirectory={workingDirectory} />
+          <WorkspaceView
+            sessionId={sessionId}
+            projectId={projectId}
+            projectRoot={projectRoot}
+            workingDirectory={workingDirectory}
+          />
         ) : (
           <div className="absolute inset-0">
             <RightSidebarEmptyState projectId={projectId} projectRoot={projectRoot} />
@@ -1461,21 +1607,28 @@ import { usePluginStore } from '../../stores/pluginStore';
 import { openToolInWorkspace } from '../../utils/workspaceActions';
 import { useServerStore } from '../../stores/serverStore';
 
-interface Props { sessionId: string; projectId?: string; onPick: () => void; }
+interface Props {
+  sessionId: string;
+  projectId?: string;
+  onPick: () => void;
+}
 
 export function ToolLauncherMenu({ sessionId, projectId, onPick }: Props) {
-  const panels = usePluginStore((s) => s.panels);
-  const disabled = usePluginStore((s) => s.disabledBuiltinPanels);
-  const backendId = useServerStore((s) => s.activeServerId);
+  const panels = usePluginStore(s => s.panels);
+  const disabled = usePluginStore(s => s.disabledBuiltinPanels);
+  const backendId = useServerStore(s => s.activeServerId);
   const tools = panels.filter(
-    (p) => (p.platforms ?? ['desktop']).includes('desktop') && !disabled.includes(p.id),
+    p => (p.platforms ?? ['desktop']).includes('desktop') && !disabled.includes(p.id)
   );
   return (
     <div className="absolute right-0 top-full mt-1 z-30 min-w-40 rounded-md border border-border bg-popover py-1 shadow-md">
-      {tools.map((t) => (
+      {tools.map(t => (
         <button
           key={t.id}
-          onClick={() => { openToolInWorkspace(sessionId, t.id, { projectId, backendId }); onPick(); }}
+          onClick={() => {
+            openToolInWorkspace(sessionId, t.id, { projectId, backendId });
+            onPick();
+          }}
           className="flex w-full items-center px-3 py-1.5 text-left text-xs text-foreground hover:bg-secondary"
         >
           {t.label}
@@ -1509,10 +1662,12 @@ Delete cases asserting `pinnedTools`, `showTabs`, drag-to-split-from-tab (split 
 - [ ] **Step 6: Run tests + typecheck**
 
 Run:
+
 ```
 npx vitest run --config=vitest.ui.config.ts src/components/__tests__/RightSidebar.test.tsx
 npx tsc --noEmit
 ```
+
 Expected: PASS / no type errors. (Type errors from removed `sessionToolsStore`/`activeTab` usage are resolved in Tasks 10–12.)
 
 - [ ] **Step 7: Commit**
@@ -1527,10 +1682,12 @@ git commit -m "feat(desktop): RightSidebar renders session workspace + header to
 ## Task 10: Migrate composer tool buttons (`ChatInputArea`) to `openToolInWorkspace`
 
 **Files:**
+
 - Modify: `src/features/chat/ChatInputArea.tsx` (lines 112-195)
 - Test: manual + existing composer tests if any.
 
 **Interfaces:**
+
 - Consumes `openToolInWorkspace`, `closeToolInWorkspace`, `useToolOpenState`.
 - The composer still needs the panel-specific "open" side effects (terminal PTY create, file viewer search, draft editor send callback). Those stay; only the visibility/activation routing changes.
 
@@ -1550,24 +1707,43 @@ const lineagePanelActive = useToolOpenState(sessionId, 'lineage');
 const backendId = useServerStore.getState().activeServerId;
 
 const openDraftTool = useCallback(() => {
-  if (draftPanelActive) { closeToolInWorkspace(sessionId, 'draft'); return; }
+  if (draftPanelActive) {
+    closeToolInWorkspace(sessionId, 'draft');
+    return;
+  }
   setSendCallback((content: string) => onSendMessage(content));
-  openDraftEditor(sessionId);                 // store side effect
+  openDraftEditor(sessionId); // store side effect
   openToolInWorkspace(sessionId, 'draft', { projectId: currentSession?.projectId, backendId });
-}, [draftPanelActive, sessionId, setSendCallback, onSendMessage, openDraftEditor, currentSession?.projectId]);
+}, [
+  draftPanelActive,
+  sessionId,
+  setSendCallback,
+  onSendMessage,
+  openDraftEditor,
+  currentSession?.projectId,
+]);
 
 const openChangesTool = useCallback(() => {
-  if (changesPanelActive) { closeToolInWorkspace(sessionId, 'session-changes'); return; }
+  if (changesPanelActive) {
+    closeToolInWorkspace(sessionId, 'session-changes');
+    return;
+  }
   openToolInWorkspace(sessionId, 'session-changes');
 }, [changesPanelActive, sessionId]);
 
 const openLineageTool = useCallback(() => {
-  if (lineagePanelActive) { closeToolInWorkspace(sessionId, 'lineage'); return; }
+  if (lineagePanelActive) {
+    closeToolInWorkspace(sessionId, 'lineage');
+    return;
+  }
   openToolInWorkspace(sessionId, 'lineage');
 }, [lineagePanelActive, sessionId]);
 
 const openFilesTool = useCallback(() => {
-  if (fileViewerPanelActive) { closeToolInWorkspace(sessionId, 'file-viewer'); return; }
+  if (fileViewerPanelActive) {
+    closeToolInWorkspace(sessionId, 'file-viewer');
+    return;
+  }
   const store = useFileViewerStore.getState();
   store.togglePanel();
   store.setSearchOpen(true);
@@ -1576,7 +1752,11 @@ const openFilesTool = useCallback(() => {
 
 const openTerminalTool = useCallback(() => {
   if (!terminalProjectId) return;
-  if (terminalPanelActive) { setDrawerOpen(terminalProjectId, false); closeToolInWorkspace(sessionId, 'terminal'); return; }
+  if (terminalPanelActive) {
+    setDrawerOpen(terminalProjectId, false);
+    closeToolInWorkspace(sessionId, 'terminal');
+    return;
+  }
   const store = useTerminalStore.getState();
   if (!store.getTerminalId(terminalProjectId)) store.openTerminal(terminalProjectId);
   setDrawerOpen(terminalProjectId, true);
@@ -1603,6 +1783,7 @@ git commit -m "refactor(desktop): composer tool buttons drive the session worksp
 ## Task 11: Migrate remaining right-region call sites
 
 **Files:**
+
 - Modify: `src/features/chat/SessionHeader.tsx` (line 107-108)
 - Modify: `src/features/chat/MessageList.tsx` (line 512-513)
 - Modify: `src/components/chat/FileReference.tsx` (line 50)
@@ -1622,7 +1803,10 @@ openToolInWorkspace(session.id, 'session-changes');
 
 ```tsx
 store.setDrawerOpen(session.projectId, true);
-openToolInWorkspace(session.id, 'terminal', { projectId: session.projectId, backendId: useServerStore.getState().activeServerId });
+openToolInWorkspace(session.id, 'terminal', {
+  projectId: session.projectId,
+  backendId: useServerStore.getState().activeServerId,
+});
 ```
 
 - [ ] **Step 3: FileReference** (line 50) — replace `activatePanel('file-viewer')`:
@@ -1630,13 +1814,17 @@ openToolInWorkspace(session.id, 'terminal', { projectId: session.projectId, back
 ```tsx
 openToolInWorkspace(sessionId, 'file-viewer');
 ```
+
 (Thread `sessionId` into `FileReference` from its parent if not already present; it renders inside a message which has the session id.)
 
 - [ ] **Step 4: TerminalOutput** (line 33-34) — keep `setDrawerOpen`, add workspace open:
 
 ```tsx
 store.setDrawerOpen(session.projectId, true);
-openToolInWorkspace(session.id, 'terminal', { projectId: session.projectId, backendId: useServerStore.getState().activeServerId });
+openToolInWorkspace(session.id, 'terminal', {
+  projectId: session.projectId,
+  backendId: useServerStore.getState().activeServerId,
+});
 ```
 
 - [ ] **Step 5: builtinPanels onClose** — the right-region `onClose` handlers that called `updatePanelVisibility(id, false)` (changes, memory, notifications, lineage) are now redundant for the right sidebar (the pane's close button calls `closePane` directly). Leave `terminal`/`file-viewer`/`draft` `onClose` (they do real store cleanup, invoked by `closeToolInWorkspace`). For `session-changes`/`memory`/`notifications`/`lineage`, set `onClose: undefined` (their close is pure layout removal). Verify mobile/bottom still closes them correctly — on mobile these are toggled via `updatePanelVisibility` directly elsewhere, unaffected.
@@ -1644,10 +1832,12 @@ openToolInWorkspace(session.id, 'terminal', { projectId: session.projectId, back
 - [ ] **Step 6: Typecheck + targeted tests**
 
 Run:
+
 ```
 npx tsc --noEmit
 npx vitest run --config=vitest.unit.config.ts src/utils/__tests__/workspaceActions.test.ts
 ```
+
 Expected: no errors; tests PASS.
 
 - [ ] **Step 7: Commit**
@@ -1662,6 +1852,7 @@ git commit -m "refactor(desktop): route right-region panel opens through the wor
 ## Task 12: Session-removal cleanup + delete `sessionToolsStore`, `splitLayoutStore`, retire `activeTab`
 
 **Files:**
+
 - Modify: wherever sessions are deleted/closed (search `removeSession`, `deleteSession`, `closeSession` in `src/stores/`), call `useRightWorkspaceStore.getState().removeSession(sessionId)`.
 - Delete: `src/stores/sessionToolsStore.ts`, `src/components/rightSidebarToolIcons.ts` (if unreferenced).
 - Delete: `src/stores/splitLayoutStore.ts` + `src/stores/__tests__/splitLayoutStore.test.ts`.
@@ -1688,11 +1879,13 @@ cd apps/desktop && grep -rn "activeTab\|setActiveTab\|sessionToolsStore\|Session
 - [ ] **Step 6: Typecheck + full unit + ui suites**
 
 Run:
+
 ```
 npx tsc --noEmit
 npx vitest run --config=vitest.unit.config.ts
 npx vitest run --config=vitest.ui.config.ts
 ```
+
 Expected: no type errors; suites green (delete/rewrite any remaining tests that referenced removed stores).
 
 - [ ] **Step 7: Commit**
@@ -1711,12 +1904,14 @@ git commit -m "refactor(desktop): remove sessionToolsStore/splitLayoutStore + re
 ## Task 13: Port `dragSplit` / `ResizeDivider` / `DropOverlay` into `workspace/`
 
 **Files:**
+
 - Create: `src/components/workspace/dragSplit.ts` (port of `split/dragSplit.ts`)
 - Create: `src/components/workspace/ResizeDivider.tsx` (copy of `split/ResizeDivider.tsx`, import `SplitDir` from `rightWorkspaceStore`)
 - Create: `src/components/workspace/DropOverlay.tsx` (verbatim copy of `split/DropOverlay.tsx`, import from `./dragSplit`)
 - Create tests: `src/components/workspace/__tests__/dragSplit.test.ts` (port of `split/__tests__/dragSplit.test.ts`)
 
 **Interfaces:**
+
 - `dragSplit.ts` exports same names as before: `DropZone`, `resolveDropZone`, `dropZoneToDir`, `canDrop`, `disabledZones`, `useDragSplitStore`, `resolvePointerToPane`, plus a renamed payload type `ToolDragPayload { toolId: string; instanceKey?: string; multiInstance?: boolean }`.
 - `canDrop`/`disabledZones`/`resolvePointerToPane` consume `findToolConflict` (from `rightWorkspaceStore`) instead of `findSingletonConflict`.
 
@@ -1749,6 +1944,7 @@ git commit -m "feat(desktop): port drag/resize/overlay primitives into workspace
 ## Task 14: Wire live resize + drag-to-split into `WorkspaceView` / `PaneView` / `RightSidebar`
 
 **Files:**
+
 - Modify: `src/components/workspace/WorkspaceView.tsx` (real `ResizeDivider` instead of the static 1px divider; pointer move/up handlers)
 - Modify: `src/components/workspace/PaneView.tsx` (drag handle on header + `DropOverlay`)
 - Modify: `src/components/RightSidebar.tsx` (content-area `onPointerMove`/`onPointerUp` to drive drag, like the old wiring but calling the new store)
@@ -1764,50 +1960,79 @@ git commit -m "feat(desktop): port drag/resize/overlay primitives into workspace
 // header label:
 <span
   className="text-xs font-medium text-foreground truncate cursor-grab active:cursor-grabbing"
-  onPointerDown={(e) => {
+  onPointerDown={e => {
     if (e.pointerType === 'mouse' && (e.buttons & 1) === 0) return;
     useDragSplitStore.getState().startDrag({
-      toolId: ref.toolId, instanceKey: ref.instanceKey,
+      toolId: ref.toolId,
+      instanceKey: ref.instanceKey,
       multiInstance: MULTI_INSTANCE_PANELS.has(ref.toolId),
     });
   }}
   title={`Drag ${panel.label} to split`}
->{panel.label}</span>
+>
+  {panel.label}
+</span>
 ```
 
 - [ ] **Step 3:** In `RightSidebar.tsx`, add `onPointerMove`/`onPointerUp` to the content wrapper (port the old `onContentPointerMove`/`onContentPointerUp` from the pre-refactor `RightSidebar`, but call the new store):
 
 ```tsx
-const onContentPointerMove = useCallback((e: React.PointerEvent) => {
-  const { active } = useDragSplitStore.getState();
-  if (!active) return;
-  const root = useRightWorkspaceStore.getState().bySession[sessionId]?.root ?? null;
-  const hit = resolvePointerToPane(contentRef.current, root, e.clientX, e.clientY, active);
-  useDragSplitStore.getState().setHover(hit?.paneId ?? null, hit?.zone ?? null, hit?.disabled ?? new Set());
-}, [sessionId]);
+const onContentPointerMove = useCallback(
+  (e: React.PointerEvent) => {
+    const { active } = useDragSplitStore.getState();
+    if (!active) return;
+    const root = useRightWorkspaceStore.getState().bySession[sessionId]?.root ?? null;
+    const hit = resolvePointerToPane(contentRef.current, root, e.clientX, e.clientY, active);
+    useDragSplitStore
+      .getState()
+      .setHover(hit?.paneId ?? null, hit?.zone ?? null, hit?.disabled ?? new Set());
+  },
+  [sessionId]
+);
 
-const onContentPointerUp = useCallback((e: React.PointerEvent) => {
-  const { active } = useDragSplitStore.getState();
-  if (!active) return;
-  const store = useRightWorkspaceStore.getState();
-  const root = store.bySession[sessionId]?.root ?? null;
-  const hit = resolvePointerToPane(contentRef.current, root, e.clientX, e.clientY, active);
-  if (hit) {
-    const split = dropZoneToDir(hit.zone);
-    if (split) {
-      if (canDrop(root, hit.paneId, hit.zone, active).allowed) {
-        store.splitPane(sessionId, hit.paneId, split.dir, active.toolId, active.instanceKey, active.multiInstance);
+const onContentPointerUp = useCallback(
+  (e: React.PointerEvent) => {
+    const { active } = useDragSplitStore.getState();
+    if (!active) return;
+    const store = useRightWorkspaceStore.getState();
+    const root = store.bySession[sessionId]?.root ?? null;
+    const hit = resolvePointerToPane(contentRef.current, root, e.clientX, e.clientY, active);
+    if (hit) {
+      const split = dropZoneToDir(hit.zone);
+      if (split) {
+        if (canDrop(root, hit.paneId, hit.zone, active).allowed) {
+          store.splitPane(
+            sessionId,
+            hit.paneId,
+            split.dir,
+            active.toolId,
+            active.instanceKey,
+            active.multiInstance
+          );
+        } else {
+          // conflict → focus the existing pane instead of duplicating
+          const existing = findPaneWithTool(
+            root,
+            active.toolId,
+            active.instanceKey,
+            !active.multiInstance
+          );
+          if (existing) store.focusPane(sessionId, existing);
+        }
       } else {
-        // conflict → focus the existing pane instead of duplicating
-        const existing = findPaneWithTool(root, active.toolId, active.instanceKey, !active.multiInstance);
-        if (existing) store.focusPane(sessionId, existing);
+        store.replaceTool(
+          sessionId,
+          hit.paneId,
+          active.toolId,
+          active.instanceKey,
+          active.multiInstance
+        );
       }
-    } else {
-      store.replaceTool(sessionId, hit.paneId, active.toolId, active.instanceKey, active.multiInstance);
     }
-  }
-  useDragSplitStore.getState().endDrag();
-}, [sessionId]);
+    useDragSplitStore.getState().endDrag();
+  },
+  [sessionId]
+);
 ```
 
 Attach `ref={contentRef}` + the two handlers to the content `div`, and import `useDragSplitStore`, `resolvePointerToPane`, `dropZoneToDir`, `canDrop` from `./workspace/dragSplit` and `findPaneWithTool` from the store. End any in-flight drag on collapse (effect mirroring the old one).
@@ -1827,10 +2052,12 @@ it('renders a ResizeDivider between split panes', () => {
 - [ ] **Step 5: Run tests + typecheck**
 
 Run:
+
 ```
 npx vitest run --config=vitest.ui.config.ts src/components/workspace/__tests__/WorkspaceView.test.tsx
 npx tsc --noEmit
 ```
+
 Expected: PASS / clean.
 
 - [ ] **Step 6: Commit**
@@ -1845,6 +2072,7 @@ git commit -m "feat(desktop): live resize + drag-to-split on the workspace"
 ## Task 15: Delete the old `split/` directory + final sweep
 
 **Files:**
+
 - Delete: `src/components/split/SplitLayoutView.tsx`, `PaneView.tsx`, `dragSplit.ts`, `ResizeDivider.tsx`, `DropOverlay.tsx` and their `__tests__`.
 - Modify: `panelInstance.ts` — if `findSingletonConflict` now has no importer, delete it (keep `MULTI_INSTANCE_PANELS`, `isSingleton`).
 
@@ -1855,12 +2083,14 @@ git commit -m "feat(desktop): live resize + drag-to-split on the workspace"
 - [ ] **Step 3: Full suite + typecheck + lint**
 
 Run:
+
 ```
 npx tsc --noEmit
 npx vitest run --config=vitest.unit.config.ts
 npx vitest run --config=vitest.ui.config.ts
 npm run lint
 ```
+
 Expected: all green.
 
 - [ ] **Step 4: Commit**
@@ -1881,6 +2111,7 @@ Not implemented now. The model already supports it: `PaneNode.tools` is an array
 ## Self-Review
 
 **Spec coverage:**
+
 - Per-session binding → `bySession` keyed store (Tasks 2–4), session isolation test (Task 4), follows on switch via `sessionId` prop (Task 9). ✓
 - Single tool per pane, tab-ready → `PaneNode.tools[]` + `activeToolId` (Task 2), Phase 3 note. ✓
 - Primary-pane reuse + dedicated → `openTool` routing (Task 4), `openMode` registry (Task 1). ✓

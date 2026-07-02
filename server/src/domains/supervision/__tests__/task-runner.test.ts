@@ -136,7 +136,7 @@ function seedProject(db: Database.Database, rootPath = '/tmp/test-project'): str
   const now = Date.now();
   db.prepare(
     `INSERT INTO projects (id, name, type, root_path, created_at, updated_at)
-     VALUES (?, ?, 'code', ?, ?, ?)`,
+     VALUES (?, ?, 'code', ?, ?, ?)`
   ).run(id, 'Test Project', rootPath, now, now);
   return id;
 }
@@ -146,7 +146,7 @@ function seedSession(db: Database.Database, projectId: string): string {
   const now = Date.now();
   db.prepare(
     `INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-     VALUES (?, ?, 'test-session', ?, ?)`,
+     VALUES (?, ?, 'test-session', ?, ?)`
   ).run(id, projectId, now, now);
   return id;
 }
@@ -156,13 +156,13 @@ function seedMessage(
   sessionId: string,
   role: 'user' | 'assistant' | 'system',
   content: string,
-  createdAt?: number,
+  createdAt?: number
 ): string {
   const id = newId();
   const ts = createdAt ?? Date.now();
   db.prepare(
     `INSERT INTO messages (id, session_id, role, content, created_at)
-     VALUES (?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?)`
   ).run(id, sessionId, role, content, ts);
   return id;
 }
@@ -173,27 +173,38 @@ function seedMessage(
  */
 function mockExecResolves(stdout: string, stderr = '') {
   mockExec.mockImplementation(
-    (_cmd: string, _opts: unknown, callback?: (err: Error | null, result: { stdout: string; stderr: string }) => void) => {
+    (
+      _cmd: string,
+      _opts: unknown,
+      callback?: (err: Error | null, result: { stdout: string; stderr: string }) => void
+    ) => {
       if (typeof _opts === 'function') {
         // exec(cmd, callback) form
-        (_opts as (err: Error | null, result: { stdout: string; stderr: string }) => void)(null, { stdout, stderr });
+        (_opts as (err: Error | null, result: { stdout: string; stderr: string }) => void)(null, {
+          stdout,
+          stderr,
+        });
       } else if (callback) {
         callback(null, { stdout, stderr });
       }
-    },
+    }
   );
 }
 
 function mockExecRejects(stdout = '', stderr = '', message = 'Command failed') {
   mockExec.mockImplementation(
-    (_cmd: string, _opts: unknown, callback?: (err: Error & { stdout?: string; stderr?: string }, result?: null) => void) => {
+    (
+      _cmd: string,
+      _opts: unknown,
+      callback?: (err: Error & { stdout?: string; stderr?: string }, result?: null) => void
+    ) => {
       const err = Object.assign(new Error(message), { stdout, stderr });
       if (typeof _opts === 'function') {
         (_opts as (err: Error, result?: null) => void)(err);
       } else if (callback) {
         callback(err);
       }
-    },
+    }
   );
 }
 
@@ -208,7 +219,7 @@ function mockExecSequence(
     stderr?: string;
     reject?: boolean;
     message?: string;
-  }>,
+  }>
 ) {
   let idx = 0;
   mockExec.mockImplementation(
@@ -235,7 +246,7 @@ function mockExecSequence(
       } else {
         cb?.(null, { stdout: entry.stdout ?? '', stderr: entry.stderr ?? '' });
       }
-    },
+    }
   );
 }
 
@@ -245,7 +256,11 @@ function makeContextManager(overrides: Partial<ContextManager> = {}): ContextMan
     scaffold: vi.fn(),
     loadAll: vi.fn().mockReturnValue({
       documents: [],
-      workflow: { onTaskComplete: [], onCheckpoint: [], checkpointTrigger: { type: 'on_task_complete' } },
+      workflow: {
+        onTaskComplete: [],
+        onCheckpoint: [],
+        checkpointTrigger: { type: 'on_task_complete' },
+      },
     }),
     getContextForTask: vi.fn().mockReturnValue(''),
     getWorkflow: vi.fn().mockReturnValue({
@@ -305,7 +320,7 @@ describe('TaskRunner', () => {
       (_projectId: string) => contextManager,
       broadcastFn,
       logFn,
-      onReadyForReview,
+      onReadyForReview
     );
   });
 
@@ -321,13 +336,18 @@ describe('TaskRunner', () => {
     it('returns parsed TaskResult from valid [TASK_RESULT] block', () => {
       const projectId = seedProject(db);
       const sessionId = seedSession(db, projectId);
-      seedMessage(db, sessionId, 'assistant', [
-        'Here is the result:',
-        '[TASK_RESULT]',
-        '- summary: Implemented the login feature',
-        '- files_changed: src/auth.ts, src/login.tsx',
-        '[/TASK_RESULT]',
-      ].join('\n'));
+      seedMessage(
+        db,
+        sessionId,
+        'assistant',
+        [
+          'Here is the result:',
+          '[TASK_RESULT]',
+          '- summary: Implemented the login feature',
+          '- files_changed: src/auth.ts, src/login.tsx',
+          '[/TASK_RESULT]',
+        ].join('\n')
+      );
 
       const result = runner.parseTaskResult(sessionId);
 
@@ -363,7 +383,7 @@ describe('TaskRunner', () => {
           '- files_changed: src/parser.ts',
           '[/TASK_RESULT]',
         ].join('\n'),
-        now - 2000,
+        now - 2000
       );
 
       // Later message without TASK_RESULT
@@ -379,13 +399,18 @@ describe('TaskRunner', () => {
     it('populates workflowOutputs when tests field is present', () => {
       const projectId = seedProject(db);
       const sessionId = seedSession(db, projectId);
-      seedMessage(db, sessionId, 'assistant', [
-        '[TASK_RESULT]',
-        '- summary: Added unit tests',
-        '- files_changed: src/utils.test.ts',
-        '- tests: All 12 tests passed',
-        '[/TASK_RESULT]',
-      ].join('\n'));
+      seedMessage(
+        db,
+        sessionId,
+        'assistant',
+        [
+          '[TASK_RESULT]',
+          '- summary: Added unit tests',
+          '- files_changed: src/utils.test.ts',
+          '- tests: All 12 tests passed',
+          '[/TASK_RESULT]',
+        ].join('\n')
+      );
 
       const result = runner.parseTaskResult(sessionId);
 
@@ -398,11 +423,12 @@ describe('TaskRunner', () => {
     it('returns null when required fields are missing', () => {
       const projectId = seedProject(db);
       const sessionId = seedSession(db, projectId);
-      seedMessage(db, sessionId, 'assistant', [
-        '[TASK_RESULT]',
-        '- summary: Added unit tests',
-        '[/TASK_RESULT]',
-      ].join('\n'));
+      seedMessage(
+        db,
+        sessionId,
+        'assistant',
+        ['[TASK_RESULT]', '- summary: Added unit tests', '[/TASK_RESULT]'].join('\n')
+      );
 
       const result = runner.parseTaskResult(sessionId);
 
@@ -433,9 +459,7 @@ describe('TaskRunner', () => {
     it('captures stderr and returns success=false when command fails', async () => {
       mockExecRejects('', 'Error: compilation failed\n', 'exit code 1');
 
-      const actions: WorkflowAction[] = [
-        { type: 'run_command', command: 'npm run build' },
-      ];
+      const actions: WorkflowAction[] = [{ type: 'run_command', command: 'npm run build' }];
 
       const results = await runner.executeWorkflowActions(actions, '/tmp/project');
 
@@ -461,11 +485,15 @@ describe('TaskRunner', () => {
       const callOrder: string[] = [];
 
       mockExec.mockImplementation(
-        (cmd: string, _opts: unknown, callback?: (err: Error | null, result: { stdout: string; stderr: string }) => void) => {
+        (
+          cmd: string,
+          _opts: unknown,
+          callback?: (err: Error | null, result: { stdout: string; stderr: string }) => void
+        ) => {
           callOrder.push(cmd);
           const cb = typeof _opts === 'function' ? (_opts as (...args: any[]) => void) : callback;
           cb?.(null, { stdout: `output of ${cmd}`, stderr: '' });
-        },
+        }
       );
 
       const actions: WorkflowAction[] = [
@@ -493,7 +521,11 @@ describe('TaskRunner', () => {
       const commands: string[] = [];
 
       mockExec.mockImplementation(
-        (cmd: string, _opts: unknown, callback?: (err: Error | null, result: { stdout: string; stderr: string }) => void) => {
+        (
+          cmd: string,
+          _opts: unknown,
+          callback?: (err: Error | null, result: { stdout: string; stderr: string }) => void
+        ) => {
           commands.push(cmd);
           const cb = typeof _opts === 'function' ? (_opts as (...args: any[]) => void) : callback;
           if (cmd.includes('git status --porcelain')) {
@@ -501,14 +533,14 @@ describe('TaskRunner', () => {
           } else {
             cb?.(null, { stdout: '', stderr: '' });
           }
-        },
+        }
       );
 
       await runner.autoCommitRemainingChanges('/tmp/project', 'task-123');
 
       expect(commands).toContain('git status --porcelain');
       expect(commands).toContain('git add -A');
-      const commitCmd = commands.find((c) => c.includes('git commit'));
+      const commitCmd = commands.find(c => c.includes('git commit'));
       expect(commitCmd).toBeDefined();
       expect(commitCmd).toContain('task-123');
     });
@@ -531,17 +563,20 @@ describe('TaskRunner', () => {
           if (cmd.includes('git status --porcelain')) {
             cb?.(null, { stdout: ' M dirty.ts\n', stderr: '' });
           } else if (cmd.includes('git commit')) {
-            const err = Object.assign(new Error('nothing to commit'), { stdout: '', stderr: 'nothing to commit' });
+            const err = Object.assign(new Error('nothing to commit'), {
+              stdout: '',
+              stderr: 'nothing to commit',
+            });
             cb?.(err);
           } else {
             cb?.(null, { stdout: '', stderr: '' });
           }
-        },
+        }
       );
 
       // Should not throw
       await expect(
-        runner.autoCommitRemainingChanges('/tmp/project', 'task-789'),
+        runner.autoCommitRemainingChanges('/tmp/project', 'task-789')
       ).resolves.toBeUndefined();
     });
   });
@@ -593,7 +628,7 @@ describe('TaskRunner', () => {
       expect(result).toBe(true);
       expect(mockExecSync).toHaveBeenCalledWith(
         'git rev-parse --is-inside-work-tree',
-        expect.objectContaining({ cwd: '/tmp/git-project' }),
+        expect.objectContaining({ cwd: '/tmp/git-project' })
       );
     });
 
@@ -616,12 +651,17 @@ describe('TaskRunner', () => {
     it('full pipeline: parses result, updates status to reviewing, calls onReadyForReview', async () => {
       const projectId = seedProject(db, '/tmp/test-project');
       const sessionId = seedSession(db, projectId);
-      seedMessage(db, sessionId, 'assistant', [
-        '[TASK_RESULT]',
-        '- summary: Built the feature',
-        '- files_changed: src/feature.ts, src/feature.test.ts',
-        '[/TASK_RESULT]',
-      ].join('\n'));
+      seedMessage(
+        db,
+        sessionId,
+        'assistant',
+        [
+          '[TASK_RESULT]',
+          '- summary: Built the feature',
+          '- files_changed: src/feature.ts, src/feature.test.ts',
+          '[/TASK_RESULT]',
+        ].join('\n')
+      );
 
       const task = taskRepo.create({
         projectId,
@@ -653,28 +693,26 @@ describe('TaskRunner', () => {
         projectId,
         'task_status_changed',
         expect.objectContaining({ taskId: task.id, from: 'running', to: 'reviewing' }),
-        task.id,
+        task.id
       );
 
       // onReadyForReview should have been called
       expect(onReadyForReview).toHaveBeenCalledTimes(1);
       expect(onReadyForReview).toHaveBeenCalledWith(
-        expect.objectContaining({ id: task.id, status: 'reviewing' }),
+        expect.objectContaining({ id: task.id, status: 'reviewing' })
       );
 
       // contextManager.writeTaskResult should have been called
       expect(contextManager.writeTaskResult).toHaveBeenCalledWith(
         task.id,
-        expect.stringContaining('Built the feature'),
+        expect.stringContaining('Built the feature')
       );
     });
 
     it('runs workflow actions when configured', async () => {
       const cm = makeContextManager({
         getWorkflow: vi.fn().mockReturnValue({
-          onTaskComplete: [
-            { type: 'run_command', command: 'npm test', description: 'Run tests' },
-          ],
+          onTaskComplete: [{ type: 'run_command', command: 'npm test', description: 'Run tests' }],
           onCheckpoint: [],
           checkpointTrigger: { type: 'on_task_complete' },
         }),
@@ -687,7 +725,7 @@ describe('TaskRunner', () => {
         (_projectId: string) => cm,
         broadcastFn,
         logFn,
-        onReadyForReview,
+        onReadyForReview
       );
 
       const projectId = seedProject(db, '/tmp/test-project');
@@ -744,9 +782,7 @@ describe('TaskRunner', () => {
         status: 'pending',
       });
 
-      await expect(runner.onTaskComplete(task.id, projectId)).rejects.toThrow(
-        /must be 'running'/,
-      );
+      await expect(runner.onTaskComplete(task.id, projectId)).rejects.toThrow(/must be 'running'/);
 
       expect(broadcastFn).not.toHaveBeenCalled();
       expect(onReadyForReview).not.toHaveBeenCalled();
@@ -765,15 +801,20 @@ describe('TaskRunner', () => {
       const sessionId = newId();
       db.prepare(
         `INSERT INTO sessions (id, project_id, name, working_directory, created_at, updated_at)
-         VALUES (?, ?, 'task-session', ?, ?, ?)`,
+         VALUES (?, ?, 'task-session', ?, ?, ?)`
       ).run(sessionId, projectId, worktreePath, now, now);
 
-      seedMessage(db, sessionId, 'assistant', [
-        '[TASK_RESULT]',
-        '- summary: Did work in worktree',
-        '- files_changed: src/a.ts',
-        '[/TASK_RESULT]',
-      ].join('\n'));
+      seedMessage(
+        db,
+        sessionId,
+        'assistant',
+        [
+          '[TASK_RESULT]',
+          '- summary: Did work in worktree',
+          '- files_changed: src/a.ts',
+          '[/TASK_RESULT]',
+        ].join('\n')
+      );
 
       const task = taskRepo.create({
         projectId,
@@ -793,7 +834,7 @@ describe('TaskRunner', () => {
       // The exec calls for git operations should use the worktree path
       const execCalls = mockExec.mock.calls;
       const statusCall = execCalls.find(
-        (c: any[]) => typeof c[0] === 'string' && c[0].includes('git status --porcelain'),
+        (c: any[]) => typeof c[0] === 'string' && c[0].includes('git status --porcelain')
       );
       if (statusCall) {
         // The cwd option should be the worktree path, not project root
@@ -812,12 +853,14 @@ describe('TaskRunner', () => {
       // Session without workingDirectory
       const sessionId = seedSession(db, projectId);
 
-      seedMessage(db, sessionId, 'assistant', [
-        '[TASK_RESULT]',
-        '- summary: Done',
-        '- files_changed: src/b.ts',
-        '[/TASK_RESULT]',
-      ].join('\n'));
+      seedMessage(
+        db,
+        sessionId,
+        'assistant',
+        ['[TASK_RESULT]', '- summary: Done', '- files_changed: src/b.ts', '[/TASK_RESULT]'].join(
+          '\n'
+        )
+      );
 
       const task = taskRepo.create({
         projectId,
@@ -836,7 +879,7 @@ describe('TaskRunner', () => {
       // Git operations should use project root path
       const execCalls = mockExec.mock.calls;
       const statusCall = execCalls.find(
-        (c: any[]) => typeof c[0] === 'string' && c[0].includes('git status --porcelain'),
+        (c: any[]) => typeof c[0] === 'string' && c[0].includes('git status --porcelain')
       );
       if (statusCall) {
         const opts = typeof statusCall[1] === 'object' ? statusCall[1] : {};
@@ -857,17 +900,22 @@ describe('TaskRunner', () => {
         (_projectId: string) => contextManager,
         broadcastFn,
         logFn,
-        onReadyForReview,
+        onReadyForReview
       );
 
       const projectId = seedProject(db, '/tmp/test-project');
       const sessionId = seedSession(db, projectId);
-      seedMessage(db, sessionId, 'assistant', [
-        '[TASK_RESULT]',
-        '- summary: Built the feature',
-        '- files_changed: src/feature.ts',
-        '[/TASK_RESULT]',
-      ].join('\n'));
+      seedMessage(
+        db,
+        sessionId,
+        'assistant',
+        [
+          '[TASK_RESULT]',
+          '- summary: Built the feature',
+          '- files_changed: src/feature.ts',
+          '[/TASK_RESULT]',
+        ].join('\n')
+      );
 
       const task = taskRepo.create({
         projectId,
@@ -889,7 +937,7 @@ describe('TaskRunner', () => {
         projectId,
         'review_started',
         expect.objectContaining({ taskId: task.id, timedOut: true }),
-        task.id,
+        task.id
       );
     });
   });

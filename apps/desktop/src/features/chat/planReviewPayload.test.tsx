@@ -68,7 +68,7 @@ describe('extractPlanPayload', () => {
       todos: [
         { id: 'a', content: 'step one', status: 'TODO_STATUS_PENDING' },
         { id: 'b', content: 'step two', status: 'TODO_STATUS_IN_PROGRESS' },
-        { id: 'c', content: '', status: 'TODO_STATUS_PENDING' },          // empty → dropped
+        { id: 'c', content: '', status: 'TODO_STATUS_PENDING' }, // empty → dropped
       ],
     });
     expect(out.planContent).toBe('# Cursor plan');

@@ -42,13 +42,17 @@ export function ClientLogsSection() {
       control={
         <>
           <button
-            onClick={() => { clearLogs(); }}
+            onClick={() => {
+              clearLogs();
+            }}
             className="px-2 py-1 text-xs bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-lg transition-colors"
           >
             Clear
           </button>
           <button
-            onClick={() => { void handleExportLogs(); }}
+            onClick={() => {
+              void handleExportLogs();
+            }}
             className="px-3 py-1 text-xs bg-muted/60 hover:bg-muted text-foreground rounded-lg font-medium transition-colors"
           >
             Export Logs

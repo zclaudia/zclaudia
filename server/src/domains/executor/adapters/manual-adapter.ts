@@ -19,7 +19,10 @@ export class ManualAdapter implements IExecutor {
   private repo: ExecutorInstanceRepository;
   private currentStatus: ExecutorStatus;
 
-  constructor(db: Database, private instance: ExecutorInstance) {
+  constructor(
+    db: Database,
+    private instance: ExecutorInstance
+  ) {
     this.repo = new ExecutorInstanceRepository(db);
     this.currentStatus = instance.statusSummary;
   }
@@ -67,7 +70,7 @@ export class ManualAdapter implements IExecutor {
 
   private transitionTo(
     next: ExecutorStatus,
-    extra?: { startedAt?: number; completedAt?: number },
+    extra?: { startedAt?: number; completedAt?: number }
   ): void {
     this.repo.update(this.instance.id, {
       statusSummary: next,

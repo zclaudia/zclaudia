@@ -1,6 +1,6 @@
 import type { Database } from 'better-sqlite3';
 import type { Session } from '@zclaudia/shared/core/session';
-import type { ServerMessage } from '@zclaudia/shared/wire/messages';
+import type { RunFailedMessage, ServerMessage } from '@zclaudia/shared/wire/messages';
 import type {
   SupervisionTask,
   ReviewVerdict,
@@ -8,16 +8,13 @@ import type {
   SupervisionLogEvent,
   TrustLevel,
 } from '@zclaudia/shared/features/supervision';
-import { SupervisionTaskRepository } from './repositories/supervision-task.js';
+import { type SupervisionTaskRepository } from './repositories/supervision-task.js';
 import type { SupervisionProjectPort, SupervisionSessionPort } from './ports.js';
 import type { ContextManager } from './context-manager.js';
 import type { WorktreePool } from './worktree-pool.js';
 import type { SupervisionAiRunPort } from './ports.js';
 import { getReviewRejectionOutcome } from './model.js';
-import {
-  assertTaskStatus,
-  assertTaskTransition,
-} from './status-machine.js';
+import { assertTaskStatus, assertTaskTransition } from './status-machine.js';
 
 const REVIEW_VERDICT_REGEX = /\[REVIEW_VERDICT\]([\s\S]*?)\[\/REVIEW_VERDICT\]/;
 const REVIEW_EVIDENCE_TIMEOUT_MS = 15_000;
@@ -38,11 +35,11 @@ export class ReviewEngine {
       projectId: string,
       event: SupervisionLogEvent,
       detail?: Record<string, unknown>,
-      taskId?: string,
+      taskId?: string
     ) => void,
     private collectGitEvidence: (cwd: string, baseCommit: string) => Promise<string>,
     private aiRunPort: SupervisionAiRunPort,
-    private getWorktreePool?: (projectId: string) => WorktreePool,
+    private getWorktreePool?: (projectId: string) => WorktreePool
   ) {}
 
   /**
@@ -51,7 +48,9 @@ export class ReviewEngine {
   async createReview(task: SupervisionTask): Promise<void> {
     const project = this.projectRepo.findById(task.projectId);
     if (!project?.rootPath) {
-      console.error(`[ReviewEngine] Cannot create review for task ${task.id}: project has no rootPath`);
+      console.error(
+        `[ReviewEngine] Cannot create review for task ${task.id}: project has no rootPath`
+      );
       return;
     }
 
@@ -80,7 +79,7 @@ export class ReviewEngine {
         evidence = await this.withTimeout(
           this.collectGitEvidence(evidenceCwd, task.baseCommit),
           REVIEW_EVIDENCE_TIMEOUT_MS,
-          'collectGitEvidence timed out',
+          'collectGitEvidence timed out'
         );
       } catch (err) {
         console.error(`[ReviewEngine] Failed to collect evidence for task ${task.id}:`, err);
@@ -98,7 +97,7 @@ export class ReviewEngine {
       sessionId: session.id,
       input: reviewPrompt,
       workingDirectory: project.rootPath,
-      onMessage: (msg) => {
+      onMessage: msg => {
         this.handleReviewRunMessage(task.id, task.projectId, session.id, msg);
       },
     });
@@ -109,7 +108,7 @@ export class ReviewEngine {
       task.projectId,
       'review_started',
       { taskId: task.id, reviewSessionId: session.id },
-      task.id,
+      task.id
     );
   }
 
@@ -120,7 +119,7 @@ export class ReviewEngine {
     taskId: string,
     projectId: string,
     reviewSessionId: string,
-    msg: ServerMessage,
+    msg: ServerMessage
   ): void {
     if (msg.type === 'run_completed') {
       this.clearReviewTimeout(taskId);
@@ -133,7 +132,10 @@ export class ReviewEngine {
           const verdict = this.parseVerdict(reviewSessionId);
           await this.handleReviewComplete(task, verdict, reviewSessionId);
         } catch (err) {
-          console.error(`[ReviewEngine] Error handling review run_completed for task ${taskId}:`, err);
+          console.error(
+            `[ReviewEngine] Error handling review run_completed for task ${taskId}:`,
+            err
+          );
         } finally {
           this.reviewClients.delete(taskId);
         }
@@ -144,12 +146,12 @@ export class ReviewEngine {
     if (msg.type === 'run_failed') {
       this.clearReviewTimeout(taskId);
       try {
-        const errorMsg = 'error' in msg ? (msg as import('@zclaudia/shared/wire/messages').RunFailedMessage).error : 'Review run failed';
+        const errorMsg = 'error' in msg ? (msg as RunFailedMessage).error : 'Review run failed';
         this.logFn(
           projectId,
           'review_failed',
           { taskId, error: errorMsg, reviewSessionId },
-          taskId,
+          taskId
         );
 
         // Don't fail the task — the code changes may be fine.
@@ -183,11 +185,11 @@ export class ReviewEngine {
         .prepare(
           `SELECT content FROM messages
            WHERE session_id = ? AND role = 'assistant'
-           ORDER BY created_at DESC LIMIT 5`,
+           ORDER BY created_at DESC LIMIT 5`
         )
         .all(sessionId) as { content: string }[];
 
-      const combined = messages.map((m) => m.content).join('\n');
+      const combined = messages.map(m => m.content).join('\n');
       const match = REVIEW_VERDICT_REGEX.exec(combined);
       if (!match) return null;
 
@@ -200,7 +202,7 @@ export class ReviewEngine {
       const suggestedChanges = suggestedChangesBlock
         ? suggestedChangesBlock
             .split('\n')
-            .map((line) => line.trim().replace(/^-\s*/, ''))
+            .map(line => line.trim().replace(/^-\s*/, ''))
             .filter(Boolean)
         : undefined;
 
@@ -210,11 +212,14 @@ export class ReviewEngine {
     }
   }
 
-  private extractMultilineField(block: string, fieldName: 'notes' | 'suggested_changes'): string | undefined {
+  private extractMultilineField(
+    block: string,
+    fieldName: 'notes' | 'suggested_changes'
+  ): string | undefined {
     const fieldHeader = new RegExp(`^\\s*${fieldName}\\s*:\\s*(\\|)?\\s*$`, 'i');
     const anyHeader = /^\s*(approved|notes|suggested_changes)\s*:/i;
     const lines = block.split('\n');
-    const startIndex = lines.findIndex((line) => fieldHeader.test(line));
+    const startIndex = lines.findIndex(line => fieldHeader.test(line));
     if (startIndex === -1) {
       return undefined;
     }
@@ -238,7 +243,7 @@ export class ReviewEngine {
   async handleReviewComplete(
     task: SupervisionTask,
     verdict: ReviewVerdict | null,
-    reviewSessionId: string,
+    reviewSessionId: string
   ): Promise<void> {
     const project = this.projectRepo.findById(task.projectId);
     const trustLevel: TrustLevel = project?.agent?.config?.trustLevel ?? 'low';
@@ -249,7 +254,9 @@ export class ReviewEngine {
       const reviewContent = verdict
         ? `# Review: ${task.title}\n\n## Verdict: ${verdict.approved ? 'APPROVED' : 'REJECTED'}\n\n${verdict.notes}\n${
             verdict.suggestedChanges?.length
-              ? '\n## Suggested Changes\n' + verdict.suggestedChanges.map((s) => `- ${s}`).join('\n') + '\n'
+              ? '\n## Suggested Changes\n' +
+                verdict.suggestedChanges.map(s => `- ${s}`).join('\n') +
+                '\n'
               : ''
           }`
         : `# Review: ${task.title}\n\nNo structured verdict found.\n`;
@@ -265,10 +272,12 @@ export class ReviewEngine {
 
     // Check if this is a worktree task
     const taskSession = task.sessionId ? this.sessionRepo.findById(task.sessionId) : undefined;
-    const isWorktreeTask =
+    const worktreePath =
       taskSession?.workingDirectory &&
       project?.rootPath &&
-      taskSession.workingDirectory !== project.rootPath;
+      taskSession.workingDirectory !== project.rootPath
+        ? taskSession.workingDirectory
+        : undefined;
 
     if (trustLevel === 'low') {
       // Low trust: keep in reviewing, let user manually confirm
@@ -283,7 +292,7 @@ export class ReviewEngine {
           trustLevel,
           autoApplied: false,
         },
-        task.id,
+        task.id
       );
       this.archiveReviewSession(reviewSessionId);
       return;
@@ -298,7 +307,7 @@ export class ReviewEngine {
         task.projectId,
         'review_completed',
         { taskId: task.id, verdictParsed: false, trustLevel },
-        task.id,
+        task.id
       );
       this.archiveReviewSession(reviewSessionId);
       return;
@@ -306,25 +315,27 @@ export class ReviewEngine {
 
     if (verdict.approved) {
       // Approved → attempt merge if worktree, otherwise integrated directly
-      if (isWorktreeTask && this.getWorktreePool) {
+      if (worktreePath && this.getWorktreePool) {
         const pool = this.getWorktreePool(task.projectId);
         this.logFn(task.projectId, 'merge_started', { taskId: task.id }, task.id);
 
-        const mergeResult = await pool.mergeBack(
-          task.id,
-          task.attempt,
-          taskSession!.workingDirectory!,
-        );
+        const mergeResult = await pool.mergeBack(task.id, task.attempt, worktreePath);
 
         if (mergeResult.success) {
-          pool.release(taskSession!.workingDirectory!);
+          pool.release(worktreePath);
           assertTaskTransition(task.status, 'integrated');
           this.taskRepo.updateStatus(task.id, 'integrated', { result: updatedResult });
           this.broadcastTaskUpdate(task.id, task.projectId);
           this.logFn(task.projectId, 'merge_completed', { taskId: task.id }, task.id);
-          this.logFn(task.projectId, 'worktree_released', {
-            taskId: task.id, worktreePath: taskSession!.workingDirectory,
-          }, task.id);
+          this.logFn(
+            task.projectId,
+            'worktree_released',
+            {
+              taskId: task.id,
+              worktreePath,
+            },
+            task.id
+          );
         } else {
           assertTaskTransition(task.status, 'merge_conflict');
           this.taskRepo.updateStatus(task.id, 'merge_conflict', {
@@ -334,9 +345,15 @@ export class ReviewEngine {
             },
           });
           this.broadcastTaskUpdate(task.id, task.projectId);
-          this.logFn(task.projectId, 'merge_conflict', {
-            taskId: task.id, conflicts: mergeResult.conflicts,
-          }, task.id);
+          this.logFn(
+            task.projectId,
+            'merge_conflict',
+            {
+              taskId: task.id,
+              conflicts: mergeResult.conflicts,
+            },
+            task.id
+          );
           // Don't release worktree — keep for manual resolution
         }
       } else {
@@ -355,16 +372,22 @@ export class ReviewEngine {
           trustLevel,
           autoApplied: true,
         },
-        task.id,
+        task.id
       );
     } else {
       // Rejected → release worktree, then retry or fail
-      if (isWorktreeTask && this.getWorktreePool) {
+      if (worktreePath && this.getWorktreePool) {
         const pool = this.getWorktreePool(task.projectId);
-        pool.release(taskSession!.workingDirectory!);
-        this.logFn(task.projectId, 'worktree_released', {
-          taskId: task.id, worktreePath: taskSession!.workingDirectory,
-        }, task.id);
+        pool.release(worktreePath);
+        this.logFn(
+          task.projectId,
+          'worktree_released',
+          {
+            taskId: task.id,
+            worktreePath,
+          },
+          task.id
+        );
       }
 
       const { nextStatus, nextAttempt } = getReviewRejectionOutcome(task.attempt, task.maxRetries);
@@ -391,7 +414,7 @@ export class ReviewEngine {
             retrying: true,
             newAttempt: nextAttempt,
           },
-          task.id,
+          task.id
         );
       } else {
         // Max retries exceeded → failed
@@ -409,7 +432,7 @@ export class ReviewEngine {
             retrying: false,
             maxRetriesExceeded: true,
           },
-          task.id,
+          task.id
         );
       }
     }
@@ -420,11 +443,7 @@ export class ReviewEngine {
   /**
    * Build the review system prompt.
    */
-  buildReviewPrompt(
-    task: SupervisionTask,
-    projectName: string,
-    evidence: string,
-  ): string {
+  buildReviewPrompt(task: SupervisionTask, projectName: string, evidence: string): string {
     let prompt = `[INDEPENDENT CODE REVIEW]
 
 You are reviewing the output of an automated coding task. You must evaluate whether the task was completed correctly based on the acceptance criteria and the actual code changes.
@@ -515,11 +534,16 @@ suggested_changes:
 
         this.taskRepo.updateStatus(taskId, 'reviewing', { result: updatedResult });
         this.broadcastTaskUpdate(taskId, projectId);
-        this.logFn(projectId, 'review_completed', {
-          taskId,
-          verdictParsed: false,
-          timedOut: true,
-        }, taskId);
+        this.logFn(
+          projectId,
+          'review_completed',
+          {
+            taskId,
+            verdictParsed: false,
+            timedOut: true,
+          },
+          taskId
+        );
       } finally {
         this.reviewClients.delete(taskId);
         this.archiveReviewSession(reviewSessionId);
@@ -542,14 +566,14 @@ suggested_changes:
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error(message)), timeoutMs);
       promise.then(
-        (value) => {
+        value => {
           clearTimeout(timer);
           resolve(value);
         },
-        (err) => {
+        err => {
           clearTimeout(timer);
           reject(err);
-        },
+        }
       );
     });
   }

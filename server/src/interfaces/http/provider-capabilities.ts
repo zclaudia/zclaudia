@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { type Router, type Request, type Response } from 'express';
 import type Database from 'better-sqlite3';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import type { ProviderCapabilities } from '@zclaudia/shared/core/runtime-capabilities';
@@ -29,8 +29,9 @@ export function mountCapabilityRoutes(router: Router, db: Database.Database): vo
   });
 
   router.get('/:id/capabilities', (req: Request, res: Response) => {
-    const row = db.prepare('SELECT id FROM llm_profiles WHERE id = ?')
-      .get(req.params.id) as { id: string } | undefined;
+    const row = db.prepare('SELECT id FROM llm_profiles WHERE id = ?').get(req.params.id) as
+      | { id: string }
+      | undefined;
 
     if (!row) {
       res.status(404).json({

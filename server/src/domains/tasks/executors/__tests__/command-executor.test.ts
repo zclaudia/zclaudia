@@ -34,14 +34,17 @@ afterEach(() => {
   rmSync(dataDir, { recursive: true, force: true });
 });
 
-const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+const wait = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
 describe('CommandTaskExecutor', () => {
   it('start spawns detached, writes output to the log file, and exit 0 completes the task', async () => {
     const repo = new TaskRepository(db);
     const service = new TaskService(repo);
     const executor = new CommandTaskExecutor(repo);
-    const task = service.createTask({ type: 'command', metadata: { command: 'echo bg-hello', cwd: dataDir } });
+    const task = service.createTask({
+      type: 'command',
+      metadata: { command: 'echo bg-hello', cwd: dataDir },
+    });
     const started = await executor.start(task);
     expect(started.status).toBe('running');
     expect(typeof started.executorRef?.pid).toBe('number');
@@ -56,7 +59,10 @@ describe('CommandTaskExecutor', () => {
     const repo = new TaskRepository(db);
     const service = new TaskService(repo);
     const executor = new CommandTaskExecutor(repo);
-    const task = service.createTask({ type: 'command', metadata: { command: 'exit 4', cwd: dataDir } });
+    const task = service.createTask({
+      type: 'command',
+      metadata: { command: 'exit 4', cwd: dataDir },
+    });
     const started = await executor.start(task);
     service.startTask(task.id, { executorRef: started.executorRef });
     await wait(700);
@@ -69,7 +75,10 @@ describe('CommandTaskExecutor', () => {
     const repo = new TaskRepository(db);
     const service = new TaskService(repo);
     const executor = new CommandTaskExecutor(repo);
-    const task = service.createTask({ type: 'command', metadata: { command: 'sleep 30', cwd: dataDir } });
+    const task = service.createTask({
+      type: 'command',
+      metadata: { command: 'sleep 30', cwd: dataDir },
+    });
     const started = await executor.start(task);
     service.startTask(task.id, { executorRef: started.executorRef });
     const pid = started.executorRef!.pid!;
@@ -84,12 +93,17 @@ describe('CommandTaskExecutor', () => {
     const repo = new TaskRepository(db);
     const service = new TaskService(repo);
     const executor = new CommandTaskExecutor(repo);
-    const task = service.createTask({ type: 'command', metadata: { command: 'echo done', cwd: dataDir } });
+    const task = service.createTask({
+      type: 'command',
+      metadata: { command: 'echo done', cwd: dataDir },
+    });
     const started = await executor.start(task);
     service.startTask(task.id, { executorRef: started.executorRef });
     await wait(700); // let it complete
     expect(repo.findById(task.id)!.status).toBe('completed');
-    await expect(executor.stop(task.id, 'late stop')).resolves.toMatchObject({ status: 'completed' });
+    await expect(executor.stop(task.id, 'late stop')).resolves.toMatchObject({
+      status: 'completed',
+    });
     expect(repo.findById(task.id)!.status).toBe('completed'); // unchanged
   });
 
@@ -97,7 +111,10 @@ describe('CommandTaskExecutor', () => {
     const repo = new TaskRepository(db);
     const service = new TaskService(repo);
     const executor = new CommandTaskExecutor(repo);
-    const task = service.createTask({ type: 'command', metadata: { command: 'echo hi', cwd: join(dataDir, 'no-such-dir') } });
+    const task = service.createTask({
+      type: 'command',
+      metadata: { command: 'echo hi', cwd: join(dataDir, 'no-such-dir') },
+    });
     const started = await executor.start(task);
     service.startTask(task.id, { executorRef: started.executorRef });
     await wait(500);
@@ -120,7 +137,10 @@ describe('CommandTaskExecutor', () => {
     const executor = new CommandTaskExecutor(repo);
     const dead = service.createTask({ type: 'command', metadata: { command: 'noop' } });
     service.startTask(dead.id, { executorRef: { pid: 99999999, command: 'noop' } });
-    const live = service.createTask({ type: 'command', metadata: { command: 'sleep 30', cwd: dataDir } });
+    const live = service.createTask({
+      type: 'command',
+      metadata: { command: 'sleep 30', cwd: dataDir },
+    });
     const started = await executor.start(repo.findById(live.id)!);
     service.startTask(live.id, { executorRef: started.executorRef });
 
@@ -141,7 +161,10 @@ describe('CommandTaskExecutor', () => {
     const repo = new TaskRepository(db);
     const service = new TaskService(repo);
     const executor = new CommandTaskExecutor(repo);
-    const task = service.createTask({ type: 'command', metadata: { command: 'echo original', cwd: dataDir } });
+    const task = service.createTask({
+      type: 'command',
+      metadata: { command: 'echo original', cwd: dataDir },
+    });
     const started = await executor.start(task);
     service.startTask(task.id, { executorRef: started.executorRef });
     await new Promise(r => setTimeout(r, 700));
@@ -187,9 +210,12 @@ describe('CommandTaskExecutor', () => {
 
     await executor.start(task);
 
-    expect(wrap).toHaveBeenCalledWith('echo original', expect.objectContaining({
-      workspaceRoot: join(dataDir, 'workspace-root'),
-      extraAllowedDomains: ['example.test'],
-    }));
+    expect(wrap).toHaveBeenCalledWith(
+      'echo original',
+      expect.objectContaining({
+        workspaceRoot: join(dataDir, 'workspace-root'),
+        extraAllowedDomains: ['example.test'],
+      })
+    );
   });
 });

@@ -5,9 +5,11 @@ import { useRecoveryStore } from '../../stores/recoveryStore';
 import { useSessionsStore } from '../../stores/sessionsStore';
 import { useSessionRunStateStore } from '../../stores/sessionRunStateStore';
 
-export function syncBackendDataSnapshot(event: Extract<BackendFacadeEvent, { type: 'backend_data_snapshot' }>): void {
+export function syncBackendDataSnapshot(
+  event: Extract<BackendFacadeEvent, { type: 'backend_data_snapshot' }>
+): void {
   const { backendId, sessions, projects } = event;
-  const activeItems = sessions.filter((item) => !item.archived);
+  const activeItems = sessions.filter(item => !item.archived);
   const mappedSessions = activeItems.map(item => ({
     id: item.sessionId,
     projectId: item.projectId || '',
@@ -19,18 +21,20 @@ export function syncBackendDataSnapshot(event: Extract<BackendFacadeEvent, { typ
   }));
 
   const currentSessions = useSessionsStore.getState().remoteSessions.get(backendId);
-  const sessionsChanged = !currentSessions
-    || currentSessions.length !== mappedSessions.length
-    || currentSessions.some((s, i) =>
-      s.id !== mappedSessions[i].id
-      || s.updatedAt !== mappedSessions[i].updatedAt
-      || s.isActive !== mappedSessions[i].isActive
+  const sessionsChanged =
+    !currentSessions ||
+    currentSessions.length !== mappedSessions.length ||
+    currentSessions.some(
+      (s, i) =>
+        s.id !== mappedSessions[i].id ||
+        s.updatedAt !== mappedSessions[i].updatedAt ||
+        s.isActive !== mappedSessions[i].isActive
     );
 
   const ownershipVersion = useRecoveryStore.getState().noteDataSyncSucceeded(backendId);
   useOwnershipStore.getState().stampSessionOwnershipVersion(
     activeItems.map(item => item.sessionId),
-    ownershipVersion,
+    ownershipVersion
   );
 
   if (sessionsChanged) {
@@ -38,34 +42,51 @@ export function syncBackendDataSnapshot(event: Extract<BackendFacadeEvent, { typ
   }
 
   const activeSessionIds = new Set(
-    activeItems.filter(item => item.runStatus === 'running' || item.runStatus === 'waiting').map(item => item.sessionId)
+    activeItems
+      .filter(item => item.runStatus === 'running' || item.runStatus === 'waiting')
+      .map(item => item.sessionId)
   );
   useSessionsStore.getState().reconcileActiveStatus(backendId, activeSessionIds);
   useSessionRunStateStore.getState().reconcileBackendSessionStatuses({
     backendId,
-    sessions: activeItems.map((item) => ({
+    sessions: activeItems.map(item => ({
       sessionId: item.sessionId,
       runStatus: item.runStatus,
     })),
     knownSessionIds: [
-      ...(currentSessions?.map((session) => session.id) ?? []),
-      ...mappedSessions.map((session) => session.id),
+      ...(currentSessions?.map(session => session.id) ?? []),
+      ...mappedSessions.map(session => session.id),
     ],
     source: 'backend_snapshot',
   });
 
   if (projects) {
-    useProjectStore.getState().replaceProjectsForBackend(backendId, projects.map(p => ({
-      id: p.projectId,
-      name: p.name,
-      type: 'code' as const,
-      createdAt: p.createdAt,
-      updatedAt: p.updatedAt,
-    })));
+    useProjectStore.getState().replaceProjectsForBackend(
+      backendId,
+      projects.map(p => ({
+        id: p.projectId,
+        name: p.name,
+        type: 'code' as const,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+      }))
+    );
   }
 }
 
-export function syncBackendDataEvent(event: Extract<BackendFacadeEvent, { type: 'backend_data_event' }>): void {
+export function syncBackendsRemoved(
+  event: Extract<BackendFacadeEvent, { type: 'backends_removed' }>
+): void {
+  for (const backendId of event.backendIds) {
+    useSessionsStore.getState().clearBackendSessions(backendId);
+    useProjectStore.getState().replaceProjectsForBackend(backendId, []);
+    useOwnershipStore.getState().removeProjectOwnersByBackend(backendId);
+  }
+}
+
+export function syncBackendDataEvent(
+  event: Extract<BackendFacadeEvent, { type: 'backend_data_event' }>
+): void {
   const { backendId, event: dataEvent } = event;
   if (dataEvent.resourceType === 'session' && dataEvent.op === 'upsert') {
     const item = dataEvent.resource as NonNullable<typeof dataEvent.resource> & {
@@ -95,8 +116,7 @@ export function syncBackendDataEvent(event: Extract<BackendFacadeEvent, { type: 
     }
     const sessionStore = useSessionsStore.getState();
     const existingSessions = sessionStore.remoteSessions.get(backendId) || [];
-    const eventType = existingSessions.some(s => s.id === item.sessionId)
-      ? 'updated' : 'created';
+    const eventType = existingSessions.some(s => s.id === item.sessionId) ? 'updated' : 'created';
     sessionStore.handleSessionEvent(backendId, eventType, {
       id: item.sessionId,
       projectId: item.projectId || '',

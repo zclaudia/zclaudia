@@ -6,9 +6,7 @@ import { Jimp } from 'jimp';
 import { buildTools } from '../tool-bridge.js';
 import { renderNotebook, parsePageSpec } from '../rich-read.js';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function readTool(dir: string, options: Record<string, unknown> = {}): any {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return buildTools(dir, { enabled: ['Read'], ...options }).find((t: any) => t.name === 'Read');
 }
 
@@ -108,7 +106,6 @@ describe('Read oversized image compression', () => {
     const image = new Jimp({ width: 1600, height: 1600 });
     for (let y = 0; y < 1600; y += 1) {
       for (let x = 0; x < 1600; x += 1) {
-        // eslint-disable-next-line no-bitwise
         image.setPixelColor(((((Math.random() * 0xffffff) | 0) << 8) | 0xff) >>> 0, x, y);
       }
     }

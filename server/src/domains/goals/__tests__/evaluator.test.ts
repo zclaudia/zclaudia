@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { GoalEvaluator, type EvaluatorLlmPort, type TranscriptMessage } from '../evaluator.js';
 
-function transcript(items: Array<Partial<TranscriptMessage> & { role: TranscriptMessage['role'] }>): TranscriptMessage[] {
+function transcript(
+  items: Array<Partial<TranscriptMessage> & { role: TranscriptMessage['role'] }>
+): TranscriptMessage[] {
   return items.map((it, i) => ({
     role: it.role,
     content: it.content ?? `msg-${i}`,
@@ -37,7 +39,7 @@ describe('GoalEvaluator', () => {
     };
     const ev = new GoalEvaluator(stub);
     const items = transcript(
-      Array.from({ length: 20 }, (_, i) => ({ role: 'user' as const, content: `m${i}` })),
+      Array.from({ length: 20 }, (_, i) => ({ role: 'user' as const, content: `m${i}` }))
     );
     await ev.evaluate({ objective: 'x', transcript: items, llmProfileId: 'lp1' });
     expect(received).toHaveLength(8);

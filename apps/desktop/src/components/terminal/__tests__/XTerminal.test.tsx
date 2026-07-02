@@ -64,8 +64,7 @@ vi.mock('@xterm/addon-web-links', () => ({
 
 vi.mock('@xterm/xterm/css/xterm.css', () => ({}));
 
-
-vi.mock('../../../utils/platform', async (importOriginal) => {
+vi.mock('../../../utils/platform', async importOriginal => {
   const mod = await importOriginal<Record<string, any>>();
   return {
     ...mod,
@@ -78,7 +77,7 @@ import { XTerminal } from '../XTerminal';
 describe('XTerminal', () => {
   async function flushTerminalMount() {
     await act(async () => {
-      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise(resolve => requestAnimationFrame(resolve));
     });
   }
 
@@ -112,9 +111,7 @@ describe('XTerminal', () => {
   });
 
   it('renders a container div', () => {
-    const { container } = render(
-      <XTerminal terminalId="term-1" projectId="proj-1" />
-    );
+    const { container } = render(<XTerminal terminalId="term-1" projectId="proj-1" />);
     const termDiv = container.firstElementChild as HTMLElement;
     expect(termDiv).toBeTruthy();
   });
@@ -141,24 +138,18 @@ describe('XTerminal', () => {
       getPropertyValue: mockGetPropertyValue,
     } as any);
 
-    const { container } = render(
-      <XTerminal terminalId="term-1" projectId="proj-1" />
-    );
+    const { container } = render(<XTerminal terminalId="term-1" projectId="proj-1" />);
     expect(container.firstElementChild).toBeTruthy();
   });
 
   it('applies inline style for background color', () => {
-    const { container } = render(
-      <XTerminal terminalId="term-1" projectId="proj-1" />
-    );
+    const { container } = render(<XTerminal terminalId="term-1" projectId="proj-1" />);
     const div = container.firstElementChild as HTMLElement;
     expect(div.style.backgroundColor).toBeDefined();
   });
 
   it('handles theme change via useTheme', async () => {
-    const { rerender } = render(
-      <XTerminal terminalId="term-1" projectId="proj-1" />
-    );
+    const { rerender } = render(<XTerminal terminalId="term-1" projectId="proj-1" />);
 
     // Simulate theme change by re-rendering
     rerender(<XTerminal terminalId="term-1" projectId="proj-1" />);

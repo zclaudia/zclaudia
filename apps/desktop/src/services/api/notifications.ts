@@ -13,7 +13,11 @@ async function gatewayFetch<T>(path: string, options?: RequestInit): Promise<T> 
   const url = resolveGatewayDirectUrl(path);
   if (!url) throw new Error('No gateway connection — notification config is not available');
 
-  const headers = { ...getGatewayAuthHeaders(), 'Content-Type': 'application/json', ...options?.headers };
+  const headers = {
+    ...getGatewayAuthHeaders(),
+    'Content-Type': 'application/json',
+    ...options?.headers,
+  };
   const response = await fetch(url, { ...options, headers });
   const json = await response.json();
 

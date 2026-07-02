@@ -17,7 +17,7 @@ export class PermissionWorkflowResolver {
 
   constructor(
     private db: Database,
-    private workflowService: WorkflowService,
+    private workflowService: WorkflowService
   ) {
     this.workflowRepo = new WorkflowRepository(db);
     this.projectRepo = new ProjectRepository(db);
@@ -43,9 +43,9 @@ export class PermissionWorkflowResolver {
       }
     }
 
-    const globalConfig = this.db.prepare(
-      'SELECT permission_workflow_override_id FROM agent_config WHERE id = 1',
-    ).get() as { permission_workflow_override_id?: string | null } | undefined;
+    const globalConfig = this.db
+      .prepare('SELECT permission_workflow_override_id FROM agent_config WHERE id = 1')
+      .get() as { permission_workflow_override_id?: string | null } | undefined;
     if (globalConfig?.permission_workflow_override_id) {
       const workflow = this.workflowRepo.findById(globalConfig.permission_workflow_override_id);
       if (this.isUsableOverride(workflow)) {
@@ -73,7 +73,7 @@ export class PermissionWorkflowResolver {
     triggerData: {
       eventPayload: Record<string, unknown>;
       triggerContext?: Record<string, unknown>;
-    },
+    }
   ): Promise<{ resolved: ResolvedPermissionWorkflow; run: WorkflowRun }> {
     const resolved = this.resolve(projectId);
     const run = await this.workflowService.triggerWorkflow(
@@ -81,7 +81,7 @@ export class PermissionWorkflowResolver {
       'event',
       'event: permission.escalated',
       triggerData,
-      'event',
+      'event'
     );
     return { resolved, run };
   }

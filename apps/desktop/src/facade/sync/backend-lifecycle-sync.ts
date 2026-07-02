@@ -5,7 +5,9 @@ import { cleanupServerSyncState } from '../../services/messageHandler';
 import { terminalRegistry } from '../../services/terminal/TerminalRegistry';
 import { hasActiveRunsForBackend, noteAutoOpenFailure, noteAutoOpenSuccess } from './state';
 
-export function syncBackendLifecycle(event: Extract<BackendFacadeEvent, { type: 'backend_state_changed' }>): void {
+export function syncBackendLifecycle(
+  event: Extract<BackendFacadeEvent, { type: 'backend_state_changed' }>
+): void {
   if (event.state === 'ready') {
     noteAutoOpenSuccess(event.backendId);
   } else if (event.state === 'error' || event.state === 'offline') {
@@ -32,7 +34,12 @@ export function syncBackendLifecycle(event: Extract<BackendFacadeEvent, { type: 
   }
 
   const isTransient = event.error === 'user_closed' || event.error === 'transport_disconnected';
-  if (event.error && !isTransient && event.state !== 'ready' && hasActiveRunsForBackend(event.backendId)) {
+  if (
+    event.error &&
+    !isTransient &&
+    event.state !== 'ready' &&
+    hasActiveRunsForBackend(event.backendId)
+  ) {
     useToastStore.getState().add({
       type: 'error',
       title: 'Remote connection lost',

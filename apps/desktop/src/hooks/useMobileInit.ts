@@ -16,10 +16,10 @@ import {
  */
 export function useMobileInit(isMobile: boolean) {
   const { connectServer } = useConnection();
-  const activeServerId = useServerStore((s) => s.activeServerId);
-  const lastActiveBackendId = useGatewayStore((s) => s.lastActiveBackendId);
-  const facadeConnectionState = useFacadeStore((s) => s.connectionState);
-  const facadeBackends = useFacadeStore((s) => s.backends);
+  const activeServerId = useServerStore(s => s.activeServerId);
+  const lastActiveBackendId = useGatewayStore(s => s.lastActiveBackendId);
+  const facadeConnectionState = useFacadeStore(s => s.connectionState);
+  const facadeBackends = useFacadeStore(s => s.backends);
 
   const mobileInitDone = useRef(false);
   const mobileAutoConnectDone = useRef(false);
@@ -45,9 +45,10 @@ export function useMobileInit(isMobile: boolean) {
     const activeBackendViewState = getMobileBackendViewState(
       backendId,
       facadeConnectionState,
-      facadeBackends,
+      facadeBackends
     );
-    const activeBackendReady = activeBackendViewState === 'ready' || activeBackendViewState === 'backend_subscribing';
+    const activeBackendReady =
+      activeBackendViewState === 'ready' || activeBackendViewState === 'backend_subscribing';
     if (activeServerId === backendId && activeBackendReady) {
       mobileAutoConnectDone.current = true;
       return;
@@ -56,7 +57,7 @@ export function useMobileInit(isMobile: boolean) {
     const backendViewState = getMobileBackendViewState(
       backendId,
       facadeConnectionState,
-      facadeBackends,
+      facadeBackends
     );
     if (backendViewState === 'offline') return;
 
@@ -64,5 +65,12 @@ export function useMobileInit(isMobile: boolean) {
     console.log('[App] Auto-reconnecting to last used backend:', lastActiveBackendId);
     useServerStore.getState().setActiveServer(lastActiveBackendId);
     connectServer(lastActiveBackendId);
-  }, [isMobile, lastActiveBackendId, facadeConnectionState, facadeBackends, activeServerId, connectServer]);
+  }, [
+    isMobile,
+    lastActiveBackendId,
+    facadeConnectionState,
+    facadeBackends,
+    activeServerId,
+    connectServer,
+  ]);
 }

@@ -26,18 +26,24 @@ export function RunsTab({ api, projectId }: RunsTabProps) {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const query = effectiveProjectId ? `?projectId=${encodeURIComponent(effectiveProjectId)}` : '';
+      const query = effectiveProjectId
+        ? `?projectId=${encodeURIComponent(effectiveProjectId)}`
+        : '';
       const [runsData, workflowsData] = await Promise.all([
         api.get(`/api/workflow-runs${query}`).catch(() => []),
         api.get(`/api/workflows${query}`).catch(() => []),
       ]);
       setRuns(runsData);
       setWorkflows(workflowsData);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     setLoading(false);
   }, [api, effectiveProjectId]);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   if (selectedRunId) {
     return (
@@ -77,12 +83,10 @@ export function RunsTab({ api, projectId }: RunsTabProps) {
           <Loader2 size={20} className="animate-spin text-muted-foreground" />
         </div>
       ) : runs.length === 0 ? (
-        <div className="text-center py-12 text-sm text-muted-foreground">
-          No workflow runs yet.
-        </div>
+        <div className="text-center py-12 text-sm text-muted-foreground">No workflow runs yet.</div>
       ) : (
         <div className="space-y-2">
-          {runs.map((run) => (
+          {runs.map(run => (
             <button
               key={run.id}
               onClick={() => setSelectedRunId(run.id)}
@@ -131,16 +135,23 @@ function RunDetail({
 
   useEffect(() => {
     setLoading(true);
-    api.get(`/api/workflow-runs/${runId}`).then((data: { run: WorkflowRun; stepRuns: WorkflowStepRun[] }) => {
-      setRun(data.run);
-      setStepRuns(data.stepRuns);
-    }).catch(() => {}).finally(() => setLoading(false));
+    api
+      .get(`/api/workflow-runs/${runId}`)
+      .then((data: { run: WorkflowRun; stepRuns: WorkflowStepRun[] }) => {
+        setRun(data.run);
+        setStepRuns(data.stepRuns);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, [api, runId]);
 
   if (loading || !run) {
     return (
       <div className="space-y-4">
-        <button onClick={onBack} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
           <ArrowLeft size={16} /> Back
         </button>
         <div className="flex items-center justify-center py-12">
@@ -155,14 +166,20 @@ function RunDetail({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground">
+          <button
+            onClick={onBack}
+            className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
+          >
             <ArrowLeft size={16} />
           </button>
           <div>
             <div className="text-sm font-medium">{workflowName}</div>
             <div className="text-xs text-muted-foreground flex items-center gap-2">
               <RunStatusBadge status={run.status} />
-              <span>{run.triggerSource}{run.triggerDetail ? ` · ${run.triggerDetail}` : ''}</span>
+              <span>
+                {run.triggerSource}
+                {run.triggerDetail ? ` · ${run.triggerDetail}` : ''}
+              </span>
               <span>{formatDuration(run.startedAt, run.completedAt)}</span>
               <span>{new Date(run.startedAt).toLocaleString()}</span>
             </div>
@@ -170,7 +187,9 @@ function RunDetail({
         </div>
         {(run.status === 'running' || run.status === 'pending') && (
           <button
-            onClick={() => { api.post(`/api/workflow-runs/${runId}/cancel`).catch(() => {}); }}
+            onClick={() => {
+              api.post(`/api/workflow-runs/${runId}/cancel`).catch(() => {});
+            }}
             className="px-3 py-1 text-xs rounded-md border border-border hover:bg-destructive hover:text-destructive-foreground transition-colors"
           >
             Cancel
@@ -180,12 +199,16 @@ function RunDetail({
 
       {/* Steps */}
       <div className="space-y-2">
-        {stepRuns.map((stepRun) => (
+        {stepRuns.map(stepRun => (
           <StepRunCard
             key={stepRun.id}
             stepRun={stepRun}
-            onApprove={(id) => { api.post(`/api/workflow-step-runs/${id}/approve`).catch(() => {}); }}
-            onReject={(id) => { api.post(`/api/workflow-step-runs/${id}/reject`).catch(() => {}); }}
+            onApprove={id => {
+              api.post(`/api/workflow-step-runs/${id}/approve`).catch(() => {});
+            }}
+            onReject={id => {
+              api.post(`/api/workflow-step-runs/${id}/reject`).catch(() => {});
+            }}
           />
         ))}
         {stepRuns.length === 0 && (

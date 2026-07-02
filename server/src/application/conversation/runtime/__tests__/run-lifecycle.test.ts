@@ -31,7 +31,9 @@ vi.mock('../../../../infra/storage/metadata-extractor.js', () => ({
 // To avoid that we set `fullContent=''` + empty arrays so the helper short-circuits.
 void upsertAssistantMessageMock;
 
-function makeActiveRun(overrides: Partial<ActiveRun> & { pendingSteers: AgentMessage[] }): ActiveRun {
+function makeActiveRun(
+  overrides: Partial<ActiveRun> & { pendingSteers: AgentMessage[] }
+): ActiveRun {
   const runId = overrides.runId ?? 'r1';
   const base = {
     runId,
@@ -134,9 +136,7 @@ describe('cancelRun — restoreDraft', () => {
     const run = makeActiveRun({
       runId: 'r1',
       sessionId: 's1',
-      pendingSteers: [
-        { role: 'user', content: 'plain string steer' as never },
-      ],
+      pendingSteers: [{ role: 'user', content: 'plain string steer' as never }],
     });
     ctx.activeRuns.set('r1', run);
 
@@ -191,9 +191,7 @@ describe('cancelRun — phase transitions (A1)', () => {
     cancelRun(run.runId, ctx);
 
     expect(run.phase).toBe('completed');
-    expect(warnSpy).not.toHaveBeenCalledWith(
-      expect.stringContaining('illegal phase transition'),
-    );
+    expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining('illegal phase transition'));
     // Terminal early-return still cleans up activeRuns and pings heartbeat.
     expect(ctx.activeRuns.has(run.runId)).toBe(false);
     // No run_failed broadcast either — there's nothing to tell clients.

@@ -11,14 +11,16 @@ import type { ConnectedClient, ActiveRun } from '../transport/types.js';
 import type { TaskCoordinationPort } from '../../../application/conversation/task-coordination-port.js';
 import type { ProcessMonitor } from '../../../utils/process-monitor.js';
 import type { initDatabase } from '../../../infra/storage/db.js';
+import type { Database } from 'better-sqlite3';
 import { isProcessAlive, killProcessTree } from '../../../utils/process-tree.js';
 import type { ProviderRegistryPort } from '../../../infra/providers/registry.js';
 import { sendMessage } from '../transport/broadcast.js';
 import { AgentProfileRepository } from '../../../domains/agent-profiles/repository.js';
 import { LlmProfileRepository } from '../../../domains/llm-profiles/repository.js';
+import { SessionRepository } from '../../../domains/sessions/repository.js';
+import { TaskRepository } from '../../../domains/tasks/repository.js';
 import { isTerminalPhase } from '../runtime/active-run-phase.js';
-import { getNextOffset } from '../runtime/run-lifecycle.js';
-import { appendMessagesToTree, buildUserMessage } from '../../../infra/providers/pi-runtime/session-tree/write-path.js';
+import { persistSteeredUserMessage } from '../runtime/steer-persistence.js';
 
 function sendSteerError(client: ConnectedClient, code: string, message: string): void {
   sendMessage(client.ws, {
@@ -30,7 +32,7 @@ function sendSteerError(client: ConnectedClient, code: string, message: string):
 
 export async function handleKillLeakedProcesses(
   client: ConnectedClient,
-  processMonitor: ProcessMonitor,
+  processMonitor: ProcessMonitor
 ): Promise<void> {
   console.log('[ProcessMonitor] Manual kill triggered by client');
   const result = await processMonitor.cleanupNow();
@@ -48,8 +50,11 @@ export async function handleStopBackgroundTask(
   message: StopBackgroundTaskMessage,
   db: ReturnType<typeof initDatabase>,
   activeRuns: Map<string, ActiveRun>,
-  findProcessPidsByTaskCommand: (taskCommand?: string, excludedPids?: number[]) => Promise<number[]>,
-  providerRegistry: ProviderRegistryPort,
+  findProcessPidsByTaskCommand: (
+    taskCommand?: string,
+    excludedPids?: number[]
+  ) => Promise<number[]>,
+  providerRegistry: ProviderRegistryPort
 ): Promise<void> {
   const { sessionId: targetSessionId, taskId, taskRootPid, cliPid, taskCommand } = message;
 
@@ -66,9 +71,7 @@ export async function handleStopBackgroundTask(
           sessionId: targetSessionId,
           taskId,
           status: stopped ? 'stopped' : 'failed',
-          message: stopped
-            ? `Task stopped by PID ${directPid}`
-            : `Failed to stop PID ${directPid}`,
+          message: stopped ? `Task stopped by PID ${directPid}` : `Failed to stop PID ${directPid}`,
           cliPid,
           taskRootPid,
         } as TaskNotificationMessage);
@@ -90,9 +93,14 @@ export async function handleStopBackgroundTask(
   }
 
   // Strategy 2: Command-matched kill
-  const matchedPids = await findProcessPidsByTaskCommand(taskCommand, [cliPid, taskRootPid].filter((pid): pid is number => typeof pid === 'number'));
+  const matchedPids = await findProcessPidsByTaskCommand(
+    taskCommand,
+    [cliPid, taskRootPid].filter((pid): pid is number => typeof pid === 'number')
+  );
   if (matchedPids.length > 0) {
-    console.log(`[StopTask] Command-matched stop for task ${taskId}: pids=[${matchedPids.join(',')}]`);
+    console.log(
+      `[StopTask] Command-matched stop for task ${taskId}: pids=[${matchedPids.join(',')}]`
+    );
     const killResults = await Promise.all(matchedPids.map(pid => killProcessTree(pid)));
     const failed = killResults.flatMap(result => result.failed);
     const killed = killResults.flatMap(result => result.killed);
@@ -102,9 +110,10 @@ export async function handleStopBackgroundTask(
       sessionId: targetSessionId,
       taskId,
       status: killed.length > 0 && failed.length === 0 ? 'stopped' : 'failed',
-      message: killed.length > 0 && failed.length === 0
-        ? `Task stopped by command match (${matchedPids.join(', ')})`
-        : `Failed to stop command-matched PID(s): ${matchedPids.join(', ')}`,
+      message:
+        killed.length > 0 && failed.length === 0
+          ? `Task stopped by command match (${matchedPids.join(', ')})`
+          : `Failed to stop command-matched PID(s): ${matchedPids.join(', ')}`,
       cliPid,
       taskRootPid,
     } as TaskNotificationMessage);
@@ -115,26 +124,24 @@ export async function handleStopBackgroundTask(
   const targetRun = [...activeRuns.values()].find(r => r.sessionId === targetSessionId);
   let resolvedProviderType = targetRun?.providerType;
   let resolvedSdkSessionId = targetRun?.providerSessionId;
+  const sessionRepo = new SessionRepository(db as unknown as Database);
+  const session = sessionRepo.findById(targetSessionId);
 
   if (!resolvedSdkSessionId) {
-    const sessionRow = db.prepare('SELECT sdk_session_id FROM sessions WHERE id = ?')
-      .get(targetSessionId) as { sdk_session_id: string | null } | undefined;
-    resolvedSdkSessionId = sessionRow?.sdk_session_id || undefined;
+    resolvedSdkSessionId = session?.sdkSessionId || undefined;
   }
 
   if (!resolvedProviderType) {
     // Resolve provider type via session → agent_profile → llm_profile chain,
     // using the same repository layer that run-bootstrap.ts uses (avoids the
     // older LEFT JOIN COALESCE shim that pre-dated agent profiles).
-    const sessionRow = db.prepare('SELECT agent_profile_id FROM sessions WHERE id = ?')
-      .get(targetSessionId) as { agent_profile_id: string | null } | undefined;
-    const agentRepo = new AgentProfileRepository(db as unknown as import('better-sqlite3').Database);
-    const llmRepo = new LlmProfileRepository(db as unknown as import('better-sqlite3').Database);
-    const agentProfile = sessionRow?.agent_profile_id
-      ? agentRepo.findById(sessionRow.agent_profile_id) ?? agentRepo.findDefault()
+    const agentRepo = new AgentProfileRepository(db as unknown as Database);
+    const llmRepo = new LlmProfileRepository(db as unknown as Database);
+    const agentProfile = session?.agentProfileId
+      ? (agentRepo.findById(session.agentProfileId) ?? agentRepo.findDefault())
       : agentRepo.findDefault();
     const llmProfile = agentProfile?.llmProfileId
-      ? llmRepo.findById(agentProfile.llmProfileId) ?? llmRepo.findDefault()
+      ? (llmRepo.findById(agentProfile.llmProfileId) ?? llmRepo.findDefault())
       : llmRepo.findDefault();
     resolvedProviderType = llmProfile?.providerType;
   }
@@ -142,9 +149,12 @@ export async function handleStopBackgroundTask(
   if (resolvedProviderType && resolvedSdkSessionId) {
     const adapter = providerRegistry.get(resolvedProviderType);
     if (adapter?.stopTask) {
-      console.log(`[StopTask] Stopping task ${taskId}: adapter=${resolvedProviderType} sdkSession=${resolvedSdkSessionId}`);
-      adapter.stopTask(resolvedSdkSessionId, taskId)
-        .then((killed) => {
+      console.log(
+        `[StopTask] Stopping task ${taskId}: adapter=${resolvedProviderType} sdkSession=${resolvedSdkSessionId}`
+      );
+      adapter
+        .stopTask(resolvedSdkSessionId, taskId)
+        .then(killed => {
           sendMessage(client.ws, {
             type: 'task_notification',
             runId: targetRun?.runId || '',
@@ -169,7 +179,9 @@ export async function handleStopBackgroundTask(
     }
   }
 
-  console.warn(`[StopTask] Cannot stop task ${taskId} in session ${targetSessionId} — providerType=${resolvedProviderType} sdkSessionId=${resolvedSdkSessionId}`);
+  console.warn(
+    `[StopTask] Cannot stop task ${taskId} in session ${targetSessionId} — providerType=${resolvedProviderType} sdkSessionId=${resolvedSdkSessionId}`
+  );
 }
 
 export async function handleAgentCancel(
@@ -178,7 +190,7 @@ export async function handleAgentCancel(
   activeRuns: Map<string, ActiveRun>,
   cancelRun: (runId: string) => void,
   db: ReturnType<typeof initDatabase>,
-  taskCoordination?: Pick<TaskCoordinationPort, 'cancelCanonicalAgentTask'>,
+  taskCoordination?: Pick<TaskCoordinationPort, 'cancelCanonicalAgentTask'>
 ): Promise<void> {
   let cancelled = false;
 
@@ -191,19 +203,13 @@ export async function handleAgentCancel(
   }
 
   if (!cancelled && taskCoordination) {
-    const canonicalTaskRow = db.prepare(
-      `SELECT id
-       FROM tasks
-       WHERE session_id = ?
-         AND type = 'agent'
-         AND json_extract(metadata, '$.initiator') = 'claudia'
-       ORDER BY created_at DESC
-       LIMIT 1`
-    ).get(sessionId) as { id: string } | undefined;
+    const canonicalTaskId = new TaskRepository(
+      db as unknown as Database
+    ).findLatestClaudiaAgentTaskId(sessionId);
 
-    if (canonicalTaskRow) {
+    if (canonicalTaskId) {
       try {
-        await taskCoordination.cancelCanonicalAgentTask(canonicalTaskRow.id);
+        await taskCoordination.cancelCanonicalAgentTask(canonicalTaskId);
         return;
       } catch (err) {
         sendMessage(client.ws, {
@@ -214,7 +220,6 @@ export async function handleAgentCancel(
         return;
       }
     }
-
   }
 }
 
@@ -234,7 +239,7 @@ export async function handleRunSteer(
   client: ConnectedClient,
   msg: RunSteerMessage,
   activeRuns: Map<string, ActiveRun>,
-  broadcastRunMessage: (run: ActiveRun, payload: ServerMessage) => void,
+  broadcastRunMessage: (run: ActiveRun, payload: ServerMessage) => void
 ): Promise<void> {
   const trimmed = msg.content?.trim() ?? '';
   if (!trimmed) {
@@ -269,7 +274,11 @@ export async function handleRunSteer(
     run.steerHandle.steer(agentMessage);
   } catch (err) {
     console.error('[handleRunSteer] steer call threw:', err);
-    sendSteerError(client, 'STEER_FAILED', err instanceof Error ? err.message : 'Failed to inject steering message');
+    sendSteerError(
+      client,
+      'STEER_FAILED',
+      err instanceof Error ? err.message : 'Failed to inject steering message'
+    );
     return;
   }
 
@@ -285,22 +294,12 @@ export async function handleRunSteer(
   try {
     const db = run.db;
     if (db) {
-      const offset = getNextOffset(db, run.sessionId);
-      db.transaction(() => {
-        db.prepare(`
-          INSERT INTO messages (id, session_id, role, content, metadata, created_at, offset)
-          VALUES (?, ?, 'user', ?, ?, ?, ?)
-        `).run(
-          steerMessageId,
-          run.sessionId,
-          trimmed,
-          JSON.stringify({ steered: true }),
-          now,
-          offset,
-        );
-        const entryIds = appendMessagesToTree(db, run.sessionId, [buildUserMessage(trimmed, [])]);
-        db.prepare(`UPDATE messages SET tree_entry_id = ? WHERE id = ?`).run(entryIds[0], steerMessageId);
-      })();
+      persistSteeredUserMessage(db, {
+        id: steerMessageId,
+        sessionId: run.sessionId,
+        content: trimmed,
+        createdAt: now,
+      });
     }
   } catch (err) {
     // Persistence failure must NOT block the steer (agent already accepted it).

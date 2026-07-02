@@ -24,14 +24,14 @@ class TestRepository extends BaseRepository<TestEntity, TestCreate, TestUpdate> 
     return {
       id: row.id,
       name: row.name,
-      value: row.value
+      value: row.value,
     };
   }
 
   createQuery(data: TestCreate): { sql: string; params: any[] } {
     return {
       sql: 'INSERT INTO test_table (id, name, value) VALUES (?, ?, ?)',
-      params: ['test-id', data.name, data.value]
+      params: ['test-id', data.name, data.value],
     };
   }
 
@@ -51,7 +51,7 @@ class TestRepository extends BaseRepository<TestEntity, TestCreate, TestUpdate> 
 
     return {
       sql: `UPDATE test_table SET ${updates.join(', ')} WHERE id = ?`,
-      params
+      params,
     };
   }
 }
@@ -67,8 +67,8 @@ describe('BaseRepository', () => {
       prepare: vi.fn().mockReturnValue({
         all: vi.fn(),
         get: vi.fn(),
-        run: vi.fn()
-      })
+        run: vi.fn(),
+      }),
     };
 
     repository = new TestRepository(mockDb, 'test_table');
@@ -78,7 +78,7 @@ describe('BaseRepository', () => {
     it('returns all entities mapped to correct type', () => {
       const mockRows = [
         { id: '1', name: 'test1', value: 10 },
-        { id: '2', name: 'test2', value: 20 }
+        { id: '2', name: 'test2', value: 20 },
       ];
       mockDb.prepare().all.mockReturnValue(mockRows);
 
@@ -86,7 +86,7 @@ describe('BaseRepository', () => {
 
       expect(result).toEqual([
         { id: '1', name: 'test1', value: 10 },
-        { id: '2', name: 'test2', value: 20 }
+        { id: '2', name: 'test2', value: 20 },
       ]);
       expect(mockDb.prepare).toHaveBeenCalledWith('SELECT * FROM test_table');
     });
@@ -129,7 +129,9 @@ describe('BaseRepository', () => {
       const result = repository.create({ name: 'new-entity', value: 100 });
 
       expect(result).toEqual({ id: 'test-id', name: 'new-entity', value: 100 });
-      expect(mockDb.prepare).toHaveBeenCalledWith('INSERT INTO test_table (id, name, value) VALUES (?, ?, ?)');
+      expect(mockDb.prepare).toHaveBeenCalledWith(
+        'INSERT INTO test_table (id, name, value) VALUES (?, ?, ?)'
+      );
     });
 
     it('throws error if creation fails', () => {

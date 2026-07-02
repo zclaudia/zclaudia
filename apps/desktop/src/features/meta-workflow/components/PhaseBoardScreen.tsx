@@ -12,20 +12,29 @@ interface Props {
 }
 
 export function PhaseBoardScreen({ projectId, run, socket }: Props): React.ReactElement {
-  const phases = useMetaWorkflowStore((s) => s.phases[run.id] ?? []);
-  const setPhases = useMetaWorkflowStore((s) => s.setPhases);
-  const patchView = useMetaWorkflowStore((s) => s.patchView);
+  const phases = useMetaWorkflowStore(s => s.phases[run.id] ?? []);
+  const setPhases = useMetaWorkflowStore(s => s.setPhases);
+  const patchView = useMetaWorkflowStore(s => s.patchView);
 
   useEffect(() => {
     let cancelled = false;
-    api.listPhases(run.id).then((ps) => {
-      if (!cancelled) setPhases(run.id, ps);
-    }).catch((e) => console.error('[meta-workflow] listPhases failed', e));
-    return () => { cancelled = true; };
+    api
+      .listPhases(run.id)
+      .then(ps => {
+        if (!cancelled) setPhases(run.id, ps);
+      })
+      .catch(e => console.error('[meta-workflow] listPhases failed', e));
+    return () => {
+      cancelled = true;
+    };
   }, [run.id, setPhases]);
 
   if (phases.length === 0) {
-    return <div className="text-muted-foreground text-sm">No phases yet. Set the phases.json to instantiate them.</div>;
+    return (
+      <div className="text-muted-foreground text-sm">
+        No phases yet. Set the phases.json to instantiate them.
+      </div>
+    );
   }
 
   return (
@@ -48,13 +57,15 @@ export function PhaseBoardScreen({ projectId, run, socket }: Props): React.React
         </div>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        {phases.map((p) => (
+        {phases.map(p => (
           <PhaseCard
             key={p.id}
             runId={run.id}
             phase={p}
             socket={socket}
-            onClick={() => patchView(projectId, { screen: 'phase-detail', selectedPhaseId: p.phaseId })}
+            onClick={() =>
+              patchView(projectId, { screen: 'phase-detail', selectedPhaseId: p.phaseId })
+            }
           />
         ))}
       </div>

@@ -20,7 +20,9 @@ export function forwardRunEvent(event: Extract<BackendFacadeEvent, { type: 'run_
   });
 }
 
-export function syncContentPatch(event: Extract<BackendFacadeEvent, { type: 'content_patch' }>): void {
+export function syncContentPatch(
+  event: Extract<BackendFacadeEvent, { type: 'content_patch' }>
+): void {
   const { sessionId, messages, latestOffset } = event;
   const restoredMessages: MessageWithToolCalls[] = messages.map((msg: SessionMessage) => ({
     id: msg.messageId,
@@ -28,15 +30,17 @@ export function syncContentPatch(event: Extract<BackendFacadeEvent, { type: 'con
     role: msg.role === 'tool' ? 'assistant' : msg.role,
     createdAt: msg.createdAt,
     offset: msg.offset,
-    content: typeof msg.content === 'string'
-      ? msg.content
-      : JSON.stringify(msg.content),
+    content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
   }));
-  useChatMessageStore.getState().appendMessages(sessionId, restoredMessages, { maxOffset: latestOffset });
+  useChatMessageStore
+    .getState()
+    .appendMessages(sessionId, restoredMessages, { maxOffset: latestOffset });
   useRecoveryStore.getState().noteActiveSessionMessage();
 }
 
-export function syncContentPatchFailure(event: Extract<BackendFacadeEvent, { type: 'content_patch_failed' }>): void {
+export function syncContentPatchFailure(
+  event: Extract<BackendFacadeEvent, { type: 'content_patch_failed' }>
+): void {
   useToastStore.getState().add({
     type: 'error',
     title: 'Message sync failed',
@@ -56,7 +60,8 @@ export function forwardEmbeddedBackendMessage(event: any): void {
     serverId: backendId,
     backendId,
     serverRunsRef: getFacadeServerRuns(),
-    resolveBackendName: () => useFacadeStore.getState().backends.find(b => b.backendId === backendId)?.name,
+    resolveBackendName: () =>
+      useFacadeStore.getState().backends.find(b => b.backendId === backendId)?.name,
     logTag: `Facade:${backendId}`,
   });
 }

@@ -36,11 +36,11 @@ function appendPromptBlock(prompt: string, block: string | undefined): string {
  * unchanged and stays cache-friendly.
  */
 export function formatMcpInstructionsForPrompt(
-  sources: Array<{ name: string; instructions: string }>,
+  sources: Array<{ name: string; instructions: string }>
 ): string {
-  const usable = sources.filter((s) => s.instructions?.trim());
+  const usable = sources.filter(s => s.instructions?.trim());
   if (usable.length === 0) return '';
-  const sections = usable.map((s) => `## ${s.name}\n${s.instructions.trim()}`);
+  const sections = usable.map(s => `## ${s.name}\n${s.instructions.trim()}`);
   return [
     '# MCP Server Instructions',
     'The following MCP servers have provided instructions for how to use their tools and resources:',
@@ -56,7 +56,14 @@ export function buildPiRunPrompt(input: {
   isPlanMode: boolean;
   mcpInstructions?: string;
 }): PiRunPromptBundle {
-  const { systemPrompt, externalProviderCatalog, skillCatalog, activeSkillContext, isPlanMode, mcpInstructions } = input;
+  const {
+    systemPrompt,
+    externalProviderCatalog,
+    skillCatalog,
+    activeSkillContext,
+    isPlanMode,
+    mcpInstructions,
+  } = input;
   const externalToolsPrompt = externalProviderCatalog
     ? `${externalProviderCatalog}\nUse SearchExternalTools and InspectExternalTool before loading external tools. LoadExternalTool only makes a tool available in this session; execution may still require permission.`
     : '';
@@ -69,14 +76,17 @@ export function buildPiRunPrompt(input: {
   const effectiveSystemPrompt = isPlanMode
     ? baseSystemPrompt + PLAN_MODE_SYSTEM_PROMPT_SUFFIX
     : baseSystemPrompt;
-  let snapshotSystemPromptText = appendPromptBlock(systemPrompt ?? '', EDIT_TOOL_SELECTION_GUIDANCE);
+  let snapshotSystemPromptText = appendPromptBlock(
+    systemPrompt ?? '',
+    EDIT_TOOL_SELECTION_GUIDANCE
+  );
   snapshotSystemPromptText = appendPromptBlock(snapshotSystemPromptText, externalProviderCatalog);
   snapshotSystemPromptText = appendPromptBlock(snapshotSystemPromptText, mcpInstructions);
 
   return {
     effectiveSystemPrompt,
-    snapshotSystemPromptText: snapshotSystemPromptText
-      + (isPlanMode ? PLAN_MODE_SYSTEM_PROMPT_SUFFIX : ''),
+    snapshotSystemPromptText:
+      snapshotSystemPromptText + (isPlanMode ? PLAN_MODE_SYSTEM_PROMPT_SUFFIX : ''),
     snapshotSkillCatalogText: skillCatalog + activeSkillContext,
   };
 }

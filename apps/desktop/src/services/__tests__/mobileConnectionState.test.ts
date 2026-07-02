@@ -24,7 +24,9 @@ describe('mobileConnectionState', () => {
 
   it('derives backend view state from transport and backend runtime state', () => {
     expect(getMobileBackendViewState('backend-1', 'connected', [readyBackend])).toBe('ready');
-    expect(getMobileBackendViewState('backend-1', 'reconnecting', [readyBackend])).toBe('transport_reconnecting');
+    expect(getMobileBackendViewState('backend-1', 'reconnecting', [readyBackend])).toBe(
+      'transport_reconnecting'
+    );
     expect(getMobileBackendViewState('missing', 'connected', [readyBackend])).toBe('offline');
   });
 

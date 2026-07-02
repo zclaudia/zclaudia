@@ -24,12 +24,7 @@ interface WindowShellProps {
   connection?: true | StandaloneConnectionProps;
 }
 
-export function WindowShell({
-  children,
-  label,
-  withTheme = true,
-  connection,
-}: WindowShellProps) {
+export function WindowShell({ children, label, withTheme = true, connection }: WindowShellProps) {
   // ConfirmDialog is a sibling of children (outside Suspense, inside every
   // provider) so the in-app confirm()/promptText() primitive works in this and
   // every popped-out standalone window.
@@ -42,11 +37,7 @@ export function WindowShell({
 
   if (connection) {
     const connectionProps = connection === true ? {} : connection;
-    content = (
-      <ConnectionProvider {...connectionProps}>
-        {content}
-      </ConnectionProvider>
-    );
+    content = <ConnectionProvider {...connectionProps}>{content}</ConnectionProvider>;
   }
 
   if (label) {

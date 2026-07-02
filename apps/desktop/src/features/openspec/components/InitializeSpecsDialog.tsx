@@ -55,14 +55,10 @@ function deriveStep(scan: BootstrapScan | null): Step {
   }
 }
 
-export function InitializeSpecsDialog({
-  projectId,
-  mode,
-  onClose,
-}: Props): React.ReactElement {
-  const scan = useOpenSpecStore((s) => s.initScansByProject[projectId] ?? null);
-  const setInitScan = useOpenSpecStore((s) => s.setInitScan);
-  const setInitCandidates = useOpenSpecStore((s) => s.setInitCandidates);
+export function InitializeSpecsDialog({ projectId, mode, onClose }: Props): React.ReactElement {
+  const scan = useOpenSpecStore(s => s.initScansByProject[projectId] ?? null);
+  const setInitScan = useOpenSpecStore(s => s.setInitScan);
+  const setInitCandidates = useOpenSpecStore(s => s.setInitCandidates);
   const [error, setError] = React.useState<string | null>(null);
 
   useEffect(() => {
@@ -70,11 +66,9 @@ export function InitializeSpecsDialog({
     setError(null);
     api
       .listBootstrapScans(projectId)
-      .then(async (scans) => {
+      .then(async scans => {
         if (cancelled) return;
-        const active = scans.find(
-          (s) => s.status === 'running' || s.status === 'awaiting_review',
-        );
+        const active = scans.find(s => s.status === 'running' || s.status === 'awaiting_review');
         if (active) {
           setInitScan(projectId, active);
           if (active.initPhase != null) {
@@ -94,7 +88,7 @@ export function InitializeSpecsDialog({
             const refreshed = await api.listBootstrapScans(projectId);
             if (cancelled) return;
             const nowActive = refreshed.find(
-              (s) => s.status === 'running' || s.status === 'awaiting_review',
+              s => s.status === 'running' || s.status === 'awaiting_review'
             );
             if (nowActive) {
               setInitScan(projectId, nowActive);
@@ -108,7 +102,7 @@ export function InitializeSpecsDialog({
           if (!cancelled) setError(message);
         }
       })
-      .catch((e) => {
+      .catch(e => {
         if (!cancelled) setError((e as Error).message);
       });
     return () => {
@@ -125,10 +119,7 @@ export function InitializeSpecsDialog({
           <h3 className="text-base font-semibold">
             {mode === 'initial' ? 'Initialize Specs' : 'Re-scan Specs'}
           </h3>
-          <button
-            className="text-xs text-muted-foreground hover:text-foreground"
-            onClick={onClose}
-          >
+          <button className="text-xs text-muted-foreground hover:text-foreground" onClick={onClose}>
             Close
           </button>
         </div>
@@ -139,23 +130,15 @@ export function InitializeSpecsDialog({
               {scan.errorMessage}
             </div>
           )}
-          {step === 'loading' && (
-            <div className="text-sm text-muted-foreground">Loading…</div>
-          )}
+          {step === 'loading' && <div className="text-sm text-muted-foreground">Loading…</div>}
           {step === 'cancelled' && (
             <div className="text-sm text-muted-foreground">Scan cancelled.</div>
           )}
-          {step === 'done' && (
-            <div className="text-sm text-muted-foreground">Scan complete.</div>
-          )}
+          {step === 'done' && <div className="text-sm text-muted-foreground">Scan complete.</div>}
           {step === 'discovering' && scan && <DiscoveringStep scan={scan} />}
-          {step === 'picker' && scan && (
-            <CapabilityPicker scan={scan} onClose={onClose} />
-          )}
+          {step === 'picker' && scan && <CapabilityPicker scan={scan} onClose={onClose} />}
           {step === 'generating' && scan && <GeneratingStep scan={scan} />}
-          {step === 'review' && scan && (
-            <ReviewStep scan={scan} onClose={onClose} />
-          )}
+          {step === 'review' && scan && <ReviewStep scan={scan} onClose={onClose} />}
           {step === 'legacy_rescan' && scan && (
             <LegacyRescanView scanId={scan.id} onClose={onClose} />
           )}

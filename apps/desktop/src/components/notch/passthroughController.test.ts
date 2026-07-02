@@ -4,9 +4,12 @@ import { createPassthroughController } from './passthroughController';
 describe('createPassthroughController', () => {
   it('serializes passthrough updates so the latest state wins after an in-flight update', async () => {
     const resolvers: Array<() => void> = [];
-    const apply = vi.fn(() => new Promise<void>((resolve) => {
-      resolvers.push(resolve);
-    }));
+    const apply = vi.fn(
+      () =>
+        new Promise<void>(resolve => {
+          resolvers.push(resolve);
+        })
+    );
     const controller = createPassthroughController(apply);
 
     const first = controller.set(false);
@@ -34,9 +37,7 @@ describe('createPassthroughController', () => {
     vi.useFakeTimers();
     const error = new Error('native failed');
     const onError = vi.fn();
-    const apply = vi.fn()
-      .mockRejectedValueOnce(error)
-      .mockResolvedValueOnce(undefined);
+    const apply = vi.fn().mockRejectedValueOnce(error).mockResolvedValueOnce(undefined);
     const controller = createPassthroughController(apply, {
       retryDelayMs: 25,
       onError,
@@ -70,7 +71,8 @@ describe('createPassthroughController', () => {
 
   it('applies the latest requested state when retrying after a failure', async () => {
     vi.useFakeTimers();
-    const apply = vi.fn()
+    const apply = vi
+      .fn()
       .mockRejectedValueOnce(new Error('native failed'))
       .mockResolvedValueOnce(undefined);
     const controller = createPassthroughController(apply, { retryDelayMs: 100 });

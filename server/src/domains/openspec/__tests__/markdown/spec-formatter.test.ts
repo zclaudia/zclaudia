@@ -35,11 +35,17 @@ System SHALL authenticate.
 
   it('formats multiple scenarios per requirement', () => {
     const md = formatSpec({
-      capability: 'c', requirements: [
-        { name: 'R', body: 'MUST work.', rfcKeywords: ['MUST'], scenarios: [
-          { name: 'S1', bodyLines: ['- **WHEN** a', '- **THEN** b'] },
-          { name: 'S2', bodyLines: ['- **WHEN** c', '- **THEN** d'] },
-        ] },
+      capability: 'c',
+      requirements: [
+        {
+          name: 'R',
+          body: 'MUST work.',
+          rfcKeywords: ['MUST'],
+          scenarios: [
+            { name: 'S1', bodyLines: ['- **WHEN** a', '- **THEN** b'] },
+            { name: 'S2', bodyLines: ['- **WHEN** c', '- **THEN** d'] },
+          ],
+        },
       ],
     });
     expect(md).toContain('#### Scenario: S1');

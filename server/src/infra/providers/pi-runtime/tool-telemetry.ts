@@ -49,7 +49,11 @@ export class ToolCallTelemetry {
   private readonly readsByPath = new Map<string, number>();
   private readonly mutationsByPath = new Map<string, number>();
 
-  record(toolName: string, args: Record<string, unknown> | undefined, result: ToolResultLike): ToolTelemetryRecord {
+  record(
+    toolName: string,
+    args: Record<string, unknown> | undefined,
+    result: ToolResultLike
+  ): ToolTelemetryRecord {
     const advisories: string[] = [];
     this.totalCalls += 1;
     this.outputBytes += textBytes(result.content);
@@ -59,14 +63,24 @@ export class ToolCallTelemetry {
     if (toolName === 'Read' && path) {
       const count = increment(this.readsByPath, path);
       if (count === 2) {
-        advisories.push(`Read has returned ${path} twice in this run. Reuse the existing snapshot unless another tool changed that file.`);
+        advisories.push(
+          `Read has returned ${path} twice in this run. Reuse the existing snapshot unless another tool changed that file.`
+        );
       }
     }
 
-    if ((toolName === 'Edit' || toolName === 'MultiEdit' || toolName === 'EditSymbol' || toolName === 'Write') && path) {
+    if (
+      (toolName === 'Edit' ||
+        toolName === 'MultiEdit' ||
+        toolName === 'EditSymbol' ||
+        toolName === 'Write') &&
+      path
+    ) {
       const count = increment(this.mutationsByPath, path);
       if (count === 3) {
-        advisories.push(`${toolName} has now mutated ${path} ${count} times in this run. Prefer MultiEdit for same-file batches or one Write for structural rewrites when possible.`);
+        advisories.push(
+          `${toolName} has now mutated ${path} ${count} times in this run. Prefer MultiEdit for same-file batches or one Write for structural rewrites when possible.`
+        );
       }
     }
 

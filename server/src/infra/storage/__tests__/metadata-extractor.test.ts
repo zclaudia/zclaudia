@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Database from 'better-sqlite3';
-import { extractAndIndexMetadata, removeIndexedMetadata, reindexAllMessages } from '../metadata-extractor.js';
+import {
+  extractAndIndexMetadata,
+  removeIndexedMetadata,
+  reindexAllMessages,
+} from '../metadata-extractor.js';
 
 function createTestDb(): Database.Database {
   const db = new Database(':memory:');
@@ -102,10 +106,12 @@ function insertMessage(
   sessionId: string,
   createdAt: number
 ): number {
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO messages (id, session_id, role, content, created_at)
     VALUES (?, ?, 'assistant', 'content', ?)
-  `).run(id, sessionId, createdAt);
+  `
+  ).run(id, sessionId, createdAt);
 
   const row = db.prepare('SELECT rowid FROM messages WHERE id = ?').get(id) as { rowid: number };
   return row.rowid;
@@ -132,16 +138,25 @@ describe('metadata-extractor', () => {
       const now = Date.now();
       const rowid = insertMessage(db, msgId, sessionId, now);
 
-      extractAndIndexMetadata(db, msgId, rowid, sessionId, {
-        toolCalls: [
-          {
-            name: 'read_file',
-            input: { file_path: '/src/index.ts' },
-          },
-        ],
-      }, now);
+      extractAndIndexMetadata(
+        db,
+        msgId,
+        rowid,
+        sessionId,
+        {
+          toolCalls: [
+            {
+              name: 'read_file',
+              input: { file_path: '/src/index.ts' },
+            },
+          ],
+        },
+        now
+      );
 
-      const refs = db.prepare('SELECT * FROM file_references WHERE message_id = ?').all(msgId) as Array<{
+      const refs = db
+        .prepare('SELECT * FROM file_references WHERE message_id = ?')
+        .all(msgId) as Array<{
         file_path: string;
         source_type: string;
         session_id: string;
@@ -158,16 +173,25 @@ describe('metadata-extractor', () => {
       const now = Date.now();
       const rowid = insertMessage(db, msgId, sessionId, now);
 
-      extractAndIndexMetadata(db, msgId, rowid, sessionId, {
-        toolCalls: [
-          {
-            name: 'multi_edit',
-            input: { paths: ['/a.ts', '/b.ts', '/c.ts'] },
-          },
-        ],
-      }, now);
+      extractAndIndexMetadata(
+        db,
+        msgId,
+        rowid,
+        sessionId,
+        {
+          toolCalls: [
+            {
+              name: 'multi_edit',
+              input: { paths: ['/a.ts', '/b.ts', '/c.ts'] },
+            },
+          ],
+        },
+        now
+      );
 
-      const refs = db.prepare('SELECT * FROM file_references WHERE message_id = ?').all(msgId) as Array<{
+      const refs = db
+        .prepare('SELECT * FROM file_references WHERE message_id = ?')
+        .all(msgId) as Array<{
         file_path: string;
       }>;
       expect(refs.length).toBe(3);
@@ -181,14 +205,23 @@ describe('metadata-extractor', () => {
       const now = Date.now();
       const rowid = insertMessage(db, msgId, sessionId, now);
 
-      extractAndIndexMetadata(db, msgId, rowid, sessionId, {
-        attachments: [
-          { path: '/uploads/image.png', name: 'image.png' },
-          { path: '/uploads/doc.pdf' },
-        ],
-      }, now);
+      extractAndIndexMetadata(
+        db,
+        msgId,
+        rowid,
+        sessionId,
+        {
+          attachments: [
+            { path: '/uploads/image.png', name: 'image.png' },
+            { path: '/uploads/doc.pdf' },
+          ],
+        },
+        now
+      );
 
-      const refs = db.prepare('SELECT * FROM file_references WHERE message_id = ?').all(msgId) as Array<{
+      const refs = db
+        .prepare('SELECT * FROM file_references WHERE message_id = ?')
+        .all(msgId) as Array<{
         file_path: string;
         source_type: string;
       }>;
@@ -204,24 +237,33 @@ describe('metadata-extractor', () => {
       const now = Date.now();
       const rowid = insertMessage(db, msgId, sessionId, now);
 
-      extractAndIndexMetadata(db, msgId, rowid, sessionId, {
-        toolCalls: [
-          {
-            name: 'bash',
-            input: { command: 'ls -la' },
-            output: 'file1\nfile2',
-            isError: false,
-          },
-          {
-            name: 'read_file',
-            input: { file_path: '/src/main.ts' },
-            output: 'content here',
-            isError: false,
-          },
-        ],
-      }, now);
+      extractAndIndexMetadata(
+        db,
+        msgId,
+        rowid,
+        sessionId,
+        {
+          toolCalls: [
+            {
+              name: 'bash',
+              input: { command: 'ls -la' },
+              output: 'file1\nfile2',
+              isError: false,
+            },
+            {
+              name: 'read_file',
+              input: { file_path: '/src/main.ts' },
+              output: 'content here',
+              isError: false,
+            },
+          ],
+        },
+        now
+      );
 
-      const records = db.prepare('SELECT * FROM tool_call_records WHERE message_id = ?').all(msgId) as Array<{
+      const records = db
+        .prepare('SELECT * FROM tool_call_records WHERE message_id = ?')
+        .all(msgId) as Array<{
         tool_name: string;
         tool_input: string;
         tool_result: string;
@@ -247,18 +289,27 @@ describe('metadata-extractor', () => {
       const now = Date.now();
       const rowid = insertMessage(db, msgId, sessionId, now);
 
-      extractAndIndexMetadata(db, msgId, rowid, sessionId, {
-        toolCalls: [
-          {
-            name: 'bash',
-            input: { command: 'bad-command' },
-            output: 'command not found',
-            isError: true,
-          },
-        ],
-      }, now);
+      extractAndIndexMetadata(
+        db,
+        msgId,
+        rowid,
+        sessionId,
+        {
+          toolCalls: [
+            {
+              name: 'bash',
+              input: { command: 'bad-command' },
+              output: 'command not found',
+              isError: true,
+            },
+          ],
+        },
+        now
+      );
 
-      const record = db.prepare('SELECT * FROM tool_call_records WHERE message_id = ?').get(msgId) as {
+      const record = db
+        .prepare('SELECT * FROM tool_call_records WHERE message_id = ?')
+        .get(msgId) as {
         is_error: number;
       };
       expect(record.is_error).toBe(1);
@@ -288,10 +339,17 @@ describe('metadata-extractor', () => {
       const rowid = insertMessage(db, msgId, sessionId, now);
 
       expect(() => {
-        extractAndIndexMetadata(db, msgId, rowid, sessionId, {
-          toolCalls: [],
-          attachments: [],
-        }, now);
+        extractAndIndexMetadata(
+          db,
+          msgId,
+          rowid,
+          sessionId,
+          {
+            toolCalls: [],
+            attachments: [],
+          },
+          now
+        );
       }).not.toThrow();
 
       const refs = db.prepare('SELECT * FROM file_references WHERE message_id = ?').all(msgId);
@@ -306,13 +364,20 @@ describe('metadata-extractor', () => {
       const now = Date.now();
       const rowid = insertMessage(db, msgId, sessionId, now);
 
-      extractAndIndexMetadata(db, msgId, rowid, sessionId, {
-        toolCalls: [
-          { name: 'noop_tool' },
-        ],
-      }, now);
+      extractAndIndexMetadata(
+        db,
+        msgId,
+        rowid,
+        sessionId,
+        {
+          toolCalls: [{ name: 'noop_tool' }],
+        },
+        now
+      );
 
-      const record = db.prepare('SELECT * FROM tool_call_records WHERE message_id = ?').get(msgId) as {
+      const record = db
+        .prepare('SELECT * FROM tool_call_records WHERE message_id = ?')
+        .get(msgId) as {
         tool_name: string;
         tool_input: string | null;
         tool_result: string | null;
@@ -330,24 +395,39 @@ describe('metadata-extractor', () => {
       const now = Date.now();
       const rowid = insertMessage(db, msgId, sessionId, now);
 
-      extractAndIndexMetadata(db, msgId, rowid, sessionId, {
-        toolCalls: [
-          { name: 'bash', input: { file_path: '/a.ts' }, output: 'ok' },
-          { name: 'read_file', input: { file_path: '/b.ts' } },
-        ],
-        attachments: [{ path: '/c.ts' }],
-      }, now);
+      extractAndIndexMetadata(
+        db,
+        msgId,
+        rowid,
+        sessionId,
+        {
+          toolCalls: [
+            { name: 'bash', input: { file_path: '/a.ts' }, output: 'ok' },
+            { name: 'read_file', input: { file_path: '/b.ts' } },
+          ],
+          attachments: [{ path: '/c.ts' }],
+        },
+        now
+      );
 
       // Verify data exists
-      let refs = db.prepare('SELECT COUNT(*) as cnt FROM file_references WHERE message_id = ?').get(msgId) as { cnt: number };
-      let records = db.prepare('SELECT COUNT(*) as cnt FROM tool_call_records WHERE message_id = ?').get(msgId) as { cnt: number };
+      let refs = db
+        .prepare('SELECT COUNT(*) as cnt FROM file_references WHERE message_id = ?')
+        .get(msgId) as { cnt: number };
+      let records = db
+        .prepare('SELECT COUNT(*) as cnt FROM tool_call_records WHERE message_id = ?')
+        .get(msgId) as { cnt: number };
       expect(refs.cnt).toBeGreaterThan(0);
       expect(records.cnt).toBeGreaterThan(0);
 
       removeIndexedMetadata(db, msgId);
 
-      refs = db.prepare('SELECT COUNT(*) as cnt FROM file_references WHERE message_id = ?').get(msgId) as { cnt: number };
-      records = db.prepare('SELECT COUNT(*) as cnt FROM tool_call_records WHERE message_id = ?').get(msgId) as { cnt: number };
+      refs = db
+        .prepare('SELECT COUNT(*) as cnt FROM file_references WHERE message_id = ?')
+        .get(msgId) as { cnt: number };
+      records = db
+        .prepare('SELECT COUNT(*) as cnt FROM tool_call_records WHERE message_id = ?')
+        .get(msgId) as { cnt: number };
       expect(refs.cnt).toBe(0);
       expect(records.cnt).toBe(0);
     });
@@ -358,18 +438,36 @@ describe('metadata-extractor', () => {
       const rowid1 = insertMessage(db, 'msg-a', sessionId, now);
       const rowid2 = insertMessage(db, 'msg-b', sessionId, now);
 
-      extractAndIndexMetadata(db, 'msg-a', rowid1, sessionId, {
-        toolCalls: [{ name: 'tool1', input: { file_path: '/x.ts' } }],
-      }, now);
+      extractAndIndexMetadata(
+        db,
+        'msg-a',
+        rowid1,
+        sessionId,
+        {
+          toolCalls: [{ name: 'tool1', input: { file_path: '/x.ts' } }],
+        },
+        now
+      );
 
-      extractAndIndexMetadata(db, 'msg-b', rowid2, sessionId, {
-        toolCalls: [{ name: 'tool2', input: { file_path: '/y.ts' } }],
-      }, now);
+      extractAndIndexMetadata(
+        db,
+        'msg-b',
+        rowid2,
+        sessionId,
+        {
+          toolCalls: [{ name: 'tool2', input: { file_path: '/y.ts' } }],
+        },
+        now
+      );
 
       removeIndexedMetadata(db, 'msg-a');
 
-      const refsA = db.prepare('SELECT COUNT(*) as cnt FROM file_references WHERE message_id = ?').get('msg-a') as { cnt: number };
-      const refsB = db.prepare('SELECT COUNT(*) as cnt FROM file_references WHERE message_id = ?').get('msg-b') as { cnt: number };
+      const refsA = db
+        .prepare('SELECT COUNT(*) as cnt FROM file_references WHERE message_id = ?')
+        .get('msg-a') as { cnt: number };
+      const refsB = db
+        .prepare('SELECT COUNT(*) as cnt FROM file_references WHERE message_id = ?')
+        .get('msg-b') as { cnt: number };
       expect(refsA.cnt).toBe(0);
       expect(refsB.cnt).toBe(1);
     });
@@ -386,15 +484,20 @@ describe('metadata-extractor', () => {
       const now = Date.now();
       const rowid = insertMessage(db, msgId, sessionId, now);
 
-      extractAndIndexMetadata(db, msgId, rowid, sessionId, {
-        toolCalls: [
-          { name: 'read_file', input: { file_path: '/src/components/Button.tsx' } },
-        ],
-      }, now);
+      extractAndIndexMetadata(
+        db,
+        msgId,
+        rowid,
+        sessionId,
+        {
+          toolCalls: [{ name: 'read_file', input: { file_path: '/src/components/Button.tsx' } }],
+        },
+        now
+      );
 
-      const results = db.prepare(
-        `SELECT * FROM files_fts WHERE files_fts MATCH ?`
-      ).all('Button') as Array<{ file_path: string }>;
+      const results = db
+        .prepare(`SELECT * FROM files_fts WHERE files_fts MATCH ?`)
+        .all('Button') as Array<{ file_path: string }>;
 
       expect(results.length).toBe(1);
       expect(results[0].file_path).toBe('/src/components/Button.tsx');
@@ -406,21 +509,32 @@ describe('metadata-extractor', () => {
       const now = Date.now();
       const rowid = insertMessage(db, msgId, sessionId, now);
 
-      extractAndIndexMetadata(db, msgId, rowid, sessionId, {
-        toolCalls: [
-          { name: 'bash', input: { command: 'npm install express' }, output: 'added 50 packages' },
-        ],
-      }, now);
+      extractAndIndexMetadata(
+        db,
+        msgId,
+        rowid,
+        sessionId,
+        {
+          toolCalls: [
+            {
+              name: 'bash',
+              input: { command: 'npm install express' },
+              output: 'added 50 packages',
+            },
+          ],
+        },
+        now
+      );
 
-      const byTool = db.prepare(
-        `SELECT * FROM tool_calls_fts WHERE tool_calls_fts MATCH 'tool_name:bash'`
-      ).all() as Array<{ tool_name: string }>;
+      const byTool = db
+        .prepare(`SELECT * FROM tool_calls_fts WHERE tool_calls_fts MATCH 'tool_name:bash'`)
+        .all() as Array<{ tool_name: string }>;
       expect(byTool.length).toBe(1);
       expect(byTool[0].tool_name).toBe('bash');
 
-      const byInput = db.prepare(
-        `SELECT * FROM tool_calls_fts WHERE tool_calls_fts MATCH 'tool_input:express'`
-      ).all() as Array<{ tool_input: string }>;
+      const byInput = db
+        .prepare(`SELECT * FROM tool_calls_fts WHERE tool_calls_fts MATCH 'tool_input:express'`)
+        .all() as Array<{ tool_input: string }>;
       expect(byInput.length).toBe(1);
     });
 
@@ -430,11 +544,16 @@ describe('metadata-extractor', () => {
       const now = Date.now();
       const rowid = insertMessage(db, msgId, sessionId, now);
 
-      extractAndIndexMetadata(db, msgId, rowid, sessionId, {
-        toolCalls: [
-          { name: 'read_file', input: { file_path: '/unique/path/Zxcvbn.ts' } },
-        ],
-      }, now);
+      extractAndIndexMetadata(
+        db,
+        msgId,
+        rowid,
+        sessionId,
+        {
+          toolCalls: [{ name: 'read_file', input: { file_path: '/unique/path/Zxcvbn.ts' } }],
+        },
+        now
+      );
 
       // Verify FTS has data
       let results = db.prepare(`SELECT * FROM files_fts WHERE files_fts MATCH ?`).all('Zxcvbn');
@@ -449,14 +568,19 @@ describe('metadata-extractor', () => {
 
   describe('reindexAllMessages', () => {
     it('indexes all messages with metadata', () => {
-      db.prepare(`INSERT INTO messages (id, session_id, role, content, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)`).run(
-        'msg-r1', 'sess-1', 'assistant', 'hello',
+      db.prepare(
+        `INSERT INTO messages (id, session_id, role, content, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)`
+      ).run(
+        'msg-r1',
+        'sess-1',
+        'assistant',
+        'hello',
         JSON.stringify({ toolCalls: [{ name: 'Read', input: { file_path: '/x.ts' } }] }),
         1000
       );
-      db.prepare(`INSERT INTO messages (id, session_id, role, content, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)`).run(
-        'msg-r2', 'sess-1', 'user', 'hi', null, 2000
-      );
+      db.prepare(
+        `INSERT INTO messages (id, session_id, role, content, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)`
+      ).run('msg-r2', 'sess-1', 'user', 'hi', null, 2000);
 
       reindexAllMessages(db);
 
@@ -467,9 +591,9 @@ describe('metadata-extractor', () => {
     });
 
     it('handles invalid JSON metadata gracefully', () => {
-      db.prepare(`INSERT INTO messages (id, session_id, role, content, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)`).run(
-        'msg-bad', 'sess-1', 'assistant', 'hello', 'invalid json', 1000
-      );
+      db.prepare(
+        `INSERT INTO messages (id, session_id, role, content, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)`
+      ).run('msg-bad', 'sess-1', 'assistant', 'hello', 'invalid json', 1000);
 
       reindexAllMessages(db);
 

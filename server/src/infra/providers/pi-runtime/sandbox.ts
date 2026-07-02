@@ -10,44 +10,79 @@ function expandHome(p: string): string {
 
 /** Credential paths to deny-read (operator-overridable default; spec §4). Pre-expanded to absolute. */
 export const SENSITIVE_DENY_READ: string[] = [
-  '~/.ssh', '~/.gnupg', '~/.aws/credentials', '~/.config/gcloud', '~/.azure',
-  '~/.docker/config.json', '~/.kube/config', '~/.config/gh/hosts.yml',
-  '~/.npmrc', '~/.pypirc', '~/.cargo/credentials.toml',
-  '~/.netrc', '~/.vault-token', '~/.terraformrc',
-  '~/.bash_history', '~/.zsh_history', '~/.zhistory',
-  '~/Library/Safari', '~/Library/Application Support/Google/Chrome',
+  '~/.ssh',
+  '~/.gnupg',
+  '~/.aws/credentials',
+  '~/.config/gcloud',
+  '~/.azure',
+  '~/.docker/config.json',
+  '~/.kube/config',
+  '~/.config/gh/hosts.yml',
+  '~/.npmrc',
+  '~/.pypirc',
+  '~/.cargo/credentials.toml',
+  '~/.netrc',
+  '~/.vault-token',
+  '~/.terraformrc',
+  '~/.bash_history',
+  '~/.zsh_history',
+  '~/.zhistory',
+  '~/Library/Safari',
+  '~/Library/Application Support/Google/Chrome',
   '~/Library/Application Support/Firefox/Profiles',
 ].map(expandHome);
 
 /** Non-secret files inside denied subtrees that tools still need (allow-within-deny). */
 export const SENSITIVE_ALLOW_BACK: string[] = [
-  '~/.ssh/config', '~/.ssh/known_hosts', '~/.ssh/known_hosts.old', '~/.ssh/*.pub',
-  '~/.aws/config', '~/.config/gh/config.yml',
+  '~/.ssh/config',
+  '~/.ssh/known_hosts',
+  '~/.ssh/known_hosts.old',
+  '~/.ssh/*.pub',
+  '~/.aws/config',
+  '~/.config/gh/config.yml',
 ].map(expandHome);
 
 /** Network allow-list (operator-overridable). Network is allow-only, so this MUST cover what the agent needs. */
 export const DEFAULT_ALLOWED_DOMAINS: string[] = [
-  'registry.npmjs.org', 'registry.yarnpkg.com',
-  'pypi.org', 'files.pythonhosted.org',
-  'crates.io', 'static.crates.io',
-  'proxy.golang.org', 'sum.golang.org',
-  'repo.maven.apache.org', 'rubygems.org',
-  'github.com', 'api.github.com', 'codeload.github.com',
-  'raw.githubusercontent.com', 'objects.githubusercontent.com',
-  'gitlab.com', 'bitbucket.org',
+  'registry.npmjs.org',
+  'registry.yarnpkg.com',
+  'pypi.org',
+  'files.pythonhosted.org',
+  'crates.io',
+  'static.crates.io',
+  'proxy.golang.org',
+  'sum.golang.org',
+  'repo.maven.apache.org',
+  'rubygems.org',
+  'github.com',
+  'api.github.com',
+  'codeload.github.com',
+  'raw.githubusercontent.com',
+  'objects.githubusercontent.com',
+  'gitlab.com',
+  'bitbucket.org',
   'nodejs.org',
 ];
 
 let cached: boolean | undefined;
 let warned = false;
-export function __resetSandboxCacheForTests(): void { cached = undefined; warned = false; }
+export function __resetSandboxCacheForTests(): void {
+  cached = undefined;
+  warned = false;
+}
 
 export function isSandboxAvailable(): boolean {
   if (cached !== undefined) return cached;
-  if (process.env.ZCLAUDIA_SANDBOX === 'off') { cached = false; return cached; }
+  if (process.env.ZCLAUDIA_SANDBOX === 'off') {
+    cached = false;
+    return cached;
+  }
   try {
     const supported = SandboxManager.isSupportedPlatform();
-    const deps = SandboxManager.checkDependencies?.() ?? { errors: [] as string[], warnings: [] as string[] };
+    const deps = SandboxManager.checkDependencies?.() ?? {
+      errors: [] as string[],
+      warnings: [] as string[],
+    };
     const ok = supported && (deps.errors?.length ?? 0) === 0;
     if (!ok && !warned) {
       warned = true;
@@ -78,7 +113,7 @@ let initPromise: Promise<void> | undefined;
 export async function ensureSandboxInitialized(): Promise<void> {
   if (!isSandboxAvailable()) return;
   if (!initPromise) {
-    initPromise = SandboxManager.initialize(baseConfig()).catch((err) => {
+    initPromise = SandboxManager.initialize(baseConfig()).catch(err => {
       console.warn('[sandbox] initialize failed; degrading to unavailable:', err);
       cached = false;
       initPromise = undefined;
@@ -88,7 +123,7 @@ export async function ensureSandboxInitialized(): Promise<void> {
 }
 
 export interface WrapOptions {
-  workspaceRoot: string;   // session project root (NOT the per-call cwd subdir)
+  workspaceRoot: string; // session project root (NOT the per-call cwd subdir)
   readOnly?: boolean;
   /** Session-granted domains (Phase B1) appended to the network allow-list for this call. */
   extraAllowedDomains?: string[];
@@ -118,7 +153,12 @@ export async function wrapCommand(command: string, opts: WrapOptions): Promise<W
         deniedDomains: [],
       },
     };
-    const wrapped = await SandboxManager.wrapWithSandboxArgv(command, undefined, customConfig, opts.signal);
+    const wrapped = await SandboxManager.wrapWithSandboxArgv(
+      command,
+      undefined,
+      customConfig,
+      opts.signal
+    );
     // env is already the full process.env — use as-is (spike-confirmed; do NOT merge).
     return { argv: wrapped.argv, env: wrapped.env, sandboxed: true };
   } catch (err) {

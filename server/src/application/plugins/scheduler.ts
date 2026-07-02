@@ -25,7 +25,7 @@ export class PluginSchedulerService {
     name: string,
     intervalMs: number,
     handler: () => Promise<void> | void,
-    immediate = true,
+    immediate = true
   ): () => void {
     const systemId = `plugin:${pluginId}/${taskId}`;
 
@@ -98,8 +98,14 @@ export class PluginSchedulerService {
     }
   }
 
-  getAll(): Array<{ systemId: string; pluginId: string; taskId: string; name: string; intervalMs: number }> {
-    return Array.from(this.tasks.values()).map((entry) => ({
+  getAll(): Array<{
+    systemId: string;
+    pluginId: string;
+    taskId: string;
+    name: string;
+    intervalMs: number;
+  }> {
+    return Array.from(this.tasks.values()).map(entry => ({
       systemId: entry.systemId,
       pluginId: entry.pluginId,
       taskId: entry.taskId,
@@ -110,8 +116,8 @@ export class PluginSchedulerService {
 
   getByPlugin(pluginId: string): string[] {
     return Array.from(this.tasks.values())
-      .filter((entry) => entry.pluginId === pluginId)
-      .map((entry) => entry.systemId);
+      .filter(entry => entry.pluginId === pluginId)
+      .map(entry => entry.systemId);
   }
 
   private async executeTask(entry: ScheduledEntry): Promise<void> {

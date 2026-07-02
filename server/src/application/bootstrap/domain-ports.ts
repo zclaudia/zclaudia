@@ -49,42 +49,69 @@ export function createDomainPorts(deps: CreateDomainPortsDeps): DomainPorts {
   const supervisionAiRunPort: SupervisionAiRunPort = {
     startVirtualRun: async ({ clientId, sessionId, input, workingDirectory, onMessage }) => {
       const virtualClient = createVirtualClient(clientId, { send: onMessage });
-      await handleRunStart(virtualClient, {
-        type: 'run_start',
-        clientRequestId: `${clientId}_${Date.now()}`,
-        sessionId,
-        input,
-        workingDirectory,
-      }, db);
+      await handleRunStart(
+        virtualClient,
+        {
+          type: 'run_start',
+          clientRequestId: `${clientId}_${Date.now()}`,
+          sessionId,
+          input,
+          workingDirectory,
+        },
+        db
+      );
     },
   };
 
   const localPrAiSessionPort: LocalPRAiSessionPort = {
-    startAISession: async ({ clientId, sessionId, input, workingDirectory, llmProfileId, onMessage }) => {
+    startAISession: async ({
+      clientId,
+      sessionId,
+      input,
+      workingDirectory,
+      llmProfileId,
+      onMessage,
+    }) => {
       const virtualClient = createVirtualClient(clientId, { send: onMessage });
-      await handleRunStart(virtualClient, {
-        type: 'run_start',
-        clientRequestId: `${clientId}_${Date.now()}`,
-        sessionId,
-        input,
-        workingDirectory,
-        llmProfileId,
-      }, db);
+      await handleRunStart(
+        virtualClient,
+        {
+          type: 'run_start',
+          clientRequestId: `${clientId}_${Date.now()}`,
+          sessionId,
+          input,
+          workingDirectory,
+          llmProfileId,
+        },
+        db
+      );
     },
   };
 
   const workflowAiRunPort: WorkflowAiRunPort = {
-    startVirtualRun: async ({ clientId, sessionId, input, workingDirectory, llmProfileId, systemContext, onMessage }) => {
+    startVirtualRun: async ({
+      clientId,
+      sessionId,
+      input,
+      workingDirectory,
+      llmProfileId,
+      systemContext,
+      onMessage,
+    }) => {
       const virtualClient = createVirtualClient(clientId, { send: onMessage });
-      await handleRunStart(virtualClient, {
-        type: 'run_start',
-        clientRequestId: clientId,
-        sessionId,
-        input,
-        workingDirectory,
-        llmProfileId,
-        systemContext,
-      }, db);
+      await handleRunStart(
+        virtualClient,
+        {
+          type: 'run_start',
+          clientRequestId: clientId,
+          sessionId,
+          input,
+          workingDirectory,
+          llmProfileId,
+          systemContext,
+        },
+        db
+      );
     },
   };
 

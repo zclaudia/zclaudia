@@ -60,7 +60,6 @@ describe('agent task runner worktree isolation', () => {
   });
 
   interface Harness {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     capturedRunStart: () => any;
     finishRun: (mutateWorkdir?: (dir: string) => void) => void;
     failRun: () => void;
@@ -70,7 +69,6 @@ describe('agent task runner worktree isolation', () => {
   }
 
   function makeHarness(): Harness {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let runStartMessage: any;
     let agentWs: { send: (msg: ServerMessage) => void } | undefined;
     let completedResult: { resultSummary: string; responseText: string } | undefined;
@@ -93,25 +91,35 @@ describe('agent task runner worktree isolation', () => {
 
     return {
       capturedRunStart: () => runStartMessage,
-      finishRun: (mutateWorkdir) => {
+      finishRun: mutateWorkdir => {
         if (mutateWorkdir) mutateWorkdir(runStartMessage.workingDirectory);
         agentWs!.send({ type: 'run_completed', runId: 'r1', sessionId: 's-sub' } as ServerMessage);
       },
       failRun: () => {
-        agentWs!.send({ type: 'run_failed', runId: 'r1', sessionId: 's-sub', error: 'boom' } as unknown as ServerMessage);
+        agentWs!.send({
+          type: 'run_failed',
+          runId: 'r1',
+          sessionId: 's-sub',
+          error: 'boom',
+        } as unknown as ServerMessage);
       },
       completed: () => completedResult,
       failed: () => failedError,
-      run: (task) => runner.run(task, {
-        onStarted: () => {},
-        onCompleted: (result) => { completedResult = result; },
-        onFailed: (error) => { failedError = error; },
-      }),
+      run: task =>
+        runner.run(task, {
+          onStarted: () => {},
+          onCompleted: result => {
+            completedResult = result;
+          },
+          onFailed: error => {
+            failedError = error;
+          },
+        }),
     };
   }
 
   async function tick(): Promise<void> {
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise(r => setTimeout(r, 50));
   }
 
   it('runs the subagent inside a fresh worktree and removes it when clean', async () => {
@@ -137,7 +145,7 @@ describe('agent task runner worktree isolation', () => {
     await tick();
     const wd = h.capturedRunStart().workingDirectory as string;
 
-    h.finishRun((dir) => writeFileSync(path.join(dir, 'work.txt'), 'changes\n'));
+    h.finishRun(dir => writeFileSync(path.join(dir, 'work.txt'), 'changes\n'));
     await tick();
 
     expect(existsSync(wd)).toBe(true);

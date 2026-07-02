@@ -30,7 +30,14 @@ export function UsageRing({ ratio, className, label, size = 16 }: UsageRingProps
       role="img"
       aria-label={label}
     >
-      <circle cx={center} cy={center} r={R} fill="none" strokeWidth={2.5} className="stroke-border" />
+      <circle
+        cx={center}
+        cy={center}
+        r={R}
+        fill="none"
+        strokeWidth={2.5}
+        className="stroke-border"
+      />
       <circle
         cx={center}
         cy={center}

@@ -38,8 +38,8 @@ describe('Phase F e2e — full lifecycle happy path (3 linear phases)', () => {
     h.service.setPhasesJson(run.id, buildLinearPhasesJson(3));
     expect(h.service.getRun(run.id)!.status).toBe('executing');
     const phasesAfterInstall = h.service.listPhases(run.id);
-    expect(phasesAfterInstall.map((p) => p.phaseId)).toEqual(['A', 'B', 'C']);
-    expect(phasesAfterInstall.every((p) => p.status === 'pending')).toBe(true);
+    expect(phasesAfterInstall.map(p => p.phaseId)).toEqual(['A', 'B', 'C']);
+    expect(phasesAfterInstall.every(p => p.status === 'pending')).toBe(true);
 
     // 4. Run each phase. Executor + run-entity stubs succeed; phase ends 'done'.
     // PhaseExecutionResult is { phase, gateResults } (no top-level `ok` flag) —
@@ -48,14 +48,14 @@ describe('Phase F e2e — full lifecycle happy path (3 linear phases)', () => {
       const result = await h.service.runPhase(run.id, id);
       expect(
         result.phase.status,
-        `Phase ${id} should land in 'done': ${JSON.stringify(result)}`,
+        `Phase ${id} should land in 'done': ${JSON.stringify(result)}`
       ).toBe('done');
-      expect(result.gateResults.every((g) => g.passed)).toBe(true);
+      expect(result.gateResults.every(g => g.passed)).toBe(true);
     }
 
     // 5. All phases are now done.
     const finalPhases = h.service.listPhases(run.id);
-    expect(finalPhases.every((p) => p.status === 'done')).toBe(true);
+    expect(finalPhases.every(p => p.status === 'done')).toBe(true);
 
     // 6. The run remains in 'executing' until an explicit reviewing/complete
     //    transition is invoked. service.runPhase only triggers releaseRun via
@@ -126,7 +126,11 @@ describe('Phase F e2e — full lifecycle happy path (3 linear phases)', () => {
       expect(service.getRun(run.id)!.status).toBe('cancelled');
     } finally {
       db.close();
-      try { rmSync(gitRepo, { recursive: true, force: true }); } catch { /* best-effort */ }
+      try {
+        rmSync(gitRepo, { recursive: true, force: true });
+      } catch {
+        /* best-effort */
+      }
     }
 
     // Re-build a harness so the afterEach cleanup() is a no-op-safe call.

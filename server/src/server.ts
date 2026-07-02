@@ -1,17 +1,16 @@
-import express, { Express, Request, Response, NextFunction } from 'express';
+import express, { type Express } from 'express';
 import cors from 'cors';
-import { createServer as createHttpServer, Server, IncomingMessage } from 'http';
-import { WebSocketServer, WebSocket } from 'ws';
+import { createServer as createHttpServer, type Server, type IncomingMessage } from 'http';
+import { WebSocketServer, type WebSocket } from 'ws';
 import { newId } from './utils/uuid.js';
 import type {
   ClientMessage,
-  ServerMessage,
   ErrorMessage,
   AuthResultMessage,
   StateHeartbeatMessage,
 } from '@zclaudia/shared/wire/messages';
 import type { Request as CorrelatedRequest } from '@zclaudia/shared/wire/correlation';
-import { ALL_SERVER_FEATURES } from '@zclaudia/shared/core/server';
+import { ALL_SERVER_FEATURES, type GatewayBackendInfo } from '@zclaudia/shared/core/server';
 import { initDatabase } from './infra/storage/db.js';
 import { initFileStore } from './infra/storage/fileStore.js';
 import { initAttachmentStore } from './infra/storage/attachmentStore.js';
@@ -29,28 +28,27 @@ import { loggingMiddleware as routerLoggingMiddleware } from './interfaces/http/
 import { errorHandlingMiddleware as routerErrorMiddleware } from './interfaces/http/middleware/error.js';
 import { isLocalhost } from './interfaces/http/middleware/local-only.js';
 import { expressErrorHandler } from './interfaces/http/middleware/express-error.js';
+import { createCorsOriginGuard, isRequestOriginAllowed } from './interfaces/http/trust-boundary.js';
 
 // Extracted modules
-import type { ConnectedClient, ActiveRun, MessageSender } from './application/conversation/transport/types.js';
+import type { ConnectedClient, MessageSender } from './application/conversation/transport/types.js';
 import { createVirtualClient } from './application/conversation/transport/types.js';
 import {
   sendMessage,
-  broadcastToOtherAuthenticatedClients,
   buildPluginStateMessage,
 } from './application/conversation/transport/broadcast.js';
-import {
-  handleClientMessage as _handleClientMessage,
-} from './application/conversation/transport/message-handler.js';
+import { handleClientMessage as _handleClientMessage } from './application/conversation/transport/message-handler.js';
+import { routeOrFallback } from './application/conversation/transport/router-dispatch.js';
 import {
   cancelRun as _cancelRun,
   parseMessage,
   type CancelRunOptions,
 } from './application/conversation/runtime/run-lifecycle.js';
-import {
-  handleRunStart as _handleRunStart,
-} from './application/conversation/runtime/run-handler.js';
+import { handleRunStart as _handleRunStart } from './application/conversation/runtime/run-handler.js';
+import type { RunStartMessage } from './application/conversation/runtime/run-bootstrap.js';
 import { setupRoutesAndServices } from './server-setup.js';
 import { providerRegistry } from './infra/providers/registry.js';
+import type { FacadeWsHub } from './infra/gateway/ws-hub.js';
 
 // Centralized server state
 import { serverState } from './server-state.js';
@@ -61,7 +59,15 @@ let connectedClients = serverState.connectedClients;
 
 // Re-exports for backward compatibility
 export type { ConnectedClient, MessageSender };
-export { sendMessage, handleClientMessage, activeRuns, handleRunStart, connectedClients, createVirtualClient, cancelRun };
+export {
+  sendMessage,
+  handleClientMessage,
+  activeRuns,
+  handleRunStart,
+  connectedClients,
+  createVirtualClient,
+  cancelRun,
+};
 
 export interface ServerContext {
   server: Server;
@@ -75,11 +81,11 @@ export interface ServerContext {
   updateGatewayConnected: (connected: boolean) => void;
   updateGatewayBackendId: (backendId: string | null) => void;
   updateGatewayIdentity: (instanceId: string, deviceId: string) => void;
-  updateDiscoveredBackends: (backends: import('@zclaudia/shared/core/server').GatewayBackendInfo[]) => void;
+  updateDiscoveredBackends: (backends: GatewayBackendInfo[]) => void;
   setGatewayConnector: (connector: (config: GatewayConfig) => Promise<void>) => void;
   setGatewayDisconnector: (disconnector: () => Promise<void>) => void;
   setServerPort: (port: number) => void;
-  setFacadeHub: (hub: import('./infra/gateway/ws-hub.js').FacadeWsHub | null) => void;
+  setFacadeHub: (hub: FacadeWsHub | null) => void;
 }
 
 export async function createServer(): Promise<ServerContext> {
@@ -106,7 +112,7 @@ export async function createServer(): Promise<ServerContext> {
   // Create Express app
   const app: Express = express();
 
-  app.use(cors());
+  app.use(cors({ origin: createCorsOriginGuard() }));
   app.use('/api/gateway-proxy', express.raw({ type: '*/*', limit: '100mb' }));
   app.use('/api/gateway-direct', express.raw({ type: '*/*', limit: '1mb' }));
   app.use(express.json({ limit: '15mb' }));
@@ -127,14 +133,20 @@ export async function createServer(): Promise<ServerContext> {
 
   // Setup routes, services, and periodic tasks
   const setup = setupRoutesAndServices({
-    db, app, router, clients, activeRuns,
+    db,
+    app,
+    router,
+    clients,
+    activeRuns,
     buildStateHeartbeat: () => serverState.buildStateHeartbeat(),
     broadcastHeartbeat: () => serverState.broadcastHeartbeat(),
     broadcastPluginState: () => serverState.broadcastPluginState(),
     handleRunStart,
     getServerPort: () => serverState.serverPort,
     notificationSender: serverState.notificationSender,
-    setProcessMonitor: (pm) => { serverState.processMonitor = pm; },
+    setProcessMonitor: pm => {
+      serverState.processMonitor = pm;
+    },
   });
   serverState.notificationsService = setup.notificationsService;
   serverState.permissionBridge = setup.permissionBridge;
@@ -156,7 +168,7 @@ export async function createServer(): Promise<ServerContext> {
 
   // Create facade WebSocket server (for /ws/backend-facade)
   const facadeWss = new WebSocketServer({ noServer: true });
-  facadeWss.on('connection', (ws) => {
+  facadeWss.on('connection', ws => {
     if (serverState.facadeHubRef) {
       serverState.facadeHubRef.attachClient(ws);
     } else {
@@ -166,20 +178,28 @@ export async function createServer(): Promise<ServerContext> {
 
   // Upgrade handler routes to WebSocketServer
   server.on('upgrade', (req: IncomingMessage, socket, head) => {
-    socket.on('error', (err) => {
-      console.warn(`[WS Upgrade] Socket error: ${(err as NodeJS.ErrnoException).code || err.message}`);
+    socket.on('error', err => {
+      console.warn(
+        `[WS Upgrade] Socket error: ${(err as NodeJS.ErrnoException).code || err.message}`
+      );
     });
+
+    if (!isRequestOriginAllowed(req.headers.origin)) {
+      console.warn(`[WS Upgrade] Rejected disallowed origin: ${req.headers.origin}`);
+      socket.destroy();
+      return;
+    }
 
     const url = req.url || '';
     if (url === '/ws' || url.startsWith('/ws?')) {
-      wss.handleUpgrade(req, socket, head, (ws) => {
+      wss.handleUpgrade(req, socket, head, ws => {
         wss.emit('connection', ws, req);
       });
       return;
     }
 
     if (url === '/ws/backend-facade' || url.startsWith('/ws/backend-facade?')) {
-      facadeWss.handleUpgrade(req, socket, head, (ws) => {
+      facadeWss.handleUpgrade(req, socket, head, ws => {
         facadeWss.emit('connection', ws, req);
       });
       return;
@@ -223,7 +243,10 @@ export async function createServer(): Promise<ServerContext> {
     if (hasRuns !== lastHeartbeatHadRuns) {
       lastHeartbeatHadRuns = hasRuns;
       clearInterval(stateHeartbeatInterval);
-      stateHeartbeatInterval = setInterval(tickHeartbeat, hasRuns ? HEARTBEAT_ACTIVE_MS : HEARTBEAT_IDLE_MS);
+      stateHeartbeatInterval = setInterval(
+        tickHeartbeat,
+        hasRuns ? HEARTBEAT_ACTIVE_MS : HEARTBEAT_IDLE_MS
+      );
     }
   }
 
@@ -235,7 +258,7 @@ export async function createServer(): Promise<ServerContext> {
       ws,
       isAlive: true,
       isLocal: clientIsLocal,
-      authenticated: false
+      authenticated: false,
     };
     clients.set(clientId, client);
 
@@ -248,7 +271,9 @@ export async function createServer(): Promise<ServerContext> {
     ws.on('message', async (data: Buffer) => {
       try {
         const { request, isOldFormat } = parseMessage(data.toString());
-        const message: ClientMessage = isOldFormat ? request.payload as ClientMessage : request.payload as ClientMessage;
+        const message: ClientMessage = isOldFormat
+          ? (request.payload as ClientMessage)
+          : (request.payload as ClientMessage);
 
         // Handle auth message for unauthenticated clients
         if (!client.authenticated) {
@@ -266,9 +291,11 @@ export async function createServer(): Promise<ServerContext> {
             } as AuthResultMessage);
 
             // Re-attach orphaned runs
-            activeRuns.forEach((run) => {
+            activeRuns.forEach(run => {
               if (!clients.has(run.clientId)) {
-                console.log(`[Reconnect] Re-attaching orphaned run ${run.runId} (session ${run.sessionId}) to new client ${clientId}`);
+                console.log(
+                  `[Reconnect] Re-attaching orphaned run ${run.runId} (session ${run.sessionId}) to new client ${clientId}`
+                );
                 run.clientId = clientId;
                 run.client = client;
               }
@@ -288,31 +315,34 @@ export async function createServer(): Promise<ServerContext> {
           sendMessage(ws, {
             type: 'error',
             code: 'UNAUTHORIZED',
-            message: 'Authentication required. Send an auth message first.'
+            message: 'Authentication required. Send an auth message first.',
           } as ErrorMessage);
           return;
         }
 
-        // Try router first, then legacy handler
-        try {
-          const response = await router.route(client, request);
-          if (response) {
+        await routeOrFallback({
+          route: () => router.route(client, request),
+          sendResponse: response => {
             if ((ws.readyState as number) === 1) {
               ws.send(JSON.stringify(response));
             }
-            return;
-          }
-        } catch (error) {
-          console.error('[Router] Error routing message:', error);
-        }
-
-        await handleClientMessage(client, message, db, clients, terminalManager);
+          },
+          sendRouteError: error => {
+            console.error('[Router] Error routing message:', error);
+            sendMessage(ws, {
+              type: 'error',
+              code: 'ROUTER_ERROR',
+              message: error instanceof Error ? error.message : 'Failed to route message',
+            } as ErrorMessage);
+          },
+          fallback: () => handleClientMessage(client, message, db, clients, terminalManager),
+        });
       } catch (error) {
         console.error('Error handling message:', error);
         sendMessage(ws, {
           type: 'error',
           code: 'INVALID_MESSAGE',
-          message: error instanceof Error ? error.message : 'Invalid message format'
+          message: error instanceof Error ? error.message : 'Invalid message format',
         });
       }
     });
@@ -329,11 +359,13 @@ export async function createServer(): Promise<ServerContext> {
         }
       });
       if (orphanedRuns.length > 0) {
-        console.log(`Client ${clientId} had ${orphanedRuns.length} active run(s) — keeping alive for reconnect`);
+        console.log(
+          `Client ${clientId} had ${orphanedRuns.length} active run(s) — keeping alive for reconnect`
+        );
       }
     });
 
-    ws.on('error', (error) => {
+    ws.on('error', error => {
       console.error(`WebSocket error for client ${clientId}:`, error);
     });
   });
@@ -359,22 +391,26 @@ export async function createServer(): Promise<ServerContext> {
         type: message.type,
         payload: message,
         timestamp: Date.now(),
-        metadata: { timeout: 30000, requiresAuth: false }
+        metadata: { timeout: 30000, requiresAuth: false },
       };
 
-      try {
-        const response = await router.route(client, request);
-        if (response) {
+      await routeOrFallback({
+        route: () => router.route(client, request),
+        sendResponse: response => {
           if ((client.ws.readyState as number) === 1) {
             client.ws.send(JSON.stringify(response));
           }
-          return;
-        }
-      } catch (error) {
-        console.error('[Router] Error routing gateway message:', error);
-      }
-
-      await handleClientMessage(client, message, db, clients, terminalManager);
+        },
+        sendRouteError: error => {
+          console.error('[Router] Error routing gateway message:', error);
+          sendMessage(client.ws, {
+            type: 'error',
+            code: 'ROUTER_ERROR',
+            message: error instanceof Error ? error.message : 'Failed to route message',
+          } as ErrorMessage);
+        },
+        fallback: () => handleClientMessage(client, message, db, clients, terminalManager),
+      });
     },
     getGatewayStatus: setup.getGatewayStatus,
     setGatewayConnector: setup.setGatewayConnector,
@@ -386,16 +422,18 @@ export async function createServer(): Promise<ServerContext> {
     updateGatewayBackendId: (backendId: string | null) => {
       setup.gatewayStatus.gatewayBackendId = backendId;
       if (backendId) {
-        db.prepare(`
+        db.prepare(
+          `
           UPDATE gateway_config SET backend_id = ?, updated_at = ? WHERE id = 1
-        `).run(backendId, Date.now());
+        `
+        ).run(backendId, Date.now());
       }
     },
     updateDiscoveredBackends: setup.updateDiscoveredBackends,
     setServerPort: (port: number) => {
       serverState.serverPort = port;
     },
-    setFacadeHub: (hub) => {
+    setFacadeHub: hub => {
       serverState.facadeHubRef = hub;
     },
   };
@@ -403,12 +441,16 @@ export async function createServer(): Promise<ServerContext> {
 
 // Thin wrapper that delegates to extracted cancelRun
 function cancelRun(runId: string, options?: CancelRunOptions): void {
-  _cancelRun(runId, {
-    activeRuns,
-    processMonitor: serverState.processMonitor,
-    broadcastHeartbeat: () => serverState.broadcastHeartbeat(),
-    providerRegistry,
-  }, options);
+  _cancelRun(
+    runId,
+    {
+      activeRuns,
+      processMonitor: serverState.processMonitor,
+      broadcastHeartbeat: () => serverState.broadcastHeartbeat(),
+      providerRegistry,
+    },
+    options
+  );
 }
 
 // Thin wrapper that delegates to the extracted message handler
@@ -420,19 +462,29 @@ async function handleClientMessage(
   termMgr?: TerminalManager
 ): Promise<void> {
   return _handleClientMessage(
-    client, message, db, clients,
+    client,
+    message,
+    db,
+    clients,
     serverState.getMessageHandlerContext(handleRunStart, cancelRun),
-    termMgr,
+    termMgr
   );
 }
 
 // Thin wrapper that delegates to extracted handleRunStart
 async function handleRunStart(
   client: ConnectedClient,
-  message: any,
+  message: RunStartMessage,
   db: ReturnType<typeof initDatabase>,
   recoveryState: { sessionResetRetryCount?: number } = {},
-  clients?: Map<string, ConnectedClient>,
+  clients?: Map<string, ConnectedClient>
 ): Promise<void> {
-  return _handleRunStart(client, message, db, recoveryState, clients, serverState.getRunHandlerContext());
+  return _handleRunStart(
+    client,
+    message,
+    db,
+    recoveryState,
+    clients,
+    serverState.getRunHandlerContext()
+  );
 }

@@ -21,7 +21,7 @@ const DARK_VARIANT_CLASSES = ['dark-neutral', 'dark-warm', 'dark-cool'];
 const VALID_THEMES: Theme[] = ['light', 'dark-neutral', 'dark-warm', 'dark-cool', 'system'];
 
 const THEME_META_COLORS: Record<ResolvedTheme, string> = {
-  'light': '#ffffff',
+  light: '#ffffff',
   'dark-neutral': '#141517',
   'dark-warm': '#141311',
   'dark-cool': '#0f1218',

@@ -18,26 +18,28 @@ export interface ActivityLogEntry {
 
 export function recordActivity(
   db: Database.Database,
-  entry: Omit<ActivityLogEntry, 'id' | 'createdAt'>,
+  entry: Omit<ActivityLogEntry, 'id' | 'createdAt'>
 ): void {
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO agent_activity_log (id, project_id, session_id, type, summary, metadata, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(
+  `
+  ).run(
     newId(),
     entry.projectId,
     entry.sessionId,
     entry.type,
     entry.summary,
     entry.metadata ? JSON.stringify(entry.metadata) : null,
-    Date.now(),
+    Date.now()
   );
 }
 
 export function getRecentActivity(
   db: Database.Database,
   projectId: string | null,
-  limit = 50,
+  limit = 50
 ): ActivityLogEntry[] {
   const query = projectId
     ? `SELECT * FROM agent_activity_log WHERE project_id = ? ORDER BY created_at DESC LIMIT ?`
@@ -55,7 +57,11 @@ export function getRecentActivity(
   return rows.map(r => {
     let metadata: Record<string, unknown> | undefined;
     if (r.metadata) {
-      try { metadata = JSON.parse(r.metadata); } catch { /* corrupted metadata, skip */ }
+      try {
+        metadata = JSON.parse(r.metadata);
+      } catch {
+        /* corrupted metadata, skip */
+      }
     }
     return {
       id: r.id,

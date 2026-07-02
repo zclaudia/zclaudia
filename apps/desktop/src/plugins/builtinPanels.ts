@@ -21,7 +21,6 @@ import { useTerminalStore } from '../stores/terminalStore';
 import { useFileViewerStore } from '../stores/fileViewerStore';
 import { useDraftEditorStore } from '../stores/draftEditorStore';
 
-
 export function initBuiltinPanels() {
   const { registerPanel } = usePluginStore.getState();
 
@@ -56,7 +55,9 @@ export function initBuiltinPanels() {
         const separatorIndex = scopeKey.indexOf('::');
         const projectId = separatorIndex >= 0 ? scopeKey.slice(separatorIndex + 2) : scopeKey;
         const backendId = separatorIndex >= 0 ? scopeKey.slice(0, separatorIndex) : undefined;
-        useTerminalStore.getState().setDrawerOpen(projectId, false, backendId === 'no-backend' ? null : backendId);
+        useTerminalStore
+          .getState()
+          .setDrawerOpen(projectId, false, backendId === 'no-backend' ? null : backendId);
       }
     },
   });

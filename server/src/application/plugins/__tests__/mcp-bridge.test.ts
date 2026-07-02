@@ -59,7 +59,9 @@ async function handleRequest(request: JsonRpcRequest): Promise<JsonRpcResponse |
     }
 
     case 'tools/call': {
-      const params = request.params as { name: string; arguments?: Record<string, unknown> } | undefined;
+      const params = request.params as
+        | { name: string; arguments?: Record<string, unknown> }
+        | undefined;
       if (!params?.name) {
         return {
           jsonrpc: '2.0',

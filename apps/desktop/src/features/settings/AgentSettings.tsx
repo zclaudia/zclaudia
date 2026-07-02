@@ -16,12 +16,12 @@ interface AgentCapabilities {
 export function AgentSettings() {
   const [capabilities, setCapabilities] = useState<AgentCapabilities | null>(null);
   const [providers, setProviders] = useState<LlmProfileConfig[]>([]);
-  const config = useAgentConfigStore((s) => s.config);
-  const loadConfig = useAgentConfigStore((s) => s.loadConfig);
-  const updateConfig = useAgentConfigStore((s) => s.updateConfig);
-  const loading = useAgentConfigStore((s) => s.isLoading);
-  const saving = useAgentConfigStore((s) => s.isSaving);
-  const error = useAgentConfigStore((s) => s.error);
+  const config = useAgentConfigStore(s => s.config);
+  const loadConfig = useAgentConfigStore(s => s.loadConfig);
+  const updateConfig = useAgentConfigStore(s => s.updateConfig);
+  const loading = useAgentConfigStore(s => s.isLoading);
+  const saving = useAgentConfigStore(s => s.isSaving);
+  const error = useAgentConfigStore(s => s.error);
   const [metaLoading, setMetaLoading] = useState(true);
   const [metaError, setMetaError] = useState<string | null>(null);
 
@@ -43,19 +43,23 @@ export function AgentSettings() {
     }
   }, [loadConfig]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
-  const saveConfig = useCallback(async (updates: {
-    enabled?: boolean;
-    llmProfileId?: string | null;
-  }) => {
-    await updateConfig(updates);
-  }, [updateConfig]);
+  const saveConfig = useCallback(
+    async (updates: { enabled?: boolean; llmProfileId?: string | null }) => {
+      await updateConfig(updates);
+    },
+    [updateConfig]
+  );
 
   if (loading || metaLoading) {
     return (
       <div className="space-y-6">
-        <div className="p-3 bg-secondary/50 rounded-lg text-sm text-muted-foreground">Loading...</div>
+        <div className="p-3 bg-secondary/50 rounded-lg text-sm text-muted-foreground">
+          Loading...
+        </div>
       </div>
     );
   }
@@ -73,7 +77,6 @@ export function AgentSettings() {
 
   return (
     <div className="space-y-6">
-
       {/* General */}
       <div>
         <h3 className="text-sm font-medium mb-3">General</h3>
@@ -93,9 +96,11 @@ export function AgentSettings() {
                 config?.enabled ? 'bg-primary' : 'bg-muted'
               }`}
             >
-              <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                config?.enabled ? 'translate-x-5' : 'translate-x-0'
-              }`} />
+              <span
+                className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                  config?.enabled ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
             </button>
           </div>
 
@@ -105,14 +110,14 @@ export function AgentSettings() {
               <span className="text-sm">Provider</span>
               <Select
                 value={config?.llmProfileId || ''}
-                onChange={(next) => saveConfig({ llmProfileId: next || null })}
+                onChange={next => saveConfig({ llmProfileId: next || null })}
                 disabled={saving}
                 size="md"
                 align="right"
                 triggerClassName="min-w-[180px]"
                 options={[
                   { value: '', label: 'Default (same as chat)' },
-                  ...providers.map((p) => ({
+                  ...providers.map(p => ({
                     value: p.id,
                     label: `${p.name}${p.isDefault ? ' (default)' : ''}`,
                   })),
@@ -139,7 +144,6 @@ export function AgentSettings() {
         <div>
           <h3 className="text-sm font-medium mb-3">Capabilities</h3>
           <div className="space-y-2">
-
             {/* Tools */}
             <div className="p-3 bg-secondary/50 rounded-lg">
               <div className="flex items-center justify-between mb-2">
@@ -150,10 +154,12 @@ export function AgentSettings() {
                 <p className="text-xs text-muted-foreground">No agent tools registered.</p>
               ) : (
                 <div className="space-y-1">
-                  {capabilities.tools.map((tool) => (
+                  {capabilities.tools.map(tool => (
                     <div key={tool.id} className="flex items-center justify-between text-xs">
                       <span className="font-mono text-foreground/80">{tool.name}</span>
-                      <span className="text-muted-foreground truncate ml-2 max-w-[50%] text-right">{tool.description}</span>
+                      <span className="text-muted-foreground truncate ml-2 max-w-[50%] text-right">
+                        {tool.description}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -165,14 +171,18 @@ export function AgentSettings() {
               <div className="p-3 bg-secondary/50 rounded-lg">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm">Skills</span>
-                  <span className="text-xs text-muted-foreground">{capabilities.skills.length}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {capabilities.skills.length}
+                  </span>
                 </div>
                 <div className="space-y-1">
-                  {capabilities.skills.map((skill) => (
+                  {capabilities.skills.map(skill => (
                     <div key={skill.id} className="flex items-center justify-between text-xs">
                       <span className="text-foreground/80">{skill.name}</span>
                       {skill.description && (
-                        <span className="text-muted-foreground truncate ml-2 max-w-[50%] text-right">{skill.description}</span>
+                        <span className="text-muted-foreground truncate ml-2 max-w-[50%] text-right">
+                          {skill.description}
+                        </span>
                       )}
                     </div>
                   ))}
@@ -196,11 +206,9 @@ export function AgentSettings() {
                 </div>
               </div>
             </div>
-
           </div>
         </div>
       )}
-
     </div>
   );
 }

@@ -64,7 +64,9 @@ describe('runPiAgentLoop', () => {
     const hookStop = vi.fn().mockResolvedValue(false);
     let stopResults: boolean[] = [];
     testState.runAgentLoop.mockImplementation(async (_prompts, _context, config, emit) => {
-      const shouldStopAfterTurn = config.shouldStopAfterTurn as (context: unknown) => Promise<boolean>;
+      const shouldStopAfterTurn = config.shouldStopAfterTurn as (
+        context: unknown
+      ) => Promise<boolean>;
       stopResults = [
         await shouldStopAfterTurn({ turn: 1 }),
         await shouldStopAfterTurn({ turn: 2 }),
@@ -95,12 +97,14 @@ describe('runPiAgentLoop', () => {
   it('passes cacheRetention into the wrapped stream function', async () => {
     const baseStreamFn = vi.fn(() => ({ [Symbol.asyncIterator]: async function* () {} }) as never);
 
-    testState.runAgentLoop.mockImplementation(async (_prompts, _context, _config, emit, _signal, streamFn) => {
-      streamFn({ id: 'model' } as never, { messages: [] } as never, { temperature: 0 } as never);
-      const messages = [{ role: 'assistant', content: 'done' } as never];
-      await emit({ type: 'agent_end', messages });
-      return messages;
-    });
+    testState.runAgentLoop.mockImplementation(
+      async (_prompts, _context, _config, emit, _signal, streamFn) => {
+        streamFn({ id: 'model' } as never, { messages: [] } as never, { temperature: 0 } as never);
+        const messages = [{ role: 'assistant', content: 'done' } as never];
+        await emit({ type: 'agent_end', messages });
+        return messages;
+      }
+    );
 
     await runPiAgentLoop({
       systemPrompt: 'system',
@@ -120,7 +124,7 @@ describe('runPiAgentLoop', () => {
     expect(baseStreamFn).toHaveBeenCalledWith(
       expect.anything(),
       expect.anything(),
-      expect.objectContaining({ temperature: 0, cacheRetention: 'long' }),
+      expect.objectContaining({ temperature: 0, cacheRetention: 'long' })
     );
   });
 });

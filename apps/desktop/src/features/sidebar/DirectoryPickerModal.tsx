@@ -20,7 +20,13 @@ interface DirectoryPickerModalProps {
  * Navigation is driven by the backend (`/api/files/browse-dirs`) so it works
  * identically for local and remote backends.
  */
-export function DirectoryPickerModal({ open, backendId, initialPath, onClose, onSelect }: DirectoryPickerModalProps) {
+export function DirectoryPickerModal({
+  open,
+  backendId,
+  initialPath,
+  onClose,
+  onSelect,
+}: DirectoryPickerModalProps) {
   const isMobile = useIsMobile();
   useAndroidBack(onClose, isMobile && open, 26);
 
@@ -30,20 +36,23 @@ export function DirectoryPickerModal({ open, backendId, initialPath, onClose, on
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async (path?: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await browseDirectories({ path, backendId });
-      setCurrentPath(res.path);
-      setParent(res.parent);
-      setDirectories(res.directories);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to read directory');
-    } finally {
-      setLoading(false);
-    }
-  }, [backendId]);
+  const load = useCallback(
+    async (path?: string) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await browseDirectories({ path, backendId });
+        setCurrentPath(res.path);
+        setParent(res.parent);
+        setDirectories(res.directories);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Failed to read directory');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [backendId]
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -75,7 +84,10 @@ export function DirectoryPickerModal({ open, backendId, initialPath, onClose, on
           >
             <ArrowUp size={16} strokeWidth={1.75} />
           </button>
-          <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground" title={currentPath ?? ''}>
+          <span
+            className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground"
+            title={currentPath ?? ''}
+          >
             {currentPath ?? '…'}
           </span>
         </div>
@@ -90,13 +102,17 @@ export function DirectoryPickerModal({ open, backendId, initialPath, onClose, on
           ) : directories.length === 0 ? (
             <p className="px-4 py-6 text-sm text-muted-foreground">No subfolders here.</p>
           ) : (
-            directories.map((dir) => (
+            directories.map(dir => (
               <button
                 key={dir.path}
                 onClick={() => load(dir.path)}
                 className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary"
               >
-                <Folder size={16} strokeWidth={1.75} className="flex-shrink-0 text-muted-foreground" />
+                <Folder
+                  size={16}
+                  strokeWidth={1.75}
+                  className="flex-shrink-0 text-muted-foreground"
+                />
                 <span className="truncate">{dir.name}</span>
               </button>
             ))
@@ -105,7 +121,12 @@ export function DirectoryPickerModal({ open, backendId, initialPath, onClose, on
 
         <div className="flex gap-2 px-4 py-3 border-t border-border">
           <button
-            onClick={() => { if (currentPath) { onSelect(currentPath); onClose(); } }}
+            onClick={() => {
+              if (currentPath) {
+                onSelect(currentPath);
+                onClose();
+              }
+            }}
             disabled={!currentPath || loading}
             className="flex-1 px-3 py-2 bg-accent text-foreground font-medium shadow-apple-sm hover:bg-accent/80 rounded-lg text-sm disabled:opacity-50"
           >

@@ -7,7 +7,7 @@ const TYPE_STYLES: Record<Toast['type'], { bg: string; icon: string }> = {
 };
 
 function ToastCard({ toast }: { toast: Toast }) {
-  const remove = useToastStore((s) => s.remove);
+  const remove = useToastStore(s => s.remove);
   const style = TYPE_STYLES[toast.type];
 
   return (
@@ -28,7 +28,10 @@ function ToastCard({ toast }: { toast: Toast }) {
         )}
       </div>
       <button
-        onClick={(e) => { e.stopPropagation(); remove(toast.id); }}
+        onClick={e => {
+          e.stopPropagation();
+          remove(toast.id);
+        }}
         className="text-muted-foreground hover:text-foreground text-xs flex-shrink-0 mt-0.5"
       >
         &times;
@@ -38,7 +41,7 @@ function ToastCard({ toast }: { toast: Toast }) {
 }
 
 export function ToastContainer({ className }: { className?: string }) {
-  const toasts = useToastStore((s) => s.toasts);
+  const toasts = useToastStore(s => s.toasts);
 
   if (toasts.length === 0) return null;
 
@@ -47,7 +50,7 @@ export function ToastContainer({ className }: { className?: string }) {
       data-testid="toast-container"
       className={className ?? 'fixed bottom-4 right-4 z-50 flex flex-col gap-2'}
     >
-      {toasts.map((toast) => (
+      {toasts.map(toast => (
         <ToastCard key={toast.id} toast={toast} />
       ))}
     </div>

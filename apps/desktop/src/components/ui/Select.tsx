@@ -60,7 +60,7 @@ export function Select<T extends string = string>({
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  const selected = useMemo(() => options.find((opt) => opt.value === value), [options, value]);
+  const selected = useMemo(() => options.find(opt => opt.value === value), [options, value]);
   const sizing = SIZE_CLASSES[size];
 
   useEffect(() => {
@@ -84,21 +84,27 @@ export function Select<T extends string = string>({
     };
   }, [isOpen]);
 
-  const handleSelect = useCallback((next: T, optionDisabled: boolean | undefined) => {
-    if (optionDisabled) return;
-    onChange(next);
-    setIsOpen(false);
-    triggerRef.current?.focus();
-  }, [onChange]);
+  const handleSelect = useCallback(
+    (next: T, optionDisabled: boolean | undefined) => {
+      if (optionDisabled) return;
+      onChange(next);
+      setIsOpen(false);
+      triggerRef.current?.focus();
+    },
+    [onChange]
+  );
 
   const triggerLabel = selected ? selected.label : (placeholder ?? '');
 
   return (
-    <div ref={containerRef} className={`relative ${block ? 'block w-full' : 'inline-block'} ${className}`}>
+    <div
+      ref={containerRef}
+      className={`relative ${block ? 'block w-full' : 'inline-block'} ${className}`}
+    >
       <button
         ref={triggerRef}
         type="button"
-        onClick={() => !disabled && setIsOpen((v) => !v)}
+        onClick={() => !disabled && setIsOpen(v => !v)}
         disabled={disabled}
         title={title}
         aria-haspopup="listbox"
@@ -111,9 +117,7 @@ export function Select<T extends string = string>({
           font-medium
           focus:outline-none focus:ring-1 focus:ring-primary
           transition-colors
-          ${disabled
-            ? 'opacity-50 cursor-not-allowed'
-            : 'hover:border-primary/40 cursor-pointer'}
+          ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-primary/40 cursor-pointer'}
           ${triggerClassName}
         `}
       >
@@ -140,7 +144,7 @@ export function Select<T extends string = string>({
             ${panelClassName}
           `}
         >
-          {options.map((opt) => {
+          {options.map(opt => {
             const isActive = opt.value === value;
             return (
               <button
@@ -154,11 +158,13 @@ export function Select<T extends string = string>({
                   w-full text-left px-3 py-1.5 ${sizing.panelText}
                   flex items-start gap-2
                   transition-colors whitespace-nowrap
-                  ${opt.disabled
-                    ? 'opacity-50 cursor-not-allowed'
-                    : isActive
-                      ? 'bg-muted/60 text-primary font-medium'
-                      : 'text-foreground hover:bg-muted active:bg-muted'}
+                  ${
+                    opt.disabled
+                      ? 'opacity-50 cursor-not-allowed'
+                      : isActive
+                        ? 'bg-muted/60 text-primary font-medium'
+                        : 'text-foreground hover:bg-muted active:bg-muted'
+                  }
                 `}
               >
                 <Check

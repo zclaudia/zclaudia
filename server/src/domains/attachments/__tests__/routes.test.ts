@@ -47,7 +47,7 @@ async function buildApp() {
   const { tmpDir } = await initRealStore();
   const db = createTestDb();
   const broadcasts: unknown[] = [];
-  const service = new AttachmentService(db, (msg) => broadcasts.push(msg));
+  const service = new AttachmentService(db, msg => broadcasts.push(msg));
   const app = express();
   app.use(express.json({ limit: '20mb' }));
   app.use('/api', createAttachmentRoutes(service));
@@ -134,15 +134,13 @@ describe('attachment routes', () => {
   describe('POST /api/attachments/json', () => {
     it('uploads via base64 JSON body', async () => {
       const data = Buffer.from('hello-json').toString('base64');
-      const res = await request(ctx.app)
-        .post('/api/attachments/json')
-        .send({
-          ownerKind: 'local_issue',
-          ownerId: 'issue-1',
-          name: 'h.txt',
-          mimeType: 'text/plain',
-          data,
-        });
+      const res = await request(ctx.app).post('/api/attachments/json').send({
+        ownerKind: 'local_issue',
+        ownerId: 'issue-1',
+        name: 'h.txt',
+        mimeType: 'text/plain',
+        data,
+      });
       expect(res.status).toBe(201);
       expect(res.body.data.kind).toBe('document');
       expect(res.body.data.size).toBe(Buffer.from('hello-json').length);
@@ -221,7 +219,7 @@ describe('attachment routes', () => {
         .query({ ownerKind: 'local_issue', ownerIds: 'a,b,c' });
       expect(res.status).toBe(200);
       const map = Object.fromEntries(
-        res.body.data.map((c: { ownerId: string; count: number }) => [c.ownerId, c.count]),
+        res.body.data.map((c: { ownerId: string; count: number }) => [c.ownerId, c.count])
       );
       expect(map).toEqual({ a: 2, b: 1, c: 0 });
     });

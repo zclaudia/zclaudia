@@ -1,38 +1,51 @@
 import { Router, type Request, type Response } from 'express';
 import type { LlmProfileRepository } from '../../domains/llm-profiles/repository.js';
 import type { CodexOAuthSessionManager } from '../../domains/llm-profiles/codex-oauth-session.js';
-import { CodexOAuthError, codexOAuthErrorToHttpStatus } from '../../domains/llm-profiles/codex-oauth-errors.js';
+import {
+  CodexOAuthError,
+  codexOAuthErrorToHttpStatus,
+} from '../../domains/llm-profiles/codex-oauth-errors.js';
 import { fetchCodexModels } from '../../domains/llm-profiles/codex-models.js';
 
 function handleCodexError(res: Response, err: unknown): void {
   if (err instanceof CodexOAuthError) {
-    res.status(codexOAuthErrorToHttpStatus(err.code)).json({ error: { code: err.code, message: err.message } });
+    res
+      .status(codexOAuthErrorToHttpStatus(err.code))
+      .json({ error: { code: err.code, message: err.message } });
     return;
   }
   console.error('[llm-profile-oauth] unexpected error', err);
-  res.status(500).json({ error: { code: 'INTERNAL', message: err instanceof Error ? err.message : 'unknown' } });
+  res
+    .status(500)
+    .json({ error: { code: 'INTERNAL', message: err instanceof Error ? err.message : 'unknown' } });
 }
 
 export function createLlmProfileOauthRouter(
   repo: LlmProfileRepository,
-  sessions: CodexOAuthSessionManager,
+  sessions: CodexOAuthSessionManager
 ): Router {
   const router = Router({ mergeParams: true });
 
   router.post('/:id/oauth/start', async (req: Request, res: Response) => {
     const profileId = req.params.id;
     const profile = repo.findById(profileId);
-    if (!profile) { res.status(404).json({ error: { code: 'NOT_FOUND', message: 'profile not found' } }); return; }
+    if (!profile) {
+      res.status(404).json({ error: { code: 'NOT_FOUND', message: 'profile not found' } });
+      return;
+    }
     if (profile.providerType !== 'openai-codex') {
-      res.status(400).json({ error: { code: 'INVALID_PROVIDER', message: 'profile is not openai-codex' } });
+      res
+        .status(400)
+        .json({ error: { code: 'INVALID_PROVIDER', message: 'profile is not openai-codex' } });
       return;
     }
 
     const method = req.body?.method === 'device_code' ? 'device_code' : 'browser';
     try {
-      const result = method === 'browser'
-        ? await sessions.startBrowserFlow(profileId)
-        : await sessions.startDeviceCodeFlow(profileId);
+      const result =
+        method === 'browser'
+          ? await sessions.startBrowserFlow(profileId)
+          : await sessions.startDeviceCodeFlow(profileId);
       res.json({ success: true, data: result });
     } catch (err) {
       handleCodexError(res, err);
@@ -42,7 +55,9 @@ export function createLlmProfileOauthRouter(
   router.get('/:id/oauth/status/:sessionId', (req: Request, res: Response) => {
     const status = sessions.getStatus(req.params.sessionId);
     if (!status) {
-      res.status(404).json({ error: { code: 'NOT_FOUND', message: 'session not found or expired' } });
+      res
+        .status(404)
+        .json({ error: { code: 'NOT_FOUND', message: 'session not found or expired' } });
       return;
     }
     if (status.state === 'success') {
@@ -50,7 +65,10 @@ export function createLlmProfileOauthRouter(
       return;
     }
     if (status.state === 'error') {
-      res.json({ success: true, data: { state: 'error', code: status.code, message: status.message } });
+      res.json({
+        success: true,
+        data: { state: 'error', code: status.code, message: status.message },
+      });
       return;
     }
     res.json({ success: true, data: status });
@@ -69,7 +87,9 @@ export function createLlmProfileOauthRouter(
       return;
     }
     if (profile.providerType !== 'openai-codex') {
-      res.status(400).json({ error: { code: 'INVALID_PROVIDER', message: 'profile is not openai-codex' } });
+      res
+        .status(400)
+        .json({ error: { code: 'INVALID_PROVIDER', message: 'profile is not openai-codex' } });
       return;
     }
     repo.clearOAuthCredentials(profileId);
@@ -78,9 +98,14 @@ export function createLlmProfileOauthRouter(
 
   router.get('/:id/codex-models', async (req: Request, res: Response) => {
     const profile = repo.findById(req.params.id);
-    if (!profile) { res.status(404).json({ error: { code: 'NOT_FOUND', message: 'profile not found' } }); return; }
+    if (!profile) {
+      res.status(404).json({ error: { code: 'NOT_FOUND', message: 'profile not found' } });
+      return;
+    }
     if (!profile.oauthCredentials) {
-      res.status(401).json({ error: { code: 'NOT_AUTHENTICATED', message: 'profile not authenticated' } });
+      res
+        .status(401)
+        .json({ error: { code: 'NOT_AUTHENTICATED', message: 'profile not authenticated' } });
       return;
     }
     const refresh = req.query.refresh === 'true';
@@ -89,7 +114,7 @@ export function createLlmProfileOauthRouter(
         profile.id,
         profile.oauthCredentials.access,
         profile.oauthCredentials.accountId,
-        { refresh },
+        { refresh }
       );
       res.json({ success: true, data: result });
     } catch (err) {

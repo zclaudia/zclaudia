@@ -4,7 +4,13 @@ import { Command, type Child } from '@tauri-apps/plugin-shell';
 import { appDataDir, resolveResource } from '@tauri-apps/api/path';
 import { invoke } from '@tauri-apps/api/core';
 
-export type EmbeddedServerStatus = 'idle' | 'starting' | 'ready' | 'error' | 'disabled' | 'wsl-mode';
+export type EmbeddedServerStatus =
+  | 'idle'
+  | 'starting'
+  | 'ready'
+  | 'error'
+  | 'disabled'
+  | 'wsl-mode';
 
 interface EmbeddedServerCoreState {
   port: number | null;
@@ -89,10 +95,12 @@ export function useEmbeddedServer(options?: { disabled?: boolean }): EmbeddedSer
 
     probeWindow.__ZCLAUDIA_PROBE_ENDPOINT__ = async (baseUrl: string) => {
       try {
-        const result = await invoke<OpenCodeEndpointProbeResult>('probe_network_endpoint', { baseUrl });
+        const result = await invoke<OpenCodeEndpointProbeResult>('probe_network_endpoint', {
+          baseUrl,
+        });
         const log = result.ok ? console.log : console.warn;
         log(
-          `[EmbeddedServer] Manual endpoint probe ${result.ok ? 'ok' : 'failed'}: ${result.base_url} (${result.host}:${result.port}) -> ${result.detail}`,
+          `[EmbeddedServer] Manual endpoint probe ${result.ok ? 'ok' : 'failed'}: ${result.base_url} (${result.host}:${result.port}) -> ${result.detail}`
         );
         return result;
       } catch (err) {
@@ -110,14 +118,16 @@ export function useEmbeddedServer(options?: { disabled?: boolean }): EmbeddedSer
     try {
       const results = await invoke<OpenCodeEndpointProbeResult[]>('probe_opencode_endpoints');
       if (!Array.isArray(results) || results.length === 0) {
-        console.warn('[EmbeddedServer] OpenCode endpoint probe: no configured provider baseURL found');
+        console.warn(
+          '[EmbeddedServer] OpenCode endpoint probe: no configured provider baseURL found'
+        );
         return;
       }
 
       for (const result of results) {
         const log = result.ok ? console.log : console.warn;
         log(
-          `[EmbeddedServer] OpenCode endpoint probe ${result.ok ? 'ok' : 'failed'}: ${result.base_url} (${result.host}:${result.port}) -> ${result.detail}`,
+          `[EmbeddedServer] OpenCode endpoint probe ${result.ok ? 'ok' : 'failed'}: ${result.base_url} (${result.host}:${result.port}) -> ${result.detail}`
         );
       }
     } catch (err) {
@@ -129,7 +139,9 @@ export function useEmbeddedServer(options?: { disabled?: boolean }): EmbeddedSer
     try {
       registerManualEndpointProbe();
       void runOpencodeEndpointProbe();
-      const shellNetworkEnv = await invoke<Record<string, string>>('get_shell_network_env').catch(() => ({}));
+      const shellNetworkEnv = await invoke<Record<string, string>>('get_shell_network_env').catch(
+        () => ({})
+      );
 
       // In tauri dev, beforeDevCommand starts the workspace server on port 3100 in parallel.
       // Vite may become ready first, so give the existing dev server a short window to finish booting
@@ -160,18 +172,26 @@ export function useEmbeddedServer(options?: { disabled?: boolean }): EmbeddedSer
       // The sidecar Node version may differ from the user's current workspace
       // install. Re-run the existing ABI self-check before loading native modules
       // from server/dist in dev mode.
-      const nativeModuleCheck = await Command.sidecar('binaries/node', [DEV_NATIVE_MODULE_CHECKER], {
-        cwd: DEV_REPO_ROOT,
-        env: shellNetworkEnv,
-      }).execute();
+      const nativeModuleCheck = await Command.sidecar(
+        'binaries/node',
+        [DEV_NATIVE_MODULE_CHECKER],
+        {
+          cwd: DEV_REPO_ROOT,
+          env: shellNetworkEnv,
+        }
+      ).execute();
       if (nativeModuleCheck.stdout.trim()) {
         console.log(`[EmbeddedServer] Native module check:\n${nativeModuleCheck.stdout.trim()}`);
       }
       if (nativeModuleCheck.stderr.trim()) {
-        console.warn(`[EmbeddedServer] Native module check stderr:\n${nativeModuleCheck.stderr.trim()}`);
+        console.warn(
+          `[EmbeddedServer] Native module check stderr:\n${nativeModuleCheck.stderr.trim()}`
+        );
       }
       if (nativeModuleCheck.code !== 0) {
-        throw new Error('Native module compatibility check failed. Try running `pnpm rebuild` in the workspace.');
+        throw new Error(
+          'Native module compatibility check failed. Try running `pnpm rebuild` in the workspace.'
+        );
       }
 
       // Use sidecar to avoid env var space issues with shell execute
@@ -218,30 +238,52 @@ export function useEmbeddedServer(options?: { disabled?: boolean }): EmbeddedSer
         setState(prev => {
           const recoveryPort = prev.port;
           if (!recoveryPort) {
-            if (prev.status === 'ready') return { ...prev, status: 'error', error: 'Server process exited unexpectedly' };
-            if (prev.status === 'starting') return { ...prev, status: 'error', error: `Server process crashed on startup (code=${data.code})` };
+            if (prev.status === 'ready')
+              return { ...prev, status: 'error', error: 'Server process exited unexpectedly' };
+            if (prev.status === 'starting')
+              return {
+                ...prev,
+                status: 'error',
+                error: `Server process crashed on startup (code=${data.code})`,
+              };
             return prev;
           }
-          fetch(`http://127.0.0.1:${recoveryPort}/health`).then(resp => {
-            if (resp.ok && mountedRef.current) {
-              console.log(`[EmbeddedServer] Process exited but server still reachable on port ${recoveryPort}, recovering`);
-              setState({ port: recoveryPort, status: 'ready', error: null });
-            } else if (mountedRef.current) {
-              setState(p => {
-                if (p.status === 'ready') return { ...p, status: 'error', error: 'Server process exited unexpectedly' };
-                if (p.status === 'starting') return { ...p, status: 'error', error: `Server process crashed on startup (code=${data.code})` };
-                return p;
-              });
-            }
-          }).catch(() => {
-            if (mountedRef.current) {
-              setState(p => {
-                if (p.status === 'ready') return { ...p, status: 'error', error: 'Server process exited unexpectedly' };
-                if (p.status === 'starting') return { ...p, status: 'error', error: `Server process crashed on startup (code=${data.code})` };
-                return p;
-              });
-            }
-          });
+          fetch(`http://127.0.0.1:${recoveryPort}/health`)
+            .then(resp => {
+              if (resp.ok && mountedRef.current) {
+                console.log(
+                  `[EmbeddedServer] Process exited but server still reachable on port ${recoveryPort}, recovering`
+                );
+                setState({ port: recoveryPort, status: 'ready', error: null });
+              } else if (mountedRef.current) {
+                setState(p => {
+                  if (p.status === 'ready')
+                    return { ...p, status: 'error', error: 'Server process exited unexpectedly' };
+                  if (p.status === 'starting')
+                    return {
+                      ...p,
+                      status: 'error',
+                      error: `Server process crashed on startup (code=${data.code})`,
+                    };
+                  return p;
+                });
+              }
+            })
+            .catch(() => {
+              if (mountedRef.current) {
+                setState(p => {
+                  if (p.status === 'ready')
+                    return { ...p, status: 'error', error: 'Server process exited unexpectedly' };
+                  if (p.status === 'starting')
+                    return {
+                      ...p,
+                      status: 'error',
+                      error: `Server process crashed on startup (code=${data.code})`,
+                    };
+                  return p;
+                });
+              }
+            });
           return prev;
         });
       });
@@ -251,9 +293,19 @@ export function useEmbeddedServer(options?: { disabled?: boolean }): EmbeddedSer
       console.log(`[EmbeddedServer] Spawned server process (pid=${child.pid})`);
 
       // Register PID with Rust so the exit hook can clean it up
-      invoke('register_dev_server_pid', { pid: child.pid }).catch((err) => {
+      try {
+        await invoke('register_dev_server_pid', { pid: child.pid });
+      } catch (err) {
         console.warn('[EmbeddedServer] Failed to register dev server pid:', err);
-      });
+        if (childRef.current === child) {
+          childRef.current = null;
+        }
+        await child.kill().catch(killErr => {
+          console.warn('[EmbeddedServer] Failed to kill unregistered dev server process:', killErr);
+        });
+        const message = err instanceof Error ? err.message : String(err);
+        throw new Error(`Failed to register dev server pid: ${message}`, { cause: err });
+      }
     } catch (err) {
       console.error('[EmbeddedServer] Failed to start:', err);
       if (mountedRef.current) {
@@ -301,7 +353,7 @@ export function useEmbeddedServer(options?: { disabled?: boolean }): EmbeddedSer
   const restart = useCallback(async () => {
     if (disabled || !isDesktopTauriNonWindows()) return;
 
-    setState((prev) => ({
+    setState(prev => ({
       ...prev,
       status: 'starting',
       error: null,
@@ -318,7 +370,7 @@ export function useEmbeddedServer(options?: { disabled?: boolean }): EmbeddedSer
       await invoke('stop_server').catch(() => {});
     }
 
-    setRestartNonce((value) => value + 1);
+    setRestartNonce(value => value + 1);
   }, [disabled]);
 
   useEffect(() => {
@@ -348,8 +400,11 @@ export function useEmbeddedServer(options?: { disabled?: boolean }): EmbeddedSer
     };
   }, [restartNonce, startServerDev, startServerProd]);
 
-  return useMemo(() => ({
-    ...state,
-    restart,
-  }), [state, restart]);
+  return useMemo(
+    () => ({
+      ...state,
+      restart,
+    }),
+    [state, restart]
+  );
 }

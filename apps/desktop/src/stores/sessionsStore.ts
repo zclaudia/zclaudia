@@ -8,8 +8,8 @@ import { useRightWorkspaceStore } from './rightWorkspaceStore';
 import { LEGACY_LOCAL_SERVER_ID, resolveCanonicalBackendId } from '../utils/controlPlane';
 
 export interface RemoteSession extends Session {
-  isActive: boolean;  // Whether there's an active run
-  lastMessageOffset?: number;  // Max message offset (for gap detection)
+  isActive: boolean; // Whether there's an active run
+  lastMessageOffset?: number; // Max message offset (for gap detection)
 }
 
 export const LOCAL_BACKEND_KEY = '__local__';
@@ -24,10 +24,13 @@ export function getSessionBucketKeyForBackend(backendId: string | null | undefin
 
 export function resolveSessionBucketBackendId(
   backendId: string | null | undefined,
-  localBackendId: string | null = null,
+  localBackendId: string | null = null
 ): string | null {
   if (backendId === LOCAL_BACKEND_KEY) {
-    return resolveCanonicalBackendId(localBackendId ?? LEGACY_LOCAL_SERVER_ID, localBackendId ?? LEGACY_LOCAL_SERVER_ID);
+    return resolveCanonicalBackendId(
+      localBackendId ?? LEGACY_LOCAL_SERVER_ID,
+      localBackendId ?? LEGACY_LOCAL_SERVER_ID
+    );
   }
   return backendId ?? null;
 }
@@ -45,7 +48,10 @@ function addToRecentlyCompleted(
   backendId: string
 ): RecentlyCompletedSession[] {
   if (existing.some(r => r.session.id === session.id)) return existing;
-  return [{ session, backendId, ownerBackendId: backendId, completedAt: Date.now() }, ...existing].slice(0, 20);
+  return [
+    { session, backendId, ownerBackendId: backendId, completedAt: Date.now() },
+    ...existing,
+  ].slice(0, 20);
 }
 
 interface SessionsState {
@@ -75,7 +81,7 @@ interface SessionsState {
   clearAllRecentlyCompleted: () => void;
 }
 
-export const useSessionsStore = create<SessionsState>((set) => ({
+export const useSessionsStore = create<SessionsState>(set => ({
   remoteSessions: new Map(),
   activeSessionIdsByBackend: new Map(),
   recentlyCompletedSessions: [],
@@ -84,8 +90,11 @@ export const useSessionsStore = create<SessionsState>((set) => ({
     // Note: caller (backend_data_snapshot handler) already checks sessionsChanged
     // before calling this method, so no duplicate diff check needed here.
     useOwnershipStore.getState().removeSessionOwnersByBackend(backendId);
-    useOwnershipStore.getState().setSessionOwners(sessions.map((s) => s.id), backendId);
-    set((state) => {
+    useOwnershipStore.getState().setSessionOwners(
+      sessions.map(s => s.id),
+      backendId
+    );
+    set(state => {
       const newMap = new Map(state.remoteSessions);
       newMap.set(backendId, sessions);
 
@@ -112,7 +121,7 @@ export const useSessionsStore = create<SessionsState>((set) => ({
     } else {
       useOwnershipStore.getState().setSessionOwner(session.id, backendId);
     }
-    set((state) => {
+    set(state => {
       const newMap = new Map(state.remoteSessions);
       const backendSessions = newMap.get(backendId) || [];
       const newActiveMap = new Map(state.activeSessionIdsByBackend);
@@ -120,7 +129,7 @@ export const useSessionsStore = create<SessionsState>((set) => ({
 
       if (eventType === 'created') {
         // Dedup: skip if session already exists (e.g. both WebSocket push and sessionSync detected it)
-        if (backendSessions.some((s) => s.id === session.id)) return state;
+        if (backendSessions.some(s => s.id === session.id)) return state;
         newMap.set(backendId, [...backendSessions, session]);
         if (session.isActive) backendActive.add(session.id);
       } else if (eventType === 'updated') {
@@ -128,7 +137,7 @@ export const useSessionsStore = create<SessionsState>((set) => ({
         const prev = backendSessions.find(s => s.id === session.id);
         newMap.set(
           backendId,
-          backendSessions.map((s) => (s.id === session.id ? session : s))
+          backendSessions.map(s => (s.id === session.id ? session : s))
         );
         const wasActive = prev?.isActive === true;
         if (session.isActive) backendActive.add(session.id);
@@ -139,14 +148,18 @@ export const useSessionsStore = create<SessionsState>((set) => ({
           return {
             remoteSessions: newMap,
             activeSessionIdsByBackend: newActiveMap,
-            recentlyCompletedSessions: addToRecentlyCompleted(state.recentlyCompletedSessions, session, backendId),
+            recentlyCompletedSessions: addToRecentlyCompleted(
+              state.recentlyCompletedSessions,
+              session,
+              backendId
+            ),
           };
         }
       } else if (eventType === 'deleted') {
         // Remove session
         newMap.set(
           backendId,
-          backendSessions.filter((s) => s.id !== session.id)
+          backendSessions.filter(s => s.id !== session.id)
         );
         backendActive.delete(session.id);
       }
@@ -160,7 +173,7 @@ export const useSessionsStore = create<SessionsState>((set) => ({
   },
 
   setActiveSessionsForBackend: (backendId: string, activeSessionIds: Set<string>) => {
-    set((state) => {
+    set(state => {
       const current = state.activeSessionIdsByBackend.get(backendId);
       if (current && current.size === activeSessionIds.size) {
         let same = true;
@@ -180,7 +193,7 @@ export const useSessionsStore = create<SessionsState>((set) => ({
   },
 
   setSessionActiveFlag: (backendId: string, sessionId: string, isActive: boolean) => {
-    set((state) => {
+    set(state => {
       const newActiveMap = new Map(state.activeSessionIdsByBackend);
       const backendActive = new Set(newActiveMap.get(backendId) || []);
 
@@ -197,7 +210,7 @@ export const useSessionsStore = create<SessionsState>((set) => ({
 
   // Update isActive status based on backend's state heartbeat
   reconcileActiveStatus: (backendId: string, activeSessionIds: Set<string>) => {
-    set((state) => {
+    set(state => {
       const sessions = state.remoteSessions.get(backendId);
       if (!sessions) return state;
 
@@ -207,7 +220,7 @@ export const useSessionsStore = create<SessionsState>((set) => ({
 
       const updated = sessions.map(s => ({
         ...s,
-        isActive: activeSessionIds.has(s.id)
+        isActive: activeSessionIds.has(s.id),
       }));
 
       const newActiveMap = new Map(state.activeSessionIdsByBackend);
@@ -233,7 +246,7 @@ export const useSessionsStore = create<SessionsState>((set) => ({
 
   // Set isActive for a specific session (used by run_started / run_failed / run_completed)
   setSessionActiveById: (backendId: string, sessionId: string, isActive: boolean) => {
-    set((state) => {
+    set(state => {
       const newActiveMap = new Map(state.activeSessionIdsByBackend);
       const backendActive = new Set(newActiveMap.get(backendId) || []);
       if (isActive) backendActive.add(sessionId);
@@ -259,7 +272,11 @@ export const useSessionsStore = create<SessionsState>((set) => ({
         return {
           remoteSessions: newMap,
           activeSessionIdsByBackend: newActiveMap,
-          recentlyCompletedSessions: addToRecentlyCompleted(state.recentlyCompletedSessions, updated[idx], backendId),
+          recentlyCompletedSessions: addToRecentlyCompleted(
+            state.recentlyCompletedSessions,
+            updated[idx],
+            backendId
+          ),
         };
       }
 
@@ -272,7 +289,7 @@ export const useSessionsStore = create<SessionsState>((set) => ({
 
   clearBackendSessions: (backendId: string) => {
     useOwnershipStore.getState().removeSessionOwnersByBackend(backendId);
-    set((state) => {
+    set(state => {
       const newMap = new Map(state.remoteSessions);
       newMap.delete(backendId);
       const newActiveMap = new Map(state.activeSessionIdsByBackend);
@@ -293,8 +310,10 @@ export const useSessionsStore = create<SessionsState>((set) => ({
   },
 
   dismissRecentlyCompleted: (sessionId: string) => {
-    set((state) => ({
-      recentlyCompletedSessions: state.recentlyCompletedSessions.filter(r => r.session.id !== sessionId),
+    set(state => ({
+      recentlyCompletedSessions: state.recentlyCompletedSessions.filter(
+        r => r.session.id !== sessionId
+      ),
     }));
   },
 

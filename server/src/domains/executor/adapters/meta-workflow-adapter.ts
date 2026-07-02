@@ -51,7 +51,7 @@ export class MetaWorkflowAdapter implements IExecutor {
   constructor(
     private db: Database,
     private service: MetaWorkflowService,
-    private instance: ExecutorInstance,
+    private instance: ExecutorInstance
   ) {
     this.repo = new ExecutorInstanceRepository(db);
   }
@@ -91,7 +91,7 @@ export class MetaWorkflowAdapter implements IExecutor {
     }
     const phases = this.service.listPhases(this.instance.underlyingId);
     const total = phases.length;
-    const done = phases.filter((p) => p.status === 'done').length;
+    const done = phases.filter(p => p.status === 'done').length;
     return {
       fraction: total > 0 ? done / total : -1,
       summary: `${done}/${total} phases done`,
@@ -114,7 +114,7 @@ export class MetaWorkflowAdapter implements IExecutor {
 
   private persistStatus(
     s: ExecutorStatus,
-    extra?: { startedAt?: number; completedAt?: number },
+    extra?: { startedAt?: number; completedAt?: number }
   ): void {
     this.repo.update(this.instance.id, {
       statusSummary: s,

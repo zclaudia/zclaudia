@@ -6,9 +6,7 @@ import { buildModel } from '../../infra/providers/pi-runtime/build-model.js';
  * Result of {@link probeModel}: round-trip latency on success, a
  * human-readable error string otherwise.
  */
-export type ProbeResult =
-  | { ok: true; latencyMs: number }
-  | { ok: false; error: string };
+export type ProbeResult = { ok: true; latencyMs: number } | { ok: false; error: string };
 
 const PROBE_TIMEOUT_MS = 15_000;
 
@@ -27,10 +25,7 @@ const PROBE_TIMEOUT_MS = 15_000;
  * a uniform `{ok, error}` shape regardless of whether the error was a thrown
  * exception (bad config, abort) or a soft error (HTTP 4xx/5xx, ECONNREFUSED).
  */
-export async function probeModel(
-  profile: LlmProfileConfig,
-  modelId: string,
-): Promise<ProbeResult> {
+export async function probeModel(profile: LlmProfileConfig, modelId: string): Promise<ProbeResult> {
   const started = Date.now();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
@@ -39,7 +34,7 @@ export async function probeModel(
     // / displayName overrides flow into the built model. For max_tokens=1
     // ping this is mostly cosmetic but keeps the build path consistent with
     // the runtime call site (PiAgentProviderAdapter).
-    const modelEntry = profile.models?.find((m) => m.modelId === modelId);
+    const modelEntry = profile.models?.find(m => m.modelId === modelId);
     const built = buildModel(profile, modelId, modelEntry);
     // Resolve api key explicitly: completeSimple's `apiKey` option takes
     // precedence over getEnvApiKey, which matches buildModel's intent.
@@ -53,10 +48,12 @@ export async function probeModel(
         maxTokens: 1,
         signal: controller.signal,
         ...(apiKey ? { apiKey } : {}),
-      },
+      }
     );
     if (result.stopReason === 'error' || result.stopReason === 'aborted') {
-      const msg = result.errorMessage || `Provider returned stopReason="${result.stopReason}" without an error message`;
+      const msg =
+        result.errorMessage ||
+        `Provider returned stopReason="${result.stopReason}" without an error message`;
       return { ok: false, error: msg };
     }
     return { ok: true, latencyMs: Date.now() - started };

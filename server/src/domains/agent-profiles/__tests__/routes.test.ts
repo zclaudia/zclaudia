@@ -32,15 +32,17 @@ describe('agent-profiles routes', () => {
   });
 
   it('POST creates an agent profile with full body', async () => {
-    const res = await request(app).post('/api/agent-profiles').send({
-      name: 'coder',
-      llmProfileId,
-      model: 'claude-sonnet-4-6',
-      systemPrompt: 'You are a coder.',
-      enabledTools: ['read', 'write', 'bash'],
-      thinkingLevel: 'medium',
-      isDefault: true,
-    });
+    const res = await request(app)
+      .post('/api/agent-profiles')
+      .send({
+        name: 'coder',
+        llmProfileId,
+        model: 'claude-sonnet-4-6',
+        systemPrompt: 'You are a coder.',
+        enabledTools: ['read', 'write', 'bash'],
+        thinkingLevel: 'medium',
+        isDefault: true,
+      });
     expect(res.status).toBe(201);
     expect(res.body.data.name).toBe('coder');
     expect(res.body.data.thinkingLevel).toBe('medium');
@@ -54,14 +56,16 @@ describe('agent-profiles routes', () => {
       models: [{ modelId: 'gpt-4o', inputModalities: ['text', 'image'] }],
     });
 
-    const res = await request(app).post('/api/agent-profiles').send({
-      name: 'coder',
-      llmProfileId,
-      model: 'claude-haiku-4-5',
-      systemPrompt: '',
-      enabledTools: ['read'],
-      multimodalFallback: { llmProfileId: vision.id, model: 'gpt-4o' },
-    });
+    const res = await request(app)
+      .post('/api/agent-profiles')
+      .send({
+        name: 'coder',
+        llmProfileId,
+        model: 'claude-haiku-4-5',
+        systemPrompt: '',
+        enabledTools: ['read'],
+        multimodalFallback: { llmProfileId: vision.id, model: 'gpt-4o' },
+      });
 
     expect(res.status).toBe(201);
     expect(res.body.data.multimodalFallback).toEqual({ llmProfileId: vision.id, model: 'gpt-4o' });
@@ -75,14 +79,16 @@ describe('agent-profiles routes', () => {
       models: [{ modelId: 'gpt-text', inputModalities: ['text'] }],
     });
 
-    const res = await request(app).post('/api/agent-profiles').send({
-      name: 'coder',
-      llmProfileId,
-      model: 'claude-haiku-4-5',
-      systemPrompt: '',
-      enabledTools: ['read'],
-      multimodalFallback: { llmProfileId: textOnly.id, model: 'gpt-text' },
-    });
+    const res = await request(app)
+      .post('/api/agent-profiles')
+      .send({
+        name: 'coder',
+        llmProfileId,
+        model: 'claude-haiku-4-5',
+        systemPrompt: '',
+        enabledTools: ['read'],
+        multimodalFallback: { llmProfileId: textOnly.id, model: 'gpt-text' },
+      });
 
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
@@ -90,31 +96,37 @@ describe('agent-profiles routes', () => {
   });
 
   it('POST rejects missing required fields', async () => {
-    const res = await request(app).post('/api/agent-profiles').send({ name: 'a', enabledTools: [] });
+    const res = await request(app)
+      .post('/api/agent-profiles')
+      .send({ name: 'a', enabledTools: [] });
     expect(res.status).toBe(400);
   });
 
   it('GET / lists agents', async () => {
-    await request(app).post('/api/agent-profiles').send({
-      name: 'a',
-      llmProfileId,
-      model: 'm',
-      systemPrompt: '',
-      enabledTools: ['read'],
-    });
+    await request(app)
+      .post('/api/agent-profiles')
+      .send({
+        name: 'a',
+        llmProfileId,
+        model: 'm',
+        systemPrompt: '',
+        enabledTools: ['read'],
+      });
     const res = await request(app).get('/api/agent-profiles');
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(1);
   });
 
   it('PATCH updates partial fields', async () => {
-    const create = await request(app).post('/api/agent-profiles').send({
-      name: 'a',
-      llmProfileId,
-      model: 'm',
-      systemPrompt: '',
-      enabledTools: ['read'],
-    });
+    const create = await request(app)
+      .post('/api/agent-profiles')
+      .send({
+        name: 'a',
+        llmProfileId,
+        model: 'm',
+        systemPrompt: '',
+        enabledTools: ['read'],
+      });
     const res = await request(app)
       .patch(`/api/agent-profiles/${create.body.data.id}`)
       .send({ name: 'updated' });
@@ -129,14 +141,16 @@ describe('agent-profiles routes', () => {
       apiKey: 'sk-vision',
       models: [{ modelId: 'gpt-4o', inputModalities: ['text', 'image'] }],
     });
-    const create = await request(app).post('/api/agent-profiles').send({
-      name: 'a',
-      llmProfileId,
-      model: 'm',
-      systemPrompt: '',
-      enabledTools: ['read'],
-      multimodalFallback: { llmProfileId: vision.id, model: 'gpt-4o' },
-    });
+    const create = await request(app)
+      .post('/api/agent-profiles')
+      .send({
+        name: 'a',
+        llmProfileId,
+        model: 'm',
+        systemPrompt: '',
+        enabledTools: ['read'],
+        multimodalFallback: { llmProfileId: vision.id, model: 'gpt-4o' },
+      });
 
     const res = await request(app)
       .patch(`/api/agent-profiles/${create.body.data.id}`)
@@ -147,24 +161,22 @@ describe('agent-profiles routes', () => {
   });
 
   it('DELETE rejects when sessions reference the agent (409)', async () => {
-    const create = await request(app).post('/api/agent-profiles').send({
-      name: 'a',
-      llmProfileId,
-      model: 'm',
-      systemPrompt: '',
-      enabledTools: ['read'],
-    });
+    const create = await request(app)
+      .post('/api/agent-profiles')
+      .send({
+        name: 'a',
+        llmProfileId,
+        model: 'm',
+        systemPrompt: '',
+        enabledTools: ['read'],
+      });
     const agentId = create.body.data.id;
     const now = Date.now();
-    db.prepare('INSERT INTO projects (id, name, root_path, created_at, updated_at) VALUES (?,?,?,?,?)').run(
-      'p1',
-      'p1',
-      '/tmp',
-      now,
-      now,
-    );
     db.prepare(
-      'INSERT INTO sessions (id, project_id, agent_profile_id, created_at, updated_at) VALUES (?,?,?,?,?)',
+      'INSERT INTO projects (id, name, root_path, created_at, updated_at) VALUES (?,?,?,?,?)'
+    ).run('p1', 'p1', '/tmp', now, now);
+    db.prepare(
+      'INSERT INTO sessions (id, project_id, agent_profile_id, created_at, updated_at) VALUES (?,?,?,?,?)'
     ).run('s1', 'p1', agentId, now, now);
 
     const res = await request(app).delete(`/api/agent-profiles/${agentId}`);
@@ -173,21 +185,25 @@ describe('agent-profiles routes', () => {
   });
 
   it('DELETE default transfers default to another agent', async () => {
-    const a = await request(app).post('/api/agent-profiles').send({
-      name: 'a',
-      llmProfileId,
-      model: 'm',
-      systemPrompt: '',
-      enabledTools: ['read'],
-      isDefault: true,
-    });
-    await request(app).post('/api/agent-profiles').send({
-      name: 'b',
-      llmProfileId,
-      model: 'm',
-      systemPrompt: '',
-      enabledTools: ['read'],
-    });
+    const a = await request(app)
+      .post('/api/agent-profiles')
+      .send({
+        name: 'a',
+        llmProfileId,
+        model: 'm',
+        systemPrompt: '',
+        enabledTools: ['read'],
+        isDefault: true,
+      });
+    await request(app)
+      .post('/api/agent-profiles')
+      .send({
+        name: 'b',
+        llmProfileId,
+        model: 'm',
+        systemPrompt: '',
+        enabledTools: ['read'],
+      });
     const del = await request(app).delete(`/api/agent-profiles/${a.body.data.id}`);
     expect(del.status).toBe(200);
     const list = await request(app).get('/api/agent-profiles');
@@ -196,21 +212,25 @@ describe('agent-profiles routes', () => {
   });
 
   it('POST /:id/set-default makes another agent default', async () => {
-    const a = await request(app).post('/api/agent-profiles').send({
-      name: 'a',
-      llmProfileId,
-      model: 'm',
-      systemPrompt: '',
-      enabledTools: ['read'],
-      isDefault: true,
-    });
-    const b = await request(app).post('/api/agent-profiles').send({
-      name: 'b',
-      llmProfileId,
-      model: 'm',
-      systemPrompt: '',
-      enabledTools: ['read'],
-    });
+    const a = await request(app)
+      .post('/api/agent-profiles')
+      .send({
+        name: 'a',
+        llmProfileId,
+        model: 'm',
+        systemPrompt: '',
+        enabledTools: ['read'],
+        isDefault: true,
+      });
+    const b = await request(app)
+      .post('/api/agent-profiles')
+      .send({
+        name: 'b',
+        llmProfileId,
+        model: 'm',
+        systemPrompt: '',
+        enabledTools: ['read'],
+      });
     await request(app).post(`/api/agent-profiles/${b.body.data.id}/set-default`);
     const fetchA = await request(app).get(`/api/agent-profiles/${a.body.data.id}`);
     expect(fetchA.body.data.isDefault).toBe(false);

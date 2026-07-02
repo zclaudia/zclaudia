@@ -22,6 +22,8 @@ export interface GoalBudgetUpdateMessage {
   turnsUsed: number;
 }
 
+export type GoalClientMessage = never;
+
 export type GoalServerMessage =
   | GoalStateChangedMessage
   | GoalEvaluatorVerdictMessage

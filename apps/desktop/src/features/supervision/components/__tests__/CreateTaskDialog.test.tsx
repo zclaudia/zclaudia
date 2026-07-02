@@ -66,7 +66,9 @@ describe('CreateTaskDialog', () => {
   it('shows Title and Description inputs', () => {
     render(<CreateTaskDialog {...defaultProps} />);
     expect(screen.getByPlaceholderText('Task title...')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Describe what this task should accomplish...')).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText('Describe what this task should accomplish...')
+    ).toBeInTheDocument();
   });
 
   it('disables Create Task button when title is empty', () => {
@@ -102,11 +104,14 @@ describe('CreateTaskDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create Task' }));
 
     await waitFor(() => {
-      expect(mockCreateSupervisionTask).toHaveBeenCalledWith('proj-1', expect.objectContaining({
-        title: 'My New Task',
-        description: 'Task description',
-        priority: 0,
-      }));
+      expect(mockCreateSupervisionTask).toHaveBeenCalledWith(
+        'proj-1',
+        expect.objectContaining({
+          title: 'My New Task',
+          description: 'Task description',
+          priority: 0,
+        })
+      );
       expect(mockUpsertTask).toHaveBeenCalledWith('proj-1', createdTask);
       expect(defaultProps.onClose).toHaveBeenCalled();
     });
@@ -133,9 +138,7 @@ describe('CreateTaskDialog', () => {
   });
 
   it('shows dependencies when existing tasks are provided', () => {
-    const existingTasks = [
-      makeTask({ id: 'dep-1', title: 'Dependency Task' }),
-    ];
+    const existingTasks = [makeTask({ id: 'dep-1', title: 'Dependency Task' })];
 
     render(<CreateTaskDialog {...defaultProps} existingTasks={existingTasks} />);
     expect(screen.getByText('Dependencies')).toBeInTheDocument();
@@ -233,7 +236,9 @@ describe('CreateTaskDialog', () => {
     fireEvent.change(screen.getByPlaceholderText('Task title...'), { target: { value: 'Task' } });
 
     // Add criterion
-    fireEvent.change(screen.getByPlaceholderText('Add acceptance criterion...'), { target: { value: 'Criterion 1' } });
+    fireEvent.change(screen.getByPlaceholderText('Add acceptance criterion...'), {
+      target: { value: 'Criterion 1' },
+    });
     fireEvent.click(screen.getByText('Add'));
 
     // Select dependency
@@ -242,10 +247,13 @@ describe('CreateTaskDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create Task' }));
 
     await waitFor(() => {
-      expect(mockCreateSupervisionTask).toHaveBeenCalledWith('proj-1', expect.objectContaining({
-        acceptanceCriteria: ['Criterion 1'],
-        dependencies: ['dep-1'],
-      }));
+      expect(mockCreateSupervisionTask).toHaveBeenCalledWith(
+        'proj-1',
+        expect.objectContaining({
+          acceptanceCriteria: ['Criterion 1'],
+          dependencies: ['dep-1'],
+        })
+      );
     });
   });
 

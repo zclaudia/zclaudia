@@ -28,14 +28,17 @@ function detectIsTauri(): boolean {
 }
 
 function codexModelsToProfileEntries(models: CodexModelEntry[]): LlmProfileModelEntry[] {
-  return models.map((m) => ({
+  return models.map(m => ({
     modelId: m.id,
     displayName: m.displayName && m.displayName !== m.id ? m.displayName : undefined,
     contextWindow: m.contextWindow,
   }));
 }
 
-function sameProfileModels(a: LlmProfileModelEntry[] | undefined, b: LlmProfileModelEntry[]): boolean {
+function sameProfileModels(
+  a: LlmProfileModelEntry[] | undefined,
+  b: LlmProfileModelEntry[]
+): boolean {
   if (!a || a.length !== b.length) return false;
   for (let i = 0; i < b.length; i += 1) {
     const left = a[i];
@@ -53,11 +56,10 @@ function sameProfileModels(a: LlmProfileModelEntry[] | undefined, b: LlmProfileM
 }
 
 export function CodexOAuthSection({ profile, onCredentialsChanged, onBeforeSignIn }: Props) {
-  const activeServerId = useServerStore((s) => s.activeServerId);
+  const activeServerId = useServerStore(s => s.activeServerId);
   const isCurrentLocalServer = activeServerId === 'local';
   const isTauri = detectIsTauri();
-  const method: 'browser' | 'device_code' =
-    isCurrentLocalServer ? 'browser' : 'device_code';
+  const method: 'browser' | 'device_code' = isCurrentLocalServer ? 'browser' : 'device_code';
 
   const [showLogin, setShowLogin] = useState(false);
   // The profile id used by the login modal. Defaults to props.profile.id but
@@ -79,12 +81,18 @@ export function CodexOAuthSection({ profile, onCredentialsChanged, onBeforeSignI
         if (saved) {
           idToUse = saved.id;
         } else {
-          setSignInError('Failed to save the profile before signing in. Please fix the form errors first.');
+          setSignInError(
+            'Failed to save the profile before signing in. Please fix the form errors first.'
+          );
           return;
         }
       } catch (err) {
         console.error('[CodexOAuthSection] onBeforeSignIn threw', err);
-        setSignInError(err instanceof Error ? err.message : 'Failed to save the profile before signing in. Please try again later.');
+        setSignInError(
+          err instanceof Error
+            ? err.message
+            : 'Failed to save the profile before signing in. Please try again later.'
+        );
         return;
       } finally {
         setSignInPending(false);
@@ -160,11 +168,8 @@ export function CodexOAuthSection({ profile, onCredentialsChanged, onBeforeSignI
             </button>
           </div>
           <ul className="text-sm">
-            {models?.map((m) => (
-              <li
-                key={m.id}
-                className="flex justify-between border-b border-border py-1"
-              >
+            {models?.map(m => (
+              <li key={m.id} className="flex justify-between border-b border-border py-1">
                 <span>
                   <code className="font-mono text-xs">{m.id}</code>
                   {m.displayName && m.displayName !== m.id ? ` — ${m.displayName}` : ''}
@@ -177,9 +182,7 @@ export function CodexOAuthSection({ profile, onCredentialsChanged, onBeforeSignI
             {models !== null && models.length === 0 && (
               <li className="text-xs text-muted-foreground">No models detected</li>
             )}
-            {models === null && (
-              <li className="text-xs text-muted-foreground">Loading…</li>
-            )}
+            {models === null && <li className="text-xs text-muted-foreground">Loading…</li>}
           </ul>
         </div>
       )}

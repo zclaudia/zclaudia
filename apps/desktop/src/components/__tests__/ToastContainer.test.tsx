@@ -43,7 +43,7 @@ describe('ToastContainer', () => {
       'absolute',
       'top-4',
       'left-1/2',
-      '-translate-x-1/2',
+      '-translate-x-1/2'
     );
   });
 });

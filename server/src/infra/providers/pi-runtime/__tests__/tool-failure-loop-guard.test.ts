@@ -28,11 +28,29 @@ describe('ToolFailureLoopGuard', () => {
     const args = { command: 'pnpm test' };
     const firstFailure = {
       exitCode: 1,
-      diagnostics: [{ path: 'src/a.ts', line: 1, column: 2, severity: 'error', source: 'TS2322', message: 'Type mismatch' }],
+      diagnostics: [
+        {
+          path: 'src/a.ts',
+          line: 1,
+          column: 2,
+          severity: 'error',
+          source: 'TS2322',
+          message: 'Type mismatch',
+        },
+      ],
     };
     const changedFailure = {
       exitCode: 1,
-      diagnostics: [{ path: 'src/b.ts', line: 3, column: 4, severity: 'error', source: 'TS2304', message: 'Missing name' }],
+      diagnostics: [
+        {
+          path: 'src/b.ts',
+          line: 3,
+          column: 4,
+          severity: 'error',
+          source: 'TS2304',
+          message: 'Missing name',
+        },
+      ],
     };
 
     expect(g.recordFailure('Bash', args, firstFailure)).toBe(1);
@@ -45,11 +63,15 @@ describe('ToolFailureLoopGuard', () => {
     const args = { command: 'pnpm test' };
     g.recordFailure('Bash', args, {
       exitCode: 1,
-      diagnostics: [{ path: 'src/a.ts', line: 1, column: 2, severity: 'error', message: 'Type mismatch' }],
+      diagnostics: [
+        { path: 'src/a.ts', line: 1, column: 2, severity: 'error', message: 'Type mismatch' },
+      ],
     });
     g.recordFailure('Bash', args, {
       exitCode: 1,
-      diagnostics: [{ path: 'src/b.ts', line: 3, column: 4, severity: 'error', message: 'Missing name' }],
+      diagnostics: [
+        { path: 'src/b.ts', line: 3, column: 4, severity: 'error', message: 'Missing name' },
+      ],
     });
 
     g.recordSuccess('Bash', args);

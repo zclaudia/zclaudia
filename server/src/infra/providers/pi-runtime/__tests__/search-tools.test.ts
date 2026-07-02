@@ -3,7 +3,12 @@ import { mkdtemp, mkdir, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import path from 'path';
 
-import { createGlobTool, createGrepBridgeTool, createLsBridgeTool, createLspTool } from '../search-tools.js';
+import {
+  createGlobTool,
+  createGrepBridgeTool,
+  createLsBridgeTool,
+  createLspTool,
+} from '../search-tools.js';
 
 describe('search and listing tools', () => {
   it('Glob returns structured relative file matches under the requested path', async () => {
@@ -72,11 +77,14 @@ describe('search and listing tools', () => {
     const contentPayload = JSON.parse(contentResult.content[0].text);
     const countPayload = JSON.parse(countResult.content[0].text);
     expect(contentPayload.results).toEqual([
-      expect.objectContaining({ file: 'single.ts', line: 1, preview: 'target line', isMatch: true }),
+      expect.objectContaining({
+        file: 'single.ts',
+        line: 1,
+        preview: 'target line',
+        isMatch: true,
+      }),
     ]);
-    expect(countPayload.counts).toEqual([
-      { file: 'single.ts', count: 1 },
-    ]);
+    expect(countPayload.counts).toEqual([{ file: 'single.ts', count: 1 }]);
   });
 
   it('Grep keeps the matching line when context output is capped', async () => {
@@ -91,7 +99,9 @@ describe('search and listing tools', () => {
     });
 
     const payload = JSON.parse(result.content[0].text);
-    expect(payload.results.some((entry: any) => entry.preview === 'target' && entry.isMatch)).toBe(true);
+    expect(payload.results.some((entry: any) => entry.preview === 'target' && entry.isMatch)).toBe(
+      true
+    );
   });
 
   it('LS lists entries alphabetically with a trailing slash on directories', async () => {
@@ -117,7 +127,13 @@ describe('search and listing tools', () => {
     const result = await ls.execute('ls-truncated', { limit: 2 });
 
     expect(result.content[0].text.split('\n')).toEqual(['a.txt', 'b.txt']);
-    expect(result.details).toMatchObject({ ok: true, path: '.', total: 3, returned: 2, truncated: true });
+    expect(result.details).toMatchObject({
+      ok: true,
+      path: '.',
+      total: 3,
+      returned: 2,
+      truncated: true,
+    });
   });
 
   it('Glob reports full match count and truncation in the payload', async () => {
@@ -142,10 +158,20 @@ describe('search and listing tools', () => {
     await writeFile(path.join(root, 'symbols.ts'), 'export function targetSymbol() {}\n');
     const lsp = createLspTool(root) as any;
 
-    const result = await lsp.execute('lsp-1', { action: 'symbols', query: 'targetSymbol', include: '*.ts' });
+    const result = await lsp.execute('lsp-1', {
+      action: 'symbols',
+      query: 'targetSymbol',
+      include: '*.ts',
+    });
 
     const payload = JSON.parse(result.content[0].text);
-    expect(result.details).toMatchObject({ ok: true, action: 'symbols', query: 'targetSymbol', fallback: 'ripgrep', total: 1 });
+    expect(result.details).toMatchObject({
+      ok: true,
+      action: 'symbols',
+      query: 'targetSymbol',
+      fallback: 'ripgrep',
+      total: 1,
+    });
     expect(payload.results[0]).toMatchObject({ file: 'symbols.ts', line: 1 });
   });
 });

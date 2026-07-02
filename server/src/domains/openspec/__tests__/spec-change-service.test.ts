@@ -17,20 +17,33 @@ describe('SpecChangeService', () => {
     db = new Database(':memory:');
     db.pragma('foreign_keys = ON');
     applyMigrations(db);
-    db.prepare(`INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`).run('proj-1', 'P', 'code', 0, 0);
-    db.prepare(`INSERT INTO local_issues (id, project_id, title, description, status, priority, labels, created_at, updated_at, type, is_anonymous)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run('i', 'proj-1', 't', null, 'open', 'medium', '[]', 0, 0, 'implement', 0);
+    db.prepare(
+      `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
+    ).run('proj-1', 'P', 'code', 0, 0);
+    db.prepare(
+      `INSERT INTO local_issues (id, project_id, title, description, status, priority, labels, created_at, updated_at, type, is_anonymous)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run('i', 'proj-1', 't', null, 'open', 'medium', '[]', 0, 0, 'implement', 0);
     projectRoot = mkdtempSync(path.join(tmpdir(), 'openspec-svc-'));
     service = new SpecChangeService({ db, getProjectRoot: () => projectRoot });
   });
 
   afterEach(() => {
     db.close();
-    try { rmSync(projectRoot, { recursive: true, force: true }); } catch { /* */ }
+    try {
+      rmSync(projectRoot, { recursive: true, force: true });
+    } catch {
+      /* */
+    }
   });
 
   it('createSpecChange writes the three skeleton files', () => {
-    const sc = service.createSpecChange({ projectId: 'proj-1', subIssueId: 'i', slug: 'add-2fa', title: 'Add 2FA' });
+    const sc = service.createSpecChange({
+      projectId: 'proj-1',
+      subIssueId: 'i',
+      slug: 'add-2fa',
+      title: 'Add 2FA',
+    });
     const dir = path.join(projectRoot, 'openspec', 'changes', 'add-2fa');
     expect(fs.existsSync(path.join(dir, 'proposal.md'))).toBe(true);
     expect(fs.existsSync(path.join(dir, 'design.md'))).toBe(true);
@@ -39,14 +52,24 @@ describe('SpecChangeService', () => {
   });
 
   it('writeProposal advances status drafting → proposing and persists content', () => {
-    const sc = service.createSpecChange({ projectId: 'proj-1', subIssueId: 'i', slug: 'x', title: 'X' });
+    const sc = service.createSpecChange({
+      projectId: 'proj-1',
+      subIssueId: 'i',
+      slug: 'x',
+      title: 'X',
+    });
     const updated = service.writeProposal(sc.id, '# new proposal\n');
     expect(updated.status).toBe('proposing');
     expect(service.readProposal(sc.id)).toBe('# new proposal\n');
   });
 
   it('writeDesign and writeTasks advance status', () => {
-    const sc = service.createSpecChange({ projectId: 'proj-1', subIssueId: 'i', slug: 'x', title: 'X' });
+    const sc = service.createSpecChange({
+      projectId: 'proj-1',
+      subIssueId: 'i',
+      slug: 'x',
+      title: 'X',
+    });
     service.writeProposal(sc.id, 'p');
     let cur = service.writeDesign(sc.id, 'd');
     expect(cur.status).toBe('designing');
@@ -55,14 +78,24 @@ describe('SpecChangeService', () => {
   });
 
   it('status does not regress when writing an earlier artifact', () => {
-    const sc = service.createSpecChange({ projectId: 'proj-1', subIssueId: 'i', slug: 'x', title: 'X' });
-    service.writeTasks(sc.id, 't');  // tasks_ready
+    const sc = service.createSpecChange({
+      projectId: 'proj-1',
+      subIssueId: 'i',
+      slug: 'x',
+      title: 'X',
+    });
+    service.writeTasks(sc.id, 't'); // tasks_ready
     const updated = service.writeProposal(sc.id, 'p2');
-    expect(updated.status).toBe('tasks_ready');  // does not regress to 'proposing'
+    expect(updated.status).toBe('tasks_ready'); // does not regress to 'proposing'
   });
 
   it('writeDeltaSpec writes file and adds to deltaSpecPaths', () => {
-    const sc = service.createSpecChange({ projectId: 'proj-1', subIssueId: 'i', slug: 'x', title: 'X' });
+    const sc = service.createSpecChange({
+      projectId: 'proj-1',
+      subIssueId: 'i',
+      slug: 'x',
+      title: 'X',
+    });
     const upd = service.writeDeltaSpec(sc.id, 'auth', '# auth delta\n');
     const target = path.join(projectRoot, 'openspec', 'changes', 'x', 'specs', 'auth', 'spec.md');
     expect(fs.existsSync(target)).toBe(true);
@@ -70,14 +103,24 @@ describe('SpecChangeService', () => {
   });
 
   it('writeDeltaSpec twice for same capability does not duplicate path entry', () => {
-    const sc = service.createSpecChange({ projectId: 'proj-1', subIssueId: 'i', slug: 'x', title: 'X' });
+    const sc = service.createSpecChange({
+      projectId: 'proj-1',
+      subIssueId: 'i',
+      slug: 'x',
+      title: 'X',
+    });
     service.writeDeltaSpec(sc.id, 'auth', 'a1');
     const upd = service.writeDeltaSpec(sc.id, 'auth', 'a2');
-    expect(upd.deltaSpecPaths.filter((p) => p.endsWith('auth/spec.md'))).toHaveLength(1);
+    expect(upd.deltaSpecPaths.filter(p => p.endsWith('auth/spec.md'))).toHaveLength(1);
   });
 
   it('cancel sets status=cancelled', () => {
-    const sc = service.createSpecChange({ projectId: 'proj-1', subIssueId: 'i', slug: 'x', title: 'X' });
+    const sc = service.createSpecChange({
+      projectId: 'proj-1',
+      subIssueId: 'i',
+      slug: 'x',
+      title: 'X',
+    });
     const c = service.cancel(sc.id);
     expect(c.status).toBe('cancelled');
   });

@@ -35,7 +35,11 @@ function parseToolInput(detail: string): Record<string, unknown> | null {
  * Edit → DiffViewer, Write → CodeViewer, Bash → terminal-style, etc.
  * Falls back to raw JSON for unrecognized tools.
  */
-export function PermissionDetailView({ toolName, detail, maxHeightClass = 'max-h-48' }: PermissionDetailViewProps) {
+export function PermissionDetailView({
+  toolName,
+  detail,
+  maxHeightClass = 'max-h-48',
+}: PermissionDetailViewProps) {
   const input = parseToolInput(detail);
 
   // Edit tool: show file path + diff
@@ -69,7 +73,7 @@ export function PermissionDetailView({ toolName, detail, maxHeightClass = 'max-h
         </div>
         <div className="space-y-1.5">
           {input.edits.map((raw, index) => {
-            const edit = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
+            const edit = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
             return (
               <div key={index} className="rounded-md border border-border bg-muted/50 p-2 text-xs">
                 <div className="mb-1 font-medium text-muted-foreground">edit {index + 1}</div>
@@ -106,13 +110,12 @@ export function PermissionDetailView({ toolName, detail, maxHeightClass = 'max-h
       <div className={`${maxHeightClass} overflow-y-auto`}>
         <div className="rounded-lg overflow-hidden border border-zinc-700">
           <pre className="text-xs font-mono p-2 bg-zinc-900 text-green-400 overflow-x-auto whitespace-pre-wrap break-words">
-            <span className="text-zinc-500 select-none">$ </span>{String(input.command)}
+            <span className="text-zinc-500 select-none">$ </span>
+            {String(input.command)}
           </pre>
         </div>
         {input.description ? (
-          <div className="text-xs text-muted-foreground mt-1.5">
-            {String(input.description)}
-          </div>
+          <div className="text-xs text-muted-foreground mt-1.5">{String(input.description)}</div>
         ) : null}
       </div>
     );
@@ -122,10 +125,8 @@ export function PermissionDetailView({ toolName, detail, maxHeightClass = 'max-h
   if (toolName === 'Read' && input?.file_path) {
     return (
       <div className="bg-muted/50 rounded-lg p-3">
-        <div className="text-xs font-mono text-foreground break-all">
-          {String(input.file_path)}
-        </div>
-        {(input.offset || input.limit) ? (
+        <div className="text-xs font-mono text-foreground break-all">{String(input.file_path)}</div>
+        {input.offset || input.limit ? (
           <div className="text-xs text-muted-foreground mt-1">
             {input.offset ? `offset: ${input.offset}` : ''}
             {input.offset && input.limit ? ', ' : ''}
@@ -147,10 +148,22 @@ export function PermissionDetailView({ toolName, detail, maxHeightClass = 'max-h
         </div>
         {risk ? (
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <div><span className="text-muted-foreground">risk:</span> {String(risk.riskLevel ?? 'unknown')}</div>
-            <div><span className="text-muted-foreground">network:</span> {String(risk.requiresNetwork ?? true)}</div>
-            <div><span className="text-muted-foreground">declared readonly:</span> {String(risk.declaredReadOnly ?? false)}</div>
-            <div><span className="text-muted-foreground">trusted readonly:</span> {String(risk.trustedReadOnly ?? false)}</div>
+            <div>
+              <span className="text-muted-foreground">risk:</span>{' '}
+              {String(risk.riskLevel ?? 'unknown')}
+            </div>
+            <div>
+              <span className="text-muted-foreground">network:</span>{' '}
+              {String(risk.requiresNetwork ?? true)}
+            </div>
+            <div>
+              <span className="text-muted-foreground">declared readonly:</span>{' '}
+              {String(risk.declaredReadOnly ?? false)}
+            </div>
+            <div>
+              <span className="text-muted-foreground">trusted readonly:</span>{' '}
+              {String(risk.trustedReadOnly ?? false)}
+            </div>
           </div>
         ) : null}
         <pre className="text-xs text-foreground whitespace-pre-wrap break-words font-mono">
@@ -197,24 +210,35 @@ export function PermissionDetailView({ toolName, detail, maxHeightClass = 'max-h
 }
 
 /** ExitPlanMode detail with fullscreen expand support */
-function ExitPlanModeDetail({ input, maxHeightClass }: { input: Record<string, unknown>; maxHeightClass: string }) {
+function ExitPlanModeDetail({
+  input,
+  maxHeightClass,
+}: {
+  input: Record<string, unknown>;
+  maxHeightClass: string;
+}) {
   const [expanded, setExpanded] = useState(false);
-  const allowedPrompts = input.allowedPrompts as Array<{ tool: string; prompt: string }> | undefined;
+  const allowedPrompts = input.allowedPrompts as
+    | Array<{ tool: string; prompt: string }>
+    | undefined;
   const plan = input.plan as string | undefined;
 
   useAndroidBack(() => setExpanded(false), expanded, 40);
 
-  const permissionsBlock = allowedPrompts && allowedPrompts.length > 0 ? (
-    <div className="bg-muted/50 rounded-lg p-3">
-      <div className="text-xs font-medium text-muted-foreground mb-1.5">Requested permissions</div>
-      {allowedPrompts.map((p, i) => (
-        <div key={i} className="flex items-start gap-2 text-xs mt-1">
-          <span className="font-mono text-primary shrink-0">{p.tool}</span>
-          <span className="text-foreground">{p.prompt}</span>
+  const permissionsBlock =
+    allowedPrompts && allowedPrompts.length > 0 ? (
+      <div className="bg-muted/50 rounded-lg p-3">
+        <div className="text-xs font-medium text-muted-foreground mb-1.5">
+          Requested permissions
         </div>
-      ))}
-    </div>
-  ) : null;
+        {allowedPrompts.map((p, i) => (
+          <div key={i} className="flex items-start gap-2 text-xs mt-1">
+            <span className="font-mono text-primary shrink-0">{p.tool}</span>
+            <span className="text-foreground">{p.prompt}</span>
+          </div>
+        ))}
+      </div>
+    ) : null;
 
   const planBlock = plan ? (
     <div className="prose prose-sm prose-invert max-w-none text-xs [&_h1]:text-sm [&_h2]:text-xs [&_h3]:text-xs [&_p]:text-xs [&_li]:text-xs [&_code]:text-xs">
@@ -240,38 +264,39 @@ function ExitPlanModeDetail({ input, maxHeightClass }: { input: Record<string, u
       </div>
 
       {/* Fullscreen overlay via portal */}
-      {expanded && createPortal(
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-          onClick={() => setExpanded(false)}
-        >
+      {expanded &&
+        createPortal(
           <div
-            className="relative w-full h-full sm:w-[90vw] sm:max-w-3xl sm:h-auto sm:max-h-[80vh] bg-card sm:border sm:border-border sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            onClick={() => setExpanded(false)}
           >
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border safe-top-pad">
-              <span className="text-sm font-medium text-card-foreground">Plan Details</span>
-              <button
-                onClick={() => setExpanded(false)}
-                className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <X size={18} />
-              </button>
+            <div
+              className="relative w-full h-full sm:w-[90vw] sm:max-w-3xl sm:h-auto sm:max-h-[80vh] bg-card sm:border sm:border-border sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border safe-top-pad">
+                <span className="text-sm font-medium text-card-foreground">Plan Details</span>
+                <button
+                  onClick={() => setExpanded(false)}
+                  className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 safe-bottom-pad">
+                {permissionsBlock}
+                {plan && (
+                  <div className="prose prose-sm prose-invert max-w-none text-sm [&_h1]:text-lg [&_h2]:text-base [&_h3]:text-sm [&_p]:text-sm [&_li]:text-sm [&_code]:text-xs">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{plan}</ReactMarkdown>
+                  </div>
+                )}
+              </div>
             </div>
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 safe-bottom-pad">
-              {permissionsBlock}
-              {plan && (
-                <div className="prose prose-sm prose-invert max-w-none text-sm [&_h1]:text-lg [&_h2]:text-base [&_h3]:text-sm [&_p]:text-sm [&_li]:text-sm [&_code]:text-xs">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{plan}</ReactMarkdown>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+          </div>,
+          document.body
+        )}
     </>
   );
 }

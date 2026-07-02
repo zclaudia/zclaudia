@@ -9,7 +9,9 @@ export async function getWebSearchConfig(): Promise<WebSearchConfig> {
   return result.data;
 }
 
-export async function updateWebSearchConfig(config: UpdateWebSearchConfigRequest): Promise<WebSearchConfig> {
+export async function updateWebSearchConfig(
+  config: UpdateWebSearchConfigRequest
+): Promise<WebSearchConfig> {
   const result = await fetchApi<WebSearchConfig>('/api/web-search/config', {
     method: 'PUT',
     body: JSON.stringify(config),

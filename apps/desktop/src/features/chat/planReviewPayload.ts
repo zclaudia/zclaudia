@@ -5,12 +5,16 @@ export function normalizePlanTodoStatus(raw: unknown): PlanTodoItem['status'] {
   if (typeof raw !== 'string') return 'pending';
   const s = raw.toUpperCase().replace(/^TODO_STATUS_/, '');
   switch (s) {
-    case 'COMPLETED': return 'completed';
-    case 'IN_PROGRESS': return 'in_progress';
+    case 'COMPLETED':
+      return 'completed';
+    case 'IN_PROGRESS':
+      return 'in_progress';
     case 'CANCELLED':
-    case 'CANCELED': return 'cancelled';
+    case 'CANCELED':
+      return 'cancelled';
     case 'PENDING':
-    default: return 'pending';
+    default:
+      return 'pending';
   }
 }
 
@@ -27,9 +31,10 @@ export function extractPlanPayload(toolInput: unknown): {
   todos?: PlanTodoItem[];
 } {
   const parsed = normalizeToolInput(toolInput);
-  const input = (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed))
-    ? (parsed as Record<string, unknown>)
-    : undefined;
+  const input =
+    parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : undefined;
 
   let planContent = '';
   if (typeof input?.plan === 'string') {

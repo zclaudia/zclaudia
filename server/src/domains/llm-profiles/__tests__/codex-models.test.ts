@@ -13,13 +13,21 @@ describe('codex-models', () => {
   });
 
   it('fetches live models from /codex/models and clamps contextWindow to 272_000', async () => {
-    globalThis.fetch = vi.fn(async () =>
-      new Response(JSON.stringify({
-        models: [
-          { slug: 'gpt-5-codex', display_name: 'GPT-5 Codex', context_window: 1_000_000 },
-          { slug: 'gpt-5-codex-mini', display_name: 'GPT-5 Codex Mini', context_window: 400_000 },
-        ],
-      }), { status: 200 }),
+    globalThis.fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            models: [
+              { slug: 'gpt-5-codex', display_name: 'GPT-5 Codex', context_window: 1_000_000 },
+              {
+                slug: 'gpt-5-codex-mini',
+                display_name: 'GPT-5 Codex Mini',
+                context_window: 400_000,
+              },
+            ],
+          }),
+          { status: 200 }
+        )
     ) as any;
 
     const result = await fetchCodexModels('p1', 'tok-abc', 'acct_xyz');
@@ -31,8 +39,9 @@ describe('codex-models', () => {
   });
 
   it('returns cached result on second call within TTL', async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ models: [{ slug: 'gpt-5-codex' }] }), { status: 200 }),
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ models: [{ slug: 'gpt-5-codex' }] }), { status: 200 })
     );
     globalThis.fetch = fetchMock as any;
 
@@ -44,9 +53,7 @@ describe('codex-models', () => {
   });
 
   it('falls back to pi-ai bundled list on fetch failure', async () => {
-    globalThis.fetch = vi.fn(async () =>
-      new Response('boom', { status: 500 }),
-    ) as any;
+    globalThis.fetch = vi.fn(async () => new Response('boom', { status: 500 })) as any;
 
     const result = await fetchCodexModels('p1', 'tok-abc', 'acct_xyz');
     expect(result.source).toBe('fallback');
@@ -57,8 +64,9 @@ describe('codex-models', () => {
   });
 
   it('refresh=true bypasses cache', async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ models: [{ slug: 'gpt-5-codex' }] }), { status: 200 }),
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ models: [{ slug: 'gpt-5-codex' }] }), { status: 200 })
     );
     globalThis.fetch = fetchMock as any;
 

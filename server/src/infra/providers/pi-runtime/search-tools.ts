@@ -9,24 +9,39 @@ import { errorResult, jsonResult, textResult, toolParams } from './tool-common.j
 import { resolveInsideWorkspace, toWorkspaceRelative } from './workspace-paths.js';
 
 const execFileAsync = promisify(execFile);
+type AgentToolParameters = AgentTool['parameters'];
 
-function parseRipgrepLines(cwd: string, stdout: string, maxResults: number): Array<{ file: string; line: number; preview: string }> {
+function agentToolParameters(schema: Record<string, unknown>): AgentToolParameters {
+  return schema as AgentToolParameters;
+}
+
+function parseRipgrepLines(
+  cwd: string,
+  stdout: string,
+  maxResults: number
+): Array<{ file: string; line: number; preview: string }> {
   return stdout
     .split('\n')
     .filter(Boolean)
     .slice(0, maxResults)
-    .flatMap((line) => {
+    .flatMap(line => {
       const match = /^(.*?):(\d+):(.*)$/.exec(line);
       if (!match) return [];
-      return [{
-        file: toWorkspaceRelative(cwd, match[1]),
-        line: Number(match[2]),
-        preview: match[3].trim(),
-      }];
+      return [
+        {
+          file: toWorkspaceRelative(cwd, match[1]),
+          line: Number(match[2]),
+          preview: match[3].trim(),
+        },
+      ];
     });
 }
 
-function parseRipgrepContextLines(cwd: string, stdout: string, maxResults: number): Array<{ file: string; line: number; preview: string; isMatch: boolean }> {
+function parseRipgrepContextLines(
+  cwd: string,
+  stdout: string,
+  maxResults: number
+): Array<{ file: string; line: number; preview: string; isMatch: boolean }> {
   const groups: string[][] = [];
   let currentGroup: string[] = [];
   for (const line of stdout.split('\n')) {
@@ -44,17 +59,19 @@ function parseRipgrepContextLines(cwd: string, stdout: string, maxResults: numbe
   let matchCount = 0;
   for (const group of groups) {
     if (matchCount >= maxResults) break;
-    const parsedGroup = group.flatMap((line) => {
+    const parsedGroup = group.flatMap(line => {
       const match = /^(.*?)([:-])(\d+)\2(.*)$/.exec(line);
       if (!match) return [];
-      return [{
-        file: toWorkspaceRelative(cwd, match[1]),
-        line: Number(match[3]),
-        preview: match[4].trim(),
-        isMatch: match[2] === ':',
-      }];
+      return [
+        {
+          file: toWorkspaceRelative(cwd, match[1]),
+          line: Number(match[3]),
+          preview: match[4].trim(),
+          isMatch: match[2] === ':',
+        },
+      ];
     });
-    const groupMatches = parsedGroup.filter((entry) => entry.isMatch).length;
+    const groupMatches = parsedGroup.filter(entry => entry.isMatch).length;
     if (groupMatches === 0) continue;
     results.push(...parsedGroup);
     matchCount += groupMatches;
@@ -67,7 +84,7 @@ async function ripgrepSearch(
   searchRoot: string,
   query: string,
   maxResults: number,
-  include?: string,
+  include?: string
 ): Promise<Array<{ file: string; line: number; preview: string }>> {
   const args = [
     '--line-number',
@@ -94,24 +111,29 @@ async function ripgrepSearch(
   }
 }
 
-export function createGrepBridgeTool(cwd: string): AgentTool<any> {
+export function createGrepBridgeTool(cwd: string): AgentTool {
   return {
     name: 'Grep',
     label: 'Grep',
-    description: 'Search file contents with ripgrep. output_mode: "content" (default, matching lines with optional context), "files_with_matches" (file paths), or "count" (total match count). Supports case_insensitive and a glob include filter.',
-    parameters: {
+    description:
+      'Search file contents with ripgrep. output_mode: "content" (default, matching lines with optional context), "files_with_matches" (file paths), or "count" (total match count). Supports case_insensitive and a glob include filter.',
+    parameters: agentToolParameters({
       type: 'object',
       properties: {
         pattern: { type: 'string' },
         path: { type: 'string' },
         include: { type: 'string', description: 'Glob filter, e.g. *.ts' },
-        output_mode: { type: 'string', enum: ['content', 'files_with_matches', 'count'], default: 'content' },
+        output_mode: {
+          type: 'string',
+          enum: ['content', 'files_with_matches', 'count'],
+          default: 'content',
+        },
         case_insensitive: { type: 'boolean', default: false },
         context: { type: 'number', default: 0 },
         max_results: { type: 'number', default: 100 },
       },
       required: ['pattern'],
-    } as any,
+    }),
     execute: async (toolCallId: string, params: unknown, signal?: AbortSignal) => {
       const args = toolParams(toolCallId, params);
       const pattern = String(args.pattern || '').trim();
@@ -120,116 +142,216 @@ export function createGrepBridgeTool(cwd: string): AgentTool<any> {
       try {
         searchRoot = resolveInsideWorkspace(cwd, args.path);
       } catch (err) {
-        return errorResult('path_outside_workspace', err instanceof Error ? err.message : String(err), { pattern });
+        return errorResult(
+          'path_outside_workspace',
+          err instanceof Error ? err.message : String(err),
+          { pattern }
+        );
       }
-      const mode = args.output_mode === 'files_with_matches' || args.output_mode === 'count' ? args.output_mode : 'content';
+      const mode =
+        args.output_mode === 'files_with_matches' || args.output_mode === 'count'
+          ? args.output_mode
+          : 'content';
       const caseInsensitive = args.case_insensitive === true;
       const context = Math.max(0, Math.min(Number(args.context ?? 0) || 0, 20));
       const maxResults = Math.max(1, Math.min(Number(args.max_results ?? 100) || 100, 500));
       const relPath = toWorkspaceRelative(cwd, searchRoot) || '.';
-      const include = typeof args.include === 'string' && args.include ? ['--glob', args.include] : [];
+      const include =
+        typeof args.include === 'string' && args.include ? ['--glob', args.include] : [];
       const ci = caseInsensitive ? ['-i'] : [];
 
       try {
         if (mode === 'files_with_matches') {
           const { lines, truncated, exitCode, stderr } = await runRipgrep(
-            ['--files-with-matches', '--color', 'never', '--with-filename', ...ci, ...include, '--', pattern, searchRoot],
-            { maxLines: maxResults, signal },
+            [
+              '--files-with-matches',
+              '--color',
+              'never',
+              '--with-filename',
+              ...ci,
+              ...include,
+              '--',
+              pattern,
+              searchRoot,
+            ],
+            { maxLines: maxResults, signal }
           );
-          if (exitCode === 2) return errorResult('grep_failed', stderr || 'ripgrep error', { pattern });
-          const files = lines.map((f) => toWorkspaceRelative(cwd, f));
-          return textResult(JSON.stringify({ pattern, path: relPath, mode, files, total: files.length, truncated }, null, 2),
-            { ok: true, pattern, path: relPath, total: files.length, truncated });
+          if (exitCode === 2)
+            return errorResult('grep_failed', stderr || 'ripgrep error', { pattern });
+          const files = lines.map(f => toWorkspaceRelative(cwd, f));
+          return textResult(
+            JSON.stringify(
+              { pattern, path: relPath, mode, files, total: files.length, truncated },
+              null,
+              2
+            ),
+            { ok: true, pattern, path: relPath, total: files.length, truncated }
+          );
         }
         if (mode === 'count') {
           const { lines, truncated, exitCode, stderr } = await runRipgrep(
-            ['--count', '--no-messages', '--color', 'never', '--with-filename', ...ci, ...include, '--', pattern, searchRoot],
-            { maxLines: maxResults, signal },
+            [
+              '--count',
+              '--no-messages',
+              '--color',
+              'never',
+              '--with-filename',
+              ...ci,
+              ...include,
+              '--',
+              pattern,
+              searchRoot,
+            ],
+            { maxLines: maxResults, signal }
           );
-          if (exitCode === 2) return errorResult('grep_failed', stderr || 'ripgrep error', { pattern });
-          const counts = lines.flatMap((l) => {
+          if (exitCode === 2)
+            return errorResult('grep_failed', stderr || 'ripgrep error', { pattern });
+          const counts = lines.flatMap(l => {
             const idx = l.lastIndexOf(':');
             if (idx < 0) return [];
-            return { file: toWorkspaceRelative(cwd, l.slice(0, idx)), count: Number(l.slice(idx + 1)) || 0 };
+            return {
+              file: toWorkspaceRelative(cwd, l.slice(0, idx)),
+              count: Number(l.slice(idx + 1)) || 0,
+            };
           });
           const total = counts.reduce((sum, c) => sum + c.count, 0);
-          return textResult(JSON.stringify({ pattern, path: relPath, mode, counts, total, truncated }, null, 2),
-            { ok: true, pattern, path: relPath, total, truncated });
+          return textResult(
+            JSON.stringify({ pattern, path: relPath, mode, counts, total, truncated }, null, 2),
+            { ok: true, pattern, path: relPath, total, truncated }
+          );
         }
         const { lines, truncated, exitCode, stderr } = await runRipgrep(
-          ['--line-number', '--no-heading', '--color', 'never', '--with-filename', ...ci, ...(context > 0 ? ['-C', String(context)] : []), ...include, '--', pattern, searchRoot],
-          { maxLines: maxResults * (context > 0 ? context * 2 + 1 : 1) + maxResults, signal },
+          [
+            '--line-number',
+            '--no-heading',
+            '--color',
+            'never',
+            '--with-filename',
+            ...ci,
+            ...(context > 0 ? ['-C', String(context)] : []),
+            ...include,
+            '--',
+            pattern,
+            searchRoot,
+          ],
+          { maxLines: maxResults * (context > 0 ? context * 2 + 1 : 1) + maxResults, signal }
         );
-        if (exitCode === 2) return errorResult('grep_failed', stderr || 'ripgrep error', { pattern });
+        if (exitCode === 2)
+          return errorResult('grep_failed', stderr || 'ripgrep error', { pattern });
         const stdout = lines.join('\n');
-        const results = context > 0
-          ? parseRipgrepContextLines(cwd, stdout, maxResults)
-          : parseRipgrepLines(cwd, stdout, maxResults).map((row) => ({ ...row, isMatch: true }));
-        return textResult(JSON.stringify({ pattern, path: relPath, mode, results, total: results.length, truncated }, null, 2),
-          { ok: true, pattern, path: relPath, total: results.length, truncated, context });
+        const results =
+          context > 0
+            ? parseRipgrepContextLines(cwd, stdout, maxResults)
+            : parseRipgrepLines(cwd, stdout, maxResults).map(row => ({ ...row, isMatch: true }));
+        return textResult(
+          JSON.stringify(
+            { pattern, path: relPath, mode, results, total: results.length, truncated },
+            null,
+            2
+          ),
+          { ok: true, pattern, path: relPath, total: results.length, truncated, context }
+        );
       } catch (err) {
-        return errorResult('grep_failed', err instanceof Error ? err.message : String(err), { pattern });
+        return errorResult('grep_failed', err instanceof Error ? err.message : String(err), {
+          pattern,
+        });
       }
     },
-  } as unknown as AgentTool<any>;
+  };
 }
 
-export function createLsBridgeTool(cwd: string): AgentTool<any> {
+export function createLsBridgeTool(cwd: string): AgentTool {
   const LS_DEFAULT_LIMIT = 500;
   return {
     name: 'LS',
     label: 'LS',
-    description: 'List the immediate contents of a directory, sorted alphabetically, with a "/" suffix for subdirectories. Includes dotfiles. Use Glob/Grep for recursive search.',
-    parameters: {
+    description:
+      'List the immediate contents of a directory, sorted alphabetically, with a "/" suffix for subdirectories. Includes dotfiles. Use Glob/Grep for recursive search.',
+    parameters: agentToolParameters({
       type: 'object',
       properties: {
-        path: { type: 'string', description: 'Workspace-relative directory (default: workspace root)' },
+        path: {
+          type: 'string',
+          description: 'Workspace-relative directory (default: workspace root)',
+        },
         limit: { type: 'number', default: LS_DEFAULT_LIMIT },
       },
-    } as any,
+    }),
     execute: async (toolCallId: string, params: unknown) => {
       const args = toolParams(toolCallId, params);
       let dirPath: string;
       try {
         dirPath = resolveInsideWorkspace(cwd, args.path);
       } catch (err) {
-        return errorResult('path_outside_workspace', err instanceof Error ? err.message : String(err));
+        return errorResult(
+          'path_outside_workspace',
+          err instanceof Error ? err.message : String(err)
+        );
       }
-      const limit = Math.max(1, Math.min(Number(args.limit ?? LS_DEFAULT_LIMIT) || LS_DEFAULT_LIMIT, 2000));
+      const limit = Math.max(
+        1,
+        Math.min(Number(args.limit ?? LS_DEFAULT_LIMIT) || LS_DEFAULT_LIMIT, 2000)
+      );
       try {
         const dirStat = await stat(dirPath);
         if (!dirStat.isDirectory()) {
-          return errorResult('not_a_directory', `Path is not a directory: ${toWorkspaceRelative(cwd, dirPath) || '.'}`, { path: toWorkspaceRelative(cwd, dirPath) || '.' });
+          return errorResult(
+            'not_a_directory',
+            `Path is not a directory: ${toWorkspaceRelative(cwd, dirPath) || '.'}`,
+            { path: toWorkspaceRelative(cwd, dirPath) || '.' }
+          );
         }
-        const entries = (await readdir(dirPath)).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+        const entries = (await readdir(dirPath)).sort((a, b) =>
+          a.toLowerCase().localeCompare(b.toLowerCase())
+        );
         const lines: string[] = [];
         let truncated = false;
         for (const entry of entries) {
-          if (lines.length >= limit) { truncated = true; break; }
+          if (lines.length >= limit) {
+            truncated = true;
+            break;
+          }
           let suffix = '';
           try {
             if ((await stat(path.join(dirPath, entry))).isDirectory()) suffix = '/';
-          } catch { /* un-stattable entry (e.g. dangling symlink) - list it without a suffix */ }
+          } catch {
+            /* un-stattable entry (e.g. dangling symlink) - list it without a suffix */
+          }
           lines.push(entry + suffix);
         }
         const relPath = toWorkspaceRelative(cwd, dirPath) || '.';
         if (lines.length === 0) {
-          return textResult('(empty directory)', { ok: true, path: relPath, total: 0, returned: 0, truncated });
+          return textResult('(empty directory)', {
+            ok: true,
+            path: relPath,
+            total: 0,
+            returned: 0,
+            truncated,
+          });
         }
-        return textResult(lines.join('\n'), { ok: true, path: relPath, total: entries.length, returned: lines.length, truncated });
+        return textResult(lines.join('\n'), {
+          ok: true,
+          path: relPath,
+          total: entries.length,
+          returned: lines.length,
+          truncated,
+        });
       } catch (err) {
-        return errorResult('ls_failed', err instanceof Error ? err.message : String(err), { path: String(args.path ?? '.') });
+        return errorResult('ls_failed', err instanceof Error ? err.message : String(err), {
+          path: String(args.path ?? '.'),
+        });
       }
     },
-  } as unknown as AgentTool<any>;
+  };
 }
 
-export function createGlobTool(cwd: string): AgentTool<any> {
+export function createGlobTool(cwd: string): AgentTool {
   return {
     name: 'Glob',
     label: 'Glob',
-    description: 'Find files by glob pattern under the workspace, returned most-recently-modified first. Respects .gitignore.',
-    parameters: {
+    description:
+      'Find files by glob pattern under the workspace, returned most-recently-modified first. Respects .gitignore.',
+    parameters: agentToolParameters({
       type: 'object',
       properties: {
         pattern: { type: 'string', description: 'Glob pattern such as **/*.ts' },
@@ -238,7 +360,7 @@ export function createGlobTool(cwd: string): AgentTool<any> {
         include_hidden: { type: 'boolean', default: false },
       },
       required: ['pattern'],
-    } as any,
+    }),
     execute: async (toolCallId: string, params: unknown, signal?: AbortSignal) => {
       const args = toolParams(toolCallId, params);
       const pattern = String(args.pattern || '').trim();
@@ -248,7 +370,11 @@ export function createGlobTool(cwd: string): AgentTool<any> {
       try {
         searchRoot = resolveInsideWorkspace(cwd, args.path);
       } catch (err) {
-        return errorResult('path_outside_workspace', err instanceof Error ? err.message : String(err), { pattern });
+        return errorResult(
+          'path_outside_workspace',
+          err instanceof Error ? err.message : String(err),
+          { pattern }
+        );
       }
       const rgArgs = [
         '--files',
@@ -259,45 +385,71 @@ export function createGlobTool(cwd: string): AgentTool<any> {
         searchRoot,
       ];
       try {
-        const { lines, truncated: streamTruncated, exitCode, stderr } = await runRipgrep(rgArgs, { maxLines: 10_000, signal });
+        const {
+          lines,
+          truncated: streamTruncated,
+          exitCode,
+          stderr,
+        } = await runRipgrep(rgArgs, { maxLines: 10_000, signal });
         if (exitCode === 2) {
           return errorResult('glob_failed', stderr || 'ripgrep error', { pattern });
         }
         const relPath = toWorkspaceRelative(cwd, searchRoot) || '.';
-        const all = lines.map((file) => toWorkspaceRelative(cwd, file));
+        const all = lines.map(file => toWorkspaceRelative(cwd, file));
         const results = all.slice(0, maxResults);
         const truncated = streamTruncated || all.length > maxResults;
-        return textResult(JSON.stringify({ pattern, path: relPath, results, total: all.length, returned: results.length, truncated }, null, 2), {
-          ok: true,
-          pattern,
-          path: relPath,
-          total: all.length,
-          returned: results.length,
-          truncated,
-        });
+        return textResult(
+          JSON.stringify(
+            {
+              pattern,
+              path: relPath,
+              results,
+              total: all.length,
+              returned: results.length,
+              truncated,
+            },
+            null,
+            2
+          ),
+          {
+            ok: true,
+            pattern,
+            path: relPath,
+            total: all.length,
+            returned: results.length,
+            truncated,
+          }
+        );
       } catch (err) {
-        return errorResult('glob_failed', err instanceof Error ? err.message : String(err), { pattern });
+        return errorResult('glob_failed', err instanceof Error ? err.message : String(err), {
+          pattern,
+        });
       }
     },
-  } as unknown as AgentTool<any>;
+  };
 }
 
-export function createLspTool(cwd: string): AgentTool<any> {
+export function createLspTool(cwd: string): AgentTool {
   return {
     name: 'LSPTool',
     label: 'LSPTool',
-    description: 'Find symbols, references, definitions, or diagnostics in the workspace. Uses ripgrep as a structured fallback when no language server is attached.',
-    parameters: {
+    description:
+      'Find symbols, references, definitions, or diagnostics in the workspace. Uses ripgrep as a structured fallback when no language server is attached.',
+    parameters: agentToolParameters({
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['symbols', 'references', 'definition', 'diagnostics'], default: 'symbols' },
+        action: {
+          type: 'string',
+          enum: ['symbols', 'references', 'definition', 'diagnostics'],
+          default: 'symbols',
+        },
         query: { type: 'string' },
         path: { type: 'string', description: 'Optional workspace-relative directory to search' },
         include: { type: 'string', description: 'Optional ripgrep glob filter, such as *.ts' },
         max_results: { type: 'number', default: 50 },
       },
       required: ['query'],
-    } as any,
+    }),
     execute: async (toolCallId: string, params: unknown) => {
       const args = toolParams(toolCallId, params);
       const action = String(args.action || 'symbols');
@@ -308,22 +460,39 @@ export function createLspTool(cwd: string): AgentTool<any> {
       try {
         searchRoot = resolveInsideWorkspace(cwd, args.path);
       } catch (err) {
-        return errorResult('path_outside_workspace', err instanceof Error ? err.message : String(err), { action, query });
+        return errorResult(
+          'path_outside_workspace',
+          err instanceof Error ? err.message : String(err),
+          { action, query }
+        );
       }
-      const results = await ripgrepSearch(cwd, searchRoot, query, maxResults, typeof args.include === 'string' ? args.include : undefined);
-      return textResult(JSON.stringify({
-        action,
+      const results = await ripgrepSearch(
+        cwd,
+        searchRoot,
         query,
-        fallback: 'ripgrep',
-        results,
-        total: results.length,
-      }, null, 2), {
-        ok: true,
-        action,
-        query,
-        fallback: 'ripgrep',
-        total: results.length,
-      });
+        maxResults,
+        typeof args.include === 'string' ? args.include : undefined
+      );
+      return textResult(
+        JSON.stringify(
+          {
+            action,
+            query,
+            fallback: 'ripgrep',
+            results,
+            total: results.length,
+          },
+          null,
+          2
+        ),
+        {
+          ok: true,
+          action,
+          query,
+          fallback: 'ripgrep',
+          total: results.length,
+        }
+      );
     },
-  } as unknown as AgentTool<any>;
+  };
 }

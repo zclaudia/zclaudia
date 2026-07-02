@@ -18,34 +18,34 @@ interface Props {
   subIssueId: string;
 }
 
-export function SubIssueDetailScreen({
-  projectId,
-  subIssueId,
-}: Props): React.ReactElement {
-  const issue = useOpenSpecStore((s) =>
-    (s.issuesByProject[projectId] ?? []).find((i) => i.id === subIssueId),
+export function SubIssueDetailScreen({ projectId, subIssueId }: Props): React.ReactElement {
+  const issue = useOpenSpecStore(s =>
+    (s.issuesByProject[projectId] ?? []).find(i => i.id === subIssueId)
   );
-  const specChange = useOpenSpecStore((s) =>
-    issue?.specChangeId ? s.specChangesById[issue.specChangeId] : undefined,
+  const specChange = useOpenSpecStore(s =>
+    issue?.specChangeId ? s.specChangesById[issue.specChangeId] : undefined
   );
-  const executors = useOpenSpecStore((s) =>
-    issue?.specChangeId ? (s.executorsBySpecChange[issue.specChangeId] ?? []) : [],
+  const executors = useOpenSpecStore(s =>
+    issue?.specChangeId ? (s.executorsBySpecChange[issue.specChangeId] ?? []) : []
   );
-  const patchView = useOpenSpecStore((s) => s.patchView);
-  const upsertIssue = useOpenSpecStore((s) => s.upsertIssue);
-  const setSpecChange = useOpenSpecStore((s) => s.setSpecChange);
-  const setExecutors = useOpenSpecStore((s) => s.setExecutors);
-  const upsertExecutor = useOpenSpecStore((s) => s.upsertExecutor);
+  const patchView = useOpenSpecStore(s => s.patchView);
+  const upsertIssue = useOpenSpecStore(s => s.upsertIssue);
+  const setSpecChange = useOpenSpecStore(s => s.setSpecChange);
+  const setExecutors = useOpenSpecStore(s => s.setExecutors);
+  const upsertExecutor = useOpenSpecStore(s => s.upsertExecutor);
   const [busy, setBusy] = useState<string | null>(null);
 
   const specChangeId = issue?.specChangeId;
 
   const refresh = useCallback((): void => {
     if (!specChangeId) return;
-    void api.getSpecChange(specChangeId).then(setSpecChange).catch(() => undefined);
+    void api
+      .getSpecChange(specChangeId)
+      .then(setSpecChange)
+      .catch(() => undefined);
     void api
       .listExecutors(specChangeId)
-      .then((list) => setExecutors(specChangeId, list))
+      .then(list => setExecutors(specChangeId, list))
       .catch(() => undefined);
   }, [specChangeId, setSpecChange, setExecutors]);
 
@@ -58,9 +58,7 @@ export function SubIssueDetailScreen({
       <div className="p-4">
         <button
           className="text-sm text-primary hover:underline"
-          onClick={() =>
-            patchView(projectId, { screen: 'issues', selectedSubIssueId: undefined })
-          }
+          onClick={() => patchView(projectId, { screen: 'issues', selectedSubIssueId: undefined })}
         >
           ← Back to Issues
         </button>
@@ -69,9 +67,7 @@ export function SubIssueDetailScreen({
     );
   }
 
-  const onTransition = async (
-    status: 'tracked' | 'closed' | 'cancelled',
-  ): Promise<void> => {
+  const onTransition = async (status: 'tracked' | 'closed' | 'cancelled'): Promise<void> => {
     setBusy(`status:${status}`);
     try {
       const updated = await api.transitionStatus(issue.id, status);
@@ -107,7 +103,7 @@ export function SubIssueDetailScreen({
   const doExecAction = async (
     inst: ExecutorInstance,
     fn: (id: string) => Promise<ExecutorInstance>,
-    label: string,
+    label: string
   ): Promise<void> => {
     setBusy(`exec:${inst.id}:${label}`);
     try {
@@ -125,9 +121,7 @@ export function SubIssueDetailScreen({
       <nav className="text-sm text-muted-foreground flex items-center gap-2">
         <button
           className="text-primary hover:underline"
-          onClick={() =>
-            patchView(projectId, { screen: 'issues', selectedSubIssueId: undefined })
-          }
+          onClick={() => patchView(projectId, { screen: 'issues', selectedSubIssueId: undefined })}
         >
           ← Issues
         </button>
@@ -232,9 +226,9 @@ export function SubIssueDetailScreen({
             projectId={projectId}
             specChangeId={specChange.id}
             capabilitiesInDelta={
-              ((specChange.deltaSpecPaths ?? [])
-                .map((p) => p.split('/').slice(-2, -1)[0])
-                .filter(Boolean)) as string[]
+              (specChange.deltaSpecPaths ?? [])
+                .map(p => p.split('/').slice(-2, -1)[0])
+                .filter(Boolean) as string[]
             }
           />
         </div>
@@ -255,11 +249,8 @@ export function SubIssueDetailScreen({
           <div className="px-3 py-3 text-sm text-muted-foreground">No executors yet.</div>
         ) : (
           <ul className="divide-y divide-border">
-            {executors.map((e) => (
-              <li
-                key={e.id}
-                className="px-3 py-2 flex items-center justify-between gap-2"
-              >
+            {executors.map(e => (
+              <li key={e.id} className="px-3 py-2 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-mono">{e.type}</span>
                   <span className="text-xs text-muted-foreground">{e.id.slice(0, 8)}</span>
@@ -318,16 +309,12 @@ function SpecChangeArtifactTabs({
   capabilitiesInDelta,
 }: ArtifactTabsProps): React.ReactElement {
   const activeTab = useOpenSpecStore(
-    (s) => s.viewByProject[projectId]?.activeArtifactTab ?? 'proposal',
+    s => s.viewByProject[projectId]?.activeArtifactTab ?? 'proposal'
   );
-  const selectedCap = useOpenSpecStore(
-    (s) => s.viewByProject[projectId]?.selectedDeltaCapability,
-  );
-  const previewMode = useOpenSpecStore(
-    (s) => s.viewByProject[projectId]?.previewMode ?? 'edit',
-  );
-  const patchView = useOpenSpecStore((s) => s.patchView);
-  const setSpecChange = useOpenSpecStore((s) => s.setSpecChange);
+  const selectedCap = useOpenSpecStore(s => s.viewByProject[projectId]?.selectedDeltaCapability);
+  const previewMode = useOpenSpecStore(s => s.viewByProject[projectId]?.previewMode ?? 'edit');
+  const patchView = useOpenSpecStore(s => s.patchView);
+  const setSpecChange = useOpenSpecStore(s => s.setSpecChange);
   const [content, setContent] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -388,11 +375,7 @@ function SpecChangeArtifactTabs({
     const name = capInput.trim();
     if (!name) return;
     try {
-      const sc = await api.writeDeltaSpec(
-        specChangeId,
-        name,
-        '## ADDED Requirements\n',
-      );
+      const sc = await api.writeDeltaSpec(specChangeId, name, '## ADDED Requirements\n');
       setSpecChange(sc);
       patchView(projectId, {
         activeArtifactTab: 'delta',
@@ -432,13 +415,11 @@ function SpecChangeArtifactTabs({
   return (
     <div>
       <div className="flex items-center gap-1 border-b border-border bg-muted/30 px-3">
-        {(['proposal', 'design', 'tasks', 'delta'] as const).map((t) => (
+        {(['proposal', 'design', 'tasks', 'delta'] as const).map(t => (
           <button
             key={t}
             className={`px-2.5 py-1.5 text-xs ${
-              activeTab === t
-                ? 'border-b-2 border-primary font-medium'
-                : 'text-muted-foreground'
+              activeTab === t ? 'border-b-2 border-primary font-medium' : 'text-muted-foreground'
             }`}
             onClick={() => patchView(projectId, { activeArtifactTab: t })}
           >
@@ -450,11 +431,9 @@ function SpecChangeArtifactTabs({
       {activeTab === 'delta' && (
         <div className="px-3 py-2 border-b border-border flex items-center gap-2 flex-wrap">
           {capabilitiesInDelta.length === 0 && (
-            <span className="text-xs text-muted-foreground">
-              No delta files yet.
-            </span>
+            <span className="text-xs text-muted-foreground">No delta files yet.</span>
           )}
-          {capabilitiesInDelta.map((c) => (
+          {capabilitiesInDelta.map(c => (
             <button
               key={c}
               className={`px-2 py-0.5 text-xs rounded-md ${
@@ -472,7 +451,7 @@ function SpecChangeArtifactTabs({
               className="px-2 py-1 text-xs bg-background border border-border rounded-md"
               placeholder="new capability"
               value={capInput}
-              onChange={(e) => setCapInput(e.target.value)}
+              onChange={e => setCapInput(e.target.value)}
             />
             <button
               className="px-2 py-1 text-xs rounded-md bg-secondary hover:bg-secondary/80"
@@ -485,7 +464,7 @@ function SpecChangeArtifactTabs({
       )}
 
       <div className="px-3 py-2 border-b border-border flex items-center gap-1">
-        {(['edit', 'split', 'preview'] as const).map((m) => (
+        {(['edit', 'split', 'preview'] as const).map(m => (
           <button
             key={m}
             className={`px-2 py-0.5 text-xs rounded-md ${
@@ -506,15 +485,13 @@ function SpecChangeArtifactTabs({
         ) : (
           <>
             <div
-              className={`grid gap-3 ${
-                previewMode === 'split' ? 'grid-cols-2' : 'grid-cols-1'
-              }`}
+              className={`grid gap-3 ${previewMode === 'split' ? 'grid-cols-2' : 'grid-cols-1'}`}
             >
               {previewMode !== 'preview' && (
                 <textarea
                   className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm font-mono min-h-[240px] focus:outline-none focus:ring-1 focus:ring-primary/50"
                   value={content}
-                  onChange={(e) => setContent(e.target.value)}
+                  onChange={e => setContent(e.target.value)}
                   spellCheck={false}
                 />
               )}
@@ -546,9 +523,7 @@ function SpecChangeArtifactTabs({
               >
                 {drafting ? 'Drafting…' : '✨ Draft with AI'}
               </button>
-              {error && (
-                <span className="text-xs text-red-500">Error: {error}</span>
-              )}
+              {error && <span className="text-xs text-red-500">Error: {error}</span>}
             </div>
           </>
         )}

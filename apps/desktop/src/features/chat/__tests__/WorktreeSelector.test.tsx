@@ -11,7 +11,7 @@ vi.mock('../SelectorTrigger', () => ({
     <button
       onClick={onClick}
       disabled={disabled || locked}
-      title={locked ? (lockReason || title || 'Locked') : title}
+      title={locked ? lockReason || title || 'Locked' : title}
       data-testid="selector-trigger"
     >
       {children}
@@ -108,9 +108,7 @@ describe('WorktreeSelector', () => {
   });
 
   it('does not open when disabled', async () => {
-    const { container } = render(
-      <WorktreeSelector {...defaultProps} disabled />
-    );
+    const { container } = render(<WorktreeSelector {...defaultProps} disabled />);
     await waitFor(() => expect(mockGetProjectWorktrees).toHaveBeenCalled());
 
     const trigger = container.querySelector('[data-testid="selector-trigger"]')!;
@@ -154,8 +152,8 @@ describe('WorktreeSelector', () => {
     });
 
     // Click the Root (default) button
-    const rootBtn = Array.from(container.querySelectorAll('button')).find(
-      (b) => b.textContent?.includes('Root (default)')
+    const rootBtn = Array.from(container.querySelectorAll('button')).find(b =>
+      b.textContent?.includes('Root (default)')
     );
     expect(rootBtn).toBeTruthy();
     await act(async () => {
@@ -205,8 +203,8 @@ describe('WorktreeSelector', () => {
       expect(container.textContent).toContain('New worktree...');
     });
 
-    const newBtn = Array.from(container.querySelectorAll('button')).find(
-      (b) => b.textContent?.includes('New worktree...')
+    const newBtn = Array.from(container.querySelectorAll('button')).find(b =>
+      b.textContent?.includes('New worktree...')
     );
     fireEvent.click(newBtn!);
 
@@ -223,10 +221,7 @@ describe('WorktreeSelector', () => {
     ]);
 
     const { container } = render(
-      <WorktreeSelector
-        {...defaultProps}
-        currentWorktree="/test/worktrees/feat-x"
-      />
+      <WorktreeSelector {...defaultProps} currentWorktree="/test/worktrees/feat-x" />
     );
 
     await waitFor(() => {

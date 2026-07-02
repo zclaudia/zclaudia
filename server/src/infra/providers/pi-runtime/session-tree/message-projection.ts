@@ -8,7 +8,13 @@ export interface ProjectedMessageRow {
   role: 'user' | 'assistant';
   content: string;
   metadata?: {
-    toolCalls?: Array<{ toolUseId: string; name: string; input?: unknown; output?: unknown; isError?: boolean }>;
+    toolCalls?: Array<{
+      toolUseId: string;
+      name: string;
+      input?: unknown;
+      output?: unknown;
+      isError?: boolean;
+    }>;
     thinkingBlocks?: Array<{ text: string; signature?: string; redacted?: boolean }>;
     usage?: unknown;
   };
@@ -16,6 +22,85 @@ export interface ProjectedMessageRow {
 
 function isMessageEntry(e: SessionTreeEntry): e is MessageEntry {
   return e.type === 'message';
+}
+
+type MessageLike = {
+  role?: unknown;
+  content?: unknown;
+  usage?: unknown;
+};
+
+type TextBlockLike = {
+  type: 'text';
+  text: string;
+};
+
+type ThinkingBlockLike = {
+  type: 'thinking';
+  thinking: string;
+  thinkingSignature?: string;
+  redacted?: boolean;
+};
+
+type ToolCallBlockLike = {
+  type: 'toolCall';
+  id: string;
+  name: string;
+  arguments?: unknown;
+};
+
+type ToolResultMessageLike = {
+  role: 'toolResult';
+  toolCallId: string;
+  content: unknown;
+  isError?: boolean;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isTextBlock(block: unknown): block is TextBlockLike {
+  return isRecord(block) && block.type === 'text' && typeof block.text === 'string';
+}
+
+function isThinkingBlock(block: unknown): block is ThinkingBlockLike {
+  return isRecord(block) && block.type === 'thinking' && typeof block.thinking === 'string';
+}
+
+function isToolCallBlock(block: unknown): block is ToolCallBlockLike {
+  return (
+    isRecord(block) &&
+    block.type === 'toolCall' &&
+    typeof block.id === 'string' &&
+    typeof block.name === 'string'
+  );
+}
+
+function isToolResultMessage(message: unknown): message is ToolResultMessageLike {
+  return (
+    isRecord(message) && message.role === 'toolResult' && typeof message.toolCallId === 'string'
+  );
+}
+
+function isToolResultEntry(entry: SessionTreeEntry | undefined): entry is MessageEntry & {
+  message: ToolResultMessageLike;
+} {
+  return !!entry && isMessageEntry(entry) && isToolResultMessage(entry.message);
+}
+
+function textFromContent(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  return content.find(isTextBlock)?.text ?? '';
+}
+
+function joinedTextFromContent(content: unknown): string {
+  if (!Array.isArray(content)) return '';
+  return content
+    .filter(isTextBlock)
+    .map(block => block.text)
+    .join('');
 }
 
 /**
@@ -29,48 +114,69 @@ export function projectEntriesToMessageRows(entries: SessionTreeEntry[]): Projec
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];
     if (!isMessageEntry(entry)) continue;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const message = entry.message as any;
+    const message = entry.message as MessageLike;
 
     if (message.role === 'user') {
-      const content = typeof message.content === 'string'
-        ? message.content
-        : (message.content.find((b: any) => b.type === 'text')?.text ?? '');
-      rows.push({ entryId: entry.id, timestamp: entry.timestamp, role: 'user', content, metadata: undefined });
+      const content = textFromContent(message.content);
+      rows.push({
+        entryId: entry.id,
+        timestamp: entry.timestamp,
+        role: 'user',
+        content,
+        metadata: undefined,
+      });
       continue;
     }
     if (message.role === 'assistant') {
       const blocks = Array.isArray(message.content) ? message.content : [];
-      const thinkingBlocks = blocks
-        .filter((b: any) => b.type === 'thinking')
-        .map((b: any) => ({ text: b.thinking, signature: b.thinkingSignature, redacted: b.redacted }));
-      const text = blocks.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('');
-      const toolCallBlocks = blocks.filter((b: any) => b.type === 'toolCall');
+      const thinkingBlocks = blocks.filter(isThinkingBlock).map(block => ({
+        text: block.thinking,
+        signature: block.thinkingSignature,
+        redacted: block.redacted,
+      }));
+      const text = joinedTextFromContent(blocks);
+      const toolCallBlocks = blocks.filter(isToolCallBlock);
 
-      const toolCalls = toolCallBlocks.map((tc: any) => {
+      const toolCalls = toolCallBlocks.map(tc => {
         let j = i + 1;
-        let matched: any;
-        while (j < entries.length && isMessageEntry(entries[j]) && (entries[j] as any).message.role === 'toolResult') {
-          const tr = (entries[j] as any).message;
-          if (tr.toolCallId === tc.id) { matched = tr; break; }
+        let matched: ToolResultMessageLike | undefined;
+        while (j < entries.length) {
+          const candidate = entries[j];
+          if (!isToolResultEntry(candidate)) break;
+          const tr = candidate.message;
+          if (tr.toolCallId === tc.id) {
+            matched = tr;
+            break;
+          }
           j++;
         }
-        const output = matched
-          ? matched.content.map((c: any) => (c.type === 'text' ? c.text : '')).join('')
-          : undefined;
-        return { toolUseId: tc.id, name: tc.name, input: tc.arguments, output, isError: matched?.isError ?? false };
+        const output = matched ? joinedTextFromContent(matched.content) : undefined;
+        return {
+          toolUseId: tc.id,
+          name: tc.name,
+          input: tc.arguments,
+          output,
+          isError: matched?.isError ?? false,
+        };
       });
 
-      const metadata = (thinkingBlocks.length || toolCalls.length || message.usage)
-        ? {
-            ...(thinkingBlocks.length ? { thinkingBlocks } : {}),
-            ...(toolCalls.length ? { toolCalls } : {}),
-            ...(message.usage ? { usage: message.usage } : {}),
-          }
-        : undefined;
+      const metadata =
+        thinkingBlocks.length || toolCalls.length || message.usage
+          ? {
+              ...(thinkingBlocks.length ? { thinkingBlocks } : {}),
+              ...(toolCalls.length ? { toolCalls } : {}),
+              ...(message.usage ? { usage: message.usage } : {}),
+            }
+          : undefined;
 
-      rows.push({ entryId: entry.id, timestamp: entry.timestamp, role: 'assistant', content: text, metadata });
-      while (i + 1 < entries.length && isMessageEntry(entries[i + 1]) && (entries[i + 1] as any).message.role === 'toolResult') {
+      rows.push({
+        entryId: entry.id,
+        timestamp: entry.timestamp,
+        role: 'assistant',
+        content: text,
+        metadata,
+      });
+      while (i + 1 < entries.length && isToolResultEntry(entries[i + 1])) {
         i++;
       }
     }

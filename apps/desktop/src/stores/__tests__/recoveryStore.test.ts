@@ -129,7 +129,7 @@ describe('recoveryStore', () => {
           backendId: 'b1',
           status: 'ready',
           subscribed: true,
-                    dataReady: true,
+          dataReady: true,
           retryCount: 0,
           lastError: null,
           lastCloseReason: null,
@@ -165,9 +165,14 @@ describe('recoveryStore', () => {
       useRecoveryStore.setState({
         backends: {
           b1: {
-            backendId: 'b1', status: 'subscribing', subscribed: true,
-            dataReady: false, retryCount: 0,
-            lastError: null, lastCloseReason: null, statusEnteredAt: Date.now(),
+            backendId: 'b1',
+            status: 'subscribing',
+            subscribed: true,
+            dataReady: false,
+            retryCount: 0,
+            lastError: null,
+            lastCloseReason: null,
+            statusEnteredAt: Date.now(),
           },
         },
       } as any);
@@ -183,9 +188,14 @@ describe('recoveryStore', () => {
       useRecoveryStore.setState({
         backends: {
           b1: {
-            backendId: 'b1', status: 'subscribing', subscribed: false,
-            dataReady: false, retryCount: 0,
-            lastError: null, lastCloseReason: null, statusEnteredAt: Date.now(),
+            backendId: 'b1',
+            status: 'subscribing',
+            subscribed: false,
+            dataReady: false,
+            retryCount: 0,
+            lastError: null,
+            lastCloseReason: null,
+            statusEnteredAt: Date.now(),
           },
         },
       } as any);
@@ -199,9 +209,13 @@ describe('recoveryStore', () => {
 
     it('applySnapshot sets subscribed when runtimeState is ready', () => {
       useRecoveryStore.getState().applySnapshot({
-        snapshotVersion: 1, capturedAt: Date.now(), mode: 'direct',
-        connectionState: 'connected', localBackendId: null,
-        currentInstanceId: null, currentDeviceId: null,
+        snapshotVersion: 1,
+        capturedAt: Date.now(),
+        mode: 'direct',
+        connectionState: 'connected',
+        localBackendId: null,
+        currentInstanceId: null,
+        currentDeviceId: null,
         backends: [{ backendId: 'b1', runtimeState: 'ready', online: true } as any],
         sessionStreams: {},
       });
@@ -213,13 +227,26 @@ describe('recoveryStore', () => {
     it('applySnapshot maps runtimeState ready to status ready regardless of dataReady', () => {
       useRecoveryStore.setState({
         backends: {
-          b1: { backendId: 'b1', status: 'visible', subscribed: false, dataReady: false, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() },
+          b1: {
+            backendId: 'b1',
+            status: 'visible',
+            subscribed: false,
+            dataReady: false,
+            retryCount: 0,
+            lastError: null,
+            lastCloseReason: null,
+            statusEnteredAt: Date.now(),
+          },
         },
       } as any);
       useRecoveryStore.getState().applySnapshot({
-        snapshotVersion: 1, capturedAt: Date.now(), mode: 'embedded',
-        connectionState: 'connected', localBackendId: 'b1',
-        currentInstanceId: null, currentDeviceId: null,
+        snapshotVersion: 1,
+        capturedAt: Date.now(),
+        mode: 'embedded',
+        connectionState: 'connected',
+        localBackendId: 'b1',
+        currentInstanceId: null,
+        currentDeviceId: null,
         backends: [{ backendId: 'b1', runtimeState: 'ready', online: true } as any],
         sessionStreams: {},
       });
@@ -236,10 +263,27 @@ describe('recoveryStore', () => {
         activeBackendId: 'b1',
         selectedSessionId: null,
         backends: {
-          b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() },
+          b1: {
+            backendId: 'b1',
+            status: 'ready',
+            subscribed: true,
+            dataReady: true,
+            retryCount: 0,
+            lastError: null,
+            lastCloseReason: null,
+            statusEnteredAt: Date.now(),
+          },
         },
         dataSyncs: {
-          b1: { backendId: 'b1', status: 'stale', ownershipVersion: 1, retryCount: 0, lastError: null, lastSyncAt: Date.now() - 60000, statusEnteredAt: Date.now() },
+          b1: {
+            backendId: 'b1',
+            status: 'stale',
+            ownershipVersion: 1,
+            retryCount: 0,
+            lastError: null,
+            lastSyncAt: Date.now() - 60000,
+            statusEnteredAt: Date.now(),
+          },
         },
       } as any);
 
@@ -257,7 +301,16 @@ describe('recoveryStore', () => {
         activeBackendId: 'b1',
         selectedSessionId: null,
         backends: {
-          b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() },
+          b1: {
+            backendId: 'b1',
+            status: 'ready',
+            subscribed: true,
+            dataReady: true,
+            retryCount: 0,
+            lastError: null,
+            lastCloseReason: null,
+            statusEnteredAt: Date.now(),
+          },
         },
         dataSyncs: {},
       } as any);
@@ -272,13 +325,28 @@ describe('recoveryStore', () => {
         activeBackendId: 'b1',
         selectedSessionId: 's1',
         backends: {
-          b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() },
+          b1: {
+            backendId: 'b1',
+            status: 'ready',
+            subscribed: true,
+            dataReady: true,
+            retryCount: 0,
+            lastError: null,
+            lastCloseReason: null,
+            statusEnteredAt: Date.now(),
+          },
         },
         dataSyncs: {},
         activeSession: {
-          sessionId: 's1', status: 'idle', backendId: null,
-          ownershipVersion: null, retryCount: 0, lastError: null,
-          hasGapMarker: false, lastMessageAt: null, statusEnteredAt: Date.now(),
+          sessionId: 's1',
+          status: 'idle',
+          backendId: null,
+          ownershipVersion: null,
+          retryCount: 0,
+          lastError: null,
+          hasGapMarker: false,
+          lastMessageAt: null,
+          statusEnteredAt: Date.now(),
         },
       } as any);
 
@@ -292,15 +360,38 @@ describe('recoveryStore', () => {
         activeBackendId: 'b1',
         selectedSessionId: 's1',
         backends: {
-          b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() },
+          b1: {
+            backendId: 'b1',
+            status: 'ready',
+            subscribed: true,
+            dataReady: true,
+            retryCount: 0,
+            lastError: null,
+            lastCloseReason: null,
+            statusEnteredAt: Date.now(),
+          },
         },
         dataSyncs: {
-          b1: { backendId: 'b1', status: 'ready', ownershipVersion: 3, retryCount: 0, lastError: null, lastSyncAt: Date.now(), statusEnteredAt: Date.now() },
+          b1: {
+            backendId: 'b1',
+            status: 'ready',
+            ownershipVersion: 3,
+            retryCount: 0,
+            lastError: null,
+            lastSyncAt: Date.now(),
+            statusEnteredAt: Date.now(),
+          },
         },
         activeSession: {
-          sessionId: 's1', status: 'stale', backendId: 'b1',
-          ownershipVersion: null, retryCount: 0, lastError: null,
-          hasGapMarker: false, lastMessageAt: null, statusEnteredAt: Date.now(),
+          sessionId: 's1',
+          status: 'stale',
+          backendId: 'b1',
+          ownershipVersion: null,
+          retryCount: 0,
+          lastError: null,
+          hasGapMarker: false,
+          lastMessageAt: null,
+          statusEnteredAt: Date.now(),
         },
       } as any);
 
@@ -334,7 +425,16 @@ describe('recoveryStore', () => {
         coordinator: 'ready',
         activeBackendId: 'b1',
         backends: {
-          b2: { backendId: 'b2', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() },
+          b2: {
+            backendId: 'b2',
+            status: 'ready',
+            subscribed: true,
+            dataReady: true,
+            retryCount: 0,
+            lastError: null,
+            lastCloseReason: null,
+            statusEnteredAt: Date.now(),
+          },
         },
       } as any);
 
@@ -348,15 +448,38 @@ describe('recoveryStore', () => {
         activeBackendId: 'b1',
         selectedSessionId: 's1',
         backends: {
-          b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() },
+          b1: {
+            backendId: 'b1',
+            status: 'ready',
+            subscribed: true,
+            dataReady: true,
+            retryCount: 0,
+            lastError: null,
+            lastCloseReason: null,
+            statusEnteredAt: Date.now(),
+          },
         },
         dataSyncs: {
-          b1: { backendId: 'b1', status: 'ready', ownershipVersion: 3, retryCount: 0, lastError: null, lastSyncAt: Date.now(), statusEnteredAt: Date.now() },
+          b1: {
+            backendId: 'b1',
+            status: 'ready',
+            ownershipVersion: 3,
+            retryCount: 0,
+            lastError: null,
+            lastSyncAt: Date.now(),
+            statusEnteredAt: Date.now(),
+          },
         },
         activeSession: {
-          sessionId: 's1', status: 'live', backendId: 'b1',
-          ownershipVersion: 3, retryCount: 0, lastError: null,
-          hasGapMarker: false, lastMessageAt: Date.now(), statusEnteredAt: Date.now(),
+          sessionId: 's1',
+          status: 'live',
+          backendId: 'b1',
+          ownershipVersion: 3,
+          retryCount: 0,
+          lastError: null,
+          hasGapMarker: false,
+          lastMessageAt: Date.now(),
+          statusEnteredAt: Date.now(),
         },
       } as any);
 
@@ -370,17 +493,57 @@ describe('recoveryStore', () => {
         activeBackendId: 'b1',
         selectedSessionId: 's1',
         backends: {
-          b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() },
-          b2: { backendId: 'b2', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() },
+          b1: {
+            backendId: 'b1',
+            status: 'ready',
+            subscribed: true,
+            dataReady: true,
+            retryCount: 0,
+            lastError: null,
+            lastCloseReason: null,
+            statusEnteredAt: Date.now(),
+          },
+          b2: {
+            backendId: 'b2',
+            status: 'ready',
+            subscribed: true,
+            dataReady: true,
+            retryCount: 0,
+            lastError: null,
+            lastCloseReason: null,
+            statusEnteredAt: Date.now(),
+          },
         },
         dataSyncs: {
-          b1: { backendId: 'b1', status: 'stale', ownershipVersion: 1, retryCount: 0, lastError: null, lastSyncAt: null, statusEnteredAt: Date.now() },
-          b2: { backendId: 'b2', status: 'ready', ownershipVersion: 2, retryCount: 0, lastError: null, lastSyncAt: Date.now(), statusEnteredAt: Date.now() },
+          b1: {
+            backendId: 'b1',
+            status: 'stale',
+            ownershipVersion: 1,
+            retryCount: 0,
+            lastError: null,
+            lastSyncAt: null,
+            statusEnteredAt: Date.now(),
+          },
+          b2: {
+            backendId: 'b2',
+            status: 'ready',
+            ownershipVersion: 2,
+            retryCount: 0,
+            lastError: null,
+            lastSyncAt: Date.now(),
+            statusEnteredAt: Date.now(),
+          },
         },
         activeSession: {
-          sessionId: 's1', status: 'stale', backendId: 'b1',
-          ownershipVersion: null, retryCount: 0, lastError: null,
-          hasGapMarker: false, lastMessageAt: null, statusEnteredAt: Date.now(),
+          sessionId: 's1',
+          status: 'stale',
+          backendId: 'b1',
+          ownershipVersion: null,
+          retryCount: 0,
+          lastError: null,
+          hasGapMarker: false,
+          lastMessageAt: null,
+          statusEnteredAt: Date.now(),
         },
       } as any);
 
@@ -401,15 +564,25 @@ describe('recoveryStore', () => {
         coordinator: 'ready',
         backends: {
           b1: {
-            backendId: 'b1', status: 'ready', subscribed: true,
-            dataReady: true, retryCount: 2,
-            lastError: null, lastCloseReason: null, statusEnteredAt: Date.now(),
+            backendId: 'b1',
+            status: 'ready',
+            subscribed: true,
+            dataReady: true,
+            retryCount: 2,
+            lastError: null,
+            lastCloseReason: null,
+            statusEnteredAt: Date.now(),
           },
         },
         dataSyncs: {
           b1: {
-            backendId: 'b1', status: 'ready', ownershipVersion: 3, retryCount: 1,
-            lastError: null, lastSyncAt: Date.now(), statusEnteredAt: Date.now(),
+            backendId: 'b1',
+            status: 'ready',
+            ownershipVersion: 3,
+            retryCount: 1,
+            lastError: null,
+            lastSyncAt: Date.now(),
+            statusEnteredAt: Date.now(),
           },
         },
         activeBackendId: 'b1',
@@ -447,7 +620,11 @@ describe('recoveryStore', () => {
     it('preserves transport.status when transport is reconnecting', () => {
       useRecoveryStore.setState({
         coordinator: 'ready',
-        transport: { ...useRecoveryStore.getState().transport, status: 'reconnecting', generation: 3 },
+        transport: {
+          ...useRecoveryStore.getState().transport,
+          status: 'reconnecting',
+          generation: 3,
+        },
         backends: {},
         dataSyncs: {},
         activeBackendId: null,
@@ -466,10 +643,15 @@ describe('recoveryStore', () => {
       } as any);
 
       useRecoveryStore.getState().applySnapshot({
-        snapshotVersion: 1, capturedAt: Date.now(), mode: 'embedded',
+        snapshotVersion: 1,
+        capturedAt: Date.now(),
+        mode: 'embedded',
         connectionState: 'reconnecting',
-        localBackendId: null, currentInstanceId: null, currentDeviceId: null,
-        backends: [], sessionStreams: {},
+        localBackendId: null,
+        currentInstanceId: null,
+        currentDeviceId: null,
+        backends: [],
+        sessionStreams: {},
       });
 
       expect(useRecoveryStore.getState().transport.status).toBe('connected');
@@ -481,10 +663,15 @@ describe('recoveryStore', () => {
       } as any);
 
       useRecoveryStore.getState().applySnapshot({
-        snapshotVersion: 1, capturedAt: Date.now(), mode: 'embedded',
+        snapshotVersion: 1,
+        capturedAt: Date.now(),
+        mode: 'embedded',
         connectionState: 'connected',
-        localBackendId: null, currentInstanceId: null, currentDeviceId: null,
-        backends: [], sessionStreams: {},
+        localBackendId: null,
+        currentInstanceId: null,
+        currentDeviceId: null,
+        backends: [],
+        sessionStreams: {},
       });
 
       expect(useRecoveryStore.getState().transport.mode).toBe('embedded');
@@ -520,9 +707,14 @@ describe('recoveryStore', () => {
       useRecoveryStore.setState({
         backends: {
           b1: {
-            backendId: 'b1', status: 'subscribing', subscribed: false,
-            dataReady: false, retryCount: 0,
-            lastError: null, lastCloseReason: null, statusEnteredAt: Date.now(),
+            backendId: 'b1',
+            status: 'subscribing',
+            subscribed: false,
+            dataReady: false,
+            retryCount: 0,
+            lastError: null,
+            lastCloseReason: null,
+            statusEnteredAt: Date.now(),
           },
         },
       } as any);
@@ -539,8 +731,13 @@ describe('recoveryStore', () => {
       useRecoveryStore.setState({
         dataSyncs: {
           b1: {
-            backendId: 'b1', status: 'syncing_delta', ownershipVersion: 1,
-            retryCount: 0, lastError: null, lastSyncAt: null, statusEnteredAt: Date.now(),
+            backendId: 'b1',
+            status: 'syncing_delta',
+            ownershipVersion: 1,
+            retryCount: 0,
+            lastError: null,
+            lastSyncAt: null,
+            statusEnteredAt: Date.now(),
           },
         },
       } as any);
@@ -553,9 +750,15 @@ describe('recoveryStore', () => {
     it('noteActiveSessionTimeout gracefully degrades catch-up to live with gap marker', () => {
       useRecoveryStore.setState({
         activeSession: {
-          sessionId: 's1', status: 'catching_up', backendId: 'b1',
-          ownershipVersion: 1, retryCount: 0, lastError: null,
-          hasGapMarker: false, lastMessageAt: null, statusEnteredAt: Date.now(),
+          sessionId: 's1',
+          status: 'catching_up',
+          backendId: 'b1',
+          ownershipVersion: 1,
+          retryCount: 0,
+          lastError: null,
+          hasGapMarker: false,
+          lastMessageAt: null,
+          statusEnteredAt: Date.now(),
         },
       } as any);
 
@@ -570,9 +773,14 @@ describe('recoveryStore', () => {
       useRecoveryStore.setState({
         coordinator: 'recovering',
         activeSession: {
-          sessionId: 's1', status: 'opening_stream', backendId: 'b1',
-          ownershipVersion: 1, retryCount: RECOVERY_MAX_RETRIES.SESSION_STREAM - 1,
-          lastError: null, hasGapMarker: false, lastMessageAt: null,
+          sessionId: 's1',
+          status: 'opening_stream',
+          backendId: 'b1',
+          ownershipVersion: 1,
+          retryCount: RECOVERY_MAX_RETRIES.SESSION_STREAM - 1,
+          lastError: null,
+          hasGapMarker: false,
+          lastMessageAt: null,
           statusEnteredAt: Date.now(),
         },
       } as any);
@@ -588,9 +796,15 @@ describe('recoveryStore', () => {
     it('noteActiveSessionMessage updates activeSession.lastMessageAt', () => {
       useRecoveryStore.setState({
         activeSession: {
-          sessionId: 's1', status: 'live', backendId: 'b1',
-          ownershipVersion: 1, retryCount: 0, lastError: null,
-          hasGapMarker: false, lastMessageAt: null, statusEnteredAt: Date.now(),
+          sessionId: 's1',
+          status: 'live',
+          backendId: 'b1',
+          ownershipVersion: 1,
+          retryCount: 0,
+          lastError: null,
+          hasGapMarker: false,
+          lastMessageAt: null,
+          statusEnteredAt: Date.now(),
         },
       } as any);
 
@@ -603,7 +817,18 @@ describe('recoveryStore', () => {
     it('returns offline when transport is idle', () => {
       useRecoveryStore.setState({
         transport: { ...useRecoveryStore.getState().transport, status: 'idle' },
-        backends: { b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() } },
+        backends: {
+          b1: {
+            backendId: 'b1',
+            status: 'ready',
+            subscribed: true,
+            dataReady: true,
+            retryCount: 0,
+            lastError: null,
+            lastCloseReason: null,
+            statusEnteredAt: Date.now(),
+          },
+        },
       } as any);
       expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('offline');
     });
@@ -611,7 +836,18 @@ describe('recoveryStore', () => {
     it('returns transport_reconnecting when transport is connecting', () => {
       useRecoveryStore.setState({
         transport: { ...useRecoveryStore.getState().transport, status: 'connecting' },
-        backends: { b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() } },
+        backends: {
+          b1: {
+            backendId: 'b1',
+            status: 'ready',
+            subscribed: true,
+            dataReady: true,
+            retryCount: 0,
+            lastError: null,
+            lastCloseReason: null,
+            statusEnteredAt: Date.now(),
+          },
+        },
       } as any);
       expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('transport_reconnecting');
     });
@@ -626,14 +862,36 @@ describe('recoveryStore', () => {
     it('returns error when transport has error', () => {
       useRecoveryStore.setState({
         transport: { ...useRecoveryStore.getState().transport, status: 'error' },
-        backends: { b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() } },
+        backends: {
+          b1: {
+            backendId: 'b1',
+            status: 'ready',
+            subscribed: true,
+            dataReady: true,
+            retryCount: 0,
+            lastError: null,
+            lastCloseReason: null,
+            statusEnteredAt: Date.now(),
+          },
+        },
       } as any);
       expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('error');
     });
 
     it('returns error when backend has error', () => {
       useRecoveryStore.setState({
-        backends: { b1: { backendId: 'b1', status: 'error', subscribed: true,  dataReady: false, retryCount: 3, lastError: 'timeout', lastCloseReason: null, statusEnteredAt: Date.now() } },
+        backends: {
+          b1: {
+            backendId: 'b1',
+            status: 'error',
+            subscribed: true,
+            dataReady: false,
+            retryCount: 3,
+            lastError: 'timeout',
+            lastCloseReason: null,
+            statusEnteredAt: Date.now(),
+          },
+        },
       } as any);
       expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('error');
     });
@@ -641,15 +899,47 @@ describe('recoveryStore', () => {
     it('returns error when data sync has error', () => {
       useRecoveryStore.setState({
         activeBackendId: 'b1',
-        backends: { b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() } },
-        dataSyncs: { b1: { backendId: 'b1', status: 'error', ownershipVersion: 1, retryCount: 3, lastError: 'sync fail', lastSyncAt: null, statusEnteredAt: Date.now() } },
+        backends: {
+          b1: {
+            backendId: 'b1',
+            status: 'ready',
+            subscribed: true,
+            dataReady: true,
+            retryCount: 0,
+            lastError: null,
+            lastCloseReason: null,
+            statusEnteredAt: Date.now(),
+          },
+        },
+        dataSyncs: {
+          b1: {
+            backendId: 'b1',
+            status: 'error',
+            ownershipVersion: 1,
+            retryCount: 3,
+            lastError: 'sync fail',
+            lastSyncAt: null,
+            statusEnteredAt: Date.now(),
+          },
+        },
       } as any);
       expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('error');
     });
 
     it('returns offline when backend is absent', () => {
       useRecoveryStore.setState({
-        backends: { b1: { backendId: 'b1', status: 'absent', subscribed: false,  dataReady: false, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() } },
+        backends: {
+          b1: {
+            backendId: 'b1',
+            status: 'absent',
+            subscribed: false,
+            dataReady: false,
+            retryCount: 0,
+            lastError: null,
+            lastCloseReason: null,
+            statusEnteredAt: Date.now(),
+          },
+        },
       } as any);
       expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('offline');
     });
@@ -660,37 +950,112 @@ describe('recoveryStore', () => {
 
     it('returns backend_visible for visible backend', () => {
       useRecoveryStore.setState({
-        backends: { b1: { backendId: 'b1', status: 'visible', subscribed: false,  dataReady: false, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() } },
+        backends: {
+          b1: {
+            backendId: 'b1',
+            status: 'visible',
+            subscribed: false,
+            dataReady: false,
+            retryCount: 0,
+            lastError: null,
+            lastCloseReason: null,
+            statusEnteredAt: Date.now(),
+          },
+        },
       } as any);
       expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('backend_visible');
     });
 
     it('returns backend_subscribing for subscribing backend', () => {
       useRecoveryStore.setState({
-        backends: { b1: { backendId: 'b1', status: 'subscribing', subscribed: false, dataReady: false, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() } },
+        backends: {
+          b1: {
+            backendId: 'b1',
+            status: 'subscribing',
+            subscribed: false,
+            dataReady: false,
+            retryCount: 0,
+            lastError: null,
+            lastCloseReason: null,
+            statusEnteredAt: Date.now(),
+          },
+        },
       } as any);
       expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('backend_subscribing');
     });
 
     it('returns data_syncing when backend is ready but data sync is stale', () => {
       useRecoveryStore.setState({
-        backends: { b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() } },
-        dataSyncs: { b1: { backendId: 'b1', status: 'stale', ownershipVersion: 1, retryCount: 0, lastError: null, lastSyncAt: null, statusEnteredAt: Date.now() } },
+        backends: {
+          b1: {
+            backendId: 'b1',
+            status: 'ready',
+            subscribed: true,
+            dataReady: true,
+            retryCount: 0,
+            lastError: null,
+            lastCloseReason: null,
+            statusEnteredAt: Date.now(),
+          },
+        },
+        dataSyncs: {
+          b1: {
+            backendId: 'b1',
+            status: 'stale',
+            ownershipVersion: 1,
+            retryCount: 0,
+            lastError: null,
+            lastSyncAt: null,
+            statusEnteredAt: Date.now(),
+          },
+        },
       } as any);
       expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('data_syncing');
     });
 
     it('returns data_syncing when data sync is syncing_full', () => {
       useRecoveryStore.setState({
-        backends: { b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() } },
-        dataSyncs: { b1: { backendId: 'b1', status: 'syncing_full', ownershipVersion: 1, retryCount: 0, lastError: null, lastSyncAt: null, statusEnteredAt: Date.now() } },
+        backends: {
+          b1: {
+            backendId: 'b1',
+            status: 'ready',
+            subscribed: true,
+            dataReady: true,
+            retryCount: 0,
+            lastError: null,
+            lastCloseReason: null,
+            statusEnteredAt: Date.now(),
+          },
+        },
+        dataSyncs: {
+          b1: {
+            backendId: 'b1',
+            status: 'syncing_full',
+            ownershipVersion: 1,
+            retryCount: 0,
+            lastError: null,
+            lastSyncAt: null,
+            statusEnteredAt: Date.now(),
+          },
+        },
       } as any);
       expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('data_syncing');
     });
 
     it('returns data_syncing when no data sync exists for backend', () => {
       useRecoveryStore.setState({
-        backends: { b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() } },
+        backends: {
+          b1: {
+            backendId: 'b1',
+            status: 'ready',
+            subscribed: true,
+            dataReady: true,
+            retryCount: 0,
+            lastError: null,
+            lastCloseReason: null,
+            statusEnteredAt: Date.now(),
+          },
+        },
         dataSyncs: {},
       } as any);
       expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('data_syncing');
@@ -700,9 +1065,40 @@ describe('recoveryStore', () => {
       useRecoveryStore.setState({
         activeBackendId: 'b1',
         selectedSessionId: 's1',
-        backends: { b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() } },
-        dataSyncs: { b1: { backendId: 'b1', status: 'ready', ownershipVersion: 1, retryCount: 0, lastError: null, lastSyncAt: Date.now(), statusEnteredAt: Date.now() } },
-        activeSession: { sessionId: 's1', status: 'catching_up', backendId: 'b1', ownershipVersion: 1, retryCount: 0, lastError: null, hasGapMarker: false, lastMessageAt: null, statusEnteredAt: Date.now() },
+        backends: {
+          b1: {
+            backendId: 'b1',
+            status: 'ready',
+            subscribed: true,
+            dataReady: true,
+            retryCount: 0,
+            lastError: null,
+            lastCloseReason: null,
+            statusEnteredAt: Date.now(),
+          },
+        },
+        dataSyncs: {
+          b1: {
+            backendId: 'b1',
+            status: 'ready',
+            ownershipVersion: 1,
+            retryCount: 0,
+            lastError: null,
+            lastSyncAt: Date.now(),
+            statusEnteredAt: Date.now(),
+          },
+        },
+        activeSession: {
+          sessionId: 's1',
+          status: 'catching_up',
+          backendId: 'b1',
+          ownershipVersion: 1,
+          retryCount: 0,
+          lastError: null,
+          hasGapMarker: false,
+          lastMessageAt: null,
+          statusEnteredAt: Date.now(),
+        },
       } as any);
       expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('session_syncing');
     });
@@ -711,9 +1107,40 @@ describe('recoveryStore', () => {
       useRecoveryStore.setState({
         activeBackendId: 'b1',
         selectedSessionId: 's1',
-        backends: { b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() } },
-        dataSyncs: { b1: { backendId: 'b1', status: 'ready', ownershipVersion: 1, retryCount: 0, lastError: null, lastSyncAt: Date.now(), statusEnteredAt: Date.now() } },
-        activeSession: { sessionId: 's1', status: 'live', backendId: 'b1', ownershipVersion: 1, retryCount: 0, lastError: null, hasGapMarker: false, lastMessageAt: Date.now(), statusEnteredAt: Date.now() },
+        backends: {
+          b1: {
+            backendId: 'b1',
+            status: 'ready',
+            subscribed: true,
+            dataReady: true,
+            retryCount: 0,
+            lastError: null,
+            lastCloseReason: null,
+            statusEnteredAt: Date.now(),
+          },
+        },
+        dataSyncs: {
+          b1: {
+            backendId: 'b1',
+            status: 'ready',
+            ownershipVersion: 1,
+            retryCount: 0,
+            lastError: null,
+            lastSyncAt: Date.now(),
+            statusEnteredAt: Date.now(),
+          },
+        },
+        activeSession: {
+          sessionId: 's1',
+          status: 'live',
+          backendId: 'b1',
+          ownershipVersion: 1,
+          retryCount: 0,
+          lastError: null,
+          hasGapMarker: false,
+          lastMessageAt: Date.now(),
+          statusEnteredAt: Date.now(),
+        },
       } as any);
       expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('ready');
     });
@@ -722,9 +1149,40 @@ describe('recoveryStore', () => {
       useRecoveryStore.setState({
         activeBackendId: 'b1',
         selectedSessionId: 's1',
-        backends: { b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() } },
-        dataSyncs: { b1: { backendId: 'b1', status: 'ready', ownershipVersion: 1, retryCount: 0, lastError: null, lastSyncAt: Date.now(), statusEnteredAt: Date.now() } },
-        activeSession: { sessionId: 's1', status: 'error', backendId: 'b1', ownershipVersion: 1, retryCount: 3, lastError: 'stream failed', hasGapMarker: false, lastMessageAt: null, statusEnteredAt: Date.now() },
+        backends: {
+          b1: {
+            backendId: 'b1',
+            status: 'ready',
+            subscribed: true,
+            dataReady: true,
+            retryCount: 0,
+            lastError: null,
+            lastCloseReason: null,
+            statusEnteredAt: Date.now(),
+          },
+        },
+        dataSyncs: {
+          b1: {
+            backendId: 'b1',
+            status: 'ready',
+            ownershipVersion: 1,
+            retryCount: 0,
+            lastError: null,
+            lastSyncAt: Date.now(),
+            statusEnteredAt: Date.now(),
+          },
+        },
+        activeSession: {
+          sessionId: 's1',
+          status: 'error',
+          backendId: 'b1',
+          ownershipVersion: 1,
+          retryCount: 3,
+          lastError: 'stream failed',
+          hasGapMarker: false,
+          lastMessageAt: null,
+          statusEnteredAt: Date.now(),
+        },
       } as any);
       expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('error');
     });
@@ -772,7 +1230,18 @@ describe('recoveryStore', () => {
       const { isBackendReady } = await import('../recoveryStore.ts');
       useRecoveryStore.setState({
         transport: { ...useRecoveryStore.getState().transport, status: 'connected' },
-        backends: { b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() } },
+        backends: {
+          b1: {
+            backendId: 'b1',
+            status: 'ready',
+            subscribed: true,
+            dataReady: true,
+            retryCount: 0,
+            lastError: null,
+            lastCloseReason: null,
+            statusEnteredAt: Date.now(),
+          },
+        },
       } as any);
       expect(isBackendReady('b1')).toBe(true);
 
@@ -800,8 +1269,13 @@ describe('recoveryStore', () => {
       useRecoveryStore.setState({
         dataSyncs: {
           b1: {
-            backendId: 'b1', status: 'syncing_full', ownershipVersion: 1,
-            retryCount: 0, lastError: null, lastSyncAt: null, statusEnteredAt: Date.now(),
+            backendId: 'b1',
+            status: 'syncing_full',
+            ownershipVersion: 1,
+            retryCount: 0,
+            lastError: null,
+            lastSyncAt: null,
+            statusEnteredAt: Date.now(),
           },
         },
       } as any);
@@ -819,9 +1293,13 @@ describe('recoveryStore', () => {
         coordinator: 'recovering',
         dataSyncs: {
           b1: {
-            backendId: 'b1', status: 'syncing_full', ownershipVersion: 1,
+            backendId: 'b1',
+            status: 'syncing_full',
+            ownershipVersion: 1,
             retryCount: RECOVERY_MAX_RETRIES.DATA_SYNC_FULL - 1,
-            lastError: null, lastSyncAt: null, statusEnteredAt: Date.now(),
+            lastError: null,
+            lastSyncAt: null,
+            statusEnteredAt: Date.now(),
           },
         },
       } as any);

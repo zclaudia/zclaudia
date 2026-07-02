@@ -10,7 +10,12 @@ export interface PanelRenderProps {
 }
 
 /** Renders either a plugin iframe panel or a built-in React panel component. */
-export function PanelContent({ panel, projectId, projectRoot, workingDirectory }: PanelRenderProps) {
+export function PanelContent({
+  panel,
+  projectId,
+  projectRoot,
+  workingDirectory,
+}: PanelRenderProps) {
   if (panel.iframeUrl) {
     return (
       <PluginPanelRenderer
@@ -22,7 +27,14 @@ export function PanelContent({ panel, projectId, projectRoot, workingDirectory }
   }
   if (!panel.component) return null;
   const Component = panel.component as ComponentType<Record<string, unknown>>;
-  return <Component projectId={projectId} projectRoot={projectRoot} workingDirectory={workingDirectory} panelId={panel.id} />;
+  return (
+    <Component
+      projectId={projectId}
+      projectRoot={projectRoot}
+      workingDirectory={workingDirectory}
+      panelId={panel.id}
+    />
+  );
 }
 
 export function PanelActions({ panel, projectId }: { panel: UIExtension; projectId?: string }) {

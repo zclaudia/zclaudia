@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
-vi.mock('@tauri-apps/api/core', async (importOriginal) => {
+vi.mock('@tauri-apps/api/core', async importOriginal => {
   const mod = await importOriginal<typeof import('@tauri-apps/api/core')>();
   return {
     ...mod,
@@ -46,13 +46,17 @@ vi.mock('../../../contexts/ConnectionContext', () => ({
 
 vi.mock('../../window/WindowContextBar', () => ({
   WindowContextBar: ({ serverName, projectId }: any) => (
-    <div data-testid="window-context">{serverName}:{projectId}</div>
+    <div data-testid="window-context">
+      {serverName}:{projectId}
+    </div>
   ),
 }));
 
 vi.mock('../XTerminal', () => ({
   XTerminal: ({ terminalId, projectId, mode }: any) => (
-    <div data-testid="xterminal">{terminalId}:{projectId}:{mode}</div>
+    <div data-testid="xterminal">
+      {terminalId}:{projectId}:{mode}
+    </div>
   ),
 }));
 

@@ -1,7 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import { EventDispatcher } from '../event-dispatcher.js';
 
-interface Evt { type: string; payload?: unknown }
+interface Evt {
+  type: string;
+  payload?: unknown;
+}
 
 describe('EventDispatcher off / offAny', () => {
   it('off() removes a specific listener', () => {

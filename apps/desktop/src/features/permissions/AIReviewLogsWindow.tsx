@@ -8,7 +8,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Loader2, RefreshCw, Bot } from 'lucide-react';
 import type { WorkflowRun, WorkflowStepRun } from '@zclaudia/shared';
-import { StepStatusIcon, RunStatusBadge, formatDuration } from '../workflows/components/RunComponents';
+import {
+  StepStatusIcon,
+  RunStatusBadge,
+  formatDuration,
+} from '../workflows/components/RunComponents';
 
 interface AIReviewLogsWindowProps {
   runId: string;
@@ -31,7 +35,9 @@ function formatTime(ts?: number): string {
 
 function StepCard({ step, highlight }: { step: WorkflowStepRun; highlight: boolean }) {
   return (
-    <div className={`rounded-lg border p-3 ${highlight ? 'border-primary/40 bg-muted/40' : 'border-border bg-card/40'}`}>
+    <div
+      className={`rounded-lg border p-3 ${highlight ? 'border-primary/40 bg-muted/40' : 'border-border bg-card/40'}`}
+    >
       <div className="flex items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 min-w-0">
           <StepStatusIcon status={step.status} />
@@ -52,9 +58,17 @@ function StepCard({ step, highlight }: { step: WorkflowStepRun; highlight: boole
       </div>
 
       <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground mb-2">
-        <div>Started: <span className="text-foreground">{formatTime(step.startedAt)}</span></div>
-        <div>Completed: <span className="text-foreground">{formatTime(step.completedAt)}</span></div>
-        {step.attempt > 1 && <div>Attempt: <span className="text-foreground">{step.attempt}</span></div>}
+        <div>
+          Started: <span className="text-foreground">{formatTime(step.startedAt)}</span>
+        </div>
+        <div>
+          Completed: <span className="text-foreground">{formatTime(step.completedAt)}</span>
+        </div>
+        {step.attempt > 1 && (
+          <div>
+            Attempt: <span className="text-foreground">{step.attempt}</span>
+          </div>
+        )}
         {step.sessionId && (
           <div className="truncate">
             Session: <code className="text-foreground bg-muted px-1 rounded">{step.sessionId}</code>
@@ -70,7 +84,9 @@ function StepCard({ step, highlight }: { step: WorkflowStepRun; highlight: boole
 
       {step.input && Object.keys(step.input).length > 0 && (
         <details className="mb-2" open={highlight}>
-          <summary className="text-[11px] font-medium text-muted-foreground cursor-pointer">Input</summary>
+          <summary className="text-[11px] font-medium text-muted-foreground cursor-pointer">
+            Input
+          </summary>
           <pre className="mt-1 p-2 rounded bg-muted text-foreground overflow-x-auto max-h-64 text-[11px] leading-relaxed">
             {JSON.stringify(step.input, null, 2)}
           </pre>
@@ -79,7 +95,9 @@ function StepCard({ step, highlight }: { step: WorkflowStepRun; highlight: boole
 
       {step.output && Object.keys(step.output).length > 0 && (
         <details open={highlight}>
-          <summary className="text-[11px] font-medium text-muted-foreground cursor-pointer">Output</summary>
+          <summary className="text-[11px] font-medium text-muted-foreground cursor-pointer">
+            Output
+          </summary>
           <pre className="mt-1 p-2 rounded bg-muted text-foreground overflow-x-auto max-h-64 text-[11px] leading-relaxed">
             {JSON.stringify(step.output, null, 2)}
           </pre>
@@ -89,7 +107,12 @@ function StepCard({ step, highlight }: { step: WorkflowStepRun; highlight: boole
   );
 }
 
-export function AIReviewLogsWindow({ runId, serverUrl, authToken, serverName }: AIReviewLogsWindowProps) {
+export function AIReviewLogsWindow({
+  runId,
+  serverUrl,
+  authToken,
+  serverName,
+}: AIReviewLogsWindowProps) {
   const [detail, setDetail] = useState<RunDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -105,7 +128,9 @@ export function AIReviewLogsWindow({ runId, serverUrl, authToken, serverName }: 
     try {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (authToken) headers['Authorization'] = authToken;
-      const resp = await fetch(`${serverUrl}/api/workflow-runs/${encodeURIComponent(runId)}`, { headers });
+      const resp = await fetch(`${serverUrl}/api/workflow-runs/${encodeURIComponent(runId)}`, {
+        headers,
+      });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const json = await resp.json();
       if (!json.success || !json.data) {
@@ -126,14 +151,24 @@ export function AIReviewLogsWindow({ runId, serverUrl, authToken, serverName }: 
   // Auto-refresh while the run is still in flight.
   useEffect(() => {
     if (!detail) return;
-    if (detail.run.status === 'completed' || detail.run.status === 'failed' || detail.run.status === 'cancelled') return;
-    const handle = setInterval(() => { void fetchDetail(); }, 2000);
+    if (
+      detail.run.status === 'completed' ||
+      detail.run.status === 'failed' ||
+      detail.run.status === 'cancelled'
+    )
+      return;
+    const handle = setInterval(() => {
+      void fetchDetail();
+    }, 2000);
     return () => clearInterval(handle);
   }, [detail, fetchDetail]);
 
   return (
     <div className="flex flex-col h-dvh bg-background text-foreground">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border" data-tauri-drag-region>
+      <div
+        className="flex items-center justify-between px-3 py-2 border-b border-border"
+        data-tauri-drag-region
+      >
         <div className="flex items-center gap-2 min-w-0">
           <Bot size={14} className="text-primary shrink-0" />
           <span className="text-sm font-medium truncate">AI Review Logs</span>
@@ -166,25 +201,56 @@ export function AIReviewLogsWindow({ runId, serverUrl, authToken, serverName }: 
           <>
             <div className="rounded-lg border border-border bg-card/40 p-3 text-xs space-y-1">
               <div className="flex flex-wrap gap-x-4 gap-y-1">
-                <div>Run ID: <code className="text-foreground bg-muted px-1 rounded">{detail.run.id}</code></div>
-                <div>Workflow: <code className="text-foreground bg-muted px-1 rounded">{detail.run.workflowId}</code></div>
-                <div>Trigger: <span className="text-foreground">{detail.run.triggerSource}</span></div>
+                <div>
+                  Run ID:{' '}
+                  <code className="text-foreground bg-muted px-1 rounded">{detail.run.id}</code>
+                </div>
+                <div>
+                  Workflow:{' '}
+                  <code className="text-foreground bg-muted px-1 rounded">
+                    {detail.run.workflowId}
+                  </code>
+                </div>
+                <div>
+                  Trigger: <span className="text-foreground">{detail.run.triggerSource}</span>
+                </div>
               </div>
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
-                <div>Started: <span className="text-foreground">{formatTime(detail.run.startedAt)}</span></div>
-                <div>Completed: <span className="text-foreground">{formatTime(detail.run.completedAt)}</span></div>
+                <div>
+                  Started:{' '}
+                  <span className="text-foreground">{formatTime(detail.run.startedAt)}</span>
+                </div>
+                <div>
+                  Completed:{' '}
+                  <span className="text-foreground">{formatTime(detail.run.completedAt)}</span>
+                </div>
                 {detail.run.startedAt && (
-                  <div>Duration: <span className="text-foreground">{formatDuration(detail.run.startedAt, detail.run.completedAt)}</span></div>
+                  <div>
+                    Duration:{' '}
+                    <span className="text-foreground">
+                      {formatDuration(detail.run.startedAt, detail.run.completedAt)}
+                    </span>
+                  </div>
                 )}
                 {detail.run.currentStepId && (
-                  <div>Current: <code className="text-foreground bg-muted px-1 rounded">{detail.run.currentStepId}</code></div>
+                  <div>
+                    Current:{' '}
+                    <code className="text-foreground bg-muted px-1 rounded">
+                      {detail.run.currentStepId}
+                    </code>
+                  </div>
                 )}
               </div>
               {detail.run.triggerDetail && (
-                <div className="text-muted-foreground">Trigger detail: <span className="text-foreground">{detail.run.triggerDetail}</span></div>
+                <div className="text-muted-foreground">
+                  Trigger detail:{' '}
+                  <span className="text-foreground">{detail.run.triggerDetail}</span>
+                </div>
               )}
               {detail.run.error && (
-                <div className="text-destructive mt-2 whitespace-pre-wrap break-words">{detail.run.error}</div>
+                <div className="text-destructive mt-2 whitespace-pre-wrap break-words">
+                  {detail.run.error}
+                </div>
               )}
             </div>
 
@@ -194,8 +260,12 @@ export function AIReviewLogsWindow({ runId, serverUrl, authToken, serverName }: 
                   No steps recorded yet.
                 </div>
               ) : (
-                detail.stepRuns.map((step) => (
-                  <StepCard key={step.id} step={step} highlight={step.stepType === AI_REVIEW_STEP_TYPE} />
+                detail.stepRuns.map(step => (
+                  <StepCard
+                    key={step.id}
+                    step={step}
+                    highlight={step.stepType === AI_REVIEW_STEP_TYPE}
+                  />
                 ))
               )}
             </div>

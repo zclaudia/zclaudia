@@ -14,7 +14,9 @@ vi.mock('../RightSidebarEmptyState', () => ({
 }));
 
 vi.mock('../workspace/WorkspaceView', () => ({
-  WorkspaceView: ({ sessionId }: any) => <div data-testid="workspace-view">WorkspaceView:{sessionId}</div>,
+  WorkspaceView: ({ sessionId }: any) => (
+    <div data-testid="workspace-view">WorkspaceView:{sessionId}</div>
+  ),
 }));
 
 import { RightSidebar } from '../RightSidebar';
@@ -25,7 +27,12 @@ const DummyMemoryPanel = () => <div data-testid="memory-panel">Memory</div>;
 describe('RightSidebar', () => {
   beforeEach(() => {
     useRightWorkspaceStore.setState({ bySession: {}, order: [] });
-    useRightSidebarStore.setState({ widthFraction: 0.26, activeTab: null, collapsed: false, unread: false });
+    useRightSidebarStore.setState({
+      widthFraction: 0.26,
+      activeTab: null,
+      collapsed: false,
+      unread: false,
+    });
     usePluginStore.setState({ panels: [], panelPlacements: {}, disabledBuiltinPanels: [] });
     (useIsMobile as any).mockReturnValue(false);
 
@@ -81,13 +88,17 @@ describe('RightSidebar', () => {
   });
 
   it('renders the empty-state launcher when not collapsed and workspace is empty', () => {
-    const { getByTestId } = render(<RightSidebar sessionId="A" projectId="p1" projectRoot="/test" />);
+    const { getByTestId } = render(
+      <RightSidebar sessionId="A" projectId="p1" projectRoot="/test" />
+    );
     expect(getByTestId('empty-state')).toBeTruthy();
   });
 
   it('renders the workspace without a separate "Workspace" header row', () => {
     useRightWorkspaceStore.getState().openTool('A', 'memory', { openMode: 'shared' });
-    const { getByTestId, queryByText } = render(<RightSidebar sessionId="A" projectId="p1" projectRoot="/test" />);
+    const { getByTestId, queryByText } = render(
+      <RightSidebar sessionId="A" projectId="p1" projectRoot="/test" />
+    );
     expect(getByTestId('workspace-view')).toBeTruthy();
     expect(queryByText('Workspace')).toBeNull();
   });
@@ -103,7 +114,9 @@ describe('RightSidebar', () => {
 
   it('renders the empty-state for a session with no open tools', () => {
     useRightWorkspaceStore.getState().openTool('B', 'memory', { openMode: 'shared' });
-    const { getByTestId } = render(<RightSidebar sessionId="A" projectId="p1" projectRoot="/test" />);
+    const { getByTestId } = render(
+      <RightSidebar sessionId="A" projectId="p1" projectRoot="/test" />
+    );
     // Session A has no tools open → empty-state is shown (not null)
     expect(getByTestId('empty-state')).toBeTruthy();
   });

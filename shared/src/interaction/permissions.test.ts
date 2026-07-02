@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  DEFAULT_UNIFIED_POLICY,
-  normalizeToUnifiedPolicy,
-} from './permissions.js';
+import { DEFAULT_UNIFIED_POLICY, normalizeToUnifiedPolicy } from './permissions.js';
 
 describe('normalizeToUnifiedPolicy', () => {
   it('returns a cloned default policy for invalid input', () => {

@@ -54,7 +54,13 @@ interface ChatMessagePaneProps {
 
   // Permission / ask-user
   permissionRequests: PermissionRequest[];
-  onPermissionDecision: (requestId: string, allow: boolean, remember?: boolean, credential?: string, feedback?: string) => Promise<void>;
+  onPermissionDecision: (
+    requestId: string,
+    allow: boolean,
+    remember?: boolean,
+    credential?: string,
+    feedback?: string
+  ) => Promise<void>;
 
   // File reference resolution context
   fileReferenceRoot?: string;
@@ -108,36 +114,35 @@ export const ChatMessagePane = memo(function ChatMessagePane({
   onBranch,
   collapsed,
 }: ChatMessagePaneProps) {
-  const interactionsMap = useInteractionStore((state) => state.interactions);
+  const interactionsMap = useInteractionStore(state => state.interactions);
   const promptInteractions = useMemo(() => {
     const inlinePromptInteractionIds = new Set(
       [...sessionToolCallHistory, ...sessionToolCalls]
-        .filter((toolCall) => toolCall.toolName === 'AskUserQuestion')
-        .map((toolCall) => toolCall.id),
+        .filter(toolCall => toolCall.toolName === 'AskUserQuestion')
+        .map(toolCall => toolCall.id)
     );
 
     return Object.values(interactionsMap)
-      .filter((interaction) =>
-        interaction.sessionId === sessionId
-        && interaction.type === 'interaction_prompt'
-        && interaction.source === 'provider_native'
-        && !inlinePromptInteractionIds.has(interaction.interactionId)
+      .filter(
+        interaction =>
+          interaction.sessionId === sessionId &&
+          interaction.type === 'interaction_prompt' &&
+          interaction.source === 'provider_native' &&
+          !inlinePromptInteractionIds.has(interaction.interactionId)
       )
       .sort((a, b) => a.createdAt - b.createdAt);
-  },
-    [interactionsMap, sessionId, sessionToolCallHistory, sessionToolCalls],
-  );
+  }, [interactionsMap, sessionId, sessionToolCallHistory, sessionToolCalls]);
   const planReviewInteractions = useMemo(() => {
     const toolCalls = [...sessionToolCallHistory, ...sessionToolCalls];
-    const hasPlanProposalTool = toolCalls.some((toolCall) =>
+    const hasPlanProposalTool = toolCalls.some(toolCall =>
       isPlanProposalTool(toolCall.toolName, toolCall.semantic)
     );
     if (hasPlanProposalTool) return [];
 
     return Object.values(interactionsMap)
-      .filter((interaction) =>
-        interaction.sessionId === sessionId
-        && interaction.type === 'interaction_plan_review'
+      .filter(
+        interaction =>
+          interaction.sessionId === sessionId && interaction.type === 'interaction_plan_review'
       )
       .sort((a, b) => a.createdAt - b.createdAt);
   }, [interactionsMap, sessionId, sessionToolCallHistory, sessionToolCalls]);
@@ -162,14 +167,18 @@ export const ChatMessagePane = memo(function ChatMessagePane({
   const updateStickToBottom = useCallback(() => {
     const container = messagesContainerRef.current;
     if (!container) return;
-    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    const distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
     shouldStickToBottomRef.current = distanceFromBottom < AUTO_STICK_BOTTOM_THRESHOLD_PX;
   }, [messagesContainerRef]);
 
-  const scrollToBottomIfSticky = useCallback((instant = false) => {
-    if (!shouldStickToBottomRef.current) return;
-    scrollToBottom(instant);
-  }, [scrollToBottom]);
+  const scrollToBottomIfSticky = useCallback(
+    (instant = false) => {
+      if (!shouldStickToBottomRef.current) return;
+      scrollToBottom(instant);
+    },
+    [scrollToBottom]
+  );
 
   // Soft fade where the message list meets the header (top) and the composer
   // (bottom): content dissolves into that chrome instead of hard-cutting. Only
@@ -181,7 +190,7 @@ export const ChatMessagePane = memo(function ChatMessagePane({
     if (!el) return;
     const top = el.scrollTop > 4;
     const bottom = el.scrollTop < el.scrollHeight - el.clientHeight - 4;
-    setEdgeFade((prev) => (prev.top === top && prev.bottom === bottom ? prev : { top, bottom }));
+    setEdgeFade(prev => (prev.top === top && prev.bottom === bottom ? prev : { top, bottom }));
   }, [messagesContainerRef]);
 
   const handleMessagesScroll = useCallback(() => {
@@ -215,14 +224,15 @@ export const ChatMessagePane = memo(function ChatMessagePane({
     return () => ro.disconnect();
   }, [messagesContainerRef, updateEdgeFade, sessionMessages.length, initialLoadDone]);
   const FADE_PX = 32;
-  const edgeMaskStyle = edgeFade.top || edgeFade.bottom
-    ? (() => {
-        const mask = `linear-gradient(to bottom, ${
-          edgeFade.top ? `transparent, black ${FADE_PX}px` : 'black'
-        }, ${edgeFade.bottom ? `black calc(100% - ${FADE_PX}px), transparent` : 'black'})`;
-        return { maskImage: mask, WebkitMaskImage: mask };
-      })()
-    : undefined;
+  const edgeMaskStyle =
+    edgeFade.top || edgeFade.bottom
+      ? (() => {
+          const mask = `linear-gradient(to bottom, ${
+            edgeFade.top ? `transparent, black ${FADE_PX}px` : 'black'
+          }, ${edgeFade.bottom ? `black calc(100% - ${FADE_PX}px), transparent` : 'black'})`;
+          return { maskImage: mask, WebkitMaskImage: mask };
+        })()
+      : undefined;
 
   const handleJumpToBottom = useCallback(() => {
     shouldStickToBottomRef.current = true;
@@ -296,138 +306,142 @@ export const ChatMessagePane = memo(function ChatMessagePane({
 
   return (
     <div className={collapsed ? 'hidden' : 'relative flex-1 flex flex-col min-h-0'}>
-    <div
-      ref={messagesContainerRef}
-      // Which edges are currently faded (see edgeMaskStyle). Exposed for tests since
-      // jsdom can't parse the calc() mask gradient to assert on the computed style.
-      data-edge-fade={
-        edgeFade.top && edgeFade.bottom
-          ? 'both'
-          : edgeFade.top
-            ? 'top'
-            : edgeFade.bottom
-              ? 'bottom'
-              : undefined
-      }
-      className="flex-1 overflow-y-auto overflow-x-hidden pl-2 pr-3 py-2 md:p-4 relative min-h-0"
-      style={edgeMaskStyle}
-      onScroll={handleMessagesScroll}
-      onWheel={(e) => handleMessageWheel(e.deltaY)}
-    >
-      {/* Centered reading column — keeps content from stretching edge-to-edge
+      <div
+        ref={messagesContainerRef}
+        // Which edges are currently faded (see edgeMaskStyle). Exposed for tests since
+        // jsdom can't parse the calc() mask gradient to assert on the computed style.
+        data-edge-fade={
+          edgeFade.top && edgeFade.bottom
+            ? 'both'
+            : edgeFade.top
+              ? 'top'
+              : edgeFade.bottom
+                ? 'bottom'
+                : undefined
+        }
+        className="flex-1 overflow-y-auto overflow-x-hidden pl-2 pr-3 py-2 md:p-4 relative min-h-0"
+        style={edgeMaskStyle}
+        onScroll={handleMessagesScroll}
+        onWheel={e => handleMessageWheel(e.deltaY)}
+      >
+        {/* Centered reading column — keeps content from stretching edge-to-edge
           on wide windows; whitespace falls to both sides like Claude/Cursor. */}
-      <div className="mx-auto w-full max-w-3xl">
-      {/* Load more indicator */}
-      {sessionPagination?.hasMore && (
-        <div className="text-center py-2 mb-2">
-          {sessionPagination?.isLoadingMore ? (
-            <span className="text-muted-foreground text-sm">Loading older messages...</span>
-          ) : (
-            <button
-              onClick={loadMoreMessages}
-              className="text-primary hover:text-primary/80 text-sm"
-            >
-              Load older messages
-            </button>
+        <div className="mx-auto w-full max-w-3xl">
+          {/* Load more indicator */}
+          {sessionPagination?.hasMore && (
+            <div className="text-center py-2 mb-2">
+              {sessionPagination?.isLoadingMore ? (
+                <span className="text-muted-foreground text-sm">Loading older messages...</span>
+              ) : (
+                <button
+                  onClick={loadMoreMessages}
+                  className="text-primary hover:text-primary/80 text-sm"
+                >
+                  Load older messages
+                </button>
+              )}
+            </div>
           )}
+
+          {/* Initial load placeholder */}
+          {isInitialMessageLoading && (
+            <div className="py-8 px-2 md:px-4">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+                <Loader2 size={16} className="animate-spin" />
+                <span>Loading messages...</span>
+              </div>
+              <div className="space-y-3 animate-pulse">
+                <div className="h-8 w-2/3 rounded-md bg-secondary/70" />
+                <div className="h-20 w-4/5 rounded-lg bg-secondary/60" />
+                <div className="h-6 w-1/2 rounded-md bg-secondary/70" />
+              </div>
+            </div>
+          )}
+
+          {/* Message load error */}
+          {loadError && (
+            <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+              <AlertTriangle
+                size={40}
+                strokeWidth={1.5}
+                className="text-muted-foreground/40 mb-3"
+              />
+              <p className="text-sm text-muted-foreground mb-1">{loadError}</p>
+              <button
+                onClick={retryLoad}
+                className="mt-2 px-3 py-1.5 text-xs font-medium text-primary hover:text-primary/80 bg-muted/60 hover:bg-muted/60 rounded-md transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          <MessageList
+            messages={sessionMessages}
+            streamingContentBlocks={useStreamingSegmented ? sessionContentBlocks : undefined}
+            streamingToolCalls={useStreamingSegmented ? sessionToolCallHistory : undefined}
+            scrollTop={scrollMetrics.scrollTop}
+            viewportHeight={scrollMetrics.viewportHeight}
+            resendTargetMessageId={resendTargetMessageId}
+            highlightedMessageId={highlightedMessageId}
+            resendDisabled={resendDisabled}
+            onResendTarget={onResendTarget}
+            fileReferenceRoot={fileReferenceRoot}
+            fileReferenceBackendId={fileReferenceBackendId}
+            onFork={onFork}
+            onBranch={onBranch}
+          />
+
+          <LoadingIndicator
+            isLoading={isLoading}
+            health={sessionHealth?.health}
+            loopPattern={sessionHealth?.loopPattern}
+            startedAt={sessionHealth?.startedAt}
+            lastActivityAt={sessionHealth?.lastActivityAt}
+            onCancel={onCancelRun}
+            retryStatus={sessionRetryStatus}
+          />
+
+          <CompactionNoticeBanner sessionId={sessionId} />
+
+          {/* Active tool calls */}
+          {!useStreamingSegmented && sessionToolCalls.length > 0 && (
+            <div className="mt-4">
+              <ToolCallList toolCalls={sessionToolCalls} />
+            </div>
+          )}
+
+          {/* Inline permission requests */}
+          {permissionRequests.length > 0 && (
+            <div className="mt-4 space-y-3">
+              {permissionRequests.map(req => (
+                <InlinePermissionRequest
+                  key={req.requestId}
+                  request={req}
+                  onDecision={onPermissionDecision}
+                />
+              ))}
+            </div>
+          )}
+
+          {promptInteractions.length > 0 && (
+            <div className="mt-4 space-y-3">
+              {promptInteractions.map(interaction => (
+                <InteractionItem key={interaction.interactionId} interaction={interaction} />
+              ))}
+            </div>
+          )}
+
+          {planReviewInteractions.length > 0 && (
+            <div className="mt-4 space-y-3">
+              {planReviewInteractions.map(interaction => (
+                <InteractionItem key={interaction.interactionId} interaction={interaction} />
+              ))}
+            </div>
+          )}
+
+          <div ref={messagesEndRef} />
         </div>
-      )}
-
-      {/* Initial load placeholder */}
-      {isInitialMessageLoading && (
-        <div className="py-8 px-2 md:px-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-            <Loader2 size={16} className="animate-spin" />
-            <span>Loading messages...</span>
-          </div>
-          <div className="space-y-3 animate-pulse">
-            <div className="h-8 w-2/3 rounded-md bg-secondary/70" />
-            <div className="h-20 w-4/5 rounded-lg bg-secondary/60" />
-            <div className="h-6 w-1/2 rounded-md bg-secondary/70" />
-          </div>
-        </div>
-      )}
-
-      {/* Message load error */}
-      {loadError && (
-        <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-          <AlertTriangle size={40} strokeWidth={1.5} className="text-muted-foreground/40 mb-3" />
-          <p className="text-sm text-muted-foreground mb-1">{loadError}</p>
-          <button
-            onClick={retryLoad}
-            className="mt-2 px-3 py-1.5 text-xs font-medium text-primary hover:text-primary/80 bg-muted/60 hover:bg-muted/60 rounded-md transition-colors"
-          >
-            Retry
-          </button>
-        </div>
-      )}
-
-      <MessageList
-        messages={sessionMessages}
-        streamingContentBlocks={useStreamingSegmented ? sessionContentBlocks : undefined}
-        streamingToolCalls={useStreamingSegmented ? sessionToolCallHistory : undefined}
-        scrollTop={scrollMetrics.scrollTop}
-        viewportHeight={scrollMetrics.viewportHeight}
-        resendTargetMessageId={resendTargetMessageId}
-        highlightedMessageId={highlightedMessageId}
-        resendDisabled={resendDisabled}
-        onResendTarget={onResendTarget}
-        fileReferenceRoot={fileReferenceRoot}
-        fileReferenceBackendId={fileReferenceBackendId}
-        onFork={onFork}
-        onBranch={onBranch}
-      />
-
-      <LoadingIndicator
-        isLoading={isLoading}
-        health={sessionHealth?.health}
-        loopPattern={sessionHealth?.loopPattern}
-        startedAt={sessionHealth?.startedAt}
-        lastActivityAt={sessionHealth?.lastActivityAt}
-        onCancel={onCancelRun}
-        retryStatus={sessionRetryStatus}
-      />
-
-      <CompactionNoticeBanner sessionId={sessionId} />
-
-      {/* Active tool calls */}
-      {!useStreamingSegmented && sessionToolCalls.length > 0 && (
-        <div className="mt-4">
-          <ToolCallList toolCalls={sessionToolCalls} />
-        </div>
-      )}
-
-      {/* Inline permission requests */}
-      {permissionRequests.length > 0 && (
-        <div className="mt-4 space-y-3">
-          {permissionRequests.map(req => (
-            <InlinePermissionRequest
-              key={req.requestId}
-              request={req}
-              onDecision={onPermissionDecision}
-            />
-          ))}
-        </div>
-      )}
-
-      {promptInteractions.length > 0 && (
-        <div className="mt-4 space-y-3">
-          {promptInteractions.map((interaction) => (
-            <InteractionItem key={interaction.interactionId} interaction={interaction} />
-          ))}
-        </div>
-      )}
-
-      {planReviewInteractions.length > 0 && (
-        <div className="mt-4 space-y-3">
-          {planReviewInteractions.map((interaction) => (
-            <InteractionItem key={interaction.interactionId} interaction={interaction} />
-          ))}
-        </div>
-      )}
-
-      <div ref={messagesEndRef} />
-      </div>
       </div>
 
       {showScrollToBottom && (

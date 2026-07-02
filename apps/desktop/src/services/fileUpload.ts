@@ -46,7 +46,8 @@ export async function uploadFile(
   const authHeaders = getAuthHeaders();
   const activeId = useServerStore.getState().activeServerId;
   const controlPlaneMode = getControlPlaneMode();
-  const viaGateway = !!activeId && !(controlPlaneMode === 'embedded-local' && isLocalBackendId(activeId));
+  const viaGateway =
+    !!activeId && !(controlPlaneMode === 'embedded-local' && isLocalBackendId(activeId));
 
   if (viaGateway) {
     // Gateway mode: send as JSON (gateway proxy can't forward multipart)
@@ -86,7 +87,7 @@ export async function uploadFile(
     const xhr = new XMLHttpRequest();
 
     if (onProgress) {
-      xhr.upload.addEventListener('progress', (event) => {
+      xhr.upload.addEventListener('progress', event => {
         if (event.lengthComputable) {
           onProgress({
             loaded: event.loaded,
@@ -125,10 +126,13 @@ export async function uploadFile(
 /**
  * Validate file before upload
  */
-export function validateFile(file: File, options?: {
-  maxSize?: number;
-  allowedTypes?: string[];
-}): { valid: boolean; error?: string } {
+export function validateFile(
+  file: File,
+  options?: {
+    maxSize?: number;
+    allowedTypes?: string[];
+  }
+): { valid: boolean; error?: string } {
   const maxSize = options?.maxSize || 10 * 1024 * 1024; // 10MB default
   const allowedTypes = options?.allowedTypes;
 

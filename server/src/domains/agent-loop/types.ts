@@ -20,15 +20,9 @@ export type AgentLoopContextPolicy =
   | 'workflow-artifacts'
   | 'workflow-thread';
 
-export type AgentLoopPermissionMode =
-  | 'deny-external'
-  | 'allow-declared-tools';
+export type AgentLoopPermissionMode = 'deny-external' | 'allow-declared-tools';
 
-export type AgentLoopRunStatus =
-  | 'completed'
-  | 'failed'
-  | 'timeout'
-  | 'contract_failed';
+export type AgentLoopRunStatus = 'completed' | 'failed' | 'timeout' | 'contract_failed';
 
 export type AgentLoopEventKind =
   | 'input'

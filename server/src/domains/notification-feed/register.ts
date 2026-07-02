@@ -5,7 +5,11 @@ import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import { createNotificationRoutes } from './routes.js';
 import { NotificationService } from './service.js';
 import type { NotificationSender } from '../../infra/push/notification-sender.js';
-import { buildAppSelectionClickUrl, formatSessionBackendContext, getBackendDisplayName } from '../../infra/push/notification-context.js';
+import {
+  buildAppSelectionClickUrl,
+  formatSessionBackendContext,
+  getBackendDisplayName,
+} from '../../infra/push/notification-context.js';
 
 export interface NotificationDomainDeps {
   db: ReturnType<typeof initDatabase>;
@@ -19,15 +23,13 @@ export interface NotificationDomainResult {
   notificationService: NotificationService;
 }
 
-export function registerNotificationDomain(
-  deps: NotificationDomainDeps,
-): NotificationDomainResult {
+export function registerNotificationDomain(deps: NotificationDomainDeps): NotificationDomainResult {
   const { db, app, authMiddleware, broadcastMessage, notificationSender } = deps;
 
   const notificationService = new NotificationService({
     db,
     broadcastFn: broadcastMessage,
-    notifyFn: (item) => {
+    notifyFn: item => {
       const context = item.sessionId
         ? `${formatSessionBackendContext(db, item.sessionId)}. `
         : `Backend ${getBackendDisplayName(db)}. `;

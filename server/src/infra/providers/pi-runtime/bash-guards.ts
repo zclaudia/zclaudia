@@ -37,9 +37,18 @@ const CRITICAL_BASH_PATTERNS: ReadonlyArray<{ pattern: RegExp; reason: string }>
   // Recursive destruction.
   { pattern: /\brm\s+-[a-z]*[rRfF][a-z]*\s+\//i, reason: 'recursive delete of a root-level path' },
   { pattern: /\bsudo\s+rm\b/i, reason: 'privileged file deletion (sudo rm)' },
-  { pattern: /\bchmod\s+-R\s+[0-7]+\s+\//i, reason: 'recursive permission change on a root-level path' },
-  { pattern: /\bchmod\s+-R\s+[ugoa+\-=rwxXst,]+\s+\//, reason: 'recursive permission change on a root-level path' },
-  { pattern: /\bchown\s+-R\s+\S+\s+\//i, reason: 'recursive ownership change on a root-level path' },
+  {
+    pattern: /\bchmod\s+-R\s+[0-7]+\s+\//i,
+    reason: 'recursive permission change on a root-level path',
+  },
+  {
+    pattern: /\bchmod\s+-R\s+[ugoa+\-=rwxXst,]+\s+\//,
+    reason: 'recursive permission change on a root-level path',
+  },
+  {
+    pattern: /\bchown\s+-R\s+\S+\s+\//i,
+    reason: 'recursive ownership change on a root-level path',
+  },
 
   // Fork bomb (a few common spacings).
   { pattern: /:\(\)\s*\{\s*:\s*\|\s*:/i, reason: 'fork bomb' },
@@ -54,29 +63,49 @@ const CRITICAL_BASH_PATTERNS: ReadonlyArray<{ pattern: RegExp; reason: string }>
 
   // System-config destruction.
   { pattern: />\s*\/etc\/(?:passwd|shadow|sudoers)\b/i, reason: 'overwrite of a system auth file' },
-  { pattern: /\btee\s+(?:-a\s+)?\/etc\/(?:passwd|shadow|sudoers)\b/i, reason: 'overwrite of a system auth file' },
+  {
+    pattern: /\btee\s+(?:-a\s+)?\/etc\/(?:passwd|shadow|sudoers)\b/i,
+    reason: 'overwrite of a system auth file',
+  },
 
   // Remote-fetch-then-execute (curl/wget piped to a shell or process-subbed).
-  { pattern: /\b(?:curl|wget|fetch)\b[^|]*\|\s*(?:bash|sh|zsh|fish)\b/i, reason: 'remote fetch piped into a shell (fetch-then-execute)' },
+  {
+    pattern: /\b(?:curl|wget|fetch)\b[^|]*\|\s*(?:bash|sh|zsh|fish)\b/i,
+    reason: 'remote fetch piped into a shell (fetch-then-execute)',
+  },
   // Process-sub variants — `bash <(curl …)`, `source <(curl …)`, `. <(curl …)`. `.` and `source` are
   // anchored to a command boundary so `find . -name` and similar don't false-positive.
-  { pattern: /(?:^|[\s;&|(])(?:bash|sh|zsh|source|\.)\s+<\(\s*(?:curl|wget|fetch)\b/i, reason: 'remote fetch executed via process substitution (fetch-then-execute)' },
+  {
+    pattern: /(?:^|[\s;&|(])(?:bash|sh|zsh|source|\.)\s+<\(\s*(?:curl|wget|fetch)\b/i,
+    reason: 'remote fetch executed via process substitution (fetch-then-execute)',
+  },
   // `eval "$(curl …)"` / `eval $(curl …)` / `eval \`curl …\``.
-  { pattern: /\beval\s+["'`]?\$\(\s*(?:curl|wget|fetch)\b|\beval\s+`\s*(?:curl|wget|fetch)\b/i, reason: 'remote fetch evaluated as code (fetch-then-execute)' },
+  {
+    pattern: /\beval\s+["'`]?\$\(\s*(?:curl|wget|fetch)\b|\beval\s+`\s*(?:curl|wget|fetch)\b/i,
+    reason: 'remote fetch evaluated as code (fetch-then-execute)',
+  },
 
   // Process/host control.
   { pattern: /\bkill\s+(?:-\S+\s+)?1\b/, reason: 'kill of PID 1' },
   // Must sit at command position so `npm run reboot-tests` or `echo 'shutdown the queue'`
   // don't false-positive.
-  { pattern: /(?:^|[\s;&|(])(?:shutdown|poweroff|reboot|halt)(?:\s|$|[;|&])/i, reason: 'host shutdown or reboot' },
+  {
+    pattern: /(?:^|[\s;&|(])(?:shutdown|poweroff|reboot|halt)(?:\s|$|[;|&])/i,
+    reason: 'host shutdown or reboot',
+  },
   { pattern: /(?:^|[\s;&|(])init\s+0\b/i, reason: 'host shutdown (init 0)' },
 
   // Network-shell exfil.
-  { pattern: /\bnc\b[^|;]*\s-[a-zA-Z]*[ec][a-zA-Z]*\s/i, reason: 'netcat with command execution (reverse shell)' },
+  {
+    pattern: /\bnc\b[^|;]*\s-[a-zA-Z]*[ec][a-zA-Z]*\s/i,
+    reason: 'netcat with command execution (reverse shell)',
+  },
 ];
 
-const SOURCE_OR_CONFIG_PATH = /(?:^|\/)(?:package(?:-lock)?\.json|pnpm-lock\.yaml|yarn\.lock|tsconfig[^/]*\.json|vite\.config\.[cm]?[jt]s|vitest\.config\.[cm]?[jt]s|AGENTS\.md|README\.md|[.\w-]+\.(?:ts|tsx|js|jsx|mjs|cjs|json|md|mdx|yaml|yml|toml|css|scss|html|rs|go|py|java|kt|c|cc|cpp|h|hpp|sh|sql|txt))$/i;
-const GENERATED_OR_TEMP_PATH = /(?:^|\/)(?:node_modules|dist|build|coverage|target|\.next|\.turbo|\.cache|tmp|temp|logs?)(?:\/|$)/i;
+const SOURCE_OR_CONFIG_PATH =
+  /(?:^|\/)(?:package(?:-lock)?\.json|pnpm-lock\.yaml|yarn\.lock|tsconfig[^/]*\.json|vite\.config\.[cm]?[jt]s|vitest\.config\.[cm]?[jt]s|AGENTS\.md|README\.md|[.\w-]+\.(?:ts|tsx|js|jsx|mjs|cjs|json|md|mdx|yaml|yml|toml|css|scss|html|rs|go|py|java|kt|c|cc|cpp|h|hpp|sh|sql|txt))$/i;
+const GENERATED_OR_TEMP_PATH =
+  /(?:^|\/)(?:node_modules|dist|build|coverage|target|\.next|\.turbo|\.cache|tmp|temp|logs?)(?:\/|$)/i;
 
 const SENSITIVE_HOME_PATHS: ReadonlyArray<RegExp> = [
   /^~\/\.ssh(?:\/|$)/,
@@ -111,11 +140,13 @@ function unquote(value: string): string {
 
 function isSafeExternalSink(pathText: string): boolean {
   const value = unquote(pathText);
-  return value === '/dev/null'
-    || value.startsWith('/tmp/')
-    || value.startsWith('/var/tmp/')
-    || value.startsWith('$TMPDIR/')
-    || value.startsWith('${TMPDIR}/');
+  return (
+    value === '/dev/null' ||
+    value.startsWith('/tmp/') ||
+    value.startsWith('/var/tmp/') ||
+    value.startsWith('$TMPDIR/') ||
+    value.startsWith('${TMPDIR}/')
+  );
 }
 
 function isWorkspaceSourceLikePath(pathText: string): boolean {
@@ -146,7 +177,8 @@ function findQuotedSourceLikePath(command: string): string | undefined {
     const value = match[1] ?? match[2];
     if (isWorkspaceSourceLikePath(value)) return value;
   }
-  const loosePath = /(?:^|[\s"',(])((?:\.\/)?(?:[\w.-]+\/)*(?:package(?:-lock)?\.json|pnpm-lock\.yaml|yarn\.lock|tsconfig[^/]*\.json|AGENTS\.md|README\.md|[.\w-]+\.(?:ts|tsx|js|jsx|mjs|cjs|json|md|mdx|yaml|yml|toml|css|scss|html|rs|go|py|java|kt|c|cc|cpp|h|hpp|sh|sql|txt)))(?=$|[\s"',)])/ig;
+  const loosePath =
+    /(?:^|[\s"',(])((?:\.\/)?(?:[\w.-]+\/)*(?:package(?:-lock)?\.json|pnpm-lock\.yaml|yarn\.lock|tsconfig[^/]*\.json|AGENTS\.md|README\.md|[.\w-]+\.(?:ts|tsx|js|jsx|mjs|cjs|json|md|mdx|yaml|yml|toml|css|scss|html|rs|go|py|java|kt|c|cc|cpp|h|hpp|sh|sql|txt)))(?=$|[\s"',)])/gi;
   while ((match = loosePath.exec(command))) {
     const value = match[1];
     if (isWorkspaceSourceLikePath(value)) return value;
@@ -217,7 +249,22 @@ function nonOptionOperands(words: string[], skipOptionArgs: Set<string> = new Se
 }
 
 function grepSuggestion(words: string[], toolName: string): BashToolRoutingSuggestion | undefined {
-  const skipOptionArgs = new Set(['-e', '--regexp', '-f', '--file', '-g', '--glob', '--type', '-t', '-C', '--context', '-A', '--after-context', '-B', '--before-context']);
+  const skipOptionArgs = new Set([
+    '-e',
+    '--regexp',
+    '-f',
+    '--file',
+    '-g',
+    '--glob',
+    '--type',
+    '-t',
+    '-C',
+    '--context',
+    '-A',
+    '--after-context',
+    '-B',
+    '--before-context',
+  ]);
   const operands = nonOptionOperands(words, skipOptionArgs);
   const pattern = operands[0] ?? optionValue(words, ['-e', '--regexp']);
   if (!pattern) return undefined;
@@ -225,11 +272,12 @@ function grepSuggestion(words: string[], toolName: string): BashToolRoutingSugge
   if (!isWorkspaceRelativeOperand(path)) return undefined;
   const include = optionValue(words, ['-g', '--glob']);
   const caseInsensitive = words.includes('-i') || words.includes('--ignore-case');
-  const outputMode = words.includes('-l') || words.includes('--files-with-matches')
-    ? 'files_with_matches'
-    : words.includes('-c') || words.includes('--count')
-      ? 'count'
-      : 'content';
+  const outputMode =
+    words.includes('-l') || words.includes('--files-with-matches')
+      ? 'files_with_matches'
+      : words.includes('-c') || words.includes('--count')
+        ? 'count'
+        : 'content';
   return {
     reason: `${toolName} is a pure content search`,
     suggestedTool: 'Grep',
@@ -244,9 +292,15 @@ function grepSuggestion(words: string[], toolName: string): BashToolRoutingSugge
 }
 
 function findSuggestion(words: string[]): BashToolRoutingSuggestion | undefined {
-  if (words.some(word => ['-exec', '-execdir', '-delete', '-ok', '-okdir'].includes(word))) return undefined;
-  const expressionStart = words.findIndex((word, index) => index > 0 && (word.startsWith('-') || word === '(' || word === '!' || word === 'not'));
-  const roots = words.slice(1, expressionStart === -1 ? words.length : expressionStart).filter(word => !word.startsWith('-'));
+  if (words.some(word => ['-exec', '-execdir', '-delete', '-ok', '-okdir'].includes(word)))
+    return undefined;
+  const expressionStart = words.findIndex(
+    (word, index) =>
+      index > 0 && (word.startsWith('-') || word === '(' || word === '!' || word === 'not')
+  );
+  const roots = words
+    .slice(1, expressionStart === -1 ? words.length : expressionStart)
+    .filter(word => !word.startsWith('-'));
   if (roots.length > 1) return undefined;
   const root = roots[0];
   if (!isWorkspaceRelativeOperand(root)) return undefined;
@@ -261,7 +315,9 @@ function findSuggestion(words: string[]): BashToolRoutingSuggestion | undefined 
   };
 }
 
-export function findBashToolRoutingSuggestion(command: string): BashToolRoutingSuggestion | undefined {
+export function findBashToolRoutingSuggestion(
+  command: string
+): BashToolRoutingSuggestion | undefined {
   if (hasShellControlSyntax(command)) return undefined;
   const words = shellWords(command);
   if (words.length === 0) return undefined;
@@ -309,12 +365,15 @@ export function findBashToolRoutingSuggestion(command: string): BashToolRoutingS
 }
 
 export function findBashSensitivePathAccess(command: string): BashSensitivePathMatch | undefined {
-  const pathPattern = /(~\/(?:[^"'\s;&|)\\]+|Library\/(?:Safari|Application Support\/(?:Google\/Chrome|Firefox\/Profiles))(?:\/[^"'\s;&|)\\]*)?)|\$HOME\/[^"'\s;&|)\\]+|\$\{HOME\}\/[^"'\s;&|)\\]+)/g;
+  const pathPattern =
+    /(~\/(?:[^"'\s;&|)\\]+|Library\/(?:Safari|Application Support\/(?:Google\/Chrome|Firefox\/Profiles))(?:\/[^"'\s;&|)\\]*)?)|\$HOME\/[^"'\s;&|)\\]+|\$\{HOME\}\/[^"'\s;&|)\\]+)/g;
   const home = process.env.HOME?.replace(/\/+$/, '');
   const absoluteHomePattern = home
     ? new RegExp(`${home.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\/[^"'\\s;&|)\\\\]+`, 'g')
     : undefined;
-  for (const pattern of [pathPattern, absoluteHomePattern].filter((value): value is RegExp => Boolean(value))) {
+  for (const pattern of [pathPattern, absoluteHomePattern].filter((value): value is RegExp =>
+    Boolean(value)
+  )) {
     let match: RegExpExecArray | null;
     while ((match = pattern.exec(command))) {
       const candidate = normalizeHomePath(match[0]);
@@ -350,7 +409,9 @@ export function findBashFileBypass(command: string): BashFileBypassMatch | undef
     }
   }
 
-  const teeMatch = /(?:^|[\s;&|])tee\s+(?:-[A-Za-z]+\s+)*(?:"([^"]+)"|'([^']+)'|([^\s;&|]+))/i.exec(command);
+  const teeMatch = /(?:^|[\s;&|])tee\s+(?:-[A-Za-z]+\s+)*(?:"([^"]+)"|'([^']+)'|([^\s;&|]+))/i.exec(
+    command
+  );
   if (teeMatch) {
     const target = teeMatch[1] ?? teeMatch[2] ?? teeMatch[3];
     if (isWorkspaceSourceLikePath(target)) {
@@ -384,9 +445,15 @@ export function findBashFileBypass(command: string): BashFileBypassMatch | undef
     }
   }
 
-  if (/\b(?:python|python3|node|ruby|perl)\b[\s\S]*(?:writeFile(?:Sync)?|appendFile(?:Sync)?|open\s*\()/i.test(command)) {
+  if (
+    /\b(?:python|python3|node|ruby|perl)\b[\s\S]*(?:writeFile(?:Sync)?|appendFile(?:Sync)?|open\s*\()/i.test(
+      command
+    )
+  ) {
     const target = findQuotedSourceLikePath(command);
-    const writes = /(?:writeFile(?:Sync)?|appendFile(?:Sync)?|open\s*\([^)]*,\s*['"][wa+])/i.test(command);
+    const writes = /(?:writeFile(?:Sync)?|appendFile(?:Sync)?|open\s*\([^)]*,\s*['"][wa+])/i.test(
+      command
+    );
     if (writes && target) {
       return {
         kind: 'file_write',
@@ -396,7 +463,7 @@ export function findBashFileBypass(command: string): BashFileBypassMatch | undef
     }
   }
 
-  const readCommandPattern = /(?:^|[\s;&|])(?:cat|bat|less|more|nl|head|tail)\b([^;&|]*)/ig;
+  const readCommandPattern = /(?:^|[\s;&|])(?:cat|bat|less|more|nl|head|tail)\b([^;&|]*)/gi;
   let readMatch: RegExpExecArray | null;
   while ((readMatch = readCommandPattern.exec(command))) {
     const target = findSourceLikeWord(readMatch[1] ?? '');
@@ -409,7 +476,11 @@ export function findBashFileBypass(command: string): BashFileBypassMatch | undef
     }
   }
 
-  if (/\b(?:python|python3|node|ruby|perl)\b[\s\S]*(?:readFileSync|open\s*\([^)]*\)[\s\S]*\.read\s*\()/i.test(command)) {
+  if (
+    /\b(?:python|python3|node|ruby|perl)\b[\s\S]*(?:readFileSync|open\s*\([^)]*\)[\s\S]*\.read\s*\()/i.test(
+      command
+    )
+  ) {
     const target = findQuotedSourceLikePath(command);
     if (target) {
       return {

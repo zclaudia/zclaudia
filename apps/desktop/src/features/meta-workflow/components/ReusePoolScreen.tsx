@@ -18,8 +18,8 @@ const PHASE_TYPES = [
 ] as const;
 
 export function ReusePoolScreen({ projectId }: Props): React.ReactElement {
-  const view = useMetaWorkflowStore((s) => s.viewByProject[projectId]);
-  const patchView = useMetaWorkflowStore((s) => s.patchView);
+  const view = useMetaWorkflowStore(s => s.viewByProject[projectId]);
+  const patchView = useMetaWorkflowStore(s => s.patchView);
   const filters = view?.poolFilters ?? {};
   const [items, setItems] = useState<ReusablePoolItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -30,10 +30,18 @@ export function ReusePoolScreen({ projectId }: Props): React.ReactElement {
     setLoading(true);
     setError(null);
     listReusePool(filters)
-      .then((rows) => { if (!cancelled) setItems(rows); })
-      .catch((e) => { if (!cancelled) setError((e as Error).message); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .then(rows => {
+        if (!cancelled) setItems(rows);
+      })
+      .catch(e => {
+        if (!cancelled) setError((e as Error).message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [filters.phaseType, filters.search]);
 
   return (
@@ -54,12 +62,18 @@ export function ReusePoolScreen({ projectId }: Props): React.ReactElement {
           <select
             className="bg-background border border-border rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50"
             value={filters.phaseType ?? ''}
-            onChange={(e) => patchView(projectId, {
-              poolFilters: { ...filters, phaseType: e.target.value || undefined },
-            })}
+            onChange={e =>
+              patchView(projectId, {
+                poolFilters: { ...filters, phaseType: e.target.value || undefined },
+              })
+            }
           >
             <option value="">All</option>
-            {PHASE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+            {PHASE_TYPES.map(t => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
           </select>
         </div>
         <div className="flex-1 min-w-[200px]">
@@ -69,9 +83,11 @@ export function ReusePoolScreen({ projectId }: Props): React.ReactElement {
             className="w-full bg-background border border-border rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50"
             placeholder="tag, description, entity id…"
             value={filters.search ?? ''}
-            onChange={(e) => patchView(projectId, {
-              poolFilters: { ...filters, search: e.target.value || undefined },
-            })}
+            onChange={e =>
+              patchView(projectId, {
+                poolFilters: { ...filters, search: e.target.value || undefined },
+              })
+            }
           />
         </div>
       </div>
@@ -83,7 +99,7 @@ export function ReusePoolScreen({ projectId }: Props): React.ReactElement {
       )}
       {!loading && items && items.length > 0 && (
         <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {items.map((it) => (
+          {items.map(it => (
             <li
               key={it.id}
               className="border border-border rounded-md p-3 bg-card hover:bg-secondary/30 transition-colors"
@@ -109,8 +125,11 @@ export function ReusePoolScreen({ projectId }: Props): React.ReactElement {
               )}
               {it.tags && it.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
-                  {it.tags.map((t) => (
-                    <span key={t} className="px-1.5 py-0.5 text-[10px] rounded bg-secondary text-foreground">
+                  {it.tags.map(t => (
+                    <span
+                      key={t}
+                      className="px-1.5 py-0.5 text-[10px] rounded bg-secondary text-foreground"
+                    >
                       {t}
                     </span>
                   ))}

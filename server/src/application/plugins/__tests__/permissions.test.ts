@@ -92,7 +92,7 @@ describe('PermissionManager', () => {
       manager.grant('test-plugin', 'storage');
 
       const granted = manager.getGrantedPermissions('test-plugin');
-      expect(granted.filter((p) => p === 'storage')).toHaveLength(1);
+      expect(granted.filter(p => p === 'storage')).toHaveLength(1);
     });
 
     it('should revoke a permission', () => {
@@ -120,7 +120,9 @@ describe('PermissionManager', () => {
     it('should grant multiple permissions', () => {
       manager.grantAll('test-plugin', ['storage', 'fs.read', 'network.fetch']);
 
-      expect(manager.hasAllPermissions('test-plugin', ['storage', 'fs.read', 'network.fetch'])).toBe(true);
+      expect(
+        manager.hasAllPermissions('test-plugin', ['storage', 'fs.read', 'network.fetch'])
+      ).toBe(true);
     });
 
     it('should clear all permissions for a plugin', () => {
@@ -250,9 +252,9 @@ describe('PermissionManager', () => {
       const sorted = manager.sortPermissionsByRisk(permissions);
 
       expect(sorted[0]).toBe('shell.execute'); // Level 4
-      expect(sorted[1]).toBe('fs.write');      // Level 3
-      expect(sorted[2]).toBe('fs.read');       // Level 2
-      expect(sorted[3]).toBe('storage');       // Level 1
+      expect(sorted[1]).toBe('fs.write'); // Level 3
+      expect(sorted[2]).toBe('fs.read'); // Level 2
+      expect(sorted[3]).toBe('storage'); // Level 1
     });
 
     it('should get permission summary', () => {
@@ -271,7 +273,9 @@ describe('PermissionManager', () => {
     });
 
     it('should check if safe to auto-grant', () => {
-      expect(manager.isSafeToAutoGrant(['storage', 'session.read', 'project.read'] as Permission[])).toBe(true);
+      expect(
+        manager.isSafeToAutoGrant(['storage', 'session.read', 'project.read'] as Permission[])
+      ).toBe(true);
       expect(manager.isSafeToAutoGrant(['storage', 'shell.execute'] as Permission[])).toBe(false);
     });
 

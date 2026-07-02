@@ -23,19 +23,25 @@ function ctx(): StepContext {
 describe('ActivityStepExecutorAdapter', () => {
   it('exposes the registry types as supportedTypes', () => {
     const registry = new ActivityRegistry();
-    registry.register({ type: 'echo', invoke: async (i) => ({ status: 'completed', output: { i } }) } as Activity);
+    registry.register({
+      type: 'echo',
+      invoke: async i => ({ status: 'completed', output: { i } }),
+    } as Activity);
     const adapter = new ActivityStepExecutorAdapter(registry, runner);
     expect(adapter.supportedTypes).toEqual(['echo']);
   });
 
   it('resolves templated config, injects context, and maps completed result', async () => {
     const registry = new ActivityRegistry();
-    registry.register({ type: 'echo', invoke: async (input) => ({ status: 'completed', output: { input } }) } as Activity);
+    registry.register({
+      type: 'echo',
+      invoke: async input => ({ status: 'completed', output: { input } }),
+    } as Activity);
     const adapter = new ActivityStepExecutorAdapter(registry, runner);
     const res = await adapter.execute(
       { type: 'echo' } as WorkflowNodeDef,
       { msg: '{{x}}', n: 2 },
-      ctx(),
+      ctx()
     );
     expect(res.status).toBe('completed');
     const input = (res.output as { input: Record<string, unknown> }).input;
@@ -44,7 +50,10 @@ describe('ActivityStepExecutorAdapter', () => {
 
   it('maps a failed activity result to a failed step result', async () => {
     const registry = new ActivityRegistry();
-    registry.register({ type: 'bad', invoke: async () => ({ status: 'failed', output: {}, error: 'boom' }) } as Activity);
+    registry.register({
+      type: 'bad',
+      invoke: async () => ({ status: 'failed', output: {}, error: 'boom' }),
+    } as Activity);
     const adapter = new ActivityStepExecutorAdapter(registry, runner);
     const res = await adapter.execute({ type: 'bad' } as WorkflowNodeDef, {}, ctx());
     expect(res).toEqual({ status: 'failed', output: {}, error: 'boom' });

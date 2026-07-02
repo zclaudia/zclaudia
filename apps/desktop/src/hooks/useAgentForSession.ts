@@ -22,18 +22,18 @@ export interface AgentForSession {
 }
 
 export function useAgentForSession(sessionId: string | undefined): AgentForSession {
-  const session = useProjectStore((s) =>
-    sessionId ? s.sessions.find((x) => x.id === sessionId) : undefined
+  const session = useProjectStore(s =>
+    sessionId ? s.sessions.find(x => x.id === sessionId) : undefined
   );
   const agentProfileId = session?.agentProfileId;
 
-  const agentProfiles = useAgentProfileMetaStore((s) => s.profiles);
-  const agentLoaded = useAgentProfileMetaStore((s) => s.loaded);
-  const agentLoading = useAgentProfileMetaStore((s) => s.loading);
-  const loadAllAgents = useAgentProfileMetaStore((s) => s.loadAll);
+  const agentProfiles = useAgentProfileMetaStore(s => s.profiles);
+  const agentLoaded = useAgentProfileMetaStore(s => s.loaded);
+  const agentLoading = useAgentProfileMetaStore(s => s.loading);
+  const loadAllAgents = useAgentProfileMetaStore(s => s.loadAll);
 
-  const activeServerId = useServerStore((s) => s.activeServerId);
-  const llmProfiles = useLlmProfileMetaStore((s) => s.getProviders(activeServerId));
+  const activeServerId = useServerStore(s => s.activeServerId);
+  const llmProfiles = useLlmProfileMetaStore(s => s.getProviders(activeServerId));
 
   useEffect(() => {
     if (!agentLoaded && !agentLoading) {
@@ -42,7 +42,7 @@ export function useAgentForSession(sessionId: string | undefined): AgentForSessi
   }, [agentLoaded, agentLoading, loadAllAgents]);
 
   const agent = agentProfileId ? agentProfiles[agentProfileId] : undefined;
-  const llm = agent ? llmProfiles.find((p) => p.id === agent.llmProfileId) : undefined;
+  const llm = agent ? llmProfiles.find(p => p.id === agent.llmProfileId) : undefined;
   // loading is only meaningful when this session actually needs something:
   //   - agentLoading matters only when a profile is expected (agentProfileId set) and not yet resolved
   //   - llmProfileMetaStore has no loading flag; guard is omitted until one is added

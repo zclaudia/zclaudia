@@ -6,11 +6,22 @@ import type { MessageWithToolCalls } from '../chatMessageStore';
 
 const reset = () => {
   useRunStore.setState({
-    activeRuns: {}, backgroundRunIds: new Set(), runHealth: {}, runRetryStatus: {},
-    activeToolCalls: {}, toolCallsHistory: {}, runContentBlocks: {},
+    activeRuns: {},
+    backgroundRunIds: new Set(),
+    runHealth: {},
+    runRetryStatus: {},
+    activeToolCalls: {},
+    toolCallsHistory: {},
+    runContentBlocks: {},
   });
   useChatMessageStore.setState({ messages: {}, pagination: {} });
-  useSessionConfigStore.setState({ systemInfoBySession: {}, modeBySession: {}, runtimeModes: {}, sessionUsage: {}, compactionNotice: {} });
+  useSessionConfigStore.setState({
+    systemInfoBySession: {},
+    modeBySession: {},
+    runtimeModes: {},
+    sessionUsage: {},
+    compactionNotice: {},
+  });
 };
 
 describe('runStore', () => {
@@ -56,7 +67,12 @@ describe('runStore', () => {
   });
 
   it('finalizeRunToMessage writes run tool calls onto the last assistant message (cross-store)', () => {
-    const am: MessageWithToolCalls = { id: 'm1', role: 'assistant', content: '', createdAt: 1 } as MessageWithToolCalls;
+    const am: MessageWithToolCalls = {
+      id: 'm1',
+      role: 'assistant',
+      content: '',
+      createdAt: 1,
+    } as MessageWithToolCalls;
     useChatMessageStore.getState().setMessages('s1', [am]);
     useRunStore.getState().startRun('r1', 's1');
     useRunStore.getState().addToolCall('r1', 't1', 'Read', { path: 'x' });

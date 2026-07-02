@@ -7,10 +7,7 @@ import type { MergeResult } from '@zclaudia/shared/features/supervision';
 
 const execFileAsync = promisify(execFileCb);
 
-async function git(
-  args: string[],
-  cwd: string,
-): Promise<{ stdout: string; stderr: string }> {
+async function git(args: string[], cwd: string): Promise<{ stdout: string; stderr: string }> {
   return execFileAsync('git', args, { cwd, maxBuffer: 10 * 1024 * 1024 });
 }
 
@@ -42,8 +39,8 @@ export class WorktreePool {
     const existingPaths = new Set(
       stdout
         .split('\n')
-        .filter((l) => l.startsWith('worktree '))
-        .map((l) => l.replace('worktree ', '').trim()),
+        .filter(l => l.startsWith('worktree '))
+        .map(l => l.replace('worktree ', '').trim())
     );
 
     for (let i = 0; i < size; i++) {
@@ -60,7 +57,7 @@ export class WorktreePool {
   }
 
   async acquire(taskId: string, attempt: number): Promise<string> {
-    const slot = this.slots.find((s) => !s.inUse);
+    const slot = this.slots.find(s => !s.inUse);
     if (!slot) {
       throw new Error('No available worktree slots');
     }
@@ -75,7 +72,7 @@ export class WorktreePool {
     console.log(`[WorktreePool] acquire preparing detached slot ${slot.path} from ${mainBranch}`);
     await git(['checkout', '--detach'], slot.path).catch(() => {});
     await git(['reset', '--hard', `origin/${mainBranch}`], slot.path).catch(() =>
-      git(['reset', '--hard', mainBranch], slot.path),
+      git(['reset', '--hard', mainBranch], slot.path)
     );
     await git(['clean', '-fd'], slot.path);
 
@@ -88,18 +85,14 @@ export class WorktreePool {
   }
 
   release(wtPath: string): void {
-    const slot = this.slots.find((s) => s.path === wtPath);
+    const slot = this.slots.find(s => s.path === wtPath);
     if (slot) {
       slot.inUse = false;
       slot.taskId = undefined;
     }
   }
 
-  async mergeBack(
-    taskId: string,
-    attempt: number,
-    wtPath: string,
-  ): Promise<MergeResult> {
+  async mergeBack(taskId: string, attempt: number, wtPath: string): Promise<MergeResult> {
     return this.mergeLock.runExclusive(async () => {
       const branch = `task/${taskId}/r${attempt}`;
       const mainBranch = await this.getMainBranch();
@@ -107,14 +100,8 @@ export class WorktreePool {
       try {
         await git(['checkout', mainBranch], this.mainPath);
         await git(
-          [
-            'merge',
-            '--no-ff',
-            branch,
-            '-m',
-            `Merge task ${taskId} (attempt ${attempt})`,
-          ],
-          this.mainPath,
+          ['merge', '--no-ff', branch, '-m', `Merge task ${taskId} (attempt ${attempt})`],
+          this.mainPath
         );
       } catch (err: unknown) {
         // Merge conflict — abort and report
@@ -154,8 +141,8 @@ export class WorktreePool {
   getStatus(): { total: number; available: number; inUse: WorktreeSlot[] } {
     return {
       total: this.slots.length,
-      available: this.slots.filter((s) => !s.inUse).length,
-      inUse: this.slots.filter((s) => s.inUse),
+      available: this.slots.filter(s => !s.inUse).length,
+      inUse: this.slots.filter(s => s.inUse),
     };
   }
 
@@ -167,7 +154,7 @@ export class WorktreePool {
     try {
       const { stdout } = await git(
         ['symbolic-ref', 'refs/remotes/origin/HEAD', '--short'],
-        this.mainPath,
+        this.mainPath
       );
       return stdout.trim().replace('origin/', '');
     } catch {

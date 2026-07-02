@@ -23,8 +23,15 @@ export interface UpdateGoalInput {
 
 // Event publisher port — implemented by infra layer, consumed by service + coordinator
 export interface GoalEventPublisher {
-  publish(event:
-    | { type: 'goal:state-changed'; goal: Goal }
-    | { type: 'goal:evaluator-verdict'; goalId: string; kind: EvaluatorVerdictKind; reason: string }
-    | { type: 'goal:budget-update'; goalId: string; tokensUsed: number; turnsUsed: number }): void;
+  publish(
+    event:
+      | { type: 'goal:state-changed'; goal: Goal }
+      | {
+          type: 'goal:evaluator-verdict';
+          goalId: string;
+          kind: EvaluatorVerdictKind;
+          reason: string;
+        }
+      | { type: 'goal:budget-update'; goalId: string; tokensUsed: number; turnsUsed: number }
+  ): void;
 }

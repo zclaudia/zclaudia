@@ -12,7 +12,7 @@ import { isTauri } from '../utils/platform';
  * Skipped when running inside a pop-out session window itself.
  */
 export function useTauriWindowEvents() {
-  const removePoppedOutSession = useUIStore((s) => s.removePoppedOutSession);
+  const removePoppedOutSession = useUIStore(s => s.removePoppedOutSession);
 
   useEffect(() => {
     if (!isTauri() || new URLSearchParams(window.location.search).has('sessionWindow')) {
@@ -26,14 +26,14 @@ export function useTauriWindowEvents() {
     (async () => {
       const { listen } = await import('@tauri-apps/api/event');
 
-      cleanupSession = await listen<{ sessionId?: string }>('session-window-closed', (event) => {
+      cleanupSession = await listen<{ sessionId?: string }>('session-window-closed', event => {
         const closedSessionId = event.payload?.sessionId;
         if (closedSessionId) {
           removePoppedOutSession(closedSessionId);
         }
       });
 
-      cleanupTerminal = await listen<{ terminalId?: string }>('terminal-window-closed', (event) => {
+      cleanupTerminal = await listen<{ terminalId?: string }>('terminal-window-closed', event => {
         const closedTerminalId = event.payload?.terminalId;
         if (!closedTerminalId) return;
         useTerminalStore.getState().removePoppedOutTerminal(closedTerminalId);

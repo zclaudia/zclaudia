@@ -15,15 +15,18 @@ describe('applyDelta', () => {
   it('ADDED inserts a new requirement', () => {
     const corpus: ParsedSpec = { capability: 'x', requirements: [mkReq('A')] };
     const result = applyDelta(corpus, { added: [mkReq('B')], modified: [], removed: [] });
-    expect(result.spec.requirements.map((r) => r.name)).toEqual(['A', 'B']);
+    expect(result.spec.requirements.map(r => r.name)).toEqual(['A', 'B']);
     expect(result.added).toEqual(['B']);
   });
 
   it('MODIFIED replaces existing requirement body, keeps position', () => {
-    const corpus: ParsedSpec = { capability: 'x', requirements: [mkReq('A'), mkReq('B'), mkReq('C')] };
+    const corpus: ParsedSpec = {
+      capability: 'x',
+      requirements: [mkReq('A'), mkReq('B'), mkReq('C')],
+    };
     const newB = mkReq('B', 'SHALL be updated.');
     const result = applyDelta(corpus, { added: [], modified: [newB], removed: [] });
-    expect(result.spec.requirements.map((r) => r.name)).toEqual(['A', 'B', 'C']);
+    expect(result.spec.requirements.map(r => r.name)).toEqual(['A', 'B', 'C']);
     expect(result.spec.requirements[1].body).toBe('SHALL be updated.');
     expect(result.modified).toEqual(['B']);
   });
@@ -31,7 +34,7 @@ describe('applyDelta', () => {
   it('REMOVED drops a requirement', () => {
     const corpus: ParsedSpec = { capability: 'x', requirements: [mkReq('A'), mkReq('B')] };
     const result = applyDelta(corpus, { added: [], modified: [], removed: ['A'] });
-    expect(result.spec.requirements.map((r) => r.name)).toEqual(['B']);
+    expect(result.spec.requirements.map(r => r.name)).toEqual(['B']);
     expect(result.removed).toEqual(['A']);
   });
 
@@ -46,7 +49,7 @@ describe('applyDelta', () => {
     const corpus: ParsedSpec = { capability: 'x', requirements: [mkReq('A')] };
     const result = applyDelta(corpus, { added: [], modified: [mkReq('B', 'new')], removed: [] });
     expect(result.modifiedMissing).toEqual(['B']);
-    expect(result.spec.requirements.map((r) => r.name)).toContain('B');
+    expect(result.spec.requirements.map(r => r.name)).toContain('B');
   });
 
   it('REMOVED missing target is reported, no error', () => {
@@ -56,26 +59,42 @@ describe('applyDelta', () => {
   });
 
   it('combined ADD + MODIFY + REMOVE in one delta', () => {
-    const corpus: ParsedSpec = { capability: 'x', requirements: [mkReq('A'), mkReq('B'), mkReq('C')] };
+    const corpus: ParsedSpec = {
+      capability: 'x',
+      requirements: [mkReq('A'), mkReq('B'), mkReq('C')],
+    };
     const result = applyDelta(corpus, {
       added: [mkReq('D')],
       modified: [mkReq('B', 'changed')],
       removed: ['A'],
     });
-    expect(result.spec.requirements.map((r) => r.name)).toEqual(['B', 'C', 'D']);
+    expect(result.spec.requirements.map(r => r.name)).toEqual(['B', 'C', 'D']);
     expect(result.spec.requirements[0].body).toBe('changed');
   });
 
   it('applyDeltaToEmptyCorpus handles ADDED-only delta', () => {
-    const result = applyDeltaToEmptyCorpus('newcap', { added: [mkReq('R1')], modified: [], removed: [] });
+    const result = applyDeltaToEmptyCorpus('newcap', {
+      added: [mkReq('R1')],
+      modified: [],
+      removed: [],
+    });
     expect(result.spec.capability).toBe('newcap');
     expect(result.spec.requirements).toHaveLength(1);
     expect(result.added).toEqual(['R1']);
   });
 
   it('corpus purpose is preserved across merge', () => {
-    const corpus: ParsedSpec = { capability: 'x', purpose: 'Original purpose.', requirements: [mkReq('A')] };
-    const result = applyDelta(corpus, { added: [mkReq('B')], modified: [], removed: [], purpose: 'change purpose' });
+    const corpus: ParsedSpec = {
+      capability: 'x',
+      purpose: 'Original purpose.',
+      requirements: [mkReq('A')],
+    };
+    const result = applyDelta(corpus, {
+      added: [mkReq('B')],
+      modified: [],
+      removed: [],
+      purpose: 'change purpose',
+    });
     expect(result.spec.purpose).toBe('Original purpose.');
   });
 });

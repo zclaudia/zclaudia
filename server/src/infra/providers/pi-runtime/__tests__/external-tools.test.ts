@@ -16,10 +16,12 @@ import {
 function createDb(): Database.Database {
   const db = new Database(':memory:');
   applyMigrations(db);
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO mcp_servers (name, command, args, env, enabled, provider_scope, created_at, updated_at)
     VALUES (?, ?, ?, ?, 1, ?, ?, ?)
-  `).run('github', 'node', '[]', NULL_JSON, '["zclaudia"]', Date.now(), Date.now());
+  `
+  ).run('github', 'node', '[]', NULL_JSON, '["zclaudia"]', Date.now(), Date.now());
   return db;
 }
 
@@ -36,7 +38,7 @@ describe('external progressive tools', () => {
   });
 
   afterEach(async () => {
-    await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+    await Promise.all(tempDirs.splice(0).map(dir => rm(dir, { recursive: true, force: true })));
   });
 
   it('loads a concrete MCP tool with the inspected description and input schema', async () => {
@@ -61,13 +63,13 @@ describe('external progressive tools', () => {
     };
     const toolsArray: AgentTool<any>[] = [];
     const metaTools = buildExternalMetaTools({ db: createDb(), state, toolsArray });
-    const loadTool = metaTools.find((tool) => tool.name === 'LoadExternalTool');
+    const loadTool = metaTools.find(tool => tool.name === 'LoadExternalTool');
 
     await loadTool!.execute('load-1', {
       ref: { source: 'mcp', server: 'github', tool: 'search_repositories' },
     });
 
-    const loadedTool = toolsArray.find((tool) => tool.name === 'mcp__github__search_repositories');
+    const loadedTool = toolsArray.find(tool => tool.name === 'mcp__github__search_repositories');
     expect(loadedTool?.description).toBe('Search GitHub repositories');
     expect(loadedTool?.parameters).toEqual({
       type: 'object',
@@ -93,8 +95,8 @@ describe('external progressive tools', () => {
       loadedExternalTools: [],
     };
     const metaTools = buildExternalMetaTools({ db: createDb(), state, toolsArray: [] });
-    const searchTool = metaTools.find((tool) => tool.name === 'SearchExternalTools')!;
-    const inspectTool = metaTools.find((tool) => tool.name === 'InspectExternalTool')!;
+    const searchTool = metaTools.find(tool => tool.name === 'SearchExternalTools')!;
+    const inspectTool = metaTools.find(tool => tool.name === 'InspectExternalTool')!;
 
     await searchTool.execute('search-1', { query: 'search' });
     await searchTool.execute('search-2', { query: 'github' });
@@ -108,7 +110,12 @@ describe('external progressive tools', () => {
   it('discovers, inspects, and reads MCP resources progressively', async () => {
     vi.spyOn(mcpClientManager, 'listTools').mockResolvedValue([]);
     vi.spyOn(mcpClientManager, 'listResources').mockResolvedValue([
-      { uri: 'file://readme', name: 'README', description: 'Project readme', mimeType: 'text/markdown' },
+      {
+        uri: 'file://readme',
+        name: 'README',
+        description: 'Project readme',
+        mimeType: 'text/markdown',
+      },
     ]);
     vi.spyOn(mcpClientManager, 'listPrompts').mockResolvedValue([]);
     vi.spyOn(mcpClientManager, 'readResource').mockResolvedValue({
@@ -121,9 +128,9 @@ describe('external progressive tools', () => {
       loadedExternalTools: [],
     };
     const metaTools = buildExternalMetaTools({ db: createDb(), state, toolsArray: [] });
-    const search = metaTools.find((tool) => tool.name === 'SearchExternalResources')!;
-    const inspect = metaTools.find((tool) => tool.name === 'InspectExternalResource')!;
-    const read = metaTools.find((tool) => tool.name === 'ReadExternalResource')!;
+    const search = metaTools.find(tool => tool.name === 'SearchExternalResources')!;
+    const inspect = metaTools.find(tool => tool.name === 'InspectExternalResource')!;
+    const read = metaTools.find(tool => tool.name === 'ReadExternalResource')!;
 
     const searchResult = await search.execute('resource-search', { query: 'readme' });
     const inspectResult = await inspect.execute('resource-inspect', {
@@ -156,8 +163,8 @@ describe('external progressive tools', () => {
       loadedExternalTools: [],
     };
     const metaTools = buildExternalMetaTools({ db: createDb(), state, toolsArray: [] });
-    const search = metaTools.find((tool) => tool.name === 'SearchExternalTools')!;
-    const inspect = metaTools.find((tool) => tool.name === 'InspectExternalTool')!;
+    const search = metaTools.find(tool => tool.name === 'SearchExternalTools')!;
+    const inspect = metaTools.find(tool => tool.name === 'InspectExternalTool')!;
 
     const searchResult = await search.execute('search-risk', { query: 'issue' });
     const inspectResult = await inspect.execute('inspect-risk', {
@@ -181,19 +188,22 @@ describe('external progressive tools', () => {
     vi.spyOn(mcpClientManager, 'listResources').mockResolvedValue([]);
     vi.spyOn(mcpClientManager, 'listPrompts').mockResolvedValue([]);
     const db = createDb();
-    db.prepare('UPDATE mcp_servers SET trust_policy = ? WHERE name = ?').run(JSON.stringify({
-      trustLevel: 'trusted-readonly',
-      trustReadOnlyHint: true,
-      defaultRiskAction: 'ask',
-      riskActions: {},
-    }), 'github');
+    db.prepare('UPDATE mcp_servers SET trust_policy = ? WHERE name = ?').run(
+      JSON.stringify({
+        trustLevel: 'trusted-readonly',
+        trustReadOnlyHint: true,
+        defaultRiskAction: 'ask',
+        riskActions: {},
+      }),
+      'github'
+    );
     const state: ExternalToolRuntimeState = {
       discoverableProviders: [{ source: 'mcp', serverId: 'github' }],
       pinnedExternalTools: [],
       loadedExternalTools: [],
     };
     const metaTools = buildExternalMetaTools({ db, state, toolsArray: [] });
-    const inspect = metaTools.find((tool) => tool.name === 'InspectExternalTool')!;
+    const inspect = metaTools.find(tool => tool.name === 'InspectExternalTool')!;
 
     const inspectResult = await inspect.execute('inspect-trusted-risk', {
       ref: { source: 'mcp', server: 'github', tool: 'read_issue' },
@@ -219,12 +229,15 @@ describe('external progressive tools', () => {
       isError: false,
     } as any);
     const db = createDb();
-    db.prepare('UPDATE mcp_servers SET trust_policy = ? WHERE name = ?').run(JSON.stringify({
-      trustLevel: 'untrusted',
-      trustReadOnlyHint: false,
-      defaultRiskAction: 'ask',
-      riskActions: { high: 'deny' },
-    }), 'github');
+    db.prepare('UPDATE mcp_servers SET trust_policy = ? WHERE name = ?').run(
+      JSON.stringify({
+        trustLevel: 'untrusted',
+        trustReadOnlyHint: false,
+        defaultRiskAction: 'ask',
+        riskActions: { high: 'deny' },
+      }),
+      'github'
+    );
     const state: ExternalToolRuntimeState = {
       discoverableProviders: [{ source: 'mcp', serverId: 'github' }],
       pinnedExternalTools: [],
@@ -232,24 +245,26 @@ describe('external progressive tools', () => {
     };
     const toolsArray: AgentTool<any>[] = [];
     const metaTools = buildExternalMetaTools({ db, state, toolsArray });
-    const load = metaTools.find((tool) => tool.name === 'LoadExternalTool')!;
+    const load = metaTools.find(tool => tool.name === 'LoadExternalTool')!;
 
     await load.execute('load-denied-tool', {
       ref: { source: 'mcp', server: 'github', tool: 'delete_issue' },
     });
-    const concrete = toolsArray.find((tool) => tool.name === 'mcp__github__delete_issue')!;
+    const concrete = toolsArray.find(tool => tool.name === 'mcp__github__delete_issue')!;
     const result = await concrete.execute('direct-denied-call', { id: '1' });
 
     expect(callTool).not.toHaveBeenCalled();
-    expect(result.details).toEqual(expect.objectContaining({
-      ok: false,
-      error: 'mcp_tool_denied_by_policy',
-      mcpTrust: expect.objectContaining({
-        server: 'github',
-        tool: 'delete_issue',
-        policyDecision: 'deny',
-      }),
-    }));
+    expect(result.details).toEqual(
+      expect.objectContaining({
+        ok: false,
+        error: 'mcp_tool_denied_by_policy',
+        mcpTrust: expect.objectContaining({
+          server: 'github',
+          tool: 'delete_issue',
+          policyDecision: 'deny',
+        }),
+      })
+    );
     expect(result.content[0].text).toContain('Denied by MCP trust policy');
   });
 
@@ -276,19 +291,23 @@ describe('external progressive tools', () => {
     };
     const toolsArray: AgentTool<any>[] = [];
     const metaTools = buildExternalMetaTools({ db: createDb(), state, toolsArray });
-    const load = metaTools.find((tool) => tool.name === 'LoadExternalTool')!;
+    const load = metaTools.find(tool => tool.name === 'LoadExternalTool')!;
 
     await load.execute('load-dump-logs', {
       ref: { source: 'mcp', server: 'github', tool: 'dump_logs' },
     });
-    const concrete = toolsArray.find((tool) => tool.name === 'mcp__github__dump_logs')!;
+    const concrete = toolsArray.find(tool => tool.name === 'mcp__github__dump_logs')!;
     const result = await concrete.execute('call-dump-logs', {});
 
-    expect(result.content[0].text).toContain('abcdefghijklmnop\n\n[OUTPUT TRUNCATED: MCP text result exceeded 16 characters]');
-    expect(result.details).toEqual(expect.objectContaining({
-      outputTruncated: true,
-      originalOutputChars: 26,
-    }));
+    expect(result.content[0].text).toContain(
+      'abcdefghijklmnop\n\n[OUTPUT TRUNCATED: MCP text result exceeded 16 characters]'
+    );
+    expect(result.details).toEqual(
+      expect.objectContaining({
+        outputTruncated: true,
+        originalOutputChars: 26,
+      })
+    );
   });
 
   it('persists full oversized MCP text output to disk and returns the saved path', async () => {
@@ -317,18 +336,20 @@ describe('external progressive tools', () => {
     };
     const toolsArray: AgentTool<any>[] = [];
     const metaTools = buildExternalMetaTools({ db: createDb(), state, toolsArray });
-    const load = metaTools.find((tool) => tool.name === 'LoadExternalTool')!;
+    const load = metaTools.find(tool => tool.name === 'LoadExternalTool')!;
 
     await load.execute('load-dump-logs', {
       ref: { source: 'mcp', server: 'github', tool: 'dump_logs' },
     });
-    const concrete = toolsArray.find((tool) => tool.name === 'mcp__github__dump_logs')!;
+    const concrete = toolsArray.find(tool => tool.name === 'mcp__github__dump_logs')!;
     const result = await concrete.execute('call-dump-logs', {});
 
-    expect(result.details).toEqual(expect.objectContaining({
-      outputPersisted: true,
-      outputFiles: [expect.stringMatching(/dump_logs-\d+-0\.txt$/)],
-    }));
+    expect(result.details).toEqual(
+      expect.objectContaining({
+        outputPersisted: true,
+        outputFiles: [expect.stringMatching(/dump_logs-\d+-0\.txt$/)],
+      })
+    );
     const savedPath = (result.details.outputFiles as string[])[0];
     expect(savedPath.startsWith(outputDir)).toBe(true);
     expect(await readFile(savedPath, 'utf8')).toBe('abcdefghijklmnopqrstuvwxyz');
@@ -345,11 +366,13 @@ describe('external progressive tools', () => {
     ]);
     vi.spyOn(mcpClientManager, 'listPrompts').mockResolvedValue([]);
     vi.spyOn(mcpClientManager, 'readResource').mockResolvedValue({
-      contents: [{
-        uri: 'file://report.pdf',
-        mimeType: 'application/pdf',
-        blob: Buffer.from('%PDF data').toString('base64'),
-      }],
+      contents: [
+        {
+          uri: 'file://report.pdf',
+          mimeType: 'application/pdf',
+          blob: Buffer.from('%PDF data').toString('base64'),
+        },
+      ],
     });
     const state: ExternalToolRuntimeState = {
       discoverableProviders: [{ source: 'mcp', serverId: 'github' }],
@@ -357,18 +380,22 @@ describe('external progressive tools', () => {
       loadedExternalTools: [],
     };
     const metaTools = buildExternalMetaTools({ db: createDb(), state, toolsArray: [] });
-    const read = metaTools.find((tool) => tool.name === 'ReadExternalResource')!;
+    const read = metaTools.find(tool => tool.name === 'ReadExternalResource')!;
 
     const result = await read.execute('read-binary-resource', {
       ref: { source: 'mcp-resource', server: 'github', uri: 'file://report.pdf' },
     });
 
-    expect(result.content[0].text).toMatch(/^Binary content \(application\/pdf, 9 bytes\) saved to /);
+    expect(result.content[0].text).toMatch(
+      /^Binary content \(application\/pdf, 9 bytes\) saved to /
+    );
     expect(result.content[0].text).not.toContain(Buffer.from('%PDF data').toString('base64'));
-    expect(result.details).toEqual(expect.objectContaining({
-      outputPersisted: true,
-      outputFiles: [expect.stringMatching(/report\.pdf-\d+-0\.pdf$/)],
-    }));
+    expect(result.details).toEqual(
+      expect.objectContaining({
+        outputPersisted: true,
+        outputFiles: [expect.stringMatching(/report\.pdf-\d+-0\.pdf$/)],
+      })
+    );
     const savedPath = (result.details.outputFiles as string[])[0];
     expect(savedPath.startsWith(outputDir)).toBe(true);
     expect(await readFile(savedPath, 'utf8')).toBe('%PDF data');
@@ -381,7 +408,9 @@ describe('external progressive tools', () => {
       authRequired: true,
       authMessage: 'Authentication required for GitHub MCP.',
     } as any);
-    const listTools = vi.spyOn(mcpClientManager, 'listTools').mockRejectedValue(new Error('401 Unauthorized'));
+    const listTools = vi
+      .spyOn(mcpClientManager, 'listTools')
+      .mockRejectedValue(new Error('401 Unauthorized'));
     vi.spyOn(mcpClientManager, 'listResources').mockResolvedValue([]);
     vi.spyOn(mcpClientManager, 'listPrompts').mockResolvedValue([]);
     const state: ExternalToolRuntimeState = {
@@ -390,7 +419,7 @@ describe('external progressive tools', () => {
       loadedExternalTools: [],
     };
     const metaTools = buildExternalMetaTools({ db: createDb(), state, toolsArray: [] });
-    const search = metaTools.find((tool) => tool.name === 'SearchExternalTools')!;
+    const search = metaTools.find(tool => tool.name === 'SearchExternalTools')!;
 
     const result = await search.execute('search-auth', { query: 'authenticate' });
 
@@ -416,33 +445,39 @@ describe('external progressive tools', () => {
     };
     const toolsArray: AgentTool<any>[] = [];
     const metaTools = buildExternalMetaTools({ db: createDb(), state, toolsArray });
-    const load = metaTools.find((tool) => tool.name === 'LoadExternalTool')!;
+    const load = metaTools.find(tool => tool.name === 'LoadExternalTool')!;
 
     const loadResult = await load.execute('load-auth-tool', {
       ref: { source: 'mcp', server: 'github', tool: 'authenticate' },
     });
-    const concrete = toolsArray.find((tool) => tool.name === 'mcp__github__authenticate')!;
+    const concrete = toolsArray.find(tool => tool.name === 'mcp__github__authenticate')!;
     const result = await concrete.execute('auth-call', {});
 
     expect(loadResult.details).toEqual(expect.objectContaining({ ok: true, loaded: true }));
     expect(callTool).not.toHaveBeenCalled();
-    expect(result.details).toEqual(expect.objectContaining({
-      ok: false,
-      authRequired: true,
-      server: 'github',
-      tool: 'authenticate',
-    }));
+    expect(result.details).toEqual(
+      expect.objectContaining({
+        ok: false,
+        authRequired: true,
+        server: 'github',
+        tool: 'authenticate',
+      })
+    );
     expect(result.content[0].text).toContain('Authentication required for GitHub MCP.');
     expect(result.content[0].text).toContain('Update the MCP server credentials');
   });
 
   it('builds a stable compact provider catalog with inventory counts', async () => {
     const db = createDb();
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO mcp_servers (name, command, args, env, enabled, provider_scope, created_at, updated_at)
       VALUES (?, ?, ?, ?, 1, ?, ?, ?)
-    `).run('alpha', 'node', '[]', NULL_JSON, '["zclaudia"]', Date.now(), Date.now());
-    vi.spyOn(mcpClientManager, 'listTools').mockResolvedValue([{ name: 'tool', description: '', inputSchema: {} }]);
+    `
+    ).run('alpha', 'node', '[]', NULL_JSON, '["zclaudia"]', Date.now(), Date.now());
+    vi.spyOn(mcpClientManager, 'listTools').mockResolvedValue([
+      { name: 'tool', description: '', inputSchema: {} },
+    ]);
     vi.spyOn(mcpClientManager, 'listResources').mockResolvedValue([{ uri: 'file://a' }]);
     vi.spyOn(mcpClientManager, 'listPrompts').mockResolvedValue([{ name: 'prompt' }]);
 
@@ -455,7 +490,9 @@ describe('external progressive tools', () => {
       loadedExternalTools: [],
     };
     const metaTools = buildExternalMetaTools({ db, state, toolsArray: [] });
-    await metaTools.find((tool) => tool.name === 'SearchExternalTools')!.execute('prime-cache', { query: '' });
+    await metaTools
+      .find(tool => tool.name === 'SearchExternalTools')!
+      .execute('prime-cache', { query: '' });
 
     const catalog = buildExternalProviderCatalog(state, db);
     const alphaIndex = catalog.indexOf('mcp/alpha');

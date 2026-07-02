@@ -101,7 +101,7 @@ test.describe('Goal feature', () => {
     await textarea.click();
     await textarea.fill('/goal all tests pass');
     await page.keyboard.press('Escape'); // close the slash-command menu
-    await textarea.press('Enter');       // dispatch the /goal command
+    await textarea.press('Enter'); // dispatch the /goal command
 
     // The pinned bar should appear with the objective and the Turns meter.
     const bar = page.getByTestId('goal-pinned-bar');
@@ -129,7 +129,7 @@ test.describe('Goal feature', () => {
     await textarea.click();
     await textarea.fill('/goal temp goal');
     await page.keyboard.press('Escape'); // close the slash-command menu
-    await textarea.press('Enter');       // dispatch the /goal command
+    await textarea.press('Enter'); // dispatch the /goal command
 
     const bar = page.getByTestId('goal-pinned-bar');
     await expect(bar).toBeVisible({ timeout: 5000 });

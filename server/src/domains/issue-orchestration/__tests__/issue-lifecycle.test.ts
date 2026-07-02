@@ -23,8 +23,9 @@ describe('IssueLifecycle', () => {
     db = new Database(':memory:');
     db.pragma('foreign_keys = ON');
     applyMigrations(db);
-    db.prepare(`INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`)
-      .run('proj-1', 'P', 'code', 0, 0);
+    db.prepare(
+      `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
+    ).run('proj-1', 'P', 'code', 0, 0);
     projectRoot = mkdtempSync(join(tmpdir(), 'issue-lc-'));
     const specChangeService = new SpecChangeService({ db, getProjectRoot: () => projectRoot });
     dispatcher = new EventDispatcher<IssueDomainEvent>();
@@ -34,45 +35,72 @@ describe('IssueLifecycle', () => {
 
   afterEach(() => {
     db.close();
-    try { rmSync(projectRoot, { recursive: true, force: true }); } catch { /* */ }
+    try {
+      rmSync(projectRoot, { recursive: true, force: true });
+    } catch {
+      /* */
+    }
   });
 
   it('createSubIssue auto-creates a SpecChange and scaffolds files', () => {
     const epic = epicRepo.create({ projectId: 'proj-1', title: 'Add 2FA' });
     const { issue, specChange } = lifecycle.createSubIssue({
-      projectId: 'proj-1', type: 'implement', title: 'Initial 2FA flow', epicId: epic.id,
+      projectId: 'proj-1',
+      type: 'implement',
+      title: 'Initial 2FA flow',
+      epicId: epic.id,
     });
     expect(issue.type).toBe('implement');
     expect(issue.epicId).toBe(epic.id);
     expect(issue.specChangeId).toBe(specChange.id);
     expect(specChange.slug).toBe('initial-2fa-flow');
-    expect(fs.existsSync(join(projectRoot, 'openspec', 'changes', specChange.slug, 'proposal.md'))).toBe(true);
+    expect(
+      fs.existsSync(join(projectRoot, 'openspec', 'changes', specChange.slug, 'proposal.md'))
+    ).toBe(true);
   });
 
   it('createSubIssue without an Epic creates a standalone sub-issue', () => {
     const { issue, specChange } = lifecycle.createSubIssue({
-      projectId: 'proj-1', type: 'bug', title: 'Fix login redirect',
+      projectId: 'proj-1',
+      type: 'bug',
+      title: 'Fix login redirect',
     });
     expect(issue.epicId).toBeUndefined();
     expect(issue.specChangeId).toBe(specChange.id);
   });
 
   it('createSubIssue rejects unknown Epic id', () => {
-    expect(() => lifecycle.createSubIssue({
-      projectId: 'proj-1', type: 'bug', title: 'B', epicId: 'no-such-epic',
-    })).toThrow(/Epic not found/);
+    expect(() =>
+      lifecycle.createSubIssue({
+        projectId: 'proj-1',
+        type: 'bug',
+        title: 'B',
+        epicId: 'no-such-epic',
+      })
+    ).toThrow(/Epic not found/);
   });
 
   it('createSubIssue rejects Epic from another project', () => {
-    db.prepare(`INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`).run('proj-2', 'B', 'code', 0, 0);
+    db.prepare(
+      `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
+    ).run('proj-2', 'B', 'code', 0, 0);
     const epic = epicRepo.create({ projectId: 'proj-1', title: 'F' });
-    expect(() => lifecycle.createSubIssue({
-      projectId: 'proj-2', type: 'implement', title: 'X', epicId: epic.id,
-    })).toThrow(/different project/);
+    expect(() =>
+      lifecycle.createSubIssue({
+        projectId: 'proj-2',
+        type: 'implement',
+        title: 'X',
+        epicId: epic.id,
+      })
+    ).toThrow(/different project/);
   });
 
   it('transitionStatus enforces legal transitions (collapsed 4-state)', () => {
-    const { issue } = lifecycle.createSubIssue({ projectId: 'proj-1', type: 'implement', title: 'A' });
+    const { issue } = lifecycle.createSubIssue({
+      projectId: 'proj-1',
+      type: 'implement',
+      title: 'A',
+    });
     lifecycle.transitionStatus(issue.id, 'tracked');
     expect(lifecycle.getIssue(issue.id)!.status).toBe('tracked');
     // Illegal: tracked → open (cannot revert to triage)
@@ -87,10 +115,14 @@ describe('IssueLifecycle', () => {
   });
 
   it('closeSubIssue dispatches a sub_issue.status_changed event', () => {
-    const { issue } = lifecycle.createSubIssue({ projectId: 'proj-1', type: 'implement', title: 'A' });
+    const { issue } = lifecycle.createSubIssue({
+      projectId: 'proj-1',
+      type: 'implement',
+      title: 'A',
+    });
     lifecycle.transitionStatus(issue.id, 'tracked');
     const events: IssueDomainEvent[] = [];
-    dispatcher.on('sub_issue.status_changed', (e) => events.push(e));
+    dispatcher.on('sub_issue.status_changed', e => events.push(e));
     lifecycle.closeSubIssue(issue.id);
     expect(events).toHaveLength(1);
     if (events[0].type === 'sub_issue.status_changed') {
@@ -107,10 +139,9 @@ describe('IssueLifecycle', () => {
       `INSERT INTO local_issues (
         id, project_id, title, status, priority, labels,
         type, is_anonymous, created_at, updated_at
-      ) VALUES (?, ?, ?, 'open', 'medium', '[]', 'implement', 0, ?, ?)`,
+      ) VALUES (?, ?, ?, 'open', 'medium', '[]', 'implement', 0, ?, ?)`
     ).run('orphan', 'proj-1', 'no-spec', 0, 0);
-    expect(() => lifecycle.transitionStatus('orphan', 'tracked'))
-      .toThrow(/without a SpecChange/);
+    expect(() => lifecycle.transitionStatus('orphan', 'tracked')).toThrow(/without a SpecChange/);
     // open → closed/cancelled remain legal even without a SpecChange.
     expect(() => lifecycle.transitionStatus('orphan', 'closed')).not.toThrow();
   });

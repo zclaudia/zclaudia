@@ -41,20 +41,24 @@ describe('provider session coordinator', () => {
     });
 
     expect(state.systemInfo).toEqual(expect.objectContaining({ cwd: '/repo', model: 'sonnet' }));
-    expect(activeRun.latestSystemInfo).toEqual(expect.objectContaining({ cwd: '/repo', model: 'sonnet' }));
+    expect(activeRun.latestSystemInfo).toEqual(
+      expect.objectContaining({ cwd: '/repo', model: 'sonnet' })
+    );
     expect(persistSessionWorkingDirectory).toHaveBeenCalledWith('/repo');
     expect(runSql).toHaveBeenCalledWith('sdk-1', expect.any(Number), 'session-1');
     expect(state.sdkSessionId).toBe('sdk-1');
     expect(activeRun.providerSessionId).toBe('sdk-1');
-    expect(sendRunEvent).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'system_info',
-      runId: 'run-1',
-      systemInfo: expect.objectContaining({
-        model: 'sonnet',
-        cwd: '/repo',
-        contextWindow: 200000,
-      }),
-    }));
+    expect(sendRunEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'system_info',
+        runId: 'run-1',
+        systemInfo: expect.objectContaining({
+          model: 'sonnet',
+          cwd: '/repo',
+          contextWindow: 200000,
+        }),
+      })
+    );
     expect(sendRunEvent).toHaveBeenCalledWith({
       type: 'session_created',
       sessionId: 'session-1',
@@ -79,6 +83,8 @@ describe('provider session coordinator', () => {
     });
 
     expect(runSql).not.toHaveBeenCalled();
-    expect(sendRunEvent).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'session_created' }));
+    expect(sendRunEvent).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'session_created' })
+    );
   });
 });

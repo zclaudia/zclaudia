@@ -22,7 +22,7 @@ export function ToolRuleList({ rules, onChange }: ToolRuleListProps) {
     if (!text) return;
     const parsed = parseToolRule(text);
     if (!parsed.ok) {
-      setErrors((e) => ({ ...e, [action]: parsed.error }));
+      setErrors(e => ({ ...e, [action]: parsed.error }));
       return;
     }
     const rule: AgentPermissionRule = {
@@ -31,19 +31,22 @@ export function ToolRuleList({ rules, onChange }: ToolRuleListProps) {
       action,
     };
     const exists = rules.some(
-      (r) => r.toolName === rule.toolName && (r.pattern ?? null) === (rule.pattern ?? null) && r.action === action,
+      r =>
+        r.toolName === rule.toolName &&
+        (r.pattern ?? null) === (rule.pattern ?? null) &&
+        r.action === action
     );
     if (!exists) onChange([...rules, rule]);
-    setDrafts((d) => ({ ...d, [action]: '' }));
-    setErrors((e) => ({ ...e, [action]: '' }));
+    setDrafts(d => ({ ...d, [action]: '' }));
+    setErrors(e => ({ ...e, [action]: '' }));
   };
 
-  const advanced = rules.filter((r) => r.action === 'continue');
+  const advanced = rules.filter(r => r.action === 'continue');
 
   return (
     <div className="space-y-3">
       {GROUPS.map(({ action, label, hint }) => {
-        const group = rules.filter((r) => r.action === action);
+        const group = rules.filter(r => r.action === action);
         return (
           <div key={action}>
             <div className="flex items-baseline gap-2 mb-1">
@@ -59,7 +62,7 @@ export function ToolRuleList({ rules, onChange }: ToolRuleListProps) {
                   <span>{formatToolRule(rule)}</span>
                   <button
                     aria-label="remove rule"
-                    onClick={() => onChange(rules.filter((r) => r !== rule))}
+                    onClick={() => onChange(rules.filter(r => r !== rule))}
                     className="text-muted-foreground hover:text-destructive text-xs ml-2 flex-shrink-0"
                   >
                     ✕
@@ -68,8 +71,8 @@ export function ToolRuleList({ rules, onChange }: ToolRuleListProps) {
               ))}
               <input
                 value={drafts[action] ?? ''}
-                onChange={(e) => setDrafts((d) => ({ ...d, [action]: e.target.value }))}
-                onKeyDown={(e) => {
+                onChange={e => setDrafts(d => ({ ...d, [action]: e.target.value }))}
+                onKeyDown={e => {
                   if (e.key === 'Enter') submit(action);
                 }}
                 placeholder="Bash(git *)"

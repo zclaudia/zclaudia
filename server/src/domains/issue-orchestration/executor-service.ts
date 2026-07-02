@@ -1,11 +1,7 @@
 import type { Database } from 'better-sqlite3';
-import type {
-  ExecutorInput,
-  ExecutorStatus,
-  IExecutor,
-} from '@zclaudia/shared/features/executor';
-import { ExecutorRegistry, ExecutorInstanceRepository } from '../executor/index.js';
-import { EventDispatcher } from '../supervision/event-dispatcher.js';
+import type { ExecutorInput, ExecutorStatus, IExecutor } from '@zclaudia/shared/features/executor';
+import { type ExecutorRegistry, ExecutorInstanceRepository } from '../executor/index.js';
+import { type EventDispatcher } from '../supervision/event-dispatcher.js';
 import type { IssueDomainEvent } from './events.js';
 
 export interface ExecutorServiceDeps {
@@ -28,24 +24,24 @@ export class ExecutorService {
   }
 
   async start(executorInstanceId: string, input: ExecutorInput = {}): Promise<void> {
-    await this.withStatusEvent(executorInstanceId, (executor) => executor.start(input));
+    await this.withStatusEvent(executorInstanceId, executor => executor.start(input));
   }
 
   async pause(executorInstanceId: string): Promise<void> {
-    await this.withStatusEvent(executorInstanceId, (executor) => executor.pause());
+    await this.withStatusEvent(executorInstanceId, executor => executor.pause());
   }
 
   async resume(executorInstanceId: string): Promise<void> {
-    await this.withStatusEvent(executorInstanceId, (executor) => executor.resume());
+    await this.withStatusEvent(executorInstanceId, executor => executor.resume());
   }
 
   async cancel(executorInstanceId: string): Promise<void> {
-    await this.withStatusEvent(executorInstanceId, (executor) => executor.cancel());
+    await this.withStatusEvent(executorInstanceId, executor => executor.cancel());
   }
 
   /** For Manual executor: caller pushes completion via this method. */
   async markCompleted(executorInstanceId: string): Promise<void> {
-    await this.withStatusEvent(executorInstanceId, async (executor) => {
+    await this.withStatusEvent(executorInstanceId, async executor => {
       const manual = executor as IExecutor & { markCompleted?: () => Promise<void> };
       if (typeof manual.markCompleted !== 'function') {
         throw new Error(`Executor does not support markCompleted (type mismatch)`);
@@ -67,7 +63,7 @@ export class ExecutorService {
 
   private async withStatusEvent(
     executorInstanceId: string,
-    op: (executor: IExecutor) => Promise<void> | void,
+    op: (executor: IExecutor) => Promise<void> | void
   ): Promise<void> {
     const before = this.repo.findById(executorInstanceId);
     if (!before) throw new Error(`ExecutorInstance not found: ${executorInstanceId}`);

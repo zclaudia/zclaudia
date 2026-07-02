@@ -16,7 +16,7 @@ describe('BackgroundTaskPanel', () => {
   it('renders tasks for the session', () => {
     useBackgroundTaskStore.setState({
       tasks: {
-        't1': {
+        t1: {
           id: 't1',
           sessionId: 's1',
           status: 'in_progress',

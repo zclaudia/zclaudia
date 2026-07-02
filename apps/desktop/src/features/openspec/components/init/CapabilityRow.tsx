@@ -10,7 +10,7 @@ interface Props {
 }
 
 export function CapabilityRow({ candidate, editable = true }: Props): React.ReactElement {
-  const upsert = useOpenSpecStore((s) => s.upsertInitCandidate);
+  const upsert = useOpenSpecStore(s => s.upsertInitCandidate);
   const [editing, setEditing] = useState(false);
 
   const toggleSelected = async (): Promise<void> => {
@@ -34,15 +34,29 @@ export function CapabilityRow({ candidate, editable = true }: Props): React.Reac
       <div className="flex items-center justify-between gap-2">
         <label className="flex items-center gap-2 cursor-pointer flex-1">
           {editable && (
-            <input type="checkbox" checked={candidate.selected} onChange={() => void toggleSelected()} />
+            <input
+              type="checkbox"
+              checked={candidate.selected}
+              onChange={() => void toggleSelected()}
+            />
           )}
           <span className="font-mono text-xs">{candidate.capability}</span>
           <span className="text-xs text-muted-foreground flex-1">{candidate.description}</span>
         </label>
         {editable && (
           <div className="flex gap-1">
-            <button className="px-1.5 py-0.5 text-[10px] rounded bg-secondary" onClick={() => setEditing(!editing)}>✏️ Edit</button>
-            <button className="px-1.5 py-0.5 text-[10px] rounded bg-red-500/15 text-red-500" onClick={() => void remove()}>🗑</button>
+            <button
+              className="px-1.5 py-0.5 text-[10px] rounded bg-secondary"
+              onClick={() => setEditing(!editing)}
+            >
+              ✏️ Edit
+            </button>
+            <button
+              className="px-1.5 py-0.5 text-[10px] rounded bg-red-500/15 text-red-500"
+              onClick={() => void remove()}
+            >
+              🗑
+            </button>
           </div>
         )}
       </div>

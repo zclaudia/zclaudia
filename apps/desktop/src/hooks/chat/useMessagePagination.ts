@@ -20,7 +20,7 @@ export function restoreToolCalls(messages: Message[]): MessageWithToolCalls[] {
         id: tc.toolUseId || `persisted-${msg.id}-${i}`,
         toolName: tc.name,
         toolInput: tc.input,
-        status: tc.isError ? 'error' as const : 'completed' as const,
+        status: tc.isError ? ('error' as const) : ('completed' as const),
         result: tc.output,
         isError: tc.isError,
         effect: tc.effect,
@@ -44,24 +44,27 @@ export function useMessagePagination({
   isConnected,
   isMobile,
 }: UseMessagePaginationParams) {
-  const pagination = useChatMessageStore((s) => s.pagination);
-  const setMessages = useChatMessageStore((s) => s.setMessages);
-  const prependMessages = useChatMessageStore((s) => s.prependMessages);
-  const appendMessages = useChatMessageStore((s) => s.appendMessages);
-  const setLoadingMore = useChatMessageStore((s) => s.setLoadingMore);
-  const sessionMessages = useChatMessageStore((s) => s.messages[sessionId]);
+  const pagination = useChatMessageStore(s => s.pagination);
+  const setMessages = useChatMessageStore(s => s.setMessages);
+  const prependMessages = useChatMessageStore(s => s.prependMessages);
+  const appendMessages = useChatMessageStore(s => s.appendMessages);
+  const setLoadingMore = useChatMessageStore(s => s.setLoadingMore);
+  const sessionMessages = useChatMessageStore(s => s.messages[sessionId]);
 
-  const forceScrollToBottomSessionId = useUIStore((s) => s.forceScrollToBottomSessionId);
-  const consumeForceScrollToBottom = useUIStore((s) => s.consumeForceScrollToBottom);
-  const pendingMessageJump = useUIStore((s) => s.pendingMessageJump);
-  const clearMessageJump = useUIStore((s) => s.clearMessageJump);
+  const forceScrollToBottomSessionId = useUIStore(s => s.forceScrollToBottomSessionId);
+  const consumeForceScrollToBottom = useUIStore(s => s.consumeForceScrollToBottom);
+  const pendingMessageJump = useUIStore(s => s.pendingMessageJump);
+  const clearMessageJump = useUIStore(s => s.clearMessageJump);
 
   const sessionPagination = pagination[sessionId];
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const bottomRefreshRef = useRef<{ lastAt: number; inFlight: boolean }>({ lastAt: 0, inFlight: false });
+  const bottomRefreshRef = useRef<{ lastAt: number; inFlight: boolean }>({
+    lastAt: 0,
+    inFlight: false,
+  });
   const lastScrollTopRef = useRef(0);
   const suppressLoadMoreUntilRef = useRef<number>(0);
   const messageJumpTimeoutRef = useRef<number | null>(null);
@@ -73,57 +76,62 @@ export function useMessagePagination({
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const scrollToBottom = useCallback((instant = false) => {
-    const container = messagesContainerRef.current;
-    if (container) {
-      container.scrollTo({
-        top: container.scrollHeight,
-        behavior: instant || isMobile ? 'auto' : 'smooth',
-      });
-      return;
-    }
+  const scrollToBottom = useCallback(
+    (instant = false) => {
+      const container = messagesContainerRef.current;
+      if (container) {
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: instant || isMobile ? 'auto' : 'smooth',
+        });
+        return;
+      }
 
-    messagesEndRef.current?.scrollIntoView({ behavior: instant || isMobile ? 'auto' : 'smooth' });
-  }, [isMobile]);
+      messagesEndRef.current?.scrollIntoView({ behavior: instant || isMobile ? 'auto' : 'smooth' });
+    },
+    [isMobile]
+  );
 
   const jumpToBottomInstant = useCallback(() => {
     suppressLoadMoreUntilRef.current = Date.now() + SUPPRESS_LOAD_MORE_MS;
     scrollToBottom(true);
   }, [scrollToBottom]);
 
-  const scrollToMessage = useCallback((messageId: string) => {
-    const escapedId = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(messageId) : messageId;
-    const target = document.querySelector(`[data-message-id="${escapedId}"]`);
-    if (!(target instanceof HTMLElement)) return false;
+  const scrollToMessage = useCallback(
+    (messageId: string) => {
+      const escapedId =
+        typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(messageId) : messageId;
+      const target = document.querySelector(`[data-message-id="${escapedId}"]`);
+      if (!(target instanceof HTMLElement)) return false;
 
-    target.scrollIntoView({ block: 'center', behavior: isMobile ? 'auto' : 'smooth' });
-    setHighlightedMessageId(messageId);
-    window.setTimeout(() => {
-      setHighlightedMessageId((current) => (current === messageId ? null : current));
-    }, 2500);
-    return true;
-  }, [isMobile]);
+      target.scrollIntoView({ block: 'center', behavior: isMobile ? 'auto' : 'smooth' });
+      setHighlightedMessageId(messageId);
+      window.setTimeout(() => {
+        setHighlightedMessageId(current => (current === messageId ? null : current));
+      }, 2500);
+      return true;
+    },
+    [isMobile]
+  );
 
-  const positionViewportForMessageJump = useCallback((messageId: string) => {
-    const container = messagesContainerRef.current;
-    const msgs = sessionMessages || [];
-    if (!container || msgs.length === 0) return false;
+  const positionViewportForMessageJump = useCallback(
+    (messageId: string) => {
+      const container = messagesContainerRef.current;
+      const msgs = sessionMessages || [];
+      if (!container || msgs.length === 0) return false;
 
-    const messageIndex = msgs.findIndex((message) => message.id === messageId);
-    if (messageIndex === -1) return false;
+      const messageIndex = msgs.findIndex(message => message.id === messageId);
+      if (messageIndex === -1) return false;
 
-    const progress = msgs.length <= 1
-      ? 0
-      : messageIndex / (msgs.length - 1);
-    const targetTop = Math.max(
-      0,
-      (container.scrollHeight * progress) - (container.clientHeight / 2),
-    );
+      const progress = msgs.length <= 1 ? 0 : messageIndex / (msgs.length - 1);
+      const targetTop = Math.max(0, container.scrollHeight * progress - container.clientHeight / 2);
 
-    suppressLoadMoreUntilRef.current = Date.now() + SUPPRESS_LOAD_MORE_MS;
-    container.scrollTo({ top: targetTop, behavior: 'auto' });
-    return true;
-  }, [sessionMessages]);
+      suppressLoadMoreUntilRef.current = Date.now() + SUPPRESS_LOAD_MORE_MS;
+      container.scrollTo({ top: targetTop, behavior: 'auto' });
+      return true;
+    },
+    [sessionMessages]
+  );
 
   // Sync filePush metadata from loaded messages into filePushStore for download tracking
   const syncFilePushMessages = useCallback((msgs: MessageWithToolCalls[]) => {
@@ -145,77 +153,94 @@ export function useMessagePagination({
   }, []);
 
   // Load messages with pagination (all via HTTP)
-  const loadMessages = useCallback(async (before?: number, signal?: AbortSignal) => {
-    try {
-      if (before) {
-        // Load more (older messages)
-        setLoadingMore(sessionId, true);
+  const loadMessages = useCallback(
+    async (before?: number, signal?: AbortSignal) => {
+      try {
+        if (before) {
+          // Load more (older messages)
+          setLoadingMore(sessionId, true);
 
-        const result = await api.getSessionMessages(sessionId, {
-          limit: MESSAGES_PER_PAGE,
-          before,
-          signal,
-        });
+          const result = await api.getSessionMessages(sessionId, {
+            limit: MESSAGES_PER_PAGE,
+            before,
+            signal,
+          });
 
-        const restoredOlder = restoreToolCalls(result.messages);
-        prependMessages(sessionId, restoredOlder, result.pagination);
-        syncFilePushMessages(restoredOlder);
-      } else {
-        // Initial load via HTTP
-        setLoadError(null);
-        const result = await api.getSessionMessages(
-          sessionId,
-          pendingMessageJump?.sessionId === sessionId
-            ? { limit: MESSAGES_PER_PAGE, aroundMessageId: pendingMessageJump.messageId, signal }
-            : { limit: MESSAGES_PER_PAGE, signal }
-        );
+          const restoredOlder = restoreToolCalls(result.messages);
+          prependMessages(sessionId, restoredOlder, result.pagination);
+          syncFilePushMessages(restoredOlder);
+        } else {
+          // Initial load via HTTP
+          setLoadError(null);
+          const result = await api.getSessionMessages(
+            sessionId,
+            pendingMessageJump?.sessionId === sessionId
+              ? { limit: MESSAGES_PER_PAGE, aroundMessageId: pendingMessageJump.messageId, signal }
+              : { limit: MESSAGES_PER_PAGE, signal }
+          );
 
-        const restoredMessages = restoreToolCalls(result.messages);
-        setMessages(sessionId, restoredMessages, result.pagination);
-        syncFilePushMessages(restoredMessages);
+          const restoredMessages = restoreToolCalls(result.messages);
+          setMessages(sessionId, restoredMessages, result.pagination);
+          syncFilePushMessages(restoredMessages);
 
-        // Restore active run state (fixes loading state lost after page refresh)
-        if (result.activeRun) {
-          const chatState = useRunStore.getState();
-          if (!chatState.activeRuns[result.activeRun.runId]) {
-            chatState.startRun(result.activeRun.runId, sessionId);
+          // Restore active run state (fixes loading state lost after page refresh)
+          if (result.activeRun) {
+            const chatState = useRunStore.getState();
+            if (!chatState.activeRuns[result.activeRun.runId]) {
+              chatState.startRun(result.activeRun.runId, sessionId);
+            }
           }
-        }
 
-        setInitialLoadDone(true);
-        // Use rAF to ensure the DOM has rendered the new messages before scrolling
-        requestAnimationFrame(() => {
-          if (pendingMessageJump?.sessionId === sessionId) {
-            return;
-          }
-          scrollToBottom(true);
-        });
-      }
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        return;
-      }
-      console.error('Failed to load messages:', error);
-      setLoadingMore(sessionId, false);
-      if (!before) {
-        const errMsg = error instanceof Error ? error.message : 'Unknown error';
-        const isTimeout = errMsg.includes('timed out') || errMsg.includes('timeout') || errMsg.includes('TIMEOUT');
-        const isOffline = errMsg.includes('BACKEND_OFFLINE') || errMsg.includes('502') || errMsg.includes('Failed to fetch');
-        const friendlyMsg = isOffline
-          ? 'Backend is offline. This session may belong to a server that is currently unreachable.'
-          : isTimeout
-          ? 'Request timed out. The backend server may be unresponsive.'
-          : `Failed to load messages: ${errMsg}`;
-        setLoadError(friendlyMsg);
-        // Preserve previously loaded messages so offline session re-open still shows cached history.
-        const existingMessages = useChatMessageStore.getState().messages[sessionId];
-        if (!existingMessages || existingMessages.length === 0) {
-          setMessages(sessionId, [], { total: 0, hasMore: false });
+          setInitialLoadDone(true);
+          // Use rAF to ensure the DOM has rendered the new messages before scrolling
+          requestAnimationFrame(() => {
+            if (pendingMessageJump?.sessionId === sessionId) {
+              return;
+            }
+            scrollToBottom(true);
+          });
         }
-        setInitialLoadDone(true);
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          return;
+        }
+        console.error('Failed to load messages:', error);
+        setLoadingMore(sessionId, false);
+        if (!before) {
+          const errMsg = error instanceof Error ? error.message : 'Unknown error';
+          const isTimeout =
+            errMsg.includes('timed out') ||
+            errMsg.includes('timeout') ||
+            errMsg.includes('TIMEOUT');
+          const isOffline =
+            errMsg.includes('BACKEND_OFFLINE') ||
+            errMsg.includes('502') ||
+            errMsg.includes('Failed to fetch');
+          const friendlyMsg = isOffline
+            ? 'Backend is offline. This session may belong to a server that is currently unreachable.'
+            : isTimeout
+              ? 'Request timed out. The backend server may be unresponsive.'
+              : `Failed to load messages: ${errMsg}`;
+          setLoadError(friendlyMsg);
+          // Preserve previously loaded messages so offline session re-open still shows cached history.
+          const existingMessages = useChatMessageStore.getState().messages[sessionId];
+          if (!existingMessages || existingMessages.length === 0) {
+            setMessages(sessionId, [], { total: 0, hasMore: false });
+          }
+          setInitialLoadDone(true);
+        }
       }
-    }
-  }, [sessionId, setLoadingMore, prependMessages, setMessages, scrollToBottom, syncFilePushMessages, pendingMessageJump]);
+    },
+    [
+      sessionId,
+      setLoadingMore,
+      prependMessages,
+      setMessages,
+      scrollToBottom,
+      syncFilePushMessages,
+      pendingMessageJump,
+    ]
+  );
 
   // Load initial messages when session changes
   useEffect(() => {
@@ -270,7 +295,14 @@ export function useMessagePagination({
         messageJumpTimeoutRef.current = null;
       }
     };
-  }, [pendingMessageJump, sessionId, initialLoadDone, clearMessageJump, scrollToMessage, positionViewportForMessageJump]);
+  }, [
+    pendingMessageJump,
+    sessionId,
+    initialLoadDone,
+    clearMessageJump,
+    scrollToMessage,
+    positionViewportForMessageJump,
+  ]);
 
   // One-shot jump: when entering from Active Sessions, force scroll to latest content
   useEffect(() => {
@@ -279,12 +311,20 @@ export function useMessagePagination({
     const timer = setTimeout(() => scrollToBottom(true), 120);
     consumeForceScrollToBottom(sessionId);
     return () => clearTimeout(timer);
-  }, [forceScrollToBottomSessionId, sessionId, initialLoadDone, scrollToBottom, consumeForceScrollToBottom]);
+  }, [
+    forceScrollToBottomSessionId,
+    sessionId,
+    initialLoadDone,
+    scrollToBottom,
+    consumeForceScrollToBottom,
+  ]);
 
   // Load more messages (older)
   const loadMoreMessages = useCallback(async () => {
     if (!sessionPagination?.hasMore || sessionPagination?.isLoadingMore) {
-      console.debug(`[ChatInterface] loadMoreMessages skipped: hasMore=${sessionPagination?.hasMore}, isLoadingMore=${sessionPagination?.isLoadingMore}`);
+      console.debug(
+        `[ChatInterface] loadMoreMessages skipped: hasMore=${sessionPagination?.hasMore}, isLoadingMore=${sessionPagination?.isLoadingMore}`
+      );
       return;
     }
 
@@ -329,16 +369,20 @@ export function useMessagePagination({
     }
   }, [appendMessages, initialLoadDone, isConnected, sessionId, syncFilePushMessages]);
 
-  const handleMessageWheel = useCallback((deltaY: number) => {
-    if (deltaY <= 0) return;
-    const container = messagesContainerRef.current;
-    if (!container) return;
+  const handleMessageWheel = useCallback(
+    (deltaY: number) => {
+      if (deltaY <= 0) return;
+      const container = messagesContainerRef.current;
+      if (!container) return;
 
-    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-    if (distanceFromBottom <= 24) {
-      void refreshLatestMessagesFromBottom();
-    }
-  }, [refreshLatestMessagesFromBottom]);
+      const distanceFromBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight;
+      if (distanceFromBottom <= 24) {
+        void refreshLatestMessagesFromBottom();
+      }
+    },
+    [refreshLatestMessagesFromBottom]
+  );
 
   // Handle scroll to detect when user scrolls near top or away from bottom
   const handleScroll = useCallback(() => {
@@ -355,12 +399,18 @@ export function useMessagePagination({
 
     // If scrolled near top (within 100px), load more messages
     const suppressLoadMore = Date.now() < suppressLoadMoreUntilRef.current;
-    if (!suppressLoadMore && currentScrollTop < 100 && sessionPagination?.hasMore && !sessionPagination?.isLoadingMore) {
+    if (
+      !suppressLoadMore &&
+      currentScrollTop < 100 &&
+      sessionPagination?.hasMore &&
+      !sessionPagination?.isLoadingMore
+    ) {
       loadMoreMessages();
     }
 
     // Show scroll-to-bottom button when not near the bottom
-    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    const distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
     setShowScrollToBottom(distanceFromBottom > 300);
     // Mobile-safe fallback: touch scrolling won't fire wheel events
     if (wasScrollingDown && distanceFromBottom <= 24) {

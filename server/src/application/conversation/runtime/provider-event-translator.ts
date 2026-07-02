@@ -16,7 +16,9 @@ export interface TranslateProviderRuntimeEventInput {
   seq: number;
 }
 
-export function translateProviderRuntimeEvent(input: TranslateProviderRuntimeEventInput): RunDomainEvent[] {
+export function translateProviderRuntimeEvent(
+  input: TranslateProviderRuntimeEventInput
+): RunDomainEvent[] {
   const { event } = input;
   switch (event.type) {
     case 'assistant':
@@ -26,70 +28,106 @@ export function translateProviderRuntimeEvent(input: TranslateProviderRuntimeEve
         : [];
 
     case 'thinking_delta':
-      return [domainEvent(input, 'assistant.thinkingDelta', {
-        content: event.thinkingContent,
-        signature: event.thinkingSignature,
-        redacted: event.thinkingRedacted,
-      })];
+      return [
+        domainEvent(input, 'assistant.thinkingDelta', {
+          content: event.thinkingContent,
+          signature: event.thinkingSignature,
+          redacted: event.thinkingRedacted,
+        }),
+      ];
 
     case 'tool_use':
     case 'tool_started':
-      return [domainEvent(input, 'tool.started', {
-        toolUseId: event.toolUseId || '',
-        toolName: event.toolName || '',
-        input: event.toolInput,
-        semantic: event.toolSemantic,
-        effect: event.toolEffect,
-      }, { toolUseId: event.toolUseId })];
+      return [
+        domainEvent(
+          input,
+          'tool.started',
+          {
+            toolUseId: event.toolUseId || '',
+            toolName: event.toolName || '',
+            input: event.toolInput,
+            semantic: event.toolSemantic,
+            effect: event.toolEffect,
+          },
+          { toolUseId: event.toolUseId }
+        ),
+      ];
 
     case 'tool_activity':
       return event.toolUseId && event.content
-        ? [domainEvent(input, 'tool.activity', {
-          toolUseId: event.toolUseId,
-          content: event.content,
-        }, { toolUseId: event.toolUseId })]
+        ? [
+            domainEvent(
+              input,
+              'tool.activity',
+              {
+                toolUseId: event.toolUseId,
+                content: event.content,
+              },
+              { toolUseId: event.toolUseId }
+            ),
+          ]
         : [];
 
     case 'tool_result':
     case 'tool_finished':
-      return [domainEvent(input, 'tool.finished', {
-        toolUseId: event.toolUseId || '',
-        toolName: event.toolName || '',
-        output: event.toolResult,
-        isError: event.isToolError,
-        effect: event.toolEffect,
-      }, { toolUseId: event.toolUseId })];
+      return [
+        domainEvent(
+          input,
+          'tool.finished',
+          {
+            toolUseId: event.toolUseId || '',
+            toolName: event.toolName || '',
+            output: event.toolResult,
+            isError: event.isToolError,
+            effect: event.toolEffect,
+          },
+          { toolUseId: event.toolUseId }
+        ),
+      ];
 
     case 'result':
     case 'provider_turn_finished':
-      return [domainEvent(input, 'run.providerTurnFinished', {
-        content: event.content,
-        usage: event.usage as UsageInfo | undefined,
-      })];
+      return [
+        domainEvent(input, 'run.providerTurnFinished', {
+          content: event.content,
+          usage: event.usage as UsageInfo | undefined,
+        }),
+      ];
 
     case 'retry_scheduled':
       return event.retryInfo
-        ? [domainEvent(input, 'run.retryScheduled', {
-          attempt: event.retryInfo.attempt,
-          maxAttempts: event.retryInfo.maxAttempts,
-          delayMs: event.retryInfo.delayMs,
-          ...(event.retryInfo.status !== undefined ? { status: event.retryInfo.status } : {}),
-        })]
+        ? [
+            domainEvent(input, 'run.retryScheduled', {
+              attempt: event.retryInfo.attempt,
+              maxAttempts: event.retryInfo.maxAttempts,
+              delayMs: event.retryInfo.delayMs,
+              ...(event.retryInfo.status !== undefined ? { status: event.retryInfo.status } : {}),
+            }),
+          ]
         : [];
 
     case 'error':
     case 'provider_error':
-      return [domainEvent(input, 'run.failed', {
-        error: event.error || 'Provider error',
-        ...(event.errorCode ? { errorCode: event.errorCode } : {}),
-      })];
+      return [
+        domainEvent(input, 'run.failed', {
+          error: event.error || 'Provider error',
+          ...(event.errorCode ? { errorCode: event.errorCode } : {}),
+        }),
+      ];
 
     case 'mode_transition':
       return event.modeTransition
-        ? [domainEvent(input, 'mode.changed', {
-          mode: event.modeTransition.mode,
-          reason: event.modeTransition.reason,
-        }, { toolUseId: event.modeTransition.sourceToolUseId })]
+        ? [
+            domainEvent(
+              input,
+              'mode.changed',
+              {
+                mode: event.modeTransition.mode,
+                reason: event.modeTransition.reason,
+              },
+              { toolUseId: event.modeTransition.sourceToolUseId }
+            ),
+          ]
         : [];
 
     case 'task_notification':
@@ -119,24 +157,38 @@ function translateTaskNotification(input: TranslateProviderRuntimeEventInput): R
     event.taskStatus === 'failed' ||
     event.taskStatus === 'stopped'
   ) {
-    return [domainEvent(input, 'backgroundTask.finished', {
-      ...payload,
-      status: event.taskStatus,
-      message: event.taskMessage,
-    }, cause)];
+    return [
+      domainEvent(
+        input,
+        'backgroundTask.finished',
+        {
+          ...payload,
+          status: event.taskStatus,
+          message: event.taskMessage,
+        },
+        cause
+      ),
+    ];
   }
-  return [domainEvent(input, 'backgroundTask.updated', {
-    ...payload,
-    status: event.taskStatus,
-    message: event.taskMessage,
-  }, cause)];
+  return [
+    domainEvent(
+      input,
+      'backgroundTask.updated',
+      {
+        ...payload,
+        status: event.taskStatus,
+        message: event.taskMessage,
+      },
+      cause
+    ),
+  ];
 }
 
 function domainEvent<TType extends RunDomainEventType>(
   input: TranslateProviderRuntimeEventInput,
   type: TType,
   payload: Parameters<typeof createRunDomainEvent<TType>>[0]['payload'],
-  cause?: { toolUseId?: string; taskId?: string },
+  cause?: { toolUseId?: string; taskId?: string }
 ): RunDomainEvent<TType> {
   return createRunDomainEvent({
     eventId: input.eventId,

@@ -24,19 +24,24 @@ export interface ToolFailureLoopAttempt {
 export class ToolFailureLoopGuard {
   private readonly counts = new Map<string, number>();
 
-  recordFailure(toolName: string, args: Record<string, unknown> | undefined, details?: ToolFailureDetails): number {
+  recordFailure(
+    toolName: string,
+    args: Record<string, unknown> | undefined,
+    details?: ToolFailureDetails
+  ): number {
     return this.recordFailureWithResult(toolName, args, details).attempts;
   }
 
   recordFailureWithResult(
     toolName: string,
     args: Record<string, unknown> | undefined,
-    details?: ToolFailureDetails,
+    details?: ToolFailureDetails
   ): ToolFailureLoopAttempt {
     const kind = isBash(toolName) ? 'bash_failure' : 'generic';
-    const sig = kind === 'bash_failure'
-      ? bashFailureSignature(args, details)
-      : generateToolSignature(toolName, args);
+    const sig =
+      kind === 'bash_failure'
+        ? bashFailureSignature(args, details)
+        : generateToolSignature(toolName, args);
     const next = (this.counts.get(sig) ?? 0) + 1;
     this.counts.set(sig, next);
     return { attempts: next, signature: sig, kind };
@@ -55,7 +60,9 @@ export class ToolFailureLoopGuard {
 }
 
 function isBash(toolName: string): boolean {
-  return ['bash', 'execute_command', 'run_terminal_cmd', 'terminal', 'shell'].includes(toolName.toLowerCase());
+  return ['bash', 'execute_command', 'run_terminal_cmd', 'terminal', 'shell'].includes(
+    toolName.toLowerCase()
+  );
 }
 
 function pickString(input: Record<string, unknown> | undefined, key: string): string | undefined {
@@ -68,18 +75,15 @@ function normalizeText(value: string): string {
 }
 
 function bashInputSignature(args: Record<string, unknown> | undefined): string {
-  const command = pickString(args, 'command') ?? pickString(args, 'cmd') ?? pickString(args, 'commandLine') ?? '';
+  const command =
+    pickString(args, 'command') ?? pickString(args, 'cmd') ?? pickString(args, 'commandLine') ?? '';
   const cwd = pickString(args, 'cwd');
   const normalizedCommand = normalizeText(command);
   return `Bash:${normalizedCommand || '<missing>'}${cwd ? `@${normalizeText(cwd)}` : ''}`;
 }
 
 function diagnosticFingerprint(diagnostic: BashOutputDiagnostic): string {
-  const location = [
-    diagnostic.path,
-    diagnostic.line ?? '',
-    diagnostic.column ?? '',
-  ].join(':');
+  const location = [diagnostic.path, diagnostic.line ?? '', diagnostic.column ?? ''].join(':');
   const source = diagnostic.source ?? '';
   return [
     location,
@@ -89,16 +93,19 @@ function diagnosticFingerprint(diagnostic: BashOutputDiagnostic): string {
   ].join('|');
 }
 
-function bashFailureSignature(args: Record<string, unknown> | undefined, details: ToolFailureDetails): string {
+function bashFailureSignature(
+  args: Record<string, unknown> | undefined,
+  details: ToolFailureDetails
+): string {
   const base = bashInputSignature(args);
   const diagnostics = Array.isArray(details?.diagnostics)
     ? (details.diagnostics as BashOutputDiagnostic[]).slice(0, 10).map(diagnosticFingerprint)
     : [];
   const failedTests = Array.isArray(details?.failedTests)
     ? (details.failedTests as unknown[])
-      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
-      .slice(0, 10)
-      .map(value => normalizeText(value).slice(0, 200))
+        .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+        .slice(0, 10)
+        .map(value => normalizeText(value).slice(0, 200))
     : [];
 
   const parts: string[] = [];

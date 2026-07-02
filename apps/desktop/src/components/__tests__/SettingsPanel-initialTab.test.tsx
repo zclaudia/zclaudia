@@ -26,12 +26,20 @@ vi.mock('../../stores/llmProfileMetaStore', () => {
 
 vi.mock('../../features/settings/LlmProfileManager', () => ({
   LlmProfileManager: ({ isOpen, inline }: any) =>
-    isOpen ? <div data-testid="provider-manager" data-inline={inline}>ProviderManager</div> : null,
+    isOpen ? (
+      <div data-testid="provider-manager" data-inline={inline}>
+        ProviderManager
+      </div>
+    ) : null,
 }));
 
 vi.mock('../../features/settings/AgentManager', () => ({
   AgentManager: ({ isOpen, inline }: any) =>
-    isOpen ? <div data-testid="agent-manager" data-inline={inline}>AgentManager</div> : null,
+    isOpen ? (
+      <div data-testid="agent-manager" data-inline={inline}>
+        AgentManager
+      </div>
+    ) : null,
 }));
 
 vi.mock('../../features/settings/GeneralSettings', () => ({
@@ -51,7 +59,9 @@ vi.mock('../../features/settings/McpServerSettings', () => ({
 }));
 
 vi.mock('../../features/settings/WorkspaceSkillsSettings', () => ({
-  WorkspaceSkillsSettings: () => <div data-testid="workspace-settings">WorkspaceSkillsSettings</div>,
+  WorkspaceSkillsSettings: () => (
+    <div data-testid="workspace-settings">WorkspaceSkillsSettings</div>
+  ),
 }));
 
 vi.mock('../../features/settings/AgentSettings', () => ({
@@ -63,7 +73,9 @@ vi.mock('../../features/settings/PermissionSettings', () => ({
 }));
 
 vi.mock('../../features/settings/NotificationSettings', () => ({
-  NotificationSettingsInline: () => <div data-testid="notification-settings">NotificationSettings</div>,
+  NotificationSettingsInline: () => (
+    <div data-testid="notification-settings">NotificationSettings</div>
+  ),
 }));
 
 vi.mock('../../features/settings/MobileGatewayConfig', () => ({
@@ -125,7 +137,7 @@ vi.mock('../../utils/platform', () => ({
   isTauri: vi.fn(() => false),
 }));
 
-vi.mock('@zclaudia/shared', async (importOriginal) => {
+vi.mock('@zclaudia/shared', async importOriginal => {
   const mod = await importOriginal<Record<string, any>>();
   return {
     ...mod,
@@ -146,7 +158,7 @@ vi.mock('@zclaudia/shared', async (importOriginal) => {
   };
 });
 
-import { SettingsPanel } from '../SettingsPanel';
+import { SettingsPanel } from '../../features/settings/SettingsPanel';
 import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useGatewayStore } from '../../stores/gatewayStore';
@@ -166,7 +178,12 @@ function setupStores() {
   useServerStore.setState({
     activeServerId: localBackend.backendId,
     connections: {
-      [localBackend.backendId]: { status: 'connected', error: null, isLocalConnection: true, features: [] },
+      [localBackend.backendId]: {
+        status: 'connected',
+        error: null,
+        isLocalConnection: true,
+        features: [],
+      },
     },
     localServerPort: 3100,
     controlPlaneMode: 'embedded-local',
@@ -211,9 +228,7 @@ describe('SettingsPanel initialTab', () => {
     setupStores();
     let container!: HTMLElement;
     await act(async () => {
-      const view = render(
-        <SettingsPanel isOpen initialTab="providers" onClose={() => {}} />,
-      );
+      const view = render(<SettingsPanel isOpen initialTab="providers" onClose={() => {}} />);
       container = view.container;
       await Promise.resolve();
     });

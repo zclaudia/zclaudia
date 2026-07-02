@@ -91,17 +91,24 @@ function normalizeExecutionMode(value: unknown): SkillExecutionMode | undefined 
 }
 
 function normalizeForkToolPolicy(value: unknown): SkillForkToolPolicy | undefined {
-  return value === 'read-only' || value === 'web' || value === 'workspace-edit' || value === 'agent-default'
+  return value === 'read-only' ||
+    value === 'web' ||
+    value === 'workspace-edit' ||
+    value === 'agent-default'
     ? value
     : undefined;
 }
 
 function parseModes(value: unknown): SkillExecutionMode[] | undefined {
   const raw = typeof value === 'string' ? [value] : Array.isArray(value) ? value : [];
-  const modes = [...new Set(raw.flatMap((mode) => {
-    const normalized = normalizeExecutionMode(mode);
-    return normalized ? [normalized] : [];
-  }))];
+  const modes = [
+    ...new Set(
+      raw.flatMap(mode => {
+        const normalized = normalizeExecutionMode(mode);
+        return normalized ? [normalized] : [];
+      })
+    ),
+  ];
   return modes.length > 0 ? modes : undefined;
 }
 
@@ -110,13 +117,21 @@ function extractExecutionMetadata(filePath: string): SkillExecutionMetadata | un
     const raw = readFileSync(filePath, 'utf-8');
     const parsed = matter(raw);
     const data = (parsed.data ?? {}) as Record<string, unknown>;
-    const nested = data.execution && typeof data.execution === 'object'
-      ? data.execution as Record<string, unknown>
-      : {};
-    const allowedModes = parseModes(nested.allowed_modes ?? nested.allowedModes ?? data.allowed_modes ?? data.allowedModes);
-    const defaultMode = normalizeExecutionMode(nested.default_mode ?? nested.defaultMode ?? data.default_mode ?? data.defaultMode);
+    const nested =
+      data.execution && typeof data.execution === 'object'
+        ? (data.execution as Record<string, unknown>)
+        : {};
+    const allowedModes = parseModes(
+      nested.allowed_modes ?? nested.allowedModes ?? data.allowed_modes ?? data.allowedModes
+    );
+    const defaultMode = normalizeExecutionMode(
+      nested.default_mode ?? nested.defaultMode ?? data.default_mode ?? data.defaultMode
+    );
     const forkToolPolicy = normalizeForkToolPolicy(
-      nested.fork_tool_policy ?? nested.forkToolPolicy ?? data.fork_tool_policy ?? data.forkToolPolicy,
+      nested.fork_tool_policy ??
+        nested.forkToolPolicy ??
+        data.fork_tool_policy ??
+        data.forkToolPolicy
     );
     const out: SkillExecutionMetadata = {};
     if (allowedModes) out.allowedModes = allowedModes;
@@ -138,19 +153,25 @@ function firstString(...values: unknown[]): string | undefined {
 
 function frontmatterStringArray(value: unknown): string[] | undefined {
   if (typeof value === 'string') {
-    const parts = value.split(',').map((part) => part.trim()).filter(Boolean);
+    const parts = value
+      .split(',')
+      .map(part => part.trim())
+      .filter(Boolean);
     return parts.length > 0 ? parts : undefined;
   }
   if (!Array.isArray(value)) return undefined;
-  const parts = value.filter((item): item is string => typeof item === 'string' && !!item.trim()).map((item) => item.trim());
+  const parts = value
+    .filter((item): item is string => typeof item === 'string' && !!item.trim())
+    .map(item => item.trim());
   return parts.length > 0 ? [...new Set(parts)] : undefined;
 }
 
 function frontmatterArgumentNames(value: unknown): string[] | undefined {
   const parts = frontmatterStringArray(value);
-  const names = parts?.flatMap((part) => part.split(/\s+/))
-    .map((part) => part.trim())
-    .filter((part) => part && !/^\d+$/.test(part));
+  const names = parts
+    ?.flatMap(part => part.split(/\s+/))
+    .map(part => part.trim())
+    .filter(part => part && !/^\d+$/.test(part));
   return names && names.length > 0 ? [...new Set(names)] : undefined;
 }
 
@@ -162,7 +183,9 @@ function frontmatterBoolean(value: unknown): boolean | undefined {
   return undefined;
 }
 
-function frontmatterHookTriggers(value: unknown): SkillFrontmatterMetadata['hookTriggers'] | undefined {
+function frontmatterHookTriggers(
+  value: unknown
+): SkillFrontmatterMetadata['hookTriggers'] | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
   const row = value as Record<string, unknown>;
   const tools = frontmatterStringArray(row.tools ?? row.allowedTools ?? row.allowed_tools);
@@ -180,14 +203,22 @@ function extractFrontmatterMetadata(filePath: string): SkillFrontmatterMetadata 
     const data = (parsed.data ?? {}) as Record<string, unknown>;
     const metadata: SkillFrontmatterMetadata = {};
     const whenToUse = firstString(data.whenToUse, data.when_to_use, data.when);
-    const allowedTools = frontmatterStringArray(data.allowedTools ?? data.allowed_tools ?? data.tools);
+    const allowedTools = frontmatterStringArray(
+      data.allowedTools ?? data.allowed_tools ?? data.tools
+    );
     const paths = frontmatterStringArray(data.paths);
     const argumentNames = frontmatterArgumentNames(data.arguments);
     const argumentHint = firstString(data.argumentHint, data.argument_hint, data['argument-hint']);
     const snippets = frontmatterStringArray(data.snippets);
-    const shellSnippets = frontmatterStringArray(data.shellSnippets ?? data.shell_snippets ?? data['shell-snippets']);
-    const hookTriggers = frontmatterHookTriggers(data.hookTriggers ?? data.hook_triggers ?? data['hook-triggers']);
-    const userInvocable = frontmatterBoolean(data.userInvocable ?? data.user_invocable ?? data['user-invocable']);
+    const shellSnippets = frontmatterStringArray(
+      data.shellSnippets ?? data.shell_snippets ?? data['shell-snippets']
+    );
+    const hookTriggers = frontmatterHookTriggers(
+      data.hookTriggers ?? data.hook_triggers ?? data['hook-triggers']
+    );
+    const userInvocable = frontmatterBoolean(
+      data.userInvocable ?? data.user_invocable ?? data['user-invocable']
+    );
     if (whenToUse) metadata.whenToUse = whenToUse;
     if (allowedTools) metadata.allowedTools = allowedTools;
     if (paths) metadata.paths = paths;
@@ -213,7 +244,7 @@ function extractFrontmatterMetadata(filePath: string): SkillFrontmatterMetadata 
  */
 export async function loadAllSkills(
   env: ExecutionEnv,
-  inputs: Array<{ path: string; source: SkillSource }>,
+  inputs: Array<{ path: string; source: SkillSource }>
 ): Promise<SkillLoadResult> {
   const result = await loadSourcedSkills<SkillSource>(env, inputs);
   return {
@@ -224,8 +255,12 @@ export async function loadAllSkills(
       metadata: extractFrontmatterMetadata(skill.filePath),
       execution: extractExecutionMetadata(skill.filePath),
     })),
-    diagnostics: result.diagnostics.map((d) => ({
-      type: d.type, code: d.code, message: d.message, path: d.path, source: d.source,
+    diagnostics: result.diagnostics.map(d => ({
+      type: d.type,
+      code: d.code,
+      message: d.message,
+      path: d.path,
+      source: d.source,
     })),
   };
 }

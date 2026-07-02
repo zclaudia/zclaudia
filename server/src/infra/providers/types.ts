@@ -8,7 +8,11 @@ import type Database from 'better-sqlite3';
 import type { ProviderEventNormalizer } from './provider-normalizer.js';
 import type { PermissionCallback, ProviderRuntimeEvent } from './message-types.js';
 import type { TaskExecutor } from '../../domains/tasks/executors/types.js';
-import type { ExternalToolRuntimeState, SkillRuntimeState, ToolExecutionObserver } from './pi-runtime/index.js';
+import type {
+  ExternalToolRuntimeState,
+  SkillRuntimeState,
+  ToolExecutionObserver,
+} from './pi-runtime/index.js';
 
 /** Handle exposed to the application after pi Agent construction, for mid-run steering. */
 export interface SteerHandle {
@@ -33,13 +37,15 @@ export interface RunOptions {
   /** User-selected mode id (matches one of `ProviderCapabilities.modes`).
    *  Adapter derives PCP `permissionMode` from this. */
   mode?: string;
-  systemPrompt?: string;  // Full system prompt assembled by run-context: agentProfile.systemPrompt (§4.6 full replacement of template persona) + workspace/context sections
-  sessionTitle?: string;  // Optional session title for providers that support it
-  serverPort?: number;    // Main server port for MCP bridge
-  claudiaSessionId?: string;  // ZClaudia session ID (for interaction tool context)
-  runId?: string;  // ZClaudia run ID for delegated task provenance
-  permissionOverride?: Partial<import('@zclaudia/shared/interaction/permissions').UnifiedPermissionPolicy>;
-  db?: Database.Database;  // Database for loading ZClaudia-managed MCP servers
+  systemPrompt?: string; // Full system prompt assembled by run-context: agentProfile.systemPrompt (§4.6 full replacement of template persona) + workspace/context sections
+  sessionTitle?: string; // Optional session title for providers that support it
+  serverPort?: number; // Main server port for MCP bridge
+  claudiaSessionId?: string; // ZClaudia session ID (for interaction tool context)
+  runId?: string; // ZClaudia run ID for delegated task provenance
+  permissionOverride?: Partial<
+    import('@zclaudia/shared/interaction/permissions').UnifiedPermissionPolicy
+  >;
+  db?: Database.Database; // Database for loading ZClaudia-managed MCP servers
   agentTaskExecutor?: TaskExecutor;
   /** Resolved LLM profile to drive buildModel. If undefined, buildModel falls back to env. */
   llmProfileConfig?: LlmProfileConfig;
@@ -84,7 +90,7 @@ export interface ProviderAdapter {
   run(
     input: string,
     options: RunOptions,
-    onPermission: PermissionCallback,
+    onPermission: PermissionCallback
   ): AsyncGenerator<ProviderRuntimeEvent, void, void>;
 
   /** Abort an active session */
@@ -97,7 +103,9 @@ export interface ProviderAdapter {
   getCliPid?(sessionId: string): number | undefined;
 
   /** Get resolved process info for a specific background task */
-  getTaskProcessInfo?(taskId: string): { taskId: string; command?: string; rootPid?: number; pids: number[] } | undefined;
+  getTaskProcessInfo?(
+    taskId: string
+  ): { taskId: string; command?: string; rootPid?: number; pids: number[] } | undefined;
 
   /** Get provider-specific state to store on ActiveRun */
   getRunState?(options: RunOptions): Record<string, unknown>;

@@ -48,12 +48,25 @@ export function createMemoryTool(options: MemoryToolOptions): AgentTool<any> {
           enum: ['view', 'create', 'str_replace', 'insert', 'delete', 'rename'],
           description: 'Operation to perform on the memory directory',
         },
-        path: { type: 'string', description: `Path inside ${VIRTUAL_MEMORY_ROOT}, e.g. ${VIRTUAL_MEMORY_ROOT}/MEMORY.md` },
-        view_range: { type: 'array', items: { type: 'number' }, description: 'Optional [startLine, endLine] for view' },
+        path: {
+          type: 'string',
+          description: `Path inside ${VIRTUAL_MEMORY_ROOT}, e.g. ${VIRTUAL_MEMORY_ROOT}/MEMORY.md`,
+        },
+        view_range: {
+          type: 'array',
+          items: { type: 'number' },
+          description: 'Optional [startLine, endLine] for view',
+        },
         file_text: { type: 'string', description: 'Full file content for create' },
-        old_str: { type: 'string', description: 'Exact text to replace (must be unique in the file)' },
+        old_str: {
+          type: 'string',
+          description: 'Exact text to replace (must be unique in the file)',
+        },
         new_str: { type: 'string', description: 'Replacement text' },
-        insert_line: { type: 'number', description: 'Insert after this line number (0 = top of file)' },
+        insert_line: {
+          type: 'number',
+          description: 'Insert after this line number (0 = top of file)',
+        },
         insert_text: { type: 'string', description: 'Text to insert' },
         old_path: { type: 'string', description: 'Source path for rename' },
         new_path: { type: 'string', description: 'Destination path for rename' },
@@ -61,23 +74,27 @@ export function createMemoryTool(options: MemoryToolOptions): AgentTool<any> {
       required: ['command'],
     } as any,
     execute: async (_toolCallId: string, params: unknown) => {
-      const args = params && typeof params === 'object' ? params as Record<string, unknown> : {};
+      const args = params && typeof params === 'object' ? (params as Record<string, unknown>) : {};
       const command = String(args.command ?? '');
       try {
         switch (command) {
           case 'view': {
             const target = typeof args.path === 'string' ? args.path : VIRTUAL_MEMORY_ROOT;
             const vr = args.view_range;
-            const range = Array.isArray(vr) && vr.length === 2
-              && Number.isInteger(Number(vr[0])) && Number.isInteger(Number(vr[1]))
-              ? [Number(vr[0]), Number(vr[1])] as [number, number]
-              : undefined;
+            const range =
+              Array.isArray(vr) &&
+              vr.length === 2 &&
+              Number.isInteger(Number(vr[0])) &&
+              Number.isInteger(Number(vr[1]))
+                ? ([Number(vr[0]), Number(vr[1])] as [number, number])
+                : undefined;
             const result = await provider.read({ path: target }, range);
             if (!result.ok) return resultError(result);
             return textResult(truncateText(result.text), { ok: true, kind: result.kind });
           }
           case 'create': {
-            if (typeof args.file_text !== 'string') return errorResult('invalid_params', 'create requires file_text');
+            if (typeof args.file_text !== 'string')
+              return errorResult('invalid_params', 'create requires file_text');
             const result = await provider.create({ path: String(args.path ?? '') }, args.file_text);
             if (!result.ok) return resultError(result);
             return textResult(`Created ${String(args.path)}`, { ok: true });
@@ -86,18 +103,31 @@ export function createMemoryTool(options: MemoryToolOptions): AgentTool<any> {
             if (typeof args.old_str !== 'string' || typeof args.new_str !== 'string') {
               return errorResult('invalid_params', 'str_replace requires old_str and new_str');
             }
-            const result = await provider.replace({ path: String(args.path ?? '') }, args.old_str, args.new_str);
+            const result = await provider.replace(
+              { path: String(args.path ?? '') },
+              args.old_str,
+              args.new_str
+            );
             if (!result.ok) return resultError(result);
             return textResult(`Replaced text in ${String(args.path)}`, { ok: true });
           }
           case 'insert': {
             const line = Number(args.insert_line);
             if (!Number.isInteger(line) || line < 0 || typeof args.insert_text !== 'string') {
-              return errorResult('invalid_params', 'insert requires insert_line (>= 0) and insert_text');
+              return errorResult(
+                'invalid_params',
+                'insert requires insert_line (>= 0) and insert_text'
+              );
             }
-            const result = await provider.insert({ path: String(args.path ?? '') }, line, args.insert_text);
+            const result = await provider.insert(
+              { path: String(args.path ?? '') },
+              line,
+              args.insert_text
+            );
             if (!result.ok) return resultError(result);
-            return textResult(`Inserted text at line ${line} in ${String(args.path)}`, { ok: true });
+            return textResult(`Inserted text at line ${line} in ${String(args.path)}`, {
+              ok: true,
+            });
           }
           case 'delete': {
             const result = await provider.delete({ path: String(args.path ?? '') });
@@ -105,9 +135,14 @@ export function createMemoryTool(options: MemoryToolOptions): AgentTool<any> {
             return textResult(`Deleted ${String(args.path)}`, { ok: true });
           }
           case 'rename': {
-            const result = await provider.rename({ path: String(args.old_path ?? '') }, { path: String(args.new_path ?? '') });
+            const result = await provider.rename(
+              { path: String(args.old_path ?? '') },
+              { path: String(args.new_path ?? '') }
+            );
             if (!result.ok) return resultError(result);
-            return textResult(`Renamed ${String(args.old_path)} to ${String(args.new_path)}`, { ok: true });
+            return textResult(`Renamed ${String(args.old_path)} to ${String(args.new_path)}`, {
+              ok: true,
+            });
           }
           default:
             return errorResult('invalid_command', `Unknown command: ${command}`);

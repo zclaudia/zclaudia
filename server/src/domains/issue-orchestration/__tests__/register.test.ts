@@ -23,7 +23,7 @@ describe('registerIssueOrchestration broadcast wiring', () => {
     db.pragma('foreign_keys = ON');
     applyMigrations(db);
     db.prepare(
-      `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
     ).run('proj-1', 'P', 'code', 0, 0);
     projectRoot = mkdtempSync(join(tmpdir(), 'wsbcast-'));
   });
@@ -39,7 +39,7 @@ describe('registerIssueOrchestration broadcast wiring', () => {
 
   function buildDeps() {
     const registry = new ExecutorRegistry();
-    registry.register('manual', (instance) => new ManualAdapter(db, instance));
+    registry.register('manual', instance => new ManualAdapter(db, instance));
     const specChangeService = new SpecChangeService({ db, getProjectRoot: () => projectRoot });
     const archiveService = new ArchiveService({ db, getProjectRoot: () => projectRoot });
     return { registry, specChangeService, archiveService };
@@ -146,7 +146,7 @@ describe('registerIssueOrchestration broadcast wiring', () => {
     io.lifecycle.transitionStatus(issue.id, 'tracked');
 
     const subEvents = broadcast.mock.calls.filter(
-      ([, m]) => (m as ServerMessage).type === 'openspec_sub_issue_status_changed',
+      ([, m]) => (m as ServerMessage).type === 'openspec_sub_issue_status_changed'
     );
     expect(subEvents.length).toBe(0);
   });

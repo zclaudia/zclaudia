@@ -66,120 +66,169 @@ export function useSidebarActions({
   newSessionAgentProfileId,
   onAgentNotReady,
 }: UseSidebarActionsOptions) {
-  const requestMessageJump = useUIStore((s) => s.requestMessageJump);
-  const {
-    selectProject,
-    selectSession,
-    selectSessionOnBackend,
-  } = useSelectionCoordinator();
+  const requestMessageJump = useUIStore(s => s.requestMessageJump);
+  const { selectProject, selectSession, selectSessionOnBackend } = useSelectionCoordinator();
 
-  const handleActiveSessionSelect = useCallback((backendId: string, sessionId: string) => {
-    useUIStore.getState().requestForceScrollToBottom(sessionId);
-    if (isLegacyLocalBackendId(backendId)) {
-      const resolvedBackendId = resolveCanonicalBackendId(backendId, backendId);
-      if (resolvedBackendId) selectSessionOnBackend(resolvedBackendId, sessionId);
-      return;
-    }
-    selectSessionOnBackend(backendId, sessionId);
-  }, [selectSessionOnBackend]);
-
-  const handleCreateProject = useCallback(async (backendId?: string | null) => {
-    if (!newProjectName.trim() || !isConnected) return;
-    setCreatingProject(true);
-    try {
-      const project = await api.createProject({
-        name: newProjectName.trim(),
-        type: 'code',
-        rootPath: newProjectRootPath.trim() || undefined,
-      }, backendId ?? null);
-      addProject(project);
-      setNewProjectName('');
-      setNewProjectRootPath('');
-      setShowNewProjectForm(false);
-      setExpandedProjects((prev) => new Set(prev).add(project.id));
-      selectProject(project.id);
-    } catch (error) {
-      if (error instanceof ApiError && error.code === 'AGENT_NOT_READY') {
-        onAgentNotReady?.(error.details);
+  const handleActiveSessionSelect = useCallback(
+    (backendId: string, sessionId: string) => {
+      useUIStore.getState().requestForceScrollToBottom(sessionId);
+      if (isLegacyLocalBackendId(backendId)) {
+        const resolvedBackendId = resolveCanonicalBackendId(backendId, backendId);
+        if (resolvedBackendId) selectSessionOnBackend(resolvedBackendId, sessionId);
         return;
       }
-      console.error('Failed to create project:', error);
-    } finally {
-      setCreatingProject(false);
-    }
-  }, [newProjectName, newProjectRootPath, isConnected, addProject, selectProject, setCreatingProject, setExpandedProjects, setNewProjectName, setNewProjectRootPath, setShowNewProjectForm, onAgentNotReady]);
+      selectSessionOnBackend(backendId, sessionId);
+    },
+    [selectSessionOnBackend]
+  );
 
-  const handleCreateSession = useCallback(async (projectId: string) => {
-    if (!isConnected) return;
-    try {
-      const session = await api.createSession({
-        projectId,
-        name: newSessionName.trim() || undefined,
-        agentProfileId: newSessionAgentProfileId || undefined,
+  const handleCreateProject = useCallback(
+    async (backendId?: string | null) => {
+      if (!newProjectName.trim() || !isConnected) return;
+      setCreatingProject(true);
+      try {
+        const project = await api.createProject(
+          {
+            name: newProjectName.trim(),
+            type: 'code',
+            rootPath: newProjectRootPath.trim() || undefined,
+          },
+          backendId ?? null
+        );
+        addProject(project);
+        setNewProjectName('');
+        setNewProjectRootPath('');
+        setShowNewProjectForm(false);
+        setExpandedProjects(prev => new Set(prev).add(project.id));
+        selectProject(project.id);
+      } catch (error) {
+        if (error instanceof ApiError && error.code === 'AGENT_NOT_READY') {
+          onAgentNotReady?.(error.details);
+          return;
+        }
+        console.error('Failed to create project:', error);
+      } finally {
+        setCreatingProject(false);
+      }
+    },
+    [
+      newProjectName,
+      newProjectRootPath,
+      isConnected,
+      addProject,
+      selectProject,
+      setCreatingProject,
+      setExpandedProjects,
+      setNewProjectName,
+      setNewProjectRootPath,
+      setShowNewProjectForm,
+      onAgentNotReady,
+    ]
+  );
+
+  const handleCreateSession = useCallback(
+    async (projectId: string) => {
+      if (!isConnected) return;
+      try {
+        const session = await api.createSession({
+          projectId,
+          name: newSessionName.trim() || undefined,
+          agentProfileId: newSessionAgentProfileId || undefined,
+        });
+        addSession(session);
+        setNewSessionName('');
+        setNewSessionAgentProfileId('');
+        setCreatingSessionForProject(null);
+        selectSession(session.id);
+      } catch (error) {
+        if (error instanceof ApiError && error.code === 'AGENT_NOT_READY') {
+          onAgentNotReady?.(error.details);
+          return;
+        }
+        console.error('Failed to create session:', error);
+      }
+    },
+    [
+      isConnected,
+      newSessionName,
+      newSessionAgentProfileId,
+      addSession,
+      selectSession,
+      setNewSessionName,
+      setNewSessionAgentProfileId,
+      setCreatingSessionForProject,
+      onAgentNotReady,
+    ]
+  );
+
+  const handleDeleteProject = useCallback(
+    async (projectId: string, projectName?: string) => {
+      if (!isConnected) return;
+      // Explicit confirmation — deleting a project also removes all of its sessions
+      // and is irreversible. (Previously this fired with no prompt at all.)
+      const ok = await confirm({
+        title: 'Delete project?',
+        message: `Delete ${projectName ? `"${projectName}"` : 'this project'} and all of its sessions? This cannot be undone.`,
+        confirmLabel: 'Delete',
+        destructive: true,
       });
-      addSession(session);
-      setNewSessionName('');
-      setNewSessionAgentProfileId('');
-      setCreatingSessionForProject(null);
-      selectSession(session.id);
-    } catch (error) {
-      if (error instanceof ApiError && error.code === 'AGENT_NOT_READY') {
-        onAgentNotReady?.(error.details);
+      if (!ok) {
+        setContextMenuProject(null);
         return;
       }
-      console.error('Failed to create session:', error);
-    }
-  }, [isConnected, newSessionName, newSessionAgentProfileId, addSession, selectSession, setNewSessionName, setNewSessionAgentProfileId, setCreatingSessionForProject, onAgentNotReady]);
+      try {
+        await api.deleteProject(projectId);
+        deleteProject(projectId);
+        setContextMenuProject(null);
+      } catch (error) {
+        console.error('Failed to delete project:', error);
+      }
+    },
+    [isConnected, deleteProject, setContextMenuProject]
+  );
 
-  const handleDeleteProject = useCallback(async (projectId: string, projectName?: string) => {
-    if (!isConnected) return;
-    // Explicit confirmation — deleting a project also removes all of its sessions
-    // and is irreversible. (Previously this fired with no prompt at all.)
-    const ok = await confirm({
-      title: 'Delete project?',
-      message: `Delete ${projectName ? `"${projectName}"` : 'this project'} and all of its sessions? This cannot be undone.`,
-      confirmLabel: 'Delete',
-      destructive: true,
-    });
-    if (!ok) {
-      setContextMenuProject(null);
-      return;
-    }
-    try {
-      await api.deleteProject(projectId);
-      deleteProject(projectId);
-      setContextMenuProject(null);
-    } catch (error) {
-      console.error('Failed to delete project:', error);
-    }
-  }, [isConnected, deleteProject, setContextMenuProject]);
+  const handleReorderProjects = useCallback(
+    (orderedIds: string[]) => {
+      storeReorderProjects(orderedIds);
+      reorderProjects(orderedIds).catch(err =>
+        console.error('[Sidebar] Failed to persist project order:', err)
+      );
+    },
+    [storeReorderProjects]
+  );
 
-  const handleReorderProjects = useCallback((orderedIds: string[]) => {
-    storeReorderProjects(orderedIds);
-    reorderProjects(orderedIds).catch((err) => console.error('[Sidebar] Failed to persist project order:', err));
-  }, [storeReorderProjects]);
+  const handleReorderSessions = useCallback(
+    (projectId: string, orderedIds: string[]) => {
+      const currentVisibleIds = getFilteredSessionsForProject(projectId).map(session => session.id);
+      const reorderedSet = new Set(orderedIds);
+      const nextSubset = [...orderedIds];
+      const mergedIds = currentVisibleIds.map(id =>
+        reorderedSet.has(id) ? (nextSubset.shift() ?? id) : id
+      );
+      storeReorderSessions(projectId, mergedIds);
+      reorderSessions(projectId, mergedIds).catch(err =>
+        console.error('[Sidebar] Failed to persist session order:', err)
+      );
+    },
+    [getFilteredSessionsForProject, storeReorderSessions]
+  );
 
-  const handleReorderSessions = useCallback((projectId: string, orderedIds: string[]) => {
-    const currentVisibleIds = getFilteredSessionsForProject(projectId).map((session) => session.id);
-    const reorderedSet = new Set(orderedIds);
-    const nextSubset = [...orderedIds];
-    const mergedIds = currentVisibleIds.map((id) => (
-      reorderedSet.has(id) ? (nextSubset.shift() ?? id) : id
-    ));
-    storeReorderSessions(projectId, mergedIds);
-    reorderSessions(projectId, mergedIds).catch((err) => console.error('[Sidebar] Failed to persist session order:', err));
-  }, [getFilteredSessionsForProject, storeReorderSessions]);
+  const handleSearchResultSelect = useCallback(
+    (sessionId: string, messageId: string, ownerBackendId?: string) => {
+      requestMessageJump(sessionId, messageId);
+      selectSession(sessionId, { backendId: ownerBackendId });
+      if (onClose) onClose();
+    },
+    [requestMessageJump, selectSession, onClose]
+  );
 
-  const handleSearchResultSelect = useCallback((sessionId: string, messageId: string, ownerBackendId?: string) => {
-    requestMessageJump(sessionId, messageId);
-    selectSession(sessionId, { backendId: ownerBackendId });
-    if (onClose) onClose();
-  }, [requestMessageJump, selectSession, onClose]);
-
-  const handleSessionSelect = useCallback((sessionId: string) => {
-    selectSession(sessionId);
-    if (isMobile && onClose) onClose();
-  }, [selectSession, isMobile, onClose]);
+  const handleSessionSelect = useCallback(
+    (sessionId: string) => {
+      selectSession(sessionId);
+      if (isMobile && onClose) onClose();
+    },
+    [selectSession, isMobile, onClose]
+  );
 
   const handlePopOutSession = useCallback((sessionId: string, projectId: string) => {
     openSessionInNewWindow(sessionId, projectId);

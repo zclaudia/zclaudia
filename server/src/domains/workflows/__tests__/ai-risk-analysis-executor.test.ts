@@ -12,9 +12,10 @@ function makeContext(eventPayload: Record<string, unknown>): StepContext {
     llmProfileId: 'fallback-profile',
     results: new Map(),
     eventPayload,
-    resolveTemplate: (template: string) => template
-      .replace('${event.toolName}', String(eventPayload.toolName ?? ''))
-      .replace('${event.detail}', String(eventPayload.detail ?? '')),
+    resolveTemplate: (template: string) =>
+      template
+        .replace('${event.toolName}', String(eventPayload.toolName ?? ''))
+        .replace('${event.detail}', String(eventPayload.detail ?? '')),
     setSessionId: vi.fn(),
   };
 }
@@ -32,19 +33,23 @@ describe('AIRiskAnalysisStepExecutor', () => {
     }));
     const executor = new AIRiskAnalysisStepExecutor({ run } as unknown as AgentLoopRunnerPort);
 
-    const result = await executor.execute({ id: 'ai_review', name: 'AI Review', type: 'ai_risk_analysis' } as any, {}, makeContext({
-      requestId: 'req-1',
-      toolName: 'Bash',
-      toolInput: { command: 'npm test' },
-      detail: 'npm test',
-      cwd: '/repo',
-      aiReview: {
-        enabled: true,
-        confidenceThreshold: 0.92,
-        maxAutoApprovalsPerMinute: 3,
-        analysisLlmProfileId: 'review-provider',
-      },
-    }));
+    const result = await executor.execute(
+      { id: 'ai_review', name: 'AI Review', type: 'ai_risk_analysis' } as any,
+      {},
+      makeContext({
+        requestId: 'req-1',
+        toolName: 'Bash',
+        toolInput: { command: 'npm test' },
+        detail: 'npm test',
+        cwd: '/repo',
+        aiReview: {
+          enabled: true,
+          confidenceThreshold: 0.92,
+          maxAutoApprovalsPerMinute: 3,
+          analysisLlmProfileId: 'review-provider',
+        },
+      })
+    );
 
     expect(result).toMatchObject({
       status: 'completed',
@@ -54,12 +59,14 @@ describe('AIRiskAnalysisStepExecutor', () => {
         contextId: 'ctx-risk',
       },
     });
-    expect(run).toHaveBeenCalledWith(expect.objectContaining({
-      purpose: 'workflow.ai_risk_analysis',
-      llmProfileId: 'review-provider',
-      toolset: { id: 'permission-review' },
-      context: { policy: 'step-local', key: 'permission:req-1:ai_review' },
-    }));
+    expect(run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        purpose: 'workflow.ai_risk_analysis',
+        llmProfileId: 'review-provider',
+        toolset: { id: 'permission-review' },
+        context: { policy: 'step-local', key: 'permission:req-1:ai_review' },
+      })
+    );
     expect(run.mock.calls[0]?.[0].input).toContain('"confidenceThreshold":0.92');
     expect(run.mock.calls[0]?.[0].input).toContain('"maxAutoApprovalsPerMinute":3');
   });
@@ -68,18 +75,22 @@ describe('AIRiskAnalysisStepExecutor', () => {
     const run = vi.fn();
     const executor = new AIRiskAnalysisStepExecutor({ run } as unknown as AgentLoopRunnerPort);
 
-    const result = await executor.execute({ id: 'ai_review', name: 'AI Review', type: 'ai_risk_analysis' } as any, {}, makeContext({
-      requestId: 'req-1',
-      toolName: 'Bash',
-      toolInput: { command: 'rm -rf build' },
-      detail: 'rm -rf build',
-      cwd: '/repo',
-      aiReview: {
-        enabled: false,
-        confidenceThreshold: 0.7,
-        maxAutoApprovalsPerMinute: 10,
-      },
-    }));
+    const result = await executor.execute(
+      { id: 'ai_review', name: 'AI Review', type: 'ai_risk_analysis' } as any,
+      {},
+      makeContext({
+        requestId: 'req-1',
+        toolName: 'Bash',
+        toolInput: { command: 'rm -rf build' },
+        detail: 'rm -rf build',
+        cwd: '/repo',
+        aiReview: {
+          enabled: false,
+          confidenceThreshold: 0.7,
+          maxAutoApprovalsPerMinute: 10,
+        },
+      })
+    );
 
     expect(result).toMatchObject({
       status: 'completed',

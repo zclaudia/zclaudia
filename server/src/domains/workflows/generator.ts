@@ -49,17 +49,70 @@ const SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutes
 const GENERATE_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
 
 const BUILTIN_STEP_TYPES = [
-  { type: 'shell', description: 'Execute a shell command', configFields: 'command (string, required), cwd (string, optional), timeoutMs (number, optional)' },
-  { type: 'webhook', description: 'Send an HTTP request', configFields: 'url (string, required), method (string, default GET), headers (object, optional), body (string, optional)' },
-  { type: 'notify', description: 'Send a notification', configFields: 'type ("system"), message (string, required), title (string, optional), priority (string, optional), tags (string[], optional)' },
-  { type: 'condition', description: 'Evaluate a condition to branch the workflow. Uses node.condition.expression field, not config.', configFields: 'none (use node.condition.expression instead, e.g. "${stepId.output.field} == value")' },
-  { type: 'wait', description: 'Wait for timeout or manual approval', configFields: 'type ("timeout" | "approval"), durationMs (number, for timeout type)' },
-  { type: 'ai_prompt', description: 'Send a prompt to AI agent for execution (can read/write files, run commands)', configFields: 'prompt (string, required), workingDirectory (string, optional), llmProfileId (string, optional), model (string, optional), maxTurns (number, optional), toolset (string, optional: workflow-prompt | workflow-prompt-readonly | none)' },
-  { type: 'ai_review', description: 'AI code review that checks git diff and outputs reviewPassed/reviewNotes', configFields: 'worktreePath (string, optional), passMarker (string, optional), failMarker (string, optional), llmProfileId (string, optional)' },
-  { type: 'git_commit', description: 'Auto-commit changes with AI-generated message', configFields: 'cwd (string, optional)' },
-  { type: 'git_merge', description: 'Merge a branch into base branch', configFields: 'branch (string, optional), baseBranch (string, required), worktreePath (string, optional)' },
-  { type: 'create_worktree', description: 'Create a git worktree with a new branch', configFields: 'branchName (string, required), baseBranch (string, optional)' },
-  { type: 'create_pr', description: 'Create a local PR info (title, description, diff)', configFields: 'worktreePath (string, optional), title (string, optional), baseBranch (string, optional)' },
+  {
+    type: 'shell',
+    description: 'Execute a shell command',
+    configFields:
+      'command (string, required), cwd (string, optional), timeoutMs (number, optional)',
+  },
+  {
+    type: 'webhook',
+    description: 'Send an HTTP request',
+    configFields:
+      'url (string, required), method (string, default GET), headers (object, optional), body (string, optional)',
+  },
+  {
+    type: 'notify',
+    description: 'Send a notification',
+    configFields:
+      'type ("system"), message (string, required), title (string, optional), priority (string, optional), tags (string[], optional)',
+  },
+  {
+    type: 'condition',
+    description:
+      'Evaluate a condition to branch the workflow. Uses node.condition.expression field, not config.',
+    configFields:
+      'none (use node.condition.expression instead, e.g. "${stepId.output.field} == value")',
+  },
+  {
+    type: 'wait',
+    description: 'Wait for timeout or manual approval',
+    configFields: 'type ("timeout" | "approval"), durationMs (number, for timeout type)',
+  },
+  {
+    type: 'ai_prompt',
+    description: 'Send a prompt to AI agent for execution (can read/write files, run commands)',
+    configFields:
+      'prompt (string, required), workingDirectory (string, optional), llmProfileId (string, optional), model (string, optional), maxTurns (number, optional), toolset (string, optional: workflow-prompt | workflow-prompt-readonly | none)',
+  },
+  {
+    type: 'ai_review',
+    description: 'AI code review that checks git diff and outputs reviewPassed/reviewNotes',
+    configFields:
+      'worktreePath (string, optional), passMarker (string, optional), failMarker (string, optional), llmProfileId (string, optional)',
+  },
+  {
+    type: 'git_commit',
+    description: 'Auto-commit changes with AI-generated message',
+    configFields: 'cwd (string, optional)',
+  },
+  {
+    type: 'git_merge',
+    description: 'Merge a branch into base branch',
+    configFields:
+      'branch (string, optional), baseBranch (string, required), worktreePath (string, optional)',
+  },
+  {
+    type: 'create_worktree',
+    description: 'Create a git worktree with a new branch',
+    configFields: 'branchName (string, required), baseBranch (string, optional)',
+  },
+  {
+    type: 'create_pr',
+    description: 'Create a local PR info (title, description, diff)',
+    configFields:
+      'worktreePath (string, optional), title (string, optional), baseBranch (string, optional)',
+  },
 ];
 
 // ── Service ──────────────────────────────────────────────────
@@ -70,7 +123,11 @@ export class WorkflowGeneratorService {
   private workflowStepRegistry?: StepRegistryPort;
   private aiRunPort: WorkflowAiRunPort;
 
-  constructor(private db: Database, workflowStepRegistry?: StepRegistryPort, aiRunPort?: WorkflowAiRunPort) {
+  constructor(
+    private db: Database,
+    workflowStepRegistry?: StepRegistryPort,
+    aiRunPort?: WorkflowAiRunPort
+  ) {
     this.sessionRepo = new SessionRepository(db);
     this.workflowStepRegistry = workflowStepRegistry;
     this.aiRunPort = aiRunPort ?? {
@@ -83,7 +140,11 @@ export class WorkflowGeneratorService {
   /**
    * Generate a workflow from a natural language description.
    */
-  async generate(projectId: string, description: string, llmProfileId: string): Promise<GenerateResult> {
+  async generate(
+    projectId: string,
+    description: string,
+    llmProfileId: string
+  ): Promise<GenerateResult> {
     const systemPrompt = this.buildSystemPrompt();
     const userPrompt = description;
 
@@ -91,13 +152,20 @@ export class WorkflowGeneratorService {
     const parsed = this.parseResponse(aiResponse);
 
     // Validate and possibly retry once
-    const validated = await this.validateOrRetry(parsed, projectId, llmProfileId, systemPrompt, userPrompt, aiResponse);
+    const validated = await this.validateOrRetry(
+      parsed,
+      projectId,
+      llmProfileId,
+      systemPrompt,
+      userPrompt,
+      aiResponse
+    );
 
     // Auto-layout
     validated.definition.nodes = autoLayoutGraph(
       validated.definition.nodes,
       validated.definition.edges,
-      validated.definition.entryNodeId,
+      validated.definition.entryNodeId
     );
 
     // Create session for future refinements
@@ -115,7 +183,11 @@ export class WorkflowGeneratorService {
   /**
    * Refine an existing generated workflow with a new instruction.
    */
-  async refine(projectId: string, generationId: string, instruction: string): Promise<GenerateResult> {
+  async refine(
+    projectId: string,
+    generationId: string,
+    instruction: string
+  ): Promise<GenerateResult> {
     const session = this.sessions.get(generationId);
     if (!session) {
       throw new Error('Generation session not found or expired');
@@ -134,13 +206,20 @@ export class WorkflowGeneratorService {
 
     const parsed = this.parseResponse(aiResponse);
 
-    const validated = await this.validateOrRetry(parsed, projectId, session.llmProfileId, systemPrompt, userPrompt, aiResponse);
+    const validated = await this.validateOrRetry(
+      parsed,
+      projectId,
+      session.llmProfileId,
+      systemPrompt,
+      userPrompt,
+      aiResponse
+    );
 
     // Auto-layout
     validated.definition.nodes = autoLayoutGraph(
       validated.definition.nodes,
       validated.definition.edges,
-      validated.definition.entryNodeId,
+      validated.definition.entryNodeId
     );
 
     // Update session
@@ -149,7 +228,7 @@ export class WorkflowGeneratorService {
     session.description = validated.description;
     session.history.push(
       { role: 'user', content: instruction },
-      { role: 'assistant', content: JSON.stringify(validated.definition) },
+      { role: 'assistant', content: JSON.stringify(validated.definition) }
     );
     this.resetSessionTimer(session);
 
@@ -166,19 +245,30 @@ export class WorkflowGeneratorService {
 
   private buildSystemPrompt(): string {
     // Get plugin step types
-    const pluginSteps = (this.workflowStepRegistry?.getAllMeta() ?? []);
-    const pluginStepDocs = pluginSteps.map(s =>
-      `  { type: '${s.type}', description: '${s.description}', category: '${s.category}' }`
-    ).join('\n');
+    const pluginSteps = this.workflowStepRegistry?.getAllMeta() ?? [];
+    const pluginStepDocs = pluginSteps
+      .map(
+        s => `  { type: '${s.type}', description: '${s.description}', category: '${s.category}' }`
+      )
+      .join('\n');
 
     // Pick two template examples
-    const exampleTemplates = BUILTIN_WORKFLOW_TEMPLATES
-      .filter(t => t.id === 'local-pr-review-merge' || t.id === 'nightly-test-and-fix');
-    const examples = exampleTemplates.map(t => JSON.stringify({
-      name: t.name,
-      description: t.description,
-      definition: t.definition,
-    }, null, 2)).join('\n\n---\n\n');
+    const exampleTemplates = BUILTIN_WORKFLOW_TEMPLATES.filter(
+      t => t.id === 'local-pr-review-merge' || t.id === 'nightly-test-and-fix'
+    );
+    const examples = exampleTemplates
+      .map(t =>
+        JSON.stringify(
+          {
+            name: t.name,
+            description: t.description,
+            definition: t.definition,
+          },
+          null,
+          2
+        )
+      )
+      .join('\n\n---\n\n');
 
     return `You are a workflow generator. Given a natural language description, you generate a valid workflow definition in JSON format.
 
@@ -280,7 +370,7 @@ Generate a workflow definition based on the user's natural language description.
     projectId: string,
     llmProfileId: string,
     systemPrompt: string,
-    userPrompt: string,
+    userPrompt: string
   ): Promise<string> {
     // llmProfileId used downstream for AI dispatch; agentProfileId auto-resolved by SessionRepository.
     void llmProfileId;
@@ -309,9 +399,11 @@ Generate a workflow definition based on the user's natural language description.
           if (msg.type === 'run_completed') {
             clearTimeout(timeout);
             // Read assistant messages from DB
-            const messages = this.db.prepare(
-              "SELECT content FROM messages WHERE session_id = ? AND role = 'assistant' ORDER BY created_at DESC LIMIT 10"
-            ).all(session.id) as { content: string }[];
+            const messages = this.db
+              .prepare(
+                "SELECT content FROM messages WHERE session_id = ? AND role = 'assistant' ORDER BY created_at DESC LIMIT 10"
+              )
+              .all(session.id) as { content: string }[];
             const allContent = messages.map(m => m.content).join('\n');
             resolve(allContent);
           } else if (msg.type === 'run_failed') {
@@ -336,11 +428,18 @@ Generate a workflow definition based on the user's natural language description.
     const jsonMatch = response.match(/```json\s*([\s\S]*?)```/);
     const jsonStr = jsonMatch ? jsonMatch[1].trim() : response.trim();
 
-    let parsed: { name?: string; description?: string; definition?: { nodes?: unknown[]; edges?: unknown[]; entryNodeId?: string }; warnings?: string[] };
+    let parsed: {
+      name?: string;
+      description?: string;
+      definition?: { nodes?: unknown[]; edges?: unknown[]; entryNodeId?: string };
+      warnings?: string[];
+    };
     try {
       parsed = JSON.parse(jsonStr);
     } catch {
-      throw new Error(`Failed to parse AI response as JSON. Raw response:\n${response.slice(0, 500)}`);
+      throw new Error(
+        `Failed to parse AI response as JSON. Raw response:\n${response.slice(0, 500)}`
+      );
     }
 
     // Validate shape
@@ -387,11 +486,19 @@ Generate a workflow definition based on the user's natural language description.
 
     // Check step types are valid
     const validTypes = new Set([
-      'shell', 'webhook', 'notify', 'condition', 'wait',
-      'ai_prompt', 'ai_review', 'git_commit', 'git_merge',
-      'create_worktree', 'create_pr',
+      'shell',
+      'webhook',
+      'notify',
+      'condition',
+      'wait',
+      'ai_prompt',
+      'ai_review',
+      'git_commit',
+      'git_merge',
+      'create_worktree',
+      'create_pr',
     ]);
-    for (const meta of (this.workflowStepRegistry?.getAllMeta() ?? [])) {
+    for (const meta of this.workflowStepRegistry?.getAllMeta() ?? []) {
       validTypes.add(meta.type);
     }
     for (const node of def.nodes) {
@@ -407,7 +514,9 @@ Generate a workflow definition based on the user's natural language description.
         const hasTrue = outEdges.some(e => e.type === 'condition_true');
         const hasFalse = outEdges.some(e => e.type === 'condition_false');
         if (!hasTrue || !hasFalse) {
-          errors.push(`Condition node "${node.id}" must have both condition_true and condition_false edges`);
+          errors.push(
+            `Condition node "${node.id}" must have both condition_true and condition_false edges`
+          );
         }
       }
     }
@@ -416,13 +525,23 @@ Generate a workflow definition based on the user's natural language description.
   }
 
   private async validateOrRetry(
-    parsed: { name: string; description: string; definition: WorkflowDefinition; warnings?: string[] },
+    parsed: {
+      name: string;
+      description: string;
+      definition: WorkflowDefinition;
+      warnings?: string[];
+    },
     projectId: string,
     llmProfileId: string,
     systemPrompt: string,
     originalUserPrompt: string,
-    originalResponse: string,
-  ): Promise<{ name: string; description: string; definition: WorkflowDefinition; warnings?: string[] }> {
+    originalResponse: string
+  ): Promise<{
+    name: string;
+    description: string;
+    definition: WorkflowDefinition;
+    warnings?: string[];
+  }> {
     const errors = this.validateDefinition(parsed.definition);
     if (errors.length === 0) return parsed;
 
@@ -459,7 +578,7 @@ Generate a workflow definition based on the user's natural language description.
     llmProfileId: string,
     result: { name: string; description: string; definition: WorkflowDefinition },
     userDescription: string,
-    aiResponse: string,
+    aiResponse: string
   ): GenerationSession {
     const id = newId();
     const session: GenerationSession = {

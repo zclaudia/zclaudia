@@ -24,7 +24,7 @@ function relativeDate(ts: number): string {
 
 export function GitStashView({ projectId, worktreePath, onAfterMutation }: GitStashViewProps) {
   const stash = useGitStore(selectStash(projectId, worktreePath));
-  const setStash = useGitStore((s) => s.setStash);
+  const setStash = useGitStore(s => s.setStash);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [stashMessage, setStashMessage] = useState('');
@@ -47,7 +47,7 @@ export function GitStashView({ projectId, worktreePath, onAfterMutation }: GitSt
     if (creating) return;
     setCreating(true);
     const ok = await runWithToast('Create stash', projectId, () =>
-      api.createGitStash(projectId, worktreePath, stashMessage.trim() || undefined),
+      api.createGitStash(projectId, worktreePath, stashMessage.trim() || undefined)
     );
     setCreating(false);
     if (ok !== null) {
@@ -59,7 +59,7 @@ export function GitStashView({ projectId, worktreePath, onAfterMutation }: GitSt
 
   const handleApply = async (index: number) => {
     const ok = await runWithToast(`Apply stash@{${index}}`, projectId, () =>
-      api.applyGitStash(projectId, worktreePath, index),
+      api.applyGitStash(projectId, worktreePath, index)
     );
     if (ok !== null) {
       await refresh();
@@ -76,7 +76,7 @@ export function GitStashView({ projectId, worktreePath, onAfterMutation }: GitSt
     });
     if (!confirmed) return;
     const ok = await runWithToast(`Drop stash@{${index}}`, projectId, () =>
-      api.dropGitStash(projectId, worktreePath, index),
+      api.dropGitStash(projectId, worktreePath, index)
     );
     if (ok !== null) await refresh();
   };
@@ -101,8 +101,8 @@ export function GitStashView({ projectId, worktreePath, onAfterMutation }: GitSt
         <input
           type="text"
           value={stashMessage}
-          onChange={(e) => setStashMessage(e.target.value)}
-          onKeyDown={(e) => {
+          onChange={e => setStashMessage(e.target.value)}
+          onKeyDown={e => {
             if (e.key === 'Enter') {
               e.preventDefault();
               handleCreate();
@@ -129,7 +129,7 @@ export function GitStashView({ projectId, worktreePath, onAfterMutation }: GitSt
           <div className="px-3 py-3 text-xs text-muted-foreground">No stashes.</div>
         ) : (
           <div className="divide-y divide-border">
-            {stash.map((s) => (
+            {stash.map(s => (
               <div key={s.index} className="px-3 py-2 flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <div className="text-xs font-medium truncate">{s.message}</div>

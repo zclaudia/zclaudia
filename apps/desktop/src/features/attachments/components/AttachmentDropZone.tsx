@@ -32,7 +32,7 @@ export function AttachmentDropZone({
       e.dataTransfer.dropEffect = 'copy';
       setIsOver(true);
     },
-    [disabled],
+    [disabled]
   );
 
   const handleDragLeave = useCallback(
@@ -43,7 +43,7 @@ export function AttachmentDropZone({
         setIsOver(false);
       }
     },
-    [disabled],
+    [disabled]
   );
 
   const handleDrop = useCallback(
@@ -54,7 +54,7 @@ export function AttachmentDropZone({
       const files = Array.from(e.dataTransfer?.files ?? []);
       if (files.length > 0) onFiles(files);
     },
-    [disabled, onFiles],
+    [disabled, onFiles]
   );
 
   return (

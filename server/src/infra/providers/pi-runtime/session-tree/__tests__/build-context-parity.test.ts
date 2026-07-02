@@ -20,7 +20,10 @@ function msg(role: 'user' | 'assistant', content: string): MessageEntry['message
 describe('buildContext over SqliteSessionStorage', () => {
   let db: Database.Database;
   let storage: SqliteSessionStorage;
-  beforeEach(() => { db = makeDb(); storage = new SqliteSessionStorage(db, 's1'); });
+  beforeEach(() => {
+    db = makeDb();
+    storage = new SqliteSessionStorage(db, 's1');
+  });
 
   it('rebuilds the root→leaf message path in order', async () => {
     const session = new Session(storage);
@@ -29,7 +32,11 @@ describe('buildContext over SqliteSessionStorage', () => {
     await session.appendMessage(msg('user', 'three'));
 
     const ctx = await session.buildContext();
-    expect(ctx.messages.map((m) => (m as { content: string }).content)).toEqual(['one', 'two', 'three']);
+    expect(ctx.messages.map(m => (m as { content: string }).content)).toEqual([
+      'one',
+      'two',
+      'three',
+    ]);
     expect(id1).not.toEqual(id2);
   });
 
@@ -43,13 +50,13 @@ describe('buildContext over SqliteSessionStorage', () => {
     const ctx = await session.buildContext();
     // The compaction-summary message uses role 'compactionSummary' with a `summary`
     // field; regular messages carry string `content`. Read whichever is present.
-    const texts = ctx.messages.map((m) => {
+    const texts = ctx.messages.map(m => {
       const mm = m as { content?: unknown; summary?: unknown };
       if (typeof mm.summary === 'string') return mm.summary;
       if (typeof mm.content === 'string') return mm.content;
       return '';
     });
-    expect(texts.some((t) => t.includes('SUMMARY TEXT'))).toBe(true);
+    expect(texts.some(t => t.includes('SUMMARY TEXT'))).toBe(true);
     expect(texts).toContain('kept-boundary');
     expect(texts).toContain('after');
     expect(texts).not.toContain('old-1');

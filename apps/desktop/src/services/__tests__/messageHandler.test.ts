@@ -64,6 +64,10 @@ const mockProjectStore = {
   sessions: [] as any[],
 };
 
+const mockSelectionStore = {
+  selectedSessionId: 'current-session',
+};
+
 const mockServerStore = {
   activeServerId: 'server-1',
   recordHeartbeat: vi.fn(),
@@ -162,6 +166,9 @@ vi.mock('../../stores/sessionConfigStore', () => ({
 vi.mock('../../stores/projectStore', () => ({
   useProjectStore: { getState: () => mockProjectStore },
 }));
+vi.mock('../../stores/selectionStore', () => ({
+  useSelectionStore: { getState: () => mockSelectionStore },
+}));
 vi.mock('../../stores/serverStore', () => ({
   useServerStore: { getState: () => mockServerStore },
 }));
@@ -249,21 +256,31 @@ describe('handleServerMessage', () => {
     mockBackgroundTaskStore.tasks = {};
     mockProjectStore.selectedSessionId = 'current-session';
     mockProjectStore.sessions = [];
+    mockSelectionStore.selectedSessionId = 'current-session';
     mockPluginStore.panels = [];
     mockServerStore.activeServerId = 'server-1';
     mockPermissionStore.aiReviewResults = {};
     mockRightSidebarStore.activeTab = null;
     mockGetEffectivePlacement.mockReturnValue('bottom');
-    useNotificationFeedStore.setState({ items: [], unreadCount: 0, hasMore: false, loading: false, hydrated: false });
+    useNotificationFeedStore.setState({
+      items: [],
+      unreadCount: 0,
+      hasMore: false,
+      loading: false,
+      hydrated: false,
+    });
     useToastStore.setState({ toasts: [] });
     // Delta buffer flushes on rAF in production; make rAF synchronous in tests
     // so the existing assertions on appendToLastMessage/appendTextBlock stay
     // observable in the same tick.
-    (globalThis as { requestAnimationFrame?: (cb: FrameRequestCallback) => number }).requestAnimationFrame = (cb: FrameRequestCallback) => {
+    (
+      globalThis as { requestAnimationFrame?: (cb: FrameRequestCallback) => number }
+    ).requestAnimationFrame = (cb: FrameRequestCallback) => {
       cb(0);
       return 1;
     };
-    (globalThis as { cancelAnimationFrame?: (handle: number) => void }).cancelAnimationFrame = () => {};
+    (globalThis as { cancelAnimationFrame?: (handle: number) => void }).cancelAnimationFrame =
+      () => {};
     __resetDeltaBufferForTests();
   });
 
@@ -274,7 +291,10 @@ describe('handleServerMessage', () => {
 
   describe('delta', () => {
     it('appends to message when sessionId is provided', () => {
-      handleServerMessage({ type: 'delta', sessionId: 's1', runId: 'r1', content: 'hello' }, makeCtx());
+      handleServerMessage(
+        { type: 'delta', sessionId: 's1', runId: 'r1', content: 'hello' },
+        makeCtx()
+      );
       expect(mockChatStore.appendToLastMessage).toHaveBeenCalledWith('s1', 'hello');
       expect(mockChatStore.appendTextBlock).toHaveBeenCalledWith('r1', 'hello');
     });
@@ -295,7 +315,9 @@ describe('handleServerMessage', () => {
     it('coalesces multiple deltas for the same run into one chatStore commit per rAF', () => {
       // Queue mode: capture rAF callback so we can flush manually after batching.
       let pendingCb: FrameRequestCallback | null = null;
-      (globalThis as { requestAnimationFrame?: (cb: FrameRequestCallback) => number }).requestAnimationFrame = (cb: FrameRequestCallback) => {
+      (
+        globalThis as { requestAnimationFrame?: (cb: FrameRequestCallback) => number }
+      ).requestAnimationFrame = (cb: FrameRequestCallback) => {
         pendingCb = cb;
         return 1;
       };
@@ -320,23 +342,40 @@ describe('handleServerMessage', () => {
 
   describe('run_started', () => {
     it('starts a foreground run', () => {
-      handleServerMessage({
-        type: 'run_started', runId: 'r1', sessionId: 's1',
-        assistantMessageId: 'am1', userMessageId: 'um1', clientRequestId: 'cr1',
-      }, makeCtx());
+      handleServerMessage(
+        {
+          type: 'run_started',
+          runId: 'r1',
+          sessionId: 's1',
+          assistantMessageId: 'am1',
+          userMessageId: 'um1',
+          clientRequestId: 'cr1',
+        },
+        makeCtx()
+      );
 
       expect(mockChatStore.startRun).toHaveBeenCalledWith('r1', 's1', false);
       expect(mockSessionConfigStore.clearSystemInfo).toHaveBeenCalledWith('s1');
-      expect(mockChatStore.updateMessageIdByClientMessageId).toHaveBeenCalledWith('s1', 'cr1', 'um1');
+      expect(mockChatStore.updateMessageIdByClientMessageId).toHaveBeenCalledWith(
+        's1',
+        'cr1',
+        'um1'
+      );
       expect(mockChatStore.addMessage).toHaveBeenCalled();
       expect(mockProjectStore.setSessionActive).toHaveBeenCalledWith('s1', true);
       expect(mockSessionsStore.setSessionActiveFlag).toHaveBeenCalledWith('__local__', 's1', true);
     });
 
     it('starts a background run', () => {
-      handleServerMessage({
-        type: 'run_started', runId: 'r1', sessionId: 's1', sessionType: 'background',
-      }, makeCtx());
+      handleServerMessage(
+        {
+          type: 'run_started',
+          runId: 'r1',
+          sessionId: 's1',
+          sessionType: 'background',
+        },
+        makeCtx()
+      );
 
       expect(mockChatStore.startRun).toHaveBeenCalledWith('r1', 's1', true);
       expect(mockProjectStore.setSessionActive).not.toHaveBeenCalled();
@@ -375,11 +414,14 @@ describe('handleServerMessage', () => {
     it('does not add a duplicate assistant placeholder for metadata-only reruns', () => {
       mockChatStore.activeRuns = { r1: 's1' };
 
-      handleServerMessage({
-        type: 'run_started',
-        runId: 'r1',
-        sessionId: 's1',
-      }, makeCtx());
+      handleServerMessage(
+        {
+          type: 'run_started',
+          runId: 'r1',
+          sessionId: 's1',
+        },
+        makeCtx()
+      );
 
       expect(mockChatStore.addMessage).not.toHaveBeenCalled();
     });
@@ -423,13 +465,18 @@ describe('handleServerMessage', () => {
     it('flushes pending buffered deltas before finalizing the run', () => {
       // Queue mode: hold rAF callback so deltas stay buffered until terminal event.
       let pendingCb: FrameRequestCallback | null = null;
-      (globalThis as { requestAnimationFrame?: (cb: FrameRequestCallback) => number }).requestAnimationFrame = (cb: FrameRequestCallback) => {
+      (
+        globalThis as { requestAnimationFrame?: (cb: FrameRequestCallback) => number }
+      ).requestAnimationFrame = (cb: FrameRequestCallback) => {
         pendingCb = cb;
         return 1;
       };
       mockChatStore.activeRuns = { r1: 's1' };
 
-      handleServerMessage({ type: 'delta', sessionId: 's1', runId: 'r1', content: 'partial' }, makeCtx());
+      handleServerMessage(
+        { type: 'delta', sessionId: 's1', runId: 'r1', content: 'partial' },
+        makeCtx()
+      );
       // run_completed arrives before the rAF tick — handler must still flush
       // the buffered text so the rendered message matches what the user saw.
       handleServerMessage({ type: 'run_completed', runId: 'r1', sessionId: 's1' }, makeCtx());
@@ -472,7 +519,10 @@ describe('handleServerMessage', () => {
 
       expect(mockPermissionStore.clearRequestsForSession).toHaveBeenCalledWith('s1');
       expect(mockInteractionStore.clearSession).toHaveBeenCalledWith('s1');
-      expect(mockChatStore.appendToLastMessage).toHaveBeenCalledWith('s1', expect.stringContaining('boom'));
+      expect(mockChatStore.appendToLastMessage).toHaveBeenCalledWith(
+        's1',
+        expect.stringContaining('boom')
+      );
       expect(mockChatStore.finalizeRunToMessage).toHaveBeenCalledWith('r1');
       expect(mockChatStore.endRun).toHaveBeenCalledWith('r1');
       expect(mockEagerSyncCurrentSession).toHaveBeenCalledWith('server-1');
@@ -482,19 +532,31 @@ describe('handleServerMessage', () => {
 
     it('flushes pending buffered deltas before appending error and finalizing', () => {
       let pendingCb: FrameRequestCallback | null = null;
-      (globalThis as { requestAnimationFrame?: (cb: FrameRequestCallback) => number }).requestAnimationFrame = (cb: FrameRequestCallback) => {
+      (
+        globalThis as { requestAnimationFrame?: (cb: FrameRequestCallback) => number }
+      ).requestAnimationFrame = (cb: FrameRequestCallback) => {
         pendingCb = cb;
         return 1;
       };
       mockChatStore.activeRuns = { r1: 's1' };
       const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      handleServerMessage({ type: 'delta', sessionId: 's1', runId: 'r1', content: 'before-fail' }, makeCtx());
-      handleServerMessage({ type: 'run_failed', runId: 'r1', sessionId: 's1', error: 'boom' }, makeCtx());
+      handleServerMessage(
+        { type: 'delta', sessionId: 's1', runId: 'r1', content: 'before-fail' },
+        makeCtx()
+      );
+      handleServerMessage(
+        { type: 'run_failed', runId: 'r1', sessionId: 's1', error: 'boom' },
+        makeCtx()
+      );
 
       // First append = buffered delta; second append = error suffix.
       expect(mockChatStore.appendToLastMessage).toHaveBeenNthCalledWith(1, 's1', 'before-fail');
-      expect(mockChatStore.appendToLastMessage).toHaveBeenNthCalledWith(2, 's1', expect.stringContaining('boom'));
+      expect(mockChatStore.appendToLastMessage).toHaveBeenNthCalledWith(
+        2,
+        's1',
+        expect.stringContaining('boom')
+      );
 
       pendingCb?.(0);
       // No duplicate delta committed after rAF tick.
@@ -506,16 +568,33 @@ describe('handleServerMessage', () => {
   describe('tool_use', () => {
     it('adds tool call for tracked run', () => {
       mockChatStore.activeRuns = { r1: 's1' };
-      handleServerMessage({
-        type: 'tool_use', runId: 'r1', toolUseId: 'tu1', toolName: 'Read', toolInput: {},
-      }, makeCtx());
-      expect(mockChatStore.addToolCall).toHaveBeenCalledWith('r1', 'tu1', 'Read', {}, undefined, undefined);
+      handleServerMessage(
+        {
+          type: 'tool_use',
+          runId: 'r1',
+          toolUseId: 'tu1',
+          toolName: 'Read',
+          toolInput: {},
+        },
+        makeCtx()
+      );
+      expect(mockChatStore.addToolCall).toHaveBeenCalledWith(
+        'r1',
+        'tu1',
+        'Read',
+        {},
+        undefined,
+        undefined
+      );
       expect(mockChatStore.addToolUseBlock).toHaveBeenCalledWith('r1', 'tu1');
     });
 
     it('warns on untracked run', () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      handleServerMessage({ type: 'tool_use', runId: 'r1', toolUseId: 'tu1', toolName: 'Read' }, makeCtx());
+      handleServerMessage(
+        { type: 'tool_use', runId: 'r1', toolUseId: 'tu1', toolName: 'Read' },
+        makeCtx()
+      );
       expect(warn).toHaveBeenCalled();
       warn.mockRestore();
     });
@@ -524,28 +603,68 @@ describe('handleServerMessage', () => {
   describe('tool_result', () => {
     it('updates tool result for tracked run', () => {
       mockChatStore.activeRuns = { r1: 's1' };
-      handleServerMessage({
-        type: 'tool_result', runId: 'r1', toolUseId: 'tu1', result: 'data', isError: false,
-      }, makeCtx());
-      expect(mockChatStore.updateToolCallResult).toHaveBeenCalledWith('r1', 'tu1', 'data', false, undefined);
+      handleServerMessage(
+        {
+          type: 'tool_result',
+          runId: 'r1',
+          toolUseId: 'tu1',
+          result: 'data',
+          isError: false,
+        },
+        makeCtx()
+      );
+      expect(mockChatStore.updateToolCallResult).toHaveBeenCalledWith(
+        'r1',
+        'tu1',
+        'data',
+        false,
+        undefined
+      );
     });
 
     it('passes completed tool effects through to the chat store', () => {
       mockChatStore.activeRuns = { r1: 's1' };
-      const effect = { kind: 'file_change' as const, files: [{ path: 'src/a.ts', changeKind: 'modify' as const, summary: '@@ diff' }] };
-      handleServerMessage({
-        type: 'tool_result', runId: 'r1', toolUseId: 'tu1', toolName: 'Edit', result: 'data', effect,
-      }, makeCtx());
-      expect(mockChatStore.updateToolCallResult).toHaveBeenCalledWith('r1', 'tu1', 'data', undefined, effect);
+      const effect = {
+        kind: 'file_change' as const,
+        files: [{ path: 'src/a.ts', changeKind: 'modify' as const, summary: '@@ diff' }],
+      };
+      handleServerMessage(
+        {
+          type: 'tool_result',
+          runId: 'r1',
+          toolUseId: 'tu1',
+          toolName: 'Edit',
+          result: 'data',
+          effect,
+        },
+        makeCtx()
+      );
+      expect(mockChatStore.updateToolCallResult).toHaveBeenCalledWith(
+        'r1',
+        'tu1',
+        'data',
+        undefined,
+        effect
+      );
     });
   });
 
   describe('tool_activity', () => {
     it('updates tool call activity', () => {
-      handleServerMessage({
-        type: 'tool_activity', runId: 'r1', toolUseId: 'tu1', content: 'Reading file...',
-      }, makeCtx());
-      expect(mockChatStore.updateToolCallActivity).toHaveBeenCalledWith('r1', 'tu1', 'Reading file...');
+      handleServerMessage(
+        {
+          type: 'tool_activity',
+          runId: 'r1',
+          toolUseId: 'tu1',
+          content: 'Reading file...',
+        },
+        makeCtx()
+      );
+      expect(mockChatStore.updateToolCallActivity).toHaveBeenCalledWith(
+        'r1',
+        'tu1',
+        'Reading file...'
+      );
     });
 
     it('skips when fields are missing', () => {
@@ -565,37 +684,49 @@ describe('handleServerMessage', () => {
   });
 
   it('handles permission_request', () => {
-    handleServerMessage({
-      type: 'permission_request', requestId: 'pr1', sessionId: 's1',
-      toolName: 'Bash', detail: 'ls', timeoutSeconds: 30,
-    }, makeCtx());
+    handleServerMessage(
+      {
+        type: 'permission_request',
+        requestId: 'pr1',
+        sessionId: 's1',
+        toolName: 'Bash',
+        detail: 'ls',
+        timeoutSeconds: 30,
+      },
+      makeCtx()
+    );
     expect(mockPermissionStore.setPendingRequest).toHaveBeenCalledWith(
       expect.objectContaining({ requestId: 'pr1', toolName: 'Bash', serverId: 'server-1' })
     );
   });
 
   it('handles interaction_prompt from provider_native', () => {
-    handleServerMessage({
-      type: 'interaction_prompt',
-      interactionId: 'q1',
-      sessionId: 's1',
-      source: 'provider_native',
-      createdAt: Date.now(),
-      title: 'Question',
-      fields: [{
-        id: 'question_0',
-        label: 'What framework?',
-        description: 'Framework',
-        type: 'select',
-        options: [{ value: 'React', label: 'React', description: 'A JS library' }],
-        allowCustomValue: true,
-        customValuePlaceholder: 'Other',
-      }],
-      submitLabel: 'Submit',
-      cancelLabel: 'Skip',
-      responseMode: 'prompt_answer',
-      variant: 'question',
-    }, makeCtx());
+    handleServerMessage(
+      {
+        type: 'interaction_prompt',
+        interactionId: 'q1',
+        sessionId: 's1',
+        source: 'provider_native',
+        createdAt: Date.now(),
+        title: 'Question',
+        fields: [
+          {
+            id: 'question_0',
+            label: 'What framework?',
+            description: 'Framework',
+            type: 'select',
+            options: [{ value: 'React', label: 'React', description: 'A JS library' }],
+            allowCustomValue: true,
+            customValuePlaceholder: 'Other',
+          },
+        ],
+        submitLabel: 'Submit',
+        cancelLabel: 'Skip',
+        responseMode: 'prompt_answer',
+        variant: 'question',
+      },
+      makeCtx()
+    );
     expect(mockPromptRequestStore.setPendingRequest).toHaveBeenCalledWith(
       expect.objectContaining({
         requestId: 'q1',
@@ -627,17 +758,20 @@ describe('handleServerMessage', () => {
   });
 
   it('shows toast when permission_auto_resolved includes redaction metadata', () => {
-    handleServerMessage({
-      type: 'permission_auto_resolved',
-      requestId: 'pr1',
-      sessionId: 's1',
-      behavior: 'approve',
-      metadata: {
-        payloadDisposition: 'send_with_redaction',
-        redactionCount: 2,
-        reviewedFileCount: 2,
+    handleServerMessage(
+      {
+        type: 'permission_auto_resolved',
+        requestId: 'pr1',
+        sessionId: 's1',
+        behavior: 'approve',
+        metadata: {
+          payloadDisposition: 'send_with_redaction',
+          redactionCount: 2,
+          reviewedFileCount: 2,
+        },
       },
-    }, makeCtx());
+      makeCtx()
+    );
 
     expect(useToastStore.getState().toasts[0]).toMatchObject({
       title: 'Permission auto-approved',
@@ -647,19 +781,22 @@ describe('handleServerMessage', () => {
   });
 
   it('stores ai_review_completed metadata and shows toast', () => {
-    handleServerMessage({
-      type: 'ai_review_completed',
-      requestId: 'pr2',
-      sessionId: 's1',
-      decision: 'uncertain',
-      reasoning: 'Need user input',
-      confidence: 0.42,
-      metadata: {
-        payloadDisposition: 'send_with_redaction',
-        redactionCount: 1,
-        reviewedFileCount: 1,
+    handleServerMessage(
+      {
+        type: 'ai_review_completed',
+        requestId: 'pr2',
+        sessionId: 's1',
+        decision: 'uncertain',
+        reasoning: 'Need user input',
+        confidence: 0.42,
+        metadata: {
+          payloadDisposition: 'send_with_redaction',
+          redactionCount: 1,
+          reviewedFileCount: 1,
+        },
       },
-    }, makeCtx());
+      makeCtx()
+    );
 
     expect(mockPermissionStore.aiReviewResults.pr2).toMatchObject({
       decision: 'uncertain',
@@ -676,18 +813,22 @@ describe('handleServerMessage', () => {
   });
 
   it('shows toast when ai_review_completed skips remote analysis for sensitive local material', () => {
-    handleServerMessage({
-      type: 'ai_review_completed',
-      requestId: 'pr3',
-      sessionId: 's1',
-      decision: 'uncertain',
-      reasoning: 'Remote AI review skipped because the request payload may contain sensitive local material',
-      confidence: 0,
-      metadata: {
-        payloadDisposition: 'do_not_send',
-        reviewedFileCount: 0,
+    handleServerMessage(
+      {
+        type: 'ai_review_completed',
+        requestId: 'pr3',
+        sessionId: 's1',
+        decision: 'uncertain',
+        reasoning:
+          'Remote AI review skipped because the request payload may contain sensitive local material',
+        confidence: 0,
+        metadata: {
+          payloadDisposition: 'do_not_send',
+          reviewedFileCount: 0,
+        },
       },
-    }, makeCtx());
+      makeCtx()
+    );
 
     expect(useToastStore.getState().toasts[0]).toMatchObject({
       title: 'AI review completed',
@@ -716,28 +857,34 @@ describe('handleServerMessage', () => {
   });
 
   it('does not create prompt route for non-provider interaction_prompt', () => {
-    handleServerMessage({
-      type: 'interaction_prompt',
-      interactionId: 'q2',
-      sessionId: 's1',
-      source: 'tool_call',
-      createdAt: Date.now(),
-      title: 'Question',
-      fields: [],
-      responseMode: 'none',
-    }, makeCtx());
+    handleServerMessage(
+      {
+        type: 'interaction_prompt',
+        interactionId: 'q2',
+        sessionId: 's1',
+        source: 'tool_call',
+        createdAt: Date.now(),
+        title: 'Question',
+        fields: [],
+        responseMode: 'none',
+      },
+      makeCtx()
+    );
     expect(mockPromptRequestStore.setPendingRequest).not.toHaveBeenCalledWith(
-      expect.objectContaining({ requestId: 'q2' }),
+      expect.objectContaining({ requestId: 'q2' })
     );
     expect(mockInteractionStore.upsertInteraction).toHaveBeenCalledWith(
-      expect.objectContaining({ interactionId: 'q2', source: 'tool_call' }),
+      expect.objectContaining({ interactionId: 'q2', source: 'tool_call' })
     );
   });
 
   describe('system_info', () => {
     it('sets system info for active server', () => {
       mockChatStore.activeRuns = { r1: 's1' };
-      handleServerMessage({ type: 'system_info', runId: 'r1', systemInfo: { version: '1.0' } }, makeCtx());
+      handleServerMessage(
+        { type: 'system_info', runId: 'r1', systemInfo: { version: '1.0' } },
+        makeCtx()
+      );
       expect(mockSessionConfigStore.setSystemInfo).toHaveBeenCalledWith('s1', { version: '1.0' });
     });
 
@@ -772,12 +919,15 @@ describe('handleServerMessage', () => {
         createdAt: 9999,
       });
 
-      handleServerMessage({
-        type: 'compaction_completed',
-        sessionId: 's1',
-        compactionId: 'c1',
-        tokensBefore: 4242,
-      }, makeCtx());
+      handleServerMessage(
+        {
+          type: 'compaction_completed',
+          sessionId: 's1',
+          compactionId: 'c1',
+          tokensBefore: 4242,
+        },
+        makeCtx()
+      );
 
       // The handler kicks off the fetch synchronously and appends on resolve.
       // Flush microtasks so we observe the appendMessage call.
@@ -785,30 +935,36 @@ describe('handleServerMessage', () => {
       await Promise.resolve();
 
       expect(mockGetSessionCompaction).toHaveBeenCalledWith('s1', 'c1');
-      expect(mockChatStore.addMessage).toHaveBeenCalledWith('s1', expect.objectContaining({
-        id: 'c1',
-        sessionId: 's1',
-        role: 'system',
-        content: '',
-        createdAt: 9999,
-        metadata: expect.objectContaining({
-          compactionMarker: expect.objectContaining({
-            compactionId: 'c1',
-            summary: 'rolled up summary',
-            tokensBefore: 4242,
-            source: 'manual',
-            customInstructions: 'focus on auth',
-            readFiles: ['/a.ts'],
-            modifiedFiles: ['/b.ts'],
-            createdAt: 9999,
+      expect(mockChatStore.addMessage).toHaveBeenCalledWith(
+        's1',
+        expect.objectContaining({
+          id: 'c1',
+          sessionId: 's1',
+          role: 'system',
+          content: '',
+          createdAt: 9999,
+          metadata: expect.objectContaining({
+            compactionMarker: expect.objectContaining({
+              compactionId: 'c1',
+              summary: 'rolled up summary',
+              tokensBefore: 4242,
+              source: 'manual',
+              customInstructions: 'focus on auth',
+              readFiles: ['/a.ts'],
+              modifiedFiles: ['/b.ts'],
+              createdAt: 9999,
+            }),
           }),
-        }),
-      }));
+        })
+      );
     });
 
     it('ignores the event when sessionId or compactionId is missing', () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      handleServerMessage({ type: 'compaction_completed', sessionId: '', compactionId: 'c1' } as any, makeCtx());
+      handleServerMessage(
+        { type: 'compaction_completed', sessionId: '', compactionId: 'c1' } as any,
+        makeCtx()
+      );
       expect(mockGetSessionCompaction).not.toHaveBeenCalled();
       expect(warn).toHaveBeenCalled();
       warn.mockRestore();
@@ -818,8 +974,14 @@ describe('handleServerMessage', () => {
   describe('compaction_failed', () => {
     it('sets a compaction notice when breaker is open', () => {
       handleServerMessage(
-        { type: 'compaction_failed', sessionId: 's1', reason: 'error: prompt_too_long', breakerOpen: true, nextRetryAtMs: 999 } as any,
-        makeCtx(),
+        {
+          type: 'compaction_failed',
+          sessionId: 's1',
+          reason: 'error: prompt_too_long',
+          breakerOpen: true,
+          nextRetryAtMs: 999,
+        } as any,
+        makeCtx()
       );
       const notice = mockSessionConfigStore.compactionNotice['s1'];
       expect(notice).toBeTruthy();
@@ -828,17 +990,26 @@ describe('handleServerMessage', () => {
     });
 
     it('ignores events missing sessionId', () => {
-      handleServerMessage({ type: 'compaction_failed', sessionId: '', reason: 'x', breakerOpen: false } as any, makeCtx());
+      handleServerMessage(
+        { type: 'compaction_failed', sessionId: '', reason: 'x', breakerOpen: false } as any,
+        makeCtx()
+      );
       expect(Object.keys(mockSessionConfigStore.compactionNotice)).toHaveLength(0);
     });
   });
 
   describe('task_notification', () => {
     it('adds new background task', () => {
-      handleServerMessage({
-        type: 'task_notification', sessionId: 's1', taskId: 't1',
-        status: 'started', message: 'Working...',
-      }, makeCtx());
+      handleServerMessage(
+        {
+          type: 'task_notification',
+          sessionId: 's1',
+          taskId: 't1',
+          status: 'started',
+          message: 'Working...',
+        },
+        makeCtx()
+      );
       expect(mockBackgroundTaskStore.addTask).toHaveBeenCalledWith(
         expect.objectContaining({
           id: 't1',
@@ -852,13 +1023,22 @@ describe('handleServerMessage', () => {
 
     it('updates existing background task', () => {
       mockBackgroundTaskStore.tasks = { t1: { id: 't1' } };
-      handleServerMessage({
-        type: 'task_notification', sessionId: 's1', taskId: 't1',
-        status: 'completed', message: 'Done',
-      }, makeCtx());
-      expect(mockBackgroundTaskStore.updateTask).toHaveBeenCalledWith('t1', expect.objectContaining({
-        status: 'completed',
-      }));
+      handleServerMessage(
+        {
+          type: 'task_notification',
+          sessionId: 's1',
+          taskId: 't1',
+          status: 'completed',
+          message: 'Done',
+        },
+        makeCtx()
+      );
+      expect(mockBackgroundTaskStore.updateTask).toHaveBeenCalledWith(
+        't1',
+        expect.objectContaining({
+          status: 'completed',
+        })
+      );
     });
 
     it('preserves existing pid fields when update omits them', () => {
@@ -874,19 +1054,25 @@ describe('handleServerMessage', () => {
         },
       };
 
-      handleServerMessage({
-        type: 'task_notification',
-        sessionId: 's1',
-        taskId: 't1',
-        status: 'in_progress',
-        message: 'Still working...',
-      }, makeCtx());
+      handleServerMessage(
+        {
+          type: 'task_notification',
+          sessionId: 's1',
+          taskId: 't1',
+          status: 'in_progress',
+          message: 'Still working...',
+        },
+        makeCtx()
+      );
 
-      expect(mockBackgroundTaskStore.updateTask).toHaveBeenCalledWith('t1', expect.objectContaining({
-        cliPid: 123,
-        taskRootPid: 456,
-        taskCommand: 'npm test',
-      }));
+      expect(mockBackgroundTaskStore.updateTask).toHaveBeenCalledWith(
+        't1',
+        expect.objectContaining({
+          cliPid: 123,
+          taskRootPid: 456,
+          taskCommand: 'npm test',
+        })
+      );
     });
 
     it('skips if missing sessionId or taskId', () => {
@@ -897,12 +1083,15 @@ describe('handleServerMessage', () => {
 
   describe('background_task_update', () => {
     it('marks background runs as non-stoppable', () => {
-      handleServerMessage({
-        type: 'background_task_update',
-        sessionId: 'background-session',
-        parentSessionId: 's1',
-        status: 'running',
-      }, makeCtx());
+      handleServerMessage(
+        {
+          type: 'background_task_update',
+          sessionId: 'background-session',
+          parentSessionId: 's1',
+          status: 'running',
+        },
+        makeCtx()
+      );
 
       expect(mockBackgroundTaskStore.addTask).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -938,26 +1127,41 @@ describe('handleServerMessage', () => {
   describe('sessions_created', () => {
     it('adds new session', () => {
       mockProjectStore.sessions = [];
-      handleServerMessage({
-        type: 'sessions_created', session: { id: 's-new', name: 'New' },
-      }, makeCtx());
+      handleServerMessage(
+        {
+          type: 'sessions_created',
+          session: { id: 's-new', name: 'New' },
+        },
+        makeCtx()
+      );
       expect(mockProjectStore.addSession).toHaveBeenCalledWith({ id: 's-new', name: 'New' });
     });
 
     it('skips duplicate session', () => {
       mockProjectStore.sessions = [{ id: 's1' }] as any;
-      handleServerMessage({
-        type: 'sessions_created', session: { id: 's1', name: 'Dup' },
-      }, makeCtx());
+      handleServerMessage(
+        {
+          type: 'sessions_created',
+          session: { id: 's1', name: 'Dup' },
+        },
+        makeCtx()
+      );
       expect(mockProjectStore.addSession).not.toHaveBeenCalled();
     });
   });
 
   it('handles sessions_updated', () => {
-    handleServerMessage({
-      type: 'sessions_updated', session: { id: 's1', name: 'Updated' },
-    }, makeCtx());
-    expect(mockProjectStore.updateSession).toHaveBeenCalledWith('s1', { id: 's1', name: 'Updated' });
+    handleServerMessage(
+      {
+        type: 'sessions_updated',
+        session: { id: 's1', name: 'Updated' },
+      },
+      makeCtx()
+    );
+    expect(mockProjectStore.updateSession).toHaveBeenCalledWith('s1', {
+      id: 's1',
+      name: 'Updated',
+    });
   });
 
   it('handles local_pr_update', () => {
@@ -1006,17 +1210,23 @@ describe('handleServerMessage', () => {
     });
 
     it('adds missing runs from heartbeat', () => {
-      handleServerMessage(makeHeartbeat({
-        activeRuns: [{ runId: 'hb-1', sessionId: 's1', sessionType: 'foreground' }],
-      }), makeCtx());
+      handleServerMessage(
+        makeHeartbeat({
+          activeRuns: [{ runId: 'hb-1', sessionId: 's1', sessionType: 'foreground' }],
+        }),
+        makeCtx()
+      );
       expect(mockChatStore.startRun).toHaveBeenCalledWith('hb-1', 's1', false);
     });
 
     it('skips already known runs', () => {
       mockChatStore.activeRuns = { r1: 's1' };
-      handleServerMessage(makeHeartbeat({
-        activeRuns: [{ runId: 'r1', sessionId: 's1' }],
-      }), makeCtx());
+      handleServerMessage(
+        makeHeartbeat({
+          activeRuns: [{ runId: 'r1', sessionId: 's1' }],
+        }),
+        makeCtx()
+      );
       expect(mockChatStore.startRun).not.toHaveBeenCalled();
     });
 
@@ -1039,57 +1249,95 @@ describe('handleServerMessage', () => {
     it('ignores stale heartbeat resurrection after terminal run event', () => {
       const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-      handleServerMessage({ type: 'run_completed', runId: 'r1', sessionId: 's1', seq: 10 }, makeCtx());
-      handleServerMessage(makeHeartbeat({
-        activeRuns: [{ runId: 'r1', sessionId: 's1', sessionType: 'foreground', lastSeq: 9 }],
-      }), makeCtx());
+      handleServerMessage(
+        { type: 'run_completed', runId: 'r1', sessionId: 's1', seq: 10 },
+        makeCtx()
+      );
+      handleServerMessage(
+        makeHeartbeat({
+          activeRuns: [{ runId: 'r1', sessionId: 's1', sessionType: 'foreground', lastSeq: 9 }],
+        }),
+        makeCtx()
+      );
 
       expect(mockChatStore.startRun).not.toHaveBeenCalled();
       logSpy.mockRestore();
     });
 
     it('triggers tail recovery when run event seq has a gap', () => {
-      handleServerMessage({ type: 'delta', runId: 'gap-run', sessionId: 's1', seq: 1, content: 'a' }, makeCtx());
-      handleServerMessage({ type: 'delta', runId: 'gap-run', sessionId: 's1', seq: 3, content: 'c' }, makeCtx());
+      handleServerMessage(
+        { type: 'delta', runId: 'gap-run', sessionId: 's1', seq: 1, content: 'a' },
+        makeCtx()
+      );
+      handleServerMessage(
+        { type: 'delta', runId: 'gap-run', sessionId: 's1', seq: 3, content: 'c' },
+        makeCtx()
+      );
 
       expect(mockRecoverCurrentSessionTail).toHaveBeenCalledWith('server-1', 's1');
     });
 
     it('updates run health info', () => {
       mockChatStore.activeRuns = { r1: 's1' };
-      handleServerMessage(makeHeartbeat({
-        activeRuns: [{
-          runId: 'r1', sessionId: 's1', startedAt: 1000,
-          lastActivityAt: 2000, health: 'healthy',
-        }],
-      }), makeCtx());
-      expect(mockChatStore.updateRunHealth).toHaveBeenCalledWith('r1', expect.objectContaining({
-        sessionId: 's1', health: 'healthy',
-      }));
+      handleServerMessage(
+        makeHeartbeat({
+          activeRuns: [
+            {
+              runId: 'r1',
+              sessionId: 's1',
+              startedAt: 1000,
+              lastActivityAt: 2000,
+              health: 'healthy',
+            },
+          ],
+        }),
+        makeCtx()
+      );
+      expect(mockChatStore.updateRunHealth).toHaveBeenCalledWith(
+        'r1',
+        expect.objectContaining({
+          sessionId: 's1',
+          health: 'healthy',
+        })
+      );
     });
 
     it('reconciles permissions', () => {
-      handleServerMessage(makeHeartbeat({
-        pendingPermissions: [{
-          requestId: 'pr1', sessionId: 's1', toolName: 'Bash',
-        }],
-      }), makeCtx());
+      handleServerMessage(
+        makeHeartbeat({
+          pendingPermissions: [
+            {
+              requestId: 'pr1',
+              sessionId: 's1',
+              toolName: 'Bash',
+            },
+          ],
+        }),
+        makeCtx()
+      );
       expect(mockPermissionStore.clearStaleRequests).toHaveBeenCalled();
       expect(mockPermissionStore.setPendingRequest).toHaveBeenCalled();
     });
 
     it('reconciles questions', () => {
-      handleServerMessage(makeHeartbeat({
-        pendingQuestions: [{
-          requestId: 'q1',
-          sessionId: 's1',
-          questions: [{
-            question: 'Confirm?',
-            header: 'Question',
-            options: [{ label: 'Yes', description: 'Proceed' }],
-          }],
-        }],
-      }), makeCtx());
+      handleServerMessage(
+        makeHeartbeat({
+          pendingQuestions: [
+            {
+              requestId: 'q1',
+              sessionId: 's1',
+              questions: [
+                {
+                  question: 'Confirm?',
+                  header: 'Question',
+                  options: [{ label: 'Yes', description: 'Proceed' }],
+                },
+              ],
+            },
+          ],
+        }),
+        makeCtx()
+      );
       expect(mockPromptRequestStore.clearStaleRequests).toHaveBeenCalled();
       expect(mockPromptRequestStore.setPendingRequest).toHaveBeenCalled();
       expect(mockInteractionStore.upsertInteraction).toHaveBeenCalledWith(
@@ -1102,66 +1350,88 @@ describe('handleServerMessage', () => {
           variant: 'question',
           submitLabel: 'Submit',
           cancelLabel: 'Skip',
-          fields: [expect.objectContaining({
-            id: 'question_0',
-            label: 'Confirm?',
-            description: 'Question',
-            type: 'select',
-            placeholder: 'Type your answer...',
-            allowCustomValue: true,
-            customValuePlaceholder: 'Other',
-            options: [{ value: 'Yes', label: 'Yes', description: 'Proceed' }],
-          })],
-        }),
+          fields: [
+            expect.objectContaining({
+              id: 'question_0',
+              label: 'Confirm?',
+              description: 'Question',
+              type: 'select',
+              placeholder: 'Type your answer...',
+              allowCustomValue: true,
+              customValuePlaceholder: 'Other',
+              options: [{ value: 'Yes', label: 'Yes', description: 'Proceed' }],
+            }),
+          ],
+        })
       );
     });
 
     it('does not recreate an existing interaction from heartbeat replay', () => {
       mockInteractionStore.has.mockReturnValue(true);
 
-      handleServerMessage(makeHeartbeat({
-        pendingQuestions: [{
-          requestId: 'q-existing',
-          sessionId: 's1',
-          questions: [{
-            question: 'Keep existing prompt?',
-            header: 'Existing',
-            options: [{ label: 'Yes', description: 'Keep it' }],
-          }],
-        }],
-      }), makeCtx({ backendId: 'b1' }));
+      handleServerMessage(
+        makeHeartbeat({
+          pendingQuestions: [
+            {
+              requestId: 'q-existing',
+              sessionId: 's1',
+              questions: [
+                {
+                  question: 'Keep existing prompt?',
+                  header: 'Existing',
+                  options: [{ label: 'Yes', description: 'Keep it' }],
+                },
+              ],
+            },
+          ],
+        }),
+        makeCtx({ backendId: 'b1' })
+      );
 
       expect(mockPromptRequestStore.setPendingRequest).toHaveBeenCalledWith(
         expect.objectContaining({
           requestId: 'q-existing',
           sessionId: 's1',
           serverId: 'server-1',
-        }),
+        })
       );
       expect(mockInteractionStore.upsertInteraction).not.toHaveBeenCalled();
     });
 
     it('gateway: reconciles active sessions', () => {
-      handleServerMessage(makeHeartbeat({
-        activeRuns: [{ runId: 'hb-2', sessionId: 's1', sessionType: 'foreground' }],
-      }), makeCtx({ backendId: 'b1' }));
+      handleServerMessage(
+        makeHeartbeat({
+          activeRuns: [{ runId: 'hb-2', sessionId: 's1', sessionType: 'foreground' }],
+        }),
+        makeCtx({ backendId: 'b1' })
+      );
       expect(mockSessionsStore.reconcileActiveStatus).toHaveBeenCalled();
     });
 
     it('direct: sets active sessions for local backend', () => {
-      handleServerMessage(makeHeartbeat({
-        activeRuns: [{ runId: 'hb-3', sessionId: 's1' }],
-      }), makeCtx());
+      handleServerMessage(
+        makeHeartbeat({
+          activeRuns: [{ runId: 'hb-3', sessionId: 's1' }],
+        }),
+        makeCtx()
+      );
       expect(mockSessionsStore.setActiveSessionsForBackend).toHaveBeenCalled();
     });
 
     it('sets systemInfo from heartbeat runs', () => {
       mockChatStore.activeRuns = { r1: 's1' };
-      handleServerMessage(makeHeartbeat({
-        activeRuns: [{
-          runId: 'r1', sessionId: 's1', systemInfo: { version: '2.0' },
-        }],
-      }), makeCtx());
+      handleServerMessage(
+        makeHeartbeat({
+          activeRuns: [
+            {
+              runId: 'r1',
+              sessionId: 's1',
+              systemInfo: { version: '2.0' },
+            },
+          ],
+        }),
+        makeCtx()
+      );
       expect(mockSessionConfigStore.setSystemInfo).toHaveBeenCalledWith('s1', { version: '2.0' });
     });
 
@@ -1199,9 +1469,12 @@ describe('handleServerMessage', () => {
         },
       };
 
-      handleServerMessage(makeHeartbeat({
-        activeRuns: [{ runId: 'r-bg', sessionId: 'bg-1', sessionType: 'background' }],
-      }), makeCtx());
+      handleServerMessage(
+        makeHeartbeat({
+          activeRuns: [{ runId: 'r-bg', sessionId: 'bg-1', sessionType: 'background' }],
+        }),
+        makeCtx()
+      );
 
       expect(mockBackgroundTaskStore.updateTask).not.toHaveBeenCalledWith(
         'background:bg-1',
@@ -1212,14 +1485,19 @@ describe('handleServerMessage', () => {
     it('replaces only the current backend project subset when project versions change', async () => {
       mockGetProjectsForBackend.mockResolvedValue([{ id: 'p1', name: 'Project 1' }]);
 
-      handleServerMessage(makeHeartbeat({
-        versions: { projects: 2 },
-      }), makeCtx({ serverId: 'gw:remote-1', backendId: 'remote-1' }));
+      handleServerMessage(
+        makeHeartbeat({
+          versions: { projects: 2 },
+        }),
+        makeCtx({ serverId: 'gw:remote-1', backendId: 'remote-1' })
+      );
 
       await Promise.resolve();
 
       expect(mockGetProjectsForBackend).toHaveBeenCalledWith('remote-1');
-      expect(mockProjectStore.replaceProjectsForBackend).toHaveBeenCalledWith('remote-1', [{ id: 'p1', name: 'Project 1' }]);
+      expect(mockProjectStore.replaceProjectsForBackend).toHaveBeenCalledWith('remote-1', [
+        { id: 'p1', name: 'Project 1' },
+      ]);
     });
 
     it('retries project reconciliation after a failed fetch because the cached version is not advanced', async () => {
@@ -1239,16 +1517,19 @@ describe('handleServerMessage', () => {
       await Promise.resolve();
 
       expect(mockGetProjectsForBackend).toHaveBeenCalledTimes(2);
-      expect(mockProjectStore.replaceProjectsForBackend).toHaveBeenCalledWith('remote-2', [{ id: 'p2', name: 'Project 2' }]);
+      expect(mockProjectStore.replaceProjectsForBackend).toHaveBeenCalledWith('remote-2', [
+        { id: 'p2', name: 'Project 2' },
+      ]);
       errorSpy.mockRestore();
     });
 
     it('does not issue duplicate project fetches while the same version fetch is still in flight', async () => {
       let resolveFetch: ((projects: Array<{ id: string; name: string }>) => void) | undefined;
       mockGetProjectsForBackend.mockImplementation(
-        () => new Promise((resolve) => {
-          resolveFetch = resolve;
-        })
+        () =>
+          new Promise(resolve => {
+            resolveFetch = resolve;
+          })
       );
 
       const ctx = makeCtx({ serverId: 'gw:remote-3', backendId: 'remote-3' });
@@ -1264,15 +1545,27 @@ describe('handleServerMessage', () => {
       await Promise.resolve();
       await Promise.resolve();
 
-      expect(mockProjectStore.replaceProjectsForBackend).toHaveBeenCalledWith('remote-3', [{ id: 'p3', name: 'Project 3' }]);
+      expect(mockProjectStore.replaceProjectsForBackend).toHaveBeenCalledWith('remote-3', [
+        { id: 'p3', name: 'Project 3' },
+      ]);
     });
 
     it('ignores stale project fetch results that resolve after a newer version has already applied', async () => {
       let resolveV4: ((projects: Array<{ id: string; name: string }>) => void) | undefined;
       let resolveV5: ((projects: Array<{ id: string; name: string }>) => void) | undefined;
       mockGetProjectsForBackend
-        .mockImplementationOnce(() => new Promise((resolve) => { resolveV4 = resolve; }))
-        .mockImplementationOnce(() => new Promise((resolve) => { resolveV5 = resolve; }));
+        .mockImplementationOnce(
+          () =>
+            new Promise(resolve => {
+              resolveV4 = resolve;
+            })
+        )
+        .mockImplementationOnce(
+          () =>
+            new Promise(resolve => {
+              resolveV5 = resolve;
+            })
+        );
 
       const ctx = makeCtx({ serverId: 'gw:remote-4', backendId: 'remote-4' });
       handleServerMessage(makeHeartbeat({ versions: { projects: 4 } }), ctx);
@@ -1286,15 +1579,27 @@ describe('handleServerMessage', () => {
       await Promise.resolve();
 
       expect(mockProjectStore.replaceProjectsForBackend).toHaveBeenCalledTimes(1);
-      expect(mockProjectStore.replaceProjectsForBackend).toHaveBeenCalledWith('remote-4', [{ id: 'p5', name: 'Project 5' }]);
+      expect(mockProjectStore.replaceProjectsForBackend).toHaveBeenCalledWith('remote-4', [
+        { id: 'p5', name: 'Project 5' },
+      ]);
     });
 
     it('ignores stale project fetch results from a previous disconnected generation even at the same version', async () => {
       let resolveOld: ((projects: Array<{ id: string; name: string }>) => void) | undefined;
       let resolveNew: ((projects: Array<{ id: string; name: string }>) => void) | undefined;
       mockGetProjectsForBackend
-        .mockImplementationOnce(() => new Promise((resolve) => { resolveOld = resolve; }))
-        .mockImplementationOnce(() => new Promise((resolve) => { resolveNew = resolve; }));
+        .mockImplementationOnce(
+          () =>
+            new Promise(resolve => {
+              resolveOld = resolve;
+            })
+        )
+        .mockImplementationOnce(
+          () =>
+            new Promise(resolve => {
+              resolveNew = resolve;
+            })
+        );
 
       const ctx = makeCtx({ serverId: 'remote-5', backendId: 'remote-5' });
       const heartbeat = makeHeartbeat({ versions: { projects: 6 } });
@@ -1311,7 +1616,9 @@ describe('handleServerMessage', () => {
       await Promise.resolve();
 
       expect(mockProjectStore.replaceProjectsForBackend).toHaveBeenCalledTimes(1);
-      expect(mockProjectStore.replaceProjectsForBackend).toHaveBeenCalledWith('remote-5', [{ id: 'p6-new', name: 'Project 6 New' }]);
+      expect(mockProjectStore.replaceProjectsForBackend).toHaveBeenCalledWith('remote-5', [
+        { id: 'p6-new', name: 'Project 6 New' },
+      ]);
     });
   });
 
@@ -1321,19 +1628,35 @@ describe('handleServerMessage', () => {
 
   describe('file_push', () => {
     it('adds message and file push item', () => {
-      handleServerMessage({
-        type: 'file_push', sessionId: 's1', fileId: 'f1', fileName: 'test.txt',
-        mimeType: 'text/plain', fileSize: 100, description: 'A file',
-      }, makeCtx());
+      handleServerMessage(
+        {
+          type: 'file_push',
+          sessionId: 's1',
+          fileId: 'f1',
+          fileName: 'test.txt',
+          mimeType: 'text/plain',
+          fileSize: 100,
+          description: 'A file',
+        },
+        makeCtx()
+      );
       expect(mockChatStore.addMessage).toHaveBeenCalled();
       expect(mockFilePushStore.addItem).toHaveBeenCalled();
     });
 
     it('auto-downloads when autoDownload is set', () => {
-      handleServerMessage({
-        type: 'file_push', sessionId: 's1', fileId: 'f1', fileName: 'test.txt',
-        mimeType: 'text/plain', fileSize: 100, autoDownload: true,
-      }, makeCtx());
+      handleServerMessage(
+        {
+          type: 'file_push',
+          sessionId: 's1',
+          fileId: 'f1',
+          fileName: 'test.txt',
+          mimeType: 'text/plain',
+          fileSize: 100,
+          autoDownload: true,
+        },
+        makeCtx()
+      );
       expect(downloadPushedFile).toHaveBeenCalledWith('f1');
     });
   });
@@ -1347,26 +1670,37 @@ describe('handleServerMessage', () => {
 
   describe('plugin messages', () => {
     it('handles plugin_state', () => {
-      handleServerMessage({
-        type: 'plugin_state',
-        plugins: [{ id: 'p1', name: 'Test', version: '1.0', status: 'active', enabled: true }],
-      }, makeCtx());
+      handleServerMessage(
+        {
+          type: 'plugin_state',
+          plugins: [{ id: 'p1', name: 'Test', version: '1.0', status: 'active', enabled: true }],
+        },
+        makeCtx()
+      );
       expect(mockPluginStore.setPlugins).toHaveBeenCalled();
     });
 
     it('handles plugin_permission_request', () => {
-      handleServerMessage({
-        type: 'plugin_permission_request',
-        pluginId: 'p1', pluginName: 'Test', permissions: ['read'],
-      }, makeCtx());
+      handleServerMessage(
+        {
+          type: 'plugin_permission_request',
+          pluginId: 'p1',
+          pluginName: 'Test',
+          permissions: ['read'],
+        },
+        makeCtx()
+      );
       expect(mockPluginStore.setPendingPermissionRequest).toHaveBeenCalled();
     });
 
     it('handles plugin_notification', async () => {
-      handleServerMessage({ type: 'plugin_notification', pluginId: 'p1', title: 'Hello', body: 'World' } as any, makeCtx());
+      handleServerMessage(
+        { type: 'plugin_notification', pluginId: 'p1', title: 'Hello', body: 'World' } as any,
+        makeCtx()
+      );
       await Promise.resolve();
       await Promise.resolve();
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise(resolve => setTimeout(resolve, 0));
       expect(useNotificationFeedStore.getState().items[0]).toMatchObject({
         ownerBackendId: 'server-1',
         title: 'Hello',
@@ -1383,11 +1717,11 @@ describe('handleServerMessage', () => {
     it('canonicalizes gateway-prefixed owner backend ids for plugin notifications', async () => {
       handleServerMessage(
         { type: 'plugin_notification', pluginId: 'p1', title: 'Hello', body: 'World' } as any,
-        makeCtx({ serverId: 'gw:backend-1', backendId: null }),
+        makeCtx({ serverId: 'gw:backend-1', backendId: null })
       );
       await Promise.resolve();
       await Promise.resolve();
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise(resolve => setTimeout(resolve, 0));
 
       expect(useNotificationFeedStore.getState().items[0]).toMatchObject({
         ownerBackendId: 'backend-1',
@@ -1395,17 +1729,30 @@ describe('handleServerMessage', () => {
     });
 
     it('handles plugin_panel_registered', () => {
-      handleServerMessage({
-        type: 'plugin_panel_registered',
-        panelId: 'pan1', pluginId: 'p1', label: 'Panel', icon: 'icon', iframeUrl: 'http://...', order: 1,
-      }, makeCtx());
+      handleServerMessage(
+        {
+          type: 'plugin_panel_registered',
+          panelId: 'pan1',
+          pluginId: 'p1',
+          label: 'Panel',
+          icon: 'icon',
+          iframeUrl: 'http://...',
+          order: 1,
+        },
+        makeCtx()
+      );
       expect(mockPluginStore.registerPanel).toHaveBeenCalled();
     });
 
     it('handles plugin_panel_unregistered', () => {
-      handleServerMessage({
-        type: 'plugin_panel_unregistered', pluginId: 'p1', panelId: 'pan1',
-      }, makeCtx());
+      handleServerMessage(
+        {
+          type: 'plugin_panel_unregistered',
+          pluginId: 'p1',
+          panelId: 'pan1',
+        },
+        makeCtx()
+      );
       expect(mockPluginStore.clearPluginExtensions).toHaveBeenCalledWith('p1');
     });
 
@@ -1418,18 +1765,29 @@ describe('handleServerMessage', () => {
       mockGetEffectivePlacement.mockReturnValueOnce('right');
       mockPluginStore.panels = [{ id: 'pan1', openMode: 'shared' }];
       mockProjectStore.selectedSessionId = 'current-session';
+      mockSelectionStore.selectedSessionId = 'current-session';
       mockProjectStore.sessions = [{ id: 'current-session', projectId: 'p1' }];
       handleServerMessage({ type: 'plugin_show_panel', panelId: 'pan1' }, makeCtx());
-      expect(mockOpenToolInWorkspace).toHaveBeenCalledWith('current-session', 'pan1', expect.any(Object));
+      expect(mockOpenToolInWorkspace).toHaveBeenCalledWith(
+        'current-session',
+        'pan1',
+        expect.any(Object)
+      );
       expect(mockBottomPanelStore.setActiveTab).not.toHaveBeenCalledWith('pan1');
     });
 
     it('registers plugin panel regardless of viewport (platform filtering is in BottomPanel)', () => {
       vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as any);
-      handleServerMessage({
-        type: 'plugin_panel_registered', panelId: 'pan1', pluginId: 'p1',
-        label: 'Test', icon: 'test',
-      }, makeCtx());
+      handleServerMessage(
+        {
+          type: 'plugin_panel_registered',
+          panelId: 'pan1',
+          pluginId: 'p1',
+          label: 'Test',
+          icon: 'test',
+        },
+        makeCtx()
+      );
       expect(mockPluginStore.registerPanel).toHaveBeenCalled();
     });
   });
@@ -1438,38 +1796,54 @@ describe('handleServerMessage', () => {
     it('dispatching run_retrying calls updateRunRetryStatus with expected fields', () => {
       mockChatStore.activeRuns = { r1: 's1' };
       const receivedAtBefore = Date.now();
-      handleServerMessage({
-        type: 'run_retrying',
-        runId: 'r1',
-        sessionId: 's1',
-        attempt: 2,
-        maxAttempts: 5,
-        delayMs: 1000,
-        status: 'network',
-      }, makeCtx());
-      expect(mockChatStore.updateRunRetryStatus).toHaveBeenCalledWith('r1', expect.objectContaining({
-        attempt: 2,
-        maxAttempts: 5,
-        delayMs: 1000,
-        status: 'network',
-        sessionId: 's1',
-        receivedAt: expect.any(Number),
-      }));
+      handleServerMessage(
+        {
+          type: 'run_retrying',
+          runId: 'r1',
+          sessionId: 's1',
+          attempt: 2,
+          maxAttempts: 5,
+          delayMs: 1000,
+          status: 'network',
+        },
+        makeCtx()
+      );
+      expect(mockChatStore.updateRunRetryStatus).toHaveBeenCalledWith(
+        'r1',
+        expect.objectContaining({
+          attempt: 2,
+          maxAttempts: 5,
+          delayMs: 1000,
+          status: 'network',
+          sessionId: 's1',
+          receivedAt: expect.any(Number),
+        })
+      );
       const { receivedAt } = mockChatStore.updateRunRetryStatus.mock.calls[0][1];
       expect(receivedAt).toBeGreaterThanOrEqual(receivedAtBefore);
     });
 
     it('dispatching a delta for a run clears the retry banner', () => {
       mockChatStore.activeRuns = { r1: 's1' };
-      handleServerMessage({ type: 'delta', sessionId: 's1', runId: 'r1', content: 'hi' }, makeCtx());
+      handleServerMessage(
+        { type: 'delta', sessionId: 's1', runId: 'r1', content: 'hi' },
+        makeCtx()
+      );
       expect(mockChatStore.clearRunRetryStatus).toHaveBeenCalledWith('r1');
     });
 
     it('dispatching a tool_use for a run clears the retry banner', () => {
       mockChatStore.activeRuns = { r1: 's1' };
-      handleServerMessage({
-        type: 'tool_use', runId: 'r1', toolUseId: 'tu1', toolName: 'Read', toolInput: {},
-      }, makeCtx());
+      handleServerMessage(
+        {
+          type: 'tool_use',
+          runId: 'r1',
+          toolUseId: 'tu1',
+          toolName: 'Read',
+          toolInput: {},
+        },
+        makeCtx()
+      );
       expect(mockChatStore.clearRunRetryStatus).toHaveBeenCalledWith('r1');
     });
   });
@@ -1483,11 +1857,14 @@ describe('handleServerMessage', () => {
 
   it('unwraps correlation envelope', () => {
     mockChatStore.activeRuns = { r1: 's1' };
-    handleServerMessage({
-      type: 'delta',
-      payload: { runId: 'r1', content: 'wrapped', sessionId: 's1' },
-      metadata: { requestId: 'req-1' },
-    }, makeCtx());
+    handleServerMessage(
+      {
+        type: 'delta',
+        payload: { runId: 'r1', content: 'wrapped', sessionId: 's1' },
+        metadata: { requestId: 'req-1' },
+      },
+      makeCtx()
+    );
     expect(mockChatStore.appendToLastMessage).toHaveBeenCalledWith('s1', 'wrapped');
   });
 });

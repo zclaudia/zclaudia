@@ -8,8 +8,15 @@
 import type { WorkflowNodeDef } from '@zclaudia/shared/features/workflows';
 import type { AIReviewConfig } from '@zclaudia/shared/interaction/permissions';
 import type { UserHookDefinition } from '@zclaudia/shared/interaction/user-hooks';
-export type { AgentLoopPermissionCallback, AgentLoopPermissionDecision, AgentLoopRunnerPort } from '../../agent-loop/index.js';
-import type { AgentLoopPermissionCallback, AgentLoopPermissionDecision } from '../../agent-loop/index.js';
+export type {
+  AgentLoopPermissionCallback,
+  AgentLoopPermissionDecision,
+  AgentLoopRunnerPort,
+} from '../../agent-loop/index.js';
+import type {
+  AgentLoopPermissionCallback,
+  AgentLoopPermissionDecision,
+} from '../../agent-loop/index.js';
 
 export interface StepResult {
   status: 'completed' | 'failed' | 'skipped';
@@ -35,7 +42,7 @@ export interface StepExecutorPort {
   execute(
     node: WorkflowNodeDef,
     config: Record<string, unknown>,
-    ctx: StepContext,
+    ctx: StepContext
   ): Promise<StepResult>;
 }
 
@@ -113,7 +120,7 @@ export interface PermissionBridgePort {
   register(
     requestId: string,
     resolve: (decision: AgentLoopPermissionDecision) => void,
-    context: PermissionEscalationContext,
+    context: PermissionEscalationContext
   ): void;
   setWorkflowRunId(requestId: string, workflowRunId: string): void;
   resolvePermission(requestId: string, decision: 'allow' | 'deny', reason?: string): boolean;

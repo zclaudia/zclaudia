@@ -8,16 +8,25 @@ interface LeakedProcessCleanupSectionProps {
   sendMessage: (msg: ClientMessage) => void;
 }
 
-export function LeakedProcessCleanupSection({ isConnected, sendMessage }: LeakedProcessCleanupSectionProps) {
+export function LeakedProcessCleanupSection({
+  isConnected,
+  sendMessage,
+}: LeakedProcessCleanupSectionProps) {
   const [leakCleanupRunning, setLeakCleanupRunning] = useState(false);
-  const [leakCleanupResult, setLeakCleanupResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [leakCleanupResult, setLeakCleanupResult] = useState<{
+    ok: boolean;
+    message: string;
+  } | null>(null);
 
-  const cleanupResult = useProcessMonitorStore((state) => state.lastCleanupResult);
-  const clearCleanupResult = useProcessMonitorStore((state) => state.clearCleanupResult);
+  const cleanupResult = useProcessMonitorStore(state => state.lastCleanupResult);
+  const clearCleanupResult = useProcessMonitorStore(state => state.clearCleanupResult);
 
   const handleLeakCleanup = useCallback(() => {
     if (!isConnected) {
-      setLeakCleanupResult({ ok: false, message: 'Connect to the server before running process cleanup.' });
+      setLeakCleanupResult({
+        ok: false,
+        message: 'Connect to the server before running process cleanup.',
+      });
       return;
     }
     setLeakCleanupRunning(true);
@@ -56,9 +65,10 @@ export function LeakedProcessCleanupSection({ isConnected, sendMessage }: Leaked
 
     setLeakCleanupResult({
       ok: cleanupResult.killedCount > 0,
-      message: cleanupResult.killedCount > 0
-        ? `Cleanup completed. Terminated ${cleanupResult.killedCount} of ${cleanupResult.leakedCount} leaked process(es).`
-        : `Cleanup completed, but none of the ${cleanupResult.leakedCount} leaked process(es) could be terminated.`,
+      message:
+        cleanupResult.killedCount > 0
+          ? `Cleanup completed. Terminated ${cleanupResult.killedCount} of ${cleanupResult.leakedCount} leaked process(es).`
+          : `Cleanup completed, but none of the ${cleanupResult.leakedCount} leaked process(es) could be terminated.`,
     });
   }, [cleanupResult]);
 

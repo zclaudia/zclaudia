@@ -139,7 +139,9 @@ describe('TerminalPanel', () => {
 describe('TerminalActions', () => {
   it('renders a reload button', () => {
     const { container } = render(<TerminalActions projectId="proj-1" />);
-    const button = Array.from(container.querySelectorAll('button')).find((el) => el.title === 'Reload terminal');
+    const button = Array.from(container.querySelectorAll('button')).find(
+      el => el.title === 'Reload terminal'
+    );
     expect(button).toBeTruthy();
     expect(button?.title).toBe('Reload terminal');
   });
@@ -172,7 +174,9 @@ describe('TerminalActions', () => {
     });
 
     const { container } = render(<TerminalActions projectId="proj-1" />);
-    const button = Array.from(container.querySelectorAll('button')).find((el) => el.title === 'Reload terminal') as HTMLButtonElement;
+    const button = Array.from(container.querySelectorAll('button')).find(
+      el => el.title === 'Reload terminal'
+    ) as HTMLButtonElement;
     fireEvent.click(button);
 
     // Reload now goes through TerminalController.close() (when a controller exists)
@@ -209,7 +213,9 @@ describe('TerminalActions', () => {
     });
 
     const { container } = render(<TerminalActions projectId="proj-1" />);
-    const button = Array.from(container.querySelectorAll('button')).find((el) => el.title === 'Reload terminal') as HTMLButtonElement;
+    const button = Array.from(container.querySelectorAll('button')).find(
+      el => el.title === 'Reload terminal'
+    ) as HTMLButtonElement;
     fireEvent.click(button);
 
     expect(mockSendMessage).not.toHaveBeenCalled();

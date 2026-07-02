@@ -61,7 +61,9 @@ describe('ensureSchemaIsCurrent', () => {
     db.exec(`CREATE TABLE sessions (id TEXT, agent_profile_id TEXT)`);
     db.exec(`CREATE TABLE projects (id TEXT, llm_profile_id TEXT)`);
 
-    expect(() => ensureSchemaIsCurrent(db)).toThrow(/projects\.llm_profile_id.*default_agent_profile_id/s);
+    expect(() => ensureSchemaIsCurrent(db)).toThrow(
+      /projects\.llm_profile_id.*default_agent_profile_id/s
+    );
 
     db.close();
   });

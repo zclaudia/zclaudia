@@ -13,7 +13,12 @@ export function useKeyboardShortcuts({ projectId, projectRoot }: UseKeyboardShor
   // Ctrl+` keyboard shortcut to toggle terminal
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === '`' && projectId && !usePluginStore.getState().disabledBuiltinPanels.includes('terminal')) {
+      if (
+        e.ctrlKey &&
+        e.key === '`' &&
+        projectId &&
+        !usePluginStore.getState().disabledBuiltinPanels.includes('terminal')
+      ) {
         e.preventDefault();
         const store = useTerminalStore.getState();
         if (store.isDrawerOpen(projectId) && isPanelActive('terminal')) {
@@ -36,7 +41,12 @@ export function useKeyboardShortcuts({ projectId, projectRoot }: UseKeyboardShor
   // Cmd+P / Ctrl+P keyboard shortcut to open file search
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'p' && projectRoot && !usePluginStore.getState().disabledBuiltinPanels.includes('file-viewer')) {
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        e.key === 'p' &&
+        projectRoot &&
+        !usePluginStore.getState().disabledBuiltinPanels.includes('file-viewer')
+      ) {
         e.preventDefault();
         const store = useFileViewerStore.getState();
         if (!store.isOpen) {

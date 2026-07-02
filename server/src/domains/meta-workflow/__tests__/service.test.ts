@@ -18,15 +18,25 @@ function freshDb(): Database.Database {
 
 const samplePhasesJson = JSON.stringify({
   version: '1',
-  phases: [{
-    id: 'p1', name: 'Echo', description: 'echo something',
-    phaseType: 'code-implement',
-    dependsOn: [], inputs: [],
-    outputs: [{ kind: 'commit', description: 'commit' }],
-    acceptanceGates: [{
-      id: 'g1', description: 'ok', command: 'true', expect: { exitCode: 0 },
-    }],
-  }],
+  phases: [
+    {
+      id: 'p1',
+      name: 'Echo',
+      description: 'echo something',
+      phaseType: 'code-implement',
+      dependsOn: [],
+      inputs: [],
+      outputs: [{ kind: 'commit', description: 'commit' }],
+      acceptanceGates: [
+        {
+          id: 'g1',
+          description: 'ok',
+          command: 'true',
+          expect: { exitCode: 0 },
+        },
+      ],
+    },
+  ],
   smokePath: ['p1'],
   metadata: { generatedAt: 0, requirementsPath: 'design/req.md' },
 });
@@ -35,7 +45,11 @@ describe('MetaWorkflowService', () => {
   let db: Database.Database;
   let service: MetaWorkflowService;
   let workdir: string;
-  let fakeAllocator: { acquire: ReturnType<typeof vi.fn>; release: ReturnType<typeof vi.fn>; releaseRun: ReturnType<typeof vi.fn> };
+  let fakeAllocator: {
+    acquire: ReturnType<typeof vi.fn>;
+    release: ReturnType<typeof vi.fn>;
+    releaseRun: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     db = freshDb();
@@ -93,7 +107,9 @@ describe('MetaWorkflowService', () => {
     service.setPhasesJson(run.id, samplePhasesJson);
     await service.runPhase(run.id, 'p1');
     expect(fakeAllocator.acquire).toHaveBeenCalledWith({
-      runId: run.id, phaseId: 'p1', attempt: expect.any(Number),
+      runId: run.id,
+      phaseId: 'p1',
+      attempt: expect.any(Number),
     });
     expect(fakeAllocator.release).toHaveBeenCalledWith(workdir);
   });
@@ -119,9 +135,9 @@ describe('MetaWorkflowService', () => {
     service.setPhasesJson(run.id, samplePhasesJson);
     await service.runPhase(run.id, 'p1');
     const phase = service.listPhases(run.id)[0];
-    const artifacts = db.prepare(
-      `SELECT * FROM meta_workflow_artifacts WHERE phase_record_id = ?`,
-    ).all(phase.id);
+    const artifacts = db
+      .prepare(`SELECT * FROM meta_workflow_artifacts WHERE phase_record_id = ?`)
+      .all(phase.id);
     expect(artifacts.length).toBeGreaterThan(0);
   });
 
@@ -166,10 +182,18 @@ describe('MetaWorkflowService', () => {
 
   it('evaluateImpact uses aiRunPort to produce a variable recommendation', async () => {
     const aiRunPort = {
-      startVirtualRun: vi.fn().mockImplementation(async (args: { onMessage?: (m: { kind: string; content?: string }) => void }) => {
-        args.onMessage?.({ kind: 'assistant', content: '{"kind":"ignore","reason":"Upstream change is comment-only and does not affect downstream behavior."}' });
-        args.onMessage?.({ kind: 'run_completed' });
-      }),
+      startVirtualRun: vi
+        .fn()
+        .mockImplementation(
+          async (args: { onMessage?: (m: { kind: string; content?: string }) => void }) => {
+            args.onMessage?.({
+              kind: 'assistant',
+              content:
+                '{"kind":"ignore","reason":"Upstream change is comment-only and does not affect downstream behavior."}',
+            });
+            args.onMessage?.({ kind: 'run_completed' });
+          }
+        ),
     };
     const service2 = new MetaWorkflowService({
       db,
@@ -187,10 +211,12 @@ describe('MetaWorkflowService', () => {
     // Force phase into stale state with a staleSourcePhaseId, and create 2 artifacts for the source.
     // For this test we use 'p1' as its own stale source (single-phase setup); both artifacts under p1.
     const phase = service2.listPhases(run.id)[0];
-    db.prepare(`UPDATE meta_workflow_phases SET status='stale', stale_source_phase_id='p1' WHERE id=?`).run(phase.id);
+    db.prepare(
+      `UPDATE meta_workflow_phases SET status='stale', stale_source_phase_id='p1' WHERE id=?`
+    ).run(phase.id);
     db.prepare(
       `INSERT INTO meta_workflow_artifacts (id, phase_record_id, version, commit_sha, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?)`
     ).run('art-extra', phase.id, 99, 'sha-current', 'active', Date.now());
 
     const rec = await service2.evaluateImpact(run.id, 'p1');
@@ -201,10 +227,17 @@ describe('MetaWorkflowService', () => {
 
   it('evaluateImpact falls back when AI returns unparseable output', async () => {
     const aiRunPort = {
-      startVirtualRun: vi.fn().mockImplementation(async (args: { onMessage?: (m: { kind: string; content?: string }) => void }) => {
-        args.onMessage?.({ kind: 'assistant', content: 'I think you should rerun, definitely.' });
-        args.onMessage?.({ kind: 'run_completed' });
-      }),
+      startVirtualRun: vi
+        .fn()
+        .mockImplementation(
+          async (args: { onMessage?: (m: { kind: string; content?: string }) => void }) => {
+            args.onMessage?.({
+              kind: 'assistant',
+              content: 'I think you should rerun, definitely.',
+            });
+            args.onMessage?.({ kind: 'run_completed' });
+          }
+        ),
     };
     const service2 = new MetaWorkflowService({
       db,
@@ -219,10 +252,12 @@ describe('MetaWorkflowService', () => {
     service2.setPhasesJson(run.id, samplePhasesJson);
     await service2.runPhase(run.id, 'p1');
     const phase = service2.listPhases(run.id)[0];
-    db.prepare(`UPDATE meta_workflow_phases SET status='stale', stale_source_phase_id='p1' WHERE id=?`).run(phase.id);
+    db.prepare(
+      `UPDATE meta_workflow_phases SET status='stale', stale_source_phase_id='p1' WHERE id=?`
+    ).run(phase.id);
     db.prepare(
       `INSERT INTO meta_workflow_artifacts (id, phase_record_id, version, commit_sha, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?)`
     ).run('art-extra', phase.id, 99, 'sha-current', 'active', Date.now());
 
     const rec = await service2.evaluateImpact(run.id, 'p1');
@@ -233,11 +268,21 @@ describe('MetaWorkflowService', () => {
   it('evaluateImpact embeds git log/diff context (SHAs + headers) in the AI prompt', async () => {
     const promptCaptured: string[] = [];
     const aiRunPort = {
-      startVirtualRun: vi.fn().mockImplementation(async (args: { input: string; onMessage?: (m: { kind: string; content?: string }) => void }) => {
-        promptCaptured.push(args.input);
-        args.onMessage?.({ kind: 'assistant', content: '{"kind":"minor-fix","reason":"Only logging changed."}' });
-        args.onMessage?.({ kind: 'run_completed' });
-      }),
+      startVirtualRun: vi
+        .fn()
+        .mockImplementation(
+          async (args: {
+            input: string;
+            onMessage?: (m: { kind: string; content?: string }) => void;
+          }) => {
+            promptCaptured.push(args.input);
+            args.onMessage?.({
+              kind: 'assistant',
+              content: '{"kind":"minor-fix","reason":"Only logging changed."}',
+            });
+            args.onMessage?.({ kind: 'run_completed' });
+          }
+        ),
     };
     // Use the suite-level fakeAllocator (real tmpdir cwd — not a git repo, so
     // `git log` will fail and the production code falls back to "(unavailable: ...)").
@@ -255,10 +300,12 @@ describe('MetaWorkflowService', () => {
     service2.setPhasesJson(run.id, samplePhasesJson);
     await service2.runPhase(run.id, 'p1');
     const phase = service2.listPhases(run.id)[0];
-    db.prepare(`UPDATE meta_workflow_phases SET status='stale', stale_source_phase_id='p1' WHERE id=?`).run(phase.id);
+    db.prepare(
+      `UPDATE meta_workflow_phases SET status='stale', stale_source_phase_id='p1' WHERE id=?`
+    ).run(phase.id);
     db.prepare(
       `INSERT INTO meta_workflow_artifacts (id, phase_record_id, version, commit_sha, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?)`
     ).run('art-extra', phase.id, 99, 'sha-cur', 'active', Date.now());
 
     const rec = await service2.evaluateImpact(run.id, 'p1');

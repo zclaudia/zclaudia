@@ -12,7 +12,10 @@
 import { readFileSync, statSync } from 'fs';
 import type { TaskRecord } from '@zclaudia/shared/core/task';
 import type { TaskNotificationMessage } from '@zclaudia/shared/wire/messages';
-import { onTaskLifecycle, type TaskLifecycleEvent } from '../../../domains/tasks/task-events-bus.js';
+import {
+  onTaskLifecycle,
+  type TaskLifecycleEvent,
+} from '../../../domains/tasks/task-events-bus.js';
 import { commandTaskLogPath } from '../../../domains/tasks/executors/command-executor.js';
 import type { ActiveRun, ConnectedClient } from '../transport/types.js';
 import { sendMessage } from '../transport/broadcast.js';
@@ -26,7 +29,10 @@ export interface TaskSettlementNotifierDeps {
   connectedClients: Map<string, ConnectedClient>;
 }
 
-function findActiveRunForSession(activeRuns: Map<string, ActiveRun>, sessionId: string): ActiveRun | undefined {
+function findActiveRunForSession(
+  activeRuns: Map<string, ActiveRun>,
+  sessionId: string
+): ActiveRun | undefined {
   for (const run of activeRuns.values()) {
     if (run.sessionId === sessionId && !isTerminalPhase(run.phase)) return run;
   }
@@ -59,7 +65,9 @@ export function buildTaskSettlementNotice(task: TaskRecord): string {
     `<system-reminder>Background task ${task.id}${title} ${verb}${resultText ? ` — ${resultText}` : ''}.`,
   ];
   if (tail) lines.push('Recent output:', tail);
-  lines.push(`Use TaskOutput({ task_id: "${task.id}" }) for the full output. Mention the outcome to the user if relevant.</system-reminder>`);
+  lines.push(
+    `Use TaskOutput({ task_id: "${task.id}" }) for the full output. Mention the outcome to the user if relevant.</system-reminder>`
+  );
   return lines.join('\n');
 }
 
@@ -68,7 +76,7 @@ function broadcastTaskNotification(
   task: TaskRecord,
   sessionId: string,
   status: string,
-  message: string,
+  message: string
 ): void {
   const payload = {
     type: 'task_notification',
@@ -97,8 +105,13 @@ function handleLifecycleEvent(deps: TaskSettlementNotifierDeps, event: TaskLifec
   const run = findActiveRunForSession(deps.activeRuns, sessionId);
 
   if (event.type === 'started') {
-    broadcastTaskNotification(deps.connectedClients, task, sessionId, 'started',
-      `Background task started${task.title ? `: ${task.title}` : ''}`);
+    broadcastTaskNotification(
+      deps.connectedClients,
+      task,
+      sessionId,
+      'started',
+      `Background task started${task.title ? `: ${task.title}` : ''}`
+    );
     if (run) {
       run.pendingBackgroundTasks = (run.pendingBackgroundTasks || 0) + 1;
       recomputePhase(run, computeBlockers(run));
@@ -106,8 +119,13 @@ function handleLifecycleEvent(deps: TaskSettlementNotifierDeps, event: TaskLifec
     return;
   }
 
-  broadcastTaskNotification(deps.connectedClients, task, sessionId, task.status,
-    `Background task ${settlementVerb(task.status)}${task.title ? `: ${task.title}` : ''}`);
+  broadcastTaskNotification(
+    deps.connectedClients,
+    task,
+    sessionId,
+    task.status,
+    `Background task ${settlementVerb(task.status)}${task.title ? `: ${task.title}` : ''}`
+  );
   if (run) {
     run.pendingBackgroundTasks = Math.max(0, (run.pendingBackgroundTasks || 0) - 1);
     recomputePhase(run, computeBlockers(run));
@@ -131,5 +149,5 @@ function handleLifecycleEvent(deps: TaskSettlementNotifierDeps, event: TaskLifec
 
 /** Subscribe to the task bus. Returns an unsubscribe function. */
 export function registerTaskSettlementNotifier(deps: TaskSettlementNotifierDeps): () => void {
-  return onTaskLifecycle((event) => handleLifecycleEvent(deps, event));
+  return onTaskLifecycle(event => handleLifecycleEvent(deps, event));
 }

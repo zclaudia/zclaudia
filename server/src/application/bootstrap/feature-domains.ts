@@ -1,8 +1,13 @@
 import type { Express, RequestHandler } from 'express';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import type { initDatabase } from '../../infra/storage/db.js';
 import type { ConnectedClient, ActiveRun } from '../conversation/transport/types.js';
 import { sendMessage } from '../conversation/transport/broadcast.js';
-import { registerProjectsDomain, ProjectRepository, type ProjectChangeEvent } from '../../domains/projects/index.js';
+import {
+  registerProjectsDomain,
+  ProjectRepository,
+  type ProjectChangeEvent,
+} from '../../domains/projects/index.js';
 import {
   registerSessionsDomain,
   SessionRepository,
@@ -12,21 +17,43 @@ import {
   buildTaskUnlockedSessionPatch,
   type SessionEventPublisherPort,
 } from '../../domains/sessions/index.js';
-import { registerLlmProfilesDomain, LlmProfileRepository } from '../../domains/llm-profiles/index.js';
+import {
+  registerLlmProfilesDomain,
+  LlmProfileRepository,
+} from '../../domains/llm-profiles/index.js';
 import { registerLlmProfileRepository } from '../../domains/llm-profiles/repository-registry.js';
 import { CodexOAuthSessionManager } from '../../domains/llm-profiles/codex-oauth-session.js';
 import { createLlmProfileOauthRouter } from '../../interfaces/http/llm-profile-oauth.js';
 import { registerAgentProfilesDomain } from '../../domains/agent-profiles/index.js';
 import { registerRuntimeRoutes } from '../../infra/providers/runtime-routes.js';
 import { registerNotificationDomain } from '../../domains/notification-feed/index.js';
-import { registerSupervisionDomain, type SupervisionAiRunPort, type SupervisionProjectPort, type SupervisionSessionPort, type SupervisionSessionModelPort } from '../../domains/supervision/index.js';
-import { registerLocalPRDomain, type LocalPRAiSessionPort, type LocalPRSchedulingPort } from '../../domains/local-pr/index.js';
+import {
+  registerSupervisionDomain,
+  type SupervisorService,
+  type SupervisionAiRunPort,
+  type SupervisionProjectPort,
+  type SupervisionSessionPort,
+  type SupervisionSessionModelPort,
+} from '../../domains/supervision/index.js';
+import {
+  registerLocalPRDomain,
+  type LocalPRAiSessionPort,
+  type LocalPRSchedulingPort,
+} from '../../domains/local-pr/index.js';
 import { registerLocalIssueDomain } from '../../domains/local-issues/index.js';
 import { registerTurnSummaryDomain } from '../../domains/turn-summaries/index.js';
 import { registerAttachmentDomain } from '../../domains/attachments/index.js';
-import { registerWorkflowDomain, WorkflowRunRepository, type WorkflowAiRunPort, type WorkflowSchedulingPort } from '../../domains/workflows/index.js';
+import {
+  registerWorkflowDomain,
+  WorkflowRunRepository,
+  type WorkflowService,
+  type WorkflowEngine,
+  type WorkflowAiRunPort,
+  type WorkflowSchedulingPort,
+} from '../../domains/workflows/index.js';
 import { PermissionWorkflowResolver } from '../../domains/workflows/index.js';
 import { registerMetaWorkflow } from '../../domains/meta-workflow/register.js';
+import type { MetaWorkflowService } from '../../domains/meta-workflow/service.js';
 import { createWorktreeAllocatorFromSupervisor } from './meta-workflow-allocator.js';
 import { registerPluginsDomain } from '../plugins/register.js';
 import { toolRegistry, workflowStepRegistry, workflowTriggerRegistry } from '../plugins/index.js';
@@ -36,7 +63,11 @@ import type { NotificationService } from '../../domains/notification-feed/index.
 import { PermissionBridge } from '../conversation/agent/permission-bridge.js';
 import { recomputePhase, computeBlockers } from '../conversation/runtime/active-run-phase.js';
 import type { WorkflowRunEvent } from '../../domains/workflows/run-events.js';
-import { ExecutorRegistry, ManualAdapter, ExecutorInstanceRepository } from '../../domains/executor/index.js';
+import {
+  ExecutorRegistry,
+  ManualAdapter,
+  ExecutorInstanceRepository,
+} from '../../domains/executor/index.js';
 import { ClassicAdapter } from '../../domains/executor/adapters/classic-adapter.js';
 import { MetaWorkflowAdapter } from '../../domains/executor/adapters/meta-workflow-adapter.js';
 import { SpecChangeRepository } from '../../domains/spec-change/spec-change-repository.js';
@@ -50,7 +81,10 @@ import {
   BootstrapScanRepository,
 } from '../../domains/openspec/index.js';
 import { BootstrapCandidateRepository } from '../../domains/openspec/repositories/bootstrap-candidate-repository.js';
-import { registerIssueOrchestration, type IssueOrchestration } from '../../domains/issue-orchestration/index.js';
+import {
+  registerIssueOrchestration,
+  type IssueOrchestration,
+} from '../../domains/issue-orchestration/index.js';
 import { createCorpusRoutes } from '../../domains/openspec/routes/corpus-routes.js';
 import { createSpecChangeRoutes } from '../../domains/openspec/routes/spec-change-routes.js';
 import { createBootstrapRoutes } from '../../domains/openspec/routes/bootstrap-routes.js';
@@ -58,10 +92,14 @@ import { createExecutorRoutes } from '../../domains/executor/routes.js';
 import { createIssueRoutes } from '../../domains/issue-orchestration/routes.js';
 import { createEpicRoutes } from '../../domains/epics/routes.js';
 import { EpicService } from '../../domains/epics/service.js';
-import { TaskExecutorRegistry } from '../../domains/tasks/executors/registry.js';
-import { ActivityRegistry, GitCommitActivity, GitStageActivity, GenerateCommitMessageActivity } from '../../domains/activities/index.js';
+import { type TaskExecutorRegistry } from '../../domains/tasks/executors/registry.js';
+import {
+  ActivityRegistry,
+  GitCommitActivity,
+  GitStageActivity,
+  GenerateCommitMessageActivity,
+} from '../../domains/activities/index.js';
 import { LightweightAgentRunner } from '../../infra/providers/pi-runtime/agent-loop/index.js';
-
 
 interface RegisterFeatureDomainsDeps {
   db: ReturnType<typeof initDatabase>;
@@ -83,14 +121,14 @@ interface RegisterFeatureDomainsDeps {
 }
 
 export interface FeatureDomainsResult {
-  supervisorService: import('../../domains/supervision/index.js').SupervisorService;
-  workflowService: import('../../domains/workflows/index.js').WorkflowService;
-  workflowEngine: import('../../domains/workflows/engine.js').WorkflowEngine;
+  supervisorService: SupervisorService;
+  workflowService: WorkflowService;
+  workflowEngine: WorkflowEngine;
   notificationsService: NotificationService;
   permissionBridge: PermissionBridge;
   cancelWorkflowRun: (runId: string) => void;
   permissionWorkflowResolver: PermissionWorkflowResolver;
-  metaWorkflowService: import('../../domains/meta-workflow/service.js').MetaWorkflowService;
+  metaWorkflowService: MetaWorkflowService;
   executorRegistry: ExecutorRegistry;
   executorInstanceRepo: ExecutorInstanceRepository;
   specChangeRepo: SpecChangeRepository;
@@ -105,11 +143,11 @@ export interface FeatureDomainsResult {
 
 function broadcastToAuthenticatedClients(
   clients: Map<string, ConnectedClient>,
-  message: unknown,
+  message: ServerMessage | { type: string; [key: string]: unknown }
 ): void {
-  clients.forEach((client) => {
+  clients.forEach(client => {
     if (client.authenticated) {
-      sendMessage(client.ws, message as any);
+      sendMessage(client.ws, message as ServerMessage);
     }
   });
 }
@@ -166,18 +204,20 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
       }
     },
   });
-  app.use('/api/llm-profiles', authMiddleware, createLlmProfileOauthRouter(llmProfileRepo, codexOauthSessions));
+  app.use(
+    '/api/llm-profiles',
+    authMiddleware,
+    createLlmProfileOauthRouter(llmProfileRepo, codexOauthSessions)
+  );
 
   registerAgentProfilesDomain({ app, authMiddleware, db });
   registerRuntimeRoutes({ app, authMiddleware, db, toolRegistry });
 
-  const {
-    notificationService: notificationsService,
-  } = registerNotificationDomain({
+  const { notificationService: notificationsService } = registerNotificationDomain({
     db,
     app,
     authMiddleware,
-    broadcastMessage: (msg) => broadcastToAuthenticatedClients(clients, msg),
+    broadcastMessage: msg => broadcastToAuthenticatedClients(clients, msg),
     notificationSender,
   });
 
@@ -185,16 +225,17 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
   const svSessionRepo = new SessionRepository(db);
 
   const supervisionProjectPort: SupervisionProjectPort = {
-    findById: (id) => svProjectRepo.findById(id) ?? undefined,
+    findById: id => svProjectRepo.findById(id) ?? undefined,
     findAll: () => svProjectRepo.findAll(),
-    update: (id, data) => svProjectRepo.update(id, {
-      ...data,
-      agent: data.agent === null ? undefined : data.agent,
-    }),
+    update: (id, data) =>
+      svProjectRepo.update(id, {
+        ...data,
+        agent: data.agent === null ? undefined : data.agent,
+      }),
   };
   const supervisionSessionPort: SupervisionSessionPort = {
-    findById: (id) => svSessionRepo.findById(id) ?? undefined,
-    create: (data) => svSessionRepo.create(data),
+    findById: id => svSessionRepo.findById(id) ?? undefined,
+    create: data => svSessionRepo.create(data),
     update: (id, data) => svSessionRepo.update(id, data),
     findByProjectRole: (projectId, role) => svSessionRepo.findByProjectRole(projectId, role),
   };
@@ -209,7 +250,7 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
     db,
     app,
     authMiddleware,
-    broadcast: (msg) => broadcastToAuthenticatedClients(clients, msg),
+    broadcast: msg => broadcastToAuthenticatedClients(clients, msg),
     activeRuns,
     aiRunPort: supervisionAiRunPort,
     systemTaskRegistry: localPrScheduling,
@@ -224,7 +265,7 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
     authMiddleware,
     broadcast: (_projectId, msg) => broadcastToAuthenticatedClients(clients, msg),
     onProjectChanged: handleProjectChanged,
-    isWorktreeAvailable: (projectId) => {
+    isWorktreeAvailable: projectId => {
       const pool = supervisorService.getWorktreePoolIfExists(projectId);
       if (!pool) return true;
       return pool.getStatus().available > 0;
@@ -239,7 +280,7 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
     db,
     app,
     authMiddleware,
-    broadcast: (msg) => broadcastToAuthenticatedClients(clients, msg),
+    broadcast: msg => broadcastToAuthenticatedClients(clients, msg),
   });
 
   registerLocalIssueDomain({
@@ -248,7 +289,7 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
     authMiddleware,
     broadcast: (_projectId, msg) => broadcastToAuthenticatedClients(clients, msg),
     hooks: {
-      onDelete: (issueId) => {
+      onDelete: issueId => {
         attachmentService.deleteByOwner('local_issue', issueId);
       },
     },
@@ -268,7 +309,8 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
       if (pending.timeout) clearTimeout(pending.timeout);
       run.pendingPermissions.delete(requestId);
       recomputePhase(run, computeBlockers(run));
-      run.db.prepare('UPDATE sessions SET last_run_status = ?, updated_at = ? WHERE id = ?')
+      run.db
+        .prepare('UPDATE sessions SET last_run_status = ?, updated_at = ? WHERE id = ?')
         .run('running', Date.now(), run.sessionId);
       return true;
     }
@@ -288,7 +330,7 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
     },
   });
 
-  let permissionWorkflowResolver: PermissionWorkflowResolver;
+  const permissionWorkflowResolverRef: { current?: PermissionWorkflowResolver } = {};
 
   const { workflowService, workflowEngine } = registerWorkflowDomain({
     db,
@@ -301,12 +343,13 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
     systemTaskRegistry: workflowScheduling,
     aiRunPort: workflowAiRunPort,
     permissionBridge,
-    getPermissionWorkflowResolver: () => permissionWorkflowResolver,
+    getPermissionWorkflowResolver: () => permissionWorkflowResolverRef.current,
     taskExecutorRegistry,
     activityRegistry,
     agentLoopRunner: sharedAgentLoopRunner,
   });
-  permissionWorkflowResolver = new PermissionWorkflowResolver(db, workflowService);
+  const permissionWorkflowResolver = new PermissionWorkflowResolver(db, workflowService);
+  permissionWorkflowResolverRef.current = permissionWorkflowResolver;
 
   const { automationService } = registerAutomationsDomain({
     db,
@@ -314,7 +357,7 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
     authMiddleware,
     broadcast: (_projectId, msg) => broadcastToAuthenticatedClients(clients, msg),
     engine: workflowEngine,
-    workflows: { getWorkflow: (id) => workflowService.getWorkflow(id) },
+    workflows: { getWorkflow: id => workflowService.getWorkflow(id) },
     systemTaskRegistry: workflowScheduling,
   });
 
@@ -330,7 +373,11 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
     const requestId = payload.requestId as string;
     const sessionId = payload.sessionId as string;
 
-    if (event.type === 'step_started' || event.type === 'step_completed' || event.type === 'step_failed') {
+    if (
+      event.type === 'step_started' ||
+      event.type === 'step_completed' ||
+      event.type === 'step_failed'
+    ) {
       const runDetail = workflowService.getRun(event.runId);
       if (!runDetail) return;
 
@@ -346,8 +393,12 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
         currentStep: {
           id: event.stepId,
           type: runDetail.stepRuns.find(s => s.stepId === event.stepId)?.stepType || 'unknown',
-          status: event.type === 'step_started' ? 'running'
-            : event.type === 'step_completed' ? 'completed' : 'failed',
+          status:
+            event.type === 'step_started'
+              ? 'running'
+              : event.type === 'step_completed'
+                ? 'completed'
+                : 'failed',
           label: runDetail.stepRuns.find(s => s.stepId === event.stepId)?.stepId || event.stepId,
         },
         completedSteps,
@@ -376,8 +427,10 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
           // before releasing the provider. Keep this fallback for older/custom
           // bridge implementations that only resolve the promise.
           if (clearPendingPermissionFromActiveRun(requestId)) {
-            const decision = stepRun.output.decision === 'allow' || stepRun.output.decision === 'approve'
-              ? 'approve' : 'deny';
+            const decision =
+              stepRun.output.decision === 'allow' || stepRun.output.decision === 'approve'
+                ? 'approve'
+                : 'deny';
             broadcastToAuthenticatedClients(clients, {
               type: 'permission_auto_resolved',
               requestId,
@@ -427,7 +480,7 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
         workingDirectory: args.workingDirectory,
         llmProfileId: args.llmProfileId,
         systemContext: args.systemContext,
-        onMessage: (msg) => {
+        onMessage: msg => {
           if (!args.onMessage) return;
           const m = msg as { type?: string; kind?: string; content?: string; data?: unknown };
           // Map ServerMessage shape to AiRunPort's simpler {kind, content} shape.
@@ -472,9 +525,15 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
   const changeLifecycle = supervisorService.getChangeLifecycle();
   const metaWorkflowService = metaWorkflow.service;
 
-  executorRegistry.register('manual', (instance) => new ManualAdapter(db, instance));
-  executorRegistry.register('classic', (instance) => new ClassicAdapter(db, changeLifecycle, instance));
-  executorRegistry.register('meta-workflow', (instance) => new MetaWorkflowAdapter(db, metaWorkflowService, instance));
+  executorRegistry.register('manual', instance => new ManualAdapter(db, instance));
+  executorRegistry.register(
+    'classic',
+    instance => new ClassicAdapter(db, changeLifecycle, instance)
+  );
+  executorRegistry.register(
+    'meta-workflow',
+    instance => new MetaWorkflowAdapter(db, metaWorkflowService, instance)
+  );
 
   // ── G2/G3: OpenSpec SpecChange / Archive services + Issue orchestration ──
   // Wires SpecChangeService, ArchiveService, and the full issue-orchestration
@@ -484,14 +543,16 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
   // G5a: real project root lookup. Returns the projects.root_path string.
   // Throws if project is missing or has no root_path configured.
   const getProjectRoot = (projectId: string): string => {
-    const row = db
-      .prepare('SELECT root_path FROM projects WHERE id = ?')
-      .get(projectId) as { root_path: string | null } | undefined;
+    const row = db.prepare('SELECT root_path FROM projects WHERE id = ?').get(projectId) as
+      | { root_path: string | null }
+      | undefined;
     if (!row) {
       throw new Error(`Project not found: ${projectId}`);
     }
     if (!row.root_path) {
-      throw new Error(`Project ${projectId} has no root_path configured (set via PATCH /api/projects/:id { rootPath })`);
+      throw new Error(
+        `Project ${projectId} has no root_path configured (set via PATCH /api/projects/:id { rootPath })`
+      );
     }
     return row.root_path;
   };
@@ -551,16 +612,35 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
   // Multiple `app.use('/api/openspec', ...)` mounts share the path prefix —
   // Express dispatches to each router based on its own sub-paths.
   app.use('/api/openspec', authMiddleware, createCorpusRoutes({ getProjectRoot }));
-  app.use('/api/openspec', authMiddleware, createSpecChangeRoutes({ db, specChangeService, draftingService: specChangeDraftingService }));
-  app.use('/api/openspec', authMiddleware, createExecutorRoutes({ db, executorService: issueOrchestration.executorService }));
-  app.use('/api/openspec', authMiddleware, createBootstrapRoutes({
-    db,
-    bootstrapService,
-    reviewService: bootstrapReviewService,
-    candidateRepo: new BootstrapCandidateRepository(db),
-    scanRepo: bootstrapScanRepo,
-  }));
-  app.use('/api/issues', authMiddleware, createIssueRoutes({ lifecycle: issueOrchestration.lifecycle, anonymousService: issueOrchestration.anonymousService }));
+  app.use(
+    '/api/openspec',
+    authMiddleware,
+    createSpecChangeRoutes({ db, specChangeService, draftingService: specChangeDraftingService })
+  );
+  app.use(
+    '/api/openspec',
+    authMiddleware,
+    createExecutorRoutes({ db, executorService: issueOrchestration.executorService })
+  );
+  app.use(
+    '/api/openspec',
+    authMiddleware,
+    createBootstrapRoutes({
+      db,
+      bootstrapService,
+      reviewService: bootstrapReviewService,
+      candidateRepo: new BootstrapCandidateRepository(db),
+      scanRepo: bootstrapScanRepo,
+    })
+  );
+  app.use(
+    '/api/issues',
+    authMiddleware,
+    createIssueRoutes({
+      lifecycle: issueOrchestration.lifecycle,
+      anonymousService: issueOrchestration.anonymousService,
+    })
+  );
   app.use('/api/epics', authMiddleware, createEpicRoutes({ service: new EpicService(db) }));
 
   return {

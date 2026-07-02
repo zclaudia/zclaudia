@@ -15,30 +15,32 @@ export async function getProjectsForBackend(backendId: string | null): Promise<P
   return apiCallForBackend<Project[]>(backendId, '/api/projects');
 }
 
-export async function createProject(data: {
-  name: string;
-  type?: 'chat_only' | 'code';
-  llmProfileId?: string;
-  rootPath?: string;
-}, backendId?: string | null): Promise<Project> {
+export async function createProject(
+  data: {
+    name: string;
+    type?: 'chat_only' | 'code';
+    llmProfileId?: string;
+    rootPath?: string;
+  },
+  backendId?: string | null
+): Promise<Project> {
   return apiCallForBackend<Project>(backendId ?? null, '/api/projects', {
     method: 'POST',
-    body: JSON.stringify(data)
+    body: JSON.stringify(data),
   });
 }
 
-export async function updateProject(
-  id: string,
-  data: Partial<Project>
-): Promise<void> {
+export async function updateProject(id: string, data: Partial<Project>): Promise<void> {
   return apiCallVoidForBackend(getProjectOwnerBackendId(id), `/api/projects/${id}`, {
     method: 'PUT',
-    body: JSON.stringify(data)
+    body: JSON.stringify(data),
   });
 }
 
 export async function deleteProject(id: string): Promise<void> {
-  return apiCallVoidForBackend(getProjectOwnerBackendId(id), `/api/projects/${id}`, { method: 'DELETE' });
+  return apiCallVoidForBackend(getProjectOwnerBackendId(id), `/api/projects/${id}`, {
+    method: 'DELETE',
+  });
 }
 
 export async function getProjectWorktrees(projectId: string): Promise<GitWorktree[]> {
@@ -54,26 +56,37 @@ export async function getProjectWorktrees(projectId: string): Promise<GitWorktre
 export async function createProjectWorktree(
   projectId: string,
   branch: string,
-  path?: string,
+  path?: string
 ): Promise<GitWorktree> {
-  return apiCallForBackend<GitWorktree>(getProjectOwnerBackendId(projectId), `/api/projects/${projectId}/worktrees`, {
-    method: 'POST',
-    body: JSON.stringify({ branch, path }),
-  });
+  return apiCallForBackend<GitWorktree>(
+    getProjectOwnerBackendId(projectId),
+    `/api/projects/${projectId}/worktrees`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ branch, path }),
+    }
+  );
 }
 
 export async function getWorktreeConfigs(projectId: string): Promise<WorktreeConfig[]> {
-  return apiCallForBackend<WorktreeConfig[]>(getProjectOwnerBackendId(projectId), `/api/projects/${projectId}/worktree-configs`);
+  return apiCallForBackend<WorktreeConfig[]>(
+    getProjectOwnerBackendId(projectId),
+    `/api/projects/${projectId}/worktree-configs`
+  );
 }
 
 export async function upsertWorktreeConfig(
   projectId: string,
-  config: { worktreePath: string; autoCreatePR: boolean; autoReview: boolean },
+  config: { worktreePath: string; autoCreatePR: boolean; autoReview: boolean }
 ): Promise<WorktreeConfig> {
-  return apiCallForBackend<WorktreeConfig>(getProjectOwnerBackendId(projectId), `/api/projects/${projectId}/worktree-configs`, {
-    method: 'PUT',
-    body: JSON.stringify(config),
-  });
+  return apiCallForBackend<WorktreeConfig>(
+    getProjectOwnerBackendId(projectId),
+    `/api/projects/${projectId}/worktree-configs`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    }
+  );
 }
 
 export async function reorderProjects(orderedIds: string[]): Promise<void> {
@@ -85,10 +98,14 @@ export async function reorderProjects(orderedIds: string[]): Promise<void> {
 
 export async function setProjectReviewProvider(
   projectId: string,
-  llmProfileId: string,
+  llmProfileId: string
 ): Promise<void> {
-  return apiCallVoidForBackend(getProjectOwnerBackendId(projectId), `/api/projects/${projectId}/review-provider`, {
-    method: 'PATCH',
-    body: JSON.stringify({ llmProfileId }),
-  });
+  return apiCallVoidForBackend(
+    getProjectOwnerBackendId(projectId),
+    `/api/projects/${projectId}/review-provider`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ llmProfileId }),
+    }
+  );
 }

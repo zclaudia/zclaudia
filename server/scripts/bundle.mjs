@@ -100,7 +100,9 @@ function findDep(modulesRoot, parentPkg, depName) {
   if (fs.existsSync(nested)) return nested;
   const hoisted = path.join(modulesRoot, depName);
   if (fs.existsSync(hoisted)) return hoisted;
-  throw new Error(`Dependency ${depName} not found (checked nested under ${parentPkg} and hoisted)`);
+  throw new Error(
+    `Dependency ${depName} not found (checked nested under ${parentPkg} and hoisted)`
+  );
 }
 
 // --- Clean output ---
@@ -144,9 +146,10 @@ const cacheBin = path.join(cacheDir, `node-v${NODE_SIDECAR_VERSION}-${platformAr
 
 // npm CLI path (extracted from Node.js tarball)
 const npmCacheBase = path.join(cacheDir, `npm-v${NODE_SIDECAR_VERSION}`);
-const npmCli = platform === 'win32'
-  ? path.join(npmCacheBase, 'node_modules', 'npm', 'bin', 'npm-cli.js')
-  : path.join(npmCacheBase, 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js');
+const npmCli =
+  platform === 'win32'
+    ? path.join(npmCacheBase, 'node_modules', 'npm', 'bin', 'npm-cli.js')
+    : path.join(npmCacheBase, 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js');
 
 if (targetTriple && nodePlatform) {
   // Check cache: need both node binary AND npm CLI
@@ -154,10 +157,14 @@ if (targetTriple && nodePlatform) {
   if (fs.existsSync(cacheBin) && fs.existsSync(npmCli)) {
     const cachedSize = fs.statSync(cacheBin).size;
     if (cachedSize > 30 * 1024 * 1024) {
-      console.log(`    Using cached node v${NODE_SIDECAR_VERSION} (${(cachedSize / 1024 / 1024).toFixed(1)} MB)`);
+      console.log(
+        `    Using cached node v${NODE_SIDECAR_VERSION} (${(cachedSize / 1024 / 1024).toFixed(1)} MB)`
+      );
       needDownload = false;
     } else {
-      console.log(`    Cached binary too small (${(cachedSize / 1024 / 1024).toFixed(1)} MB), re-downloading...`);
+      console.log(
+        `    Cached binary too small (${(cachedSize / 1024 / 1024).toFixed(1)} MB), re-downloading...`
+      );
       fs.unlinkSync(cacheBin);
     }
   }
@@ -261,12 +268,7 @@ await esbuild.build({
   target: 'node20',
   format: 'esm',
   outfile: path.join(outDir, 'server.mjs'),
-  external: [
-    'better-sqlite3',
-    'node-pty',
-    'bufferutil',
-    'utf-8-validate',
-  ],
+  external: ['better-sqlite3', 'node-pty', 'bufferutil', 'utf-8-validate'],
   banner: {
     js: [
       `import { createRequire as __bundled_createRequire } from 'module';`,
@@ -308,7 +310,7 @@ await esbuild.build({
       console.log(`    Compiling ${name}.ts`);
       execSync(
         `npx tsc --target ES2022 --module ESNext --moduleResolution bundler --esModuleInterop --skipLibCheck --outDir "${path.dirname(dist)}" "${src}"`,
-        { cwd: serverRoot, stdio: 'pipe' },
+        { cwd: serverRoot, stdio: 'pipe' }
       );
     }
 
@@ -333,7 +335,11 @@ console.log('  [3/4] Clean-room native module install');
     'node-pty': readPackageVersion('node-pty'),
   };
 
-  console.log(`    Versions: ${Object.entries(EXTERNAL_DEPS).map(([k, v]) => `${k}@${v}`).join(', ')}`);
+  console.log(
+    `    Versions: ${Object.entries(EXTERNAL_DEPS)
+      .map(([k, v]) => `${k}@${v}`)
+      .join(', ')}`
+  );
 
   // Cache key: node version + platform + dependency versions
   const depsHash = createHash('md5')
@@ -355,11 +361,18 @@ console.log('  [3/4] Clean-room native module install');
     fs.mkdirSync(installCacheDir, { recursive: true });
 
     // Write minimal package.json
-    fs.writeFileSync(path.join(installCacheDir, 'package.json'), JSON.stringify({
-      name: 'zclaudia-server-bundle',
-      private: true,
-      dependencies: EXTERNAL_DEPS,
-    }, null, 2));
+    fs.writeFileSync(
+      path.join(installCacheDir, 'package.json'),
+      JSON.stringify(
+        {
+          name: 'zclaudia-server-bundle',
+          private: true,
+          dependencies: EXTERNAL_DEPS,
+        },
+        null,
+        2
+      )
+    );
 
     console.log(`    Running npm install (cache key: ${depsHash})...`);
 
@@ -379,7 +392,7 @@ console.log('  [3/4] Clean-room native module install');
           npm_config_arch: arch,
           npm_config_target_arch: arch,
         },
-      },
+      }
     );
 
     // Mark as complete
@@ -456,10 +469,11 @@ console.log('  [3/4] Clean-room native module install');
       copyFile(buildReleasePty, path.join(dest, 'build', 'Release', 'pty.node'));
       console.log(`    node-pty@${EXTERNAL_DEPS['node-pty']}: OK (build/Release)`);
     } else {
-      console.warn(`    node-pty: WARNING - no native binary found (checked prebuilds/${platformArch} and build/Release)`);
+      console.warn(
+        `    node-pty: WARNING - no native binary found (checked prebuilds/${platformArch} and build/Release)`
+      );
     }
   }
-
 }
 
 // ============================================================================
@@ -468,14 +482,17 @@ console.log('  [3/4] Clean-room native module install');
 console.log('  [4/4] Verifying native modules');
 if (fs.existsSync(cacheBin)) {
   try {
-    const betterSqlite3Path = path.join(outDir, 'node_modules', 'better-sqlite3').replace(/\\/g, '/');
-    execSync(
-      `"${cacheBin}" -e "new (require('${betterSqlite3Path}'))(':memory:').close()"`,
-      { stdio: 'pipe' },
-    );
+    const betterSqlite3Path = path
+      .join(outDir, 'node_modules', 'better-sqlite3')
+      .replace(/\\/g, '/');
+    execSync(`"${cacheBin}" -e "new (require('${betterSqlite3Path}'))(':memory:').close()"`, {
+      stdio: 'pipe',
+    });
     console.log('    better-sqlite3: OK');
   } catch (e) {
-    console.error(`    better-sqlite3: FAILED - ${e.stderr?.toString().trim().split('\n')[0] || e.message}`);
+    console.error(
+      `    better-sqlite3: FAILED - ${e.stderr?.toString().trim().split('\n')[0] || e.message}`
+    );
     process.exit(1);
   }
 } else {

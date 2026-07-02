@@ -15,7 +15,9 @@ export class ChangeSyncRunRepository {
 
   private hasTable(): boolean {
     const row = this.db
-      .prepare("SELECT 1 as ok FROM sqlite_master WHERE type = 'table' AND name = 'change_sync_runs'")
+      .prepare(
+        "SELECT 1 as ok FROM sqlite_master WHERE type = 'table' AND name = 'change_sync_runs'"
+      )
       .get() as { ok?: number } | undefined;
     return Boolean(row?.ok);
   }
@@ -35,42 +37,58 @@ export class ChangeSyncRunRepository {
     if (!this.hasTable()) return undefined;
     const id = newId();
     const now = Date.now();
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO change_sync_runs
       (id, change_id, status, summary, created_at)
       VALUES (?, ?, 'pending', ?, ?)
-    `).run(id, changeId, summary, now);
+    `
+      )
+      .run(id, changeId, summary, now);
     return this.findLatest(changeId);
   }
 
   markApplied(changeId: string): ChangeSyncRunRecord | undefined {
     if (!this.hasTable()) return undefined;
-    const pending = this.db.prepare(`
+    const pending = this.db
+      .prepare(
+        `
       SELECT id FROM change_sync_runs
       WHERE change_id = ? AND status = 'pending'
       ORDER BY created_at DESC
       LIMIT 1
-    `).get(changeId) as { id: string } | undefined;
+    `
+      )
+      .get(changeId) as { id: string } | undefined;
     if (!pending) {
       return this.findLatest(changeId);
     }
     const now = Date.now();
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       UPDATE change_sync_runs
       SET status = 'applied', applied_at = ?
       WHERE id = ?
-    `).run(now, pending.id);
+    `
+      )
+      .run(now, pending.id);
     return this.findLatest(changeId);
   }
 
   findLatest(changeId: string): ChangeSyncRunRecord | undefined {
     if (!this.hasTable()) return undefined;
-    const row = this.db.prepare(`
+    const row = this.db
+      .prepare(
+        `
       SELECT * FROM change_sync_runs
       WHERE change_id = ?
       ORDER BY created_at DESC
       LIMIT 1
-    `).get(changeId);
+    `
+      )
+      .get(changeId);
     return row ? this.mapRow(row) : undefined;
   }
 }

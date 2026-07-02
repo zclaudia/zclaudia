@@ -43,7 +43,9 @@ export class ClaudiaBranchService {
 
   private sessionExists(sessionId: string | null | undefined): boolean {
     if (!sessionId) return false;
-    const row = this.db.prepare('SELECT 1 FROM sessions WHERE id = ?').get(sessionId) as { 1: number } | undefined;
+    const row = this.db.prepare('SELECT 1 FROM sessions WHERE id = ?').get(sessionId) as
+      | { 1: number }
+      | undefined;
     return Boolean(row);
   }
 
@@ -51,9 +53,9 @@ export class ClaudiaBranchService {
    * Find a branch by ID.
    */
   findById(branchId: string): ClaudiaBranch | null {
-    const row = this.db.prepare(
-      'SELECT * FROM claudia_branches WHERE id = ?'
-    ).get(branchId) as BranchRow | undefined;
+    const row = this.db.prepare('SELECT * FROM claudia_branches WHERE id = ?').get(branchId) as
+      | BranchRow
+      | undefined;
     return row ? rowToBranch(row) : null;
   }
 
@@ -61,28 +63,31 @@ export class ClaudiaBranchService {
    * Check if a branch has any active (running/queued/waiting) tasks.
    */
   branchHasActiveTask(branchId: string): boolean {
-    const row = this.db.prepare(
-      `SELECT 1 FROM tasks
+    const row = this.db
+      .prepare(
+        `SELECT 1 FROM tasks
        WHERE json_extract(metadata, '$.branchId') = ?
          AND status IN (${ACTIVE_STATUSES.map(() => '?').join(', ')})
        LIMIT 1`
-    ).get(branchId, ...ACTIVE_STATUSES) as { 1: number } | undefined;
+      )
+      .get(branchId, ...ACTIVE_STATUSES) as { 1: number } | undefined;
     return !!row;
   }
 
   /**
    * Create a new branch. Session is attached later once a real session row exists.
    */
-  createBranch(opts: {
-    hostProjectId: string;
-    title: string;
-  }): ClaudiaBranch {
+  createBranch(opts: { hostProjectId: string; title: string }): ClaudiaBranch {
     const id = newId();
     const now = Date.now();
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO claudia_branches (id, host_project_id, active_session_id, title, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run(id, opts.hostProjectId, null, opts.title, now, now);
+    `
+      )
+      .run(id, opts.hostProjectId, null, opts.title, now, now);
     return {
       id,
       hostProjectId: opts.hostProjectId,
@@ -100,13 +105,15 @@ export class ClaudiaBranchService {
   updateBranchTask(branchId: string, taskId: string, sessionId?: string): void {
     const now = Date.now();
     if (sessionId) {
-      this.db.prepare(
-        'UPDATE claudia_branches SET last_task_id = ?, active_session_id = ?, updated_at = ? WHERE id = ?'
-      ).run(taskId, sessionId, now, branchId);
+      this.db
+        .prepare(
+          'UPDATE claudia_branches SET last_task_id = ?, active_session_id = ?, updated_at = ? WHERE id = ?'
+        )
+        .run(taskId, sessionId, now, branchId);
     } else {
-      this.db.prepare(
-        'UPDATE claudia_branches SET last_task_id = ?, updated_at = ? WHERE id = ?'
-      ).run(taskId, now, branchId);
+      this.db
+        .prepare('UPDATE claudia_branches SET last_task_id = ?, updated_at = ? WHERE id = ?')
+        .run(taskId, now, branchId);
     }
   }
 
@@ -114,23 +121,25 @@ export class ClaudiaBranchService {
    * Attach a real session to a branch after the session row exists.
    */
   attachSession(branchId: string, sessionId: string): void {
-    this.db.prepare(
-      'UPDATE claudia_branches SET active_session_id = ?, updated_at = ? WHERE id = ?'
-    ).run(sessionId, Date.now(), branchId);
+    this.db
+      .prepare('UPDATE claudia_branches SET active_session_id = ?, updated_at = ? WHERE id = ?')
+      .run(sessionId, Date.now(), branchId);
   }
 
   getActiveBranchId(hostProjectId: string): string | null {
-    const row = this.db.prepare(
-      'SELECT active_branch_id FROM claudia_project_state WHERE host_project_id = ?'
-    ).get(hostProjectId) as { active_branch_id: string | null } | undefined;
+    const row = this.db
+      .prepare('SELECT active_branch_id FROM claudia_project_state WHERE host_project_id = ?')
+      .get(hostProjectId) as { active_branch_id: string | null } | undefined;
     return row?.active_branch_id ?? null;
   }
 
   listActiveBranches(): ClaudiaProjectActiveBranch[] {
-    const rows = this.db.prepare(
-      'SELECT host_project_id, active_branch_id FROM claudia_project_state WHERE active_branch_id IS NOT NULL'
-    ).all() as Array<{ host_project_id: string; active_branch_id: string }>;
-    return rows.map((row) => ({
+    const rows = this.db
+      .prepare(
+        'SELECT host_project_id, active_branch_id FROM claudia_project_state WHERE active_branch_id IS NOT NULL'
+      )
+      .all() as Array<{ host_project_id: string; active_branch_id: string }>;
+    return rows.map(row => ({
       projectId: row.host_project_id,
       branchId: row.active_branch_id,
     }));
@@ -138,13 +147,17 @@ export class ClaudiaBranchService {
 
   setActiveBranchId(hostProjectId: string, branchId: string | null): void {
     const now = Date.now();
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO claudia_project_state (host_project_id, active_branch_id, updated_at)
       VALUES (?, ?, ?)
       ON CONFLICT(host_project_id) DO UPDATE SET
         active_branch_id = excluded.active_branch_id,
         updated_at = excluded.updated_at
-    `).run(hostProjectId, branchId, now);
+    `
+      )
+      .run(hostProjectId, branchId, now);
   }
 
   /**
@@ -182,7 +195,12 @@ export class ClaudiaBranchService {
           if (this.sessionExists(branch.activeSessionId)) {
             return { branchId: branch.id, sessionId: branch.activeSessionId!, action: 'reused' };
           }
-          return { branchId: branch.id, sessionId: opts.sessionId, action: 'created', contextReset: true };
+          return {
+            branchId: branch.id,
+            sessionId: opts.sessionId,
+            action: 'created',
+            contextReset: true,
+          };
         }
         // Branch busy — fork new branch
         const newBranch = this.createBranch({
@@ -217,7 +235,12 @@ export class ClaudiaBranchService {
         if (this.sessionExists(branch.activeSessionId)) {
           return { branchId: branch.id, sessionId: branch.activeSessionId!, action: 'reused' };
         }
-        return { branchId: branch.id, sessionId: opts.sessionId, action: 'created', contextReset: true };
+        return {
+          branchId: branch.id,
+          sessionId: opts.sessionId,
+          action: 'created',
+          contextReset: true,
+        };
       }
       if (branch) {
         // Branch busy — fork with context reset warning
@@ -225,7 +248,12 @@ export class ClaudiaBranchService {
           hostProjectId: opts.hostProjectId,
           title: opts.title,
         });
-        return { branchId: newBranch.id, sessionId: opts.sessionId, action: 'forked', contextReset: true };
+        return {
+          branchId: newBranch.id,
+          sessionId: opts.sessionId,
+          action: 'forked',
+          contextReset: true,
+        };
       }
     }
     // No branch info — create new

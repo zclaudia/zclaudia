@@ -38,16 +38,14 @@ describe('RequirementsScreen', () => {
         projectId="p1"
         run={makeRun({ title: 'Awesome feature' })}
         socket={{ send: vi.fn() }}
-      />,
+      />
     );
     expect(screen.getByText(/Requirements\s*—\s*Awesome feature/)).toBeInTheDocument();
     expect(screen.getByText(/requirement_draft/)).toBeInTheDocument();
   });
 
   it('Submit Requirements button invokes sendSubmitRequirements with edited path', async () => {
-    const submitSpy = vi
-      .spyOn(api, 'sendSubmitRequirements')
-      .mockImplementation(() => {});
+    const submitSpy = vi.spyOn(api, 'sendSubmitRequirements').mockImplementation(() => {});
     const user = userEvent.setup();
     const socket = { send: vi.fn() };
     render(
@@ -55,7 +53,7 @@ describe('RequirementsScreen', () => {
         projectId="p1"
         run={makeRun({ status: 'requirement_draft' })}
         socket={socket}
-      />,
+      />
     );
     // Path input is the only textbox; default seeded to 'design/requirements.md'.
     const pathInput = screen.getByRole('textbox') as HTMLInputElement;
@@ -72,9 +70,7 @@ describe('RequirementsScreen', () => {
   });
 
   it('Approve button in review status calls sendResolveRequirements with approve and switches to phase-graph', async () => {
-    const resolveSpy = vi
-      .spyOn(api, 'sendResolveRequirements')
-      .mockImplementation(() => {});
+    const resolveSpy = vi.spyOn(api, 'sendResolveRequirements').mockImplementation(() => {});
     const user = userEvent.setup();
     const socket = { send: vi.fn() };
     render(
@@ -82,7 +78,7 @@ describe('RequirementsScreen', () => {
         projectId="p1"
         run={makeRun({ status: 'requirement_review' })}
         socket={socket}
-      />,
+      />
     );
     // Submit must NOT be present in review state; Approve/Reject must be.
     expect(screen.queryByRole('button', { name: /Submit Requirements/i })).not.toBeInTheDocument();
@@ -97,9 +93,7 @@ describe('RequirementsScreen', () => {
   });
 
   it('Reject button in review status calls sendResolveRequirements with reject', async () => {
-    const resolveSpy = vi
-      .spyOn(api, 'sendResolveRequirements')
-      .mockImplementation(() => {});
+    const resolveSpy = vi.spyOn(api, 'sendResolveRequirements').mockImplementation(() => {});
     const user = userEvent.setup();
     const socket = { send: vi.fn() };
     render(
@@ -107,7 +101,7 @@ describe('RequirementsScreen', () => {
         projectId="p1"
         run={makeRun({ status: 'requirement_review' })}
         socket={socket}
-      />,
+      />
     );
     await user.click(screen.getByRole('button', { name: /^Reject$/ }));
 
@@ -126,7 +120,7 @@ describe('RequirementsScreen', () => {
         projectId="p1"
         run={makeRun({ status: 'requirement_review', rejectCount: 4 })}
         socket={{ send: vi.fn() }}
-      />,
+      />
     );
     expect(screen.getByText(/Reject count:\s*4/)).toBeInTheDocument();
     expect(screen.getByText(/escape hatch/i)).toBeInTheDocument();

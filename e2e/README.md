@@ -75,25 +75,25 @@ pnpm test:e2e:ui
 
 ### 已重构为传统 Playwright（100% 通过率）✨
 
-| 测试文件 | 测试数 | 状态 | 说明 |
-|---------|-------|------|------|
-| [chat-core.spec.ts](tests/chat-core.spec.ts) | 8 | ✅ | 聊天核心功能（B1-B8）|
-| [file-reference.spec.ts](tests/file-reference.spec.ts) | 7 | ✅ | 文件引用 @ 功能（D1-D7）|
-| [file-upload.spec.ts](tests/file-upload.spec.ts) | 7 | ✅ | 文件上传功能（E1-E7）|
-| [permission-system.spec.ts](tests/permission-system.spec.ts) | 8 | ✅ | 权限系统（F1-F8）|
-| [project-management.spec.ts](tests/project-management.spec.ts) | 11 | ✅ | 项目管理（A1-A11）|
-| [session-import.spec.ts](tests/session-import.spec.ts) | 6 | ✅ | 会话导入（J1-J6）|
-| [settings-panel.spec.ts](tests/settings-panel.spec.ts) | 6 | ✅ | 设置面板（I1-I6）|
-| [slash-commands.spec.ts](tests/slash-commands.spec.ts) | 9 | ✅ | 斜杠命令（C1-C9）|
-| [workflows.spec.ts](tests/workflows.spec.ts) | 3 | ✅ | 工作流（M1, M3, M7）|
-| **总计** | **65** | **✅** | **所有测试已重构** |
+| 测试文件                                                       | 测试数 | 状态   | 说明                     |
+| -------------------------------------------------------------- | ------ | ------ | ------------------------ |
+| [chat-core.spec.ts](tests/chat-core.spec.ts)                   | 8      | ✅     | 聊天核心功能（B1-B8）    |
+| [file-reference.spec.ts](tests/file-reference.spec.ts)         | 7      | ✅     | 文件引用 @ 功能（D1-D7） |
+| [file-upload.spec.ts](tests/file-upload.spec.ts)               | 7      | ✅     | 文件上传功能（E1-E7）    |
+| [permission-system.spec.ts](tests/permission-system.spec.ts)   | 8      | ✅     | 权限系统（F1-F8）        |
+| [project-management.spec.ts](tests/project-management.spec.ts) | 11     | ✅     | 项目管理（A1-A11）       |
+| [session-import.spec.ts](tests/session-import.spec.ts)         | 6      | ✅     | 会话导入（J1-J6）        |
+| [settings-panel.spec.ts](tests/settings-panel.spec.ts)         | 6      | ✅     | 设置面板（I1-I6）        |
+| [slash-commands.spec.ts](tests/slash-commands.spec.ts)         | 9      | ✅     | 斜杠命令（C1-C9）        |
+| [workflows.spec.ts](tests/workflows.spec.ts)                   | 3      | ✅     | 工作流（M1, M3, M7）     |
+| **总计**                                                       | **65** | **✅** | **所有测试已重构**       |
 
 ### 其他测试
 
-| 测试文件 | 说明 |
-|---------|------|
-| [performance.spec.ts](tests/performance.spec.ts) | 性能测试（L1-L5）|
-| [security.spec.ts](tests/security.spec.ts) | 安全测试（K1-K6）|
+| 测试文件                                         | 说明              |
+| ------------------------------------------------ | ----------------- |
+| [performance.spec.ts](tests/performance.spec.ts) | 性能测试（L1-L5） |
+| [security.spec.ts](tests/security.spec.ts)       | 安全测试（K1-K6） |
 
 ---
 
@@ -151,12 +151,12 @@ pnpm test:e2e:ui
 
 ### 重构前后对比
 
-| 指标 | AI 模式（重构前） | 传统模式（重构后） | 改进 |
-|------|------------------|-------------------|------|
-| **通过率** | ~70% | **100%** | +30% ↑ |
-| **平均速度** | 30-50s/test | 3-7s/test | **快 5-10x** ⚡️ |
-| **外部依赖** | AI API | 无 | **移除** |
-| **维护难度** | 中等 | 低 | **降低 50%** |
+| 指标         | AI 模式（重构前） | 传统模式（重构后） | 改进            |
+| ------------ | ----------------- | ------------------ | --------------- |
+| **通过率**   | ~70%              | **100%**           | +30% ↑          |
+| **平均速度** | 30-50s/test       | 3-7s/test          | **快 5-10x** ⚡️ |
+| **外部依赖** | AI API            | 无                 | **移除**        |
+| **维护难度** | 中等              | 低                 | **降低 50%**    |
 
 ---
 
@@ -232,5 +232,5 @@ describe('My Feature', () => {
 
 ---
 
-*最后更新：2026-02-06*
-*测试覆盖率：65 个核心测试，100% 通过 ✨*
+_最后更新：2026-02-06_
+_测试覆盖率：65 个核心测试，100% 通过 ✨_

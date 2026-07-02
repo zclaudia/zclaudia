@@ -23,16 +23,19 @@ export function NotificationSettingsInline({ readOnly = false }: { readOnly?: bo
   const [packageId, setPackageId] = useState('com.zclaudia.mobile');
 
   useEffect(() => {
-    api.getNotificationConfig()
-      .then((c) => {
+    api
+      .getNotificationConfig()
+      .then(c => {
         setConfig(c);
         setConfigLoaded(true);
         setConfigError(null);
         setLoading(false);
       })
-      .catch((err) => {
+      .catch(err => {
         setConfigLoaded(false);
-        setConfigError(err instanceof Error ? err.message : 'Failed to load gateway notification policy.');
+        setConfigError(
+          err instanceof Error ? err.message : 'Failed to load gateway notification policy.'
+        );
         setLoading(false);
       });
   }, []);
@@ -106,11 +109,15 @@ export function NotificationSettingsInline({ readOnly = false }: { readOnly?: bo
       setConfigLoaded(true);
       setConfigError(null);
       setBridgeStatus(await api.getLocalNotificationBridgeStatus());
-      setStatusResult({ ok: true, message: 'This device is synced to the gateway notification policy.' });
+      setStatusResult({
+        ok: true,
+        message: 'This device is synced to the gateway notification policy.',
+      });
     } catch (err) {
       setStatusResult({
         ok: false,
-        message: err instanceof Error ? err.message : 'Failed to sync this device to the local bridge.',
+        message:
+          err instanceof Error ? err.message : 'Failed to sync this device to the local bridge.',
       });
     } finally {
       setSyncingBridge(false);
@@ -130,7 +137,10 @@ export function NotificationSettingsInline({ readOnly = false }: { readOnly?: bo
       setConfigError(null);
       setBridgeStatus(await api.getLocalNotificationBridgeStatus());
       await api.sendTestNotification();
-      setTestResult({ ok: true, message: 'Test notification sent. Check this device for delivery.' });
+      setTestResult({
+        ok: true,
+        message: 'Test notification sent. Check this device for delivery.',
+      });
     } catch (err) {
       setTestResult({ ok: false, message: err instanceof Error ? err.message : 'Failed to send' });
     } finally {
@@ -146,18 +156,21 @@ export function NotificationSettingsInline({ readOnly = false }: { readOnly?: bo
     return (
       <div className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          Push notifications require a gateway connection. Connect to a gateway to view the active ntfy notification policy.
+          Push notifications require a gateway connection. Connect to a gateway to view the active
+          ntfy notification policy.
         </p>
       </div>
     );
   }
 
-  const localSubscription = bridgeStatus.subscriptions?.[packageId] as {
-    connected?: boolean;
-    status?: string;
-    last_error?: string;
-    retry_in_ms?: number;
-  } | undefined;
+  const localSubscription = bridgeStatus.subscriptions?.[packageId] as
+    | {
+        connected?: boolean;
+        status?: string;
+        last_error?: string;
+        retry_in_ms?: number;
+      }
+    | undefined;
   const gatewayPolicyAvailable = configLoaded && !configError;
 
   const bridgeStatusText = !isAndroid()
@@ -176,7 +189,8 @@ export function NotificationSettingsInline({ readOnly = false }: { readOnly?: bo
     return (
       <div className="space-y-6">
         <p className="text-sm text-muted-foreground">
-          This device consumes notification policy from the gateway. Event rules are configured statically on the gateway; Android only handles local delivery and status.
+          This device consumes notification policy from the gateway. Event rules are configured
+          statically on the gateway; Android only handles local delivery and status.
         </p>
 
         <div className="p-3 bg-secondary/40 rounded-lg border border-border/60 space-y-1">
@@ -199,41 +213,50 @@ export function NotificationSettingsInline({ readOnly = false }: { readOnly?: bo
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Server URL</p>
-              <p className="text-sm break-all">{gatewayPolicyAvailable ? (config.ntfyUrl || 'Not configured') : 'Unavailable'}</p>
+              <p className="text-sm break-all">
+                {gatewayPolicyAvailable ? config.ntfyUrl || 'Not configured' : 'Unavailable'}
+              </p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Topic</p>
-              <p className="text-sm break-all">{gatewayPolicyAvailable ? (config.ntfyTopic || 'Not configured') : 'Unavailable'}</p>
+              <p className="text-sm break-all">
+                {gatewayPolicyAvailable ? config.ntfyTopic || 'Not configured' : 'Unavailable'}
+              </p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Auth</p>
-              <p className="text-sm font-medium">{gatewayPolicyAvailable ? (config.ntfyAuthMode || 'none') : 'Unavailable'}</p>
+              <p className="text-sm font-medium">
+                {gatewayPolicyAvailable ? config.ntfyAuthMode || 'none' : 'Unavailable'}
+              </p>
             </div>
-            {configError && (
-              <p className="text-xs text-destructive">{configError}</p>
-            )}
+            {configError && <p className="text-xs text-destructive">{configError}</p>}
             <p className="text-xs text-muted-foreground">
-              Event types, enablement, and delivery policy are configured on the gateway, not on this device.
+              Event types, enablement, and delivery policy are configured on the gateway, not on
+              this device.
             </p>
           </div>
         </div>
 
         {statusResult && (
-          <div className={`p-3 rounded-lg text-sm ${
-            statusResult.ok
-              ? 'bg-success/10 border border-success/30 text-success'
-              : 'bg-destructive/10 border border-destructive/30 text-destructive'
-          }`}>
+          <div
+            className={`p-3 rounded-lg text-sm ${
+              statusResult.ok
+                ? 'bg-success/10 border border-success/30 text-success'
+                : 'bg-destructive/10 border border-destructive/30 text-destructive'
+            }`}
+          >
             {statusResult.message}
           </div>
         )}
 
         {testResult && (
-          <div className={`p-3 rounded-lg text-sm ${
-            testResult.ok
-              ? 'bg-success/10 border border-success/30 text-success'
-              : 'bg-destructive/10 border border-destructive/30 text-destructive'
-          }`}>
+          <div
+            className={`p-3 rounded-lg text-sm ${
+              testResult.ok
+                ? 'bg-success/10 border border-success/30 text-success'
+                : 'bg-destructive/10 border border-destructive/30 text-destructive'
+            }`}
+          >
             {testResult.message}
           </div>
         )}
@@ -263,7 +286,16 @@ export function NotificationSettingsInline({ readOnly = false }: { readOnly?: bo
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted-foreground">
-        Receive push notifications on your phone via <a href="https://ntfy.sh" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">ntfy</a>. Install the ntfy app and subscribe to the same topic configured below.
+        Receive push notifications on your phone via{' '}
+        <a
+          href="https://ntfy.sh"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary hover:underline"
+        >
+          ntfy
+        </a>
+        . Install the ntfy app and subscribe to the same topic configured below.
       </p>
 
       <div className="p-3 bg-secondary/40 rounded-lg border border-border/60">
@@ -285,9 +317,7 @@ export function NotificationSettingsInline({ readOnly = false }: { readOnly?: bo
       <div className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
         <div>
           <p className="text-sm font-medium">Enable notifications</p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Send push notifications for events
-          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">Send push notifications for events</p>
         </div>
         <button
           disabled={true}
@@ -348,8 +378,14 @@ export function NotificationSettingsInline({ readOnly = false }: { readOnly?: bo
           <div className="space-y-3">
             <h3 className="text-sm font-medium">Notification filters</h3>
             <div className="space-y-1">
-              {(config.eventAllowlist.length > 0 ? config.eventAllowlist : DEFAULT_EVENT_PATTERNS).map((pattern) => (
-                <div key={pattern} className="flex items-center justify-between p-2 rounded-lg hover:bg-secondary/30">
+              {(config.eventAllowlist.length > 0
+                ? config.eventAllowlist
+                : DEFAULT_EVENT_PATTERNS
+              ).map(pattern => (
+                <div
+                  key={pattern}
+                  className="flex items-center justify-between p-2 rounded-lg hover:bg-secondary/30"
+                >
                   <div>
                     <p className="text-sm">{pattern}</p>
                     <p className="text-xs text-muted-foreground">
@@ -369,36 +405,40 @@ export function NotificationSettingsInline({ readOnly = false }: { readOnly?: bo
 
           {/* Test result */}
           {testResult && (
-            <div className={`p-3 rounded-lg text-sm ${
-              testResult.ok
-                ? 'bg-success/10 border border-success/30 text-success'
-                : 'bg-destructive/10 border border-destructive/30 text-destructive'
-            }`}>
+            <div
+              className={`p-3 rounded-lg text-sm ${
+                testResult.ok
+                  ? 'bg-success/10 border border-success/30 text-success'
+                  : 'bg-destructive/10 border border-destructive/30 text-destructive'
+              }`}
+            >
               {testResult.message}
             </div>
           )}
 
           {/* Action buttons */}
           {statusResult && (
-            <div className={`p-3 rounded-lg text-sm ${
-              statusResult.ok
-                ? 'bg-success/10 border border-success/30 text-success'
-                : 'bg-destructive/10 border border-destructive/30 text-destructive'
-            }`}>
+            <div
+              className={`p-3 rounded-lg text-sm ${
+                statusResult.ok
+                  ? 'bg-success/10 border border-success/30 text-success'
+                  : 'bg-destructive/10 border border-destructive/30 text-destructive'
+              }`}
+            >
               {statusResult.message}
             </div>
           )}
 
           {!readOnly && (
-          <div className="flex gap-2">
-            <button
-              onClick={handleTest}
-              disabled={testing || !config.ntfyTopic}
-              className="px-4 py-2 text-sm rounded-lg border border-border hover:bg-secondary disabled:opacity-50 font-medium transition-colors"
-            >
-              {testing ? 'Sending...' : 'Send Test'}
-            </button>
-          </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleTest}
+                disabled={testing || !config.ntfyTopic}
+                className="px-4 py-2 text-sm rounded-lg border border-border hover:bg-secondary disabled:opacity-50 font-medium transition-colors"
+              >
+                {testing ? 'Sending...' : 'Send Test'}
+              </button>
+            </div>
           )}
         </>
       )}

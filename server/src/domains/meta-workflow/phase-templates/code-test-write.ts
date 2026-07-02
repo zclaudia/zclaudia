@@ -18,8 +18,10 @@ export const codeTestWriteTemplate: PhaseTemplate = {
       `Use the multi-step pattern: identify uncovered behavior → write tests → run them → verify pass.`,
       ``,
       `Acceptance gates that MUST pass:`,
-      ...phase.acceptanceGates.map((g) => `  - ${g.id}: ${g.command}`),
+      ...phase.acceptanceGates.map(g => `  - ${g.id}: ${g.command}`),
     ].join('\n');
   },
-  defaultGates(_phase: PhaseDef) { return []; },
+  defaultGates(_phase: PhaseDef) {
+    return [];
+  },
 };

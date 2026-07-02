@@ -25,7 +25,10 @@ describe('extractRetryDelayMsFromError', () => {
 
   it('parses "resets 7pm (Asia/Shanghai)" format', () => {
     const now = Date.parse('2026-03-06T08:00:00Z'); // 16:00 in Asia/Shanghai
-    const ms = extractRetryDelayMsFromError("You're out of extra usage · resets 7pm (Asia/Shanghai)", now);
+    const ms = extractRetryDelayMsFromError(
+      "You're out of extra usage · resets 7pm (Asia/Shanghai)",
+      now
+    );
     expect(ms).toBe(3 * 60 * 60 * 1000); // 3 hours to 19:00 local
   });
 
@@ -42,7 +45,7 @@ describe('extractRetryDelayMsFromError', () => {
   it('parses "resets 7pm" when already past 7pm (rolls to next day)', () => {
     // 12:00 UTC = 20:00 in Asia/Shanghai, past 7pm
     const now = Date.parse('2026-03-06T12:00:00Z');
-    const ms = extractRetryDelayMsFromError("limit resets 7pm (Asia/Shanghai)", now);
+    const ms = extractRetryDelayMsFromError('limit resets 7pm (Asia/Shanghai)', now);
     // Should roll to next day 7pm local = 2026-03-07T11:00:00Z
     // That's 23 hours from now
     expect(ms).toBe(23 * 60 * 60 * 1000);

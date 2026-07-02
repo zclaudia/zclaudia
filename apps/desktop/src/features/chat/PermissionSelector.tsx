@@ -1,7 +1,22 @@
 import { useState, useRef, useEffect } from 'react';
-import { Shield, Scale, Rocket, LockOpen, Settings, Lightbulb, ChevronDown, SlidersHorizontal, AlertTriangle } from 'lucide-react';
+import {
+  Shield,
+  Scale,
+  Rocket,
+  LockOpen,
+  Settings,
+  Lightbulb,
+  ChevronDown,
+  SlidersHorizontal,
+  AlertTriangle,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { UnifiedPermissionPolicy, CategoryAction, PermissionCategory, CategoryProfile } from '@zclaudia/shared';
+import type {
+  UnifiedPermissionPolicy,
+  CategoryAction,
+  PermissionCategory,
+  CategoryProfile,
+} from '@zclaudia/shared';
 
 interface PermissionSelectorProps {
   value: Partial<UnifiedPermissionPolicy> | null;
@@ -10,46 +25,92 @@ interface PermissionSelectorProps {
 }
 
 // Preset profiles mapping to v3 CategoryProfile
-const PRESETS: { id: string; label: string; icon: LucideIcon; description: string; profile: CategoryProfile }[] = [
+const PRESETS: {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  description: string;
+  profile: CategoryProfile;
+}[] = [
   {
     id: 'read-only',
     label: 'Read Only',
     icon: Shield,
     description: 'Only auto-approve read operations',
-    profile: { fileRead: 'auto-approve', fileWrite: 'ask', shellSafe: 'ask', networkOps: 'ask', destructiveOps: 'block', userQuestions: 'ask' },
+    profile: {
+      fileRead: 'auto-approve',
+      fileWrite: 'ask',
+      shellSafe: 'ask',
+      networkOps: 'ask',
+      destructiveOps: 'block',
+      userQuestions: 'ask',
+    },
   },
   {
     id: 'standard',
     label: 'Standard',
     icon: Scale,
     description: '+ File edits auto-approved',
-    profile: { fileRead: 'auto-approve', fileWrite: 'auto-approve', shellSafe: 'ask', networkOps: 'ask', destructiveOps: 'block', userQuestions: 'ask' },
+    profile: {
+      fileRead: 'auto-approve',
+      fileWrite: 'auto-approve',
+      shellSafe: 'ask',
+      networkOps: 'ask',
+      destructiveOps: 'block',
+      userQuestions: 'ask',
+    },
   },
   {
     id: 'power-user',
     label: 'Power User',
     icon: Rocket,
     description: '+ Safe shell auto-approved',
-    profile: { fileRead: 'auto-approve', fileWrite: 'auto-approve', shellSafe: 'auto-approve', networkOps: 'ask', destructiveOps: 'block', userQuestions: 'ask' },
+    profile: {
+      fileRead: 'auto-approve',
+      fileWrite: 'auto-approve',
+      shellSafe: 'auto-approve',
+      networkOps: 'ask',
+      destructiveOps: 'block',
+      userQuestions: 'ask',
+    },
   },
   {
     id: 'full-auto',
     label: 'Full Auto',
     icon: LockOpen,
     description: '+ Network ops auto-approved',
-    profile: { fileRead: 'auto-approve', fileWrite: 'auto-approve', shellSafe: 'auto-approve', networkOps: 'auto-approve', destructiveOps: 'block', userQuestions: 'ask' },
+    profile: {
+      fileRead: 'auto-approve',
+      fileWrite: 'auto-approve',
+      shellSafe: 'auto-approve',
+      networkOps: 'auto-approve',
+      destructiveOps: 'block',
+      userQuestions: 'ask',
+    },
   },
   {
     id: 'bypass-all',
     label: 'Bypass All',
     icon: AlertTriangle,
     description: '⚠ Auto-approves EVERYTHING including destructive operations',
-    profile: { fileRead: 'auto-approve', fileWrite: 'auto-approve', shellSafe: 'auto-approve', networkOps: 'auto-approve', destructiveOps: 'auto-approve', userQuestions: 'auto-approve' },
+    profile: {
+      fileRead: 'auto-approve',
+      fileWrite: 'auto-approve',
+      shellSafe: 'auto-approve',
+      networkOps: 'auto-approve',
+      destructiveOps: 'auto-approve',
+      userQuestions: 'auto-approve',
+    },
   },
 ];
 
 const CATEGORY_ORDER: PermissionCategory[] = [
-  'fileRead', 'fileWrite', 'shellSafe', 'networkOps', 'destructiveOps', 'userQuestions',
+  'fileRead',
+  'fileWrite',
+  'shellSafe',
+  'networkOps',
+  'destructiveOps',
+  'userQuestions',
 ];
 
 const CATEGORY_LABELS: Record<PermissionCategory, string> = {
@@ -77,7 +138,10 @@ export function PermissionSelector({ value, onChange, disabled }: PermissionSele
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!isOpen) { setShowCustom(false); return; }
+    if (!isOpen) {
+      setShowCustom(false);
+      return;
+    }
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         setIsOpen(false);
@@ -108,7 +172,7 @@ export function PermissionSelector({ value, onChange, disabled }: PermissionSele
     (value.profile.fileWrite === 'auto-approve' || value.profile.shellSafe === 'auto-approve')
   );
 
-  const handleSelectPreset = (preset: typeof PRESETS[number] | null) => {
+  const handleSelectPreset = (preset: (typeof PRESETS)[number] | null) => {
     if (preset === null) {
       onChange(null);
     } else {
@@ -131,13 +195,14 @@ export function PermissionSelector({ value, onChange, disabled }: PermissionSele
         className={`
           flex items-center gap-1 px-1.5 py-1 rounded-md text-[11px] font-medium
           transition-colors h-7
-          ${disabled
-            ? 'opacity-50 cursor-not-allowed text-muted-foreground'
-            : isElevated
-            ? 'bg-warning/10 text-warning border border-warning/40 hover:bg-warning/15 active:bg-warning/20 cursor-pointer'
-            : hasOverride
-            ? 'text-primary hover:bg-secondary active:bg-secondary/80 hover:text-foreground cursor-pointer'
-            : 'text-muted-foreground hover:bg-secondary active:bg-secondary/80 hover:text-foreground cursor-pointer'
+          ${
+            disabled
+              ? 'opacity-50 cursor-not-allowed text-muted-foreground'
+              : isElevated
+                ? 'bg-warning/10 text-warning border border-warning/40 hover:bg-warning/15 active:bg-warning/20 cursor-pointer'
+                : hasOverride
+                  ? 'text-primary hover:bg-secondary active:bg-secondary/80 hover:text-foreground cursor-pointer'
+                  : 'text-muted-foreground hover:bg-secondary active:bg-secondary/80 hover:text-foreground cursor-pointer'
           }
         `}
         title={triggerLabel}
@@ -159,13 +224,16 @@ export function PermissionSelector({ value, onChange, disabled }: PermissionSele
             onClick={() => handleSelectPreset(null)}
             className={`
               w-full text-left px-3 py-1.5 transition-colors
-              ${!hasOverride
-                ? 'bg-muted/60 text-primary font-medium'
-                : 'text-foreground hover:bg-muted active:bg-muted'
+              ${
+                !hasOverride
+                  ? 'bg-muted/60 text-primary font-medium'
+                  : 'text-foreground hover:bg-muted active:bg-muted'
               }
             `}
           >
-            <div className="flex items-center gap-1.5 text-[13px]"><Settings size={13} strokeWidth={1.75} /> Project Default</div>
+            <div className="flex items-center gap-1.5 text-[13px]">
+              <Settings size={13} strokeWidth={1.75} /> Project Default
+            </div>
             <div className="text-[10px] text-muted-foreground mt-0.5">
               Use project or global permission settings
             </div>
@@ -176,8 +244,9 @@ export function PermissionSelector({ value, onChange, disabled }: PermissionSele
           {/* Preset options */}
           {!showCustom && (
             <>
-              {PRESETS.map((preset) => {
-                const isActive = value?.profile && profilesEqual(preset.profile, value.profile as CategoryProfile);
+              {PRESETS.map(preset => {
+                const isActive =
+                  value?.profile && profilesEqual(preset.profile, value.profile as CategoryProfile);
                 const isBypassAll = preset.id === 'bypass-all';
                 return (
                   <button
@@ -185,14 +254,23 @@ export function PermissionSelector({ value, onChange, disabled }: PermissionSele
                     onClick={() => handleSelectPreset(preset)}
                     className={`
                       w-full text-left px-3 py-1.5 transition-colors
-                      ${isActive
-                        ? (isBypassAll ? 'bg-orange-500/15 text-orange-300 font-medium' : 'bg-muted/60 text-primary font-medium')
-                        : (isBypassAll ? 'text-orange-400 hover:bg-orange-500/10 active:bg-orange-500/15' : 'text-foreground hover:bg-muted active:bg-muted')
+                      ${
+                        isActive
+                          ? isBypassAll
+                            ? 'bg-orange-500/15 text-orange-300 font-medium'
+                            : 'bg-muted/60 text-primary font-medium'
+                          : isBypassAll
+                            ? 'text-orange-400 hover:bg-orange-500/10 active:bg-orange-500/15'
+                            : 'text-foreground hover:bg-muted active:bg-muted'
                       }
                     `}
                   >
-                    <div className="flex items-center gap-1.5 text-[13px]"><preset.icon size={13} strokeWidth={1.75} /> {preset.label}</div>
-                    <div className={`text-[10px] mt-0.5 ${isBypassAll ? 'text-orange-400/80' : 'text-muted-foreground'}`}>
+                    <div className="flex items-center gap-1.5 text-[13px]">
+                      <preset.icon size={13} strokeWidth={1.75} /> {preset.label}
+                    </div>
+                    <div
+                      className={`text-[10px] mt-0.5 ${isBypassAll ? 'text-orange-400/80' : 'text-muted-foreground'}`}
+                    >
                       {preset.description}
                     </div>
                   </button>
@@ -206,13 +284,16 @@ export function PermissionSelector({ value, onChange, disabled }: PermissionSele
                 onClick={() => setShowCustom(true)}
                 className={`
                   w-full text-left px-3 py-1.5 transition-colors
-                  ${triggerLabel === 'Custom'
-                    ? 'bg-muted/60 text-primary font-medium'
-                    : 'text-foreground hover:bg-muted active:bg-muted'
+                  ${
+                    triggerLabel === 'Custom'
+                      ? 'bg-muted/60 text-primary font-medium'
+                      : 'text-foreground hover:bg-muted active:bg-muted'
                   }
                 `}
               >
-                <div className="flex items-center gap-1.5 text-[13px]"><SlidersHorizontal size={13} strokeWidth={1.75} /> Custom...</div>
+                <div className="flex items-center gap-1.5 text-[13px]">
+                  <SlidersHorizontal size={13} strokeWidth={1.75} /> Custom...
+                </div>
                 <div className="text-[10px] text-muted-foreground mt-0.5">
                   Fine-tune each category individually
                 </div>
@@ -229,23 +310,30 @@ export function PermissionSelector({ value, onChange, disabled }: PermissionSele
               >
                 &larr; Back to presets
               </button>
-              {CATEGORY_ORDER.map((cat) => {
+              {CATEGORY_ORDER.map(cat => {
                 const isLocked = cat === 'userQuestions';
-                const currentValue = (value?.profile as Record<string, CategoryAction> | undefined)?.[cat];
+                const currentValue = (
+                  value?.profile as Record<string, CategoryAction> | undefined
+                )?.[cat];
                 return (
                   <div key={cat} className="flex items-center justify-between py-0.5">
                     <span className="text-[11px] font-medium">{CATEGORY_LABELS[cat]}</span>
                     <select
                       value={isLocked ? 'ask' : (currentValue ?? 'inherit')}
-                      onChange={(e) => {
+                      onChange={e => {
                         const val = e.target.value;
                         if (val === 'inherit') {
                           // Remove this category from override
-                          const newProfile = { ...value?.profile } as Record<string, CategoryAction>;
+                          const newProfile = { ...value?.profile } as Record<
+                            string,
+                            CategoryAction
+                          >;
                           delete newProfile[cat];
-                          onChange(Object.keys(newProfile).length > 0
-                            ? { ...value, enabled: true, profile: newProfile as CategoryProfile }
-                            : null);
+                          onChange(
+                            Object.keys(newProfile).length > 0
+                              ? { ...value, enabled: true, profile: newProfile as CategoryProfile }
+                              : null
+                          );
                         } else {
                           handleCustomChange(cat, val as CategoryAction);
                         }
@@ -256,8 +344,10 @@ export function PermissionSelector({ value, onChange, disabled }: PermissionSele
                       } ${currentValue ? '' : 'text-muted-foreground'}`}
                     >
                       <option value="inherit">Inherit</option>
-                      {ACTION_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      {ACTION_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -268,7 +358,9 @@ export function PermissionSelector({ value, onChange, disabled }: PermissionSele
 
           {/* Info footer */}
           <div className="px-3 py-1.5 text-[10px] text-muted-foreground border-t border-border mt-1">
-            <span className="flex items-center gap-1"><Lightbulb size={10} strokeWidth={1.75} /> Session override is temporary</span>
+            <span className="flex items-center gap-1">
+              <Lightbulb size={10} strokeWidth={1.75} /> Session override is temporary
+            </span>
           </div>
         </div>
       )}

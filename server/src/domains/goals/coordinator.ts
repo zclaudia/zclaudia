@@ -1,6 +1,6 @@
 import { GOAL_AUTO_CONTINUATION_TEXT } from '@zclaudia/shared';
-import { GoalService } from './service.js';
-import { GoalEvaluator, type TranscriptMessage } from './evaluator.js';
+import { type GoalService } from './service.js';
+import { type GoalEvaluator, type TranscriptMessage } from './evaluator.js';
 
 export interface TranscriptPort {
   read(sessionId: string, lookback: number): Promise<TranscriptMessage[]>;
@@ -10,7 +10,7 @@ export interface ContinueTurnPort {
   appendAndRun(
     sessionId: string,
     text: string,
-    metadata: { source: 'goal-auto'; goalId: string },
+    metadata: { source: 'goal-auto'; goalId: string }
   ): Promise<void>;
 }
 
@@ -75,7 +75,7 @@ export class GoalCoordinator {
       case 'blocked':
         this.deps.service.markCompleted(
           goal.id,
-          `blocked: ${evalResult.verdict.reason || 'no progress'}`,
+          `blocked: ${evalResult.verdict.reason || 'no progress'}`
         );
         return;
       case 'error':
@@ -100,7 +100,10 @@ export class GoalCoordinator {
       try {
         this.deps.service.markBudgetLimited(goal.id, 'continuation failed');
       } catch (markErr) {
-        console.warn(`[goal] markBudgetLimited after continuation failure failed for ${goal.id}:`, markErr);
+        console.warn(
+          `[goal] markBudgetLimited after continuation failure failed for ${goal.id}:`,
+          markErr
+        );
       }
     }
   }
@@ -135,7 +138,10 @@ export class GoalCoordinator {
       try {
         this.deps.service.markBudgetLimited(goal.id, 'continuation failed');
       } catch (markErr) {
-        console.warn(`[goal] markBudgetLimited after resume failure failed for ${goal.id}:`, markErr);
+        console.warn(
+          `[goal] markBudgetLimited after resume failure failed for ${goal.id}:`,
+          markErr
+        );
       }
     }
   }

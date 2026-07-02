@@ -88,28 +88,32 @@ export type TerminalLifecycleKind = TerminalLifecycleState['kind'];
  *   exited / disposed are terminal — only `disposed` is reachable from `exited`
  *   (via the controller's automatic cleanup or explicit dispose()).
  */
-export const TERMINAL_LIFECYCLE_TRANSITIONS: Readonly<Record<TerminalLifecycleKind, readonly TerminalLifecycleKind[]>> = Object.freeze({
-  idle:       ['opening', 'attaching', 'disposed'],
-  opening:    ['open', 'failed', 'disposed'],
+export const TERMINAL_LIFECYCLE_TRANSITIONS: Readonly<
+  Record<TerminalLifecycleKind, readonly TerminalLifecycleKind[]>
+> = Object.freeze({
+  idle: ['opening', 'attaching', 'disposed'],
+  opening: ['open', 'failed', 'disposed'],
   // attaching → exited covers the case where the PTY exited while detached and the server
   // forwards the exit code along with the scrollback in terminal_attached.pendingExit.
-  attaching:  ['open', 'failed', 'exited', 'disposed'],
-  open:       ['detached', 'exited', 'disposed'],
-  detached:   ['attaching', 'disposed'],
-  failed:     ['opening', 'attaching', 'disposed'],
-  exited:     ['disposed'],
-  disposed:   [],
+  attaching: ['open', 'failed', 'exited', 'disposed'],
+  open: ['detached', 'exited', 'disposed'],
+  detached: ['attaching', 'disposed'],
+  failed: ['opening', 'attaching', 'disposed'],
+  exited: ['disposed'],
+  disposed: [],
 });
 
 /** Returns true iff `next` is a legal successor of `current`. */
 export function canTransition(
   current: TerminalLifecycleKind,
-  next: TerminalLifecycleKind,
+  next: TerminalLifecycleKind
 ): boolean {
   return TERMINAL_LIFECYCLE_TRANSITIONS[current].includes(next);
 }
 
 /** Convenience predicates used across views and tests. */
 export const isTerminalReady = (s: TerminalLifecycleState): boolean => s.kind === 'open';
-export const isTerminalBusy = (s: TerminalLifecycleState): boolean => s.kind === 'opening' || s.kind === 'attaching';
-export const isTerminalTerminal = (s: TerminalLifecycleState): boolean => s.kind === 'exited' || s.kind === 'disposed';
+export const isTerminalBusy = (s: TerminalLifecycleState): boolean =>
+  s.kind === 'opening' || s.kind === 'attaching';
+export const isTerminalTerminal = (s: TerminalLifecycleState): boolean =>
+  s.kind === 'exited' || s.kind === 'disposed';

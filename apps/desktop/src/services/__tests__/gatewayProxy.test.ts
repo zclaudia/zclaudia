@@ -42,7 +42,9 @@ describe('services/gatewayProxy', () => {
 
     it('routes directly to gateway on mobile (with ws://)', () => {
       vi.mocked(useServerStore.getState).mockReturnValue({ localServerPort: null } as any);
-      vi.mocked(useGatewayStore.getState).mockReturnValue({ gatewayUrl: 'ws://gateway.example.com' } as any);
+      vi.mocked(useGatewayStore.getState).mockReturnValue({
+        gatewayUrl: 'ws://gateway.example.com',
+      } as any);
 
       const result = resolveGatewayBackendUrl('backend-1');
 
@@ -51,7 +53,9 @@ describe('services/gatewayProxy', () => {
 
     it('routes directly to gateway on mobile (with wss://)', () => {
       vi.mocked(useServerStore.getState).mockReturnValue({ localServerPort: null } as any);
-      vi.mocked(useGatewayStore.getState).mockReturnValue({ gatewayUrl: 'wss://secure.gateway.com' } as any);
+      vi.mocked(useGatewayStore.getState).mockReturnValue({
+        gatewayUrl: 'wss://secure.gateway.com',
+      } as any);
 
       const result = resolveGatewayBackendUrl('backend-1');
 
@@ -60,7 +64,9 @@ describe('services/gatewayProxy', () => {
 
     it('routes directly to gateway on mobile (without protocol)', () => {
       vi.mocked(useServerStore.getState).mockReturnValue({ localServerPort: null } as any);
-      vi.mocked(useGatewayStore.getState).mockReturnValue({ gatewayUrl: 'gateway.example.com:8080' } as any);
+      vi.mocked(useGatewayStore.getState).mockReturnValue({
+        gatewayUrl: 'gateway.example.com:8080',
+      } as any);
 
       const result = resolveGatewayBackendUrl('backend-1');
 
@@ -69,7 +75,9 @@ describe('services/gatewayProxy', () => {
 
     it('prioritizes desktop local proxy over gateway URL', () => {
       vi.mocked(useServerStore.getState).mockReturnValue({ localServerPort: 3456 } as any);
-      vi.mocked(useGatewayStore.getState).mockReturnValue({ gatewayUrl: 'ws://gateway.example.com' } as any);
+      vi.mocked(useGatewayStore.getState).mockReturnValue({
+        gatewayUrl: 'ws://gateway.example.com',
+      } as any);
 
       const result = resolveGatewayBackendUrl('backend-1');
 
@@ -98,7 +106,9 @@ describe('services/gatewayProxy', () => {
 
     it('returns Bearer token on mobile with gateway secret', () => {
       vi.mocked(useServerStore.getState).mockReturnValue({ localServerPort: null } as any);
-      vi.mocked(useGatewayStore.getState).mockReturnValue({ gatewaySecret: 'my-secret-token' } as any);
+      vi.mocked(useGatewayStore.getState).mockReturnValue({
+        gatewaySecret: 'my-secret-token',
+      } as any);
 
       const result = getGatewayAuthHeaders();
 

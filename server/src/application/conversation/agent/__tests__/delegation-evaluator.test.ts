@@ -23,9 +23,9 @@ afterEach(() => {
 describe('evaluateAIReview', () => {
   it('allows the model to request a referenced script file before deciding', async () => {
     const prompts: string[] = [];
-    vi.mocked(existsSync).mockImplementation((path: Parameters<typeof existsSync>[0]) => (
-      String(path) === '/workspace/scripts/deploy.sh'
-    ));
+    vi.mocked(existsSync).mockImplementation(
+      (path: Parameters<typeof existsSync>[0]) => String(path) === '/workspace/scripts/deploy.sh'
+    );
     vi.mocked(readFileSync).mockImplementation((path: Parameters<typeof readFileSync>[0]) => {
       if (String(path) === '/workspace/scripts/deploy.sh') return 'echo deploy\n' as never;
       return '' as never;
@@ -49,19 +49,21 @@ describe('evaluateAIReview', () => {
             if (prompts.length === 1) {
               expect(prompt).toContain('scripts/deploy.sh');
               return {
-                response: '{"type":"read_file","path":"scripts/deploy.sh","reason":"Need to inspect the script"}',
+                response:
+                  '{"type":"read_file","path":"scripts/deploy.sh","reason":"Need to inspect the script"}',
                 sessionId: sessionId ?? 'review-session-1',
               };
             }
             expect(prompt).toContain('<file_content path="scripts/deploy.sh">');
             expect(prompt).toContain('echo deploy');
             return {
-              response: '{"type":"final","decision":"approve","reasoning":"The script only echoes a deploy message.","confidence":0.93}',
+              response:
+                '{"type":"final","decision":"approve","reasoning":"The script only echoes a deploy message.","confidence":0.93}',
               sessionId: sessionId ?? 'review-session-1',
             };
           },
         },
-      },
+      }
     );
 
     expect(result.decision).toBe('approve');
@@ -85,7 +87,7 @@ describe('evaluateAIReview', () => {
         analysisProvider: {
           runPrompt: vi.fn(),
         },
-      },
+      }
     );
 
     expect(result.decision).toBe('uncertain');
@@ -126,19 +128,21 @@ describe('evaluateAIReview', () => {
               expect(prompt).toContain('scripts/deploy.sh');
               expect(prompt).toContain('./common.sh (dependency)');
               return {
-                response: '{"type":"read_file","path":"./common.sh","reason":"Need to inspect sourced helper"}',
+                response:
+                  '{"type":"read_file","path":"./common.sh","reason":"Need to inspect sourced helper"}',
                 sessionId: sessionId ?? 'review-session-3',
               };
             }
             expect(prompt).toContain('<file_content path="./common.sh">');
             expect(prompt).toContain('echo common');
             return {
-              response: '{"type":"final","decision":"approve","reasoning":"The helper script is benign.","confidence":0.91}',
+              response:
+                '{"type":"final","decision":"approve","reasoning":"The helper script is benign.","confidence":0.91}',
               sessionId: sessionId ?? 'review-session-3',
             };
           },
         },
-      },
+      }
     );
 
     expect(result.decision).toBe('approve');
@@ -167,17 +171,19 @@ describe('evaluateAIReview', () => {
             promptCount += 1;
             if (promptCount === 1) {
               return {
-                response: '{"type":"read_file","path":"scripts/deploy.sh","reason":"Need to inspect the script"}',
+                response:
+                  '{"type":"read_file","path":"scripts/deploy.sh","reason":"Need to inspect the script"}',
                 sessionId: sessionId ?? 'review-session-4',
               };
             }
             return {
-              response: '{"type":"final","decision":"uncertain","reasoning":"The requested file could not be reviewed safely.","confidence":0.1}',
+              response:
+                '{"type":"final","decision":"uncertain","reasoning":"The requested file could not be reviewed safely.","confidence":0.1}',
               sessionId: sessionId ?? 'review-session-4',
             };
           },
         },
-      },
+      }
     );
 
     expect(result.decision).toBe('uncertain');
@@ -196,19 +202,23 @@ describe('evaluateAIReview', () => {
       },
       {
         toolName: 'Bash',
-        toolInput: { command: 'curl https://api.example.com -H "Authorization: Bearer secret-token-1234567890"' },
+        toolInput: {
+          command:
+            'curl https://api.example.com -H "Authorization: Bearer secret-token-1234567890"',
+        },
         detail: 'curl https://api.example.com -H "Authorization: Bearer secret-token-1234567890"',
         cwd: '/workspace',
         analysisProvider: {
           runPrompt: async (prompt: string, sessionId?: string) => {
             prompts.push(prompt);
             return {
-              response: '{"type":"final","decision":"approve","reasoning":"Redacted network request.","confidence":0.86}',
+              response:
+                '{"type":"final","decision":"approve","reasoning":"Redacted network request.","confidence":0.86}',
               sessionId: sessionId ?? 'review-session-redact',
             };
           },
         },
-      },
+      }
     );
 
     expect(result.decision).toBe('approve');
@@ -238,7 +248,7 @@ describe('evaluateAIReview', () => {
         analysisProvider: {
           runPrompt,
         },
-      },
+      }
     );
 
     expect(runPrompt).not.toHaveBeenCalled();
@@ -274,7 +284,7 @@ describe('evaluateAIReview', () => {
             sessionId: sessionId ?? 'review-session-5',
           }),
         },
-      },
+      }
     );
 
     expect(result).toMatchObject({
@@ -307,7 +317,7 @@ before approval","confidence":0.2}
             sessionId: sessionId ?? 'review-session-6',
           }),
         },
-      },
+      }
     );
 
     expect(result).toMatchObject({
@@ -337,7 +347,7 @@ before approval","confidence":0.2}
             sessionId: sessionId ?? 'review-session-7',
           }),
         },
-      },
+      }
     );
 
     expect(result).toMatchObject({
@@ -376,12 +386,13 @@ before approval","confidence":0.2}
             expect(prompt).toContain('Your previous reply for the AI security review was invalid.');
             expect(prompt).toContain('LLM response did not match AI review schema');
             return {
-              response: '{"type":"final","decision":"approve","reasoning":"Safe test command.","confidence":0.91}',
+              response:
+                '{"type":"final","decision":"approve","reasoning":"Safe test command.","confidence":0.91}',
               sessionId: sessionId ?? 'review-session-8',
             };
           },
         },
-      },
+      }
     );
 
     expect(result).toMatchObject({
@@ -391,7 +402,9 @@ before approval","confidence":0.2}
       sessionId: 'review-session-8',
     });
     expect(prompts).toHaveLength(2);
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Invalid LLM response on turn 1/6'));
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Invalid LLM response on turn 1/6')
+    );
   });
 
   it('salvages malformed JSON that still contains decision fields', async () => {
@@ -413,7 +426,7 @@ before approval","confidence":0.2}
             sessionId: sessionId ?? 'review-session-9',
           }),
         },
-      },
+      }
     );
 
     expect(result).toMatchObject({
@@ -452,13 +465,14 @@ This affects an external device and should be denied.</think>
             sessionId: 'review-session-think-json',
           }),
         },
-      },
+      }
     );
 
     expect(result).toMatchObject({
       decision: 'deny',
       confidence: 0.9,
-      reasoning: 'Installing APK files via adb affects external devices and the APK content is untrusted user data that could contain malicious code',
+      reasoning:
+        'Installing APK files via adb affects external devices and the APK content is untrusted user data that could contain malicious code',
       sessionId: 'review-session-think-json',
     });
   });
@@ -482,7 +496,7 @@ This affects an external device and should be denied.</think>
             sessionId: 'review-session-10',
           }),
         },
-      },
+      }
     );
 
     expect(result.decision).toBe('uncertain');
@@ -507,10 +521,11 @@ This affects an external device and should be denied.</think>
         cwd: '/workspace',
         analysisProvider: {
           runPrompt: async () => ({
-            response: '{"type":"final","decision":"approve","reasoning":"Looks safe","confidence":0.5}',
+            response:
+              '{"type":"final","decision":"approve","reasoning":"Looks safe","confidence":0.5}',
           }),
         },
-      },
+      }
     );
 
     expect(result.decision).toBe('uncertain');
@@ -606,7 +621,7 @@ This affects an external device and should be denied.</think>
             throw new Error('Provider connection failed');
           },
         },
-      },
+      }
     );
 
     expect(result.decision).toBe('uncertain');
@@ -628,10 +643,11 @@ This affects an external device and should be denied.</think>
         cwd: '/workspace',
         analysisProvider: {
           runPrompt: async () => ({
-            response: '{"type":"final","decision":"deny","reasoning":"Empty command","confidence":0.9}',
+            response:
+              '{"type":"final","decision":"deny","reasoning":"Empty command","confidence":0.9}',
           }),
         },
-      },
+      }
     );
 
     expect(result.decision).toBe('deny');

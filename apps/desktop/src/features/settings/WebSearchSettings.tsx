@@ -4,20 +4,23 @@ import { getWebSearchConfig, updateWebSearchConfig } from '../../services/api';
 
 function sourceLabel(source: WebSearchConfigSource): string {
   switch (source) {
-    case 'stored': return 'Stored';
-    case 'env': return 'Environment';
-    default: return 'Not configured';
+    case 'stored':
+      return 'Stored';
+    case 'env':
+      return 'Environment';
+    default:
+      return 'Not configured';
   }
 }
 
 function SourceBadge({ source }: { source: WebSearchConfigSource }) {
   const configured = source !== null;
   return (
-    <span className={`text-xs px-2 py-1 rounded-md ${
-      configured
-        ? 'bg-success/15 text-success'
-        : 'bg-muted text-muted-foreground'
-    }`}>
+    <span
+      className={`text-xs px-2 py-1 rounded-md ${
+        configured ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground'
+      }`}
+    >
       {sourceLabel(source)}
     </span>
   );
@@ -39,7 +42,7 @@ export function WebSearchSettings({ readOnly = false }: WebSearchSettingsProps) 
   useEffect(() => {
     let cancelled = false;
     getWebSearchConfig()
-      .then((data) => {
+      .then(data => {
         if (cancelled) return;
         setConfig(data);
         setBraveApiKey('');
@@ -129,17 +132,17 @@ export function WebSearchSettings({ readOnly = false }: WebSearchSettingsProps) 
         <div className="border border-border rounded-lg p-4 space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <label className="block text-sm font-medium text-foreground">Brave Search API Key</label>
-              <p className="text-xs text-muted-foreground mt-1">
-                Used first when configured.
-              </p>
+              <label className="block text-sm font-medium text-foreground">
+                Brave Search API Key
+              </label>
+              <p className="text-xs text-muted-foreground mt-1">Used first when configured.</p>
             </div>
             <SourceBadge source={config?.braveApiKeySource ?? null} />
           </div>
           <input
             type="password"
             value={braveApiKey}
-            onChange={(event) => setBraveApiKey(event.target.value)}
+            onChange={event => setBraveApiKey(event.target.value)}
             placeholder={config?.braveApiKey ? 'Configured; enter a new key to replace' : 'brv-...'}
             disabled={readOnly || saving}
             autoComplete="off"
@@ -173,7 +176,7 @@ export function WebSearchSettings({ readOnly = false }: WebSearchSettingsProps) 
           <input
             type="url"
             value={searxngBaseUrl}
-            onChange={(event) => setSearxngBaseUrl(event.target.value)}
+            onChange={event => setSearxngBaseUrl(event.target.value)}
             placeholder="https://search.example.com"
             disabled={readOnly || saving}
             className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary font-mono disabled:opacity-60"

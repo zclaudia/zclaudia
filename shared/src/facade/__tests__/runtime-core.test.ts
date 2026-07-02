@@ -20,8 +20,7 @@ describe('BackendFacadeRuntimeCore', () => {
     core = new BackendFacadeRuntimeCore({
       adapter: mock.adapter,
       mode: 'embedded',
-      localBackendMatcher: (presence, identity) =>
-        presence.instanceId === identity.instanceId,
+      localBackendMatcher: (presence, identity) => presence.instanceId === identity.instanceId,
     });
 
     core.onEvent(e => events.push(e));
@@ -98,10 +97,7 @@ describe('BackendFacadeRuntimeCore', () => {
     it('handles registry_snapshot_received', () => {
       emit({
         type: 'registry_snapshot_received',
-        items: [
-          makePresence({ backendId: 'b1' }),
-          makePresence({ backendId: 'b2' }),
-        ],
+        items: [makePresence({ backendId: 'b1' }), makePresence({ backendId: 'b2' })],
       });
 
       const snapshot = core.getSnapshot();
@@ -111,29 +107,27 @@ describe('BackendFacadeRuntimeCore', () => {
     it('emits snapshot_updated with the full registry snapshot after registry changes', () => {
       emit({
         type: 'registry_snapshot_received',
-        items: [
-          makePresence({ backendId: 'b1' }),
-          makePresence({ backendId: 'b2' }),
-        ],
+        items: [makePresence({ backendId: 'b1' }), makePresence({ backendId: 'b2' })],
       });
 
-      const snapshotEvent = [...events].reverse().find((event) => event.type === 'snapshot_updated');
+      const snapshotEvent = [...events].reverse().find(event => event.type === 'snapshot_updated');
       expect(snapshotEvent).toBeDefined();
       expect(snapshotEvent?.type).toBe('snapshot_updated');
-      expect((snapshotEvent as Extract<BackendFacadeEvent, { type: 'snapshot_updated' }>).snapshot.backends)
-        .toEqual(expect.arrayContaining([
+      expect(
+        (snapshotEvent as Extract<BackendFacadeEvent, { type: 'snapshot_updated' }>).snapshot
+          .backends
+      ).toEqual(
+        expect.arrayContaining([
           expect.objectContaining({ backendId: 'b1' }),
           expect.objectContaining({ backendId: 'b2' }),
-        ]));
+        ])
+      );
     });
 
     it('handles upsert via registry_snapshot_received', () => {
       emit({
         type: 'registry_snapshot_received',
-        items: [
-          makePresence({ backendId: 'b1' }),
-          makePresence({ backendId: 'b2' }),
-        ],
+        items: [makePresence({ backendId: 'b1' }), makePresence({ backendId: 'b2' })],
       });
 
       const snapshot = core.getSnapshot();
@@ -149,6 +143,18 @@ describe('BackendFacadeRuntimeCore', () => {
       const snapshot = core.getSnapshot();
       // Removed backend has presence=null, filtered from snapshot
       expect(snapshot.backends.some(b => b.backendId === 'b1')).toBe(false);
+    });
+
+    it('forwards backend removal events to facade listeners', () => {
+      emit({
+        type: 'backends_removed',
+        backendIds: ['b1'],
+      } as any);
+
+      expect(events).toContainEqual({
+        type: 'backends_removed',
+        backendIds: ['b1'],
+      });
     });
   });
 
@@ -183,7 +189,9 @@ describe('BackendFacadeRuntimeCore', () => {
       emit({
         type: 'backend_data_snapshot_received',
         backendId: 'b1',
-        sessions: [{ sessionId: 's1', createdAt: Date.now(), updatedAt: Date.now(), runStatus: 'idle' }],
+        sessions: [
+          { sessionId: 's1', createdAt: Date.now(), updatedAt: Date.now(), runStatus: 'idle' },
+        ],
         projects: [],
       });
 
@@ -290,15 +298,17 @@ describe('BackendFacadeRuntimeCore', () => {
         error: 'Catch-up failed',
       });
 
-      expect(events).toEqual(expect.arrayContaining([
-        expect.objectContaining({
-          type: 'content_patch_failed',
-          backendId: 'b1',
-          sessionId: 's1',
-          afterOffset: 12,
-          error: 'Catch-up failed',
-        }),
-      ]));
+      expect(events).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            type: 'content_patch_failed',
+            backendId: 'b1',
+            sessionId: 's1',
+            afterOffset: 12,
+            error: 'Catch-up failed',
+          }),
+        ])
+      );
     });
 
     it('auto-resumes streams when backend becomes ready again', () => {

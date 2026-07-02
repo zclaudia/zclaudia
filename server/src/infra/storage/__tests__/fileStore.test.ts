@@ -119,7 +119,9 @@ describe('fileStore', () => {
     mod.initFileStore(db);
     const store = mod.getFileStore();
 
-    db.prepare('INSERT INTO files (id, name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?)').run('f1', 'test.txt', 'text/plain', 9, Date.now());
+    db.prepare(
+      'INSERT INTO files (id, name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?)'
+    ).run('f1', 'test.txt', 'text/plain', 9, Date.now());
 
     const file = store.getFile('f1');
     expect(file).not.toBeNull();
@@ -148,7 +150,9 @@ describe('fileStore', () => {
     const mod = await import('../fileStore.js');
     mod.initFileStore(db);
 
-    db.prepare('INSERT INTO files (id, name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?)').run('f1', 'test.txt', 'text/plain', 9, Date.now());
+    db.prepare(
+      'INSERT INTO files (id, name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?)'
+    ).run('f1', 'test.txt', 'text/plain', 9, Date.now());
 
     const result = mod.getFileStore().getFile('f1');
     expect(result).toBeNull();
@@ -162,7 +166,9 @@ describe('fileStore', () => {
     const mod = await import('../fileStore.js');
     mod.initFileStore(db);
 
-    db.prepare('INSERT INTO files (id, name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?)').run('f1', 'test.txt', 'text/plain', 9, Date.now());
+    db.prepare(
+      'INSERT INTO files (id, name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?)'
+    ).run('f1', 'test.txt', 'text/plain', 9, Date.now());
 
     expect(mod.getFileStore().deleteFile('f1')).toBe(true);
     expect(fs.unlinkSync).toHaveBeenCalled();
@@ -181,11 +187,15 @@ describe('fileStore', () => {
     vi.resetModules();
     const fs = await import('fs');
     vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.unlinkSync).mockImplementation(() => { throw new Error('EACCES'); });
+    vi.mocked(fs.unlinkSync).mockImplementation(() => {
+      throw new Error('EACCES');
+    });
     const mod = await import('../fileStore.js');
     mod.initFileStore(db);
 
-    db.prepare('INSERT INTO files (id, name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?)').run('f1', 'test.txt', 'text/plain', 9, Date.now());
+    db.prepare(
+      'INSERT INTO files (id, name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?)'
+    ).run('f1', 'test.txt', 'text/plain', 9, Date.now());
     expect(() => mod.getFileStore().deleteFile('f1')).not.toThrow();
   });
 
@@ -197,7 +207,9 @@ describe('fileStore', () => {
     mod.initFileStore(db);
 
     const oldTime = Date.now() - 8 * 24 * 60 * 60 * 1000;
-    db.prepare('INSERT INTO files (id, name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?)').run('old', 'old.txt', 'text/plain', 9, oldTime);
+    db.prepare(
+      'INSERT INTO files (id, name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?)'
+    ).run('old', 'old.txt', 'text/plain', 9, oldTime);
 
     mod.getFileStore().cleanup();
     expect(db.prepare('SELECT * FROM files WHERE id = ?').get('old')).toBeUndefined();
@@ -210,7 +222,9 @@ describe('fileStore', () => {
     const mod = await import('../fileStore.js');
     mod.initFileStore(db);
 
-    const id = mod.getFileStore().storeFileFromBuffer('test.bin', 'application/octet-stream', Buffer.from('data'));
+    const id = mod
+      .getFileStore()
+      .storeFileFromBuffer('test.bin', 'application/octet-stream', Buffer.from('data'));
     expect(id).toBeDefined();
     expect(fs.writeFileSync).toHaveBeenCalled();
   });
@@ -233,7 +247,9 @@ describe('fileStore', () => {
     const fs = await import('fs');
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.statSync).mockReturnValue({ size: 42 } as any);
-    vi.mocked(fs.renameSync).mockImplementation(() => { throw new Error('EXDEV'); });
+    vi.mocked(fs.renameSync).mockImplementation(() => {
+      throw new Error('EXDEV');
+    });
     vi.mocked(fs.unlinkSync).mockImplementation(() => {}); // ensure unlinkSync works for source removal
     const mod = await import('../fileStore.js');
     mod.initFileStore(db);
@@ -248,12 +264,18 @@ describe('fileStore', () => {
     const fs = await import('fs');
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.statSync).mockReturnValue({ size: 42 } as any);
-    vi.mocked(fs.renameSync).mockImplementation(() => { throw new Error('EXDEV'); });
-    vi.mocked(fs.unlinkSync).mockImplementation(() => { throw new Error('EPERM'); });
+    vi.mocked(fs.renameSync).mockImplementation(() => {
+      throw new Error('EXDEV');
+    });
+    vi.mocked(fs.unlinkSync).mockImplementation(() => {
+      throw new Error('EPERM');
+    });
     const mod = await import('../fileStore.js');
     mod.initFileStore(db);
 
-    expect(() => mod.getFileStore().storeFileByMoving('/tmp/upload', 'file.txt', 'text/plain')).not.toThrow();
+    expect(() =>
+      mod.getFileStore().storeFileByMoving('/tmp/upload', 'file.txt', 'text/plain')
+    ).not.toThrow();
     expect(console.error).toHaveBeenCalledWith(
       '[FileStore] Failed to remove source file after copy fallback:',
       expect.any(Error)
@@ -283,6 +305,32 @@ describe('fileStore', () => {
     expect(mod.getFileStore().getFilePath('f1')).toContain('f1');
   });
 
+  it('getFilePath rejects traversal file ids before filesystem lookup', async () => {
+    vi.resetModules();
+    const fs = await import('fs');
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    const mod = await import('../fileStore.js');
+    mod.initFileStore(db);
+
+    expect(mod.getFileStore().getFilePath('../secret')).toBeNull();
+    expect(fs.existsSync).not.toHaveBeenCalledWith(expect.stringContaining('secret'));
+  });
+
+  it('getFile returns null for unsafe metadata ids', async () => {
+    vi.resetModules();
+    const fs = await import('fs');
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    const mod = await import('../fileStore.js');
+    mod.initFileStore(db);
+
+    db.prepare(
+      'INSERT INTO files (id, name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?)'
+    ).run('../secret', 'secret.txt', 'text/plain', 9, Date.now());
+
+    expect(mod.getFileStore().getFile('../secret')).toBeNull();
+    expect(fs.readFileSync).not.toHaveBeenCalled();
+  });
+
   it('getFilePath returns null when not exists', async () => {
     vi.resetModules();
     const fs = await import('fs');
@@ -304,10 +352,18 @@ describe('fileStore', () => {
     const mod = await import('../fileStore.js');
     mod.initFileStore(db);
 
-    db.prepare('INSERT INTO files (id, name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?)').run('f1', 'test.txt', 'text/plain', 9, 1000);
+    db.prepare(
+      'INSERT INTO files (id, name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?)'
+    ).run('f1', 'test.txt', 'text/plain', 9, 1000);
 
     const meta = mod.getFileStore().getFileMetadata('f1');
-    expect(meta).toEqual({ id: 'f1', name: 'test.txt', mimeType: 'text/plain', size: 9, createdAt: 1000 });
+    expect(meta).toEqual({
+      id: 'f1',
+      name: 'test.txt',
+      mimeType: 'text/plain',
+      size: 9,
+      createdAt: 1000,
+    });
   });
 
   it('getFileMetadata returns null for non-existent', async () => {
@@ -326,8 +382,12 @@ describe('fileStore', () => {
     const mod = await import('../fileStore.js');
     mod.initFileStore(db);
 
-    db.prepare('INSERT INTO files (id, name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?)').run('f1', 'a.txt', 'text/plain', 100, Date.now());
-    db.prepare('INSERT INTO files (id, name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?)').run('f2', 'b.txt', 'text/plain', 200, Date.now());
+    db.prepare(
+      'INSERT INTO files (id, name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?)'
+    ).run('f1', 'a.txt', 'text/plain', 100, Date.now());
+    db.prepare(
+      'INSERT INTO files (id, name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?)'
+    ).run('f2', 'b.txt', 'text/plain', 200, Date.now());
 
     const stats = mod.getFileStore().getStats();
     expect(stats.count).toBe(2);

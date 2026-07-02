@@ -42,7 +42,8 @@ import { providerRegistry } from '../../../infra/providers/registry.js';
 import { recomputePhase, computeBlockers } from './active-run-phase.js';
 
 /** Read-only bash commands that are safe to auto-approve for remembered outside-workspace directories. */
-const READONLY_BASH_COMMANDS = /^\s*(ls|cat|head|tail|wc|file|stat|du|find|tree|realpath|dirname|basename)\b/;
+const READONLY_BASH_COMMANDS =
+  /^\s*(ls|cat|head|tail|wc|file|stat|du|find|tree|realpath|dirname|basename)\b/;
 import type { PermissionDecision } from '../../../infra/providers/types.js';
 import type { ActiveRun } from '../transport/types.js';
 import { broadcastRunMessage } from '../transport/broadcast.js';
@@ -52,8 +53,15 @@ import { writePermissionLog } from '../agent/permission-log-writer.js';
 import type { PermissionBridge } from '../agent/permission-bridge.js';
 import type { PermissionEscalationContext } from '../../../domains/workflows/ports/step-executor.js';
 import type { PermissionWorkflowResolver } from '../../../domains/workflows/index.js';
-import { buildAppSelectionClickUrl, formatSessionBackendContext } from '../../../infra/push/notification-context.js';
-import { createRunDomainEvent, type RunDomainEventType, type RunDomainEventPayloadMap } from './run-domain-events.js';
+import {
+  buildAppSelectionClickUrl,
+  formatSessionBackendContext,
+} from '../../../infra/push/notification-context.js';
+import {
+  createRunDomainEvent,
+  type RunDomainEventType,
+  type RunDomainEventPayloadMap,
+} from './run-domain-events.js';
 import {
   runDomainEventListeners,
   type RunDomainEventListenerRegistry,
@@ -92,7 +100,9 @@ function parseJsonObject(raw: string | null | undefined): Record<string, unknown
   if (!raw) return undefined;
   try {
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : undefined;
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : undefined;
   } catch {
     return undefined;
   }
@@ -102,9 +112,10 @@ function inferMcpPermissionRisk(tool: unknown): {
   riskLevel: 'low' | 'medium' | 'high';
   declaredReadOnly: boolean;
 } {
-  const annotations = tool && typeof tool === 'object' && 'annotations' in tool
-    ? ((tool as { annotations?: Record<string, unknown> }).annotations ?? {})
-    : {};
+  const annotations =
+    tool && typeof tool === 'object' && 'annotations' in tool
+      ? ((tool as { annotations?: Record<string, unknown> }).annotations ?? {})
+      : {};
   const declaredReadOnly = annotations.readOnlyHint === true || annotations.readOnly === true;
   const destructive = annotations.destructiveHint === true;
   const openWorld = annotations.openWorldHint !== false;
@@ -114,19 +125,20 @@ function inferMcpPermissionRisk(tool: unknown): {
   };
 }
 
-function resolveMcpTrustDecision(
-  db: ActiveRun['db'],
-  toolName: string,
-): McpTrustDecision | null {
+function resolveMcpTrustDecision(db: ActiveRun['db'], toolName: string): McpTrustDecision | null {
   const ref = parseConcreteMcpToolName(toolName);
   if (!ref) return null;
 
   try {
-    const row = db.prepare(`
+    const row = db
+      .prepare(
+        `
       SELECT name, command, args, env, enabled, trust_policy,
              transport, url, headers, headers_helper, oauth_config, oauth_credentials
       FROM mcp_servers WHERE name = ?
-    `).get(ref.server) as
+    `
+      )
+      .get(ref.server) as
       | {
           name: string;
           command: string;
@@ -148,24 +160,31 @@ function resolveMcpTrustDecision(
     if (!trustPolicy) return null;
 
     const transport = normalizeMcpServerTransport(row.transport);
-    const config = transport === 'streamable-http' || transport === 'sse'
-      ? {
-        transport,
-        command: row.command,
-        url: row.url || '',
-        ...(row.headers ? { headers: normalizeMcpHeaders(JSON.parse(row.headers)) } : {}),
-        ...(normalizeMcpHeadersHelper(row.headers_helper) ? { headersHelper: normalizeMcpHeadersHelper(row.headers_helper) } : {}),
-        ...(row.oauth_config ? { oauthConfig: normalizeMcpOAuthConfig(JSON.parse(row.oauth_config)) } : {}),
-        ...(row.oauth_credentials ? { oauthCredentials: unprotectMcpOAuthCredentials(row.oauth_credentials) } : {}),
-      }
-      : {
-        transport: 'stdio' as const,
-        command: row.command,
-        ...(row.args ? { args: JSON.parse(row.args) as string[] } : {}),
-        ...(row.env ? { env: JSON.parse(row.env) as Record<string, string> } : {}),
-      };
+    const config =
+      transport === 'streamable-http' || transport === 'sse'
+        ? {
+            transport,
+            command: row.command,
+            url: row.url || '',
+            ...(row.headers ? { headers: normalizeMcpHeaders(JSON.parse(row.headers)) } : {}),
+            ...(normalizeMcpHeadersHelper(row.headers_helper)
+              ? { headersHelper: normalizeMcpHeadersHelper(row.headers_helper) }
+              : {}),
+            ...(row.oauth_config
+              ? { oauthConfig: normalizeMcpOAuthConfig(JSON.parse(row.oauth_config)) }
+              : {}),
+            ...(row.oauth_credentials
+              ? { oauthCredentials: unprotectMcpOAuthCredentials(row.oauth_credentials) }
+              : {}),
+          }
+        : {
+            transport: 'stdio' as const,
+            command: row.command,
+            ...(row.args ? { args: JSON.parse(row.args) as string[] } : {}),
+            ...(row.env ? { env: JSON.parse(row.env) as Record<string, string> } : {}),
+          };
     const cached = mcpInventoryCache.getCached(ref.server, mcpInventoryCache.configHash(config));
-    const tool = cached?.tools.find((item) => item.name === ref.tool);
+    const tool = cached?.tools.find(item => item.name === ref.tool);
     if (!tool) return null;
 
     const risk = inferMcpPermissionRisk(tool);
@@ -178,9 +197,10 @@ function resolveMcpTrustDecision(
       declaredReadOnly: risk.declaredReadOnly,
       trustLevel: trustPolicy.trustLevel,
       policyDecision,
-      reason: policyDecision === 'approve'
-        ? 'Auto-approved by MCP trust policy'
-        : 'Denied by MCP trust policy',
+      reason:
+        policyDecision === 'approve'
+          ? 'Auto-approved by MCP trust policy'
+          : 'Denied by MCP trust policy',
     };
   } catch (error) {
     console.warn('[Permission] Failed to evaluate MCP trust policy', { toolName, error });
@@ -231,7 +251,7 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
   const sessionPermissionOverride = message.permissionOverride;
 
   return async (request: PermissionRequest) => {
-    return new Promise<PermissionDecision>((resolve) => {
+    return new Promise<PermissionDecision>(resolve => {
       const autoResolve = (decision: PermissionDecision, reason?: string) => {
         emitPermissionDomainEvent({
           activeRun,
@@ -267,7 +287,14 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
             sessionId: message.sessionId,
             runId,
           } as AgentPermissionInterceptedMessage);
-          writePermissionLog(db, message.sessionId, request.toolName, request.detail, 'deny', false);
+          writePermissionLog(
+            db,
+            message.sessionId,
+            request.toolName,
+            request.detail,
+            'deny',
+            false
+          );
           autoResolve({ behavior: 'deny', message: reason }, reason);
           return;
         }
@@ -279,7 +306,7 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
         activeRun.rememberedDecisions,
         request.toolName,
         request.toolInput,
-        request.detail,
+        request.detail
       );
       if (!isProviderNativeQuestion && remembered) {
         broadcastRunMessage(activeRun, {
@@ -290,28 +317,39 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
           sessionId: message.sessionId,
           runId,
         } as AgentPermissionInterceptedMessage);
-        writePermissionLog(db, message.sessionId, request.toolName, request.detail, remembered, true);
+        writePermissionLog(
+          db,
+          message.sessionId,
+          request.toolName,
+          request.detail,
+          remembered,
+          true
+        );
         autoResolve(
-          { behavior: remembered, message: remembered === 'deny' ? 'Denied (remembered)' : undefined },
-          `Remembered decision (${remembered}) for "${rememberKey}"`,
+          {
+            behavior: remembered,
+            message: remembered === 'deny' ? 'Denied (remembered)' : undefined,
+          },
+          `Remembered decision (${remembered}) for "${rememberKey}"`
         );
         return;
       }
 
       const category = classify(request.toolName, request.toolInput, request.detail);
-      const isReadOnlyBash = category === 'shellSafe'
-        && isBashLikeTool(request.toolName)
-        && READONLY_BASH_COMMANDS.test(extractBashCommand(request.toolInput, request.detail) || '');
+      const isReadOnlyBash =
+        category === 'shellSafe' &&
+        isBashLikeTool(request.toolName) &&
+        READONLY_BASH_COMMANDS.test(extractBashCommand(request.toolInput, request.detail) || '');
 
       if (
         !isProviderNativeQuestion &&
-        (category === 'fileRead' || isReadOnlyBash)
-        && isOutsideWorkspacePathAllowed(
+        (category === 'fileRead' || isReadOnlyBash) &&
+        isOutsideWorkspacePathAllowed(
           request.toolName,
           request.toolInput,
           request.detail,
           activeRun.workspaceRoot,
-          activeRun.allowedOutsideWorkspaceRoots,
+          activeRun.allowedOutsideWorkspaceRoots
         )
       ) {
         broadcastRunMessage(activeRun, {
@@ -323,7 +361,10 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
           runId,
         } as AgentPermissionInterceptedMessage);
         writePermissionLog(db, message.sessionId, request.toolName, request.detail, 'allow', true);
-        autoResolve({ behavior: 'allow', updatedInput: request.toolInput }, 'Auto-approved for remembered outside-workspace directory');
+        autoResolve(
+          { behavior: 'allow', updatedInput: request.toolInput },
+          'Auto-approved for remembered outside-workspace directory'
+        );
         return;
       }
 
@@ -340,8 +381,19 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
           runId,
           mcpTrust: mcpTrustDecision,
         } as AgentPermissionInterceptedMessage);
-        writePermissionLog(db, message.sessionId, request.toolName, request.detail, 'allow', false, mcpTrustDecision);
-        autoResolve({ behavior: 'allow', updatedInput: request.toolInput }, mcpTrustDecision.reason);
+        writePermissionLog(
+          db,
+          message.sessionId,
+          request.toolName,
+          request.detail,
+          'allow',
+          false,
+          mcpTrustDecision
+        );
+        autoResolve(
+          { behavior: 'allow', updatedInput: request.toolInput },
+          mcpTrustDecision.reason
+        );
         return;
       }
       if (mcpTrustDecision?.policyDecision === 'deny') {
@@ -354,8 +406,19 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
           runId,
           mcpTrust: mcpTrustDecision,
         } as AgentPermissionInterceptedMessage);
-        writePermissionLog(db, message.sessionId, request.toolName, request.detail, 'deny', false, mcpTrustDecision);
-        autoResolve({ behavior: 'deny', message: mcpTrustDecision.reason }, mcpTrustDecision.reason);
+        writePermissionLog(
+          db,
+          message.sessionId,
+          request.toolName,
+          request.detail,
+          'deny',
+          false,
+          mcpTrustDecision
+        );
+        autoResolve(
+          { behavior: 'deny', message: mcpTrustDecision.reason },
+          mcpTrustDecision.reason
+        );
         return;
       }
 
@@ -377,14 +440,19 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
       // Claude/Codex's `ExitPlanMode`) out of the shared default policy.
       const providerEscalateTools = providerRegistry.getPolicy(providerType)?.escalateAlwaysTools;
       if (providerEscalateTools && providerEscalateTools.length > 0) {
-        const merged = new Set([...(effectivePolicy.escalateAlways || []), ...providerEscalateTools]);
+        const merged = new Set([
+          ...(effectivePolicy.escalateAlways || []),
+          ...providerEscalateTools,
+        ]);
         effectivePolicy = { ...effectivePolicy, escalateAlways: Array.from(merged) };
       }
 
       const commandPreview = isBashLikeTool(request.toolName)
         ? ` | cmd=${JSON.stringify((request.toolInput as Record<string, unknown>)?.command || request.detail).slice(0, 120)}`
         : '';
-      console.log(`[Permission] Tool=${request.toolName}${commandPreview} | effective=${effectivePolicy?.enabled ? 'enabled' : 'null/disabled'} | sessionType=${sessionType}`);
+      console.log(
+        `[Permission] Tool=${request.toolName}${commandPreview} | effective=${effectivePolicy?.enabled ? 'enabled' : 'null/disabled'} | sessionType=${sessionType}`
+      );
 
       if (!isProviderNativeQuestion && effectivePolicy?.enabled) {
         const evaluator = new PermissionEvaluator();
@@ -393,7 +461,7 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
           request.toolInput,
           request.detail,
           effectivePolicy,
-          { rootPath: cwd, sessionType },
+          { rootPath: cwd, sessionType }
         );
         if (decision === 'approve') {
           broadcastRunMessage(activeRun, {
@@ -404,7 +472,10 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
             sessionId: message.sessionId,
             runId,
           } as AgentPermissionInterceptedMessage);
-          autoResolve({ behavior: 'allow', updatedInput: request.toolInput }, 'Auto-approved by category policy');
+          autoResolve(
+            { behavior: 'allow', updatedInput: request.toolInput },
+            'Auto-approved by category policy'
+          );
           return;
         }
         if (decision === 'deny') {
@@ -416,27 +487,31 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
             sessionId: message.sessionId,
             runId,
           } as AgentPermissionInterceptedMessage);
-          autoResolve({ behavior: 'deny', message: 'Denied by policy' }, 'Blocked by category policy');
+          autoResolve(
+            { behavior: 'deny', message: 'Denied by policy' },
+            'Blocked by category policy'
+          );
           return;
         }
       }
 
-      const matchedRule = !isProviderNativeQuestion && effectivePolicy?.enabled
-        ? getMatchedPermissionRule(
-            request.toolName,
-            request.toolInput,
-            request.detail,
-            effectivePolicy,
-            { rootPath: cwd, sessionType },
-          ) || undefined
-        : undefined;
+      const matchedRule =
+        !isProviderNativeQuestion && effectivePolicy?.enabled
+          ? getMatchedPermissionRule(
+              request.toolName,
+              request.toolInput,
+              request.detail,
+              effectivePolicy,
+              { rootPath: cwd, sessionType }
+            ) || undefined
+          : undefined;
 
       if (matchedRule === 'Outside workspace access') {
         const outsidePaths = getOutsideWorkspacePaths(
           request.toolName,
           request.toolInput,
           request.detail,
-          cwd,
+          cwd
         );
         const bashCommand = isBashLikeTool(request.toolName)
           ? ((request.toolInput as { command?: unknown } | undefined)?.command ?? request.detail)
@@ -461,7 +536,10 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
             sessionId: message.sessionId,
             runId,
           } as AgentPermissionInterceptedMessage);
-          autoResolve({ behavior: 'allow', updatedInput: request.toolInput }, 'Internal interaction tool handles its own user flow');
+          autoResolve(
+            { behavior: 'allow', updatedInput: request.toolInput },
+            'Internal interaction tool handles its own user flow'
+          );
           return;
         }
 
@@ -517,20 +595,21 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
 
         // Store pending permission (user can still manually decide via frontend)
         const toolInput = request.toolInput as Record<string, unknown>;
-        const normalizedPermission = providerRegistry
-          .getDefinition(providerType)
-          ?.normalizer
-          ?.normalizePermissionRequest?.({
+        const normalizedPermission =
+          providerRegistry.getDefinition(providerType)?.normalizer?.normalizePermissionRequest?.({
             requestId: request.requestId,
             toolName: request.toolName,
             toolInput: request.toolInput,
           }) ?? {};
-        const isAskUserQuestion = normalizedPermission.interactionKind === 'ask_user_question'
-          || request.toolName === 'AskUserQuestion';
-        const askUserQuestions = normalizedPermission.questions
-          ?? (toolInput.questions as AskUserQuestionItem[] | undefined)
-          ?? [];
-        const requiresCredential = !isAskUserQuestion && isSudoCommand(request.toolName, request.toolInput);
+        const isAskUserQuestion =
+          normalizedPermission.interactionKind === 'ask_user_question' ||
+          request.toolName === 'AskUserQuestion';
+        const askUserQuestions =
+          normalizedPermission.questions ??
+          (toolInput.questions as AskUserQuestionItem[] | undefined) ??
+          [];
+        const requiresCredential =
+          !isAskUserQuestion && isSudoCommand(request.toolName, request.toolInput);
 
         if (!isAskUserQuestion) {
           // Register in bridge so workflow's permission_decide step can resolve it.
@@ -549,7 +628,10 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
             ...(matchedRule && { matchedRule }),
             timeoutSeconds: 0,
             sessionId: message.sessionId,
-            ...(requiresCredential && { requiresCredential: true, credentialHint: 'sudo_password' }),
+            ...(requiresCredential && {
+              requiresCredential: true,
+              credentialHint: 'sudo_password',
+            }),
             ...(isAskUserQuestion && { questions: askUserQuestions }),
           },
         });
@@ -566,27 +648,33 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
           type: 'permission.requested',
         });
 
-        db.prepare('UPDATE sessions SET last_run_status = ?, updated_at = ? WHERE id = ?')
-          .run('waiting', Date.now(), activeRun.sessionId);
+        db.prepare('UPDATE sessions SET last_run_status = ?, updated_at = ? WHERE id = ?').run(
+          'waiting',
+          Date.now(),
+          activeRun.sessionId
+        );
 
         const triggerPermissionWorkflow = () => {
-          void permissionWorkflowResolver.triggerPermissionEscalation(session.project_id, {
-            eventPayload: escalationContext as unknown as Record<string, unknown>,
-            triggerContext: {
-              type: 'event',
-              event: 'permission.escalated',
-            },
-          }).then(({ resolved, run }) => {
-            permissionBridge.setWorkflowRunId(request.requestId, run.id);
-            console.log(
-              `[Permission] Delegated ${request.requestId} (${request.toolName}) to ${resolved.source} workflow ${resolved.workflowId} run=${run.id}`,
-            );
-          }).catch((error) => {
-            console.error(
-              `[Permission] Failed to trigger permission workflow for ${request.requestId} (${request.toolName}):`,
-              error,
-            );
-          });
+          void permissionWorkflowResolver
+            .triggerPermissionEscalation(session.project_id, {
+              eventPayload: escalationContext as unknown as Record<string, unknown>,
+              triggerContext: {
+                type: 'event',
+                event: 'permission.escalated',
+              },
+            })
+            .then(({ resolved, run }) => {
+              permissionBridge.setWorkflowRunId(request.requestId, run.id);
+              console.log(
+                `[Permission] Delegated ${request.requestId} (${request.toolName}) to ${resolved.source} workflow ${resolved.workflowId} run=${run.id}`
+              );
+            })
+            .catch(error => {
+              console.error(
+                `[Permission] Failed to trigger permission workflow for ${request.requestId} (${request.toolName}):`,
+                error
+              );
+            });
         };
 
         // Send request to frontend (user can still manually approve/deny)

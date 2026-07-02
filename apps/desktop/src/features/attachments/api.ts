@@ -1,8 +1,4 @@
-import type {
-  Attachment,
-  AttachmentCount,
-  AttachmentOwnerKind,
-} from '@zclaudia/shared';
+import type { Attachment, AttachmentCount, AttachmentOwnerKind } from '@zclaudia/shared';
 import { useServerStore } from '../../stores/serverStore';
 import { getControlPlaneMode, isLocalBackendId } from '../../utils/controlPlane';
 import { apiCall } from '../../services/api/unwrap';
@@ -27,7 +23,7 @@ function shouldUseGatewayJson(): boolean {
 
 export async function listAttachments(
   ownerKind: AttachmentOwnerKind,
-  ownerId: string,
+  ownerId: string
 ): Promise<Attachment[]> {
   const params = new URLSearchParams({ ownerKind, ownerId });
   return apiCall<Attachment[]>(`/api/attachments?${params.toString()}`);
@@ -35,7 +31,7 @@ export async function listAttachments(
 
 export async function listAttachmentCounts(
   ownerKind: AttachmentOwnerKind,
-  ownerIds: string[],
+  ownerIds: string[]
 ): Promise<AttachmentCount[]> {
   if (ownerIds.length === 0) return [];
   const params = new URLSearchParams({
@@ -53,7 +49,7 @@ export async function deleteAttachment(id: string): Promise<void> {
 
 export async function updateAttachment(
   id: string,
-  patch: { name?: string; sortOrder?: number },
+  patch: { name?: string; sortOrder?: number }
 ): Promise<Attachment> {
   return apiCall<Attachment>(`/api/attachments/${encodeURIComponent(id)}`, {
     method: 'PATCH',
@@ -69,7 +65,7 @@ export async function uploadAttachment(
   ownerKind: AttachmentOwnerKind,
   ownerId: string,
   file: File,
-  options?: UploadAttachmentOptions,
+  options?: UploadAttachmentOptions
 ): Promise<Attachment> {
   if (shouldUseGatewayJson()) {
     return uploadViaJson(ownerKind, ownerId, file, options);
@@ -81,7 +77,7 @@ async function uploadViaJson(
   ownerKind: AttachmentOwnerKind,
   ownerId: string,
   file: File,
-  options?: UploadAttachmentOptions,
+  options?: UploadAttachmentOptions
 ): Promise<Attachment> {
   const baseUrl = getBaseUrl();
   const authHeaders = getAuthHeaders();
@@ -117,7 +113,7 @@ async function uploadViaMultipart(
   ownerKind: AttachmentOwnerKind,
   ownerId: string,
   file: File,
-  options?: UploadAttachmentOptions,
+  options?: UploadAttachmentOptions
 ): Promise<Attachment> {
   const baseUrl = getBaseUrl();
   const authHeaders = getAuthHeaders() as Record<string, string>;
@@ -131,7 +127,7 @@ async function uploadViaMultipart(
     }
 
     if (options?.onProgress) {
-      xhr.upload.addEventListener('progress', (event) => {
+      xhr.upload.addEventListener('progress', event => {
         if (event.lengthComputable) {
           options.onProgress?.({
             loaded: event.loaded,

@@ -13,8 +13,13 @@ function initRepo(dir: string) {
 
 describe('GitStageActivity', () => {
   let repo: string;
-  beforeEach(() => { repo = mkdtempSync(join(tmpdir(), 'gitstage-')); initRepo(repo); });
-  afterEach(() => { rmSync(repo, { recursive: true, force: true }); });
+  beforeEach(() => {
+    repo = mkdtempSync(join(tmpdir(), 'gitstage-'));
+    initRepo(repo);
+  });
+  afterEach(() => {
+    rmSync(repo, { recursive: true, force: true });
+  });
 
   it('stages all changes and reports the staged files', async () => {
     writeFileSync(join(repo, 'a.txt'), 'hello');

@@ -10,13 +10,13 @@ export const PHASE_TYPES = [
   'dep-update',
   'investigation',
 ] as const;
-export type PhaseType = typeof PHASE_TYPES[number];
+export type PhaseType = (typeof PHASE_TYPES)[number];
 
 export const EXECUTE_ENTITIES = ['workflow', 'subagent'] as const;
-export type ExecuteEntity = typeof EXECUTE_ENTITIES[number];
+export type ExecuteEntity = (typeof EXECUTE_ENTITIES)[number];
 
 export const EXECUTE_PATTERNS = ['single-shot', 'multi-step', 'self-healing'] as const;
-export type ExecutePattern = typeof EXECUTE_PATTERNS[number];
+export type ExecutePattern = (typeof EXECUTE_PATTERNS)[number];
 
 export const META_WORKFLOW_RUN_STATUSES = [
   'requirement_draft',
@@ -27,7 +27,7 @@ export const META_WORKFLOW_RUN_STATUSES = [
   'completed',
   'cancelled',
 ] as const;
-export type MetaWorkflowRunStatus = typeof META_WORKFLOW_RUN_STATUSES[number];
+export type MetaWorkflowRunStatus = (typeof META_WORKFLOW_RUN_STATUSES)[number];
 
 export const META_WORKFLOW_PHASE_STATUSES = [
   'pending',
@@ -40,10 +40,10 @@ export const META_WORKFLOW_PHASE_STATUSES = [
   'failed',
   'stale',
 ] as const;
-export type MetaWorkflowPhaseStatus = typeof META_WORKFLOW_PHASE_STATUSES[number];
+export type MetaWorkflowPhaseStatus = (typeof META_WORKFLOW_PHASE_STATUSES)[number];
 
 export const REUSE_POOL_SOURCE_TYPES = ['auto', 'user'] as const;
-export type ReusePoolSourceType = typeof REUSE_POOL_SOURCE_TYPES[number];
+export type ReusePoolSourceType = (typeof REUSE_POOL_SOURCE_TYPES)[number];
 
 // ────────────────────────────────────────────────────────────────────
 // PhasesDoc (the source-of-truth for a run's phase graph)
@@ -58,7 +58,7 @@ export interface PhaseInput {
 
 export interface PhaseOutput {
   kind: 'commit' | 'file';
-  path?: string;       // present when kind === 'file'
+  path?: string; // present when kind === 'file'
   description: string;
 }
 
@@ -66,10 +66,10 @@ export interface AcceptanceGate {
   id: string;
   description: string;
   command: string;
-  cwd?: string;        // relative to worktree root
+  cwd?: string; // relative to worktree root
   expect: {
-    exitCode?: number;           // default 0
-    stdoutMatches?: string;      // regex
+    exitCode?: number; // default 0
+    stdoutMatches?: string; // regex
     stderrMatches?: string;
     fileExists?: string[];
     fileNotExists?: string[];
@@ -90,7 +90,7 @@ export interface PhaseDef {
   name: string;
   description: string;
   phaseType: PhaseType;
-  executeEntity?: ExecuteEntity;        // defaults inferred from phaseType
+  executeEntity?: ExecuteEntity; // defaults inferred from phaseType
   dependsOn: string[];
   inputs: PhaseInput[];
   outputs: PhaseOutput[];
@@ -130,7 +130,7 @@ export interface MetaWorkflowRun {
   description?: string;
   status: MetaWorkflowRunStatus;
   requirementsPath?: string;
-  phasesJson?: string;                  // serialized PhasesDoc
+  phasesJson?: string; // serialized PhasesDoc
   smokePathRunId?: string;
   rejectCount: number;
   defaultLlmProfileId?: string;

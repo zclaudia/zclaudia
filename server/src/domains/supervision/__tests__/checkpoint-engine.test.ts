@@ -6,8 +6,15 @@ import { SupervisionTaskRepository } from '../repositories/supervision-task.js';
 import { ProjectRepository } from '../../projects/index.js';
 import { SessionRepository } from '../../sessions/repository.js';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
-import type { ProjectAgent, SupervisionLogEvent, SupervisionTask } from '@zclaudia/shared/features/supervision';
-import { createAgentProfilesTable, seedDefaultAgent } from '../../../test-helpers/seed-default-agent.js';
+import type {
+  ProjectAgent,
+  SupervisionLogEvent,
+  SupervisionTask,
+} from '@zclaudia/shared/features/supervision';
+import {
+  createAgentProfilesTable,
+  seedDefaultAgent,
+} from '../../../test-helpers/seed-default-agent.js';
 
 function createTestDb(): Database.Database {
   const db = new Database(':memory:');
@@ -118,14 +125,21 @@ function makeAgent(overrides: Partial<ProjectAgent> = {}): ProjectAgent {
 
 function seedProject(
   db: Database.Database,
-  opts: { agent?: ProjectAgent; rootPath?: string; name?: string } = {},
+  opts: { agent?: ProjectAgent; rootPath?: string; name?: string } = {}
 ): string {
   const id = newId();
   const now = Date.now();
   db.prepare(
     `INSERT INTO projects (id, name, type, root_path, agent, created_at, updated_at)
-     VALUES (?, ?, 'code', ?, ?, ?, ?)`,
-  ).run(id, opts.name ?? 'Test Project', opts.rootPath ?? '/tmp/test', opts.agent ? JSON.stringify(opts.agent) : null, now, now);
+     VALUES (?, ?, 'code', ?, ?, ?, ?)`
+  ).run(
+    id,
+    opts.name ?? 'Test Project',
+    opts.rootPath ?? '/tmp/test',
+    opts.agent ? JSON.stringify(opts.agent) : null,
+    now,
+    now
+  );
   return id;
 }
 
@@ -161,14 +175,24 @@ describe('CheckpointEngine', () => {
 
     broadcastFn = vi.fn();
     logFn = vi.fn();
-    createTaskFn = vi.fn().mockImplementation(
-      (_pid: string, data: any) => ({ id: newId(), ...data, status: 'proposed', createdAt: Date.now() }),
-    );
+    createTaskFn = vi.fn().mockImplementation((_pid: string, data: any) => ({
+      id: newId(),
+      ...data,
+      status: 'proposed',
+      createdAt: Date.now(),
+    }));
     mockAiRunPort = { startVirtualRun: vi.fn() };
 
     mockContextManager = {
       isInitialized: vi.fn().mockReturnValue(true),
-      loadAll: vi.fn().mockReturnValue({ documents: [], workflow: { onTaskComplete: [], onCheckpoint: [], checkpointTrigger: { type: 'on_task_complete' } } }),
+      loadAll: vi.fn().mockReturnValue({
+        documents: [],
+        workflow: {
+          onTaskComplete: [],
+          onCheckpoint: [],
+          checkpointTrigger: { type: 'on_task_complete' },
+        },
+      }),
       getWorkflow: vi.fn().mockReturnValue({
         onTaskComplete: [],
         onCheckpoint: [],
@@ -197,7 +221,7 @@ describe('CheckpointEngine', () => {
       broadcastFn,
       logFn,
       createTaskFn,
-      mockAiRunPort,
+      mockAiRunPort
     );
   }
 
@@ -286,7 +310,10 @@ describe('CheckpointEngine', () => {
     it('returns false when unarchived checkpoint session exists', () => {
       const projectId = seedProject(db, { agent: makeAgent() });
       sessionRepo.create({
-        projectId, name: 'Ckpt', type: 'background', projectRole: 'checkpoint',
+        projectId,
+        name: 'Ckpt',
+        type: 'background',
+        projectRole: 'checkpoint',
       } as any);
       const engine = createEngine();
       expect(engine.shouldTrigger(projectId, 'task_complete')).toBe(false);
@@ -295,7 +322,10 @@ describe('CheckpointEngine', () => {
     it('returns true when only archived checkpoint sessions exist', () => {
       const projectId = seedProject(db, { agent: makeAgent() });
       const session = sessionRepo.create({
-        projectId, name: 'Ckpt', type: 'background', projectRole: 'checkpoint',
+        projectId,
+        name: 'Ckpt',
+        type: 'background',
+        projectRole: 'checkpoint',
       } as any);
       sessionRepo.update(session.id, { archivedAt: Date.now() });
       const engine = createEngine();
@@ -312,10 +342,10 @@ describe('CheckpointEngine', () => {
       const sessionId = newId();
       const projectId = seedProject(db, { agent: makeAgent() });
       db.prepare(
-        `INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, 'test', ?, ?)`,
+        `INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, 'test', ?, ?)`
       ).run(sessionId, projectId, Date.now(), Date.now());
       db.prepare(
-        `INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, 'assistant', 'no result here', ?)`,
+        `INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, 'assistant', 'no result here', ?)`
       ).run(newId(), sessionId, Date.now());
 
       const engine = createEngine();
@@ -326,7 +356,7 @@ describe('CheckpointEngine', () => {
       const sessionId = newId();
       const projectId = seedProject(db, { agent: makeAgent() });
       db.prepare(
-        `INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, 'test', ?, ?)`,
+        `INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, 'test', ?, ?)`
       ).run(sessionId, projectId, Date.now(), Date.now());
 
       const content = `Some preamble
@@ -338,7 +368,7 @@ project_summary_update: |
 After text`;
 
       db.prepare(
-        `INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, 'assistant', ?, ?)`,
+        `INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, 'assistant', ?, ?)`
       ).run(newId(), sessionId, content, Date.now());
 
       const engine = createEngine();
@@ -351,7 +381,7 @@ After text`;
       const sessionId = newId();
       const projectId = seedProject(db, { agent: makeAgent() });
       db.prepare(
-        `INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, 'test', ?, ?)`,
+        `INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, 'test', ?, ?)`
       ).run(sessionId, projectId, Date.now(), Date.now());
 
       const content = `[CHECKPOINT_RESULT]
@@ -363,7 +393,7 @@ discovered_tasks:
 [/CHECKPOINT_RESULT]`;
 
       db.prepare(
-        `INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, 'assistant', ?, ?)`,
+        `INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, 'assistant', ?, ?)`
       ).run(newId(), sessionId, content, Date.now());
 
       const engine = createEngine();
@@ -378,14 +408,14 @@ discovered_tasks:
       const sessionId = newId();
       const projectId = seedProject(db, { agent: makeAgent() });
       db.prepare(
-        `INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, 'test', ?, ?)`,
+        `INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, 'test', ?, ?)`
       ).run(sessionId, projectId, Date.now(), Date.now());
 
       const content = `[CHECKPOINT_RESULT]
 [/CHECKPOINT_RESULT]`;
 
       db.prepare(
-        `INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, 'assistant', ?, ?)`,
+        `INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, 'assistant', ?, ?)`
       ).run(newId(), sessionId, content, Date.now());
 
       const engine = createEngine();
@@ -414,9 +444,7 @@ discovered_tasks:
       expect(runArgs.input).toContain('[PROJECT CHECKPOINT]');
       expect(runArgs.workingDirectory).toBe('/tmp/proj');
 
-      expect(logFn).toHaveBeenCalledWith(
-        projectId, 'checkpoint_started', expect.any(Object),
-      );
+      expect(logFn).toHaveBeenCalledWith(projectId, 'checkpoint_started', expect.any(Object));
     });
 
     it('does nothing when project has no rootPath', async () => {
@@ -432,14 +460,17 @@ discovered_tasks:
 
     it('handles errors gracefully', async () => {
       const projectId = seedProject(db, { agent: makeAgent(), rootPath: '/tmp/proj' });
-      mockAiRunPort.startVirtualRun.mockImplementation(() => { throw new Error('mock error'); });
+      mockAiRunPort.startVirtualRun.mockImplementation(() => {
+        throw new Error('mock error');
+      });
 
       const engine = createEngine();
       await engine.runCheckpoint(projectId);
 
       expect(logFn).toHaveBeenCalledWith(
-        projectId, 'checkpoint_completed',
-        expect.objectContaining({ error: 'mock error' }),
+        projectId,
+        'checkpoint_completed',
+        expect.objectContaining({ error: 'mock error' })
       );
       expect((engine as any).runningCheckpoints.has(projectId)).toBe(false);
     });
@@ -452,7 +483,9 @@ discovered_tasks:
   describe('checkpoint run message handling', () => {
     it('applies results and archives session on run_completed', async () => {
       const projectId = seedProject(db, {
-        agent: makeAgent({ config: { maxConcurrentTasks: 1, trustLevel: 'low', autoDiscoverTasks: true } }),
+        agent: makeAgent({
+          config: { maxConcurrentTasks: 1, trustLevel: 'low', autoDiscoverTasks: true },
+        }),
         rootPath: '/tmp/proj',
       });
 
@@ -480,7 +513,7 @@ discovered_tasks:
 [/CHECKPOINT_RESULT]`;
 
       db.prepare(
-        `INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, 'assistant', ?, ?)`,
+        `INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, 'assistant', ?, ?)`
       ).run(newId(), sessionId, resultContent, Date.now());
 
       // Simulate run_completed
@@ -488,7 +521,7 @@ discovered_tasks:
 
       // Should have applied the project summary
       expect(mockContextManager.updateProjectSummary).toHaveBeenCalledWith(
-        expect.stringContaining('Updated summary'),
+        expect.stringContaining('Updated summary')
       );
 
       // Should have created discovered task (autoDiscoverTasks=true)
@@ -497,7 +530,7 @@ discovered_tasks:
         expect.objectContaining({
           title: 'New discovered task',
           source: 'agent_discovered',
-        }),
+        })
       );
 
       // Should have archived the session
@@ -506,7 +539,7 @@ discovered_tasks:
 
       // Should have broadcast
       expect(broadcastFn).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'supervision_checkpoint' }),
+        expect.objectContaining({ type: 'supervision_checkpoint' })
       );
 
       // runningCheckpoints should be cleared
@@ -535,8 +568,9 @@ discovered_tasks:
       expect(updatedSession?.archivedAt).toBeDefined();
 
       expect(logFn).toHaveBeenCalledWith(
-        projectId, 'checkpoint_completed',
-        expect.objectContaining({ error: 'run_failed' }),
+        projectId,
+        'checkpoint_completed',
+        expect.objectContaining({ error: 'run_failed' })
       );
     });
 
@@ -566,8 +600,9 @@ discovered_tasks:
 
       // Should log the error
       expect(logFn).toHaveBeenCalledWith(
-        projectId, 'checkpoint_completed',
-        expect.objectContaining({ error: 'Parse error' }),
+        projectId,
+        'checkpoint_completed',
+        expect.objectContaining({ error: 'Parse error' })
       );
       // Should still archive session and cleanup
       expect((engine as any).runningCheckpoints.has(projectId)).toBe(false);
@@ -600,7 +635,7 @@ knowledge_updates:
 [/CHECKPOINT_RESULT]`;
 
       db.prepare(
-        `INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, 'assistant', ?, ?)`,
+        `INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, 'assistant', ?, ?)`
       ).run(newId(), sessionId, content, Date.now());
 
       capturedCallback!({ type: 'run_completed' } as ServerMessage);
@@ -608,17 +643,20 @@ knowledge_updates:
       expect(mockContextManager.updateDocument).toHaveBeenCalledWith(
         'knowledge/api-patterns.md',
         expect.stringContaining('Updated API patterns'),
-        expect.objectContaining({ category: 'knowledge', source: 'agent' }),
+        expect.objectContaining({ category: 'knowledge', source: 'agent' })
       );
       expect(logFn).toHaveBeenCalledWith(
-        projectId, 'context_updated',
-        expect.objectContaining({ type: 'knowledge', docId: 'knowledge/api-patterns.md' }),
+        projectId,
+        'context_updated',
+        expect.objectContaining({ type: 'knowledge', docId: 'knowledge/api-patterns.md' })
       );
     });
 
     it('handles createTaskFn errors gracefully during discovered tasks', async () => {
       const projectId = seedProject(db, {
-        agent: makeAgent({ config: { maxConcurrentTasks: 1, trustLevel: 'low', autoDiscoverTasks: true } }),
+        agent: makeAgent({
+          config: { maxConcurrentTasks: 1, trustLevel: 'low', autoDiscoverTasks: true },
+        }),
         rootPath: '/tmp/proj',
       });
 
@@ -645,7 +683,7 @@ discovered_tasks:
 [/CHECKPOINT_RESULT]`;
 
       db.prepare(
-        `INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, 'assistant', ?, ?)`,
+        `INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, 'assistant', ?, ?)`
       ).run(newId(), sessionId, content, Date.now());
 
       capturedCallback!({ type: 'run_completed' } as ServerMessage);
@@ -653,7 +691,7 @@ discovered_tasks:
       // Should have logged error but not crashed
       expect(errorSpy).toHaveBeenCalledWith(
         expect.stringContaining('Failed to create discovered task'),
-        expect.any(Error),
+        expect.any(Error)
       );
       // Session should still be archived
       const updatedSession = sessionRepo.findById(sessionId);
@@ -663,7 +701,9 @@ discovered_tasks:
 
     it('does not create tasks when autoDiscoverTasks is false', async () => {
       const projectId = seedProject(db, {
-        agent: makeAgent({ config: { maxConcurrentTasks: 1, trustLevel: 'low', autoDiscoverTasks: false } }),
+        agent: makeAgent({
+          config: { maxConcurrentTasks: 1, trustLevel: 'low', autoDiscoverTasks: false },
+        }),
         rootPath: '/tmp/proj',
       });
 
@@ -685,7 +725,7 @@ discovered_tasks:
 [/CHECKPOINT_RESULT]`;
 
       db.prepare(
-        `INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, 'assistant', ?, ?)`,
+        `INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, 'assistant', ?, ?)`
       ).run(newId(), sessionId, content, Date.now());
 
       capturedCallback!({ type: 'run_completed' } as ServerMessage);
@@ -701,10 +741,12 @@ discovered_tasks:
   describe('buildCheckpointPrompt edge cases', () => {
     it('includes documents in prompt when context manager returns them', async () => {
       mockContextManager.loadAll.mockReturnValue({
-        documents: [
-          { id: 'doc1', category: 'knowledge', content: 'Document content here' },
-        ],
-        workflow: { onTaskComplete: [], onCheckpoint: [], checkpointTrigger: { type: 'on_task_complete' } },
+        documents: [{ id: 'doc1', category: 'knowledge', content: 'Document content here' }],
+        workflow: {
+          onTaskComplete: [],
+          onCheckpoint: [],
+          checkpointTrigger: { type: 'on_task_complete' },
+        },
       });
 
       const projectId = seedProject(db, {

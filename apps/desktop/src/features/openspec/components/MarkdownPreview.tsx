@@ -26,9 +26,7 @@ export function MarkdownPreview({ content, className = '' }: Props): React.React
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          h1: ({ children }) => (
-            <h1 className="text-lg font-semibold mb-3 mt-0">{children}</h1>
-          ),
+          h1: ({ children }) => <h1 className="text-lg font-semibold mb-3 mt-0">{children}</h1>,
           h2: ({ children }) => (
             <h2 className="text-base font-semibold mt-4 mb-2 border-b border-border pb-1">
               {children}
@@ -42,9 +40,7 @@ export function MarkdownPreview({ content, className = '' }: Props): React.React
               {children}
             </h4>
           ),
-          p: ({ children }) => (
-            <p className="text-sm mb-2 leading-relaxed">{children}</p>
-          ),
+          p: ({ children }) => <p className="text-sm mb-2 leading-relaxed">{children}</p>,
           ul: ({ children }) => (
             <ul className="text-sm list-disc pl-5 space-y-0.5 mb-2">{children}</ul>
           ),
@@ -59,9 +55,7 @@ export function MarkdownPreview({ content, className = '' }: Props): React.React
                 {children}
               </code>
             ) : (
-              <code className="px-1 py-0.5 bg-muted rounded text-xs font-mono">
-                {children}
-              </code>
+              <code className="px-1 py-0.5 bg-muted rounded text-xs font-mono">{children}</code>
             );
           },
           pre: ({ children }) => (

@@ -28,10 +28,27 @@ describe('AutomationRepository', () => {
   });
 
   it('filters enabled and by system key', () => {
-    repo.create({ name: 'on', enabled: true, trigger: { type: 'manual' }, action: { kind: 'activity', ref: 'shell' } });
-    repo.create({ name: 'off', enabled: false, trigger: { type: 'manual' }, action: { kind: 'activity', ref: 'shell' } });
+    repo.create({
+      name: 'on',
+      enabled: true,
+      trigger: { type: 'manual' },
+      action: { kind: 'activity', ref: 'shell' },
+    });
+    repo.create({
+      name: 'off',
+      enabled: false,
+      trigger: { type: 'manual' },
+      action: { kind: 'activity', ref: 'shell' },
+    });
     expect(repo.findAllEnabled()).toHaveLength(1);
-    const sys = repo.create({ name: 'sys', enabled: true, trigger: { type: 'event', event: 'x' }, action: { kind: 'workflow', ref: 'w1' }, isSystem: true, systemKey: 'k1' });
+    const sys = repo.create({
+      name: 'sys',
+      enabled: true,
+      trigger: { type: 'event', event: 'x' },
+      action: { kind: 'workflow', ref: 'w1' },
+      isSystem: true,
+      systemKey: 'k1',
+    });
     expect(repo.findBySystemKey('k1')!.id).toBe(sys.id);
   });
 });

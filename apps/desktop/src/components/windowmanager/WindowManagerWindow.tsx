@@ -38,22 +38,28 @@ interface WindowMeta {
 }
 
 function classifyWindow(label: string): WindowMeta {
-  if (label === 'main')                       return { type: 'Main Window',     Icon: SquareStack };
-  if (label === 'claudia-ball')               return { type: 'Floating Ball',   Icon: Circle };
-  if (label === 'claudia-chat')               return { type: 'Claudia Chat',    Icon: MessageCircle };
-  if (label === 'notch')                      return { type: 'Notch Panel',     Icon: LayoutPanelTop };
-  if (label.startsWith('session-chat-'))      return { type: 'Session Chat',    Icon: MessageSquare };
-  if (label.startsWith('terminal-'))          return { type: 'Terminal',        Icon: Terminal };
-  if (label.startsWith('draft-'))             return { type: 'Draft Editor',    Icon: FileEdit };
-  if (label.startsWith('file-viewer-'))       return { type: 'File Viewer',     Icon: File };
-  if (label.startsWith('workflow-editor-'))   return { type: 'Workflow Editor', Icon: Workflow };
-  if (label.startsWith('automation-'))        return { type: 'Automation',      Icon: Bot };
-  if (label.startsWith('plugin-'))            return { type: 'Plugin',          Icon: Puzzle };
+  if (label === 'main') return { type: 'Main Window', Icon: SquareStack };
+  if (label === 'claudia-ball') return { type: 'Floating Ball', Icon: Circle };
+  if (label === 'claudia-chat') return { type: 'Claudia Chat', Icon: MessageCircle };
+  if (label === 'notch') return { type: 'Notch Panel', Icon: LayoutPanelTop };
+  if (label.startsWith('session-chat-')) return { type: 'Session Chat', Icon: MessageSquare };
+  if (label.startsWith('terminal-')) return { type: 'Terminal', Icon: Terminal };
+  if (label.startsWith('draft-')) return { type: 'Draft Editor', Icon: FileEdit };
+  if (label.startsWith('file-viewer-')) return { type: 'File Viewer', Icon: File };
+  if (label.startsWith('workflow-editor-')) return { type: 'Workflow Editor', Icon: Workflow };
+  if (label.startsWith('automation-')) return { type: 'Automation', Icon: Bot };
+  if (label.startsWith('plugin-')) return { type: 'Plugin', Icon: Puzzle };
   return { type: label, Icon: SquareStack };
 }
 
 // System windows that should never be force-closed
-const PROTECTED_LABELS = new Set(['main', 'window-manager', 'claudia-ball', 'claudia-chat', 'notch']);
+const PROTECTED_LABELS = new Set([
+  'main',
+  'window-manager',
+  'claudia-ball',
+  'claudia-chat',
+  'notch',
+]);
 
 export function WindowManagerWindow() {
   const [windows, setWindows] = useState<WindowInfo[]>([]);
@@ -84,9 +90,7 @@ export function WindowManagerWindow() {
   const handleClose = (label: string) => invoke('close_window', { label });
 
   const handleCloseAll = () => {
-    windows
-      .filter(w => !PROTECTED_LABELS.has(w.label))
-      .forEach(w => void handleClose(w.label));
+    windows.filter(w => !PROTECTED_LABELS.has(w.label)).forEach(w => void handleClose(w.label));
   };
 
   const pid = windows[0]?.pid;
@@ -147,7 +151,9 @@ export function WindowManagerWindow() {
                 }`}
               >
                 {/* Icon + info */}
-                <div className={`flex-shrink-0 ${win.focused ? 'text-primary' : 'text-muted-foreground'}`}>
+                <div
+                  className={`flex-shrink-0 ${win.focused ? 'text-primary' : 'text-muted-foreground'}`}
+                >
                   <Icon size={15} />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -159,7 +165,9 @@ export function WindowManagerWindow() {
                       </span>
                     )}
                   </div>
-                  <div className="text-[11px] text-muted-foreground font-mono truncate">{win.label}</div>
+                  <div className="text-[11px] text-muted-foreground font-mono truncate">
+                    {win.label}
+                  </div>
                   {win.title && win.title !== type && (
                     <div className="text-[11px] text-muted-foreground truncate">{win.title}</div>
                   )}
@@ -167,8 +175,12 @@ export function WindowManagerWindow() {
 
                 {/* Size */}
                 <div className="text-[11px] text-muted-foreground font-mono flex-shrink-0 text-right hidden sm:block">
-                  <div>{win.width}×{win.height}</div>
-                  <div>{win.x},{win.y}</div>
+                  <div>
+                    {win.width}×{win.height}
+                  </div>
+                  <div>
+                    {win.x},{win.y}
+                  </div>
                 </div>
 
                 {/* Visible badge */}

@@ -1,5 +1,9 @@
 import type Database from 'better-sqlite3';
-import type { McpOAuthConfig, McpOAuthCredentials, McpServerTransport } from '@zclaudia/shared/core/mcp';
+import type {
+  McpOAuthConfig,
+  McpOAuthCredentials,
+  McpServerTransport,
+} from '@zclaudia/shared/core/mcp';
 import {
   normalizeMcpHeaders,
   normalizeMcpHeadersHelper,
@@ -50,11 +54,13 @@ export function loadMcpServersFromDb(
   db: Database.Database,
   providerType?: string
 ): Record<string, McpServerRuntimeConfig> {
-  const rows = db.prepare(
-    `SELECT name, command, args, env, provider_scope,
+  const rows = db
+    .prepare(
+      `SELECT name, command, args, env, provider_scope,
             transport, url, headers, headers_helper, oauth_config, oauth_credentials
      FROM mcp_servers WHERE enabled = 1`
-  ).all() as McpServerRow[];
+    )
+    .all() as McpServerRow[];
 
   const servers: Record<string, McpServerRuntimeConfig> = {};
   for (const row of rows) {
@@ -76,9 +82,15 @@ export function loadMcpServersFromDb(
         command: row.command,
         url: row.url,
         ...(row.headers && { headers: normalizeMcpHeaders(JSON.parse(row.headers)) }),
-        ...(normalizeMcpHeadersHelper(row.headers_helper) && { headersHelper: normalizeMcpHeadersHelper(row.headers_helper) }),
-        ...(row.oauth_config && { oauthConfig: normalizeMcpOAuthConfig(JSON.parse(row.oauth_config)) }),
-        ...(row.oauth_credentials && { oauthCredentials: unprotectMcpOAuthCredentials(row.oauth_credentials) }),
+        ...(normalizeMcpHeadersHelper(row.headers_helper) && {
+          headersHelper: normalizeMcpHeadersHelper(row.headers_helper),
+        }),
+        ...(row.oauth_config && {
+          oauthConfig: normalizeMcpOAuthConfig(JSON.parse(row.oauth_config)),
+        }),
+        ...(row.oauth_credentials && {
+          oauthCredentials: unprotectMcpOAuthCredentials(row.oauth_credentials),
+        }),
       };
     } else {
       servers[row.name] = {
@@ -93,8 +105,8 @@ export function loadMcpServersFromDb(
   if (Object.keys(servers).length > 0) {
     console.log(
       `[MCP Config] Loaded ${Object.keys(servers).length} MCP server(s) from DB` +
-      (providerType ? ` for ${providerType}` : '') +
-      `: ${Object.keys(servers).join(', ')}`
+        (providerType ? ` for ${providerType}` : '') +
+        `: ${Object.keys(servers).join(', ')}`
     );
   }
 

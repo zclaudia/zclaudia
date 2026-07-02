@@ -6,7 +6,11 @@ import { useServerStore } from '../stores/serverStore';
 import { useShortcutStore } from '../stores/shortcutStore';
 import { useClaudiaStatus } from './useClaudiaStatus';
 import { isDesktopTauri } from '../utils/platform';
-import { LEGACY_LOCAL_SERVER_ID, resolveCanonicalBackendId, resolveLocalBackendId } from '../utils/controlPlane';
+import {
+  LEGACY_LOCAL_SERVER_ID,
+  resolveCanonicalBackendId,
+  resolveLocalBackendId,
+} from '../utils/controlPlane';
 
 interface ClaudiaDesktopOptions {
   isMobile: boolean;
@@ -23,23 +27,31 @@ export function useClaudiaDesktop({
   controlPlaneState,
   claudiaContextProjectId,
 }: ClaudiaDesktopOptions) {
-  const agentConfig = useAgentConfigStore((s) => s.config);
-  const agentConfigLoaded = useAgentConfigStore((s) => s.hasLoaded);
-  const loadAgentConfig = useAgentConfigStore((s) => s.loadConfig);
-  const localServerPort = useServerStore((s) => s.localServerPort);
-  const facadeLocalBackendId = useFacadeStore((s) => s.localBackendId);
+  const agentConfig = useAgentConfigStore(s => s.config);
+  const agentConfigLoaded = useAgentConfigStore(s => s.hasLoaded);
+  const loadAgentConfig = useAgentConfigStore(s => s.loadConfig);
+  const localServerPort = useServerStore(s => s.localServerPort);
+  const facadeLocalBackendId = useFacadeStore(s => s.localBackendId);
   const localBackendId = facadeLocalBackendId || resolveLocalBackendId();
-  const localBackendName = useFacadeStore((s) =>
-    s.backends.find((backend) => backend.backendId === (s.localBackendId || resolveLocalBackendId()))?.name
+  const localBackendName = useFacadeStore(
+    s =>
+      s.backends.find(
+        backend => backend.backendId === (s.localBackendId || resolveLocalBackendId())
+      )?.name
   );
-  const shortcut = useShortcutStore((s) => s.shortcut);
-  const shortcutEnabled = useShortcutStore((s) => s.enabled);
-  const { hasUnread: hasClaudiaUnread, hasRunning: hasClaudiaRunning, hasPermissionPending: hasClaudiaPermissionPending } = useClaudiaStatus();
+  const shortcut = useShortcutStore(s => s.shortcut);
+  const shortcutEnabled = useShortcutStore(s => s.enabled);
+  const {
+    hasUnread: hasClaudiaUnread,
+    hasRunning: hasClaudiaRunning,
+    hasPermissionPending: hasClaudiaPermissionPending,
+  } = useClaudiaStatus();
 
   const [claudiaProjectId, setClaudiaProjectId] = useState<string | null>(null);
 
   // Don't send the context project if it's the same as the Claudia host project
-  const resolvedContextProjectId = claudiaContextProjectId === claudiaProjectId ? null : claudiaContextProjectId;
+  const resolvedContextProjectId =
+    claudiaContextProjectId === claudiaProjectId ? null : claudiaContextProjectId;
 
   const claudiaServerUrl = useMemo(() => {
     return `http://localhost:${localServerPort || 3100}`;
@@ -68,7 +80,9 @@ export function useClaudiaDesktop({
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [agentConfig?.enabled, agentConfigLoaded, controlPlaneState]);
 
   // Sync floating ball visibility with master toggle
@@ -92,12 +106,15 @@ export function useClaudiaDesktop({
 
         const { getCurrentWindow } = await import('@tauri-apps/api/window');
         const authToken = '';
-        const serverId = resolveCanonicalBackendId(localBackendId ?? LEGACY_LOCAL_SERVER_ID, localBackendId) || LEGACY_LOCAL_SERVER_ID;
+        const serverId =
+          resolveCanonicalBackendId(localBackendId ?? LEGACY_LOCAL_SERVER_ID, localBackendId) ||
+          LEGACY_LOCAL_SERVER_ID;
         const serverName = localBackendName || 'Local Server';
         const hostWindow = getCurrentWindow();
-        const scale = typeof window.devicePixelRatio === 'number' && window.devicePixelRatio > 0
-          ? window.devicePixelRatio
-          : 1;
+        const scale =
+          typeof window.devicePixelRatio === 'number' && window.devicePixelRatio > 0
+            ? window.devicePixelRatio
+            : 1;
         const hostPos = await hostWindow.outerPosition().catch(() => null);
         const hostSize = await hostWindow.outerSize().catch(() => null);
         const hostX = hostPos ? hostPos.x / scale : window.screenX;
@@ -116,7 +133,16 @@ export function useClaudiaDesktop({
         if (resolvedContextProjectId) ballParams.set('contextProjectId', resolvedContextProjectId);
 
         const chatParams = new URLSearchParams({ claudiaChat: 'true' });
-        for (const key of ['serverUrl', 'authToken', 'serverId', 'serverName', 'gatewayUrl', 'gatewaySecret', 'projectId', 'contextProjectId'] as const) {
+        for (const key of [
+          'serverUrl',
+          'authToken',
+          'serverId',
+          'serverName',
+          'gatewayUrl',
+          'gatewaySecret',
+          'projectId',
+          'contextProjectId',
+        ] as const) {
           const val = ballParams.get(key);
           if (val) chatParams.set(key, val);
         }
@@ -136,7 +162,7 @@ export function useClaudiaDesktop({
 
         void invoke('preload_claudia_chat', {
           chatUrl: `${window.location.origin}${window.location.pathname}?${chatParams}`,
-        }).catch((preloadErr) => {
+        }).catch(preloadErr => {
           console.warn('[App] Failed to preload Claudia chat window:', preloadErr);
         });
 
@@ -152,7 +178,16 @@ export function useClaudiaDesktop({
         console.warn('[App] Failed to create Claudia floating ball:', err);
       }
     })();
-  }, [agentConfig?.enabled, agentConfigLoaded, resolvedContextProjectId, claudiaProjectId, claudiaServerUrl, isMobile, localBackendId, localBackendName]);
+  }, [
+    agentConfig?.enabled,
+    agentConfigLoaded,
+    resolvedContextProjectId,
+    claudiaProjectId,
+    claudiaServerUrl,
+    isMobile,
+    localBackendId,
+    localBackendName,
+  ]);
 
   // Sync global shortcut
   useEffect(() => {

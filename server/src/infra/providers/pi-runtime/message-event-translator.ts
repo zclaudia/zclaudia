@@ -13,7 +13,7 @@ export interface TranslateContext {
 export function translateEvent(
   event: AgentEvent,
   _ctx: TranslateContext,
-  usage?: Usage,
+  usage?: Usage
 ): ProviderRuntimeEvent | undefined {
   try {
     switch (event.type) {

@@ -1,4 +1,9 @@
-import type { StepExecutorPort, StepResult, StepContext, AgentLoopRunnerPort } from '../ports/step-executor.js';
+import type {
+  StepExecutorPort,
+  StepResult,
+  StepContext,
+  AgentLoopRunnerPort,
+} from '../ports/step-executor.js';
 import type { WorkflowNodeDef } from '@zclaudia/shared/features/workflows';
 import type { ActivityRegistry, ActivityServices } from '../../activities/index.js';
 
@@ -14,13 +19,13 @@ export class ActivityStepExecutorAdapter implements StepExecutorPort {
 
   constructor(
     private readonly registry: ActivityRegistry,
-    private readonly agentLoopRunner: AgentLoopRunnerPort,
+    private readonly agentLoopRunner: AgentLoopRunnerPort
   ) {}
 
   async execute(
     node: WorkflowNodeDef,
     config: Record<string, unknown>,
-    ctx: StepContext,
+    ctx: StepContext
   ): Promise<StepResult> {
     const input: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(config)) {

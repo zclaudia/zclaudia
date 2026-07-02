@@ -25,8 +25,11 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 };
 
 export function TaskDetail({ task, onClose }: TaskDetailProps) {
-  const upsertTask = useSupervisionStore((s) => s.upsertTask);
-  const status = statusConfig[task.status] ?? { label: task.status, color: 'bg-gray-500/10 text-gray-400' };
+  const upsertTask = useSupervisionStore(s => s.upsertTask);
+  const status = statusConfig[task.status] ?? {
+    label: task.status,
+    color: 'bg-gray-500/10 text-gray-400',
+  };
 
   useAndroidBack(onClose, true, 20);
 
@@ -44,7 +47,9 @@ export function TaskDetail({ task, onClose }: TaskDetailProps) {
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
         <div className="flex items-center gap-2 min-w-0">
-          <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full shrink-0 ${status.color}`}>
+          <span
+            className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full shrink-0 ${status.color}`}
+          >
             {status.label}
           </span>
           <h3 className="text-sm font-semibold truncate">{task.title}</h3>
@@ -77,18 +82,24 @@ export function TaskDetail({ task, onClose }: TaskDetailProps) {
           </div>
           <div>
             <span className="text-xs text-muted-foreground">Attempt</span>
-            <p className="text-sm">{task.attempt} / {task.maxRetries + 1}</p>
+            <p className="text-sm">
+              {task.attempt} / {task.maxRetries + 1}
+            </p>
           </div>
           <div>
             <span className="text-xs text-muted-foreground">Dependencies</span>
-            <p className="text-sm">{task.dependencies.length > 0 ? task.dependencies.join(', ') : 'None'}</p>
+            <p className="text-sm">
+              {task.dependencies.length > 0 ? task.dependencies.join(', ') : 'None'}
+            </p>
           </div>
         </section>
 
         {/* Acceptance criteria */}
         {task.acceptanceCriteria.length > 0 && (
           <section>
-            <h4 className="text-xs font-medium text-muted-foreground uppercase mb-1">Acceptance Criteria</h4>
+            <h4 className="text-xs font-medium text-muted-foreground uppercase mb-1">
+              Acceptance Criteria
+            </h4>
             <ul className="space-y-1">
               {task.acceptanceCriteria.map((c, i) => (
                 <li key={i} className="flex items-start gap-2 text-sm">
@@ -106,7 +117,10 @@ export function TaskDetail({ task, onClose }: TaskDetailProps) {
             <h4 className="text-xs font-medium text-muted-foreground uppercase mb-1">Scope</h4>
             <div className="flex flex-wrap gap-1">
               {task.scope.map((s, i) => (
-                <span key={i} className="flex items-center gap-1 px-1.5 py-0.5 text-xs bg-secondary rounded-md">
+                <span
+                  key={i}
+                  className="flex items-center gap-1 px-1.5 py-0.5 text-xs bg-secondary rounded-md"
+                >
                   <FileText size={10} /> {s}
                 </span>
               ))}
@@ -125,7 +139,9 @@ export function TaskDetail({ task, onClose }: TaskDetailProps) {
                   <span className="text-xs text-muted-foreground">Files changed:</span>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {task.result.filesChanged.map((f, i) => (
-                      <span key={i} className="text-xs bg-secondary px-1.5 py-0.5 rounded-md">{f}</span>
+                      <span key={i} className="text-xs bg-secondary px-1.5 py-0.5 rounded-md">
+                        {f}
+                      </span>
                     ))}
                   </div>
                 </div>
@@ -155,7 +171,9 @@ export function TaskDetail({ task, onClose }: TaskDetailProps) {
         {/* Review notes */}
         {task.result?.reviewNotes && (
           <section>
-            <h4 className="text-xs font-medium text-muted-foreground uppercase mb-1">Review Notes</h4>
+            <h4 className="text-xs font-medium text-muted-foreground uppercase mb-1">
+              Review Notes
+            </h4>
             <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-md p-3">
               <p className="text-sm whitespace-pre-wrap">{task.result.reviewNotes}</p>
             </div>
@@ -190,7 +208,9 @@ export function TaskDetail({ task, onClose }: TaskDetailProps) {
               <CheckCircle size={14} /> Approve Result
             </button>
             <button
-              onClick={() => handleAction(() => api.rejectSupervisionTaskResult(task.id, 'Rejected by user'))}
+              onClick={() =>
+                handleAction(() => api.rejectSupervisionTaskResult(task.id, 'Rejected by user'))
+              }
               className="flex items-center gap-1 px-3 py-1.5 text-sm bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-md"
             >
               <XCircle size={14} /> Reject Result

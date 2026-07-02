@@ -39,7 +39,8 @@ const EMPTY_PROVIDERS: LlmProfileConfig[] = [];
 
 function resolveBackendId(backendId?: string | null): string | null {
   if (backendId) return backendId;
-  const getState = (useServerStore as { getState?: () => { activeServerId?: string | null } }).getState;
+  const getState = (useServerStore as { getState?: () => { activeServerId?: string | null } })
+    .getState;
   return getState?.().activeServerId ?? null;
 }
 
@@ -49,25 +50,26 @@ export const useLlmProfileMetaStore = create<LlmProfileMetaState>((set, get) => 
   providerCapabilities: {},
   codexOauthSessions: new Map(),
 
-  setProviders: (providers, backendId) => set((state) => {
-    const resolvedBackendId = resolveBackendId(backendId);
-    if (!resolvedBackendId) return state;
-    return {
-      providersByBackend: {
-        ...state.providersByBackend,
-        [resolvedBackendId]: providers,
-      },
-    };
-  }),
+  setProviders: (providers, backendId) =>
+    set(state => {
+      const resolvedBackendId = resolveBackendId(backendId);
+      if (!resolvedBackendId) return state;
+      return {
+        providersByBackend: {
+          ...state.providersByBackend,
+          [resolvedBackendId]: providers,
+        },
+      };
+    }),
 
-  getProviders: (backendId) => {
+  getProviders: backendId => {
     const resolvedBackendId = resolveBackendId(backendId);
     if (!resolvedBackendId) return EMPTY_PROVIDERS;
     return get().providersByBackend[resolvedBackendId] ?? EMPTY_PROVIDERS;
   },
 
   setProviderCommands: (llmProfileId, commands) =>
-    set((state) => ({
+    set(state => ({
       providerCommands: {
         ...state.providerCommands,
         [llmProfileId]: commands,
@@ -75,7 +77,7 @@ export const useLlmProfileMetaStore = create<LlmProfileMetaState>((set, get) => 
     })),
 
   setProviderCapabilities: (llmProfileId, capabilities) =>
-    set((state) => ({
+    set(state => ({
       providerCapabilities: {
         ...state.providerCapabilities,
         [llmProfileId]: capabilities,
@@ -83,7 +85,7 @@ export const useLlmProfileMetaStore = create<LlmProfileMetaState>((set, get) => 
     })),
 
   setCodexOauthSession: (profileId, session) =>
-    set((state) => {
+    set(state => {
       const next = new Map(state.codexOauthSessions);
       if (session === null) {
         next.delete(profileId);

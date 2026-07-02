@@ -12,7 +12,7 @@ import { useGoalStore } from '../stores/goalStore';
  */
 export async function activateGoal(
   sessionId: string,
-  args: { objective: string; tokenBudget?: number; maxTurns?: number },
+  args: { objective: string; tokenBudget?: number; maxTurns?: number }
 ): Promise<Goal> {
   const store = useGoalStore.getState();
   const current = store.bySession[sessionId]?.goal ?? null;

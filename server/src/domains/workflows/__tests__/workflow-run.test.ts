@@ -22,22 +22,44 @@ describe('WorkflowRunRepository', () => {
   describe('mapRow', () => {
     it('maps row with all fields', () => {
       const result = repo.mapRow({
-        id: 'r1', workflow_id: 'w1', project_id: 'p1', status: 'running',
-        trigger_source: 'manual', trigger_detail: 'user', current_step_id: 's1',
-        started_at: 100, completed_at: 200, error: 'err',
+        id: 'r1',
+        workflow_id: 'w1',
+        project_id: 'p1',
+        status: 'running',
+        trigger_source: 'manual',
+        trigger_detail: 'user',
+        current_step_id: 's1',
+        started_at: 100,
+        completed_at: 200,
+        error: 'err',
       });
       expect(result).toEqual({
-        id: 'r1', workflowId: 'w1', projectId: 'p1', status: 'running',
-        triggerSource: 'manual', triggerDetail: 'user', initiator: 'manual', currentStepId: 's1',
-        startedAt: 100, completedAt: 200, error: 'err',
+        id: 'r1',
+        workflowId: 'w1',
+        projectId: 'p1',
+        status: 'running',
+        triggerSource: 'manual',
+        triggerDetail: 'user',
+        initiator: 'manual',
+        currentStepId: 's1',
+        startedAt: 100,
+        completedAt: 200,
+        error: 'err',
       });
     });
 
     it('handles null optional fields', () => {
       const result = repo.mapRow({
-        id: 'r1', workflow_id: 'w1', project_id: 'p1', status: 'pending',
-        trigger_source: 'cron', trigger_detail: null, current_step_id: null,
-        started_at: 100, completed_at: null, error: null,
+        id: 'r1',
+        workflow_id: 'w1',
+        project_id: 'p1',
+        status: 'pending',
+        trigger_source: 'cron',
+        trigger_detail: null,
+        current_step_id: null,
+        started_at: 100,
+        completed_at: null,
+        error: null,
       });
       expect(result.triggerDetail).toBeUndefined();
       expect(result.currentStepId).toBeUndefined();
@@ -49,9 +71,13 @@ describe('WorkflowRunRepository', () => {
   describe('createQuery', () => {
     it('generates insert SQL', () => {
       const { sql, params } = repo.createQuery({
-        workflowId: 'w1', projectId: 'p1', status: 'pending' as any,
-        triggerSource: 'manual' as any, triggerDetail: 'user',
-        currentStepId: 's1', startedAt: 100,
+        workflowId: 'w1',
+        projectId: 'p1',
+        status: 'pending' as any,
+        triggerSource: 'manual' as any,
+        triggerDetail: 'user',
+        currentStepId: 's1',
+        startedAt: 100,
       });
       expect(sql).toContain('INSERT INTO workflow_runs');
       expect(params[0]).toBe('mock-uuid');
@@ -60,8 +86,11 @@ describe('WorkflowRunRepository', () => {
 
     it('handles nullable fields', () => {
       const { params } = repo.createQuery({
-        workflowId: 'w1', projectId: 'p1', status: 'pending' as any,
-        triggerSource: 'manual' as any, startedAt: 100,
+        workflowId: 'w1',
+        projectId: 'p1',
+        status: 'pending' as any,
+        triggerSource: 'manual' as any,
+        startedAt: 100,
       } as any);
       expect(params[5]).toBeNull(); // triggerDetail
       expect(params[6]).toBe('manual'); // initiator (defaults to 'manual')
@@ -84,7 +113,9 @@ describe('WorkflowRunRepository', () => {
 
     it('handles all optional fields', () => {
       const { sql } = repo.updateQuery('r1', {
-        triggerDetail: 'd', currentStepId: 's2', completedAt: 200,
+        triggerDetail: 'd',
+        currentStepId: 's2',
+        completedAt: 200,
       });
       expect(sql).toContain('trigger_detail = ?');
       expect(sql).toContain('current_step_id = ?');
@@ -113,8 +144,12 @@ describe('WorkflowRunRepository', () => {
 
     it('returns mapped row when found', () => {
       mockDb.prepare().get.mockReturnValue({
-        id: 'r1', workflow_id: 'w1', project_id: 'p1', status: 'running',
-        trigger_source: 'manual', started_at: 100,
+        id: 'r1',
+        workflow_id: 'w1',
+        project_id: 'p1',
+        status: 'running',
+        trigger_source: 'manual',
+        started_at: 100,
       });
       expect(repo.findActiveByWorkflow('w1')).not.toBeNull();
     });

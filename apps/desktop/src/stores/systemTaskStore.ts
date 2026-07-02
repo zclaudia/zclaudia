@@ -11,7 +11,7 @@ interface SystemTaskState {
   updateTask: (task: SystemTaskInfo) => void;
 }
 
-export const useSystemTaskStore = create<SystemTaskState>((set) => ({
+export const useSystemTaskStore = create<SystemTaskState>(set => ({
   tasks: [],
 
   loadTasks: async () => {
@@ -19,13 +19,11 @@ export const useSystemTaskStore = create<SystemTaskState>((set) => ({
     if (res.success) set({ tasks: res.data });
   },
 
-  updateTask: (task) =>
-    set((state) => {
-      const idx = state.tasks.findIndex((t) => t.id === task.id);
+  updateTask: task =>
+    set(state => {
+      const idx = state.tasks.findIndex(t => t.id === task.id);
       const updated =
-        idx >= 0
-          ? state.tasks.map((t, i) => (i === idx ? task : t))
-          : [...state.tasks, task];
+        idx >= 0 ? state.tasks.map((t, i) => (i === idx ? task : t)) : [...state.tasks, task];
       return { tasks: updated };
     }),
 }));

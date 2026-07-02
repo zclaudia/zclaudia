@@ -34,15 +34,15 @@ describe('ClassicAdapter', () => {
     db.pragma('foreign_keys = ON');
     applyMigrations(db);
     db.prepare(
-      `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
     ).run('proj-1', 'P', 'code', 0, 0);
     db.prepare(
       `INSERT INTO local_issues (id, project_id, title, description, status, priority, labels, created_at, updated_at, type, is_anonymous)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run('i', 'proj-1', 't', null, 'open', 'medium', '[]', 0, 0, 'implement', 0);
     db.prepare(
       `INSERT INTO spec_changes (id, project_id, sub_issue_id, slug, title, status, proposal_path, design_path, tasks_path, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run('sc', 'proj-1', 'i', 'x', 'X', 'drafting', 'a', 'b', 'c', 0, 0);
     repo = new ExecutorInstanceRepository(db);
     lifecycle = { getChange: vi.fn() } as unknown as ChangeLifecycle;
@@ -56,18 +56,18 @@ describe('ClassicAdapter', () => {
       underlyingId: 'pc-1',
     });
     (lifecycle.getChange as ReturnType<typeof vi.fn>).mockReturnValue(
-      mkChange({ status: 'executing' }),
+      mkChange({ status: 'executing' })
     );
     const a = new ClassicAdapter(db, lifecycle, e);
     expect(a.getStatus()).toBe('executing');
 
     (lifecycle.getChange as ReturnType<typeof vi.fn>).mockReturnValue(
-      mkChange({ status: 'completed' }),
+      mkChange({ status: 'completed' })
     );
     expect(a.getStatus()).toBe('completed');
 
     (lifecycle.getChange as ReturnType<typeof vi.fn>).mockReturnValue(
-      mkChange({ status: 'draft' }),
+      mkChange({ status: 'draft' })
     );
     expect(a.getStatus()).toBe('pending');
   });
@@ -80,7 +80,7 @@ describe('ClassicAdapter', () => {
       underlyingId: 'pc-1',
     });
     (lifecycle.getChange as ReturnType<typeof vi.fn>).mockReturnValue(
-      mkChange({ status: 'executing' }),
+      mkChange({ status: 'executing' })
     );
     const a = new ClassicAdapter(db, lifecycle, e);
     await a.start({});

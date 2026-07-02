@@ -3,7 +3,13 @@ import express from 'express';
 import request from 'supertest';
 import { createWorkspaceRoutes } from '../workspace.js';
 import { workspaceService } from '../../../application/services/workspace.js';
-import { getDiscoveredSkills, getExternalSkillDirs, getSkillLoadDiagnostics, refreshSkillCache, saveExternalSkillDirs } from '../../../application/plugins/skill-tools.js';
+import {
+  getDiscoveredSkills,
+  getExternalSkillDirs,
+  getSkillLoadDiagnostics,
+  refreshSkillCache,
+  saveExternalSkillDirs,
+} from '../../../application/plugins/skill-tools.js';
 
 vi.mock('../../../application/services/workspace.js', () => ({
   workspaceService: {
@@ -51,9 +57,7 @@ describe('workspace routes', () => {
   });
 
   it('returns structured 400 when config update body is empty', async () => {
-    const res = await request(app)
-      .put('/api/workspace/config')
-      .send({});
+    const res = await request(app).put('/api/workspace/config').send({});
 
     expect(res.status).toBe(400);
     expect(res.body).toEqual({
@@ -68,8 +72,7 @@ describe('workspace routes', () => {
   it('returns structured 404 when skill does not exist', async () => {
     vi.mocked(workspaceService.loadSkill).mockResolvedValueOnce(null);
 
-    const res = await request(app)
-      .get('/api/workspace/skills/missing-skill');
+    const res = await request(app).get('/api/workspace/skills/missing-skill');
 
     expect(res.status).toBe(404);
     expect(res.body).toEqual({
@@ -102,7 +105,13 @@ describe('workspace routes', () => {
       },
     ] as any);
     vi.mocked(getSkillLoadDiagnostics).mockReturnValue([
-      { type: 'warning', code: 'INVALID_SKILL', message: 'Bad skill', path: '/bad/SKILL.md', source: 'workspace' },
+      {
+        type: 'warning',
+        code: 'INVALID_SKILL',
+        message: 'Bad skill',
+        path: '/bad/SKILL.md',
+        source: 'workspace',
+      },
     ]);
 
     const res = await request(app).get('/api/workspace/skills');
@@ -143,9 +152,7 @@ describe('workspace routes', () => {
   });
 
   it('returns structured 400 when skill dirs payload is invalid', async () => {
-    const res = await request(app)
-      .put('/api/workspace/skill-dirs')
-      .send({ dirs: 'not-an-array' });
+    const res = await request(app).put('/api/workspace/skill-dirs').send({ dirs: 'not-an-array' });
 
     expect(res.status).toBe(400);
     expect(res.body).toEqual({
@@ -161,8 +168,7 @@ describe('workspace routes', () => {
   it('returns structured 500 when get config fails', async () => {
     vi.mocked(workspaceService.getConfig).mockRejectedValueOnce(new Error('boom'));
 
-    const res = await request(app)
-      .get('/api/workspace/config');
+    const res = await request(app).get('/api/workspace/config');
 
     expect(res.status).toBe(500);
     expect(res.body).toEqual({

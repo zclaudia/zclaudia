@@ -189,9 +189,7 @@ export function createBootstrapRoutes(deps: BootstrapRoutesDeps): Router {
     } catch (e) {
       const message = (e as Error).message;
       const status = message.includes('not found') ? 404 : 400;
-      res
-        .status(status)
-        .json(err(status === 404 ? 'NOT_FOUND' : 'OPENSPEC_ERROR', message));
+      res.status(status).json(err(status === 404 ? 'NOT_FOUND' : 'OPENSPEC_ERROR', message));
     }
   });
 

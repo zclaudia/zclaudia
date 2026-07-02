@@ -106,18 +106,20 @@ export const useDraftEditorStore = create<DraftEditorState>((set, get) => ({
       const prevSession = prev.activeSessionId;
       const prevContent = prev.localContent;
       if (hasDraftContent(prevContent)) {
-        saveDraftToServer(prevSession, prevContent).catch((err) =>
+        saveDraftToServer(prevSession, prevContent).catch(err =>
           console.error('[DraftEditor] Background save on switch failed:', err)
         );
       } else {
         set({ draftExists: { ...get().draftExists, [prevSession]: false } });
-        api.deleteSessionDraft(prevSession).catch((err) =>
-          console.error('[DraftEditor] Failed to delete empty draft on switch:', err)
-        );
+        api
+          .deleteSessionDraft(prevSession)
+          .catch(err =>
+            console.error('[DraftEditor] Failed to delete empty draft on switch:', err)
+          );
       }
-      api.unlockSessionDraft(prevSession, CLIENT_DEVICE_ID).catch((err) =>
-        console.error('[DraftEditor] Failed to release lock on switch:', err)
-      );
+      api
+        .unlockSessionDraft(prevSession, CLIENT_DEVICE_ID)
+        .catch(err => console.error('[DraftEditor] Failed to release lock on switch:', err));
     }
 
     // Show panel immediately with empty content for responsive UI
@@ -140,7 +142,10 @@ export const useDraftEditorStore = create<DraftEditorState>((set, get) => ({
         set({
           localContent: result.draft?.content || '',
           lastSavedAt: result.draft?.updatedAt || null,
-          draftExists: { ...get().draftExists, [sessionId]: hasDraftContent(result.draft?.content) },
+          draftExists: {
+            ...get().draftExists,
+            [sessionId]: hasDraftContent(result.draft?.content),
+          },
         });
       } else {
         // Lock held by another device
@@ -182,18 +187,18 @@ export const useDraftEditorStore = create<DraftEditorState>((set, get) => ({
     // Save and release lock in background (don't block UI)
     if (activeSessionId && !isReadOnly) {
       if (hasDraftContent(localContent)) {
-        saveDraftToServer(activeSessionId, localContent).catch((err) =>
+        saveDraftToServer(activeSessionId, localContent).catch(err =>
           console.error('[DraftEditor] Background save failed:', err)
         );
       } else {
         set({ draftExists: { ...get().draftExists, [activeSessionId]: false } });
-        api.deleteSessionDraft(activeSessionId).catch((err) =>
-          console.error('[DraftEditor] Failed to delete empty draft:', err)
-        );
+        api
+          .deleteSessionDraft(activeSessionId)
+          .catch(err => console.error('[DraftEditor] Failed to delete empty draft:', err));
       }
-      api.unlockSessionDraft(activeSessionId, CLIENT_DEVICE_ID).catch((err) =>
-        console.error('[DraftEditor] Failed to release lock:', err)
-      );
+      api
+        .unlockSessionDraft(activeSessionId, CLIENT_DEVICE_ID)
+        .catch(err => console.error('[DraftEditor] Failed to release lock:', err));
     }
   },
 
@@ -359,9 +364,9 @@ export const useDraftEditorStore = create<DraftEditorState>((set, get) => ({
     });
   },
 
-  setSendCallback: (cb) => set({ sendCallback: cb }),
+  setSendCallback: cb => set({ sendCallback: cb }),
 
   setPoppedOut: (poppedOut, label) => set({ poppedOut, poppedOutWindowLabel: label }),
 
-  setSessionArchived: (archived) => set({ sessionArchived: archived }),
+  setSessionArchived: archived => set({ sessionArchived: archived }),
 }));

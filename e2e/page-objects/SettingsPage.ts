@@ -1,4 +1,4 @@
-import { Page, Locator } from '@playwright/test';
+import type { Page, Locator } from '@playwright/test';
 
 /**
  * Page Object Model for Settings panel
@@ -169,7 +169,7 @@ export class SettingsPage {
     // Wait for connection
     await this.connectionStatus.waitFor({
       state: 'visible',
-      timeout: 10000
+      timeout: 10000,
     });
   }
 
@@ -182,7 +182,7 @@ export class SettingsPage {
     // Wait for disconnection
     await this.connectionStatus.waitFor({
       state: 'visible',
-      timeout: 5000
+      timeout: 5000,
     });
   }
 
@@ -190,7 +190,7 @@ export class SettingsPage {
    * Get connection status
    */
   async getConnectionStatus(): Promise<string> {
-    return await this.connectionStatus.textContent() || '';
+    return (await this.connectionStatus.textContent()) || '';
   }
 
   /**

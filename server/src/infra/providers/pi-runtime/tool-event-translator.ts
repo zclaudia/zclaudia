@@ -16,7 +16,10 @@ interface PiToolCallBlock {
 
 function toolInteractionKind(toolName: string): 'todo_update' | undefined {
   const normalized = toolName.replace(/[^a-z0-9]/gi, '').toLowerCase();
-  return normalized === 'todowrite' || normalized === 'updatetodos' || normalized === 'todolist' || normalized === 'todolistwrite'
+  return normalized === 'todowrite' ||
+    normalized === 'updatetodos' ||
+    normalized === 'todolist' ||
+    normalized === 'todolistwrite'
     ? 'todo_update'
     : undefined;
 }
@@ -32,7 +35,7 @@ function toolInteractionKind(toolName: string): 'todo_update' | undefined {
 function planModeTransitionEvent(
   toolName: unknown,
   toolUseId: string | undefined,
-  result: unknown,
+  result: unknown
 ): ProviderRuntimeEvent | undefined {
   if (typeof toolName !== 'string') return undefined;
   const normalized = toolName.replace(/[^a-z0-9]/gi, '').toLowerCase();
@@ -67,7 +70,7 @@ function extractPartialText(partialResult: unknown): string {
   return content
     .filter(
       (b: unknown) =>
-        typeof b === 'object' && b !== null && (b as { type?: unknown }).type === 'text',
+        typeof b === 'object' && b !== null && (b as { type?: unknown }).type === 'text'
     )
     .map((b: unknown) => String((b as { text?: unknown }).text ?? ''))
     .join('');
@@ -82,7 +85,7 @@ function extractPartialText(partialResult: unknown): string {
  */
 export function translateToolEvent(
   event: AgentEvent,
-  _ctx: TranslateToolContext,
+  _ctx: TranslateToolContext
 ): ProviderRuntimeEvent | ProviderRuntimeEvent[] | undefined {
   try {
     switch (event.type) {

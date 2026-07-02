@@ -1,15 +1,27 @@
 import { readFileSync, existsSync } from 'fs';
 import { resolve, isAbsolute, basename, extname, sep, dirname } from 'path';
-import {
-  guardReviewFileContent,
-} from '../review-payload-guard.js';
+import { guardReviewFileContent } from '../review-payload-guard.js';
 import type { AIReviewContext } from '../delegation-evaluator.js';
 
 /** File extensions recognized as executable scripts */
 export const SCRIPT_EXTENSIONS = new Set([
-  '.sh', '.bash', '.zsh', '.fish', '.ksh',
-  '.py', '.rb', '.pl', '.js', '.ts', '.mjs', '.cjs',
-  '.php', '.lua', '.ps1', '.bat', '.cmd',
+  '.sh',
+  '.bash',
+  '.zsh',
+  '.fish',
+  '.ksh',
+  '.py',
+  '.rb',
+  '.pl',
+  '.js',
+  '.ts',
+  '.mjs',
+  '.cjs',
+  '.php',
+  '.lua',
+  '.ps1',
+  '.bat',
+  '.cmd',
 ]);
 
 export const MAX_REVIEW_FILES = 5;
@@ -39,14 +51,7 @@ export const HARD_DENY_NAMES = new Set([
   'known_hosts',
 ]);
 
-export const HARD_DENY_EXTENSIONS = new Set([
-  '.pem',
-  '.key',
-  '.p12',
-  '.pfx',
-  '.crt',
-  '.der',
-]);
+export const HARD_DENY_EXTENSIONS = new Set(['.pem', '.key', '.p12', '.pfx', '.crt', '.der']);
 
 export interface CandidateScript {
   displayPath: string;
@@ -70,7 +75,7 @@ export function isWithinRoot(root: string, target: string): boolean {
 }
 
 export function hasHardDeniedPathSegment(resolvedPath: string): boolean {
-  return HARD_DENY_PATH_SEGMENTS.some((segment) => resolvedPath.includes(segment));
+  return HARD_DENY_PATH_SEGMENTS.some(segment => resolvedPath.includes(segment));
 }
 
 export function hasSensitiveName(filePath: string): boolean {
@@ -97,11 +102,16 @@ export function extractScriptPaths(command: string): string[] {
   const paths: string[] = [];
 
   // Strip shell wrapper: /bin/zsh -lc '...' or /bin/bash -c "..."
-  const shellWrapperMatch = command.match(/^\/bin\/(?:bash|zsh|sh)\s+(?:-\w+\s+)*(?:'([\s\S]*)'|"([\s\S]*)")$/);
-  const innerCmd = shellWrapperMatch ? (shellWrapperMatch[1] || shellWrapperMatch[2] || command) : command;
+  const shellWrapperMatch = command.match(
+    /^\/bin\/(?:bash|zsh|sh)\s+(?:-\w+\s+)*(?:'([\s\S]*)'|"([\s\S]*)")$/
+  );
+  const innerCmd = shellWrapperMatch
+    ? shellWrapperMatch[1] || shellWrapperMatch[2] || command
+    : command;
 
   // Pattern: interpreter script_path (e.g., bash deploy.sh, python setup.py)
-  const interpreterPattern = /\b(?:bash|sh|zsh|fish|python3?|ruby|perl|node|tsx?|php|lua|pwsh|powershell)\s+([\w./_-]+\.\w+)/gi;
+  const interpreterPattern =
+    /\b(?:bash|sh|zsh|fish|python3?|ruby|perl|node|tsx?|php|lua|pwsh|powershell)\s+([\w./_-]+\.\w+)/gi;
   let match;
   while ((match = interpreterPattern.exec(innerCmd)) !== null) {
     paths.push(match[1]);
@@ -134,7 +144,7 @@ export function addCandidateScript(
   seen: Set<string>,
   displayPath: string,
   resolvedPath: string,
-  source: CandidateScript['source'],
+  source: CandidateScript['source']
 ): void {
   if (seen.has(resolvedPath)) return;
   seen.add(resolvedPath);
@@ -146,7 +156,7 @@ export function maybeAddDependencyCandidate(
   parentResolvedPath: string,
   workspaceRoot: string,
   candidates: CandidateScript[],
-  seen: Set<string>,
+  seen: Set<string>
 ): void {
   const resolvedPath = dependencyPath.startsWith('.')
     ? resolve(dirname(parentResolvedPath), dependencyPath)
@@ -229,7 +239,7 @@ export function collectCandidateScripts(command: string, cwd?: string): Candidat
     addCandidateScript(candidates, seen, scriptPath, resolvedPath, 'direct');
   }
 
-  let frontier = candidates.filter((item) => item.source === 'direct');
+  let frontier = candidates.filter(item => item.source === 'direct');
   for (let depth = 0; depth < MAX_DEPENDENCY_DEPTH; depth += 1) {
     const nextFrontier: CandidateScript[] = [];
     for (const candidate of frontier) {
@@ -238,7 +248,13 @@ export function collectCandidateScripts(command: string, cwd?: string): Candidat
         const content = readFileSync(candidate.resolvedPath, 'utf-8');
         const beforeCount = candidates.length;
         for (const dependencyPath of extractLocalDependencies(candidate.resolvedPath, content)) {
-          maybeAddDependencyCandidate(dependencyPath, candidate.resolvedPath, root, candidates, seen);
+          maybeAddDependencyCandidate(
+            dependencyPath,
+            candidate.resolvedPath,
+            root,
+            candidates,
+            seen
+          );
         }
         if (candidates.length > beforeCount) {
           nextFrontier.push(...candidates.slice(beforeCount));
@@ -258,30 +274,57 @@ export async function readReviewFile(
   workspaceRoot: string,
   allowedFiles: Map<string, CandidateScript>,
   totalBytesUsed: number,
-  commandContext: string,
+  commandContext: string
 ): Promise<ReviewFileAccessResult> {
-  const resolvedPath = isAbsolute(requestPath) ? resolve(requestPath) : resolve(workspaceRoot, requestPath);
-  const allowedCandidate = allowedFiles.get(resolvedPath)
-    ?? Array.from(allowedFiles.values()).find((candidate) => candidate.displayPath === requestPath);
+  const resolvedPath = isAbsolute(requestPath)
+    ? resolve(requestPath)
+    : resolve(workspaceRoot, requestPath);
+  const allowedCandidate =
+    allowedFiles.get(resolvedPath) ??
+    Array.from(allowedFiles.values()).find(candidate => candidate.displayPath === requestPath);
   const candidateResolvedPath = allowedCandidate?.resolvedPath ?? resolvedPath;
 
   if (!allowedCandidate) {
-    const denied = { ok: false, path: requestPath, resolvedPath: candidateResolvedPath, reason: 'Path is not in the command-referenced file list' };
+    const denied = {
+      ok: false,
+      path: requestPath,
+      resolvedPath: candidateResolvedPath,
+      reason: 'Path is not in the command-referenced file list',
+    };
     auditReviewFileAccess(denied);
     return denied;
   }
   if (!isWithinRoot(workspaceRoot, candidateResolvedPath)) {
-    const denied = { ok: false, path: requestPath, resolvedPath: candidateResolvedPath, reason: 'Path is outside the workspace root' };
+    const denied = {
+      ok: false,
+      path: requestPath,
+      resolvedPath: candidateResolvedPath,
+      reason: 'Path is outside the workspace root',
+    };
     auditReviewFileAccess(denied);
     return denied;
   }
-  if (hasHardDeniedPathSegment(candidateResolvedPath) || hasSensitiveName(candidateResolvedPath) || hasSensitiveExtension(candidateResolvedPath)) {
-    const denied = { ok: false, path: requestPath, resolvedPath: candidateResolvedPath, reason: 'Path matched a sensitive file rule' };
+  if (
+    hasHardDeniedPathSegment(candidateResolvedPath) ||
+    hasSensitiveName(candidateResolvedPath) ||
+    hasSensitiveExtension(candidateResolvedPath)
+  ) {
+    const denied = {
+      ok: false,
+      path: requestPath,
+      resolvedPath: candidateResolvedPath,
+      reason: 'Path matched a sensitive file rule',
+    };
     auditReviewFileAccess(denied);
     return denied;
   }
   if (!existsSync(candidateResolvedPath)) {
-    const denied = { ok: false, path: requestPath, resolvedPath: candidateResolvedPath, reason: 'File does not exist' };
+    const denied = {
+      ok: false,
+      path: requestPath,
+      resolvedPath: candidateResolvedPath,
+      reason: 'File does not exist',
+    };
     auditReviewFileAccess(denied);
     return denied;
   }
@@ -289,7 +332,12 @@ export async function readReviewFile(
   try {
     const budget = Math.max(0, MAX_TOTAL_BYTES - totalBytesUsed);
     if (budget <= 0) {
-      const denied = { ok: false, path: requestPath, resolvedPath: candidateResolvedPath, reason: 'Review file budget exhausted' };
+      const denied = {
+        ok: false,
+        path: requestPath,
+        resolvedPath: candidateResolvedPath,
+        reason: 'Review file budget exhausted',
+      };
       auditReviewFileAccess(denied);
       return denied;
     }
@@ -325,7 +373,12 @@ export async function readReviewFile(
     auditReviewFileAccess(result);
     return result;
   } catch {
-    const denied = { ok: false, path: requestPath, resolvedPath: candidateResolvedPath, reason: 'Failed to read file' };
+    const denied = {
+      ok: false,
+      path: requestPath,
+      resolvedPath: candidateResolvedPath,
+      reason: 'Failed to read file',
+    };
     auditReviewFileAccess(denied);
     return denied;
   }
@@ -335,11 +388,16 @@ export function buildInitialReviewPrompt(
   ctx: AIReviewContext,
   candidateScripts: CandidateScript[],
   detail: string,
-  inputJson: string,
+  inputJson: string
 ): string {
-  const fileList = candidateScripts.length > 0
-    ? candidateScripts.map((item) => `- ${item.displayPath}${item.source === 'dependency' ? ' (dependency)' : ''}`).join('\n')
-    : '- none';
+  const fileList =
+    candidateScripts.length > 0
+      ? candidateScripts
+          .map(
+            item => `- ${item.displayPath}${item.source === 'dependency' ? ' (dependency)' : ''}`
+          )
+          .join('\n')
+      : '- none';
 
   return `You are a security analyzer for a coding assistant. Analyze whether this tool call should be automatically approved, denied, or left uncertain.
 

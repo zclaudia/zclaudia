@@ -3,7 +3,7 @@ import { createRunDomainEvent } from '../run-domain-events.js';
 
 function event<TType extends Parameters<typeof createRunDomainEvent>[0]['type']>(
   type: TType,
-  payload: Parameters<typeof createRunDomainEvent<TType>>[0]['payload'],
+  payload: Parameters<typeof createRunDomainEvent<TType>>[0]['payload']
 ) {
   return createRunDomainEvent({
     eventId: `event-${type}`,

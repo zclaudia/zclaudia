@@ -33,7 +33,12 @@ interface ResolvedChip {
   stale: boolean; // pinned but not found in the current skills list
 }
 
-export function PinnedSkillChips({ pinnedRefs, skills, onActivate, onUnpin }: PinnedSkillChipsProps) {
+export function PinnedSkillChips({
+  pinnedRefs,
+  skills,
+  onActivate,
+  onUnpin,
+}: PinnedSkillChipsProps) {
   const byKey = useMemo(() => {
     const m = new Map<string, WorkspaceSkillInfo>();
     for (const s of skills) m.set(skillRefKey({ source: s.source ?? 'workspace', id: s.id }), s);
@@ -41,7 +46,7 @@ export function PinnedSkillChips({ pinnedRefs, skills, onActivate, onUnpin }: Pi
   }, [skills]);
 
   const chips = useMemo<ResolvedChip[]>(() => {
-    return pinnedRefs.map((ref) => {
+    return pinnedRefs.map(ref => {
       const skill = byKey.get(skillRefKey(ref));
       if (skill) {
         return {
@@ -65,7 +70,7 @@ export function PinnedSkillChips({ pinnedRefs, skills, onActivate, onUnpin }: Pi
 
   return (
     <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
-      {chips.map((chip) => (
+      {chips.map(chip => (
         <span
           key={skillRefKey(chip.ref)}
           className={`group inline-flex items-center gap-1 rounded-full border pl-2 pr-1 py-0.5 text-[11px] font-medium transition-colors ${
@@ -87,7 +92,7 @@ export function PinnedSkillChips({ pinnedRefs, skills, onActivate, onUnpin }: Pi
             type="button"
             aria-label={`Unpin ${chip.label}`}
             onClick={() => onUnpin(chip.ref)}
-            onMouseDown={(e) => e.stopPropagation()}
+            onMouseDown={e => e.stopPropagation()}
             className="rounded-full p-0.5 text-current opacity-50 hover:opacity-100 hover:bg-foreground/10 transition-opacity cursor-pointer"
           >
             <X size={11} strokeWidth={2.5} />

@@ -73,8 +73,15 @@ interface MetaVariableSource {
 export function substituteMetaVariables(rewrite: string, match: MetaVariableSource): string {
   return rewrite
     .replace(/\$\$\$([A-Z_][A-Z0-9_]*)/g, (_whole, name: string) =>
-      match.getMultipleMatches(name).map(node => node.text()).join(', '))
-    .replace(/\$([A-Z_][A-Z0-9_]*)/g, (whole, name: string) => match.getMatch(name)?.text() ?? whole);
+      match
+        .getMultipleMatches(name)
+        .map(node => node.text())
+        .join(', ')
+    )
+    .replace(
+      /\$([A-Z_][A-Z0-9_]*)/g,
+      (whole, name: string) => match.getMatch(name)?.text() ?? whole
+    );
 }
 
 export interface AstMatch {
@@ -90,7 +97,11 @@ async function loadNapi(): Promise<typeof import('@ast-grep/napi')> {
   return napiModule;
 }
 
-export async function findAstMatches(content: string, filePath: string, pattern: string): Promise<AstMatch[]> {
+export async function findAstMatches(
+  content: string,
+  filePath: string,
+  pattern: string
+): Promise<AstMatch[]> {
   const langName = langForFile(filePath);
   if (!langName) return [];
   const napi = await loadNapi();
@@ -112,7 +123,7 @@ export async function rewriteAstMatches(
   content: string,
   filePath: string,
   pattern: string,
-  rewrite: string,
+  rewrite: string
 ): Promise<AstRewriteResult | undefined> {
   const langName = langForFile(filePath);
   if (!langName) return undefined;

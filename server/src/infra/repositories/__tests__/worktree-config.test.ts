@@ -84,8 +84,18 @@ describe('WorktreeConfigRepository', () => {
     });
 
     it('updates existing config', () => {
-      repo.upsert({ projectId: 'p1', worktreePath: '/wt1', autoCreatePR: false, autoReview: false });
-      const updated = repo.upsert({ projectId: 'p1', worktreePath: '/wt1', autoCreatePR: true, autoReview: true });
+      repo.upsert({
+        projectId: 'p1',
+        worktreePath: '/wt1',
+        autoCreatePR: false,
+        autoReview: false,
+      });
+      const updated = repo.upsert({
+        projectId: 'p1',
+        worktreePath: '/wt1',
+        autoCreatePR: true,
+        autoReview: true,
+      });
 
       expect(updated.autoCreatePR).toBe(true);
       expect(updated.autoReview).toBe(true);

@@ -15,10 +15,11 @@ export interface ReuseSearchResult {
 function tokenize(s: string | undefined): Set<string> {
   if (!s) return new Set();
   return new Set(
-    s.toLowerCase()
+    s
+      .toLowerCase()
       .replace(/[^a-z0-9 ]+/g, ' ')
       .split(/\s+/)
-      .filter((t) => t.length >= 3),
+      .filter(t => t.length >= 3)
   );
 }
 
@@ -31,7 +32,7 @@ function tokenOverlap(a: Set<string>, b: Set<string>): number {
 export class ReusePoolSearchService {
   constructor(
     private repo: MetaWorkflowReusePoolRepository,
-    private limit = 5,
+    private limit = 5
   ) {}
 
   search(phase: PhaseDef): ReuseSearchResult[] {
@@ -40,10 +41,10 @@ export class ReusePoolSearchService {
 
     const candidates = this.repo
       .findByPhaseType(phase.phaseType)
-      .filter((c) => c.kind === expectedKind);
+      .filter(c => c.kind === expectedKind);
 
     const queryTokens = tokenize(`${phase.name} ${phase.description}`);
-    const scored = candidates.map((item) => ({
+    const scored = candidates.map(item => ({
       item,
       score: tokenOverlap(queryTokens, tokenize(item.description)),
     }));

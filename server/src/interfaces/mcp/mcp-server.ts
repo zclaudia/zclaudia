@@ -9,6 +9,7 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { toolRegistry } from '../../application/plugins/tool-registry.js';
 
@@ -26,11 +27,11 @@ const sessions = new Map<string, McpSession>();
 function createServer(): Server {
   const server = new Server(
     { name: SERVER_NAME, version: SERVER_VERSION },
-    { capabilities: { tools: {} } },
+    { capabilities: { tools: {} } }
   );
 
   // tools/list — dynamically read from toolRegistry on each request
-  server.setRequestHandler({ method: 'tools/list' } as any, async () => {
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
     const bridgeTools = toolRegistry.getBridgeTools();
     return {
       tools: bridgeTools.map(t => ({
@@ -42,7 +43,7 @@ function createServer(): Server {
   });
 
   // tools/call — dispatch to toolRegistry.execute
-  server.setRequestHandler({ method: 'tools/call' } as any, async (request: any) => {
+  server.setRequestHandler(CallToolRequestSchema, async request => {
     const { name, arguments: args } = request.params;
     try {
       const result = await toolRegistry.execute(name, args || {}, {});
@@ -68,15 +69,17 @@ function createServer(): Server {
 export async function handleMcpRequest(
   req: IncomingMessage,
   res: ServerResponse,
-  parsedBody?: unknown,
+  parsedBody?: unknown
 ): Promise<void> {
   const sessionId = req.headers['mcp-session-id'] as string | undefined;
 
-  if (sessionId && sessions.has(sessionId)) {
+  if (sessionId) {
     // Reuse existing transport for this session
-    const { transport } = sessions.get(sessionId)!;
-    await transport.handleRequest(req, res, parsedBody);
-    return;
+    const session = sessions.get(sessionId);
+    if (session) {
+      await session.transport.handleRequest(req, res, parsedBody);
+      return;
+    }
   }
 
   // New session — create transport
@@ -107,21 +110,35 @@ export async function handleMcpSse(req: IncomingMessage, res: ServerResponse): P
   const sessionId = req.headers['mcp-session-id'] as string | undefined;
   if (!sessionId || !sessions.has(sessionId)) {
     res.writeHead(400, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Missing or invalid session ID. Initialize first with POST /mcp.' }));
+    res.end(
+      JSON.stringify({ error: 'Missing or invalid session ID. Initialize first with POST /mcp.' })
+    );
     return;
   }
-  const { transport } = sessions.get(sessionId)!;
-  await transport.handleRequest(req, res);
+  const session = sessions.get(sessionId);
+  if (!session) {
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(
+      JSON.stringify({ error: 'Missing or invalid session ID. Initialize first with POST /mcp.' })
+    );
+    return;
+  }
+  await session.transport.handleRequest(req, res);
 }
 
 /**
  * Handle DELETE /mcp (session cleanup).
  */
-export async function handleMcpSessionClose(req: IncomingMessage, res: ServerResponse): Promise<void> {
+export async function handleMcpSessionClose(
+  req: IncomingMessage,
+  res: ServerResponse
+): Promise<void> {
   const sessionId = req.headers['mcp-session-id'] as string | undefined;
-  if (sessionId && sessions.has(sessionId)) {
-    const { server } = sessions.get(sessionId)!;
-    await server.close();
+  if (sessionId) {
+    const session = sessions.get(sessionId);
+    if (session) {
+      await session.server.close();
+    }
     sessions.delete(sessionId);
   }
   res.writeHead(200);

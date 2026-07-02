@@ -18,15 +18,13 @@ export class SqliteTranscriptPort implements TranscriptPort {
          FROM messages
          WHERE session_id = ?
          ORDER BY offset DESC
-         LIMIT ?`,
+         LIMIT ?`
       )
       .all(sessionId, lookback) as MessageRow[];
-    return rows
-      .reverse()
-      .map((r) => ({
-        role: (r.role as TranscriptMessage['role']) ?? 'user',
-        content: r.content ?? '',
-        timestamp: r.created_at,
-      }));
+    return rows.reverse().map(r => ({
+      role: (r.role as TranscriptMessage['role']) ?? 'user',
+      content: r.content ?? '',
+      timestamp: r.created_at,
+    }));
   }
 }

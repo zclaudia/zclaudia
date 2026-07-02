@@ -12,7 +12,7 @@ function createLocalHandler(): TestLocalHandler {
     onStreamOpen: vi.fn(),
     onStreamClose: vi.fn(),
     onCatchUp: vi.fn(async () => []),
-    onServerEvent: (listener) => {
+    onServerEvent: listener => {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
@@ -35,7 +35,12 @@ function createGatewayClientMock() {
     },
     queries: {
       connection: { isConnected: () => true },
-      identity: { getInstanceId: () => 'instance-1', getDeviceId: () => 'device-1', getBackendId: () => 'backend-local', getEpoch: () => 1 },
+      identity: {
+        getInstanceId: () => 'instance-1',
+        getDeviceId: () => 'device-1',
+        getBackendId: () => 'backend-local',
+        getEpoch: () => 1,
+      },
       registry: { getItems: () => new Map() },
       channel: {
         getOutgoing: vi.fn(),
@@ -55,7 +60,7 @@ describe('EmbeddedGatewayAdapter', () => {
     const adapter = new EmbeddedGatewayAdapter(gatewayClient as any, localHandler, 3100);
     adapter.setLocalBackendId('backend-local');
     const events: any[] = [];
-    adapter.events.subscribe((event) => events.push(event));
+    adapter.events.subscribe(event => events.push(event));
 
     adapter.commands.backend.subscribe('backend-local');
     localHandler.emit({
@@ -73,7 +78,7 @@ describe('EmbeddedGatewayAdapter', () => {
           sessionId: 'session-1',
           event: expect.objectContaining({ type: 'run_started', runId: 'run-1' }),
         }),
-      ]),
+      ])
     );
   });
 });

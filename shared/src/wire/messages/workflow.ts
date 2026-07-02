@@ -99,3 +99,21 @@ export interface AttachmentRemovedMessage {
   ownerId: string;
   attachmentId: string;
 }
+
+export type WorkflowClientMessage = never;
+
+export type WorkflowServerMessage =
+  | WorkflowRunUpdateMessage
+  | WorkflowUpdateMessage
+  | WorkflowDeletedMessage
+  | WorkflowStepTypesChangedMessage
+  | WorkflowTriggerSourcesChangedMessage
+  | SystemTaskUpdateMessage
+  | LocalPRUpdateMessage
+  | LocalPRDeletedMessage
+  | LocalIssueUpdateMessage
+  | LocalIssueDeletedMessage
+  | LocalIssueCommentUpdateMessage
+  | LocalIssueCommentDeletedMessage
+  | AttachmentAddedMessage
+  | AttachmentRemovedMessage;

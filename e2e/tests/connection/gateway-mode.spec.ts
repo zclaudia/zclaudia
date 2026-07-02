@@ -13,7 +13,7 @@ describe('Gateway Mode Specific Features', () => {
     }
   });
 
-  test('should connect through gateway relay', async () => {
+  test.skipIf(!gatewayMode.enabled)('should connect through gateway relay', async () => {
     browser = await createBrowser();
     await browser.goto('/');
     await browser.waitForLoadState('networkidle');
@@ -21,8 +21,10 @@ describe('Gateway Mode Specific Features', () => {
 
     // Fetch backend ID dynamically
     if (!gatewayMode.backendId) {
+      const apiKey = gatewayMode.apiKey;
+      if (!apiKey) return; // Skip - Gateway auth not configured
       try {
-        gatewayMode.backendId = await fetchGatewayBackendId(gatewayMode.apiKey!);
+        gatewayMode.backendId = await fetchGatewayBackendId(apiKey);
       } catch {
         return; // Skip - Gateway backend not registered
       }

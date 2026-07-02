@@ -25,13 +25,10 @@ const PHASE_TRANSITIONS: Record<MetaWorkflowPhaseStatus, MetaWorkflowPhaseStatus
   verifying_gates: ['done', 'failed'],
   done: ['stale'],
   failed: ['pending'],
-  stale: ['pending', 'done'],   // 'done' supports clearStale when upstream re-run produced identical artifact
+  stale: ['pending', 'done'], // 'done' supports clearStale when upstream re-run produced identical artifact
 };
 
-export function assertRunTransition(
-  from: MetaWorkflowRunStatus,
-  to: MetaWorkflowRunStatus,
-): void {
+export function assertRunTransition(from: MetaWorkflowRunStatus, to: MetaWorkflowRunStatus): void {
   if (from === to) return;
   if (!RUN_TRANSITIONS[from]?.includes(to)) {
     throw new Error(`Invalid run transition: '${from}' -> '${to}'`);
@@ -40,7 +37,7 @@ export function assertRunTransition(
 
 export function assertPhaseTransition(
   from: MetaWorkflowPhaseStatus,
-  to: MetaWorkflowPhaseStatus,
+  to: MetaWorkflowPhaseStatus
 ): void {
   if (from === to) return;
   if (!PHASE_TRANSITIONS[from]?.includes(to)) {
@@ -51,7 +48,7 @@ export function assertPhaseTransition(
 export function assertRunStatusIn(
   status: MetaWorkflowRunStatus,
   allowed: MetaWorkflowRunStatus[],
-  action: string,
+  action: string
 ): void {
   if (!allowed.includes(status)) {
     throw new Error(`Cannot ${action} run in status '${status}'`);
@@ -61,7 +58,7 @@ export function assertRunStatusIn(
 export function assertPhaseStatusIn(
   status: MetaWorkflowPhaseStatus,
   allowed: MetaWorkflowPhaseStatus[],
-  action: string,
+  action: string
 ): void {
   if (!allowed.includes(status)) {
     throw new Error(`Cannot ${action} phase in status '${status}'`);

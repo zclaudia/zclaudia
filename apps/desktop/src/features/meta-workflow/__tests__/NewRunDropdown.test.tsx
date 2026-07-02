@@ -20,11 +20,7 @@ describe('NewRunDropdown', () => {
 
   it('renders the "New ▾" trigger', () => {
     render(
-      <NewRunDropdown
-        projectId="p1"
-        socket={{ send: vi.fn() }}
-        onNewClassicChange={() => {}}
-      />,
+      <NewRunDropdown projectId="p1" socket={{ send: vi.fn() }} onNewClassicChange={() => {}} />
     );
     expect(screen.getByRole('button', { name: /^New\s*▾$/ })).toBeInTheDocument();
   });
@@ -33,11 +29,7 @@ describe('NewRunDropdown', () => {
     const onNewClassic = vi.fn();
     const user = userEvent.setup();
     render(
-      <NewRunDropdown
-        projectId="p1"
-        socket={{ send: vi.fn() }}
-        onNewClassicChange={onNewClassic}
-      />,
+      <NewRunDropdown projectId="p1" socket={{ send: vi.fn() }} onNewClassicChange={onNewClassic} />
     );
     await user.click(screen.getByRole('button', { name: /^New\s*▾$/ }));
     await user.click(screen.getByRole('button', { name: /New Classic Change/i }));
@@ -50,13 +42,7 @@ describe('NewRunDropdown', () => {
     const sendCreateRunSpy = vi.spyOn(api, 'sendCreateRun').mockImplementation(() => {});
     const user = userEvent.setup();
     const socket = { send: vi.fn() };
-    render(
-      <NewRunDropdown
-        projectId="p1"
-        socket={socket}
-        onNewClassicChange={() => {}}
-      />,
-    );
+    render(<NewRunDropdown projectId="p1" socket={socket} onNewClassicChange={() => {}} />);
     await user.click(screen.getByRole('button', { name: /^New\s*▾$/ }));
     await user.click(screen.getByRole('button', { name: /New Meta Workflow Run/i }));
     await user.type(screen.getByPlaceholderText('Title'), 'My new run');
@@ -69,11 +55,7 @@ describe('NewRunDropdown', () => {
     const sendCreateRunSpy = vi.spyOn(api, 'sendCreateRun').mockImplementation(() => {});
     const user = userEvent.setup();
     render(
-      <NewRunDropdown
-        projectId="p1"
-        socket={{ send: vi.fn() }}
-        onNewClassicChange={() => {}}
-      />,
+      <NewRunDropdown projectId="p1" socket={{ send: vi.fn() }} onNewClassicChange={() => {}} />
     );
     await user.click(screen.getByRole('button', { name: /^New\s*▾$/ }));
     await user.click(screen.getByRole('button', { name: /New Meta Workflow Run/i }));

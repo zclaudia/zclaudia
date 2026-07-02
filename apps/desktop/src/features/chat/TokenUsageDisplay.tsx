@@ -40,7 +40,11 @@ export function TokenUsageDisplay({
 
   return (
     <div className={`flex items-center gap-1.5 text-xs ${colorClass}`}>
-      <UsageRing ratio={ratio} className={colorClass} label={`Context window ${percentText} used`} />
+      <UsageRing
+        ratio={ratio}
+        className={colorClass}
+        label={`Context window ${percentText} used`}
+      />
       <span className="tabular-nums">{percentText}</span>
     </div>
   );

@@ -1,9 +1,4 @@
-import type {
-  GitWorktreeStatus,
-  GitBranch,
-  GitCommit,
-  GitStash,
-} from '@zclaudia/shared';
+import type { GitWorktreeStatus, GitBranch, GitCommit, GitStash } from '@zclaudia/shared';
 import { apiCallForBackend, apiCallVoidForBackend } from './unwrap';
 import { useOwnershipStore } from '../../stores/ownershipStore';
 
@@ -11,26 +6,35 @@ function ownerOf(projectId: string): string | null {
   return useOwnershipStore.getState().getProjectBackendId(projectId);
 }
 
-export async function deleteProjectWorktree(projectId: string, worktreePath: string): Promise<void> {
+export async function deleteProjectWorktree(
+  projectId: string,
+  worktreePath: string
+): Promise<void> {
   return apiCallVoidForBackend(ownerOf(projectId), `/api/projects/${projectId}/worktrees`, {
     method: 'DELETE',
     body: JSON.stringify({ path: worktreePath }),
   });
 }
 
-export async function getWorktreeStatus(projectId: string, worktreePath: string): Promise<GitWorktreeStatus> {
+export async function getWorktreeStatus(
+  projectId: string,
+  worktreePath: string
+): Promise<GitWorktreeStatus> {
   const q = encodeURIComponent(worktreePath);
   return apiCallForBackend<GitWorktreeStatus>(
     ownerOf(projectId),
-    `/api/projects/${projectId}/worktrees/status?path=${q}`,
+    `/api/projects/${projectId}/worktrees/status?path=${q}`
   );
 }
 
-export async function getGitBranches(projectId: string, worktreePath: string): Promise<GitBranch[]> {
+export async function getGitBranches(
+  projectId: string,
+  worktreePath: string
+): Promise<GitBranch[]> {
   const q = encodeURIComponent(worktreePath);
   return apiCallForBackend<GitBranch[]>(
     ownerOf(projectId),
-    `/api/projects/${projectId}/git/branches?worktree=${q}`,
+    `/api/projects/${projectId}/git/branches?worktree=${q}`
   );
 }
 
@@ -41,11 +45,14 @@ export interface GitStatusFiles {
   untracked: string[];
 }
 
-export async function getGitStatus(projectId: string, worktreePath: string): Promise<GitStatusFiles> {
+export async function getGitStatus(
+  projectId: string,
+  worktreePath: string
+): Promise<GitStatusFiles> {
   const q = encodeURIComponent(worktreePath);
   return apiCallForBackend<GitStatusFiles>(
     ownerOf(projectId),
-    `/api/projects/${projectId}/git/status?worktree=${q}`,
+    `/api/projects/${projectId}/git/status?worktree=${q}`
   );
 }
 
@@ -55,26 +62,26 @@ export async function getGitFileDiff(
   projectId: string,
   worktreePath: string,
   file: string,
-  kind: GitFileDiffKind,
+  kind: GitFileDiffKind
 ): Promise<{ diff: string }> {
   const worktree = encodeURIComponent(worktreePath);
   const encodedFile = encodeURIComponent(file);
   const encodedKind = encodeURIComponent(kind);
   return apiCallForBackend<{ diff: string }>(
     ownerOf(projectId),
-    `/api/projects/${projectId}/git/diff?worktree=${worktree}&file=${encodedFile}&kind=${encodedKind}`,
+    `/api/projects/${projectId}/git/diff?worktree=${worktree}&file=${encodedFile}&kind=${encodedKind}`
   );
 }
 
 export async function getGitLog(
   projectId: string,
   worktreePath: string,
-  limit: number = 50,
+  limit: number = 50
 ): Promise<GitCommit[]> {
   const q = encodeURIComponent(worktreePath);
   return apiCallForBackend<GitCommit[]>(
     ownerOf(projectId),
-    `/api/projects/${projectId}/git/log?worktree=${q}&limit=${limit}`,
+    `/api/projects/${projectId}/git/log?worktree=${q}&limit=${limit}`
   );
 }
 
@@ -82,14 +89,14 @@ export async function getGitStash(projectId: string, worktreePath: string): Prom
   const q = encodeURIComponent(worktreePath);
   return apiCallForBackend<GitStash[]>(
     ownerOf(projectId),
-    `/api/projects/${projectId}/git/stash?worktree=${q}`,
+    `/api/projects/${projectId}/git/stash?worktree=${q}`
   );
 }
 
 export async function createGitStash(
   projectId: string,
   worktreePath: string,
-  message?: string,
+  message?: string
 ): Promise<void> {
   return apiCallVoidForBackend(ownerOf(projectId), `/api/projects/${projectId}/git/stash`, {
     method: 'POST',
@@ -100,7 +107,7 @@ export async function createGitStash(
 export async function applyGitStash(
   projectId: string,
   worktreePath: string,
-  index: number,
+  index: number
 ): Promise<void> {
   return apiCallVoidForBackend(ownerOf(projectId), `/api/projects/${projectId}/git/stash/apply`, {
     method: 'POST',
@@ -111,7 +118,7 @@ export async function applyGitStash(
 export async function dropGitStash(
   projectId: string,
   worktreePath: string,
-  index: number,
+  index: number
 ): Promise<void> {
   return apiCallVoidForBackend(ownerOf(projectId), `/api/projects/${projectId}/git/stash/drop`, {
     method: 'POST',
@@ -122,7 +129,7 @@ export async function dropGitStash(
 export async function stageGitFiles(
   projectId: string,
   worktreePath: string,
-  files: string[],
+  files: string[]
 ): Promise<void> {
   return apiCallVoidForBackend(ownerOf(projectId), `/api/projects/${projectId}/git/stage`, {
     method: 'POST',
@@ -133,7 +140,7 @@ export async function stageGitFiles(
 export async function unstageGitFiles(
   projectId: string,
   worktreePath: string,
-  files: string[],
+  files: string[]
 ): Promise<void> {
   return apiCallVoidForBackend(ownerOf(projectId), `/api/projects/${projectId}/git/unstage`, {
     method: 'POST',
@@ -144,17 +151,21 @@ export async function unstageGitFiles(
 export async function commitGit(
   projectId: string,
   worktreePath: string,
-  message: string,
+  message: string
 ): Promise<{ sha: string }> {
-  return apiCallForBackend<{ sha: string }>(ownerOf(projectId), `/api/projects/${projectId}/git/commit`, {
-    method: 'POST',
-    body: JSON.stringify({ worktree: worktreePath, message }),
-  });
+  return apiCallForBackend<{ sha: string }>(
+    ownerOf(projectId),
+    `/api/projects/${projectId}/git/commit`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ worktree: worktreePath, message }),
+    }
+  );
 }
 
 export async function generateCommitMessage(
   projectId: string,
-  worktreePath: string,
+  worktreePath: string
 ): Promise<{ message: string }> {
   return apiCallForBackend<{ message: string }>(
     ownerOf(projectId),
@@ -162,7 +173,7 @@ export async function generateCommitMessage(
     {
       method: 'POST',
       body: JSON.stringify({ worktree: worktreePath }),
-    },
+    }
   );
 }
 
@@ -183,7 +194,7 @@ export async function pullGit(projectId: string, worktreePath: string): Promise<
 export async function pushGit(
   projectId: string,
   worktreePath: string,
-  force: boolean = false,
+  force: boolean = false
 ): Promise<void> {
   return apiCallVoidForBackend(ownerOf(projectId), `/api/projects/${projectId}/git/push`, {
     method: 'POST',
@@ -194,7 +205,7 @@ export async function pushGit(
 export async function checkoutGitBranch(
   projectId: string,
   worktreePath: string,
-  branch: string,
+  branch: string
 ): Promise<void> {
   return apiCallVoidForBackend(ownerOf(projectId), `/api/projects/${projectId}/git/checkout`, {
     method: 'POST',
@@ -206,11 +217,16 @@ export async function createGitBranch(
   projectId: string,
   worktreePath: string,
   name: string,
-  opts: { checkout?: boolean; startPoint?: string } = {},
+  opts: { checkout?: boolean; startPoint?: string } = {}
 ): Promise<void> {
   return apiCallVoidForBackend(ownerOf(projectId), `/api/projects/${projectId}/git/branch`, {
     method: 'POST',
-    body: JSON.stringify({ worktree: worktreePath, name, checkout: opts.checkout, startPoint: opts.startPoint }),
+    body: JSON.stringify({
+      worktree: worktreePath,
+      name,
+      checkout: opts.checkout,
+      startPoint: opts.startPoint,
+    }),
   });
 }
 
@@ -218,7 +234,7 @@ export async function deleteGitBranch(
   projectId: string,
   worktreePath: string,
   name: string,
-  force: boolean = false,
+  force: boolean = false
 ): Promise<void> {
   return apiCallVoidForBackend(ownerOf(projectId), `/api/projects/${projectId}/git/branch`, {
     method: 'DELETE',

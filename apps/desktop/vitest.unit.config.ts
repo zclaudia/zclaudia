@@ -19,7 +19,7 @@ export default defineConfig({
   test: {
     name: 'unit',
     globals: true,
-    environment: 'node',  // 不需要 jsdom，速度提升 10x
+    environment: 'node', // 不需要 jsdom，速度提升 10x
     setupFiles: ['./src/test/setup-unit.ts'],
     include: [
       'src/stores/**/*.test.ts',
@@ -44,15 +44,18 @@ export default defineConfig({
       'src/services/terminal/**/*.test.ts',
       'src/plugins/__tests__/builtinPanels.test.ts',
     ],
-    exclude: [
-      '**/node_modules/**',
-      '**/src-tauri/**',
-    ],
+    exclude: ['**/node_modules/**', '**/src-tauri/**'],
     pool: 'forks',
     coverage: {
       provider: 'istanbul',
       reporter: ['text', 'text-summary'],
-      include: ['src/stores/**/*.ts', 'src/utils/**/*.ts', 'src/hooks/**/*.ts', 'src/components/**/*.ts', 'src/components/**/*.tsx'],
+      include: [
+        'src/stores/**/*.ts',
+        'src/utils/**/*.ts',
+        'src/hooks/**/*.ts',
+        'src/components/**/*.ts',
+        'src/components/**/*.tsx',
+      ],
       exclude: ['src/**/*.test.ts', 'src/**/*.d.ts'],
       all: true,
     },

@@ -5,7 +5,10 @@ import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useConnection } from '../../contexts/ConnectionContext';
 import type { BackendSnapshot } from '@zclaudia/shared';
-import { getVisibleMobileBackends, isMobileGatewayConnected } from '../../services/mobileConnectionState';
+import {
+  getVisibleMobileBackends,
+  isMobileGatewayConnected,
+} from '../../services/mobileConnectionState';
 
 function shouldShowMobileDebug(): boolean {
   if (typeof window === 'undefined') return false;
@@ -20,12 +23,12 @@ export function MobileSetup() {
     setDirectGatewayConfig,
     setLastActiveBackend,
   } = useGatewayStore();
-  const facadeConnectionState = useFacadeStore((s) => s.connectionState);
-  const facadeConnectionError = useFacadeStore((s) => s.connectionError);
-  const backends = useFacadeStore((s) => s.backends);
-  const currentInstanceId = useFacadeStore((s) => s.currentInstanceId);
+  const facadeConnectionState = useFacadeStore(s => s.connectionState);
+  const facadeConnectionError = useFacadeStore(s => s.connectionError);
+  const backends = useFacadeStore(s => s.backends);
+  const currentInstanceId = useFacadeStore(s => s.currentInstanceId);
 
-  const setActiveServer = useServerStore((s) => s.setActiveServer);
+  const setActiveServer = useServerStore(s => s.setActiveServer);
   const { connectServer } = useConnection();
 
   const [gatewayUrl, setGatewayUrl] = useState(directGatewayUrl || '');
@@ -92,18 +95,14 @@ export function MobileSetup() {
     clearConnectTimers();
 
     connectIntervalRef.current = window.setInterval(() => {
-      if (isMobileGatewayConnected(
-        useFacadeStore.getState().connectionState,
-      )) {
+      if (isMobileGatewayConnected(useFacadeStore.getState().connectionState)) {
         setConnecting(false);
         clearConnectTimers();
       }
     }, 500);
 
     connectTimeoutRef.current = window.setTimeout(() => {
-      if (!isMobileGatewayConnected(
-        useFacadeStore.getState().connectionState,
-      )) {
+      if (!isMobileGatewayConnected(useFacadeStore.getState().connectionState)) {
         setConnecting(false);
         setError('Connection timed out. Please check the URL and secret.');
       }
@@ -121,18 +120,14 @@ export function MobileSetup() {
 
   const { showLocalBackend } = useGatewayStore();
   const isGatewayConnected = isMobileGatewayConnected(facadeConnectionState);
-  const onlineBackends = getVisibleMobileBackends(
-    backends,
-    currentInstanceId,
-    showLocalBackend,
-  );
+  const onlineBackends = getVisibleMobileBackends(backends, currentInstanceId, showLocalBackend);
   const showDebug = debugVisible;
 
   const handleLogoTap = () => {
     logoTapCountRef.current += 1;
     if (logoTapCountRef.current >= 5) {
       logoTapCountRef.current = 0;
-      setDebugVisible((visible) => !visible);
+      setDebugVisible(visible => !visible);
     }
   };
 
@@ -152,14 +147,12 @@ export function MobileSetup() {
                 <Bot size={32} strokeWidth={1.5} className="text-primary" />
               </button>
               <h1 className="text-xl font-bold text-foreground">Select a Server</h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Choose a backend to connect to
-              </p>
+              <p className="text-sm text-muted-foreground mt-1">Choose a backend to connect to</p>
             </div>
 
             {/* Backend list */}
             <div className="space-y-2">
-              {onlineBackends.map((backend) => {
+              {onlineBackends.map(backend => {
                 const authStatus = backendAuthStatus[backend.backendId];
                 const isAuthenticating = authStatus === 'pending';
 
@@ -181,7 +174,11 @@ export function MobileSetup() {
                         {isAuthenticating ? 'Connecting...' : backend.backendId}
                       </div>
                     </div>
-                    <ChevronRight size={20} strokeWidth={1.75} className="text-muted-foreground flex-shrink-0" />
+                    <ChevronRight
+                      size={20}
+                      strokeWidth={1.75}
+                      className="text-muted-foreground flex-shrink-0"
+                    />
                   </button>
                 );
               })}
@@ -206,11 +203,17 @@ export function MobileSetup() {
                 <div>backends: {backends.length}</div>
                 <div>onlineBackends: {onlineBackends.length}</div>
                 <div className="space-y-1">
-                  {backends.map((backend) => (
-                    <div key={backend.backendId} className="rounded-lg border border-border/70 px-2 py-1">
-                      <div className="text-foreground">{backend.name} ({backend.backendId})</div>
+                  {backends.map(backend => (
+                    <div
+                      key={backend.backendId}
+                      className="rounded-lg border border-border/70 px-2 py-1"
+                    >
+                      <div className="text-foreground">
+                        {backend.name} ({backend.backendId})
+                      </div>
                       <div>
-                        online={String(backend.online)} runtime={backend.runtimeState} thisInstance={String(backend.isThisInstance)}
+                        online={String(backend.online)} runtime={backend.runtimeState} thisInstance=
+                        {String(backend.isThisInstance)}
                       </div>
                       <div className="truncate">instanceId={backend.instanceId || '-'}</div>
                     </div>
@@ -239,9 +242,7 @@ export function MobileSetup() {
               <Bot size={32} strokeWidth={1.5} className="text-primary" />
             </button>
             <h1 className="text-xl font-bold text-foreground">ZClaudia</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Connect to your server via Gateway
-            </p>
+            <p className="text-sm text-muted-foreground mt-1">Connect to your server via Gateway</p>
           </div>
 
           {/* Error */}
@@ -260,7 +261,7 @@ export function MobileSetup() {
               <input
                 type="text"
                 value={gatewayUrl}
-                onChange={(e) => setGatewayUrl(e.target.value)}
+                onChange={e => setGatewayUrl(e.target.value)}
                 placeholder="http://gateway.example.com:3200"
                 disabled={connecting}
                 className="w-full px-4 py-3 border border-border rounded-xl
@@ -278,7 +279,7 @@ export function MobileSetup() {
               <input
                 type="password"
                 value={gatewaySecret}
-                onChange={(e) => setGatewaySecret(e.target.value)}
+                onChange={e => setGatewaySecret(e.target.value)}
                 placeholder="Enter gateway secret"
                 disabled={connecting}
                 className="w-full px-4 py-3 border border-border rounded-xl
@@ -301,8 +302,19 @@ export function MobileSetup() {
             {connecting ? (
               <span className="flex items-center justify-center gap-2">
                 <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
                 </svg>
                 Connecting...
               </span>
@@ -315,7 +327,9 @@ export function MobileSetup() {
           {isGatewayConnected && onlineBackends.length === 0 && (
             <div className="text-center text-sm text-muted-foreground">
               <p>Gateway connected. Waiting for backends...</p>
-              <p className="text-xs mt-1">Make sure your server is running and connected to the gateway.</p>
+              <p className="text-xs mt-1">
+                Make sure your server is running and connected to the gateway.
+              </p>
             </div>
           )}
 
@@ -332,11 +346,17 @@ export function MobileSetup() {
               <div>backends: {backends.length}</div>
               <div>onlineBackends: {onlineBackends.length}</div>
               <div className="space-y-1">
-                {backends.map((backend) => (
-                  <div key={backend.backendId} className="rounded-lg border border-border/70 px-2 py-1">
-                    <div className="text-foreground">{backend.name} ({backend.backendId})</div>
+                {backends.map(backend => (
+                  <div
+                    key={backend.backendId}
+                    className="rounded-lg border border-border/70 px-2 py-1"
+                  >
+                    <div className="text-foreground">
+                      {backend.name} ({backend.backendId})
+                    </div>
                     <div>
-                      online={String(backend.online)} runtime={backend.runtimeState} thisInstance={String(backend.isThisInstance)}
+                      online={String(backend.online)} runtime={backend.runtimeState} thisInstance=
+                      {String(backend.isThisInstance)}
                     </div>
                     <div className="truncate">instanceId={backend.instanceId || '-'}</div>
                   </div>

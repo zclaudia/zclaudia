@@ -23,13 +23,23 @@ describe('LlmProfileRepository — models field', () => {
       name: 'with-models',
       providerType: 'anthropic',
       models: [
-        { modelId: 'claude-opus-4-7', displayName: 'Opus 1M', contextWindow: 1_000_000, maxTokens: 32_768 },
+        {
+          modelId: 'claude-opus-4-7',
+          displayName: 'Opus 1M',
+          contextWindow: 1_000_000,
+          maxTokens: 32_768,
+        },
         { modelId: 'claude-sonnet-4-6' },
       ],
     });
     const read = repo.findById(created.id);
     expect(read?.models).toEqual([
-      { modelId: 'claude-opus-4-7', displayName: 'Opus 1M', contextWindow: 1_000_000, maxTokens: 32_768 },
+      {
+        modelId: 'claude-opus-4-7',
+        displayName: 'Opus 1M',
+        contextWindow: 1_000_000,
+        maxTokens: 32_768,
+      },
       { modelId: 'claude-sonnet-4-6' },
     ]);
   });
@@ -51,7 +61,8 @@ describe('LlmProfileRepository — models field', () => {
   it('update preserves models when not in patch', () => {
     const repo = new LlmProfileRepository(db);
     const created = repo.create({
-      name: 'p', providerType: 'anthropic',
+      name: 'p',
+      providerType: 'anthropic',
       models: [{ modelId: 'a', contextWindow: 100 }],
     });
     repo.update(created.id, { name: 'renamed' });
@@ -71,12 +82,22 @@ describe('cacheRetention', () => {
   });
 
   it('round-trips cacheRetention through create and findById', () => {
-    const created = repo.create({ name: 'p', providerType: 'anthropic', cacheRetention: 'long', isDefault: false });
+    const created = repo.create({
+      name: 'p',
+      providerType: 'anthropic',
+      cacheRetention: 'long',
+      isDefault: false,
+    });
     expect(repo.findById(created.id)?.cacheRetention).toBe('long');
   });
 
   it('updates and clears cacheRetention', () => {
-    const created = repo.create({ name: 'p', providerType: 'anthropic', cacheRetention: 'short', isDefault: false });
+    const created = repo.create({
+      name: 'p',
+      providerType: 'anthropic',
+      cacheRetention: 'short',
+      isDefault: false,
+    });
     repo.update(created.id, { cacheRetention: 'none' });
     expect(repo.findById(created.id)?.cacheRetention).toBe('none');
     // null is outside the public type; proves clearing writes DB NULL and reads back as undefined
@@ -86,7 +107,10 @@ describe('cacheRetention', () => {
 
   it('maps unknown stored values to undefined (forward-compat)', () => {
     const created = repo.create({ name: 'p', providerType: 'anthropic', isDefault: false });
-    db.prepare('UPDATE llm_profiles SET cache_retention = ? WHERE id = ?').run('weekly', created.id);
+    db.prepare('UPDATE llm_profiles SET cache_retention = ? WHERE id = ?').run(
+      'weekly',
+      created.id
+    );
     expect(repo.findById(created.id)?.cacheRetention).toBeUndefined();
   });
 });

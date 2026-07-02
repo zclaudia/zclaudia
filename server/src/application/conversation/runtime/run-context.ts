@@ -88,8 +88,12 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
   } = input;
 
   const nativeToolSet = new Set(adapter?.policy?.nativeInteractionTools ?? []);
-  const allInteractionTools = pluginToolRegistry.getAll().filter((tool) => tool.source === 'interaction');
-  const injectableInteractionTools = allInteractionTools.filter((tool) => !nativeToolSet.has(tool.id));
+  const allInteractionTools = pluginToolRegistry
+    .getAll()
+    .filter(tool => tool.source === 'interaction');
+  const injectableInteractionTools = allInteractionTools.filter(
+    tool => !nativeToolSet.has(tool.id)
+  );
   const hasInteractionTools = injectableInteractionTools.length > 0;
 
   const filePushEnv: Record<string, string> = {};
@@ -98,20 +102,20 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
     const apiUrl = `http://127.0.0.1:${serverPort}`;
     filePushEnv.ZCLAUDIA_API_URL = apiUrl;
     filePushEnv.ZCLAUDIA_SESSION_ID = message.sessionId;
-    const hasPushFileTool = injectableInteractionTools.some((tool) => tool.id === 'push_file');
+    const hasPushFileTool = injectableInteractionTools.some(tool => tool.id === 'push_file');
     if (!hasPushFileTool) {
       filePushContext = buildFilePushContext(apiUrl, message.sessionId);
     }
   }
 
-  const nonNativePlanPrompt = modeValue === 'plan' && !providerSupportsNativePlanMode(adapter.manifest)
-    ? buildNonNativePlanPrompt(providerType)
-    : undefined;
-  const planDocumentPrompt = forcedPlanBySession && session.task_id
-    ? buildPlanDocumentPrompt(session.task_id)
-    : undefined;
+  const nonNativePlanPrompt =
+    modeValue === 'plan' && !providerSupportsNativePlanMode(adapter.manifest)
+      ? buildNonNativePlanPrompt(providerType)
+      : undefined;
+  const planDocumentPrompt =
+    forcedPlanBySession && session.task_id ? buildPlanDocumentPrompt(session.task_id) : undefined;
   const interactionToolPrompt = hasInteractionTools
-    ? buildInteractionToolPrompt(injectableInteractionTools.map((tool) => tool.id))
+    ? buildInteractionToolPrompt(injectableInteractionTools.map(tool => tool.id))
     : undefined;
 
   const workspacePrompt = await workspaceService.assembleSystemPrompt({
@@ -127,7 +131,8 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
     ? mapPermissionMode(adapter.manifest as never, modeValue)
     : modeValue;
 
-  const template = ((message as Record<string, unknown>)._contextTemplate || (sessionType === 'agent' ? 'agent' : 'coding')) as ContextTemplate;
+  const template = ((message as Record<string, unknown>)._contextTemplate ||
+    (sessionType === 'agent' ? 'agent' : 'coding')) as ContextTemplate;
   // Merge transform: agentProfile.systemPrompt fully replaces the template's
   // built-in persona (§4.6) and leads the prompt; workspace/project instructions
   // (SOUL.md/AGENTS.md/TOOLS.md/CLAUDE.md) and run context fragments are appended
@@ -160,7 +165,9 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
       serverPort: serverPort || undefined,
       claudiaSessionId: message.sessionId,
       runId,
-      permissionOverride: message.permissionOverride as Partial<UnifiedPermissionPolicy> | undefined,
+      permissionOverride: message.permissionOverride as
+        | Partial<UnifiedPermissionPolicy>
+        | undefined,
       memoryDir,
       db,
       agentTaskExecutor,

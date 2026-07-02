@@ -7,15 +7,23 @@
  * the code easier to test.
  */
 
-import type { StateHeartbeatMessage } from '@zclaudia/shared/wire/messages';
+import type {
+  BranchAction,
+  ClaudiaTaskSnapshotMessage,
+  ClaudiaTaskStatus,
+  ClaudiaTaskUpdateMessage,
+  StateHeartbeatMessage,
+} from '@zclaudia/shared/wire/messages';
 import type { TaskRecord } from '@zclaudia/shared/core/task';
-import type { GatewayBackendInfo } from '@zclaudia/shared/core/server';
 import type { initDatabase } from './infra/storage/db.js';
 import type { ProcessMonitor } from './utils/process-monitor.js';
 import type { NotificationSender } from './infra/push/notification-sender.js';
 import type { PermissionBridge } from './application/conversation/agent/permission-bridge.js';
 import type { PermissionWorkflowResolver } from './domains/workflows/index.js';
 import type { NotificationService } from './domains/notification-feed/index.js';
+import type { MetaWorkflowService } from './domains/meta-workflow/service.js';
+import type { GoalCoordinator } from './domains/goals/coordinator.js';
+import type { GoalService } from './domains/goals/service.js';
 import type { FacadeWsHub } from './infra/gateway/ws-hub.js';
 import type { TaskCoordinationPort } from './application/conversation/task-coordination-port.js';
 import type { SessionSyncPort } from './application/conversation/session-sync-port.js';
@@ -54,10 +62,10 @@ export class ServerState {
   cancelWorkflowRun: ((runId: string) => void) | undefined;
   permissionWorkflowResolver: PermissionWorkflowResolver | undefined;
   branchAllocator: ClaudiaBranchService | undefined;
-  metaWorkflowService: import('./domains/meta-workflow/service.js').MetaWorkflowService | undefined;
+  metaWorkflowService: MetaWorkflowService | undefined;
   agentTaskExecutor: TaskExecutor | undefined;
-  goalCoordinator: import('./domains/goals/coordinator.js').GoalCoordinator | undefined;
-  goalService: import('./domains/goals/service.js').GoalService | undefined;
+  goalCoordinator: GoalCoordinator | undefined;
+  goalService: GoalService | undefined;
 
   // --- Broadcast wrappers ---
 
@@ -83,7 +91,9 @@ export class ServerState {
     const db = this.database;
     const agentTaskExecutor = this.agentTaskExecutor;
     if (!db || !alloc || !agentTaskExecutor) return undefined;
-    const parseMetadata = (taskId: string): { task: TaskRecord; metadata: Record<string, unknown> } | undefined => {
+    const parseMetadata = (
+      taskId: string
+    ): { task: TaskRecord; metadata: Record<string, unknown> } | undefined => {
       if (!db) return undefined;
       const task = new TaskRepository(db).findById(taskId);
       if (!task || task.type !== 'agent') return undefined;
@@ -100,10 +110,11 @@ export class ServerState {
       projectId: string;
       llmProfileId?: string;
       branchId: string;
-      branchAction: import('@zclaudia/shared/wire/messages').BranchAction;
+      branchAction: BranchAction;
       contextReset?: boolean;
     }) => {
-      if (!db || !agentTaskExecutor) throw new Error('Canonical agent task runtime is not available');
+      if (!db || !agentTaskExecutor)
+        throw new Error('Canonical agent task runtime is not available');
       const taskService = new TaskService(new TaskRepository(db));
       const task = taskService.createTask({
         type: 'agent',
@@ -126,106 +137,126 @@ export class ServerState {
         executorRef: started.executorRef,
         sessionId: started.sessionId,
       });
-      void agentTaskExecutor.wait(task.id).then((update) => {
-        const repo = new TaskRepository(db);
-        const service = new TaskService(repo);
-        let updated = repo.findById(task.id);
-        if (!updated || updated.status === 'completed' || updated.status === 'failed' || updated.status === 'stopped') return;
-        if (update.status === 'completed') {
-          updated = service.completeTask(task.id, update.result ?? {});
-        } else if (update.status === 'stopped') {
-          updated = service.stopTask(task.id, update.result);
-        } else {
-          updated = service.failTask(task.id, update.result ?? { error: 'Agent task failed' });
-        }
-        const metadata = updated.metadata ?? {};
-        const result = updated.result ?? {};
-        const text = typeof result.text === 'string' ? result.text : undefined;
-        const error = typeof result.error === 'string' ? result.error : undefined;
-        const branchId = typeof metadata.branchId === 'string' ? metadata.branchId : undefined;
-        const branchAction = typeof metadata.branchAction === 'string' ? metadata.branchAction : undefined;
-        const contextReset = typeof metadata.contextReset === 'boolean' ? metadata.contextReset : undefined;
-        const wireStatus = updated.status === 'stopped' ? 'cancelled' : updated.status;
-        for (const [, client] of this.connectedClients) {
-          if (client.authenticated) {
-            sendMessage(client.ws, {
-              type: 'claudia_task_update',
-              taskId: updated.id,
-              status: wireStatus,
-              sessionId: updated.sessionId ?? undefined,
-              branchId,
-              branchAction: branchAction as import('@zclaudia/shared/wire/messages').BranchAction | undefined,
-              contextReset,
-              title: updated.title,
-              summary: text,
-              error,
-              responseText: text,
-              updatedAt: updated.updatedAt,
-            } as import('@zclaudia/shared/wire/messages').ClaudiaTaskUpdateMessage);
+      void agentTaskExecutor
+        .wait(task.id)
+        .then(update => {
+          const repo = new TaskRepository(db);
+          const service = new TaskService(repo);
+          let updated = repo.findById(task.id);
+          if (
+            !updated ||
+            updated.status === 'completed' ||
+            updated.status === 'failed' ||
+            updated.status === 'stopped'
+          )
+            return;
+          if (update.status === 'completed') {
+            updated = service.completeTask(task.id, update.result ?? {});
+          } else if (update.status === 'stopped') {
+            updated = service.stopTask(task.id, update.result);
+          } else {
+            updated = service.failTask(task.id, update.result ?? { error: 'Agent task failed' });
           }
-        }
-        const feedItem = this.notificationsService?.findByTaskId(task.id);
-        if (feedItem) {
-          this.notificationsService?.updateItemStatus(
-            feedItem.id,
-            updated.status === 'completed' ? 'completed' : 'failed',
-            { summary: text, error },
+          const metadata = updated.metadata ?? {};
+          const result = updated.result ?? {};
+          const text = typeof result.text === 'string' ? result.text : undefined;
+          const error = typeof result.error === 'string' ? result.error : undefined;
+          const branchId = typeof metadata.branchId === 'string' ? metadata.branchId : undefined;
+          const branchAction =
+            typeof metadata.branchAction === 'string' ? metadata.branchAction : undefined;
+          const contextReset =
+            typeof metadata.contextReset === 'boolean' ? metadata.contextReset : undefined;
+          const wireStatus = (
+            updated.status === 'stopped' ? 'cancelled' : updated.status
+          ) as ClaudiaTaskStatus;
+          for (const [, client] of this.connectedClients) {
+            if (client.authenticated) {
+              const updateMessage: ClaudiaTaskUpdateMessage = {
+                type: 'claudia_task_update',
+                taskId: updated.id,
+                status: wireStatus,
+                sessionId: updated.sessionId ?? undefined,
+                branchId,
+                branchAction: branchAction as BranchAction | undefined,
+                contextReset,
+                title: updated.title,
+                summary: text,
+                error,
+                responseText: text,
+                updatedAt: updated.updatedAt,
+              };
+              sendMessage(client.ws, updateMessage);
+            }
+          }
+          const feedItem = this.notificationsService?.findByTaskId(task.id);
+          if (feedItem) {
+            this.notificationsService?.updateItemStatus(
+              feedItem.id,
+              updated.status === 'completed' ? 'completed' : 'failed',
+              { summary: text, error }
+            );
+          }
+        })
+        .catch((err: unknown) => {
+          console.error(
+            `[TaskCoordination] Failed to settle canonical Claudia task ${task.id}:`,
+            err
           );
-        }
-      }).catch((err: unknown) => {
-        console.error(`[TaskCoordination] Failed to settle canonical Claudia task ${task.id}:`, err);
-      });
+        });
       return { taskId: task.id, sessionId: running.sessionId ?? '' };
     };
     return {
-      allocateBranch: (opts) => alloc.allocateBranch(opts),
-      allocateForContinue: (opts) => alloc.allocateForContinue(opts),
-      setActiveBranchId: (hostProjectId, branchId) => alloc.setActiveBranchId(hostProjectId, branchId),
+      allocateBranch: opts => alloc.allocateBranch(opts),
+      allocateForContinue: opts => alloc.allocateForContinue(opts),
+      setActiveBranchId: (hostProjectId, branchId) =>
+        alloc.setActiveBranchId(hostProjectId, branchId),
       attachSession: (branchId, sessionId) => alloc.attachSession(branchId, sessionId),
-      updateBranchTask: (branchId, taskId, sessionId) => alloc.updateBranchTask(branchId, taskId, sessionId),
-      submitCanonicalAgentTask: async (input) => {
-            return startCanonicalAgentTask({
-              taskInput: input.input,
-              title: input.title,
-              projectId: input.projectId,
-              llmProfileId: input.llmProfileId,
-              branchId: input.branchId,
-              branchAction: input.branchAction,
-              contextReset: input.contextReset,
-            });
-          },
-      getCanonicalAgentTask: (taskId) => {
-            const found = parseMetadata(taskId);
-            if (!found || found.metadata.initiator !== 'claudia') return undefined;
-            return {
-              taskId: found.task.id,
-              projectId: metadataString(found.metadata, 'projectId') ?? null,
-              branchId: metadataString(found.metadata, 'branchId') ?? null,
-              llmProfileId: metadataString(found.metadata, 'llmProfileId'),
-            };
-          },
-      continueCanonicalAgentTask: async (input) => {
-            return startCanonicalAgentTask({
-              parentTaskId: input.parentTaskId,
-              taskInput: input.input,
-              title: input.title,
-              projectId: input.projectId,
-              llmProfileId: input.llmProfileId,
-              branchId: input.branchId,
-              branchAction: input.branchAction,
-              contextReset: input.contextReset,
-            });
-          },
-      cancelCanonicalAgentTask: async (taskId) => {
-            const repo = new TaskRepository(db);
-            const task = repo.findById(taskId);
-            if (!task || task.type !== 'agent') return false;
-            if (task.status === 'completed' || task.status === 'failed' || task.status === 'stopped') return true;
-            const taskService = new TaskService(repo);
-            const stopped = await agentTaskExecutor.stop(taskId, 'Cancelled by user');
-            taskService.stopTask(taskId, stopped.result);
-            return true;
-          },
+      updateBranchTask: (branchId, taskId, sessionId) =>
+        alloc.updateBranchTask(branchId, taskId, sessionId),
+      submitCanonicalAgentTask: async input => {
+        return startCanonicalAgentTask({
+          taskInput: input.input,
+          title: input.title,
+          projectId: input.projectId,
+          llmProfileId: input.llmProfileId,
+          branchId: input.branchId,
+          branchAction: input.branchAction,
+          contextReset: input.contextReset,
+        });
+      },
+      getCanonicalAgentTask: taskId => {
+        const found = parseMetadata(taskId);
+        if (!found || found.metadata.initiator !== 'claudia') return undefined;
+        return {
+          taskId: found.task.id,
+          projectId: metadataString(found.metadata, 'projectId') ?? null,
+          branchId: metadataString(found.metadata, 'branchId') ?? null,
+          llmProfileId: metadataString(found.metadata, 'llmProfileId'),
+        };
+      },
+      continueCanonicalAgentTask: async input => {
+        return startCanonicalAgentTask({
+          parentTaskId: input.parentTaskId,
+          taskInput: input.input,
+          title: input.title,
+          projectId: input.projectId,
+          llmProfileId: input.llmProfileId,
+          branchId: input.branchId,
+          branchAction: input.branchAction,
+          contextReset: input.contextReset,
+        });
+      },
+      cancelCanonicalAgentTask: async taskId => {
+        const repo = new TaskRepository(db);
+        const task = repo.findById(taskId);
+        if (!task || task.type !== 'agent') return false;
+        if (task.status === 'completed' || task.status === 'failed' || task.status === 'stopped')
+          return true;
+        const taskService = new TaskService(repo);
+        const stopped = await agentTaskExecutor.stop(taskId, 'Cancelled by user');
+        taskService.stopTask(taskId, stopped.result);
+        return true;
+      },
     };
   }
 
@@ -235,11 +266,15 @@ export class ServerState {
         const gatewayClient = getGatewayClient();
         if (!gatewayClient) return;
 
-        const updatedSession = db.prepare(`
+        const updatedSession = db
+          .prepare(
+            `
           SELECT s.id, s.name, s.updated_at as updatedAt, s.archived_at as archivedAt
           FROM sessions s
           WHERE s.id = ?
-        `).get(sessionId);
+        `
+          )
+          .get(sessionId);
 
         if (updatedSession) {
           gatewayClient.commands.backendData.broadcastSessionEvent('updated', updatedSession);
@@ -249,8 +284,8 @@ export class ServerState {
   }
 
   getMessageHandlerContext(
-    handleRunStart: (...args: any[]) => Promise<void>,
-    cancelRun: (...args: any[]) => void,
+    handleRunStart: MessageHandlerContext['handleRunStart'],
+    cancelRun: MessageHandlerContext['cancelRun']
   ): MessageHandlerContext {
     return {
       activeRuns: this.activeRuns,
@@ -267,10 +302,12 @@ export class ServerState {
       cancelWorkflowRun: this.cancelWorkflowRun,
       metaWorkflowService: this.metaWorkflowService,
       pauseActiveGoalForSession: (sessionId: string) => {
-        const g = this.goalService?.getActive(sessionId);
+        const goalService = this.goalService;
+        if (!goalService) return;
+        const g = goalService.getActive(sessionId);
         if (g && g.status === 'active') {
           try {
-            this.goalService!.pause(g.id);
+            goalService.pause(g.id);
           } catch (err) {
             console.warn('[goal] pause-on-cancel failed', err);
           }
@@ -280,10 +317,15 @@ export class ServerState {
   }
 
   getRunHandlerContext(): RunHandlerContext {
+    const notificationSender = this.notificationSender;
+    if (!notificationSender) {
+      throw new Error('Notification sender is not initialized');
+    }
+
     return {
       activeRuns: this.activeRuns,
       processMonitor: this.processMonitor,
-      notificationService: this.notificationSender!,
+      notificationService: notificationSender,
       notificationsService: this.notificationsService,
       serverPort: this.serverPort,
       broadcastHeartbeat: () => this.broadcastHeartbeat(),
@@ -296,17 +338,21 @@ export class ServerState {
     };
   }
 
-  buildClaudiaTaskSnapshot(): import('@zclaudia/shared/wire/messages').ClaudiaTaskSnapshotMessage | null {
+  buildClaudiaTaskSnapshot(): ClaudiaTaskSnapshotMessage | null {
     const db = this.database;
     if (!db) return null;
     const branchService = new ClaudiaBranchService(db);
-    const canonicalRows = db.prepare(`
+    const canonicalRows = db
+      .prepare(
+        `
       SELECT id, session_id, status, title, description, result, metadata, created_at, updated_at
       FROM tasks
       WHERE type = 'agent'
         AND json_extract(metadata, '$.initiator') = 'claudia'
       ORDER BY created_at DESC
-    `).all() as Array<{
+    `
+      )
+      .all() as Array<{
       id: string;
       session_id: string | null;
       status: string;
@@ -322,16 +368,15 @@ export class ServerState {
       try {
         const parsed = JSON.parse(value);
         return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-          ? parsed as Record<string, unknown>
+          ? (parsed as Record<string, unknown>)
           : {};
       } catch {
         return {};
       }
     };
-    const stringValue = (value: unknown): string | undefined => (
-      typeof value === 'string' && value.trim() ? value : undefined
-    );
-    const canonicalTasks = canonicalRows.map((row) => {
+    const stringValue = (value: unknown): string | undefined =>
+      typeof value === 'string' && value.trim() ? value : undefined;
+    const canonicalTasks = canonicalRows.map(row => {
       const metadata = parseObject(row.metadata);
       const result = parseObject(row.result);
       const responseText = stringValue(result.text);
@@ -340,11 +385,11 @@ export class ServerState {
         id: row.id,
         sessionId: row.session_id,
         branchId: stringValue(metadata.branchId) ?? null,
-        branchAction: stringValue(metadata.branchAction) as import('@zclaudia/shared/wire/messages').BranchAction | undefined,
+        branchAction: stringValue(metadata.branchAction) as BranchAction | undefined,
         contextReset: Boolean(metadata.contextReset),
         input,
         title: row.title ?? (input.trim().replace(/\s+/g, ' ').slice(0, 80) || 'Claudia Task'),
-        status: (row.status === 'stopped' ? 'cancelled' : row.status) as import('@zclaudia/shared/wire/messages').ClaudiaTaskStatus,
+        status: (row.status === 'stopped' ? 'cancelled' : row.status) as ClaudiaTaskStatus,
         summary: responseText,
         error: stringValue(result.error),
         responseText,

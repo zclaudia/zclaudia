@@ -72,13 +72,15 @@ describe('McpServerSettings', () => {
 
   it('shows lifecycle status, inventory counts, and refresh action', () => {
     useMcpServerStore.setState({
-      servers: [{
-        id: 'mcp-1',
-        name: 'GitHub',
-        command: 'npx',
-        args: ['github-mcp'],
-        enabled: true,
-      }],
+      servers: [
+        {
+          id: 'mcp-1',
+          name: 'GitHub',
+          command: 'npx',
+          args: ['github-mcp'],
+          enabled: true,
+        },
+      ],
       statuses: {
         GitHub: {
           name: 'GitHub',
@@ -101,13 +103,15 @@ describe('McpServerSettings', () => {
 
   it('shows auth-required guidance and authenticate action for needs-auth MCP server', () => {
     useMcpServerStore.setState({
-      servers: [{
-        id: 'mcp-1',
-        name: 'GitHub',
-        command: 'npx',
-        args: ['github-mcp'],
-        enabled: true,
-      }],
+      servers: [
+        {
+          id: 'mcp-1',
+          name: 'GitHub',
+          command: 'npx',
+          args: ['github-mcp'],
+          enabled: true,
+        },
+      ],
       statuses: {
         GitHub: {
           name: 'GitHub',
@@ -124,7 +128,9 @@ describe('McpServerSettings', () => {
 
     expect(screen.getByText('needs-auth')).toBeTruthy();
     expect(screen.getByText('Authentication required for GitHub MCP.')).toBeTruthy();
-    expect(screen.getByText('Update credentials, then authenticate to refresh this MCP server.')).toBeTruthy();
+    expect(
+      screen.getByText('Update credentials, then authenticate to refresh this MCP server.')
+    ).toBeTruthy();
 
     fireEvent.click(screen.getByText('Authenticate'));
     expect(mockRefresh).toHaveBeenCalledWith('GitHub');
@@ -132,21 +138,23 @@ describe('McpServerSettings', () => {
 
   it('shows OAuth login action for remote OAuth MCP server', () => {
     useMcpServerStore.setState({
-      servers: [{
-        id: 'mcp-1',
-        name: 'RemoteGitHub',
-        command: '',
-        transport: 'streamable-http',
-        url: 'https://mcp.example.com/mcp',
-        enabled: true,
-        oauthConfig: {
+      servers: [
+        {
+          id: 'mcp-1',
+          name: 'RemoteGitHub',
+          command: '',
+          transport: 'streamable-http',
+          url: 'https://mcp.example.com/mcp',
           enabled: true,
-          authorizationEndpoint: 'https://auth.example.com/oauth/authorize',
-          tokenEndpoint: 'https://auth.example.com/oauth/token',
-          clientId: 'zclaudia-client',
-          scopes: ['repo'],
+          oauthConfig: {
+            enabled: true,
+            authorizationEndpoint: 'https://auth.example.com/oauth/authorize',
+            tokenEndpoint: 'https://auth.example.com/oauth/token',
+            clientId: 'zclaudia-client',
+            scopes: ['repo'],
+          },
         },
-      }],
+      ],
       statuses: {
         RemoteGitHub: { name: 'RemoteGitHub', state: 'needs-auth', authRequired: true },
       },
@@ -207,13 +215,15 @@ describe('McpServerSettings', () => {
 
   it('expands server inventory drilldown with searchable tools, resources, and prompts', () => {
     useMcpServerStore.setState({
-      servers: [{
-        id: 'mcp-1',
-        name: 'GitHub',
-        command: 'npx',
-        args: ['github-mcp'],
-        enabled: true,
-      }],
+      servers: [
+        {
+          id: 'mcp-1',
+          name: 'GitHub',
+          command: 'npx',
+          args: ['github-mcp'],
+          enabled: true,
+        },
+      ],
       statuses: {
         GitHub: {
           name: 'GitHub',
@@ -221,23 +231,31 @@ describe('McpServerSettings', () => {
           enabled: true,
           inventory: { tools: 1, resources: 1, prompts: 1, cachedAt: 1234 },
           inventoryDetail: {
-            tools: [{
-              name: 'read_issue',
-              description: 'Read an issue',
-              inputSchema: { type: 'object', properties: { id: { type: 'string' } } },
-              annotations: { readOnlyHint: true },
-              permissionSummary: {
-                declaredReadOnly: true,
-                trustedReadOnly: false,
-                mutatesWorkspace: false,
-                requiresNetwork: true,
-                riskLevel: 'medium',
-                providerTrust: 'untrusted',
-                advisory: 'MCP annotations are self-declared.',
+            tools: [
+              {
+                name: 'read_issue',
+                description: 'Read an issue',
+                inputSchema: { type: 'object', properties: { id: { type: 'string' } } },
+                annotations: { readOnlyHint: true },
+                permissionSummary: {
+                  declaredReadOnly: true,
+                  trustedReadOnly: false,
+                  mutatesWorkspace: false,
+                  requiresNetwork: true,
+                  riskLevel: 'medium',
+                  providerTrust: 'untrusted',
+                  advisory: 'MCP annotations are self-declared.',
+                },
               },
-            }],
+            ],
             resources: [{ uri: 'file://readme', name: 'README', mimeType: 'text/markdown' }],
-            prompts: [{ name: 'summarize', description: 'Summarize content', arguments: [{ name: 'topic', required: true }] }],
+            prompts: [
+              {
+                name: 'summarize',
+                description: 'Summarize content',
+                arguments: [{ name: 'topic', required: true }],
+              },
+            ],
           },
         },
       },
@@ -253,20 +271,24 @@ describe('McpServerSettings', () => {
     expect(screen.getByText('file://readme')).toBeTruthy();
     expect(screen.getByText('summarize')).toBeTruthy();
 
-    fireEvent.change(screen.getByPlaceholderText('Search inventory...'), { target: { value: 'readme' } });
+    fireEvent.change(screen.getByPlaceholderText('Search inventory...'), {
+      target: { value: 'readme' },
+    });
     expect(screen.queryByText('read_issue')).toBeNull();
     expect(screen.getByText('file://readme')).toBeTruthy();
   });
 
   it('renders servers list', () => {
     useMcpServerStore.setState({
-      servers: [{
-        id: 'mcp-1',
-        name: 'Test Server',
-        command: 'npx',
-        args: ['-y', 'test-server'],
-        enabled: true,
-      }],
+      servers: [
+        {
+          id: 'mcp-1',
+          name: 'Test Server',
+          command: 'npx',
+          args: ['-y', 'test-server'],
+          enabled: true,
+        },
+      ],
       isLoading: false,
       error: null,
       fetchServers: mockFetchServers,
@@ -284,13 +306,15 @@ describe('McpServerSettings', () => {
 
   it('renders disabled server badge', () => {
     useMcpServerStore.setState({
-      servers: [{
-        id: 'mcp-1',
-        name: 'Disabled Server',
-        command: 'npx',
-        args: [],
-        enabled: false,
-      }],
+      servers: [
+        {
+          id: 'mcp-1',
+          name: 'Disabled Server',
+          command: 'npx',
+          args: [],
+          enabled: false,
+        },
+      ],
       isLoading: false,
       error: null,
       fetchServers: mockFetchServers,
@@ -307,13 +331,15 @@ describe('McpServerSettings', () => {
 
   it('shows server command with args', () => {
     useMcpServerStore.setState({
-      servers: [{
-        id: 'mcp-1',
-        name: 'FS Server',
-        command: 'npx',
-        args: ['-y', '@modelcontextprotocol/server-filesystem'],
-        enabled: true,
-      }],
+      servers: [
+        {
+          id: 'mcp-1',
+          name: 'FS Server',
+          command: 'npx',
+          args: ['-y', '@modelcontextprotocol/server-filesystem'],
+          enabled: true,
+        },
+      ],
       isLoading: false,
       error: null,
       fetchServers: mockFetchServers,
@@ -329,14 +355,16 @@ describe('McpServerSettings', () => {
 
   it('shows description when present', () => {
     useMcpServerStore.setState({
-      servers: [{
-        id: 'mcp-1',
-        name: 'Server',
-        command: 'npx',
-        args: [],
-        enabled: true,
-        description: 'A test server description',
-      }],
+      servers: [
+        {
+          id: 'mcp-1',
+          name: 'Server',
+          command: 'npx',
+          args: [],
+          enabled: true,
+          description: 'A test server description',
+        },
+      ],
       isLoading: false,
       error: null,
       fetchServers: mockFetchServers,
@@ -352,14 +380,16 @@ describe('McpServerSettings', () => {
 
   it('shows provider scope badges', () => {
     useMcpServerStore.setState({
-      servers: [{
-        id: 'mcp-1',
-        name: 'Server',
-        command: 'npx',
-        args: [],
-        enabled: true,
-        providerScope: ['zclaudia'],
-      }],
+      servers: [
+        {
+          id: 'mcp-1',
+          name: 'Server',
+          command: 'npx',
+          args: [],
+          enabled: true,
+          providerScope: ['zclaudia'],
+        },
+      ],
       isLoading: false,
       error: null,
       fetchServers: mockFetchServers,
@@ -375,14 +405,16 @@ describe('McpServerSettings', () => {
 
   it('shows imported badge for imported servers', () => {
     useMcpServerStore.setState({
-      servers: [{
-        id: 'mcp-1',
-        name: 'Imported Server',
-        command: 'npx',
-        args: [],
-        enabled: true,
-        source: 'imported',
-      }],
+      servers: [
+        {
+          id: 'mcp-1',
+          name: 'Imported Server',
+          command: 'npx',
+          args: [],
+          enabled: true,
+          source: 'imported',
+        },
+      ],
       isLoading: false,
       error: null,
       fetchServers: mockFetchServers,
@@ -517,19 +549,21 @@ describe('McpServerSettings', () => {
     fireEvent.click(screen.getByText('Add'));
 
     await waitFor(() => {
-      expect(mockAddServer).toHaveBeenCalledWith(expect.objectContaining({
-        name: 'remote-github',
-        command: '',
-        transport: 'streamable-http',
-        url: 'https://mcp.example.com/mcp',
-        oauthConfig: expect.objectContaining({
-          enabled: true,
-          authorizationEndpoint: 'https://auth.example.com/oauth/authorize',
-          tokenEndpoint: 'https://auth.example.com/oauth/token',
-          clientId: 'zclaudia-client',
-          scopes: ['repo', 'read:user'],
-        }),
-      }));
+      expect(mockAddServer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'remote-github',
+          command: '',
+          transport: 'streamable-http',
+          url: 'https://mcp.example.com/mcp',
+          oauthConfig: expect.objectContaining({
+            enabled: true,
+            authorizationEndpoint: 'https://auth.example.com/oauth/authorize',
+            tokenEndpoint: 'https://auth.example.com/oauth/token',
+            clientId: 'zclaudia-client',
+            scopes: ['repo', 'read:user'],
+          }),
+        })
+      );
     });
   });
 
@@ -588,13 +622,15 @@ describe('McpServerSettings', () => {
 
   it('calls toggle when toggle button is clicked', () => {
     useMcpServerStore.setState({
-      servers: [{
-        id: 'mcp-1',
-        name: 'Server',
-        command: 'cmd',
-        args: [],
-        enabled: true,
-      }],
+      servers: [
+        {
+          id: 'mcp-1',
+          name: 'Server',
+          command: 'cmd',
+          args: [],
+          enabled: true,
+        },
+      ],
       isLoading: false,
       error: null,
       fetchServers: mockFetchServers,
@@ -612,15 +648,17 @@ describe('McpServerSettings', () => {
 
   it('opens edit form when edit button is clicked', () => {
     useMcpServerStore.setState({
-      servers: [{
-        id: 'mcp-1',
-        name: 'Editable Server',
-        command: 'npx',
-        args: ['-y', 'test'],
-        enabled: true,
-        description: 'Some desc',
-        providerScope: ['claude'],
-      }],
+      servers: [
+        {
+          id: 'mcp-1',
+          name: 'Editable Server',
+          command: 'npx',
+          args: ['-y', 'test'],
+          enabled: true,
+          description: 'Some desc',
+          providerScope: ['claude'],
+        },
+      ],
       isLoading: false,
       error: null,
       fetchServers: mockFetchServers,
@@ -646,13 +684,15 @@ describe('McpServerSettings', () => {
 
   it('submits edit form', async () => {
     useMcpServerStore.setState({
-      servers: [{
-        id: 'mcp-1',
-        name: 'Server',
-        command: 'cmd',
-        args: [],
-        enabled: true,
-      }],
+      servers: [
+        {
+          id: 'mcp-1',
+          name: 'Server',
+          command: 'cmd',
+          args: [],
+          enabled: true,
+        },
+      ],
       isLoading: false,
       error: null,
       fetchServers: mockFetchServers,
@@ -681,19 +721,21 @@ describe('McpServerSettings', () => {
 
   it('edits MCP trust policy controls', async () => {
     useMcpServerStore.setState({
-      servers: [{
-        id: 'mcp-1',
-        name: 'Trust Server',
-        command: 'npx',
-        args: [],
-        enabled: true,
-        trustPolicy: {
-          trustLevel: 'untrusted',
-          trustReadOnlyHint: false,
-          defaultRiskAction: 'ask',
-          riskActions: {},
+      servers: [
+        {
+          id: 'mcp-1',
+          name: 'Trust Server',
+          command: 'npx',
+          args: [],
+          enabled: true,
+          trustPolicy: {
+            trustLevel: 'untrusted',
+            trustReadOnlyHint: false,
+            defaultRiskAction: 'ask',
+            riskActions: {},
+          },
         },
-      }],
+      ],
       isLoading: false,
       error: null,
       fetchServers: mockFetchServers,
@@ -705,32 +747,39 @@ describe('McpServerSettings', () => {
 
     render(<McpServerSettings />);
     fireEvent.click(screen.getByTitle('Edit'));
-    fireEvent.change(screen.getByLabelText('Trust Level'), { target: { value: 'trusted-readonly' } });
+    fireEvent.change(screen.getByLabelText('Trust Level'), {
+      target: { value: 'trusted-readonly' },
+    });
     fireEvent.click(screen.getByLabelText('Trust read-only hints'));
     fireEvent.change(screen.getByLabelText('High risk action'), { target: { value: 'deny' } });
     fireEvent.click(screen.getByText('Save'));
 
     await waitFor(() => {
-      expect(mockEditServer).toHaveBeenCalledWith('mcp-1', expect.objectContaining({
-        trustPolicy: {
-          trustLevel: 'trusted-readonly',
-          trustReadOnlyHint: true,
-          defaultRiskAction: 'ask',
-          riskActions: { high: 'deny' },
-        },
-      }));
+      expect(mockEditServer).toHaveBeenCalledWith(
+        'mcp-1',
+        expect.objectContaining({
+          trustPolicy: {
+            trustLevel: 'trusted-readonly',
+            trustReadOnlyHint: true,
+            defaultRiskAction: 'ask',
+            riskActions: { high: 'deny' },
+          },
+        })
+      );
     });
   });
 
   it('handles delete with confirm', () => {
     useMcpServerStore.setState({
-      servers: [{
-        id: 'mcp-1',
-        name: 'To Delete',
-        command: 'cmd',
-        args: [],
-        enabled: true,
-      }],
+      servers: [
+        {
+          id: 'mcp-1',
+          name: 'To Delete',
+          command: 'cmd',
+          args: [],
+          enabled: true,
+        },
+      ],
       isLoading: false,
       error: null,
       fetchServers: mockFetchServers,
@@ -740,7 +789,10 @@ describe('McpServerSettings', () => {
       toggle: mockToggle,
     } as any);
 
-    vi.stubGlobal('confirm', vi.fn(() => true));
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => true)
+    );
 
     render(<McpServerSettings />);
     fireEvent.click(screen.getByTitle('Delete'));
@@ -750,13 +802,15 @@ describe('McpServerSettings', () => {
 
   it('does not delete when confirm is cancelled', () => {
     useMcpServerStore.setState({
-      servers: [{
-        id: 'mcp-1',
-        name: 'Keep Me',
-        command: 'cmd',
-        args: [],
-        enabled: true,
-      }],
+      servers: [
+        {
+          id: 'mcp-1',
+          name: 'Keep Me',
+          command: 'cmd',
+          args: [],
+          enabled: true,
+        },
+      ],
       isLoading: false,
       error: null,
       fetchServers: mockFetchServers,
@@ -766,7 +820,10 @@ describe('McpServerSettings', () => {
       toggle: mockToggle,
     } as any);
 
-    vi.stubGlobal('confirm', vi.fn(() => false));
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => false)
+    );
 
     render(<McpServerSettings />);
     fireEvent.click(screen.getByTitle('Delete'));
@@ -800,9 +857,7 @@ describe('McpServerSettings', () => {
 
   it('shows no match message when search has no results', () => {
     useMcpServerStore.setState({
-      servers: [
-        { id: '1', name: 'Server', command: 'cmd', args: [], enabled: true },
-      ],
+      servers: [{ id: '1', name: 'Server', command: 'cmd', args: [], enabled: true }],
       isLoading: false,
       error: null,
       fetchServers: mockFetchServers,

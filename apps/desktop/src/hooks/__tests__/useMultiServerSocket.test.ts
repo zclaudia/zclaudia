@@ -59,14 +59,21 @@ const {
   });
   recoveryHook.getState = vi.fn(() => recoveryState);
 
-  const ownershipState: { sessionOwners: Record<string, string>; projectOwners: Record<string, string> } = {
+  const ownershipState: {
+    sessionOwners: Record<string, string>;
+    projectOwners: Record<string, string>;
+  } = {
     sessionOwners: {},
     projectOwners: {},
   };
-  const ownershipHook: any = vi.fn((selector?: any) => (selector ? selector(ownershipState) : ownershipState));
+  const ownershipHook: any = vi.fn((selector?: any) =>
+    selector ? selector(ownershipState) : ownershipState
+  );
   ownershipHook.getState = vi.fn(() => ({
-    getSessionBackendId: (id?: string | null) => (id ? ownershipState.sessionOwners[id] ?? null : null),
-    getProjectBackendId: (id?: string | null) => (id ? ownershipState.projectOwners[id] ?? null : null),
+    getSessionBackendId: (id?: string | null) =>
+      id ? (ownershipState.sessionOwners[id] ?? null) : null,
+    getProjectBackendId: (id?: string | null) =>
+      id ? (ownershipState.projectOwners[id] ?? null) : null,
   }));
 
   return {
@@ -290,7 +297,9 @@ describe('hooks/useMultiServerSocket', () => {
           result.current.sendToServer('backend-1', { type: 'ping' } as any);
         });
 
-        expect(mockGatewayConnection.sendToBackend).toHaveBeenCalledWith('backend-1', { type: 'ping' });
+        expect(mockGatewayConnection.sendToBackend).toHaveBeenCalledWith('backend-1', {
+          type: 'ping',
+        });
       });
     });
   });
@@ -311,9 +320,7 @@ describe('hooks/useMultiServerSocket', () => {
         result.current.sendMessage({ type: 'ping' } as any);
       });
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('no target backend')
-      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('no target backend'));
     });
 
     it('falls back to the active server for messages without an owner', () => {
@@ -340,10 +347,11 @@ describe('hooks/useMultiServerSocket', () => {
         result.current.sendMessage({ type: 'rename_session', sessionId: 's1', name: 'x' } as any);
       });
 
-      expect(mockFacade.sendToBackend).toHaveBeenCalledWith(
-        'server-b',
-        { type: 'rename_session', sessionId: 's1', name: 'x' },
-      );
+      expect(mockFacade.sendToBackend).toHaveBeenCalledWith('server-b', {
+        type: 'rename_session',
+        sessionId: 's1',
+        name: 'x',
+      });
     });
 
     it('routes to the project owner when there is no sessionId', () => {
@@ -357,10 +365,10 @@ describe('hooks/useMultiServerSocket', () => {
         result.current.sendMessage({ type: 'create_session', projectId: 'p1' } as any);
       });
 
-      expect(mockFacade.sendToBackend).toHaveBeenCalledWith(
-        'server-c',
-        { type: 'create_session', projectId: 'p1' },
-      );
+      expect(mockFacade.sendToBackend).toHaveBeenCalledWith('server-c', {
+        type: 'create_session',
+        projectId: 'p1',
+      });
     });
 
     it('routes an owned message via gateway when no facade is present', () => {
@@ -374,10 +382,11 @@ describe('hooks/useMultiServerSocket', () => {
         result.current.sendMessage({ type: 'rename_session', sessionId: 's1', name: 'x' } as any);
       });
 
-      expect(mockGatewayConnection.sendToBackend).toHaveBeenCalledWith(
-        'server-b',
-        { type: 'rename_session', sessionId: 's1', name: 'x' },
-      );
+      expect(mockGatewayConnection.sendToBackend).toHaveBeenCalledWith('server-b', {
+        type: 'rename_session',
+        sessionId: 's1',
+        name: 'x',
+      });
     });
   });
 
@@ -395,9 +404,7 @@ describe('hooks/useMultiServerSocket', () => {
 
       it('returns true when backend is ready via isMobileBackendUsable', () => {
         mockFacadeStoreState.connectionState = 'connected';
-        mockFacadeStoreState.backends = [
-          { backendId: 'backend-1', runtimeState: 'ready' },
-        ] as any;
+        mockFacadeStoreState.backends = [{ backendId: 'backend-1', runtimeState: 'ready' }] as any;
 
         const { result } = renderHook(() => useMultiServerSocket());
 
@@ -412,9 +419,7 @@ describe('hooks/useMultiServerSocket', () => {
       it('uses mobile recovery connection state on Android', () => {
         mockIsAndroid.mockReturnValue(true);
         mockFacadeStoreState.connectionState = 'connected';
-        mockFacadeStoreState.backends = [
-          { backendId: 'backend-1', runtimeState: 'ready' },
-        ] as any;
+        mockFacadeStoreState.backends = [{ backendId: 'backend-1', runtimeState: 'ready' }] as any;
 
         const { result } = renderHook(() => useMultiServerSocket());
 
@@ -424,9 +429,7 @@ describe('hooks/useMultiServerSocket', () => {
 
       it('returns true when backend is ready and connected', () => {
         mockFacadeStoreState.connectionState = 'connected';
-        mockFacadeStoreState.backends = [
-          { backendId: 'backend-1', runtimeState: 'ready' },
-        ] as any;
+        mockFacadeStoreState.backends = [{ backendId: 'backend-1', runtimeState: 'ready' }] as any;
 
         const { result } = renderHook(() => useMultiServerSocket());
 
@@ -512,9 +515,7 @@ describe('hooks/useMultiServerSocket', () => {
       };
       mockFacadeStoreState.facade = mockFacade;
       mockFacadeStoreState.connectionState = 'connected';
-      mockFacadeStoreState.backends = [
-        { backendId: 'server-1', runtimeState: 'ready' },
-      ] as any;
+      mockFacadeStoreState.backends = [{ backendId: 'server-1', runtimeState: 'ready' }] as any;
       mockServerStoreState.activeServerId = 'server-1';
 
       const { result } = renderHook(() => useMultiServerSocket());

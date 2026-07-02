@@ -40,7 +40,7 @@ export function ModeSelector({
   if (!capabilities.modes || capabilities.modes.length === 0) return null;
 
   const effective = value || capabilities.defaultModeId || capabilities.modes[0].id;
-  const current = capabilities.modes.find((m) => m.id === effective) ?? capabilities.modes[0];
+  const current = capabilities.modes.find(m => m.id === effective) ?? capabilities.modes[0];
   const isDisabled = disabled || locked;
   const title = locked
     ? (lockReason ?? 'Mode locked')
@@ -50,7 +50,9 @@ export function ModeSelector({
     <div ref={ref} className="relative inline-block">
       <button
         type="button"
-        onClick={() => { if (!isDisabled) setOpen((o) => !o); }}
+        onClick={() => {
+          if (!isDisabled) setOpen(o => !o);
+        }}
         disabled={isDisabled}
         title={title}
         aria-haspopup="listbox"
@@ -70,20 +72,25 @@ export function ModeSelector({
           role="listbox"
           className="absolute left-0 bottom-full mb-1 z-50 min-w-[140px] bg-popover border border-border rounded-md shadow-lg py-1"
         >
-          {capabilities.modes.map((m) => (
+          {capabilities.modes.map(m => (
             <button
               key={m.id}
               type="button"
               role="option"
               aria-selected={m.id === effective}
-              onClick={() => { onChange(m.id); setOpen(false); }}
+              onClick={() => {
+                onChange(m.id);
+                setOpen(false);
+              }}
               className={[
                 'w-full text-left px-3 py-1.5 text-xs hover:bg-muted',
                 m.id === effective ? 'bg-muted/60 font-medium' : '',
               ].join(' ')}
             >
               <div>{m.label}</div>
-              {m.description ? <div className="text-[10px] text-muted-foreground">{m.description}</div> : null}
+              {m.description ? (
+                <div className="text-[10px] text-muted-foreground">{m.description}</div>
+              ) : null}
             </button>
           ))}
         </div>

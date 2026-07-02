@@ -53,9 +53,13 @@ export function registerLocalIssueDomain(deps: LocalIssueDomainDeps): LocalIssue
 
   // Owner-existence guard for the attachments domain — refuses to attach
   // anything to an issue that has been deleted (or never existed).
-  registerOwnerGuard('local_issue', (ownerId) => localIssueService.issueExists(ownerId));
+  registerOwnerGuard('local_issue', ownerId => localIssueService.issueExists(ownerId));
 
-  app.use('/api', authMiddleware, createLocalIssueRoutes(localIssueService, localIssueCommentService));
+  app.use(
+    '/api',
+    authMiddleware,
+    createLocalIssueRoutes(localIssueService, localIssueCommentService)
+  );
 
   return { localIssueService, localIssueCommentService };
 }

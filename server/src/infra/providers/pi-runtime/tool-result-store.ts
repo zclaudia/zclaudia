@@ -33,7 +33,7 @@ export function measureTextBytes(content: ContentBlock[]): number {
  */
 export function persistToolResultText(
   toolName: string,
-  content: ContentBlock[],
+  content: ContentBlock[]
 ): { filePath: string; size: number } | undefined {
   const text = content
     .filter(block => block.type === 'text' && typeof block.text === 'string')

@@ -14,7 +14,7 @@ export function synthesizeSubagent(phase: PhaseDef): MetaSubagentTemplate {
   const systemPrompt = template.buildSynthesizerPrompt(phase);
 
   // Determine termination: prefer the first file output, else fall back to a keyword.
-  const fileOutput = phase.outputs.find((o) => o.kind === 'file' && o.path);
+  const fileOutput = phase.outputs.find(o => o.kind === 'file' && o.path);
   const terminationCondition: MetaSubagentTerminationCondition = fileOutput?.path
     ? { kind: 'output-file', target: fileOutput.path }
     : { kind: 'output-keyword', target: '[INVESTIGATION_COMPLETE]' };

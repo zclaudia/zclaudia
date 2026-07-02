@@ -54,12 +54,13 @@ export function createMockAdapter(options?: {
       disconnect: () => log('connection.disconnect'),
     },
     backend: {
-      subscribe: (backendId) => log('backend.subscribe', backendId),
-      unsubscribe: (backendId) => log('backend.unsubscribe', backendId),
+      subscribe: backendId => log('backend.subscribe', backendId),
+      unsubscribe: backendId => log('backend.unsubscribe', backendId),
       sendToBackend: (backendId, message) => log('backend.sendToBackend', backendId, message),
     },
     stream: {
-      catchUp: (backendId, sessionId, afterOffset) => log('stream.catchUp', backendId, sessionId, afterOffset),
+      catchUp: (backendId, sessionId, afterOffset) =>
+        log('stream.catchUp', backendId, sessionId, afterOffset),
     },
   };
 
@@ -84,16 +85,16 @@ export function createMockAdapter(options?: {
       getSnapshot: () => registry,
     },
     backend: {
-      isSubscribed: (backendId) => subscribedSet.has(backendId),
+      isSubscribed: backendId => subscribedSet.has(backendId),
     },
     http: {
-      getBaseUrl: (backendId) => `http://mock/${backendId}`,
+      getBaseUrl: backendId => `http://mock/${backendId}`,
       getHeaders: () => ({ 'x-mock': 'true' }),
     },
   };
 
   const events: FacadeAdapterEventBus = {
-    subscribe: (listener) => {
+    subscribe: listener => {
       listeners.push(listener);
       return () => {
         const idx = listeners.indexOf(listener);
@@ -114,7 +115,9 @@ export function createMockAdapter(options?: {
   };
 }
 
-export function makePresence(overrides: Partial<BackendPresence> & { backendId: string }): BackendPresence {
+export function makePresence(
+  overrides: Partial<BackendPresence> & { backendId: string }
+): BackendPresence {
   return {
     namespace: 'zclaudia',
     instanceId: 'inst-remote',

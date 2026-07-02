@@ -13,7 +13,11 @@ const ansiUp = new AnsiUp();
 // Normalize tool input: some providers send stringified JSON instead of objects
 function normalizeToolInput(input: unknown): unknown {
   if (typeof input === 'string') {
-    try { return JSON.parse(input); } catch { return input; }
+    try {
+      return JSON.parse(input);
+    } catch {
+      return input;
+    }
   }
   return input;
 }
@@ -57,7 +61,7 @@ function buildAskUserQuestionInteraction(params: {
       label: question.question,
       description: question.header,
       type: question.multiSelect ? 'multiselect' : 'select',
-      options: (question.options || []).map((option) => ({
+      options: (question.options || []).map(option => ({
         value: option.label,
         label: option.label,
         description: option.description,
@@ -82,7 +86,7 @@ function normalizeTodoItems(value: unknown): TodoItem[] {
   const normalized = normalizeToolInput(value);
 
   if (Array.isArray(normalized)) {
-    return normalized.flatMap((item) => {
+    return normalized.flatMap(item => {
       if (!item || typeof item !== 'object') return [];
       const content = 'content' in item ? String(item.content ?? '') : '';
       if (!content) return [];
@@ -123,13 +127,13 @@ function formatToolInput(toolName: string, input: unknown, semantic?: ToolSemant
     return 'Update task list';
   }
   if (isAskUserFormTool(toolName)) {
-    return obj.title as string || 'Form';
+    return (obj.title as string) || 'Form';
   }
   if (isApprovalTool(toolName)) {
-    return obj.title as string || 'Approval required';
+    return (obj.title as string) || 'Approval required';
   }
   if (isPushFileTool(toolName)) {
-    const filePath = obj.filePath as string || '';
+    const filePath = (obj.filePath as string) || '';
     return filePath ? filePath.split('/').pop()! : 'Push file';
   }
 
@@ -145,7 +149,11 @@ function formatToolInput(toolName: string, input: unknown, semantic?: ToolSemant
     } else if (Object.keys(obj).length > 0) {
       planText = JSON.stringify(obj);
     }
-    const firstLine = planText.split('\n').find(l => l.trim())?.replace(/^#+\s*/, '') || 'Plan ready for review';
+    const firstLine =
+      planText
+        .split('\n')
+        .find(l => l.trim())
+        ?.replace(/^#+\s*/, '') || 'Plan ready for review';
     return firstLine.length > 60 ? firstLine.slice(0, 60) + '…' : firstLine;
   }
 
@@ -163,17 +171,17 @@ function formatToolInput(toolName: string, input: unknown, semantic?: ToolSemant
     case 'EditSymbol':
       return fileAndSymbol || JSON.stringify(input);
     case 'Bash':
-      return obj.command as string || JSON.stringify(input);
+      return (obj.command as string) || JSON.stringify(input);
     case 'Grep':
       return `${obj.pattern || ''} ${obj.path ? `in ${obj.path}` : ''}`;
     case 'Glob':
       return `${obj.pattern || ''} ${obj.path ? `in ${obj.path}` : ''}`;
     case 'Task':
-      return obj.description as string || JSON.stringify(input);
+      return (obj.description as string) || JSON.stringify(input);
     case 'WebFetch':
-      return obj.url as string || JSON.stringify(input);
+      return (obj.url as string) || JSON.stringify(input);
     case 'WebSearch':
-      return obj.query as string || JSON.stringify(input);
+      return (obj.query as string) || JSON.stringify(input);
     case 'AskUserQuestion': {
       const questions = extractQuestions(obj.questions);
       return `${questions.length} question${questions.length !== 1 ? 's' : ''}`;

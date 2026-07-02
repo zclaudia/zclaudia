@@ -47,21 +47,27 @@ vi.mock('../../../services/api', () => ({
 }));
 
 vi.mock('../../../contexts/ConnectionContext', () => ({
-  useConnection: () => ({ sendMessage: mockSendMessage, handlePromptAnswer: mockHandlePromptAnswer }),
+  useConnection: () => ({
+    sendMessage: mockSendMessage,
+    handlePromptAnswer: mockHandlePromptAnswer,
+  }),
 }));
 
 vi.mock('../../../stores/terminalStore', () => ({
+  getTerminalScopeKey: (projectId: string, backendId: string | null | undefined) =>
+    `${backendId ?? 'no-backend'}::${projectId}`,
   useTerminalStore: Object.assign(
-    (selector: any) => selector({
-      terminals: {},
-      getTerminalId: vi.fn((projectId: string) => {
-        const backendId = (globalThis as any).__toolCallTestActiveBackend ?? 'backend-1';
-        return terminalIdsByBackend.get(`${backendId}:${projectId}`);
+    (selector: any) =>
+      selector({
+        terminals: {},
+        getTerminalId: vi.fn((projectId: string) => {
+          const backendId = (globalThis as any).__toolCallTestActiveBackend ?? 'backend-1';
+          return terminalIdsByBackend.get(`${backendId}:${projectId}`);
+        }),
+        openTerminal: mockOpenTerminal,
+        setDrawerOpen: mockSetDrawerOpen,
+        waitForReady: mockWaitForReady,
       }),
-      openTerminal: mockOpenTerminal,
-      setDrawerOpen: mockSetDrawerOpen,
-      waitForReady: mockWaitForReady,
-    }),
     {
       getState: () => ({
         terminals: {},
@@ -73,7 +79,7 @@ vi.mock('../../../stores/terminalStore', () => ({
         setDrawerOpen: mockSetDrawerOpen,
         waitForReady: mockWaitForReady,
       }),
-    },
+    }
   ),
 }));
 
@@ -82,10 +88,9 @@ const mockProjectState = {
 };
 
 vi.mock('../../../stores/projectStore', () => ({
-  useProjectStore: Object.assign(
-    (selector: any) => selector(mockProjectState),
-    { getState: () => mockProjectState },
-  ),
+  useProjectStore: Object.assign((selector: any) => selector(mockProjectState), {
+    getState: () => mockProjectState,
+  }),
 }));
 
 const mockSelectionState = {
@@ -93,10 +98,9 @@ const mockSelectionState = {
 };
 
 vi.mock('../../../stores/selectionStore', () => ({
-  useSelectionStore: Object.assign(
-    (selector: any) => selector(mockSelectionState),
-    { getState: () => mockSelectionState },
-  ),
+  useSelectionStore: Object.assign((selector: any) => selector(mockSelectionState), {
+    getState: () => mockSelectionState,
+  }),
 }));
 
 vi.mock('../../../stores/serverStore', () => ({
@@ -109,7 +113,7 @@ vi.mock('../../../stores/serverStore', () => ({
     },
     {
       setState: vi.fn(),
-    },
+    }
   ),
 }));
 
@@ -121,20 +125,18 @@ const mockInteractionState = {
   interactions: {} as Record<string, any>,
 };
 vi.mock('../../../stores/interactionStore', () => ({
-  useInteractionStore: Object.assign(
-    (selector: any) => selector(mockInteractionState),
-    { getState: () => mockInteractionState },
-  ),
+  useInteractionStore: Object.assign((selector: any) => selector(mockInteractionState), {
+    getState: () => mockInteractionState,
+  }),
 }));
 
 const mockPromptRequestState = {
   pendingRequests: [] as Array<{ requestId: string; sessionId?: string; serverId?: string }>,
 };
 vi.mock('../../../stores/promptRequestStore', () => ({
-  usePromptRequestStore: Object.assign(
-    (selector: any) => selector(mockPromptRequestState),
-    { getState: () => mockPromptRequestState },
-  ),
+  usePromptRequestStore: Object.assign((selector: any) => selector(mockPromptRequestState), {
+    getState: () => mockPromptRequestState,
+  }),
 }));
 
 const createToolCall = (overrides: Partial<ToolCallState> = {}): ToolCallState => ({
@@ -187,19 +189,25 @@ describe('ToolCallItem', () => {
     });
 
     it('shows running spinner when status is running', () => {
-      const { container } = render(<ToolCallItem toolCall={createToolCall({ status: 'running' })} />);
+      const { container } = render(
+        <ToolCallItem toolCall={createToolCall({ status: 'running' })} />
+      );
       const spinner = container.querySelector('.animate-spin');
       expect(spinner).toBeInTheDocument();
     });
 
     it('shows success checkmark when completed without error', () => {
-      const { container } = render(<ToolCallItem toolCall={createToolCall({ status: 'completed', isError: false })} />);
+      const { container } = render(
+        <ToolCallItem toolCall={createToolCall({ status: 'completed', isError: false })} />
+      );
       const checkIcon = container.querySelector('.text-success');
       expect(checkIcon).toBeInTheDocument();
     });
 
     it('shows error icon when completed with error', () => {
-      const { container } = render(<ToolCallItem toolCall={createToolCall({ status: 'completed', isError: true })} />);
+      const { container } = render(
+        <ToolCallItem toolCall={createToolCall({ status: 'completed', isError: true })} />
+      );
       const errorIcon = container.querySelector('.text-destructive');
       expect(errorIcon).toBeInTheDocument();
     });
@@ -223,11 +231,15 @@ describe('ToolCallItem', () => {
     });
 
     it('AskUserQuestion with isError shows as success (not error)', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'AskUserQuestion',
-        toolInput: { questions: [{ question: 'What?' }] },
-        isError: true,
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'AskUserQuestion',
+            toolInput: { questions: [{ question: 'What?' }] },
+            isError: true,
+          })}
+        />
+      );
       const el = screen.getByTestId('tool-use');
       // AskUserQuestion treats isError as expected behavior, not destructive
       expect(el.className).toContain('border-success/30');
@@ -238,32 +250,44 @@ describe('ToolCallItem', () => {
 
   describe('expand/collapse', () => {
     it('starts collapsed', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'CustomTool',
-        status: 'completed',
-        result: 'result text',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'CustomTool',
+            status: 'completed',
+            result: 'result text',
+          })}
+        />
+      );
       expect(screen.queryByText('Result:')).not.toBeInTheDocument();
     });
 
     it('expands when clicked to show content', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'CustomTool',
-        toolInput: { key: 'value' },
-        status: 'completed',
-        result: 'Test result',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'CustomTool',
+            toolInput: { key: 'value' },
+            status: 'completed',
+            result: 'Test result',
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       expect(screen.getByText('Result:')).toBeInTheDocument();
       expect(screen.getByText('Test result')).toBeInTheDocument();
     });
 
     it('collapses when clicked again', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'CustomTool',
-        status: 'completed',
-        result: 'Test result',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'CustomTool',
+            status: 'completed',
+            result: 'Test result',
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       expect(screen.getByText('Result:')).toBeInTheDocument();
       fireEvent.click(screen.getByRole('button'));
@@ -271,32 +295,44 @@ describe('ToolCallItem', () => {
     });
 
     it('shows Input label for generic tools when expanded', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'CustomTool',
-        toolInput: { file_path: '/test.ts', encoding: 'utf-8' },
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'CustomTool',
+            toolInput: { file_path: '/test.ts', encoding: 'utf-8' },
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       expect(screen.getByText('Input:')).toBeInTheDocument();
       expect(screen.getAllByText(/"file_path":/).length).toBeGreaterThanOrEqual(1);
     });
 
     it('shows Error label when isError is true', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'CustomTool',
-        status: 'completed',
-        isError: true,
-        result: 'Command failed',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'CustomTool',
+            status: 'completed',
+            isError: true,
+            result: 'Command failed',
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       expect(screen.getByText('Error:')).toBeInTheDocument();
     });
 
     it('does not show result when still running', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'CustomTool',
-        status: 'running',
-        result: undefined,
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'CustomTool',
+            status: 'running',
+            result: undefined,
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       expect(screen.queryByText('Result:')).not.toBeInTheDocument();
     });
@@ -306,185 +342,277 @@ describe('ToolCallItem', () => {
 
   describe('formatToolInput summary display', () => {
     it('formats Read tool with file path', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'Read',
-        toolInput: { file_path: '/project/src/index.ts' },
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Read',
+            toolInput: { file_path: '/project/src/index.ts' },
+          })}
+        />
+      );
       expect(screen.getByText('/project/src/index.ts')).toBeInTheDocument();
     });
 
     it('formats ReadSymbol tool with file path and symbol name', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'ReadSymbol',
-        toolInput: { file_path: '/project/src/client.ts', symbol: 'Client.connect' },
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'ReadSymbol',
+            toolInput: { file_path: '/project/src/client.ts', symbol: 'Client.connect' },
+          })}
+        />
+      );
       expect(screen.getByText('/project/src/client.ts#Client.connect')).toBeInTheDocument();
     });
 
     it('formats Write tool with file path', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'Write',
-        toolInput: { file_path: '/project/new-file.ts', content: 'hello' },
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Write',
+            toolInput: { file_path: '/project/new-file.ts', content: 'hello' },
+          })}
+        />
+      );
       expect(screen.getByText('/project/new-file.ts')).toBeInTheDocument();
     });
 
     it('formats Edit tool with file path', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'Edit',
-        toolInput: { file_path: '/project/file.ts', old_string: 'old', new_string: 'new' },
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Edit',
+            toolInput: { file_path: '/project/file.ts', old_string: 'old', new_string: 'new' },
+          })}
+        />
+      );
       expect(screen.getByText('/project/file.ts')).toBeInTheDocument();
     });
 
     it('formats MultiEdit tool with file path and edit count', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'MultiEdit',
-        toolInput: {
-          file_path: '/project/file.ts',
-          edits: [
-            { old_string: 'old a', new_string: 'new a' },
-            { old_string: 'old b', new_string: 'new b' },
-          ],
-        },
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'MultiEdit',
+            toolInput: {
+              file_path: '/project/file.ts',
+              edits: [
+                { old_string: 'old a', new_string: 'new a' },
+                { old_string: 'old b', new_string: 'new b' },
+              ],
+            },
+          })}
+        />
+      );
       expect(screen.getByText('/project/file.ts | 2 edits')).toBeInTheDocument();
     });
 
     it('formats EditSymbol tool with file path and symbol name', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'EditSymbol',
-        toolInput: { file_path: '/project/file.ts', symbol: 'Client.connect', new_body: 'connect() {}' },
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'EditSymbol',
+            toolInput: {
+              file_path: '/project/file.ts',
+              symbol: 'Client.connect',
+              new_body: 'connect() {}',
+            },
+          })}
+        />
+      );
       expect(screen.getByText('/project/file.ts#Client.connect')).toBeInTheDocument();
     });
 
     it('formats Bash tool with command', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'Bash',
-        toolInput: { command: 'npm test' },
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Bash',
+            toolInput: { command: 'npm test' },
+          })}
+        />
+      );
       expect(screen.getByText('npm test')).toBeInTheDocument();
     });
 
     it('formats Grep tool with pattern and path', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'Grep',
-        toolInput: { pattern: 'TODO', path: '/project/src' },
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Grep',
+            toolInput: { pattern: 'TODO', path: '/project/src' },
+          })}
+        />
+      );
       expect(screen.getByText(/TODO.*in \/project\/src/)).toBeInTheDocument();
     });
 
     it('formats Glob tool with pattern', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'Glob',
-        toolInput: { pattern: '**/*.ts' },
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Glob',
+            toolInput: { pattern: '**/*.ts' },
+          })}
+        />
+      );
       expect(screen.getByText(/\*\*\/\*\.ts/)).toBeInTheDocument();
     });
 
     it('formats WebFetch with URL', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'WebFetch',
-        toolInput: { url: 'https://example.com/api' },
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'WebFetch',
+            toolInput: { url: 'https://example.com/api' },
+          })}
+        />
+      );
       expect(screen.getByText('https://example.com/api')).toBeInTheDocument();
     });
 
     it('formats WebSearch with query', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'WebSearch',
-        toolInput: { query: 'vitest testing guide' },
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'WebSearch',
+            toolInput: { query: 'vitest testing guide' },
+          })}
+        />
+      );
       expect(screen.getByText('vitest testing guide')).toBeInTheDocument();
     });
 
     it('formats Task tool with description', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'Task',
-        toolInput: { description: 'Search for files' },
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Task',
+            toolInput: { description: 'Search for files' },
+          })}
+        />
+      );
       expect(screen.getByText('Search for files')).toBeInTheDocument();
     });
 
     it('formats AskUserQuestion with question count', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'AskUserQuestion',
-        toolInput: { questions: [{ question: 'What?' }] },
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'AskUserQuestion',
+            toolInput: { questions: [{ question: 'What?' }] },
+          })}
+        />
+      );
       expect(screen.getByText('1 question')).toBeInTheDocument();
     });
 
     it('formats AskUserQuestion plural', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'AskUserQuestion',
-        toolInput: { questions: [{ question: 'A?' }, { question: 'B?' }] },
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'AskUserQuestion',
+            toolInput: { questions: [{ question: 'A?' }, { question: 'B?' }] },
+          })}
+        />
+      );
       expect(screen.getByText('2 questions')).toBeInTheDocument();
     });
 
     it('formats TodoWrite tool', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'TodoWrite',
-        toolInput: { todos: [{ content: 'Task 1', status: 'pending' }] },
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'TodoWrite',
+            toolInput: { todos: [{ content: 'Task 1', status: 'pending' }] },
+          })}
+        />
+      );
       expect(screen.getByText('Update task list')).toBeInTheDocument();
     });
 
     it('formats plain-name update_todo_list tool', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'update_todo_list',
-        toolInput: { todos: [{ content: 'Task 1', status: 'pending' }] },
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'update_todo_list',
+            toolInput: { todos: [{ content: 'Task 1', status: 'pending' }] },
+          })}
+        />
+      );
       expect(screen.getByText('Update task list')).toBeInTheDocument();
     });
 
     it('formats Cursor updateTodos tool', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'updateTodos',
-        toolInput: { todos: [{ content: 'Task 1', status: 'pending' }] },
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'updateTodos',
+            toolInput: { todos: [{ content: 'Task 1', status: 'pending' }] },
+          })}
+        />
+      );
       expect(screen.getByText('Update task list')).toBeInTheDocument();
     });
 
     it('formats plain-name ask_user_form tool', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'ask_user_form',
-        toolInput: { title: 'Need input' },
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'ask_user_form',
+            toolInput: { title: 'Need input' },
+          })}
+        />
+      );
       expect(screen.getByText('Need input')).toBeInTheDocument();
     });
 
     it('formats EnterPlanMode tool', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'EnterPlanMode',
-        toolInput: {},
-        semantic: 'plan_enter',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'EnterPlanMode',
+            toolInput: {},
+            semantic: 'plan_enter',
+          })}
+        />
+      );
       expect(screen.getByText('Entering plan mode')).toBeInTheDocument();
     });
 
     it('falls back to JSON stringify for unknown tools', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'UnknownTool',
-        toolInput: { foo: 'bar' },
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'UnknownTool',
+            toolInput: { foo: 'bar' },
+          })}
+        />
+      );
       expect(screen.getByText(/"foo"/)).toBeInTheDocument();
     });
 
     it('handles null input', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'Read',
-        toolInput: null,
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Read',
+            toolInput: null,
+          })}
+        />
+      );
       expect(screen.getByTestId('tool-name').textContent).toBe('Read');
     });
 
     it('handles stringified JSON input (normalizeToolInput)', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'Bash',
-        toolInput: '{"command":"ls -la"}',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Bash',
+            toolInput: '{"command":"ls -la"}',
+          })}
+        />
+      );
       expect(screen.getByText('ls -la')).toBeInTheDocument();
     });
   });
@@ -493,46 +621,58 @@ describe('ToolCallItem', () => {
 
   describe('tool-specific expanded content', () => {
     it('shows DiffViewer for Edit tool when expanded', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'Edit',
-        toolInput: { file_path: '/file.ts', old_string: 'const x = 1;', new_string: 'const x = 2;' },
-        status: 'completed',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Edit',
+            toolInput: {
+              file_path: '/file.ts',
+              old_string: 'const x = 1;',
+              new_string: 'const x = 2;',
+            },
+            status: 'completed',
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       expect(screen.getByTestId('diff-viewer')).toBeInTheDocument();
     });
 
     it('shows Edit error result alongside diff', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'Edit',
-        toolInput: { file_path: '/file.ts', old_string: 'old', new_string: 'new' },
-        status: 'completed',
-        isError: true,
-        result: 'old_string not found',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Edit',
+            toolInput: { file_path: '/file.ts', old_string: 'old', new_string: 'new' },
+            status: 'completed',
+            isError: true,
+            result: 'old_string not found',
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       expect(screen.getByTestId('diff-viewer')).toBeInTheDocument();
       expect(screen.getByTestId('tool-result').textContent).toContain('old_string not found');
     });
 
     it('shows unified diff from file change effect for Cursor Edit tool', () => {
-      const diff = [
-        '--- a/src/app.ts',
-        '+++ b/src/app.ts',
-        '@@ -1 +1 @@',
-        '-old',
-        '+new',
-      ].join('\n');
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'Edit',
-        toolInput: { path: '/repo/src/app.ts' },
-        status: 'completed',
-        result: 'Provider change summary',
-        effect: {
-          kind: 'file_change',
-          files: [{ path: '/repo/src/app.ts', changeKind: 'modify', summary: diff }],
-        },
-      })} />);
+      const diff = ['--- a/src/app.ts', '+++ b/src/app.ts', '@@ -1 +1 @@', '-old', '+new'].join(
+        '\n'
+      );
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Edit',
+            toolInput: { path: '/repo/src/app.ts' },
+            status: 'completed',
+            result: 'Provider change summary',
+            effect: {
+              kind: 'file_change',
+              files: [{ path: '/repo/src/app.ts', changeKind: 'modify', summary: diff }],
+            },
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       const unifiedDiff = screen.getByTestId('unified-diff-viewer');
       expect(unifiedDiff).toBeInTheDocument();
@@ -542,19 +682,21 @@ describe('ToolCallItem', () => {
     });
 
     it('shows Edit result diff before falling back to input diff', () => {
-      const diff = [
-        '--- file.ts',
-        '+++ file.ts',
-        '@@ -1,1 +1,1 @@',
-        '-old',
-        '+new',
-      ].join('\n');
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'Edit',
-        toolInput: { file_path: 'file.ts', old_string: 'ignored old', new_string: 'ignored new' },
-        status: 'completed',
-        result: { details: { ok: true, path: 'file.ts', diff } },
-      })} />);
+      const diff = ['--- file.ts', '+++ file.ts', '@@ -1,1 +1,1 @@', '-old', '+new'].join('\n');
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Edit',
+            toolInput: {
+              file_path: 'file.ts',
+              old_string: 'ignored old',
+              new_string: 'ignored new',
+            },
+            status: 'completed',
+            result: { details: { ok: true, path: 'file.ts', diff } },
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       expect(screen.queryByTestId('diff-viewer')).not.toBeInTheDocument();
       const unifiedDiff = screen.getByTestId('unified-diff-viewer');
@@ -563,64 +705,80 @@ describe('ToolCallItem', () => {
     });
 
     it('shows EditSymbol result diff and symbol metadata', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'EditSymbol',
-        toolInput: { file_path: 'client.ts', symbol: 'Client.connect', new_body: 'connect() { return true; }' },
-        status: 'completed',
-        result: {
-          details: {
-            ok: true,
-            path: 'client.ts',
-            symbol: 'Client.connect',
-            symbolKind: 'method',
-            diff: '--- client.ts\n+++ client.ts\n@@\n-old\n+new',
-          },
-        },
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'EditSymbol',
+            toolInput: {
+              file_path: 'client.ts',
+              symbol: 'Client.connect',
+              new_body: 'connect() { return true; }',
+            },
+            status: 'completed',
+            result: {
+              details: {
+                ok: true,
+                path: 'client.ts',
+                symbol: 'Client.connect',
+                symbolKind: 'method',
+                diff: '--- client.ts\n+++ client.ts\n@@\n-old\n+new',
+              },
+            },
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       expect(screen.getByTestId('unified-diff-viewer')).toBeInTheDocument();
       expect(screen.getByText('method Client.connect')).toBeInTheDocument();
     });
 
     it('shows MultiEdit result diff when available', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'MultiEdit',
-        toolInput: {
-          file_path: 'file.ts',
-          edits: [
-            { old_string: 'old a', new_string: 'new a' },
-            { old_string: 'old b', new_string: 'new b' },
-          ],
-        },
-        status: 'completed',
-        result: {
-          details: {
-            ok: true,
-            path: 'file.ts',
-            editCount: 2,
-            diff: '--- file.ts\n+++ file.ts\n@@\n-old\n+new',
-          },
-        },
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'MultiEdit',
+            toolInput: {
+              file_path: 'file.ts',
+              edits: [
+                { old_string: 'old a', new_string: 'new a' },
+                { old_string: 'old b', new_string: 'new b' },
+              ],
+            },
+            status: 'completed',
+            result: {
+              details: {
+                ok: true,
+                path: 'file.ts',
+                editCount: 2,
+                diff: '--- file.ts\n+++ file.ts\n@@\n-old\n+new',
+              },
+            },
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       expect(screen.getByTestId('unified-diff-viewer')).toBeInTheDocument();
     });
 
     it('shows multi-file patch results from Edit details', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'Edit',
-        toolInput: { patch: '*** Begin Patch\n*** End Patch' },
-        status: 'completed',
-        result: {
-          details: {
-            ok: true,
-            perFileResults: [
-              { path: 'a.ts', diff: '--- a.ts\n+++ a.ts\n@@\n-old\n+new' },
-              { path: 'b.ts', diff: '--- b.ts\n+++ b.ts\n@@\n-x\n+y' },
-            ],
-          },
-        },
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Edit',
+            toolInput: { patch: '*** Begin Patch\n*** End Patch' },
+            status: 'completed',
+            result: {
+              details: {
+                ok: true,
+                perFileResults: [
+                  { path: 'a.ts', diff: '--- a.ts\n+++ a.ts\n@@\n-old\n+new' },
+                  { path: 'b.ts', diff: '--- b.ts\n+++ b.ts\n@@\n-x\n+y' },
+                ],
+              },
+            },
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       expect(screen.getAllByTestId('unified-diff-viewer')).toHaveLength(2);
       expect(screen.getAllByText('a.ts').length).toBeGreaterThan(0);
@@ -628,24 +786,41 @@ describe('ToolCallItem', () => {
     });
 
     it('shows diagnostics backup and preview metadata for Edit results', async () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'Edit',
-        toolInput: { file_path: 'file.ts', old_string: 'old', new_string: 'new', preview_only: true },
-        status: 'completed',
-        result: {
-          details: {
-            ok: true,
-            preview: true,
-            path: 'file.ts',
-            diff: '--- file.ts\n+++ file.ts\n@@\n-old\n+new',
-            backup: { originalPath: 'file.ts', path: '/tmp/backup.bak' },
-            lifecycle: {
-              diagnostics: [{ path: 'file.ts', line: 3, severity: 'warning', message: 'unused variable', source: 'ts' }],
-              deferredDiagnostics: { id: 'diag-1', status: 'pending' },
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Edit',
+            toolInput: {
+              file_path: 'file.ts',
+              old_string: 'old',
+              new_string: 'new',
+              preview_only: true,
             },
-          },
-        },
-      })} />);
+            status: 'completed',
+            result: {
+              details: {
+                ok: true,
+                preview: true,
+                path: 'file.ts',
+                diff: '--- file.ts\n+++ file.ts\n@@\n-old\n+new',
+                backup: { originalPath: 'file.ts', path: '/tmp/backup.bak' },
+                lifecycle: {
+                  diagnostics: [
+                    {
+                      path: 'file.ts',
+                      line: 3,
+                      severity: 'warning',
+                      message: 'unused variable',
+                      source: 'ts',
+                    },
+                  ],
+                  deferredDiagnostics: { id: 'diag-1', status: 'pending' },
+                },
+              },
+            },
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       expect(screen.getByText('Preview only')).toBeInTheDocument();
       expect(screen.getByText('Backup created')).toBeInTheDocument();
@@ -657,23 +832,36 @@ describe('ToolCallItem', () => {
     it('refreshes deferred diagnostics and renders completed results', async () => {
       mockGetDeferredDiagnostics.mockResolvedValueOnce({
         status: 'completed',
-        diagnostics: [{ path: 'file.ts', line: 4, column: 2, severity: 'error', message: 'late type error', source: 'tsc' }],
-      });
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'Edit',
-        toolInput: { file_path: 'file.ts', old_string: 'old', new_string: 'new' },
-        status: 'completed',
-        result: {
-          details: {
-            ok: true,
+        diagnostics: [
+          {
             path: 'file.ts',
-            diff: '--- file.ts\n+++ file.ts\n@@\n-old\n+new',
-            lifecycle: {
-              deferredDiagnostics: { id: 'diag-1', status: 'pending' },
-            },
+            line: 4,
+            column: 2,
+            severity: 'error',
+            message: 'late type error',
+            source: 'tsc',
           },
-        },
-      })} />);
+        ],
+      });
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Edit',
+            toolInput: { file_path: 'file.ts', old_string: 'old', new_string: 'new' },
+            status: 'completed',
+            result: {
+              details: {
+                ok: true,
+                path: 'file.ts',
+                diff: '--- file.ts\n+++ file.ts\n@@\n-old\n+new',
+                lifecycle: {
+                  deferredDiagnostics: { id: 'diag-1', status: 'pending' },
+                },
+              },
+            },
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
 
       await waitFor(() => {
@@ -684,19 +872,23 @@ describe('ToolCallItem', () => {
     });
 
     it('restores a file backup from Edit results', async () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'Edit',
-        toolInput: { file_path: 'file.ts', old_string: 'old', new_string: 'new' },
-        status: 'completed',
-        result: {
-          details: {
-            ok: true,
-            path: 'file.ts',
-            diff: '--- file.ts\n+++ file.ts\n@@\n-old\n+new',
-            backup: { id: 'backup-1', originalPath: 'file.ts', path: '/tmp/backup.bak' },
-          },
-        },
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Edit',
+            toolInput: { file_path: 'file.ts', old_string: 'old', new_string: 'new' },
+            status: 'completed',
+            result: {
+              details: {
+                ok: true,
+                path: 'file.ts',
+                diff: '--- file.ts\n+++ file.ts\n@@\n-old\n+new',
+                backup: { id: 'backup-1', originalPath: 'file.ts', path: '/tmp/backup.bak' },
+              },
+            },
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       fireEvent.click(screen.getByRole('button', { name: /Restore backup/ }));
 
@@ -707,59 +899,85 @@ describe('ToolCallItem', () => {
     });
 
     it('shows CodeViewer for Write tool when expanded', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'Write',
-        toolInput: { file_path: '/file.ts', content: 'console.log("hello")' },
-        status: 'completed',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Write',
+            toolInput: { file_path: '/file.ts', content: 'console.log("hello")' },
+            status: 'completed',
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       expect(screen.getByTestId('code-viewer')).toBeInTheDocument();
     });
 
     it('shows Write result diff when available', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'Write',
-        toolInput: { file_path: 'file.ts', content: 'new' },
-        status: 'completed',
-        result: { details: { ok: true, path: 'file.ts', diff: '--- file.ts\n+++ file.ts\n@@\n-old\n+new' } },
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Write',
+            toolInput: { file_path: 'file.ts', content: 'new' },
+            status: 'completed',
+            result: {
+              details: {
+                ok: true,
+                path: 'file.ts',
+                diff: '--- file.ts\n+++ file.ts\n@@\n-old\n+new',
+              },
+            },
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       expect(screen.queryByTestId('code-viewer')).not.toBeInTheDocument();
       expect(screen.getByTestId('unified-diff-viewer')).toBeInTheDocument();
     });
 
     it('shows CodeViewer for Read tool result when expanded', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'Read',
-        toolInput: { file_path: '/file.ts' },
-        status: 'completed',
-        result: 'const x = 1;',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Read',
+            toolInput: { file_path: '/file.ts' },
+            status: 'completed',
+            result: 'const x = 1;',
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       expect(screen.getByTestId('code-viewer')).toBeInTheDocument();
     });
 
     it('shows CodeViewer for ReadSymbol result text when expanded', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'ReadSymbol',
-        toolInput: { file_path: '/file.ts', symbol: 'run' },
-        status: 'completed',
-        result: {
-          content: [{ type: 'text', text: 'function run() { return 1; }' }],
-          details: { ok: true, path: '/file.ts', symbol: 'run' },
-        },
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'ReadSymbol',
+            toolInput: { file_path: '/file.ts', symbol: 'run' },
+            status: 'completed',
+            result: {
+              content: [{ type: 'text', text: 'function run() { return 1; }' }],
+              details: { ok: true, path: '/file.ts', symbol: 'run' },
+            },
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       expect(screen.getByTestId('code-viewer')).toHaveTextContent('function run() { return 1; }');
     });
 
     it('shows terminal-style command for Bash tool', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'Bash',
-        toolInput: { command: 'npm test' },
-        status: 'completed',
-        result: 'PASS all tests',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Bash',
+            toolInput: { command: 'npm test' },
+            status: 'completed',
+            result: 'PASS all tests',
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       // Command shown with $ prefix
       const container = screen.getByTestId('tool-use');
@@ -773,12 +991,16 @@ describe('ToolCallItem', () => {
       mockProjectState.sessions = [{ id: 's1', projectId: 'proj-1' }];
       terminalIdsByBackend.set('backend-1:proj-1', 'term-backend-1-proj-1');
 
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'Bash',
-        toolInput: { command: 'npm test' },
-        status: 'completed',
-        result: 'PASS all tests',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Bash',
+            toolInput: { command: 'npm test' },
+            status: 'completed',
+            result: 'PASS all tests',
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
 
       (globalThis as any).__toolCallTestActiveBackend = 'backend-2';
@@ -798,13 +1020,17 @@ describe('ToolCallItem', () => {
     });
 
     it('shows Bash error result with error styling', () => {
-      const { container } = render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'Bash',
-        toolInput: { command: 'bad-cmd' },
-        status: 'completed',
-        isError: true,
-        result: 'command not found',
-      })} />);
+      const { container } = render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Bash',
+            toolInput: { command: 'bad-cmd' },
+            status: 'completed',
+            isError: true,
+            result: 'command not found',
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       const resultEl = screen.getByTestId('tool-result');
       expect(resultEl.className).toContain('bg-red-950');
@@ -812,12 +1038,16 @@ describe('ToolCallItem', () => {
 
     it('shows terminal output expand/collapse for long Bash results', () => {
       const longResult = Array.from({ length: 20 }, (_, i) => `line ${i}`).join('\n');
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'Bash',
-        toolInput: { command: 'cat file' },
-        status: 'completed',
-        result: longResult,
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Bash',
+            toolInput: { command: 'cat file' },
+            status: 'completed',
+            result: longResult,
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       // Should show "Show all X lines" button
       expect(screen.getByText(/Show all 20 lines/)).toBeInTheDocument();
@@ -825,33 +1055,43 @@ describe('ToolCallItem', () => {
 
     it('expands terminal output when clicking "Show all" button', () => {
       const longResult = Array.from({ length: 20 }, (_, i) => `line ${i}`).join('\n');
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'Bash',
-        toolInput: { command: 'cat file' },
-        status: 'completed',
-        result: longResult,
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Bash',
+            toolInput: { command: 'cat file' },
+            status: 'completed',
+            result: longResult,
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button')); // Expand tool call
       fireEvent.click(screen.getByText(/Show all 20 lines/)); // Expand terminal output
       expect(screen.getByText('Collapse')).toBeInTheDocument();
     });
 
     it('shows AskUserQuestion with formatted questions when expanded', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'AskUserQuestion',
-        toolInput: {
-          questions: [{
-            question: 'Which framework?',
-            header: 'Framework',
-            options: [
-              { label: 'React', description: 'A JS library' },
-              { label: 'Vue', description: 'Progressive framework' },
-            ],
-          }],
-        },
-        status: 'completed',
-        result: 'React',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'AskUserQuestion',
+            toolInput: {
+              questions: [
+                {
+                  question: 'Which framework?',
+                  header: 'Framework',
+                  options: [
+                    { label: 'React', description: 'A JS library' },
+                    { label: 'Vue', description: 'Progressive framework' },
+                  ],
+                },
+              ],
+            },
+            status: 'completed',
+            result: 'React',
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       expect(screen.getByText('Framework')).toBeInTheDocument();
       expect(screen.getByText('Which framework?')).toBeInTheDocument();
@@ -860,30 +1100,38 @@ describe('ToolCallItem', () => {
     });
 
     it('shows user answer for AskUserQuestion', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'AskUserQuestion',
-        toolInput: { questions: [{ question: 'Pick', header: 'Q', options: [] }] },
-        status: 'completed',
-        isError: true,
-        result: 'User chose option A',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'AskUserQuestion',
+            toolInput: { questions: [{ question: 'Pick', header: 'Q', options: [] }] },
+            status: 'completed',
+            isError: true,
+            result: 'User chose option A',
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       expect(screen.getByText("User's Answer:")).toBeInTheDocument();
       expect(screen.getByText('User chose option A')).toBeInTheDocument();
     });
 
     it('shows TodoWrite with task list when expanded', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'TodoWrite',
-        toolInput: {
-          todos: [
-            { content: 'Fix bug', status: 'completed' },
-            { content: 'Write tests', status: 'in_progress' },
-            { content: 'Deploy', status: 'pending' },
-          ],
-        },
-        status: 'completed',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'TodoWrite',
+            toolInput: {
+              todos: [
+                { content: 'Fix bug', status: 'completed' },
+                { content: 'Write tests', status: 'in_progress' },
+                { content: 'Deploy', status: 'pending' },
+              ],
+            },
+            status: 'completed',
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       expect(screen.getByText('Fix bug')).toBeInTheDocument();
       expect(screen.getByText('Write tests')).toBeInTheDocument();
@@ -891,54 +1139,70 @@ describe('ToolCallItem', () => {
     });
 
     it('shows plain-name update_todo_list with task list when expanded', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'update_todo_list',
-        toolInput: {
-          todos: [
-            { content: 'Fix bug', status: 'completed' },
-            { content: 'Write tests', status: 'in_progress' },
-          ],
-        },
-        status: 'completed',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'update_todo_list',
+            toolInput: {
+              todos: [
+                { content: 'Fix bug', status: 'completed' },
+                { content: 'Write tests', status: 'in_progress' },
+              ],
+            },
+            status: 'completed',
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       expect(screen.getByText('Fix bug')).toBeInTheDocument();
       expect(screen.getByText('Write tests')).toBeInTheDocument();
     });
 
     it('shows Cursor updateTodos with task list when expanded', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'updateTodos',
-        toolInput: {
-          todos: [
-            { content: 'Fix bug', status: 'completed' },
-            { content: 'Write tests', status: 'in_progress' },
-          ],
-        },
-        status: 'completed',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'updateTodos',
+            toolInput: {
+              todos: [
+                { content: 'Fix bug', status: 'completed' },
+                { content: 'Write tests', status: 'in_progress' },
+              ],
+            },
+            status: 'completed',
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       expect(screen.getByText('Fix bug')).toBeInTheDocument();
       expect(screen.getByText('Write tests')).toBeInTheDocument();
     });
 
     it('shows completed todo with strikethrough', () => {
-      const { container } = render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'TodoWrite',
-        toolInput: { todos: [{ content: 'Done task', status: 'completed' }] },
-        status: 'completed',
-      })} />);
+      const { container } = render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'TodoWrite',
+            toolInput: { todos: [{ content: 'Done task', status: 'completed' }] },
+            status: 'completed',
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       const doneEl = screen.getByText('Done task');
       expect(doneEl.className).toContain('line-through');
     });
 
     it('does not crash when TodoWrite todos is not an array', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'TodoWrite',
-        toolInput: { todos: { content: 'Single task', status: 'pending' } },
-        status: 'completed',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'TodoWrite',
+            toolInput: { todos: { content: 'Single task', status: 'pending' } },
+            status: 'completed',
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       expect(screen.getByText('Single task')).toBeInTheDocument();
     });
@@ -953,11 +1217,15 @@ describe('ToolCallItem', () => {
         todos: [{ content: 'Use normalized todo list', status: 'pending' }],
       };
 
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'TodoWrite',
-        toolInput: { unexpected: 'shape' },
-        status: 'completed',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'TodoWrite',
+            toolInput: { unexpected: 'shape' },
+            status: 'completed',
+          })}
+        />
+      );
 
       expect(screen.getByText('Task List')).toBeInTheDocument();
       expect(screen.getByText('Use normalized todo list')).toBeInTheDocument();
@@ -973,12 +1241,16 @@ describe('ToolCallItem', () => {
         todos: [{ content: 'Render MCP todo list', status: 'in_progress' }],
       };
 
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'mcp:claudia-plugins:update_todo_list',
-        toolInput: { todos: [{ content: 'Stale raw todo', status: 'pending' }] },
-        result: JSON.stringify({ success: true, interactionId: 'interaction-1' }),
-        status: 'completed',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'mcp:claudia-plugins:update_todo_list',
+            toolInput: { todos: [{ content: 'Stale raw todo', status: 'pending' }] },
+            result: JSON.stringify({ success: true, interactionId: 'interaction-1' }),
+            status: 'completed',
+          })}
+        />
+      );
 
       expect(screen.getByText('Task List')).toBeInTheDocument();
       expect(screen.getByText('Render MCP todo list')).toBeInTheDocument();
@@ -995,11 +1267,15 @@ describe('ToolCallItem', () => {
         todos: [{ content: 'Render Cursor todo list', status: 'in_progress' }],
       };
 
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'updateTodos',
-        toolInput: { todos: [{ content: 'Stale raw todo', status: 'pending' }] },
-        status: 'completed',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'updateTodos',
+            toolInput: { todos: [{ content: 'Stale raw todo', status: 'pending' }] },
+            status: 'completed',
+          })}
+        />
+      );
 
       expect(screen.getByText('Task List')).toBeInTheDocument();
       expect(screen.getByText('Render Cursor todo list')).toBeInTheDocument();
@@ -1017,12 +1293,16 @@ describe('ToolCallItem', () => {
       };
       mockSelectionState.selectedSessionId = 's1';
 
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'ExitPlanMode',
-        toolInput: { plan: 'Raw plan' },
-        status: 'running',
-        semantic: 'plan_proposal',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'ExitPlanMode',
+            toolInput: { plan: 'Raw plan' },
+            status: 'running',
+            semantic: 'plan_proposal',
+          })}
+        />
+      );
 
       expect(screen.getByText('Plan Review')).toBeInTheDocument();
       expect(screen.getByText('Approve Plan')).toBeInTheDocument();
@@ -1040,13 +1320,17 @@ describe('ToolCallItem', () => {
       };
       mockSelectionState.selectedSessionId = 's1';
 
-      render(<ToolCallItem toolCall={createToolCall({
-        id: 'cursor-tool-1',
-        toolName: 'createPlan',
-        toolInput: { plan: 'Raw Cursor plan' },
-        status: 'completed',
-        semantic: 'plan_proposal',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            id: 'cursor-tool-1',
+            toolName: 'createPlan',
+            toolInput: { plan: 'Raw Cursor plan' },
+            status: 'completed',
+            semantic: 'plan_proposal',
+          })}
+        />
+      );
 
       expect(screen.getByText('Plan Review')).toBeInTheDocument();
       expect(screen.getByText('Approve Plan')).toBeInTheDocument();
@@ -1065,13 +1349,17 @@ describe('ToolCallItem', () => {
       };
       mockSelectionState.selectedSessionId = 's1';
 
-      render(<ToolCallItem toolCall={createToolCall({
-        id: 'cursor-tool-1',
-        toolName: 'createPlan',
-        toolInput: { plan: 'Raw Cursor plan' },
-        status: 'completed',
-        semantic: 'plan_proposal',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            id: 'cursor-tool-1',
+            toolName: 'createPlan',
+            toolInput: { plan: 'Raw Cursor plan' },
+            status: 'completed',
+            semantic: 'plan_proposal',
+          })}
+        />
+      );
 
       expect(screen.queryByText('Approve Plan')).not.toBeInTheDocument();
       expect(screen.queryByText('Other session plan')).not.toBeInTheDocument();
@@ -1089,27 +1377,35 @@ describe('ToolCallItem', () => {
         responseMode: 'prompt_answer',
         submitLabel: 'Submit',
         cancelLabel: 'Skip',
-        fields: [{
-          id: 'question_0',
-          label: '是否立刻开工？',
-          type: 'select',
-          options: [{ value: 'yes', label: 'Yes' }],
-          allowCustomValue: true,
-        }],
+        fields: [
+          {
+            id: 'question_0',
+            label: '是否立刻开工？',
+            type: 'select',
+            options: [{ value: 'yes', label: 'Yes' }],
+            allowCustomValue: true,
+          },
+        ],
       };
       mockSelectionState.selectedSessionId = 's1';
 
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'AskUserQuestion',
-        toolInput: {
-          questions: [{
-            header: '推进 Phase 2',
-            question: '只读旧卡片',
-            options: [{ label: 'A' }],
-          }],
-        },
-        status: 'running',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'AskUserQuestion',
+            toolInput: {
+              questions: [
+                {
+                  header: '推进 Phase 2',
+                  question: '只读旧卡片',
+                  options: [{ label: 'A' }],
+                },
+              ],
+            },
+            status: 'running',
+          })}
+        />
+      );
 
       expect(screen.getByText('Question')).toBeInTheDocument();
       expect(screen.getByText('是否立刻开工？')).toBeInTheDocument();
@@ -1128,27 +1424,35 @@ describe('ToolCallItem', () => {
         responseMode: 'prompt_answer',
         submitLabel: 'Submit',
         cancelLabel: 'Skip',
-        fields: [{
-          id: 'question_0',
-          label: '是否立刻开工？',
-          type: 'select',
-          options: [{ value: 'yes', label: 'Yes' }],
-          allowCustomValue: true,
-        }],
+        fields: [
+          {
+            id: 'question_0',
+            label: '是否立刻开工？',
+            type: 'select',
+            options: [{ value: 'yes', label: 'Yes' }],
+            allowCustomValue: true,
+          },
+        ],
       };
       mockSelectionState.selectedSessionId = 's1';
 
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'AskUserQuestion',
-        toolInput: {
-          questions: [{
-            header: '推进 Phase 2',
-            question: '只读旧卡片',
-            options: [{ label: 'A' }],
-          }],
-        },
-        status: 'running',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'AskUserQuestion',
+            toolInput: {
+              questions: [
+                {
+                  header: '推进 Phase 2',
+                  question: '只读旧卡片',
+                  options: [{ label: 'A' }],
+                },
+              ],
+            },
+            status: 'running',
+          })}
+        />
+      );
 
       expect(screen.getByTestId('tool-use')).toBeInTheDocument();
       expect(screen.queryByText('是否立刻开工？')).not.toBeInTheDocument();
@@ -1156,23 +1460,31 @@ describe('ToolCallItem', () => {
 
     it('falls back to a prompt interaction when the request is pending but interaction store is missing', () => {
       mockSelectionState.selectedSessionId = 's1';
-      mockPromptRequestState.pendingRequests = [{
-        requestId: 'tool-1',
-        sessionId: 's1',
-        serverId: 'gw:backend-1',
-      }];
-
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'AskUserQuestion',
-        toolInput: {
-          questions: [{
-            header: '实现细节',
-            question: '移动端是否应该允许直接回复？',
-            options: [{ label: '允许', description: '跨端一致' }],
-          }],
+      mockPromptRequestState.pendingRequests = [
+        {
+          requestId: 'tool-1',
+          sessionId: 's1',
+          serverId: 'gw:backend-1',
         },
-        status: 'completed',
-      })} />);
+      ];
+
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'AskUserQuestion',
+            toolInput: {
+              questions: [
+                {
+                  header: '实现细节',
+                  question: '移动端是否应该允许直接回复？',
+                  options: [{ label: '允许', description: '跨端一致' }],
+                },
+              ],
+            },
+            status: 'completed',
+          })}
+        />
+      );
 
       expect(screen.getByText('Question')).toBeInTheDocument();
       expect(screen.getByText('移动端是否应该允许直接回复？')).toBeInTheDocument();
@@ -1191,12 +1503,16 @@ describe('ToolCallItem', () => {
       };
       mockSelectionState.selectedSessionId = 's1';
 
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'ExitPlanMode',
-        toolInput: { plan: 'Raw plan' },
-        status: 'running',
-        semantic: 'plan_proposal',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'ExitPlanMode',
+            toolInput: { plan: 'Raw plan' },
+            status: 'running',
+            semantic: 'plan_proposal',
+          })}
+        />
+      );
 
       fireEvent.change(
         screen.getByPlaceholderText('Add an optional comment for approval or rejection'),
@@ -1225,43 +1541,59 @@ describe('ToolCallItem', () => {
         todos: [],
       };
 
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'TodoWrite',
-        toolInput: { todos: [{ content: 'Fallback task', status: 'pending' }] },
-        status: 'completed',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'TodoWrite',
+            toolInput: { todos: [{ content: 'Fallback task', status: 'pending' }] },
+            status: 'completed',
+          })}
+        />
+      );
 
       fireEvent.click(screen.getByRole('button'));
       expect(screen.getByText('Fallback task')).toBeInTheDocument();
     });
 
     it('shows Agent activity indicator when running', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'Agent',
-        toolInput: { description: 'Research' },
-        status: 'running',
-        activity: 'Reading file...',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Agent',
+            toolInput: { description: 'Research' },
+            status: 'running',
+            activity: 'Reading file...',
+          })}
+        />
+      );
       expect(screen.getByText('Reading file...')).toBeInTheDocument();
     });
 
     it('does not show Agent activity when not running', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'Agent',
-        toolInput: { description: 'Research' },
-        status: 'completed',
-        activity: 'Reading file...',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Agent',
+            toolInput: { description: 'Research' },
+            status: 'completed',
+            activity: 'Reading file...',
+          })}
+        />
+      );
       expect(screen.queryByText('Reading file...')).not.toBeInTheDocument();
     });
 
     it('does not show activity for non-Agent tools', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'Bash',
-        toolInput: { command: 'ls' },
-        status: 'running',
-        activity: 'Some activity',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'Bash',
+            toolInput: { command: 'ls' },
+            status: 'running',
+            activity: 'Some activity',
+          })}
+        />
+      );
       expect(screen.queryByText('Some activity')).not.toBeInTheDocument();
     });
   });
@@ -1272,73 +1604,100 @@ describe('ToolCallItem', () => {
     // Plan-proposal cards auto-expand on completion so the plan body and the
     // "Execute plan" action are visible without an extra click.
     it('displays plan content when plan is a string', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'ExitPlanMode',
-        toolInput: { plan: '# My Plan\n\nStep 1: Do something' },
-        semantic: 'plan_proposal',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'ExitPlanMode',
+            toolInput: { plan: '# My Plan\n\nStep 1: Do something' },
+            semantic: 'plan_proposal',
+          })}
+        />
+      );
       expect(screen.getAllByText(/My Plan/).length).toBeGreaterThanOrEqual(1);
       expect(screen.getByText(/Step 1/)).toBeInTheDocument();
     });
 
     it('displays plan when plan is an object', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'ExitPlanMode',
-        toolInput: { plan: { steps: ['a', 'b'] } },
-        semantic: 'plan_proposal',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'ExitPlanMode',
+            toolInput: { plan: { steps: ['a', 'b'] } },
+            semantic: 'plan_proposal',
+          })}
+        />
+      );
       expect(screen.getAllByText(/"steps"/).length).toBeGreaterThanOrEqual(1);
     });
 
     it('displays plan_file message when plan_file exists', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'ExitPlanMode',
-        toolInput: { plan_file: '/path/to/plan.md' },
-        semantic: 'plan_proposal',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'ExitPlanMode',
+            toolInput: { plan_file: '/path/to/plan.md' },
+            semantic: 'plan_proposal',
+          })}
+        />
+      );
       expect(screen.getAllByText(/Plan file:/).length).toBeGreaterThanOrEqual(1);
     });
 
     it('displays fallback message when no plan data', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'ExitPlanMode',
-        toolInput: {},
-        semantic: 'plan_proposal',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'ExitPlanMode',
+            toolInput: {},
+            semantic: 'plan_proposal',
+          })}
+        />
+      );
       expect(screen.getAllByText(/Plan ready for review/).length).toBeGreaterThanOrEqual(1);
     });
 
     it('shows result after plan content', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'ExitPlanMode',
-        toolInput: { plan: '# Plan' },
-        status: 'completed',
-        result: 'Plan approved',
-        semantic: 'plan_proposal',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'ExitPlanMode',
+            toolInput: { plan: '# Plan' },
+            status: 'completed',
+            result: 'Plan approved',
+            semantic: 'plan_proposal',
+          })}
+        />
+      );
       expect(screen.getByTestId('tool-result').textContent).toContain('Plan approved');
     });
 
     it('shows plan expand/collapse for long plans', () => {
       const longPlan = Array.from({ length: 30 }, (_, i) => `Step ${i}: Do thing ${i}`).join('\n');
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'ExitPlanMode',
-        toolInput: { plan: longPlan },
-        semantic: 'plan_proposal',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'ExitPlanMode',
+            toolInput: { plan: longPlan },
+            semantic: 'plan_proposal',
+          })}
+        />
+      );
       expect(screen.getByText(/Show full plan/)).toBeInTheDocument();
     });
 
     it('renders plan content for cursor-style createPlan via semantic only', () => {
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'createPlan',
-        toolInput: { plan: '# Cursor Plan\n\nDo X first' },
-        semantic: 'plan_proposal',
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'createPlan',
+            toolInput: { plan: '# Cursor Plan\n\nDo X first' },
+            semantic: 'plan_proposal',
+          })}
+        />
+      );
       expect(screen.getAllByText(/Cursor Plan/).length).toBeGreaterThanOrEqual(1);
       expect(screen.getAllByText(/Do X first/).length).toBeGreaterThanOrEqual(1);
     });
-
   });
 
   // ── formatToolResult ──────────────────────────────────────────────────────
@@ -1346,11 +1705,15 @@ describe('ToolCallItem', () => {
   describe('formatToolResult (no truncation)', () => {
     it('shows full long string results', () => {
       const longResult = 'A'.repeat(600);
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'CustomTool',
-        status: 'completed',
-        result: longResult,
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'CustomTool',
+            status: 'completed',
+            result: longResult,
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       const resultEl = screen.getByTestId('tool-result');
       expect(resultEl.textContent).toContain('A'.repeat(600));
@@ -1358,11 +1721,15 @@ describe('ToolCallItem', () => {
 
     it('shows full long JSON results', () => {
       const longResult = { data: 'A'.repeat(600) };
-      render(<ToolCallItem toolCall={createToolCall({
-        toolName: 'CustomTool',
-        status: 'completed',
-        result: longResult,
-      })} />);
+      render(
+        <ToolCallItem
+          toolCall={createToolCall({
+            toolName: 'CustomTool',
+            status: 'completed',
+            result: longResult,
+          })}
+        />
+      );
       fireEvent.click(screen.getByRole('button'));
       const resultEl = screen.getByTestId('tool-result');
       expect(resultEl.textContent).toContain('A'.repeat(600));
@@ -1452,8 +1819,14 @@ describe('ToolCallList', () => {
       const countRow = screen.getByText('3 tool calls').parentElement!;
       expect(countRow).toHaveTextContent(/3 tool calls\s*2\s*1\s*Click to expand/);
 
-      expect(screen.getByText('范围').parentElement).toHaveClass('bg-secondary', 'text-muted-foreground');
-      expect(screen.getByText('npm').parentElement).toHaveClass('bg-destructive/20', 'text-destructive');
+      expect(screen.getByText('范围').parentElement).toHaveClass(
+        'bg-secondary',
+        'text-muted-foreground'
+      );
+      expect(screen.getByText('npm').parentElement).toHaveClass(
+        'bg-destructive/20',
+        'text-destructive'
+      );
     });
 
     it('expands when collapsed summary is clicked', () => {

@@ -13,8 +13,8 @@ vi.mock('fs', () => ({
 }));
 
 // Mock os module for homedir (preserve all other exports)
-vi.mock('os', async (importOriginal) => {
-  const actual = await importOriginal() as typeof import('os');
+vi.mock('os', async importOriginal => {
+  const actual = (await importOriginal()) as typeof import('os');
   return {
     ...actual,
     homedir: vi.fn(() => '/home/testuser'),
@@ -47,9 +47,7 @@ describe('commands routes', () => {
     it('returns builtin and custom commands', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(false); // No custom commands
 
-      const res = await request(app)
-        .post('/api/commands/list')
-        .send({});
+      const res = await request(app).post('/api/commands/list').send({});
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
@@ -60,7 +58,7 @@ describe('commands routes', () => {
     });
 
     it('scans project commands when projectPath provided', async () => {
-      vi.mocked(fs.existsSync).mockImplementation((path) => {
+      vi.mocked(fs.existsSync).mockImplementation(path => {
         return typeof path === 'string' && path.includes('/my-project/.claude/commands');
       });
       vi.mocked(fs.readdirSync).mockReturnValue([
@@ -75,12 +73,14 @@ describe('commands routes', () => {
       expect(res.status).toBe(200);
       expect(res.body.data.custom.length).toBeGreaterThanOrEqual(1);
       // Verify project command is found
-      const deployCmd = res.body.data.custom.find((cmd: { command: string }) => cmd.command === '/deploy');
+      const deployCmd = res.body.data.custom.find(
+        (cmd: { command: string }) => cmd.command === '/deploy'
+      );
       expect(deployCmd).toBeDefined();
     });
 
     it('scans user commands from ~/.claude/commands', async () => {
-      vi.mocked(fs.existsSync).mockImplementation((path) => {
+      vi.mocked(fs.existsSync).mockImplementation(path => {
         return typeof path === 'string' && path.includes('/home/testuser/.claude/commands');
       });
       vi.mocked(fs.readdirSync).mockReturnValue([
@@ -88,12 +88,12 @@ describe('commands routes', () => {
       ] as unknown as ReturnType<typeof fs.readdirSync>);
       vi.mocked(fs.readFileSync).mockReturnValue('# Global Command\nA global command');
 
-      const res = await request(app)
-        .post('/api/commands/list')
-        .send({});
+      const res = await request(app).post('/api/commands/list').send({});
 
       expect(res.status).toBe(200);
-      const globalCmd = res.body.data.custom.find((cmd: { command: string }) => cmd.command === '/global-cmd');
+      const globalCmd = res.body.data.custom.find(
+        (cmd: { command: string }) => cmd.command === '/global-cmd'
+      );
       expect(globalCmd).toBeDefined();
     });
   });
@@ -112,9 +112,7 @@ describe('commands routes', () => {
       });
 
       it('handles /help command with markdown content', async () => {
-        const res = await request(app)
-          .post('/api/commands/execute')
-          .send({ commandName: '/help' });
+        const res = await request(app).post('/api/commands/execute').send({ commandName: '/help' });
 
         expect(res.status).toBe(200);
         expect(res.body.data.type).toBe('builtin');
@@ -128,7 +126,7 @@ describe('commands routes', () => {
           .post('/api/commands/execute')
           .send({
             commandName: '/status',
-            context: { model: 'claude-3', provider: 'claude' }
+            context: { model: 'claude-3', provider: 'claude' },
           });
 
         expect(res.status).toBe(200);
@@ -144,7 +142,7 @@ describe('commands routes', () => {
           .post('/api/commands/execute')
           .send({
             commandName: '/model',
-            context: { model: 'claude-3-opus', provider: 'claude' }
+            context: { model: 'claude-3-opus', provider: 'claude' },
           });
 
         expect(res.status).toBe(200);
@@ -158,7 +156,7 @@ describe('commands routes', () => {
           .post('/api/commands/execute')
           .send({
             commandName: '/cost',
-            context: { tokenUsage: { used: 5000, total: 100000 } }
+            context: { tokenUsage: { used: 5000, total: 100000 } },
           });
 
         expect(res.status).toBe(200);
@@ -176,7 +174,7 @@ describe('commands routes', () => {
           .post('/api/commands/execute')
           .send({
             commandName: '/memory',
-            context: { projectPath: '/my-project' }
+            context: { projectPath: '/my-project' },
           });
 
         expect(res.status).toBe(200);
@@ -231,9 +229,7 @@ describe('commands routes', () => {
 
     describe('custom commands', () => {
       it('returns 400 when commandName is missing', async () => {
-        const res = await request(app)
-          .post('/api/commands/execute')
-          .send({});
+        const res = await request(app).post('/api/commands/execute').send({});
 
         expect(res.status).toBe(400);
         expect(res.body.success).toBe(false);
@@ -255,7 +251,7 @@ describe('commands routes', () => {
           .send({
             commandName: '/evil-cmd',
             commandPath: '/etc/passwd',
-            context: { projectPath: '/my-project' }
+            context: { projectPath: '/my-project' },
           });
 
         expect(res.status).toBe(403);
@@ -268,13 +264,11 @@ describe('commands routes', () => {
         vi.mocked(fs.existsSync).mockReturnValue(true);
         vi.mocked(fs.readFileSync).mockReturnValue(commandContent);
 
-        const res = await request(app)
-          .post('/api/commands/execute')
-          .send({
-            commandName: '/plugin-cmd',
-            commandPath: '/home/testuser/.claude/plugins/foo-plugin/commands/foo.md',
-            context: {}
-          });
+        const res = await request(app).post('/api/commands/execute').send({
+          commandName: '/plugin-cmd',
+          commandPath: '/home/testuser/.claude/plugins/foo-plugin/commands/foo.md',
+          context: {},
+        });
 
         expect(res.status).toBe(200);
         expect(res.body.data.type).toBe('custom');
@@ -284,13 +278,11 @@ describe('commands routes', () => {
       it('returns 404 when command file not found', async () => {
         vi.mocked(fs.existsSync).mockReturnValue(false);
 
-        const res = await request(app)
-          .post('/api/commands/execute')
-          .send({
-            commandName: '/missing-cmd',
-            commandPath: '/home/testuser/.claude/commands/missing.md',
-            context: {}
-          });
+        const res = await request(app).post('/api/commands/execute').send({
+          commandName: '/missing-cmd',
+          commandPath: '/home/testuser/.claude/commands/missing.md',
+          context: {},
+        });
 
         expect(res.status).toBe(404);
         expect(res.body.success).toBe(false);
@@ -302,13 +294,11 @@ describe('commands routes', () => {
         vi.mocked(fs.existsSync).mockReturnValue(true);
         vi.mocked(fs.readFileSync).mockReturnValue(commandContent);
 
-        const res = await request(app)
-          .post('/api/commands/execute')
-          .send({
-            commandName: '/test-cmd',
-            commandPath: '/home/testuser/.claude/commands/test-cmd.md',
-            context: {}
-          });
+        const res = await request(app).post('/api/commands/execute').send({
+          commandName: '/test-cmd',
+          commandPath: '/home/testuser/.claude/commands/test-cmd.md',
+          context: {},
+        });
 
         expect(res.status).toBe(200);
         expect(res.body.data.type).toBe('custom');
@@ -326,7 +316,7 @@ describe('commands routes', () => {
             commandName: '/run-cmd',
             commandPath: '/home/testuser/.claude/commands/run-cmd.md',
             args: ['npm', 'test'],
-            context: {}
+            context: {},
           });
 
         expect(res.status).toBe(200);
@@ -344,7 +334,7 @@ describe('commands routes', () => {
             commandName: '/deploy-cmd',
             commandPath: '/home/testuser/.claude/commands/deploy-cmd.md',
             args: ['app', 'production'],
-            context: {}
+            context: {},
           });
 
         expect(res.status).toBe(200);
@@ -366,7 +356,7 @@ describe('commands routes', () => {
           .send({
             commandName: '/custom-fail',
             commandPath: '/home/testuser/.claude/commands/fail.md',
-            context: { projectPath: '/home/testuser/project' }
+            context: { projectPath: '/home/testuser/project' },
           });
 
         expect(res.status).toBe(500);
@@ -378,10 +368,10 @@ describe('commands routes', () => {
 
     describe('scanCommandsDirectory edge cases', () => {
       it('handles subdirectory scanning', async () => {
-        vi.mocked(fs.existsSync).mockImplementation((p) => {
+        vi.mocked(fs.existsSync).mockImplementation(p => {
           return typeof p === 'string' && p.includes('.claude/commands');
         });
-        vi.mocked(fs.readdirSync).mockImplementation((dir) => {
+        vi.mocked(fs.readdirSync).mockImplementation(dir => {
           const dirStr = String(dir);
           if (dirStr.endsWith('commands')) {
             return [
@@ -395,35 +385,33 @@ describe('commands routes', () => {
         });
         vi.mocked(fs.readFileSync).mockReturnValue('# Sub Command\nA sub command');
 
-        const res = await request(app)
-          .post('/api/commands/list')
-          .send({});
+        const res = await request(app).post('/api/commands/list').send({});
 
         expect(res.status).toBe(200);
         // The sub command should appear in custom commands
-        const subCmd = res.body.data.custom.find((cmd: { command: string }) => cmd.command.includes('sub-cmd'));
+        const subCmd = res.body.data.custom.find((cmd: { command: string }) =>
+          cmd.command.includes('sub-cmd')
+        );
         expect(subCmd).toBeDefined();
         expect(subCmd.scope).toBe('global');
       });
 
       it('skips non-md files', async () => {
-        vi.mocked(fs.existsSync).mockImplementation((path) => {
+        vi.mocked(fs.existsSync).mockImplementation(path => {
           return typeof path === 'string' && path.includes('/home/testuser/.claude/commands');
         });
         vi.mocked(fs.readdirSync).mockReturnValue([
           { name: 'readme.txt', isDirectory: () => false, isFile: () => true },
         ] as unknown as ReturnType<typeof fs.readdirSync>);
 
-        const res = await request(app)
-          .post('/api/commands/list')
-          .send({});
+        const res = await request(app).post('/api/commands/list').send({});
 
         expect(res.status).toBe(200);
         expect(res.body.data.custom).toHaveLength(0);
       });
 
       it('handles file read errors gracefully during scan', async () => {
-        vi.mocked(fs.existsSync).mockImplementation((path) => {
+        vi.mocked(fs.existsSync).mockImplementation(path => {
           return typeof path === 'string' && path.includes('/home/testuser/.claude/commands');
         });
         vi.mocked(fs.readdirSync).mockReturnValue([
@@ -434,9 +422,7 @@ describe('commands routes', () => {
         });
         const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-        const res = await request(app)
-          .post('/api/commands/list')
-          .send({});
+        const res = await request(app).post('/api/commands/list').send({});
 
         expect(res.status).toBe(200);
         // The broken file should be skipped gracefully
@@ -451,9 +437,7 @@ describe('commands routes', () => {
         });
         const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-        const res = await request(app)
-          .post('/api/commands/list')
-          .send({});
+        const res = await request(app).post('/api/commands/list').send({});
 
         expect(res.status).toBe(200);
         // Errors during scanning should be caught gracefully
@@ -485,9 +469,9 @@ describe('POST /api/commands/execute — args + substitution', () => {
     // Bypass the file-level vi.mock('fs') for these tests: route real fs calls
     // through to node:fs so the commands.ts handler can readFileSync our
     // fixture files.
-    vi.mocked(fs.existsSync).mockImplementation((p) => realFs.existsSync(p as never));
+    vi.mocked(fs.existsSync).mockImplementation(p => realFs.existsSync(p as never));
     vi.mocked(fs.readFileSync).mockImplementation((p, enc) =>
-      realFs.readFileSync(p as never, enc as never),
+      realFs.readFileSync(p as never, enc as never)
     );
 
     app = express();
@@ -496,7 +480,8 @@ describe('POST /api/commands/execute — args + substitution', () => {
   });
 
   afterEach(() => {
-    if (originalHome === undefined) delete process.env.HOME; else process.env.HOME = originalHome;
+    if (originalHome === undefined) delete process.env.HOME;
+    else process.env.HOME = originalHome;
     realFs.rmSync(tmpRoot, { recursive: true, force: true });
   });
 
@@ -510,13 +495,11 @@ describe('POST /api/commands/execute — args + substitution', () => {
 
   it('rawArgs tokenizes with shell-style quotes via pi parseCommandArgs', async () => {
     const cmdPath = writeCustomCmd('echo', 'Args: $@');
-    const res = await request(app)
-      .post('/api/commands/execute')
-      .send({
-        commandName: '/echo',
-        commandPath: cmdPath,
-        rawArgs: 'foo "bar baz" qux',
-      });
+    const res = await request(app).post('/api/commands/execute').send({
+      commandName: '/echo',
+      commandPath: cmdPath,
+      rawArgs: 'foo "bar baz" qux',
+    });
     expect(res.status).toBe(200);
     expect(res.body.data.content).toBe('Args: foo bar baz qux');
   });
@@ -593,13 +576,11 @@ describe('POST /api/commands/execute — args + substitution', () => {
   it('path traversal guard still rejects out-of-base commandPath', async () => {
     const outsidePath = path.join(tmpRoot, 'outside.md');
     realFs.writeFileSync(outsidePath, '# Not allowed');
-    const res = await request(app)
-      .post('/api/commands/execute')
-      .send({
-        commandName: '/evil',
-        commandPath: outsidePath,
-        args: [],
-      });
+    const res = await request(app).post('/api/commands/execute').send({
+      commandName: '/evil',
+      commandPath: outsidePath,
+      args: [],
+    });
     expect(res.status).toBe(403);
   });
 

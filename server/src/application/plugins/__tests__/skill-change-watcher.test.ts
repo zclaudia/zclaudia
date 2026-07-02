@@ -5,11 +5,13 @@ describe('skill-change-watcher', () => {
   it('debounces SKILL.md changes and refreshes the skill cache', async () => {
     vi.useFakeTimers();
     const close = vi.fn();
-    const watch = vi.fn((_path: string, _options: unknown, listener: (event: string, filename: string) => void) => {
-      listener('change', 'demo/SKILL.md');
-      listener('rename', 'demo/SKILL.md');
-      return { close };
-    });
+    const watch = vi.fn(
+      (_path: string, _options: unknown, listener: (event: string, filename: string) => void) => {
+        listener('change', 'demo/SKILL.md');
+        listener('rename', 'demo/SKILL.md');
+        return { close };
+      }
+    );
     const refresh = vi.fn().mockResolvedValue(2);
 
     const watcher = startSkillChangeWatcher({
@@ -32,10 +34,12 @@ describe('skill-change-watcher', () => {
 
   it('ignores non-skill file changes', async () => {
     vi.useFakeTimers();
-    const watch = vi.fn((_path: string, _options: unknown, listener: (event: string, filename: string) => void) => {
-      listener('change', 'README.md');
-      return { close: vi.fn() };
-    });
+    const watch = vi.fn(
+      (_path: string, _options: unknown, listener: (event: string, filename: string) => void) => {
+        listener('change', 'README.md');
+        return { close: vi.fn() };
+      }
+    );
     const refresh = vi.fn().mockResolvedValue(0);
 
     startSkillChangeWatcher({

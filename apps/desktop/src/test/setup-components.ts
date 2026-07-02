@@ -124,19 +124,42 @@ Object.defineProperty(globalThis, 'navigator', {
   configurable: true,
 });
 
-// Mock window.location
+// Mock window.location. Keep it synchronized with history navigation because
+// components read window.location.search directly in jsdom tests.
+const mockLocation = {
+  href: 'http://localhost:1420/',
+  pathname: '/',
+  search: '',
+  hash: '',
+  reload: vi.fn(),
+  replace: vi.fn(),
+  assign: vi.fn(),
+};
+
+function updateMockLocation(url: string | URL | null | undefined): void {
+  if (url === undefined || url === null) return;
+  const parsed = new URL(String(url), mockLocation.href);
+  mockLocation.href = parsed.href;
+  mockLocation.pathname = parsed.pathname;
+  mockLocation.search = parsed.search;
+  mockLocation.hash = parsed.hash;
+}
+
 Object.defineProperty(window, 'location', {
   writable: true,
-  value: {
-    href: 'http://localhost:1420',
-    pathname: '/',
-    search: '',
-    hash: '',
-    reload: vi.fn(),
-    replace: vi.fn(),
-    assign: vi.fn(),
-  },
+  value: mockLocation,
 });
+
+const originalPushState = window.history.pushState.bind(window.history);
+const originalReplaceState = window.history.replaceState.bind(window.history);
+window.history.pushState = ((state: unknown, unused: string, url?: string | URL | null) => {
+  updateMockLocation(url);
+  return originalPushState(state, unused, url);
+}) as History['pushState'];
+window.history.replaceState = ((state: unknown, unused: string, url?: string | URL | null) => {
+  updateMockLocation(url);
+  return originalReplaceState(state, unused, url);
+}) as History['replaceState'];
 
 // Mock Tauri internals
 Object.defineProperty(window, '__TAURI_INTERNALS__', {
@@ -270,6 +293,7 @@ vi.mock('@/hooks/useMediaQuery', () => ({
   useIsMobile: vi.fn(() => false),
   useIsTablet: vi.fn(() => false),
   useIsDesktop: vi.fn(() => true),
+  isMobileViewport: vi.fn(() => false),
 }));
 
 // ===== Context Mocks =====
@@ -295,6 +319,9 @@ vi.mock('@/contexts/ConnectionContext', () => ({
     sendMessage: vi.fn(),
     connect: vi.fn(),
     disconnect: vi.fn(),
+    connectServer: vi.fn(),
+    disconnectServer: vi.fn(),
+    isServerConnected: vi.fn(() => false),
   })),
   ConnectionProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
@@ -305,7 +332,7 @@ vi.mock('@/contexts/ConnectionContext', () => ({
 const createMockStore = (initialState: any) => {
   let state = { ...initialState };
   const listeners = new Set<(state: any) => void>();
-  
+
   return {
     getState: () => state,
     setState: (updater: any) => {
@@ -327,7 +354,15 @@ const createMockStore = (initialState: any) => {
 // Mock serverStore
 const MOCK_LOCAL_BACKEND_ID = 'local-standalone';
 const mockServerStore = createMockStore({
-  servers: [{ id: 'local', name: 'Local', address: 'localhost:3100', isDefault: true, createdAt: Date.now() }],
+  servers: [
+    {
+      id: 'local',
+      name: 'Local',
+      address: 'localhost:3100',
+      isDefault: true,
+      createdAt: Date.now(),
+    },
+  ],
   activeServerId: MOCK_LOCAL_BACKEND_ID,
   connections: {
     [MOCK_LOCAL_BACKEND_ID]: {
@@ -346,8 +381,16 @@ const mockServerStore = createMockStore({
   setServerLatency: vi.fn(),
   setLocalServerPort: vi.fn(),
   setControlPlaneMode: vi.fn(),
-  getActiveServer: vi.fn(() => ({ id: 'local', name: 'Local', address: 'localhost:3100', isDefault: true, createdAt: Date.now() })),
-  getServerConnection: vi.fn((serverId: string) => mockServerStore.getState().connections[serverId]),
+  getActiveServer: vi.fn(() => ({
+    id: 'local',
+    name: 'Local',
+    address: 'localhost:3100',
+    isDefault: true,
+    createdAt: Date.now(),
+  })),
+  getServerConnection: vi.fn(
+    (serverId: string) => mockServerStore.getState().connections[serverId]
+  ),
   getActiveServerConnection: vi.fn(() => {
     const state = mockServerStore.getState();
     return state.activeServerId ? state.connections[state.activeServerId] : undefined;
@@ -416,6 +459,7 @@ vi.mock('@/stores/facadeStore', () => ({
 // Mock projectStore
 const mockProjectStore = createMockStore({
   projects: [],
+  sessions: [],
   activeProjectId: null,
   setActiveProjectId: vi.fn(),
   loadProjects: vi.fn(),
@@ -443,6 +487,7 @@ vi.mock('@/stores/projectStore', () => ({
 // Mock sessionsStore
 const mockSessionsStore = createMockStore({
   sessions: [],
+  remoteSessions: new Map(),
   loadSessions: vi.fn(),
   createSession: vi.fn(),
   updateSession: vi.fn(),
@@ -453,12 +498,16 @@ const mockSessionsStore = createMockStore({
   recentlyCompletedSessions: [],
   clearAllRecentlyCompleted: vi.fn(),
   dismissRecentlyCompleted: vi.fn(),
+  activeSessionIdsByBackend: new Map(),
   activeSessionsByBackend: new Map(),
   setActiveSessionsForBackend: vi.fn((backendId: string, sessionIds: Set<string>) => {
     const state = mockSessionsStore.getState();
-    const newMap = new Map(state.activeSessionsByBackend);
+    const newMap = new Map(state.activeSessionIdsByBackend ?? state.activeSessionsByBackend);
     newMap.set(backendId, sessionIds);
-    mockSessionsStore.setState({ activeSessionsByBackend: newMap });
+    mockSessionsStore.setState({
+      activeSessionIdsByBackend: newMap,
+      activeSessionsByBackend: newMap,
+    });
   }),
 });
 
@@ -504,15 +553,37 @@ vi.mock('@/stores/uiStore', () => ({
 // Mock gatewayStore
 const mockGatewayStore = createMockStore({
   isConnected: false,
+  gatewayUrl: null,
+  gatewaySecret: null,
+  backendAuthStatus: {},
   showLocalBackend: false,
-  directGatewayUrl: '',
-  directGatewaySecret: '',
+  directGatewayUrl: null,
+  directGatewaySecret: null,
+  lastActiveBackendId: null,
   discoveredBackends: [],
   localBackendId: null,
   gateways: [],
   activeGatewayId: null,
-  setDirectGatewayConfig: vi.fn(),
-  clearDirectGatewayConfig: vi.fn(),
+  setDirectGatewayConfig: vi.fn((url: string, secret: string) => {
+    mockGatewayStore.setState({
+      directGatewayUrl: url,
+      directGatewaySecret: secret,
+      gatewayUrl: url,
+      gatewaySecret: secret,
+    });
+  }),
+  setLastActiveBackend: vi.fn((serverId: string | null) => {
+    mockGatewayStore.setState({ lastActiveBackendId: serverId });
+  }),
+  clearDirectGatewayConfig: vi.fn(() => {
+    mockGatewayStore.setState({
+      directGatewayUrl: null,
+      directGatewaySecret: null,
+      lastActiveBackendId: null,
+      gatewayUrl: null,
+      gatewaySecret: null,
+    });
+  }),
   getDiscoveredBackends: vi.fn(() => []),
 });
 
@@ -529,14 +600,36 @@ vi.mock('@/stores/gatewayStore', () => ({
   gatewayStore: mockGatewayStore,
   ...mockGatewayStore,
   toGatewayServerId: (backendId: string) => `gw:${backendId}`,
-  parseBackendId: (serverId: string) => serverId.startsWith('gw:') ? serverId.slice(3) : serverId,
+  parseBackendId: (serverId: string) => (serverId.startsWith('gw:') ? serverId.slice(3) : serverId),
   isGatewayTarget: (serverId: string | null) => serverId?.startsWith('gw:') ?? false,
-  shouldShowNonCurrentInstanceBackend: () => true,
-  shouldShowBackend: () => true,
+  shouldShowNonCurrentInstanceBackend: (
+    backend: { instanceId?: string | null; isThisInstance?: boolean },
+    currentInstanceId: string | null,
+    showLocalBackend: boolean
+  ) => {
+    if (showLocalBackend) return true;
+    if (!currentInstanceId) return true;
+    const isThisInstance = backend.instanceId
+      ? backend.instanceId === currentInstanceId
+      : !!backend.isThisInstance;
+    return !isThisInstance;
+  },
+  shouldShowBackend: (
+    backend: { instanceId?: string | null; isThisInstance?: boolean },
+    currentInstanceId: string | null,
+    showLocalBackend: boolean
+  ) => {
+    if (showLocalBackend) return true;
+    if (!currentInstanceId) return true;
+    const isThisInstance = backend.instanceId
+      ? backend.instanceId === currentInstanceId
+      : !!backend.isThisInstance;
+    return !isThisInstance;
+  },
 }));
 
 // Mock sessionsStore constants
-vi.mock('@/stores/sessionsStore', async (importOriginal) => {
+vi.mock('@/stores/sessionsStore', async importOriginal => {
   const actual = await importOriginal();
   return {
     ...actual,
@@ -616,7 +709,7 @@ afterEach(() => {
   vi.clearAllMocks();
   uuidCounter = 0;
   localStorageMock.clear();
-  
+
   // Reset stores to initial state
   mockServerStore.setState(mockServerStore.getInitialState());
   mockFacadeStore.setState(mockFacadeStore.getInitialState());

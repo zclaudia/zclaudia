@@ -31,8 +31,8 @@ describe('context usage routes', () => {
       model: 'claude-sonnet-4-6',
       contextWindow: 200_000,
       contextWindowSource: 'profile_entry',
-      systemPromptText: 'a'.repeat(400),   // 100 tokens
-      skillCatalogText: '',                 // 0 tokens
+      systemPromptText: 'a'.repeat(400), // 100 tokens
+      skillCatalogText: '', // 0 tokens
       tools: [{ name: 'Read', description: 'c'.repeat(36) }], // 10 tokens
     });
     recordContextUsage('s1', { input: 500, output: 80, cacheRead: 4500, cacheWrite: 0 });

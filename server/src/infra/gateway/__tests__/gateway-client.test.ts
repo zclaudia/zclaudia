@@ -6,7 +6,7 @@ import * as uuidModule from '../../../utils/uuid.js';
 
 // Mock WebSocket
 vi.mock('ws', () => {
-  const MockWebSocket = vi.fn().mockImplementation(function(this: any) {
+  const MockWebSocket = vi.fn().mockImplementation(function (this: any) {
     this.on = vi.fn();
     this.removeAllListeners = vi.fn();
     this.close = vi.fn();
@@ -16,7 +16,7 @@ vi.mock('ws', () => {
   MockWebSocket.OPEN = 1;
   MockWebSocket.CLOSED = 0;
   return {
-    default: MockWebSocket
+    default: MockWebSocket,
   };
 });
 
@@ -25,7 +25,7 @@ vi.mock('fs', () => ({
   existsSync: vi.fn(),
   mkdirSync: vi.fn(),
   writeFileSync: vi.fn(),
-  readFileSync: vi.fn()
+  readFileSync: vi.fn(),
 }));
 
 // Mock uuid
@@ -52,11 +52,11 @@ describe('GatewayClient', () => {
       gatewaySecret: 'test-secret',
       name: 'test-backend',
       serverPort: 3100,
-      visible: true
+      visible: true,
     };
 
     mockDb = {
-      prepare: vi.fn()
+      prepare: vi.fn(),
     };
 
     mockActiveRuns = new Map();
@@ -65,10 +65,12 @@ describe('GatewayClient', () => {
     vi.mocked(fs.existsSync).mockReturnValue(false);
     vi.mocked(fs.mkdirSync).mockImplementation(() => {});
     vi.mocked(fs.writeFileSync).mockImplementation(() => {});
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({
         deviceId: 'existing-device-id',
-        createdAt: Date.now()
-      }));
+        createdAt: Date.now(),
+      })
+    );
 
     // Mock newId
     vi.mocked(uuidModule.newId).mockReturnValue('new-device-uuid');
@@ -98,10 +100,12 @@ describe('GatewayClient', () => {
 
     it('loads existing device ID from file', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
-        deviceId: 'existing-device-id',
-        createdAt: Date.now()
-      }));
+      vi.mocked(fs.readFileSync).mockReturnValue(
+        JSON.stringify({
+          deviceId: 'existing-device-id',
+          createdAt: Date.now(),
+        })
+      );
 
       client = new GatewayClient(mockConfig);
 
@@ -155,7 +159,7 @@ describe('GatewayClient', () => {
     it('configures SOCKS5 proxy if provided', () => {
       const configWithProxy = {
         ...mockConfig,
-        proxyUrl: 'socks5://proxy.example.com:1080'
+        proxyUrl: 'socks5://proxy.example.com:1080',
       };
       client = new GatewayClient(configWithProxy);
       client.connect();
@@ -169,8 +173,8 @@ describe('GatewayClient', () => {
         proxyUrl: 'socks5://proxy.example.com:1080',
         proxyAuth: {
           username: 'user',
-          password: 'pass'
-        }
+          password: 'pass',
+        },
       };
       client = new GatewayClient(configWithAuth);
       client.connect();
@@ -190,7 +194,7 @@ describe('GatewayClient', () => {
     it('closes existing WebSocket before reconnecting', () => {
       const mockWs = {
         removeAllListeners: vi.fn(),
-        close: vi.fn()
+        close: vi.fn(),
       };
       (client as any).ws = mockWs;
 
@@ -224,7 +228,7 @@ describe('GatewayClient', () => {
     it('closes WebSocket connection', () => {
       const mockWs = {
         removeAllListeners: vi.fn(),
-        close: vi.fn()
+        close: vi.fn(),
       };
       (client as any).ws = mockWs;
 
@@ -303,8 +307,12 @@ describe('GatewayClient', () => {
 
     it('queries.registry.getDiscoveredBackends returns backends list', () => {
       (client as any).registryItems.set('backend-1', {
-        backendId: 'backend-1', instanceId: 'i1', deviceId: 'd1',
-        channel: 'prod', name: 'B1', visible: true,
+        backendId: 'backend-1',
+        instanceId: 'i1',
+        deviceId: 'd1',
+        channel: 'prod',
+        name: 'B1',
+        visible: true,
       });
       expect(client.queries.registry.getDiscoveredBackends()).toHaveLength(1);
     });
@@ -312,7 +320,9 @@ describe('GatewayClient', () => {
 
   describe('HTTP proxy content handling', () => {
     it('does not stream known text-like content types', () => {
-      const shouldStream = (GatewayClient as any).shouldStream as (headers: Record<string, string>) => boolean;
+      const shouldStream = (GatewayClient as any).shouldStream as (
+        headers: Record<string, string>
+      ) => boolean;
 
       expect(shouldStream({ 'content-type': 'application/json' })).toBe(false);
       expect(shouldStream({ 'content-type': 'text/plain; charset=utf-8' })).toBe(false);
@@ -321,16 +331,22 @@ describe('GatewayClient', () => {
     });
 
     it('streams binary content types to avoid UTF-8 corruption', () => {
-      const shouldStream = (GatewayClient as any).shouldStream as (headers: Record<string, string>) => boolean;
+      const shouldStream = (GatewayClient as any).shouldStream as (
+        headers: Record<string, string>
+      ) => boolean;
 
       expect(shouldStream({ 'content-type': 'image/png' })).toBe(true);
       expect(shouldStream({ 'content-type': 'application/pdf' })).toBe(true);
       expect(shouldStream({ 'content-type': 'application/octet-stream' })).toBe(true);
-      expect(shouldStream({ 'content-type': 'application/vnd.android.package-archive' })).toBe(true);
+      expect(shouldStream({ 'content-type': 'application/vnd.android.package-archive' })).toBe(
+        true
+      );
     });
 
     it('streams large payloads regardless of content type', () => {
-      const shouldStream = (GatewayClient as any).shouldStream as (headers: Record<string, string>) => boolean;
+      const shouldStream = (GatewayClient as any).shouldStream as (
+        headers: Record<string, string>
+      ) => boolean;
 
       expect(
         shouldStream({
@@ -374,9 +390,7 @@ describe('GatewayClient', () => {
         },
       };
 
-      const messageHandler = mockWs.on.mock.calls.find(
-        (call: any[]) => call[0] === 'message'
-      )?.[1];
+      const messageHandler = mockWs.on.mock.calls.find((call: any[]) => call[0] === 'message')?.[1];
       if (messageHandler) {
         messageHandler(Buffer.from(JSON.stringify(message)));
       }
@@ -393,32 +407,34 @@ describe('GatewayClient', () => {
       const mockWs = (client as any).ws;
       (client as any).backendId = 'backend-1';
 
-      const messageHandler = mockWs.on.mock.calls.find(
-        (call: any[]) => call[0] === 'message'
-      )?.[1];
+      const messageHandler = mockWs.on.mock.calls.find((call: any[]) => call[0] === 'message')?.[1];
 
-      messageHandler?.(Buffer.from(JSON.stringify({
-        type: 'registry_snapshot',
-        revision: 2,
-        items: [
-          {
-            backendId: 'backend-1',
-            instanceId: 'instance-1',
-            deviceId: 'device-1',
-            channel: 'prod',
-            name: 'Backend 1',
-            visible: true,
-          },
-          {
-            backendId: 'backend-2',
-            instanceId: 'instance-2',
-            deviceId: 'device-2',
-            channel: 'prod',
-            name: 'Backend 2',
-            visible: true,
-          }
-        ]
-      })));
+      messageHandler?.(
+        Buffer.from(
+          JSON.stringify({
+            type: 'registry_snapshot',
+            revision: 2,
+            items: [
+              {
+                backendId: 'backend-1',
+                instanceId: 'instance-1',
+                deviceId: 'device-1',
+                channel: 'prod',
+                name: 'Backend 1',
+                visible: true,
+              },
+              {
+                backendId: 'backend-2',
+                instanceId: 'instance-2',
+                deviceId: 'device-2',
+                channel: 'prod',
+                name: 'Backend 2',
+                visible: true,
+              },
+            ],
+          })
+        )
+      );
 
       expect((client as any).registryItems.size).toBe(2);
       expect(client.getDiscoveredBackends()).toHaveLength(2);
@@ -430,9 +446,7 @@ describe('GatewayClient', () => {
       (client as any).backendId = 'backend-123';
       (client as any).epoch = 1;
 
-      const closeHandler = mockWs.on.mock.calls.find(
-        (call: any[]) => call[0] === 'close'
-      )?.[1];
+      const closeHandler = mockWs.on.mock.calls.find((call: any[]) => call[0] === 'close')?.[1];
 
       closeHandler?.(1006);
 
@@ -445,9 +459,7 @@ describe('GatewayClient', () => {
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const mockWs = (client as any).ws;
 
-      const messageHandler = mockWs.on.mock.calls.find(
-        (call: any[]) => call[0] === 'message'
-      )?.[1];
+      const messageHandler = mockWs.on.mock.calls.find((call: any[]) => call[0] === 'message')?.[1];
       if (messageHandler) {
         messageHandler(Buffer.from('invalid json'));
       }
@@ -470,12 +482,14 @@ describe('GatewayClient', () => {
         afterOffset: 7,
       });
 
-      expect(sendWsSpy).toHaveBeenCalledWith(expect.objectContaining({
-        type: 'content_patch_error',
-        backendId: 'backend-1',
-        afterOffset: 7,
-        message: 'catch-up query failed',
-      }));
+      expect(sendWsSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'content_patch_error',
+          backendId: 'backend-1',
+          afterOffset: 7,
+          message: 'catch-up query failed',
+        })
+      );
     });
 
     it('removes backend from subscribedBackends on unsubscribed event', () => {
@@ -518,11 +532,13 @@ describe('GatewayClient', () => {
       });
 
       expect(onOutgoingBackendDataSnapshot).toHaveBeenCalledWith('remote-backend', [], []);
-      expect(onOutgoingBackendDataEvent).toHaveBeenCalledWith(expect.objectContaining({
-        type: 'backend_resource_event',
-        op: 'remove',
-        resourceId: 'session-1',
-      }));
+      expect(onOutgoingBackendDataEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'backend_resource_event',
+          op: 'remove',
+          resourceId: 'session-1',
+        })
+      );
     });
   });
 
@@ -541,9 +557,7 @@ describe('GatewayClient', () => {
       const mockWs = (client as any).ws;
 
       // Simulate close event (not code 4000)
-      const closeHandler = mockWs.on.mock.calls.find(
-        (call: any[]) => call[0] === 'close'
-      )?.[1];
+      const closeHandler = mockWs.on.mock.calls.find((call: any[]) => call[0] === 'close')?.[1];
       if (closeHandler) {
         closeHandler(1000);
       }
@@ -556,9 +570,7 @@ describe('GatewayClient', () => {
       client.connect();
       const mockWs = (client as any).ws;
 
-      const errorHandler = mockWs.on.mock.calls.find(
-        (call: any[]) => call[0] === 'error'
-      )?.[1];
+      const errorHandler = mockWs.on.mock.calls.find((call: any[]) => call[0] === 'error')?.[1];
       errorHandler?.(new Error('proxy unavailable'));
 
       expect((client as any).reconnectTimeout).not.toBeNull();
@@ -578,9 +590,7 @@ describe('GatewayClient', () => {
       client.connect();
       const mockWs = (client as any).ws;
 
-      const closeHandler = mockWs.on.mock.calls.find(
-        (call: any[]) => call[0] === 'close'
-      )?.[1];
+      const closeHandler = mockWs.on.mock.calls.find((call: any[]) => call[0] === 'close')?.[1];
       if (closeHandler) {
         closeHandler(4000);
       }
@@ -593,9 +603,7 @@ describe('GatewayClient', () => {
       const mockWs = (client as any).ws;
 
       // Get the close handler before disconnect
-      const closeHandler = mockWs.on.mock.calls.find(
-        (call: any[]) => call[0] === 'close'
-      )?.[1];
+      const closeHandler = mockWs.on.mock.calls.find((call: any[]) => call[0] === 'close')?.[1];
 
       // Now disconnect
       client.disconnect();
@@ -622,7 +630,11 @@ describe('GatewayClient', () => {
   describe('session broadcasting via catalog', () => {
     it('publishes catalog snapshot when connected with db', () => {
       // Setup mock db with prepare().all() chain
-      const mockAll = vi.fn().mockReturnValue([{ id: 'session-1', name: 'Test', createdAt: 1, updatedAt: 1, lastMessageOffset: 5 }]);
+      const mockAll = vi
+        .fn()
+        .mockReturnValue([
+          { id: 'session-1', name: 'Test', createdAt: 1, updatedAt: 1, lastMessageOffset: 5 },
+        ]);
       mockDb.prepare = vi.fn().mockReturnValue({ all: mockAll });
 
       client = new GatewayClient(mockConfig, mockDb, mockActiveRuns);
@@ -649,11 +661,12 @@ describe('GatewayClient', () => {
       (client as any).epoch = 1;
       (client as any).isConnected = true;
 
-      client.commands.backendData.broadcastSessionEvent('created', { id: 'session-1', name: 'Test' });
+      client.commands.backendData.broadcastSessionEvent('created', {
+        id: 'session-1',
+        name: 'Test',
+      });
 
-      expect(mockWs.send).toHaveBeenCalledWith(
-        expect.stringContaining('backend_resource_event')
-      );
+      expect(mockWs.send).toHaveBeenCalledWith(expect.stringContaining('backend_resource_event'));
     });
 
     it('broadcastSessionEvent removes archived sessions', () => {
@@ -743,40 +756,52 @@ describe('GatewayClient', () => {
 
   describe('additional content type handling', () => {
     it('handles empty content-type header', () => {
-      const shouldStream = (GatewayClient as any).shouldStream as (headers: Record<string, string>) => boolean;
+      const shouldStream = (GatewayClient as any).shouldStream as (
+        headers: Record<string, string>
+      ) => boolean;
 
       expect(shouldStream({})).toBe(false);
       expect(shouldStream({ 'content-type': '' })).toBe(false);
     });
 
     it('handles content-type with charset and other params', () => {
-      const shouldStream = (GatewayClient as any).shouldStream as (headers: Record<string, string>) => boolean;
+      const shouldStream = (GatewayClient as any).shouldStream as (
+        headers: Record<string, string>
+      ) => boolean;
 
       expect(shouldStream({ 'content-type': 'text/html; charset=utf-8' })).toBe(false);
       expect(shouldStream({ 'content-type': 'application/json; charset=utf-8' })).toBe(false);
     });
 
     it('handles javascript content types', () => {
-      const shouldStream = (GatewayClient as any).shouldStream as (headers: Record<string, string>) => boolean;
+      const shouldStream = (GatewayClient as any).shouldStream as (
+        headers: Record<string, string>
+      ) => boolean;
 
       expect(shouldStream({ 'content-type': 'application/javascript' })).toBe(false);
       expect(shouldStream({ 'content-type': 'text/javascript' })).toBe(false);
     });
 
     it('handles form-urlencoded content type', () => {
-      const shouldStream = (GatewayClient as any).shouldStream as (headers: Record<string, string>) => boolean;
+      const shouldStream = (GatewayClient as any).shouldStream as (
+        headers: Record<string, string>
+      ) => boolean;
 
       expect(shouldStream({ 'content-type': 'application/x-www-form-urlencoded' })).toBe(false);
     });
 
     it('handles graphql response content type', () => {
-      const shouldStream = (GatewayClient as any).shouldStream as (headers: Record<string, string>) => boolean;
+      const shouldStream = (GatewayClient as any).shouldStream as (
+        headers: Record<string, string>
+      ) => boolean;
 
       expect(shouldStream({ 'content-type': 'application/graphql-response+json' })).toBe(false);
     });
 
     it('streams unknown content types', () => {
-      const shouldStream = (GatewayClient as any).shouldStream as (headers: Record<string, string>) => boolean;
+      const shouldStream = (GatewayClient as any).shouldStream as (
+        headers: Record<string, string>
+      ) => boolean;
 
       expect(shouldStream({ 'content-type': 'application/unknown' })).toBe(true);
       expect(shouldStream({ 'content-type': 'video/mp4' })).toBe(true);
@@ -820,23 +845,28 @@ describe('GatewayClient', () => {
       (client as any).backendId = 'local-backend';
 
       const now = Date.now();
-      mockDb.prepare = vi.fn()
+      mockDb.prepare = vi
+        .fn()
         .mockReturnValueOnce({
-          all: vi.fn(() => [{
-            id: 'session-1',
-            name: 'Session 1',
-            projectId: 'project-1',
-            createdAt: now,
-            updatedAt: now,
-          }]),
+          all: vi.fn(() => [
+            {
+              id: 'session-1',
+              name: 'Session 1',
+              projectId: 'project-1',
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]),
         })
         .mockReturnValueOnce({
-          all: vi.fn(() => [{
-            id: 'project-1',
-            name: 'Project 1',
-            createdAt: now,
-            updatedAt: now,
-          }]),
+          all: vi.fn(() => [
+            {
+              id: 'project-1',
+              name: 'Project 1',
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]),
         });
 
       client.publishBackendDataSnapshot('peer-session-1');

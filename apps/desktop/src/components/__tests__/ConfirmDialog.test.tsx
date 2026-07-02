@@ -17,7 +17,7 @@ describe('ConfirmDialog', () => {
     render(<ConfirmDialog />);
     let resolved: boolean | undefined;
     act(() => {
-      void confirm({ title: 'Remove worktree?', confirmLabel: 'Remove' }).then((r) => {
+      void confirm({ title: 'Remove worktree?', confirmLabel: 'Remove' }).then(r => {
         resolved = r;
       });
     });
@@ -32,7 +32,7 @@ describe('ConfirmDialog', () => {
     render(<ConfirmDialog />);
     let resolved: boolean | undefined;
     act(() => {
-      void confirm({ title: 'Drop stash?' }).then((r) => {
+      void confirm({ title: 'Drop stash?' }).then(r => {
         resolved = r;
       });
     });
@@ -45,7 +45,7 @@ describe('ConfirmDialog', () => {
     render(<ConfirmDialog />);
     let resolved: boolean | undefined;
     act(() => {
-      void confirm({ title: 'Discard plan?' }).then((r) => {
+      void confirm({ title: 'Discard plan?' }).then(r => {
         resolved = r;
       });
     });
@@ -58,7 +58,7 @@ describe('ConfirmDialog', () => {
     render(<ConfirmDialog />);
     let resolved: string | null | undefined;
     act(() => {
-      void promptText({ title: 'Fork session', confirmLabel: 'Fork' }).then((r) => {
+      void promptText({ title: 'Fork session', confirmLabel: 'Fork' }).then(r => {
         resolved = r;
       });
     });
@@ -72,7 +72,7 @@ describe('ConfirmDialog', () => {
     render(<ConfirmDialog />);
     let resolved: string | null | undefined = 'sentinel';
     act(() => {
-      void promptText({ title: 'Fork session' }).then((r) => {
+      void promptText({ title: 'Fork session' }).then(r => {
         resolved = r;
       });
     });
@@ -86,11 +86,15 @@ describe('ConfirmDialog', () => {
     let first: boolean | undefined;
     let second: boolean | undefined;
     act(() => {
-      void confirm({ title: 'First' }).then((r) => { first = r; });
+      void confirm({ title: 'First' }).then(r => {
+        first = r;
+      });
     });
     await screen.findByText('First');
     act(() => {
-      void confirm({ title: 'Second' }).then((r) => { second = r; });
+      void confirm({ title: 'Second' }).then(r => {
+        second = r;
+      });
     });
     // First is auto-resolved as cancelled; second dialog is now shown.
     await waitFor(() => expect(first).toBe(false));

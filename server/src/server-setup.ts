@@ -6,10 +6,14 @@
  * message router used for shared-protocol request.type dispatch.
  */
 import type { Express, Request, Response } from 'express';
-import type { WebSocket } from 'ws';
 import type { initDatabase } from './infra/storage/db.js';
 import type { GatewayConfig, GatewayStatus } from './interfaces/http/gateway.js';
-import { ProcessSupervisor, setGlobalProcessSupervisor } from './infra/services/process-supervisor.js';
+import type { GatewayBackendInfo } from '@zclaudia/shared/core/server';
+import type { StateHeartbeatMessage } from '@zclaudia/shared/wire/messages';
+import {
+  ProcessSupervisor,
+  setGlobalProcessSupervisor,
+} from './infra/services/process-supervisor.js';
 import type { NotificationService } from './domains/notification-feed/index.js';
 import type { SupervisorService } from './domains/supervision/index.js';
 import type { NotificationSender } from './infra/push/notification-sender.js';
@@ -21,11 +25,30 @@ import { getSdkVersionReport } from './utils/sdk-version-check.js';
 import { ProcessMonitor } from './utils/process-monitor.js';
 import { sendMessage } from './application/conversation/transport/broadcast.js';
 import type { ConnectedClient, ActiveRun } from './application/conversation/transport/types.js';
+import type { RunStartMessage } from './application/conversation/runtime/run-bootstrap.js';
 import type { createRouter } from './interfaces/websocket/index.js';
 import { createGatewayState } from './infra/gateway/gateway-state.js';
 import { bootstrapDomains } from './application/domain-bootstrap.js';
-import { buildAppSelectionClickUrl, getBackendDisplayName, getBackendRouteId } from './infra/push/notification-context.js';
+import {
+  buildAppSelectionClickUrl,
+  getBackendDisplayName,
+  getBackendRouteId,
+} from './infra/push/notification-context.js';
 import { registerTaskSettlementNotifier } from './application/conversation/runtime/task-settlement-notifier.js';
+import type { PermissionBridge } from './application/conversation/agent/permission-bridge.js';
+import type { PermissionWorkflowResolver } from './domains/workflows/index.js';
+import type { MetaWorkflowService } from './domains/meta-workflow/service.js';
+import type { TaskExecutor } from './domains/tasks/executors/types.js';
+import type { GoalCoordinator } from './domains/goals/coordinator.js';
+import type { GoalService } from './domains/goals/service.js';
+
+export type RunStartHandler = (
+  client: ConnectedClient,
+  message: RunStartMessage,
+  db: ReturnType<typeof initDatabase>,
+  recoveryState?: { sessionResetRetryCount?: number; overflowRetryCount?: number },
+  clients?: Map<string, ConnectedClient>
+) => Promise<void>;
 
 export interface SetupDependencies {
   db: ReturnType<typeof initDatabase>;
@@ -33,10 +56,10 @@ export interface SetupDependencies {
   router: ReturnType<typeof createRouter>;
   clients: Map<string, ConnectedClient>;
   activeRuns: Map<string, ActiveRun>;
-  buildStateHeartbeat: () => import('@zclaudia/shared/wire/messages').StateHeartbeatMessage;
+  buildStateHeartbeat: () => StateHeartbeatMessage;
   broadcastHeartbeat: () => void;
   broadcastPluginState: () => void;
-  handleRunStart: (...args: any[]) => Promise<void>;
+  handleRunStart: RunStartHandler;
   getServerPort: () => number | null;
   notificationSender: NotificationSender;
   setProcessMonitor: (pm: ProcessMonitor) => void;
@@ -50,28 +73,35 @@ export interface SetupResult {
   updateGatewayConnected: (connected: boolean) => void;
   updateGatewayBackendId: (backendId: string | null) => void;
   updateGatewayIdentity: (instanceId: string, deviceId: string) => void;
-  updateDiscoveredBackends: (backends: import('@zclaudia/shared/core/server').GatewayBackendInfo[]) => void;
+  updateDiscoveredBackends: (backends: GatewayBackendInfo[]) => void;
   setGatewayConnector: (connector: (config: GatewayConfig) => Promise<void>) => void;
   setGatewayDisconnector: (disconnector: () => Promise<void>) => void;
   supervisorService: SupervisorService;
   notificationsService: NotificationService;
-  permissionBridge?: import('./application/conversation/agent/permission-bridge.js').PermissionBridge;
+  permissionBridge?: PermissionBridge;
   cancelWorkflowRun?: (runId: string) => void;
-  permissionWorkflowResolver?: import('./domains/workflows/index.js').PermissionWorkflowResolver;
-  metaWorkflowService?: import('./domains/meta-workflow/service.js').MetaWorkflowService;
-  agentTaskExecutor?: import('./domains/tasks/executors/types.js').TaskExecutor;
-  goalCoordinator?: import('./domains/goals/coordinator.js').GoalCoordinator;
-  goalService?: import('./domains/goals/service.js').GoalService;
+  permissionWorkflowResolver?: PermissionWorkflowResolver;
+  metaWorkflowService?: MetaWorkflowService;
+  agentTaskExecutor?: TaskExecutor;
+  goalCoordinator?: GoalCoordinator;
+  goalService?: GoalService;
   /** Cleanup function: call when WebSocket server closes */
   onWssClose: () => void;
 }
 
 export function setupRoutesAndServices(deps: SetupDependencies): SetupResult {
   const {
-    db, app, router, clients, activeRuns,
-    buildStateHeartbeat, broadcastHeartbeat, broadcastPluginState,
-    handleRunStart, getServerPort,
-    notificationSender, setProcessMonitor,
+    db,
+    app,
+    clients,
+    activeRuns,
+    buildStateHeartbeat,
+    broadcastHeartbeat,
+    broadcastPluginState,
+    handleRunStart,
+    getServerPort,
+    notificationSender,
+    setProcessMonitor,
   } = deps;
 
   // Background command tasks → conversation bridge (task monitor broadcasts,
@@ -101,18 +131,22 @@ export function setupRoutesAndServices(deps: SetupDependencies): SetupResult {
         features: ALL_SERVER_FEATURES,
         ...(publicKey && { publicKey }),
         ...(sdkVersions && { sdkVersions }),
-      }
+      },
     });
   });
 
   // Auth middleware
-  const authMiddleware = createExpressAuthMiddleware((token) => {
-    const row = db.prepare(`
+  const authMiddleware = createExpressAuthMiddleware(token => {
+    const row = db
+      .prepare(
+        `
       SELECT client_id
       FROM servers
       WHERE client_id = ?
       LIMIT 1
-    `).get(token) as { client_id: string } | undefined;
+    `
+      )
+      .get(token) as { client_id: string } | undefined;
 
     return !!row?.client_id;
   });
@@ -132,17 +166,24 @@ export function setupRoutesAndServices(deps: SetupDependencies): SetupResult {
     goalCoordinator,
     goalService,
   } = bootstrapDomains({
-    db, app, authMiddleware, clients, activeRuns,
-    broadcastPluginState, broadcastHeartbeat,
-    handleRunStart, getServerPort,
-    notificationSender, processSupervisor,
+    db,
+    app,
+    authMiddleware,
+    clients,
+    activeRuns,
+    broadcastPluginState,
+    broadcastHeartbeat,
+    handleRunStart,
+    getServerPort,
+    notificationSender,
+    processSupervisor,
     gateway,
   });
 
   // Periodic state heartbeat broadcast (every 30s)
   const heartbeatInterval = setInterval(() => {
     const heartbeat = buildStateHeartbeat();
-    clients.forEach((client) => {
+    clients.forEach(client => {
       if (client.authenticated) {
         sendMessage(client.ws, heartbeat);
       }
@@ -152,9 +193,13 @@ export function setupRoutesAndServices(deps: SetupDependencies): SetupResult {
   // Process leak monitor
   const processMonitor = new ProcessMonitor(
     () => activeRuns.size,
-    (report) => {
-      const pids = report.leakedProcesses.map(p => `PID=${p.pid}(${p.command}, ${p.elapsedSeconds}s)`).join(', ');
-      console.warn(`[ProcessMonitor] Leaked processes detected (activeRuns=${report.activeRunCount}): ${pids}`);
+    report => {
+      const pids = report.leakedProcesses
+        .map(p => `PID=${p.pid}(${p.command}, ${p.elapsedSeconds}s)`)
+        .join(', ');
+      console.warn(
+        `[ProcessMonitor] Leaked processes detected (activeRuns=${report.activeRunCount}): ${pids}`
+      );
       const backendName = getBackendDisplayName(db);
       void notificationSender.notify({
         type: 'process_leak',
@@ -169,7 +214,7 @@ export function setupRoutesAndServices(deps: SetupDependencies): SetupResult {
       autoKill: false,
       minElapsedSeconds: 120,
       ignoreCommands: ['mcp-bridge', 'mcp-server'],
-    },
+    }
   );
   processMonitor.start();
   setProcessMonitor(processMonitor);

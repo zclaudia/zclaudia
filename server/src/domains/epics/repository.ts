@@ -44,32 +44,51 @@ export class EpicRepository {
   create(data: EpicCreate): Epic {
     const id = newId();
     const now = Date.now();
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO epics (
         id, project_id, title, description, status, labels,
         created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      id,
-      data.projectId,
-      data.title,
-      data.description ?? null,
-      data.status ?? 'open',
-      JSON.stringify(data.labels ?? []),
-      now,
-      now,
-    );
+    `
+      )
+      .run(
+        id,
+        data.projectId,
+        data.title,
+        data.description ?? null,
+        data.status ?? 'open',
+        JSON.stringify(data.labels ?? []),
+        now,
+        now
+      );
     return this.findById(id)!;
   }
 
   update(id: string, data: EpicUpdate): Epic {
     const sets: string[] = ['updated_at = ?'];
     const params: unknown[] = [Date.now()];
-    if (data.title !== undefined) { sets.push('title = ?'); params.push(data.title); }
-    if (data.description !== undefined) { sets.push('description = ?'); params.push(data.description); }
-    if (data.status !== undefined) { sets.push('status = ?'); params.push(data.status); }
-    if (data.labels !== undefined) { sets.push('labels = ?'); params.push(JSON.stringify(data.labels)); }
-    if (data.closedAt !== undefined) { sets.push('closed_at = ?'); params.push(data.closedAt); }
+    if (data.title !== undefined) {
+      sets.push('title = ?');
+      params.push(data.title);
+    }
+    if (data.description !== undefined) {
+      sets.push('description = ?');
+      params.push(data.description);
+    }
+    if (data.status !== undefined) {
+      sets.push('status = ?');
+      params.push(data.status);
+    }
+    if (data.labels !== undefined) {
+      sets.push('labels = ?');
+      params.push(JSON.stringify(data.labels));
+    }
+    if (data.closedAt !== undefined) {
+      sets.push('closed_at = ?');
+      params.push(data.closedAt);
+    }
     params.push(id);
     this.db.prepare(`UPDATE epics SET ${sets.join(', ')} WHERE id = ?`).run(...params);
     const next = this.findById(id);
@@ -86,7 +105,7 @@ export class EpicRepository {
     const rows = this.db
       .prepare('SELECT * FROM epics WHERE project_id = ? ORDER BY created_at DESC')
       .all(projectId);
-    return rows.map((r) => this.mapRow(r));
+    return rows.map(r => this.mapRow(r));
   }
 
   delete(id: string): boolean {

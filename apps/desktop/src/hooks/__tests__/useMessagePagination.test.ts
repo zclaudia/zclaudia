@@ -64,11 +64,12 @@ describe('useMessagePagination', () => {
     });
 
     const { result } = renderHook(
-      ({ isConnected }) => useMessagePagination({
-        sessionId: 'session-1',
-        isConnected,
-        isMobile: false,
-      }),
+      ({ isConnected }) =>
+        useMessagePagination({
+          sessionId: 'session-1',
+          isConnected,
+          isMobile: false,
+        }),
       {
         initialProps: { isConnected: false },
       }
@@ -119,7 +120,7 @@ describe('useMessagePagination', () => {
       expect(api.getSessionMessages).toHaveBeenCalledTimes(1);
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise(resolve => setTimeout(resolve, 50));
     expect(api.getSessionMessages).toHaveBeenCalledTimes(1);
   });
 

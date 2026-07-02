@@ -27,10 +27,10 @@ export function loadSessionRememberedDecisions(
   db: PermissionMemoryDb,
   sessionId: string
 ): Map<string, RememberedDecision> {
-  const rows = db.prepare(
-    'SELECT remember_key, decision FROM permission_memories WHERE session_id = ?'
-  ).all(sessionId);
-  return new Map(rows.map((row) => [row.remember_key as string, row.decision as RememberedDecision]));
+  const rows = db
+    .prepare('SELECT remember_key, decision FROM permission_memories WHERE session_id = ?')
+    .all(sessionId);
+  return new Map(rows.map(row => [row.remember_key as string, row.decision as RememberedDecision]));
 }
 
 export function persistSessionRememberedDecision(
@@ -42,22 +42,24 @@ export function persistSessionRememberedDecision(
   decision: RememberedDecision
 ): void {
   const now = Date.now();
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO permission_memories (session_id, remember_key, decision, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?)
     ON CONFLICT(session_id, remember_key)
     DO UPDATE SET decision = excluded.decision, updated_at = excluded.updated_at
-  `).run(sessionId, buildRememberKey(toolName, toolInput, detail), decision, now, now);
+  `
+  ).run(sessionId, buildRememberKey(toolName, toolInput, detail), decision, now, now);
 }
 
 export function loadProjectAllowedOutsideWorkspaceRoots(
   db: PermissionMemoryDb,
   projectId: string
 ): Set<string> {
-  const rows = db.prepare(
-    'SELECT allowed_root FROM permission_outside_workspace_roots WHERE project_id = ?'
-  ).all(projectId);
-  return new Set(rows.map((row) => row.allowed_root as string));
+  const rows = db
+    .prepare('SELECT allowed_root FROM permission_outside_workspace_roots WHERE project_id = ?')
+    .all(projectId);
+  return new Set(rows.map(row => row.allowed_root as string));
 }
 
 export function persistProjectAllowedOutsideWorkspaceRoots(
@@ -86,17 +88,16 @@ const SANDBOX_NETWORK_KEY_PREFIX = 'sandbox:network:';
  * Defensive: a DB error (e.g. an incomplete/missing `permission_memories` table)
  * must not crash an agent run — degrade to "no grants".
  */
-export function loadSessionSandboxDomains(
-  db: PermissionMemoryDb,
-  sessionId: string
-): string[] {
+export function loadSessionSandboxDomains(db: PermissionMemoryDb, sessionId: string): string[] {
   try {
-    const rows = db.prepare(
-      "SELECT remember_key FROM permission_memories WHERE session_id = ? AND remember_key LIKE 'sandbox:network:%' AND decision = 'allow'"
-    ).all(sessionId);
+    const rows = db
+      .prepare(
+        "SELECT remember_key FROM permission_memories WHERE session_id = ? AND remember_key LIKE 'sandbox:network:%' AND decision = 'allow'"
+      )
+      .all(sessionId);
     return rows
-      .map((row) => (row.remember_key as string).slice(SANDBOX_NETWORK_KEY_PREFIX.length))
-      .filter((host) => host.length > 0);
+      .map(row => (row.remember_key as string).slice(SANDBOX_NETWORK_KEY_PREFIX.length))
+      .filter(host => host.length > 0);
   } catch (err) {
     console.warn('[sandbox] failed to load session network grants; treating as none:', err);
     return [];
@@ -110,10 +111,12 @@ export function persistSessionSandboxDomain(
   host: string
 ): void {
   const now = Date.now();
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO permission_memories (session_id, remember_key, decision, created_at, updated_at)
     VALUES (?, ?, 'allow', ?, ?)
     ON CONFLICT(session_id, remember_key)
     DO UPDATE SET decision = 'allow', updated_at = excluded.updated_at
-  `).run(sessionId, SANDBOX_NETWORK_KEY_PREFIX + host, now, now);
+  `
+  ).run(sessionId, SANDBOX_NETWORK_KEY_PREFIX + host, now, now);
 }

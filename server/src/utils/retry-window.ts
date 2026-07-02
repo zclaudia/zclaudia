@@ -16,7 +16,10 @@ function parseDurationToken(value: number, unit: string): number {
   return value * 1000;
 }
 
-function getZonedParts(ts: number, timeZone: string): {
+function getZonedParts(
+  ts: number,
+  timeZone: string
+): {
   year: number;
   month: number;
   day: number;
@@ -35,7 +38,7 @@ function getZonedParts(ts: number, timeZone: string): {
     hourCycle: 'h23',
   });
   const parts = fmt.formatToParts(new Date(ts));
-  const get = (type: string) => parseInt(parts.find((p) => p.type === type)?.value || '0', 10);
+  const get = (type: string) => parseInt(parts.find(p => p.type === type)?.value || '0', 10);
   return {
     year: get('year'),
     month: get('month'),
@@ -70,13 +73,13 @@ function zonedLocalToEpoch(
   ts = naiveUtc - offset2;
 
   const final = getZonedParts(ts, timeZone);
-  return (
-    final.year === year &&
+  return final.year === year &&
     final.month === month &&
     final.day === day &&
     final.hour === hour &&
     final.minute === minute
-  ) ? ts : null;
+    ? ts
+    : null;
 }
 
 /**
@@ -88,12 +91,17 @@ function zonedLocalToEpoch(
  * 3) "in HH:MM:SS" style durations
  * 4) absolute timestamps (ISO / UTC-like) and compute delta from now
  */
-export function extractRetryDelayMsFromError(errorMessage: string, now = Date.now()): number | null {
+export function extractRetryDelayMsFromError(
+  errorMessage: string,
+  now = Date.now()
+): number | null {
   const text = errorMessage || '';
   if (!text) return null;
 
   // 1) retry-after: 12s / 1.5m / 2000ms (optional unit, defaults seconds)
-  const retryAfter = text.match(/retry[-\s]?after[:\s]+(\d+(?:\.\d+)?)\s*(ms|msecs?|milliseconds?|s|secs?|seconds?|m|mins?|minutes?|h|hrs?|hours?)?/i);
+  const retryAfter = text.match(
+    /retry[-\s]?after[:\s]+(\d+(?:\.\d+)?)\s*(ms|msecs?|milliseconds?|s|secs?|seconds?|m|mins?|minutes?|h|hrs?|hours?)?/i
+  );
   if (retryAfter) {
     const value = parseFloat(retryAfter[1]);
     const unit = retryAfter[2] || 's';
@@ -106,7 +114,8 @@ export function extractRetryDelayMsFromError(errorMessage: string, now = Date.no
   if (relativePhrase) {
     const body = relativePhrase[1];
     let total = 0;
-    const tokenRegex = /(\d+(?:\.\d+)?)\s*(ms|msecs?|milliseconds?|h|hrs?|hours?|m|mins?|minutes?|s|secs?|seconds?)/gi;
+    const tokenRegex =
+      /(\d+(?:\.\d+)?)\s*(ms|msecs?|milliseconds?|h|hrs?|hours?|m|mins?|minutes?|s|secs?|seconds?)/gi;
     let m: RegExpExecArray | null;
     while ((m = tokenRegex.exec(body)) !== null) {
       total += parseDurationToken(parseFloat(m[1]), m[2]);
@@ -143,7 +152,14 @@ export function extractRetryDelayMsFromError(errorMessage: string, now = Date.no
       let targetMonth = nowZoned.month;
       let targetDay = nowZoned.day;
 
-      let targetTs = zonedLocalToEpoch(targetYear, targetMonth, targetDay, hour24, minute, timeZone);
+      let targetTs = zonedLocalToEpoch(
+        targetYear,
+        targetMonth,
+        targetDay,
+        hour24,
+        minute,
+        timeZone
+      );
       if (targetTs != null && targetTs <= now) {
         const next = new Date(Date.UTC(targetYear, targetMonth - 1, targetDay));
         next.setUTCDate(next.getUTCDate() + 1);
@@ -166,7 +182,9 @@ export function extractRetryDelayMsFromError(errorMessage: string, now = Date.no
   // Examples:
   // - 2026-03-06T10:20:30Z
   // - 2026-03-06 10:20:30 UTC
-  const isoLike = text.match(/\b(\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2}| UTC)?)\b/i);
+  const isoLike = text.match(
+    /\b(\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2}| UTC)?)\b/i
+  );
   if (isoLike) {
     const normalized = isoLike[1].replace(/\sUTC$/i, 'Z').replace(' ', 'T');
     const ts = Date.parse(normalized);

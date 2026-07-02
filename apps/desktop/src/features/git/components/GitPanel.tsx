@@ -10,11 +10,11 @@ interface GitPanelProps {
 }
 
 export function GitPanel({ projectId, projectRootPath }: GitPanelProps) {
-  const worktrees = useGitStore((s) => s.worktrees[projectId] ?? []);
-  const selectedPath = useGitStore((s) => s.selectedWorktree[projectId] ?? null);
-  const setWorktrees = useGitStore((s) => s.setWorktrees);
-  const setSelectedWorktree = useGitStore((s) => s.setSelectedWorktree);
-  const setStatus = useGitStore((s) => s.setStatus);
+  const worktrees = useGitStore(s => s.worktrees[projectId] ?? []);
+  const selectedPath = useGitStore(s => s.selectedWorktree[projectId] ?? null);
+  const setWorktrees = useGitStore(s => s.setWorktrees);
+  const setSelectedWorktree = useGitStore(s => s.setSelectedWorktree);
+  const setStatus = useGitStore(s => s.setStatus);
   const [loading, setLoading] = useState(false);
 
   const refreshWorktrees = useCallback(async () => {
@@ -24,18 +24,18 @@ export function GitPanel({ projectId, projectRootPath }: GitPanelProps) {
       setWorktrees(projectId, list);
       // Lazy-load status for each in parallel (best effort).
       await Promise.all(
-        list.map(async (wt) => {
+        list.map(async wt => {
           try {
             const status = await api.getWorktreeStatus(projectId, wt.path);
             setStatus(projectId, wt.path, status);
           } catch {
             // ignore individual failures
           }
-        }),
+        })
       );
       // Default-select first non-supervisor worktree if nothing selected
       if (!selectedPath) {
-        const preferred = list.find((w) => !w.managedBy) ?? list[0];
+        const preferred = list.find(w => !w.managedBy) ?? list[0];
         if (preferred) setSelectedWorktree(projectId, preferred.path);
       }
     } finally {
@@ -47,7 +47,7 @@ export function GitPanel({ projectId, projectRootPath }: GitPanelProps) {
     refreshWorktrees().catch(() => {});
   }, [projectId]);
 
-  const selected = worktrees.find((w) => w.path === selectedPath) ?? null;
+  const selected = worktrees.find(w => w.path === selectedPath) ?? null;
   const hasRoot = !!projectRootPath;
 
   if (!hasRoot) {
@@ -55,7 +55,9 @@ export function GitPanel({ projectId, projectRootPath }: GitPanelProps) {
       <div className="flex h-full items-center justify-center p-6 text-center text-muted-foreground">
         <div>
           <p className="text-sm">This project has no local path.</p>
-          <p className="text-xs mt-1">Git management is only available for projects with a `rootPath`.</p>
+          <p className="text-xs mt-1">
+            Git management is only available for projects with a `rootPath`.
+          </p>
         </div>
       </div>
     );
@@ -69,7 +71,7 @@ export function GitPanel({ projectId, projectRootPath }: GitPanelProps) {
           worktrees={worktrees}
           selectedPath={selectedPath}
           loading={loading}
-          onSelect={(p) => setSelectedWorktree(projectId, p)}
+          onSelect={p => setSelectedWorktree(projectId, p)}
           onRefresh={refreshWorktrees}
         />
       </div>

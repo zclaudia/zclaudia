@@ -11,23 +11,32 @@ import type {
   ClaudiaTaskCreatedMessage,
   ClaudiaTaskDeltaMessage,
   ClaudiaTaskUpdateMessage,
-  BranchAction,
   ErrorMessage,
 } from '@zclaudia/shared/wire/messages';
 import type { ConnectedClient, ActiveRun } from '../transport/types.js';
 import type { initDatabase } from '../../../infra/storage/db.js';
+import type { Database } from 'better-sqlite3';
 import type { NotificationService } from '../../../domains/notification-feed/index.js';
 import type { TaskCoordinationPort } from '../../../application/conversation/task-coordination-port.js';
+import type { WebSocket } from 'ws';
 import { sendMessage } from '../transport/broadcast.js';
-import { resolveAgentForSession, NoAgentAvailableError } from '../../../domains/agent-profiles/agent-resolver.js';
+import { NoAgentAvailableError } from '../../../domains/agent-profiles/agent-resolver.js';
 import { TaskRepository } from '../../../domains/tasks/repository.js';
 import { TaskService } from '../../../domains/tasks/task-service.js';
+import { ProjectRepository } from '../../../domains/projects/repository.js';
+import { ClaudiaInlineSessionAllocationService } from '../claudia-inline-session-allocation-service.js';
 
 interface ClaudiaHandlerContext {
   activeRuns: Map<string, ActiveRun>;
   connectedClients: Map<string, ConnectedClient>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- handleRunStart accepts various message shapes from different callers
-  handleRunStart: (client: ConnectedClient, message: any, db: ReturnType<typeof initDatabase>, options?: Record<string, unknown>, clients?: Map<string, ConnectedClient>) => Promise<void>;
+  handleRunStart: (
+    client: ConnectedClient,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- handleRunStart accepts various message shapes from different callers
+    message: any,
+    db: ReturnType<typeof initDatabase>,
+    options?: Record<string, unknown>,
+    clients?: Map<string, ConnectedClient>
+  ) => Promise<void>;
   notificationService?: NotificationService;
   taskCoordination?: TaskCoordinationPort;
 }
@@ -37,7 +46,7 @@ export async function handleClaudiaMessage(
   message: ClaudiaMessageMessage,
   db: ReturnType<typeof initDatabase>,
   clients: Map<string, ConnectedClient>,
-  ctx: ClaudiaHandlerContext,
+  ctx: ClaudiaHandlerContext
 ): Promise<void> {
   const clientReqId = message.clientRequestId;
   const inlineInput = message.input?.trim();
@@ -62,10 +71,8 @@ export async function handleClaudiaMessage(
   }
 
   const inlineProjectId = message.projectId;
-  const projectRow = inlineProjectId
-    ? db.prepare('SELECT id FROM projects WHERE id = ?').get(inlineProjectId) as { id: string } | undefined
-    : undefined;
-  if (inlineProjectId && !projectRow) {
+  const projectRepo = new ProjectRepository(db as unknown as Database);
+  if (inlineProjectId && !projectRepo.exists(inlineProjectId)) {
     sendMessage(client.ws, {
       type: 'claudia_message_failed',
       clientRequestId: clientReqId,
@@ -76,16 +83,10 @@ export async function handleClaudiaMessage(
 
   // Validate context projects
   const contextProjectIds = Array.from(new Set((message.contextProjectIds || []).filter(Boolean)));
-  const contextProjects = contextProjectIds.length > 0
-    ? db.prepare(`
-        SELECT id, name, root_path
-        FROM projects
-        WHERE id IN (${contextProjectIds.map(() => '?').join(',')})
-      `).all(...contextProjectIds) as Array<{ id: string; name: string; root_path: string | null }>
-    : [];
+  const contextProjects = projectRepo.findContextSummariesByIds(contextProjectIds);
   if (contextProjects.length !== contextProjectIds.length) {
-    const foundIds = new Set(contextProjects.map((project) => project.id));
-    const missingIds = contextProjectIds.filter((id) => !foundIds.has(id));
+    const foundIds = new Set(contextProjects.map(project => project.id));
+    const missingIds = contextProjectIds.filter(id => !foundIds.has(id));
     sendMessage(client.ws, {
       type: 'claudia_message_failed',
       clientRequestId: clientReqId,
@@ -94,76 +95,62 @@ export async function handleClaudiaMessage(
     return;
   }
 
-  const primaryContextProject = contextProjects.find((project) => project.id === message.primaryContextProjectId)
-    ?? contextProjects[0]
-    ?? null;
-  const sessionWorkingDirectory = primaryContextProject?.root_path || null;
-  const contextSystemPrompt = contextProjects.length > 0
-    ? [
-        'Attached project context:',
-        ...contextProjects.map((project, index) => {
-          const primaryTag = primaryContextProject?.id === project.id ? ' [primary]' : '';
-          const rootInfo = project.root_path ? project.root_path : 'no root path configured';
-          return `${index + 1}. ${project.name} (${project.id})${primaryTag} — root: ${rootInfo}`;
-        }),
-        '',
-        'Use the primary attached project as the active workspace for file and shell operations unless the user says otherwise.',
-      ].join('\n')
-    : undefined;
-  const now = Date.now();
+  const primaryContextProject =
+    contextProjects.find(project => project.id === message.primaryContextProjectId) ??
+    contextProjects[0] ??
+    null;
+  const sessionWorkingDirectory = primaryContextProject?.rootPath || undefined;
+  const contextSystemPrompt =
+    contextProjects.length > 0
+      ? [
+          'Attached project context:',
+          ...contextProjects.map((project, index) => {
+            const primaryTag = primaryContextProject?.id === project.id ? ' [primary]' : '';
+            const rootInfo = project.rootPath ? project.rootPath : 'no root path configured';
+            return `${index + 1}. ${project.name} (${project.id})${primaryTag} — root: ${rootInfo}`;
+          }),
+          '',
+          'Use the primary attached project as the active workspace for file and shell operations unless the user says otherwise.',
+        ].join('\n')
+      : undefined;
   const inlineTitle = inlineInput.replace(/\s+/g, ' ').slice(0, 80);
 
   // Branch allocation
   const branchService = ctx.taskCoordination;
   const freshSessionId = newId();
-  const allocation = branchService.allocateBranch({
-    hostProjectId: inlineProjectId,
-    activeBranchId: message.activeBranchId,
-    forceNew: message.forceNewBranch,
-    title: inlineTitle,
-    sessionId: freshSessionId,
-  });
-
-  const sessionId = allocation.sessionId;
-  const branchId = allocation.branchId;
-  const branchAction: BranchAction = allocation.action;
-  const contextReset = allocation.contextReset;
-  const isSessionReuse = allocation.action === 'reused' && sessionId !== freshSessionId;
-  if (branchAction !== 'forked') {
-    branchService.setActiveBranchId(inlineProjectId, branchId);
-  }
-
-  // Create new session only if not reusing
-  if (!isSessionReuse) {
-    let agentProfileId: string;
-    try {
-      const { agent } = resolveAgentForSession(db as unknown as import('better-sqlite3').Database, {
-        projectId: inlineProjectId,
-      });
-      agentProfileId = agent.id;
-    } catch (err) {
-      if (err instanceof NoAgentAvailableError) {
-        sendMessage(client.ws, {
-          type: 'claudia_message_failed',
-          clientRequestId: clientReqId,
-          error: 'No default agent profile available — create one in Settings first',
-        } as ClaudiaMessageFailedMessage);
-        return;
-      }
-      throw err;
+  let inlineAllocation;
+  try {
+    inlineAllocation = new ClaudiaInlineSessionAllocationService(
+      db as unknown as Database,
+      branchService
+    ).allocate({
+      hostProjectId: inlineProjectId,
+      activeBranchId: message.activeBranchId,
+      forceNew: message.forceNewBranch,
+      title: inlineTitle,
+      freshSessionId,
+      input: inlineInput,
+      workingDirectory: sessionWorkingDirectory,
+    });
+  } catch (err) {
+    if (err instanceof NoAgentAvailableError) {
+      sendMessage(client.ws, {
+        type: 'claudia_message_failed',
+        clientRequestId: clientReqId,
+        error: 'No default agent profile available — create one in Settings first',
+      } as ClaudiaMessageFailedMessage);
+      return;
     }
-    db.prepare(`
-      INSERT INTO sessions (id, project_id, name, agent_profile_id, type, parent_session_id, working_directory, created_at, updated_at)
-      VALUES (?, ?, ?, ?, 'agent', NULL, ?, ?, ?)
-    `).run(sessionId, inlineProjectId, `Claudia: ${inlineInput.slice(0, 50)}`, agentProfileId, sessionWorkingDirectory, now, now);
-    branchService.attachSession(branchId, sessionId);
+    throw err;
   }
+
+  const { sessionId, branchId, branchAction, contextReset } = inlineAllocation;
 
   let fullContent = '';
   let promoted = false;
   let completed = false;
   const PROMOTE_TIMEOUT_MS = 5_000;
-  const canonicalTaskRepo = new TaskRepository(db as unknown as import('better-sqlite3').Database);
+  const canonicalTaskRepo = new TaskRepository(db as unknown as Database);
   const canonicalTaskService = new TaskService(canonicalTaskRepo);
   let promotedTaskId: string | null = null;
 
@@ -171,7 +158,10 @@ export async function handleClaudiaMessage(
     if (!completed && !promoted) promote();
   }, PROMOTE_TIMEOUT_MS);
 
-  function persistInlineHistory(status: 'completed' | 'failed', extra?: { summary?: string; error?: string; updatedAt?: number }) {
+  function persistInlineHistory(
+    status: 'completed' | 'failed',
+    extra?: { summary?: string; error?: string; updatedAt?: number }
+  ) {
     if (promotedTaskId) return promotedTaskId;
     const task = canonicalTaskService.createTask({
       type: 'agent',
@@ -196,7 +186,10 @@ export async function handleClaudiaMessage(
     if (status === 'completed') {
       canonicalTaskService.completeTask(task.id, { text: fullContent || extra?.summary });
     } else {
-      canonicalTaskService.failTask(task.id, { text: fullContent || undefined, error: extra?.error ?? 'Task failed' });
+      canonicalTaskService.failTask(task.id, {
+        text: fullContent || undefined,
+        error: extra?.error ?? 'Task failed',
+      });
     }
     promotedTaskId = task.id;
     branchService.updateBranchTask(branchId, task.id, sessionId);
@@ -235,15 +228,25 @@ export async function handleClaudiaMessage(
 
     if (ctx.notificationService) {
       ctx.notificationService.postItem({
-        taskId, sessionId, projectId: inlineProjectId,
-        source: 'manual', title: inlineTitle, summary: inlineInput, status: 'running',
+        taskId,
+        sessionId,
+        projectId: inlineProjectId,
+        source: 'manual',
+        title: inlineTitle,
+        summary: inlineInput,
+        status: 'running',
       });
     }
 
     sendMessage(client.ws, {
       type: 'claudia_message_promoted',
       clientRequestId: clientReqId,
-      taskId, projectId: inlineProjectId, sessionId, branchId, branchAction, contextReset,
+      taskId,
+      projectId: inlineProjectId,
+      sessionId,
+      branchId,
+      branchAction,
+      contextReset,
     } as ClaudiaMessagePromotedMessage);
   }
 
@@ -266,11 +269,12 @@ export async function handleClaudiaMessage(
           } else {
             if (promotedTaskId) {
               for (const [, c] of ctx.connectedClients) {
-                if (c.authenticated) sendMessage(c.ws, {
-                  type: 'claudia_task_delta',
-                  taskId: promotedTaskId,
-                  content: text,
-                } as ClaudiaTaskDeltaMessage);
+                if (c.authenticated)
+                  sendMessage(c.ws, {
+                    type: 'claudia_task_delta',
+                    taskId: promotedTaskId,
+                    content: text,
+                  } as ClaudiaTaskDeltaMessage);
               }
             }
           }
@@ -282,7 +286,9 @@ export async function handleClaudiaMessage(
           clearTimeout(promoteTimer);
           if (!promoted) {
             const stripped = fullContent.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-            persistInlineHistory('completed', { summary: stripped.slice(0, 200) || 'Task completed' });
+            persistInlineHistory('completed', {
+              summary: stripped.slice(0, 200) || 'Task completed',
+            });
             sendMessage(client.ws, {
               type: 'claudia_message_completed',
               clientRequestId: clientReqId,
@@ -293,15 +299,25 @@ export async function handleClaudiaMessage(
               const summary = fullContent.slice(0, 200) || 'Task completed';
               canonicalTaskService.completeTask(promotedTaskId, { text: fullContent || summary });
               for (const [, c] of ctx.connectedClients) {
-                if (c.authenticated) sendMessage(c.ws, {
-                  type: 'claudia_task_update',
-                  taskId: promotedTaskId, status: 'completed', sessionId, branchId, branchAction, contextReset,
-                  title: inlineTitle, responseText: fullContent, toolCount, updatedAt: Date.now(),
-                } as ClaudiaTaskUpdateMessage);
+                if (c.authenticated)
+                  sendMessage(c.ws, {
+                    type: 'claudia_task_update',
+                    taskId: promotedTaskId,
+                    status: 'completed',
+                    sessionId,
+                    branchId,
+                    branchAction,
+                    contextReset,
+                    title: inlineTitle,
+                    responseText: fullContent,
+                    toolCount,
+                    updatedAt: Date.now(),
+                  } as ClaudiaTaskUpdateMessage);
               }
               if (ctx.notificationService) {
                 const feedItem = ctx.notificationService.findByTaskId(promotedTaskId);
-                if (feedItem) ctx.notificationService.updateItemStatus(feedItem.id, 'completed', { summary });
+                if (feedItem)
+                  ctx.notificationService.updateItemStatus(feedItem.id, 'completed', { summary });
               }
             }
           }
@@ -321,28 +337,45 @@ export async function handleClaudiaMessage(
             return;
           }
           if (promotedTaskId) {
-            canonicalTaskService.failTask(promotedTaskId, { text: fullContent || undefined, error: errorMsg });
+            canonicalTaskService.failTask(promotedTaskId, {
+              text: fullContent || undefined,
+              error: errorMsg,
+            });
             for (const [, c] of ctx.connectedClients) {
-              if (c.authenticated) sendMessage(c.ws, {
-                type: 'claudia_task_update',
-                taskId: promotedTaskId, status: 'failed', sessionId, branchId, branchAction, contextReset,
-                error: errorMsg, responseText: fullContent || undefined, toolCount, updatedAt: Date.now(),
-              } as ClaudiaTaskUpdateMessage);
+              if (c.authenticated)
+                sendMessage(c.ws, {
+                  type: 'claudia_task_update',
+                  taskId: promotedTaskId,
+                  status: 'failed',
+                  sessionId,
+                  branchId,
+                  branchAction,
+                  contextReset,
+                  error: errorMsg,
+                  responseText: fullContent || undefined,
+                  toolCount,
+                  updatedAt: Date.now(),
+                } as ClaudiaTaskUpdateMessage);
             }
             if (ctx.notificationService) {
               const feedItem = ctx.notificationService.findByTaskId(promotedTaskId);
-              if (feedItem) ctx.notificationService.updateItemStatus(feedItem.id, 'failed', { error: errorMsg });
+              if (feedItem)
+                ctx.notificationService.updateItemStatus(feedItem.id, 'failed', {
+                  error: errorMsg,
+                });
             }
           }
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     },
   };
 
   const wrapperClientId = `claudia-inline-${clientReqId}`;
   const wrapperClient = {
     id: wrapperClientId,
-    ws: wrapperWs as unknown as import('ws').WebSocket,
+    ws: wrapperWs as unknown as WebSocket,
     isAlive: true,
     isLocal: true,
     authenticated: true,
@@ -350,45 +383,59 @@ export async function handleClaudiaMessage(
   clients.set(wrapperClientId, wrapperClient);
 
   // Start the run
-  ctx.handleRunStart(wrapperClient, {
-    type: 'run_start',
-    clientRequestId: clientReqId,
-    sessionId,
-    input: inlineInput,
-    llmProfileId: message.llmProfileId,
-    systemContext: contextSystemPrompt,
-    _contextTemplate: 'agent',
-  }, db, {}, clients).catch((err) => {
-    completed = true;
-    clearTimeout(promoteTimer);
-    clients.delete(wrapperClientId);
-    sendMessage(client.ws, {
-      type: 'claudia_message_failed',
-      clientRequestId: clientReqId,
-      error: err instanceof Error ? err.message : 'Failed to start inline run',
-    } as ClaudiaMessageFailedMessage);
-  });
+  ctx
+    .handleRunStart(
+      wrapperClient,
+      {
+        type: 'run_start',
+        clientRequestId: clientReqId,
+        sessionId,
+        input: inlineInput,
+        llmProfileId: message.llmProfileId,
+        systemContext: contextSystemPrompt,
+        _contextTemplate: 'agent',
+      },
+      db,
+      {},
+      clients
+    )
+    .catch(err => {
+      completed = true;
+      clearTimeout(promoteTimer);
+      clients.delete(wrapperClientId);
+      sendMessage(client.ws, {
+        type: 'claudia_message_failed',
+        clientRequestId: clientReqId,
+        error: err instanceof Error ? err.message : 'Failed to start inline run',
+      } as ClaudiaMessageFailedMessage);
+    });
 }
 
 export async function handleClaudiaTaskSubmit(
   client: ConnectedClient,
   message: ClaudiaTaskSubmitMessage,
   db: ReturnType<typeof initDatabase>,
-  taskCoordination: TaskCoordinationPort,
+  taskCoordination: TaskCoordinationPort
 ): Promise<void> {
   const taskInput = message.input?.trim();
   if (!taskInput) return;
 
   if (taskInput.length > 100_000) {
-    sendMessage(client.ws, { type: 'error', code: 'INPUT_TOO_LARGE', message: 'Task input exceeds 100KB limit' } as ErrorMessage);
+    sendMessage(client.ws, {
+      type: 'error',
+      code: 'INPUT_TOO_LARGE',
+      message: 'Task input exceeds 100KB limit',
+    } as ErrorMessage);
     return;
   }
 
-  const projectRow = message.projectId
-    ? db.prepare('SELECT id FROM projects WHERE id = ?').get(message.projectId) as { id: string } | undefined
-    : undefined;
-  if (message.projectId && !projectRow) {
-    sendMessage(client.ws, { type: 'error', code: 'PROJECT_NOT_FOUND', message: `Project not found: ${message.projectId}` } as ErrorMessage);
+  const projectRepo = new ProjectRepository(db as unknown as Database);
+  if (message.projectId && !projectRepo.exists(message.projectId)) {
+    sendMessage(client.ws, {
+      type: 'error',
+      code: 'PROJECT_NOT_FOUND',
+      message: `Project not found: ${message.projectId}`,
+    } as ErrorMessage);
     return;
   }
 
@@ -416,7 +463,11 @@ export async function handleClaudiaTaskSubmit(
       branchAction: submitAllocation.action,
       contextReset: submitAllocation.contextReset,
     });
-    submitBranchService.updateBranchTask(submitAllocation.branchId, submitted.taskId, submitted.sessionId);
+    submitBranchService.updateBranchTask(
+      submitAllocation.branchId,
+      submitted.taskId,
+      submitted.sessionId
+    );
 
     sendMessage(client.ws, {
       type: 'claudia_task_created',
@@ -442,7 +493,7 @@ export async function handleClaudiaTaskContinue(
   client: ConnectedClient,
   message: ClaudiaTaskContinueMessage,
   db: ReturnType<typeof initDatabase>,
-  taskCoordination: TaskCoordinationPort,
+  taskCoordination: TaskCoordinationPort
 ): Promise<void> {
   const continueInput = message.input?.trim();
   if (!continueInput) return;
@@ -481,7 +532,11 @@ export async function handleClaudiaTaskContinue(
       branchAction: continueAllocation.action,
       contextReset: continueAllocation.contextReset,
     });
-    continueBranchService.updateBranchTask(continueAllocation.branchId, submitted.taskId, submitted.sessionId);
+    continueBranchService.updateBranchTask(
+      continueAllocation.branchId,
+      submitted.taskId,
+      submitted.sessionId
+    );
 
     sendMessage(client.ws, {
       type: 'claudia_task_created',
@@ -507,7 +562,7 @@ export async function handleClaudiaTaskContinue(
 export async function handleClaudiaTaskCancel(
   client: ConnectedClient,
   message: ClaudiaTaskCancelMessage,
-  taskCoordination: TaskCoordinationPort,
+  taskCoordination: TaskCoordinationPort
 ): Promise<void> {
   const task = taskCoordination.getCanonicalAgentTask(message.taskId);
   if (!task) {

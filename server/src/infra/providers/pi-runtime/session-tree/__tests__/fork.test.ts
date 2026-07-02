@@ -13,11 +13,14 @@ function makeDb(): Database.Database {
   db.exec(migration.sql);
   return db;
 }
-const msg = (role: 'user' | 'assistant', content: string) => ({ role, content } as MessageEntry['message']);
+const msg = (role: 'user' | 'assistant', content: string) =>
+  ({ role, content }) as MessageEntry['message'];
 
 describe('forkSessionAt (position "at")', () => {
   let db: Database.Database;
-  beforeEach(() => { db = makeDb(); });
+  beforeEach(() => {
+    db = makeDb();
+  });
 
   it('copies the path up to and including the entry into a new session, sets its leaf', async () => {
     const src = new Session(new SqliteSessionStorage(db, 'src'));
@@ -29,7 +32,7 @@ describe('forkSessionAt (position "at")', () => {
 
     const dst = new Session(new SqliteSessionStorage(db, 'dst'));
     const ctx = await dst.buildContext();
-    expect(ctx.messages.map((m) => (m as { content: string }).content)).toEqual(['a', 'b']);
+    expect(ctx.messages.map(m => (m as { content: string }).content)).toEqual(['a', 'b']);
   });
 
   it('leaves the source session untouched', async () => {
@@ -41,7 +44,7 @@ describe('forkSessionAt (position "at")', () => {
     forkSessionAt(db, 'src', forkPoint, 'dst');
 
     const ctx = await src.buildContext();
-    expect(ctx.messages.map((m) => (m as { content: string }).content)).toEqual(['a', 'b', 'c']);
+    expect(ctx.messages.map(m => (m as { content: string }).content)).toEqual(['a', 'b', 'c']);
   });
 
   it('throws for a non-existent fork target', () => {

@@ -9,9 +9,11 @@ describe('migrations canonical task runtime', () => {
     const db = new Database(':memory:');
     applyMigrations(db);
 
-    const table = db.prepare(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'orchestrator_tasks'"
-    ).get();
+    const table = db
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'orchestrator_tasks'"
+      )
+      .get();
 
     expect(table).toBeUndefined();
     db.close();
@@ -42,19 +44,23 @@ describe('migrations canonical task runtime', () => {
 
     db.exec(dropLegacyOrchestratorTasks.sql);
 
-    const table = db.prepare(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'orchestrator_tasks'"
-    ).get();
+    const table = db
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'orchestrator_tasks'"
+      )
+      .get();
     const branch = db.prepare('SELECT * FROM claudia_branches WHERE id = ?').get('branch-1') as {
       last_task_id: string;
       active_session_id: string;
     };
-    const foreignKeys = db.prepare('PRAGMA foreign_key_list(claudia_branches)').all() as Array<{ table: string }>;
+    const foreignKeys = db.prepare('PRAGMA foreign_key_list(claudia_branches)').all() as Array<{
+      table: string;
+    }>;
 
     expect(table).toBeUndefined();
     expect(branch.last_task_id).toBe('legacy-task-1');
     expect(branch.active_session_id).toBe('session-1');
-    expect(foreignKeys.map((fk) => fk.table)).not.toContain('orchestrator_tasks');
+    expect(foreignKeys.map(fk => fk.table)).not.toContain('orchestrator_tasks');
     db.close();
   });
 });

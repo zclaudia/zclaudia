@@ -35,7 +35,7 @@ export class IssueStatusPropagator {
 
   /** Wire up the subscriber. Returns an unsubscribe function. */
   install(): () => void {
-    const handler: EventHandler<IssueDomainEvent> = (event) => {
+    const handler: EventHandler<IssueDomainEvent> = event => {
       if (event.type !== 'executor.status_changed') return;
       try {
         this.onExecutorStatusChanged(event);
@@ -75,12 +75,12 @@ export class IssueStatusPropagator {
  */
 export function deriveSubIssueStatus(
   executors: ExecutorInstance[],
-  _currentSubIssueStatus: LocalIssueStatus,
+  _currentSubIssueStatus: LocalIssueStatus
 ): LocalIssueStatus | null {
   if (executors.length === 0) return null;
 
-  const states = executors.map((e) => e.statusSummary);
-  const all = (s: ExecutorStatus): boolean => states.every((x) => x === s);
+  const states = executors.map(e => e.statusSummary);
+  const all = (s: ExecutorStatus): boolean => states.every(x => x === s);
 
   // Strict terminal-only cases first.
   if (all('cancelled')) return 'cancelled';

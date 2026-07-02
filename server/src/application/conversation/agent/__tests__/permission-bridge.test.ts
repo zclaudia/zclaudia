@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { PermissionBridge } from '../permission-bridge.js';
 import type { PermissionEscalationContext } from '../../../../domains/workflows/ports/step-executor.js';
 
-function createContext(overrides: Partial<PermissionEscalationContext> = {}): PermissionEscalationContext {
+function createContext(
+  overrides: Partial<PermissionEscalationContext> = {}
+): PermissionEscalationContext {
   return {
     requestId: 'req-1',
     runId: 'run-1',
@@ -24,7 +26,7 @@ describe('PermissionBridge', () => {
     const onWorkflowResolved = vi.fn(() => {
       calls.push('notify-ui');
     });
-    const resolve = vi.fn((decision) => {
+    const resolve = vi.fn(decision => {
       calls.push(`resolve-provider:${decision.behavior}`);
     });
 

@@ -25,9 +25,7 @@ function makeContext(overrides: Partial<StepContext> = {}): StepContext {
     projectId: 'project-1',
     projectRootPath: '/repo',
     llmProfileId: 'llm-1',
-    results: new Map([
-      ['lint', { status: 'completed', output: { stdout: 'lint ok' } }],
-    ]),
+    results: new Map([['lint', { status: 'completed', output: { stdout: 'lint ok' } }]]),
     resolveTemplate: vi.fn((value: string) => `resolved:${value}`),
     setSessionId: vi.fn(),
     ...overrides,
@@ -35,7 +33,7 @@ function makeContext(overrides: Partial<StepContext> = {}): StepContext {
 }
 
 function makeRuntimeResolver(
-  overrides: Partial<Awaited<ReturnType<WorkflowAgentRuntimePort['resolve']>>> = {},
+  overrides: Partial<Awaited<ReturnType<WorkflowAgentRuntimePort['resolve']>>> = {}
 ): WorkflowAgentRuntimePort {
   return {
     resolve: vi.fn(async () => ({
@@ -57,14 +55,14 @@ describe('workflow agent-loop AI executors', () => {
     const runtimeResolver = makeRuntimeResolver();
     const executor = new AIPromptStepExecutor(
       { run } as unknown as AgentLoopRunnerPort,
-      runtimeResolver,
+      runtimeResolver
     );
     const ctx = makeContext();
 
     const result = await executor.execute(
       makeNode(),
       { prompt: 'Analyze ${lint.output.stdout}' },
-      ctx,
+      ctx
     );
 
     expect(result).toEqual({
@@ -107,7 +105,8 @@ describe('workflow agent-loop AI executors', () => {
       llmProfileId: 'llm-1',
       model: undefined,
       baseSystemPrompt: undefined,
-      systemContext: 'You are executing a workflow AI prompt. Return JSON that satisfies the requested contract.',
+      systemContext:
+        'You are executing a workflow AI prompt. Return JSON that satisfies the requested contract.',
     });
     expect(ctx.resolveTemplate).not.toHaveBeenCalled();
     expect(ctx.setSessionId).not.toHaveBeenCalled();
@@ -122,15 +121,11 @@ describe('workflow agent-loop AI executors', () => {
     }));
     const executor = new AIPromptStepExecutor(
       { run } as unknown as AgentLoopRunnerPort,
-      makeRuntimeResolver(),
+      makeRuntimeResolver()
     );
     const ctx = makeContext();
 
-    const result = await executor.execute(
-      makeNode(),
-      { prompt: 'Analyze repo' },
-      ctx,
-    );
+    const result = await executor.execute(makeNode(), { prompt: 'Analyze repo' }, ctx);
 
     expect(result).toEqual({
       status: 'failed',
@@ -148,21 +143,23 @@ describe('workflow agent-loop AI executors', () => {
     }));
     const executor = new AIPromptStepExecutor(
       { run } as unknown as AgentLoopRunnerPort,
-      makeRuntimeResolver(),
+      makeRuntimeResolver()
     );
 
     await executor.execute(
       makeNode({ id: 'prompt-none', timeoutMs: 4321 }),
       { prompt: 'Answer from memory', toolset: 'none' },
-      makeContext(),
+      makeContext()
     );
 
-    expect(run).toHaveBeenCalledWith(expect.objectContaining({
-      toolset: { id: 'none' },
-      limits: { timeoutMs: 4321 },
-      permissionMode: 'deny-external',
-      context: { policy: 'workflow-artifacts', key: 'prompt-none' },
-    }));
+    expect(run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolset: { id: 'none' },
+        limits: { timeoutMs: 4321 },
+        permissionMode: 'deny-external',
+        context: { policy: 'workflow-artifacts', key: 'prompt-none' },
+      })
+    );
   });
 
   it('falls back to process cwd when the workflow has no project root', async () => {
@@ -173,18 +170,20 @@ describe('workflow agent-loop AI executors', () => {
     }));
     const executor = new AIPromptStepExecutor(
       { run } as unknown as AgentLoopRunnerPort,
-      makeRuntimeResolver(),
+      makeRuntimeResolver()
     );
 
     await executor.execute(
       makeNode({ id: 'prompt-cwd' }),
       { prompt: 'Run from current cwd' },
-      makeContext({ projectRootPath: undefined }),
+      makeContext({ projectRootPath: undefined })
     );
 
-    expect(run).toHaveBeenCalledWith(expect.objectContaining({
-      cwd: process.cwd(),
-    }));
+    expect(run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cwd: process.cwd(),
+      })
+    );
   });
 
   it('allows workflow prompts to opt into the readonly toolset', async () => {
@@ -195,20 +194,22 @@ describe('workflow agent-loop AI executors', () => {
     }));
     const executor = new AIPromptStepExecutor(
       { run } as unknown as AgentLoopRunnerPort,
-      makeRuntimeResolver(),
+      makeRuntimeResolver()
     );
 
     await executor.execute(
       makeNode({ id: 'prompt-readonly' }),
       { prompt: 'Summarize repo', toolset: 'workflow-prompt-readonly' },
-      makeContext(),
+      makeContext()
     );
 
-    expect(run).toHaveBeenCalledWith(expect.objectContaining({
-      toolset: { id: 'workflow-prompt-readonly' },
-      permissionMode: 'allow-declared-tools',
-      context: { policy: 'workflow-artifacts', key: 'prompt-readonly' },
-    }));
+    expect(run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolset: { id: 'workflow-prompt-readonly' },
+        permissionMode: 'allow-declared-tools',
+        context: { policy: 'workflow-artifacts', key: 'prompt-readonly' },
+      })
+    );
   });
 
   it('passes explicit maxTurns and runtime permission hooks to the agent loop', async () => {
@@ -224,23 +225,25 @@ describe('workflow agent-loop AI executors', () => {
         userHooks: [{ event: 'PreToolUse', command: 'echo ok' }],
         permissionCallback,
         toolSessionId: 'run-1',
-      }),
+      })
     );
 
     await executor.execute(
       makeNode({ id: 'prompt-permissions', timeoutMs: 9999 }),
       { prompt: 'Fix it', maxTurns: 12 },
-      makeContext(),
+      makeContext()
     );
 
-    expect(run).toHaveBeenCalledWith(expect.objectContaining({
-      limits: { maxTurns: 12, timeoutMs: 9999 },
-      permissions: {
-        userHooks: [{ event: 'PreToolUse', command: 'echo ok' }],
-        permissionCallback,
-        toolSessionId: 'run-1',
-      },
-    }));
+    expect(run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        limits: { maxTurns: 12, timeoutMs: 9999 },
+        permissions: {
+          userHooks: [{ event: 'PreToolUse', command: 'echo ok' }],
+          permissionCallback,
+          toolSessionId: 'run-1',
+        },
+      })
+    );
   });
 
   it('runs ai_review through AgentLoopRunnerPort and returns structured review output', async () => {
@@ -253,15 +256,13 @@ describe('workflow agent-loop AI executors', () => {
       },
       contextId: 'ctx-review',
     }));
-    const executor = new AIReviewStepExecutor(
-      { run } as unknown as AgentLoopRunnerPort,
-    );
+    const executor = new AIReviewStepExecutor({ run } as unknown as AgentLoopRunnerPort);
     const ctx = makeContext();
 
     const result = await executor.execute(
       makeNode({ id: 'review', name: 'Review', type: 'ai_review', timeoutMs: 2222 }),
       {},
-      ctx,
+      ctx
     );
 
     expect(result).toEqual({
@@ -273,22 +274,24 @@ describe('workflow agent-loop AI executors', () => {
         contextId: 'ctx-review',
       },
     });
-    expect(run).toHaveBeenCalledWith(expect.objectContaining({
-      owner: { type: 'workflow_run', id: 'run-1' },
-      purpose: 'workflow.ai_review',
-      llmProfileId: 'llm-1',
-      cwd: '/repo',
-      toolset: { id: 'code-review-readonly' },
-      context: { policy: 'workflow-artifacts', key: 'review' },
-      limits: { maxTurns: 8, timeoutMs: 2222 },
-      permissionMode: 'allow-declared-tools',
-      outputContract: expect.objectContaining({
-        type: 'json',
-        schema: expect.objectContaining({
-          required: ['reviewPassed', 'reviewNotes'],
+    expect(run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: { type: 'workflow_run', id: 'run-1' },
+        purpose: 'workflow.ai_review',
+        llmProfileId: 'llm-1',
+        cwd: '/repo',
+        toolset: { id: 'code-review-readonly' },
+        context: { policy: 'workflow-artifacts', key: 'review' },
+        limits: { maxTurns: 8, timeoutMs: 2222 },
+        permissionMode: 'allow-declared-tools',
+        outputContract: expect.objectContaining({
+          type: 'json',
+          schema: expect.objectContaining({
+            required: ['reviewPassed', 'reviewNotes'],
+          }),
         }),
-      }),
-    }));
+      })
+    );
     expect(run.mock.calls[0]?.[0].input).toContain('lint ok');
     expect(ctx.setSessionId).not.toHaveBeenCalled();
   });
@@ -304,9 +307,7 @@ describe('workflow agent-loop AI executors', () => {
       },
       contextId: 'ctx-risk',
     }));
-    const executor = new AIRiskAnalysisStepExecutor(
-      { run } as unknown as AgentLoopRunnerPort,
-    );
+    const executor = new AIRiskAnalysisStepExecutor({ run } as unknown as AgentLoopRunnerPort);
 
     const result = await executor.execute(
       makeNode({ id: 'ai_review', name: 'AI Review', type: 'ai_risk_analysis', timeoutMs: 120000 }),
@@ -325,7 +326,7 @@ describe('workflow agent-loop AI executors', () => {
             analysisLlmProfileId: 'review-llm',
           },
         },
-      }),
+      })
     );
 
     expect(result).toMatchObject({
@@ -339,23 +340,23 @@ describe('workflow agent-loop AI executors', () => {
         contextId: 'ctx-risk',
       },
     });
-    expect(run).toHaveBeenCalledWith(expect.objectContaining({
-      purpose: 'workflow.ai_risk_analysis',
-      llmProfileId: 'review-llm',
-      cwd: '/repo',
-      toolset: { id: 'permission-review' },
-      context: { policy: 'step-local', key: 'permission:req-1:ai_review' },
-      limits: { maxTurns: 4, timeoutMs: 120000 },
-      permissionMode: 'allow-declared-tools',
-    }));
+    expect(run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        purpose: 'workflow.ai_risk_analysis',
+        llmProfileId: 'review-llm',
+        cwd: '/repo',
+        toolset: { id: 'permission-review' },
+        context: { policy: 'step-local', key: 'permission:req-1:ai_review' },
+        limits: { maxTurns: 4, timeoutMs: 120000 },
+        permissionMode: 'allow-declared-tools',
+      })
+    );
     expect(run.mock.calls[0]?.[0].input).toContain('"confidenceThreshold":0.92');
   });
 
   it('ai_risk_analysis returns uncertain without model call when AI review is disabled', async () => {
     const run = vi.fn();
-    const executor = new AIRiskAnalysisStepExecutor(
-      { run } as unknown as AgentLoopRunnerPort,
-    );
+    const executor = new AIRiskAnalysisStepExecutor({ run } as unknown as AgentLoopRunnerPort);
 
     const result = await executor.execute(
       makeNode({ id: 'ai_review', name: 'AI Review', type: 'ai_risk_analysis' }),
@@ -369,7 +370,7 @@ describe('workflow agent-loop AI executors', () => {
           cwd: '/repo',
           aiReview: { enabled: false },
         },
-      }),
+      })
     );
 
     expect(result).toMatchObject({
@@ -393,9 +394,7 @@ describe('workflow agent-loop AI executors', () => {
       },
       contextId: 'ctx-risk-template',
     }));
-    const executor = new AIRiskAnalysisStepExecutor(
-      { run } as unknown as AgentLoopRunnerPort,
-    );
+    const executor = new AIRiskAnalysisStepExecutor({ run } as unknown as AgentLoopRunnerPort);
 
     await executor.execute(
       makeNode({ id: 'ai_review', type: 'ai_risk_analysis' }),
@@ -408,7 +407,7 @@ describe('workflow agent-loop AI executors', () => {
           detail: 'npm test',
           cwd: '/repo',
         },
-      }),
+      })
     );
 
     expect(run.mock.calls[0]?.[0].input).toContain('"toolName":"resolved:${event.toolName}"');
@@ -424,9 +423,7 @@ describe('workflow agent-loop AI executors', () => {
         confidence: 0.4,
       },
     }));
-    const executor = new AIRiskAnalysisStepExecutor(
-      { run } as unknown as AgentLoopRunnerPort,
-    );
+    const executor = new AIRiskAnalysisStepExecutor({ run } as unknown as AgentLoopRunnerPort);
 
     const result = await executor.execute(
       makeNode({ id: 'ai_review', type: 'ai_risk_analysis' }),
@@ -440,7 +437,7 @@ describe('workflow agent-loop AI executors', () => {
           cwd: '/repo',
           aiReview: { enabled: true, confidenceThreshold: 0.9 },
         },
-      }),
+      })
     );
 
     expect(result).toMatchObject({

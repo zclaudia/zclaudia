@@ -4,7 +4,12 @@
 
 import { create } from 'zustand';
 import type { McpServerConfig, McpServerStatus } from '@zclaudia/shared';
-import type { McpOAuthConfig, McpOAuthCredentials, McpServerTransport, McpServerTrustPolicy } from '@zclaudia/shared/core/mcp';
+import type {
+  McpOAuthConfig,
+  McpOAuthCredentials,
+  McpServerTransport,
+  McpServerTrustPolicy,
+} from '@zclaudia/shared/core/mcp';
 import {
   getMcpServers,
   createMcpServer,
@@ -41,22 +46,25 @@ interface McpServerStoreState {
     providerScope?: string[];
     trustPolicy?: McpServerTrustPolicy;
   }) => Promise<McpServerConfig>;
-  editServer: (id: string, config: Partial<{
-    name: string;
-    command: string;
-    args: string[];
-    env: Record<string, string>;
-    transport: McpServerTransport;
-    url: string;
-    headers: Record<string, string>;
-    headersHelper: string;
-    oauthConfig: McpOAuthConfig;
-    oauthCredentials: McpOAuthCredentials | null;
-    enabled: boolean;
-    description: string;
-    providerScope: string[];
-    trustPolicy: McpServerTrustPolicy;
-  }>) => Promise<void>;
+  editServer: (
+    id: string,
+    config: Partial<{
+      name: string;
+      command: string;
+      args: string[];
+      env: Record<string, string>;
+      transport: McpServerTransport;
+      url: string;
+      headers: Record<string, string>;
+      headersHelper: string;
+      oauthConfig: McpOAuthConfig;
+      oauthCredentials: McpOAuthCredentials | null;
+      enabled: boolean;
+      description: string;
+      providerScope: string[];
+      trustPolicy: McpServerTrustPolicy;
+    }>
+  ) => Promise<void>;
   removeServer: (id: string) => Promise<void>;
   toggle: (id: string) => Promise<void>;
   connect: (name: string) => Promise<void>;
@@ -89,7 +97,7 @@ export const useMcpServerStore = create<McpServerStoreState>((set, get) => ({
     }
   },
 
-  addServer: async (config) => {
+  addServer: async config => {
     const server = await createMcpServer(config);
     set({ servers: [...get().servers, server] });
     return server;
@@ -97,30 +105,30 @@ export const useMcpServerStore = create<McpServerStoreState>((set, get) => ({
 
   editServer: async (id, config) => {
     const updated = await updateMcpServer(id, config);
-    set({ servers: get().servers.map(s => s.id === id ? updated : s) });
+    set({ servers: get().servers.map(s => (s.id === id ? updated : s)) });
   },
 
-  removeServer: async (id) => {
+  removeServer: async id => {
     await deleteMcpServer(id);
     set({ servers: get().servers.filter(s => s.id !== id) });
   },
 
-  toggle: async (id) => {
+  toggle: async id => {
     const updated = await toggleMcpServer(id);
-    set({ servers: get().servers.map(s => s.id === id ? updated : s) });
+    set({ servers: get().servers.map(s => (s.id === id ? updated : s)) });
   },
 
-  connect: async (name) => {
+  connect: async name => {
     const status = await connectMcpServer(name);
     set({ statuses: { ...get().statuses, [name]: status } });
   },
 
-  disconnect: async (name) => {
+  disconnect: async name => {
     const status = await disconnectMcpServer(name);
     set({ statuses: { ...get().statuses, [name]: status } });
   },
 
-  refresh: async (name) => {
+  refresh: async name => {
     const status = await refreshMcpServer(name);
     set({ statuses: { ...get().statuses, [name]: status } });
   },

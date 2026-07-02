@@ -6,7 +6,7 @@ import { isLocalhost } from './local-only.js';
  * Local requests are always allowed. Remote requests require a known clientId.
  */
 export function createExpressAuthMiddleware(
-  isValidClientId: (token: string) => boolean,
+  isValidClientId: (token: string) => boolean
 ): (req: Request, res: Response, next: NextFunction) => void {
   return (req: Request, res: Response, next: NextFunction): void => {
     // Local connections are always trusted
@@ -27,7 +27,7 @@ export function createExpressAuthMiddleware(
 
     res.status(401).json({
       success: false,
-      error: { code: 'UNAUTHORIZED', message: 'Authentication required' }
+      error: { code: 'UNAUTHORIZED', message: 'Authentication required' },
     });
   };
 }

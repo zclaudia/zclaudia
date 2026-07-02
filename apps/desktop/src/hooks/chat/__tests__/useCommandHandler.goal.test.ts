@@ -3,7 +3,9 @@ import { renderHook } from '@testing-library/react';
 
 vi.mock('../../../services/goalActions', () => ({ activateGoal: vi.fn() }));
 vi.mock('../../../services/api/goals', () => ({
-  pauseGoal: vi.fn(), resumeGoal: vi.fn(), clearGoal: vi.fn(),
+  pauseGoal: vi.fn(),
+  resumeGoal: vi.fn(),
+  clearGoal: vi.fn(),
 }));
 
 import { activateGoal } from '../../../services/goalActions';
@@ -27,7 +29,7 @@ function setup() {
       llmProfileId: undefined,
       commandsCacheKey: 'k',
       setDrawerOpen: vi.fn(),
-    }),
+    })
   );
   return { handleCommand: result.current.handleCommand, addMessage };
 }
@@ -45,42 +47,67 @@ describe('useCommandHandler /goal', () => {
     const { handleCommand, addMessage } = setup();
     await handleCommand('/goal', '');
     expect(activateGoal).not.toHaveBeenCalled();
-    expect(addMessage).toHaveBeenCalledWith('s1', expect.objectContaining({
-      role: 'system',
-      content: expect.stringContaining('Usage: /goal'),
-    }));
+    expect(addMessage).toHaveBeenCalledWith(
+      's1',
+      expect.objectContaining({
+        role: 'system',
+        content: expect.stringContaining('Usage: /goal'),
+      })
+    );
   });
 
   it('routes the pause subcommand when a goal is active', async () => {
     const { useGoalStore } = await import('../../../stores/goalStore');
     useGoalStore.setState({
-      bySession: { s1: { goal: { id: 'g1', status: 'active' } as any, budgetTokensUsed: 0, budgetTurnsUsed: 0, lastVerdictKind: null, lastVerdictReason: null } },
+      bySession: {
+        s1: {
+          goal: { id: 'g1', status: 'active' } as any,
+          budgetTokensUsed: 0,
+          budgetTurnsUsed: 0,
+          lastVerdictKind: null,
+          lastVerdictReason: null,
+        },
+      },
     });
     vi.mocked(pauseGoal).mockResolvedValue({ id: 'g1', status: 'paused' } as any);
     const { handleCommand, addMessage } = setup();
     await handleCommand('/goal', 'pause');
     expect(pauseGoal).toHaveBeenCalledWith('s1');
     expect(activateGoal).not.toHaveBeenCalled();
-    expect(addMessage).toHaveBeenCalledWith('s1', expect.objectContaining({
-      role: 'system',
-      content: 'Goal paused.',
-    }));
+    expect(addMessage).toHaveBeenCalledWith(
+      's1',
+      expect.objectContaining({
+        role: 'system',
+        content: 'Goal paused.',
+      })
+    );
   });
 
   it('routes the resume subcommand when a goal is active', async () => {
     const { useGoalStore } = await import('../../../stores/goalStore');
     useGoalStore.setState({
-      bySession: { s1: { goal: { id: 'g1', status: 'paused' } as any, budgetTokensUsed: 0, budgetTurnsUsed: 0, lastVerdictKind: null, lastVerdictReason: null } },
+      bySession: {
+        s1: {
+          goal: { id: 'g1', status: 'paused' } as any,
+          budgetTokensUsed: 0,
+          budgetTurnsUsed: 0,
+          lastVerdictKind: null,
+          lastVerdictReason: null,
+        },
+      },
     });
     vi.mocked(resumeGoal).mockResolvedValue({ id: 'g1', status: 'active' } as any);
     const { handleCommand, addMessage } = setup();
     await handleCommand('/goal', 'resume');
     expect(resumeGoal).toHaveBeenCalledWith('s1');
     expect(activateGoal).not.toHaveBeenCalled();
-    expect(addMessage).toHaveBeenCalledWith('s1', expect.objectContaining({
-      role: 'system',
-      content: 'Goal resumed.',
-    }));
+    expect(addMessage).toHaveBeenCalledWith(
+      's1',
+      expect.objectContaining({
+        role: 'system',
+        content: 'Goal resumed.',
+      })
+    );
   });
 
   it('treats pause as an objective when no goal is live', async () => {

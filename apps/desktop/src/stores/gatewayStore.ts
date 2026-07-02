@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { GatewayBackendInfo, BackendSnapshot } from '@zclaudia/shared';
 
-
 export type BackendAuthStatus = 'authenticated' | 'pending' | 'failed';
 export const GATEWAY_SERVER_PREFIX = 'gw:';
 
@@ -29,8 +28,8 @@ interface GatewayState {
   backendAuthStatus: Record<string, BackendAuthStatus>;
 
   // ---------------------------------------------------------------------------
-  // UI preferences — persisted, NOT managed by facade
-  // These are user settings that survive across sessions.
+  // UI preferences. The direct URL is persisted; directGatewaySecret is runtime
+  // only and must not be written to browser storage.
   // ---------------------------------------------------------------------------
   directGatewayUrl: string | null;
   directGatewaySecret: string | null;
@@ -94,20 +93,17 @@ export const useGatewayStore = create<GatewayState>()(
 
       // Dev debug
       showLocalBackend: false,
-      setShowLocalBackend: (show) => set({ showLocalBackend: show }),
+      setShowLocalBackend: show => set({ showLocalBackend: show }),
 
-      setConnected: (connected) => {
+      setConnected: connected => {
         const current = get();
         if (current.isConnected === connected) return;
-        set(connected
-          ? { isConnected: true }
-          : { isConnected: false, backendAuthStatus: {} }
-        );
+        set(connected ? { isConnected: true } : { isConnected: false, backendAuthStatus: {} });
       },
 
       setBackendAuthStatus: (backendId, status) => {
-        set((state) => ({
-          backendAuthStatus: { ...state.backendAuthStatus, [backendId]: status }
+        set(state => ({
+          backendAuthStatus: { ...state.backendAuthStatus, [backendId]: status },
         }));
       },
 
@@ -131,7 +127,7 @@ export const useGatewayStore = create<GatewayState>()(
         });
       },
 
-      setLastActiveBackend: (serverId) => {
+      setLastActiveBackend: serverId => {
         set({ lastActiveBackendId: serverId });
       },
 
@@ -155,14 +151,13 @@ export const useGatewayStore = create<GatewayState>()(
       hasDirectConfig: () => {
         const state = get();
         return !!state.directGatewayUrl && !!state.directGatewaySecret;
-      }
+      },
     }),
     {
       name: 'zclaudia-gateway',
-      version: 5,
-      partialize: (state) => ({
+      version: 6,
+      partialize: state => ({
         directGatewayUrl: state.directGatewayUrl,
-        directGatewaySecret: state.directGatewaySecret,
         lastActiveBackendId: state.lastActiveBackendId,
       }),
       migrate: (persisted: any, version: number) => {
@@ -175,8 +170,11 @@ export const useGatewayStore = create<GatewayState>()(
         }
         // v4: adds directGatewayUrl, directGatewaySecret, lastActiveBackendId
         // v5: subscribedBackendIds removed (was unused notification filter)
+        if (version < 6) {
+          delete persisted.directGatewaySecret;
+        }
         return persisted;
-      }
+      },
     }
   )
 );

@@ -44,7 +44,6 @@ export function tryGetRegistryModel(provider: string, modelId: string): Registry
  * always override via `models[*].contextWindow`).
  */
 export function findInRegistryCrossProvider(modelId: string): RegistryHit | undefined {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const getProvidersFn = getProviders as () => string[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const getModelsFn = getModels as (p: string) => Model<any>[];

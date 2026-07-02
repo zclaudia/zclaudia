@@ -1,17 +1,11 @@
 import type { Database } from 'better-sqlite3';
-import type {
-  Attachment,
-  AttachmentOwnerKind,
-} from '@zclaudia/shared/features/attachment';
+import type { Attachment, AttachmentOwnerKind } from '@zclaudia/shared/features/attachment';
 import type {
   AttachmentAddedMessage,
   AttachmentRemovedMessage,
   ServerMessage,
 } from '@zclaudia/shared/wire/messages';
-import {
-  attachmentStore,
-  type AttachmentStore,
-} from '../../infra/storage/attachmentStore.js';
+import { attachmentStore, type AttachmentStore } from '../../infra/storage/attachmentStore.js';
 import { AttachmentRepository, type AttachmentRow } from './repository.js';
 import { detectKindFromMime } from './kind-detector.js';
 
@@ -41,7 +35,7 @@ export class AttachmentService {
   constructor(
     db: Database,
     private broadcast: AttachmentBroadcaster,
-    storeOverride?: AttachmentStore,
+    storeOverride?: AttachmentStore
   ) {
     this.repo = new AttachmentRepository(db);
     this.store = (storeOverride ?? attachmentStore) as AttachmentStore;
@@ -94,10 +88,7 @@ export class AttachmentService {
     return this.repo.findByOwner(ownerKind, ownerId).map(toAttachment);
   }
 
-  countByOwners(
-    ownerKind: AttachmentOwnerKind,
-    ownerIds: string[],
-  ): Map<string, number> {
+  countByOwners(ownerKind: AttachmentOwnerKind, ownerIds: string[]): Map<string, number> {
     return this.repo.countByOwners(ownerKind, ownerIds);
   }
 

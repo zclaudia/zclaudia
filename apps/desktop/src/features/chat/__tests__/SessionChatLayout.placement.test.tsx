@@ -13,8 +13,12 @@ vi.mock('../ChatInterface', () => ({
     <div data-testid="chat">{beforeComposer ?? null}</div>
   ),
 }));
-vi.mock('../../../components/RightSidebar', () => ({ RightSidebar: () => <div data-testid="right" /> }));
-vi.mock('../../../components/BottomPanel', () => ({ BottomPanel: () => <div data-testid="bottom" /> }));
+vi.mock('../../../components/RightSidebar', () => ({
+  RightSidebar: () => <div data-testid="right" />,
+}));
+vi.mock('../../../components/BottomPanel', () => ({
+  BottomPanel: () => <div data-testid="bottom" />,
+}));
 
 import { SessionChatLayout } from '../SessionChatLayout';
 

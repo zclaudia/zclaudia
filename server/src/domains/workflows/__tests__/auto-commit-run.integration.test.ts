@@ -27,11 +27,12 @@ describe('AI auto-commit end-to-end', () => {
   let engine: WorkflowEngine;
   let runRepo: WorkflowRunRepository;
 
-  const def = () => BUILTIN_WORKFLOW_TEMPLATES.find((t) => t.id === AI_AUTO_COMMIT_TEMPLATE_ID)!.definition;
+  const def = () =>
+    BUILTIN_WORKFLOW_TEMPLATES.find(t => t.id === AI_AUTO_COMMIT_TEMPLATE_ID)!.definition;
 
   async function waitForTerminal(runId: string): Promise<WorkflowRun> {
     for (let i = 0; i < 150; i += 1) {
-      await new Promise((res) => setTimeout(res, 20));
+      await new Promise(res => setTimeout(res, 20));
       const run = runRepo.findById(runId);
       if (run && ['completed', 'failed', 'cancelled'].includes(run.status)) return run;
     }
@@ -58,7 +59,10 @@ describe('AI auto-commit end-to-end', () => {
     registry.register(new GitCommitActivity());
     registry.register({
       type: 'generate_commit_message',
-      invoke: async () => ({ status: 'completed', output: { subject: 'feat: x', message: 'feat: x' } }),
+      invoke: async () => ({
+        status: 'completed',
+        output: { subject: 'feat: x', message: 'feat: x' },
+      }),
     } as any);
 
     const composite = new CompositeStepExecutor();
@@ -68,13 +72,22 @@ describe('AI auto-commit end-to-end', () => {
     engine = new WorkflowEngine(db, () => {}, composite);
   });
 
-  afterEach(() => { rmSync(repo, { recursive: true, force: true }); db.close(); });
+  afterEach(() => {
+    rmSync(repo, { recursive: true, force: true });
+    db.close();
+  });
 
   it('stages, generates, and commits with the AI message', async () => {
     writeFileSync(join(repo, 'a.txt'), 'hello');
     const run = await engine.startRun({
-      workflowId: 'wf1', projectId: 'p1', definition: def(),
-      triggerSource: 'manual', initiator: 'manual', actionKind: 'workflow', actionRef: 'wf1', trackingKey: 'wf1',
+      workflowId: 'wf1',
+      projectId: 'p1',
+      definition: def(),
+      triggerSource: 'manual',
+      initiator: 'manual',
+      actionKind: 'workflow',
+      actionRef: 'wf1',
+      trackingKey: 'wf1',
     });
     const final = await waitForTerminal(run.id);
     expect(final.status).toBe('completed');
@@ -89,8 +102,14 @@ describe('AI auto-commit end-to-end', () => {
     const before = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo }).toString().trim();
 
     const run = await engine.startRun({
-      workflowId: 'wf1', projectId: 'p1', definition: def(),
-      triggerSource: 'manual', initiator: 'manual', actionKind: 'workflow', actionRef: 'wf1', trackingKey: 'wf1',
+      workflowId: 'wf1',
+      projectId: 'p1',
+      definition: def(),
+      triggerSource: 'manual',
+      initiator: 'manual',
+      actionKind: 'workflow',
+      actionRef: 'wf1',
+      trackingKey: 'wf1',
     });
     const final = await waitForTerminal(run.id);
     expect(final.status).toBe('completed');

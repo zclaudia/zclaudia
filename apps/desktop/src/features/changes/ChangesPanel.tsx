@@ -18,19 +18,20 @@ interface ChangesPanelProps {
 }
 
 export function ChangesPanel({ projectId, projectRoot }: ChangesPanelProps) {
-  const selectedSessionId = useSelectionStore((s) => s.selectedSessionId);
+  const selectedSessionId = useSelectionStore(s => s.selectedSessionId);
 
   // Per-session "since" cursor is persisted in changesPanelStore so the user's
   // pick survives panel close/reopen, session switches, and app restarts.
   // Missing key (never picked) → fall back to the latest user message ("this turn").
-  const pickedSinceBySession = useChangesPanelStore((s) => s.pickedSinceBySession);
-  const setPickedSince = useChangesPanelStore((s) => s.setPickedSince);
+  const pickedSinceBySession = useChangesPanelStore(s => s.pickedSinceBySession);
+  const setPickedSince = useChangesPanelStore(s => s.setPickedSince);
 
-  const clearPickedSince = useChangesPanelStore((s) => s.clearPickedSince);
+  const clearPickedSince = useChangesPanelStore(s => s.clearPickedSince);
 
-  const pickedSince = selectedSessionId && selectedSessionId in pickedSinceBySession
-    ? pickedSinceBySession[selectedSessionId]
-    : undefined;
+  const pickedSince =
+    selectedSessionId && selectedSessionId in pickedSinceBySession
+      ? pickedSinceBySession[selectedSessionId]
+      : undefined;
 
   const [expandedById, setExpandedById] = useState<Record<string, boolean>>({});
   const [bashCollapsed, setBashCollapsed] = useState(true);
@@ -44,7 +45,7 @@ export function ChangesPanel({ projectId, projectRoot }: ChangesPanelProps) {
   const { result, effectiveSinceId, effectiveSinceOption, latestUserMessageId } = useChangesData(
     selectedSessionId,
     pickedSince,
-    projectRoot,
+    projectRoot
   );
 
   // Auto-clear stale pickedSince: if messages have loaded (latestUserMessageId is set)
@@ -74,32 +75,36 @@ export function ChangesPanel({ projectId, projectRoot }: ChangesPanelProps) {
   const userMessageOptions = useUserMessageOptions(selectedSessionId, sinceOpen);
 
   const allExpanded = useMemo(
-    () => modified.length > 0 && modified.every((m) => expandedById[m.absolutePath]),
-    [modified, expandedById],
+    () => modified.length > 0 && modified.every(m => expandedById[m.absolutePath]),
+    [modified, expandedById]
   );
 
   const summaryTurn = useMemo(
-    () => (effectiveSinceId ? turns.find((t) => t.userMessageId === effectiveSinceId) ?? null : null),
-    [effectiveSinceId, turns],
+    () =>
+      effectiveSinceId ? (turns.find(t => t.userMessageId === effectiveSinceId) ?? null) : null,
+    [effectiveSinceId, turns]
   );
 
   const summaryRelatedFiles = useMemo(() => {
     if (!summaryTurn) return [];
     return modified
-      .filter((entry) => entry.groups.some((group) => group.sinceUserMessageId === summaryTurn.userMessageId))
-      .map((entry) => entry.path || entry.absolutePath);
+      .filter(entry =>
+        entry.groups.some(group => group.sinceUserMessageId === summaryTurn.userMessageId)
+      )
+      .map(entry => entry.path || entry.absolutePath);
   }, [modified, summaryTurn]);
 
   const summaryAffectedCommands = useMemo(() => {
     if (!summaryTurn) return [];
-    const turnIndex = turns.findIndex((turn) => turn.userMessageId === summaryTurn.userMessageId);
+    const turnIndex = turns.findIndex(turn => turn.userMessageId === summaryTurn.userMessageId);
     const nextTurn = turnIndex >= 0 ? turns[turnIndex + 1] : undefined;
     return affected
-      .filter((entry) =>
-        entry.timestamp >= summaryTurn.timestamp
-        && (!nextTurn || entry.timestamp < nextTurn.timestamp),
+      .filter(
+        entry =>
+          entry.timestamp >= summaryTurn.timestamp &&
+          (!nextTurn || entry.timestamp < nextTurn.timestamp)
       )
-      .map((entry) => entry.command);
+      .map(entry => entry.command);
   }, [affected, summaryTurn, turns]);
 
   const toggleAll = () => {
@@ -176,7 +181,7 @@ export function ChangesPanel({ projectId, projectRoot }: ChangesPanelProps) {
               <section className="space-y-1.5">
                 <button
                   type="button"
-                  onClick={() => setTurnsCollapsed((v) => !v)}
+                  onClick={() => setTurnsCollapsed(v => !v)}
                   className="w-full flex items-center gap-1 px-1 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground hover:text-foreground"
                 >
                   {turnsCollapsed ? (
@@ -193,7 +198,7 @@ export function ChangesPanel({ projectId, projectRoot }: ChangesPanelProps) {
                 </button>
                 {!turnsCollapsed && (
                   <div className="space-y-1.5">
-                    {visibleTurns.map((turn) => (
+                    {visibleTurns.map(turn => (
                       <TurnSummaryCard key={turn.userMessageId} turn={turn} />
                     ))}
                   </div>
@@ -207,14 +212,14 @@ export function ChangesPanel({ projectId, projectRoot }: ChangesPanelProps) {
                   Modified files ({modified.length})
                 </div>
                 <div className="space-y-1.5">
-                  {modified.map((entry) => (
+                  {modified.map(entry => (
                     <ChangeListItem
                       key={entry.absolutePath}
                       entry={entry}
                       projectRoot={projectRoot}
                       expanded={!!expandedById[entry.absolutePath]}
                       onToggle={() =>
-                        setExpandedById((prev) => ({
+                        setExpandedById(prev => ({
                           ...prev,
                           [entry.absolutePath]: !prev[entry.absolutePath],
                         }))
@@ -229,7 +234,7 @@ export function ChangesPanel({ projectId, projectRoot }: ChangesPanelProps) {
               <section className="space-y-1.5">
                 <button
                   type="button"
-                  onClick={() => setBashCollapsed((v) => !v)}
+                  onClick={() => setBashCollapsed(v => !v)}
                   className="w-full flex items-center gap-1 px-1 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground hover:text-foreground"
                 >
                   {bashCollapsed ? (
@@ -253,7 +258,10 @@ export function ChangesPanel({ projectId, projectRoot }: ChangesPanelProps) {
                               {a.path}
                             </div>
                           )}
-                          <div className="text-[10px] font-mono text-muted-foreground truncate" title={a.command}>
+                          <div
+                            className="text-[10px] font-mono text-muted-foreground truncate"
+                            title={a.command}
+                          >
                             $ {a.command.length > 80 ? `${a.command.slice(0, 79)}…` : a.command}
                           </div>
                         </div>

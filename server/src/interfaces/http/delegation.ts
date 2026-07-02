@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, type Request, type Response } from 'express';
 import type Database from 'better-sqlite3';
 import {
   getDelegationConfig,
@@ -17,7 +17,10 @@ export function createDelegationRoutes(db: Database.Database): Router {
       res.json({ success: true, data: config });
     } catch (error) {
       console.error('Error fetching delegation config:', error);
-      res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to fetch delegation config' } });
+      res.status(500).json({
+        success: false,
+        error: { code: 'INTERNAL_ERROR', message: 'Failed to fetch delegation config' },
+      });
     }
   });
 
@@ -30,26 +33,47 @@ export function createDelegationRoutes(db: Database.Database): Router {
       const updated = {
         ...current,
         ...(body.enabled !== undefined && { enabled: body.enabled }),
-        ...(body.confidenceThreshold !== undefined && { confidenceThreshold: body.confidenceThreshold }),
-        ...(body.maxAutoApprovalsPerMinute !== undefined && { maxAutoApprovalsPerMinute: body.maxAutoApprovalsPerMinute }),
+        ...(body.confidenceThreshold !== undefined && {
+          confidenceThreshold: body.confidenceThreshold,
+        }),
+        ...(body.maxAutoApprovalsPerMinute !== undefined && {
+          maxAutoApprovalsPerMinute: body.maxAutoApprovalsPerMinute,
+        }),
         ...(body.allowedCategories !== undefined && { allowedCategories: body.allowedCategories }),
         ...(body.neverDelegate !== undefined && { neverDelegate: body.neverDelegate }),
-        ...(body.analysisLlmProfileId !== undefined && { analysisLlmProfileId: body.analysisLlmProfileId }),
+        ...(body.analysisLlmProfileId !== undefined && {
+          analysisLlmProfileId: body.analysisLlmProfileId,
+        }),
       };
       // Validate
       if (typeof updated.enabled !== 'boolean') updated.enabled = DEFAULT_DELEGATION_CONFIG.enabled;
-      if (typeof updated.confidenceThreshold !== 'number' || updated.confidenceThreshold < 0 || updated.confidenceThreshold > 1) {
+      if (
+        typeof updated.confidenceThreshold !== 'number' ||
+        updated.confidenceThreshold < 0 ||
+        updated.confidenceThreshold > 1
+      ) {
         updated.confidenceThreshold = DEFAULT_DELEGATION_CONFIG.confidenceThreshold;
       }
-      if (!Number.isInteger(updated.maxAutoApprovalsPerMinute) || updated.maxAutoApprovalsPerMinute < 1) {
+      if (
+        !Number.isInteger(updated.maxAutoApprovalsPerMinute) ||
+        updated.maxAutoApprovalsPerMinute < 1
+      ) {
         updated.maxAutoApprovalsPerMinute = DEFAULT_DELEGATION_CONFIG.maxAutoApprovalsPerMinute;
       }
-      if (!Array.isArray(updated.allowedCategories)) updated.allowedCategories = DEFAULT_DELEGATION_CONFIG.allowedCategories;
-      if (!Array.isArray(updated.neverDelegate)) updated.neverDelegate = DEFAULT_DELEGATION_CONFIG.neverDelegate;
-      if (updated.analysisLlmProfileId !== undefined && typeof updated.analysisLlmProfileId !== 'string') {
+      if (!Array.isArray(updated.allowedCategories))
+        updated.allowedCategories = DEFAULT_DELEGATION_CONFIG.allowedCategories;
+      if (!Array.isArray(updated.neverDelegate))
+        updated.neverDelegate = DEFAULT_DELEGATION_CONFIG.neverDelegate;
+      if (
+        updated.analysisLlmProfileId !== undefined &&
+        typeof updated.analysisLlmProfileId !== 'string'
+      ) {
         updated.analysisLlmProfileId = DEFAULT_DELEGATION_CONFIG.analysisLlmProfileId;
       }
-      if (typeof updated.analysisLlmProfileId === 'string' && updated.analysisLlmProfileId.trim() === '') {
+      if (
+        typeof updated.analysisLlmProfileId === 'string' &&
+        updated.analysisLlmProfileId.trim() === ''
+      ) {
         updated.analysisLlmProfileId = undefined;
       }
       const providerValidationError = validateAIReviewProviderId(db, updated.analysisLlmProfileId);
@@ -65,7 +89,10 @@ export function createDelegationRoutes(db: Database.Database): Router {
       res.json({ success: true, data: updated });
     } catch (error) {
       console.error('Error updating delegation config:', error);
-      res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to update delegation config' } });
+      res.status(500).json({
+        success: false,
+        error: { code: 'INTERNAL_ERROR', message: 'Failed to update delegation config' },
+      });
     }
   });
 

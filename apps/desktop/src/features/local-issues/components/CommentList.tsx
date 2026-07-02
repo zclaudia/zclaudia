@@ -10,9 +10,9 @@ interface CommentListProps {
 }
 
 export function CommentList({ issueId }: CommentListProps) {
-  const comments = useLocalIssueCommentStore((s) => s.comments[issueId] ?? []);
-  const loading = useLocalIssueCommentStore((s) => s.loading[issueId] ?? false);
-  const loadComments = useLocalIssueCommentStore((s) => s.loadComments);
+  const comments = useLocalIssueCommentStore(s => s.comments[issueId] ?? []);
+  const loading = useLocalIssueCommentStore(s => s.loading[issueId] ?? false);
+  const loadComments = useLocalIssueCommentStore(s => s.loadComments);
 
   useEffect(() => {
     void loadComments(issueId);
@@ -31,7 +31,7 @@ export function CommentList({ issueId }: CommentListProps) {
         <p className="text-xs text-muted-foreground italic">No comments yet.</p>
       ) : (
         <div className="space-y-2">
-          {comments.map((c) => (
+          {comments.map(c => (
             <CommentItem key={c.id} comment={c} />
           ))}
         </div>
@@ -47,8 +47,8 @@ function CommentItem({ comment }: { comment: LocalIssueComment }) {
   const [draft, setDraft] = useState(comment.body);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const editComment = useLocalIssueCommentStore((s) => s.editComment);
-  const removeComment = useLocalIssueCommentStore((s) => s.removeComment);
+  const editComment = useLocalIssueCommentStore(s => s.editComment);
+  const removeComment = useLocalIssueCommentStore(s => s.removeComment);
 
   const wasEdited = comment.updatedAt > comment.createdAt + 500;
 
@@ -89,7 +89,9 @@ function CommentItem({ comment }: { comment: LocalIssueComment }) {
     <div className="border border-border rounded-md bg-card">
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/60 text-[11px] text-muted-foreground">
         <span>{timeAgo(comment.createdAt)}</span>
-        {wasEdited && <span className="text-muted-foreground/70">· edited {timeAgo(comment.updatedAt)}</span>}
+        {wasEdited && (
+          <span className="text-muted-foreground/70">· edited {timeAgo(comment.updatedAt)}</span>
+        )}
         <div className="flex-1" />
         {!editing && (
           <>
@@ -117,7 +119,7 @@ function CommentItem({ comment }: { comment: LocalIssueComment }) {
           <div className="space-y-2">
             <textarea
               value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={e => setDraft(e.target.value)}
               className="w-full min-h-[80px] rounded-md border border-border bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary resize-y"
               autoFocus
             />
@@ -138,7 +140,11 @@ function CommentItem({ comment }: { comment: LocalIssueComment }) {
                 disabled={saving || !draft.trim()}
                 className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded-md bg-muted/60 text-foreground hover:bg-muted disabled:opacity-50"
               >
-                {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                {saving ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Check className="w-3 h-3" />
+                )}
                 Save
               </button>
             </div>
@@ -155,7 +161,7 @@ function CommentComposer({ issueId }: { issueId: string }) {
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const addComment = useLocalIssueCommentStore((s) => s.addComment);
+  const addComment = useLocalIssueCommentStore(s => s.addComment);
 
   const submit = async () => {
     const trimmed = body.trim();
@@ -177,8 +183,8 @@ function CommentComposer({ issueId }: { issueId: string }) {
       <div className="px-3 py-2">
         <textarea
           value={body}
-          onChange={(e) => setBody(e.target.value)}
-          onKeyDown={(e) => {
+          onChange={e => setBody(e.target.value)}
+          onKeyDown={e => {
             if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
               e.preventDefault();
               void submit();
@@ -195,7 +201,11 @@ function CommentComposer({ issueId }: { issueId: string }) {
             disabled={sending || !body.trim()}
             className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-md bg-muted/60 text-foreground hover:bg-muted disabled:opacity-50"
           >
-            {sending ? <Loader2 className="w-3 h-3 animate-spin" /> : <MessageSquare className="w-3 h-3" />}
+            {sending ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              <MessageSquare className="w-3 h-3" />
+            )}
             Comment
           </button>
         </div>

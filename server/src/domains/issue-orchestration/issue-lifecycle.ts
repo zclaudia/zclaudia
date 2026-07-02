@@ -9,9 +9,9 @@ import type {
 import type { SpecChange } from '@zclaudia/shared/features/spec-change';
 import { LocalIssueRepository } from '../local-issues/repository.js';
 import { EpicRepository } from '../epics/repository.js';
-import { SpecChangeService } from '../openspec/spec-change-service.js';
+import { type SpecChangeService } from '../openspec/spec-change-service.js';
 import type { ArchiveResult, ArchiveService } from '../openspec/archive-service.js';
-import { EventDispatcher } from '../supervision/event-dispatcher.js';
+import { type EventDispatcher } from '../supervision/event-dispatcher.js';
 import type { IssueDomainEvent } from './events.js';
 
 export interface IssueLifecycleDeps {
@@ -100,7 +100,9 @@ export class IssueLifecycle {
     if (current.status === next) return current;
     const allowed = SUB_ISSUE_TRANSITIONS[current.status] ?? [];
     if (!allowed.includes(next)) {
-      throw new Error(`Illegal status transition for ${current.type} issue: ${current.status} → ${next}`);
+      throw new Error(
+        `Illegal status transition for ${current.type} issue: ${current.status} → ${next}`
+      );
     }
     // C2 invariant: a sub-issue can only enter `tracked` if it has a
     // SpecChange backing it. Lifecycle progress beyond triage must always
@@ -108,12 +110,12 @@ export class IssueLifecycle {
     if (next === 'tracked' && !current.specChangeId) {
       throw new Error(
         `Issue ${issueId} cannot transition to 'tracked' without a SpecChange. ` +
-        `Upgrade it via the spec workflow first.`,
+          `Upgrade it via the spec workflow first.`
       );
     }
     const updated = this.issueRepo.update(issueId, {
       status: next,
-      closedAt: (next === 'closed' || next === 'cancelled') ? Date.now() : undefined,
+      closedAt: next === 'closed' || next === 'cancelled' ? Date.now() : undefined,
     });
     this.deps.dispatcher.dispatch({
       type: 'sub_issue.status_changed',
@@ -137,7 +139,7 @@ export class IssueLifecycle {
    * Archive failure does NOT roll back the close — it surfaces in the result.
    */
   async closeSubIssueAndArchive(
-    issueId: string,
+    issueId: string
   ): Promise<{ issue: LocalIssue; archive?: ArchiveResult }> {
     const issue = this.closeSubIssue(issueId);
     if (!this.deps.archiveService) return { issue };
@@ -156,18 +158,20 @@ export class IssueLifecycle {
 
   /** List LocalIssues grouped under an Epic. */
   listIssuesByEpic(epicId: string): LocalIssue[] {
-    const rows = this.deps.db.prepare(
-      `SELECT * FROM local_issues WHERE epic_id = ? ORDER BY created_at ASC`,
-    ).all(epicId);
-    return rows.map((r) => this.issueRepo.mapRow(r));
+    const rows = this.deps.db
+      .prepare(`SELECT * FROM local_issues WHERE epic_id = ? ORDER BY created_at ASC`)
+      .all(epicId);
+    return rows.map(r => this.issueRepo.mapRow(r));
   }
 
   /** List all LocalIssues (anonymous included) for a project, newest first. */
   listByProject(projectId: string): LocalIssue[] {
-    const rows = this.deps.db.prepare(
-      `SELECT * FROM local_issues WHERE project_id = ? ORDER BY updated_at DESC, created_at DESC`,
-    ).all(projectId);
-    return rows.map((r) => this.issueRepo.mapRow(r));
+    const rows = this.deps.db
+      .prepare(
+        `SELECT * FROM local_issues WHERE project_id = ? ORDER BY updated_at DESC, created_at DESC`
+      )
+      .all(projectId);
+    return rows.map(r => this.issueRepo.mapRow(r));
   }
 }
 

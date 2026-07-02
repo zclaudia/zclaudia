@@ -25,10 +25,17 @@ interface HandleRunExceptionInput {
   formatProviderErrorMessage: (
     message: string,
     providerType?: string,
-    authErrorHint?: { matchAny: Array<string | string[]>; message: string },
+    authErrorHint?: { matchAny: Array<string | string[]>; message: string }
   ) => string;
-  providerRegistry?: { getPolicy(type: string): { authErrorHint?: { matchAny: Array<string | string[]>; message: string } } | undefined };
-  handleRetry: (nextRecoveryState: { sessionResetRetryCount?: number; overflowRetryCount?: number }) => Promise<void>;
+  providerRegistry?: {
+    getPolicy(
+      type: string
+    ): { authErrorHint?: { matchAny: Array<string | string[]>; message: string } } | undefined;
+  };
+  handleRetry: (nextRecoveryState: {
+    sessionResetRetryCount?: number;
+    overflowRetryCount?: number;
+  }) => Promise<void>;
   isHardQuotaExceededError: (message: string) => boolean;
   message: {
     sessionId: string;
@@ -44,7 +51,9 @@ interface HandleRunExceptionInput {
   trace: TraceRecorder;
 }
 
-export async function handleRunException(input: HandleRunExceptionInput): Promise<{ handedOffToRetry: boolean }> {
+export async function handleRunException(
+  input: HandleRunExceptionInput
+): Promise<{ handedOffToRetry: boolean }> {
   const {
     activeRun,
     activeRuns,
@@ -76,10 +85,10 @@ export async function handleRunException(input: HandleRunExceptionInput): Promis
   const sessionResetRetryCount = recoveryState.sessionResetRetryCount || 0;
   const overflowRetryCount = recoveryState.overflowRetryCount || 0;
   if (
-    error instanceof ContextOverflowError
-    && activeRun.agentProfile
-    && activeRun.llmProfile
-    && overflowRetryCount < MAX_OVERFLOW_RETRIES
+    error instanceof ContextOverflowError &&
+    activeRun.agentProfile &&
+    activeRun.llmProfile &&
+    overflowRetryCount < MAX_OVERFLOW_RETRIES
   ) {
     const outcome = await compactForOverflow({
       db: input.db,
@@ -95,7 +104,8 @@ export async function handleRunException(input: HandleRunExceptionInput): Promis
         type: 'delta',
         runId,
         sessionId: activeRun.sessionId,
-        content: '⚠️ Context limit reached — compacted the conversation and retrying automatically…',
+        content:
+          '⚠️ Context limit reached — compacted the conversation and retrying automatically…',
       });
       if (activeRun.saveInterval) {
         clearInterval(activeRun.saveInterval);
@@ -105,7 +115,10 @@ export async function handleRunException(input: HandleRunExceptionInput): Promis
       activeRuns.delete(runId);
       broadcastHeartbeat();
       try {
-        await handleRetry({ overflowRetryCount: overflowRetryCount + 1, sessionResetRetryCount: recoveryState.sessionResetRetryCount });
+        await handleRetry({
+          overflowRetryCount: overflowRetryCount + 1,
+          sessionResetRetryCount: recoveryState.sessionResetRetryCount,
+        });
         return { handedOffToRetry: true };
       } catch (retryError) {
         console.error('[Overflow] retry after compaction also failed:', retryError);
@@ -116,13 +129,16 @@ export async function handleRunException(input: HandleRunExceptionInput): Promis
   }
 
   if (
-    errMsg.includes('process exited with code')
-    && sdkSessionId
-    && sessionResetRetryCount < MAX_SESSION_RESET_RETRIES
-    && !isHardQuotaExceededError(errMsg)
+    errMsg.includes('process exited with code') &&
+    sdkSessionId &&
+    sessionResetRetryCount < MAX_SESSION_RESET_RETRIES &&
+    !isHardQuotaExceededError(errMsg)
   ) {
-    console.log(`[Recovery] Auto-resetting corrupted sdk_session_id ${sdkSessionId} for session ${message.sessionId}`);
-    input.db.prepare('UPDATE sessions SET sdk_session_id = NULL, updated_at = ? WHERE id = ?')
+    console.log(
+      `[Recovery] Auto-resetting corrupted sdk_session_id ${sdkSessionId} for session ${message.sessionId}`
+    );
+    input.db
+      .prepare('UPDATE sessions SET sdk_session_id = NULL, updated_at = ? WHERE id = ?')
       .run(Date.now(), message.sessionId);
 
     sendRunEvent({
@@ -141,7 +157,10 @@ export async function handleRunException(input: HandleRunExceptionInput): Promis
     broadcastHeartbeat();
 
     try {
-      await handleRetry({ sessionResetRetryCount: sessionResetRetryCount + 1, overflowRetryCount: recoveryState.overflowRetryCount });
+      await handleRetry({
+        sessionResetRetryCount: sessionResetRetryCount + 1,
+        overflowRetryCount: recoveryState.overflowRetryCount,
+      });
       return { handedOffToRetry: true };
     } catch (retryError) {
       console.error('[Recovery] Auto-retry after session reset also failed:', retryError);
@@ -206,14 +225,19 @@ export function finalizeRun(input: FinalizeRunInput): void {
     trace,
   } = input;
 
-  trace.log('server_norm', 'run_finalized', {
-    runId,
-    sessionId: message.sessionId,
-    completed: isTerminalPhase(activeRun.phase),
-    providerType: activeRun.providerType,
-    contentChars: activeRun.fullContent.length,
-    collectedToolCalls: activeRun.collectedToolCalls.length,
-  }, 'run finalized');
+  trace.log(
+    'server_norm',
+    'run_finalized',
+    {
+      runId,
+      sessionId: message.sessionId,
+      completed: isTerminalPhase(activeRun.phase),
+      providerType: activeRun.providerType,
+      contentChars: activeRun.fullContent.length,
+      collectedToolCalls: activeRun.collectedToolCalls.length,
+    },
+    'run finalized'
+  );
 
   if (activeRun.saveInterval) {
     clearInterval(activeRun.saveInterval);
@@ -233,9 +257,13 @@ export function finalizeRun(input: FinalizeRunInput): void {
     setTimeout(() => processMonitor?.check(), 5_000);
   }
 
-  activeRun.db.prepare(`
+  activeRun.db
+    .prepare(
+      `
       UPDATE sessions SET last_run_status = NULL, updated_at = ? WHERE id = ?
-    `).run(Date.now(), message.sessionId);
+    `
+    )
+    .run(Date.now(), message.sessionId);
 
   sessionSync?.broadcastSessionUpdated(message.sessionId, activeRun.db);
 }

@@ -76,7 +76,10 @@ const TERMINAL_RUN_TOMBSTONE_MS = 60_000;
 
 // Heartbeat state — shared with heartbeat-reconciliation handler
 const entityVersions = new Map<string, { projects: number; plugins: number }>();
-const projectFetchInFlight = new Map<string, { version: number; generation: number; promise: Promise<void> }>();
+const projectFetchInFlight = new Map<
+  string,
+  { version: number; generation: number; promise: Promise<void> }
+>();
 const serverSyncGenerations = new Map<string, number>();
 
 const heartbeatState: HeartbeatState = {
@@ -109,11 +112,11 @@ function recoverRunGap(
   ctx: MessageHandlerContext,
   runId: string,
   seq: number | undefined,
-  sessionId?: string,
+  sessionId?: string
 ): void {
   const resolvedSessionId = sessionId || useRunStore.getState().activeRuns[runId];
   console.warn(
-    `[${ctx.logTag}] Run event gap detected for ${runId}: expected ${((maxSeqByRun.get(runId) ?? 0) + 1)}, got ${seq ?? 'none'}`
+    `[${ctx.logTag}] Run event gap detected for ${runId}: expected ${(maxSeqByRun.get(runId) ?? 0) + 1}, got ${seq ?? 'none'}`
   );
   if (resolvedSessionId) {
     void recoverCurrentSessionTail(ctx.serverId, resolvedSessionId);
@@ -184,11 +187,11 @@ const messageDispatcher = createMessageDispatcher<ServerMessage, MessageDispatch
   },
   {
     types: ['sessions_created', 'sessions_updated', 'system_task_update'],
-    handle: (msg) => handleSessionMessage(msg),
+    handle: msg => handleSessionMessage(msg),
   },
   {
     types: ['goal:state-changed', 'goal:evaluator-verdict', 'goal:budget-update'],
-    handle: (msg) => handleGoalMessage(msg),
+    handle: msg => handleGoalMessage(msg),
   },
   {
     types: ['file_push'],
@@ -250,7 +253,7 @@ const messageDispatcher = createMessageDispatcher<ServerMessage, MessageDispatch
       'workflow_trigger_sources_changed',
       'bootstrap_event',
     ],
-    handle: (msg) => dispatchFeatureMessage(msg),
+    handle: msg => dispatchFeatureMessage(msg),
   },
 ]);
 
@@ -271,7 +274,13 @@ export function handleServerMessage(
 
   // Update lastActivityAt for run activity messages (throttled)
   const runMsg = msg as { runId?: string; type: string };
-  if (runMsg.runId && (msg.type === 'delta' || msg.type === 'tool_use' || msg.type === 'tool_result' || msg.type === 'tool_activity')) {
+  if (
+    runMsg.runId &&
+    (msg.type === 'delta' ||
+      msg.type === 'tool_use' ||
+      msg.type === 'tool_result' ||
+      msg.type === 'tool_activity')
+  ) {
     updateRunActivity(runMsg.runId);
   }
 
@@ -281,9 +290,9 @@ export function handleServerMessage(
     isRunEventGap,
     recoverRunGap: (runId, seq, sessionId) => recoverRunGap(ctx, runId, seq, sessionId),
     recordTerminalRun,
-    clearRunActivity: (runId) => lastActivityUpdate.delete(runId),
-    clearRunSeq: (runId) => maxSeqByRun.delete(runId),
-    clearTerminalRunSeq: (runId) => terminalRunSeqByRun.delete(runId),
+    clearRunActivity: runId => lastActivityUpdate.delete(runId),
+    clearRunSeq: runId => maxSeqByRun.delete(runId),
+    clearTerminalRunSeq: runId => terminalRunSeqByRun.delete(runId),
   };
   if (messageDispatcher.dispatch(msg, dispatchCtx)) return;
 

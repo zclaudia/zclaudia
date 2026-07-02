@@ -69,8 +69,8 @@ describe('WorkspaceView', () => {
     const { container } = render(<WorkspaceView sessionId="A" />);
     const rootEl = container.firstChild as HTMLElement;
     expect(rootEl.className).not.toContain('bg-muted'); // canvas shares the chat background
-    expect(rootEl.className).toContain('p-1.5');        // gutter padding around cards
-    expect(rootEl.className).toContain('inset-0');      // still fills container
+    expect(rootEl.className).toContain('p-1.5'); // gutter padding around cards
+    expect(rootEl.className).toContain('inset-0'); // still fills container
     const pane = container.querySelector('[data-pane-id]') as HTMLElement;
     expect(pane.className).toContain('rounded-lg'); // card
     expect(pane.className).toContain('border');

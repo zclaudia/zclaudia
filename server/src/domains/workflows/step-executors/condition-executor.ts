@@ -7,7 +7,7 @@ export class ConditionStepExecutor implements StepExecutorPort {
   async execute(
     node: WorkflowNodeDef,
     _config: Record<string, unknown>,
-    ctx: StepContext,
+    ctx: StepContext
   ): Promise<StepResult> {
     if (!node.condition) {
       return { status: 'failed', output: {}, error: 'No condition defined' };

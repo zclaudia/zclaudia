@@ -31,11 +31,19 @@ export interface MemoryProvider {
 type Resolved = { abs: string };
 type ResolveFailure = { error: MemoryError };
 
-function failure(error: string, message: string, details: Record<string, unknown> = {}): ResolveFailure {
+function failure(
+  error: string,
+  message: string,
+  details: Record<string, unknown> = {}
+): ResolveFailure {
   return { error: { ok: false, error, message, details } };
 }
 
-function opFailure(error: string, message: string, details: Record<string, unknown> = {}): MemoryError {
+function opFailure(
+  error: string,
+  message: string,
+  details: Record<string, unknown> = {}
+): MemoryError {
   return { ok: false, error, message, details };
 }
 
@@ -51,10 +59,14 @@ function nearestExistingAncestor(root: string, abs: string): string {
 function validateContentSize(content: string): MemoryError | undefined {
   const size = Buffer.byteLength(content, 'utf8');
   if (size <= MAX_MEMORY_FILE_BYTES) return undefined;
-  return opFailure('content_too_large', `Memory file content is too large (${size} bytes; max ${MAX_MEMORY_FILE_BYTES}).`, {
-    size,
-    maxBytes: MAX_MEMORY_FILE_BYTES,
-  });
+  return opFailure(
+    'content_too_large',
+    `Memory file content is too large (${size} bytes; max ${MAX_MEMORY_FILE_BYTES}).`,
+    {
+      size,
+      maxBytes: MAX_MEMORY_FILE_BYTES,
+    }
+  );
 }
 
 function numberedLines(content: string, range?: MemoryViewRange): string {
@@ -78,17 +90,24 @@ export class FileSystemMemoryProvider implements MemoryProvider {
 
   private resolveVirtualPath(raw: unknown): Resolved | ResolveFailure {
     if (typeof raw !== 'string' || !raw.trim()) {
-      return failure('invalid_path', `path is required and must start with ${VIRTUAL_MEMORY_ROOT}/`);
+      return failure(
+        'invalid_path',
+        `path is required and must start with ${VIRTUAL_MEMORY_ROOT}/`
+      );
     }
     const trimmed = raw.trim();
     if (trimmed !== VIRTUAL_MEMORY_ROOT && !trimmed.startsWith(`${VIRTUAL_MEMORY_ROOT}/`)) {
-      return failure('invalid_path', `path must start with ${VIRTUAL_MEMORY_ROOT}/ (got: ${trimmed})`);
+      return failure(
+        'invalid_path',
+        `path must start with ${VIRTUAL_MEMORY_ROOT}/ (got: ${trimmed})`
+      );
     }
     const rootStat = fs.lstatSync(this.root, { throwIfNoEntry: false });
     if (rootStat?.isSymbolicLink()) {
       return failure('symlink_not_allowed', 'memory root cannot be a symlink');
     }
-    const rel = trimmed === VIRTUAL_MEMORY_ROOT ? '' : trimmed.slice(VIRTUAL_MEMORY_ROOT.length + 1);
+    const rel =
+      trimmed === VIRTUAL_MEMORY_ROOT ? '' : trimmed.slice(VIRTUAL_MEMORY_ROOT.length + 1);
     const abs = path.resolve(this.root, rel);
     if (abs !== this.root && !abs.startsWith(this.root + path.sep)) {
       return failure('path_escape', 'path escapes the memory directory');
@@ -99,11 +118,18 @@ export class FileSystemMemoryProvider implements MemoryProvider {
     }
     if (abs !== this.root) {
       const existingParent = nearestExistingAncestor(this.root, abs);
-      if (existingParent !== this.root && existingParent.startsWith(this.root + path.sep) && fs.existsSync(existingParent)) {
+      if (
+        existingParent !== this.root &&
+        existingParent.startsWith(this.root + path.sep) &&
+        fs.existsSync(existingParent)
+      ) {
         const realParent = fs.realpathSync(existingParent);
         const realRoot = fs.existsSync(this.root) ? fs.realpathSync(this.root) : this.root;
         if (realParent !== realRoot && !realParent.startsWith(realRoot + path.sep)) {
-          return failure('symlink_not_allowed', 'memory path resolves outside the memory directory');
+          return failure(
+            'symlink_not_allowed',
+            'memory path resolves outside the memory directory'
+          );
         }
       }
     }
@@ -112,9 +138,10 @@ export class FileSystemMemoryProvider implements MemoryProvider {
 
   private listFiles(root: string): string {
     if (!fs.existsSync(root)) return '(no memories yet)';
-    const entries = fs.readdirSync(root, { recursive: true, withFileTypes: true })
-      .filter((e) => e.isFile())
-      .map((e) => {
+    const entries = fs
+      .readdirSync(root, { recursive: true, withFileTypes: true })
+      .filter(e => e.isFile())
+      .map(e => {
         const full = path.join(e.parentPath, e.name);
         const rel = path.relative(root, full);
         const size = fs.statSync(full).size;
@@ -130,7 +157,10 @@ export class FileSystemMemoryProvider implements MemoryProvider {
     return { ok: true, kind: 'directory', text: this.listFiles(resolved.abs) };
   }
 
-  async read(target: MemoryTarget, range?: MemoryViewRange): Promise<MemoryResult<MemoryViewResult>> {
+  async read(
+    target: MemoryTarget,
+    range?: MemoryViewRange
+  ): Promise<MemoryResult<MemoryViewResult>> {
     const resolved = this.resolveVirtualPath(target.path);
     if ('error' in resolved) return resolved.error;
     const isRoot = resolved.abs === this.root;
@@ -143,12 +173,20 @@ export class FileSystemMemoryProvider implements MemoryProvider {
       return { ok: true, kind: 'directory', text: this.listFiles(resolved.abs) };
     }
     if (stat.size > MAX_MEMORY_FILE_BYTES) {
-      return opFailure('content_too_large', `Memory file is too large to view (${stat.size} bytes; max ${MAX_MEMORY_FILE_BYTES}).`, {
-        size: stat.size,
-        maxBytes: MAX_MEMORY_FILE_BYTES,
-      });
+      return opFailure(
+        'content_too_large',
+        `Memory file is too large to view (${stat.size} bytes; max ${MAX_MEMORY_FILE_BYTES}).`,
+        {
+          size: stat.size,
+          maxBytes: MAX_MEMORY_FILE_BYTES,
+        }
+      );
     }
-    return { ok: true, kind: 'file', text: numberedLines(fs.readFileSync(resolved.abs, 'utf8'), range) };
+    return {
+      ok: true,
+      kind: 'file',
+      text: numberedLines(fs.readFileSync(resolved.abs, 'utf8'), range),
+    };
   }
 
   async create(target: MemoryTarget, content: string): Promise<MemoryResult> {
@@ -156,7 +194,8 @@ export class FileSystemMemoryProvider implements MemoryProvider {
     if ('error' in resolved) return resolved.error;
     const sizeError = validateContentSize(content);
     if (sizeError) return sizeError;
-    if (fs.existsSync(resolved.abs)) return opFailure('already_exists', `${target.path} already exists`);
+    if (fs.existsSync(resolved.abs))
+      return opFailure('already_exists', `${target.path} already exists`);
     fs.mkdirSync(path.dirname(resolved.abs), { recursive: true });
     fs.writeFileSync(resolved.abs, content, 'utf8');
     return { ok: true };
@@ -165,11 +204,20 @@ export class FileSystemMemoryProvider implements MemoryProvider {
   async replace(target: MemoryTarget, oldStr: string, newStr: string): Promise<MemoryResult> {
     const resolved = this.resolveVirtualPath(target.path);
     if ('error' in resolved) return resolved.error;
-    if (!fs.existsSync(resolved.abs)) return opFailure('not_found', `${target.path} does not exist`);
+    if (!fs.existsSync(resolved.abs))
+      return opFailure('not_found', `${target.path} does not exist`);
     const content = fs.readFileSync(resolved.abs, 'utf8');
     const occurrences = content.split(oldStr).length - 1;
-    if (occurrences === 0) return opFailure('not_found', 'old_str not found in file — view the file and retry with exact text');
-    if (occurrences > 1) return opFailure('not_unique', `old_str appears ${occurrences} times — include more surrounding context to make it unique`);
+    if (occurrences === 0)
+      return opFailure(
+        'not_found',
+        'old_str not found in file — view the file and retry with exact text'
+      );
+    if (occurrences > 1)
+      return opFailure(
+        'not_unique',
+        `old_str appears ${occurrences} times — include more surrounding context to make it unique`
+      );
     const updated = content.replace(oldStr, newStr);
     const sizeError = validateContentSize(updated);
     if (sizeError) return sizeError;
@@ -180,9 +228,14 @@ export class FileSystemMemoryProvider implements MemoryProvider {
   async insert(target: MemoryTarget, line: number, text: string): Promise<MemoryResult> {
     const resolved = this.resolveVirtualPath(target.path);
     if ('error' in resolved) return resolved.error;
-    if (!fs.existsSync(resolved.abs)) return opFailure('not_found', `${target.path} does not exist`);
+    if (!fs.existsSync(resolved.abs))
+      return opFailure('not_found', `${target.path} does not exist`);
     const lines = fs.readFileSync(resolved.abs, 'utf8').split('\n');
-    if (line > lines.length) return opFailure('invalid_params', `insert_line ${line} is beyond end of file (${lines.length} lines)`);
+    if (line > lines.length)
+      return opFailure(
+        'invalid_params',
+        `insert_line ${line} is beyond end of file (${lines.length} lines)`
+      );
     lines.splice(line, 0, text);
     const updated = lines.join('\n');
     const sizeError = validateContentSize(updated);
@@ -194,8 +247,10 @@ export class FileSystemMemoryProvider implements MemoryProvider {
   async delete(target: MemoryTarget): Promise<MemoryResult> {
     const resolved = this.resolveVirtualPath(target.path);
     if ('error' in resolved) return resolved.error;
-    if (resolved.abs === this.root) return opFailure('cannot_delete_root', `cannot delete ${VIRTUAL_MEMORY_ROOT} itself`);
-    if (!fs.existsSync(resolved.abs)) return opFailure('not_found', `${target.path} does not exist`);
+    if (resolved.abs === this.root)
+      return opFailure('cannot_delete_root', `cannot delete ${VIRTUAL_MEMORY_ROOT} itself`);
+    if (!fs.existsSync(resolved.abs))
+      return opFailure('not_found', `${target.path} does not exist`);
     if (fs.statSync(resolved.abs).isDirectory()) {
       return opFailure('cannot_delete_directory', 'delete refuses directories by default');
     }

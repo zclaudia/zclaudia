@@ -16,7 +16,10 @@ export interface AIToolCall {
   };
 }
 
-export type ToolHandler = (args: Record<string, unknown>, context?: Record<string, unknown>) => Promise<string> | string;
+export type ToolHandler = (
+  args: Record<string, unknown>,
+  context?: Record<string, unknown>
+) => Promise<string> | string;
 
 export interface ToolRegistration {
   id: string;

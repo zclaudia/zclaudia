@@ -21,9 +21,10 @@ Rules:
 - Write in English.
 Return JSON: { "subject": string, "body"?: string }.`;
 
-export class GenerateCommitMessageActivity
-  implements Activity<GenerateCommitMessageInput, GenerateCommitMessageOutput>
-{
+export class GenerateCommitMessageActivity implements Activity<
+  GenerateCommitMessageInput,
+  GenerateCommitMessageOutput
+> {
   readonly type = 'generate_commit_message';
   readonly name = 'Generate Commit Message';
   readonly description = 'Generate a Conventional Commits message from the staged diff via AI';
@@ -33,17 +34,25 @@ export class GenerateCommitMessageActivity
 
   async invoke(
     input: GenerateCommitMessageInput,
-    services: ActivityServices,
+    services: ActivityServices
   ): Promise<ActivityResult<GenerateCommitMessageOutput>> {
     const repoPath = input.worktreePath ?? input.projectRootPath;
     if (!repoPath) {
-      return { status: 'failed', output: { subject: '', message: '' }, error: 'No working directory' };
+      return {
+        status: 'failed',
+        output: { subject: '', message: '' },
+        error: 'No working directory',
+      };
     }
 
     try {
       const staged = await getStagedDiff(repoPath);
       if (staged.files.length === 0) {
-        return { status: 'failed', output: { subject: '', message: '' }, error: 'No staged changes' };
+        return {
+          status: 'failed',
+          output: { subject: '', message: '' },
+          error: 'No staged changes',
+        };
       }
 
       const userInput = [
@@ -94,7 +103,11 @@ export class GenerateCommitMessageActivity
       const subject = String(result.output.subject ?? '').trim();
       const body = typeof result.output.body === 'string' ? result.output.body.trim() : '';
       if (!subject) {
-        return { status: 'failed', output: { subject: '', message: '' }, error: 'Model returned an empty subject' };
+        return {
+          status: 'failed',
+          output: { subject: '', message: '' },
+          error: 'Model returned an empty subject',
+        };
       }
       const message = body ? `${subject}\n\n${body}` : subject;
       return { status: 'completed', output: { subject, ...(body ? { body } : {}), message } };

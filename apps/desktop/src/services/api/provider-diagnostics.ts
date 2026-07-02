@@ -15,7 +15,9 @@ export type DeferredDiagnosticsResult =
   | { status: 'failed'; error: string };
 
 export async function getDeferredDiagnostics(id: string): Promise<DeferredDiagnosticsResult> {
-  return apiCall<DeferredDiagnosticsResult>(`/api/providers/deferred-diagnostics/${encodeURIComponent(id)}`);
+  return apiCall<DeferredDiagnosticsResult>(
+    `/api/providers/deferred-diagnostics/${encodeURIComponent(id)}`
+  );
 }
 
 export type FileBackupRestoreResult = {
@@ -26,8 +28,11 @@ export type FileBackupRestoreResult = {
 };
 
 export async function restoreFileBackup(id: string): Promise<FileBackupRestoreResult> {
-  return apiCall<FileBackupRestoreResult>(`/api/providers/file-history/backups/${encodeURIComponent(id)}/restore`, {
-    method: 'POST',
-    body: JSON.stringify({}),
-  });
+  return apiCall<FileBackupRestoreResult>(
+    `/api/providers/file-history/backups/${encodeURIComponent(id)}/restore`,
+    {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }
+  );
 }

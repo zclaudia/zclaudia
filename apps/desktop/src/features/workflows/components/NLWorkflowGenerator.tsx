@@ -18,7 +18,11 @@ interface HistoryEntry {
   content: string;
 }
 
-export function NLWorkflowGenerator({ projectId, llmProfileId, onGenerated }: NLWorkflowGeneratorProps) {
+export function NLWorkflowGenerator({
+  projectId,
+  llmProfileId,
+  onGenerated,
+}: NLWorkflowGeneratorProps) {
   const [description, setDescription] = useState('');
   const [refineInput, setRefineInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -38,7 +42,10 @@ export function NLWorkflowGenerator({ projectId, llmProfileId, onGenerated }: NL
       setGenerationId(result.generationId);
       setHistory([
         { role: 'user', content: description.trim() },
-        { role: 'system', content: `Generated "${result.name}" with ${result.definition.nodes.length} nodes` },
+        {
+          role: 'system',
+          content: `Generated "${result.name}" with ${result.definition.nodes.length} nodes`,
+        },
       ]);
       setWarnings(result.warnings ?? []);
       onGenerated({
@@ -90,12 +97,15 @@ export function NLWorkflowGenerator({ projectId, llmProfileId, onGenerated }: NL
     setWarnings([]);
   }, []);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>, action: () => void) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault();
-      action();
-    }
-  }, []);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>, action: () => void) => {
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        action();
+      }
+    },
+    []
+  );
 
   return (
     <div className="flex flex-col gap-2">
@@ -122,7 +132,9 @@ export function NLWorkflowGenerator({ projectId, llmProfileId, onGenerated }: NL
             value={description}
             onChange={e => setDescription(e.target.value)}
             onKeyDown={e => handleKeyDown(e, handleGenerate)}
-            placeholder={"e.g. Every day at 9 AM, check git for uncommitted changes, auto-commit and run tests. If tests fail, notify me."}
+            placeholder={
+              'e.g. Every day at 9 AM, check git for uncommitted changes, auto-commit and run tests. If tests fail, notify me.'
+            }
             rows={5}
             disabled={loading}
           />
@@ -134,9 +146,7 @@ export function NLWorkflowGenerator({ projectId, llmProfileId, onGenerated }: NL
             {loading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
             {loading ? 'Generating...' : 'Generate'}
           </button>
-          {!llmProfileId && (
-            <p className="text-[10px] text-destructive">No provider configured.</p>
-          )}
+          {!llmProfileId && <p className="text-[10px] text-destructive">No provider configured.</p>}
           <p className="text-[10px] text-muted-foreground/60">Cmd+Enter to submit</p>
         </div>
       ) : (
@@ -192,7 +202,10 @@ export function NLWorkflowGenerator({ projectId, llmProfileId, onGenerated }: NL
       {warnings.length > 0 && (
         <div className="flex flex-col gap-1">
           {warnings.map((w, i) => (
-            <div key={i} className="flex items-start gap-1.5 text-[10px] text-yellow-600 dark:text-yellow-400 bg-yellow-500/10 rounded-md px-2 py-1">
+            <div
+              key={i}
+              className="flex items-start gap-1.5 text-[10px] text-yellow-600 dark:text-yellow-400 bg-yellow-500/10 rounded-md px-2 py-1"
+            >
               <AlertTriangle size={10} className="shrink-0 mt-0.5" />
               <span className="break-words">{w}</span>
             </div>

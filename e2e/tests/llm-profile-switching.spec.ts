@@ -61,7 +61,9 @@ describe('LLM Profile Management', () => {
     expect(typeof profile.name).toBe('string');
     expect(typeof profile.providerType).toBe('string');
 
-    console.log(`  First profile: ${profile.name} (providerType=${profile.providerType}, id=${profile.id})`);
+    console.log(
+      `  First profile: ${profile.name} (providerType=${profile.providerType}, id=${profile.id})`
+    );
     console.log('PM1: List llm profiles test completed');
   }, 30000);
 
@@ -231,7 +233,9 @@ describe('LLM Profile Management', () => {
 
     if (!settingsVisible) {
       // Fallback: look for a gear icon or "Settings" text
-      const altSettings = browser.locator('button[title*="Settings"], button[aria-label*="Settings"], text=Settings').first();
+      const altSettings = browser
+        .locator('button[title*="Settings"], button[aria-label*="Settings"], text=Settings')
+        .first();
       const altVisible = await altSettings.isVisible({ timeout: 3000 }).catch(() => false);
 
       if (altVisible) {
@@ -249,7 +253,9 @@ describe('LLM Profile Management', () => {
 
     // Look for an LLM Profiles tab or section
     const llmProfilesTab = browser.locator('[data-testid="llm-profiles-tab"]').first();
-    const llmProfilesTabVisible = await llmProfilesTab.isVisible({ timeout: 3000 }).catch(() => false);
+    const llmProfilesTabVisible = await llmProfilesTab
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
 
     if (llmProfilesTabVisible) {
       await llmProfilesTab.click();
@@ -270,9 +276,9 @@ describe('LLM Profile Management', () => {
     }
 
     // Verify some profile-related content is visible
-    const profileContent = browser.locator(
-      'text=/profile|Profile|llm|LLM|anthropic|Anthropic/i'
-    ).first();
+    const profileContent = browser
+      .locator('text=/profile|Profile|llm|LLM|anthropic|Anthropic/i')
+      .first();
     const hasProfileContent = await profileContent.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (hasProfileContent) {
@@ -281,7 +287,9 @@ describe('LLM Profile Management', () => {
       console.log('  LLM profile list is visible in settings');
     } else {
       // Check for any list items in the settings panel
-      const listItems = browser.locator('.p-3.border.rounded-lg, [class*="llm-profile"], [class*="profile"], [class*="server"]');
+      const listItems = browser.locator(
+        '.p-3.border.rounded-lg, [class*="llm-profile"], [class*="profile"], [class*="server"]'
+      );
       const count = await listItems.count().catch(() => 0);
       console.log(`  Found ${count} list item(s) in settings panel`);
     }

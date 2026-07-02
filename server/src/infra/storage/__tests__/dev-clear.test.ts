@@ -12,7 +12,8 @@ describe('maybeWipeDevDataDir', () => {
     originalEnv = process.env.NODE_ENV;
   });
   afterEach(() => {
-    if (originalEnv === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = originalEnv;
+    if (originalEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = originalEnv;
     delete process.env.ZCLAUDIA_DEV;
     rmSync(tmpRoot, { recursive: true, force: true });
   });

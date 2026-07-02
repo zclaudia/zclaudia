@@ -34,7 +34,7 @@ describe('AnonymousIssueService + close→archive integration', () => {
     db.pragma('foreign_keys = ON');
     applyMigrations(db);
     db.prepare(
-      `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
     ).run('proj-1', 'P', 'code', 0, 0);
     projectRoot = mkdtempSync(join(tmpdir(), 'anon-'));
     scService = new SpecChangeService({ db, getProjectRoot: () => projectRoot });
@@ -86,7 +86,7 @@ describe('AnonymousIssueService + close→archive integration', () => {
     // Corpus written
     const corpus = fs.readFileSync(
       join(projectRoot, 'openspec', 'specs', 'core', 'spec.md'),
-      'utf-8',
+      'utf-8'
     );
     expect(corpus).toContain('Anon test');
   });

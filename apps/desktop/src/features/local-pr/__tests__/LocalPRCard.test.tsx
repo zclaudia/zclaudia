@@ -234,7 +234,9 @@ describe('LocalPRCard', () => {
   it('calls resolveConflictPR when resolve AI button is clicked', async () => {
     const pr = createPR({ status: 'conflict' });
     const { container } = render(<LocalPRCard pr={pr} projectId="proj-1" />);
-    const resolveBtn = container.querySelector('button[title="Resolve with AI"]') as HTMLButtonElement;
+    const resolveBtn = container.querySelector(
+      'button[title="Resolve with AI"]'
+    ) as HTMLButtonElement;
     fireEvent.click(resolveBtn);
     await waitFor(() => {
       expect(mockResolveConflictPR).toHaveBeenCalledWith('pr-1', 'proj-1');
@@ -327,7 +329,9 @@ describe('LocalPRCard', () => {
   it('calls cancelMergePR and mergePR when cancel and retry button is clicked', async () => {
     const pr = createPR({ status: 'merging' });
     const { container } = render(<LocalPRCard pr={pr} projectId="proj-1" />);
-    const retryBtn = container.querySelector('button[title="Cancel and retry"]') as HTMLButtonElement;
+    const retryBtn = container.querySelector(
+      'button[title="Cancel and retry"]'
+    ) as HTMLButtonElement;
     fireEvent.click(retryBtn);
     await waitFor(() => {
       expect(mockCancelMergePR).toHaveBeenCalledWith('pr-1', 'proj-1');

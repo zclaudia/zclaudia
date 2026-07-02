@@ -9,7 +9,9 @@ describe('runRipgrep', () => {
     const dir = mkdtempSync(join(tmpdir(), 'zc-rg-'));
     writeFileSync(join(dir, 'a.ts'), 'const x = 1;\n');
     writeFileSync(join(dir, 'b.ts'), 'const y = 2;\n');
-    const { lines, truncated, exitCode } = await runRipgrep(['--files', '--glob', '*.ts', dir], { maxLines: 100 });
+    const { lines, truncated, exitCode } = await runRipgrep(['--files', '--glob', '*.ts', dir], {
+      maxLines: 100,
+    });
     rmSync(dir, { recursive: true, force: true });
     expect(exitCode).toBe(0);
     expect(truncated).toBe(false);
@@ -28,7 +30,9 @@ describe('runRipgrep', () => {
   it('returns exitCode 1 with no lines when nothing matches', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'zc-rg-'));
     writeFileSync(join(dir, 'a.ts'), 'hello\n');
-    const { lines, exitCode } = await runRipgrep(['nonexistent_pattern_zzz', dir], { maxLines: 100 });
+    const { lines, exitCode } = await runRipgrep(['nonexistent_pattern_zzz', dir], {
+      maxLines: 100,
+    });
     rmSync(dir, { recursive: true, force: true });
     expect(exitCode).toBe(1);
     expect(lines.length).toBe(0);

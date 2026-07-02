@@ -47,12 +47,8 @@ describe('middleware/logging', () => {
 
       await loggingMiddleware(mockCtx, handler);
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('user.create.request')
-      );
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('client-test-1')
-      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('user.create.request'));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('client-test-1'));
     });
 
     it('logs response success status', async () => {
@@ -66,9 +62,7 @@ describe('middleware/logging', () => {
 
       await loggingMiddleware(mockCtx, handler);
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('SUCCESS')
-      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('SUCCESS'));
     });
 
     it('logs response failure status', async () => {
@@ -82,9 +76,7 @@ describe('middleware/logging', () => {
 
       await loggingMiddleware(mockCtx, handler);
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('FAILED')
-      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('FAILED'));
     });
 
     it('logs request duration', async () => {
@@ -101,9 +93,7 @@ describe('middleware/logging', () => {
 
       await loggingMiddleware(mockCtx, handler);
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringMatching(/\d+ms/)
-      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringMatching(/\d+ms/));
     });
 
     it('logs "no response" when handler returns nothing', async () => {
@@ -111,9 +101,7 @@ describe('middleware/logging', () => {
 
       await loggingMiddleware(mockCtx, handler);
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('no response')
-      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('no response'));
     });
 
     it('logs errors and re-throws', async () => {
@@ -124,10 +112,7 @@ describe('middleware/logging', () => {
 
       await expect(loggingMiddleware(mockCtx, handler)).rejects.toThrow('Test error');
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Error'),
-        error
-      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Error'), error);
     });
 
     it('logs error duration', async () => {
@@ -262,9 +247,7 @@ describe('middleware/logging', () => {
 
       // The payload should be truncated to 200 chars
       // console.log is called with '[Request Details]' as first arg, object as second
-      const logCall = consoleLogSpy.mock.calls.find(
-        call => call[1]?.payload !== undefined
-      );
+      const logCall = consoleLogSpy.mock.calls.find(call => call[1]?.payload !== undefined);
       expect(logCall).toBeDefined();
       expect(logCall![1].payload.length).toBeLessThanOrEqual(202); // 200 + quotes
     });

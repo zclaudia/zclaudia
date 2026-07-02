@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 const getPermissionLogs = vi.fn().mockResolvedValue({ entries: [], total: 0 });
-vi.mock('../../../../services/api', () => ({ getPermissionLogs: (a: unknown) => getPermissionLogs(a) }));
+vi.mock('../../../../services/api', () => ({
+  getPermissionLogs: (a: unknown) => getPermissionLogs(a),
+}));
 
 import { PermissionLogsSection } from '../PermissionLogsSection';
 

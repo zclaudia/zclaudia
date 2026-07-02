@@ -54,17 +54,26 @@ export const CATEGORY_COLORS: Record<string, string> = {
   plugin: 'bg-muted text-muted-foreground',
 };
 
-export function automationToItem(a: Automation, workflowNames?: Map<string, string>): AutomationItem {
+export function automationToItem(
+  a: Automation,
+  workflowNames?: Map<string, string>
+): AutomationItem {
   const trigger = a.trigger;
-  const triggerSummary = !trigger ? 'manual'
-    : trigger.type === 'cron' ? `cron: ${trigger.cron}`
-    : trigger.type === 'interval' ? `every ${trigger.intervalMinutes}m`
-    : trigger.type === 'once' ? 'once'
-    : trigger.type === 'event' ? `event: ${trigger.event}`
-    : trigger.type;
-  const actionSummary = a.action.kind === 'workflow'
-    ? (workflowNames?.get(a.action.ref) ?? `workflow: ${a.action.ref.slice(0, 8)}`)
-    : a.action.ref;
+  const triggerSummary = !trigger
+    ? 'manual'
+    : trigger.type === 'cron'
+      ? `cron: ${trigger.cron}`
+      : trigger.type === 'interval'
+        ? `every ${trigger.intervalMinutes}m`
+        : trigger.type === 'once'
+          ? 'once'
+          : trigger.type === 'event'
+            ? `event: ${trigger.event}`
+            : trigger.type;
+  const actionSummary =
+    a.action.kind === 'workflow'
+      ? (workflowNames?.get(a.action.ref) ?? `workflow: ${a.action.ref.slice(0, 8)}`)
+      : a.action.ref;
   return {
     id: a.id,
     name: a.name,

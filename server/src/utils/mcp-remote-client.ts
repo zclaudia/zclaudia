@@ -19,7 +19,10 @@ export interface RemoteMcpClientConfig {
   url: string;
   headers?: Record<string, string>;
   headersHelper?: string;
-  headersHelperRunner?: (command: string, context: { serverName?: string; url: string }) => Promise<Record<string, string>>;
+  headersHelperRunner?: (
+    command: string,
+    context: { serverName?: string; url: string }
+  ) => Promise<Record<string, string>>;
   oauthConfig?: McpOAuthConfig;
   oauthCredentials?: McpOAuthCredentials;
   fetchFn?: typeof fetch;
@@ -34,7 +37,11 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
 const HEADERS_HELPER_TIMEOUT_MS = 10_000;
 
 function shouldRefresh(credentials?: McpOAuthCredentials): boolean {
-  return !!credentials?.refreshToken && typeof credentials.expiresAt === 'number' && credentials.expiresAt <= Date.now() + REFRESH_SKEW_MS;
+  return (
+    !!credentials?.refreshToken &&
+    typeof credentials.expiresAt === 'number' &&
+    credentials.expiresAt <= Date.now() + REFRESH_SKEW_MS
+  );
 }
 
 function formBody(values: Record<string, string | undefined>): URLSearchParams {
@@ -46,68 +53,98 @@ function formBody(values: Record<string, string | undefined>): URLSearchParams {
 }
 
 function credentialsFromTokenResponse(
-  token: { access_token?: unknown; refresh_token?: unknown; token_type?: unknown; expires_in?: unknown; scope?: unknown },
-  previous?: McpOAuthCredentials,
+  token: {
+    access_token?: unknown;
+    refresh_token?: unknown;
+    token_type?: unknown;
+    expires_in?: unknown;
+    scope?: unknown;
+  },
+  previous?: McpOAuthCredentials
 ): McpOAuthCredentials {
   if (typeof token.access_token !== 'string' || !token.access_token) {
     throw new Error('OAuth refresh response did not include access_token');
   }
-  const expiresIn = typeof token.expires_in === 'number' && Number.isFinite(token.expires_in)
-    ? token.expires_in
-    : undefined;
+  const expiresIn =
+    typeof token.expires_in === 'number' && Number.isFinite(token.expires_in)
+      ? token.expires_in
+      : undefined;
   return {
     accessToken: token.access_token,
-    refreshToken: typeof token.refresh_token === 'string' && token.refresh_token ? token.refresh_token : previous?.refreshToken,
-    tokenType: typeof token.token_type === 'string' && token.token_type ? token.token_type : previous?.tokenType ?? 'Bearer',
+    refreshToken:
+      typeof token.refresh_token === 'string' && token.refresh_token
+        ? token.refresh_token
+        : previous?.refreshToken,
+    tokenType:
+      typeof token.token_type === 'string' && token.token_type
+        ? token.token_type
+        : (previous?.tokenType ?? 'Bearer'),
     expiresAt: expiresIn ? Date.now() + expiresIn * 1000 : undefined,
     scope: typeof token.scope === 'string' && token.scope ? token.scope : previous?.scope,
   };
 }
 
 function isTerminalRefreshError(message: string): boolean {
-  return /\b(invalid_grant|refresh_token_expired|refresh_token_invalidated|refresh_token_reused)\b/i.test(message);
+  return /\b(invalid_grant|refresh_token_expired|refresh_token_invalidated|refresh_token_reused)\b/i.test(
+    message
+  );
 }
 
-function runHeadersHelper(command: string, context: { serverName?: string; url: string }): Promise<Record<string, string>> {
+function runHeadersHelper(
+  command: string,
+  context: { serverName?: string; url: string }
+): Promise<Record<string, string>> {
   return new Promise((resolve, reject) => {
-    execFile(command, [], {
-      shell: true,
-      timeout: HEADERS_HELPER_TIMEOUT_MS,
-      env: {
-        ...process.env,
-        ZCLAUDIA_MCP_SERVER_NAME: context.serverName ?? '',
-        ZCLAUDIA_MCP_SERVER_URL: context.url,
+    execFile(
+      command,
+      [],
+      {
+        shell: true,
+        timeout: HEADERS_HELPER_TIMEOUT_MS,
+        env: {
+          ...process.env,
+          ZCLAUDIA_MCP_SERVER_NAME: context.serverName ?? '',
+          ZCLAUDIA_MCP_SERVER_URL: context.url,
+        },
       },
-    }, (error, stdout) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      try {
-        const parsed = JSON.parse(stdout.trim()) as unknown;
-        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-          throw new Error('headersHelper must return a JSON object');
+      (error, stdout) => {
+        if (error) {
+          reject(error);
+          return;
         }
-        const headers: Record<string, string> = {};
-        for (const [key, value] of Object.entries(parsed)) {
-          if (typeof value !== 'string') throw new Error(`headersHelper value for ${key} must be a string`);
-          headers[key] = value;
+        try {
+          const parsed = JSON.parse(stdout.trim()) as unknown;
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            throw new Error('headersHelper must return a JSON object');
+          }
+          const headers: Record<string, string> = {};
+          for (const [key, value] of Object.entries(parsed)) {
+            if (typeof value !== 'string')
+              throw new Error(`headersHelper value for ${key} must be a string`);
+            headers[key] = value;
+          }
+          resolve(headers);
+        } catch (err) {
+          reject(err);
         }
-        resolve(headers);
-      } catch (err) {
-        reject(err);
       }
-    });
+    );
   });
 }
 
-async function requestHeaders(config: RemoteMcpClientConfig, credentials = config.oauthCredentials): Promise<Record<string, string>> {
+async function requestHeaders(
+  config: RemoteMcpClientConfig,
+  credentials = config.oauthCredentials
+): Promise<Record<string, string>> {
   const headers = { ...(config.headers ?? {}) };
   if (config.headersHelper) {
-    const dynamicHeaders = await (config.headersHelperRunner ?? runHeadersHelper)(config.headersHelper, {
-      serverName: config.serverName,
-      url: config.url,
-    });
+    const dynamicHeaders = await (config.headersHelperRunner ?? runHeadersHelper)(
+      config.headersHelper,
+      {
+        serverName: config.serverName,
+        url: config.url,
+      }
+    );
     Object.assign(headers, dynamicHeaders);
   }
   if (credentials?.accessToken) {
@@ -119,7 +156,10 @@ async function requestHeaders(config: RemoteMcpClientConfig, credentials = confi
 function withRequestTimeout(config: RemoteMcpClientConfig): typeof fetch {
   const baseFetch = config.fetchFn ?? globalThis.fetch;
   const timeoutMs = config.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
-  return async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]): Promise<Response> => {
+  return async (
+    input: Parameters<typeof fetch>[0],
+    init?: Parameters<typeof fetch>[1]
+  ): Promise<Response> => {
     const method = (init?.method ?? 'GET').toUpperCase();
     if (method === 'GET') return baseFetch(input, init);
 
@@ -129,7 +169,10 @@ function withRequestTimeout(config: RemoteMcpClientConfig): typeof fetch {
     if (upstreamSignal?.aborted) controller.abort(upstreamSignal.reason);
     else upstreamSignal?.addEventListener('abort', abortFromUpstream, { once: true });
 
-    const timeout = setTimeout(() => controller.abort(new Error(`Remote MCP request timed out after ${timeoutMs}ms`)), timeoutMs);
+    const timeout = setTimeout(
+      () => controller.abort(new Error(`Remote MCP request timed out after ${timeoutMs}ms`)),
+      timeoutMs
+    );
     try {
       return await baseFetch(input, { ...init, signal: controller.signal });
     } finally {
@@ -152,10 +195,14 @@ export class RemoteMcpClient {
     const headers = await requestHeaders(this.config, oauthCredentials);
     const requestInit = Object.keys(headers).length > 0 ? { headers } : undefined;
     const fetch = withRequestTimeout(this.config);
-    this.client = new Client({ name: 'zclaudia-mcp-client', version: '0.1.0' }, { capabilities: {} });
-    this.transportInstance = this.config.transport === 'sse'
-      ? new SSEClientTransport(new URL(this.config.url), { requestInit, fetch })
-      : new StreamableHTTPClientTransport(new URL(this.config.url), { requestInit, fetch });
+    this.client = new Client(
+      { name: 'zclaudia-mcp-client', version: '0.1.0' },
+      { capabilities: {} }
+    );
+    this.transportInstance =
+      this.config.transport === 'sse'
+        ? new SSEClientTransport(new URL(this.config.url), { requestInit, fetch })
+        : new StreamableHTTPClientTransport(new URL(this.config.url), { requestInit, fetch });
     await this.withConnectTimeout(this.client.connect(this.transportInstance));
     this.connected = true;
   }
@@ -177,10 +224,13 @@ export class RemoteMcpClient {
 
   async listTools(): Promise<McpToolDefinition[]> {
     const result = await this.requireClient().listTools();
-    return result.tools.map((tool) => ({
+    return result.tools.map(tool => ({
       name: tool.name,
       description: tool.description ?? '',
-      inputSchema: (tool.inputSchema ?? { type: 'object', properties: {} }) as Record<string, unknown>,
+      inputSchema: (tool.inputSchema ?? { type: 'object', properties: {} }) as Record<
+        string,
+        unknown
+      >,
       annotations: (tool as { annotations?: Record<string, unknown> }).annotations,
     })) as McpToolDefinition[];
   }
@@ -195,7 +245,7 @@ export class RemoteMcpClient {
 
   async listResources(): Promise<McpResourceDefinition[]> {
     const result = await this.requireClient().listResources();
-    return result.resources.map((resource) => ({
+    return result.resources.map(resource => ({
       uri: resource.uri,
       name: resource.name,
       description: resource.description,
@@ -210,7 +260,7 @@ export class RemoteMcpClient {
 
   async listPrompts(): Promise<McpPromptDefinition[]> {
     const result = await this.requireClient().listPrompts();
-    return result.prompts.map((prompt) => ({
+    return result.prompts.map(prompt => ({
       name: prompt.name,
       description: prompt.description,
       arguments: prompt.arguments,
@@ -218,7 +268,10 @@ export class RemoteMcpClient {
   }
 
   async getPrompt(name: string, args?: Record<string, unknown>): Promise<McpPromptResult> {
-    const result = await this.requireClient().getPrompt({ name, arguments: (args ?? {}) as Record<string, string> });
+    const result = await this.requireClient().getPrompt({
+      name,
+      arguments: (args ?? {}) as Record<string, string>,
+    });
     return {
       description: result.description,
       messages: result.messages as McpPromptResult['messages'],
@@ -237,7 +290,10 @@ export class RemoteMcpClient {
       return await Promise.race([
         promise,
         new Promise<T>((_, reject) => {
-          timeout = setTimeout(() => reject(new Error(`Remote MCP connection timed out after ${timeoutMs}ms`)), timeoutMs);
+          timeout = setTimeout(
+            () => reject(new Error(`Remote MCP connection timed out after ${timeoutMs}ms`)),
+            timeoutMs
+          );
         }),
       ]);
     } catch (error) {
@@ -254,7 +310,11 @@ export class RemoteMcpClient {
   private async resolveOAuthCredentials(): Promise<McpOAuthCredentials | undefined> {
     if (!shouldRefresh(this.config.oauthCredentials)) return this.config.oauthCredentials;
     if (this.config.oauthConfig?.enabled && !this.config.oauthConfig.tokenEndpoint) {
-      this.config.oauthConfig = await discoverMcpOAuthConfig(this.config.oauthConfig, this.config.url, this.config.fetchFn ?? globalThis.fetch);
+      this.config.oauthConfig = await discoverMcpOAuthConfig(
+        this.config.oauthConfig,
+        this.config.url,
+        this.config.fetchFn ?? globalThis.fetch
+      );
     }
     const tokenEndpoint = this.config.oauthConfig?.tokenEndpoint;
     const refreshToken = this.config.oauthCredentials?.refreshToken;
@@ -279,13 +339,16 @@ export class RemoteMcpClient {
       throw new Error(`OAuth refresh failed: ${message || response.status}`);
     }
 
-    const fresh = credentialsFromTokenResponse(await response.json() as {
-      access_token?: unknown;
-      refresh_token?: unknown;
-      token_type?: unknown;
-      expires_in?: unknown;
-      scope?: unknown;
-    }, this.config.oauthCredentials);
+    const fresh = credentialsFromTokenResponse(
+      (await response.json()) as {
+        access_token?: unknown;
+        refresh_token?: unknown;
+        token_type?: unknown;
+        expires_in?: unknown;
+        scope?: unknown;
+      },
+      this.config.oauthCredentials
+    );
     this.config.oauthCredentials = fresh;
     await this.config.onOAuthCredentials?.(fresh);
     return fresh;

@@ -55,10 +55,7 @@ describe('tool selection resolver', () => {
   it('applies include and exclude after expanding sets', () => {
     const resolved = resolveToolSelection({
       sets: [{ source: 'builtin', id: 'web' }],
-      include: [
-        builtinToolRef('Read'),
-        { source: 'plugin', pluginId: 'jira', toolId: 'search' },
-      ],
+      include: [builtinToolRef('Read'), { source: 'plugin', pluginId: 'jira', toolId: 'search' }],
       exclude: [builtinToolRef('WebSearch')],
     });
 
@@ -122,8 +119,12 @@ describe('tool selection resolver', () => {
   });
 
   it('creates stable external tool keys for concrete MCP and plugin tools', () => {
-    expect(toolRefKey({ source: 'mcp', server: 'github', tool: 'create_issue' })).toBe('mcp:github/create_issue');
-    expect(toolRefKey({ source: 'plugin', pluginId: 'jira', toolId: 'search_issues' })).toBe('plugin:jira/search_issues');
+    expect(toolRefKey({ source: 'mcp', server: 'github', tool: 'create_issue' })).toBe(
+      'mcp:github/create_issue'
+    );
+    expect(toolRefKey({ source: 'plugin', pluginId: 'jira', toolId: 'search_issues' })).toBe(
+      'plugin:jira/search_issues'
+    );
   });
 
   it('lets exclude block a pinned external tool by stable key', () => {

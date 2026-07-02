@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, type Request, type Response } from 'express';
 import type { Database } from 'better-sqlite3';
 import type { GatewayBackendInfo } from '@zclaudia/shared/core/server';
 
@@ -30,6 +30,38 @@ export interface GatewayStatus {
   currentDeviceId?: string;
 }
 
+interface GatewayConfigRow {
+  id: number;
+  enabled: number;
+  gateway_url: string | null;
+  gateway_secret: string | null;
+  backend_name: string | null;
+  backend_id: string | null;
+  register_as_backend: number;
+  proxy_url: string | null;
+  proxy_username: string | null;
+  proxy_password: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+function mapGatewayConfigRow(row: GatewayConfigRow): GatewayConfig {
+  return {
+    id: row.id,
+    enabled: row.enabled === 1,
+    gatewayUrl: row.gateway_url,
+    gatewaySecret: row.gateway_secret,
+    backendName: row.backend_name,
+    gatewayBackendId: row.backend_id,
+    registerAsBackend: row.register_as_backend === 1,
+    proxyUrl: row.proxy_url,
+    proxyUsername: row.proxy_username,
+    proxyPassword: row.proxy_password,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 export function createGatewayRouter(
   db: Database,
   getGatewayStatus: () => GatewayStatus,
@@ -41,42 +73,33 @@ export function createGatewayRouter(
   // Get Gateway configuration
   router.get('/config', (_req: Request, res: Response) => {
     try {
-      const row = db.prepare(`
+      const row = db
+        .prepare(
+          `
         SELECT id, enabled, gateway_url, gateway_secret, backend_name, backend_id,
                register_as_backend,
                proxy_url, proxy_username, proxy_password,
                created_at, updated_at
         FROM gateway_config
         WHERE id = 1
-      `).get() as any;
+      `
+        )
+        .get() as GatewayConfigRow | undefined;
 
       if (!row) {
         return res.json({
           success: false,
-          error: { code: 'NOT_FOUND', message: 'Gateway config not found' }
+          error: { code: 'NOT_FOUND', message: 'Gateway config not found' },
         });
       }
 
-      const config: GatewayConfig = {
-        id: row.id,
-        enabled: row.enabled === 1,
-        gatewayUrl: row.gateway_url,
-        gatewaySecret: row.gateway_secret,
-        backendName: row.backend_name,
-        gatewayBackendId: row.backend_id,
-        registerAsBackend: row.register_as_backend === 1,
-        proxyUrl: row.proxy_url,
-        proxyUsername: row.proxy_username,
-        proxyPassword: row.proxy_password,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at
-      };
+      const config = mapGatewayConfigRow(row);
 
       // Don't send secrets to the client
       const safeConfig = {
         ...config,
         gatewaySecret: config.gatewaySecret ? '********' : null,
-        proxyPassword: config.proxyPassword ? '********' : null
+        proxyPassword: config.proxyPassword ? '********' : null,
       };
 
       res.json({ success: true, data: safeConfig });
@@ -86,8 +109,8 @@ export function createGatewayRouter(
         success: false,
         error: {
           code: 'DATABASE_ERROR',
-          message: error instanceof Error ? error.message : 'Failed to get gateway config'
-        }
+          message: error instanceof Error ? error.message : 'Failed to get gateway config',
+        },
       });
     }
   });
@@ -95,27 +118,41 @@ export function createGatewayRouter(
   // Update Gateway configuration
   router.put('/config', async (req: Request, res: Response) => {
     try {
-      const { enabled, gatewayUrl, gatewaySecret, backendName, registerAsBackend, proxyUrl, proxyUsername, proxyPassword } = req.body;
+      const {
+        enabled,
+        gatewayUrl,
+        gatewaySecret,
+        backendName,
+        registerAsBackend,
+        proxyUrl,
+        proxyUsername,
+        proxyPassword,
+      } = req.body;
 
-      const existingRow = db.prepare(`
+      const existingRow = db
+        .prepare(
+          `
         SELECT id, enabled, gateway_url, gateway_secret, backend_name, backend_id,
                register_as_backend,
                proxy_url, proxy_username, proxy_password,
                created_at, updated_at
         FROM gateway_config
         WHERE id = 1
-      `).get() as any;
+      `
+        )
+        .get() as GatewayConfigRow | undefined;
 
       if (!existingRow) {
         return res.json({
           success: false,
-          error: { code: 'NOT_FOUND', message: 'Gateway config not found' }
+          error: { code: 'NOT_FOUND', message: 'Gateway config not found' },
         });
       }
 
       const resolvedEnabled = typeof enabled === 'boolean' ? enabled : existingRow.enabled === 1;
       const resolvedGatewayUrl = gatewayUrl !== undefined ? gatewayUrl : existingRow.gateway_url;
-      const resolvedGatewaySecret = gatewaySecret !== undefined ? gatewaySecret : existingRow.gateway_secret;
+      const resolvedGatewaySecret =
+        gatewaySecret !== undefined ? gatewaySecret : existingRow.gateway_secret;
 
       // Validate required fields if enabling
       if (resolvedEnabled && (!resolvedGatewayUrl || !resolvedGatewaySecret)) {
@@ -123,13 +160,13 @@ export function createGatewayRouter(
           success: false,
           error: {
             code: 'VALIDATION_ERROR',
-            message: 'Gateway URL and Secret are required when enabling'
-          }
+            message: 'Gateway URL and Secret are required when enabling',
+          },
         });
       }
 
       const updates: string[] = [];
-      const params: any[] = [];
+      const params: Array<string | number | null> = [];
 
       if (typeof enabled === 'boolean') {
         updates.push('enabled = ?');
@@ -176,36 +213,36 @@ export function createGatewayRouter(
 
       params.push(1); // WHERE id = 1
 
-      db.prepare(`
+      db.prepare(
+        `
         UPDATE gateway_config
         SET ${updates.join(', ')}
         WHERE id = ?
-      `).run(...params);
+      `
+      ).run(...params);
 
       // Get updated config
-      const row = db.prepare(`
+      const row = db
+        .prepare(
+          `
         SELECT id, enabled, gateway_url, gateway_secret, backend_name, backend_id,
                register_as_backend,
                proxy_url, proxy_username, proxy_password,
                created_at, updated_at
         FROM gateway_config
         WHERE id = 1
-      `).get() as any;
+      `
+        )
+        .get() as GatewayConfigRow | undefined;
 
-      const config: GatewayConfig = {
-        id: row.id,
-        enabled: row.enabled === 1,
-        gatewayUrl: row.gateway_url,
-        gatewaySecret: row.gateway_secret,
-        backendName: row.backend_name,
-        gatewayBackendId: row.backend_id,
-        registerAsBackend: row.register_as_backend === 1,
-        proxyUrl: row.proxy_url,
-        proxyUsername: row.proxy_username,
-        proxyPassword: row.proxy_password,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at
-      };
+      if (!row) {
+        return res.json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Gateway config not found' },
+        });
+      }
+
+      const config = mapGatewayConfigRow(row);
 
       // If enabled, connect to gateway
       if (config.enabled && config.gatewayUrl && config.gatewaySecret) {
@@ -218,7 +255,7 @@ export function createGatewayRouter(
       const safeConfig = {
         ...config,
         gatewaySecret: config.gatewaySecret ? '********' : null,
-        proxyPassword: config.proxyPassword ? '********' : null
+        proxyPassword: config.proxyPassword ? '********' : null,
       };
 
       res.json({ success: true, data: safeConfig });
@@ -228,8 +265,8 @@ export function createGatewayRouter(
         success: false,
         error: {
           code: 'UPDATE_FAILED',
-          message: error instanceof Error ? error.message : 'Failed to update gateway config'
-        }
+          message: error instanceof Error ? error.message : 'Failed to update gateway config',
+        },
       });
     }
   });
@@ -245,8 +282,8 @@ export function createGatewayRouter(
         success: false,
         error: {
           code: 'STATUS_ERROR',
-          message: error instanceof Error ? error.message : 'Failed to get gateway status'
-        }
+          message: error instanceof Error ? error.message : 'Failed to get gateway status',
+        },
       });
     }
   });
@@ -254,48 +291,39 @@ export function createGatewayRouter(
   // Manually connect to Gateway (if enabled)
   router.post('/connect', async (_req: Request, res: Response) => {
     try {
-      const row = db.prepare(`
+      const row = db
+        .prepare(
+          `
         SELECT id, enabled, gateway_url, gateway_secret, backend_name, backend_id,
                register_as_backend,
                proxy_url, proxy_username, proxy_password,
                created_at, updated_at
         FROM gateway_config
         WHERE id = 1
-      `).get() as any;
+      `
+        )
+        .get() as GatewayConfigRow | undefined;
 
       if (!row) {
         return res.json({
           success: false,
-          error: { code: 'NOT_FOUND', message: 'Gateway config not found' }
+          error: { code: 'NOT_FOUND', message: 'Gateway config not found' },
         });
       }
 
-      const config: GatewayConfig = {
-        id: row.id,
-        enabled: row.enabled === 1,
-        gatewayUrl: row.gateway_url,
-        gatewaySecret: row.gateway_secret,
-        backendName: row.backend_name,
-        gatewayBackendId: row.backend_id,
-        registerAsBackend: row.register_as_backend === 1,
-        proxyUrl: row.proxy_url,
-        proxyUsername: row.proxy_username,
-        proxyPassword: row.proxy_password,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at
-      };
+      const config = mapGatewayConfigRow(row);
 
       if (!config.enabled) {
         return res.json({
           success: false,
-          error: { code: 'DISABLED', message: 'Gateway is disabled' }
+          error: { code: 'DISABLED', message: 'Gateway is disabled' },
         });
       }
 
       if (!config.gatewayUrl || !config.gatewaySecret) {
         return res.json({
           success: false,
-          error: { code: 'NOT_CONFIGURED', message: 'Gateway URL or Secret not configured' }
+          error: { code: 'NOT_CONFIGURED', message: 'Gateway URL or Secret not configured' },
         });
       }
 
@@ -308,8 +336,8 @@ export function createGatewayRouter(
         success: false,
         error: {
           code: 'CONNECT_FAILED',
-          message: error instanceof Error ? error.message : 'Failed to connect to gateway'
-        }
+          message: error instanceof Error ? error.message : 'Failed to connect to gateway',
+        },
       });
     }
   });
@@ -325,8 +353,8 @@ export function createGatewayRouter(
         success: false,
         error: {
           code: 'DISCONNECT_FAILED',
-          message: error instanceof Error ? error.message : 'Failed to disconnect from gateway'
-        }
+          message: error instanceof Error ? error.message : 'Failed to disconnect from gateway',
+        },
       });
     }
   });

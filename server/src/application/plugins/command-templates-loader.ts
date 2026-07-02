@@ -71,7 +71,7 @@ function extractFrontmatterDescription(filePath: string): string | undefined {
  */
 export async function loadAllCommandTemplates(
   env: ExecutionEnv,
-  inputs: CommandTemplateLoadInput[],
+  inputs: CommandTemplateLoadInput[]
 ): Promise<CommandTemplateLoadResult> {
   const templates: SourcedPromptTemplate[] = [];
   const diagnostics: CommandTemplateDiagnostic[] = [];

@@ -37,17 +37,17 @@ interface ToastState {
   remove: (id: string) => void;
 }
 
-export const useToastStore = create<ToastState>((set) => ({
+export const useToastStore = create<ToastState>(set => ({
   toasts: [],
 
-  add: (toast) => {
+  add: toast => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const entry: Toast = { ...toast, id, createdAt: Date.now() };
     entry.category = classifyToast(entry);
 
-    set((state) => {
+    set(state => {
       const base = toast.sessionId
-        ? state.toasts.filter((t) => t.sessionId !== toast.sessionId)
+        ? state.toasts.filter(t => t.sessionId !== toast.sessionId)
         : state.toasts;
       return { toasts: [entry, ...base].slice(0, MAX_TOASTS) };
     });
@@ -60,15 +60,16 @@ export const useToastStore = create<ToastState>((set) => ({
 
     // Auto-dismiss
     setTimeout(() => {
-      set((state) => ({
-        toasts: state.toasts.filter((t) => t.id !== id),
+      set(state => ({
+        toasts: state.toasts.filter(t => t.id !== id),
       }));
     }, AUTO_DISMISS_MS);
   },
 
-  remove: (id) => set((state) => ({
-    toasts: state.toasts.filter((t) => t.id !== id),
-  })),
+  remove: id =>
+    set(state => ({
+      toasts: state.toasts.filter(t => t.id !== id),
+    })),
 }));
 
 // Dev-only: expose store on window for manual testing (e.g. NotchPanel demo)

@@ -35,26 +35,29 @@ export function FileTree({ projectRoot, backendId, selectedPath, onOpenFile }: F
   const [loadingPaths, setLoadingPaths] = useState<FlagMap>({});
   const [errorByPath, setErrorByPath] = useState<ErrorMap>({});
 
-  const loadDirectory = useCallback(async (relativePath: string) => {
-    setLoadingPaths((state) => ({ ...state, [relativePath]: true }));
-    setErrorByPath((state) => ({ ...state, [relativePath]: null }));
+  const loadDirectory = useCallback(
+    async (relativePath: string) => {
+      setLoadingPaths(state => ({ ...state, [relativePath]: true }));
+      setErrorByPath(state => ({ ...state, [relativePath]: null }));
 
-    try {
-      const result = await api.listDirectory({
-        projectRoot,
-        relativePath,
-        backendId: backendId ?? undefined,
-      });
-      setEntriesByPath((state) => ({ ...state, [relativePath]: result.entries }));
-    } catch (err) {
-      setErrorByPath((state) => ({
-        ...state,
-        [relativePath]: err instanceof Error ? err.message : 'Failed to load directory',
-      }));
-    } finally {
-      setLoadingPaths((state) => ({ ...state, [relativePath]: false }));
-    }
-  }, [backendId, projectRoot]);
+      try {
+        const result = await api.listDirectory({
+          projectRoot,
+          relativePath,
+          backendId: backendId ?? undefined,
+        });
+        setEntriesByPath(state => ({ ...state, [relativePath]: result.entries }));
+      } catch (err) {
+        setErrorByPath(state => ({
+          ...state,
+          [relativePath]: err instanceof Error ? err.message : 'Failed to load directory',
+        }));
+      } finally {
+        setLoadingPaths(state => ({ ...state, [relativePath]: false }));
+      }
+    },
+    [backendId, projectRoot]
+  );
 
   useEffect(() => {
     setEntriesByPath({});
@@ -66,7 +69,7 @@ export function FileTree({ projectRoot, backendId, selectedPath, onOpenFile }: F
 
   const toggleDirectory = (path: string) => {
     const willExpand = !(expandedPaths[path] ?? shouldAutoExpand(selectedPath, path));
-    setExpandedPaths((state) => ({ ...state, [path]: willExpand }));
+    setExpandedPaths(state => ({ ...state, [path]: willExpand }));
     if (willExpand && !entriesByPath[path]) {
       void loadDirectory(path);
     }
@@ -85,12 +88,15 @@ export function FileTree({ projectRoot, backendId, selectedPath, onOpenFile }: F
           </div>
         )}
         {loading && !entries.length && (
-          <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground" style={entryIndent(depth)}>
+          <div
+            className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground"
+            style={entryIndent(depth)}
+          >
             <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
             <span>Loading...</span>
           </div>
         )}
-        {entries.map((entry) => {
+        {entries.map(entry => {
           const isDirectory = entry.type === 'directory';
           const isSelected = !isDirectory && selectedPath === entry.path;
           const autoExpand = isDirectory && shouldAutoExpand(selectedPath, entry.path);
@@ -102,7 +108,7 @@ export function FileTree({ projectRoot, backendId, selectedPath, onOpenFile }: F
             <div key={entry.path}>
               <button
                 type="button"
-                onClick={() => isDirectory ? toggleDirectory(entry.path) : onOpenFile(entry.path)}
+                onClick={() => (isDirectory ? toggleDirectory(entry.path) : onOpenFile(entry.path))}
                 className={`group w-full flex items-center gap-1.5 px-2 py-1.5 text-left text-xs font-mono min-w-0 outline-none transition-colors focus-visible:ring-1 focus-visible:ring-primary/50 focus-visible:ring-inset ${
                   isSelected
                     ? 'bg-muted text-foreground shadow-[inset_2px_0_0_hsl(var(--muted-foreground))]'
@@ -115,9 +121,11 @@ export function FileTree({ projectRoot, backendId, selectedPath, onOpenFile }: F
               >
                 <span className="flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center text-muted-foreground/80 group-hover:text-foreground">
                   {isDirectory ? (
-                    showChildren
-                      ? <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
-                      : <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+                    showChildren ? (
+                      <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+                    ) : (
+                      <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+                    )
                   ) : null}
                 </span>
                 {isDirectory ? (

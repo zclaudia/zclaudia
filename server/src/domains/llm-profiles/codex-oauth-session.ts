@@ -64,7 +64,11 @@ export class CodexOAuthSessionManager {
   dispose(): void {
     clearInterval(this.cleanupTimer);
     for (const s of this.sessions.values()) {
-      try { s.controller.abort(); } catch { /* ignore */ }
+      try {
+        s.controller.abort();
+      } catch {
+        /* ignore */
+      }
     }
     this.sessions.clear();
   }
@@ -82,7 +86,9 @@ export class CodexOAuthSessionManager {
     const promise = (loginOpenAICodex as any)({
       originator: 'zclaudia',
       onAuth: (info: { url: string; instructions?: string }) => resolveAuth(info),
-      onPrompt: async () => { throw new CodexOAuthError('OAUTH_TIMEOUT', 'Manual prompt not supported via HTTP flow'); },
+      onPrompt: async () => {
+        throw new CodexOAuthError('OAUTH_TIMEOUT', 'Manual prompt not supported via HTTP flow');
+      },
       signal: controller.signal,
     } as any).then(
       async (creds: unknown) => {
@@ -100,7 +106,7 @@ export class CodexOAuthSessionManager {
         } else {
           rejectAuth(new CodexOAuthError(classified.code, classified.message));
         }
-      },
+      }
     );
 
     this.sessions.set(sessionId, {
@@ -124,19 +130,27 @@ export class CodexOAuthSessionManager {
   async startDeviceCodeFlow(profileId: string): Promise<CodexOAuthStartResult> {
     const sessionId = randomUUID();
     const controller = new AbortController();
-    let resolveDevice!: (info: { userCode: string; verificationUri: string; expiresInSeconds?: number }) => void;
+    let resolveDevice!: (info: {
+      userCode: string;
+      verificationUri: string;
+      expiresInSeconds?: number;
+    }) => void;
     let rejectDevice!: (err: Error) => void;
-    const deviceReady = new Promise<{ userCode: string; verificationUri: string; expiresInSeconds?: number }>((res, rej) => {
+    const deviceReady = new Promise<{
+      userCode: string;
+      verificationUri: string;
+      expiresInSeconds?: number;
+    }>((res, rej) => {
       resolveDevice = res;
       rejectDevice = rej;
     });
 
     const promise = loginOpenAICodexDeviceCode({
-      onDeviceCode: (info) => resolveDevice(info),
+      onDeviceCode: info => resolveDevice(info),
       signal: controller.signal,
     }).then(
-      async (creds) => this.markSuccess(sessionId, creds as any),
-      (err) => {
+      async creds => this.markSuccess(sessionId, creds as any),
+      err => {
         if (controller.signal.aborted) {
           this.markCancelled(sessionId);
           return;
@@ -144,7 +158,7 @@ export class CodexOAuthSessionManager {
         const classified = this.classifyLoginError(err);
         this.markError(sessionId, classified.code, classified.message);
         rejectDevice(new CodexOAuthError(classified.code, classified.message));
-      },
+      }
     );
 
     this.sessions.set(sessionId, {
@@ -185,7 +199,11 @@ export class CodexOAuthSessionManager {
   remove(sessionId: string): void {
     const s = this.sessions.get(sessionId);
     if (!s) return;
-    try { s.controller.abort(); } catch { /* ignore */ }
+    try {
+      s.controller.abort();
+    } catch {
+      /* ignore */
+    }
     this.sessions.delete(sessionId);
   }
 
@@ -197,7 +215,11 @@ export class CodexOAuthSessionManager {
         await this.writer.updateOAuthCredentials(s.profileId, creds);
       } catch (err) {
         console.error('[codex-oauth-session] failed to persist credentials', err);
-        this.markError(sessionId, 'REFRESH_FAILED_TRANSIENT', err instanceof Error ? err.message : String(err));
+        this.markError(
+          sessionId,
+          'REFRESH_FAILED_TRANSIENT',
+          err instanceof Error ? err.message : String(err)
+        );
         return;
       }
     }
@@ -223,24 +245,32 @@ export class CodexOAuthSessionManager {
   private classifyLoginError(err: unknown): LoginErrorClassification {
     const msg = err instanceof Error ? err.message : String(err);
     if (/EADDRINUSE.*1455/i.test(msg)) {
-      return { code: 'OAUTH_PORT_CONFLICT', message: 'localhost:1455 is occupied by another process' };
+      return {
+        code: 'OAUTH_PORT_CONFLICT',
+        message: 'localhost:1455 is occupied by another process',
+      };
     }
     if (this.isDeviceAuthChallenge(msg)) {
       return { code: 'OAUTH_DEVICE_AUTH_CHALLENGE', message: DEVICE_AUTH_CHALLENGE_MESSAGE };
     }
-    if (/state mismatch/i.test(msg)) return { code: 'OAUTH_STATE_MISMATCH', message: 'OAuth state mismatch. Please retry the sign-in flow.' };
-    if (/timeout/i.test(msg)) return { code: 'OAUTH_TIMEOUT', message: 'OAuth login timed out. Please retry.' };
+    if (/state mismatch/i.test(msg))
+      return {
+        code: 'OAUTH_STATE_MISMATCH',
+        message: 'OAuth state mismatch. Please retry the sign-in flow.',
+      };
+    if (/timeout/i.test(msg))
+      return { code: 'OAUTH_TIMEOUT', message: 'OAuth login timed out. Please retry.' };
     if (/cancel/i.test(msg)) return { code: 'OAUTH_CANCELLED', message: 'OAuth login cancelled.' };
     return { code: 'OAUTH_TIMEOUT', message: this.compactErrorMessage(msg) };
   }
 
   private isDeviceAuthChallenge(message: string): boolean {
     return (
-      /OpenAI Codex device code request failed with status 429/i.test(message)
-      || (
-        /deviceauth\/(?:usercode|token)|OpenAI Codex device auth/i.test(message)
-        && /<!doctype html|<html|cloudflare|challenges\.cloudflare\.com|Enable JavaScript and cookies|Just a moment|__cf_chl/i.test(message)
-      )
+      /OpenAI Codex device code request failed with status 429/i.test(message) ||
+      (/deviceauth\/(?:usercode|token)|OpenAI Codex device auth/i.test(message) &&
+        /<!doctype html|<html|cloudflare|challenges\.cloudflare\.com|Enable JavaScript and cookies|Just a moment|__cf_chl/i.test(
+          message
+        ))
     );
   }
 
@@ -255,7 +285,11 @@ export class CodexOAuthSessionManager {
     const now = Date.now();
     for (const [sid, s] of this.sessions) {
       if (now - s.createdAt > SESSION_TTL_MS) {
-        try { s.controller.abort(); } catch { /* ignore */ }
+        try {
+          s.controller.abort();
+        } catch {
+          /* ignore */
+        }
         this.sessions.delete(sid);
       }
     }

@@ -7,7 +7,7 @@ import { useToastStore } from '../../stores/toastStore';
 export async function runWithToast<T>(
   label: string,
   projectId: string,
-  fn: () => Promise<T>,
+  fn: () => Promise<T>
 ): Promise<T | null> {
   try {
     const result = await fn();

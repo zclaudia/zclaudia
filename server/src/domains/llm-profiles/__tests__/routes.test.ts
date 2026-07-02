@@ -68,51 +68,61 @@ describe('llm-profiles routes', () => {
 
   describe('requestHeaders validation', () => {
     it('POST with valid requestHeaders → 201', async () => {
-      const res = await request(app).post('/api/llm-profiles').send({
-        name: 'with-headers',
-        providerType: 'openai',
-        requestHeaders: { 'X-Org-Id': 'abc' },
-      });
+      const res = await request(app)
+        .post('/api/llm-profiles')
+        .send({
+          name: 'with-headers',
+          providerType: 'openai',
+          requestHeaders: { 'X-Org-Id': 'abc' },
+        });
       expect(res.status).toBe(201);
       expect(res.body.data.requestHeaders).toEqual({ 'X-Org-Id': 'abc' });
     });
 
     it('POST rejects Authorization in requestHeaders', async () => {
-      const res = await request(app).post('/api/llm-profiles').send({
-        name: 'bad',
-        providerType: 'openai',
-        requestHeaders: { 'Authorization': 'Bearer leaked' },
-      });
+      const res = await request(app)
+        .post('/api/llm-profiles')
+        .send({
+          name: 'bad',
+          providerType: 'openai',
+          requestHeaders: { Authorization: 'Bearer leaked' },
+        });
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
       expect(res.body.error.message).toMatch(/Authorization/);
     });
 
     it('POST rejects Content-Type (case-insensitive)', async () => {
-      const res = await request(app).post('/api/llm-profiles').send({
-        name: 'bad',
-        providerType: 'openai',
-        requestHeaders: { 'CONTENT-TYPE': 'application/x-evil' },
-      });
+      const res = await request(app)
+        .post('/api/llm-profiles')
+        .send({
+          name: 'bad',
+          providerType: 'openai',
+          requestHeaders: { 'CONTENT-TYPE': 'application/x-evil' },
+        });
       expect(res.status).toBe(400);
       expect(res.body.error.message).toMatch(/Content-Type|CONTENT-TYPE/i);
     });
 
     it('POST rejects Host', async () => {
-      const res = await request(app).post('/api/llm-profiles').send({
-        name: 'bad',
-        providerType: 'openai',
-        requestHeaders: { 'host': 'evil.example.com' },
-      });
+      const res = await request(app)
+        .post('/api/llm-profiles')
+        .send({
+          name: 'bad',
+          providerType: 'openai',
+          requestHeaders: { host: 'evil.example.com' },
+        });
       expect(res.status).toBe(400);
     });
 
     it('POST rejects non-string header value', async () => {
-      const res = await request(app).post('/api/llm-profiles').send({
-        name: 'bad',
-        providerType: 'openai',
-        requestHeaders: { 'X-Foo': 123 },
-      });
+      const res = await request(app)
+        .post('/api/llm-profiles')
+        .send({
+          name: 'bad',
+          providerType: 'openai',
+          requestHeaders: { 'X-Foo': 123 },
+        });
       expect(res.status).toBe(400);
       expect(res.body.error.message).toMatch(/X-Foo/);
     });
@@ -127,11 +137,13 @@ describe('llm-profiles routes', () => {
     });
 
     it('POST rejects array as requestHeaders', async () => {
-      const res = await request(app).post('/api/llm-profiles').send({
-        name: 'bad',
-        providerType: 'openai',
-        requestHeaders: [['X-Foo', 'bar']],
-      });
+      const res = await request(app)
+        .post('/api/llm-profiles')
+        .send({
+          name: 'bad',
+          providerType: 'openai',
+          requestHeaders: [['X-Foo', 'bar']],
+        });
       expect(res.status).toBe(400);
     });
 
@@ -141,18 +153,22 @@ describe('llm-profiles routes', () => {
         providerType: 'openai',
       });
       const id = createRes.body.data.id;
-      const res = await request(app).put(`/api/llm-profiles/${id}`).send({
-        requestHeaders: { 'Authorization': 'Bearer x' },
-      });
+      const res = await request(app)
+        .put(`/api/llm-profiles/${id}`)
+        .send({
+          requestHeaders: { Authorization: 'Bearer x' },
+        });
       expect(res.status).toBe(400);
     });
 
     it('PUT clears requestHeaders when null is sent', async () => {
-      const createRes = await request(app).post('/api/llm-profiles').send({
-        name: 'with-headers',
-        providerType: 'openai',
-        requestHeaders: { 'X-Org-Id': 'abc' },
-      });
+      const createRes = await request(app)
+        .post('/api/llm-profiles')
+        .send({
+          name: 'with-headers',
+          providerType: 'openai',
+          requestHeaders: { 'X-Org-Id': 'abc' },
+        });
       const id = createRes.body.data.id;
 
       const res = await request(app).put(`/api/llm-profiles/${id}`).send({
@@ -167,20 +183,27 @@ describe('llm-profiles routes', () => {
 
   describe('models validation', () => {
     it('accepts a single well-formed entry', async () => {
-      const res = await request(app).post('/api/llm-profiles').send({
-        name: 'ok', providerType: 'anthropic',
-        models: [{ modelId: 'claude-opus-4-7', contextWindow: 1_000_000 }],
-      });
+      const res = await request(app)
+        .post('/api/llm-profiles')
+        .send({
+          name: 'ok',
+          providerType: 'anthropic',
+          models: [{ modelId: 'claude-opus-4-7', contextWindow: 1_000_000 }],
+        });
       expect(res.status).toBe(201);
-      expect(res.body.data.models).toEqual([{ modelId: 'claude-opus-4-7', contextWindow: 1_000_000 }]);
+      expect(res.body.data.models).toEqual([
+        { modelId: 'claude-opus-4-7', contextWindow: 1_000_000 },
+      ]);
     });
 
     it('normalizes image inputModalities by including text', async () => {
-      const res = await request(app).post('/api/llm-profiles').send({
-        name: 'vision',
-        providerType: 'openai',
-        models: [{ modelId: 'gpt-4o', inputModalities: ['image'] }],
-      });
+      const res = await request(app)
+        .post('/api/llm-profiles')
+        .send({
+          name: 'vision',
+          providerType: 'openai',
+          models: [{ modelId: 'gpt-4o', inputModalities: ['image'] }],
+        });
       expect(res.status).toBe(201);
       expect(res.body.data.models).toEqual([
         { modelId: 'gpt-4o', inputModalities: ['text', 'image'] },
@@ -188,60 +211,78 @@ describe('llm-profiles routes', () => {
     });
 
     it('rejects invalid inputModalities values', async () => {
-      const res = await request(app).post('/api/llm-profiles').send({
-        name: 'bad-modalities',
-        providerType: 'openai',
-        models: [{ modelId: 'gpt-4o', inputModalities: ['audio'] }],
-      });
+      const res = await request(app)
+        .post('/api/llm-profiles')
+        .send({
+          name: 'bad-modalities',
+          providerType: 'openai',
+          models: [{ modelId: 'gpt-4o', inputModalities: ['audio'] }],
+        });
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
       expect(res.body.error.message).toMatch(/inputModalities/i);
     });
 
     it('rejects duplicate modelId', async () => {
-      const res = await request(app).post('/api/llm-profiles').send({
-        name: 'dup', providerType: 'anthropic',
-        models: [{ modelId: 'foo' }, { modelId: 'foo' }],
-      });
+      const res = await request(app)
+        .post('/api/llm-profiles')
+        .send({
+          name: 'dup',
+          providerType: 'anthropic',
+          models: [{ modelId: 'foo' }, { modelId: 'foo' }],
+        });
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
     });
 
     it('rejects empty modelId', async () => {
-      const res = await request(app).post('/api/llm-profiles').send({
-        name: 'mid', providerType: 'anthropic',
-        models: [{}],
-      });
+      const res = await request(app)
+        .post('/api/llm-profiles')
+        .send({
+          name: 'mid',
+          providerType: 'anthropic',
+          models: [{}],
+        });
       expect(res.status).toBe(400);
     });
 
     it('rejects zero / negative contextWindow', async () => {
-      const res = await request(app).post('/api/llm-profiles').send({
-        name: 'cw0', providerType: 'anthropic',
-        models: [{ modelId: 'm', contextWindow: 0 }],
-      });
+      const res = await request(app)
+        .post('/api/llm-profiles')
+        .send({
+          name: 'cw0',
+          providerType: 'anthropic',
+          models: [{ modelId: 'm', contextWindow: 0 }],
+        });
       expect(res.status).toBe(400);
     });
 
     it('rejects non-integer contextWindow', async () => {
-      const res = await request(app).post('/api/llm-profiles').send({
-        name: 'frac', providerType: 'anthropic',
-        models: [{ modelId: 'm', contextWindow: 1.5 }],
-      });
+      const res = await request(app)
+        .post('/api/llm-profiles')
+        .send({
+          name: 'frac',
+          providerType: 'anthropic',
+          models: [{ modelId: 'm', contextWindow: 1.5 }],
+        });
       expect(res.status).toBe(400);
     });
 
     it('rejects non-string displayName', async () => {
-      const res = await request(app).post('/api/llm-profiles').send({
-        name: 'dn', providerType: 'anthropic',
-        models: [{ modelId: 'm', displayName: 123 }],
-      });
+      const res = await request(app)
+        .post('/api/llm-profiles')
+        .send({
+          name: 'dn',
+          providerType: 'anthropic',
+          models: [{ modelId: 'm', displayName: 123 }],
+        });
       expect(res.status).toBe(400);
     });
 
     it('rejects models not being an array', async () => {
       const res = await request(app).post('/api/llm-profiles').send({
-        name: 'bad', providerType: 'anthropic',
+        name: 'bad',
+        providerType: 'anthropic',
         models: 'oops',
       });
       expect(res.status).toBe(400);
@@ -249,7 +290,9 @@ describe('llm-profiles routes', () => {
 
     it('treats models = null as no override (saves as undefined)', async () => {
       const res = await request(app).post('/api/llm-profiles').send({
-        name: 'nil', providerType: 'anthropic', models: null,
+        name: 'nil',
+        providerType: 'anthropic',
+        models: null,
       });
       expect(res.status).toBe(201);
       expect(res.body.data.models).toBeUndefined();
@@ -257,12 +300,15 @@ describe('llm-profiles routes', () => {
 
     it('PUT applies same validator', async () => {
       const created = await request(app).post('/api/llm-profiles').send({
-        name: 'patch-target', providerType: 'anthropic',
+        name: 'patch-target',
+        providerType: 'anthropic',
       });
       const id = created.body.data.id;
-      const res = await request(app).put(`/api/llm-profiles/${id}`).send({
-        models: [{ modelId: 'a' }, { modelId: 'a' }],
-      });
+      const res = await request(app)
+        .put(`/api/llm-profiles/${id}`)
+        .send({
+          models: [{ modelId: 'a' }, { modelId: 'a' }],
+        });
       expect(res.status).toBe(400);
     });
 
@@ -272,9 +318,11 @@ describe('llm-profiles routes', () => {
         providerType: 'openai',
       });
       const id = created.body.data.id;
-      const res = await request(app).put(`/api/llm-profiles/${id}`).send({
-        models: [{ modelId: 'gpt-4o', inputModalities: ['text', 'image', 'image'] }],
-      });
+      const res = await request(app)
+        .put(`/api/llm-profiles/${id}`)
+        .send({
+          models: [{ modelId: 'gpt-4o', inputModalities: ['text', 'image', 'image'] }],
+        });
       expect(res.status).toBe(200);
       expect(res.body.data.models).toEqual([
         { modelId: 'gpt-4o', inputModalities: ['text', 'image'] },
@@ -283,13 +331,16 @@ describe('llm-profiles routes', () => {
   });
 
   describe('POST /models/fetch-preview', () => {
-    afterEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
 
     it('returns the model list from the upstream endpoint without persisting anything', async () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(
         new Response(JSON.stringify({ data: [{ id: 'gpt-5' }, { id: 'gpt-4o' }] }), {
-          status: 200, headers: { 'content-type': 'application/json' },
-        }),
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
       );
       const before = new LlmProfileRepository(db).findAllOrdered().length;
       const res = await request(app).post('/api/llm-profiles/models/fetch-preview').send({
@@ -314,23 +365,26 @@ describe('llm-profiles routes', () => {
       // Belt-and-braces: confirm the `/models/fetch-preview` literal segment
       // is NOT swallowed by the `:id` matcher.
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify({ data: [{ id: 'm' }] }), { status: 200 }),
+        new Response(JSON.stringify({ data: [{ id: 'm' }] }), { status: 200 })
       );
       const res = await request(app).post('/api/llm-profiles/models/fetch-preview').send({
-        providerType: 'anthropic', apiKey: 'k',
+        providerType: 'anthropic',
+        apiKey: 'k',
       });
       expect(res.status).toBe(200);
     });
   });
 
   describe('POST /models/probe-preview', () => {
-    afterEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
 
     it('returns ok=false on upstream error without persisting anything', async () => {
       // probeModel uses pi-ai's completeSimple, which goes through fetch.
       // Stub fetch to a 401; probeModel translates it to {ok:false}.
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response('unauthorized', { status: 401 }),
+        new Response('unauthorized', { status: 401 })
       );
       const before = new LlmProfileRepository(db).findAllOrdered().length;
       const res = await request(app).post('/api/llm-profiles/models/probe-preview').send({
@@ -347,7 +401,8 @@ describe('llm-profiles routes', () => {
 
     it('rejects body missing modelId with 400', async () => {
       const res = await request(app).post('/api/llm-profiles/models/probe-preview').send({
-        providerType: 'anthropic', apiKey: 'k',
+        providerType: 'anthropic',
+        apiKey: 'k',
       });
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
@@ -422,12 +477,14 @@ describe('llm-profiles routes', () => {
       // `claude-opus-4-7` carries no contextWindow, mirroring what the
       // desktop ModelRow strips before calling.
       const before = new LlmProfileRepository(db).findAllOrdered().length;
-      const res = await request(app).post('/api/llm-profiles/models/resolve-preview').send({
-        providerType: 'anthropic',
-        apiKey: 'k',
-        models: [{ modelId: 'claude-opus-4-7' }],
-        modelId: 'claude-opus-4-7',
-      });
+      const res = await request(app)
+        .post('/api/llm-profiles/models/resolve-preview')
+        .send({
+          providerType: 'anthropic',
+          apiKey: 'k',
+          models: [{ modelId: 'claude-opus-4-7' }],
+          modelId: 'claude-opus-4-7',
+        });
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.data.source).toBe('pi_ai_registry');
@@ -469,7 +526,8 @@ describe('llm-profiles routes', () => {
 
     it('rejects body missing modelId with 400', async () => {
       const res = await request(app).post('/api/llm-profiles/models/resolve-preview').send({
-        providerType: 'anthropic', apiKey: 'k',
+        providerType: 'anthropic',
+        apiKey: 'k',
       });
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');

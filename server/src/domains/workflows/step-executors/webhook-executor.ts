@@ -7,7 +7,7 @@ export class WebhookStepExecutor implements StepExecutorPort {
   async execute(
     _node: WorkflowNodeDef,
     config: Record<string, unknown>,
-    _ctx: StepContext,
+    _ctx: StepContext
   ): Promise<StepResult> {
     const url = config.url as string;
     if (!url) return { status: 'failed', output: {}, error: 'No URL specified' };
@@ -15,13 +15,13 @@ export class WebhookStepExecutor implements StepExecutorPort {
     const method = (config.method as string) ?? 'POST';
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...(config.headers as Record<string, string> ?? {}),
+      ...((config.headers as Record<string, string>) ?? {}),
     };
 
     const response = await fetch(url, {
       method,
       headers,
-      body: method !== 'GET' ? (config.body as string) ?? undefined : undefined,
+      body: method !== 'GET' ? ((config.body as string) ?? undefined) : undefined,
     });
 
     const body = await response.text();

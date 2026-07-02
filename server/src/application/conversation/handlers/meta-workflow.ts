@@ -38,7 +38,7 @@ function broadcastPhase(
   client: ConnectedClient,
   projectId: string,
   runId: string,
-  phase: unknown,
+  phase: unknown
 ): void {
   send(client, {
     type: 'meta_workflow_phase_update',
@@ -51,7 +51,7 @@ function broadcastPhase(
 export function handleCreateMetaWorkflowRun(
   client: ConnectedClient,
   msg: CreateMetaWorkflowRunMessage,
-  service: MetaWorkflowService,
+  service: MetaWorkflowService
 ): void {
   try {
     const run = service.createRun({
@@ -69,7 +69,7 @@ export function handleCreateMetaWorkflowRun(
 export function handleSubmitMetaWorkflowRequirements(
   client: ConnectedClient,
   msg: SubmitMetaWorkflowRequirementsMessage,
-  service: MetaWorkflowService,
+  service: MetaWorkflowService
 ): void {
   try {
     const run = service.submitRequirements(msg.runId, msg.requirementsPath);
@@ -82,12 +82,13 @@ export function handleSubmitMetaWorkflowRequirements(
 export function handleResolveMetaWorkflowRequirements(
   client: ConnectedClient,
   msg: ResolveMetaWorkflowRequirementsMessage,
-  service: MetaWorkflowService,
+  service: MetaWorkflowService
 ): void {
   try {
-    const run = msg.decision === 'approve'
-      ? service.approveRequirements(msg.runId)
-      : service.rejectRequirements(msg.runId);
+    const run =
+      msg.decision === 'approve'
+        ? service.approveRequirements(msg.runId)
+        : service.rejectRequirements(msg.runId);
     broadcastRun(client, run);
   } catch (e) {
     sendError(client, e);
@@ -97,7 +98,7 @@ export function handleResolveMetaWorkflowRequirements(
 export function handleSetMetaWorkflowPhases(
   client: ConnectedClient,
   msg: SetMetaWorkflowPhasesMessage,
-  service: MetaWorkflowService,
+  service: MetaWorkflowService
 ): void {
   try {
     const run = service.setPhasesJson(msg.runId, msg.phasesJson);
@@ -110,7 +111,7 @@ export function handleSetMetaWorkflowPhases(
 export function handleCancelMetaWorkflowRun(
   client: ConnectedClient,
   msg: CancelMetaWorkflowRunMessage,
-  service: MetaWorkflowService,
+  service: MetaWorkflowService
 ): void {
   try {
     const run = service.cancelRun(msg.runId);
@@ -123,7 +124,7 @@ export function handleCancelMetaWorkflowRun(
 export async function handleRunMetaWorkflowPhase(
   client: ConnectedClient,
   msg: RunMetaWorkflowPhaseMessage,
-  service: MetaWorkflowService,
+  service: MetaWorkflowService
 ): Promise<void> {
   try {
     const result = await service.runPhase(msg.runId, msg.phaseId);
@@ -138,7 +139,7 @@ export async function handleRunMetaWorkflowPhase(
 export async function handleRerunMetaWorkflowPhase(
   client: ConnectedClient,
   msg: RerunMetaWorkflowPhaseMessage,
-  service: MetaWorkflowService,
+  service: MetaWorkflowService
 ): Promise<void> {
   try {
     const result = await service.rerunPhase(msg.runId, msg.phaseId);
@@ -152,7 +153,7 @@ export async function handleRerunMetaWorkflowPhase(
 export function handleIgnoreMetaWorkflowPhaseStale(
   client: ConnectedClient,
   msg: IgnoreMetaWorkflowPhaseStaleMessage,
-  service: MetaWorkflowService,
+  service: MetaWorkflowService
 ): void {
   try {
     const phase = service.ignoreStale(msg.runId, msg.phaseId);
@@ -166,7 +167,7 @@ export function handleIgnoreMetaWorkflowPhaseStale(
 export async function handleEvaluateMetaWorkflowPhaseImpact(
   client: ConnectedClient,
   msg: EvaluateMetaWorkflowPhaseImpactMessage,
-  service: MetaWorkflowService,
+  service: MetaWorkflowService
 ): Promise<void> {
   try {
     const recommendation = await service.evaluateImpact(msg.runId, msg.phaseId);
@@ -184,7 +185,7 @@ export async function handleEvaluateMetaWorkflowPhaseImpact(
 export async function handleCascadeRerunMetaWorkflowPhase(
   client: ConnectedClient,
   msg: CascadeRerunMetaWorkflowPhaseMessage,
-  service: MetaWorkflowService,
+  service: MetaWorkflowService
 ): Promise<void> {
   try {
     const results = await service.cascadeRerun(msg.runId, msg.phaseId);

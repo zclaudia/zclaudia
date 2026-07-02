@@ -50,10 +50,12 @@ describe('delegation routes', () => {
 
   it('accepts an analysisLlmProfileId that points to an existing provider', async () => {
     const now = Date.now();
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO llm_profiles (id, name, provider_type, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
-    `).run('p-zclaudia', 'ZClaudia', 'zclaudia', now, now);
+    `
+    ).run('p-zclaudia', 'ZClaudia', 'zclaudia', now, now);
 
     const res = await request(app)
       .put('/api/delegation/config')

@@ -39,7 +39,7 @@ async function saveFileTauri(blob: Blob, fileName: string): Promise<string> {
  */
 export async function downloadPushedFile(fileId: string): Promise<void> {
   const store = useFilePushStore.getState();
-  const item = store.items.find((i) => i.fileId === fileId);
+  const item = store.items.find(i => i.fileId === fileId);
   if (!item) {
     console.warn(`[fileDownload] No push item found for fileId: ${fileId}`);
     return;
@@ -96,11 +96,7 @@ export async function downloadPushedFile(fileId: string): Promise<void> {
     store.updateStatus(fileId, 'completed');
   } catch (error) {
     console.error(`[fileDownload] Failed to download ${fileId}:`, error);
-    store.updateStatus(
-      fileId,
-      'error',
-      error instanceof Error ? error.message : 'Download failed'
-    );
+    store.updateStatus(fileId, 'error', error instanceof Error ? error.message : 'Download failed');
   }
 }
 
@@ -121,7 +117,11 @@ async function saveOrDownload(blob: Blob, fileName: string, fileId: string): Pro
         const item = store.items.find(i => i.fileId === fileId);
         const mimeType = item?.mimeType || 'application/octet-stream';
         try {
-          const sharedPath = (window as any).AndroidFiles.saveToDownloads(privatePath, fileName, mimeType);
+          const sharedPath = (window as any).AndroidFiles.saveToDownloads(
+            privatePath,
+            fileName,
+            mimeType
+          );
           // savedPath is for display only on Android; privatePath is used for opening
           if (typeof sharedPath === 'string' && sharedPath.length > 0) {
             store.updateSavedPath(fileId, sharedPath);
@@ -183,7 +183,7 @@ export function openFileAndroid(filePath: string, mimeType: string): void {
     bridge.openFile(filePath, safeMime);
   } catch (error) {
     console.error('[fileDownload] Android file open failed:', error);
-    void openFile(filePath).catch((fallbackError) => {
+    void openFile(filePath).catch(fallbackError => {
       console.error('[fileDownload] Shell open fallback failed:', fallbackError);
     });
   }

@@ -37,6 +37,10 @@ describe('MCP bridge tools', () => {
     const readResult = await read.execute('read-1', { server: 'docs', uri: 'file://doc' });
 
     expect(listResult.details).toMatchObject({ ok: false, error: 'missing_db_context' });
-    expect(readResult.details).toMatchObject({ ok: false, error: 'missing_db_context', server: 'docs' });
+    expect(readResult.details).toMatchObject({
+      ok: false,
+      error: 'missing_db_context',
+      server: 'docs',
+    });
   });
 });

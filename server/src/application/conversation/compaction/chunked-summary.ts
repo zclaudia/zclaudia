@@ -27,7 +27,7 @@ export function summaryChunkBudget(contextWindow: number, summaryReserveTokens: 
 export function planSummaryChunks(
   messages: readonly AgentMessage[],
   chunkBudget: number,
-  estimate: (m: AgentMessage) => number = estimateTokens,
+  estimate: (m: AgentMessage) => number = estimateTokens
 ): AgentMessage[][] {
   const chunks: AgentMessage[][] = [];
   let current: AgentMessage[] = [];
@@ -55,7 +55,7 @@ export interface SummaryGenerateResult {
 /** Generate a summary for one chunk, optionally folding in the prior rollup. */
 export type SummaryGenerator = (
   chunk: AgentMessage[],
-  previousSummary: string | undefined,
+  previousSummary: string | undefined
 ) => Promise<SummaryGenerateResult>;
 
 /**

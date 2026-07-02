@@ -5,7 +5,7 @@ import { extractBashOutputInsights, formatBashResultText } from '../bash-output.
 describe('Bash output insights', () => {
   it('extracts TypeScript colon diagnostics', () => {
     const insights = extractBashOutputInsights(
-      "src/app.ts:2:7 - error TS2322: Type 'number' is not assignable to type 'string'.\n",
+      "src/app.ts:2:7 - error TS2322: Type 'number' is not assignable to type 'string'.\n"
     );
 
     expect(insights.diagnostics).toEqual([
@@ -22,7 +22,7 @@ describe('Bash output insights', () => {
 
   it('extracts TypeScript paren diagnostics', () => {
     const insights = extractBashOutputInsights(
-      "src/app.ts(3,5): warning TS6133: 'unused' is declared but its value is never read.\n",
+      "src/app.ts(3,5): warning TS6133: 'unused' is declared but its value is never read.\n"
     );
 
     expect(insights.diagnostics).toEqual([
@@ -38,11 +38,13 @@ describe('Bash output insights', () => {
   });
 
   it('extracts ESLint stylish diagnostics', () => {
-    const insights = extractBashOutputInsights([
-      '/repo/src/app.ts',
-      '  4:9  error  Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any',
-      '',
-    ].join('\n'));
+    const insights = extractBashOutputInsights(
+      [
+        '/repo/src/app.ts',
+        '  4:9  error  Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any',
+        '',
+      ].join('\n')
+    );
 
     expect(insights.diagnostics).toEqual([
       {
@@ -57,16 +59,11 @@ describe('Bash output insights', () => {
   });
 
   it('extracts failed test names from Vitest and Jest-style output', () => {
-    const insights = extractBashOutputInsights([
-      ' × renders markdown 12ms',
-      ' ● MarkdownPreview › escapes html',
-      '',
-    ].join('\n'));
+    const insights = extractBashOutputInsights(
+      [' × renders markdown 12ms', ' ● MarkdownPreview › escapes html', ''].join('\n')
+    );
 
-    expect(insights.failedTests).toEqual([
-      'renders markdown',
-      'MarkdownPreview › escapes html',
-    ]);
+    expect(insights.failedTests).toEqual(['renders markdown', 'MarkdownPreview › escapes html']);
   });
 
   it('formats command metadata, diagnostics, and output together', () => {

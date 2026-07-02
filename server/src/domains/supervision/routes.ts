@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, type Request, type Response } from 'express';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import type {
   AcceptanceDecision,
@@ -11,6 +11,8 @@ import type {
 } from '@zclaudia/shared/features/supervision';
 import type { SupervisorService } from './supervisor-service.js';
 import type { ContextDocument } from './context-manager.js';
+
+type SupervisionLogRows = ReturnType<SupervisorService['getLogs']>;
 
 export function createSupervisionRoutes(service: SupervisorService): Router {
   const router = Router();
@@ -39,7 +41,10 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       if (!action || !['pause', 'resume', 'archive', 'approve_setup'].includes(action)) {
         res.status(400).json({
           success: false,
-          error: { code: 'VALIDATION_ERROR', message: 'action must be one of: pause, resume, archive, approve_setup' },
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'action must be one of: pause, resume, archive, approve_setup',
+          },
         } as ApiResponse<never>);
         return;
       }
@@ -67,7 +72,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
         return;
       }
       res.json({ success: true, data: agent } as ApiResponse<ProjectAgent>);
-    } catch (error) {
+    } catch (_error) {
       res.status(500).json({
         success: false,
         error: { code: 'INTERNAL_ERROR', message: 'Failed to get agent' },
@@ -120,7 +125,12 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
         return;
       }
       const change = service.createChange(req.params.projectId, {
-        title, summary, motivation, nonGoals, scope, acceptanceCriteria,
+        title,
+        summary,
+        motivation,
+        nonGoals,
+        scope,
+        acceptanceCriteria,
       });
       res.json({ success: true, data: change } as ApiResponse<ProjectChange>);
     } catch (error) {
@@ -228,12 +238,16 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
   router.post('/changes/:changeId/gates/execution/resolve', (req: Request, res: Response) => {
     try {
       const { decision, notes } = req.body as { decision?: ExecutionGateDecision; notes?: string };
-      if (!decision || !['approve_execution', 'revise_plan', 'revise_design', 'split_change'].includes(decision)) {
+      if (
+        !decision ||
+        !['approve_execution', 'revise_plan', 'revise_design', 'split_change'].includes(decision)
+      ) {
         res.status(400).json({
           success: false,
           error: {
             code: 'VALIDATION_ERROR',
-            message: 'decision must be one of: approve_execution, revise_plan, revise_design, split_change',
+            message:
+              'decision must be one of: approve_execution, revise_plan, revise_design, split_change',
           },
         } as ApiResponse<never>);
         return;
@@ -327,7 +341,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const changeId = typeof req.query.changeId === 'string' ? req.query.changeId : undefined;
       const tasks = service.getTasks(req.params.projectId, changeId);
       res.json({ success: true, data: tasks } as ApiResponse<SupervisionTask[]>);
-    } catch (error) {
+    } catch (_error) {
       res.status(500).json({
         success: false,
         error: { code: 'INTERNAL_ERROR', message: 'Failed to list tasks' },
@@ -341,9 +355,17 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const { projectId } = req.params;
       const {
         changeId,
-        title, description, dependencies, dependencyMode, priority,
-        acceptanceCriteria, relevantDocIds, scope,
-        scheduleCron, scheduleEnabled, retryDelayMs,
+        title,
+        description,
+        dependencies,
+        dependencyMode,
+        priority,
+        acceptanceCriteria,
+        relevantDocIds,
+        scope,
+        scheduleCron,
+        scheduleEnabled,
+        retryDelayMs,
       } = req.body;
       if (!title || !description) {
         res.status(400).json({
@@ -354,18 +376,26 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       }
       const task = service.createTask(projectId, {
         changeId,
-        title, description, dependencies, dependencyMode, priority,
-        acceptanceCriteria, relevantDocIds, scope,
-        scheduleCron, scheduleEnabled, retryDelayMs,
+        title,
+        description,
+        dependencies,
+        dependencyMode,
+        priority,
+        acceptanceCriteria,
+        relevantDocIds,
+        scope,
+        scheduleCron,
+        scheduleEnabled,
+        retryDelayMs,
       });
       res.json({ success: true, data: task } as ApiResponse<SupervisionTask>);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create task';
       const status = message.includes('budget')
         ? 409
-        : (message.includes('No agent')
-          || message.includes('Change not found')
-          || message.includes('does not belong to project'))
+        : message.includes('No agent') ||
+            message.includes('Change not found') ||
+            message.includes('does not belong to project')
           ? 400
           : 500;
       res.status(status).json({
@@ -388,7 +418,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
         return;
       }
       res.json({ success: true, data: task } as ApiResponse<SupervisionTask>);
-    } catch (error) {
+    } catch (_error) {
       res.status(500).json({
         success: false,
         error: { code: 'INTERNAL_ERROR', message: 'Failed to update task' },
@@ -512,14 +542,21 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       res.json({ success: true, data: result });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to submit plan';
-      const code = message.includes('incomplete') ? 'VALIDATION_ERROR'
-        : message.includes('not found') ? 'NOT_FOUND'
-        : message.includes('not in planning status') ? 'INVALID_STATE'
-        : 'INTERNAL_ERROR';
-      const status = code === 'VALIDATION_ERROR' ? 400
-        : code === 'NOT_FOUND' ? 404
-        : code === 'INVALID_STATE' ? 409
-        : 500;
+      const code = message.includes('incomplete')
+        ? 'VALIDATION_ERROR'
+        : message.includes('not found')
+          ? 'NOT_FOUND'
+          : message.includes('not in planning status')
+            ? 'INVALID_STATE'
+            : 'INTERNAL_ERROR';
+      const status =
+        code === 'VALIDATION_ERROR'
+          ? 400
+          : code === 'NOT_FOUND'
+            ? 404
+            : code === 'INVALID_STATE'
+              ? 409
+              : 500;
       res.status(status).json({
         success: false,
         error: { code, message },
@@ -550,9 +587,13 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const limit = agent?.config?.maxTokenBudget;
       res.json({
         success: true,
-        data: { usage, limit, remaining: limit !== undefined ? Math.max(0, limit - usage) : undefined },
+        data: {
+          usage,
+          limit,
+          remaining: limit !== undefined ? Math.max(0, limit - usage) : undefined,
+        },
       } as ApiResponse<{ usage: number; limit?: number; remaining?: number }>);
-    } catch (error) {
+    } catch (_error) {
       res.status(500).json({
         success: false,
         error: { code: 'INTERNAL_ERROR', message: 'Failed to get budget' },
@@ -566,8 +607,8 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const { projectId } = req.params;
       const limit = parseInt(req.query.limit as string) || 100;
       const logs = service.getLogs(projectId, limit);
-      res.json({ success: true, data: logs } as ApiResponse<any[]>);
-    } catch (error) {
+      res.json({ success: true, data: logs } as ApiResponse<SupervisionLogRows>);
+    } catch (_error) {
       res.status(500).json({
         success: false,
         error: { code: 'INTERNAL_ERROR', message: 'Failed to get logs' },
@@ -580,7 +621,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
     try {
       const documents = service.getContextDocuments(req.params.projectId);
       res.json({ success: true, data: documents } as ApiResponse<ContextDocument[]>);
-    } catch (error) {
+    } catch (_error) {
       res.status(500).json({
         success: false,
         error: { code: 'INTERNAL_ERROR', message: 'Failed to get context documents' },
@@ -596,7 +637,10 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       if (!['design', 'execution', 'tasks'].includes(docType)) {
         res.status(400).json({
           success: false,
-          error: { code: 'VALIDATION_ERROR', message: 'docType must be one of: design, execution, tasks' },
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'docType must be one of: design, execution, tasks',
+          },
         } as ApiResponse<never>);
         return;
       }
@@ -610,7 +654,7 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
       const change = service.updateChangeDocument(
         req.params.changeId,
         docType as 'design' | 'execution' | 'tasks',
-        content,
+        content
       );
       res.json({ success: true, data: change } as ApiResponse<ProjectChange>);
     } catch (error) {

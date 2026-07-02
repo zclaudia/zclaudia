@@ -6,11 +6,7 @@
  * extracted into the `Epic` entity in C5 (see `./epic.ts`); LocalIssues
  * reference their grouping container via `epicId?`.
  */
-export type LocalIssueType =
-  | 'implement'
-  | 'bug'
-  | 'enhancement'
-  | 'chore';
+export type LocalIssueType = 'implement' | 'bug' | 'enhancement' | 'chore';
 
 /**
  * LocalIssue lifecycle status (4 states).
@@ -32,11 +28,7 @@ export type LocalIssueType =
  * collapsed into `tracked` (C1); `feature` was extracted into the standalone
  * `Epic` entity (C5).
  */
-export type LocalIssueStatus =
-  | 'open'
-  | 'tracked'
-  | 'closed'
-  | 'cancelled';
+export type LocalIssueStatus = 'open' | 'tracked' | 'closed' | 'cancelled';
 
 export type LocalIssuePriority = 'low' | 'medium' | 'high' | 'critical';
 

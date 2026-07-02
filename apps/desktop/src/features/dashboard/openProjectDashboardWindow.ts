@@ -29,7 +29,10 @@ export async function openProjectDashboardWindow({
 
   new WebviewWindow(label, {
     url,
-    title: buildWindowTitle(projectName ? `${projectName} Dashboard` : 'Project Dashboard', conn.serverName),
+    title: buildWindowTitle(
+      projectName ? `${projectName} Dashboard` : 'Project Dashboard',
+      conn.serverName
+    ),
     width: 1200,
     height: 780,
     center: true,

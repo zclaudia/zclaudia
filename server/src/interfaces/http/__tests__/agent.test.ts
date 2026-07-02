@@ -3,7 +3,10 @@ import express from 'express';
 import request from 'supertest';
 import Database from 'better-sqlite3';
 import { createAgentRoutes } from '../agent.js';
-import { createAgentProfilesTable, seedDefaultAgent } from '../../../test-helpers/seed-default-agent.js';
+import {
+  createAgentProfilesTable,
+  seedDefaultAgent,
+} from '../../../test-helpers/seed-default-agent.js';
 
 // Create in-memory database for testing
 function createTestDb(): Database.Database {
@@ -86,10 +89,12 @@ function createTestApp(db: Database.Database) {
 
 function seedDefaultConfig(db: Database.Database) {
   const now = Date.now();
-  db.prepare(`
+  db.prepare(
+    `
     INSERT OR IGNORE INTO agent_config (id, enabled, created_at, updated_at)
     VALUES (1, 1, ?, ?)
-  `).run(now, now);
+  `
+  ).run(now, now);
 }
 
 describe('agent routes', () => {
@@ -148,10 +153,12 @@ describe('agent routes', () => {
 
     it('returns configured config with project and session IDs', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO agent_config (id, enabled, project_id, session_id, llm_profile_id, permission_policy, created_at, updated_at)
         VALUES (1, 0, 'proj-1', 'sess-1', 'prov-1', '{"enabled":true}', ?, ?)
-      `).run(now, now);
+      `
+      ).run(now, now);
 
       const res = await request(app).get('/api/agent/config');
 
@@ -182,28 +189,38 @@ describe('agent routes', () => {
       expect(res.body.data.projectId).toBeTruthy();
       expect(res.body.data.sessionId).toBeTruthy();
 
-      const project = db.prepare('SELECT name, type, is_internal FROM projects WHERE id = ?')
+      const project = db
+        .prepare('SELECT name, type, is_internal FROM projects WHERE id = ?')
         .get(res.body.data.projectId) as { name: string; type: string; is_internal: number };
-      const session = db.prepare('SELECT name, project_id FROM sessions WHERE id = ?')
+      const session = db
+        .prepare('SELECT name, project_id FROM sessions WHERE id = ?')
         .get(res.body.data.sessionId) as { name: string; project_id: string };
-      const config = db.prepare('SELECT project_id, session_id FROM agent_config WHERE id = 1')
+      const config = db
+        .prepare('SELECT project_id, session_id FROM agent_config WHERE id = 1')
         .get() as { project_id: string; session_id: string };
 
       expect(project).toEqual({ name: '__claudia', type: 'chat_only', is_internal: 1 });
       expect(session).toEqual({ name: 'Claudia Chat', project_id: res.body.data.projectId });
-      expect(config).toEqual({ project_id: res.body.data.projectId, session_id: res.body.data.sessionId });
+      expect(config).toEqual({
+        project_id: res.body.data.projectId,
+        session_id: res.body.data.sessionId,
+      });
     });
 
     it('reuses legacy _Agent Assistant project and renames it to __claudia', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, is_internal, created_at, updated_at)
         VALUES ('legacy-project', '_Agent Assistant', 'chat_only', 1, ?, ?)
-      `).run(now, now);
-      db.prepare(`
+      `
+      ).run(now, now);
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, type, created_at, updated_at)
         VALUES ('legacy-session', 'legacy-project', 'Agent Chat', 'regular', ?, ?)
-      `).run(now, now);
+      `
+      ).run(now, now);
 
       const res = await request(app).post('/api/agent/ensure');
 
@@ -214,9 +231,11 @@ describe('agent routes', () => {
         sessionId: 'legacy-session',
       });
 
-      const project = db.prepare('SELECT name, is_internal FROM projects WHERE id = ?')
+      const project = db
+        .prepare('SELECT name, is_internal FROM projects WHERE id = ?')
         .get('legacy-project') as { name: string; is_internal: number };
-      const session = db.prepare('SELECT name FROM sessions WHERE id = ?')
+      const session = db
+        .prepare('SELECT name FROM sessions WHERE id = ?')
         .get('legacy-session') as { name: string };
 
       expect(project).toEqual({ name: '__claudia', is_internal: 1 });
@@ -225,14 +244,18 @@ describe('agent routes', () => {
 
     it('creates a new Claudia session instead of renaming an unrelated session in the host project', async () => {
       const now = Date.now();
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, is_internal, created_at, updated_at)
         VALUES ('claudia-project', '__claudia', 'chat_only', 1, ?, ?)
-      `).run(now, now);
-      db.prepare(`
+      `
+      ).run(now, now);
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, type, created_at, updated_at)
         VALUES ('user-session', 'claudia-project', 'Keep Me', 'regular', ?, ?)
-      `).run(now, now);
+      `
+      ).run(now, now);
 
       const res = await request(app).post('/api/agent/ensure');
 
@@ -241,9 +264,11 @@ describe('agent routes', () => {
       expect(res.body.data.projectId).toBe('claudia-project');
       expect(res.body.data.sessionId).not.toBe('user-session');
 
-      const reusedSession = db.prepare('SELECT name FROM sessions WHERE id = ?')
+      const reusedSession = db
+        .prepare('SELECT name FROM sessions WHERE id = ?')
         .get('user-session') as { name: string };
-      const claudiaSession = db.prepare('SELECT name, project_id FROM sessions WHERE id = ?')
+      const claudiaSession = db
+        .prepare('SELECT name, project_id FROM sessions WHERE id = ?')
         .get(res.body.data.sessionId) as { name: string; project_id: string };
 
       expect(reusedSession).toEqual({ name: 'Keep Me' });
@@ -257,9 +282,7 @@ describe('agent routes', () => {
     });
 
     it('updates enabled to false', async () => {
-      const res = await request(app)
-        .put('/api/agent/config')
-        .send({ enabled: false });
+      const res = await request(app).put('/api/agent/config').send({ enabled: false });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
@@ -270,9 +293,7 @@ describe('agent routes', () => {
       // First disable
       db.prepare('UPDATE agent_config SET enabled = 0 WHERE id = 1').run();
 
-      const res = await request(app)
-        .put('/api/agent/config')
-        .send({ enabled: true });
+      const res = await request(app).put('/api/agent/config').send({ enabled: true });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
@@ -291,9 +312,7 @@ describe('agent routes', () => {
 
     it('updates permissionPolicy as JSON object', async () => {
       const policy = { enabled: true, customRules: [] };
-      const res = await request(app)
-        .put('/api/agent/config')
-        .send({ permissionPolicy: policy });
+      const res = await request(app).put('/api/agent/config').send({ permissionPolicy: policy });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
@@ -302,9 +321,7 @@ describe('agent routes', () => {
 
     it('updates permissionPolicy as string', async () => {
       const policyStr = '{"enabled":true}';
-      const res = await request(app)
-        .put('/api/agent/config')
-        .send({ permissionPolicy: policyStr });
+      const res = await request(app).put('/api/agent/config').send({ permissionPolicy: policyStr });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
@@ -313,26 +330,24 @@ describe('agent routes', () => {
 
     it('clears permissionPolicy when sent as null', async () => {
       // First set a policy
-      db.prepare("UPDATE agent_config SET permission_policy = '{\"x\":1}' WHERE id = 1").run();
+      db.prepare('UPDATE agent_config SET permission_policy = \'{"x":1}\' WHERE id = 1').run();
 
-      const res = await request(app)
-        .put('/api/agent/config')
-        .send({ permissionPolicy: null });
+      const res = await request(app).put('/api/agent/config').send({ permissionPolicy: null });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.data.permissionPolicy).toBeNull();
-      const row = db.prepare('SELECT permission_policy FROM agent_config WHERE id = 1').get() as any;
+      const row = db
+        .prepare('SELECT permission_policy FROM agent_config WHERE id = 1')
+        .get() as any;
       expect(row.permission_policy).toBeNull();
     });
 
     it('preserves permissionPolicy when field is omitted from request', async () => {
       // First set a policy
-      db.prepare("UPDATE agent_config SET permission_policy = '{\"x\":1}' WHERE id = 1").run();
+      db.prepare('UPDATE agent_config SET permission_policy = \'{"x":1}\' WHERE id = 1').run();
 
-      const res = await request(app)
-        .put('/api/agent/config')
-        .send({ enabled: true });
+      const res = await request(app).put('/api/agent/config').send({ enabled: true });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
@@ -340,7 +355,7 @@ describe('agent routes', () => {
     });
 
     it('preserves permissionPolicy when only llmProfileId is updated', async () => {
-      db.prepare("UPDATE agent_config SET permission_policy = '{\"x\":1}' WHERE id = 1").run();
+      db.prepare('UPDATE agent_config SET permission_policy = \'{"x":1}\' WHERE id = 1').run();
 
       const res = await request(app)
         .put('/api/agent/config')
@@ -350,7 +365,9 @@ describe('agent routes', () => {
       expect(res.body.success).toBe(true);
       expect(res.body.data.llmProfileId).toBe('new-provider');
       expect(res.body.data.permissionPolicy).toBe('{"x":1}');
-      const row = db.prepare('SELECT permission_policy FROM agent_config WHERE id = 1').get() as any;
+      const row = db
+        .prepare('SELECT permission_policy FROM agent_config WHERE id = 1')
+        .get() as any;
       expect(row.permission_policy).toBe('{"x":1}');
     });
 
@@ -379,13 +396,17 @@ describe('agent routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.data.permissionWorkflowOverrideId).toBe('wf-user');
-      const row = db.prepare('SELECT permission_workflow_override_id FROM agent_config WHERE id = 1').get() as any;
+      const row = db
+        .prepare('SELECT permission_workflow_override_id FROM agent_config WHERE id = 1')
+        .get() as any;
       expect(row.permission_workflow_override_id).toBe('wf-user');
     });
 
     it('clears permissionWorkflowOverrideId when set to null', async () => {
       db.prepare(`INSERT INTO workflows (id, is_system) VALUES (?, 0)`).run('wf-user');
-      db.prepare(`UPDATE agent_config SET permission_workflow_override_id = 'wf-user' WHERE id = 1`).run();
+      db.prepare(
+        `UPDATE agent_config SET permission_workflow_override_id = 'wf-user' WHERE id = 1`
+      ).run();
 
       const res = await request(app)
         .put('/api/agent/config')
@@ -393,7 +414,9 @@ describe('agent routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.data.permissionWorkflowOverrideId).toBeNull();
-      const row = db.prepare('SELECT permission_workflow_override_id FROM agent_config WHERE id = 1').get() as any;
+      const row = db
+        .prepare('SELECT permission_workflow_override_id FROM agent_config WHERE id = 1')
+        .get() as any;
       expect(row.permission_workflow_override_id).toBeNull();
     });
 
@@ -421,9 +444,7 @@ describe('agent routes', () => {
       // Pre-configure provider
       db.prepare("UPDATE agent_config SET llm_profile_id = 'original-provider' WHERE id = 1").run();
 
-      const res = await request(app)
-        .put('/api/agent/config')
-        .send({ enabled: false });
+      const res = await request(app).put('/api/agent/config').send({ enabled: false });
 
       expect(res.status).toBe(200);
       expect(res.body.data.enabled).toBe(false);
@@ -431,16 +452,18 @@ describe('agent routes', () => {
     });
 
     it('updates the updatedAt timestamp', async () => {
-      const before = db.prepare('SELECT updated_at FROM agent_config WHERE id = 1').get() as { updated_at: number };
+      const before = db.prepare('SELECT updated_at FROM agent_config WHERE id = 1').get() as {
+        updated_at: number;
+      };
 
       // Small delay to ensure timestamp difference
       await new Promise(resolve => setTimeout(resolve, 10));
 
-      await request(app)
-        .put('/api/agent/config')
-        .send({ enabled: false });
+      await request(app).put('/api/agent/config').send({ enabled: false });
 
-      const after = db.prepare('SELECT updated_at FROM agent_config WHERE id = 1').get() as { updated_at: number };
+      const after = db.prepare('SELECT updated_at FROM agent_config WHERE id = 1').get() as {
+        updated_at: number;
+      };
       expect(after.updated_at).toBeGreaterThan(before.updated_at);
     });
   });
@@ -468,9 +491,7 @@ describe('agent routes', () => {
       });
       const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      const res = await request(app)
-        .put('/api/agent/config')
-        .send({ enabled: false });
+      const res = await request(app).put('/api/agent/config').send({ enabled: false });
 
       expect(res.status).toBe(500);
       expect(res.body.error.code).toBe('DB_ERROR');

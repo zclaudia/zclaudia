@@ -1,9 +1,14 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useSessionConfigStore } from '../sessionConfigStore';
 
-const reset = () => useSessionConfigStore.setState({
-  systemInfoBySession: {}, modeBySession: {}, runtimeModes: {}, sessionUsage: {}, compactionNotice: {},
-});
+const reset = () =>
+  useSessionConfigStore.setState({
+    systemInfoBySession: {},
+    modeBySession: {},
+    runtimeModes: {},
+    sessionUsage: {},
+    compactionNotice: {},
+  });
 
 describe('sessionConfigStore', () => {
   beforeEach(reset);
@@ -22,7 +27,9 @@ describe('sessionConfigStore', () => {
   });
 
   it('accumulates session usage', () => {
-    useSessionConfigStore.getState().addSessionUsage('s1', { input: 10, output: 5, cacheRead: 1, cacheWrite: 2 } as never);
+    useSessionConfigStore
+      .getState()
+      .addSessionUsage('s1', { input: 10, output: 5, cacheRead: 1, cacheWrite: 2 } as never);
     useSessionConfigStore.getState().addSessionUsage('s1', { input: 3, output: 2 } as never);
     const u = useSessionConfigStore.getState().sessionUsage.s1;
     expect(u.inputTokens).toBe(13);
@@ -49,7 +56,12 @@ describe('sessionConfigStore', () => {
   });
 
   it('compaction notice set/clear', () => {
-    useSessionConfigStore.getState().setCompactionNotice('s1', { sessionId: 's1', reason: 'overflow', breakerOpen: false, receivedAt: 1 });
+    useSessionConfigStore.getState().setCompactionNotice('s1', {
+      sessionId: 's1',
+      reason: 'overflow',
+      breakerOpen: false,
+      receivedAt: 1,
+    });
     expect(useSessionConfigStore.getState().compactionNotice.s1?.reason).toBe('overflow');
     useSessionConfigStore.getState().clearCompactionNotice('s1');
     expect(useSessionConfigStore.getState().compactionNotice.s1).toBeUndefined();

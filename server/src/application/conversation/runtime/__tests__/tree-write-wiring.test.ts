@@ -20,8 +20,13 @@ function makeDb(): Database.Database {
 
 function fakeRun(db: Database.Database): any {
   return {
-    db, sessionId: 's1', assistantMessageId: 'a1',
-    fullContent: 'hello world', collectedToolCalls: [], contentBlocks: [], thinkingBlocks: [],
+    db,
+    sessionId: 's1',
+    assistantMessageId: 'a1',
+    fullContent: 'hello world',
+    collectedToolCalls: [],
+    contentBlocks: [],
+    thinkingBlocks: [],
   };
 }
 
@@ -32,11 +37,17 @@ describe('Route C tree write wiring (assistant final save)', () => {
     upsertAssistantMessage(run, { indexMetadata: true });
     const ctx = await new Session(new SqliteSessionStorage(db, 's1')).buildContext();
     expect(ctx.messages.map((m: any) => m.role)).toEqual(['assistant']);
-    expect((ctx.messages[0] as any).content.find((b: any) => b.type === 'text').text).toBe('hello world');
+    expect((ctx.messages[0] as any).content.find((b: any) => b.type === 'text').text).toBe(
+      'hello world'
+    );
 
     // The assistant messages row must be back-linked to its session_entries id.
-    const msgRow = db.prepare('SELECT tree_entry_id FROM messages WHERE id = ?').get('a1') as { tree_entry_id: string | null };
-    const entryRow = db.prepare('SELECT id FROM session_entries WHERE session_id = ? AND type = ?').get('s1', 'message') as { id: string } | undefined;
+    const msgRow = db.prepare('SELECT tree_entry_id FROM messages WHERE id = ?').get('a1') as {
+      tree_entry_id: string | null;
+    };
+    const entryRow = db
+      .prepare('SELECT id FROM session_entries WHERE session_id = ? AND type = ?')
+      .get('s1', 'message') as { id: string } | undefined;
     expect(msgRow.tree_entry_id).toBeTruthy();
     expect(msgRow.tree_entry_id).toBe(entryRow?.id);
   });

@@ -15,14 +15,14 @@ import { useAndroidBack } from '../../hooks/useAndroidBack';
 const PERMISSION_LEVELS: Record<string, number> = {
   'session.read': 1,
   'project.read': 1,
-  'storage': 1,
+  storage: 1,
   'fs.read': 2,
   'network.fetch': 2,
-  'timer': 2,
+  timer: 2,
   'provider.call': 2,
   'fs.write': 3,
   'session.write': 3,
-  'notification': 3,
+  notification: 3,
   'clipboard.read': 3,
   'clipboard.write': 3,
   'shell.execute': 4,
@@ -45,14 +45,14 @@ const LEVEL_COLORS: Record<number, string> = {
 const PERMISSION_DESCRIPTIONS: Record<string, string> = {
   'session.read': 'Read session information',
   'project.read': 'Read project metadata',
-  'storage': 'Persist data across sessions',
+  storage: 'Persist data across sessions',
   'fs.read': 'Read files from disk',
   'network.fetch': 'Make network requests',
-  'timer': 'Set timers and intervals',
+  timer: 'Set timers and intervals',
   'provider.call': 'Call AI providers',
   'fs.write': 'Write files to disk',
   'session.write': 'Modify session data',
-  'notification': 'Show notifications',
+  notification: 'Show notifications',
   'clipboard.read': 'Read clipboard contents',
   'clipboard.write': 'Write to clipboard',
   'shell.execute': 'Execute shell commands',
@@ -63,19 +63,22 @@ export function PluginPermissionDialog() {
   const { sendMessage } = useConnection();
   const [remember, setRemember] = useState(false);
 
-  const handleDecision = useCallback((granted: boolean) => {
-    if (!pendingPermissionRequest) return;
+  const handleDecision = useCallback(
+    (granted: boolean) => {
+      if (!pendingPermissionRequest) return;
 
-    sendMessage({
-      type: 'plugin_permission_response',
-      pluginId: pendingPermissionRequest.pluginId,
-      granted,
-      permanently: remember,
-    });
+      sendMessage({
+        type: 'plugin_permission_response',
+        pluginId: pendingPermissionRequest.pluginId,
+        granted,
+        permanently: remember,
+      });
 
-    setPendingPermissionRequest(null);
-    setRemember(false);
-  }, [pendingPermissionRequest, remember, sendMessage, setPendingPermissionRequest]);
+      setPendingPermissionRequest(null);
+      setRemember(false);
+    },
+    [pendingPermissionRequest, remember, sendMessage, setPendingPermissionRequest]
+  );
 
   useAndroidBack(() => handleDecision(false), !!pendingPermissionRequest, 45);
 
@@ -103,14 +106,21 @@ export function PluginPermissionDialog() {
           <div className="flex items-center gap-3 px-4 py-3 border-b border-border flex-shrink-0">
             <div className={`p-1.5 rounded-md ${LEVEL_COLORS[maxLevel] || LEVEL_COLORS[1]}`}>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                />
               </svg>
             </div>
             <div>
               <h2 className="text-base font-semibold">Permission Request</h2>
               <p className="text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">{pendingPermissionRequest.pluginName}</span> requests the following permissions
+                <span className="font-medium text-foreground">
+                  {pendingPermissionRequest.pluginName}
+                </span>{' '}
+                requests the following permissions
               </p>
             </div>
           </div>
@@ -119,20 +129,24 @@ export function PluginPermissionDialog() {
           <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
             {/* Permission list */}
             <div className="space-y-1.5">
-              {sortedPermissions.map((perm) => {
+              {sortedPermissions.map(perm => {
                 const level = PERMISSION_LEVELS[perm] || 1;
                 return (
                   <div
                     key={perm}
                     className="flex items-center gap-2 p-2 rounded-md bg-secondary/50"
                   >
-                    <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium border ${LEVEL_COLORS[level]}`}>
+                    <span
+                      className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium border ${LEVEL_COLORS[level]}`}
+                    >
                       {LEVEL_LABELS[level]}
                     </span>
                     <div className="flex-1 min-w-0">
                       <span className="text-sm font-mono">{perm}</span>
                       {PERMISSION_DESCRIPTIONS[perm] && (
-                        <p className="text-xs text-muted-foreground">{PERMISSION_DESCRIPTIONS[perm]}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {PERMISSION_DESCRIPTIONS[perm]}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -152,7 +166,7 @@ export function PluginPermissionDialog() {
               <input
                 type="checkbox"
                 checked={remember}
-                onChange={(e) => setRemember(e.target.checked)}
+                onChange={e => setRemember(e.target.checked)}
                 className="w-3.5 h-3.5 rounded-md border-border"
               />
               <span className="text-sm text-muted-foreground">Remember this decision</span>

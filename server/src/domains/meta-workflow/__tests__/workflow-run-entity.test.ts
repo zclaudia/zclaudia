@@ -7,8 +7,12 @@ function makeFakeDispatcher() {
   type Handler = (e: { runId: string; type: string }) => void;
   const handlers: Handler[] = [];
   return {
-    onAny: (h: Handler) => { handlers.push(h); },
-    dispatch: (e: { runId: string; type: string }) => { for (const h of handlers) h(e); },
+    onAny: (h: Handler) => {
+      handlers.push(h);
+    },
+    dispatch: (e: { runId: string; type: string }) => {
+      for (const h of handlers) h(e);
+    },
   };
 }
 
@@ -31,8 +35,12 @@ describe('workflow run-entity adapter', () => {
     });
 
     const outcomeP = runEntity(
-      { kind: 'workflow', workflow: { nodes: [], edges: [], entryNodeId: '', triggers: [] }, workflowId: 'wf-1' },
-      { worktreePath: '/tmp/wt' },
+      {
+        kind: 'workflow',
+        workflow: { nodes: [], edges: [], entryNodeId: '', triggers: [] },
+        workflowId: 'wf-1',
+      },
+      { worktreePath: '/tmp/wt' }
     );
     // simulate engine emitting completion event
     setTimeout(() => dispatcher.dispatch({ runId: 'run-1', type: 'run_completed' }), 0);
@@ -58,8 +66,12 @@ describe('workflow run-entity adapter', () => {
     });
 
     const outcomeP = runEntity(
-      { kind: 'workflow', workflow: { nodes: [], edges: [], entryNodeId: '', triggers: [] }, workflowId: 'wf-1' },
-      { worktreePath: '/tmp/wt' },
+      {
+        kind: 'workflow',
+        workflow: { nodes: [], edges: [], entryNodeId: '', triggers: [] },
+        workflowId: 'wf-1',
+      },
+      { worktreePath: '/tmp/wt' }
     );
     setTimeout(() => dispatcher.dispatch({ runId: 'run-1', type: 'run_failed' }), 0);
     const outcome = await outcomeP;
@@ -73,7 +85,8 @@ describe('workflow run-entity adapter', () => {
       startRun: vi.fn().mockResolvedValue({ id: 'run-1', status: 'running' } as WorkflowRun),
     };
     const runRepo = {
-      findById: vi.fn()
+      findById: vi
+        .fn()
         .mockReturnValueOnce({ id: 'run-1', status: 'running' })
         .mockReturnValueOnce({ id: 'run-1', status: 'completed' }),
     };
@@ -85,8 +98,12 @@ describe('workflow run-entity adapter', () => {
       timeoutMs: 1000,
     });
     const outcome = await runEntity(
-      { kind: 'workflow', workflow: { nodes: [], edges: [], entryNodeId: '', triggers: [] }, workflowId: 'wf-1' },
-      { worktreePath: '/tmp/wt' },
+      {
+        kind: 'workflow',
+        workflow: { nodes: [], edges: [], entryNodeId: '', triggers: [] },
+        workflowId: 'wf-1',
+      },
+      { worktreePath: '/tmp/wt' }
     );
     expect(outcome.exitOk).toBe(true);
   });
@@ -108,8 +125,12 @@ describe('workflow run-entity adapter', () => {
       timeoutMs: 5,
     });
     const outcome = await runEntity(
-      { kind: 'workflow', workflow: { nodes: [], edges: [], entryNodeId: '', triggers: [] }, workflowId: 'wf-1' },
-      { worktreePath: '/tmp/wt' },
+      {
+        kind: 'workflow',
+        workflow: { nodes: [], edges: [], entryNodeId: '', triggers: [] },
+        workflowId: 'wf-1',
+      },
+      { worktreePath: '/tmp/wt' }
     );
     expect(outcome.exitOk).toBe(false);
   });
@@ -120,9 +141,8 @@ describe('workflow run-entity adapter', () => {
       runRepo: {} as never,
       projectId: 'p1',
     });
-    await expect(runEntity(
-      { kind: 'subagent', subagent: {} as never },
-      { worktreePath: '/tmp/wt' },
-    )).rejects.toThrow(/workflow/i);
+    await expect(
+      runEntity({ kind: 'subagent', subagent: {} as never }, { worktreePath: '/tmp/wt' })
+    ).rejects.toThrow(/workflow/i);
   });
 });

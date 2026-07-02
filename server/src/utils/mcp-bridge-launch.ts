@@ -25,7 +25,7 @@ export interface McpBridgeServerEntry {
 export function buildMcpBridgeEntry(
   serverPort: number,
   sessionId?: string,
-  sessionIdFile?: string,
+  sessionIdFile?: string
 ): McpBridgeServerEntry | null {
   const bridgeTools = toolRegistry.getBridgeTools();
   if (bridgeTools.length === 0) return null;
@@ -47,10 +47,7 @@ export function buildMcpBridgeEntry(
   };
 }
 
-function createLaunchConfig(
-  filePath: string,
-  runtime: 'js' | 'ts',
-): McpBridgeLaunchConfig {
+function createLaunchConfig(filePath: string, runtime: 'js' | 'ts'): McpBridgeLaunchConfig {
   if (runtime === 'js') {
     return {
       command: process.execPath,
@@ -65,7 +62,7 @@ function createLaunchConfig(
 }
 
 export function resolveMcpBridgeLaunchConfig(
-  currentModuleUrl: string = import.meta.url,
+  currentModuleUrl: string = import.meta.url
 ): McpBridgeLaunchConfig {
   const currentDir = path.dirname(fileURLToPath(currentModuleUrl));
 
@@ -76,11 +73,20 @@ export function resolveMcpBridgeLaunchConfig(
   //   bundle alt  (server/)     → plugins/mcp-bridge.js
   //   final fallback            → source ts bridge via tsx/esm
   const candidates: Array<{ path: string; runtime: 'js' | 'ts' }> = [
-    { path: path.resolve(currentDir, '..', '..', 'dist', 'application', 'plugins', 'mcp-bridge.js'), runtime: 'js' },
-    { path: path.resolve(currentDir, '..', 'application', 'plugins', 'mcp-bridge.js'), runtime: 'js' },
+    {
+      path: path.resolve(currentDir, '..', '..', 'dist', 'application', 'plugins', 'mcp-bridge.js'),
+      runtime: 'js',
+    },
+    {
+      path: path.resolve(currentDir, '..', 'application', 'plugins', 'mcp-bridge.js'),
+      runtime: 'js',
+    },
     { path: path.resolve(currentDir, 'application', 'plugins', 'mcp-bridge.js'), runtime: 'js' },
     { path: path.resolve(currentDir, 'plugins', 'mcp-bridge.js'), runtime: 'js' },
-    { path: path.resolve(currentDir, '..', 'application', 'plugins', 'mcp-bridge.ts'), runtime: 'ts' },
+    {
+      path: path.resolve(currentDir, '..', 'application', 'plugins', 'mcp-bridge.ts'),
+      runtime: 'ts',
+    },
     { path: path.resolve(currentDir, 'application', 'plugins', 'mcp-bridge.ts'), runtime: 'ts' },
   ];
 

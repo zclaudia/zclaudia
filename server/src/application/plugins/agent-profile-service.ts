@@ -25,7 +25,9 @@ export class PluginAgentProfileService {
     const llmRepo = new LlmProfileRepository(this.db);
     const llmProfile = llmRepo.findDefault() ?? llmRepo.findAllOrdered()[0];
     if (!llmProfile) {
-      console.warn(`[PluginAgentProfiles] No LLM profile available for ${pluginId}/${contribution.id}`);
+      console.warn(
+        `[PluginAgentProfiles] No LLM profile available for ${pluginId}/${contribution.id}`
+      );
       return false;
     }
 

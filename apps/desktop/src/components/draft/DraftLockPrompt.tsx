@@ -11,9 +11,13 @@ export function DraftLockPrompt() {
     openReadOnly,
   } = useDraftEditorStore();
 
-  useAndroidBack(() => {
-    if (showLockPrompt) dismissLockPrompt();
-  }, showLockPrompt, 35);
+  useAndroidBack(
+    () => {
+      if (showLockPrompt) dismissLockPrompt();
+    },
+    showLockPrompt,
+    35
+  );
 
   if (!showLockPrompt || !activeSessionId) return null;
 
@@ -23,13 +27,16 @@ export function DraftLockPrompt() {
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <div
           className="bg-card border border-border rounded-lg shadow-xl w-full max-w-sm pointer-events-auto"
-          onClick={(e) => e.stopPropagation()}
+          onClick={e => e.stopPropagation()}
         >
           <div className="px-4 py-3 border-b border-border">
             <h3 className="text-base font-semibold">Draft Locked</h3>
           </div>
           <div className="px-4 py-4 text-sm text-muted-foreground">
-            <p>This draft is being edited by another device{lockedByDevice ? ` (${lockedByDevice.slice(0, 8)})` : ''}.</p>
+            <p>
+              This draft is being edited by another device
+              {lockedByDevice ? ` (${lockedByDevice.slice(0, 8)})` : ''}.
+            </p>
           </div>
           <div className="flex justify-end gap-2 px-4 py-3 border-t border-border">
             <button

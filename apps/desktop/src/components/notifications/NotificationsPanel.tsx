@@ -10,7 +10,8 @@ interface NotificationsPanelProps {
 }
 
 export function NotificationsPanel({ onClose }: NotificationsPanelProps = {}) {
-  const { items, hasMore, loading, unreadCount, hydrated, setLoading, clearRead, removeItem } = useNotificationFeedStore();
+  const { items, hasMore, loading, unreadCount, hydrated, setLoading, clearRead, removeItem } =
+    useNotificationFeedStore();
   const { sendMessage } = useConnection();
 
   useEffect(() => {
@@ -40,12 +41,15 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps = {}) {
     clearRead();
   }, [clearRead, sendMessage]);
 
-  const handleDismiss = useCallback((id: string) => {
-    sendMessage({ type: 'dismiss_notifications', itemIds: [id] });
-    removeItem(id);
-  }, [removeItem, sendMessage]);
+  const handleDismiss = useCallback(
+    (id: string) => {
+      sendMessage({ type: 'dismiss_notifications', itemIds: [id] });
+      removeItem(id);
+    },
+    [removeItem, sendMessage]
+  );
 
-  const hasReadItems = items.some((i) => i.readAt);
+  const hasReadItems = items.some(i => i.readAt);
 
   return (
     <div className="h-full flex flex-col">
@@ -94,13 +98,20 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps = {}) {
         {items.length === 0 && !loading && (
           <div className="p-8 text-center text-muted-foreground text-sm">
             <p>No notifications yet.</p>
-            <p className="text-xs mt-1">Task results, scheduled events, and plugin notifications appear here.</p>
+            <p className="text-xs mt-1">
+              Task results, scheduled events, and plugin notifications appear here.
+            </p>
           </div>
         )}
 
         <div className="divide-y divide-border/50">
-          {items.map((item) => (
-            <NotificationItem key={item.id} item={item} onDismiss={handleDismiss} onAfterSelect={onClose} />
+          {items.map(item => (
+            <NotificationItem
+              key={item.id}
+              item={item}
+              onDismiss={handleDismiss}
+              onAfterSelect={onClose}
+            />
           ))}
         </div>
 

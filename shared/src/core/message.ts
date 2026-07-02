@@ -4,9 +4,9 @@ export type MessageRole = 'user' | 'assistant' | 'system';
 
 // File attachment reference (uses fileId instead of embedded base64)
 export interface MessageAttachment {
-  fileId: string;        // Reference to uploaded file
-  name: string;          // Original filename
-  mimeType: string;      // MIME type
+  fileId: string; // Reference to uploaded file
+  name: string; // Original filename
+  mimeType: string; // MIME type
   type: 'image' | 'file'; // Attachment type
 }
 
@@ -23,7 +23,7 @@ export interface Message {
   content: string;
   metadata?: MessageMetadata;
   createdAt: number;
-  offset?: number;  // Per-session sequential message number (for gap detection)
+  offset?: number; // Per-session sequential message number (for gap detection)
   /** Tree entry id this UI row projects from. Stable cross-reference for fork/branch targeting (SP-A). */
   treeEntryId?: string;
 }

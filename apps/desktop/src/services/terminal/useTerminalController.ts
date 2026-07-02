@@ -20,14 +20,14 @@ export function useTerminalController(terminalId: string | null): {
   state: TerminalLifecycleState | null;
 } {
   const controller = useMemo(
-    () => (terminalId ? terminalRegistry.get(terminalId) ?? null : null),
-    [terminalId],
+    () => (terminalId ? (terminalRegistry.get(terminalId) ?? null) : null),
+    [terminalId]
   );
 
   const state = useSyncExternalStore(
-    (cb) => controller?.subscribe(cb) ?? noopUnsubscribe,
+    cb => controller?.subscribe(cb) ?? noopUnsubscribe,
     () => controller?.getState() ?? null,
-    () => controller?.getState() ?? null,
+    () => controller?.getState() ?? null
   );
 
   return { controller, state };
@@ -42,20 +42,20 @@ export function useTerminalController(terminalId: string | null): {
  */
 export function useEnsureTerminalController(
   terminalId: string,
-  buildDeps: () => TerminalControllerDeps,
+  buildDeps: () => TerminalControllerDeps
 ): { controller: TerminalController; state: TerminalLifecycleState } {
   const buildDepsRef = useRef(buildDeps);
   buildDepsRef.current = buildDeps;
 
   const controller = useMemo(
     () => terminalRegistry.getOrCreate(terminalId, buildDepsRef.current()),
-    [terminalId],
+    [terminalId]
   );
 
   const state = useSyncExternalStore(
-    (cb) => controller.subscribe(cb),
+    cb => controller.subscribe(cb),
     () => controller.getState(),
-    () => controller.getState(),
+    () => controller.getState()
   );
 
   return { controller, state };

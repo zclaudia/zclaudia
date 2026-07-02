@@ -12,13 +12,15 @@ import {
 
 describe('sessions model', () => {
   it('normalizes create input strings and nullables', () => {
-    expect(normalizeSessionCreateInput({
-      projectId: '  project-1  ',
-      name: '  Demo  ',
-      agentProfileId: null,
-      parentSessionId: '  parent-1  ',
-      workingDirectory: '  /tmp/work  ',
-    })).toEqual({
+    expect(
+      normalizeSessionCreateInput({
+        projectId: '  project-1  ',
+        name: '  Demo  ',
+        agentProfileId: null,
+        parentSessionId: '  parent-1  ',
+        workingDirectory: '  /tmp/work  ',
+      })
+    ).toEqual({
       projectId: 'project-1',
       name: 'Demo',
       agentProfileId: undefined,
@@ -29,11 +31,13 @@ describe('sessions model', () => {
   });
 
   it('builds update patch with trim and explicit null clearing', () => {
-    expect(buildSessionUpdatePatch({
-      name: '  Updated  ',
-      agentProfileId: null,
-      sdkSessionId: '  sdk-1  ',
-    })).toEqual({
+    expect(
+      buildSessionUpdatePatch({
+        name: '  Updated  ',
+        agentProfileId: null,
+        sdkSessionId: '  sdk-1  ',
+      })
+    ).toEqual({
       name: 'Updated',
       agentProfileId: null,
       sdkSessionId: 'sdk-1',
@@ -41,11 +45,13 @@ describe('sessions model', () => {
   });
 
   it('builds unlocked task-session state', () => {
-    expect(buildUnlockedSessionState({
-      type: 'background',
-      parentSessionId: 'parent-1',
-      projectRole: 'task',
-    })).toEqual({
+    expect(
+      buildUnlockedSessionState({
+        type: 'background',
+        parentSessionId: 'parent-1',
+        projectRole: 'task',
+      })
+    ).toEqual({
       type: 'background',
       parentSessionId: 'parent-1',
       projectRole: 'task',
@@ -55,19 +61,23 @@ describe('sessions model', () => {
 
   it('recognizes session validation errors', () => {
     expect(isSessionValidationError(new Error('Project ID is required'))).toBe(true);
-    expect(isSessionValidationError(new Error('Regular sessions cannot have a parent session'))).toBe(true);
+    expect(
+      isSessionValidationError(new Error('Regular sessions cannot have a parent session'))
+    ).toBe(true);
     expect(isSessionValidationError(new Error('Something unexpected'))).toBe(false);
   });
 
   it('builds task session lifecycle helpers', () => {
-    expect(buildTaskPlanningSession({
-      projectId: 'project-1',
-      title: 'Implement feature',
-      taskId: 'task-1',
-      agentProfileId: 'agent-1',
-      parentSessionId: 'main-1',
-      workingDirectory: '/repo',
-    })).toEqual({
+    expect(
+      buildTaskPlanningSession({
+        projectId: 'project-1',
+        title: 'Implement feature',
+        taskId: 'task-1',
+        agentProfileId: 'agent-1',
+        parentSessionId: 'main-1',
+        workingDirectory: '/repo',
+      })
+    ).toEqual({
       projectId: 'project-1',
       name: 'Task: Implement feature',
       type: 'regular',

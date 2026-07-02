@@ -41,7 +41,7 @@ async function requireOwnerAccess(
   req: Request,
   res: Response,
   ownerKind: AttachmentOwnerKind,
-  ownerId: string,
+  ownerId: string
 ): Promise<boolean> {
   const ok = await checkOwnerAccess(ownerKind, ownerId, req);
   if (!ok) {
@@ -115,7 +115,12 @@ export function createAttachmentRoutes(service: AttachmentService): Router {
         return;
       }
       if (typeof name !== 'string' || typeof mimeType !== 'string' || typeof data !== 'string') {
-        sendApiError(res, 400, 'VALIDATION_ERROR', 'name, mimeType, and data (base64) are required');
+        sendApiError(
+          res,
+          400,
+          'VALIDATION_ERROR',
+          'name, mimeType, and data (base64) are required'
+        );
         return;
       }
       if (!(await requireOwnerAccess(req, res, owner.ownerKind, owner.ownerId))) return;
@@ -167,16 +172,20 @@ export function createAttachmentRoutes(service: AttachmentService): Router {
         sendApiError(res, 400, 'VALIDATION_ERROR', 'ownerKind is required');
         return;
       }
-      const ownerIds = typeof ownerIdsRaw === 'string'
-        ? ownerIdsRaw.split(',').map((s) => s.trim()).filter(Boolean)
-        : [];
+      const ownerIds =
+        typeof ownerIdsRaw === 'string'
+          ? ownerIdsRaw
+              .split(',')
+              .map(s => s.trim())
+              .filter(Boolean)
+          : [];
       if (ownerIds.length === 0) {
         res.json({ success: true, data: [] } as ApiResponse<AttachmentCount[]>);
         return;
       }
 
       const counts = service.countByOwners(ownerKindRaw, ownerIds);
-      const result: AttachmentCount[] = ownerIds.map((id) => ({
+      const result: AttachmentCount[] = ownerIds.map(id => ({
         ownerKind: ownerKindRaw,
         ownerId: id,
         count: counts.get(id) ?? 0,
@@ -227,7 +236,7 @@ export function createAttachmentRoutes(service: AttachmentService): Router {
 
   // GET /api/attachments/:id/download — forced download
   router.get('/attachments/:id/download', (req, res) =>
-    streamAttachment(req, res, service, 'attachment'),
+    streamAttachment(req, res, service, 'attachment')
   );
 
   // PATCH /api/attachments/:id — rename / reorder
@@ -278,7 +287,7 @@ async function streamAttachment(
   req: Request,
   res: Response,
   service: AttachmentService,
-  disposition: 'inline' | 'attachment',
+  disposition: 'inline' | 'attachment'
 ): Promise<void> {
   try {
     const row = service.findById(req.params.id);
@@ -302,11 +311,11 @@ async function streamAttachment(
     res.setHeader('Content-Length', row.size.toString());
     res.setHeader(
       'Content-Disposition',
-      `${disposition}; filename="${encodeURIComponent(row.name)}"`,
+      `${disposition}; filename="${encodeURIComponent(row.name)}"`
     );
 
     const stream = fs.createReadStream(absPath);
-    stream.on('error', (streamErr) => {
+    stream.on('error', streamErr => {
       console.error(`[Attachments] Stream error for ${row.id}:`, streamErr);
       if (!res.headersSent) {
         sendApiError(res, 500, 'STREAM_ERROR', 'Failed to stream attachment');

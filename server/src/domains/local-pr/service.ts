@@ -2,9 +2,12 @@ import type { Database } from 'better-sqlite3';
 import type { LocalPR, LocalPRStatus } from '@zclaudia/shared/features/local-pr';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import { LocalPRRepository } from './repository.js';
+import { buildConflictResolutionPrompt } from './conflict-resolution-prompt.js';
+import { parseReviewVerdict } from './review-verdict.js';
 import { ProjectRepository } from '../projects/repository.js';
 import { LlmProfileRepository } from '../llm-profiles/repository.js';
 import { SessionRepository } from '../sessions/repository.js';
+import { SessionMessageRepository } from '../sessions/message-repository.js';
 import { resolveAgentForSession, NoAgentAvailableError } from '../agent-profiles/agent-resolver.js';
 import type { LocalPRAiSessionPort } from './ports.js';
 import { WorktreeConfigRepository } from '../../infra/repositories/worktree-config.js';
@@ -24,10 +27,6 @@ import {
   abortMerge,
   removeWorktree,
 } from '../../utils/git-operations.js';
-
-// Regex to detect review outcome from AI session messages
-const REVIEW_PASSED_RE = /\[REVIEW_PASSED\]/i;
-const REVIEW_FAILED_RE = /\[REVIEW_FAILED\]/i;
 
 // How long (ms) before a reviewing/merging PR is considered stale and reset
 const STALE_TIMEOUT_MS = 30 * 60 * 1000;
@@ -58,6 +57,7 @@ export class LocalPRService {
   private projectRepo: ProjectRepository;
   private llmProfileRepo: LlmProfileRepository;
   private sessionRepo: SessionRepository;
+  private messageRepo: SessionMessageRepository;
   private wtConfigRepo: WorktreeConfigRepository;
   private mergeLock = new Mutex();
   private activeReviewIds = new Set<string>();
@@ -67,11 +67,16 @@ export class LocalPRService {
   constructor(
     private db: Database,
     private broadcastToProject: (projectId: string, message: ServerMessage) => void,
-    deps?: LocalPRAIDeps | ((projectId: string) => boolean),
+    deps?: LocalPRAIDeps | ((projectId: string) => boolean)
   ) {
     // Backward compat: accept a bare function as isProjectSlotAvailable
     if (typeof deps === 'function') {
-      this.aiDeps = { startAISession: () => { throw new Error('AI session not configured'); }, isProjectSlotAvailable: deps };
+      this.aiDeps = {
+        startAISession: () => {
+          throw new Error('AI session not configured');
+        },
+        isProjectSlotAvailable: deps,
+      };
     } else {
       this.aiDeps = deps;
     }
@@ -79,7 +84,19 @@ export class LocalPRService {
     this.projectRepo = new ProjectRepository(db);
     this.llmProfileRepo = new LlmProfileRepository(db);
     this.sessionRepo = new SessionRepository(db);
+    this.messageRepo = new SessionMessageRepository(db);
     this.wtConfigRepo = new WorktreeConfigRepository(db);
+  }
+
+  private requirePR(prId: string): LocalPR {
+    const pr = this.prRepo.findById(prId);
+    if (!pr) throw new Error(`Local PR not found: ${prId}`);
+    return pr;
+  }
+
+  private requireAiDeps(): LocalPRAIDeps {
+    if (!this.aiDeps) throw new Error('Local PR AI dependencies are not configured');
+    return this.aiDeps;
   }
 
   // ---------------------------------------------------------------------------
@@ -95,9 +112,8 @@ export class LocalPRService {
     const sessionIds = [pr.reviewSessionId, pr.conflictSessionId].filter(Boolean) as string[];
     if (sessionIds.length === 0) return;
 
-    const stmt = this.db.prepare('UPDATE sessions SET archived_at = ?, updated_at = ? WHERE id = ? AND archived_at IS NULL');
     for (const sid of sessionIds) {
-      stmt.run(now, now, sid);
+      this.sessionRepo.archiveIfActive(sid, now);
     }
     console.log(`[LocalPRService] Archived ${sessionIds.length} session(s) for PR ${pr.id}`);
   }
@@ -112,7 +128,7 @@ export class LocalPRService {
    */
   async checkCreatePreconditions(
     projectId: string,
-    worktreePath: string,
+    worktreePath: string
   ): Promise<{ canCreate: boolean; reason?: string }> {
     const project = this.projectRepo.findById(projectId);
     if (!project?.rootPath) {
@@ -138,7 +154,7 @@ export class LocalPRService {
         };
       }
 
-      if (!await hasCommits(worktreePath)) {
+      if (!(await hasCommits(worktreePath))) {
         return {
           canCreate: false,
           reason: `Branch '${branchName}' has no commits yet`,
@@ -169,7 +185,13 @@ export class LocalPRService {
   async createPR(
     projectId: string,
     worktreePath: string,
-    options: { title?: string; description?: string; baseBranch?: string; autoTriggered?: boolean; autoReview?: boolean } = {},
+    options: {
+      title?: string;
+      description?: string;
+      baseBranch?: string;
+      autoTriggered?: boolean;
+      autoReview?: boolean;
+    } = {}
   ): Promise<LocalPR> {
     const project = this.projectRepo.findById(projectId);
     if (!project?.rootPath) {
@@ -182,7 +204,7 @@ export class LocalPRService {
       throw new Error(`An active local PR already exists for this worktree (id: ${existing.id})`);
     }
 
-    const baseBranch = options.baseBranch || await getMainBranch(worktreePath);
+    const baseBranch = options.baseBranch || (await getMainBranch(worktreePath));
     const branchName = await getCurrentBranch(worktreePath);
 
     if (branchName === baseBranch) {
@@ -205,9 +227,7 @@ export class LocalPRService {
 
     const title =
       options.title ??
-      (commits.length === 1
-        ? commits[0].message
-        : `${branchName} (${commits.length} commits)`);
+      (commits.length === 1 ? commits[0].message : `${branchName} (${commits.length} commits)`);
 
     // Atomic re-check + insert to prevent race conditions (async git ops above create a window)
     const pr = this.db.transaction(() => {
@@ -222,7 +242,7 @@ export class LocalPRService {
         title,
         description: options.description,
         status: 'open',
-        commits: commits.map((c) => c.sha),
+        commits: commits.map(c => c.sha),
         diffSummary,
         autoTriggered: options.autoTriggered ?? false,
         autoReview: options.autoReview ?? false,
@@ -273,6 +293,12 @@ export class LocalPRService {
     }
   }
 
+  async maybeAutoCreatePRForCompletedSession(sessionId: string): Promise<LocalPR | null> {
+    const session = this.sessionRepo.findRegularSessionWorktree(sessionId);
+    if (!session) return null;
+    return this.maybeAutoCreatePR(session.projectId, session.workingDirectory);
+  }
+
   /**
    * Refresh an existing PR's commits and diff if it's in a safe state.
    * Skips update when the PR is being reviewed or merged to avoid interfering.
@@ -283,7 +309,7 @@ export class LocalPRService {
     commits: Array<{ sha: string; message: string }>,
     baseBranch: string,
     branchName: string,
-    options: { resetReviewStateOnCommitChange?: boolean } = {},
+    options: { resetReviewStateOnCommitChange?: boolean } = {}
   ): Promise<LocalPR | null> {
     // Don't touch PRs that are currently being processed
     const busyStatuses: LocalPRStatus[] = ['reviewing', 'merging', 'conflict'];
@@ -292,7 +318,7 @@ export class LocalPRService {
       return null;
     }
 
-    const newShas = commits.map((c) => c.sha);
+    const newShas = commits.map(c => c.sha);
     const oldShas = pr.commits ?? [];
 
     // Nothing changed
@@ -305,10 +331,10 @@ export class LocalPRService {
     const shouldResetReviewState = options.resetReviewStateOnCommitChange ?? true;
     // If review was done on old commits, reset to open so it can be re-reviewed.
     // When commit changes are produced by the review session itself, caller can preserve the verdict.
-    const newStatus: LocalPRStatus = shouldResetReviewState &&
-      (pr.status === 'approved' || pr.status === 'review_failed')
-      ? 'open'
-      : pr.status;
+    const newStatus: LocalPRStatus =
+      shouldResetReviewState && (pr.status === 'approved' || pr.status === 'review_failed')
+        ? 'open'
+        : pr.status;
 
     const updated = this.prRepo.update(pr.id, {
       commits: newShas,
@@ -317,7 +343,9 @@ export class LocalPRService {
     });
 
     this.broadcastPRUpdate(updated);
-    console.log(`[LocalPRService] Refreshed PR ${pr.id}: ${oldShas.length} → ${newShas.length} commits${newStatus !== pr.status ? `, status ${pr.status} → ${newStatus}` : ''}`);
+    console.log(
+      `[LocalPRService] Refreshed PR ${pr.id}: ${oldShas.length} → ${newShas.length} commits${newStatus !== pr.status ? `, status ${pr.status} → ${newStatus}` : ''}`
+    );
     return updated;
   }
 
@@ -327,7 +355,7 @@ export class LocalPRService {
    */
   private async refreshAfterBusyState(
     prId: string,
-    options: { resetReviewStateOnCommitChange?: boolean } = {},
+    options: { resetReviewStateOnCommitChange?: boolean } = {}
   ): Promise<void> {
     try {
       const pr = this.prRepo.findById(prId);
@@ -367,7 +395,11 @@ export class LocalPRService {
 
     // Precedence: explicit override > project.reviewLlmProfileId > project agent's LLM > default LLM.
     const agentLlmId = this.resolveAgentLlmIdForProject(pr.projectId);
-    const llmProfileId = this.resolveAvailableProviderId(overrideProviderId, project.reviewLlmProfileId, agentLlmId);
+    const llmProfileId = this.resolveAvailableProviderId(
+      overrideProviderId,
+      project.reviewLlmProfileId,
+      agentLlmId
+    );
     if (!llmProfileId) {
       throw new Error(`No provider available for review on project ${pr.projectId}`);
     }
@@ -378,7 +410,7 @@ export class LocalPRService {
         executionState: 'queued',
         pendingAction: 'review',
       });
-      this.broadcastPRUpdate(this.prRepo.findById(prId)!);
+      this.broadcastPRUpdate(this.requirePR(prId));
       return;
     }
 
@@ -408,12 +440,12 @@ export class LocalPRService {
 
     this.prRepo.update(prId, { status: 'reviewing', reviewSessionId: session.id });
     this.broadcastToProject(pr.projectId, { type: 'sessions_created', session });
-    this.broadcastPRUpdate(this.prRepo.findById(prId)!);
+    this.broadcastPRUpdate(this.requirePR(prId));
 
     const reviewPrompt = await this.buildReviewPrompt(pr);
     this.activeReviewIds.add(prId);
 
-    this.aiDeps!.startAISession({
+    this.requireAiDeps().startAISession({
       clientId: `localpr_review_${prId}`,
       sessionId: session.id,
       input: reviewPrompt,
@@ -422,8 +454,8 @@ export class LocalPRService {
       onMessage: (msg: ServerMessage) => {
         this.forwardSessionStream(pr.projectId, session.id, msg);
         if (msg.type === 'run_completed' || msg.type === 'run_failed') {
-          this.onReviewSessionComplete(prId, session.id, msg.type === 'run_failed').catch((err) =>
-            console.error(`[LocalPRService] Review completion error for PR ${prId}:`, err),
+          this.onReviewSessionComplete(prId, session.id, msg.type === 'run_failed').catch(err =>
+            console.error(`[LocalPRService] Review completion error for PR ${prId}:`, err)
           );
           this.activeReviewIds.delete(prId);
         }
@@ -435,7 +467,7 @@ export class LocalPRService {
 
   private async buildReviewPrompt(pr: LocalPR): Promise<string> {
     const diff = pr.diffSummary ?? '(no diff available)';
-    let diffSection = '';
+    let diffSection: string;
 
     if (diff.length <= INLINE_DIFF_MAX_CHARS) {
       diffSection = `## Diff
@@ -484,38 +516,24 @@ ${diffSection}
 Be thorough but pragmatic. Minor style issues do not warrant REVIEW_FAILED.`;
   }
 
-  private async onReviewSessionComplete(prId: string, sessionId: string, runFailed = false): Promise<void> {
+  private async onReviewSessionComplete(
+    prId: string,
+    sessionId: string,
+    runFailed = false
+  ): Promise<void> {
     const pr = this.prRepo.findById(prId);
     if (!pr || pr.status !== 'reviewing') return;
 
     // Extract outcome from last assistant messages
-    const messages = this.db
-      .prepare(
-        `SELECT content FROM messages WHERE session_id = ? AND role = 'assistant' ORDER BY created_at DESC LIMIT 5`,
-      )
-      .all(sessionId) as { content: string }[];
+    const messages = this.messageRepo.listRecentAssistantContents(sessionId, 5);
 
-    let passed = false;
-    let reviewNotes = '';
-    let sawExplicitVerdict = false;
-
-    for (const msg of messages) {
-      if (REVIEW_FAILED_RE.test(msg.content)) {
-        passed = false;
-        reviewNotes = msg.content.slice(-2000); // last 2KB of the message
-        sawExplicitVerdict = true;
-        break;
-      }
-      if (REVIEW_PASSED_RE.test(msg.content)) {
-        passed = true;
-        sawExplicitVerdict = true;
-        break;
-      }
-    }
+    const verdict = parseReviewVerdict(messages);
+    const { sawExplicitVerdict } = verdict;
+    let { passed, reviewNotes } = verdict;
 
     // Clean review temp artifacts before final status/commit checks.
-    await this.cleanupReviewArtifacts(pr).catch((err) =>
-      console.warn(`[LocalPRService] Failed to cleanup review artifacts for PR ${prId}:`, err),
+    await this.cleanupReviewArtifacts(pr).catch(err =>
+      console.warn(`[LocalPRService] Failed to cleanup review artifacts for PR ${prId}:`, err)
     );
 
     // Enforce clean worktree after review by auto-committing any remaining changes.
@@ -534,7 +552,10 @@ Be thorough but pragmatic. Minor style issues do not warrant REVIEW_FAILED.`;
     if (autoCommitError) {
       passed = false;
       const prefix = reviewNotes ? `${reviewNotes}\n\n` : '';
-      reviewNotes = `${prefix}Review left uncommitted changes and auto-commit failed: ${autoCommitError}`.slice(-2000);
+      reviewNotes =
+        `${prefix}Review left uncommitted changes and auto-commit failed: ${autoCommitError}`.slice(
+          -2000
+        );
     } else if (!sawExplicitVerdict && runFailed) {
       passed = false;
       if (!reviewNotes) {
@@ -550,11 +571,13 @@ Be thorough but pragmatic. Minor style issues do not warrant REVIEW_FAILED.`;
     this.prRepo.update(prId, {
       status: newStatus,
       reviewNotes: reviewNotes || undefined,
-      statusMessage: passed ? 'Review approved. Ready to merge.' : 'Review failed. Please address comments.',
+      statusMessage: passed
+        ? 'Review approved. Ready to merge.'
+        : 'Review failed. Please address comments.',
       executionState: 'idle',
       pendingAction: 'none',
     });
-    this.broadcastPRUpdate(this.prRepo.findById(prId)!);
+    this.broadcastPRUpdate(this.requirePR(prId));
     console.log(`[LocalPRService] Review complete for PR ${prId}: ${newStatus}`);
 
     // Check for commits that arrived during the review
@@ -581,6 +604,7 @@ Be thorough but pragmatic. Minor style issues do not warrant REVIEW_FAILED.`;
 
     const project = this.projectRepo.findById(pr.projectId);
     if (!project?.rootPath) throw new Error(`Project ${pr.projectId} has no rootPath`);
+    const projectRoot = project.rootPath;
 
     return this.mergeLock.runExclusive(async () => {
       // Re-fetch inside lock to ensure status hasn't changed
@@ -598,7 +622,7 @@ Be thorough but pragmatic. Minor style issues do not warrant REVIEW_FAILED.`;
           executionState: 'queued',
           pendingAction: 'merge',
         });
-        this.broadcastPRUpdate(this.prRepo.findById(prId)!);
+        this.broadcastPRUpdate(this.requirePR(prId));
         return;
       }
 
@@ -610,43 +634,48 @@ Be thorough but pragmatic. Minor style issues do not warrant REVIEW_FAILED.`;
 
       // Manual merge from open/conflict should go through approved -> merging transition.
       if (freshPR.status !== 'approved') {
-        this.prRepo.update(prId, { status: 'approved', statusMessage: 'Merge requested. Preparing to merge...' });
-        this.broadcastPRUpdate(this.prRepo.findById(prId)!);
+        this.prRepo.update(prId, {
+          status: 'approved',
+          statusMessage: 'Merge requested. Preparing to merge...',
+        });
+        this.broadcastPRUpdate(this.requirePR(prId));
       }
 
       // Verify main worktree is clean
-      const mainClean = await isWorkingTreeClean(project.rootPath!);
+      const mainClean = await isWorkingTreeClean(projectRoot);
       if (!mainClean) {
         this.prRepo.update(prId, {
           status: 'approved',
-          statusMessage: 'Cannot merge: main worktree is dirty. Commit or stash changes, then retry.',
+          statusMessage:
+            'Cannot merge: main worktree is dirty. Commit or stash changes, then retry.',
           executionState: 'idle',
           pendingAction: 'none',
         });
-        this.broadcastPRUpdate(this.prRepo.findById(prId)!);
+        this.broadcastPRUpdate(this.requirePR(prId));
         throw new Error(
-          `Main worktree is dirty for project ${project.id}. Commit or stash changes before merging PR ${prId}.`,
+          `Main worktree is dirty for project ${project.id}. Commit or stash changes before merging PR ${prId}.`
         );
       }
 
-      this.prRepo.update(prId, { status: 'merging', statusMessage: `Merging '${pr.branchName}' into '${pr.baseBranch}'...` });
-      this.broadcastPRUpdate(this.prRepo.findById(prId)!);
+      this.prRepo.update(prId, {
+        status: 'merging',
+        statusMessage: `Merging '${pr.branchName}' into '${pr.baseBranch}'...`,
+      });
+      this.broadcastPRUpdate(this.requirePR(prId));
 
       try {
         // Checkout base branch in main worktree
         const { execFile: execFileCb } = await import('child_process');
         const { promisify } = await import('util');
         const execFileAsync = promisify(execFileCb);
-        await execFileAsync('git', ['checkout', pr.baseBranch], { cwd: project.rootPath! });
+        await execFileAsync('git', ['checkout', pr.baseBranch], { cwd: projectRoot });
 
-        const result = await mergeBranch(
-          project.rootPath!,
-          pr.branchName,
-          `Merge Local PR: ${pr.title}`,
-        );
+        const result = await mergeBranch(projectRoot, pr.branchName, `Merge Local PR: ${pr.title}`);
 
         if (result.success) {
-          const { stdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], { cwd: project.rootPath! });
+          const { stdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+            cwd: projectRoot,
+          });
           const mergeCommitSha = stdout.trim();
           this.prRepo.update(prId, {
             status: 'merged',
@@ -656,22 +685,22 @@ Be thorough but pragmatic. Minor style issues do not warrant REVIEW_FAILED.`;
             executionState: 'idle',
             pendingAction: 'none',
           });
-          const mergedPR = this.prRepo.findById(prId)!;
+          const mergedPR = this.requirePR(prId);
           this.broadcastPRUpdate(mergedPR);
           this.archiveRelatedSessions(mergedPR);
           console.log(`[LocalPRService] Merged PR ${prId} into ${pr.baseBranch}`);
         } else {
           console.warn(
-            `[LocalPRService] Merge conflict for PR ${prId}: ${result.conflicts?.join(', ')}`,
+            `[LocalPRService] Merge conflict for PR ${prId}: ${result.conflicts?.join(', ')}`
           );
-          await abortMerge(project.rootPath!);
+          await abortMerge(projectRoot);
           this.prRepo.update(prId, {
             status: 'conflict',
             statusMessage: `Merge conflict detected. Resolve conflicts and retry merge, or start AI conflict resolution.`,
             executionState: 'idle',
             pendingAction: 'none',
           });
-          this.broadcastPRUpdate(this.prRepo.findById(prId)!);
+          this.broadcastPRUpdate(this.requirePR(prId));
           await this.startConflictResolution(prId);
         }
       } catch (err) {
@@ -683,7 +712,7 @@ Be thorough but pragmatic. Minor style issues do not warrant REVIEW_FAILED.`;
           executionState: 'failed',
           executionError: message,
         }); // reset so it can retry
-        this.broadcastPRUpdate(this.prRepo.findById(prId)!);
+        this.broadcastPRUpdate(this.requirePR(prId));
 
         // Check for commits that arrived during the merge attempt
         await this.refreshAfterBusyState(prId);
@@ -700,10 +729,11 @@ Be thorough but pragmatic. Minor style issues do not warrant REVIEW_FAILED.`;
 
     const project = this.projectRepo.findById(pr.projectId);
     if (!project?.rootPath) throw new Error(`Project ${pr.projectId} has no rootPath`);
+    const projectRoot = project.rootPath;
 
     await this.mergeLock.runExclusive(async () => {
       try {
-        await abortMerge(project.rootPath!);
+        await abortMerge(projectRoot);
       } catch {
         // Best-effort abort; status reset still helps unblock UI.
       }
@@ -711,7 +741,7 @@ Be thorough but pragmatic. Minor style issues do not warrant REVIEW_FAILED.`;
         status: 'approved',
         statusMessage: 'Merge cancelled manually. You can retry merge.',
       });
-      this.broadcastPRUpdate(this.prRepo.findById(prId)!);
+      this.broadcastPRUpdate(this.requirePR(prId));
       await this.refreshAfterBusyState(prId);
     });
   }
@@ -720,20 +750,24 @@ Be thorough but pragmatic. Minor style issues do not warrant REVIEW_FAILED.`;
   async triggerConflictResolution(prId: string): Promise<void> {
     const pr = this.prRepo.findById(prId);
     if (!pr) throw new Error(`Local PR not found: ${prId}`);
-    if (pr.status !== 'conflict') throw new Error(`Cannot resolve conflict in status '${pr.status}'`);
+    if (pr.status !== 'conflict')
+      throw new Error(`Cannot resolve conflict in status '${pr.status}'`);
     const project = this.projectRepo.findById(pr.projectId);
     if (!project?.rootPath) throw new Error(`Project ${pr.projectId} has no rootPath`);
     if (!this.hasAvailableSlot(pr.projectId)) {
       this.prRepo.update(prId, {
         statusMessage: 'Queued for AI conflict resolution: waiting for an available worktree slot.',
+        executionState: 'queued',
+        pendingAction: 'resolve_conflict',
       });
-      this.broadcastPRUpdate(this.prRepo.findById(prId)!);
+      this.broadcastPRUpdate(this.requirePR(prId));
       return;
     }
     // Precedence: project.reviewLlmProfileId > project agent's LLM > default LLM.
     const agentLlmId = this.resolveAgentLlmIdForProject(pr.projectId);
     const llmProfileId = this.resolveAvailableProviderId(project.reviewLlmProfileId, agentLlmId);
-    if (!llmProfileId) throw new Error(`No provider available for conflict resolution on project ${pr.projectId}`);
+    if (!llmProfileId)
+      throw new Error(`No provider available for conflict resolution on project ${pr.projectId}`);
     await this.startConflictResolution(prId, llmProfileId);
   }
 
@@ -747,7 +781,7 @@ Be thorough but pragmatic. Minor style issues do not warrant REVIEW_FAILED.`;
       status: 'open',
       statusMessage: 'PR reopened. Ready for review or merge.',
     });
-    this.broadcastPRUpdate(this.prRepo.findById(prId)!);
+    this.broadcastPRUpdate(this.requirePR(prId));
   }
 
   /** Revert a merged PR by reverting its merge commit on base branch. */
@@ -758,41 +792,42 @@ Be thorough but pragmatic. Minor style issues do not warrant REVIEW_FAILED.`;
 
     const project = this.projectRepo.findById(pr.projectId);
     if (!project?.rootPath) throw new Error(`Project ${pr.projectId} has no rootPath`);
+    const projectRoot = project.rootPath;
 
     await this.mergeLock.runExclusive(async () => {
       const { execFile: execFileCb } = await import('child_process');
       const { promisify } = await import('util');
       const execFileAsync = promisify(execFileCb);
 
-      const mainClean = await isWorkingTreeClean(project.rootPath!);
+      const mainClean = await isWorkingTreeClean(projectRoot);
       if (!mainClean) {
         throw new Error(
-          `Main worktree is dirty for project ${project.id}. Commit or stash changes before reverting PR ${prId}.`,
+          `Main worktree is dirty for project ${project.id}. Commit or stash changes before reverting PR ${prId}.`
         );
       }
 
-      const mergeCommitSha = await this.resolveMergeCommitSha(pr, project.rootPath!, execFileAsync);
+      const mergeCommitSha = await this.resolveMergeCommitSha(pr, projectRoot, execFileAsync);
       if (!mergeCommitSha) {
         throw new Error(`Cannot determine merge commit for PR ${prId}`);
       }
 
       try {
-        await execFileAsync('git', ['checkout', pr.baseBranch], { cwd: project.rootPath! });
+        await execFileAsync('git', ['checkout', pr.baseBranch], { cwd: projectRoot });
         await execFileAsync('git', ['revert', '-m', '1', mergeCommitSha, '--no-edit'], {
-          cwd: project.rootPath!,
+          cwd: projectRoot,
         });
         this.prRepo.update(prId, {
           status: 'closed',
           statusMessage: `Merge reverted successfully (${mergeCommitSha.slice(0, 8)}).`,
         });
-        this.broadcastPRUpdate(this.prRepo.findById(prId)!);
+        this.broadcastPRUpdate(this.requirePR(prId));
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown revert error';
         this.prRepo.update(prId, {
           status: 'merged',
           statusMessage: `Revert failed: ${message}`,
         });
-        this.broadcastPRUpdate(this.prRepo.findById(prId)!);
+        this.broadcastPRUpdate(this.requirePR(prId));
         throw err;
       }
     });
@@ -816,7 +851,11 @@ Be thorough but pragmatic. Minor style issues do not warrant REVIEW_FAILED.`;
 
     // Precedence: explicit override > project.reviewLlmProfileId > project agent's LLM > default LLM.
     const agentLlmId = this.resolveAgentLlmIdForProject(pr.projectId);
-    const llmProfileId = this.resolveAvailableProviderId(overrideProviderId, project.reviewLlmProfileId, agentLlmId);
+    const llmProfileId = this.resolveAvailableProviderId(
+      overrideProviderId,
+      project.reviewLlmProfileId,
+      agentLlmId
+    );
     if (!llmProfileId) {
       console.warn(`[LocalPRService] No provider for conflict resolution on PR ${prId}`);
       return;
@@ -842,28 +881,18 @@ Be thorough but pragmatic. Minor style issues do not warrant REVIEW_FAILED.`;
       executionState: 'running',
       pendingAction: 'resolve_conflict',
     });
-    this.broadcastPRUpdate(this.prRepo.findById(prId)!);
+    this.broadcastPRUpdate(this.requirePR(prId));
     this.broadcastToProject(pr.projectId, { type: 'sessions_created', session });
 
-    const conflictPrompt = `You are a git expert. The branch '${pr.branchName}' has a merge conflict when merging into '${pr.baseBranch}'.
-
-Your task:
-1. You are in the worktree for branch '${pr.branchName}'. Rebase onto '${pr.baseBranch}':
-   git rebase ${pr.baseBranch}
-2. Resolve any conflicts by editing the conflicted files (look for <<<<<<, =======, >>>>>>> markers).
-3. After resolving each file: git add <file>
-4. Continue the rebase: git rebase --continue
-5. Repeat steps 2-4 until the rebase completes.
-
-IMPORTANT: Do NOT merge into ${pr.baseBranch}. Only rebase this branch. The merge will be handled separately.
-
-If the rebase succeeds, output: [CONFLICT_RESOLVED]
-If you cannot resolve it, output: [CONFLICT_UNRESOLVED]`;
+    const conflictPrompt = buildConflictResolutionPrompt({
+      branchName: pr.branchName,
+      baseBranch: pr.baseBranch,
+    });
 
     this.activeConflictIds.add(prId);
 
     try {
-      this.aiDeps!.startAISession({
+      this.requireAiDeps().startAISession({
         clientId: `localpr_conflict_${prId}`,
         sessionId: session.id,
         input: conflictPrompt,
@@ -872,8 +901,8 @@ If you cannot resolve it, output: [CONFLICT_UNRESOLVED]`;
         onMessage: (msg: ServerMessage) => {
           this.forwardSessionStream(pr.projectId, session.id, msg);
           if (msg.type === 'run_completed' || msg.type === 'run_failed') {
-            this.onConflictSessionComplete(prId, session.id).catch((err) =>
-              console.error(`[LocalPRService] Conflict completion error for PR ${prId}:`, err),
+            this.onConflictSessionComplete(prId, session.id).catch(err =>
+              console.error(`[LocalPRService] Conflict completion error for PR ${prId}:`, err)
             );
             this.activeConflictIds.delete(prId);
           }
@@ -885,24 +914,22 @@ If you cannot resolve it, output: [CONFLICT_UNRESOLVED]`;
       this.prRepo.update(prId, {
         statusMessage: `Failed to start AI conflict resolution: ${message}`,
       });
-      this.broadcastPRUpdate(this.prRepo.findById(prId)!);
+      this.broadcastPRUpdate(this.requirePR(prId));
       throw err;
     }
 
-    console.log(`[LocalPRService] Started conflict resolution session ${session.id} for PR ${prId}`);
+    console.log(
+      `[LocalPRService] Started conflict resolution session ${session.id} for PR ${prId}`
+    );
   }
 
   private async onConflictSessionComplete(prId: string, sessionId: string): Promise<void> {
     const pr = this.prRepo.findById(prId);
     if (!pr || pr.status !== 'conflict') return;
 
-    const messages = this.db
-      .prepare(
-        `SELECT content FROM messages WHERE session_id = ? AND role = 'assistant' ORDER BY created_at DESC LIMIT 5`,
-      )
-      .all(sessionId) as { content: string }[];
+    const messages = this.messageRepo.listRecentAssistantContents(sessionId, 5);
 
-    const resolved = messages.some((m) => /\[CONFLICT_RESOLVED\]/i.test(m.content));
+    const resolved = messages.some(m => /\[CONFLICT_RESOLVED\]/i.test(m.content));
 
     if (resolved) {
       // Reset to open so the PR goes through review again (rebase changed the code)
@@ -912,8 +939,10 @@ If you cannot resolve it, output: [CONFLICT_UNRESOLVED]`;
         executionState: 'idle',
         pendingAction: 'none',
       });
-      this.broadcastPRUpdate(this.prRepo.findById(prId)!);
-      console.log(`[LocalPRService] Conflict resolved for PR ${prId}, returning to open for re-review`);
+      this.broadcastPRUpdate(this.requirePR(prId));
+      console.log(
+        `[LocalPRService] Conflict resolved for PR ${prId}, returning to open for re-review`
+      );
 
       // Check for commits that arrived during conflict resolution
       await this.refreshAfterBusyState(prId);
@@ -925,7 +954,7 @@ If you cannot resolve it, output: [CONFLICT_UNRESOLVED]`;
         executionState: 'failed',
         executionError: 'AI could not resolve conflict',
       });
-      this.broadcastPRUpdate(this.prRepo.findById(prId)!);
+      this.broadcastPRUpdate(this.requirePR(prId));
     }
   }
 
@@ -1006,7 +1035,7 @@ If you cannot resolve it, output: [CONFLICT_UNRESOLVED]`;
   /** Reset stale reviewing/merging PRs that have been stuck for too long. */
   private async processStale(): Promise<void> {
     const threshold = Date.now() - STALE_TIMEOUT_MS;
-    const stale = this.prRepo.findInProgress().filter((pr) => pr.updatedAt < threshold);
+    const stale = this.prRepo.findInProgress().filter(pr => pr.updatedAt < threshold);
 
     for (const pr of stale) {
       const resetStatus: LocalPRStatus = pr.status === 'reviewing' ? 'open' : 'approved';
@@ -1017,10 +1046,8 @@ If you cannot resolve it, output: [CONFLICT_UNRESOLVED]`;
         pendingAction: 'none',
       });
       this.activeReviewIds.delete(pr.id);
-      this.broadcastPRUpdate(this.prRepo.findById(pr.id)!);
-      console.log(
-        `[LocalPRService] Reset stale PR ${pr.id} (${pr.status} → ${resetStatus})`,
-      );
+      this.broadcastPRUpdate(this.requirePR(pr.id));
+      console.log(`[LocalPRService] Reset stale PR ${pr.id} (${pr.status} → ${resetStatus})`);
       await this.refreshAfterBusyState(pr.id);
     }
   }
@@ -1032,8 +1059,8 @@ If you cannot resolve it, output: [CONFLICT_UNRESOLVED]`;
     for (const pr of pending) {
       if (this.activeReviewIds.has(pr.id)) continue; // already running
 
-      await this.startReview(pr.id).catch((err) =>
-        console.error(`[LocalPRService] Failed to start review for PR ${pr.id}:`, err),
+      await this.startReview(pr.id).catch(err =>
+        console.error(`[LocalPRService] Failed to start review for PR ${pr.id}:`, err)
       );
     }
   }
@@ -1042,8 +1069,8 @@ If you cannot resolve it, output: [CONFLICT_UNRESOLVED]`;
     const pending = this.prRepo.findPendingMerge();
 
     for (const pr of pending) {
-      await this.mergePR(pr.id).catch((err) =>
-        console.error(`[LocalPRService] Failed to merge PR ${pr.id}:`, err),
+      await this.mergePR(pr.id).catch(err =>
+        console.error(`[LocalPRService] Failed to merge PR ${pr.id}:`, err)
       );
     }
   }
@@ -1058,7 +1085,7 @@ If you cannot resolve it, output: [CONFLICT_UNRESOLVED]`;
     for (const project of projects) {
       const allPRs = this.prRepo.findByProjectId(project.id);
       // Keep only merged/closed, sorted newest first (findByProjectId already orders by created_at DESC)
-      const finished = allPRs.filter((pr) => pr.status === 'merged' || pr.status === 'closed');
+      const finished = allPRs.filter(pr => pr.status === 'merged' || pr.status === 'closed');
       if (finished.length <= MAX_FINISHED_PRS_PER_PROJECT) continue;
 
       const toRemove = finished.slice(MAX_FINISHED_PRS_PER_PROJECT);
@@ -1175,22 +1202,26 @@ If you cannot resolve it, output: [CONFLICT_UNRESOLVED]`;
   private async resolveMergeCommitSha(
     pr: LocalPR,
     repoPath: string,
-    execFileAsync: (file: string, args: string[], options: { cwd: string }) => Promise<{ stdout: string | Buffer }>,
+    execFileAsync: (
+      file: string,
+      args: string[],
+      options: { cwd: string }
+    ) => Promise<{ stdout: string | Buffer }>
   ): Promise<string | null> {
     if (pr.mergeCommitSha) return pr.mergeCommitSha;
     const { stdout } = await execFileAsync(
       'git',
       ['log', '--merges', '--format=%H%x1f%s', '-n', '200'],
-      { cwd: repoPath },
+      { cwd: repoPath }
     );
     const expectedSubject = `Merge Local PR: ${pr.title}`;
     const output = String(stdout);
     const row = output
       .split('\n')
-      .map((line) => line.trim())
+      .map(line => line.trim())
       .filter(Boolean)
-      .map((line) => line.split('\x1f'))
-      .find((parts) => parts[1] === expectedSubject);
+      .map(line => line.split('\x1f'))
+      .find(parts => parts[1] === expectedSubject);
     return row?.[0] ?? null;
   }
 }

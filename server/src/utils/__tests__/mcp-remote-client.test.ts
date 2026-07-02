@@ -72,19 +72,24 @@ describe('RemoteMcpClient', () => {
 
     await client.connect();
 
-    expect(fetchMock).toHaveBeenCalledWith('https://auth.example.com/oauth/token', expect.objectContaining({
-      method: 'POST',
-      body: expect.any(URLSearchParams),
-    }));
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://auth.example.com/oauth/token',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.any(URLSearchParams),
+      })
+    );
     const tokenRequestBody = fetchMock.mock.calls[0][1].body as URLSearchParams;
     expect(tokenRequestBody.get('grant_type')).toBe('refresh_token');
     expect(tokenRequestBody.get('refresh_token')).toBe('old-refresh-token');
-    expect(onOAuthCredentials).toHaveBeenCalledWith(expect.objectContaining({
-      accessToken: 'fresh-access-token',
-      refreshToken: 'fresh-refresh-token',
-      tokenType: 'Bearer',
-      scope: 'repo',
-    }));
+    expect(onOAuthCredentials).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accessToken: 'fresh-access-token',
+        refreshToken: 'fresh-refresh-token',
+        tokenType: 'Bearer',
+        scope: 'repo',
+      })
+    );
     expect(streamableTransportCtorMock).toHaveBeenCalledWith(
       new URL('https://mcp.example.com/mcp'),
       expect.objectContaining({
@@ -93,7 +98,7 @@ describe('RemoteMcpClient', () => {
             Authorization: 'Bearer fresh-access-token',
           }),
         },
-      }),
+      })
     );
     expect(clientConnectMock).toHaveBeenCalledTimes(1);
   });
@@ -103,7 +108,8 @@ describe('RemoteMcpClient', () => {
       ok: false,
       status: 400,
       json: async () => ({ error: 'invalid_grant', error_description: 'refresh token expired' }),
-      text: async () => JSON.stringify({ error: 'invalid_grant', error_description: 'refresh token expired' }),
+      text: async () =>
+        JSON.stringify({ error: 'invalid_grant', error_description: 'refresh token expired' }),
     });
     const onOAuthCredentials = vi.fn();
     const { RemoteMcpClient } = await import('../mcp-remote-client.js');
@@ -132,7 +138,8 @@ describe('RemoteMcpClient', () => {
   });
 
   it('discovers OAuth token endpoint from metadataUrl before refreshing credentials', async () => {
-    const fetchMock = vi.fn()
+    const fetchMock = vi
+      .fn()
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -173,12 +180,22 @@ describe('RemoteMcpClient', () => {
 
     await client.connect();
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://auth.example.com/.well-known/oauth-authorization-server', expect.objectContaining({ method: 'GET' }));
-    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://auth.example.com/oauth/token', expect.objectContaining({ method: 'POST' }));
-    expect(onOAuthCredentials).toHaveBeenCalledWith(expect.objectContaining({
-      accessToken: 'fresh-access-token',
-      refreshToken: 'fresh-refresh-token',
-    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'https://auth.example.com/.well-known/oauth-authorization-server',
+      expect.objectContaining({ method: 'GET' })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'https://auth.example.com/oauth/token',
+      expect.objectContaining({ method: 'POST' })
+    );
+    expect(onOAuthCredentials).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accessToken: 'fresh-access-token',
+        refreshToken: 'fresh-refresh-token',
+      })
+    );
   });
 
   it('times out remote MCP connection attempts and closes the transport', async () => {
@@ -192,7 +209,9 @@ describe('RemoteMcpClient', () => {
       connectTimeoutMs: 100,
     } as any);
 
-    const connectPromise = expect(client.connect()).rejects.toThrow('Remote MCP connection timed out after 100ms');
+    const connectPromise = expect(client.connect()).rejects.toThrow(
+      'Remote MCP connection timed out after 100ms'
+    );
     await vi.advanceTimersByTimeAsync(100);
 
     await connectPromise;
@@ -202,9 +221,12 @@ describe('RemoteMcpClient', () => {
 
   it('passes a per-request timeout fetch to remote MCP transports', async () => {
     vi.useFakeTimers();
-    const neverFetch = vi.fn((_url: string | URL, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
-      init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
-    }));
+    const neverFetch = vi.fn(
+      (_url: string | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+        })
+    );
     const { RemoteMcpClient } = await import('../mcp-remote-client.js');
 
     const client = new RemoteMcpClient({
@@ -215,15 +237,22 @@ describe('RemoteMcpClient', () => {
     } as any);
 
     await client.connect();
-    const transportOptions = streamableTransportCtorMock.mock.calls[0][1] as { fetch?: typeof fetch };
+    const transportOptions = streamableTransportCtorMock.mock.calls[0][1] as {
+      fetch?: typeof fetch;
+    };
     expect(transportOptions.fetch).toEqual(expect.any(Function));
 
-    const requestPromise = expect(transportOptions.fetch!('https://mcp.example.com/mcp', { method: 'POST' })).rejects.toThrow('aborted');
+    const requestPromise = expect(
+      transportOptions.fetch!('https://mcp.example.com/mcp', { method: 'POST' })
+    ).rejects.toThrow('aborted');
     await vi.advanceTimersByTimeAsync(250);
     await requestPromise;
-    expect(neverFetch).toHaveBeenCalledWith('https://mcp.example.com/mcp', expect.objectContaining({
-      signal: expect.any(AbortSignal),
-    }));
+    expect(neverFetch).toHaveBeenCalledWith(
+      'https://mcp.example.com/mcp',
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+      })
+    );
   });
 
   it('executes headersHelper before connect and lets dynamic headers override static headers', async () => {
@@ -260,7 +289,7 @@ describe('RemoteMcpClient', () => {
             'X-Dynamic': 'yes',
           },
         },
-      }),
+      })
     );
   });
 });

@@ -22,7 +22,6 @@ function makeDb(): Database.Database {
   return db;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function makeActiveRun(sessionId: string, overrides: Record<string, unknown> = {}): any {
   return {
     runId: `run-${sessionId}`,
@@ -36,9 +35,7 @@ function makeActiveRun(sessionId: string, overrides: Record<string, unknown> = {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function makeClient(): { client: any; sent: any[] } {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sent: any[] = [];
   const client = {
     id: `c-${Math.random().toString(36).slice(2)}`,
@@ -53,7 +50,7 @@ describe('task lifecycle event bus', () => {
     const db = makeDb();
     const service = new TaskService(new TaskRepository(db));
     const events: Array<{ type: string; taskId: string; status: string }> = [];
-    const off = onTaskLifecycle((event) => {
+    const off = onTaskLifecycle(event => {
       events.push({ type: event.type, taskId: event.task.id, status: event.task.status });
     });
 
@@ -120,10 +117,14 @@ describe('task settlement notifier', () => {
     service.startTask(task.id);
     service.completeTask(task.id, { text: 'exit 0' });
 
-    const notifications = sent.filter((m) => m.type === 'task_notification');
+    const notifications = sent.filter(m => m.type === 'task_notification');
     expect(notifications).toHaveLength(2);
     expect(notifications[0]).toMatchObject({ taskId: task.id, sessionId: 's1', status: 'started' });
-    expect(notifications[1]).toMatchObject({ taskId: task.id, sessionId: 's1', status: 'completed' });
+    expect(notifications[1]).toMatchObject({
+      taskId: task.id,
+      sessionId: 's1',
+      status: 'completed',
+    });
   });
 
   it('tracks pendingBackgroundTasks on the owning active run', () => {
@@ -139,7 +140,6 @@ describe('task settlement notifier', () => {
   });
 
   it('steers a completion notice into an active steerable run', () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const steered: any[] = [];
     const run = makeActiveRun('s1', { steerHandle: { steer: (m: unknown) => steered.push(m) } });
     const activeRuns = new Map([[run.runId, run]]);

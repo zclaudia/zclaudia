@@ -35,8 +35,8 @@ export function handleBootstrapEvent(msg: BootstrapEvent): void {
     case 'phase1_started':
     case 'phase1_completed':
     case 'phase1_failed':
-      void api.getBootstrapScan(scanId).then((s) => store.setInitScan(projectId, s));
-      void api.listBootstrapCandidates(scanId).then((c) => store.setInitCandidates(scanId, c));
+      void api.getBootstrapScan(scanId).then(s => store.setInitScan(projectId, s));
+      void api.listBootstrapCandidates(scanId).then(c => store.setInitCandidates(scanId, c));
       return;
 
     case 'candidate_updated':
@@ -65,7 +65,7 @@ export function handleBootstrapEvent(msg: BootstrapEvent): void {
     case 'scan_cancelled':
       if (payload.scan) store.setInitScan(projectId, payload.scan);
       if (payload.kind === 'scan_finalized') {
-        void api.listCorpus(projectId).then((c) => store.setCorpus(projectId, c));
+        void api.listCorpus(projectId).then(c => store.setCorpus(projectId, c));
       }
       return;
   }

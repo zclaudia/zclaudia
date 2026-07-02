@@ -10,10 +10,7 @@ import {
   firstLetter,
   NotchTabBar,
 } from './NotchPanelVisuals';
-import {
-  NOTCH_EVENT,
-  type NotchStateSnapshot,
-} from '../../services/notchBridge';
+import { NOTCH_EVENT, type NotchStateSnapshot } from '../../services/notchBridge';
 import { classifyToast, classifyFeedItem, type NotchTab } from '../../utils/notchTabCategory';
 import { NOTCH_WINDOW_TIMINGS } from '../../config/notch';
 import { EMPTY_NOTIFICATION_UNREAD_COUNTS_BY_TAB, type NotificationItem } from '@zclaudia/shared';
@@ -21,23 +18,44 @@ import type { Toast } from '../../stores/toastStore';
 import type { PluginNotchTab } from '../../stores/pluginStore';
 import { createPassthroughController } from './passthroughController';
 
-function NotchEmptyState({ activeTab, pluginNotchTabs }: { activeTab: NotchTab; pluginNotchTabs: PluginNotchTab[] }) {
+function NotchEmptyState({
+  activeTab,
+  pluginNotchTabs,
+}: {
+  activeTab: NotchTab;
+  pluginNotchTabs: PluginNotchTab[];
+}) {
   const pluginTab = activeTab.startsWith('plugin:')
-    ? pluginNotchTabs.find((t) => `plugin:${t.id}` === activeTab)
+    ? pluginNotchTabs.find(t => `plugin:${t.id}` === activeTab)
     : undefined;
-  const emptyTitle = activeTab === 'sessions' ? "You're all caught up."
-    : activeTab === 'claudia' ? 'No Claudia activity.'
-    : activeTab === 'approvals' ? 'No pending approvals.'
-    : pluginTab ? `No ${pluginTab.label} activity.`
-    : 'All systems normal.';
-  const emptySubtitle = activeTab === 'sessions' ? 'Task results and session events will appear here.'
-    : activeTab === 'claudia' ? 'Claudia Chat task results and updates will appear here.'
-    : activeTab === 'approvals' ? 'Permission requests and AI reviews will appear here.'
-    : pluginTab ? `${pluginTab.label} notifications will appear here.`
-    : 'Connection and sync status will appear here.';
+  const emptyTitle =
+    activeTab === 'sessions'
+      ? "You're all caught up."
+      : activeTab === 'claudia'
+        ? 'No Claudia activity.'
+        : activeTab === 'approvals'
+          ? 'No pending approvals.'
+          : pluginTab
+            ? `No ${pluginTab.label} activity.`
+            : 'All systems normal.';
+  const emptySubtitle =
+    activeTab === 'sessions'
+      ? 'Task results and session events will appear here.'
+      : activeTab === 'claudia'
+        ? 'Claudia Chat task results and updates will appear here.'
+        : activeTab === 'approvals'
+          ? 'Permission requests and AI reviews will appear here.'
+          : pluginTab
+            ? `${pluginTab.label} notifications will appear here.`
+            : 'Connection and sync status will appear here.';
   return (
     <div className="px-6 py-10 text-center">
-      <img src="/logo.png" alt="" className="w-10 h-10 mx-auto opacity-40 rounded-xl" draggable={false} />
+      <img
+        src="/logo.png"
+        alt=""
+        className="w-10 h-10 mx-auto opacity-40 rounded-xl"
+        draggable={false}
+      />
       <p className="mt-3 text-[13px] text-white/60">{emptyTitle}</p>
       <p className="mt-1 text-[11px] text-white/40">{emptySubtitle}</p>
     </div>
@@ -124,33 +142,41 @@ export function NotchWindow() {
   const prevSnapshotRef = useRef<NotchStateSnapshot | null>(null);
   const surfacePathRef = useRef<SVGPathElement | null>(null);
   const passthroughErrorWarnCountRef = useRef(0);
-  const passthroughControllerRef = useRef<ReturnType<typeof createPassthroughController> | null>(null);
+  const passthroughControllerRef = useRef<ReturnType<typeof createPassthroughController> | null>(
+    null
+  );
   if (!passthroughControllerRef.current) {
-    passthroughControllerRef.current = createPassthroughController((passthrough) => (
-      invoke('set_notch_passthrough', { passthrough })
-    ), {
-      retryDelayMs: PASSTHROUGH_RETRY_DELAY_MS,
-      onError: (error, requested) => {
-        passthroughErrorWarnCountRef.current += 1;
-        if (passthroughErrorWarnCountRef.current === 1 || passthroughErrorWarnCountRef.current % 5 === 0) {
-          console.warn('[NotchWindow] set_notch_passthrough failed; will retry', {
-            requested,
-            error,
-          });
-        }
-      },
-    });
+    passthroughControllerRef.current = createPassthroughController(
+      passthrough => invoke('set_notch_passthrough', { passthrough }),
+      {
+        retryDelayMs: PASSTHROUGH_RETRY_DELAY_MS,
+        onError: (error, requested) => {
+          passthroughErrorWarnCountRef.current += 1;
+          if (
+            passthroughErrorWarnCountRef.current === 1 ||
+            passthroughErrorWarnCountRef.current % 5 === 0
+          ) {
+            console.warn('[NotchWindow] set_notch_passthrough failed; will retry', {
+              requested,
+              error,
+            });
+          }
+        },
+      }
+    );
   }
-  const setPassthrough = (passthrough: boolean) => (
-    passthroughControllerRef.current?.set(passthrough).catch(() => undefined) ?? Promise.resolve()
-  );
-  const ensurePassthrough = (passthrough: boolean) => (
-    passthroughControllerRef.current?.ensure(passthrough).catch(() => undefined) ?? Promise.resolve()
-  );
+  const setPassthrough = (passthrough: boolean) =>
+    passthroughControllerRef.current?.set(passthrough).catch(() => undefined) ?? Promise.resolve();
+  const ensurePassthrough = (passthrough: boolean) =>
+    passthroughControllerRef.current?.ensure(passthrough).catch(() => undefined) ??
+    Promise.resolve();
 
-  useEffect(() => () => {
-    passthroughControllerRef.current?.dispose();
-  }, []);
+  useEffect(
+    () => () => {
+      passthroughControllerRef.current?.dispose();
+    },
+    []
+  );
 
   // Mark the document so the shared CSS knows to make html/body/#root transparent
   // — otherwise the light-mode `--background` color paints the whole window white
@@ -166,14 +192,14 @@ export function NotchWindow() {
 
   // Listen for state snapshots from the main window.
   useEffect(() => {
-    const un = listen<NotchStateSnapshot>(NOTCH_EVENT.state, (e) => {
+    const un = listen<NotchStateSnapshot>(NOTCH_EVENT.state, e => {
       const next = e.payload;
       const prev = prevSnapshotRef.current;
 
-      const prevToastIds = new Set((prev?.toasts ?? []).map((t) => t.id));
-      const newToasts = next.toasts.filter((t) => !prevToastIds.has(t.id));
+      const prevToastIds = new Set((prev?.toasts ?? []).map(t => t.id));
+      const newToasts = next.toasts.filter(t => !prevToastIds.has(t.id));
       const shouldAutoExpand = newToasts.some(
-        (t) => t.icon === 'permission' || t.icon === 'task' || t.type === 'error',
+        t => t.icon === 'permission' || t.icon === 'task' || t.type === 'error'
       );
 
       prevSnapshotRef.current = next;
@@ -184,7 +210,7 @@ export function NotchWindow() {
       if (shouldAutoExpand) {
         // Auto-switch to the tab of the triggering toast
         const triggerToast = newToasts.find(
-          (t) => t.icon === 'permission' || t.icon === 'task' || t.type === 'error',
+          t => t.icon === 'permission' || t.icon === 'task' || t.type === 'error'
         );
         if (triggerToast) {
           setActiveTab(triggerToast.category ?? classifyToast(triggerToast));
@@ -192,21 +218,27 @@ export function NotchWindow() {
         setIsOpen(true);
       }
     });
-    return () => { un.then((u) => u()).catch(() => undefined); };
+    return () => {
+      un.then(u => u()).catch(() => undefined);
+    };
   }, []);
 
   useEffect(() => {
     const un = listen(NOTCH_EVENT.collapse, () => {
       setIsOpen(false);
     });
-    return () => { un.then((u) => u()).catch(() => undefined); };
+    return () => {
+      un.then(u => u()).catch(() => undefined);
+    };
   }, []);
 
   useEffect(() => {
     const un = listen(NOTCH_EVENT.toggle, () => {
-      setIsOpen((v) => !v);
+      setIsOpen(v => !v);
     });
-    return () => { un.then((u) => u()).catch(() => undefined); };
+    return () => {
+      un.then(u => u()).catch(() => undefined);
+    };
   }, []);
 
   // Escape key or window blur collapses the panel.
@@ -253,7 +285,10 @@ export function NotchWindow() {
             hoverExpandTimer.current = null;
             const stillIn = await invoke<boolean>('check_notch_hover').catch(() => false);
             if (!stillIn) return;
-            if (hoverPollRef.current) { clearInterval(hoverPollRef.current); hoverPollRef.current = null; }
+            if (hoverPollRef.current) {
+              clearInterval(hoverPollRef.current);
+              hoverPollRef.current = null;
+            }
             await setPassthrough(false);
             setIsOpen(true);
           }, HOVER_EXPAND_DELAY);
@@ -263,14 +298,18 @@ export function NotchWindow() {
           clearTimeout(hoverExpandTimer.current);
           hoverExpandTimer.current = null;
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }, 50);
   };
 
   // On mount: window is at full size, enable pass-through for collapsed state.
   useEffect(() => {
     startPassthroughPolling();
-    return () => { if (hoverPollRef.current) clearInterval(hoverPollRef.current); };
+    return () => {
+      if (hoverPollRef.current) clearInterval(hoverPollRef.current);
+    };
   }, []);
 
   // Keep the native OS-window mouse policy aligned with React state. This is a
@@ -303,7 +342,10 @@ export function NotchWindow() {
 
     if (isOpen) {
       // Expanding — stop polling, ensure pass-through is off.
-      if (hoverPollRef.current) { clearInterval(hoverPollRef.current); hoverPollRef.current = null; }
+      if (hoverPollRef.current) {
+        clearInterval(hoverPollRef.current);
+        hoverPollRef.current = null;
+      }
       setPassthrough(false);
       // Non-macOS: resize window.
       invoke('resize_notch_window', { expanded: true }).catch(() => undefined);
@@ -339,7 +381,9 @@ export function NotchWindow() {
     };
 
     rafRef.current = requestAnimationFrame(tick);
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
   }, [isOpen]);
 
   // Unified auto-collapse: while open, check every few seconds whether the
@@ -355,7 +399,7 @@ export function NotchWindow() {
     const scheduleCollapseCheck = () => {
       autoCollapseTimer.current = setTimeout(() => {
         invoke<boolean>('check_notch_panel_hover')
-          .then((isPointerInsidePanel) => {
+          .then(isPointerInsidePanel => {
             if (isPointerInsidePanel) {
               scheduleCollapseCheck();
               return;
@@ -408,7 +452,7 @@ export function NotchWindow() {
     if (snapshot.toasts.length > 0) {
       const t = snapshot.toasts[0];
       const projectName = t.projectId
-        ? snapshot.projects.find((p) => p.id === t.projectId)?.name ?? null
+        ? (snapshot.projects.find(p => p.id === t.projectId)?.name ?? null)
         : null;
       return {
         title: t.title,
@@ -424,14 +468,14 @@ export function NotchWindow() {
 
   const projectNameOf = (id?: string): string | null => {
     if (!id) return null;
-    return snapshot.projects.find((p) => p.id === id)?.name ?? null;
+    return snapshot.projects.find(p => p.id === id)?.name ?? null;
   };
 
   // --- User actions (routed via events to main) ---
   const openSession = async (item: NotificationItem) => {
-    setSnapshot((s) => ({
+    setSnapshot(s => ({
       ...s,
-      items: s.items.map((i) => (i.id === item.id ? { ...i, readAt: Date.now() } : i)),
+      items: s.items.map(i => (i.id === item.id ? { ...i, readAt: Date.now() } : i)),
       unreadCount: Math.max(0, s.unreadCount - (item.readAt ? 0 : 1)),
     }));
     if (!item.readAt) {
@@ -447,24 +491,24 @@ export function NotchWindow() {
   };
 
   const dismissItem = (id: string) => {
-    setSnapshot((s) => ({ ...s, items: s.items.filter((i) => i.id !== id) }));
+    setSnapshot(s => ({ ...s, items: s.items.filter(i => i.id !== id) }));
     emit(NOTCH_EVENT.dismissItem, { id }).catch(() => undefined);
   };
 
   const markAllRead = () => {
     if (snapshot.unreadCount === 0) return;
-    setSnapshot((s) => ({
+    setSnapshot(s => ({
       ...s,
-      items: s.items.map((i) => (i.readAt ? i : { ...i, readAt: Date.now() })),
+      items: s.items.map(i => (i.readAt ? i : { ...i, readAt: Date.now() })),
       unreadCount: 0,
     }));
     emit(NOTCH_EVENT.markAllRead).catch(() => undefined);
   };
 
   const clearRead = () => {
-    const readIds = new Set(filteredItems.filter((i) => i.readAt).map((i) => i.id));
+    const readIds = new Set(filteredItems.filter(i => i.readAt).map(i => i.id));
     if (readIds.size === 0) return;
-    setSnapshot((s) => ({ ...s, items: s.items.filter((i) => !readIds.has(i.id)) }));
+    setSnapshot(s => ({ ...s, items: s.items.filter(i => !readIds.has(i.id)) }));
     for (const id of readIds) {
       emit(NOTCH_EVENT.dismissItem, { id }).catch(() => undefined);
     }
@@ -487,12 +531,12 @@ export function NotchWindow() {
 
   // Filter by active tab
   const filteredToasts = useMemo(
-    () => snapshot.toasts.filter((t) => (t.category ?? classifyToast(t)) === activeTab),
-    [snapshot.toasts, activeTab],
+    () => snapshot.toasts.filter(t => (t.category ?? classifyToast(t)) === activeTab),
+    [snapshot.toasts, activeTab]
   );
   const filteredItems = useMemo(
-    () => snapshot.items.filter((i) => classifyFeedItem(i) === activeTab),
-    [snapshot.items, activeTab],
+    () => snapshot.items.filter(i => classifyFeedItem(i) === activeTab),
+    [snapshot.items, activeTab]
   );
 
   // Per-tab unread counts — merge built-in with plugin tab counts
@@ -510,26 +554,32 @@ export function NotchWindow() {
   // Sorted plugin notch tabs
   const pluginNotchTabs = useMemo(
     () => [...(snapshot.pluginNotchTabs ?? [])].sort((a, b) => a.order - b.order),
-    [snapshot.pluginNotchTabs],
+    [snapshot.pluginNotchTabs]
   );
 
-  const hasReadItems = filteredItems.some((i) => i.readAt);
+  const hasReadItems = filteredItems.some(i => i.readAt);
 
   // --- Closed notch content: small leading glyph + title preview + badge ---
-  const closedLeading = pillPreview?.projectId && pillPreview.projectName ? (
-    <div
-      className={`w-4 h-4 rounded-full flex items-center justify-center text-white text-[9px] font-semibold ${
-        AVATAR_PALETTE[hashToIndex(pillPreview.projectId, AVATAR_PALETTE.length)]
-      }`}
-      aria-hidden
-    >
-      {firstLetter(pillPreview.projectName)}
-    </div>
-  ) : pillPreview?.icon ? (
-    <SystemIcon icon={pillPreview.icon} className="w-3 h-3 text-white/90" />
-  ) : (
-    <img src="/logo.png" alt="" className="w-4 h-4 rounded-full ring-1 ring-white/15 object-cover" draggable={false} />
-  );
+  const closedLeading =
+    pillPreview?.projectId && pillPreview.projectName ? (
+      <div
+        className={`w-4 h-4 rounded-full flex items-center justify-center text-white text-[9px] font-semibold ${
+          AVATAR_PALETTE[hashToIndex(pillPreview.projectId, AVATAR_PALETTE.length)]
+        }`}
+        aria-hidden
+      >
+        {firstLetter(pillPreview.projectName)}
+      </div>
+    ) : pillPreview?.icon ? (
+      <SystemIcon icon={pillPreview.icon} className="w-3 h-3 text-white/90" />
+    ) : (
+      <img
+        src="/logo.png"
+        alt=""
+        className="w-4 h-4 rounded-full ring-1 ring-white/15 object-cover"
+        draggable={false}
+      />
+    );
 
   const closedTrailing = snapshot.hasPendingAttention ? (
     <span className="relative w-1.5 h-1.5 flex-shrink-0">
@@ -567,7 +617,11 @@ export function NotchWindow() {
   };
 
   return (
-    <div className="w-full h-full relative" style={{ contain: 'strict' }} onMouseDown={handleBackdropMouseDown}>
+    <div
+      className="w-full h-full relative"
+      style={{ contain: 'strict' }}
+      onMouseDown={handleBackdropMouseDown}
+    >
       <div
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -584,11 +638,12 @@ export function NotchWindow() {
           viewBox={`${-outerHalfWidth} 0 ${canvasWidth} ${shapeHeight}`}
           preserveAspectRatio="none"
           style={{
-            filter: p > 0.01
-              ? (p > 0.5
-                ? 'drop-shadow(0 6px 10px rgba(0,0,0,0.12))'
-                : 'drop-shadow(0 4px 10px rgba(0,0,0,0.18))')
-              : 'none',
+            filter:
+              p > 0.01
+                ? p > 0.5
+                  ? 'drop-shadow(0 6px 10px rgba(0,0,0,0.12))'
+                  : 'drop-shadow(0 4px 10px rgba(0,0,0,0.18))'
+                : 'none',
           }}
         >
           <path ref={surfacePathRef} d={islandPath} fill="currentColor" />
@@ -598,114 +653,128 @@ export function NotchWindow() {
           className="absolute top-0 left-1/2 z-10 overflow-hidden -translate-x-1/2"
           style={{ width: shapeWidth, height: shapeHeight }}
         >
-        {/* Closed content — always rendered, opacity driven by progress */}
-        <div
-          className="absolute inset-x-0 top-0 flex h-8 translate-y-1 items-center justify-center gap-2 px-3"
-          style={{
-            opacity: closedOpacity,
-            pointerEvents: closedOpacity > 0 ? 'auto' : 'none',
-            visibility: closedOpacity > 0 ? 'visible' : 'hidden',
-          }}
-        >
-          {closedLeading}
-          <span className="text-[13px] font-semibold tracking-tight text-white truncate max-w-[150px]">
-            {pillPreview?.title ?? 'ZClaudia'}
-          </span>
-          {closedTrailing}
-        </div>
-
-        {/* Opened content — conditionally rendered to avoid ghost artifacts */}
-        {openedOpacity > 0 && (
-        <div
-          className="absolute inset-0 flex min-h-0 flex-col"
-          style={{ opacity: openedOpacity }}
-        >
-            {/* Header */}
-            <div className="relative flex min-h-11 items-start justify-end border-b border-white/[0.06] px-3 pt-3 pb-1.5 flex-shrink-0">
-              <div className="absolute left-1/2 top-3 flex -translate-x-1/2 items-center gap-2">
-                <img src="/logo.png" alt="" className="w-4 h-4 rounded-full ring-1 ring-white/15 object-cover" draggable={false} />
-                <span className="text-[13px] font-semibold tracking-tight text-white">ZClaudia</span>
-              </div>
-              <div className="flex items-center gap-1 relative z-10">
-                {hasReadItems && (
-                  <button
-                    onClick={clearRead}
-                    className="px-2 h-6 text-[11px] text-white/55 hover:text-white hover:bg-white/[0.06] rounded-md transition-colors"
-                  >
-                    Clear read
-                  </button>
-                )}
-                {(unreadCounts[activeTab] ?? 0) > 0 && (
-                  <button
-                    onClick={markAllRead}
-                    className="px-2 h-6 text-[11px] text-white/55 hover:text-white hover:bg-white/[0.06] rounded-md transition-colors"
-                  >
-                    Mark all read
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Tab bar */}
-            <NotchTabBar activeTab={activeTab} onTabChange={handleTabChange} unreadCounts={unreadCounts} pluginTabs={pluginNotchTabs} />
-
-            {/* List */}
-            <div className="flex-1 min-h-0 overflow-y-auto px-1.5 py-1.5">
-              {filteredToasts.length > 0 && (
-                <>
-                  {filteredToasts.map((t) => (
-                    <OpenedRow
-                      key={t.id}
-                      id={t.id}
-                      title={t.title}
-                      description={t.message}
-                      createdAt={t.createdAt}
-                      projectId={t.projectId}
-                      projectName={projectNameOf(t.projectId)}
-                      icon={t.icon}
-                      type={t.type}
-                      onClick={() => toastClick(t)}
-                    />
-                  ))}
-                  {filteredItems.length > 0 && (
-                    <div className="mx-3 my-1 border-t border-white/[0.04]" />
-                  )}
-                </>
-              )}
-
-              {filteredItems.length === 0 && filteredToasts.length === 0 ? (
-                <NotchEmptyState activeTab={activeTab} pluginNotchTabs={pluginNotchTabs} />
-              ) : (
-                filteredItems.map((item) => (
-                  <OpenedRow
-                    key={item.id}
-                    id={item.id}
-                    title={item.title}
-                    description={item.summary || item.error}
-                    createdAt={item.createdAt}
-                    projectId={item.projectId}
-                    projectName={projectNameOf(item.projectId)}
-                    status={item.status}
-                    isUnread={!item.readAt}
-                    onClick={() => openSession(item)}
-                    onDismiss={() => dismissItem(item.id)}
-                  />
-                ))
-              )}
-            </div>
-
-            <div className="flex items-center justify-center border-t border-white/[0.06] px-3 py-2.5 flex-shrink-0">
-              <button
-                type="button"
-                onClick={() => { setIsOpen(false); }}
-                aria-label="Collapse panel"
-                className="group relative flex h-11 min-w-[44px] items-center justify-center rounded-full px-3 text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white active:bg-white/[0.09]"
-              >
-                <CollapseChevronIcon className="h-5 w-5 transition-transform group-hover:-translate-y-0.5" />
-              </button>
-            </div>
+          {/* Closed content — always rendered, opacity driven by progress */}
+          <div
+            className="absolute inset-x-0 top-0 flex h-8 translate-y-1 items-center justify-center gap-2 px-3"
+            style={{
+              opacity: closedOpacity,
+              pointerEvents: closedOpacity > 0 ? 'auto' : 'none',
+              visibility: closedOpacity > 0 ? 'visible' : 'hidden',
+            }}
+          >
+            {closedLeading}
+            <span className="text-[13px] font-semibold tracking-tight text-white truncate max-w-[150px]">
+              {pillPreview?.title ?? 'ZClaudia'}
+            </span>
+            {closedTrailing}
           </div>
-        )}
+
+          {/* Opened content — conditionally rendered to avoid ghost artifacts */}
+          {openedOpacity > 0 && (
+            <div
+              className="absolute inset-0 flex min-h-0 flex-col"
+              style={{ opacity: openedOpacity }}
+            >
+              {/* Header */}
+              <div className="relative flex min-h-11 items-start justify-end border-b border-white/[0.06] px-3 pt-3 pb-1.5 flex-shrink-0">
+                <div className="absolute left-1/2 top-3 flex -translate-x-1/2 items-center gap-2">
+                  <img
+                    src="/logo.png"
+                    alt=""
+                    className="w-4 h-4 rounded-full ring-1 ring-white/15 object-cover"
+                    draggable={false}
+                  />
+                  <span className="text-[13px] font-semibold tracking-tight text-white">
+                    ZClaudia
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 relative z-10">
+                  {hasReadItems && (
+                    <button
+                      onClick={clearRead}
+                      className="px-2 h-6 text-[11px] text-white/55 hover:text-white hover:bg-white/[0.06] rounded-md transition-colors"
+                    >
+                      Clear read
+                    </button>
+                  )}
+                  {(unreadCounts[activeTab] ?? 0) > 0 && (
+                    <button
+                      onClick={markAllRead}
+                      className="px-2 h-6 text-[11px] text-white/55 hover:text-white hover:bg-white/[0.06] rounded-md transition-colors"
+                    >
+                      Mark all read
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Tab bar */}
+              <NotchTabBar
+                activeTab={activeTab}
+                onTabChange={handleTabChange}
+                unreadCounts={unreadCounts}
+                pluginTabs={pluginNotchTabs}
+              />
+
+              {/* List */}
+              <div className="flex-1 min-h-0 overflow-y-auto px-1.5 py-1.5">
+                {filteredToasts.length > 0 && (
+                  <>
+                    {filteredToasts.map(t => (
+                      <OpenedRow
+                        key={t.id}
+                        id={t.id}
+                        title={t.title}
+                        description={t.message}
+                        createdAt={t.createdAt}
+                        projectId={t.projectId}
+                        projectName={projectNameOf(t.projectId)}
+                        icon={t.icon}
+                        type={t.type}
+                        onClick={() => toastClick(t)}
+                      />
+                    ))}
+                    {filteredItems.length > 0 && (
+                      <div className="mx-3 my-1 border-t border-white/[0.04]" />
+                    )}
+                  </>
+                )}
+
+                {filteredItems.length === 0 && filteredToasts.length === 0 ? (
+                  <NotchEmptyState activeTab={activeTab} pluginNotchTabs={pluginNotchTabs} />
+                ) : (
+                  filteredItems.map(item => (
+                    <OpenedRow
+                      key={item.id}
+                      id={item.id}
+                      title={item.title}
+                      description={item.summary || item.error}
+                      createdAt={item.createdAt}
+                      projectId={item.projectId}
+                      projectName={projectNameOf(item.projectId)}
+                      status={item.status}
+                      isUnread={!item.readAt}
+                      onClick={() => openSession(item)}
+                      onDismiss={() => dismissItem(item.id)}
+                    />
+                  ))
+                )}
+              </div>
+
+              <div className="flex items-center justify-center border-t border-white/[0.06] px-3 py-2.5 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOpen(false);
+                  }}
+                  aria-label="Collapse panel"
+                  className="group relative flex h-11 min-w-[44px] items-center justify-center rounded-full px-3 text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white active:bg-white/[0.09]"
+                >
+                  <CollapseChevronIcon className="h-5 w-5 transition-transform group-hover:-translate-y-0.5" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

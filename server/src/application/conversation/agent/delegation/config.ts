@@ -44,7 +44,12 @@ export function appendAIReviewDebugLog(message: string): void {
   }
 }
 
-export function logAIReviewPayload(kind: 'prompt' | 'response', turn: number, sessionId: string | undefined, payload: string): void {
+export function logAIReviewPayload(
+  kind: 'prompt' | 'response',
+  turn: number,
+  sessionId: string | undefined,
+  payload: string
+): void {
   if (!AI_REVIEW_DEBUG_ENABLED) return;
   appendAIReviewDebugLog(
     [
@@ -61,14 +66,17 @@ export function logAIReviewPayload(kind: 'prompt' | 'response', turn: number, se
 export function isRateLimited(maxPerMinute: number): boolean {
   const now = Date.now();
   const oneMinuteAgo = now - 60_000;
-  while (approvalStartIdx < approvalTimestamps.length && approvalTimestamps[approvalStartIdx] < oneMinuteAgo) {
+  while (
+    approvalStartIdx < approvalTimestamps.length &&
+    approvalTimestamps[approvalStartIdx] < oneMinuteAgo
+  ) {
     approvalStartIdx++;
   }
   if (approvalStartIdx > approvalTimestamps.length / 2) {
     approvalTimestamps = approvalTimestamps.slice(approvalStartIdx);
     approvalStartIdx = 0;
   }
-  return (approvalTimestamps.length - approvalStartIdx) >= maxPerMinute;
+  return approvalTimestamps.length - approvalStartIdx >= maxPerMinute;
 }
 
 export function recordApproval(): void {
@@ -87,8 +95,9 @@ export function getDelegationConfig(
   db: { prepare: (sql: string) => { get: (...args: any[]) => Record<string, unknown> | undefined } }
 ): DelegationConfig {
   try {
-    const row = db.prepare('SELECT config FROM delegation_config WHERE id = 1')
-      .get() as { config: string } | undefined;
+    const row = db.prepare('SELECT config FROM delegation_config WHERE id = 1').get() as
+      | { config: string }
+      | undefined;
     if (!row?.config) return DEFAULT_DELEGATION_CONFIG;
     return { ...DEFAULT_DELEGATION_CONFIG, ...JSON.parse(row.config) };
   } catch {
@@ -97,11 +106,9 @@ export function getDelegationConfig(
 }
 
 /** Save delegation config to DB */
-export function saveDelegationConfig(
-  db: Database.Database,
-  config: DelegationConfig
-): void {
-  db.prepare('UPDATE delegation_config SET config = ?, updated_at = ? WHERE id = 1')
-    .run(JSON.stringify(config), Date.now());
+export function saveDelegationConfig(db: Database.Database, config: DelegationConfig): void {
+  db.prepare('UPDATE delegation_config SET config = ?, updated_at = ? WHERE id = 1').run(
+    JSON.stringify(config),
+    Date.now()
+  );
 }
-

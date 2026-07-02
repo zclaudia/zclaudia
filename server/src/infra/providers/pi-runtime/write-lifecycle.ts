@@ -32,11 +32,15 @@ export interface WriteLifecycleResult {
 }
 
 export interface WriteLifecycleHooks {
-  afterWrite?(input: WriteLifecycleInput): Promise<WriteLifecycleResult | void> | WriteLifecycleResult | void;
+  afterWrite?(
+    input: WriteLifecycleInput
+  ): Promise<WriteLifecycleResult | void> | WriteLifecycleResult | void;
   timeoutMs?: number;
 }
 
-export type WriteDiagnosticsProvider = (input: WriteLifecycleInput) => Promise<WriteLifecycleDiagnostic[]> | WriteLifecycleDiagnostic[];
+export type WriteDiagnosticsProvider = (
+  input: WriteLifecycleInput
+) => Promise<WriteLifecycleDiagnostic[]> | WriteLifecycleDiagnostic[];
 
 export type DiagnosticsMode = 'inline' | 'deferred';
 
@@ -58,15 +62,19 @@ function failureResult(code: string, message: string): WriteLifecycleResult {
 
 export async function runWriteLifecycle(
   hooks: WriteLifecycleHooks | undefined,
-  input: WriteLifecycleInput,
+  input: WriteLifecycleInput
 ): Promise<WriteLifecycleResult | undefined> {
   if (!hooks?.afterWrite) return undefined;
   try {
     const timeoutMs = Math.max(1, hooks.timeoutMs ?? DEFAULT_WRITE_LIFECYCLE_TIMEOUT_MS);
     const result = await Promise.race([
       Promise.resolve(hooks.afterWrite(input)),
-      new Promise<WriteLifecycleResult>((resolve) => {
-        setTimeout(() => resolve(failureResult('write_lifecycle_timeout', `afterWrite exceeded ${timeoutMs}ms`)), timeoutMs);
+      new Promise<WriteLifecycleResult>(resolve => {
+        setTimeout(
+          () =>
+            resolve(failureResult('write_lifecycle_timeout', `afterWrite exceeded ${timeoutMs}ms`)),
+          timeoutMs
+        );
       }),
     ]);
     return result ?? undefined;
@@ -78,22 +86,32 @@ export async function runWriteLifecycle(
 
 export function mergeWriteLifecycleResults(
   first: WriteLifecycleResult | undefined,
-  second: WriteLifecycleResult | undefined,
+  second: WriteLifecycleResult | undefined
 ): WriteLifecycleResult | undefined {
   if (!first) return second;
   if (!second) return first;
   return {
-    ...(first.diagnostics || second.diagnostics ? { diagnostics: [...(first.diagnostics ?? []), ...(second.diagnostics ?? [])] } : {}),
-    ...(first.notifications || second.notifications ? { notifications: [...(first.notifications ?? []), ...(second.notifications ?? [])] } : {}),
-    ...(first.warnings || second.warnings ? { warnings: [...(first.warnings ?? []), ...(second.warnings ?? [])] } : {}),
-    ...(first.errors || second.errors ? { errors: [...(first.errors ?? []), ...(second.errors ?? [])] } : {}),
-    ...(first.deferredDiagnostics || second.deferredDiagnostics ? { deferredDiagnostics: first.deferredDiagnostics ?? second.deferredDiagnostics } : {}),
+    ...(first.diagnostics || second.diagnostics
+      ? { diagnostics: [...(first.diagnostics ?? []), ...(second.diagnostics ?? [])] }
+      : {}),
+    ...(first.notifications || second.notifications
+      ? { notifications: [...(first.notifications ?? []), ...(second.notifications ?? [])] }
+      : {}),
+    ...(first.warnings || second.warnings
+      ? { warnings: [...(first.warnings ?? []), ...(second.warnings ?? [])] }
+      : {}),
+    ...(first.errors || second.errors
+      ? { errors: [...(first.errors ?? []), ...(second.errors ?? [])] }
+      : {}),
+    ...(first.deferredDiagnostics || second.deferredDiagnostics
+      ? { deferredDiagnostics: first.deferredDiagnostics ?? second.deferredDiagnostics }
+      : {}),
   };
 }
 
 export async function runDiagnosticsProvider(
   provider: WriteDiagnosticsProvider | undefined,
-  input: WriteLifecycleInput,
+  input: WriteLifecycleInput
 ): Promise<WriteLifecycleResult | undefined> {
   if (!provider) return undefined;
   try {
@@ -107,18 +125,21 @@ export async function runDiagnosticsProvider(
 
 export function scheduleDeferredDiagnostics(
   provider: WriteDiagnosticsProvider | undefined,
-  input: WriteLifecycleInput,
+  input: WriteLifecycleInput
 ): WriteLifecycleResult | undefined {
   if (!provider) return undefined;
   const id = randomUUID();
   deferredDiagnostics.set(id, { status: 'pending' });
   Promise.resolve()
     .then(() => provider(input))
-    .then((diagnostics) => {
+    .then(diagnostics => {
       deferredDiagnostics.set(id, { status: 'completed', diagnostics });
     })
-    .catch((err) => {
-      deferredDiagnostics.set(id, { status: 'failed', error: err instanceof Error ? err.message : String(err) });
+    .catch(err => {
+      deferredDiagnostics.set(id, {
+        status: 'failed',
+        error: err instanceof Error ? err.message : String(err),
+      });
     });
   return { deferredDiagnostics: { id, status: 'pending' } };
 }

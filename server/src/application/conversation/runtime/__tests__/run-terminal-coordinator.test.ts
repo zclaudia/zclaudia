@@ -5,7 +5,11 @@ import { RunDomainEventListenerRegistry } from '../run-domain-event-listeners.js
 const upsertAssistantMessageMock = vi.fn();
 const cleanupPendingPermissionsMock = vi.fn();
 const clearSessionMock = vi.fn();
-const maybeCompactMock = vi.fn(async () => ({ outcome: 'skipped', compacted: false, reason: 'below_threshold' }));
+const maybeCompactMock = vi.fn(async () => ({
+  outcome: 'skipped',
+  compacted: false,
+  reason: 'below_threshold',
+}));
 const pluginEventsEmitMock = vi.fn(async () => {});
 
 vi.mock('../run-lifecycle.js', () => ({
@@ -61,7 +65,14 @@ describe('run terminal coordinator', () => {
     const sendRunEvent = vi.fn();
     const broadcastHeartbeat = vi.fn();
     const notificationsService = { postItem: vi.fn() };
-    const usage = { input: 1, output: 2, cacheRead: 0, cacheWrite: 0, totalTokens: 3, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
+    const usage = {
+      input: 1,
+      output: 2,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 3,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    };
     const listeners = new RunDomainEventListenerRegistry();
     const runCompletedListener = vi.fn();
     listeners.on('run.completed', runCompletedListener);
@@ -91,19 +102,23 @@ describe('run terminal coordinator', () => {
       usage,
       indexMetadata: true,
     });
-    expect(sendRunEvent).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'run_completed',
-      runId: 'run-1',
-      sessionId: 'session-1',
-      usage,
-    }));
+    expect(sendRunEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'run_completed',
+        runId: 'run-1',
+        sessionId: 'session-1',
+        usage,
+      })
+    );
     expect(activeRun.phase).toBe('completed');
-    expect(runCompletedListener).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'run.completed',
-      runId: 'run-1',
-      sessionId: 'session-1',
-      payload: { usage },
-    }));
+    expect(runCompletedListener).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'run.completed',
+        runId: 'run-1',
+        sessionId: 'session-1',
+        payload: { usage },
+      })
+    );
     expect(broadcastHeartbeat).toHaveBeenCalled();
     expect(notificationsService.postItem).toHaveBeenCalled();
     expect(sendRunEvent).toHaveBeenCalledWith({
@@ -114,7 +129,14 @@ describe('run terminal coordinator', () => {
   });
 
   it('emits compaction event before run_completed when auto compaction succeeds', async () => {
-    const usage = { input: 1, output: 2, cacheRead: 0, cacheWrite: 0, totalTokens: 3, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
+    const usage = {
+      input: 1,
+      output: 2,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 3,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    };
     const activeRun = buildRun({
       agentProfile: { id: 'agent-1', model: 'model-1' },
       llmProfile: { id: 'llm-1', providerType: 'zclaudia', models: [] },
@@ -155,20 +177,31 @@ describe('run terminal coordinator', () => {
     });
     const eventTypes = sendRunEvent.mock.calls.map(([event]) => event.type);
     expect(eventTypes.indexOf('compaction_completed')).toBeGreaterThanOrEqual(0);
-    expect(eventTypes.indexOf('compaction_completed')).toBeLessThan(eventTypes.indexOf('run_completed'));
-    expect(compactionCompletedListener).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'compaction.completed',
-      runId: 'run-1',
-      sessionId: 'session-1',
-      payload: {
-        compactionId: 'compaction-1',
-        tokensBefore: 1234,
-      },
-    }));
+    expect(eventTypes.indexOf('compaction_completed')).toBeLessThan(
+      eventTypes.indexOf('run_completed')
+    );
+    expect(compactionCompletedListener).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'compaction.completed',
+        runId: 'run-1',
+        sessionId: 'session-1',
+        payload: {
+          compactionId: 'compaction-1',
+          tokensBefore: 1234,
+        },
+      })
+    );
   });
 
   it('emits compaction.failed domain event before run_completed when auto compaction fails', async () => {
-    const usage = { input: 1, output: 2, cacheRead: 0, cacheWrite: 0, totalTokens: 3, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
+    const usage = {
+      input: 1,
+      output: 2,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 3,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    };
     const activeRun = buildRun({
       agentProfile: { id: 'agent-1', model: 'model-1' },
       llmProfile: { id: 'llm-1', providerType: 'zclaudia', models: [] },
@@ -212,17 +245,21 @@ describe('run terminal coordinator', () => {
     });
     const eventTypes = sendRunEvent.mock.calls.map(([event]) => event.type);
     expect(eventTypes.indexOf('compaction_failed')).toBeGreaterThanOrEqual(0);
-    expect(eventTypes.indexOf('compaction_failed')).toBeLessThan(eventTypes.indexOf('run_completed'));
-    expect(compactionFailedListener).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'compaction.failed',
-      runId: 'run-1',
-      sessionId: 'session-1',
-      payload: {
-        reason: 'summarizer unavailable',
-        breakerOpen: true,
-        nextRetryAtMs: 4567,
-      },
-    }));
+    expect(eventTypes.indexOf('compaction_failed')).toBeLessThan(
+      eventTypes.indexOf('run_completed')
+    );
+    expect(compactionFailedListener).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'compaction.failed',
+        runId: 'run-1',
+        sessionId: 'session-1',
+        payload: {
+          reason: 'summarizer unavailable',
+          breakerOpen: true,
+          nextRetryAtMs: 4567,
+        },
+      })
+    );
   });
 
   it('fails provider turns with persistence, wire event, plugin event, cleanup, and notification', async () => {
@@ -262,24 +299,36 @@ describe('run terminal coordinator', () => {
       errorCode: 'BAD_MODEL',
     });
     expect(activeRun.phase).toBe('failed');
-    expect(runFailedListener).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'run.failed',
-      runId: 'run-1',
-      sessionId: 'session-1',
-      payload: {
-        error: 'formatted provider error',
-        errorCode: 'BAD_MODEL',
-      },
-    }));
+    expect(runFailedListener).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'run.failed',
+        runId: 'run-1',
+        sessionId: 'session-1',
+        payload: {
+          error: 'formatted provider error',
+          errorCode: 'BAD_MODEL',
+        },
+      })
+    );
     expect(broadcastHeartbeat).toHaveBeenCalled();
     expect(notificationsService.postItem).toHaveBeenCalled();
     expect(clearSessionMock).toHaveBeenCalledWith('session-1');
-    expect(cleanupPendingPermissionsMock).toHaveBeenCalledWith(activeRun, 'formatted provider error');
+    expect(cleanupPendingPermissionsMock).toHaveBeenCalledWith(
+      activeRun,
+      'formatted provider error'
+    );
     expect(activeRuns.has('run-1')).toBe(false);
   });
 
   it('does not emit duplicate run.completed domain events for already terminal runs', async () => {
-    const usage = { input: 1, output: 2, cacheRead: 0, cacheWrite: 0, totalTokens: 3, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
+    const usage = {
+      input: 1,
+      output: 2,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 3,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    };
     const activeRun = buildRun({ phase: 'completed' });
     const listeners = new RunDomainEventListenerRegistry();
     const runCompletedListener = vi.fn();
@@ -305,10 +354,12 @@ describe('run terminal coordinator', () => {
       listeners,
     });
 
-    expect(sendRunEvent).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'run_completed',
-      usage,
-    }));
+    expect(sendRunEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'run_completed',
+        usage,
+      })
+    );
     expect(runCompletedListener).not.toHaveBeenCalled();
   });
 });

@@ -38,17 +38,23 @@ export function AutomationContent({ tab, projectId, backendId }: AutomationConte
 
   useEffect(() => {
     setProjects([]);
-    api.get('/api/projects').then((projectData) => {
-      setProjects(projectData);
-    }).catch(() => {});
+    api
+      .get('/api/projects')
+      .then(projectData => {
+        setProjects(projectData);
+      })
+      .catch(() => {});
   }, [api]);
 
-  const projectName = useCallback((id?: string) => {
-    if (!id) return 'Global';
-    const project = projects.find(p => p.id === id);
-    if (!project) return id.slice(0, 8);
-    return isInternalProject(project.name) ? 'Global' : project.name;
-  }, [projects]);
+  const projectName = useCallback(
+    (id?: string) => {
+      if (!id) return 'Global';
+      const project = projects.find(p => p.id === id);
+      if (!project) return id.slice(0, 8);
+      return isInternalProject(project.name) ? 'Global' : project.name;
+    },
+    [projects]
+  );
 
   const meta = TAB_META[tab];
   const scopeKey = backendId || 'fallback';
@@ -82,9 +88,7 @@ export function AutomationContent({ tab, projectId, backendId }: AutomationConte
             projectId={projectId}
           />
         )}
-        {tab === 'runs' && (
-          <RunsTab key={`runs-${scopeKey}`} api={api} projectId={projectId} />
-        )}
+        {tab === 'runs' && <RunsTab key={`runs-${scopeKey}`} api={api} projectId={projectId} />}
         {tab === 'system' && <SystemTasksTab key={`system-${scopeKey}`} api={api} />}
       </div>
     </div>

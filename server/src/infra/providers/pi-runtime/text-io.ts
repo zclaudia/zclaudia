@@ -55,7 +55,11 @@ export function decodeTextBuffer(buffer: Buffer): TextFileMetadata {
   };
 }
 
-function encodeTextContent(content: string, encoding: TextEncoding, hasBom: boolean): Buffer | string {
+function encodeTextContent(
+  content: string,
+  encoding: TextEncoding,
+  hasBom: boolean
+): Buffer | string {
   if (encoding === 'utf16le') {
     const withBom = hasBom ? `\ufeff${content}` : content;
     return Buffer.from(withBom, 'utf16le');
@@ -71,11 +75,26 @@ export async function readTextFileWithMetadata(filePath: string): Promise<TextFi
   };
 }
 
-export async function writeTextFileAtomic(filePath: string, content: string, metadata?: Pick<TextFileMetadata, 'encoding' | 'hasBom' | 'mode'>): Promise<void> {
-  const tempPath = path.join(path.dirname(filePath), `.${path.basename(filePath)}.${process.pid}.${randomUUID()}.tmp`);
-  const encoded = encodeTextContent(content, metadata?.encoding ?? 'utf8', metadata?.hasBom ?? false);
+export async function writeTextFileAtomic(
+  filePath: string,
+  content: string,
+  metadata?: Pick<TextFileMetadata, 'encoding' | 'hasBom' | 'mode'>
+): Promise<void> {
+  const tempPath = path.join(
+    path.dirname(filePath),
+    `.${path.basename(filePath)}.${process.pid}.${randomUUID()}.tmp`
+  );
+  const encoded = encodeTextContent(
+    content,
+    metadata?.encoding ?? 'utf8',
+    metadata?.hasBom ?? false
+  );
   try {
-    await writeFile(tempPath, encoded, metadata?.mode !== undefined ? { mode: metadata.mode } : undefined);
+    await writeFile(
+      tempPath,
+      encoded,
+      metadata?.mode !== undefined ? { mode: metadata.mode } : undefined
+    );
     if (metadata?.mode !== undefined) await chmod(tempPath, metadata.mode);
     await rename(tempPath, filePath);
   } catch (err) {
@@ -89,7 +108,10 @@ export async function writeTextFileAtomic(filePath: string, content: string, met
 // separate chmod. Returns true only when the mode actually changed; any failure
 // (read-only mount, Windows ACL) is swallowed — making the file executable is a
 // convenience, not a contract.
-export async function maybeMarkExecutableForShebang(filePath: string, content: string): Promise<boolean> {
+export async function maybeMarkExecutableForShebang(
+  filePath: string,
+  content: string
+): Promise<boolean> {
   if (!content.startsWith('#!')) return false;
   try {
     const fileStat = await stat(filePath);
@@ -103,7 +125,10 @@ export async function maybeMarkExecutableForShebang(filePath: string, content: s
   }
 }
 
-export function truncateToolResultContent(content: string, limit = TOOL_RESULT_CONTENT_LIMIT): { content: string; truncated: boolean } {
+export function truncateToolResultContent(
+  content: string,
+  limit = TOOL_RESULT_CONTENT_LIMIT
+): { content: string; truncated: boolean } {
   if (content.length <= limit) return { content, truncated: false };
   return {
     content: `${content.slice(0, limit)}\n... [truncated ${content.length - limit} chars]`,
@@ -111,11 +136,15 @@ export function truncateToolResultContent(content: string, limit = TOOL_RESULT_C
   };
 }
 
-export function buildContentDetailFields(originalContent: string | null, updatedContent: string): ContentDetailFields {
+export function buildContentDetailFields(
+  originalContent: string | null,
+  updatedContent: string
+): ContentDetailFields {
   const updated = truncateToolResultContent(updatedContent);
-  const original = originalContent === null
-    ? { content: null, truncated: false }
-    : truncateToolResultContent(originalContent);
+  const original =
+    originalContent === null
+      ? { content: null, truncated: false }
+      : truncateToolResultContent(originalContent);
   const contentTruncated = {
     ...(original.truncated ? { originalContent: true } : {}),
     ...(updated.truncated ? { updatedContent: true } : {}),

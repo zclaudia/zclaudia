@@ -1,13 +1,19 @@
 import { GOAL_DEFAULTS } from '@zclaudia/shared';
-import type { Goal, GoalStatus, SetGoalInput, EvaluatorVerdictKind, GoalEventPublisher } from './types.js';
-import { GoalRepository } from './repository.js';
+import type {
+  Goal,
+  GoalStatus,
+  SetGoalInput,
+  EvaluatorVerdictKind,
+  GoalEventPublisher,
+} from './types.js';
+import { type GoalRepository } from './repository.js';
 
 const TERMINAL_STATUSES: GoalStatus[] = ['completed', 'budget-limited', 'aborted'];
 
 export class GoalService {
   constructor(
     private readonly repo: GoalRepository,
-    private readonly events: GoalEventPublisher,
+    private readonly events: GoalEventPublisher
   ) {}
 
   get(id: string): Goal | null {

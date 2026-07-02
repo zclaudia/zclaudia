@@ -94,15 +94,18 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
     }
   }, [newSkillId, newSkillContent, loadData]);
 
-  const handleDeleteSkill = useCallback(async (skillId: string, skillName: string) => {
-    if (!confirm(`Delete skill "${skillName}"?`)) return;
-    try {
-      await api.deleteWorkspaceSkill(skillId);
-      await loadData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete skill');
-    }
-  }, [loadData]);
+  const handleDeleteSkill = useCallback(
+    async (skillId: string, skillName: string) => {
+      if (!confirm(`Delete skill "${skillName}"?`)) return;
+      try {
+        await api.deleteWorkspaceSkill(skillId);
+        await loadData();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to delete skill');
+      }
+    },
+    [loadData]
+  );
 
   const handleAddDir = useCallback(async () => {
     const trimmed = newDirPath.trim();
@@ -118,16 +121,19 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
     }
   }, [newDirPath, externalDirs, loadData]);
 
-  const handleRemoveDir = useCallback(async (dir: string) => {
-    try {
-      const updated = externalDirs.filter(d => d !== dir);
-      await api.saveExternalSkillDirs(updated);
-      setExternalDirs(updated);
-      await loadData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to remove directory');
-    }
-  }, [externalDirs, loadData]);
+  const handleRemoveDir = useCallback(
+    async (dir: string) => {
+      try {
+        const updated = externalDirs.filter(d => d !== dir);
+        await api.saveExternalSkillDirs(updated);
+        setExternalDirs(updated);
+        await loadData();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to remove directory');
+      }
+    },
+    [externalDirs, loadData]
+  );
 
   if (isLoading && skills.length === 0) {
     return (
@@ -138,9 +144,11 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
     );
   }
 
-  const workspaceSkillCount = skills.filter((skill) => (skill.source ?? 'workspace') === 'workspace').length;
+  const workspaceSkillCount = skills.filter(
+    skill => (skill.source ?? 'workspace') === 'workspace'
+  ).length;
   const externalSkillCount = skills.length - workspaceSkillCount;
-  const filteredSkills = skills.filter((skill) => {
+  const filteredSkills = skills.filter(skill => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return true;
     const haystack = [
@@ -157,7 +165,10 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
       ...(skill.metadata?.shellSnippets ?? []),
       ...(skill.metadata?.hookTriggers?.tools ?? []),
       ...(skill.metadata?.hookTriggers?.paths ?? []),
-    ].filter(Boolean).join(' ').toLowerCase();
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
     return haystack.includes(query);
   });
 
@@ -168,14 +179,27 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
         <div className="bg-secondary/50 border border-border/50 rounded-lg p-4 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              <svg
+                className="w-4 h-4 text-muted-foreground"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                />
               </svg>
               <span className="font-medium text-sm">{editingSkillId}</span>
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => { setEditingSkillId(null); setEditContent(''); }}
+                onClick={() => {
+                  setEditingSkillId(null);
+                  setEditContent('');
+                }}
                 className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 Cancel
@@ -191,7 +215,7 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
           </div>
           <textarea
             value={editContent}
-            onChange={(e) => setEditContent(e.target.value)}
+            onChange={e => setEditContent(e.target.value)}
             className="w-full h-80 px-3 py-2 text-sm font-mono bg-secondary/50 border border-border rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-primary/50"
             spellCheck={false}
           />
@@ -211,24 +235,32 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
             stroke="currentColor"
             viewBox="0 0 24 24"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
           </svg>
           <input
             type="text"
             placeholder="Search skills..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={e => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2 bg-secondary/50 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
         </div>
         {!readOnly && (
-        <button
-          type="button"
-          onClick={() => { setShowNewForm(true); setEditingSkillId(null); }}
-          className="px-3 py-2 text-sm bg-muted/60 text-foreground rounded-lg hover:bg-muted whitespace-nowrap transition-colors"
-        >
-          + Add
-        </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowNewForm(true);
+              setEditingSkillId(null);
+            }}
+            className="px-3 py-2 text-sm bg-muted/60 text-foreground rounded-lg hover:bg-muted whitespace-nowrap transition-colors"
+          >
+            + Add
+          </button>
         )}
       </div>
 
@@ -251,7 +283,12 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
       {error && (
         <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
           <p className="text-red-400 text-sm">{error}</p>
-          <button onClick={() => setError(null)} className="text-xs text-red-400/70 hover:text-red-400 mt-1">dismiss</button>
+          <button
+            onClick={() => setError(null)}
+            className="text-xs text-red-400/70 hover:text-red-400 mt-1"
+          >
+            dismiss
+          </button>
         </div>
       )}
 
@@ -263,7 +300,10 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
           </div>
           <div className="space-y-1">
             {diagnostics.slice(0, 4).map((diagnostic, index) => (
-              <div key={`${diagnostic.path}:${diagnostic.code}:${index}`} className="text-xs text-amber-100/90">
+              <div
+                key={`${diagnostic.path}:${diagnostic.code}:${index}`}
+                className="text-xs text-amber-100/90"
+              >
                 <span className="font-medium">{diagnostic.code}</span>
                 <span className="text-amber-100/60"> ({diagnostic.source}) </span>
                 <span>{diagnostic.message}</span>
@@ -283,23 +323,29 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
               type="text"
               placeholder="e.g. my-skill"
               value={newSkillId}
-              onChange={(e) => setNewSkillId(e.target.value)}
+              onChange={e => setNewSkillId(e.target.value)}
               className="w-full px-3 py-1.5 text-sm bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono"
             />
           </div>
           <div>
             <label className="block text-xs text-muted-foreground mb-1">SKILL.md Content *</label>
             <textarea
-              placeholder={"---\nname: My Skill\ndescription: What this skill does\n---\n\n# My Skill\n\nInstructions here..."}
+              placeholder={
+                '---\nname: My Skill\ndescription: What this skill does\n---\n\n# My Skill\n\nInstructions here...'
+              }
               value={newSkillContent}
-              onChange={(e) => setNewSkillContent(e.target.value)}
+              onChange={e => setNewSkillContent(e.target.value)}
               className="w-full h-40 px-3 py-2 text-sm font-mono bg-secondary/50 border border-border rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-primary/50"
               spellCheck={false}
             />
           </div>
           <div className="flex gap-2 justify-end">
             <button
-              onClick={() => { setShowNewForm(false); setNewSkillId(''); setNewSkillContent(''); }}
+              onClick={() => {
+                setShowNewForm(false);
+                setNewSkillId('');
+                setNewSkillContent('');
+              }}
               className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               Cancel
@@ -324,10 +370,17 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
             stroke="currentColor"
             viewBox="0 0 24 24"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+            />
           </svg>
           <p className="text-muted-foreground text-sm">No skills configured</p>
-          <p className="text-muted-foreground/70 text-xs mt-1">Add a skill or configure an external directory</p>
+          <p className="text-muted-foreground/70 text-xs mt-1">
+            Add a skill or configure an external directory
+          </p>
         </div>
       ) : filteredSkills.length === 0 ? (
         <div className="text-center py-8">
@@ -344,9 +397,13 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
             const isEligible = skill.eligible !== false;
             const requirementSummary = [
               skill.requirements?.os?.length ? `os: ${skill.requirements.os.join(', ')}` : '',
-              skill.requirements?.binaries?.length ? `bin: ${skill.requirements.binaries.join(', ')}` : '',
+              skill.requirements?.binaries?.length
+                ? `bin: ${skill.requirements.binaries.join(', ')}`
+                : '',
               skill.requirements?.env?.length ? `env: ${skill.requirements.env.join(', ')}` : '',
-            ].filter(Boolean).join(' | ');
+            ]
+              .filter(Boolean)
+              .join(' | ');
 
             return (
               <div
@@ -359,17 +416,31 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
                     <span className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-green-500/20 text-green-400">
                       {isEligible ? 'Eligible' : 'Blocked'}
                     </span>
-                    <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium ${
-                      isWorkspace ? 'bg-blue-500/10 text-blue-400' : 'bg-purple-500/10 text-purple-400'
-                    }`}>
+                    <span
+                      className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium ${
+                        isWorkspace
+                          ? 'bg-blue-500/10 text-blue-400'
+                          : 'bg-purple-500/10 text-purple-400'
+                      }`}
+                    >
                       {source[0].toUpperCase() + source.slice(1)}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground truncate mt-0.5">{displayDesc}</p>
                   {skill.metadata?.whenToUse && (
-                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">When: {skill.metadata.whenToUse}</p>
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                      When: {skill.metadata.whenToUse}
+                    </p>
                   )}
-                  {(skill.metadata?.allowedTools?.length || skill.metadata?.paths?.length || skill.metadata?.arguments?.length || skill.metadata?.argumentHint || skill.metadata?.snippets?.length || skill.metadata?.shellSnippets?.length || skill.metadata?.hookTriggers?.tools?.length || skill.metadata?.hookTriggers?.paths?.length || requirementSummary) && (
+                  {(skill.metadata?.allowedTools?.length ||
+                    skill.metadata?.paths?.length ||
+                    skill.metadata?.arguments?.length ||
+                    skill.metadata?.argumentHint ||
+                    skill.metadata?.snippets?.length ||
+                    skill.metadata?.shellSnippets?.length ||
+                    skill.metadata?.hookTriggers?.tools?.length ||
+                    skill.metadata?.hookTriggers?.paths?.length ||
+                    requirementSummary) && (
                     <div className="mt-1 flex flex-wrap gap-1">
                       {skill.metadata?.argumentHint && (
                         <span className="px-1.5 py-0.5 rounded bg-muted/60 text-[10px] text-primary">
@@ -381,33 +452,51 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
                           args {skill.metadata.arguments.join(' ')}
                         </span>
                       ) : null}
-                      {skill.metadata?.allowedTools?.map((tool) => (
-                        <span key={`tool:${tool}`} className="px-1.5 py-0.5 rounded bg-secondary text-[10px] text-muted-foreground">
+                      {skill.metadata?.allowedTools?.map(tool => (
+                        <span
+                          key={`tool:${tool}`}
+                          className="px-1.5 py-0.5 rounded bg-secondary text-[10px] text-muted-foreground"
+                        >
                           {tool}
                         </span>
                       ))}
-                      {skill.metadata?.paths?.map((skillPath) => (
-                        <span key={`path:${skillPath}`} className="px-1.5 py-0.5 rounded bg-secondary text-[10px] text-muted-foreground font-mono">
+                      {skill.metadata?.paths?.map(skillPath => (
+                        <span
+                          key={`path:${skillPath}`}
+                          className="px-1.5 py-0.5 rounded bg-secondary text-[10px] text-muted-foreground font-mono"
+                        >
                           {skillPath}
                         </span>
                       ))}
-                      {skill.metadata?.snippets?.map((snippet) => (
-                        <span key={`snippet:${snippet}`} className="px-1.5 py-0.5 rounded bg-muted/60 text-[10px] text-primary">
+                      {skill.metadata?.snippets?.map(snippet => (
+                        <span
+                          key={`snippet:${snippet}`}
+                          className="px-1.5 py-0.5 rounded bg-muted/60 text-[10px] text-primary"
+                        >
                           snippet {snippet}
                         </span>
                       ))}
-                      {skill.metadata?.shellSnippets?.map((snippet) => (
-                        <span key={`shell:${snippet}`} className="px-1.5 py-0.5 rounded bg-secondary text-[10px] text-muted-foreground font-mono">
+                      {skill.metadata?.shellSnippets?.map(snippet => (
+                        <span
+                          key={`shell:${snippet}`}
+                          className="px-1.5 py-0.5 rounded bg-secondary text-[10px] text-muted-foreground font-mono"
+                        >
                           shell {snippet}
                         </span>
                       ))}
-                      {skill.metadata?.hookTriggers?.tools?.map((tool) => (
-                        <span key={`hook-tool:${tool}`} className="px-1.5 py-0.5 rounded bg-purple-500/10 text-[10px] text-purple-300">
+                      {skill.metadata?.hookTriggers?.tools?.map(tool => (
+                        <span
+                          key={`hook-tool:${tool}`}
+                          className="px-1.5 py-0.5 rounded bg-purple-500/10 text-[10px] text-purple-300"
+                        >
                           hook tool {tool}
                         </span>
                       ))}
-                      {skill.metadata?.hookTriggers?.paths?.map((skillPath) => (
-                        <span key={`hook-path:${skillPath}`} className="px-1.5 py-0.5 rounded bg-purple-500/10 text-[10px] text-purple-300 font-mono">
+                      {skill.metadata?.hookTriggers?.paths?.map(skillPath => (
+                        <span
+                          key={`hook-path:${skillPath}`}
+                          className="px-1.5 py-0.5 rounded bg-purple-500/10 text-[10px] text-purple-300 font-mono"
+                        >
                           hook path {skillPath}
                         </span>
                       ))}
@@ -418,7 +507,9 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
                       )}
                     </div>
                   )}
-                  <p className="text-xs text-muted-foreground/50 font-mono mt-0.5">{source}/{skillId}</p>
+                  <p className="text-xs text-muted-foreground/50 font-mono mt-0.5">
+                    {source}/{skillId}
+                  </p>
                 </div>
                 {!readOnly && isWorkspace && (
                   <div className="flex items-center gap-1 shrink-0">
@@ -428,8 +519,18 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
                       className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
                       title="Edit"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                        />
                       </svg>
                     </button>
                     <button
@@ -438,8 +539,18 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
                       className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-red-400 transition-colors"
                       title="Delete"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
                       </svg>
                     </button>
                   </div>
@@ -456,7 +567,8 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
           <h4 className="text-sm font-medium">External Directories</h4>
         </div>
         <p className="text-xs text-muted-foreground">
-          Directories with SKILL.md files are auto-discovered and available to agents through SearchSkills and LoadSkill.
+          Directories with SKILL.md files are auto-discovered and available to agents through
+          SearchSkills and LoadSkill.
         </p>
 
         {externalDirs.length > 0 && (
@@ -466,21 +578,36 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
                 key={dir}
                 className="p-3 bg-secondary/50 rounded-lg border border-border/50 hover:border-border transition-colors flex items-center gap-3"
               >
-                <svg className="w-4 h-4 text-muted-foreground shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                <svg
+                  className="w-4 h-4 text-muted-foreground shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                  />
                 </svg>
                 <span className="text-sm font-mono truncate flex-1 min-w-0">{dir}</span>
                 {!readOnly && (
-                <button
-                  type="button"
-                  onClick={() => handleRemoveDir(dir)}
-                  className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-red-400 transition-colors shrink-0"
-                  title="Remove"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveDir(dir)}
+                    className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-red-400 transition-colors shrink-0"
+                    title="Remove"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
                 )}
               </div>
             ))}
@@ -488,23 +615,23 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
         )}
 
         {!readOnly && (
-        <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="/path/to/skills/directory"
-            value={newDirPath}
-            onChange={(e) => setNewDirPath(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleAddDir()}
-            className="flex-1 px-3 py-1.5 text-sm font-mono bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
-          />
-          <button
-            onClick={handleAddDir}
-            disabled={!newDirPath.trim()}
-            className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground disabled:opacity-50 whitespace-nowrap transition-colors"
-          >
-            + Add
-          </button>
-        </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="/path/to/skills/directory"
+              value={newDirPath}
+              onChange={e => setNewDirPath(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAddDir()}
+              className="flex-1 px-3 py-1.5 text-sm font-mono bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
+            />
+            <button
+              onClick={handleAddDir}
+              disabled={!newDirPath.trim()}
+              className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground disabled:opacity-50 whitespace-nowrap transition-colors"
+            >
+              + Add
+            </button>
+          </div>
         )}
       </div>
     </div>

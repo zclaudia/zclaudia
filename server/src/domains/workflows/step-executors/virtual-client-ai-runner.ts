@@ -14,7 +14,10 @@ export class VirtualClientAIRunner implements AIRunnerPort {
   private sessionRepo: SessionRepository;
   private aiRunPort: WorkflowAiRunPort;
 
-  constructor(private db: Database, aiRunPort?: WorkflowAiRunPort) {
+  constructor(
+    private db: Database,
+    aiRunPort?: WorkflowAiRunPort
+  ) {
     this.sessionRepo = new SessionRepository(db);
     this.aiRunPort = aiRunPort ?? {
       startVirtualRun: () => {
@@ -37,21 +40,23 @@ export class VirtualClientAIRunner implements AIRunnerPort {
       throw new Error('VirtualClientAIRunner.runPrompt: projectId is required');
     }
     // opts.llmProfileId used downstream for AI dispatch; agentProfileId auto-resolved by SessionRepository.
-    const sessionId = opts.sessionId ?? this.sessionRepo.create({
-      projectId: opts.projectId!,
-      name: opts.sessionName ?? 'Workflow AI',
-      type: 'background',
-      projectRole: 'workflow',
-      workingDirectory: opts.workingDirectory,
-    }).id;
+    const sessionId =
+      opts.sessionId ??
+      this.sessionRepo.create({
+        projectId: opts.projectId!,
+        name: opts.sessionName ?? 'Workflow AI',
+        type: 'background',
+        projectRole: 'workflow',
+        workingDirectory: opts.workingDirectory,
+      }).id;
 
     if (!opts.sessionId) {
       opts.onSessionCreated?.(sessionId);
     }
 
-    const before = this.db.prepare(
-      'SELECT COALESCE(MAX(rowid), 0) AS rowid FROM messages WHERE session_id = ?'
-    ).get(sessionId) as { rowid: number } | undefined;
+    const before = this.db
+      .prepare('SELECT COALESCE(MAX(rowid), 0) AS rowid FROM messages WHERE session_id = ?')
+      .get(sessionId) as { rowid: number } | undefined;
     const beforeRowid = before?.rowid ?? 0;
 
     const timeoutMs = opts.timeoutMs ?? 10 * 60 * 1000;
@@ -76,15 +81,19 @@ export class VirtualClientAIRunner implements AIRunnerPort {
           if (msg.type === 'run_completed') {
             settled = true;
             clearTimeout(timeout);
-            const messages = this.db.prepare(
-              "SELECT content FROM messages WHERE session_id = ? AND role = 'assistant' AND rowid > ? ORDER BY rowid ASC"
-            ).all(sessionId, beforeRowid) as { content: string }[];
+            const messages = this.db
+              .prepare(
+                "SELECT content FROM messages WHERE session_id = ? AND role = 'assistant' AND rowid > ? ORDER BY rowid ASC"
+              )
+              .all(sessionId, beforeRowid) as { content: string }[];
             const content = messages.map(m => m.content).join('\n');
             resolve({ sessionId, content });
           } else if (msg.type === 'run_failed') {
             settled = true;
             clearTimeout(timeout);
-            const error = (msg as import('@zclaudia/shared/wire/messages').RunFailedMessage).error ?? 'AI prompt failed';
+            const error =
+              (msg as import('@zclaudia/shared/wire/messages').RunFailedMessage).error ??
+              'AI prompt failed';
             reject(new Error(error));
           }
         },

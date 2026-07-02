@@ -1,5 +1,9 @@
 import { useCallback, useEffect } from 'react';
-import { useRightWorkspaceStore, activeToolRef, type PaneNode } from '../../stores/rightWorkspaceStore';
+import {
+  useRightWorkspaceStore,
+  activeToolRef,
+  type PaneNode,
+} from '../../stores/rightWorkspaceStore';
 import { usePluginStore, type UIExtension } from '../../stores/pluginStore';
 import { useServerStore } from '../../stores/serverStore';
 import { useTerminalStore } from '../../stores/terminalStore';
@@ -25,17 +29,25 @@ function decodeTerminalProjectId(instanceKey: string | undefined): string | unde
   return instanceKey.slice(sep + 2) || undefined;
 }
 
-export function PaneView({ sessionId, paneId, pane, focused, projectId, projectRoot, workingDirectory }: PaneViewProps) {
-  const panels = usePluginStore((s) => s.panels);
+export function PaneView({
+  sessionId,
+  paneId,
+  pane,
+  focused,
+  projectId,
+  projectRoot,
+  workingDirectory,
+}: PaneViewProps) {
+  const panels = usePluginStore(s => s.panels);
 
   const onFocus = useCallback(
     () => useRightWorkspaceStore.getState().focusPane(sessionId, paneId),
-    [sessionId, paneId],
+    [sessionId, paneId]
   );
 
   const ref = activeToolRef(pane);
-  const panel: UIExtension | undefined = ref ? panels.find((p) => p.id === ref.toolId) : undefined;
-  const activeServerId = useServerStore((s) => s.activeServerId);
+  const panel: UIExtension | undefined = ref ? panels.find(p => p.id === ref.toolId) : undefined;
+  const activeServerId = useServerStore(s => s.activeServerId);
 
   // The workspace layout is persisted but terminal sessions are in-memory, and the
   // terminal's onOpen hook only fires on explicit user opens. So a restored terminal
@@ -60,7 +72,7 @@ export function PaneView({ sessionId, paneId, pane, focused, projectId, projectR
   }
 
   const effectiveProjectId =
-    ref.toolId === 'terminal' ? decodeTerminalProjectId(ref.instanceKey) ?? projectId : projectId;
+    ref.toolId === 'terminal' ? (decodeTerminalProjectId(ref.instanceKey) ?? projectId) : projectId;
 
   return (
     <div
@@ -68,14 +80,22 @@ export function PaneView({ sessionId, paneId, pane, focused, projectId, projectR
       data-focused={focused ? 'true' : 'false'}
       onPointerDown={onFocus}
       className={`flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden rounded-lg border bg-card transition-shadow ${
-        focused
-          ? 'border-muted-foreground/30 shadow-md'
-          : 'border-border/50 shadow-sm'
+        focused ? 'border-muted-foreground/30 shadow-md' : 'border-border/50 shadow-sm'
       }`}
     >
-      <PaneTabs sessionId={sessionId} pane={pane} focused={focused} projectId={effectiveProjectId} />
+      <PaneTabs
+        sessionId={sessionId}
+        pane={pane}
+        focused={focused}
+        projectId={effectiveProjectId}
+      />
       <div className="flex-1 min-h-0 overflow-hidden relative">
-        <PanelContent panel={panel} projectId={effectiveProjectId} projectRoot={projectRoot} workingDirectory={workingDirectory} />
+        <PanelContent
+          panel={panel}
+          projectId={effectiveProjectId}
+          projectRoot={projectRoot}
+          workingDirectory={workingDirectory}
+        />
         <DropOverlay paneId={paneId} />
       </div>
     </div>

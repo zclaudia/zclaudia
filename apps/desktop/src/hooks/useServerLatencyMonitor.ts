@@ -7,15 +7,12 @@ import { getUsableMobileBackendIds } from '../services/mobileConnectionState';
 const PROBE_INTERVAL_MS = 15_000;
 
 export function useServerLatencyMonitor(): void {
-  const setServerLatency = useServerStore((s) => s.setServerLatency);
-  const facadeConnectionState = useFacadeStore((s) => s.connectionState);
-  const facadeBackends = useFacadeStore((s) => s.backends);
+  const setServerLatency = useServerStore(s => s.setServerLatency);
+  const facadeConnectionState = useFacadeStore(s => s.connectionState);
+  const facadeBackends = useFacadeStore(s => s.backends);
 
   const readyBackendIds = useMemo(() => {
-    return getUsableMobileBackendIds(
-      facadeConnectionState,
-      facadeBackends,
-    ).sort().join(',');
+    return getUsableMobileBackendIds(facadeConnectionState, facadeBackends).sort().join(',');
   }, [facadeBackends, facadeConnectionState]);
 
   useEffect(() => {
@@ -24,12 +21,14 @@ export function useServerLatencyMonitor(): void {
     let cancelled = false;
 
     const probeAll = async () => {
-      await Promise.all(serverIds.map(async (serverId) => {
-        const latencyMs = await probeServerLatency(serverId);
-        if (!cancelled) {
-          setServerLatency(serverId, latencyMs);
-        }
-      }));
+      await Promise.all(
+        serverIds.map(async serverId => {
+          const latencyMs = await probeServerLatency(serverId);
+          if (!cancelled) {
+            setServerLatency(serverId, latencyMs);
+          }
+        })
+      );
     };
 
     void probeAll();

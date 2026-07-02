@@ -49,7 +49,7 @@ export function ContextBrowser({ projectId }: ContextBrowserProps) {
     }
   };
 
-  const selected = docs.find((d) => d.id === selectedDoc);
+  const selected = docs.find(d => d.id === selectedDoc);
 
   // Group by category
   const categories = docs.reduce<Record<string, ContextDocument[]>>((acc, doc) => {
@@ -72,9 +72,7 @@ export function ContextBrowser({ projectId }: ContextBrowserProps) {
         </button>
       </div>
 
-      {error && (
-        <div className="px-3 py-1 text-xs text-destructive">{error}</div>
-      )}
+      {error && <div className="px-3 py-1 text-xs text-destructive">{error}</div>}
 
       <div className="flex-1 overflow-y-auto">
         {docs.length === 0 && !loading ? (
@@ -140,7 +138,7 @@ function CategorySection({
       </button>
       {expanded && (
         <div className="ml-3">
-          {docs.map((doc) => (
+          {docs.map(doc => (
             <button
               key={doc.id}
               onClick={() => onSelect(selectedDoc === doc.id ? null : doc.id)}

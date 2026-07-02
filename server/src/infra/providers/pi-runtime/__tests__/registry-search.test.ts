@@ -2,7 +2,10 @@ import { describe, it, expect, vi } from 'vitest';
 
 // Mock pi-ai's registry so we can exercise hit/miss paths deterministically.
 vi.mock('@earendil-works/pi-ai', () => {
-  const providers: Record<string, Array<{ id: string; contextWindow?: number; provider?: string }>> = {
+  const providers: Record<
+    string,
+    Array<{ id: string; contextWindow?: number; provider?: string }>
+  > = {
     anthropic: [
       { id: 'claude-opus-4-7', contextWindow: 200_000 },
       { id: 'claude-sonnet-4-6', contextWindow: 200_000 },
@@ -11,24 +14,20 @@ vi.mock('@earendil-works/pi-ai', () => {
       { id: 'gpt-5', contextWindow: 400_000 },
       { id: 'gpt-4o', contextWindow: 128_000 },
     ],
-    deepseek: [
-      { id: 'deepseek-v4-flash', contextWindow: 1_000_000 },
-    ],
+    deepseek: [{ id: 'deepseek-v4-flash', contextWindow: 1_000_000 }],
     // Same id under multiple providers — tie-breaker: largest contextWindow wins.
     openrouter: [
       { id: 'gpt-4o', contextWindow: 64_000 },
       { id: 'shared-model', contextWindow: 50_000 },
     ],
-    vercel: [
-      { id: 'shared-model', contextWindow: 100_000 },
-    ],
+    vercel: [{ id: 'shared-model', contextWindow: 100_000 }],
   };
 
   return {
     getProviders: vi.fn(() => Object.keys(providers)),
     getModels: vi.fn((provider: string) => providers[provider] ?? []),
     getModel: vi.fn((provider: string, modelId: string) =>
-      providers[provider]?.find((m) => m.id === modelId),
+      providers[provider]?.find(m => m.id === modelId)
     ),
   };
 });

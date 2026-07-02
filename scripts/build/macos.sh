@@ -3,7 +3,9 @@
 # Requires: Rust, Node.js, pnpm
 # Run on macOS only
 set -euo pipefail
-cd "$(dirname "$0")/../.."
+# shellcheck source=scripts/build/common.sh
+source "$(dirname "$0")/common.sh"
+zclaudia_cd_repo_root
 
 # --- Preflight checks ---
 if [[ "$(uname)" != "Darwin" ]]; then
@@ -12,16 +14,13 @@ if [[ "$(uname)" != "Darwin" ]]; then
 fi
 
 # Prefer rustup-managed toolchain over Homebrew Rust
-export PATH="$HOME/.cargo/bin:$PATH"
+zclaudia_prefer_rustup
 
 # Ensure Node.js is available (fnm / nvm) and matches .node-version
-if command -v fnm >/dev/null 2>&1; then eval "$(fnm env --use-on-cd)"; fnm use --silent-if-unchanged 2>/dev/null || true; fi
-if command -v nvm >/dev/null 2>&1; then nvm use 2>/dev/null || true; fi
+zclaudia_setup_node
 
 # Load .env if present (for TAURI_SIGNING_PRIVATE_KEY_PATH, etc.)
-if [ -f .env ]; then
-  set -a; source .env; set +a
-fi
+zclaudia_load_env
 
 # Local macOS signing certificate support.
 # CI imports a .p12 into a temporary keychain before building; do the same locally
@@ -92,9 +91,7 @@ if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ] && [ -n "${TAURI_SIGNING_PRIVATE_KEY_
   export TAURI_SIGNING_PRIVATE_KEY
 fi
 
-for cmd in rustup pnpm; do
-  command -v "$cmd" >/dev/null || { echo "ERROR: $cmd not found"; exit 1; }
-done
+zclaudia_require_commands rustup pnpm
 
 sign_updater_artifact() {
   local artifact_path="$1"

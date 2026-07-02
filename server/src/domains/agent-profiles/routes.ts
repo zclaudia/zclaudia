@@ -1,4 +1,5 @@
-import { Router, Request, Response } from 'express';
+import { Router } from 'express';
+import type { Request, Response } from 'express';
 import type Database from 'better-sqlite3';
 import type { AgentProfileConfig, ThinkingLevel } from '@zclaudia/shared/core/agent-profile';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
@@ -11,16 +12,23 @@ import {
 } from './agent-profile-deletion-service.js';
 import { resolveAgentReadiness } from '../agent-readiness/check.js';
 
-const VALID_THINKING_LEVELS: readonly ThinkingLevel[] = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'];
+const VALID_THINKING_LEVELS: readonly ThinkingLevel[] = [
+  'off',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+];
 
 type MultimodalFallbackValidation =
   | { ok: true; value: AgentProfileConfig['multimodalFallback'] | null | undefined }
   | { ok: false; error: string };
 
 function validateMultimodalFallback(
-  db: Database.Database,
+  llmRepo: LlmProfileRepository,
   input: unknown,
-  options: { allowNull: boolean },
+  options: { allowNull: boolean }
 ): MultimodalFallbackValidation {
   if (input === undefined) return { ok: true, value: undefined };
   if (input === null) return { ok: true, value: options.allowNull ? null : undefined };
@@ -39,18 +47,27 @@ function validateMultimodalFallback(
     llmProfileId: raw.llmProfileId.trim(),
     model: raw.model.trim(),
   };
-  const llm = new LlmProfileRepository(db).findById(fallback.llmProfileId);
+  const llm = llmRepo.findById(fallback.llmProfileId);
   if (!llm) {
-    return { ok: false, error: `multimodalFallback.llmProfileId not found: ${fallback.llmProfileId}` };
+    return {
+      ok: false,
+      error: `multimodalFallback.llmProfileId not found: ${fallback.llmProfileId}`,
+    };
   }
   const declaredModels = llm.models ?? [];
   if (declaredModels.length > 0) {
-    const entry = declaredModels.find((model) => model.modelId === fallback.model);
+    const entry = declaredModels.find(model => model.modelId === fallback.model);
     if (!entry) {
-      return { ok: false, error: `multimodalFallback.model not found on LLM profile: ${fallback.model}` };
+      return {
+        ok: false,
+        error: `multimodalFallback.model not found on LLM profile: ${fallback.model}`,
+      };
     }
     if (entry.inputModalities && !entry.inputModalities.includes('image')) {
-      return { ok: false, error: `multimodalFallback.model must support image input: ${fallback.model}` };
+      return {
+        ok: false,
+        error: `multimodalFallback.model must support image input: ${fallback.model}`,
+      };
     }
   }
   return { ok: true, value: fallback };
@@ -59,6 +76,7 @@ function validateMultimodalFallback(
 export function createAgentProfileRoutes(db: Database.Database): Router {
   const router = Router();
   const repo = new AgentProfileRepository(db);
+  const llmRepo = new LlmProfileRepository(db);
   const deletionService = new AgentProfileDeletionService(db);
 
   router.get('/', (_req: Request, res: Response) => {
@@ -75,7 +93,9 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
 
   router.get('/readiness', (_req: Request, res: Response) => {
     try {
-      res.json({ success: true, data: resolveAgentReadiness(db) } as ApiResponse<ReturnType<typeof resolveAgentReadiness>>);
+      res.json({ success: true, data: resolveAgentReadiness(db) } as ApiResponse<
+        ReturnType<typeof resolveAgentReadiness>
+      >);
     } catch (error) {
       console.error('Error checking agent readiness:', error);
       res.status(500).json({
@@ -146,11 +166,18 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
       if (toolSelection === undefined && !Array.isArray(enabledTools)) {
         res.status(400).json({
           success: false,
-          error: { code: 'VALIDATION_ERROR', message: 'enabledTools must be an array when toolSelection is absent' },
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'enabledTools must be an array when toolSelection is absent',
+          },
         });
         return;
       }
-      if (thinkingLevel !== undefined && thinkingLevel !== null && !VALID_THINKING_LEVELS.includes(thinkingLevel)) {
+      if (
+        thinkingLevel !== undefined &&
+        thinkingLevel !== null &&
+        !VALID_THINKING_LEVELS.includes(thinkingLevel)
+      ) {
         res.status(400).json({
           success: false,
           error: {
@@ -161,10 +188,7 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         return;
       }
 
-      const llmExists = db.prepare('SELECT id FROM llm_profiles WHERE id = ?').get(llmProfileId) as
-        | { id: string }
-        | undefined;
-      if (!llmExists) {
+      if (!llmRepo.findById(llmProfileId)) {
         res.status(400).json({
           success: false,
           error: { code: 'VALIDATION_ERROR', message: `llmProfileId not found: ${llmProfileId}` },
@@ -172,11 +196,9 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         return;
       }
 
-      if (isDefault) {
-        repo.clearAllDefaults();
-      }
-
-      const validatedFallback = validateMultimodalFallback(db, multimodalFallback, { allowNull: false });
+      const validatedFallback = validateMultimodalFallback(llmRepo, multimodalFallback, {
+        allowNull: false,
+      });
       if (!validatedFallback.ok) {
         res.status(400).json({
           success: false,
@@ -185,7 +207,7 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         return;
       }
 
-      const profile = repo.create({
+      const profile = repo.createWithDefaultHandling({
         name,
         description,
         llmProfileId,
@@ -230,10 +252,7 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
       }
 
       if (body.llmProfileId !== undefined) {
-        const llmExists = db.prepare('SELECT id FROM llm_profiles WHERE id = ?').get(body.llmProfileId) as
-          | { id: string }
-          | undefined;
-        if (!llmExists) {
+        if (!llmRepo.findById(body.llmProfileId)) {
           res.status(400).json({
             success: false,
             error: {
@@ -247,7 +266,9 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
 
       let validatedFallback: MultimodalFallbackValidation = { ok: true, value: undefined };
       if (Object.prototype.hasOwnProperty.call(body, 'multimodalFallback')) {
-        validatedFallback = validateMultimodalFallback(db, body.multimodalFallback, { allowNull: true });
+        validatedFallback = validateMultimodalFallback(llmRepo, body.multimodalFallback, {
+          allowNull: true,
+        });
         if (!validatedFallback.ok) {
           res.status(400).json({
             success: false,
@@ -265,25 +286,31 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         return;
       }
 
-      if (body.isDefault === true) {
-        repo.clearAllDefaults();
-      }
-
       const patch: Partial<Omit<AgentProfileConfig, 'id' | 'createdAt' | 'updatedAt'>> = {};
       if (Object.prototype.hasOwnProperty.call(body, 'name')) patch.name = body.name;
-      if (Object.prototype.hasOwnProperty.call(body, 'description')) patch.description = body.description ?? undefined;
-      if (Object.prototype.hasOwnProperty.call(body, 'llmProfileId')) patch.llmProfileId = body.llmProfileId;
+      if (Object.prototype.hasOwnProperty.call(body, 'description'))
+        patch.description = body.description ?? undefined;
+      if (Object.prototype.hasOwnProperty.call(body, 'llmProfileId'))
+        patch.llmProfileId = body.llmProfileId;
       if (Object.prototype.hasOwnProperty.call(body, 'model')) patch.model = body.model;
-      if (Object.prototype.hasOwnProperty.call(body, 'systemPrompt')) patch.systemPrompt = body.systemPrompt;
-      if (Object.prototype.hasOwnProperty.call(body, 'enabledTools')) patch.enabledTools = body.enabledTools;
-      if (Object.prototype.hasOwnProperty.call(body, 'toolSelection')) patch.toolSelection = body.toolSelection;
-      if (Object.prototype.hasOwnProperty.call(body, 'skillSelection')) patch.skillSelection = body.skillSelection;
-      if (Object.prototype.hasOwnProperty.call(body, 'skillExecution')) patch.skillExecution = body.skillExecution;
-      if (Object.prototype.hasOwnProperty.call(body, 'multimodalFallback')) patch.multimodalFallback = validatedFallback.value as never;
-      if (Object.prototype.hasOwnProperty.call(body, 'thinkingLevel')) patch.thinkingLevel = body.thinkingLevel ?? undefined;
-      if (Object.prototype.hasOwnProperty.call(body, 'isDefault')) patch.isDefault = Boolean(body.isDefault);
+      if (Object.prototype.hasOwnProperty.call(body, 'systemPrompt'))
+        patch.systemPrompt = body.systemPrompt;
+      if (Object.prototype.hasOwnProperty.call(body, 'enabledTools'))
+        patch.enabledTools = body.enabledTools;
+      if (Object.prototype.hasOwnProperty.call(body, 'toolSelection'))
+        patch.toolSelection = body.toolSelection;
+      if (Object.prototype.hasOwnProperty.call(body, 'skillSelection'))
+        patch.skillSelection = body.skillSelection;
+      if (Object.prototype.hasOwnProperty.call(body, 'skillExecution'))
+        patch.skillExecution = body.skillExecution;
+      if (Object.prototype.hasOwnProperty.call(body, 'multimodalFallback'))
+        patch.multimodalFallback = validatedFallback.value as never;
+      if (Object.prototype.hasOwnProperty.call(body, 'thinkingLevel'))
+        patch.thinkingLevel = body.thinkingLevel ?? undefined;
+      if (Object.prototype.hasOwnProperty.call(body, 'isDefault'))
+        patch.isDefault = Boolean(body.isDefault);
 
-      const updated = repo.update(req.params.id, patch);
+      const updated = repo.updateWithDefaultHandling(req.params.id, patch);
       res.json({ success: true, data: updated } as ApiResponse<AgentProfileConfig>);
     } catch (error) {
       console.error('Error updating agent profile:', error);
@@ -334,7 +361,10 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         });
         return;
       }
-      res.json({ success: true, data: repo.setDefault(req.params.id) } as ApiResponse<AgentProfileConfig>);
+      res.json({
+        success: true,
+        data: repo.setDefault(req.params.id),
+      } as ApiResponse<AgentProfileConfig>);
     } catch (error) {
       console.error('Error setting default agent profile:', error);
       res.status(500).json({

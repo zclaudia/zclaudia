@@ -10,13 +10,15 @@ export interface CommandListResponse {
 export async function listCommands(projectPath?: string): Promise<CommandListResponse> {
   return apiCall<CommandListResponse>('/api/commands/list', {
     method: 'POST',
-    body: JSON.stringify({ projectPath })
+    body: JSON.stringify({ projectPath }),
   });
 }
 
-export async function executeCommand(request: CommandExecuteRequest): Promise<CommandExecuteResponse> {
+export async function executeCommand(
+  request: CommandExecuteRequest
+): Promise<CommandExecuteResponse> {
   return apiCall<CommandExecuteResponse>('/api/commands/execute', {
     method: 'POST',
-    body: JSON.stringify(request)
+    body: JSON.stringify(request),
   });
 }

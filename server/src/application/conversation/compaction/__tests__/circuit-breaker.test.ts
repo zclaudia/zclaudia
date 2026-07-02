@@ -12,7 +12,10 @@ const COOLDOWN = 5 * 60 * 1000;
 
 describe('resolveBreaker (pure)', () => {
   it('allows when no state', () => {
-    expect(resolveBreaker(undefined, 1000, 3, COOLDOWN)).toEqual({ action: 'allow', wasHalfOpen: false });
+    expect(resolveBreaker(undefined, 1000, 3, COOLDOWN)).toEqual({
+      action: 'allow',
+      wasHalfOpen: false,
+    });
   });
 
   it('allows while failures below max', () => {
@@ -38,13 +41,18 @@ describe('resolveBreaker (pure)', () => {
 
   it('allows half-open when cooldown elapsed', () => {
     const s = { consecutiveFailures: 3, lastFailureAtMs: 1000, nextRetryAtMs: 1000 + COOLDOWN };
-    expect(resolveBreaker(s, 1000 + COOLDOWN, 3, COOLDOWN)).toEqual({ action: 'allow', wasHalfOpen: true });
+    expect(resolveBreaker(s, 1000 + COOLDOWN, 3, COOLDOWN)).toEqual({
+      action: 'allow',
+      wasHalfOpen: true,
+    });
   });
 });
 
 describe('CompactionCircuitBreaker (stateful)', () => {
   let b: CompactionCircuitBreaker;
-  beforeEach(() => { b = new CompactionCircuitBreaker(); });
+  beforeEach(() => {
+    b = new CompactionCircuitBreaker();
+  });
 
   it('opens after maxFailures consecutive failures', () => {
     expect(b.evaluate('s', 0).action).toBe('allow');
@@ -57,7 +65,9 @@ describe('CompactionCircuitBreaker (stateful)', () => {
   });
 
   it('recordSuccess clears the breaker', () => {
-    b.recordFailure('s', 0); b.recordFailure('s', 0); b.recordFailure('s', 0);
+    b.recordFailure('s', 0);
+    b.recordFailure('s', 0);
+    b.recordFailure('s', 0);
     expect(b.evaluate('s', 1).action).toBe('skip');
     b.recordSuccess('s');
     expect(b.evaluate('s', 1)).toEqual({ action: 'allow', wasHalfOpen: false });
@@ -65,7 +75,9 @@ describe('CompactionCircuitBreaker (stateful)', () => {
   });
 
   it('reset clears the breaker (manual compact)', () => {
-    b.recordFailure('s', 0); b.recordFailure('s', 0); b.recordFailure('s', 0);
+    b.recordFailure('s', 0);
+    b.recordFailure('s', 0);
+    b.recordFailure('s', 0);
     b.reset('s');
     expect(b.size()).toBe(0);
   });
@@ -77,7 +89,9 @@ describe('CompactionCircuitBreaker (stateful)', () => {
   });
 
   it('half-open re-opens immediately on next failure with a fresh cooldown', () => {
-    b.recordFailure('s', 0); b.recordFailure('s', 0); b.recordFailure('s', 0);
+    b.recordFailure('s', 0);
+    b.recordFailure('s', 0);
+    b.recordFailure('s', 0);
     // cooldown elapsed → half-open allow
     expect(b.evaluate('s', COOLDOWN).action).toBe('allow');
     // a failure during half-open bumps count and sets a new cooldown from now
@@ -100,7 +114,9 @@ describe('CompactionCircuitBreaker (stateful)', () => {
 
 describe('env overrides', () => {
   const orig = { ...process.env };
-  afterEach(() => { process.env = { ...orig }; });
+  afterEach(() => {
+    process.env = { ...orig };
+  });
 
   it('resolveMaxFailures honors valid positive int', () => {
     process.env.ZCLAUDIA_COMPACTION_MAX_FAILURES = '5';

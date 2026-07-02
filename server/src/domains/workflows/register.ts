@@ -44,7 +44,14 @@ import { TaskExecutorRegistry } from '../tasks/executors/registry.js';
 
 /** Minimal port for plugin step registry — avoids direct application/ import */
 type WorkflowStepRegistryPort = import('./step-executors/plugin-executor.js').PluginStepRegistry & {
-  getAllMeta(): Array<{ type: string; name: string; description: string; category: string; icon?: string; configSchema?: unknown }>;
+  getAllMeta(): Array<{
+    type: string;
+    name: string;
+    description: string;
+    category: string;
+    icon?: string;
+    configSchema?: unknown;
+  }>;
 };
 
 /** Minimal port for plugin trigger registry */
@@ -56,7 +63,10 @@ export interface WorkflowDomainDeps {
   db: ReturnType<typeof initDatabase>;
   app: Express;
   authMiddleware: RequestHandler;
-  broadcast: (projectId: string | undefined, msg: ServerMessage | { type: string; [key: string]: unknown }) => void;
+  broadcast: (
+    projectId: string | undefined,
+    msg: ServerMessage | { type: string; [key: string]: unknown }
+  ) => void;
   notificationService: NotificationSender;
   workflowStepRegistry: WorkflowStepRegistryPort;
   workflowTriggerRegistry?: WorkflowTriggerRegistryPort;
@@ -76,7 +86,19 @@ export interface WorkflowDomainResult {
 }
 
 export function registerWorkflowDomain(deps: WorkflowDomainDeps): WorkflowDomainResult {
-  const { db, app, authMiddleware, broadcast, notificationService, workflowStepRegistry, workflowTriggerRegistry, aiRunPort, permissionBridge, getPermissionWorkflowResolver, activityRegistry } = deps;
+  const {
+    db,
+    app,
+    authMiddleware,
+    broadcast,
+    notificationService,
+    workflowStepRegistry,
+    workflowTriggerRegistry,
+    aiRunPort,
+    permissionBridge,
+    getPermissionWorkflowResolver,
+    activityRegistry,
+  } = deps;
 
   // -- Assemble step executors --
   const agentLoopRunner = deps.agentLoopRunner ?? new LightweightAgentRunner({ db });
@@ -96,10 +118,12 @@ export function registerWorkflowDomain(deps: WorkflowDomainDeps): WorkflowDomain
   composite.register(new AIPromptStepExecutor(agentLoopRunner, agentRuntime));
   composite.register(new AIReviewStepExecutor(agentLoopRunner));
   composite.register(new GitStepExecutor());
-  composite.register(new TaskWorkflowStepExecutor(
-    new TaskService(new TaskRepository(db)),
-    deps.taskExecutorRegistry ?? new TaskExecutorRegistry(),
-  ));
+  composite.register(
+    new TaskWorkflowStepExecutor(
+      new TaskService(new TaskRepository(db)),
+      deps.taskExecutorRegistry ?? new TaskExecutorRegistry()
+    )
+  );
   composite.registerPlugin(new PluginStepExecutor(workflowStepRegistry));
 
   // -- Permission workflow step executors --
@@ -123,14 +147,22 @@ export function registerWorkflowDomain(deps: WorkflowDomainDeps): WorkflowDomain
   const workflowService = new WorkflowService(db, broadcast, engine);
   workflowService.initialize();
 
-  const workflowGeneratorService = new WorkflowGeneratorService(db, workflowStepRegistry, aiRunPort);
+  const workflowGeneratorService = new WorkflowGeneratorService(
+    db,
+    workflowStepRegistry,
+    aiRunPort
+  );
 
   // -- Mount routes --
-  app.use('/api', authMiddleware, createWorkflowRoutes(workflowService, workflowGeneratorService, {
-    stepRegistry: workflowStepRegistry,
-    triggerRegistry: workflowTriggerRegistry,
-    activityRegistry,
-  }));
+  app.use(
+    '/api',
+    authMiddleware,
+    createWorkflowRoutes(workflowService, workflowGeneratorService, {
+      stepRegistry: workflowStepRegistry,
+      triggerRegistry: workflowTriggerRegistry,
+      activityRegistry,
+    })
+  );
 
   // Scheduling + event subscriptions are owned by AutomationService.
 

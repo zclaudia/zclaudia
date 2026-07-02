@@ -30,9 +30,10 @@ export function createCorpusRoutes(deps: CorpusRoutesDeps): Router {
         res.json(ok({ capabilities: [] }));
         return;
       }
-      const capabilities = fs.readdirSync(specsDir, { withFileTypes: true })
-        .filter((e) => e.isDirectory())
-        .map((e) => {
+      const capabilities = fs
+        .readdirSync(specsDir, { withFileTypes: true })
+        .filter(e => e.isDirectory())
+        .map(e => {
           const file = path.join(specsDir, e.name, 'spec.md');
           if (!fs.existsSync(file)) return null;
           const parsed = parseSpec(fs.readFileSync(file, 'utf-8'));

@@ -12,7 +12,8 @@ import { newPane } from '../../../stores/rightWorkspaceStore';
 import type { LayoutNode, PaneNode, GroupNode } from '../../../stores/rightWorkspaceStore';
 
 const R: Rect = { left: 0, top: 0, width: 100, height: 100 };
-const cx = 50, cy = 50;
+const cx = 50,
+  cy = 50;
 
 // Build a pane fixture using the real newPane factory and override its id for
 // stable test assertions. We reassign id because newPane generates a random UUID.
@@ -79,7 +80,10 @@ describe('canDrop', () => {
 
   it('forbids adding a singleton present in a sibling (edge)', () => {
     const root: GroupNode = {
-      id: 'g', kind: 'group', dir: 'row', ratio: 0.5,
+      id: 'g',
+      kind: 'group',
+      dir: 'row',
+      ratio: 0.5,
       children: [pane('p1', 'draft'), pane('p2', 'memory')],
     };
     // Splitting p2 to add draft conflicts with p1.
@@ -89,12 +93,24 @@ describe('canDrop', () => {
 
   it('allows adding a multi-instance tool for a different scope (edge)', () => {
     const root: LayoutNode = pane('p1', 'terminal', 'b1::projA');
-    expect(canDrop(root, 'p1', 'right', { toolId: 'terminal', instanceKey: 'b1::projB', multiInstance: true }).allowed).toBe(true);
+    expect(
+      canDrop(root, 'p1', 'right', {
+        toolId: 'terminal',
+        instanceKey: 'b1::projB',
+        multiInstance: true,
+      }).allowed
+    ).toBe(true);
   });
 
   it('forbids adding a multi-instance tool for the same scope (edge)', () => {
     const root: LayoutNode = pane('p1', 'terminal', 'b1::projA');
-    expect(canDrop(root, 'p1', 'right', { toolId: 'terminal', instanceKey: 'b1::projA', multiInstance: true }).allowed).toBe(false);
+    expect(
+      canDrop(root, 'p1', 'right', {
+        toolId: 'terminal',
+        instanceKey: 'b1::projA',
+        multiInstance: true,
+      }).allowed
+    ).toBe(false);
   });
 });
 
@@ -117,11 +133,33 @@ describe('resolveTabDrop', () => {
     const el = document.createElement('div');
     el.setAttribute('data-tab-strip', '');
     el.setAttribute('data-pane-id', paneId);
-    el.getBoundingClientRect = () => ({ left: 0, top: 0, right: 300, bottom: 32, width: 300, height: 32, x: 0, y: 0, toJSON: () => ({}) } as DOMRect);
+    el.getBoundingClientRect = () =>
+      ({
+        left: 0,
+        top: 0,
+        right: 300,
+        bottom: 32,
+        width: 300,
+        height: 32,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }) as DOMRect;
     tabs.forEach(([l, r], i) => {
       const t = document.createElement('div');
       t.setAttribute('data-tab-index', String(i));
-      t.getBoundingClientRect = () => ({ left: l, top: 0, right: r, bottom: 32, width: r - l, height: 32, x: l, y: 0, toJSON: () => ({}) } as DOMRect);
+      t.getBoundingClientRect = () =>
+        ({
+          left: l,
+          top: 0,
+          right: r,
+          bottom: 32,
+          width: r - l,
+          height: 32,
+          x: l,
+          y: 0,
+          toJSON: () => ({}),
+        }) as DOMRect;
       el.appendChild(t);
     });
     return el;
@@ -129,7 +167,12 @@ describe('resolveTabDrop', () => {
 
   it('returns the pane id and insert index based on tab midpoints', () => {
     const container = document.createElement('div');
-    container.appendChild(strip('P1', [[0, 100], [100, 200]]));
+    container.appendChild(
+      strip('P1', [
+        [0, 100],
+        [100, 200],
+      ])
+    );
     // pointer x=160 is past tab 1's midpoint (150) → insert index 2
     const hit = resolveTabDrop(container, 160, 16);
     expect(hit).toEqual({ paneId: 'P1', index: 2 });

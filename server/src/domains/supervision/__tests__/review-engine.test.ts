@@ -38,8 +38,17 @@ import { SupervisionTaskRepository } from '../repositories/supervision-task.js';
 import { ProjectRepository } from '../../projects/index.js';
 import { SessionRepository } from '../../sessions/repository.js';
 import { ContextManager } from '../context-manager.js';
-import type { ProjectAgent, SupervisionTask, TaskResult, ReviewVerdict, MergeResult } from '@zclaudia/shared/features/supervision';
-import { createAgentProfilesTable, seedDefaultAgent } from '../../../test-helpers/seed-default-agent.js';
+import type {
+  ProjectAgent,
+  SupervisionTask,
+  TaskResult,
+  ReviewVerdict,
+  MergeResult,
+} from '@zclaudia/shared/features/supervision';
+import {
+  createAgentProfilesTable,
+  seedDefaultAgent,
+} from '../../../test-helpers/seed-default-agent.js';
 
 // ========================================
 // Test DB setup
@@ -175,20 +184,20 @@ function makeAgent(overrides: Partial<ProjectAgent> = {}): ProjectAgent {
 
 function seedProject(
   db: Database.Database,
-  opts: { name?: string; rootPath?: string; agent?: ProjectAgent } = {},
+  opts: { name?: string; rootPath?: string; agent?: ProjectAgent } = {}
 ): string {
   const id = newId();
   const now = Date.now();
   db.prepare(
     `INSERT INTO projects (id, name, type, root_path, agent, created_at, updated_at)
-     VALUES (?, ?, 'code', ?, ?, ?, ?)`,
+     VALUES (?, ?, 'code', ?, ?, ?, ?)`
   ).run(
     id,
     opts.name ?? 'Test Project',
     opts.rootPath ?? '/tmp/test-project',
     opts.agent ? JSON.stringify(opts.agent) : null,
     now,
-    now,
+    now
   );
   return id;
 }
@@ -206,7 +215,7 @@ function seedTask(
     acceptanceCriteria?: string[];
     result?: TaskResult;
     baseCommit?: string;
-  },
+  }
 ): SupervisionTask {
   const task = taskRepo.create({
     projectId: opts.projectId,
@@ -234,13 +243,13 @@ function insertMessage(
   db: Database.Database,
   sessionId: string,
   role: 'user' | 'assistant' | 'system',
-  content: string,
+  content: string
 ): void {
   const id = newId();
   const now = Date.now();
   db.prepare(
     `INSERT INTO messages (id, session_id, role, content, created_at)
-     VALUES (?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?)`
   ).run(id, sessionId, role, content, now);
 }
 
@@ -300,7 +309,7 @@ describe('ReviewEngine', () => {
       broadcastFn,
       logFn,
       collectGitEvidenceFn,
-      mockSupervisionAiRunPort as any,
+      mockSupervisionAiRunPort as any
     );
   });
 
@@ -321,7 +330,11 @@ describe('ReviewEngine', () => {
         type: 'background',
       } as any);
 
-      insertMessage(db, session.id, 'assistant', `
+      insertMessage(
+        db,
+        session.id,
+        'assistant',
+        `
 Here is my review.
 
 [REVIEW_VERDICT]
@@ -329,7 +342,8 @@ approved: true
 notes: |
   All acceptance criteria met. Code looks good.
 [/REVIEW_VERDICT]
-      `);
+      `
+      );
 
       const verdict = engine.parseVerdict(session.id);
 
@@ -347,7 +361,11 @@ notes: |
         type: 'background',
       } as any);
 
-      insertMessage(db, session.id, 'assistant', `
+      insertMessage(
+        db,
+        session.id,
+        'assistant',
+        `
 [REVIEW_VERDICT]
 approved: false
 notes: |
@@ -356,7 +374,8 @@ suggested_changes:
   - Add error handling for edge cases
   - Fix the return type of the function
 [/REVIEW_VERDICT]
-      `);
+      `
+      );
 
       const verdict = engine.parseVerdict(session.id);
 
@@ -392,10 +411,15 @@ suggested_changes:
         type: 'background',
       } as any);
 
-      insertMessage(db, session.id, 'assistant', `
+      insertMessage(
+        db,
+        session.id,
+        'assistant',
+        `
 [REVIEW_VERDICT]
 [/REVIEW_VERDICT]
-      `);
+      `
+      );
 
       const verdict = engine.parseVerdict(session.id);
 
@@ -412,7 +436,11 @@ suggested_changes:
         type: 'background',
       } as any);
 
-      insertMessage(db, session.id, 'assistant', `
+      insertMessage(
+        db,
+        session.id,
+        'assistant',
+        `
 [REVIEW_VERDICT]
 approved: true
 notes: |
@@ -420,7 +448,8 @@ notes: |
   Line 2 of the review.
   Line 3 of the review.
 [/REVIEW_VERDICT]
-      `);
+      `
+      );
 
       const verdict = engine.parseVerdict(session.id);
 
@@ -439,7 +468,11 @@ notes: |
         type: 'background',
       } as any);
 
-      insertMessage(db, session.id, 'assistant', `
+      insertMessage(
+        db,
+        session.id,
+        'assistant',
+        `
 [REVIEW_VERDICT]
 Approved: true
 Notes: |
@@ -447,7 +480,8 @@ Notes: |
 Suggested_Changes:
   - Tighten one edge case
 [/REVIEW_VERDICT]
-      `);
+      `
+      );
 
       const verdict = engine.parseVerdict(session.id);
 
@@ -483,7 +517,11 @@ Suggested_Changes:
     }
 
     it('contains task title, description, and attempt', () => {
-      const task = makeTask({ title: 'Fix login bug', description: 'Email validation missing', attempt: 2 });
+      const task = makeTask({
+        title: 'Fix login bug',
+        description: 'Email validation missing',
+        attempt: 2,
+      });
       const prompt = engine.buildReviewPrompt(task, 'MyProject', '(no changes)');
 
       expect(prompt).toContain('Title: Fix login bug');
@@ -537,7 +575,8 @@ Suggested_Changes:
     });
 
     it('contains evidence diff', () => {
-      const evidence = 'diff --git a/src/login.ts b/src/login.ts\n+const emailRegex = /^[^@]+@[^@]+$/;';
+      const evidence =
+        'diff --git a/src/login.ts b/src/login.ts\n+const emailRegex = /^[^@]+@[^@]+$/;';
       const task = makeTask();
       const prompt = engine.buildReviewPrompt(task, 'MyProject', evidence);
 
@@ -692,11 +731,11 @@ Suggested_Changes:
 
       expect(mockWriteReviewResult).toHaveBeenCalledWith(
         task.id,
-        expect.stringContaining('APPROVED'),
+        expect.stringContaining('APPROVED')
       );
       expect(mockWriteReviewResult).toHaveBeenCalledWith(
         task.id,
-        expect.stringContaining('All good'),
+        expect.stringContaining('All good')
       );
     });
 
@@ -722,11 +761,11 @@ Suggested_Changes:
 
       expect(mockWriteReviewResult).toHaveBeenCalledWith(
         task.id,
-        expect.stringContaining('REJECTED'),
+        expect.stringContaining('REJECTED')
       );
       expect(mockWriteReviewResult).toHaveBeenCalledWith(
         task.id,
-        expect.stringContaining('Fix tests'),
+        expect.stringContaining('Fix tests')
       );
     });
 
@@ -745,7 +784,7 @@ Suggested_Changes:
 
       expect(mockWriteReviewResult).toHaveBeenCalledWith(
         task.id,
-        expect.stringContaining('No structured verdict found'),
+        expect.stringContaining('No structured verdict found')
       );
     });
   });
@@ -836,7 +875,7 @@ Suggested_Changes:
           trustLevel: 'low',
           autoApplied: false,
         }),
-        task.id,
+        task.id
       );
     });
   });
@@ -882,7 +921,7 @@ Suggested_Changes:
         expect.objectContaining({
           clientId: `supervisor_review_${task.id}`,
           onMessage: expect.any(Function),
-        }),
+        })
       );
     });
 
@@ -901,7 +940,7 @@ Suggested_Changes:
       expect(mockSupervisionAiRunPort.startVirtualRun).toHaveBeenCalledWith(
         expect.objectContaining({
           input: expect.stringContaining('[INDEPENDENT CODE REVIEW]'),
-        }),
+        })
       );
     });
 
@@ -923,7 +962,7 @@ Suggested_Changes:
           taskId: task.id,
           reviewSessionId: expect.any(String),
         }),
-        task.id,
+        task.id
       );
     });
 
@@ -932,7 +971,7 @@ Suggested_Changes:
       const now = Date.now();
       db.prepare(
         `INSERT INTO projects (id, name, type, root_path, agent, created_at, updated_at)
-         VALUES (?, ?, 'code', NULL, ?, ?, ?)`,
+         VALUES (?, ?, 'code', NULL, ?, ?, ?)`
       ).run(id, 'No Root', JSON.stringify(makeAgent()), now, now);
 
       const task = seedTask(db, taskRepo, {
@@ -1149,7 +1188,7 @@ Suggested_Changes:
 
       // Get the review session that was created
       const sessions = sessionRepo.findByProjectId(projectId);
-      const reviewSession = sessions.find((s) => s.projectRole === 'review')!;
+      const reviewSession = sessions.find(s => s.projectRole === 'review')!;
 
       // Simulate a run_failed message
       expect(capturedSendFn).toBeDefined();
@@ -1169,7 +1208,7 @@ Suggested_Changes:
           error: 'Provider timeout',
           reviewSessionId: reviewSession.id,
         }),
-        task.id,
+        task.id
       );
 
       // Session should be archived
@@ -1218,7 +1257,7 @@ Suggested_Changes:
           retrying: true,
           newAttempt: 2,
         }),
-        task.id,
+        task.id
       );
     });
 
@@ -1254,7 +1293,7 @@ Suggested_Changes:
           retrying: false,
           maxRetriesExceeded: true,
         }),
-        task.id,
+        task.id
       );
     });
 
@@ -1284,7 +1323,7 @@ Suggested_Changes:
           verdictParsed: false,
           trustLevel: 'medium',
         }),
-        task.id,
+        task.id
       );
     });
   });
@@ -1322,7 +1361,7 @@ Suggested_Changes:
       // Should collect evidence from worktree path, not project root
       expect(collectGitEvidenceFn).toHaveBeenCalledWith(
         '/tmp/worktrees/supervision/slot-0',
-        'abc123',
+        'abc123'
       );
     });
 
@@ -1391,7 +1430,7 @@ Suggested_Changes:
         logFn,
         collectGitEvidenceFn,
         mockSupervisionAiRunPort as any,
-        (_pid: string) => mockPool as any,
+        (_pid: string) => mockPool as any
       );
 
       return { projectId, mockPool, engineWithPool };
@@ -1424,7 +1463,9 @@ Suggested_Changes:
       const result = taskRepo.findById(task.id)!;
       expect(result.status).toBe('integrated');
       expect(mockPool.mergeBack).toHaveBeenCalledWith(
-        task.id, 1, '/tmp/worktrees/supervision/slot-0',
+        task.id,
+        1,
+        '/tmp/worktrees/supervision/slot-0'
       );
       expect(mockPool.release).toHaveBeenCalledWith('/tmp/worktrees/supervision/slot-0');
     });

@@ -102,7 +102,7 @@ export function readCrashReports(limit = 20): CrashReportEntry[] {
     return raw
       .split('\n')
       .filter(Boolean)
-      .map((line) => {
+      .map(line => {
         try {
           return JSON.parse(line) as CrashReportEntry;
         } catch {

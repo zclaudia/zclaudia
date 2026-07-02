@@ -217,7 +217,10 @@ describe('SubIssueDetailScreen', () => {
     it('Draft button is disabled while drafting', async () => {
       let resolveDraft: (v: { specChange: never; content: string }) => void = () => undefined;
       vi.spyOn(api, 'draftProposal').mockImplementation(
-        () => new Promise((resolve) => { resolveDraft = resolve; }),
+        () =>
+          new Promise(resolve => {
+            resolveDraft = resolve;
+          })
       );
       render(<SubIssueDetailScreen projectId="p1" subIssueId="s" />);
       await waitFor(() => {

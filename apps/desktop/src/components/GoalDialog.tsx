@@ -38,7 +38,7 @@ export function GoalDialog({ goal, open, onClose, onSubmit, onClear }: GoalDialo
   return (
     <div
       className="fixed inset-0 bg-black/40 flex items-center justify-center z-[100]"
-      onMouseDown={(e) => {
+      onMouseDown={e => {
         if (e.target === e.currentTarget) onClose();
       }}
       onKeyDown={onKeyDown}
@@ -59,7 +59,7 @@ export function GoalDialog({ goal, open, onClose, onSubmit, onClear }: GoalDialo
             <label className="block text-xs text-muted-foreground mb-1">Objective</label>
             <textarea
               value={objective}
-              onChange={(e) => setObjective(e.target.value)}
+              onChange={e => setObjective(e.target.value)}
               maxLength={GOAL_DEFAULTS.objectiveMaxChars}
               rows={4}
               className="w-full text-sm px-2.5 py-1.5 rounded-md bg-input border border-border focus:outline-none focus:ring-1 focus:ring-ring resize-none"
@@ -77,7 +77,7 @@ export function GoalDialog({ goal, open, onClose, onSubmit, onClear }: GoalDialo
                 max={10_000_000}
                 step={10000}
                 value={tokenBudget}
-                onChange={(e) => setTokenBudget(Number(e.target.value))}
+                onChange={e => setTokenBudget(Number(e.target.value))}
                 className="w-full text-sm px-2.5 py-1.5 rounded-md bg-input border border-border focus:outline-none focus:ring-1 focus:ring-ring"
               />
             </div>
@@ -88,7 +88,7 @@ export function GoalDialog({ goal, open, onClose, onSubmit, onClear }: GoalDialo
                 min={1}
                 max={500}
                 value={maxTurns}
-                onChange={(e) => setMaxTurns(Number(e.target.value))}
+                onChange={e => setMaxTurns(Number(e.target.value))}
                 className="w-full text-sm px-2.5 py-1.5 rounded-md bg-input border border-border focus:outline-none focus:ring-1 focus:ring-ring"
               />
             </div>
@@ -120,9 +120,7 @@ export function GoalDialog({ goal, open, onClose, onSubmit, onClear }: GoalDialo
             <button
               type="button"
               disabled={disableSubmit}
-              onClick={() =>
-                onSubmit({ objective: objective.trim(), tokenBudget, maxTurns })
-              }
+              onClick={() => onSubmit({ objective: objective.trim(), tokenBudget, maxTurns })}
               className="px-3 py-1.5 text-sm rounded-md bg-muted/60 text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitLabel}

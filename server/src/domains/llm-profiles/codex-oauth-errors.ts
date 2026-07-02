@@ -11,7 +11,10 @@ export type CodexOAuthErrorCode =
   | 'RESPONSE_ENDPOINT_REJECTED';
 
 export class CodexOAuthError extends Error {
-  constructor(public readonly code: CodexOAuthErrorCode, message: string) {
+  constructor(
+    public readonly code: CodexOAuthErrorCode,
+    message: string
+  ) {
     super(message);
     this.name = 'CodexOAuthError';
   }

@@ -20,8 +20,10 @@ function normalizeSearchPreview(content: string): string {
 }
 
 function resultIcon(resultType?: string) {
-  if (resultType === 'file') return <FileText size={15} strokeWidth={1.75} aria-label="File result" />;
-  if (resultType && resultType !== 'message') return <Wrench size={15} strokeWidth={1.75} aria-label="Tool result" />;
+  if (resultType === 'file')
+    return <FileText size={15} strokeWidth={1.75} aria-label="File result" />;
+  if (resultType && resultType !== 'message')
+    return <Wrench size={15} strokeWidth={1.75} aria-label="Tool result" />;
   return <MessageSquare size={15} strokeWidth={1.75} aria-label="Message result" />;
 }
 
@@ -32,10 +34,23 @@ function resultIcon(resultType?: string) {
  */
 export function SearchModal({ open, onClose, search, sessions, onResultSelect }: SearchModalProps) {
   const {
-    searchQuery, setSearchQuery, searchResults, setSearchResults, isSearching,
-    searchHistory, showFilters, setShowFilters, searchFilters,
-    hasMoreResults, isLoadingMore, searchInputRef,
-    handleSearch, handleLoadMore, handleSelectHistoryItem, handleClearHistory, handleFiltersChange,
+    searchQuery,
+    setSearchQuery,
+    searchResults,
+    setSearchResults,
+    isSearching,
+    searchHistory,
+    showFilters,
+    setShowFilters,
+    searchFilters,
+    hasMoreResults,
+    isLoadingMore,
+    searchInputRef,
+    handleSearch,
+    handleLoadMore,
+    handleSelectHistoryItem,
+    handleClearHistory,
+    handleFiltersChange,
   } = search;
 
   const [activeIndex, setActiveIndex] = useState(0);
@@ -43,7 +58,7 @@ export function SearchModal({ open, onClose, search, sessions, onResultSelect }:
 
   const hasQuery = !!searchQuery.trim();
   const showingHistory = !hasQuery && searchHistory.length > 0;
-  const navCount = hasQuery ? searchResults.length : (showingHistory ? searchHistory.length : 0);
+  const navCount = hasQuery ? searchResults.length : showingHistory ? searchHistory.length : 0;
 
   // Reset the highlight when the result set or mode changes (adjust-during-render
   // instead of an effect, per React guidance).
@@ -66,39 +81,55 @@ export function SearchModal({ open, onClose, search, sessions, onResultSelect }:
     activeRowRef.current?.scrollIntoView({ block: 'nearest' });
   }, [activeIndex]);
 
-  const selectResult = useCallback((r: typeof searchResults[number]) => {
-    onResultSelect(r.sessionId, r.id, r.ownerBackendId);
-    setSearchQuery('');
-    setSearchResults([]);
-    onClose();
-  }, [onResultSelect, setSearchQuery, setSearchResults, onClose]);
-
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      e.preventDefault();
+  const selectResult = useCallback(
+    (r: (typeof searchResults)[number]) => {
+      onResultSelect(r.sessionId, r.id, r.ownerBackendId);
+      setSearchQuery('');
+      setSearchResults([]);
       onClose();
-      return;
-    }
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setActiveIndex((i) => Math.min(i + 1, Math.max(navCount - 1, 0)));
-      return;
-    }
-    if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setActiveIndex((i) => Math.max(i - 1, 0));
-      return;
-    }
-    if (e.key === 'Enter') {
-      if (hasQuery && searchResults[activeIndex]) {
+    },
+    [onResultSelect, setSearchQuery, setSearchResults, onClose]
+  );
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Escape') {
         e.preventDefault();
-        selectResult(searchResults[activeIndex]);
-      } else if (showingHistory && searchHistory[activeIndex]) {
-        e.preventDefault();
-        handleSelectHistoryItem(searchHistory[activeIndex].query);
+        onClose();
+        return;
       }
-    }
-  }, [navCount, hasQuery, searchResults, activeIndex, showingHistory, searchHistory, selectResult, handleSelectHistoryItem, onClose]);
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setActiveIndex(i => Math.min(i + 1, Math.max(navCount - 1, 0)));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setActiveIndex(i => Math.max(i - 1, 0));
+        return;
+      }
+      if (e.key === 'Enter') {
+        if (hasQuery && searchResults[activeIndex]) {
+          e.preventDefault();
+          selectResult(searchResults[activeIndex]);
+        } else if (showingHistory && searchHistory[activeIndex]) {
+          e.preventDefault();
+          handleSelectHistoryItem(searchHistory[activeIndex].query);
+        }
+      }
+    },
+    [
+      navCount,
+      hasQuery,
+      searchResults,
+      activeIndex,
+      showingHistory,
+      searchHistory,
+      selectResult,
+      handleSelectHistoryItem,
+      onClose,
+    ]
+  );
 
   if (!open) return null;
 
@@ -123,12 +154,16 @@ export function SearchModal({ open, onClose, search, sessions, onResultSelect }:
       >
         {/* Header / input row */}
         <div className="flex items-center gap-2.5 px-4 py-3">
-          <SearchIcon size={18} strokeWidth={1.75} className="flex-shrink-0 text-muted-foreground" />
+          <SearchIcon
+            size={18}
+            strokeWidth={1.75}
+            className="flex-shrink-0 text-muted-foreground"
+          />
           <input
             ref={searchInputRef}
             type="text"
             value={searchQuery}
-            onChange={(e) => handleSearch(e.target.value)}
+            onChange={e => handleSearch(e.target.value)}
             placeholder="Search messages and sessions…"
             spellCheck={false}
             autoCorrect="off"
@@ -187,9 +222,15 @@ export function SearchModal({ open, onClose, search, sessions, onResultSelect }:
                   onMouseMove={() => setActiveIndex(i)}
                   className={`flex w-full items-center gap-3 px-4 py-2.5 text-left ${i === activeIndex ? 'bg-secondary' : ''}`}
                 >
-                  <Clock size={15} strokeWidth={1.75} className="flex-shrink-0 text-muted-foreground" />
+                  <Clock
+                    size={15}
+                    strokeWidth={1.75}
+                    className="flex-shrink-0 text-muted-foreground"
+                  />
                   <span className="flex-1 truncate text-sm text-foreground">{entry.query}</span>
-                  <span className="flex-shrink-0 text-xs text-muted-foreground">{entry.resultCount} results</span>
+                  <span className="flex-shrink-0 text-xs text-muted-foreground">
+                    {entry.resultCount} results
+                  </span>
                 </button>
               ))}
             </div>
@@ -206,7 +247,9 @@ export function SearchModal({ open, onClose, search, sessions, onResultSelect }:
           {hasQuery && (
             <>
               {isSearching && searchResults.length === 0 ? (
-                <div className="px-4 py-10 text-center text-sm text-muted-foreground">Searching...</div>
+                <div className="px-4 py-10 text-center text-sm text-muted-foreground">
+                  Searching...
+                </div>
               ) : searchResults.length === 0 ? (
                 <div className="px-4 py-10 text-center text-sm text-muted-foreground">
                   No results for “{searchQuery.trim()}”
@@ -221,7 +264,9 @@ export function SearchModal({ open, onClose, search, sessions, onResultSelect }:
                       onMouseMove={() => setActiveIndex(i)}
                       className={`flex w-full items-center gap-3 px-4 py-2.5 text-left ${i === activeIndex ? 'bg-secondary' : ''}`}
                     >
-                      <span className="flex-shrink-0 text-muted-foreground">{resultIcon(r.resultType)}</span>
+                      <span className="flex-shrink-0 text-muted-foreground">
+                        {resultIcon(r.resultType)}
+                      </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium text-foreground">
                           {r.sessionName || 'Untitled'}
@@ -231,9 +276,15 @@ export function SearchModal({ open, onClose, search, sessions, onResultSelect }:
                         </span>
                       </span>
                       {i === activeIndex ? (
-                        <CornerDownLeft size={14} strokeWidth={1.75} className="flex-shrink-0 text-muted-foreground" />
+                        <CornerDownLeft
+                          size={14}
+                          strokeWidth={1.75}
+                          className="flex-shrink-0 text-muted-foreground"
+                        />
                       ) : (
-                        <span className="flex-shrink-0 text-xs text-muted-foreground">{timeAgo(r.createdAt)}</span>
+                        <span className="flex-shrink-0 text-xs text-muted-foreground">
+                          {timeAgo(r.createdAt)}
+                        </span>
                       )}
                     </button>
                   ))}
@@ -254,6 +305,6 @@ export function SearchModal({ open, onClose, search, sessions, onResultSelect }:
         </div>
       </div>
     </div>,
-    document.body,
+    document.body
   );
 }

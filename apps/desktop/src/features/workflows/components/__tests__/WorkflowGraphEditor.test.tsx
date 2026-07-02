@@ -15,10 +15,7 @@ const mockOnEdgesChange = vi.fn();
 // Mock @xyflow/react
 vi.mock('@xyflow/react', () => ({
   ReactFlow: (props: any) => (
-    <div
-      data-testid="reactflow"
-      data-fit-view={props.fitView ? 'true' : 'false'}
-    >
+    <div data-testid="reactflow" data-fit-view={props.fitView ? 'true' : 'false'}>
       {props.children}
     </div>
   ),
@@ -154,9 +151,7 @@ describe('WorkflowGraphEditor', () => {
   });
 
   it('renders with initial edges', () => {
-    const initialEdges = [
-      { id: 'e1', source: 'n1', target: 'n2', type: 'success' as const },
-    ];
+    const initialEdges = [{ id: 'e1', source: 'n1', target: 'n2', type: 'success' as const }];
 
     const { container } = render(
       <WorkflowGraphEditor

@@ -1,10 +1,15 @@
-import { Router, Request, Response } from 'express';
+import { Router } from 'express';
+import type { Request, Response } from 'express';
 import type Database from 'better-sqlite3';
 import type { Project } from '@zclaudia/shared/core/project';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import { parseUserHooks } from '@zclaudia/shared/interaction/user-hooks';
 import { ProjectRepository } from './repository.js';
-import { ProjectWorktreeService, ProjectNotFoundError, ProjectRootPathMissingError } from './worktree-service.js';
+import {
+  ProjectWorktreeService,
+  ProjectNotFoundError,
+  ProjectRootPathMissingError,
+} from './worktree-service.js';
 import { createGitRoutes } from './git-routes.js';
 import type { GitRoutesDeps } from './git-routes.js';
 import { resolveProjectMemoryDir } from '../../utils/memory-paths.js';
@@ -26,21 +31,16 @@ export type ProjectChangeEvent =
 export function createProjectRoutes(
   db: Database.Database,
   onProjectChanged?: (event?: ProjectChangeEvent) => void,
-  gitDeps?: GitRoutesDeps,
+  gitDeps?: GitRoutesDeps
 ): Router {
   const router = Router();
   const repo = new ProjectRepository(db);
   const workflowRepo = new WorkflowRepository(db);
   const worktreeService = new ProjectWorktreeService(db);
 
-  function hasAgentReadinessSchema(): boolean {
-    const llmTable = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'llm_profiles'").get();
-    if (!llmTable) return false;
-    const agentCols = db.prepare('PRAGMA table_info(agent_profiles)').all() as Array<{ name: string }>;
-    return agentCols.some((col) => col.name === 'llm_profile_id');
-  }
-
-  function validatePermissionWorkflowOverride(permissionWorkflowOverrideId: string | undefined): string | null {
+  function validatePermissionWorkflowOverride(
+    permissionWorkflowOverrideId: string | undefined
+  ): string | null {
     if (!permissionWorkflowOverrideId) return null;
     const workflow = workflowRepo.findOverrideMetadataById(permissionWorkflowOverrideId);
     if (!workflow) return 'permissionWorkflowOverrideId must reference an existing workflow';
@@ -109,7 +109,7 @@ export function createProjectRoutes(
 
   router.post('/', (req: Request, res: Response) => {
     try {
-      if (hasAgentReadinessSchema()) {
+      if (repo.hasAgentReadinessSchema()) {
         const readiness = resolveAgentReadinessForSession(db, {});
         if (!readiness.usable) {
           sendApiError(
@@ -117,14 +117,16 @@ export function createProjectRoutes(
             409,
             'AGENT_NOT_READY',
             'No usable agent profile is available. Create an agent or configure an LLM profile first.',
-            readiness,
+            readiness
           );
           return;
         }
       }
       const sortOrder = repo.findNextSortOrder();
       const createState = buildProjectCreateState(req.body ?? {}, sortOrder);
-      const overrideError = validatePermissionWorkflowOverride(createState.permissionWorkflowOverrideId);
+      const overrideError = validatePermissionWorkflowOverride(
+        createState.permissionWorkflowOverrideId
+      );
       if (overrideError) {
         res.status(400).json({
           success: false,
@@ -162,7 +164,9 @@ export function createProjectRoutes(
       }
 
       const nextState = applyProjectPatch(existing, patch);
-      const overrideError = validatePermissionWorkflowOverride(nextState.permissionWorkflowOverrideId);
+      const overrideError = validatePermissionWorkflowOverride(
+        nextState.permissionWorkflowOverrideId
+      );
       if (overrideError) {
         res.status(400).json({
           success: false,
@@ -263,7 +267,9 @@ export function createProjectRoutes(
       res.json({ success: true, data: worktrees });
     } catch (error) {
       if (error instanceof ProjectNotFoundError) {
-        res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Project not found' } });
+        res
+          .status(404)
+          .json({ success: false, error: { code: 'NOT_FOUND', message: 'Project not found' } });
         return;
       }
       const msg = error instanceof Error ? error.message : 'Failed to list worktrees';
@@ -274,7 +280,10 @@ export function createProjectRoutes(
 
   router.post('/:id/worktrees', (req: Request, res: Response) => {
     const projectId = req.params.id;
-    const { branch: rawBranch, path: worktreePath } = req.body as { branch?: string; path?: string };
+    const { branch: rawBranch, path: worktreePath } = req.body as {
+      branch?: string;
+      path?: string;
+    };
 
     try {
       const worktree = worktreeService.createWorktree(projectId, {
@@ -284,11 +293,16 @@ export function createProjectRoutes(
       res.json({ success: true, data: worktree });
     } catch (error) {
       if (error instanceof ProjectNotFoundError) {
-        res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Project not found' } });
+        res
+          .status(404)
+          .json({ success: false, error: { code: 'NOT_FOUND', message: 'Project not found' } });
         return;
       }
       if (error instanceof ProjectRootPathMissingError) {
-        res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Project has no root path' } });
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'Project has no root path' },
+        });
         return;
       }
       const msg = error instanceof Error ? error.message : 'Failed to create worktree';
@@ -304,7 +318,10 @@ export function createProjectRoutes(
     try {
       const { orderedIds } = req.body as { orderedIds?: string[] };
       if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
-        res.status(400).json({ success: false, error: { code: 'BAD_REQUEST', message: 'orderedIds must be a non-empty array' } });
+        res.status(400).json({
+          success: false,
+          error: { code: 'BAD_REQUEST', message: 'orderedIds must be a non-empty array' },
+        });
         return;
       }
 
@@ -314,7 +331,10 @@ export function createProjectRoutes(
       res.json({ success: true } as ApiResponse<void>);
     } catch (error) {
       console.error('Error reordering projects:', error);
-      res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: 'Failed to reorder projects' } });
+      res.status(500).json({
+        success: false,
+        error: { code: 'DB_ERROR', message: 'Failed to reorder projects' },
+      });
     }
   });
 

@@ -4,11 +4,11 @@ export type SlashCommandSource = 'local' | 'provider' | 'custom' | 'plugin';
 export type SlashCommandScope = 'global' | 'project';
 
 export interface SlashCommand {
-  command: string;        // e.g., '/clear', '/help', '/project:my-command', '/commit-commands:commit'
-  description: string;    // Displayed in autocomplete
-  source: SlashCommandSource;  // 'local' = frontend, 'provider' = runtime built-in, 'custom' = user-defined, 'plugin' = plugin-supplied
-  scope?: SlashCommandScope;   // For custom commands: 'global' or 'project'
-  filePath?: string;      // For custom/plugin commands: path to the .md file
+  command: string; // e.g., '/clear', '/help', '/project:my-command', '/commit-commands:commit'
+  description: string; // Displayed in autocomplete
+  source: SlashCommandSource; // 'local' = frontend, 'provider' = runtime built-in, 'custom' = user-defined, 'plugin' = plugin-supplied
+  scope?: SlashCommandScope; // For custom commands: 'global' or 'project'
+  filePath?: string; // For custom/plugin commands: path to the .md file
 }
 
 // Local UI commands (always available, handled by frontend)
@@ -23,7 +23,11 @@ export const LOCAL_COMMANDS: SlashCommand[] = [
   { command: '/new-session', description: 'Create new session', source: 'local' },
   { command: '/reload', description: 'Reload custom commands', source: 'local' },
   { command: '/worktree', description: 'Switch to or view current worktree', source: 'local' },
-  { command: '/create-worktree', description: 'Create a new git worktree and switch to it', source: 'local' },
+  {
+    command: '/create-worktree',
+    description: 'Create a new git worktree and switch to it',
+    source: 'local',
+  },
 ];
 
 // Runtime pass-through commands forwarded to the active agent runtime.
@@ -36,7 +40,7 @@ export type CommandType = 'builtin' | 'custom';
 
 export interface CommandExecuteRequest {
   commandName: string;
-  commandPath?: string;   // For custom commands: path to .md file
+  commandPath?: string; // For custom commands: path to .md file
   args?: string[];
   /**
    * Raw unparsed args string (e.g. `"focus on 'auth refactor'"`). When
@@ -60,8 +64,8 @@ export interface CommandExecuteRequest {
 export interface CommandExecuteResponse {
   type: CommandType;
   command: string;
-  action?: string;        // For builtin: 'clear', 'help', 'model', 'cost', 'status', etc.
+  action?: string; // For builtin: 'clear', 'help', 'model', 'cost', 'status', etc.
   data?: Record<string, unknown>;
-  content?: string;       // For custom: processed command content
+  content?: string; // For custom: processed command content
   error?: string;
 }

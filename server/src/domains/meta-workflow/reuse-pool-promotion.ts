@@ -13,23 +13,22 @@ export interface PromoteInput {
 const AUTO_TAG_PREFIXES = ['auto-generated', 'run-', 'phase-'];
 
 function stripAutoTags(tags: string[]): string[] {
-  return tags.filter((t) => !AUTO_TAG_PREFIXES.some((p) => t === p || t.startsWith(p)));
+  return tags.filter(t => !AUTO_TAG_PREFIXES.some(p => t === p || t.startsWith(p)));
 }
 
 export class ReusePoolPromotionService {
   constructor(
     private poolRepo: MetaWorkflowReusePoolRepository,
-    private subagentRepo: MetaSubagentTemplateRepository,
+    private subagentRepo: MetaSubagentTemplateRepository
   ) {}
 
   promote(itemId: string, input: PromoteInput): ReusablePoolItem {
     const item = this.poolRepo.findById(itemId);
     if (!item) throw new Error(`Reuse pool item not found: ${itemId}`);
 
-    const mergedTags = Array.from(new Set([
-      ...stripAutoTags(item.tags),
-      ...stripAutoTags(input.newTags),
-    ]));
+    const mergedTags = Array.from(
+      new Set([...stripAutoTags(item.tags), ...stripAutoTags(input.newTags)])
+    );
 
     const updated = this.poolRepo.update(itemId, {
       sourceType: 'user',

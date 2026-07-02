@@ -138,7 +138,9 @@ export function checkPluginCompatibility(engines?: { claudia?: string }): {
       compatible,
       appVersion,
       requiredRange,
-      error: compatible ? undefined : `Plugin requires claudia ${requiredRange}, but current version is ${appVersion}`,
+      error: compatible
+        ? undefined
+        : `Plugin requires claudia ${requiredRange}, but current version is ${appVersion}`,
     };
   } catch (error) {
     return {

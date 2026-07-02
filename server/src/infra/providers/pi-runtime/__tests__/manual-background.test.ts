@@ -13,13 +13,16 @@ import {
 } from '../inflight-bash-registry.js';
 import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
 import { TaskRepository } from '../../../../domains/tasks/repository.js';
-import { commandTaskLogPath, pidAlive } from '../../../../domains/tasks/executors/command-executor.js';
+import {
+  commandTaskLogPath,
+  pidAlive,
+} from '../../../../domains/tasks/executors/command-executor.js';
 
 async function waitUntil(predicate: () => boolean, timeoutMs = 5000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (predicate()) return true;
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise(r => setTimeout(r, 50));
   }
   return predicate();
 }
@@ -29,7 +32,11 @@ describe('inflight foreground command registry', () => {
 
   it('registers, lists, and unregisters commands', () => {
     const unregister = registerInflightForegroundCommand({
-      sessionId: 's1', toolUseId: 't1', command: 'sleep 5', startedAt: 1, requestBackground: () => {},
+      sessionId: 's1',
+      toolUseId: 't1',
+      command: 'sleep 5',
+      startedAt: 1,
+      requestBackground: () => {},
     });
     expect(listInflightForegroundCommands('s1')).toHaveLength(1);
     unregister();
@@ -39,10 +46,18 @@ describe('inflight foreground command registry', () => {
   it('request targets the oldest command when no toolUseId given', () => {
     const fired: string[] = [];
     registerInflightForegroundCommand({
-      sessionId: 's1', toolUseId: 't-new', command: 'b', startedAt: 200, requestBackground: () => fired.push('t-new'),
+      sessionId: 's1',
+      toolUseId: 't-new',
+      command: 'b',
+      startedAt: 200,
+      requestBackground: () => fired.push('t-new'),
     });
     registerInflightForegroundCommand({
-      sessionId: 's1', toolUseId: 't-old', command: 'a', startedAt: 100, requestBackground: () => fired.push('t-old'),
+      sessionId: 's1',
+      toolUseId: 't-old',
+      command: 'a',
+      startedAt: 100,
+      requestBackground: () => fired.push('t-old'),
     });
     const result = requestBackgroundForCommand('s1');
     expect(result.ok).toBe(true);
@@ -52,7 +67,11 @@ describe('inflight foreground command registry', () => {
   it('request by toolUseId targets the matching command', () => {
     const fired: string[] = [];
     registerInflightForegroundCommand({
-      sessionId: 's1', toolUseId: 't1', command: 'a', startedAt: 1, requestBackground: () => fired.push('t1'),
+      sessionId: 's1',
+      toolUseId: 't1',
+      command: 'a',
+      startedAt: 1,
+      requestBackground: () => fired.push('t1'),
     });
     const miss = requestBackgroundForCommand('s1', 'nope');
     expect(miss.ok).toBe(false);
@@ -128,15 +147,15 @@ describe('manual backgrounding (tool integration)', () => {
 
   it('converts a waiting foreground command via the registry', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-manualbg-ws-'));
-    const bash = buildTools(dir, { enabled: ['Bash'], db, sessionId: 's1' })
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .find((t: any) => t.name === 'Bash') as any;
+    const bash = buildTools(dir, { enabled: ['Bash'], db, sessionId: 's1' }).find(
+      (t: any) => t.name === 'Bash'
+    ) as any;
 
     const pending = bash.execute('mb1', { command: 'echo early; sleep 2; echo late' });
     const registered = await waitUntil(() => listInflightForegroundCommands('s1').length === 1);
     expect(registered).toBe(true);
     // let the command produce its first output before converting
-    await new Promise((r) => setTimeout(r, 400));
+    await new Promise(r => setTimeout(r, 400));
 
     const request = requestBackgroundForCommand('s1');
     expect(request.ok).toBe(true);
@@ -147,7 +166,9 @@ describe('manual backgrounding (tool integration)', () => {
     expect(res.content[0].text).toContain('early');
 
     const repo = new TaskRepository(db);
-    const completed = await waitUntil(() => repo.findById(res.details.taskId)?.status === 'completed');
+    const completed = await waitUntil(
+      () => repo.findById(res.details.taskId)?.status === 'completed'
+    );
     expect(completed).toBe(true);
     expect(readFileSync(commandTaskLogPath(res.details.taskId), 'utf8')).toContain('late');
     // registry cleaned up after the tool returned
@@ -157,9 +178,9 @@ describe('manual backgrounding (tool integration)', () => {
 
   it('manual conversion works even with an explicit timeout', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-manualbg-ws-'));
-    const bash = buildTools(dir, { enabled: ['Bash'], db, sessionId: 's1' })
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .find((t: any) => t.name === 'Bash') as any;
+    const bash = buildTools(dir, { enabled: ['Bash'], db, sessionId: 's1' }).find(
+      (t: any) => t.name === 'Bash'
+    ) as any;
 
     const pending = bash.execute('mb2', { command: 'sleep 1; echo fin', timeout: 30 });
     await waitUntil(() => listInflightForegroundCommands('s1').length === 1);
@@ -174,9 +195,9 @@ describe('manual backgrounding (tool integration)', () => {
 
   it('a normally-completing command leaves no registry residue', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-manualbg-ws-'));
-    const bash = buildTools(dir, { enabled: ['Bash'], db, sessionId: 's1' })
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .find((t: any) => t.name === 'Bash') as any;
+    const bash = buildTools(dir, { enabled: ['Bash'], db, sessionId: 's1' }).find(
+      (t: any) => t.name === 'Bash'
+    ) as any;
     const res = await bash.execute('mb3', { command: 'echo quick' });
     expect(res.details.ok).toBe(true);
     expect(res.details.background).toBeUndefined();

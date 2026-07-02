@@ -19,8 +19,8 @@ interface BottomPanelProps {
 
 export function BottomPanel({ projectId, projectRoot, workingDirectory }: BottomPanelProps) {
   const isMobile = useIsMobile();
-  const activeTab = useBottomPanelStore((s) => s.activeTab);
-  const setActiveTab = useBottomPanelStore((s) => s.setActiveTab);
+  const activeTab = useBottomPanelStore(s => s.activeTab);
+  const setActiveTab = useBottomPanelStore(s => s.setActiveTab);
   const {
     visiblePanels,
     mountedPanels,
@@ -39,7 +39,7 @@ export function BottomPanel({ projectId, projectRoot, workingDirectory }: Bottom
   // Height / drag state
   const containerRef = useRef<HTMLDivElement>(null);
   const [heightPx, setHeightPx] = useState(
-    isMobile ? DEFAULT_HEIGHT_MOBILE : DEFAULT_HEIGHT_DESKTOP,
+    isMobile ? DEFAULT_HEIGHT_MOBILE : DEFAULT_HEIGHT_DESKTOP
   );
   const dragging = useRef(false);
   const startY = useRef(0);
@@ -48,13 +48,19 @@ export function BottomPanel({ projectId, projectRoot, workingDirectory }: Bottom
 
   // Clean up drag listeners if component unmounts mid-drag
   useEffect(() => {
-    return () => { dragCleanupRef.current?.(); };
+    return () => {
+      dragCleanupRef.current?.();
+    };
   }, []);
 
   // Android back to close current panel
-  useAndroidBack(() => {
-    activePanel?.onClose?.();
-  }, isOpen, 15);
+  useAndroidBack(
+    () => {
+      activePanel?.onClose?.();
+    },
+    isOpen,
+    15
+  );
 
   const onDragStart = useCallback(
     (e: React.MouseEvent | React.TouchEvent) => {
@@ -90,13 +96,13 @@ export function BottomPanel({ projectId, projectRoot, workingDirectory }: Bottom
       document.addEventListener('touchmove', onMove);
       document.addEventListener('touchend', onUp);
     },
-    [heightPx],
+    [heightPx]
   );
 
   const handleClose = () => {
     const { updatePanelVisibility } = usePluginStore.getState();
     // Close all visible panels
-    visiblePanels.forEach((p) => {
+    visiblePanels.forEach(p => {
       if (p.onClose) {
         p.onClose();
       } else {
@@ -116,7 +122,7 @@ export function BottomPanel({ projectId, projectRoot, workingDirectory }: Bottom
           <div className="flex items-center gap-0.5 flex-shrink-0">
             {showTabs ? (
               <>
-                {visiblePanels.map((panel) => (
+                {visiblePanels.map(panel => (
                   <button
                     key={panel.id}
                     onClick={() => setActiveTab(panel.id)}
@@ -147,16 +153,29 @@ export function BottomPanel({ projectId, projectRoot, workingDirectory }: Bottom
               title="Close panel"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
         </div>
 
         <div className="flex-1 overflow-hidden relative">
-          {mountedPanels.map((panel) => (
-            <div key={panel.id} className={`absolute inset-0 ${effectiveTab === panel.id ? '' : 'invisible'}`}>
-              <PanelContent panel={panel} projectId={projectId} projectRoot={projectRoot} workingDirectory={workingDirectory} />
+          {mountedPanels.map(panel => (
+            <div
+              key={panel.id}
+              className={`absolute inset-0 ${effectiveTab === panel.id ? '' : 'invisible'}`}
+            >
+              <PanelContent
+                panel={panel}
+                projectId={projectId}
+                projectRoot={projectRoot}
+                workingDirectory={workingDirectory}
+              />
             </div>
           ))}
         </div>
@@ -181,10 +200,14 @@ export function BottomPanel({ projectId, projectRoot, workingDirectory }: Bottom
         onTouchStart={onDragStart}
       >
         {/* Tabs */}
-        <div className="flex items-center gap-0.5 flex-shrink-0" onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
+        <div
+          className="flex items-center gap-0.5 flex-shrink-0"
+          onMouseDown={e => e.stopPropagation()}
+          onTouchStart={e => e.stopPropagation()}
+        >
           {showTabs ? (
             <>
-              {visiblePanels.map((panel) => (
+              {visiblePanels.map(panel => (
                 <button
                   key={panel.id}
                   onClick={() => setActiveTab(panel.id)}
@@ -208,7 +231,11 @@ export function BottomPanel({ projectId, projectRoot, workingDirectory }: Bottom
         <div className="flex-1" />
 
         {/* Tab-specific actions */}
-        <div className="flex items-center gap-0.5" onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
+        <div
+          className="flex items-center gap-0.5"
+          onMouseDown={e => e.stopPropagation()}
+          onTouchStart={e => e.stopPropagation()}
+        >
           {activePanel && <PanelActions panel={activePanel} projectId={projectId} />}
 
           {/* Close button */}
@@ -218,7 +245,12 @@ export function BottomPanel({ projectId, projectRoot, workingDirectory }: Bottom
             title="Hide panel"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -226,9 +258,17 @@ export function BottomPanel({ projectId, projectRoot, workingDirectory }: Bottom
 
       {/* Panel content — alwaysMount panels stay in DOM even when hidden */}
       <div className="flex-1 overflow-hidden relative">
-        {mountedPanels.map((panel) => (
-          <div key={panel.id} className={`absolute inset-0 ${effectiveTab === panel.id && isOpen ? '' : 'invisible'}`}>
-            <PanelContent panel={panel} projectId={projectId} projectRoot={projectRoot} workingDirectory={workingDirectory} />
+        {mountedPanels.map(panel => (
+          <div
+            key={panel.id}
+            className={`absolute inset-0 ${effectiveTab === panel.id && isOpen ? '' : 'invisible'}`}
+          >
+            <PanelContent
+              panel={panel}
+              projectId={projectId}
+              projectRoot={projectRoot}
+              workingDirectory={workingDirectory}
+            />
           </div>
         ))}
       </div>

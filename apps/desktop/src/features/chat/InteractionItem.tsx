@@ -1,6 +1,28 @@
 import { memo, useState, useCallback } from 'react';
-import { CheckCircle2, Loader2, Square, XCircle, ListTodo, FileQuestion, Send, Check, ShieldAlert, ThumbsUp, ThumbsDown, ClipboardCheck, Maximize2, Minimize2, Bookmark } from 'lucide-react';
-import type { InteractionMessage, InteractionPromptMessage, InteractionPromptField, ApprovalInteractionMessage, PlanReviewInteractionMessage } from '@zclaudia/shared';
+import {
+  CheckCircle2,
+  Loader2,
+  Square,
+  XCircle,
+  ListTodo,
+  FileQuestion,
+  Send,
+  Check,
+  ShieldAlert,
+  ThumbsUp,
+  ThumbsDown,
+  ClipboardCheck,
+  Maximize2,
+  Minimize2,
+  Bookmark,
+} from 'lucide-react';
+import type {
+  InteractionMessage,
+  InteractionPromptMessage,
+  InteractionPromptField,
+  ApprovalInteractionMessage,
+  PlanReviewInteractionMessage,
+} from '@zclaudia/shared';
 import { ACTIONABLE_LABEL, extractDefaultTitleFromPlan } from '@zclaudia/shared';
 import { useConnection } from '../../contexts/ConnectionContext';
 import { useLocalIssueStore } from '../local-issues/store';
@@ -21,23 +43,39 @@ interface InteractionItemProps {
 // Form Field Renderers
 // ============================================
 
-function TextField({ field, value, onChange }: { field: InteractionPromptField; value: string; onChange: (v: string) => void }) {
+function TextField({
+  field,
+  value,
+  onChange,
+}: {
+  field: InteractionPromptField;
+  value: string;
+  onChange: (v: string) => void;
+}) {
   return (
     <input
       type="text"
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={e => onChange(e.target.value)}
       placeholder={field.placeholder}
       className="w-full px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
     />
   );
 }
 
-function TextareaField({ field, value, onChange }: { field: InteractionPromptField; value: string; onChange: (v: string) => void }) {
+function TextareaField({
+  field,
+  value,
+  onChange,
+}: {
+  field: InteractionPromptField;
+  value: string;
+  onChange: (v: string) => void;
+}) {
   return (
     <textarea
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={e => onChange(e.target.value)}
       placeholder={field.placeholder}
       rows={3}
       className="w-full px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-y"
@@ -62,13 +100,13 @@ function ChoiceField({
   onCustomEnabledChange: (v: boolean) => void;
   onCustomValueChange: (v: string) => void;
 }) {
-  const selected = Array.isArray(value) ? value : (value ? [value] : []);
+  const selected = Array.isArray(value) ? value : value ? [value] : [];
   const isMulti = field.type === 'multiselect';
 
   const toggle = (optValue: string) => {
     if (isMulti) {
       const next = selected.includes(optValue)
-        ? selected.filter((item) => item !== optValue)
+        ? selected.filter(item => item !== optValue)
         : [...selected, optValue];
       onChange(next);
       return;
@@ -79,7 +117,7 @@ function ChoiceField({
 
   return (
     <div className="flex flex-col gap-1.5">
-      {(field.options || []).map((opt) => {
+      {(field.options || []).map(opt => {
         const isSelected = selected.includes(opt.value);
         return (
           <label
@@ -127,12 +165,14 @@ function ChoiceField({
             className="mt-0.5 w-3.5 h-3.5 flex-shrink-0"
           />
           <div className="flex-1 min-w-0">
-            <div className="font-medium text-foreground">{field.customValuePlaceholder || 'Other'}</div>
+            <div className="font-medium text-foreground">
+              {field.customValuePlaceholder || 'Other'}
+            </div>
             {customEnabled && (
               <input
                 type="text"
                 value={customValue}
-                onChange={(e) => onCustomValueChange(e.target.value)}
+                onChange={e => onCustomValueChange(e.target.value)}
                 placeholder={field.placeholder || 'Type your answer...'}
                 className="mt-1 w-full px-2 py-1 text-xs bg-background border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
               />
@@ -144,14 +184,23 @@ function ChoiceField({
   );
 }
 
-function ConfirmField({ value, onChange }: { field: InteractionPromptField; value: boolean; onChange: (v: boolean) => void }) {
+function ConfirmField({
+  value,
+  onChange,
+}: {
+  field: InteractionPromptField;
+  value: boolean;
+  onChange: (v: boolean) => void;
+}) {
   return (
     <button
       type="button"
       onClick={() => onChange(!value)}
       className={`w-8 h-4 rounded-full transition-colors relative ${value ? 'bg-primary' : 'bg-muted-foreground/30'}`}
     >
-      <span className={`block w-3 h-3 rounded-full bg-white absolute top-0.5 transition-transform ${value ? 'translate-x-4' : 'translate-x-0.5'}`} />
+      <span
+        className={`block w-3 h-3 rounded-full bg-white absolute top-0.5 transition-transform ${value ? 'translate-x-4' : 'translate-x-0.5'}`}
+      />
     </button>
   );
 }
@@ -164,7 +213,7 @@ function buildPromptResponse(
   fields: InteractionPromptField[],
   formData: Record<string, unknown>,
   customValues: Record<string, string>,
-  customEnabled: Record<string, boolean>,
+  customEnabled: Record<string, boolean>
 ): Record<string, unknown> {
   const response: Record<string, unknown> = {};
   for (const field of fields) {
@@ -193,15 +242,19 @@ function formatAskUserAnswer(
   fields: InteractionPromptField[],
   formData: Record<string, unknown>,
   customValues: Record<string, string>,
-  customEnabled: Record<string, boolean>,
+  customEnabled: Record<string, boolean>
 ): string {
-  return fields.map((field) => {
-    const raw = buildPromptResponse([field], formData, customValues, customEnabled)[field.id];
-    const answerText = Array.isArray(raw)
-      ? (raw.length > 0 ? raw.join(', ') : 'No answer')
-      : String(raw || 'No answer');
-    return `Q: ${field.label}\nA: ${answerText}`;
-  }).join('\n\n');
+  return fields
+    .map(field => {
+      const raw = buildPromptResponse([field], formData, customValues, customEnabled)[field.id];
+      const answerText = Array.isArray(raw)
+        ? raw.length > 0
+          ? raw.join(', ')
+          : 'No answer'
+        : String(raw || 'No answer');
+      return `Q: ${field.label}\nA: ${answerText}`;
+    })
+    .join('\n\n');
 }
 
 function PromptRenderer({ interaction }: { interaction: InteractionPromptMessage }) {
@@ -224,7 +277,7 @@ function PromptRenderer({ interaction }: { interaction: InteractionPromptMessage
     if (interaction.responseMode === 'prompt_answer') {
       handlePromptAnswer(
         interaction.interactionId,
-        formatAskUserAnswer(interaction.fields, formData, customValues, customEnabled),
+        formatAskUserAnswer(interaction.fields, formData, customValues, customEnabled)
       );
     } else {
       sendMessage({
@@ -249,7 +302,9 @@ function PromptRenderer({ interaction }: { interaction: InteractionPromptMessage
       <div className="flex flex-col gap-1 px-3 py-2 rounded-md bg-success/10 border border-success/30">
         <div className="flex items-center gap-2 text-xs font-medium text-success">
           <Check size={12} />
-          <span>{interaction.variant === 'question' ? 'Response submitted' : 'Form submitted'}</span>
+          <span>
+            {interaction.variant === 'question' ? 'Response submitted' : 'Form submitted'}
+          </span>
         </div>
       </div>
     );
@@ -265,7 +320,7 @@ function PromptRenderer({ interaction }: { interaction: InteractionPromptMessage
         <p className="text-xs text-muted-foreground">{interaction.description}</p>
       )}
       <div className="flex flex-col gap-2">
-        {interaction.fields.map((field) => (
+        {interaction.fields.map(field => (
           <div key={field.id} className="flex flex-col gap-1">
             <label className="text-xs font-medium text-foreground">
               {field.label}
@@ -275,10 +330,18 @@ function PromptRenderer({ interaction }: { interaction: InteractionPromptMessage
               <p className="text-xs text-muted-foreground">{field.description}</p>
             )}
             {field.type === 'text' && (
-              <TextField field={field} value={formData[field.id] as string} onChange={(v) => setFormData(prev => ({ ...prev, [field.id]: v }))} />
+              <TextField
+                field={field}
+                value={formData[field.id] as string}
+                onChange={v => setFormData(prev => ({ ...prev, [field.id]: v }))}
+              />
             )}
             {field.type === 'textarea' && (
-              <TextareaField field={field} value={formData[field.id] as string} onChange={(v) => setFormData(prev => ({ ...prev, [field.id]: v }))} />
+              <TextareaField
+                field={field}
+                value={formData[field.id] as string}
+                onChange={v => setFormData(prev => ({ ...prev, [field.id]: v }))}
+              />
             )}
             {(field.type === 'select' || field.type === 'multiselect') && (
               <ChoiceField
@@ -286,13 +349,17 @@ function PromptRenderer({ interaction }: { interaction: InteractionPromptMessage
                 value={formData[field.id] as string | string[]}
                 customEnabled={Boolean(customEnabled[field.id])}
                 customValue={customValues[field.id] || ''}
-                onChange={(v) => setFormData(prev => ({ ...prev, [field.id]: v }))}
-                onCustomEnabledChange={(v) => setCustomEnabled(prev => ({ ...prev, [field.id]: v }))}
-                onCustomValueChange={(v) => setCustomValues(prev => ({ ...prev, [field.id]: v }))}
+                onChange={v => setFormData(prev => ({ ...prev, [field.id]: v }))}
+                onCustomEnabledChange={v => setCustomEnabled(prev => ({ ...prev, [field.id]: v }))}
+                onCustomValueChange={v => setCustomValues(prev => ({ ...prev, [field.id]: v }))}
               />
             )}
             {field.type === 'confirm' && (
-              <ConfirmField field={field} value={formData[field.id] as boolean} onChange={(v) => setFormData(prev => ({ ...prev, [field.id]: v }))} />
+              <ConfirmField
+                field={field}
+                value={formData[field.id] as boolean}
+                onChange={v => setFormData(prev => ({ ...prev, [field.id]: v }))}
+              />
             )}
           </div>
         ))}
@@ -326,22 +393,31 @@ function ApprovalRenderer({ interaction }: { interaction: ApprovalInteractionMes
   const { sendMessage } = useConnection();
   const [decision, setDecision] = useState<'approved' | 'rejected' | null>(null);
 
-  const handleDecision = useCallback((approved: boolean) => {
-    sendMessage({
-      type: 'interaction_response',
-      interactionId: interaction.interactionId,
-      sessionId: interaction.sessionId,
-      response: { approved },
-    });
-    setDecision(approved ? 'approved' : 'rejected');
-  }, [sendMessage, interaction.interactionId, interaction.sessionId]);
+  const handleDecision = useCallback(
+    (approved: boolean) => {
+      sendMessage({
+        type: 'interaction_response',
+        interactionId: interaction.interactionId,
+        sessionId: interaction.sessionId,
+        response: { approved },
+      });
+      setDecision(approved ? 'approved' : 'rejected');
+    },
+    [sendMessage, interaction.interactionId, interaction.sessionId]
+  );
 
   if (decision) {
     return (
-      <div className={`flex flex-col gap-1 px-3 py-2 rounded-md border ${decision === 'approved' ? 'bg-success/10 border-success/30' : 'bg-destructive/10 border-destructive/30'}`}>
-        <div className={`flex items-center gap-2 text-xs font-medium ${decision === 'approved' ? 'text-success' : 'text-destructive'}`}>
+      <div
+        className={`flex flex-col gap-1 px-3 py-2 rounded-md border ${decision === 'approved' ? 'bg-success/10 border-success/30' : 'bg-destructive/10 border-destructive/30'}`}
+      >
+        <div
+          className={`flex items-center gap-2 text-xs font-medium ${decision === 'approved' ? 'text-success' : 'text-destructive'}`}
+        >
           {decision === 'approved' ? <ThumbsUp size={12} /> : <ThumbsDown size={12} />}
-          <span>{interaction.title} — {decision === 'approved' ? 'Approved' : 'Rejected'}</span>
+          <span>
+            {interaction.title} — {decision === 'approved' ? 'Approved' : 'Rejected'}
+          </span>
         </div>
       </div>
     );
@@ -380,12 +456,9 @@ function ApprovalRenderer({ interaction }: { interaction: ApprovalInteractionMes
 
 function PlanReviewRenderer({ interaction }: { interaction: PlanReviewInteractionMessage }) {
   const { sendMessage } = useConnection();
-  const createIssue = useLocalIssueStore((s) => s.createIssue);
+  const createIssue = useLocalIssueStore(s => s.createIssue);
   const [decision, setDecision] = useState<
-    | { kind: 'approved' }
-    | { kind: 'rejected' }
-    | { kind: 'saved'; issueId: string }
-    | null
+    { kind: 'approved' } | { kind: 'rejected' } | { kind: 'saved'; issueId: string } | null
   >(null);
   const [feedback, setFeedback] = useState('');
   const [expanded, setExpanded] = useState(false);
@@ -464,7 +537,7 @@ function PlanReviewRenderer({ interaction }: { interaction: PlanReviewInteractio
       try {
         const projectId = useProjectStore
           .getState()
-          .sessions.find((s) => s.id === interaction.sessionId)?.projectId;
+          .sessions.find(s => s.id === interaction.sessionId)?.projectId;
         if (!projectId) {
           throw new Error('Could not resolve project for this session');
         }
@@ -493,7 +566,15 @@ function PlanReviewRenderer({ interaction }: { interaction: PlanReviewInteractio
         setSaving(false);
       }
     },
-    [isClientSynth, chatActions, createIssue, sendMessage, interaction.sessionId, interaction.interactionId, interaction.plan],
+    [
+      isClientSynth,
+      chatActions,
+      createIssue,
+      sendMessage,
+      interaction.sessionId,
+      interaction.interactionId,
+      interaction.plan,
+    ]
   );
 
   if (decision) {
@@ -582,9 +663,11 @@ function PlanReviewRenderer({ interaction }: { interaction: PlanReviewInteractio
                 </span>
                 <span
                   className={
-                    todo.status === 'completed' ? 'text-muted-foreground line-through' :
-                    todo.status === 'cancelled' ? 'text-muted-foreground/70 line-through' :
-                    'text-foreground'
+                    todo.status === 'completed'
+                      ? 'text-muted-foreground line-through'
+                      : todo.status === 'cancelled'
+                        ? 'text-muted-foreground/70 line-through'
+                        : 'text-foreground'
                   }
                 >
                   {todo.content}
@@ -594,7 +677,7 @@ function PlanReviewRenderer({ interaction }: { interaction: PlanReviewInteractio
           </div>
           {interaction.todos.length > 8 && (
             <button
-              onClick={() => setShowAllTodos((v) => !v)}
+              onClick={() => setShowAllTodos(v => !v)}
               className="text-[11px] text-muted-foreground hover:text-foreground text-left transition-colors"
             >
               {showAllTodos ? 'Show fewer steps' : `Show all ${interaction.todos.length} steps`}
@@ -605,7 +688,7 @@ function PlanReviewRenderer({ interaction }: { interaction: PlanReviewInteractio
 
       <textarea
         value={feedback}
-        onChange={(e) => setFeedback(e.target.value)}
+        onChange={e => setFeedback(e.target.value)}
         placeholder="Add an optional comment for approval or rejection"
         rows={2}
         className="w-full px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-y"
@@ -679,7 +762,13 @@ function InteractionItemInner({ interaction }: InteractionItemProps) {
                   <Square size={12} className="text-muted-foreground" />
                 )}
               </span>
-              <span className={todo.status === 'completed' ? 'text-muted-foreground line-through' : 'text-foreground'}>
+              <span
+                className={
+                  todo.status === 'completed'
+                    ? 'text-muted-foreground line-through'
+                    : 'text-foreground'
+                }
+              >
                 {todo.content}
               </span>
             </div>

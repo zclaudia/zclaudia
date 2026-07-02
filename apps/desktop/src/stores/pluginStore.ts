@@ -35,7 +35,7 @@ export type PanelPlacement = 'bottom' | 'right';
 
 export function normalizeDisabledBuiltinPanels(panelIds: string[] | undefined): string[] {
   if (!Array.isArray(panelIds)) return [];
-  return Array.from(new Set(panelIds.map((id) => BUILTIN_PANEL_ID_ALIASES[id] ?? id)));
+  return Array.from(new Set(panelIds.map(id => BUILTIN_PANEL_ID_ALIASES[id] ?? id)));
 }
 
 /**
@@ -44,7 +44,7 @@ export function normalizeDisabledBuiltinPanels(panelIds: string[] | undefined): 
  * collapse all persisted 'bottom' overrides to 'right' on rehydrate.
  */
 export function migratePanelPlacements(
-  placements: Record<string, PanelPlacement> | undefined,
+  placements: Record<string, PanelPlacement> | undefined
 ): Record<string, PanelPlacement> {
   if (!placements) return {};
   const migrated: Record<string, PanelPlacement> = {};
@@ -69,16 +69,16 @@ export interface UIExtension {
   label: string;
   icon?: string;
   component?: unknown; // React component (builtin panels)
-  iframeUrl?: string;  // Server-relative URL for third-party iframe panels
+  iframeUrl?: string; // Server-relative URL for third-party iframe panels
   order?: number;
-  platforms?: ('desktop' | 'mobile')[];  // Defaults to ['desktop']
-  alwaysMount?: boolean;   // Keep DOM mounted even when hidden (e.g. terminal xterm canvas)
-  visible?: boolean;       // For alwaysMount panels: controls tab visibility without unmounting
-  actions?: unknown;       // React component for tab-specific action buttons
+  platforms?: ('desktop' | 'mobile')[]; // Defaults to ['desktop']
+  alwaysMount?: boolean; // Keep DOM mounted even when hidden (e.g. terminal xterm canvas)
+  visible?: boolean; // For alwaysMount panels: controls tab visibility without unmounting
+  actions?: unknown; // React component for tab-specific action buttons
   /** Called when the user explicitly opens this panel into the workspace (not on
    *  hidden always-mount renders). Use for per-tool init, e.g. creating a session. */
   onOpen?: (ctx: PanelOpenCtx) => void;
-  onClose?: () => void;    // Called when user closes this panel
+  onClose?: () => void; // Called when user closes this panel
   defaultPlacement?: PanelPlacement; // Where panel appears by default (desktop). Defaults to 'right'
   /** Right-sidebar workspace routing for openTool: 'shared' reuses the primary
    *  pane; 'dedicated' opens (or focuses) its own pane. Defaults to 'shared'. */
@@ -160,7 +160,9 @@ interface PluginStoreState {
   clearPluginSettings: (pluginId: string) => void;
 
   // Actions - Permission
-  setPendingPermissionRequest: (req: { pluginId: string; pluginName: string; permissions: string[] } | null) => void;
+  setPendingPermissionRequest: (
+    req: { pluginId: string; pluginName: string; permissions: string[] } | null
+  ) => void;
 
   // Actions - Loading
   setLoading: (loading: boolean) => void;
@@ -188,115 +190,109 @@ export const usePluginStore = create<PluginStoreState>()(
       panelPlacements: {},
 
       // Plugin Actions
-      setPlugins: (plugins) => set({ plugins }),
+      setPlugins: plugins => set({ plugins }),
 
-      addPlugin: (plugin) =>
-        set((state) => ({
-          plugins: [...state.plugins.filter((p) => p.manifest.id !== plugin.manifest.id), plugin],
+      addPlugin: plugin =>
+        set(state => ({
+          plugins: [...state.plugins.filter(p => p.manifest.id !== plugin.manifest.id), plugin],
         })),
 
       updatePlugin: (pluginId, updates) =>
-        set((state) => ({
-          plugins: state.plugins.map((p) =>
-            p.manifest.id === pluginId ? { ...p, ...updates } : p
-          ),
+        set(state => ({
+          plugins: state.plugins.map(p => (p.manifest.id === pluginId ? { ...p, ...updates } : p)),
         })),
 
-      removePlugin: (pluginId) =>
-        set((state) => ({
-          plugins: state.plugins.filter((p) => p.manifest.id !== pluginId),
+      removePlugin: pluginId =>
+        set(state => ({
+          plugins: state.plugins.filter(p => p.manifest.id !== pluginId),
         })),
 
       setPluginStatus: (pluginId, status) =>
-        set((state) => ({
-          plugins: state.plugins.map((p) =>
-            p.manifest.id === pluginId ? { ...p, status } : p
-          ),
+        set(state => ({
+          plugins: state.plugins.map(p => (p.manifest.id === pluginId ? { ...p, status } : p)),
         })),
 
-      togglePlugin: (pluginId) =>
-        set((state) => ({
-          plugins: state.plugins.map((p) =>
+      togglePlugin: pluginId =>
+        set(state => ({
+          plugins: state.plugins.map(p =>
             p.manifest.id === pluginId ? { ...p, enabled: !p.enabled } : p
           ),
         })),
 
       // Built-in panel toggle
-      toggleBuiltinPanel: (panelId) =>
-        set((state) => {
+      toggleBuiltinPanel: panelId =>
+        set(state => {
           const isDisabled = state.disabledBuiltinPanels.includes(panelId);
           return {
             disabledBuiltinPanels: isDisabled
-              ? state.disabledBuiltinPanels.filter((id) => id !== panelId)
+              ? state.disabledBuiltinPanels.filter(id => id !== panelId)
               : [...state.disabledBuiltinPanels, panelId],
           };
         }),
 
       // Panel placement override
       setPanelPlacement: (panelId, placement) =>
-        set((state) => ({
+        set(state => ({
           panelPlacements: { ...state.panelPlacements, [panelId]: placement },
         })),
 
       // UI Extension Actions
-      registerPanel: (extension) =>
-        set((state) => ({
-          panels: [...state.panels.filter((p) => p.id !== extension.id), extension],
+      registerPanel: extension =>
+        set(state => ({
+          panels: [...state.panels.filter(p => p.id !== extension.id), extension],
         })),
 
-      unregisterPanel: (id) =>
-        set((state) => ({
-          panels: state.panels.filter((p) => p.id !== id),
+      unregisterPanel: id =>
+        set(state => ({
+          panels: state.panels.filter(p => p.id !== id),
         })),
 
       updatePanelVisibility: (id, visible) =>
-        set((state) => ({
-          panels: state.panels.map((p) =>
-            p.id === id ? { ...p, visible } : p
-          ),
+        set(state => ({
+          panels: state.panels.map(p => (p.id === id ? { ...p, visible } : p)),
         })),
 
-      registerSettingsTab: (extension) =>
-        set((state) => ({
-          settingsTabs: [...state.settingsTabs.filter((t) => t.id !== extension.id), extension],
+      registerSettingsTab: extension =>
+        set(state => ({
+          settingsTabs: [...state.settingsTabs.filter(t => t.id !== extension.id), extension],
         })),
 
-      unregisterSettingsTab: (id) =>
-        set((state) => ({
-          settingsTabs: state.settingsTabs.filter((t) => t.id !== id),
+      unregisterSettingsTab: id =>
+        set(state => ({
+          settingsTabs: state.settingsTabs.filter(t => t.id !== id),
         })),
 
-      registerToolbarItem: (extension) =>
-        set((state) => ({
-          toolbarItems: [...state.toolbarItems.filter((t) => t.id !== extension.id), extension],
+      registerToolbarItem: extension =>
+        set(state => ({
+          toolbarItems: [...state.toolbarItems.filter(t => t.id !== extension.id), extension],
         })),
 
-      unregisterToolbarItem: (id) =>
-        set((state) => ({
-          toolbarItems: state.toolbarItems.filter((t) => t.id !== id),
+      unregisterToolbarItem: id =>
+        set(state => ({
+          toolbarItems: state.toolbarItems.filter(t => t.id !== id),
         })),
 
-      registerNotchTab: (tab) =>
-        set((state) => ({
-          notchTabs: [...state.notchTabs.filter((t) => t.id !== tab.id), tab],
+      registerNotchTab: tab =>
+        set(state => ({
+          notchTabs: [...state.notchTabs.filter(t => t.id !== tab.id), tab],
         })),
 
-      unregisterNotchTabs: (pluginId) =>
-        set((state) => ({
-          notchTabs: state.notchTabs.filter((t) => t.pluginId !== pluginId),
+      unregisterNotchTabs: pluginId =>
+        set(state => ({
+          notchTabs: state.notchTabs.filter(t => t.pluginId !== pluginId),
         })),
 
-      clearPluginExtensions: (pluginId) =>
-        set((state) => ({
-          panels: state.panels.filter((p) => p.pluginId !== pluginId),
-          settingsTabs: state.settingsTabs.filter((t) => t.pluginId !== pluginId),
-          toolbarItems: state.toolbarItems.filter((t) => t.pluginId !== pluginId),
-          notchTabs: state.notchTabs.filter((t) => t.pluginId !== pluginId),
+      clearPluginExtensions: pluginId =>
+        set(state => ({
+          panels: state.panels.filter(p => p.pluginId !== pluginId),
+          settingsTabs: state.settingsTabs.filter(t => t.pluginId !== pluginId),
+          toolbarItems: state.toolbarItems.filter(t => t.pluginId !== pluginId),
+          notchTabs: state.notchTabs.filter(t => t.pluginId !== pluginId),
         })),
 
       // Settings Actions
       setPluginSetting: (pluginId, key, value) =>
-        set((state) => ({
+        set(state => ({
           settings: {
             ...state.settings,
             [pluginId]: {
@@ -315,22 +311,22 @@ export const usePluginStore = create<PluginStoreState>()(
         return defaultValue;
       },
 
-      clearPluginSettings: (pluginId) =>
-        set((state) => {
+      clearPluginSettings: pluginId =>
+        set(state => {
           const { [pluginId]: _, ...rest } = state.settings;
           return { settings: rest };
         }),
 
       // Permission Actions
-      setPendingPermissionRequest: (pendingPermissionRequest) => set({ pendingPermissionRequest }),
+      setPendingPermissionRequest: pendingPermissionRequest => set({ pendingPermissionRequest }),
 
       // Loading Actions
-      setLoading: (isLoading) => set({ isLoading }),
-      setError: (error) => set({ error }),
+      setLoading: isLoading => set({ isLoading }),
+      setError: error => set({ error }),
     }),
     {
       name: 'claudia-plugin-store',
-      partialize: (state) => ({
+      partialize: state => ({
         // Only persist user preferences — plugin list is server-authoritative
         settings: state.settings,
         disabledBuiltinPanels: state.disabledBuiltinPanels,
@@ -343,7 +339,9 @@ export const usePluginStore = create<PluginStoreState>()(
           // Only restore user preferences — ignore stale plugins from old localStorage data
           settings: persisted.settings ?? currentState.settings,
           disabledBuiltinPanels: normalizeDisabledBuiltinPanels(persisted.disabledBuiltinPanels),
-          panelPlacements: migratePanelPlacements(persisted.panelPlacements ?? currentState.panelPlacements),
+          panelPlacements: migratePanelPlacements(
+            persisted.panelPlacements ?? currentState.panelPlacements
+          ),
         };
       },
     }
@@ -355,10 +353,12 @@ export const usePluginStore = create<PluginStoreState>()(
 // ============================================
 
 export const selectActivePlugins = (state: PluginStoreState): InstalledPlugin[] =>
-  state.plugins.filter((p) => p.status === 'active' && p.enabled);
+  state.plugins.filter(p => p.status === 'active' && p.enabled);
 
-export const selectPluginById = (pluginId: string) => (state: PluginStoreState): InstalledPlugin | undefined =>
-  state.plugins.find((p) => p.manifest.id === pluginId);
+export const selectPluginById =
+  (pluginId: string) =>
+  (state: PluginStoreState): InstalledPlugin | undefined =>
+    state.plugins.find(p => p.manifest.id === pluginId);
 
 export const selectPluginPanels = (state: PluginStoreState): UIExtension[] =>
   [...state.panels].sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -373,12 +373,9 @@ export const selectPluginNotchTabs = (state: PluginStoreState): PluginNotchTab[]
  * Resolve effective placement for a panel.
  * Priority: user override → panel default → 'right'.
  */
-export function getEffectivePlacement(
-  state: PluginStoreState,
-  panelId: string,
-): PanelPlacement {
+export function getEffectivePlacement(state: PluginStoreState, panelId: string): PanelPlacement {
   const override = state.panelPlacements[panelId];
   if (override) return override;
-  const panel = state.panels.find((p) => p.id === panelId);
+  const panel = state.panels.find(p => p.id === panelId);
   return panel?.defaultPlacement ?? 'right';
 }

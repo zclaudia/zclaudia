@@ -69,9 +69,7 @@ describe('NodePalette', () => {
 
   it('adds plugin step to existing category when matching', () => {
     (useWorkflowStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-      stepTypes: [
-        { type: 'custom_git', name: 'Custom Git Op', source: 'plugin', category: 'Git' },
-      ],
+      stepTypes: [{ type: 'custom_git', name: 'Custom Git Op', source: 'plugin', category: 'Git' }],
     });
     const { container } = render(<NodePalette />);
     expect(container.textContent).toContain('Custom Git Op');

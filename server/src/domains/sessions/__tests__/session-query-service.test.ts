@@ -50,14 +50,18 @@ describe('SessionQueryService', () => {
 
   it('lists active sessions by default and includes archived when requested', () => {
     const now = Date.now();
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run('s1', 'project-1', 'Active', null, now, now);
-    db.prepare(`
+    `
+    ).run('s1', 'project-1', 'Active', null, now, now);
+    db.prepare(
+      `
       INSERT INTO sessions (id, project_id, name, archived_at, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run('s2', 'project-1', 'Archived', now, now, now);
+    `
+    ).run('s2', 'project-1', 'Archived', now, now, now);
 
     const service = new SessionQueryService(db, new Map());
 
@@ -68,14 +72,18 @@ describe('SessionQueryService', () => {
 
   it('filters session list by project', () => {
     const now = Date.now();
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO sessions (id, project_id, name, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
-    `).run('s1', 'project-1', 'One', now, now);
-    db.prepare(`
+    `
+    ).run('s1', 'project-1', 'One', now, now);
+    db.prepare(
+      `
       INSERT INTO sessions (id, project_id, name, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
-    `).run('s2', 'project-2', 'Two', now, now);
+    `
+    ).run('s2', 'project-2', 'Two', now, now);
 
     const service = new SessionQueryService(db, new Map());
 
@@ -86,14 +94,18 @@ describe('SessionQueryService', () => {
 
   it('returns sync payload with active state and last offset', () => {
     const base = Date.now() - 1000;
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO sessions (id, project_id, name, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
-    `).run('s1', 'project-1', 'Recent', base, base);
-    db.prepare(`
+    `
+    ).run('s1', 'project-1', 'Recent', base, base);
+    db.prepare(
+      `
       INSERT INTO messages (id, session_id, role, content, created_at, offset)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run('m1', 's1', 'user', 'Hi', base, 9);
+    `
+    ).run('m1', 's1', 'user', 'Hi', base, 9);
 
     const activeRuns = new Map<string, { status: string; sessionId: string }>();
     activeRuns.set('run-1', { status: 'streaming', sessionId: 's1' });

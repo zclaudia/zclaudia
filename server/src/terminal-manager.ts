@@ -1,6 +1,10 @@
 import * as pty from 'node-pty';
 import { execSync } from 'child_process';
-import type { TerminalOutputMessage, TerminalExitedMessage, ServerMessage } from '@zclaudia/shared/wire/messages';
+import type {
+  TerminalOutputMessage,
+  TerminalExitedMessage,
+  ServerMessage,
+} from '@zclaudia/shared/wire/messages';
 
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 const SCROLLBACK_MAX_BYTES = 64 * 1024; // 64KB scrollback buffer
@@ -113,7 +117,9 @@ export class TerminalManager {
     // TCC-protected folders (~/{Desktop,Documents,Downloads}) need the "spawn at
     // $HOME then cd" fallback; see resolveSpawnCwd for the full rationale.
     const { spawnCwd, needsCd } = resolveSpawnCwd(cwd);
-    console.log(`[Terminal] Spawning: shell=${shell}, spawnCwd=${spawnCwd}, targetCwd=${cwd}, needsCd=${needsCd}, cols=${cols}, rows=${rows}`);
+    console.log(
+      `[Terminal] Spawning: shell=${shell}, spawnCwd=${spawnCwd}, targetCwd=${cwd}, needsCd=${needsCd}, cols=${cols}, rows=${rows}`
+    );
     let ptyProcess: pty.IPty;
     try {
       ptyProcess = pty.spawn(shell, [], {
@@ -124,7 +130,9 @@ export class TerminalManager {
         env: process.env as Record<string, string>,
       });
     } catch (err) {
-      console.error(`[Terminal] pty.spawn failed: shell=${shell}, cwd=${spawnCwd}, PATH=${process.env.PATH?.substring(0, 200)}`);
+      console.error(
+        `[Terminal] pty.spawn failed: shell=${shell}, cwd=${spawnCwd}, PATH=${process.env.PATH?.substring(0, 200)}`
+      );
       throw err;
     }
 
@@ -147,7 +155,7 @@ export class TerminalManager {
 
     this.terminals.set(terminalId, managed);
 
-    ptyProcess.onData((data) => {
+    ptyProcess.onData(data => {
       this.appendScrollback(managed, data);
       if (managed.clientId) {
         this.sendToClient(managed.clientId, {
@@ -187,8 +195,13 @@ export class TerminalManager {
     terminalId: string,
     clientId: string,
     cols: number,
-    rows: number,
-  ): { success: boolean; scrollback: string[]; error?: string; pendingExit?: { exitCode: number } } {
+    rows: number
+  ): {
+    success: boolean;
+    scrollback: string[];
+    error?: string;
+    pendingExit?: { exitCode: number };
+  } {
     const managed = this.terminals.get(terminalId);
     if (!managed) {
       return { success: false, scrollback: [], error: 'Terminal not found' };

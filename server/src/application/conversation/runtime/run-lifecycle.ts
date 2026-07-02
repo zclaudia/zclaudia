@@ -7,11 +7,17 @@ import type { Request as CorrelatedRequest } from '@zclaudia/shared/wire/correla
 import { isRequest } from '@zclaudia/shared/wire/correlation';
 import type { ProviderRegistryPort } from '../../../infra/providers/registry.js';
 import { interactionDispatcher } from '../interactions/interaction-dispatcher.js';
-import { extractAndIndexMetadata, removeIndexedMetadata } from '../../../infra/storage/metadata-extractor.js';
+import {
+  extractAndIndexMetadata,
+  removeIndexedMetadata,
+} from '../../../infra/storage/metadata-extractor.js';
 import { broadcastRunMessage, sendMessage } from '../transport/broadcast.js';
 import type { ConnectedClient, ActiveRun } from '../transport/types.js';
 import { setPhase, isTerminalPhase } from './active-run-phase.js';
-import { appendMessagesToTree, buildAssistantTurnMessages } from '../../../infra/providers/pi-runtime/session-tree/write-path.js';
+import {
+  appendMessagesToTree,
+  buildAssistantTurnMessages,
+} from '../../../infra/providers/pi-runtime/session-tree/write-path.js';
 
 /**
  * Extract a plain-text string from an AgentMessage's content field, handling
@@ -27,8 +33,14 @@ function extractTextContent(message: AgentMessage): string | undefined {
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) {
     const texts = content
-      .filter((c): c is { type: 'text'; text: string } => !!c && typeof c === 'object' && (c as { type?: unknown }).type === 'text' && typeof (c as { text?: unknown }).text === 'string')
-      .map((c) => c.text);
+      .filter(
+        (c): c is { type: 'text'; text: string } =>
+          !!c &&
+          typeof c === 'object' &&
+          (c as { type?: unknown }).type === 'text' &&
+          typeof (c as { text?: unknown }).text === 'string'
+      )
+      .map(c => c.text);
     return texts.length > 0 ? texts.join('') : undefined;
   }
   return undefined;
@@ -51,7 +63,10 @@ function buildTaskCommandNeedles(taskCommand?: string): string[] {
   return [...needles];
 }
 
-export async function findProcessPidsByTaskCommand(taskCommand?: string, excludedPids: number[] = []): Promise<number[]> {
+export async function findProcessPidsByTaskCommand(
+  taskCommand?: string,
+  excludedPids: number[] = []
+): Promise<number[]> {
   const needles = buildTaskCommandNeedles(taskCommand);
   if (needles.length === 0) return [];
 
@@ -75,7 +90,10 @@ export async function findProcessPidsByTaskCommand(taskCommand?: string, exclude
       .filter(proc => needles.some(needle => proc.args.includes(needle)))
       .filter(proc => {
         const args = proc.args.toLowerCase();
-        if (args.includes('/opt/homebrew/bin/claude ') || args.includes(' claude --output-format stream-json')) {
+        if (
+          args.includes('/opt/homebrew/bin/claude ') ||
+          args.includes(' claude --output-format stream-json')
+        ) {
           return false;
         }
         if (args.includes('mcp-bridge.js') || args.includes('claudia-plugins')) {
@@ -115,7 +133,7 @@ export function cleanupPendingPermissions(run: ActiveRun, message = 'Run cancell
 export function cancelRun(
   runId: string,
   ctx: CancelRunContext,
-  options: CancelRunOptions = {},
+  options: CancelRunOptions = {}
 ): void {
   const run = ctx.activeRuns.get(runId);
   if (run) {
@@ -158,7 +176,9 @@ export function cancelRun(
     try {
       upsertAssistantMessage(run, { indexMetadata: true });
       if (run.fullContent) {
-        console.log(`[Cancel] Saved partial assistant message for run ${runId} (${run.fullContent.length} chars)`);
+        console.log(
+          `[Cancel] Saved partial assistant message for run ${runId} (${run.fullContent.length} chars)`
+        );
       }
     } catch (err) {
       console.error(`[Cancel] Failed to save partial message for run ${runId}:`, err);
@@ -169,15 +189,16 @@ export function cancelRun(
     // them back as a single restorable draft so the client can repopulate the
     // input box. join('\n\n') matches what a user typing the same text across
     // multiple sends would visually look like.
-    const restoreDraft = run.pendingSteers && run.pendingSteers.length > 0
-      ? (() => {
-          const joined = run.pendingSteers
-            .map((m) => extractTextContent(m))
-            .filter((t): t is string => Boolean(t))
-            .join('\n\n');
-          return joined.length > 0 ? joined : undefined;
-        })()
-      : undefined;
+    const restoreDraft =
+      run.pendingSteers && run.pendingSteers.length > 0
+        ? (() => {
+            const joined = run.pendingSteers
+              .map(m => extractTextContent(m))
+              .filter((t): t is string => Boolean(t))
+              .join('\n\n');
+            return joined.length > 0 ? joined : undefined;
+          })()
+        : undefined;
 
     // Broadcast run_failed to ALL connected clients so every device updates its UI.
     run.eventSeq += 1;
@@ -220,9 +241,9 @@ export function cancelRun(
  * Get the next sequential offset for a message in a session.
  */
 export function getNextOffset(db: import('better-sqlite3').Database, sessionId: string): number {
-  const row = db.prepare(
-    'SELECT COALESCE(MAX(offset), 0) + 1 as next FROM messages WHERE session_id = ?'
-  ).get(sessionId) as { next: number };
+  const row = db
+    .prepare('SELECT COALESCE(MAX(offset), 0) + 1 as next FROM messages WHERE session_id = ?')
+    .get(sessionId) as { next: number };
   return row.next;
 }
 
@@ -240,9 +261,16 @@ export function upsertAssistantMessage(
     metadata.usage = options.usage;
   }
   if (run.collectedToolCalls.length > 0) {
-    metadata.toolCalls = run.collectedToolCalls.map(({ toolUseId, name, input, output, isError, effect }) => ({
-      toolUseId, name, input, output, isError, effect
-    }));
+    metadata.toolCalls = run.collectedToolCalls.map(
+      ({ toolUseId, name, input, output, isError, effect }) => ({
+        toolUseId,
+        name,
+        input,
+        output,
+        isError,
+        effect,
+      })
+    );
   }
   if (run.contentBlocks.length > 0) {
     metadata.contentBlocks = run.contentBlocks;
@@ -252,10 +280,10 @@ export function upsertAssistantMessage(
   }
 
   const hasPersistableContent =
-    run.fullContent.trim().length > 0
-    || run.collectedToolCalls.length > 0
-    || run.contentBlocks.length > 0
-    || (run.thinkingBlocks?.length ?? 0) > 0;
+    run.fullContent.trim().length > 0 ||
+    run.collectedToolCalls.length > 0 ||
+    run.contentBlocks.length > 0 ||
+    (run.thinkingBlocks?.length ?? 0) > 0;
 
   if (!hasPersistableContent) return;
 
@@ -270,39 +298,58 @@ export function upsertAssistantMessage(
   // silently skipping. (appendMessagesToTree's own transaction nests as a savepoint.)
   const willAppendTree = Boolean(options?.indexMetadata) && !run.treeTurnAppended;
   run.db.transaction(() => {
-    run.db.prepare(`
+    run.db
+      .prepare(
+        `
       INSERT INTO messages (id, session_id, role, content, metadata, created_at, offset)
       VALUES (?, ?, 'assistant', ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         content = excluded.content,
         metadata = excluded.metadata
-    `).run(
-      run.assistantMessageId,
-      run.sessionId,
-      run.fullContent,
-      metadataJson,
-      Date.now(),
-      assistantOffset
-    );
+    `
+      )
+      .run(
+        run.assistantMessageId,
+        run.sessionId,
+        run.fullContent,
+        metadataJson,
+        Date.now(),
+        assistantOffset
+      );
 
     // Extended indexing (file_references, tool_call_records) — only on final/cancel save
     if (options?.indexMetadata && metadataJson) {
-      const row = run.db.prepare('SELECT rowid FROM messages WHERE id = ?').get(run.assistantMessageId) as { rowid: number } | undefined;
+      const row = run.db
+        .prepare('SELECT rowid FROM messages WHERE id = ?')
+        .get(run.assistantMessageId) as { rowid: number } | undefined;
       if (row) {
         // Clean previous index entries then re-extract
         removeIndexedMetadata(run.db, run.assistantMessageId);
-        extractAndIndexMetadata(run.db, run.assistantMessageId, row.rowid, run.sessionId, metadata as Parameters<typeof extractAndIndexMetadata>[4], Date.now());
+        extractAndIndexMetadata(
+          run.db,
+          run.assistantMessageId,
+          row.rowid,
+          run.sessionId,
+          metadata as Parameters<typeof extractAndIndexMetadata>[4],
+          Date.now()
+        );
       }
     }
 
     if (willAppendTree) {
-      const entryIds = appendMessagesToTree(run.db, run.sessionId, buildAssistantTurnMessages({
-        fullContent: run.fullContent,
-        thinkingBlocks: run.thinkingBlocks,
-        collectedToolCalls: run.collectedToolCalls,
-        usage: options?.usage,
-      }));
-      run.db.prepare(`UPDATE messages SET tree_entry_id = ? WHERE id = ?`).run(entryIds[0], run.assistantMessageId);
+      const entryIds = appendMessagesToTree(
+        run.db,
+        run.sessionId,
+        buildAssistantTurnMessages({
+          fullContent: run.fullContent,
+          thinkingBlocks: run.thinkingBlocks,
+          collectedToolCalls: run.collectedToolCalls,
+          usage: options?.usage,
+        })
+      );
+      run.db
+        .prepare(`UPDATE messages SET tree_entry_id = ? WHERE id = ?`)
+        .run(entryIds[0], run.assistantMessageId);
     }
   })();
   if (willAppendTree) run.treeTurnAppended = true;
@@ -335,8 +382,8 @@ export function parseMessage(data: string): { request: CorrelatedRequest; isOldF
     timestamp: Date.now(),
     metadata: {
       timeout: 30000,
-      requiresAuth: false
-    }
+      requiresAuth: false,
+    },
   };
 
   return { request, isOldFormat: true };

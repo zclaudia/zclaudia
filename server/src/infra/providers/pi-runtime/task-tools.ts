@@ -11,19 +11,24 @@ import { EvalTaskRuntime } from './eval-task-runtime.js';
 import { createTaskRuntimeRegistry, type TaskRuntimeRegistry } from './task-runtime.js';
 export { parseTaskOutputWindowParams } from './task-output-window.js';
 
+type AgentToolParameters = AgentTool['parameters'];
+
+function agentToolParameters(schema: Record<string, unknown>): AgentToolParameters {
+  return schema as AgentToolParameters;
+}
+
 function taskTitleFromArgs(args: Record<string, unknown>): string | undefined {
-  if (typeof args.description === 'string' && args.description.trim()) return args.description.trim();
-  if (typeof args.prompt === 'string' && args.prompt.trim()) return truncateText(args.prompt.trim(), 120);
+  if (typeof args.description === 'string' && args.description.trim())
+    return args.description.trim();
+  if (typeof args.prompt === 'string' && args.prompt.trim())
+    return truncateText(args.prompt.trim(), 120);
   return undefined;
 }
 
 export type TaskRuntimeRegistryFactory = (repo: TaskRepository) => TaskRuntimeRegistry;
 
 export function createDefaultTaskRuntimeRegistry(repo: TaskRepository): TaskRuntimeRegistry {
-  return createTaskRuntimeRegistry([
-    new CommandTaskRuntime(repo),
-    new EvalTaskRuntime(repo),
-  ]);
+  return createTaskRuntimeRegistry([new CommandTaskRuntime(repo), new EvalTaskRuntime(repo)]);
 }
 
 export function createAgentTool(
@@ -32,22 +37,27 @@ export function createAgentTool(
   runId?: string,
   db?: Database.Database,
   permissionOverride?: Partial<UnifiedPermissionPolicy>,
-  agentTaskExecutor?: TaskExecutor,
-): AgentTool<any> {
+  agentTaskExecutor?: TaskExecutor
+): AgentTool {
   return {
     name: 'Agent',
     label: 'Agent',
-    description: 'Delegate work to a background sub-agent task. Set isolation:"worktree" to run it in an ephemeral git worktree so parallel agents never conflict on files; a clean worktree is removed automatically, one with changes is kept and reported.',
-    parameters: {
+    description:
+      'Delegate work to a background sub-agent task. Set isolation:"worktree" to run it in an ephemeral git worktree so parallel agents never conflict on files; a clean worktree is removed automatically, one with changes is kept and reported.',
+    parameters: agentToolParameters({
       type: 'object',
       properties: {
         prompt: { type: 'string' },
         description: { type: 'string' },
         wait: { type: 'boolean' },
-        isolation: { type: 'string', enum: ['worktree'], description: 'Run the sub-agent in an isolated git worktree' },
+        isolation: {
+          type: 'string',
+          enum: ['worktree'],
+          description: 'Run the sub-agent in an isolated git worktree',
+        },
       },
       required: ['prompt'],
-    } as any,
+    }),
     execute: async (toolCallId: string, params: unknown) => {
       const args = toolParams(toolCallId, params);
       if (!agentTaskExecutor) return jsonResult({ error: 'Agent tool requires a task executor' });
@@ -66,7 +76,8 @@ export function createAgentTool(
         metadata: {
           prompt: args.prompt,
           wait: Boolean(args.wait),
-          permissionOverride: args.permission_override ?? args.permissionOverride ?? permissionOverride,
+          permissionOverride:
+            args.permission_override ?? args.permissionOverride ?? permissionOverride,
           cwd,
           ...(args.isolation === 'worktree' ? { isolation: 'worktree' } : {}),
         },
@@ -83,11 +94,12 @@ export function createAgentTool(
           });
         }
         const result = await agentTaskExecutor.wait(task.id);
-        const updated = result.status === 'completed'
-          ? taskService.completeTask(task.id, result.result ?? {})
-          : result.status === 'stopped'
-            ? taskService.stopTask(task.id, result.result)
-            : taskService.failTask(task.id, result.result ?? { error: 'Agent task failed' });
+        const updated =
+          result.status === 'completed'
+            ? taskService.completeTask(task.id, result.result ?? {})
+            : result.status === 'stopped'
+              ? taskService.stopTask(task.id, result.result)
+              : taskService.failTask(task.id, result.result ?? { error: 'Agent task failed' });
         return jsonResult({
           ok: true,
           taskId: task.id,
@@ -100,25 +112,36 @@ export function createAgentTool(
         return errorResult('agent_delegate_failed', message, { taskId: task.id });
       }
     },
-  } as unknown as AgentTool<any>;
+  };
 }
 
-export function createTaskOutputTool(db?: Database.Database, runtimeRegistryFactory: TaskRuntimeRegistryFactory = createDefaultTaskRuntimeRegistry): AgentTool<any> {
+export function createTaskOutputTool(
+  db?: Database.Database,
+  runtimeRegistryFactory: TaskRuntimeRegistryFactory = createDefaultTaskRuntimeRegistry
+): AgentTool {
   return {
     name: 'TaskOutput',
     label: 'TaskOutput',
     description: 'Read task state, result, and lifecycle events by task id.',
-    parameters: {
+    parameters: agentToolParameters({
       type: 'object',
       properties: {
         task_id: { type: 'string' },
         taskId: { type: 'string' },
         include_events: { type: 'boolean', default: true },
-        output_offset: { type: 'number', description: 'For command tasks: byte offset to read the log from (use the previous nextOffset)' },
-        tail_lines: { type: 'number', description: 'For command tasks: return only the last N lines (takes precedence over output_offset)' },
+        output_offset: {
+          type: 'number',
+          description:
+            'For command tasks: byte offset to read the log from (use the previous nextOffset)',
+        },
+        tail_lines: {
+          type: 'number',
+          description:
+            'For command tasks: return only the last N lines (takes precedence over output_offset)',
+        },
       },
       required: ['task_id'],
-    } as any,
+    }),
     execute: async (toolCallId: string, params: unknown) => {
       const args = toolParams(toolCallId, params);
       if (!db) return errorResult('missing_db_context', 'TaskOutput requires database context');
@@ -143,15 +166,20 @@ export function createTaskOutputTool(db?: Database.Database, runtimeRegistryFact
         eventCount: events.length,
       });
     },
-  } as unknown as AgentTool<any>;
+  };
 }
 
-export function createMonitorTool(sessionId?: string, runId?: string, db?: Database.Database, runtimeRegistryFactory: TaskRuntimeRegistryFactory = createDefaultTaskRuntimeRegistry): AgentTool<any> {
+export function createMonitorTool(
+  sessionId?: string,
+  runId?: string,
+  db?: Database.Database,
+  runtimeRegistryFactory: TaskRuntimeRegistryFactory = createDefaultTaskRuntimeRegistry
+): AgentTool {
   return {
     name: 'Monitor',
     label: 'Monitor',
     description: 'Create, inspect, or stop a monitor task using the shared Task lifecycle.',
-    parameters: {
+    parameters: agentToolParameters({
       type: 'object',
       properties: {
         action: { type: 'string', enum: ['start', 'status', 'stop'], default: 'start' },
@@ -163,7 +191,7 @@ export function createMonitorTool(sessionId?: string, runId?: string, db?: Datab
         interval_ms: { type: 'number' },
         reason: { type: 'string' },
       },
-    } as any,
+    }),
     execute: async (toolCallId: string, params: unknown) => {
       const args = toolParams(toolCallId, params);
       if (!db) return errorResult('missing_db_context', 'Monitor requires database context');
@@ -195,7 +223,8 @@ export function createMonitorTool(sessionId?: string, runId?: string, db?: Datab
         return errorResult('missing_task_id', `Monitor action "${action}" requires task_id`);
       }
       const task = repo.findById(taskId.trim());
-      if (!task) return errorResult('task_not_found', `Monitor task not found: ${taskId}`, { taskId });
+      if (!task)
+        return errorResult('task_not_found', `Monitor task not found: ${taskId}`, { taskId });
 
       if (action === 'status') {
         return jsonResult({ ok: true, task, events: repo.listEvents(task.id) });
@@ -204,7 +233,10 @@ export function createMonitorTool(sessionId?: string, runId?: string, db?: Datab
         try {
           const runtime = runtimeRegistryFactory(repo).get(task.type);
           if (runtime?.stop) {
-            const update = await runtime.stop(task, typeof args.reason === 'string' ? args.reason : undefined);
+            const update = await runtime.stop(
+              task,
+              typeof args.reason === 'string' ? args.reason : undefined
+            );
             return jsonResult({ ok: true, taskId: task.id, status: update.status });
           }
           const stopped = service.stopTask(task.id, {
@@ -219,5 +251,5 @@ export function createMonitorTool(sessionId?: string, runId?: string, db?: Datab
 
       return errorResult('unknown_monitor_action', `Unknown Monitor action: ${action}`);
     },
-  } as unknown as AgentTool<any>;
+  };
 }

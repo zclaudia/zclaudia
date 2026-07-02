@@ -31,13 +31,23 @@ export class GitStageActivity implements Activity<GitStageInput, GitStageOutput>
   async invoke(input: GitStageInput): Promise<ActivityResult<GitStageOutput>> {
     const cwd = input.worktreePath ?? input.projectRootPath;
     if (!cwd) {
-      return { status: 'failed', output: { stagedFiles: [], count: 0, hasChanges: false }, error: 'No working directory' };
+      return {
+        status: 'failed',
+        output: { stagedFiles: [], count: 0, hasChanges: false },
+        error: 'No working directory',
+      };
     }
     try {
       await execFileAsync('git', ['add', '-A'], { cwd });
       const { stdout } = await execFileAsync('git', ['diff', '--cached', '--name-only'], { cwd });
-      const stagedFiles = stdout.split('\n').map((s) => s.trim()).filter(Boolean);
-      return { status: 'completed', output: { stagedFiles, count: stagedFiles.length, hasChanges: stagedFiles.length > 0 } };
+      const stagedFiles = stdout
+        .split('\n')
+        .map(s => s.trim())
+        .filter(Boolean);
+      return {
+        status: 'completed',
+        output: { stagedFiles, count: stagedFiles.length, hasChanges: stagedFiles.length > 0 },
+      };
     } catch (err: unknown) {
       return {
         status: 'failed',

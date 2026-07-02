@@ -18,19 +18,19 @@ export interface UseAttachmentsResult {
  */
 export function useAttachments(
   ownerKind: AttachmentOwnerKind | null | undefined,
-  ownerId: string | null | undefined,
+  ownerId: string | null | undefined
 ): UseAttachmentsResult {
   const safeKind = ownerKind ?? null;
   const safeId = ownerId ?? null;
   const key = safeKind && safeId ? ownerKey(safeKind, safeId) : '';
 
-  const items = useAttachmentsStore((state) => (key ? state.byOwner[key] : undefined)) ?? EMPTY;
-  const isLoading = useAttachmentsStore((state) => (key ? !!state.loadingOwners[key] : false));
+  const items = useAttachmentsStore(state => (key ? state.byOwner[key] : undefined)) ?? EMPTY;
+  const isLoading = useAttachmentsStore(state => (key ? !!state.loadingOwners[key] : false));
 
-  const loadAttachments = useAttachmentsStore((state) => state.loadAttachments);
-  const uploadFn = useAttachmentsStore((state) => state.uploadAttachment);
-  const removeFn = useAttachmentsStore((state) => state.removeAttachment);
-  const renameFn = useAttachmentsStore((state) => state.renameAttachment);
+  const loadAttachments = useAttachmentsStore(state => state.loadAttachments);
+  const uploadFn = useAttachmentsStore(state => state.uploadAttachment);
+  const removeFn = useAttachmentsStore(state => state.removeAttachment);
+  const renameFn = useAttachmentsStore(state => state.renameAttachment);
 
   useEffect(() => {
     if (!safeKind || !safeId) return;
@@ -51,7 +51,7 @@ export function useAttachments(
       }
       return uploadFn(safeKind, safeId, file, options);
     },
-    [safeKind, safeId, uploadFn],
+    [safeKind, safeId, uploadFn]
   );
 
   const remove = useCallback(
@@ -59,7 +59,7 @@ export function useAttachments(
       if (!safeKind || !safeId) return;
       await removeFn(id, safeKind, safeId);
     },
-    [safeKind, safeId, removeFn],
+    [safeKind, safeId, removeFn]
   );
 
   const rename = useCallback(
@@ -69,12 +69,12 @@ export function useAttachments(
       }
       return renameFn(id, name);
     },
-    [safeKind, safeId, renameFn],
+    [safeKind, safeId, renameFn]
   );
 
   return useMemo(
     () => ({ items, isLoading, reload, upload, remove, rename }),
-    [items, isLoading, reload, upload, remove, rename],
+    [items, isLoading, reload, upload, remove, rename]
   );
 }
 

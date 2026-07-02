@@ -39,7 +39,7 @@ export function SinceSelector({
 
   // Prefer the parent-supplied selection for the label, fall back to scanning
   // the options list (only populated while the dropdown is open).
-  const selected = selectedOption ?? options.find((o) => o.id === selectedId) ?? null;
+  const selected = selectedOption ?? options.find(o => o.id === selectedId) ?? null;
   const buttonLabel = selected
     ? `Since: "${selected.preview}" · ${timeAgo(selected.timestamp)}`
     : selectedId === null
@@ -79,7 +79,7 @@ export function SinceSelector({
               No user messages yet
             </div>
           ) : (
-            options.map((opt) => (
+            options.map(opt => (
               <button
                 key={opt.id}
                 type="button"
@@ -95,9 +95,7 @@ export function SinceSelector({
                 </span>
                 <div className="flex-1 min-w-0">
                   <div className="truncate">{opt.preview || '(empty)'}</div>
-                  <div className="text-[10px] text-muted-foreground">
-                    {timeAgo(opt.timestamp)}
-                  </div>
+                  <div className="text-[10px] text-muted-foreground">{timeAgo(opt.timestamp)}</div>
                 </div>
               </button>
             ))

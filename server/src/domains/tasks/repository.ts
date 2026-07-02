@@ -85,30 +85,34 @@ export class TaskRepository {
   create(input: CreateTaskInput): TaskRecord {
     const id = newId();
     const now = Date.now();
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO tasks (
         id, type, status, parent_task_id, parent_session_id, parent_run_id, parent_tool_use_id,
         session_id, run_id, title, description, executor_ref, result, metadata, created_at, updated_at
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      id,
-      input.type,
-      input.status ?? 'queued',
-      input.parentTaskId ?? null,
-      input.parentSessionId ?? null,
-      input.parentRunId ?? null,
-      input.parentToolUseId ?? null,
-      input.sessionId ?? null,
-      input.runId ?? null,
-      input.title ?? null,
-      input.description ?? null,
-      stringifyJson(input.executorRef),
-      stringifyJson(input.result),
-      stringifyJson(input.metadata),
-      now,
-      now,
-    );
+    `
+      )
+      .run(
+        id,
+        input.type,
+        input.status ?? 'queued',
+        input.parentTaskId ?? null,
+        input.parentSessionId ?? null,
+        input.parentRunId ?? null,
+        input.parentToolUseId ?? null,
+        input.sessionId ?? null,
+        input.runId ?? null,
+        input.title ?? null,
+        input.description ?? null,
+        stringifyJson(input.executorRef),
+        stringifyJson(input.result),
+        stringifyJson(input.metadata),
+        now,
+        now
+      );
     const created = this.findById(id);
     if (!created) throw new Error(`Failed to create task: ${id}`);
     return created;
@@ -127,36 +131,57 @@ export class TaskRepository {
       : `SELECT * FROM tasks WHERE type = ? AND status IN (${placeholders})`;
     const params = sessionId ? [type, ...statuses, sessionId] : [type, ...statuses];
     const rows = this.db.prepare(sql).all(...params) as TaskRow[];
-    return rows.map((row) => this.mapTask(row));
+    return rows.map(row => this.mapTask(row));
+  }
+
+  findLatestClaudiaAgentTaskId(sessionId: string): string | null {
+    const row = this.db
+      .prepare(
+        `SELECT id
+       FROM tasks
+       WHERE session_id = ?
+         AND type = 'agent'
+         AND json_extract(metadata, '$.initiator') = 'claudia'
+       ORDER BY created_at DESC
+       LIMIT 1`
+      )
+      .get(sessionId) as { id: string } | undefined;
+    return row?.id ?? null;
   }
 
   update(id: string, input: UpdateTaskInput): TaskRecord {
     const existing = this.findById(id);
     if (!existing) throw new Error(`Task not found: ${id}`);
-    const mergedExecutorRef = input.executorRef === undefined
-      ? existing.executorRef
-      : { ...(existing.executorRef ?? {}), ...input.executorRef };
-    const mergedMetadata = input.metadata === undefined
-      ? existing.metadata
-      : { ...(existing.metadata ?? {}), ...input.metadata };
+    const mergedExecutorRef =
+      input.executorRef === undefined
+        ? existing.executorRef
+        : { ...(existing.executorRef ?? {}), ...input.executorRef };
+    const mergedMetadata =
+      input.metadata === undefined
+        ? existing.metadata
+        : { ...(existing.metadata ?? {}), ...input.metadata };
     const now = Date.now();
-    const result = this.db.prepare(`
+    const result = this.db
+      .prepare(
+        `
       UPDATE tasks
       SET status = ?, session_id = ?, run_id = ?, title = ?, description = ?,
           executor_ref = ?, result = ?, metadata = ?, updated_at = ?
       WHERE id = ?
-    `).run(
-      input.status ?? existing.status,
-      input.sessionId ?? existing.sessionId ?? null,
-      input.runId ?? existing.runId ?? null,
-      input.title ?? existing.title ?? null,
-      input.description ?? existing.description ?? null,
-      stringifyJson(mergedExecutorRef),
-      stringifyJson(input.result ?? existing.result),
-      stringifyJson(mergedMetadata),
-      now,
-      id,
-    );
+    `
+      )
+      .run(
+        input.status ?? existing.status,
+        input.sessionId ?? existing.sessionId ?? null,
+        input.runId ?? existing.runId ?? null,
+        input.title ?? existing.title ?? null,
+        input.description ?? existing.description ?? null,
+        stringifyJson(mergedExecutorRef),
+        stringifyJson(input.result ?? existing.result),
+        stringifyJson(mergedMetadata),
+        now,
+        id
+      );
     if (result.changes === 0) throw new Error(`Task not found: ${id}`);
     const updated = this.findById(id);
     if (!updated) throw new Error(`Failed to update task: ${id}`);
@@ -171,17 +196,14 @@ export class TaskRepository {
   }): TaskEvent {
     const id = newId();
     const now = Date.now();
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO task_events (id, task_id, type, status, payload, created_at)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run(
-      id,
-      input.taskId,
-      input.type,
-      input.status ?? null,
-      stringifyJson(input.payload),
-      now,
-    );
+    `
+      )
+      .run(id, input.taskId, input.type, input.status ?? null, stringifyJson(input.payload), now);
     return {
       id,
       taskId: input.taskId,
@@ -193,9 +215,13 @@ export class TaskRepository {
   }
 
   listEvents(taskId: string): TaskEvent[] {
-    const rows = this.db.prepare(`
+    const rows = this.db
+      .prepare(
+        `
       SELECT * FROM task_events WHERE task_id = ? ORDER BY created_at ASC, id ASC
-    `).all(taskId) as TaskEventRow[];
+    `
+      )
+      .all(taskId) as TaskEventRow[];
     return rows.map(row => this.mapEvent(row));
   }
 

@@ -16,7 +16,7 @@ interface AgentConfigState {
   }) => Promise<boolean>;
 }
 
-export const useAgentConfigStore = create<AgentConfigState>((set) => ({
+export const useAgentConfigStore = create<AgentConfigState>(set => ({
   config: null,
   isLoading: false,
   isSaving: false,
@@ -42,7 +42,7 @@ export const useAgentConfigStore = create<AgentConfigState>((set) => ({
     }
   },
 
-  updateConfig: async (updates) => {
+  updateConfig: async updates => {
     set({ isSaving: true, error: null });
     try {
       const config = await updateAgentConfig(updates);

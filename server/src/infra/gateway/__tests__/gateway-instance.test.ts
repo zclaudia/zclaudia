@@ -1,8 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-  setGatewayClient,
-  getGatewayClient,
-} from '../gateway-instance.js';
+import { setGatewayClient, getGatewayClient } from '../gateway-instance.js';
 
 // Mock the types
 type MockGatewayClient = { id: string; mock: true };

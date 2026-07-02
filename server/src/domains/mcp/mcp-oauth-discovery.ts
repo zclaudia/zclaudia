@@ -38,14 +38,18 @@ function discoveryUrls(config: McpOAuthConfig, resourceUrl?: string): string[] {
 
 function mergeMetadata(config: McpOAuthConfig, metadata: OAuthMetadata): McpOAuthConfig {
   const scopes = Array.isArray(metadata.scopes_supported)
-    ? metadata.scopes_supported.filter((scope): scope is string => typeof scope === 'string' && !!scope.trim())
+    ? metadata.scopes_supported.filter(
+        (scope): scope is string => typeof scope === 'string' && !!scope.trim()
+      )
     : undefined;
 
   return {
     ...config,
-    authorizationEndpoint: config.authorizationEndpoint ?? validUrl(metadata.authorization_endpoint),
+    authorizationEndpoint:
+      config.authorizationEndpoint ?? validUrl(metadata.authorization_endpoint),
     tokenEndpoint: config.tokenEndpoint ?? validUrl(metadata.token_endpoint),
-    deviceAuthorizationEndpoint: config.deviceAuthorizationEndpoint ?? validUrl(metadata.device_authorization_endpoint),
+    deviceAuthorizationEndpoint:
+      config.deviceAuthorizationEndpoint ?? validUrl(metadata.device_authorization_endpoint),
     scopes: config.scopes ?? (scopes && scopes.length > 0 ? scopes : undefined),
   };
 }
@@ -53,7 +57,7 @@ function mergeMetadata(config: McpOAuthConfig, metadata: OAuthMetadata): McpOAut
 export async function discoverMcpOAuthConfig(
   config: McpOAuthConfig,
   resourceUrl: string | undefined,
-  fetchFn: typeof fetch = globalThis.fetch,
+  fetchFn: typeof fetch = globalThis.fetch
 ): Promise<McpOAuthConfig> {
   const urls = discoveryUrls(config, resourceUrl);
   if (urls.length === 0) return config;
@@ -66,7 +70,7 @@ export async function discoverMcpOAuthConfig(
         lastError = new Error(await response.text());
         continue;
       }
-      const metadata = await response.json() as OAuthMetadata;
+      const metadata = (await response.json()) as OAuthMetadata;
       return mergeMetadata(config, metadata);
     } catch (error) {
       lastError = error;

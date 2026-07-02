@@ -13,19 +13,19 @@ function makeApp() {
   const now = Date.now();
   db.prepare(
     `INSERT INTO projects (id, name, created_at, updated_at)
-     VALUES (?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?)`
   ).run('p1', 'p', now, now);
   db.prepare(
     `INSERT INTO llm_profiles (id, name, created_at, updated_at)
-     VALUES (?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?)`
   ).run('lp1', 'lp', now, now);
   db.prepare(
     `INSERT INTO agent_profiles (id, name, llm_profile_id, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?)`
   ).run('ap1', 'ap', 'lp1', now, now);
   db.prepare(
     `INSERT INTO sessions (id, project_id, agent_profile_id, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?)`
   ).run('s1', 'p1', 'ap1', now, now);
   const repo = new GoalRepository(db);
   const svc = new GoalService(repo, { publish: () => {} });
@@ -45,9 +45,7 @@ describe('goal routes', () => {
 
   it('PUT creates a goal', async () => {
     const { app } = makeApp();
-    const res = await request(app)
-      .put('/sessions/s1/goal')
-      .send({ objective: 'tests pass' });
+    const res = await request(app).put('/sessions/s1/goal').send({ objective: 'tests pass' });
     expect(res.status).toBe(201);
     expect(res.body.data.objective).toBe('tests pass');
     expect(res.body.data.status).toBe('active');

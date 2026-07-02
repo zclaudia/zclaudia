@@ -16,6 +16,7 @@ import { useSelectionStore } from '../stores/selectionStore';
 import { useSessionRunStateStore } from '../stores/sessionRunStateStore';
 import * as api from './api';
 import { getControlPlaneMode, isLocalBackendId } from '../utils/controlPlane';
+import { findDeletedSessionIds, planDeltaSessionEvents } from './sessionSyncReconciliation';
 
 interface BackendSyncState {
   lastSyncTime: number;
@@ -49,14 +50,16 @@ async function fillMessageGapForSession(
   try {
     console.log(
       `[SessionSync] Gap detected for session ${currentSessionId}: ` +
-      `local maxOffset=${localMaxOffset}, server lastMessageOffset=${session.lastMessageOffset}`
+        `local maxOffset=${localMaxOffset}, server lastMessageOffset=${session.lastMessageOffset}`
     );
     const result = await api.getSessionMessages(currentSessionId, {
       afterOffset: localMaxOffset,
       limit: 100,
     });
     if (result.messages.length > 0) {
-      useChatMessageStore.getState().appendMessages(currentSessionId, result.messages, result.pagination);
+      useChatMessageStore
+        .getState()
+        .appendMessages(currentSessionId, result.messages, result.pagination);
       console.log(`[SessionSync] Filled ${result.messages.length} missing messages`);
     }
   } catch (error) {
@@ -68,7 +71,7 @@ async function checkAndFillMessageGaps(sessions: RemoteSession[]): Promise<void>
   const currentSessionId = useSelectionStore.getState().selectedSessionId;
   if (!currentSessionId) return;
 
-  const session = sessions.find((s) => s.id === currentSessionId);
+  const session = sessions.find(s => s.id === currentSessionId);
   if (!session) return;
   await fillMessageGapForSession(session);
 }
@@ -180,32 +183,34 @@ async function incrementalSync(backendId: string): Promise<RemoteSession[] | nul
     const existing = store.remoteSessions.get(backendId) || [];
 
     sessions.forEach((session: RemoteSession) => {
-      const existingSession = existing.find((s) => s.id === session.id);
       useSessionRunStateStore.getState().applySessionRunStatus({
         backendId,
         sessionId: session.id,
         isActive: Boolean(session.isActive),
         source: 'session_sync',
       });
+    });
 
-      if (!existingSession) {
+    for (const { eventType, session } of planDeltaSessionEvents<RemoteSession>(
+      existing,
+      sessions
+    )) {
+      if (eventType === 'created') {
         // New session (possibly from missed push)
         console.log(`[SessionSync] Found new session: ${session.id}`);
         store.handleSessionEvent(backendId, 'created', session);
-      } else if (existingSession.updatedAt < session.updatedAt) {
+      } else {
         // Updated session
         console.log(`[SessionSync] Session updated: ${session.id}`);
         store.handleSessionEvent(backendId, 'updated', session);
       }
-    });
+    }
 
     // Update sync timestamp
     state.lastSyncTime = timestamp;
 
     if (sessions.length > 0) {
-      console.log(
-        `[SessionSync] Incremental sync: ${sessions.length} changed sessions`
-      );
+      console.log(`[SessionSync] Incremental sync: ${sessions.length} changed sessions`);
     }
 
     // Check for message gaps in the currently viewed session
@@ -266,15 +271,12 @@ async function fullSync(backendId: string): Promise<RemoteSession[] | null> {
     const store = useSessionsStore.getState();
 
     // Detect deleted sessions and clean up projectStore too (cross-store consistency)
-    const serverSessionIds = new Set(sessions.map((s: RemoteSession) => s.id));
     const localSessions = store.remoteSessions.get(backendId) || [];
     const projectStore = useProjectStore.getState();
 
-    for (const localSession of localSessions) {
-      if (!serverSessionIds.has(localSession.id)) {
-        console.log(`[SessionSync] Detected deleted session: ${localSession.id}`);
-        projectStore.deleteSession(localSession.id);
-      }
+    for (const sessionId of findDeletedSessionIds(localSessions, sessions)) {
+      console.log(`[SessionSync] Detected deleted session: ${sessionId}`);
+      projectStore.deleteSession(sessionId);
     }
 
     // Replace sessionsStore with server's complete list (no need for individual delete events)
@@ -306,7 +308,7 @@ async function fullSync(backendId: string): Promise<RemoteSession[] | null> {
 
 export async function syncBackendData(
   backendId: string,
-  mode: 'full' | 'delta' = 'full',
+  mode: 'full' | 'delta' = 'full'
 ): Promise<{ completed: boolean; sessions: RemoteSession[] }> {
   // Reuse the existing state tracker so ad-hoc recovery syncs and periodic syncs
   // share the same dedupe and request URL resolution.
@@ -317,9 +319,7 @@ export async function syncBackendData(
     });
   }
 
-  const result = mode === 'delta'
-    ? await incrementalSync(backendId)
-    : await fullSync(backendId);
+  const result = mode === 'delta' ? await incrementalSync(backendId) : await fullSync(backendId);
   return {
     completed: result !== null,
     sessions: result ?? [],
@@ -343,8 +343,12 @@ export async function eagerSyncCurrentSession(_backendId: string): Promise<void>
       limit: 100,
     });
     if (result.messages.length > 0) {
-      useChatMessageStore.getState().appendMessages(currentSessionId, result.messages, result.pagination);
-      console.log(`[SessionSync] Eager sync filled ${result.messages.length} messages for session ${currentSessionId}`);
+      useChatMessageStore
+        .getState()
+        .appendMessages(currentSessionId, result.messages, result.pagination);
+      console.log(
+        `[SessionSync] Eager sync filled ${result.messages.length} messages for session ${currentSessionId}`
+      );
     }
   } catch (error) {
     console.error('[SessionSync] Eager sync failed:', error);
@@ -363,7 +367,10 @@ export async function eagerSyncCurrentSession(_backendId: string): Promise<void>
 const pendingRecovery = new Map<string, Promise<void>>();
 const trailingRecovery = new Set<string>();
 
-export async function recoverCurrentSessionTail(targetServerId: string, sessionId?: string): Promise<void> {
+export async function recoverCurrentSessionTail(
+  targetServerId: string,
+  sessionId?: string
+): Promise<void> {
   const currentSessionId = useSelectionStore.getState().selectedSessionId;
   const activeServerId = useServerStore.getState().activeServerId;
   const targetSessionId = sessionId ?? currentSessionId;
@@ -382,8 +389,12 @@ export async function recoverCurrentSessionTail(targetServerId: string, sessionI
   const run = async () => {
     try {
       const result = await api.getSessionMessages(targetSessionId, { limit: 100 });
-      useChatMessageStore.getState().mergeMessages(targetSessionId, result.messages, result.pagination);
-      console.log(`[SessionSync] Recovered tail snapshot for session ${targetSessionId}: ${result.messages.length} messages`);
+      useChatMessageStore
+        .getState()
+        .mergeMessages(targetSessionId, result.messages, result.pagination);
+      console.log(
+        `[SessionSync] Recovered tail snapshot for session ${targetSessionId}: ${result.messages.length} messages`
+      );
     } catch (error) {
       console.error('[SessionSync] Failed to recover current session tail:', error);
     } finally {

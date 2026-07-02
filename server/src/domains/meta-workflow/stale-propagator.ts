@@ -22,8 +22,8 @@ export class StalePropagator {
    */
   propagateUpstreamRerun(runId: string, sourcePhaseId: string, phasesDoc: PhasesDoc): void {
     const downstreamIds = phasesDoc.phases
-      .filter((p) => p.dependsOn.includes(sourcePhaseId))
-      .map((p) => p.id);
+      .filter(p => p.dependsOn.includes(sourcePhaseId))
+      .map(p => p.id);
 
     for (const phaseId of downstreamIds) {
       const phaseRecord = this.opts.phaseRepo.findByRunAndPhaseId(runId, phaseId);

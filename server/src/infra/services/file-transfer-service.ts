@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import type { Database } from 'better-sqlite3';
 import { newId } from '../../utils/uuid.js';
 import type { FilePushMetadata } from '@zclaudia/shared/core/message';
 import type { FilePushNotificationMessage, ServerMessage } from '@zclaudia/shared/wire/messages';
@@ -41,8 +42,9 @@ const AUTO_DOWNLOAD_SIZE = 500 * 1024;
 export interface FilesRouteBroadcastContext {
   sendMessage: (ws: WebSocket, message: ServerMessage) => void;
   getAuthenticatedClients: () => Array<{ ws: WebSocket }>;
-  db: import('better-sqlite3').Database;
+  db: Database;
   getNextOffset: (sessionId: string) => number;
+  allowUnscopedPush?: boolean;
 }
 
 export interface StoredUploadResult {
@@ -82,7 +84,7 @@ export class FileTransferError extends Error {
   constructor(
     readonly status: number,
     readonly code: string,
-    message: string,
+    message: string
   ) {
     super(message);
   }
@@ -91,6 +93,14 @@ export class FileTransferError extends Error {
 function detectMimeType(filePath: string): string {
   const ext = path.extname(filePath).toLowerCase();
   return MIME_TYPES[ext] || 'application/octet-stream';
+}
+
+function isPathInsideRoot(candidatePath: string, rootPath: string): boolean {
+  const resolvedCandidate = path.resolve(candidatePath);
+  const resolvedRoot = path.resolve(rootPath);
+  return (
+    resolvedCandidate === resolvedRoot || resolvedCandidate.startsWith(resolvedRoot + path.sep)
+  );
 }
 
 export class FileTransferService {
@@ -111,13 +121,13 @@ export class FileTransferService {
   storeJsonUpload(
     name: string | undefined,
     mimeType: string | undefined,
-    data: string | undefined,
+    data: string | undefined
   ): StoredUploadResult {
     if (!name || !mimeType || !data) {
       throw new FileTransferError(
         400,
         'VALIDATION_ERROR',
-        'name, mimeType, and data (base64) are required',
+        'name, mimeType, and data (base64) are required'
       );
     }
 
@@ -153,7 +163,7 @@ export class FileTransferService {
     sourcePath: string | undefined,
     sessionId: string | undefined,
     description: string | undefined,
-    broadcastCtx?: FilesRouteBroadcastContext,
+    broadcastCtx?: FilesRouteBroadcastContext
   ): PushFileResult {
     if (!sourcePath) {
       throw new FileTransferError(400, 'VALIDATION_ERROR', 'filePath is required');
@@ -162,6 +172,8 @@ export class FileTransferService {
     if (!sessionId) {
       throw new FileTransferError(400, 'VALIDATION_ERROR', 'sessionId is required');
     }
+
+    this.assertPushSourceAllowed(sourcePath, sessionId, broadcastCtx);
 
     if (!fs.existsSync(sourcePath)) {
       throw new FileTransferError(404, 'FILE_NOT_FOUND', `File not found: ${sourcePath}`);
@@ -179,18 +191,14 @@ export class FileTransferService {
     const autoDownload = mimeType.startsWith('image/') || fileSize < AUTO_DOWNLOAD_SIZE;
 
     if (broadcastCtx) {
-      this.persistPushMessageAndBroadcast(
-        broadcastCtx,
-        sessionId,
-        {
-          fileId,
-          fileName,
-          mimeType,
-          fileSize,
-          description,
-          autoDownload,
-        },
-      );
+      this.persistPushMessageAndBroadcast(broadcastCtx, sessionId, {
+        fileId,
+        fileName,
+        mimeType,
+        fileSize,
+        description,
+        autoDownload,
+      });
     }
 
     return {
@@ -200,6 +208,55 @@ export class FileTransferService {
       fileSize,
       autoDownload,
     };
+  }
+
+  private assertPushSourceAllowed(
+    sourcePath: string,
+    sessionId: string,
+    broadcastCtx?: FilesRouteBroadcastContext
+  ): void {
+    if (!broadcastCtx) {
+      if (process.env.ZCLAUDIA_ALLOW_UNSCOPED_FILE_PUSH === '1') {
+        return;
+      }
+      throw new FileTransferError(
+        403,
+        'FILE_PUSH_FORBIDDEN',
+        'File push requires a session-scoped server context'
+      );
+    }
+
+    if (broadcastCtx.allowUnscopedPush) {
+      return;
+    }
+
+    const row = broadcastCtx.db
+      .prepare(
+        `
+          SELECT s.working_directory, p.root_path
+          FROM sessions s
+          LEFT JOIN projects p ON p.id = s.project_id
+          WHERE s.id = ?
+          LIMIT 1
+        `
+      )
+      .get(sessionId) as { working_directory: string | null; root_path: string | null } | undefined;
+
+    if (!row) {
+      throw new FileTransferError(404, 'SESSION_NOT_FOUND', 'Session not found');
+    }
+
+    const allowedRoots = [row.working_directory, row.root_path].filter(
+      (value): value is string => typeof value === 'string' && value.trim().length > 0
+    );
+
+    if (!allowedRoots.some(root => isPathInsideRoot(sourcePath, root))) {
+      throw new FileTransferError(
+        403,
+        'FILE_PUSH_FORBIDDEN',
+        'filePath must be inside the session working directory or project root'
+      );
+    }
   }
 
   private persistPushMessageAndBroadcast(
@@ -212,12 +269,12 @@ export class FileTransferService {
       fileSize: number;
       description: string | undefined;
       autoDownload: boolean;
-    },
+    }
   ): void {
     let messageId: string | undefined;
-    const sessionExists = broadcastCtx.db.prepare(
-      'SELECT 1 FROM sessions WHERE id = ?',
-    ).get(sessionId);
+    const sessionExists = broadcastCtx.db
+      .prepare('SELECT 1 FROM sessions WHERE id = ?')
+      .get(sessionId);
 
     if (sessionExists) {
       messageId = newId();
@@ -232,17 +289,21 @@ export class FileTransferService {
         },
       };
       const offset = broadcastCtx.getNextOffset(sessionId);
-      broadcastCtx.db.prepare(`
+      broadcastCtx.db
+        .prepare(
+          `
         INSERT INTO messages (id, session_id, role, content, metadata, created_at, offset)
         VALUES (?, ?, 'system', ?, ?, ?, ?)
-      `).run(
-        messageId,
-        sessionId,
-        `File pushed: ${payload.fileName}`,
-        JSON.stringify(metadata),
-        Date.now(),
-        offset,
-      );
+      `
+        )
+        .run(
+          messageId,
+          sessionId,
+          `File pushed: ${payload.fileName}`,
+          JSON.stringify(metadata),
+          Date.now(),
+          offset
+        );
     }
 
     const notification: FilePushNotificationMessage = {
@@ -263,7 +324,7 @@ export class FileTransferService {
     }
 
     console.log(
-      `[Files] Pushed file ${payload.fileId} (${payload.fileName}, ${payload.fileSize} bytes) to ${clients.length} client(s)`,
+      `[Files] Pushed file ${payload.fileId} (${payload.fileName}, ${payload.fileSize} bytes) to ${clients.length} client(s)`
     );
   }
 }

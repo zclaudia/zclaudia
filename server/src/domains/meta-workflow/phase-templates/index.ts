@@ -20,7 +20,7 @@ export const PHASE_TEMPLATES: readonly PhaseTemplate[] = [
 ];
 
 const TEMPLATE_BY_TYPE = new Map<PhaseType, PhaseTemplate>(
-  PHASE_TEMPLATES.map((t) => [t.phaseType, t]),
+  PHASE_TEMPLATES.map(t => [t.phaseType, t])
 );
 
 export function getPhaseTemplate(phaseType: PhaseType): PhaseTemplate {

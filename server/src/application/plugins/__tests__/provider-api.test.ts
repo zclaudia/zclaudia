@@ -36,12 +36,12 @@ describe('PluginProviderAPI', () => {
     vi.clearAllMocks();
     db = createTestDb();
     const now = Date.now();
-    db.prepare('INSERT INTO llm_profiles (id, name, provider_type, base_url, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
-      'prov-1', 'Primary ZClaudia', 'zclaudia', '/usr/bin/pi-agent', 1, now, now
-    );
-    db.prepare('INSERT INTO llm_profiles (id, name, provider_type, base_url, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
-      'prov-2', 'Secondary ZClaudia', 'zclaudia', null, 0, now, now
-    );
+    db.prepare(
+      'INSERT INTO llm_profiles (id, name, provider_type, base_url, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run('prov-1', 'Primary ZClaudia', 'zclaudia', '/usr/bin/pi-agent', 1, now, now);
+    db.prepare(
+      'INSERT INTO llm_profiles (id, name, provider_type, base_url, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run('prov-2', 'Secondary ZClaudia', 'zclaudia', null, 0, now, now);
     api = new PluginProviderAPI(db, 'test-plugin');
   });
 
@@ -86,7 +86,11 @@ describe('PluginProviderAPI', () => {
       const mockAdapter = {
         run: vi.fn().mockImplementation(async function* () {
           yield { type: 'assistant', content: 'Hello world' };
-          yield { type: 'result', result: 'Final result', usage: { input_tokens: 10, output_tokens: 20 } };
+          yield {
+            type: 'result',
+            result: 'Final result',
+            usage: { input_tokens: 10, output_tokens: 20 },
+          };
         }),
       };
       vi.mocked(providerRegistry.get).mockReturnValue(mockAdapter as any);
@@ -103,18 +107,22 @@ describe('PluginProviderAPI', () => {
     });
 
     it('throws for non-existent provider', async () => {
-      await expect(api.call({
-        providerId: 'missing',
-        messages: [{ role: 'user', content: 'Hi' }],
-      })).rejects.toThrow('Provider not found: missing');
+      await expect(
+        api.call({
+          providerId: 'missing',
+          messages: [{ role: 'user', content: 'Hi' }],
+        })
+      ).rejects.toThrow('Provider not found: missing');
     });
 
     it('throws for missing adapter', async () => {
       vi.mocked(providerRegistry.get).mockReturnValue(undefined as any);
-      await expect(api.call({
-        providerId: 'prov-1',
-        messages: [{ role: 'user', content: 'Hi' }],
-      })).rejects.toThrow('No adapter found');
+      await expect(
+        api.call({
+          providerId: 'prov-1',
+          messages: [{ role: 'user', content: 'Hi' }],
+        })
+      ).rejects.toThrow('No adapter found');
     });
 
     it('throws on provider run error', async () => {
@@ -125,10 +133,12 @@ describe('PluginProviderAPI', () => {
         }),
       };
       vi.mocked(providerRegistry.get).mockReturnValue(mockAdapter as any);
-      await expect(api.call({
-        providerId: 'prov-1',
-        messages: [{ role: 'user', content: 'Hi' }],
-      })).rejects.toThrow('Provider call failed');
+      await expect(
+        api.call({
+          providerId: 'prov-1',
+          messages: [{ role: 'user', content: 'Hi' }],
+        })
+      ).rejects.toThrow('Provider call failed');
     });
 
     it('includes system prompt in built prompt', async () => {

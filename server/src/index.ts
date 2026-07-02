@@ -2,8 +2,19 @@ import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
 import { maybeWipeDevDataDir, writeSchemaVersion } from './infra/storage/dev-clear.js';
-import { createServer, createVirtualClient, activeRuns, connectedClients, cancelRun } from './server.js';
-import { autoDetectProviders, checkProviderVersions, startTempFileCleanup, shutdownProviders } from './infra/providers/initializer.js';
+import {
+  createServer,
+  createVirtualClient,
+  activeRuns,
+  connectedClients,
+  cancelRun,
+} from './server.js';
+import {
+  autoDetectProviders,
+  checkProviderVersions,
+  startTempFileCleanup,
+  shutdownProviders,
+} from './infra/providers/initializer.js';
 import { pluginLoader } from './application/plugins/loader.js';
 import { registerBuiltinCommands } from './application/commands/init.js';
 import { sanitizeInheritedProviderEnv } from './utils/startup-env.js';
@@ -11,15 +22,20 @@ import { isIgnorableProcessError } from './utils/process-error-filter.js';
 import { GatewayManager } from './infra/gateway/manager.js';
 import { stopFileStoreCleanup } from './infra/storage/fileStore.js';
 import { writeCrashReportSync } from './utils/crash-log.js';
+import { defaultServerHost } from './interfaces/http/trust-boundary.js';
 
 const sanitizedEnv = sanitizeInheritedProviderEnv();
 if (sanitizedEnv.removedKeys.length > 0) {
-  console.log(`[Startup] Removed inherited provider model env: ${sanitizedEnv.removedKeys.join(', ')}`);
+  console.log(
+    `[Startup] Removed inherited provider model env: ${sanitizedEnv.removedKeys.join(', ')}`
+  );
 }
 
-process.on('uncaughtException', (error) => {
+process.on('uncaughtException', error => {
   if (isIgnorableProcessError(error)) {
-    console.warn(`[Process] Ignored non-fatal uncaught exception: ${(error as NodeJS.ErrnoException).code || error.message}`);
+    console.warn(
+      `[Process] Ignored non-fatal uncaught exception: ${(error as NodeJS.ErrnoException).code || error.message}`
+    );
     return;
   }
   console.error('[Process] Uncaught exception:', error);
@@ -34,9 +50,12 @@ process.on('uncaughtException', (error) => {
   process.exit(1);
 });
 
-process.on('unhandledRejection', (reason) => {
+process.on('unhandledRejection', reason => {
   if (isIgnorableProcessError(reason)) {
-    const code = typeof reason === 'object' && reason && 'code' in reason ? String((reason as { code?: unknown }).code) : 'unknown';
+    const code =
+      typeof reason === 'object' && reason && 'code' in reason
+        ? String((reason as { code?: unknown }).code)
+        : 'unknown';
     console.warn(`[Process] Ignored non-fatal unhandled rejection: ${code}`);
     return;
   }
@@ -47,8 +66,7 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const PORT = parseInt(process.env.PORT || '3100', 10);
-// Listen on 0.0.0.0 to allow connections from other devices on the network
-const HOST = process.env.SERVER_HOST || '0.0.0.0';
+const HOST = defaultServerHost();
 
 // Gateway configuration from environment (legacy support)
 const GATEWAY_URL = process.env.GATEWAY_URL;
@@ -113,7 +131,7 @@ async function main() {
       host: HOST,
     });
 
-    serverContext.setGatewayConnector((config) => gatewayManager.connect(config));
+    serverContext.setGatewayConnector(config => gatewayManager.connect(config));
     serverContext.setGatewayDisconnector(() => gatewayManager.disconnect());
 
     checkProviderVersions();
@@ -133,7 +151,11 @@ async function main() {
     }
 
     // Load workspace + external skills into the shared skill cache.
-    const { setDatabase: setSkillDb, loadAndCacheSkills, getSkillWatchDirs } = await import('./application/plugins/skill-tools.js');
+    const {
+      setDatabase: setSkillDb,
+      loadAndCacheSkills,
+      getSkillWatchDirs,
+    } = await import('./application/plugins/skill-tools.js');
     const { createExecutionEnv } = await import('./infra/execution-env.js');
     setSkillDb(serverContext.db);
     const skillEnv = createExecutionEnv(process.cwd());
@@ -150,11 +172,12 @@ async function main() {
       console.log(`   Registered ${pluginSkillCount} plugin skill(s)`);
     }
 
-    const { startSkillChangeWatcher } = await import('./application/plugins/skill-change-watcher.js');
+    const { startSkillChangeWatcher } =
+      await import('./application/plugins/skill-change-watcher.js');
     const skillWatcher = startSkillChangeWatcher({
       watchPaths: [
         ...getSkillWatchDirs(),
-        ...pluginLoader.getPluginSkillDirs().map((dir) => dir.path),
+        ...pluginLoader.getPluginSkillDirs().map(dir => dir.path),
       ],
       refresh: async () => {
         const { refreshSkillCache } = await import('./application/plugins/skill-tools.js');
@@ -195,7 +218,7 @@ async function main() {
           gatewayBackendId: null,
           registerAsBackend: true,
           createdAt: Date.now(),
-          updatedAt: Date.now()
+          updatedAt: Date.now(),
         });
       }
       // Priority 2: Database configuration

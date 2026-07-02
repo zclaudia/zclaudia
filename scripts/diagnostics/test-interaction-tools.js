@@ -52,7 +52,8 @@ const TEST_SCENARIOS = [
   {
     id: 'todo_list',
     name: 'update_todo_list',
-    prompt: '请帮我规划以下任务并用 todo list 跟踪：1. 检查代码风格 2. 运行测试 3. 构建项目。只需要创建 todo list，不需要真的执行这些任务。',
+    prompt:
+      '请帮我规划以下任务并用 todo list 跟踪：1. 检查代码风格 2. 运行测试 3. 构建项目。只需要创建 todo list，不需要真的执行这些任务。',
     expectEvent: 'interaction_todo_update',
     // No response needed (fire-and-forget)
     transactional: false,
@@ -60,10 +61,11 @@ const TEST_SCENARIOS = [
   {
     id: 'ask_form',
     name: 'ask_user_form',
-    prompt: '我想配置一个新的部署环境，请用表单询问我以下信息：环境名称（dev/staging/prod）、目标服务器地址、是否启用 HTTPS。请使用 ask_user_form 工具。',
+    prompt:
+      '我想配置一个新的部署环境，请用表单询问我以下信息：环境名称（dev/staging/prod）、目标服务器地址、是否启用 HTTPS。请使用 ask_user_form 工具。',
     expectEvent: 'interaction_ask_user_form',
     transactional: true,
-    autoResponse: (msg) => {
+    autoResponse: msg => {
       // Build response based on fields
       const response = {};
       for (const field of msg.fields || []) {
@@ -81,7 +83,8 @@ const TEST_SCENARIOS = [
   {
     id: 'approval',
     name: 'request_approval',
-    prompt: '我现在要执行一个危险操作：删除所有临时文件。请先用 request_approval 工具请求我的批准，不要直接执行。',
+    prompt:
+      '我现在要执行一个危险操作：删除所有临时文件。请先用 request_approval 工具请求我的批准，不要直接执行。',
     expectEvent: 'interaction_approval',
     transactional: true,
     autoResponse: () => ({ approved: true }),
@@ -151,7 +154,7 @@ class WsClient {
   constructor(url) {
     this._ws = new WebSocket(url);
     this._listeners = new Map(); // event -> Set<handler>
-    this._ws.addEventListener('message', (ev) => {
+    this._ws.addEventListener('message', ev => {
       for (const handler of this._getHandlers('message')) {
         handler(ev.data);
       }
@@ -190,7 +193,7 @@ function connectWs() {
   return new Promise((resolve, reject) => {
     const ws = new WsClient(WS_URL);
     ws.on('open', () => resolve(ws));
-    ws.on('error', (err) => reject(err));
+    ws.on('error', err => reject(err));
     setTimeout(() => reject(new Error('WebSocket connection timeout')), 10000);
   });
 }
@@ -201,7 +204,7 @@ function send(ws, msg) {
 
 async function authenticate(ws) {
   return new Promise((resolve, reject) => {
-    const handler = (data) => {
+    const handler = data => {
       const msg = JSON.parse(data);
       if (msg.type === 'auth_result') {
         ws.removeListener('message', handler);
@@ -221,7 +224,7 @@ async function runScenario(ws, sessionId, scenario, providerId) {
   const clientRequestId = randomUUID();
   const tag = `[${providerId}/${scenario.id}]`;
 
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     const result = {
       scenario: scenario.id,
       toolName: scenario.name,
@@ -257,7 +260,7 @@ async function runScenario(ws, sessionId, scenario, providerId) {
       }
     }, TIMEOUT_MS);
 
-    const handler = (data) => {
+    const handler = data => {
       const msg = JSON.parse(data);
 
       // Track run
@@ -316,7 +319,11 @@ async function runScenario(ws, sessionId, scenario, providerId) {
       }
 
       // Handle provider-native interaction_prompt (auto-answer)
-      if (msg.type === 'interaction_prompt' && msg.sessionId === sessionId && msg.responseMode === 'prompt_answer') {
+      if (
+        msg.type === 'interaction_prompt' &&
+        msg.sessionId === sessionId &&
+        msg.responseMode === 'prompt_answer'
+      ) {
         console.log(`  ${c.yellow}${tag} interaction_prompt - auto-answering${c.reset}`);
         send(ws, {
           type: 'prompt_answer',
@@ -372,7 +379,7 @@ async function testProvider(provider) {
     await authenticate(ws);
   } catch (err) {
     console.error(`${c.red}Failed to connect: ${err.message}${c.reset}`);
-    return TEST_SCENARIOS.map((s) => ({
+    return TEST_SCENARIOS.map(s => ({
       scenario: s.id,
       toolName: s.name,
       eventReceived: false,
@@ -384,7 +391,7 @@ async function testProvider(provider) {
   if (!projectId) {
     console.error(`${c.red}Failed to create project${c.reset}`);
     ws.close();
-    return TEST_SCENARIOS.map((s) => ({
+    return TEST_SCENARIOS.map(s => ({
       scenario: s.id,
       toolName: s.name,
       eventReceived: false,
@@ -397,7 +404,7 @@ async function testProvider(provider) {
   if (!sessionId) {
     console.error(`${c.red}Failed to create session${c.reset}`);
     ws.close();
-    return TEST_SCENARIOS.map((s) => ({
+    return TEST_SCENARIOS.map(s => ({
       scenario: s.id,
       toolName: s.name,
       eventReceived: false,
@@ -429,7 +436,7 @@ function printMatrix(matrix) {
   console.log(`${'═'.repeat(80)}\n`);
 
   // Header
-  const tools = TEST_SCENARIOS.map((s) => s.name);
+  const tools = TEST_SCENARIOS.map(s => s.name);
   const colWidth = 20;
   const providerWidth = 16;
 
@@ -444,7 +451,7 @@ function printMatrix(matrix) {
   for (const [providerName, results] of Object.entries(matrix)) {
     let row = providerName.padEnd(providerWidth);
     for (const tool of tools) {
-      const r = results.find((x) => x.toolName === tool);
+      const r = results.find(x => x.toolName === tool);
       if (!r) {
         row += `${c.dim}N/A${c.reset}`.padEnd(colWidth + c.dim.length + c.reset.length);
       } else if (r.error === 'timeout') {
@@ -464,7 +471,9 @@ function printMatrix(matrix) {
     console.log(row);
   }
 
-  console.log(`\n${c.dim}Legend: ✓ works = interaction event received | ◐ called = tool_use seen but no interaction event | ✗ = not called or failed${c.reset}`);
+  console.log(
+    `\n${c.dim}Legend: ✓ works = interaction event received | ◐ called = tool_use seen but no interaction event | ✗ = not called or failed${c.reset}`
+  );
 }
 
 function printDetailedResults(matrix) {
@@ -520,7 +529,7 @@ async function main() {
 
   if (ONLY_PROVIDER) {
     providers = providers.filter(
-      (p) => p.type === ONLY_PROVIDER || p.name.toLowerCase().includes(ONLY_PROVIDER.toLowerCase())
+      p => p.type === ONLY_PROVIDER || p.name.toLowerCase().includes(ONLY_PROVIDER.toLowerCase())
     );
     if (providers.length === 0) {
       console.error(`${c.red}No provider matching "${ONLY_PROVIDER}" found.${c.reset}`);
@@ -528,7 +537,7 @@ async function main() {
     }
   }
 
-  console.log(`Providers to test: ${providers.map((p) => `${p.name} (${p.type})`).join(', ')}`);
+  console.log(`Providers to test: ${providers.map(p => `${p.name} (${p.type})`).join(', ')}`);
 
   // Run tests
   const matrix = {};
@@ -545,13 +554,15 @@ async function main() {
 
   // Exit code based on results
   const allResults = Object.values(matrix).flat();
-  const failures = allResults.filter((r) => !r.eventReceived && !r.error?.includes('timeout'));
+  const failures = allResults.filter(r => !r.eventReceived && !r.error?.includes('timeout'));
   if (failures.length > 0) {
-    console.log(`\n${c.yellow}${failures.length} scenario(s) did not produce expected interaction events.${c.reset}`);
+    console.log(
+      `\n${c.yellow}${failures.length} scenario(s) did not produce expected interaction events.${c.reset}`
+    );
   }
 }
 
-main().catch((err) => {
+main().catch(err => {
   console.error(`${c.red}Fatal: ${err.message}${c.reset}`);
   process.exit(1);
 });

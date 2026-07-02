@@ -52,7 +52,7 @@ describe('generateToolSignature', () => {
 
     it('should handle deeply nested paths', () => {
       const result = generateToolSignature('Write', {
-        file_path: '/project/apps/desktop/src/components/Button.tsx'
+        file_path: '/project/apps/desktop/src/components/Button.tsx',
       });
       expect(result).toBe('Write:components/Button.tsx');
     });
@@ -61,9 +61,18 @@ describe('generateToolSignature', () => {
       const readResult = generateToolSignature('Read', { file_path: '/app/src/file.ts' });
       const writeResult = generateToolSignature('Write', { file_path: '/app/src/file.ts' });
       const editResult = generateToolSignature('Edit', { file_path: '/app/src/file.ts' });
-      const multiEditResult = generateToolSignature('MultiEdit', { file_path: '/app/src/file.ts', edits: [] });
-      const readSymbolResult = generateToolSignature('ReadSymbol', { file_path: '/app/src/file.ts', symbol: 'run' });
-      const editSymbolResult = generateToolSignature('EditSymbol', { file_path: '/app/src/file.ts', symbol: 'run' });
+      const multiEditResult = generateToolSignature('MultiEdit', {
+        file_path: '/app/src/file.ts',
+        edits: [],
+      });
+      const readSymbolResult = generateToolSignature('ReadSymbol', {
+        file_path: '/app/src/file.ts',
+        symbol: 'run',
+      });
+      const editSymbolResult = generateToolSignature('EditSymbol', {
+        file_path: '/app/src/file.ts',
+        symbol: 'run',
+      });
 
       expect(readResult).toBe('Read:src/file.ts');
       expect(writeResult).toBe('Write:src/file.ts');
@@ -82,7 +91,7 @@ describe('generateToolSignature', () => {
 
     it('should truncate long patterns', () => {
       const result = generateToolSignature('Grep', {
-        pattern: 'This is a very long search pattern that should be truncated'
+        pattern: 'This is a very long search pattern that should be truncated',
       });
       expect(result).toBe('Grep:This is a very long search pat');
       expect(result.length).toBeLessThanOrEqual(35); // "Grep:" + 30 chars
@@ -140,13 +149,14 @@ describe('generateToolSignature', () => {
     it('should include path hint for Grep with path', () => {
       const result = generateToolSignature('Grep', {
         pattern: 'TODO',
-        path: '/project/src/components'
+        path: '/project/src/components',
       });
       expect(result).toBe('Grep:TODO@src/components');
     });
 
     it('should truncate long Grep patterns', () => {
-      const longPattern = 'This is a very very very very very very very very very very long pattern';
+      const longPattern =
+        'This is a very very very very very very very very very very long pattern';
       const result = generateToolSignature('Grep', { pattern: longPattern });
       expect(result.length).toBeLessThanOrEqual(35);
       expect(result.startsWith('Grep:')).toBe(true);
@@ -189,7 +199,12 @@ describe('detectLoop', () => {
   describe('Basic loop detection', () => {
     it('should detect simple repeating pattern (period 2)', () => {
       const toolCalls = [
-        'Read:file', 'Edit:file', 'Read:file', 'Edit:file', 'Read:file', 'Edit:file'
+        'Read:file',
+        'Edit:file',
+        'Read:file',
+        'Edit:file',
+        'Read:file',
+        'Edit:file',
       ];
       const result = detectLoop(toolCalls);
       expect(result.detected).toBe(true);
@@ -198,9 +213,15 @@ describe('detectLoop', () => {
 
     it('should detect repeating pattern (period 3)', () => {
       const toolCalls = [
-        'Read:a', 'Edit:b', 'Grep:c',
-        'Read:a', 'Edit:b', 'Grep:c',
-        'Read:a', 'Edit:b', 'Grep:c'
+        'Read:a',
+        'Edit:b',
+        'Grep:c',
+        'Read:a',
+        'Edit:b',
+        'Grep:c',
+        'Read:a',
+        'Edit:b',
+        'Grep:c',
       ];
       const result = detectLoop(toolCalls);
       expect(result.detected).toBe(true);
@@ -209,9 +230,18 @@ describe('detectLoop', () => {
 
     it('should detect repeating pattern (period 4)', () => {
       const toolCalls = [
-        'Read:a', 'Edit:b', 'Grep:c', 'Bash:d',
-        'Read:a', 'Edit:b', 'Grep:c', 'Bash:d',
-        'Read:a', 'Edit:b', 'Grep:c', 'Bash:d'
+        'Read:a',
+        'Edit:b',
+        'Grep:c',
+        'Bash:d',
+        'Read:a',
+        'Edit:b',
+        'Grep:c',
+        'Bash:d',
+        'Read:a',
+        'Edit:b',
+        'Grep:c',
+        'Bash:d',
       ];
       const result = detectLoop(toolCalls);
       expect(result.detected).toBe(true);
@@ -227,27 +257,26 @@ describe('detectLoop', () => {
     });
 
     it('should NOT detect loop with different commands', () => {
-      const toolCalls = [
-        'Bash:git', 'Bash:npm', 'Bash:ls',
-        'Bash:git', 'Bash:npm', 'Bash:ls'
-      ];
+      const toolCalls = ['Bash:git', 'Bash:npm', 'Bash:ls', 'Bash:git', 'Bash:npm', 'Bash:ls'];
       const result = detectLoop(toolCalls);
       expect(result.detected).toBe(false);
     });
 
     it('should NOT detect loop with different files', () => {
       const toolCalls = [
-        'Edit:src/a.ts', 'Edit:src/b.ts', 'Edit:src/c.ts',
-        'Edit:src/d.ts', 'Edit:src/e.ts', 'Edit:src/f.ts'
+        'Edit:src/a.ts',
+        'Edit:src/b.ts',
+        'Edit:src/c.ts',
+        'Edit:src/d.ts',
+        'Edit:src/e.ts',
+        'Edit:src/f.ts',
       ];
       const result = detectLoop(toolCalls);
       expect(result.detected).toBe(false);
     });
 
     it('should NOT detect loop with no pattern', () => {
-      const toolCalls = [
-        'Read:a', 'Write:b', 'Edit:c', 'Bash:d', 'Grep:e', 'Read:f'
-      ];
+      const toolCalls = ['Read:a', 'Write:b', 'Edit:c', 'Bash:d', 'Grep:e', 'Read:f'];
       const result = detectLoop(toolCalls);
       expect(result.detected).toBe(false);
     });
@@ -274,9 +303,14 @@ describe('detectLoop', () => {
 
     it('should detect loop with partial match at end', () => {
       const toolCalls = [
-        'Read:a', 'Edit:b', 'Grep:c',
-        'Read:a', 'Edit:b', 'Grep:c',
-        'Read:a', 'Edit:b' // Partial third cycle
+        'Read:a',
+        'Edit:b',
+        'Grep:c',
+        'Read:a',
+        'Edit:b',
+        'Grep:c',
+        'Read:a',
+        'Edit:b', // Partial third cycle
       ];
       const result = detectLoop(toolCalls);
       expect(result.detected).toBe(false); // Needs full 3 cycles
@@ -284,10 +318,14 @@ describe('detectLoop', () => {
 
     it('should detect loop in long history', () => {
       const toolCalls = [
-        'Bash:git', 'Bash:ls', // Some initial calls
-        'Read:a', 'Edit:b', // Start of pattern
-        'Read:a', 'Edit:b', // Second iteration
-        'Read:a', 'Edit:b'  // Third iteration
+        'Bash:git',
+        'Bash:ls', // Some initial calls
+        'Read:a',
+        'Edit:b', // Start of pattern
+        'Read:a',
+        'Edit:b', // Second iteration
+        'Read:a',
+        'Edit:b', // Third iteration
       ];
       const result = detectLoop(toolCalls);
       expect(result.detected).toBe(true);
@@ -298,9 +336,12 @@ describe('detectLoop', () => {
   describe('Real-world scenarios', () => {
     it('should detect: Read same file → Edit same file loop', () => {
       const toolCalls = [
-        'Read:src/server.ts', 'Edit:src/server.ts',
-        'Read:src/server.ts', 'Edit:src/server.ts',
-        'Read:src/server.ts', 'Edit:src/server.ts'
+        'Read:src/server.ts',
+        'Edit:src/server.ts',
+        'Read:src/server.ts',
+        'Edit:src/server.ts',
+        'Read:src/server.ts',
+        'Edit:src/server.ts',
       ];
       const result = detectLoop(toolCalls);
       expect(result.detected).toBe(true);
@@ -309,9 +350,12 @@ describe('detectLoop', () => {
 
     it('should NOT detect: Read different files → Edit different files', () => {
       const toolCalls = [
-        'Read:src/a.ts', 'Edit:src/a.ts',
-        'Read:src/b.ts', 'Edit:src/b.ts',
-        'Read:src/c.ts', 'Edit:src/c.ts'
+        'Read:src/a.ts',
+        'Edit:src/a.ts',
+        'Read:src/b.ts',
+        'Edit:src/b.ts',
+        'Read:src/c.ts',
+        'Edit:src/c.ts',
       ];
       const result = detectLoop(toolCalls);
       expect(result.detected).toBe(false);
@@ -319,9 +363,12 @@ describe('detectLoop', () => {
 
     it('should detect: Grep pattern → Edit result loop', () => {
       const toolCalls = [
-        'Grep:TODO', 'Edit:src/file.ts',
-        'Grep:TODO', 'Edit:src/file.ts',
-        'Grep:TODO', 'Edit:src/file.ts'
+        'Grep:TODO',
+        'Edit:src/file.ts',
+        'Grep:TODO',
+        'Edit:src/file.ts',
+        'Grep:TODO',
+        'Edit:src/file.ts',
       ];
       const result = detectLoop(toolCalls);
       expect(result.detected).toBe(true);
@@ -330,9 +377,15 @@ describe('detectLoop', () => {
 
     it('should NOT detect: Different bash commands in sequence', () => {
       const toolCalls = [
-        'Bash:git', 'Bash:npm', 'Bash:ls',
-        'Bash:git', 'Bash:npm', 'Bash:ls',
-        'Bash:git', 'Bash:npm', 'Bash:ls'
+        'Bash:git',
+        'Bash:npm',
+        'Bash:ls',
+        'Bash:git',
+        'Bash:npm',
+        'Bash:ls',
+        'Bash:git',
+        'Bash:npm',
+        'Bash:ls',
       ];
       const result = detectLoop(toolCalls);
       expect(result.detected).toBe(false); // Period 3, but they're all different Bash commands
@@ -340,9 +393,15 @@ describe('detectLoop', () => {
 
     it('should handle mixed tool types in pattern', () => {
       const toolCalls = [
-        'Read:src/api.ts', 'Grep:fetch', 'Edit:src/api.ts',
-        'Read:src/api.ts', 'Grep:fetch', 'Edit:src/api.ts',
-        'Read:src/api.ts', 'Grep:fetch', 'Edit:src/api.ts'
+        'Read:src/api.ts',
+        'Grep:fetch',
+        'Edit:src/api.ts',
+        'Read:src/api.ts',
+        'Grep:fetch',
+        'Edit:src/api.ts',
+        'Read:src/api.ts',
+        'Grep:fetch',
+        'Edit:src/api.ts',
       ];
       const result = detectLoop(toolCalls);
       expect(result.detected).toBe(true);

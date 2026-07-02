@@ -2,9 +2,18 @@ import { closeSync, openSync, readSync, statSync } from 'fs';
 
 export type TaskOutputWindowParams =
   | { ok: true; outputOffset: number; tailLines?: number }
-  | { ok: false; code: 'invalid_output_offset' | 'invalid_tail_lines'; message: string; details: Record<string, unknown> };
+  | {
+      ok: false;
+      code: 'invalid_output_offset' | 'invalid_tail_lines';
+      message: string;
+      details: Record<string, unknown>;
+    };
 
-function parseIntegerParam(value: unknown, name: string, options: { min: number; max?: number }): { ok: true; value: number } | { ok: false; message: string } {
+function parseIntegerParam(
+  value: unknown,
+  name: string,
+  options: { min: number; max?: number }
+): { ok: true; value: number } | { ok: false; message: string } {
   if (typeof value !== 'number' || !Number.isInteger(value) || !Number.isFinite(value)) {
     return { ok: false, message: `${name} must be an integer` };
   }
@@ -20,9 +29,8 @@ function parseIntegerParam(value: unknown, name: string, options: { min: number;
 export function parseTaskOutputWindowParams(args: Record<string, unknown>): TaskOutputWindowParams {
   const offsetValue = args.output_offset;
   const tailValue = args.tail_lines;
-  const outputOffset = offsetValue === undefined
-    ? 0
-    : parseIntegerParam(offsetValue, 'output_offset', { min: 0 });
+  const outputOffset =
+    offsetValue === undefined ? 0 : parseIntegerParam(offsetValue, 'output_offset', { min: 0 });
   if (typeof outputOffset !== 'number' && !outputOffset.ok) {
     return {
       ok: false,
@@ -32,7 +40,10 @@ export function parseTaskOutputWindowParams(args: Record<string, unknown>): Task
     };
   }
   if (tailValue === undefined) {
-    return { ok: true, outputOffset: typeof outputOffset === 'number' ? outputOffset : outputOffset.value };
+    return {
+      ok: true,
+      outputOffset: typeof outputOffset === 'number' ? outputOffset : outputOffset.value,
+    };
   }
   const tailLines = parseIntegerParam(tailValue, 'tail_lines', { min: 1, max: 2_000 });
   if (!tailLines.ok) {
@@ -61,9 +72,18 @@ export function readLogWindow(filePath: string, offset: number, length: number):
   }
 }
 
-export function readTaskLogWindow(logPath: string, args: Record<string, unknown>, capBytes = 50 * 1024):
+export function readTaskLogWindow(
+  logPath: string,
+  args: Record<string, unknown>,
+  capBytes = 50 * 1024
+):
   | { ok: true; output: string; size: number; nextOffset: number; eof: boolean; truncated: boolean }
-  | { ok: false; code: 'invalid_output_offset' | 'invalid_tail_lines'; message: string; details: Record<string, unknown> } {
+  | {
+      ok: false;
+      code: 'invalid_output_offset' | 'invalid_tail_lines';
+      message: string;
+      details: Record<string, unknown>;
+    } {
   const windowParams = parseTaskOutputWindowParams(args);
   if (!windowParams.ok) return windowParams;
   const requestedOffset = windowParams.outputOffset;
@@ -86,9 +106,12 @@ export function readTaskLogWindow(logPath: string, args: Record<string, unknown>
   } catch {
     // no log yet - empty output
   }
-  const eof = windowParams.tailLines !== undefined || size <= requestedOffset + Buffer.byteLength(output, 'utf8');
-  const truncated = windowParams.tailLines !== undefined
-    ? size > Buffer.byteLength(output, 'utf8')
-    : size - requestedOffset > Buffer.byteLength(output, 'utf8');
+  const eof =
+    windowParams.tailLines !== undefined ||
+    size <= requestedOffset + Buffer.byteLength(output, 'utf8');
+  const truncated =
+    windowParams.tailLines !== undefined
+      ? size > Buffer.byteLength(output, 'utf8')
+      : size - requestedOffset > Buffer.byteLength(output, 'utf8');
   return { ok: true, output, size, nextOffset: size, eof, truncated };
 }

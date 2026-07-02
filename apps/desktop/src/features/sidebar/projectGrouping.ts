@@ -6,9 +6,9 @@ export function selectProjectIdsForBackend<T extends { id: string }>(
   projects: T[],
   backendId: string,
   getProjectBackendId: (projectId: string) => string | null,
-  localBackendId: string | null,
+  localBackendId: string | null
 ): string[] {
   return projects
-    .filter((p) => (getProjectBackendId(p.id) ?? localBackendId) === backendId)
-    .map((p) => p.id);
+    .filter(p => (getProjectBackendId(p.id) ?? localBackendId) === backendId)
+    .map(p => p.id);
 }

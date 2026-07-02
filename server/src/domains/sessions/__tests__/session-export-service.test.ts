@@ -40,14 +40,18 @@ describe('SessionExportService', () => {
 
   it('exports session markdown with messages and metadata summaries', () => {
     const now = Date.now();
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO sessions (id, project_id, name, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
-    `).run('s1', 'project-1', 'Export Session', now, now);
-    db.prepare(`
+    `
+    ).run('s1', 'project-1', 'Export Session', now, now);
+    db.prepare(
+      `
       INSERT INTO messages (id, session_id, role, content, metadata, created_at)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run(
+    `
+    ).run(
       'm1',
       's1',
       'assistant',
@@ -56,7 +60,7 @@ describe('SessionExportService', () => {
         toolCalls: [{ name: 'Read', input: { file_path: '/foo.ts' }, isError: false }],
         usage: { inputTokens: 1200, outputTokens: 300 },
       }),
-      now,
+      now
     );
 
     const result = service.exportSession('s1');
@@ -71,10 +75,12 @@ describe('SessionExportService', () => {
 
   it('falls back to Untitled Session when name is null', () => {
     const now = Date.now();
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO sessions (id, project_id, name, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
-    `).run('s1', 'project-1', null, now, now);
+    `
+    ).run('s1', 'project-1', null, now, now);
 
     const result = service.exportSession('s1');
 

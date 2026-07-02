@@ -23,7 +23,7 @@ const STREAM_CHUNK_BYTES = 512 * 1024;
 export function readLineWindowStreaming(
   filePath: string,
   offset: number,
-  limit: number,
+  limit: number
 ): Promise<LineWindowResult> {
   const start = Math.max(0, offset - 1);
   const end = start + Math.max(1, limit);
@@ -61,7 +61,12 @@ export function readLineWindowStreaming(
         if (chunk.length >= 2 && chunk[0] === 0xff && chunk[1] === 0xfe) {
           encoding = 'utf16le';
           hasBom = true;
-        } else if (chunk.length >= 3 && chunk[0] === 0xef && chunk[1] === 0xbb && chunk[2] === 0xbf) {
+        } else if (
+          chunk.length >= 3 &&
+          chunk[0] === 0xef &&
+          chunk[1] === 0xbb &&
+          chunk[2] === 0xbf
+        ) {
           encoding = 'utf8';
           hasBom = true;
         }

@@ -1,6 +1,10 @@
 import { BaseRepository } from '../../infra/repositories/base.js';
 import type { Database } from 'better-sqlite3';
-import type { AgentProfileConfig, MultimodalFallbackConfig, ThinkingLevel } from '@zclaudia/shared/core/agent-profile';
+import type {
+  AgentProfileConfig,
+  MultimodalFallbackConfig,
+  ThinkingLevel,
+} from '@zclaudia/shared/core/agent-profile';
 import {
   normalizeSkillExecutionSelection,
   normalizeSkillSelection,
@@ -22,7 +26,14 @@ import {
 } from '@zclaudia/shared/core/tools';
 import { newId } from '../../utils/uuid.js';
 
-const VALID_THINKING_LEVELS = new Set<ThinkingLevel>(['off', 'minimal', 'low', 'medium', 'high', 'xhigh']);
+const VALID_THINKING_LEVELS = new Set<ThinkingLevel>([
+  'off',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+]);
 
 type AgentProfileCreate = Omit<AgentProfileConfig, 'id' | 'createdAt' | 'updatedAt'>;
 type AgentProfileUpdate = Partial<Omit<AgentProfileConfig, 'id' | 'createdAt' | 'updatedAt'>> & {
@@ -30,7 +41,7 @@ type AgentProfileUpdate = Partial<Omit<AgentProfileConfig, 'id' | 'createdAt' | 
 };
 
 function normalizeEnabledTools(tools: string[]): string[] {
-  const normalized = tools.flatMap((tool) => {
+  const normalized = tools.flatMap(tool => {
     const name = normalizeToolName(tool);
     return name ? [name] : [];
   });
@@ -45,16 +56,16 @@ function normalizeToolRef(ref: unknown): ToolRef | undefined {
     return name ? builtinToolRef(name) : undefined;
   }
   if (
-    candidate.source === 'plugin'
-    && typeof candidate.pluginId === 'string'
-    && typeof candidate.toolId === 'string'
+    candidate.source === 'plugin' &&
+    typeof candidate.pluginId === 'string' &&
+    typeof candidate.toolId === 'string'
   ) {
     return { source: 'plugin', pluginId: candidate.pluginId, toolId: candidate.toolId };
   }
   if (
-    candidate.source === 'mcp'
-    && typeof candidate.server === 'string'
-    && typeof candidate.tool === 'string'
+    candidate.source === 'mcp' &&
+    typeof candidate.server === 'string' &&
+    typeof candidate.tool === 'string'
   ) {
     return { source: 'mcp', server: candidate.server, tool: candidate.tool };
   }
@@ -67,10 +78,18 @@ function normalizeToolRef(ref: unknown): ToolRef | undefined {
 function normalizeExternalToolProviderRef(ref: unknown): ExternalToolProviderRef | undefined {
   if (!ref || typeof ref !== 'object' || !('source' in ref)) return undefined;
   const candidate = ref as Record<string, unknown>;
-  if (candidate.source === 'mcp' && typeof candidate.serverId === 'string' && candidate.serverId.trim()) {
+  if (
+    candidate.source === 'mcp' &&
+    typeof candidate.serverId === 'string' &&
+    candidate.serverId.trim()
+  ) {
     return { source: 'mcp', serverId: candidate.serverId.trim() };
   }
-  if (candidate.source === 'plugin' && typeof candidate.pluginId === 'string' && candidate.pluginId.trim()) {
+  if (
+    candidate.source === 'plugin' &&
+    typeof candidate.pluginId === 'string' &&
+    candidate.pluginId.trim()
+  ) {
     return {
       source: 'plugin',
       pluginId: candidate.pluginId.trim(),
@@ -86,36 +105,40 @@ function normalizeToolSelection(value: unknown): ToolSelection | undefined {
   if (!value || typeof value !== 'object') return undefined;
   const candidate = value as Record<string, unknown>;
   const sets: ToolSetRef[] = Array.isArray(candidate.sets)
-    ? candidate.sets.flatMap<ToolSetRef>((set) => {
-      if (!set || typeof set !== 'object' || !('source' in set)) return [];
-      const row = set as Record<string, unknown>;
-      if (row.source === 'builtin' && typeof row.id === 'string') {
-        if (!Object.prototype.hasOwnProperty.call(BUILTIN_TOOL_SETS, row.id)) return [];
-        return [{ source: 'builtin', id: row.id as BuiltinToolSetId }];
-      }
-      if (row.source === 'plugin' && typeof row.pluginId === 'string' && typeof row.id === 'string') {
-        return [{ source: 'plugin', pluginId: row.pluginId, id: row.id }];
-      }
-      return [];
-    })
+    ? candidate.sets.flatMap<ToolSetRef>(set => {
+        if (!set || typeof set !== 'object' || !('source' in set)) return [];
+        const row = set as Record<string, unknown>;
+        if (row.source === 'builtin' && typeof row.id === 'string') {
+          if (!Object.prototype.hasOwnProperty.call(BUILTIN_TOOL_SETS, row.id)) return [];
+          return [{ source: 'builtin', id: row.id as BuiltinToolSetId }];
+        }
+        if (
+          row.source === 'plugin' &&
+          typeof row.pluginId === 'string' &&
+          typeof row.id === 'string'
+        ) {
+          return [{ source: 'plugin', pluginId: row.pluginId, id: row.id }];
+        }
+        return [];
+      })
     : [];
   const providers = Array.isArray(candidate.providers)
-    ? candidate.providers.flatMap((ref) => {
-      const normalized = normalizeExternalToolProviderRef(ref);
-      return normalized ? [normalized] : [];
-    })
+    ? candidate.providers.flatMap(ref => {
+        const normalized = normalizeExternalToolProviderRef(ref);
+        return normalized ? [normalized] : [];
+      })
     : [];
   const include = Array.isArray(candidate.include)
-    ? candidate.include.flatMap((ref) => {
-      const normalized = normalizeToolRef(ref);
-      return normalized ? [normalized] : [];
-    })
+    ? candidate.include.flatMap(ref => {
+        const normalized = normalizeToolRef(ref);
+        return normalized ? [normalized] : [];
+      })
     : [];
   const exclude = Array.isArray(candidate.exclude)
-    ? candidate.exclude.flatMap((ref) => {
-      const normalized = normalizeToolRef(ref);
-      return normalized ? [normalized] : [];
-    })
+    ? candidate.exclude.flatMap(ref => {
+        const normalized = normalizeToolRef(ref);
+        return normalized ? [normalized] : [];
+      })
     : [];
   return { sets, providers, include, exclude };
 }
@@ -125,7 +148,9 @@ function stringifySelection(selection: ToolSelection): string {
 }
 
 function stringifySkillSelection(selection: SkillSelection): string {
-  return JSON.stringify(normalizeSkillSelection(selection) ?? { providers: [], include: [], exclude: [], pinned: [] });
+  return JSON.stringify(
+    normalizeSkillSelection(selection) ?? { providers: [], include: [], exclude: [], pinned: [] }
+  );
 }
 
 function stringifySkillExecution(selection: SkillExecutionSelection): string {
@@ -173,23 +198,36 @@ export class AgentProfileRepository extends BaseRepository<
     try {
       const parsed = JSON.parse(raw);
       if (!Array.isArray(parsed)) {
-        console.warn('[AgentProfileRepository] enabled_tools is not an array, falling back to all 7');
+        console.warn(
+          '[AgentProfileRepository] enabled_tools is not an array, falling back to all 7'
+        );
         return [...ALL_TOOL_NAMES];
       }
-      return normalizeEnabledTools(parsed.filter((s: unknown): s is string => typeof s === 'string'));
+      return normalizeEnabledTools(
+        parsed.filter((s: unknown): s is string => typeof s === 'string')
+      );
     } catch (err) {
-      console.warn('[AgentProfileRepository] invalid enabled_tools JSON, falling back to all 7:', err);
+      console.warn(
+        '[AgentProfileRepository] invalid enabled_tools JSON, falling back to all 7:',
+        err
+      );
       return [...ALL_TOOL_NAMES];
     }
   }
 
-  private parseToolSelection(raw: string | null | undefined, fallbackEnabledTools: string | null): ToolSelection {
+  private parseToolSelection(
+    raw: string | null | undefined,
+    fallbackEnabledTools: string | null
+  ): ToolSelection {
     if (raw) {
       try {
         const parsed = normalizeToolSelection(JSON.parse(raw));
         if (parsed) return parsed;
       } catch (err) {
-        console.warn('[AgentProfileRepository] invalid tool_selection JSON, falling back to enabled_tools:', err);
+        console.warn(
+          '[AgentProfileRepository] invalid tool_selection JSON, falling back to enabled_tools:',
+          err
+        );
       }
     }
     return legacyEnabledToolsToSelection(this.parseEnabledTools(fallbackEnabledTools));
@@ -200,7 +238,10 @@ export class AgentProfileRepository extends BaseRepository<
     try {
       return normalizeSkillSelection(JSON.parse(raw));
     } catch (err) {
-      console.warn('[AgentProfileRepository] invalid skill_selection JSON, falling back to undefined:', err);
+      console.warn(
+        '[AgentProfileRepository] invalid skill_selection JSON, falling back to undefined:',
+        err
+      );
       return undefined;
     }
   }
@@ -210,7 +251,10 @@ export class AgentProfileRepository extends BaseRepository<
     try {
       return normalizeSkillExecutionSelection(JSON.parse(raw));
     } catch (err) {
-      console.warn('[AgentProfileRepository] invalid skill_execution JSON, falling back to undefined:', err);
+      console.warn(
+        '[AgentProfileRepository] invalid skill_execution JSON, falling back to undefined:',
+        err
+      );
       return undefined;
     }
   }
@@ -218,24 +262,35 @@ export class AgentProfileRepository extends BaseRepository<
   private parseThinkingLevel(raw: string | null): ThinkingLevel | undefined {
     if (!raw) return undefined;
     if (VALID_THINKING_LEVELS.has(raw as ThinkingLevel)) return raw as ThinkingLevel;
-    console.warn(`[AgentProfileRepository] invalid thinking_level "${raw}", falling back to undefined`);
+    console.warn(
+      `[AgentProfileRepository] invalid thinking_level "${raw}", falling back to undefined`
+    );
     return undefined;
   }
 
-  private parseMultimodalFallback(raw: string | null | undefined): MultimodalFallbackConfig | undefined {
+  private parseMultimodalFallback(
+    raw: string | null | undefined
+  ): MultimodalFallbackConfig | undefined {
     if (!raw) return undefined;
     try {
       const parsed = JSON.parse(raw) as Record<string, unknown>;
       if (
-        typeof parsed?.llmProfileId === 'string' && parsed.llmProfileId.trim()
-        && typeof parsed?.model === 'string' && parsed.model.trim()
+        typeof parsed?.llmProfileId === 'string' &&
+        parsed.llmProfileId.trim() &&
+        typeof parsed?.model === 'string' &&
+        parsed.model.trim()
       ) {
         return { llmProfileId: parsed.llmProfileId, model: parsed.model };
       }
-      console.warn('[AgentProfileRepository] multimodal_fallback missing fields, falling back to undefined');
+      console.warn(
+        '[AgentProfileRepository] multimodal_fallback missing fields, falling back to undefined'
+      );
       return undefined;
     } catch (err) {
-      console.warn('[AgentProfileRepository] invalid multimodal_fallback JSON, falling back to undefined:', err);
+      console.warn(
+        '[AgentProfileRepository] invalid multimodal_fallback JSON, falling back to undefined:',
+        err
+      );
       return undefined;
     }
   }
@@ -273,10 +328,7 @@ export class AgentProfileRepository extends BaseRepository<
     };
   }
 
-  updateQuery(
-    id: string,
-    data: AgentProfileUpdate,
-  ): { sql: string; params: unknown[] } {
+  updateQuery(id: string, data: AgentProfileUpdate): { sql: string; params: unknown[] } {
     const updates: string[] = [];
     const params: unknown[] = [];
 
@@ -367,24 +419,44 @@ export class AgentProfileRepository extends BaseRepository<
     const rows = this.db
       .prepare('SELECT * FROM agent_profiles ORDER BY is_default DESC, name ASC')
       .all();
-    return rows.map((r) => this.mapRow(r));
+    return rows.map(r => this.mapRow(r));
   }
 
   clearAllDefaults(): void {
     this.db.prepare('UPDATE agent_profiles SET is_default = 0 WHERE is_default = 1').run();
   }
 
+  createWithDefaultHandling(data: AgentProfileCreate): AgentProfileConfig {
+    return this.db.transaction(() => {
+      if (data.isDefault) {
+        this.clearAllDefaults();
+      }
+      return this.create(data);
+    })();
+  }
+
+  updateWithDefaultHandling(id: string, data: AgentProfileUpdate): AgentProfileConfig {
+    return this.db.transaction(() => {
+      if (data.isDefault === true) {
+        this.clearAllDefaults();
+      }
+      return this.update(id, data);
+    })();
+  }
+
   setDefault(id: string): AgentProfileConfig {
-    this.clearAllDefaults();
-    const result = this.db
-      .prepare('UPDATE agent_profiles SET is_default = 1, updated_at = ? WHERE id = ?')
-      .run(Date.now(), id);
-    if (result.changes === 0) {
-      throw new Error(`AgentProfile not found: ${id}`);
-    }
-    const profile = this.findById(id);
-    if (!profile) throw new Error(`AgentProfile not found: ${id}`);
-    return profile;
+    return this.db.transaction(() => {
+      if (!this.findById(id)) {
+        throw new Error(`AgentProfile not found: ${id}`);
+      }
+      this.clearAllDefaults();
+      this.db
+        .prepare('UPDATE agent_profiles SET is_default = 1, updated_at = ? WHERE id = ?')
+        .run(Date.now(), id);
+      const profile = this.findById(id);
+      if (!profile) throw new Error(`AgentProfile not found: ${id}`);
+      return profile;
+    })();
   }
 
   findByPluginProfile(pluginId: string, pluginProfileId: string): AgentProfileConfig | undefined {

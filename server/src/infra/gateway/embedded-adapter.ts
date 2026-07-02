@@ -53,7 +53,7 @@ export class EmbeddedGatewayAdapter implements FacadeRuntimeGatewayAdapter {
   constructor(
     private readonly gatewayClient: GatewayClient,
     private readonly localHandler: LocalBackendHandler | null,
-    serverPort: number,
+    serverPort: number
   ) {
     this.serverPort = serverPort;
     this.wireGatewayEvents();
@@ -70,14 +70,14 @@ export class EmbeddedGatewayAdapter implements FacadeRuntimeGatewayAdapter {
       disconnect: () => this.gatewayClient.commands.connection.disconnect(),
     },
     backend: {
-      subscribe: (backendId) => {
+      subscribe: backendId => {
         if (this.isLocalBackend(backendId)) {
           this.handleLocalSubscribe(backendId);
         } else {
           this.gatewayClient.commands.backend.subscribe(backendId);
         }
       },
-      unsubscribe: (backendId) => {
+      unsubscribe: backendId => {
         if (this.isLocalBackend(backendId)) {
           this.handleLocalUnsubscribe(backendId);
         } else {
@@ -133,7 +133,10 @@ export class EmbeddedGatewayAdapter implements FacadeRuntimeGatewayAdapter {
       },
     },
     connection: {
-      getState: () => (this.gatewayClient.queries.connection.isConnected() ? 'connected' : 'disconnected') as FacadeAdapterConnectionState,
+      getState: () =>
+        (this.gatewayClient.queries.connection.isConnected()
+          ? 'connected'
+          : 'disconnected') as FacadeAdapterConnectionState,
     },
     identity: {
       getInstanceId: () => this.gatewayClient.queries.identity.getInstanceId(),
@@ -143,13 +146,13 @@ export class EmbeddedGatewayAdapter implements FacadeRuntimeGatewayAdapter {
       getSnapshot: () => this.gatewayClient.queries.registry.getItems(),
     },
     backend: {
-      isSubscribed: (backendId) => {
+      isSubscribed: backendId => {
         if (this.isLocalBackend(backendId)) return this.localSubscribed;
         return this.gatewayClient.queries.backend.isSubscribed(backendId);
       },
     },
     http: {
-      getBaseUrl: (backendId) => {
+      getBaseUrl: backendId => {
         if (this.isLocalBackend(backendId)) {
           return `http://localhost:${this.serverPort}`;
         }
@@ -161,7 +164,7 @@ export class EmbeddedGatewayAdapter implements FacadeRuntimeGatewayAdapter {
   };
 
   readonly events: FacadeAdapterEventBus = {
-    subscribe: (listener) => {
+    subscribe: listener => {
       this.listeners.push(listener);
       return () => {
         const idx = this.listeners.indexOf(listener);
@@ -236,13 +239,16 @@ export class EmbeddedGatewayAdapter implements FacadeRuntimeGatewayAdapter {
     void this.localHandler?.onMessage(message);
   }
 
-  private async handleLocalCatchUp(backendId: string, sessionId: string, afterOffset: number): Promise<void> {
+  private async handleLocalCatchUp(
+    backendId: string,
+    sessionId: string,
+    afterOffset: number
+  ): Promise<void> {
     if (!this.localHandler) return;
     try {
       const messages = await this.localHandler.onCatchUp(sessionId, afterOffset);
-      const maxOffset = messages.length > 0
-        ? Math.max(...messages.map(m => m.offset))
-        : afterOffset;
+      const maxOffset =
+        messages.length > 0 ? Math.max(...messages.map(m => m.offset)) : afterOffset;
       this.emit({
         type: 'content_patch_received',
         backendId,
@@ -268,19 +274,17 @@ export class EmbeddedGatewayAdapter implements FacadeRuntimeGatewayAdapter {
 
   private wireGatewayEvents(): void {
     this.gatewayClient.events.setOutgoingEvents({
-      onConnectionStateChanged: (connected) => {
+      onConnectionStateChanged: connected => {
         this.emit({
           type: 'connection_state_changed',
           state: connected ? 'connected' : 'reconnecting',
         });
       },
 
-      onRegistrySnapshotChanged: (items) => {
+      onRegistrySnapshotChanged: items => {
         // Include local backend in registry snapshot so runtime-core doesn't
         // mark it as removed on every 30s gateway registry push.
-        const allItems = this.localBackendId
-          ? [this.buildLocalPresence(), ...items]
-          : items;
+        const allItems = this.localBackendId ? [this.buildLocalPresence(), ...items] : items;
         this.emit({ type: 'registry_snapshot_received', items: allItems });
       },
 
@@ -296,8 +300,8 @@ export class EmbeddedGatewayAdapter implements FacadeRuntimeGatewayAdapter {
         this.emit({ type: 'backend_data_snapshot_received', backendId, sessions, projects });
       },
 
-      onOutgoingBackendDataEvent: (event) => {
-        const backendId = (event as unknown as Record<string, unknown>).backendId as string ?? '';
+      onOutgoingBackendDataEvent: event => {
+        const backendId = ((event as unknown as Record<string, unknown>).backendId as string) ?? '';
         this.emit({ type: 'backend_data_event_received', backendId, event });
       },
 
@@ -323,7 +327,7 @@ export class EmbeddedGatewayAdapter implements FacadeRuntimeGatewayAdapter {
 
   private wireLocalHandlerEvents(): void {
     if (!this.localHandler) return;
-    this.localHandler.onServerEvent((message) => {
+    this.localHandler.onServerEvent(message => {
       if (!this.localBackendId) return;
       const sessionId = this.getSessionId(message) ?? '';
       this.emit({

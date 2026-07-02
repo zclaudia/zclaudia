@@ -45,6 +45,6 @@ export function useSessionManager() {
   return {
     addSession,
     updateSession,
-    deleteSession
+    deleteSession,
   };
 }

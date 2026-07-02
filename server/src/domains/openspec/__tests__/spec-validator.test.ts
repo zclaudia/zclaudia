@@ -133,12 +133,12 @@ describe('validateSpec', () => {
     const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'spec-validator');
 
     const cases: Array<{ name: string; valid: boolean; expectedRule?: string }> = [
-      { name: 'valid-minimal',        valid: true },
-      { name: 'missing-purpose',      valid: false, expectedRule: 'purpose-required' },
-      { name: 'missing-scenario',     valid: false, expectedRule: 'scenario-required-per-requirement' },
+      { name: 'valid-minimal', valid: true },
+      { name: 'missing-purpose', valid: false, expectedRule: 'purpose-required' },
+      { name: 'missing-scenario', valid: false, expectedRule: 'scenario-required-per-requirement' },
       { name: 'missing-must-keyword', valid: false, expectedRule: 'rfc-keyword-required' },
-      { name: 'invalid-format',       valid: false, expectedRule: 'heading-hierarchy' },
-      { name: 'invalid-when-then',    valid: false, expectedRule: 'scenario-when-then-required' },
+      { name: 'invalid-format', valid: false, expectedRule: 'heading-hierarchy' },
+      { name: 'invalid-when-then', valid: false, expectedRule: 'scenario-when-then-required' },
     ];
 
     for (const c of cases) {
@@ -147,7 +147,7 @@ describe('validateSpec', () => {
         const result = validateSpec(md);
         expect(result.valid).toBe(c.valid);
         if (c.expectedRule) {
-          expect(result.errors.some((e) => e.rule === c.expectedRule)).toBe(true);
+          expect(result.errors.some(e => e.rule === c.expectedRule)).toBe(true);
         }
       });
     }

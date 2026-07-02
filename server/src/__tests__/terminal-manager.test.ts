@@ -10,8 +10,12 @@ let mockOnExitCallback: ((e: { exitCode: number }) => void) | null = null;
 
 vi.mock('node-pty', () => ({
   spawn: vi.fn(() => ({
-    onData: (cb: (data: string) => void) => { mockOnDataCallback = cb; },
-    onExit: (cb: (e: { exitCode: number }) => void) => { mockOnExitCallback = cb; },
+    onData: (cb: (data: string) => void) => {
+      mockOnDataCallback = cb;
+    },
+    onExit: (cb: (e: { exitCode: number }) => void) => {
+      mockOnExitCallback = cb;
+    },
     write: mockPtyWrite,
     resize: mockPtyResize,
     kill: mockPtyKill,
@@ -108,7 +112,7 @@ describe('TerminalManager', () => {
           cols: 80,
           rows: 24,
           cwd: '/home/test/project',
-        }),
+        })
       );
       // No cd should be written: the shell already started in the target dir.
       expect(mockPtyWrite).not.toHaveBeenCalledWith(expect.stringContaining('cd '));
@@ -129,10 +133,12 @@ describe('TerminalManager', () => {
           [],
           expect.objectContaining({
             cwd: '/Users/test',
-          }),
+          })
         );
         // Then cd into the actual target dir
-        expect(mockPtyWrite).toHaveBeenCalledWith(expect.stringContaining('/Users/test/Desktop/proj'));
+        expect(mockPtyWrite).toHaveBeenCalledWith(
+          expect.stringContaining('/Users/test/Desktop/proj')
+        );
       } finally {
         Object.defineProperty(process, 'platform', { value: originalPlatform });
         if (originalHome !== undefined) process.env.HOME = originalHome;
@@ -413,11 +419,7 @@ describe('TerminalManager', () => {
 
       manager.create('term-1', 'client-1', '/tmp', 80, 24);
 
-      expect(pty.spawn).toHaveBeenCalledWith(
-        '/bin/zsh',
-        [],
-        expect.any(Object),
-      );
+      expect(pty.spawn).toHaveBeenCalledWith('/bin/zsh', [], expect.any(Object));
     });
 
     it('falls back to bash on Linux/macOS when $SHELL is unset', () => {
@@ -426,11 +428,7 @@ describe('TerminalManager', () => {
 
       manager.create('term-1', 'client-1', '/tmp', 80, 24);
 
-      expect(pty.spawn).toHaveBeenCalledWith(
-        'bash',
-        [],
-        expect.any(Object),
-      );
+      expect(pty.spawn).toHaveBeenCalledWith('bash', [], expect.any(Object));
     });
 
     it('uses wsl.exe on Windows when WSL is available', () => {
@@ -445,11 +443,7 @@ describe('TerminalManager', () => {
 
       winManager.create('term-1', 'client-1', 'C:\\Users\\test', 80, 24);
 
-      expect(pty.spawn).toHaveBeenCalledWith(
-        'wsl.exe',
-        [],
-        expect.any(Object),
-      );
+      expect(pty.spawn).toHaveBeenCalledWith('wsl.exe', [], expect.any(Object));
 
       winManager.destroyAll();
     });
@@ -458,7 +452,9 @@ describe('TerminalManager', () => {
       Object.defineProperty(process, 'platform', { value: 'win32' });
       delete process.env.SHELL;
       delete process.env.COMSPEC;
-      mockExecSync.mockImplementation(() => { throw new Error('not found'); });
+      mockExecSync.mockImplementation(() => {
+        throw new Error('not found');
+      });
 
       const winManager = new TerminalManager((clientId, msg) => {
         sentMessages.push({ clientId, msg });
@@ -466,11 +462,7 @@ describe('TerminalManager', () => {
 
       winManager.create('term-1', 'client-1', 'C:\\Users\\test', 80, 24);
 
-      expect(pty.spawn).toHaveBeenCalledWith(
-        'powershell.exe',
-        [],
-        expect.any(Object),
-      );
+      expect(pty.spawn).toHaveBeenCalledWith('powershell.exe', [], expect.any(Object));
 
       winManager.destroyAll();
     });
@@ -479,7 +471,9 @@ describe('TerminalManager', () => {
       Object.defineProperty(process, 'platform', { value: 'win32' });
       delete process.env.SHELL;
       process.env.COMSPEC = 'C:\\Windows\\system32\\cmd.exe';
-      mockExecSync.mockImplementation(() => { throw new Error('not found'); });
+      mockExecSync.mockImplementation(() => {
+        throw new Error('not found');
+      });
 
       const winManager = new TerminalManager((clientId, msg) => {
         sentMessages.push({ clientId, msg });
@@ -490,7 +484,7 @@ describe('TerminalManager', () => {
       expect(pty.spawn).toHaveBeenCalledWith(
         'C:\\Windows\\system32\\cmd.exe',
         [],
-        expect.any(Object),
+        expect.any(Object)
       );
 
       winManager.destroyAll();

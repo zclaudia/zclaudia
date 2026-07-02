@@ -33,8 +33,15 @@ export class GitCommitActivity implements Activity<GitCommitInput, GitCommitOutp
     type: 'object',
     properties: {
       stageAll: { type: 'boolean', description: 'Run git add -A before committing (default true)' },
-      messageMode: { type: 'string', enum: ['stat', 'explicit'], description: 'stat = auto summary; explicit = use message field' },
-      message: { type: 'string', description: 'Commit message (used when messageMode is explicit)' },
+      messageMode: {
+        type: 'string',
+        enum: ['stat', 'explicit'],
+        description: 'stat = auto summary; explicit = use message field',
+      },
+      message: {
+        type: 'string',
+        description: 'Commit message (used when messageMode is explicit)',
+      },
     },
     required: [] as string[],
   };
@@ -42,7 +49,11 @@ export class GitCommitActivity implements Activity<GitCommitInput, GitCommitOutp
   async invoke(input: GitCommitInput): Promise<ActivityResult<GitCommitOutput>> {
     const cwd = input.worktreePath ?? input.projectRootPath;
     if (!cwd) {
-      return { status: 'failed', output: { commitSha: null, message: '' }, error: 'No working directory' };
+      return {
+        status: 'failed',
+        output: { commitSha: null, message: '' },
+        error: 'No working directory',
+      };
     }
 
     const stageAll = input.stageAll ?? true;
@@ -51,7 +62,10 @@ export class GitCommitActivity implements Activity<GitCommitInput, GitCommitOutp
     try {
       const { stdout: status } = await execFileAsync('git', ['status', '--porcelain'], { cwd });
       if (!status.trim()) {
-        return { status: 'completed', output: { commitSha: null, message: 'No changes to commit' } };
+        return {
+          status: 'completed',
+          output: { commitSha: null, message: 'No changes to commit' },
+        };
       }
 
       if (stageAll) {
@@ -60,13 +74,19 @@ export class GitCommitActivity implements Activity<GitCommitInput, GitCommitOutp
 
       // Always compute the stat — matches the original GitStepExecutor.handleGitCommit
       // git-call sequence; used for the stat-mode message.
-      const { stdout: diffStat } = await execFileAsync('git', ['diff', '--cached', '--stat'], { cwd });
+      const { stdout: diffStat } = await execFileAsync('git', ['diff', '--cached', '--stat'], {
+        cwd,
+      });
 
       let message: string;
       if (messageMode === 'explicit') {
         const explicit = (input.message ?? '').trim();
         if (!explicit) {
-          return { status: 'failed', output: { commitSha: null, message: '' }, error: 'No commit message provided' };
+          return {
+            status: 'failed',
+            output: { commitSha: null, message: '' },
+            error: 'No commit message provided',
+          };
         }
         message = explicit;
       } else {

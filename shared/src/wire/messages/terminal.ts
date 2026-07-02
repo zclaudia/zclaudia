@@ -78,3 +78,17 @@ export interface TerminalAttachedMessage {
    */
   pendingExit?: { exitCode: number };
 }
+
+export type TerminalClientMessage =
+  | TerminalOpenMessage
+  | TerminalInputMessage
+  | TerminalResizeMessage
+  | TerminalCloseMessage
+  | TerminalAttachMessage
+  | TerminalDetachMessage;
+
+export type TerminalServerMessage =
+  | TerminalOpenedMessage
+  | TerminalOutputMessage
+  | TerminalExitedMessage
+  | TerminalAttachedMessage;

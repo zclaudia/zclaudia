@@ -128,7 +128,7 @@ class CommandRegistry {
    * Get all registered commands as SlashCommand array for UI display.
    */
   getAllCommands(): SlashCommand[] {
-    return Array.from(this.commands.values()).map((cmd) => ({
+    return Array.from(this.commands.values()).map(cmd => ({
       command: cmd.command,
       description: cmd.description,
       source: cmd.source === 'builtin' ? 'provider' : ('plugin' as const),
@@ -140,8 +140,8 @@ class CommandRegistry {
    */
   getCommandsBySource(source: CommandSource): SlashCommand[] {
     return Array.from(this.commands.values())
-      .filter((cmd) => cmd.source === source)
-      .map((cmd) => ({
+      .filter(cmd => cmd.source === source)
+      .map(cmd => ({
         command: cmd.command,
         description: cmd.description,
         source: cmd.source === 'builtin' ? 'provider' : ('plugin' as const),
@@ -206,7 +206,7 @@ class CommandRegistry {
    * Get all commands registered by a specific plugin.
    */
   getByPlugin(pluginId: string): CommandMeta[] {
-    return Array.from(this.commands.values()).filter((cmd) => cmd.pluginId === pluginId);
+    return Array.from(this.commands.values()).filter(cmd => cmd.pluginId === pluginId);
   }
 
   /**

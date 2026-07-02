@@ -74,4 +74,3 @@ export function getGatewayAuthHeaders(): Record<string, string> {
   if (!gatewaySecret) return {};
   return { Authorization: `Bearer ${gatewaySecret}` };
 }
-

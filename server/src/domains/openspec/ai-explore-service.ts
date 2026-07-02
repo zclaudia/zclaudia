@@ -71,7 +71,7 @@ export class AiExploreService {
     let timedOut = false;
     const timeoutMs = this.deps.timeoutMs ?? 120_000;
 
-    await new Promise<void>((resolve) => {
+    await new Promise<void>(resolve => {
       const timer = setTimeout(() => {
         if (!resolved) {
           timedOut = true;
@@ -84,7 +84,7 @@ export class AiExploreService {
           input: prompt,
           workingDirectory: input.workingDirectory,
           llmProfileId: this.deps.llmProfileId,
-          onMessage: (m) => {
+          onMessage: m => {
             if (m.content) collected += m.content;
             if (m.kind === 'run_failed') {
               runFailedMessage = m.content || 'run_failed (no detail)';
@@ -122,13 +122,10 @@ export class AiExploreService {
     if (parsed.parseErrors.length > 0) {
       console.warn(
         `[AiExploreService] explore returned with ${parsed.parseErrors.length} parse error(s):`,
-        parsed.parseErrors,
+        parsed.parseErrors
       );
       if (collected.length > 0) {
-        console.warn(
-          `[AiExploreService] raw response (first 500 chars):`,
-          collected.slice(0, 500),
-        );
+        console.warn(`[AiExploreService] raw response (first 500 chars):`, collected.slice(0, 500));
       }
     }
     return parsed;
@@ -144,23 +141,23 @@ export class AiExploreService {
       const raw = await this.runAi(prompt, input.workingDirectory);
       lastRaw = raw;
       console.log(
-        `[AiExploreService] discoverCapabilities attempt ${attempt}: collected ${raw.length} chars`,
+        `[AiExploreService] discoverCapabilities attempt ${attempt}: collected ${raw.length} chars`
       );
       const parsed = tryParseDiscoverResponse(raw);
       if (parsed) return parsed;
       console.warn(
         `[AiExploreService] discoverCapabilities attempt ${attempt} could not parse response. First 500 chars:`,
-        raw.slice(0, 500),
+        raw.slice(0, 500)
       );
       repairContext =
         'Your previous response did not contain a parseable JSON object matching the required schema. Try again.';
     }
     console.warn(
       `[AiExploreService] discoverCapabilities final raw response (first 1500 chars):`,
-      lastRaw.slice(0, 1500),
+      lastRaw.slice(0, 1500)
     );
     throw new Error(
-      `AI did not emit parseable JSON for capability discovery after 2 attempts (last response: ${lastRaw.length} chars)`,
+      `AI did not emit parseable JSON for capability discovery after 2 attempts (last response: ${lastRaw.length} chars)`
     );
   }
 
@@ -171,7 +168,9 @@ export class AiExploreService {
       const raw = await this.runAiStreaming(prompt, input.workingDirectory, input.onStream);
       const md = extractSpecTag(raw);
       if (!md) {
-        lastErrors = [{ rule: 'output-format', message: 'No <spec>...</spec> tag found in AI response.' }];
+        lastErrors = [
+          { rule: 'output-format', message: 'No <spec>...</spec> tag found in AI response.' },
+        ];
         continue;
       }
       const v = validateSpec(md);
@@ -185,13 +184,18 @@ export class AiExploreService {
   private async runAiStreaming(
     prompt: string,
     workingDirectory: string,
-    onStream?: (s: string) => void,
+    onStream?: (s: string) => void
   ): Promise<string> {
     let collected = '';
     let resolved = false;
     const timeoutMs = this.deps.timeoutMs ?? 120_000;
-    await new Promise<void>((resolve) => {
-      const timer = setTimeout(() => { if (!resolved) { resolved = true; resolve(); } }, timeoutMs);
+    await new Promise<void>(resolve => {
+      const timer = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          resolve();
+        }
+      }, timeoutMs);
       this.deps.aiRunPort
         .startVirtualRun({
           input: prompt,
@@ -203,11 +207,21 @@ export class AiExploreService {
               onStream?.(collected);
             }
             if (['run_completed', 'completed', 'final', 'run_failed'].includes(m.kind)) {
-              if (!resolved) { resolved = true; clearTimeout(timer); resolve(); }
+              if (!resolved) {
+                resolved = true;
+                clearTimeout(timer);
+                resolve();
+              }
             }
           },
         })
-        .catch(() => { if (!resolved) { resolved = true; clearTimeout(timer); resolve(); } });
+        .catch(() => {
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timer);
+            resolve();
+          }
+        });
     });
     return collected;
   }
@@ -216,7 +230,7 @@ export class AiExploreService {
     let collected = '';
     let resolved = false;
     const timeoutMs = this.deps.timeoutMs ?? 120_000;
-    await new Promise<void>((resolve) => {
+    await new Promise<void>(resolve => {
       const timer = setTimeout(() => {
         if (!resolved) {
           resolved = true;
@@ -329,7 +343,9 @@ export function parseExploreResponse(rawResponse: string): ExploreResult {
   for (const [cap, val] of Object.entries(parsed.perCapability)) {
     const slot = val as { added?: unknown[]; modified?: unknown[]; removed?: unknown[] };
     perCapability[cap] = {
-      added: (slot.added ?? []).map(toRequirement).filter((r): r is ParsedRequirement => r !== null),
+      added: (slot.added ?? [])
+        .map(toRequirement)
+        .filter((r): r is ParsedRequirement => r !== null),
       modified: (slot.modified ?? [])
         .map(toRequirement)
         .filter((r): r is ParsedRequirement => r !== null),
@@ -391,7 +407,10 @@ function detectRfcKeywords(body: string): RfcKeyword[] {
     const pattern = new RegExp(`\\b${kw.replace(' ', '\\s+')}\\b`);
     if (pattern.test(scratch)) {
       out.push(kw);
-      scratch = scratch.replace(new RegExp(`\\b${kw.replace(' ', '\\s+')}\\b`, 'g'), ' '.repeat(kw.length));
+      scratch = scratch.replace(
+        new RegExp(`\\b${kw.replace(' ', '\\s+')}\\b`, 'g'),
+        ' '.repeat(kw.length)
+      );
     }
   }
   return out;
@@ -403,7 +422,7 @@ function toRequirement(raw: unknown): ParsedRequirement | null {
   if (typeof obj.name !== 'string' || typeof obj.body !== 'string') return null;
   const scenarios: ParsedScenario[] = Array.isArray(obj.scenarios)
     ? obj.scenarios
-        .map((s) => {
+        .map(s => {
           if (!s || typeof s !== 'object') return null;
           const sObj = s as { name?: string; bodyLines?: unknown[] };
           if (typeof sObj.name !== 'string') return null;
@@ -423,16 +442,17 @@ function toRequirement(raw: unknown): ParsedRequirement | null {
 }
 
 function buildDiscoverPrompt(input: DiscoverInput): string {
-  const existing = input.existingCapabilities && input.existingCapabilities.length > 0
-    ? `\n\nExisting openspec/specs/ already documents these capabilities (skip them in your output):\n${input.existingCapabilities.map(c => `- ${c}`).join('\n')}`
-    : '';
+  const existing =
+    input.existingCapabilities && input.existingCapabilities.length > 0
+      ? `\n\nExisting openspec/specs/ already documents these capabilities (skip them in your output):\n${input.existingCapabilities.map(c => `- ${c}`).join('\n')}`
+      : '';
   return [
-    'You are a code archaeologist looking at an existing project. Your job in this phase is NOT to write specs — it is to identify the system\'s capability boundaries so a follow-up phase can document them one at a time.',
+    "You are a code archaeologist looking at an existing project. Your job in this phase is NOT to write specs — it is to identify the system's capability boundaries so a follow-up phase can document them one at a time.",
     '',
     '## Stance',
     '- Curious, not prescriptive. Investigate before classifying.',
-    '- Grounded — read the actual code, don\'t theorize.',
-    '- Open threads — when uncertain about a directory\'s purpose, say so.',
+    "- Grounded — read the actual code, don't theorize.",
+    "- Open threads — when uncertain about a directory's purpose, say so.",
     '',
     '## Steps',
     '1. Use Read / Glob / Grep to investigate: README, package manifests, entry points, top-level src/ directories.',
@@ -441,7 +461,8 @@ function buildDiscoverPrompt(input: DiscoverInput): string {
     '   - too fine: login / logout / reset-password (merge to auth)',
     '   - too coarse: core / main / misc (says nothing)',
     '3. For each capability give a kebab-case name + one-sentence description.',
-    '4. List any directories or subsystems you couldn\'t make sense of, in `uncertainties`.' + existing,
+    "4. List any directories or subsystems you couldn't make sense of, in `uncertainties`." +
+      existing,
     '',
     '## Output (strict JSON, single object, in its own fenced code block at the end)',
     '```json',
@@ -462,13 +483,13 @@ function buildDiscoverPrompt(input: DiscoverInput): string {
 
 function buildGeneratePrompt(
   cap: { name: string; description: string },
-  lastErrors: { rule: string; message: string }[] | null,
+  lastErrors: { rule: string; message: string }[] | null
 ): string {
   const repair = lastErrors
     ? [
         `Your previous spec.md for \`${cap.name}\` failed schema validation:`,
         '',
-        ...lastErrors.map((e) => `- [${e.rule}] ${e.message}`),
+        ...lastErrors.map(e => `- [${e.rule}] ${e.message}`),
         '',
         'Regenerate the complete spec.md fixing these issues. Do not patch — rewrite the whole file. Rules unchanged.',
         '',

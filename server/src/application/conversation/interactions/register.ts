@@ -1,6 +1,12 @@
-import { sendMessage, broadcastToOtherAuthenticatedClients } from '../../../application/conversation/transport/broadcast.js';
+import {
+  sendMessage,
+  broadcastToOtherAuthenticatedClients,
+} from '../../../application/conversation/transport/broadcast.js';
 import { interactionDispatcher } from './interaction-dispatcher.js';
-import type { ActiveRun, ConnectedClient } from '../../../application/conversation/transport/types.js';
+import type {
+  ActiveRun,
+  ConnectedClient,
+} from '../../../application/conversation/transport/types.js';
 
 export interface InteractionDomainDeps {
   activeRuns: Map<string, ActiveRun>;

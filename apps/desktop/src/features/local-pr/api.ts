@@ -8,7 +8,7 @@ export async function listLocalPRs(projectId: string): Promise<LocalPR[]> {
 export async function createLocalPR(
   projectId: string,
   worktreePath: string,
-  options?: { title?: string; description?: string; baseBranch?: string; autoReview?: boolean },
+  options?: { title?: string; description?: string; baseBranch?: string; autoReview?: boolean }
 ): Promise<LocalPR> {
   return apiCall<LocalPR>(`/api/projects/${projectId}/local-prs`, {
     method: 'POST',
@@ -18,7 +18,7 @@ export async function createLocalPR(
 
 export async function precheckLocalPRCreation(
   projectId: string,
-  worktreePath: string,
+  worktreePath: string
 ): Promise<{ canCreate: boolean; reason?: string }> {
   const params = new URLSearchParams({ worktreePath });
   return apiCall<{ canCreate: boolean; reason?: string }>(

@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { AcceptanceDecision, ExecutionGateDecision, ProjectAgent, ProjectChange } from '@zclaudia/shared';
+import type {
+  AcceptanceDecision,
+  ExecutionGateDecision,
+  ProjectAgent,
+  ProjectChange,
+} from '@zclaudia/shared';
 import type { ClientMessage } from '@zclaudia/shared';
 import * as api from '../../../services/api';
 import { useConnection } from '../../../contexts/ConnectionContext';
@@ -27,15 +32,17 @@ export function SupervisorWorkspacePanel({ projectId, agent }: SupervisorWorkspa
   const { sendMessage } = useConnection();
   const socket = useMemo(
     () => ({ send: (raw: string) => sendMessage(JSON.parse(raw) as ClientMessage) }),
-    [sendMessage],
+    [sendMessage]
   );
   const [activeTab, setActiveTab] = useState<'classic' | 'meta'>('classic');
-  const activeChange = useSupervisionStore((s) => s.activeChanges[projectId] ?? null);
-  const executionPlan = useSupervisionStore((s) => activeChange ? s.executionPlans[activeChange.id] : undefined);
-  const tasks = useSupervisionStore((s) => s.tasks[projectId] ?? []);
-  const setActiveChange = useSupervisionStore((s) => s.setActiveChange);
-  const setExecutionPlan = useSupervisionStore((s) => s.setExecutionPlan);
-  const setTasks = useSupervisionStore((s) => s.setTasks);
+  const activeChange = useSupervisionStore(s => s.activeChanges[projectId] ?? null);
+  const executionPlan = useSupervisionStore(s =>
+    activeChange ? s.executionPlans[activeChange.id] : undefined
+  );
+  const tasks = useSupervisionStore(s => s.tasks[projectId] ?? []);
+  const setActiveChange = useSupervisionStore(s => s.setActiveChange);
+  const setExecutionPlan = useSupervisionStore(s => s.setExecutionPlan);
+  const setTasks = useSupervisionStore(s => s.setTasks);
   const [loading, setLoading] = useState(false);
   const [showCreateChange, setShowCreateChange] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -48,7 +55,9 @@ export function SupervisorWorkspacePanel({ projectId, agent }: SupervisorWorkspa
   const [allChanges, setAllChanges] = useState<ProjectChange[]>([]);
   const [previewChangeId, setPreviewChangeId] = useState<string | null>(null);
   const [showAllChanges, setShowAllChanges] = useState(false);
-  const [changesFilter, setChangesFilter] = useState<'all' | 'active' | 'completed' | 'cancelled'>('all');
+  const [changesFilter, setChangesFilter] = useState<'all' | 'active' | 'completed' | 'cancelled'>(
+    'all'
+  );
   const [editingDocId, setEditingDocId] = useState<string | null>(null);
   const [draftDocContent, setDraftDocContent] = useState('');
   const [legacyClassicChangeIds, setLegacyClassicChangeIds] = useState<Set<string>>(new Set());
@@ -56,9 +65,13 @@ export function SupervisorWorkspacePanel({ projectId, agent }: SupervisorWorkspa
   useEffect(() => {
     let cancelled = false;
     listLegacyClassicChangeIds(projectId)
-      .then((ids) => { if (!cancelled) setLegacyClassicChangeIds(new Set(ids)); })
+      .then(ids => {
+        if (!cancelled) setLegacyClassicChangeIds(new Set(ids));
+      })
       .catch(() => undefined);
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [projectId]);
 
   useEffect(() => {
@@ -72,7 +85,7 @@ export function SupervisorWorkspacePanel({ projectId, agent }: SupervisorWorkspa
         const changes = await api.getProjectChanges(projectId);
         if (cancelled) return;
         setAllChanges(changes);
-        setChangeHistory(changes.filter((item) => !item.active));
+        setChangeHistory(changes.filter(item => !item.active));
         const contextDocs = await api.getSupervisionContext(projectId);
         if (cancelled) return;
         if (change) {
@@ -85,7 +98,9 @@ export function SupervisorWorkspacePanel({ projectId, agent }: SupervisorWorkspa
           setTasks(projectId, filteredTasks);
           const nextDocs = extractWorkspaceDocs(change.id, contextDocs);
           setDocs(nextDocs);
-          setSelectedDocId((prev) => prev && nextDocs.some((doc) => doc.id === prev) ? prev : nextDocs[0]?.id ?? null);
+          setSelectedDocId(prev =>
+            prev && nextDocs.some(doc => doc.id === prev) ? prev : (nextDocs[0]?.id ?? null)
+          );
         } else {
           const nextDocs = extractWorkspaceDocs(undefined, contextDocs);
           setDocs(nextDocs);
@@ -104,8 +119,8 @@ export function SupervisorWorkspacePanel({ projectId, agent }: SupervisorWorkspa
   }, [projectId, setActiveChange, setExecutionPlan, setTasks]);
 
   const changeTasks = useMemo(
-    () => activeChange ? tasks.filter((task) => task.changeId === activeChange.id) : [],
-    [activeChange, tasks],
+    () => (activeChange ? tasks.filter(task => task.changeId === activeChange.id) : []),
+    [activeChange, tasks]
   );
 
   const refreshActiveChange = async (change: ProjectChange) => {
@@ -120,10 +135,12 @@ export function SupervisorWorkspacePanel({ projectId, agent }: SupervisorWorkspa
     setExecutionPlan(change.id, plan);
     setTasks(projectId, filteredTasks);
     setAllChanges(changes);
-    setChangeHistory(changes.filter((item) => !item.active));
+    setChangeHistory(changes.filter(item => !item.active));
     const nextDocs = extractWorkspaceDocs(change.id, contextDocs);
     setDocs(nextDocs);
-    setSelectedDocId((prev) => prev && nextDocs.some((doc) => doc.id === prev) ? prev : nextDocs[0]?.id ?? null);
+    setSelectedDocId(prev =>
+      prev && nextDocs.some(doc => doc.id === prev) ? prev : (nextDocs[0]?.id ?? null)
+    );
   };
 
   const handleCreateChange = async () => {
@@ -146,10 +163,7 @@ export function SupervisorWorkspacePanel({ projectId, agent }: SupervisorWorkspa
     }
   };
 
-  const handleGateAction = async (
-    action: () => Promise<ProjectChange>,
-    errorMessage: string,
-  ) => {
+  const handleGateAction = async (action: () => Promise<ProjectChange>, errorMessage: string) => {
     if (!activeChange) return;
     setLoading(true);
     setError(null);
@@ -167,49 +181,49 @@ export function SupervisorWorkspacePanel({ projectId, agent }: SupervisorWorkspa
   const handleRequestDesign = () =>
     handleGateAction(
       () => api.requestDesignGate(activeChange!.id, actionNotes.trim() || undefined),
-      'Failed to request design review',
+      'Failed to request design review'
     );
 
   const handleResolveDesign = (decision: 'approve_design' | 'revise_design' | 'revise_change') =>
     handleGateAction(
       () => api.resolveDesignGate(activeChange!.id, decision, actionNotes.trim() || undefined),
-      'Failed to resolve design gate',
+      'Failed to resolve design gate'
     );
 
   const handleRequestExecution = () =>
     handleGateAction(
       () => api.requestExecutionGate(activeChange!.id, actionNotes.trim() || undefined),
-      'Failed to request execution review',
+      'Failed to request execution review'
     );
 
   const handleResolveExecution = (decision: ExecutionGateDecision) =>
     handleGateAction(
       () => api.resolveExecutionGate(activeChange!.id, decision, actionNotes.trim() || undefined),
-      'Failed to resolve execution gate',
+      'Failed to resolve execution gate'
     );
 
   const handleRequestAcceptance = () =>
     handleGateAction(
       () => api.requestAcceptance(activeChange!.id, actionNotes.trim() || undefined),
-      'Failed to request acceptance',
+      'Failed to request acceptance'
     );
 
   const handleResolveAcceptance = (decision: AcceptanceDecision) =>
     handleGateAction(
       () => api.resolveAcceptance(activeChange!.id, decision, actionNotes.trim() || undefined),
-      'Failed to resolve acceptance',
+      'Failed to resolve acceptance'
     );
 
   const handleRequestSync = () =>
     handleGateAction(
       () => api.requestChangeSync(activeChange!.id, actionNotes.trim() || undefined),
-      'Failed to request sync',
+      'Failed to request sync'
     );
 
   const handleCompleteChange = () =>
     handleGateAction(
       () => api.completeProjectChange(activeChange!.id, actionNotes.trim() || undefined),
-      'Failed to complete change',
+      'Failed to complete change'
     );
 
   const handlePreviewChange = async (change: ProjectChange, preferredDoc?: PreviewDocTarget) => {
@@ -223,11 +237,12 @@ export function SupervisorWorkspacePanel({ projectId, agent }: SupervisorWorkspa
       setEditingDocId(null);
       setDraftDocContent('');
       const preferredDocId = preferredDoc
-        ? nextDocs.find((doc) => doc.id.endsWith(`/${preferredDoc}.md`))?.id ?? null
+        ? (nextDocs.find(doc => doc.id.endsWith(`/${preferredDoc}.md`))?.id ?? null)
         : null;
       setSelectedDocId(
-        preferredDocId
-          ?? ((prev) => prev && nextDocs.some((doc) => doc.id === prev) ? prev : nextDocs[0]?.id ?? null),
+        preferredDocId ??
+          (prev =>
+            prev && nextDocs.some(doc => doc.id === prev) ? prev : (nextDocs[0]?.id ?? null))
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load change documents');
@@ -236,23 +251,31 @@ export function SupervisorWorkspacePanel({ projectId, agent }: SupervisorWorkspa
     }
   };
 
-  const selectedDoc = docs.find((doc) => doc.id === selectedDocId) ?? null;
+  const selectedDoc = docs.find(doc => doc.id === selectedDocId) ?? null;
   const recentHistory = useMemo(
-    () => [...changeHistory].sort((a, b) => (b.updatedAt ?? b.createdAt) - (a.updatedAt ?? a.createdAt)).slice(0, 5),
-    [changeHistory],
+    () =>
+      [...changeHistory]
+        .sort((a, b) => (b.updatedAt ?? b.createdAt) - (a.updatedAt ?? a.createdAt))
+        .slice(0, 5),
+    [changeHistory]
   );
   const filteredChanges = useMemo(() => {
-    const sorted = [...allChanges].sort((a, b) => (b.updatedAt ?? b.createdAt) - (a.updatedAt ?? a.createdAt));
-    if (changesFilter === 'active') return sorted.filter((change) => change.active);
-    if (changesFilter === 'completed') return sorted.filter((change) => change.status === 'completed');
-    if (changesFilter === 'cancelled') return sorted.filter((change) => change.status === 'cancelled');
+    const sorted = [...allChanges].sort(
+      (a, b) => (b.updatedAt ?? b.createdAt) - (a.updatedAt ?? a.createdAt)
+    );
+    if (changesFilter === 'active') return sorted.filter(change => change.active);
+    if (changesFilter === 'completed')
+      return sorted.filter(change => change.status === 'completed');
+    if (changesFilter === 'cancelled')
+      return sorted.filter(change => change.status === 'cancelled');
     return sorted;
   }, [allChanges, changesFilter]);
   const previewChange = useMemo(
-    () => (activeChange?.id === previewChangeId
-      ? activeChange
-      : recentHistory.find((change) => change.id === previewChangeId) ?? null),
-    [activeChange, previewChangeId, recentHistory],
+    () =>
+      activeChange?.id === previewChangeId
+        ? activeChange
+        : (recentHistory.find(change => change.id === previewChangeId) ?? null),
+    [activeChange, previewChangeId, recentHistory]
   );
 
   const handleStartEditing = () => {
@@ -273,7 +296,11 @@ export function SupervisorWorkspacePanel({ projectId, agent }: SupervisorWorkspa
     setLoading(true);
     setError(null);
     try {
-      const updated = await api.updateChangeDocument(activeChange.id, docType as 'design' | 'execution' | 'tasks', draftDocContent);
+      const updated = await api.updateChangeDocument(
+        activeChange.id,
+        docType as 'design' | 'execution' | 'tasks',
+        draftDocContent
+      );
       await refreshActiveChange(updated);
       setEditingDocId(null);
       setDraftDocContent('');
@@ -301,13 +328,15 @@ export function SupervisorWorkspacePanel({ projectId, agent }: SupervisorWorkspa
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-sm font-semibold">Supervisor Workspace</h2>
-            <p className="text-xs text-muted-foreground">Spec-driven execution for the active change.</p>
+            <p className="text-xs text-muted-foreground">
+              Spec-driven execution for the active change.
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <NewRunDropdown
               projectId={projectId}
               socket={socket}
-              onNewClassicChange={() => setShowCreateChange((value) => !value)}
+              onNewClassicChange={() => setShowCreateChange(value => !value)}
             />
           </div>
         </div>
@@ -316,13 +345,13 @@ export function SupervisorWorkspacePanel({ projectId, agent }: SupervisorWorkspa
           <div className="grid gap-2 rounded-lg border border-border bg-secondary/30 p-3">
             <input
               value={newTitle}
-              onChange={(event) => setNewTitle(event.target.value)}
+              onChange={event => setNewTitle(event.target.value)}
               placeholder="Change title"
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
             />
             <textarea
               value={newSummary}
-              onChange={(event) => setNewSummary(event.target.value)}
+              onChange={event => setNewSummary(event.target.value)}
               placeholder="What will this change accomplish?"
               rows={3}
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm resize-none"
@@ -370,7 +399,7 @@ export function SupervisorWorkspacePanel({ projectId, agent }: SupervisorWorkspa
           previewChangeId={previewChangeId}
           showAllChanges={showAllChanges}
           loading={loading}
-          onToggleShowAll={() => setShowAllChanges((value) => !value)}
+          onToggleShowAll={() => setShowAllChanges(value => !value)}
           onPreviewChange={handlePreviewChange}
         />
 
@@ -381,7 +410,7 @@ export function SupervisorWorkspacePanel({ projectId, agent }: SupervisorWorkspa
             previewChangeId={previewChangeId}
             loading={loading}
             onFilterChange={setChangesFilter}
-            onPreviewChange={(change) => handlePreviewChange(change)}
+            onPreviewChange={change => handlePreviewChange(change)}
           />
         )}
       </div>
@@ -417,7 +446,9 @@ export function SupervisorWorkspacePanel({ projectId, agent }: SupervisorWorkspa
                     <div className="flex h-full items-center justify-center px-6 text-center text-muted-foreground">
                       <div>
                         <p className="text-sm">Project context is available.</p>
-                        <p className="mt-1 text-xs">Review or edit baseline docs, then start a change when you are ready.</p>
+                        <p className="mt-1 text-xs">
+                          Review or edit baseline docs, then start a change when you are ready.
+                        </p>
                       </div>
                     </div>
                   )}
@@ -442,7 +473,9 @@ export function SupervisorWorkspacePanel({ projectId, agent }: SupervisorWorkspa
               <div className="flex h-full items-center justify-center px-6 text-center text-muted-foreground">
                 <div>
                   <p className="text-sm">No active change yet.</p>
-                  <p className="mt-1 text-xs">Set up project context, then create a change to start spec-driven execution.</p>
+                  <p className="mt-1 text-xs">
+                    Set up project context, then create a change to start spec-driven execution.
+                  </p>
                 </div>
               </div>
             )}

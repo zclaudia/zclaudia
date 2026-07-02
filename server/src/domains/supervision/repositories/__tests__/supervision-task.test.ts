@@ -80,7 +80,7 @@ function createTestDb(): Database.Database {
 function seedProject(db: Database.Database, id = 'proj-1'): string {
   const now = Date.now();
   db.prepare(
-    `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, 'code', ?, ?)`,
+    `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, 'code', ?, ?)`
   ).run(id, 'Test Project', now, now);
   return id;
 }
@@ -232,20 +232,50 @@ describe('SupervisionTaskRepository', () => {
 
   describe('findByStatus()', () => {
     it('returns tasks matching multiple statuses', () => {
-      repo.create({ projectId, title: 'Pending', description: 'd', source: 'user', status: 'pending' });
-      repo.create({ projectId, title: 'Running', description: 'd', source: 'user', status: 'running' });
-      repo.create({ projectId, title: 'Integrated', description: 'd', source: 'user', status: 'integrated' });
-      repo.create({ projectId, title: 'Failed', description: 'd', source: 'user', status: 'failed' });
+      repo.create({
+        projectId,
+        title: 'Pending',
+        description: 'd',
+        source: 'user',
+        status: 'pending',
+      });
+      repo.create({
+        projectId,
+        title: 'Running',
+        description: 'd',
+        source: 'user',
+        status: 'running',
+      });
+      repo.create({
+        projectId,
+        title: 'Integrated',
+        description: 'd',
+        source: 'user',
+        status: 'integrated',
+      });
+      repo.create({
+        projectId,
+        title: 'Failed',
+        description: 'd',
+        source: 'user',
+        status: 'failed',
+      });
 
       const active = repo.findByStatus(projectId, 'pending', 'running');
       expect(active).toHaveLength(2);
-      const titles = active.map((t) => t.title);
+      const titles = active.map(t => t.title);
       expect(titles).toContain('Pending');
       expect(titles).toContain('Running');
     });
 
     it('returns empty array when no tasks match status', () => {
-      repo.create({ projectId, title: 'Pending', description: 'd', source: 'user', status: 'pending' });
+      repo.create({
+        projectId,
+        title: 'Pending',
+        description: 'd',
+        source: 'user',
+        status: 'pending',
+      });
       const result = repo.findByStatus(projectId, 'running');
       expect(result).toEqual([]);
     });
@@ -347,7 +377,7 @@ describe('SupervisionTaskRepository', () => {
       const now = Date.now();
       db.prepare(
         `INSERT INTO sessions (id, project_id, name, created_at, updated_at)
-         VALUES (?, ?, 'Test Session', ?, ?)`,
+         VALUES (?, ?, 'Test Session', ?, ?)`
       ).run('sess-1', projectId, now, now);
 
       const task = repo.create({
@@ -464,7 +494,13 @@ describe('SupervisionTaskRepository', () => {
 
       repo.create({ projectId, title: 'T1', description: 'd', source: 'user', status: 'pending' });
       repo.create({ projectId, title: 'T2', description: 'd', source: 'user', status: 'running' });
-      repo.create({ projectId, title: 'T3', description: 'd', source: 'user', status: 'integrated' });
+      repo.create({
+        projectId,
+        title: 'T3',
+        description: 'd',
+        source: 'user',
+        status: 'integrated',
+      });
 
       expect(repo.countByProject(projectId)).toBe(3);
     });

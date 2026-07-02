@@ -5,6 +5,7 @@ import type { GatewayBackendInfo } from '@zclaudia/shared';
 
 describe('gatewayStore', () => {
   beforeEach(() => {
+    localStorage.clear();
     useGatewayStore.setState({
       gatewayUrl: null,
       gatewaySecret: null,
@@ -79,6 +80,22 @@ describe('gatewayStore', () => {
     expect(state.directGatewaySecret).toBe('secret');
     expect(state.gatewayUrl).toBe('https://gw');
     expect(state.gatewaySecret).toBe('secret');
+  });
+
+  it('does not persist direct gateway secrets', () => {
+    localStorage.removeItem('zclaudia-gateway');
+    useGatewayStore.getState().setDirectGatewayConfig('https://gw', 'secret');
+
+    const persisted = localStorage.getItem('zclaudia-gateway');
+
+    expect(persisted).not.toContain('secret');
+    expect(JSON.parse(persisted!)).toEqual({
+      state: {
+        directGatewayUrl: 'https://gw',
+        lastActiveBackendId: null,
+      },
+      version: 6,
+    });
   });
 
   it('clears direct gateway config', () => {

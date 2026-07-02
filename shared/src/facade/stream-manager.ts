@@ -19,9 +19,6 @@ import type {
   DesiredSessionStream,
   SessionStreamRuntime,
   SessionStreamSnapshot,
-  SessionStreamState,
-  StreamCommand,
-  StreamEvent,
   StreamManagerResult,
 } from './types.js';
 
@@ -73,7 +70,7 @@ export class FacadeStreamManager {
   requestOpen(
     backendId: string,
     sessionId: string,
-    context: { backendReady: boolean; latestKnownOffset?: number },
+    _context: { backendReady: boolean; latestKnownOffset?: number }
   ): StreamManagerResult {
     const key = streamKey(backendId, sessionId);
     const now = Date.now();
@@ -133,10 +130,7 @@ export class FacadeStreamManager {
     return result;
   }
 
-  requestClose(
-    backendId: string,
-    sessionId: string,
-  ): StreamManagerResult {
+  requestClose(backendId: string, sessionId: string): StreamManagerResult {
     const key = streamKey(backendId, sessionId);
     const now = Date.now();
     const result = emptyResult();
@@ -171,9 +165,7 @@ export class FacadeStreamManager {
   // Backend Lifecycle
   // --------------------------------------------------------------------------
 
-  handleBackendBecameReady(
-    backendId: string,
-  ): StreamManagerResult {
+  handleBackendBecameReady(backendId: string): StreamManagerResult {
     const now = Date.now();
     const result = emptyResult();
 
@@ -219,7 +211,7 @@ export class FacadeStreamManager {
   handleBackendUnsubscribed(
     backendId: string,
     reason: string,
-    context: { willAutoRecover: boolean },
+    context: { willAutoRecover: boolean }
   ): StreamManagerResult {
     const now = Date.now();
     const result = emptyResult();
@@ -264,7 +256,7 @@ export class FacadeStreamManager {
   handleSessionStreamClosed(
     backendId: string,
     sessionId: string,
-    reason: string,
+    reason: string
   ): StreamManagerResult {
     const key = streamKey(backendId, sessionId);
     const now = Date.now();
@@ -298,7 +290,7 @@ export class FacadeStreamManager {
     backendId: string,
     sessionId: string,
     messages: SessionMessage[],
-    latestOffset: number,
+    latestOffset: number
   ): StreamManagerResult {
     const key = streamKey(backendId, sessionId);
     const now = Date.now();
@@ -356,11 +348,7 @@ export class FacadeStreamManager {
     return result;
   }
 
-  handleRunEvent(
-    backendId: string,
-    sessionId: string,
-    event: ServerMessage,
-  ): StreamManagerResult {
+  handleRunEvent(backendId: string, sessionId: string, event: ServerMessage): StreamManagerResult {
     const key = streamKey(backendId, sessionId);
     const now = Date.now();
     const result = emptyResult();

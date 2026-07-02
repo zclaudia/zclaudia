@@ -61,7 +61,9 @@ describe('Web Search config routes', () => {
       searxngBaseUrl: 'https://search.example.com',
       searxngBaseUrlSource: 'stored',
     });
-    const row = db.prepare('SELECT brave_api_key, searxng_base_url FROM web_search_config WHERE id = 1').get() as {
+    const row = db
+      .prepare('SELECT brave_api_key, searxng_base_url FROM web_search_config WHERE id = 1')
+      .get() as {
       brave_api_key: string;
       searxng_base_url: string;
     };
@@ -71,8 +73,9 @@ describe('Web Search config routes', () => {
 
   it('clears stored values without clearing env fallbacks', async () => {
     vi.stubEnv('BRAVE_SEARCH_API_KEY', 'env-key');
-    db.prepare('UPDATE web_search_config SET brave_api_key = ?, searxng_base_url = ? WHERE id = 1')
-      .run('stored-key', 'https://stored.example.com');
+    db.prepare(
+      'UPDATE web_search_config SET brave_api_key = ?, searxng_base_url = ? WHERE id = 1'
+    ).run('stored-key', 'https://stored.example.com');
 
     const response = await request(app)
       .put('/api/web-search/config')
@@ -85,7 +88,9 @@ describe('Web Search config routes', () => {
       searxngBaseUrl: null,
       searxngBaseUrlSource: null,
     });
-    const row = db.prepare('SELECT brave_api_key, searxng_base_url FROM web_search_config WHERE id = 1').get() as {
+    const row = db
+      .prepare('SELECT brave_api_key, searxng_base_url FROM web_search_config WHERE id = 1')
+      .get() as {
       brave_api_key: string | null;
       searxng_base_url: string | null;
     };

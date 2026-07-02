@@ -1,6 +1,11 @@
 import { runBash } from './bash-runner.js';
 import { parseToolRule } from '@zclaudia/shared/interaction/tool-rule-syntax';
-import { matchesToolRule, clampHookTimeout, type UserHookDefinition, type UserHookEvent } from '@zclaudia/shared/interaction/user-hooks';
+import {
+  matchesToolRule,
+  clampHookTimeout,
+  type UserHookDefinition,
+  type UserHookEvent,
+} from '@zclaudia/shared/interaction/user-hooks';
 
 export interface HookInvocation {
   event: UserHookEvent;
@@ -18,13 +23,20 @@ export interface PreHookOutcome {
 
 const REASON_LIMIT = 1024;
 
-function matchingHooks(hooks: UserHookDefinition[], event: UserHookEvent, toolName: string, detail: string): UserHookDefinition[] {
-  return hooks.filter((h) => {
+function matchingHooks(
+  hooks: UserHookDefinition[],
+  event: UserHookEvent,
+  toolName: string,
+  detail: string
+): UserHookDefinition[] {
+  return hooks.filter(h => {
     if (h.event !== event || h.enabled === false) return false;
     if (!h.matcher) return true;
     const parsed = parseToolRule(h.matcher);
     if (!parsed.ok) {
-      console.warn(`[UserHooks] skipping hook with invalid matcher "${h.matcher}": ${parsed.error}`);
+      console.warn(
+        `[UserHooks] skipping hook with invalid matcher "${h.matcher}": ${parsed.error}`
+      );
       return false;
     }
     return matchesToolRule(parsed.rule, toolName, detail);
@@ -58,22 +70,27 @@ async function invokeHook(hook: UserHookDefinition, inv: HookInvocation, signal?
 export async function runPreToolUseHooks(
   hooks: UserHookDefinition[],
   inv: HookInvocation,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<PreHookOutcome> {
   for (const hook of matchingHooks(hooks, 'PreToolUse', inv.toolName, inv.detail)) {
     try {
       const result = await invokeHook(hook, inv, signal);
       if (result.timedOut || result.aborted) {
-        console.warn(`[UserHooks] PreToolUse hook timed out/aborted, passing: ${hook.command.slice(0, 80)}`);
+        console.warn(
+          `[UserHooks] PreToolUse hook timed out/aborted, passing: ${hook.command.slice(0, 80)}`
+        );
         continue;
       }
       if (result.exitCode === 2) {
-        const reason = result.stderrOutput.trim().slice(0, REASON_LIMIT)
-          || `Blocked by PreToolUse hook: ${hook.command.slice(0, 80)}`;
+        const reason =
+          result.stderrOutput.trim().slice(0, REASON_LIMIT) ||
+          `Blocked by PreToolUse hook: ${hook.command.slice(0, 80)}`;
         return { blocked: true, reason };
       }
       if (result.exitCode !== 0) {
-        console.warn(`[UserHooks] PreToolUse hook exited ${result.exitCode}, passing: ${hook.command.slice(0, 80)}`);
+        console.warn(
+          `[UserHooks] PreToolUse hook exited ${result.exitCode}, passing: ${hook.command.slice(0, 80)}`
+        );
       }
     } catch (err) {
       console.warn('[UserHooks] PreToolUse hook failed, passing:', err);
@@ -89,21 +106,25 @@ export async function runPreToolUseHooks(
 export async function runPostToolUseHooks(
   hooks: UserHookDefinition[],
   inv: HookInvocation,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<string[]> {
   const extras: string[] = [];
   for (const hook of matchingHooks(hooks, 'PostToolUse', inv.toolName, inv.detail)) {
     try {
       const result = await invokeHook(hook, inv, signal);
       if (result.timedOut || result.aborted) {
-        console.warn(`[UserHooks] PostToolUse hook timed out/aborted: ${hook.command.slice(0, 80)}`);
+        console.warn(
+          `[UserHooks] PostToolUse hook timed out/aborted: ${hook.command.slice(0, 80)}`
+        );
         continue;
       }
       if (result.exitCode === 2) {
         const text = result.stderrOutput.trim().slice(0, REASON_LIMIT);
         if (text) extras.push(text);
       } else if (result.exitCode !== 0) {
-        console.warn(`[UserHooks] PostToolUse hook exited ${result.exitCode}: ${hook.command.slice(0, 80)}`);
+        console.warn(
+          `[UserHooks] PostToolUse hook exited ${result.exitCode}: ${hook.command.slice(0, 80)}`
+        );
       }
     } catch (err) {
       console.warn('[UserHooks] PostToolUse hook failed:', err);

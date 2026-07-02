@@ -34,15 +34,16 @@ export function createTurnSummaryRoutes(service: TurnSummaryService): Router {
         res.json({ success: true, data: result } as ApiResponse<GenerateTurnSummaryResponse>);
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to generate turn summary';
-        const code = message.includes('No messages') || message.includes('not a user message')
-          ? 'NOT_FOUND'
-          : message.includes('parse summary')
-            ? 'GENERATION_FAILED'
-            : 'INTERNAL_ERROR';
+        const code =
+          message.includes('No messages') || message.includes('not a user message')
+            ? 'NOT_FOUND'
+            : message.includes('parse summary')
+              ? 'GENERATION_FAILED'
+              : 'INTERNAL_ERROR';
         const status = code === 'NOT_FOUND' ? 404 : 500;
         res.status(status).json({ success: false, error: { code, message } });
       }
-    },
+    }
   );
 
   return router;

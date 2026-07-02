@@ -48,12 +48,10 @@ describe('attachments store', () => {
       att({ id: 'c', sortOrder: 1, createdAt: 50 }),
     ]);
 
-    const result = await useAttachmentsStore
-      .getState()
-      .loadAttachments('local_issue', 'issue-1');
+    const result = await useAttachmentsStore.getState().loadAttachments('local_issue', 'issue-1');
 
-    expect(result.map((a) => a.id)).toEqual(['c', 'a', 'b']);
-    expect(useAttachmentsStore.getState().byOwner['local_issue:issue-1'].map((a) => a.id)).toEqual([
+    expect(result.map(a => a.id)).toEqual(['c', 'a', 'b']);
+    expect(useAttachmentsStore.getState().byOwner['local_issue:issue-1'].map(a => a.id)).toEqual([
       'c',
       'a',
       'b',
@@ -61,11 +59,11 @@ describe('attachments store', () => {
   });
 
   it('loadAttachments deduplicates concurrent calls', async () => {
-    let resolveFn: ((value: Attachment[]) => void) = () => {};
+    let resolveFn: (value: Attachment[]) => void = () => {};
     (listAttachments as any).mockReturnValue(
-      new Promise<Attachment[]>((resolve) => {
+      new Promise<Attachment[]>(resolve => {
         resolveFn = resolve;
-      }),
+      })
     );
 
     const p1 = useAttachmentsStore.getState().loadAttachments('local_issue', 'issue-1');
@@ -81,7 +79,7 @@ describe('attachments store', () => {
     (listAttachments as any).mockRejectedValue(new Error('boom'));
 
     await expect(
-      useAttachmentsStore.getState().loadAttachments('local_issue', 'issue-1'),
+      useAttachmentsStore.getState().loadAttachments('local_issue', 'issue-1')
     ).rejects.toThrow('boom');
     expect(useAttachmentsStore.getState().loadingOwners['local_issue:issue-1']).toBe(false);
   });
@@ -106,19 +104,19 @@ describe('attachments store', () => {
 
     useAttachmentsStore.getState().upsertFromRemote({ ...a, name: 'renamed.png' });
     const list = useAttachmentsStore.getState().byOwner['local_issue:issue-1'];
-    expect(list.find((x) => x.id === 'a')?.name).toBe('renamed.png');
+    expect(list.find(x => x.id === 'a')?.name).toBe('renamed.png');
     expect(list).toHaveLength(2);
   });
 
   it('removeFromRemote drops by id, no-op when key missing', async () => {
     await primeOwner([att({ id: 'a' }), att({ id: 'b' })]);
     useAttachmentsStore.getState().removeFromRemote('local_issue', 'issue-1', 'a');
-    expect(
-      useAttachmentsStore.getState().byOwner['local_issue:issue-1'].map((x) => x.id),
-    ).toEqual(['b']);
+    expect(useAttachmentsStore.getState().byOwner['local_issue:issue-1'].map(x => x.id)).toEqual([
+      'b',
+    ]);
 
     expect(() =>
-      useAttachmentsStore.getState().removeFromRemote('local_issue', 'no-owner', 'b'),
+      useAttachmentsStore.getState().removeFromRemote('local_issue', 'no-owner', 'b')
     ).not.toThrow();
   });
 
@@ -135,7 +133,7 @@ describe('attachments store', () => {
       'local_issue',
       'issue-1',
       expect.any(File),
-      undefined,
+      undefined
     );
     expect(result).toEqual(created);
     expect(useAttachmentsStore.getState().byOwner['local_issue:issue-1']).toHaveLength(1);
@@ -159,8 +157,7 @@ describe('attachments store', () => {
 
     expect(updateAttachment).toHaveBeenCalledWith('a', { name: 'new.png' });
     expect(
-      useAttachmentsStore.getState().byOwner['local_issue:issue-1'].find((x) => x.id === 'a')
-        ?.name,
+      useAttachmentsStore.getState().byOwner['local_issue:issue-1'].find(x => x.id === 'a')?.name
     ).toBe('new.png');
   });
 
@@ -171,7 +168,7 @@ describe('attachments store', () => {
       att({ id: 'c', sortOrder: 2 }),
     ]);
     (updateAttachment as any).mockImplementation((id: string, patch: { sortOrder?: number }) =>
-      Promise.resolve(att({ id, sortOrder: patch.sortOrder ?? 0 })),
+      Promise.resolve(att({ id, sortOrder: patch.sortOrder ?? 0 }))
     );
 
     await useAttachmentsStore
@@ -179,8 +176,8 @@ describe('attachments store', () => {
       .reorderAttachments('local_issue', 'issue-1', ['c', 'a', 'b']);
 
     const list = useAttachmentsStore.getState().byOwner['local_issue:issue-1'];
-    expect(list.map((x) => x.id)).toEqual(['c', 'a', 'b']);
-    expect(list.map((x) => x.sortOrder)).toEqual([0, 1, 2]);
+    expect(list.map(x => x.id)).toEqual(['c', 'a', 'b']);
+    expect(list.map(x => x.sortOrder)).toEqual([0, 1, 2]);
 
     expect(updateAttachment).toHaveBeenCalledTimes(3);
     expect(updateAttachment).toHaveBeenCalledWith('c', { sortOrder: 0 });
@@ -198,12 +195,10 @@ describe('attachments store', () => {
 
     // Caller only knows about a/b — c was added concurrently and should keep
     // its relative position at the tail rather than being dropped.
-    await useAttachmentsStore
-      .getState()
-      .reorderAttachments('local_issue', 'issue-1', ['b', 'a']);
+    await useAttachmentsStore.getState().reorderAttachments('local_issue', 'issue-1', ['b', 'a']);
 
     const list = useAttachmentsStore.getState().byOwner['local_issue:issue-1'];
-    expect(list.map((x) => x.id)).toEqual(['b', 'a', 'c']);
+    expect(list.map(x => x.id)).toEqual(['b', 'a', 'c']);
   });
 
   it('reorderAttachments is a no-op when owner not loaded', async () => {
@@ -244,9 +239,7 @@ describe('attachments store - counts', () => {
       { ownerKind: 'local_issue', ownerId: 'iss-2', count: 5 },
     ]);
 
-    await useAttachmentsStore
-      .getState()
-      .loadAttachmentCounts('local_issue', ['iss-1', 'iss-2']);
+    await useAttachmentsStore.getState().loadAttachmentCounts('local_issue', ['iss-1', 'iss-2']);
 
     // iss-1 was excluded from the request body.
     expect((listAttachmentCounts as any).mock.calls[0][1]).toEqual(['iss-2']);
@@ -279,9 +272,7 @@ describe('attachments store - counts', () => {
     ]);
     await useAttachmentsStore.getState().loadAttachmentCounts('local_issue', ['iss-9']);
 
-    useAttachmentsStore
-      .getState()
-      .upsertFromRemote(att({ id: 'new', ownerId: 'iss-9' }));
+    useAttachmentsStore.getState().upsertFromRemote(att({ id: 'new', ownerId: 'iss-9' }));
 
     expect(useAttachmentsStore.getState().getCount('local_issue', 'iss-9')).toBe(3);
     // byOwner intentionally not populated — partial list would be misleading.
@@ -289,9 +280,7 @@ describe('attachments store - counts', () => {
   });
 
   it('upsertFromRemote starts a fresh count for an unknown owner', () => {
-    useAttachmentsStore
-      .getState()
-      .upsertFromRemote(att({ id: 'a', ownerId: 'iss-new' }));
+    useAttachmentsStore.getState().upsertFromRemote(att({ id: 'a', ownerId: 'iss-new' }));
 
     expect(useAttachmentsStore.getState().getCount('local_issue', 'iss-new')).toBe(1);
   });

@@ -41,10 +41,10 @@ export const useFilePushStore = create<FilePushState>()(
     (set, get) => ({
       items: [],
 
-      addItem: (item) =>
-        set((state) => {
+      addItem: item =>
+        set(state => {
           // Don't add duplicates
-          if (state.items.some((i) => i.fileId === item.fileId)) {
+          if (state.items.some(i => i.fileId === item.fileId)) {
             return state;
           }
           return {
@@ -61,57 +61,58 @@ export const useFilePushStore = create<FilePushState>()(
         }),
 
       updateStatus: (fileId, status, error) =>
-        set((state) => ({
-          items: state.items.map((i) =>
+        set(state => ({
+          items: state.items.map(i =>
             i.fileId === fileId
-              ? { ...i, status, error, downloadProgress: status === 'completed' ? 100 : i.downloadProgress }
+              ? {
+                  ...i,
+                  status,
+                  error,
+                  downloadProgress: status === 'completed' ? 100 : i.downloadProgress,
+                }
               : i
           ),
         })),
 
       updateProgress: (fileId, progress) =>
-        set((state) => ({
-          items: state.items.map((i) =>
+        set(state => ({
+          items: state.items.map(i =>
             i.fileId === fileId ? { ...i, downloadProgress: progress } : i
           ),
         })),
 
       updateSavedPath: (fileId, savedPath) =>
-        set((state) => ({
-          items: state.items.map((i) =>
-            i.fileId === fileId ? { ...i, savedPath } : i
-          ),
+        set(state => ({
+          items: state.items.map(i => (i.fileId === fileId ? { ...i, savedPath } : i)),
         })),
 
       updatePrivatePath: (fileId, privatePath) =>
-        set((state) => ({
-          items: state.items.map((i) =>
-            i.fileId === fileId ? { ...i, privatePath } : i
-          ),
+        set(state => ({
+          items: state.items.map(i => (i.fileId === fileId ? { ...i, privatePath } : i)),
         })),
 
-      removeItem: (fileId) =>
-        set((state) => ({
-          items: state.items.filter((i) => i.fileId !== fileId),
+      removeItem: fileId =>
+        set(state => ({
+          items: state.items.filter(i => i.fileId !== fileId),
         })),
 
-      getItemsForSession: (sessionId) => {
-        return get().items.filter((i) => i.sessionId === sessionId);
+      getItemsForSession: sessionId => {
+        return get().items.filter(i => i.sessionId === sessionId);
       },
 
       getPendingItems: () => {
-        return get().items.filter((i) => i.status === 'pending');
+        return get().items.filter(i => i.status === 'pending');
       },
     }),
     {
       name: 'file-push-store',
       // Reset interrupted downloads on reload
-      onRehydrateStorage: () => (state) => {
+      onRehydrateStorage: () => state => {
         if (!state) return;
         state.items = state.items.map((i: FilePushItem) =>
           i.status === 'downloading' ? { ...i, status: 'pending' as const, downloadProgress: 0 } : i
         );
       },
-    },
-  ),
+    }
+  )
 );

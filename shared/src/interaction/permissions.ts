@@ -29,13 +29,19 @@ export interface PermissionRequest {
 // ============================================
 
 export interface AgentPermissionRule {
-  toolName: string;      // exact match or '*'
-  pattern?: string;      // optional regex on detail
+  toolName: string; // exact match or '*'
+  pattern?: string; // optional regex on detail
   action: 'approve' | 'deny' | 'escalate' | 'continue';
 }
 
 /** The six operation categories for permission evaluation */
-export type PermissionCategory = 'fileRead' | 'fileWrite' | 'shellSafe' | 'networkOps' | 'destructiveOps' | 'userQuestions';
+export type PermissionCategory =
+  | 'fileRead'
+  | 'fileWrite'
+  | 'shellSafe'
+  | 'networkOps'
+  | 'destructiveOps'
+  | 'userQuestions';
 
 /** Per-category action */
 export type CategoryAction = 'auto-approve' | 'ask' | 'block';
@@ -45,7 +51,7 @@ export type CategoryProfile = Record<PermissionCategory, CategoryAction>;
 
 /** Global guard toggles (always checked regardless of category) */
 export interface GlobalGuards {
-  blockSensitiveFiles: boolean;   // .env, .ssh, credentials → escalate
+  blockSensitiveFiles: boolean; // .env, .ssh, credentials → escalate
   blockOutsideWorkspace: boolean; // Outside workspace → escalate
 }
 
@@ -144,7 +150,6 @@ function cloneUnifiedPolicy(policy: UnifiedPermissionPolicy): UnifiedPermissionP
   };
 }
 
-
 /**
  * Ensure AskUserQuestion is present in the escalateAlways list. Provider-
  * specific tools (e.g. plan-mode submissions) are NOT added here — those
@@ -176,8 +181,8 @@ export function normalizeToUnifiedPolicy(raw: unknown): UnifiedPermissionPolicy 
 
 /** Context passed to the permission evaluator for path-aware evaluation */
 export interface EvaluationContext {
-  rootPath: string;              // Session's workspace root directory
-  sessionType?: SessionType;     // Optional, no longer used for profile lookup
+  rootPath: string; // Session's workspace root directory
+  sessionType?: SessionType; // Optional, no longer used for profile lookup
 }
 
 /** Default sensitive file patterns */

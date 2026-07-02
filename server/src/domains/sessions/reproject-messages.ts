@@ -1,11 +1,20 @@
 import type { Database } from 'better-sqlite3';
 import { newId } from '../../utils/uuid.js';
 import { SqliteSessionStorage } from '../../infra/providers/pi-runtime/session-tree/sqlite-session-storage.js';
-import { projectEntriesToMessageRows, type ProjectedMessageRow } from '../../infra/providers/pi-runtime/session-tree/message-projection.js';
-import { extractAndIndexMetadata, removeIndexedMetadata } from '../../infra/storage/metadata-extractor.js';
+import {
+  projectEntriesToMessageRows,
+  type ProjectedMessageRow,
+} from '../../infra/providers/pi-runtime/session-tree/message-projection.js';
+import {
+  extractAndIndexMetadata,
+  removeIndexedMetadata,
+} from '../../infra/storage/metadata-extractor.js';
 
 /** Async, pre-transaction: read the active path (root → leaf) and project it to message rows. */
-export async function readActivePathRows(db: Database, sessionId: string): Promise<ProjectedMessageRow[]> {
+export async function readActivePathRows(
+  db: Database,
+  sessionId: string
+): Promise<ProjectedMessageRow[]> {
   const storage = new SqliteSessionStorage(db, sessionId);
   const leafId = await storage.getLeafId();
   const path = leafId ? await storage.getPathToRoot(leafId) : [];
@@ -18,8 +27,14 @@ export async function readActivePathRows(db: Database, sessionId: string): Promi
  * tree_entry_id back-link. Safe for both fork (empty target → delete is a no-op)
  * and branch (rewrite). Caller wraps this in db.transaction().
  */
-export function writeProjectedMessages(db: Database, sessionId: string, rows: ProjectedMessageRow[]): void {
-  const existing = db.prepare(`SELECT id FROM messages WHERE session_id = ?`).all(sessionId) as Array<{ id: string }>;
+export function writeProjectedMessages(
+  db: Database,
+  sessionId: string,
+  rows: ProjectedMessageRow[]
+): void {
+  const existing = db
+    .prepare(`SELECT id FROM messages WHERE session_id = ?`)
+    .all(sessionId) as Array<{ id: string }>;
   for (const r of existing) removeIndexedMetadata(db, r.id);
   db.prepare(`DELETE FROM messages WHERE session_id = ?`).run(sessionId);
 
@@ -43,9 +58,20 @@ export function writeProjectedMessages(db: Database, sessionId: string, rows: Pr
     const metadataJson = row.metadata ? JSON.stringify(row.metadata) : null;
     insert.run(id, sessionId, row.role, row.content, metadataJson, createdAt, i + 1, row.entryId);
     if (row.metadata) {
-      const rowid = (db.prepare(`SELECT rowid FROM messages WHERE id = ?`).get(id) as { rowid: number } | undefined)?.rowid;
+      const rowid = (
+        db.prepare(`SELECT rowid FROM messages WHERE id = ?`).get(id) as
+          | { rowid: number }
+          | undefined
+      )?.rowid;
       if (rowid != null) {
-        extractAndIndexMetadata(db, id, rowid, sessionId, row.metadata as Parameters<typeof extractAndIndexMetadata>[4], createdAt);
+        extractAndIndexMetadata(
+          db,
+          id,
+          rowid,
+          sessionId,
+          row.metadata as Parameters<typeof extractAndIndexMetadata>[4],
+          createdAt
+        );
       }
     }
   });

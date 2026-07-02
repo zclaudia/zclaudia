@@ -93,7 +93,7 @@ test.describe('File Operations', () => {
 
       // Check for line numbers
       const lineNumbers = page.locator('[class*="line-number"], [class*="linenums"]');
-      const hasLineNumbers = await lineNumbers.count() > 0;
+      const hasLineNumbers = (await lineNumbers.count()) > 0;
 
       if (hasLineNumbers) {
         console.log('  ✓ Line numbers present');
@@ -119,15 +119,19 @@ test.describe('File Operations', () => {
     await page.waitForTimeout(5000);
 
     // Look for edit indicator
-    const editIndicator = page.locator('[class*="edit"], [class*="diff"], text=/Edit|Modified|Changed/i').first();
+    const editIndicator = page
+      .locator('[class*="edit"], [class*="diff"], text=/Edit|Modified|Changed/i')
+      .first();
     const hasEdit = await editIndicator.isVisible({ timeout: 10000 }).catch(() => false);
 
     if (hasEdit) {
       console.log('  ✓ Edit operation shown');
 
       // Check for diff view
-      const diffView = page.locator('[class*="diff-view"], [class*="redgreen"], .deletion, .addition');
-      const hasDiff = await diffView.count() > 0;
+      const diffView = page.locator(
+        '[class*="diff-view"], [class*="redgreen"], .deletion, .addition'
+      );
+      const hasDiff = (await diffView.count()) > 0;
 
       if (hasDiff) {
         console.log('  ✓ Diff view displayed');
@@ -150,7 +154,9 @@ test.describe('File Operations', () => {
     }
 
     // Look for upload button
-    const uploadBtn = page.locator('button[title*="Upload"], button[aria-label*="Upload"], input[type="file"]').first();
+    const uploadBtn = page
+      .locator('button[title*="Upload"], button[aria-label*="Upload"], input[type="file"]')
+      .first();
     const hasUpload = await uploadBtn.isVisible({ timeout: 2000 }).catch(() => false);
 
     if (hasUpload) {
@@ -185,7 +191,9 @@ test.describe('File Operations', () => {
     await page.waitForTimeout(3000);
 
     // Look for file reference indicator
-    const fileRef = page.locator('[class*="file-ref"], [class*="mention"], text=package.json').first();
+    const fileRef = page
+      .locator('[class*="file-ref"], [class*="mention"], text=package.json')
+      .first();
     const hasRef = await fileRef.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (hasRef) {
@@ -321,7 +329,9 @@ test.describe('File Operations', () => {
     await page.waitForTimeout(5000);
 
     // Look for creation indicator
-    const createIndicator = page.locator('[class*="created"], [class*="new-file"], text=/Created|New file/i').first();
+    const createIndicator = page
+      .locator('[class*="created"], [class*="new-file"], text=/Created|New file/i')
+      .first();
     const hasCreated = await createIndicator.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (hasCreated) {
@@ -347,7 +357,9 @@ test.describe('File Operations', () => {
     await page.waitForTimeout(3000);
 
     // Look for warning/confirmation
-    const warningDialog = page.locator('[class*="warning"], [role="alertdialog"], text=/Delete|Warning|Confirm/i').first();
+    const warningDialog = page
+      .locator('[class*="warning"], [role="alertdialog"], text=/Delete|Warning|Confirm/i')
+      .first();
     const hasWarning = await warningDialog.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (hasWarning) {

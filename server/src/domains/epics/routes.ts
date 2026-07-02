@@ -24,7 +24,12 @@ export function createEpicRoutes(deps: EpicRoutesDeps): Router {
   router.use(express.json());
 
   router.post('/', (req: Request, res: Response) => {
-    const body = req.body as { projectId?: string; title?: string; description?: string; labels?: string[] };
+    const body = req.body as {
+      projectId?: string;
+      title?: string;
+      description?: string;
+      labels?: string[];
+    };
     if (!body.projectId || !body.title) {
       res.status(400).json(err('VALIDATION', 'projectId + title required'));
       return;

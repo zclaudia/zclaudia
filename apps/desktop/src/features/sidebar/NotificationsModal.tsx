@@ -15,12 +15,15 @@ interface NotificationsModalProps {
 export function NotificationsModal({ open, onClose }: NotificationsModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      onClose();
-    }
-  }, [onClose]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    },
+    [onClose]
+  );
 
   // Focus the dialog on open so the container's onKeyDown (Escape) actually
   // receives key events — nothing inside is auto-focused otherwise.
@@ -57,6 +60,6 @@ export function NotificationsModal({ open, onClose }: NotificationsModalProps) {
         </div>
       </div>
     </div>,
-    document.body,
+    document.body
   );
 }

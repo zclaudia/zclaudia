@@ -2,7 +2,10 @@ import type Database from 'better-sqlite3';
 import { DEFAULT_UNIFIED_POLICY } from '@zclaudia/shared/interaction/permissions';
 import type { PermissionRequest } from '@zclaudia/shared/interaction/permissions';
 import type { PermissionBridgePort } from '../ports/step-executor.js';
-import type { AgentLoopPermissionCallback, AgentLoopPermissionDecision } from '../../agent-loop/index.js';
+import type {
+  AgentLoopPermissionCallback,
+  AgentLoopPermissionDecision,
+} from '../../agent-loop/index.js';
 import type { PermissionWorkflowResolver } from '../permission-workflow-resolver.js';
 import { providerRegistry } from '../../../infra/providers/registry.js';
 import {
@@ -40,12 +43,14 @@ export type WorkflowAgentPermissionCallbackFactory = (
 ) => AgentLoopPermissionCallback | undefined;
 
 export function createWorkflowAgentPermissionCallbackFactory(
-  deps: WorkflowAgentPermissionDeps,
+  deps: WorkflowAgentPermissionDeps
 ): WorkflowAgentPermissionCallbackFactory {
-  return (context) => async (request) => {
+  return context => async request => {
     let policy = mergePolicy(
       getAgentPermissionPolicy(deps.db as unknown as PolicyDb) ?? DEFAULT_UNIFIED_POLICY,
-      context.projectId ? getProjectPermissionOverride(deps.db as unknown as PolicyDb, context.projectId) : null,
+      context.projectId
+        ? getProjectPermissionOverride(deps.db as unknown as PolicyDb, context.projectId)
+        : null
     );
     const providerEscalateTools = context.providerType
       ? providerRegistry.getPolicy(context.providerType)?.escalateAlwaysTools
@@ -94,15 +99,16 @@ async function escalateWorkflowPermission(input: {
   }
 
   const category = classify(request.toolName, request.toolInput, request.detail);
-  const matchedRule = getMatchedPermissionRule(request.toolName, request.toolInput, request.detail, policy, {
-    rootPath: context.cwd,
-  }) ?? undefined;
+  const matchedRule =
+    getMatchedPermissionRule(request.toolName, request.toolInput, request.detail, policy, {
+      rootPath: context.cwd,
+    }) ?? undefined;
   const aiReview = {
     ...policy.aiReview,
     enabled: policy.enabled === true && policy.aiReview.enabled === true,
   };
 
-  return await new Promise<AgentLoopPermissionDecision>((resolve) => {
+  return await new Promise<AgentLoopPermissionDecision>(resolve => {
     let settled = false;
     let poll: NodeJS.Timeout | undefined;
     let timeout: NodeJS.Timeout | undefined;
@@ -138,63 +144,67 @@ async function escalateWorkflowPermission(input: {
     }, deps.workflowDecisionTimeoutMs ?? DEFAULT_WORKFLOW_PERMISSION_TIMEOUT_MS);
     timeout.unref?.();
 
-    void resolver.triggerPermissionEscalation(context.projectId, {
-      eventPayload: {
-        requestId: request.requestId,
-        runId: context.runId,
-        sessionId: context.runId,
-        toolName: request.toolName,
-        toolInput: asRecord(request.toolInput),
-        detail: request.detail,
-        cwd: context.cwd,
-        category,
-        matchedRule,
-        isEscalateAlways: policy.escalateAlways?.includes(request.toolName) ?? false,
-        sessionType: 'background',
-        aiReview,
-      },
-      triggerContext: {
-        type: 'event',
-        event: 'permission.escalated',
-      },
-    }).then(({ run }) => {
-      deps.permissionBridge?.setWorkflowRunId(request.requestId, run.id);
-      if (settled) return;
-      poll = setInterval(() => {
+    void resolver
+      .triggerPermissionEscalation(context.projectId, {
+        eventPayload: {
+          requestId: request.requestId,
+          runId: context.runId,
+          sessionId: context.runId,
+          toolName: request.toolName,
+          toolInput: asRecord(request.toolInput),
+          detail: request.detail,
+          cwd: context.cwd,
+          category,
+          matchedRule,
+          isEscalateAlways: policy.escalateAlways?.includes(request.toolName) ?? false,
+          sessionType: 'background',
+          aiReview,
+        },
+        triggerContext: {
+          type: 'event',
+          event: 'permission.escalated',
+        },
+      })
+      .then(({ run }) => {
+        deps.permissionBridge?.setWorkflowRunId(request.requestId, run.id);
         if (settled) return;
-        let detail: ReturnType<PermissionWorkflowResolver['getRun']>;
-        try {
-          detail = resolver.getRun(run.id);
-        } catch (error) {
-          deps.permissionBridge?.remove(request.requestId);
-          finish({
-            behavior: 'deny',
-            message: error instanceof Error ? error.message : 'Permission workflow status lookup failed',
-          });
-          return;
-        }
-        const status = detail?.run.status;
-        if (status && TERMINAL_WORKFLOW_RUN_STATUSES.has(status)) {
-          deps.permissionBridge?.remove(request.requestId);
-          finish({
-            behavior: 'deny',
-            message: `Permission workflow completed without a decision (${status})`,
-          });
-        }
-      }, deps.workflowDecisionPollMs ?? WORKFLOW_PERMISSION_POLL_MS);
-      poll.unref?.();
-    }).catch((error) => {
-      deps.permissionBridge?.remove(request.requestId);
-      finish({
-        behavior: 'deny',
-        message: error instanceof Error ? error.message : 'Workflow permission escalation failed',
+        poll = setInterval(() => {
+          if (settled) return;
+          let detail: ReturnType<PermissionWorkflowResolver['getRun']>;
+          try {
+            detail = resolver.getRun(run.id);
+          } catch (error) {
+            deps.permissionBridge?.remove(request.requestId);
+            finish({
+              behavior: 'deny',
+              message:
+                error instanceof Error ? error.message : 'Permission workflow status lookup failed',
+            });
+            return;
+          }
+          const status = detail?.run.status;
+          if (status && TERMINAL_WORKFLOW_RUN_STATUSES.has(status)) {
+            deps.permissionBridge?.remove(request.requestId);
+            finish({
+              behavior: 'deny',
+              message: `Permission workflow completed without a decision (${status})`,
+            });
+          }
+        }, deps.workflowDecisionPollMs ?? WORKFLOW_PERMISSION_POLL_MS);
+        poll.unref?.();
+      })
+      .catch(error => {
+        deps.permissionBridge?.remove(request.requestId);
+        finish({
+          behavior: 'deny',
+          message: error instanceof Error ? error.message : 'Workflow permission escalation failed',
+        });
       });
-    });
   });
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
+    ? (value as Record<string, unknown>)
     : { value };
 }

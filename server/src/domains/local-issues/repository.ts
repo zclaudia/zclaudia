@@ -19,11 +19,13 @@ export type LocalIssueCreate = Omit<
   isAnonymous?: boolean;
 };
 
-export type LocalIssueUpdate = Partial<
-  Omit<LocalIssue, 'id' | 'projectId' | 'createdAt'>
->;
+export type LocalIssueUpdate = Partial<Omit<LocalIssue, 'id' | 'projectId' | 'createdAt'>>;
 
-export class LocalIssueRepository extends BaseRepository<LocalIssue, LocalIssueCreate, LocalIssueUpdate> {
+export class LocalIssueRepository extends BaseRepository<
+  LocalIssue,
+  LocalIssueCreate,
+  LocalIssueUpdate
+> {
   constructor(db: Database) {
     super(db, 'local_issues');
   }
@@ -81,17 +83,47 @@ export class LocalIssueRepository extends BaseRepository<LocalIssue, LocalIssueC
     const sets: string[] = ['updated_at = ?'];
     const params: unknown[] = [now];
 
-    if (data.title !== undefined) { sets.push('title = ?'); params.push(data.title); }
-    if (data.description !== undefined) { sets.push('description = ?'); params.push(data.description); }
-    if (data.status !== undefined) { sets.push('status = ?'); params.push(data.status); }
-    if (data.priority !== undefined) { sets.push('priority = ?'); params.push(data.priority); }
-    if (data.labels !== undefined) { sets.push('labels = ?'); params.push(JSON.stringify(data.labels)); }
-    if (data.closedAt !== undefined) { sets.push('closed_at = ?'); params.push(data.closedAt); }
+    if (data.title !== undefined) {
+      sets.push('title = ?');
+      params.push(data.title);
+    }
+    if (data.description !== undefined) {
+      sets.push('description = ?');
+      params.push(data.description);
+    }
+    if (data.status !== undefined) {
+      sets.push('status = ?');
+      params.push(data.status);
+    }
+    if (data.priority !== undefined) {
+      sets.push('priority = ?');
+      params.push(data.priority);
+    }
+    if (data.labels !== undefined) {
+      sets.push('labels = ?');
+      params.push(JSON.stringify(data.labels));
+    }
+    if (data.closedAt !== undefined) {
+      sets.push('closed_at = ?');
+      params.push(data.closedAt);
+    }
     // G1 additions
-    if (data.type !== undefined) { sets.push('type = ?'); params.push(data.type); }
-    if (data.epicId !== undefined) { sets.push('epic_id = ?'); params.push(data.epicId); }
-    if (data.specChangeId !== undefined) { sets.push('spec_change_id = ?'); params.push(data.specChangeId); }
-    if (data.isAnonymous !== undefined) { sets.push('is_anonymous = ?'); params.push(data.isAnonymous ? 1 : 0); }
+    if (data.type !== undefined) {
+      sets.push('type = ?');
+      params.push(data.type);
+    }
+    if (data.epicId !== undefined) {
+      sets.push('epic_id = ?');
+      params.push(data.epicId);
+    }
+    if (data.specChangeId !== undefined) {
+      sets.push('spec_change_id = ?');
+      params.push(data.specChangeId);
+    }
+    if (data.isAnonymous !== undefined) {
+      sets.push('is_anonymous = ?');
+      params.push(data.isAnonymous ? 1 : 0);
+    }
 
     params.push(id);
     return {
@@ -104,13 +136,15 @@ export class LocalIssueRepository extends BaseRepository<LocalIssue, LocalIssueC
     const rows = this.db
       .prepare('SELECT * FROM local_issues WHERE project_id = ? ORDER BY created_at DESC')
       .all(projectId);
-    return rows.map((r) => this.mapRow(r));
+    return rows.map(r => this.mapRow(r));
   }
 
   findByStatus(projectId: string, status: LocalIssueStatus): LocalIssue[] {
     const rows = this.db
-      .prepare('SELECT * FROM local_issues WHERE project_id = ? AND status = ? ORDER BY created_at DESC')
+      .prepare(
+        'SELECT * FROM local_issues WHERE project_id = ? AND status = ? ORDER BY created_at DESC'
+      )
       .all(projectId, status);
-    return rows.map((r) => this.mapRow(r));
+    return rows.map(r => this.mapRow(r));
   }
 }

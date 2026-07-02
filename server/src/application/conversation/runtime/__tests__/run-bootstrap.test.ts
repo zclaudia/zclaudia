@@ -104,15 +104,18 @@ function createDb(providerType: string, options: CreateDbOptions = {}): Database
   const insertProfile = options.insertProfile !== false;
   // Default: agent's llm_profile_id points at the seeded profile (if any). Pass
   // `agentLlmProfileId: null` to force the agent → no llm_profile_id path.
-  const agentLlmProfileId = options.agentLlmProfileId === null
-    ? null
-    : options.agentLlmProfileId ?? (insertProfile ? 'provider-1' : null);
+  const agentLlmProfileId =
+    options.agentLlmProfileId === null
+      ? null
+      : (options.agentLlmProfileId ?? (insertProfile ? 'provider-1' : null));
 
   if (insertProfile) {
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO llm_profiles (id, name, provider_type, base_url, api_key, env, is_default, created_at, updated_at)
       VALUES ('provider-1', ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    `
+    ).run(
       providerType,
       providerType,
       options.baseUrl ?? null,
@@ -120,44 +123,50 @@ function createDb(providerType: string, options: CreateDbOptions = {}): Database
       options.env ?? null,
       options.profileIsDefault ? 1 : 0,
       now,
-      now,
+      now
     );
   }
 
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO projects (id, llm_profile_id, root_path, system_prompt)
     VALUES ('project-1', NULL, '/tmp/project', NULL)
-  `).run();
+  `
+  ).run();
 
   // T2 schema: sessions.agent_profile_id is NOT NULL with FK RESTRICT. The runtime
   // always resolves session → agent_profile → llm_profile (no per-session llm fallback).
   // Always seed a default agent so the bootstrap chain works.
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO agent_profiles (
       id, name, llm_profile_id, model, system_prompt, enabled_tools, tool_selection, skill_selection, thinking_level,
       is_default, created_at, updated_at
     )
     VALUES ('agent-1', 'Test Agent', ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
-  `).run(
+  `
+  ).run(
     agentLlmProfileId,
     options.agentModel ?? 'claude-sonnet-4-6',
     options.agentSystemPrompt ?? '',
-    JSON.stringify(options.agentEnabledTools ?? ['read', 'write', 'edit', 'bash', 'grep', 'find', 'ls']),
+    JSON.stringify(
+      options.agentEnabledTools ?? ['read', 'write', 'edit', 'bash', 'grep', 'find', 'ls']
+    ),
     options.agentToolSelection ? JSON.stringify(options.agentToolSelection) : null,
     options.agentSkillSelection ? JSON.stringify(options.agentSkillSelection) : null,
     options.agentThinkingLevel ?? null,
     now,
-    now,
+    now
   );
   // `sessionAgentProfileId` lets a test reference a stale agent id (no row exists
   // for that id) — required for the "stale agent_profile_id fallback" path. Default
   // is the seeded 'agent-1'. Pass `null` to insert a NULL FK (T2 forbids this at
   // schema level, but the in-memory test schema is permissive).
-  const sessionAgentId = options.sessionAgentProfileId === null
-    ? null
-    : options.sessionAgentProfileId ?? 'agent-1';
+  const sessionAgentId =
+    options.sessionAgentProfileId === null ? null : (options.sessionAgentProfileId ?? 'agent-1');
 
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO sessions (
       id, project_id, name, sdk_session_id, type, working_directory,
       project_role, plan_status, task_id, agent_profile_id, created_at, updated_at
@@ -166,12 +175,18 @@ function createDb(providerType: string, options: CreateDbOptions = {}): Database
       'session-1', 'project-1', 'Test Session', 'sdk-existing', 'regular', '/tmp/project',
       NULL, NULL, NULL, ?, ?, ?
     )
-  `).run(sessionAgentId, now, now);
+  `
+  ).run(sessionAgentId, now, now);
 
   return db;
 }
 
-function bootstrap(providerType: string, mode: string, dbOptions: CreateDbOptions = {}, input: string = 'hello') {
+function bootstrap(
+  providerType: string,
+  mode: string,
+  dbOptions: CreateDbOptions = {},
+  input: string = 'hello'
+) {
   const activeRuns = new Map();
   return initializeRunBootstrap({
     activeRuns,
@@ -198,7 +213,12 @@ function bootstrap(providerType: string, mode: string, dbOptions: CreateDbOption
   });
 }
 
-function bootstrapWithDb(providerType: string, mode: string, input: string, dbOptions: CreateDbOptions = {}) {
+function bootstrapWithDb(
+  providerType: string,
+  mode: string,
+  input: string,
+  dbOptions: CreateDbOptions = {}
+) {
   const db = createDb(providerType, dbOptions);
   const activeRuns = new Map();
   const result = initializeRunBootstrap({
@@ -315,8 +335,26 @@ describe('initializeRunBootstrap Agent profile resolution', () => {
       },
     });
 
-    expect(result?.enabledTools).toEqual(['Read', 'Write', 'Edit', 'MultiEdit', 'ReadSymbol', 'EditSymbol', 'Eval', 'Grep', 'Glob', 'LS', 'EnterPlanMode', 'ExitPlanMode', 'Memory']);
-    expect(result?.agentProfile.resolvedTools).toContainEqual({ source: 'plugin', pluginId: 'jira', toolId: 'search' });
+    expect(result?.enabledTools).toEqual([
+      'Read',
+      'Write',
+      'Edit',
+      'MultiEdit',
+      'ReadSymbol',
+      'EditSymbol',
+      'Eval',
+      'Grep',
+      'Glob',
+      'LS',
+      'EnterPlanMode',
+      'ExitPlanMode',
+      'Memory',
+    ]);
+    expect(result?.agentProfile.resolvedTools).toContainEqual({
+      source: 'plugin',
+      pluginId: 'jira',
+      toolId: 'search',
+    });
   });
 
   it('hydrates session-scoped external tool state from agent toolSelection', () => {
@@ -342,39 +380,68 @@ describe('initializeRunBootstrap Agent profile resolution', () => {
       apiKey: 'sk-test',
     });
 
-    expect(result?.activeRun.skillState).toEqual(expect.objectContaining({
-      discoverableSkills: expect.any(Array),
-      pinnedSkills: [],
-      loadedSkills: [],
-      loadedSkillContents: {},
-    }));
+    expect(result?.activeRun.skillState).toEqual(
+      expect.objectContaining({
+        discoverableSkills: expect.any(Array),
+        pinnedSkills: [],
+        loadedSkills: [],
+        loadedSkillContents: {},
+      })
+    );
   });
 
   it('builds skill runtime state from profile skillSelection', () => {
     const skills = [
-      { source: 'workspace' as const, id: 'guidelines', name: 'guidelines', description: 'Follow rules', filePath: '/skills/guidelines/SKILL.md', dirPath: '/skills/guidelines' },
-      { source: 'external' as const, id: 'audit', name: 'audit', description: 'Audit code', filePath: '/skills/audit/SKILL.md', dirPath: '/skills/audit' },
-      { source: 'plugin' as const, id: 'plugin-reviewer', name: 'plugin-reviewer', description: 'Review code', filePath: '/skills/plugin-reviewer/SKILL.md', dirPath: '/skills/plugin-reviewer' },
+      {
+        source: 'workspace' as const,
+        id: 'guidelines',
+        name: 'guidelines',
+        description: 'Follow rules',
+        filePath: '/skills/guidelines/SKILL.md',
+        dirPath: '/skills/guidelines',
+      },
+      {
+        source: 'external' as const,
+        id: 'audit',
+        name: 'audit',
+        description: 'Audit code',
+        filePath: '/skills/audit/SKILL.md',
+        dirPath: '/skills/audit',
+      },
+      {
+        source: 'plugin' as const,
+        id: 'plugin-reviewer',
+        name: 'plugin-reviewer',
+        description: 'Review code',
+        filePath: '/skills/plugin-reviewer/SKILL.md',
+        dirPath: '/skills/plugin-reviewer',
+      },
     ];
 
-    const state = buildSkillRuntimeState({
-      id: 'agent-1',
-      name: 'agent',
-      llmProfileId: 'llm-1',
-      model: 'm',
-      systemPrompt: '',
-      enabledTools: [],
-      skillSelection: {
-        providers: [{ source: 'workspace' }],
-        include: [{ source: 'external', id: 'audit' }],
-        exclude: [{ source: 'workspace', id: 'guidelines' }],
-        pinned: [{ source: 'external', id: 'audit' }],
+    const state = buildSkillRuntimeState(
+      {
+        id: 'agent-1',
+        name: 'agent',
+        llmProfileId: 'llm-1',
+        model: 'm',
+        systemPrompt: '',
+        enabledTools: [],
+        skillSelection: {
+          providers: [{ source: 'workspace' }],
+          include: [{ source: 'external', id: 'audit' }],
+          exclude: [{ source: 'workspace', id: 'guidelines' }],
+          pinned: [{ source: 'external', id: 'audit' }],
+        },
+        createdAt: 0,
+        updatedAt: 0,
       },
-      createdAt: 0,
-      updatedAt: 0,
-    }, skills, (ref) => ref.id === 'audit' ? '# Audit\nReview carefully.' : null);
+      skills,
+      ref => (ref.id === 'audit' ? '# Audit\nReview carefully.' : null)
+    );
 
-    expect(state.discoverableSkills.map((skill) => `${skill.source}:${skill.id}`)).toEqual(['external:audit']);
+    expect(state.discoverableSkills.map(skill => `${skill.source}:${skill.id}`)).toEqual([
+      'external:audit',
+    ]);
     expect(state.pinnedSkills).toEqual([{ source: 'external', id: 'audit' }]);
     expect(state.loadedSkills).toEqual([{ source: 'external', id: 'audit' }]);
     expect(state.loadedSkillContents['external:audit']).toContain('# Audit');
@@ -382,27 +449,38 @@ describe('initializeRunBootstrap Agent profile resolution', () => {
 
   it('skips missing or hidden pinned skills without failing bootstrap state creation', () => {
     const skills = [
-      { source: 'workspace' as const, id: 'guidelines', name: 'guidelines', description: 'Follow rules', filePath: '/skills/guidelines/SKILL.md', dirPath: '/skills/guidelines' },
+      {
+        source: 'workspace' as const,
+        id: 'guidelines',
+        name: 'guidelines',
+        description: 'Follow rules',
+        filePath: '/skills/guidelines/SKILL.md',
+        dirPath: '/skills/guidelines',
+      },
     ];
 
-    const state = buildSkillRuntimeState({
-      id: 'agent-1',
-      name: 'agent',
-      llmProfileId: 'llm-1',
-      model: 'm',
-      systemPrompt: '',
-      enabledTools: [],
-      skillSelection: {
-        providers: [{ source: 'workspace' }],
-        exclude: [{ source: 'workspace', id: 'guidelines' }],
-        pinned: [
-          { source: 'workspace', id: 'guidelines' },
-          { source: 'external', id: 'missing' },
-        ],
+    const state = buildSkillRuntimeState(
+      {
+        id: 'agent-1',
+        name: 'agent',
+        llmProfileId: 'llm-1',
+        model: 'm',
+        systemPrompt: '',
+        enabledTools: [],
+        skillSelection: {
+          providers: [{ source: 'workspace' }],
+          exclude: [{ source: 'workspace', id: 'guidelines' }],
+          pinned: [
+            { source: 'workspace', id: 'guidelines' },
+            { source: 'external', id: 'missing' },
+          ],
+        },
+        createdAt: 0,
+        updatedAt: 0,
       },
-      createdAt: 0,
-      updatedAt: 0,
-    }, skills, () => '# unused');
+      skills,
+      () => '# unused'
+    );
 
     expect(state.discoverableSkills).toEqual([]);
     expect(state.pinnedSkills).toEqual([]);
@@ -449,7 +527,8 @@ describe('initializeRunBootstrap message INSERT — parsed text + metadata', () 
     const { result, db } = bootstrapWithDb('zclaudia', 'default', 'just a plain message');
     expect(result?.userMessageId).toBeDefined();
 
-    const row = db.prepare('SELECT content, metadata FROM messages WHERE id = ?')
+    const row = db
+      .prepare('SELECT content, metadata FROM messages WHERE id = ?')
       .get(result!.userMessageId!) as { content: string; metadata: string | null };
 
     expect(row.content).toBe('just a plain message');
@@ -465,7 +544,8 @@ describe('initializeRunBootstrap message INSERT — parsed text + metadata', () 
     const { result, db } = bootstrapWithDb('zclaudia', 'default', envelopeInput);
     expect(result?.userMessageId).toBeDefined();
 
-    const row = db.prepare('SELECT content, metadata FROM messages WHERE id = ?')
+    const row = db
+      .prepare('SELECT content, metadata FROM messages WHERE id = ?')
       .get(result!.userMessageId!) as { content: string; metadata: string | null };
 
     expect(row.content).toBe('look at this');
@@ -481,7 +561,8 @@ describe('initializeRunBootstrap message INSERT — parsed text + metadata', () 
     const { result, db } = bootstrapWithDb('zclaudia', 'default', envelopeInput);
     expect(result?.userMessageId).toBeDefined();
 
-    const row = db.prepare('SELECT content, metadata FROM messages WHERE id = ?')
+    const row = db
+      .prepare('SELECT content, metadata FROM messages WHERE id = ?')
       .get(result!.userMessageId!) as { content: string; metadata: string | null };
 
     expect(row.content).toBe('no files');
@@ -517,7 +598,8 @@ describe('initializeRunBootstrap message INSERT — parsed text + metadata', () 
     });
     expect(result?.userMessageId).toBeDefined();
 
-    const row = db.prepare('SELECT content, metadata FROM messages WHERE id = ?')
+    const row = db
+      .prepare('SELECT content, metadata FROM messages WHERE id = ?')
       .get(result!.userMessageId!) as { content: string; metadata: string | null };
 
     expect(row.content).toBe('hello');
@@ -559,7 +641,8 @@ describe('initializeRunBootstrap message INSERT — parsed text + metadata', () 
     });
     expect(result?.userMessageId).toBeDefined();
 
-    const row = db.prepare('SELECT content, metadata FROM messages WHERE id = ?')
+    const row = db
+      .prepare('SELECT content, metadata FROM messages WHERE id = ?')
       .get(result!.userMessageId!) as { content: string; metadata: string | null };
 
     expect(row.content).toBe('check this');
@@ -577,13 +660,15 @@ describe('initializeRunBootstrap dual-write — messages.tree_entry_id', () => {
     const { result, db } = bootstrapWithDb('zclaudia', 'default', 'hello world');
     expect(result?.userMessageId).toBeDefined();
 
-    const msgRow = db.prepare(
-      `SELECT tree_entry_id AS t FROM messages WHERE id = ?`
-    ).get(result!.userMessageId!) as { t: string | null };
+    const msgRow = db
+      .prepare(`SELECT tree_entry_id AS t FROM messages WHERE id = ?`)
+      .get(result!.userMessageId!) as { t: string | null };
 
-    const entry = db.prepare(
-      `SELECT id FROM session_entries WHERE session_id = ? AND type = 'message' ORDER BY rowid ASC LIMIT 1`
-    ).get('session-1') as { id: string } | undefined;
+    const entry = db
+      .prepare(
+        `SELECT id FROM session_entries WHERE session_id = ? AND type = 'message' ORDER BY rowid ASC LIMIT 1`
+      )
+      .get('session-1') as { id: string } | undefined;
 
     expect(entry).toBeDefined();
     expect(msgRow.t).not.toBeNull();

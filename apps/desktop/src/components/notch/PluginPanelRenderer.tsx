@@ -26,20 +26,38 @@ const PROTOCOL_VERSION = 1;
 
 // CSS variable names to collect and forward to plugin iframes
 const THEME_CSS_VARS = [
-  '--background', '--foreground',
-  '--card', '--card-foreground',
-  '--popover', '--popover-foreground',
-  '--primary', '--primary-foreground',
-  '--secondary', '--secondary-foreground',
-  '--muted', '--muted-foreground',
-  '--accent', '--accent-foreground',
-  '--destructive', '--destructive-foreground',
-  '--success', '--success-foreground',
-  '--warning', '--warning-foreground',
-  '--thinking', '--thinking-foreground',
-  '--border', '--input', '--ring', '--radius',
-  '--scrollbar-thumb', '--scrollbar-thumb-hover',
-  '--terminal-bg', '--terminal-fg', '--terminal-cursor', '--terminal-selection',
+  '--background',
+  '--foreground',
+  '--card',
+  '--card-foreground',
+  '--popover',
+  '--popover-foreground',
+  '--primary',
+  '--primary-foreground',
+  '--secondary',
+  '--secondary-foreground',
+  '--muted',
+  '--muted-foreground',
+  '--accent',
+  '--accent-foreground',
+  '--destructive',
+  '--destructive-foreground',
+  '--success',
+  '--success-foreground',
+  '--warning',
+  '--warning-foreground',
+  '--thinking',
+  '--thinking-foreground',
+  '--border',
+  '--input',
+  '--ring',
+  '--radius',
+  '--scrollbar-thumb',
+  '--scrollbar-thumb-hover',
+  '--terminal-bg',
+  '--terminal-fg',
+  '--terminal-cursor',
+  '--terminal-selection',
 ];
 
 function collectCSSVars(): Record<string, string> {
@@ -54,7 +72,7 @@ function collectCSSVars(): Record<string, string> {
 
 function getThemeClasses(): string[] {
   return Array.from(document.documentElement.classList).filter(
-    (c) => c === 'dark' || c.startsWith('dark-')
+    c => c === 'dark' || c.startsWith('dark-')
   );
 }
 
@@ -136,7 +154,7 @@ export function PluginPanelRenderer({
   projectId,
 }: PluginPanelRendererProps) {
   const panels = usePluginStore(selectPluginPanels);
-  const activePanel = panels.find((p) => p.id === activePluginPanelId);
+  const activePanel = panels.find(p => p.id === activePluginPanelId);
 
   if (!activePanel) return null;
 
@@ -172,11 +190,7 @@ export function PluginPanelRenderer({
 
   return (
     <div className="absolute inset-0">
-      <PluginComponent
-        projectRoot={projectRoot}
-        projectId={projectId}
-        panelId={activePanel.id}
-      />
+      <PluginComponent projectRoot={projectRoot} projectId={projectId} panelId={activePanel.id} />
     </div>
   );
 }
@@ -188,7 +202,7 @@ export function PluginPanelRenderer({
 export function usePluginPanelTabs() {
   const panels = usePluginStore(selectPluginPanels);
 
-  return panels.map((panel) => ({
+  return panels.map(panel => ({
     id: `plugin:${panel.id}`,
     label: panel.label,
     icon: panel.icon,

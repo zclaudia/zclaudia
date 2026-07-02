@@ -27,7 +27,11 @@ async function writeIndex(index: Record<string, FileBackupResult>): Promise<void
   await writeFile(indexPath, JSON.stringify(index, null, 2), 'utf8');
 }
 
-export async function recordFileBackup(originalPath: string, content: string, originalAbsolutePath?: string): Promise<FileBackupResult> {
+export async function recordFileBackup(
+  originalPath: string,
+  content: string,
+  originalAbsolutePath?: string
+): Promise<FileBackupResult> {
   const id = randomUUID();
   const createdAt = Date.now();
   await mkdir(backupDir, { recursive: true });
@@ -50,7 +54,9 @@ export async function getFileBackup(id: string): Promise<FileBackupResult | unde
   return (await readIndex())[id];
 }
 
-export async function restoreFileBackup(id: string): Promise<FileBackupResult & { restored: true }> {
+export async function restoreFileBackup(
+  id: string
+): Promise<FileBackupResult & { restored: true }> {
   const backup = await getFileBackup(id);
   if (!backup) throw new Error('backup_not_found');
   if (!backup.originalAbsolutePath) throw new Error('backup_missing_target');

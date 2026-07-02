@@ -1,6 +1,11 @@
 import { BaseRepository } from '../../infra/repositories/base.js';
 import type { Database } from 'better-sqlite3';
-import type { LlmProfileConfig, LlmProfileCompat, LlmProfileModelEntry, CacheRetentionSetting } from '@zclaudia/shared/core/llm-profile';
+import type {
+  LlmProfileConfig,
+  LlmProfileCompat,
+  LlmProfileModelEntry,
+  CacheRetentionSetting,
+} from '@zclaudia/shared/core/llm-profile';
 import { newId } from '../../utils/uuid.js';
 
 export class LlmProfileRepository extends BaseRepository<
@@ -22,7 +27,9 @@ export class LlmProfileRepository extends BaseRepository<
       compat: row.compat ? this.parseCompat(row.compat) : undefined,
       requestHeaders: row.request_headers ? JSON.parse(row.request_headers) : undefined,
       models: row.models != null ? this.parseModels(row.models) : undefined,
-      oauthCredentials: row.oauth_credentials ? this.parseOAuthCredentials(row.oauth_credentials) : undefined,
+      oauthCredentials: row.oauth_credentials
+        ? this.parseOAuthCredentials(row.oauth_credentials)
+        : undefined,
       cacheRetention: this.parseCacheRetention(row.cache_retention),
       isDefault: row.is_default === 1,
       createdAt: row.created_at,
@@ -76,7 +83,10 @@ export class LlmProfileRepository extends BaseRepository<
     }
   }
 
-  createQuery(data: Omit<LlmProfileConfig, 'id' | 'createdAt' | 'updatedAt'>): { sql: string; params: any[] } {
+  createQuery(data: Omit<LlmProfileConfig, 'id' | 'createdAt' | 'updatedAt'>): {
+    sql: string;
+    params: any[];
+  } {
     const id = newId();
     const now = Date.now();
 
@@ -103,7 +113,10 @@ export class LlmProfileRepository extends BaseRepository<
     };
   }
 
-  updateQuery(id: string, data: Partial<Omit<LlmProfileConfig, 'id' | 'createdAt' | 'updatedAt'>>): { sql: string; params: any[] } {
+  updateQuery(
+    id: string,
+    data: Partial<Omit<LlmProfileConfig, 'id' | 'createdAt' | 'updatedAt'>>
+  ): { sql: string; params: any[] } {
     const updates: string[] = [];
     const params: any[] = [];
 
@@ -159,24 +172,34 @@ export class LlmProfileRepository extends BaseRepository<
   }
 
   clearOAuthCredentials(id: string): void {
-    this.db.prepare(`UPDATE llm_profiles SET oauth_credentials = NULL, updated_at = ? WHERE id = ?`).run(Date.now(), id);
+    this.db
+      .prepare(`UPDATE llm_profiles SET oauth_credentials = NULL, updated_at = ? WHERE id = ?`)
+      .run(Date.now(), id);
   }
 
   findDefault(): LlmProfileConfig | null {
-    const row = this.db.prepare(`
+    const row = this.db
+      .prepare(
+        `
       SELECT * FROM llm_profiles
       WHERE is_default = 1
       LIMIT 1
-    `).get();
+    `
+      )
+      .get();
     return row ? this.mapRow(row) : null;
   }
 
   findAllOrdered(): LlmProfileConfig[] {
-    const rows = this.db.prepare(`
+    const rows = this.db
+      .prepare(
+        `
       SELECT * FROM llm_profiles
       ORDER BY is_default DESC, name ASC
-    `).all();
-    return rows.map((row) => this.mapRow(row));
+    `
+      )
+      .all();
+    return rows.map(row => this.mapRow(row));
   }
 
   clearAllDefaults(): void {
@@ -190,10 +213,14 @@ export class LlmProfileRepository extends BaseRepository<
   setDefault(id: string): LlmProfileConfig {
     this.db.prepare('UPDATE llm_profiles SET is_default = 0').run();
 
-    const result = this.db.prepare(`
+    const result = this.db
+      .prepare(
+        `
       UPDATE llm_profiles SET is_default = 1, updated_at = ?
       WHERE id = ?
-    `).run(Date.now(), id);
+    `
+      )
+      .run(Date.now(), id);
 
     if (result.changes === 0) {
       throw new Error(`LlmProfile not found: ${id}`);

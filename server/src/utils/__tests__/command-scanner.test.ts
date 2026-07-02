@@ -2,7 +2,11 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { scanCustomCommands, getGlobalCommandsDir, getProjectCommandsDir } from '../command-scanner.js';
+import {
+  scanCustomCommands,
+  getGlobalCommandsDir,
+  getProjectCommandsDir,
+} from '../command-scanner.js';
 import { createExecutionEnv } from '../../infra/execution-env.js';
 
 describe('command-scanner', () => {
@@ -21,8 +25,10 @@ describe('command-scanner', () => {
   });
 
   afterEach(() => {
-    if (originalHome === undefined) delete process.env.HOME; else process.env.HOME = originalHome;
-    if (originalUserProfile === undefined) delete process.env.USERPROFILE; else process.env.USERPROFILE = originalUserProfile;
+    if (originalHome === undefined) delete process.env.HOME;
+    else process.env.HOME = originalHome;
+    if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = originalUserProfile;
     rmSync(tmpHome, { recursive: true, force: true });
     rmSync(tmpProject, { recursive: true, force: true });
   });
@@ -93,8 +99,14 @@ describe('command-scanner', () => {
       const projectDir = path.join(tmpProject, '.claude', 'commands');
       mkdirSync(globalDir, { recursive: true });
       mkdirSync(projectDir, { recursive: true });
-      writeFileSync(path.join(globalDir, 'shared.md'), '---\ndescription: Global version\n---\nbody');
-      writeFileSync(path.join(projectDir, 'shared.md'), '---\ndescription: Project version\n---\nbody');
+      writeFileSync(
+        path.join(globalDir, 'shared.md'),
+        '---\ndescription: Global version\n---\nbody'
+      );
+      writeFileSync(
+        path.join(projectDir, 'shared.md'),
+        '---\ndescription: Project version\n---\nbody'
+      );
 
       const env = createExecutionEnv(tmpProject);
       const result = await scanCustomCommands(env, { projectRoot: tmpProject });
@@ -112,7 +124,7 @@ describe('command-scanner', () => {
       mkdirSync(globalDir, { recursive: true });
       writeFileSync(
         path.join(globalDir, 'fm.md'),
-        '---\ndescription: From frontmatter\n---\n\n# Heading\nBody',
+        '---\ndescription: From frontmatter\n---\n\n# Heading\nBody'
       );
 
       const env = createExecutionEnv(tmpHome);
@@ -158,7 +170,7 @@ describe('command-scanner', () => {
       mkdirSync(manifestDir, { recursive: true });
       writeFileSync(
         path.join(manifestDir, 'plugin.json'),
-        JSON.stringify({ name: 'my-plugin', description: 'Test plugin', author: { name: 'alice' } }),
+        JSON.stringify({ name: 'my-plugin', description: 'Test plugin', author: { name: 'alice' } })
       );
 
       const pluginsRegistryDir = path.join(tmpHome, '.claude', 'plugins');
@@ -178,7 +190,7 @@ describe('command-scanner', () => {
               },
             ],
           },
-        }),
+        })
       );
 
       const env = createExecutionEnv(tmpHome);
@@ -197,7 +209,7 @@ describe('command-scanner', () => {
       mkdirSync(pluginsRegistryDir, { recursive: true });
       writeFileSync(
         path.join(pluginsRegistryDir, 'installed_plugins.json'),
-        JSON.stringify({ version: 1, plugins: {} }),
+        JSON.stringify({ version: 1, plugins: {} })
       );
 
       const env = createExecutionEnv(tmpHome);
@@ -250,10 +262,16 @@ describe('command-scanner', () => {
           version: 1,
           plugins: {
             'my-plugin@market': [
-              { scope: 'user', installPath: pluginInstallPath, version: '1.0.0', installedAt: 't', lastUpdated: 't' },
+              {
+                scope: 'user',
+                installPath: pluginInstallPath,
+                version: '1.0.0',
+                installedAt: 't',
+                lastUpdated: 't',
+              },
             ],
           },
-        }),
+        })
       );
       const env = createExecutionEnv(tmpHome);
       const result = await scanCustomCommands(env, {});
@@ -276,10 +294,16 @@ describe('command-scanner', () => {
           version: 1,
           plugins: {
             'doc-plugin@market': [
-              { scope: 'user', installPath: pluginInstallPath, version: '1.0.0', installedAt: 't', lastUpdated: 't' },
+              {
+                scope: 'user',
+                installPath: pluginInstallPath,
+                version: '1.0.0',
+                installedAt: 't',
+                lastUpdated: 't',
+              },
             ],
           },
-        }),
+        })
       );
       const env = createExecutionEnv(tmpHome);
       const result = await scanCustomCommands(env, {});
@@ -307,10 +331,16 @@ describe('command-scanner', () => {
           version: 1,
           plugins: {
             'dup-plugin@market': [
-              { scope: 'user', installPath: pluginInstallPath, version: '1.0.0', installedAt: 't', lastUpdated: 't' },
+              {
+                scope: 'user',
+                installPath: pluginInstallPath,
+                version: '1.0.0',
+                installedAt: 't',
+                lastUpdated: 't',
+              },
             ],
           },
-        }),
+        })
       );
       const env = createExecutionEnv(tmpHome);
       const result = await scanCustomCommands(env, {});

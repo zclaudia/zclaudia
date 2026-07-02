@@ -19,7 +19,11 @@ type Update = {
   updatedAt?: number;
 };
 
-export class MetaSubagentTemplateRepository extends BaseRepository<MetaSubagentTemplate, Create, Update> {
+export class MetaSubagentTemplateRepository extends BaseRepository<
+  MetaSubagentTemplate,
+  Create,
+  Update
+> {
   constructor(db: Database) {
     super(db, 'meta_subagent_templates');
   }
@@ -32,7 +36,9 @@ export class MetaSubagentTemplateRepository extends BaseRepository<MetaSubagentT
       systemPrompt: row.system_prompt as string,
       allowedTools: JSON.parse(row.allowed_tools as string) as string[],
       maxTurns: row.max_turns as number,
-      terminationCondition: JSON.parse(row.termination_condition as string) as MetaSubagentTerminationCondition,
+      terminationCondition: JSON.parse(
+        row.termination_condition as string
+      ) as MetaSubagentTerminationCondition,
       sourceType: row.source_type as ReusePoolSourceType,
       createdAt: row.created_at as number,
       updatedAt: row.updated_at as number,
@@ -47,12 +53,15 @@ export class MetaSubagentTemplateRepository extends BaseRepository<MetaSubagentT
         termination_condition, source_type, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       params: [
-        id, data.name ?? null, data.systemPrompt,
+        id,
+        data.name ?? null,
+        data.systemPrompt,
         JSON.stringify(data.allowedTools),
         data.maxTurns,
         JSON.stringify(data.terminationCondition),
         data.sourceType,
-        data.createdAt, data.updatedAt,
+        data.createdAt,
+        data.updatedAt,
       ],
     };
   }
@@ -61,16 +70,34 @@ export class MetaSubagentTemplateRepository extends BaseRepository<MetaSubagentT
     const sets: string[] = [];
     const params: unknown[] = [];
 
-    if (data.name !== undefined) { sets.push('name = ?'); params.push(data.name ?? null); }
-    if (data.systemPrompt !== undefined) { sets.push('system_prompt = ?'); params.push(data.systemPrompt); }
-    if (data.allowedTools !== undefined) { sets.push('allowed_tools = ?'); params.push(JSON.stringify(data.allowedTools)); }
-    if (data.maxTurns !== undefined) { sets.push('max_turns = ?'); params.push(data.maxTurns); }
+    if (data.name !== undefined) {
+      sets.push('name = ?');
+      params.push(data.name ?? null);
+    }
+    if (data.systemPrompt !== undefined) {
+      sets.push('system_prompt = ?');
+      params.push(data.systemPrompt);
+    }
+    if (data.allowedTools !== undefined) {
+      sets.push('allowed_tools = ?');
+      params.push(JSON.stringify(data.allowedTools));
+    }
+    if (data.maxTurns !== undefined) {
+      sets.push('max_turns = ?');
+      params.push(data.maxTurns);
+    }
     if (data.terminationCondition !== undefined) {
       sets.push('termination_condition = ?');
       params.push(JSON.stringify(data.terminationCondition));
     }
-    if (data.sourceType !== undefined) { sets.push('source_type = ?'); params.push(data.sourceType); }
-    if (data.updatedAt !== undefined) { sets.push('updated_at = ?'); params.push(data.updatedAt); }
+    if (data.sourceType !== undefined) {
+      sets.push('source_type = ?');
+      params.push(data.sourceType);
+    }
+    if (data.updatedAt !== undefined) {
+      sets.push('updated_at = ?');
+      params.push(data.updatedAt);
+    }
 
     if (sets.length === 0) {
       return { sql: `SELECT 1 FROM meta_subagent_templates WHERE id = ?`, params: [id] };

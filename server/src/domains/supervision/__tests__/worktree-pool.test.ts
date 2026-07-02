@@ -20,7 +20,7 @@ function mockExecFileResolves(stdout = '', stderr = '') {
       const cb = typeof _opts === 'function' ? _opts : callback;
       if (cb) cb(null, { stdout, stderr });
       return {};
-    },
+    }
   );
 }
 
@@ -37,7 +37,7 @@ function mockExecFileSequence(results: Array<{ stdout?: string; stderr?: string;
         if (cb) cb(null, { stdout: result.stdout ?? '', stderr: result.stderr ?? '' });
       }
       return {};
-    },
+    }
   );
 }
 
@@ -66,7 +66,7 @@ describe('WorktreePool', () => {
             cb(null, { stdout: '', stderr: '' });
           }
           return {};
-        },
+        }
       );
 
       await pool.init(2);
@@ -85,14 +85,14 @@ describe('WorktreePool', () => {
             cb(null, { stdout: '', stderr: '' });
           }
           return {};
-        },
+        }
       );
 
       await pool.init(3);
 
       // Should have called `git worktree add --detach` 3 times
       const addCalls = mockExecFile.mock.calls.filter(
-        (call: any[]) => call[1] && call[1].includes('add'),
+        (call: any[]) => call[1] && call[1].includes('add')
       );
       expect(addCalls).toHaveLength(3);
       expect(addCalls[0][1]).toEqual([
@@ -116,7 +116,7 @@ describe('WorktreePool', () => {
             cb(null, { stdout: '', stderr: '' });
           }
           return {};
-        },
+        }
       );
 
       await pool.init(2);
@@ -142,20 +142,18 @@ describe('WorktreePool', () => {
             cb(null, { stdout: '', stderr: '' });
           }
           return {};
-        },
+        }
       );
 
       await pool.init(2);
 
       // Only slot-1 should be created (slot-0 already exists)
       const addCalls = mockExecFile.mock.calls.filter(
-        (call: any[]) => call[1] && call[1].includes('add'),
+        (call: any[]) => call[1] && call[1].includes('add')
       );
       expect(addCalls).toHaveLength(1);
       // The args array should contain a path ending in 'slot-1'
-      expect(addCalls[0][1]).toEqual(
-        expect.arrayContaining([expect.stringContaining('slot-1')]),
-      );
+      expect(addCalls[0][1]).toEqual(expect.arrayContaining([expect.stringContaining('slot-1')]));
     });
   });
 
@@ -174,7 +172,7 @@ describe('WorktreePool', () => {
             cb(null, { stdout: '', stderr: '' });
           }
           return {};
-        },
+        }
       );
       await pool.init(2);
     });
@@ -207,7 +205,7 @@ describe('WorktreePool', () => {
             cb(null, { stdout: '', stderr: '' });
           }
           return {};
-        },
+        }
       );
 
       await pool.acquire('task-1', 1);
@@ -220,19 +218,17 @@ describe('WorktreePool', () => {
       // 5. branch -D task/task-1/r1 (delete old branch)
       // 6. checkout -B task/task-1/r1
       const acquireCalls = gitCalls.filter(
-        (args) =>
+        args =>
           args.includes('checkout') ||
           args.includes('reset') ||
           args.includes('clean') ||
-          (args.includes('branch') && args.includes('-D')),
+          (args.includes('branch') && args.includes('-D'))
       );
 
-      expect(acquireCalls.some((a) => a[0] === 'checkout' && a[1] === '--detach')).toBe(true);
-      expect(acquireCalls.some((a) => a.includes('reset') && a.includes('--hard'))).toBe(true);
-      expect(acquireCalls.some((a) => a.includes('clean') && a.includes('-fd'))).toBe(true);
-      expect(
-        acquireCalls.some((a) => a.includes('-B') && a.includes('task/task-1/r1')),
-      ).toBe(true);
+      expect(acquireCalls.some(a => a[0] === 'checkout' && a[1] === '--detach')).toBe(true);
+      expect(acquireCalls.some(a => a.includes('reset') && a.includes('--hard'))).toBe(true);
+      expect(acquireCalls.some(a => a.includes('clean') && a.includes('-fd'))).toBe(true);
+      expect(acquireCalls.some(a => a.includes('-B') && a.includes('task/task-1/r1'))).toBe(true);
     });
   });
 
@@ -247,7 +243,7 @@ describe('WorktreePool', () => {
             cb(null, { stdout: '', stderr: '' });
           }
           return {};
-        },
+        }
       );
       await pool.init(2);
     });
@@ -277,7 +273,7 @@ describe('WorktreePool', () => {
             cb(null, { stdout: '', stderr: '' });
           }
           return {};
-        },
+        }
       );
       await pool.init(2);
     });
@@ -296,20 +292,16 @@ describe('WorktreePool', () => {
             cb(null, { stdout: '', stderr: '' });
           }
           return {};
-        },
+        }
       );
 
       const result = await pool.mergeBack('task-1', 1, wtPath);
 
       expect(result.success).toBe(true);
       // Should call: checkout main, merge --no-ff, checkout --detach (in wt), branch -d
-      expect(gitCalls.some((a) => a.includes('merge') && a.includes('--no-ff'))).toBe(true);
-      expect(
-        gitCalls.some(
-          (a) => a.includes('merge') && a.includes('task/task-1/r1'),
-        ),
-      ).toBe(true);
-      expect(gitCalls.some((a) => a[0] === 'checkout' && a[1] === '--detach')).toBe(true);
+      expect(gitCalls.some(a => a.includes('merge') && a.includes('--no-ff'))).toBe(true);
+      expect(gitCalls.some(a => a.includes('merge') && a.includes('task/task-1/r1'))).toBe(true);
+      expect(gitCalls.some(a => a[0] === 'checkout' && a[1] === '--detach')).toBe(true);
     });
 
     it('returns conflicts on merge failure', async () => {
@@ -320,7 +312,8 @@ describe('WorktreePool', () => {
           const cb = typeof _opts === 'function' ? _opts : callback;
           if (args.includes('merge') && args.includes('--no-ff')) {
             const err = new Error('merge conflict') as any;
-            err.stdout = 'CONFLICT (content): merge conflict in src/file.ts\nAutomatic merge failed';
+            err.stdout =
+              'CONFLICT (content): merge conflict in src/file.ts\nAutomatic merge failed';
             err.stderr = '';
             cb(err, { stdout: '', stderr: '' });
           } else if (args.includes('symbolic-ref')) {
@@ -329,7 +322,7 @@ describe('WorktreePool', () => {
             cb(null, { stdout: '', stderr: '' });
           }
           return {};
-        },
+        }
       );
 
       const result = await pool.mergeBack('task-1', 1, wtPath);
@@ -358,14 +351,12 @@ describe('WorktreePool', () => {
             cb(null, { stdout: '', stderr: '' });
           }
           return {};
-        },
+        }
       );
 
       await pool.mergeBack('task-1', 1, wtPath);
 
-      expect(
-        gitCalls.some((a) => a.includes('merge') && a.includes('--abort')),
-      ).toBe(true);
+      expect(gitCalls.some(a => a.includes('merge') && a.includes('--abort'))).toBe(true);
     });
 
     it('serializes concurrent mergeBack calls via mutex', async () => {
@@ -392,7 +383,7 @@ describe('WorktreePool', () => {
             cb(null, { stdout: '', stderr: '' });
           }
           return {};
-        },
+        }
       );
 
       const [r1, r2] = await Promise.all([
@@ -414,14 +405,14 @@ describe('WorktreePool', () => {
           const cb = typeof _opts === 'function' ? _opts : callback;
           cb(null, { stdout: '', stderr: '' });
           return {};
-        },
+        }
       );
 
       await pool.init(2);
       await pool.destroy();
 
       const removeCalls = mockExecFile.mock.calls.filter(
-        (call: any[]) => call[1] && call[1].includes('remove'),
+        (call: any[]) => call[1] && call[1].includes('remove')
       );
       expect(removeCalls).toHaveLength(2);
       expect(pool.getStatus().total).toBe(0);
@@ -432,13 +423,13 @@ describe('WorktreePool', () => {
       mockExecFile.mockImplementation(
         (_binary: string, args: string[], _opts: unknown, callback?: any) => {
           const cb = typeof _opts === 'function' ? _opts : callback;
-          if (args.includes('remove') && args.some((a) => a.includes('slot-0'))) {
+          if (args.includes('remove') && args.some(a => a.includes('slot-0'))) {
             cb(new Error('remove failed'), { stdout: '', stderr: '' });
           } else {
             cb(null, { stdout: '', stderr: '' });
           }
           return {};
-        },
+        }
       );
 
       await pool.init(2);
@@ -460,7 +451,7 @@ describe('WorktreePool', () => {
             cb(null, { stdout: '', stderr: '' });
           }
           return {};
-        },
+        }
       );
 
       await pool.init(3);

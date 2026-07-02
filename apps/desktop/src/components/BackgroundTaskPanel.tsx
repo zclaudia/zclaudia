@@ -1,7 +1,16 @@
 import { useState, useCallback, useRef } from 'react';
 import { useBackgroundTaskStore, type BackgroundTask } from '../stores/backgroundTaskStore';
 import { getProcessInfo } from '../services/api';
-import { CheckCircle2, XCircle, Loader2, X, ChevronDown, ChevronRight, PauseCircle, StopCircle } from 'lucide-react';
+import {
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  X,
+  ChevronDown,
+  ChevronRight,
+  PauseCircle,
+  StopCircle,
+} from 'lucide-react';
 
 function formatTimeAgo(ts: number): string {
   const seconds = Math.floor((Date.now() - ts) / 1000);
@@ -13,7 +22,9 @@ function formatTimeAgo(ts: number): string {
 }
 
 function PidBadge({ pid, cliPid, serverId }: { pid: number; cliPid?: number; serverId?: string }) {
-  const [tooltip, setTooltip] = useState<string>(`PID: ${pid}${cliPid ? ` (CLI: ${cliPid})` : ''}\nHover to query process info...`);
+  const [tooltip, setTooltip] = useState<string>(
+    `PID: ${pid}${cliPid ? ` (CLI: ${cliPid})` : ''}\nHover to query process info...`
+  );
   const fetchedRef = useRef(false);
 
   const handleMouseEnter = useCallback(() => {
@@ -21,21 +32,23 @@ function PidBadge({ pid, cliPid, serverId }: { pid: number; cliPid?: number; ser
     fetchedRef.current = true;
 
     const pidsToQuery = cliPid ? [pid, cliPid] : [pid];
-    Promise.all(pidsToQuery.map(p => getProcessInfo(p, serverId))).then((results) => {
-      const lines: string[] = [];
-      for (const info of results) {
-        if (info.alive) {
-          const cmd = info.args || info.command || 'unknown';
-          const elapsed = info.elapsedSeconds != null ? `${info.elapsedSeconds}s` : '?';
-          lines.push(`PID ${info.pid}: ${cmd} (uptime: ${elapsed})`);
-        } else {
-          lines.push(`PID ${info.pid}: not running`);
+    Promise.all(pidsToQuery.map(p => getProcessInfo(p, serverId)))
+      .then(results => {
+        const lines: string[] = [];
+        for (const info of results) {
+          if (info.alive) {
+            const cmd = info.args || info.command || 'unknown';
+            const elapsed = info.elapsedSeconds != null ? `${info.elapsedSeconds}s` : '?';
+            lines.push(`PID ${info.pid}: ${cmd} (uptime: ${elapsed})`);
+          } else {
+            lines.push(`PID ${info.pid}: not running`);
+          }
         }
-      }
-      setTooltip(lines.join('\n'));
-    }).catch(() => {
-      setTooltip(`PID ${pid}: query failed`);
-    });
+        setTooltip(lines.join('\n'));
+      })
+      .catch(() => {
+        setTooltip(`PID ${pid}: query failed`);
+      });
   }, [pid, cliPid]);
 
   return (
@@ -49,7 +62,15 @@ function PidBadge({ pid, cliPid, serverId }: { pid: number; cliPid?: number; ser
   );
 }
 
-function TaskItem({ task, onRemove, onStop }: { task: BackgroundTask; onRemove: () => void; onStop?: (task: BackgroundTask) => void }) {
+function TaskItem({
+  task,
+  onRemove,
+  onStop,
+}: {
+  task: BackgroundTask;
+  onRemove: () => void;
+  onStop?: (task: BackgroundTask) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const isRunning = task.status === 'started' || task.status === 'in_progress';
   const canStop = isRunning && task.stoppable !== false && !!onStop;
@@ -57,9 +78,11 @@ function TaskItem({ task, onRemove, onStop }: { task: BackgroundTask; onRemove: 
   const isFailed = task.status === 'failed' || task.status === 'stopped';
 
   return (
-    <div className={`flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg hover:bg-muted/50 transition-colors group ${
-      expanded ? 'flex-wrap' : ''
-    }`}>
+    <div
+      className={`flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg hover:bg-muted/50 transition-colors group ${
+        expanded ? 'flex-wrap' : ''
+      }`}
+    >
       {/* Status icon */}
       {isRunning ? (
         <Loader2 size={13} className="animate-spin text-primary flex-shrink-0" />
@@ -76,9 +99,7 @@ function TaskItem({ task, onRemove, onStop }: { task: BackgroundTask; onRemove: 
         onClick={() => (task.summary || task.taskCommand) && setExpanded(!expanded)}
         className="flex-1 min-w-0 text-left flex items-center gap-1.5"
       >
-        <span className="text-foreground truncate">
-          {task.description || 'Background Task'}
-        </span>
+        <span className="text-foreground truncate">{task.description || 'Background Task'}</span>
         {task.taskRootPid && (
           <PidBadge pid={task.taskRootPid} cliPid={task.cliPid} serverId={task.serverId} />
         )}
@@ -115,12 +136,18 @@ function TaskItem({ task, onRemove, onStop }: { task: BackgroundTask; onRemove: 
       {expanded && (task.summary || task.taskCommand) && (
         <div className="w-full pl-5 pt-1 pb-0.5">
           {task.cliPid && (
-            <div className="text-[11px] font-mono text-muted-foreground/50 truncate mb-0.5" title={`Provider PID: ${task.cliPid}`}>
+            <div
+              className="text-[11px] font-mono text-muted-foreground/50 truncate mb-0.5"
+              title={`Provider PID: ${task.cliPid}`}
+            >
               cli pid: {task.cliPid}
             </div>
           )}
           {task.taskCommand && (
-            <div className="text-[11px] font-mono text-muted-foreground/60 truncate mb-0.5" title={task.taskCommand}>
+            <div
+              className="text-[11px] font-mono text-muted-foreground/60 truncate mb-0.5"
+              title={task.taskCommand}
+            >
               $ {task.taskCommand}
             </div>
           )}
@@ -143,8 +170,8 @@ interface BackgroundTaskPanelProps {
 
 export function BackgroundTaskPanel({ sessionId, onStopTask }: BackgroundTaskPanelProps) {
   const [collapsed, setCollapsed] = useState(false);
-  const tasks = useBackgroundTaskStore((s) => s.getTasksBySession(sessionId));
-  const removeTask = useBackgroundTaskStore((s) => s.removeTask);
+  const tasks = useBackgroundTaskStore(s => s.getTasksBySession(sessionId));
+  const removeTask = useBackgroundTaskStore(s => s.removeTask);
 
   if (tasks.length === 0) {
     return null;
@@ -152,7 +179,9 @@ export function BackgroundTaskPanel({ sessionId, onStopTask }: BackgroundTaskPan
 
   const activeTasks = tasks.filter(t => t.status === 'started' || t.status === 'in_progress');
   const pausedTasks = tasks.filter(t => t.status === 'paused');
-  const completedTasks = tasks.filter(t => t.status === 'completed' || t.status === 'failed' || t.status === 'stopped');
+  const completedTasks = tasks.filter(
+    t => t.status === 'completed' || t.status === 'failed' || t.status === 'stopped'
+  );
 
   return (
     <div className="border-t border-border bg-card/30">
@@ -162,29 +191,37 @@ export function BackgroundTaskPanel({ sessionId, onStopTask }: BackgroundTaskPan
           {activeTasks.length > 0
             ? `${activeTasks.length} task${activeTasks.length > 1 ? 's' : ''} running`
             : pausedTasks.length > 0
-            ? `${pausedTasks.length} task${pausedTasks.length > 1 ? 's' : ''} paused`
-            : `${tasks.length} task${tasks.length > 1 ? 's' : ''}`
-          }
+              ? `${pausedTasks.length} task${pausedTasks.length > 1 ? 's' : ''} paused`
+              : `${tasks.length} task${tasks.length > 1 ? 's' : ''}`}
         </span>
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="ml-auto p-0.5 rounded-md hover:bg-muted transition-colors"
           title={collapsed ? 'Expand' : 'Collapse'}
         >
-          {collapsed ? <ChevronRight size={11} className="text-muted-foreground" /> : <ChevronDown size={11} className="text-muted-foreground" />}
+          {collapsed ? (
+            <ChevronRight size={11} className="text-muted-foreground" />
+          ) : (
+            <ChevronDown size={11} className="text-muted-foreground" />
+          )}
         </button>
       </div>
 
       {/* Task list — compact rows */}
       {!collapsed && (
         <div className="overflow-y-auto max-h-40 pb-1">
-          {activeTasks.map((task) => (
-            <TaskItem key={task.id} task={task} onRemove={() => removeTask(task.id)} onStop={onStopTask} />
+          {activeTasks.map(task => (
+            <TaskItem
+              key={task.id}
+              task={task}
+              onRemove={() => removeTask(task.id)}
+              onStop={onStopTask}
+            />
           ))}
-          {pausedTasks.map((task) => (
+          {pausedTasks.map(task => (
             <TaskItem key={task.id} task={task} onRemove={() => removeTask(task.id)} />
           ))}
-          {completedTasks.map((task) => (
+          {completedTasks.map(task => (
             <TaskItem key={task.id} task={task} onRemove={() => removeTask(task.id)} />
           ))}
         </div>

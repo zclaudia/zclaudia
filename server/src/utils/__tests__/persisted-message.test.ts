@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { parsePersistedMessageContent, parsePersistedMessageMetadata } from '../persisted-message.js';
+import {
+  parsePersistedMessageContent,
+  parsePersistedMessageMetadata,
+} from '../persisted-message.js';
 
 describe('parsePersistedMessageContent', () => {
   it('parses JSON content when stored as serialized JSON', () => {

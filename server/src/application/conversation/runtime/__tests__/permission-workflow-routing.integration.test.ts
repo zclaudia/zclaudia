@@ -4,15 +4,13 @@ import { createPermissionCallback } from '../run-permissions.js';
 import { PermissionWorkflowResolver } from '../../../../domains/workflows/permission-workflow-resolver.js';
 import { PhaseEmitter } from '../active-run-phase.js';
 
-const {
-  broadcastRunMessageMock,
-  normalizeFromAskUserMock,
-  writePermissionLogMock,
-} = vi.hoisted(() => ({
-  broadcastRunMessageMock: vi.fn(),
-  normalizeFromAskUserMock: vi.fn(),
-  writePermissionLogMock: vi.fn(),
-}));
+const { broadcastRunMessageMock, normalizeFromAskUserMock, writePermissionLogMock } = vi.hoisted(
+  () => ({
+    broadcastRunMessageMock: vi.fn(),
+    normalizeFromAskUserMock: vi.fn(),
+    writePermissionLogMock: vi.fn(),
+  })
+);
 
 vi.mock('../../transport/broadcast.js', () => ({
   broadcastRunMessage: broadcastRunMessageMock,
@@ -58,8 +56,8 @@ vi.mock('../../agent/permission-evaluator.js', () => ({
   getProjectPermissionOverride: vi.fn(() => undefined),
   isInternalInteractionTool: vi.fn(() => false),
   isOutsideWorkspacePathAllowed: vi.fn(() => false),
-  mergePolicy: vi.fn((globalPolicy) => globalPolicy),
-  normalizePolicy: vi.fn((policy) => policy),
+  mergePolicy: vi.fn(globalPolicy => globalPolicy),
+  normalizePolicy: vi.fn(policy => policy),
   PermissionEvaluator: class {
     evaluate() {
       return 'ask';
@@ -126,22 +124,27 @@ function createDb(): Database.Database {
   return db;
 }
 
-function insertWorkflow(db: Database.Database, values: {
-  id: string;
-  status?: string;
-  isSystem?: boolean;
-  systemKey?: string | null;
-}) {
-  db.prepare(`
+function insertWorkflow(
+  db: Database.Database,
+  values: {
+    id: string;
+    status?: string;
+    isSystem?: boolean;
+    systemKey?: string | null;
+  }
+) {
+  db.prepare(
+    `
     INSERT INTO workflows (
       id, project_id, name, status, definition, is_system, system_key, created_at, updated_at
     ) VALUES (?, NULL, ?, ?, '{"triggers":[],"nodes":[],"edges":[],"entryNodeId":""}', ?, ?, 1, 1)
-  `).run(
+  `
+  ).run(
     values.id,
     values.id,
     values.status ?? 'active',
     values.isSystem ? 1 : 0,
-    values.systemKey ?? null,
+    values.systemKey ?? null
   );
 }
 
@@ -205,11 +208,15 @@ describe('permission workflow routing integration', () => {
   it('prefers the project override when present', async () => {
     insertWorkflow(db, { id: 'wf-project' });
     insertWorkflow(db, { id: 'wf-global' });
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO projects (id, name, type, permission_workflow_override_id, created_at, updated_at)
       VALUES ('project-1', 'Project', 'code', 'wf-project', 1, 1)
-    `).run();
-    db.prepare(`UPDATE agent_config SET permission_workflow_override_id = 'wf-global' WHERE id = 1`).run();
+    `
+    ).run();
+    db.prepare(
+      `UPDATE agent_config SET permission_workflow_override_id = 'wf-global' WHERE id = 1`
+    ).run();
 
     const resolver = new PermissionWorkflowResolver(db, workflowService as any);
     const callback = createPermissionCallback(createInput(db, resolver) as any);
@@ -232,17 +239,21 @@ describe('permission workflow routing integration', () => {
       expect.objectContaining({
         eventPayload: expect.objectContaining({ requestId: 'req-project' }),
       }),
-      'event',
+      'event'
     );
   });
 
   it('falls back to the global override when the project override is unavailable', async () => {
     insertWorkflow(db, { id: 'wf-global' });
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO projects (id, name, type, permission_workflow_override_id, created_at, updated_at)
       VALUES ('project-1', 'Project', 'code', 'wf-missing', 1, 1)
-    `).run();
-    db.prepare(`UPDATE agent_config SET permission_workflow_override_id = 'wf-global' WHERE id = 1`).run();
+    `
+    ).run();
+    db.prepare(
+      `UPDATE agent_config SET permission_workflow_override_id = 'wf-global' WHERE id = 1`
+    ).run();
 
     const resolver = new PermissionWorkflowResolver(db, workflowService as any);
     const callback = createPermissionCallback(createInput(db, resolver) as any);
@@ -263,17 +274,21 @@ describe('permission workflow routing integration', () => {
       'event',
       'event: permission.escalated',
       expect.any(Object),
-      'event',
+      'event'
     );
   });
 
   it('falls back to the immutable system workflow when overrides are unavailable', async () => {
     insertWorkflow(db, { id: 'wf-global', status: 'disabled' });
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO projects (id, name, type, permission_workflow_override_id, created_at, updated_at)
       VALUES ('project-1', 'Project', 'code', 'wf-missing', 1, 1)
-    `).run();
-    db.prepare(`UPDATE agent_config SET permission_workflow_override_id = 'wf-global' WHERE id = 1`).run();
+    `
+    ).run();
+    db.prepare(
+      `UPDATE agent_config SET permission_workflow_override_id = 'wf-global' WHERE id = 1`
+    ).run();
 
     const resolver = new PermissionWorkflowResolver(db, workflowService as any);
     const callback = createPermissionCallback(createInput(db, resolver) as any);
@@ -294,20 +309,22 @@ describe('permission workflow routing integration', () => {
       'event',
       'event: permission.escalated',
       expect.any(Object),
-      'event',
+      'event'
     );
     expect(broadcastRunMessageMock).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
         requestId: 'req-system',
         workflowMode: true,
-      }),
+      })
     );
   });
 
   it('sends permission_request before starting the permission workflow', async () => {
     insertWorkflow(db, { id: 'wf-global' });
-    db.prepare(`UPDATE agent_config SET permission_workflow_override_id = 'wf-global' WHERE id = 1`).run();
+    db.prepare(
+      `UPDATE agent_config SET permission_workflow_override_id = 'wf-global' WHERE id = 1`
+    ).run();
 
     const resolver = new PermissionWorkflowResolver(db, workflowService as any);
     const callback = createPermissionCallback(createInput(db, resolver) as any);
@@ -328,16 +345,17 @@ describe('permission workflow routing integration', () => {
       expect.objectContaining({
         type: 'permission_request',
         requestId: 'req-order',
-      }),
+      })
     );
     expect(triggerWorkflowMock).toHaveBeenCalledWith(
       'wf-global',
       'event',
       'event: permission.escalated',
       expect.any(Object),
-      'event',
+      'event'
     );
-    expect(broadcastRunMessageMock.mock.invocationCallOrder[0])
-      .toBeLessThan(triggerWorkflowMock.mock.invocationCallOrder[0]);
+    expect(broadcastRunMessageMock.mock.invocationCallOrder[0]).toBeLessThan(
+      triggerWorkflowMock.mock.invocationCallOrder[0]
+    );
   });
 });

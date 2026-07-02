@@ -11,7 +11,7 @@ export async function getSessionDraft(sessionId: string): Promise<SessionDraft |
   // Special: returns null on failure instead of throwing
   const result = await fetchApiForBackend<SessionDraft | null>(
     `/api/sessions/${sessionId}/draft`,
-    getBackendIdForSession(sessionId),
+    getBackendIdForSession(sessionId)
   );
   if (!result.success) {
     throw new Error(result.error?.message || 'Failed to fetch draft');
@@ -24,10 +24,14 @@ export async function upsertSessionDraft(
   content: string,
   deviceId?: string
 ): Promise<SessionDraft> {
-  return apiCallForBackend<SessionDraft>(getBackendIdForSession(sessionId), `/api/sessions/${sessionId}/draft`, {
-    method: 'PUT',
-    body: JSON.stringify({ content, deviceId }),
-  });
+  return apiCallForBackend<SessionDraft>(
+    getBackendIdForSession(sessionId),
+    `/api/sessions/${sessionId}/draft`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ content, deviceId }),
+    }
+  );
 }
 
 export async function lockSessionDraft(
@@ -45,21 +49,30 @@ export async function lockSessionDraft(
   );
 }
 
-export async function unlockSessionDraft(
-  sessionId: string,
-  deviceId: string
-): Promise<void> {
+export async function unlockSessionDraft(sessionId: string, deviceId: string): Promise<void> {
   // Fire-and-forget, no error check
-  await fetchApiForBackend(`/api/sessions/${sessionId}/draft/unlock`, getBackendIdForSession(sessionId), {
-    method: 'POST',
-    body: JSON.stringify({ deviceId }),
-  });
+  await fetchApiForBackend(
+    `/api/sessions/${sessionId}/draft/unlock`,
+    getBackendIdForSession(sessionId),
+    {
+      method: 'POST',
+      body: JSON.stringify({ deviceId }),
+    }
+  );
 }
 
 export async function archiveSessionDraft(sessionId: string): Promise<void> {
-  return apiCallVoidForBackend(getBackendIdForSession(sessionId), `/api/sessions/${sessionId}/draft/archive`, { method: 'POST' });
+  return apiCallVoidForBackend(
+    getBackendIdForSession(sessionId),
+    `/api/sessions/${sessionId}/draft/archive`,
+    { method: 'POST' }
+  );
 }
 
 export async function deleteSessionDraft(sessionId: string): Promise<void> {
-  return apiCallVoidForBackend(getBackendIdForSession(sessionId), `/api/sessions/${sessionId}/draft`, { method: 'DELETE' });
+  return apiCallVoidForBackend(
+    getBackendIdForSession(sessionId),
+    `/api/sessions/${sessionId}/draft`,
+    { method: 'DELETE' }
+  );
 }

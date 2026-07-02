@@ -4,9 +4,11 @@ import { AgentProfileRepository } from './repository.js';
 export class AgentProfileInUseError extends Error {
   constructor(
     public readonly sessionCount: number,
-    public readonly agentId: string,
+    public readonly agentId: string
   ) {
-    super(`AgentProfile ${agentId} is referenced by ${sessionCount} session(s) and cannot be deleted`);
+    super(
+      `AgentProfile ${agentId} is referenced by ${sessionCount} session(s) and cannot be deleted`
+    );
     this.name = 'AgentProfileInUseError';
   }
 }

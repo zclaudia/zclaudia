@@ -24,6 +24,7 @@ function createTestDb(): Database.Database {
       name TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
+      archived_at INTEGER,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
     );
 
@@ -68,15 +69,19 @@ describe('sessionDrafts routes', () => {
     db.exec('DELETE FROM projects');
 
     const now = Date.now();
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO projects (id, name, type, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
-    `).run('project-1', 'Test Project', 'code', now, now);
+    `
+    ).run('project-1', 'Test Project', 'code', now, now);
 
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO sessions (id, project_id, name, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
-    `).run('session-1', 'project-1', 'Test Session', now, now);
+    `
+    ).run('session-1', 'project-1', 'Test Session', now, now);
   });
 
   it('acquires a draft lock for an existing session', async () => {
@@ -102,8 +107,7 @@ describe('sessionDrafts routes', () => {
   });
 
   it('returns 400 when deviceId is missing, even if body is absent', async () => {
-    const res = await request(app)
-      .post('/api/sessions/session-1/draft/lock');
+    const res = await request(app).post('/api/sessions/session-1/draft/lock');
 
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
@@ -112,8 +116,7 @@ describe('sessionDrafts routes', () => {
   });
 
   it('returns structured 404 when archiving without an active draft', async () => {
-    const res = await request(app)
-      .post('/api/sessions/session-1/draft/archive');
+    const res = await request(app).post('/api/sessions/session-1/draft/archive');
 
     expect(res.status).toBe(404);
     expect(res.body.success).toBe(false);
@@ -124,8 +127,7 @@ describe('sessionDrafts routes', () => {
   });
 
   it('returns structured 404 when deleting a missing draft', async () => {
-    const res = await request(app)
-      .delete('/api/sessions/session-1/draft');
+    const res = await request(app).delete('/api/sessions/session-1/draft');
 
     expect(res.status).toBe(404);
     expect(res.body.success).toBe(false);

@@ -13,7 +13,7 @@ function encryptWithPublicKey(publicKeyPem: string, plaintext: string): string {
       padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
       oaepHash: 'sha256',
     },
-    Buffer.from(plaintext, 'utf8'),
+    Buffer.from(plaintext, 'utf8')
   );
   return encrypted.toString('base64');
 }

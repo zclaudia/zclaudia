@@ -24,7 +24,7 @@ function normalizePath(p: string): string {
 interface WorktreeSelectorProps {
   projectId: string;
   projectRootPath: string;
-  currentWorktree: string;   // currentSession?.workingDirectory || ''
+  currentWorktree: string; // currentSession?.workingDirectory || ''
   onChange: (path: string) => Promise<void> | void;
   disabled?: boolean;
   locked?: boolean;
@@ -34,8 +34,12 @@ interface WorktreeSelectorProps {
 function BranchIcon({ className = 'w-3.5 h-3.5' }: { className?: string }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-        d="M6 3v12m0 0a3 3 0 100 6 3 3 0 000-6zm0 0c3.314 0 6-2.686 6-6m0-6a3 3 0 100 6 3 3 0 000-6z" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M6 3v12m0 0a3 3 0 100 6 3 3 0 000-6zm0 0c3.314 0 6-2.686 6-6m0-6a3 3 0 100 6 3 3 0 000-6z"
+      />
     </svg>
   );
 }
@@ -43,8 +47,12 @@ function BranchIcon({ className = 'w-3.5 h-3.5' }: { className?: string }) {
 function LockIcon({ className = 'w-3.5 h-3.5' }: { className?: string }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-        d="M12 11c-1.657 0-3 1.343-3 3v2h6v-2c0-1.657-1.343-3-3-3zm6 3v2a2 2 0 01-2 2H7a2 2 0 01-2-2v-2a7 7 0 1114 0z" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M12 11c-1.657 0-3 1.343-3 3v2h6v-2c0-1.657-1.343-3-3-3zm6 3v2a2 2 0 01-2 2H7a2 2 0 01-2-2v-2a7 7 0 1114 0z"
+      />
     </svg>
   );
 }
@@ -160,21 +168,19 @@ export function WorktreeSelector({
   };
 
   const hasOverride = Boolean(
-    currentWorktree &&
-    normalizePath(currentWorktree) !== normalizePath(projectRootPath)
+    currentWorktree && normalizePath(currentWorktree) !== normalizePath(projectRootPath)
   );
   const normalizedRootPath = normalizePath(projectRootPath);
   const currentWt = hasOverride
     ? worktrees.find(w => w.path === currentWorktree)
-    : worktrees.find(w => normalizePath(w.path) === normalizedRootPath) || worktrees.find(w => w.isMain);
-  const worktreeLabel = hasOverride
-    ? getWorktreeLabel(currentWorktree, projectRootPath)
-    : 'Root';
+    : worktrees.find(w => normalizePath(w.path) === normalizedRootPath) ||
+      worktrees.find(w => w.isMain);
+  const worktreeLabel = hasOverride ? getWorktreeLabel(currentWorktree, projectRootPath) : 'Root';
   const branchLabel = currentWt?.branch;
   const triggerLabel = branchLabel ? `${worktreeLabel} · ${branchLabel}` : worktreeLabel;
   const effectiveTitle = locked
-    ? (lockReason || 'Worktree is locked for this session')
-    : (currentWorktree || projectRootPath);
+    ? lockReason || 'Worktree is locked for this session'
+    : currentWorktree || projectRootPath;
 
   return (
     <div ref={ref} className="relative">
@@ -186,17 +192,27 @@ export function WorktreeSelector({
         title={effectiveTitle}
         className={[
           'max-w-[170px] sm:max-w-[260px]',
-          (!disabled && !locked && hasOverride) ? 'text-primary' : '',
+          !disabled && !locked && hasOverride ? 'text-primary' : '',
         ].join(' ')}
       >
         {locked ? <LockIcon /> : <BranchIcon />}
-        <span className="hidden sm:inline-block min-w-0 max-w-[140px] truncate align-bottom sm:max-w-[220px]" title={triggerLabel}>
+        <span
+          className="hidden sm:inline-block min-w-0 max-w-[140px] truncate align-bottom sm:max-w-[220px]"
+          title={triggerLabel}
+        >
           {triggerLabel}
         </span>
         {locked && (
-          <span className="hidden sm:inline text-[10px] uppercase tracking-wide font-semibold">Locked</span>
+          <span className="hidden sm:inline text-[10px] uppercase tracking-wide font-semibold">
+            Locked
+          </span>
         )}
-        <svg className={`w-3 h-3 ${locked ? 'text-amber-500/80' : 'text-muted-foreground'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg
+          className={`w-3 h-3 ${locked ? 'text-amber-500/80' : 'text-muted-foreground'}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </SelectorTrigger>
@@ -218,17 +234,19 @@ export function WorktreeSelector({
             ].join(' ')}
           >
             <div className="text-[13px]">Root (default)</div>
-            <div className="text-[10px] text-muted-foreground mt-0.5 break-all whitespace-normal">{projectRootPath}</div>
+            <div className="text-[10px] text-muted-foreground mt-0.5 break-all whitespace-normal">
+              {projectRootPath}
+            </div>
           </button>
 
           <div className="my-1 border-t border-border" />
 
-          {loading && (
-            <div className="px-3 py-2 text-[12px] text-muted-foreground">Loading...</div>
-          )}
+          {loading && <div className="px-3 py-2 text-[12px] text-muted-foreground">Loading...</div>}
 
           {!loading && worktrees.length <= 1 && !creating && (
-            <div className="px-3 py-2 text-[12px] text-muted-foreground">No additional worktrees</div>
+            <div className="px-3 py-2 text-[12px] text-muted-foreground">
+              No additional worktrees
+            </div>
           )}
 
           {selectionError && (
@@ -237,26 +255,35 @@ export function WorktreeSelector({
             </div>
           )}
 
-          {!loading && worktrees.filter(wt => !wt.isMain).map(wt => {
-            const isSelected = currentWorktree === wt.path;
-            let relPath = wt.path;
-            try { relPath = pathRelative(projectRootPath, wt.path); } catch { /* ignore */ }
-            return (
-              <button
-                key={wt.path}
-                onClick={() => handleSelect(wt.path)}
-                className={[
-                  'w-full text-left px-3 py-1.5 transition-colors',
-                  isSelected
-                    ? 'bg-muted/60 text-primary font-medium'
-                    : 'text-foreground hover:bg-muted active:bg-muted',
-                ].join(' ')}
-              >
-                <div className="text-[13px]">{wt.branch}</div>
-                <div className="text-[10px] text-muted-foreground mt-0.5 break-all whitespace-normal">{relPath}</div>
-              </button>
-            );
-          })}
+          {!loading &&
+            worktrees
+              .filter(wt => !wt.isMain)
+              .map(wt => {
+                const isSelected = currentWorktree === wt.path;
+                let relPath = wt.path;
+                try {
+                  relPath = pathRelative(projectRootPath, wt.path);
+                } catch {
+                  /* ignore */
+                }
+                return (
+                  <button
+                    key={wt.path}
+                    onClick={() => handleSelect(wt.path)}
+                    className={[
+                      'w-full text-left px-3 py-1.5 transition-colors',
+                      isSelected
+                        ? 'bg-muted/60 text-primary font-medium'
+                        : 'text-foreground hover:bg-muted active:bg-muted',
+                    ].join(' ')}
+                  >
+                    <div className="text-[13px]">{wt.branch}</div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5 break-all whitespace-normal">
+                      {relPath}
+                    </div>
+                  </button>
+                );
+              })}
 
           {/* Create new worktree */}
           <div className="border-t border-border mt-1">
@@ -266,7 +293,12 @@ export function WorktreeSelector({
                 className="w-full text-left px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex items-center gap-1.5"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
                 </svg>
                 New worktree...
               </button>
@@ -277,10 +309,17 @@ export function WorktreeSelector({
                   ref={branchInputRef}
                   type="text"
                   value={newBranch}
-                  onChange={e => { setNewBranch(e.target.value); setCreateError(''); }}
+                  onChange={e => {
+                    setNewBranch(e.target.value);
+                    setCreateError('');
+                  }}
                   onKeyDown={e => {
                     if (e.key === 'Enter') handleCreate();
-                    if (e.key === 'Escape') { setCreating(false); setNewBranch(''); setCreateError(''); }
+                    if (e.key === 'Escape') {
+                      setCreating(false);
+                      setNewBranch('');
+                      setCreateError('');
+                    }
                   }}
                   placeholder="feat/my-feature"
                   className="w-full text-[12px] bg-background border border-border rounded-md px-2 py-1 outline-none focus:border-primary"
@@ -297,7 +336,11 @@ export function WorktreeSelector({
                     {loading ? 'Creating...' : 'Create'}
                   </button>
                   <button
-                    onClick={() => { setCreating(false); setNewBranch(''); setCreateError(''); }}
+                    onClick={() => {
+                      setCreating(false);
+                      setNewBranch('');
+                      setCreateError('');
+                    }}
                     className="text-[11px] text-muted-foreground hover:text-foreground px-2 py-1"
                   >
                     Cancel

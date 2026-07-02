@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import { useEmbeddedServer } from '../useEmbeddedServer.js';
 
 // Capture event handlers registered by the hook
@@ -10,12 +10,14 @@ let stderrHandlers: Map<string, EventHandler>;
 let commandHandlers: Map<string, EventHandler>;
 let mockSpawnFn: ReturnType<typeof vi.fn>;
 let mockExecuteFn: ReturnType<typeof vi.fn>;
+let mockChildKillFn: ReturnType<typeof vi.fn>;
 
 function createMockCommand() {
   stdoutHandlers = new Map();
   stderrHandlers = new Map();
   commandHandlers = new Map();
-  mockSpawnFn = vi.fn().mockResolvedValue({ pid: 12345 });
+  mockChildKillFn = vi.fn().mockResolvedValue(undefined);
+  mockSpawnFn = vi.fn().mockResolvedValue({ pid: 12345, kill: mockChildKillFn });
   mockExecuteFn = vi.fn().mockResolvedValue({ code: 0, signal: null, stdout: '', stderr: '' });
 
   return {
@@ -85,7 +87,9 @@ vi.mock('../../utils/platform', () => ({
   }),
   isDesktopTauriNonWindows: vi.fn(() => {
     const t = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-    return t && !navigator.userAgent.includes('Android') && !navigator.userAgent.includes('Windows');
+    return (
+      t && !navigator.userAgent.includes('Android') && !navigator.userAgent.includes('Windows')
+    );
   }),
 }));
 
@@ -430,9 +434,7 @@ describe('hooks/useEmbeddedServer', () => {
         stdoutHandler!('Database initialized');
       });
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Database initialized')
-      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Database initialized'));
     });
   });
 
@@ -446,11 +448,11 @@ describe('hooks/useEmbeddedServer', () => {
       (Command.sidecar as ReturnType<typeof vi.fn>)
         .mockImplementationOnce(() => createMockCommand())
         .mockImplementationOnce(() => {
-        const cmd = createMockCommand();
-        cmd.spawn = vi.fn().mockRejectedValue(new Error('Failed to spawn process'));
-        latestMockCommand = cmd;
-        return cmd;
-      });
+          const cmd = createMockCommand();
+          cmd.spawn = vi.fn().mockRejectedValue(new Error('Failed to spawn process'));
+          latestMockCommand = cmd;
+          return cmd;
+        });
 
       const { result } = renderHook(() => useEmbeddedServer());
 
@@ -471,11 +473,11 @@ describe('hooks/useEmbeddedServer', () => {
       (Command.sidecar as ReturnType<typeof vi.fn>)
         .mockImplementationOnce(() => createMockCommand())
         .mockImplementationOnce(() => {
-        const cmd = createMockCommand();
-        cmd.spawn = vi.fn().mockRejectedValue('string error');
-        latestMockCommand = cmd;
-        return cmd;
-      });
+          const cmd = createMockCommand();
+          cmd.spawn = vi.fn().mockRejectedValue('string error');
+          latestMockCommand = cmd;
+          return cmd;
+        });
 
       const { result } = renderHook(() => useEmbeddedServer());
 
@@ -680,6 +682,31 @@ describe('hooks/useEmbeddedServer', () => {
 
       expect(mockSpawnFn).toHaveBeenCalled();
     });
+
+    it('kills spawned process and reports error when PID registration fails', async () => {
+      mockTauriInternals();
+      mockFetch.mockRejectedValue(new Error('Not running'));
+      mockInvoke.mockImplementation((command: string) => {
+        if (command === 'get_shell_network_env') return Promise.resolve({});
+        if (command === 'probe_opencode_endpoints') return Promise.resolve([]);
+        if (command === 'register_dev_server_pid') {
+          return Promise.reject(new Error('registry unavailable'));
+        }
+        return Promise.resolve({});
+      });
+
+      const { result } = renderHook(() => useEmbeddedServer());
+
+      await act(async () => {
+        await vi.runAllTimersAsync();
+        await Promise.resolve();
+      });
+
+      expect(mockChildKillFn).toHaveBeenCalledTimes(1);
+      expect(result.current.status).toBe('error');
+      expect(result.current.error).toContain('Failed to register dev server pid');
+      expect(result.current.error).toContain('registry unavailable');
+    });
   });
 
   describe('cleanup on unmount', () => {
@@ -698,7 +725,7 @@ describe('hooks/useEmbeddedServer', () => {
       mockTauriInternals();
       mockFetch.mockRejectedValue(new Error('Not running'));
 
-      const { result, unmount } = renderHook(() => useEmbeddedServer());
+      const { unmount } = renderHook(() => useEmbeddedServer());
 
       await act(async () => {
         await vi.runAllTimersAsync();

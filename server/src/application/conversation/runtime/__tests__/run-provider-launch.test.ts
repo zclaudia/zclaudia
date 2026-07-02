@@ -11,7 +11,11 @@ const pluginEventsEmitMock = vi.fn(async () => {});
 const mcpListStatusesMock = vi.fn();
 const prepareDirectSkillInvocationMock = vi.fn();
 const executePreparedDirectSkillInvocationMock = vi.fn();
-const maybeCompactMock = vi.fn(async () => ({ outcome: 'skipped', compacted: false, reason: 'below_threshold' }));
+const maybeCompactMock = vi.fn(async () => ({
+  outcome: 'skipped',
+  compacted: false,
+  reason: 'below_threshold',
+}));
 
 vi.mock('../run-context.js', () => ({
   buildRunContext: buildRunContextMock,
@@ -72,7 +76,11 @@ describe('ws/run-provider-launch', () => {
     mcpListStatusesMock.mockReturnValue([]);
     prepareDirectSkillInvocationMock.mockResolvedValue({ matched: false });
     executePreparedDirectSkillInvocationMock.mockReset();
-    maybeCompactMock.mockResolvedValue({ outcome: 'skipped', compacted: false, reason: 'below_threshold' });
+    maybeCompactMock.mockResolvedValue({
+      outcome: 'skipped',
+      compacted: false,
+      reason: 'below_threshold',
+    });
   });
 
   it('emits run_started, background status, negotiates profile, and starts periodic save', async () => {
@@ -97,7 +105,8 @@ describe('ws/run-provider-launch', () => {
     const listeners = new RunDomainEventListenerRegistry();
     const runStartedListener = vi.fn();
     listeners.on('run.started', runStartedListener);
-    const { registerPluginDomainEventListener } = await import('../plugin-domain-event-listener.js');
+    const { registerPluginDomainEventListener } =
+      await import('../plugin-domain-event-listener.js');
     const unregisterPluginDomainEventListener = registerPluginDomainEventListener(listeners);
 
     const result = await launchProviderRun({
@@ -126,7 +135,11 @@ describe('ws/run-provider-launch', () => {
       modeValue: 'default',
       permissionCallback,
       processedInput: 'processed hello',
-      providerConfig: { id: 'provider-1', providerType: 'claude', baseUrl: '/usr/bin/claude' } as any,
+      providerConfig: {
+        id: 'provider-1',
+        providerType: 'claude',
+        baseUrl: '/usr/bin/claude',
+      } as any,
       llmProfileId: 'provider-1',
       providerType: 'claude',
       runId: 'run-1',
@@ -154,55 +167,66 @@ describe('ws/run-provider-launch', () => {
     });
 
     expect(negotiateProfileMock).toHaveBeenCalled();
-    expect(activeRun.effectiveProfile).toEqual(expect.objectContaining({
-      llmProfileId: 'pcp-claude',
-      sessionId: 'session-1',
-    }));
-    expect(sendRunEventMock).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'run_started',
-      runId: 'run-1',
-      sessionId: 'session-1',
-      clientRequestId: 'req-1',
-      userMessageId: 'user-1',
-      assistantMessageId: 'assistant-1',
-      sessionType: 'background',
-    }));
-    expect(broadcastSessionCatalogUpdateMock).toHaveBeenCalled();
-    expect(pluginEventsEmitMock).toHaveBeenCalledWith('run.started', expect.objectContaining({
-      runId: 'run-1',
-      sessionId: 'session-1',
-      llmProfileId: 'provider-1',
-      providerType: 'claude',
-    }));
-    expect(runStartedListener).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'run.started',
-      runId: 'run-1',
-      sessionId: 'session-1',
-      payload: expect.objectContaining({
+    expect(activeRun.effectiveProfile).toEqual(
+      expect.objectContaining({
+        llmProfileId: 'pcp-claude',
+        sessionId: 'session-1',
+      })
+    );
+    expect(sendRunEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'run_started',
+        runId: 'run-1',
+        sessionId: 'session-1',
         clientRequestId: 'req-1',
-        assistantMessageId: 'assistant-1',
         userMessageId: 'user-1',
+        assistantMessageId: 'assistant-1',
         sessionType: 'background',
-        input: 'hello',
+      })
+    );
+    expect(broadcastSessionCatalogUpdateMock).toHaveBeenCalled();
+    expect(pluginEventsEmitMock).toHaveBeenCalledWith(
+      'run.started',
+      expect.objectContaining({
+        runId: 'run-1',
+        sessionId: 'session-1',
         llmProfileId: 'provider-1',
         providerType: 'claude',
-      }),
-    }));
+      })
+    );
+    expect(runStartedListener).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'run.started',
+        runId: 'run-1',
+        sessionId: 'session-1',
+        payload: expect.objectContaining({
+          clientRequestId: 'req-1',
+          assistantMessageId: 'assistant-1',
+          userMessageId: 'user-1',
+          sessionType: 'background',
+          input: 'hello',
+          llmProfileId: 'provider-1',
+          providerType: 'claude',
+        }),
+      })
+    );
     expect(sendRunEventMock).toHaveBeenCalledWith({
       type: 'background_task_update',
       sessionId: 'session-1',
       status: 'running',
     });
-    expect(buildRunContextMock).toHaveBeenCalledWith(expect.objectContaining({
-      cwd: '/tmp/project',
-      providerType: 'claude',
-      sdkSessionId: 'sdk-prev',
-      sessionType: 'background',
-      providerConfig: expect.objectContaining({
-        id: 'provider-1',
+    expect(buildRunContextMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cwd: '/tmp/project',
         providerType: 'claude',
-      }),
-    }));
+        sdkSessionId: 'sdk-prev',
+        sessionType: 'background',
+        providerConfig: expect.objectContaining({
+          id: 'provider-1',
+          providerType: 'claude',
+        }),
+      })
+    );
     expect(adapter.run).toHaveBeenCalledWith(
       'processed hello',
       expect.objectContaining({
@@ -211,7 +235,7 @@ describe('ws/run-provider-launch', () => {
         onAgentReady: expect.any(Function),
         onSteerConsumed: expect.any(Function),
       }),
-      permissionCallback,
+      permissionCallback
     );
     expect(activeRun.providerType).toBe('claude');
     expect(activeRun.providerSessionId).toBe('sdk-1');
@@ -222,11 +246,25 @@ describe('ws/run-provider-launch', () => {
 
     // onAgentReady mutates activeRun.steerHandle; onSteerConsumed clears
     // pendingSteers — verify both wirings work end-to-end through the closure.
-    const runOptionsArg = (adapter.run as unknown as { mock: { calls: [string, { onAgentReady: (h: { steer: () => void }) => void; onSteerConsumed: () => void }, unknown][] } }).mock.calls[0][1];
+    const runOptionsArg = (
+      adapter.run as unknown as {
+        mock: {
+          calls: [
+            string,
+            { onAgentReady: (h: { steer: () => void }) => void; onSteerConsumed: () => void },
+            unknown,
+          ][];
+        };
+      }
+    ).mock.calls[0][1];
     const fakeHandle = { steer: () => {} };
     runOptionsArg.onAgentReady(fakeHandle);
     expect(activeRun.steerHandle).toBe(fakeHandle);
-    activeRun.pendingSteers.push({ role: 'user', content: [{ type: 'text', text: 'x' }], timestamp: 0 } as never);
+    activeRun.pendingSteers.push({
+      role: 'user',
+      content: [{ type: 'text', text: 'x' }],
+      timestamp: 0,
+    } as never);
     runOptionsArg.onSteerConsumed();
     expect(activeRun.pendingSteers).toEqual([]);
 
@@ -285,7 +323,11 @@ describe('ws/run-provider-launch', () => {
       modeValue: 'default',
       permissionCallback: vi.fn(),
       processedInput: 'processed hello',
-      providerConfig: { id: 'provider-1', providerType: 'claude', baseUrl: '/usr/bin/claude' } as any,
+      providerConfig: {
+        id: 'provider-1',
+        providerType: 'claude',
+        baseUrl: '/usr/bin/claude',
+      } as any,
       llmProfileId: 'provider-1',
       providerType: 'claude',
       runId: 'run-1',
@@ -310,22 +352,26 @@ describe('ws/run-provider-launch', () => {
       listeners,
     });
 
-    expect(sendRunEventMock).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'compaction_completed',
-      runId: 'run-1',
-      sessionId: 'session-1',
-      compactionId: 'compaction-1',
-      tokensBefore: 1234,
-    }));
-    expect(compactionCompletedListener).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'compaction.completed',
-      runId: 'run-1',
-      sessionId: 'session-1',
-      payload: {
+    expect(sendRunEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'compaction_completed',
+        runId: 'run-1',
+        sessionId: 'session-1',
         compactionId: 'compaction-1',
         tokensBefore: 1234,
-      },
-    }));
+      })
+    );
+    expect(compactionCompletedListener).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'compaction.completed',
+        runId: 'run-1',
+        sessionId: 'session-1',
+        payload: {
+          compactionId: 'compaction-1',
+          tokensBefore: 1234,
+        },
+      })
+    );
     expect(adapter.run).toHaveBeenCalled();
 
     clearInterval(activeRun.saveInterval);
@@ -382,7 +428,12 @@ describe('ws/run-provider-launch', () => {
       enabledTools: [],
       forcedPlanBySession: false,
       images: [{ name: 'a.png', mimeType: 'image/png', data: 'abc' }],
-      message: { type: 'run_start', sessionId: 'session-1', clientRequestId: 'req-1', input: 'look' },
+      message: {
+        type: 'run_start',
+        sessionId: 'session-1',
+        clientRequestId: 'req-1',
+        input: 'look',
+      },
       modeValue: 'default',
       permissionCallback: vi.fn(),
       processedInput: 'look',
@@ -409,24 +460,28 @@ describe('ws/run-provider-launch', () => {
       listeners,
     });
 
-    expect(buildRunContextMock).toHaveBeenCalledWith(expect.objectContaining({
-      agentProfile: expect.objectContaining({
-        llmProfileId: fallback.id,
-        model: 'vision-model',
-      }),
-      providerConfig: expect.objectContaining({
-        id: fallback.id,
-        baseUrl: 'http://vision/v1',
-      }),
-      providerType: fallback.providerType,
-    }));
-    expect(runStartedListener).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'run.started',
-      payload: expect.objectContaining({
-        llmProfileId: fallback.id,
+    expect(buildRunContextMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agentProfile: expect.objectContaining({
+          llmProfileId: fallback.id,
+          model: 'vision-model',
+        }),
+        providerConfig: expect.objectContaining({
+          id: fallback.id,
+          baseUrl: 'http://vision/v1',
+        }),
         providerType: fallback.providerType,
-      }),
-    }));
+      })
+    );
+    expect(runStartedListener).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'run.started',
+        payload: expect.objectContaining({
+          llmProfileId: fallback.id,
+          providerType: fallback.providerType,
+        }),
+      })
+    );
     expect(activeRun.agentProfile).toEqual(expect.objectContaining({ model: 'vision-model' }));
     expect(activeRun.llmProfile).toEqual(expect.objectContaining({ id: fallback.id }));
 
@@ -466,7 +521,13 @@ describe('ws/run-provider-launch', () => {
     await launchProviderRun({
       activeRun: { assistantMessageId: 'assistant-1', pendingSteers: [] } as any,
       adapter,
-      agentProfile: { id: 'agent-1', name: 'Agent', model: 'm', systemPrompt: '', enabledTools: [] } as any,
+      agentProfile: {
+        id: 'agent-1',
+        name: 'Agent',
+        model: 'm',
+        systemPrompt: '',
+        enabledTools: [],
+      } as any,
       broadcastSessionCatalogUpdate: vi.fn(),
       client: { ws: {} as any } as any,
       cwd: '/tmp/project',
@@ -474,7 +535,12 @@ describe('ws/run-provider-launch', () => {
       enabledTools: [],
       forcedPlanBySession: false,
       images: [],
-      message: { type: 'run_start', sessionId: 'session-1', clientRequestId: 'req-1', input: 'hello' },
+      message: {
+        type: 'run_start',
+        sessionId: 'session-1',
+        clientRequestId: 'req-1',
+        input: 'hello',
+      },
       modeValue: 'default',
       permissionCallback: vi.fn(),
       processedInput: 'hello',
@@ -531,13 +597,24 @@ describe('ws/run-provider-launch', () => {
     const activeRun = {
       assistantMessageId: 'assistant-1',
       pendingSteers: [],
-      skillState: { discoverableSkills: [], pinnedSkills: [], loadedSkills: [], loadedSkillContents: {} },
+      skillState: {
+        discoverableSkills: [],
+        pinnedSkills: [],
+        loadedSkills: [],
+        loadedSkillContents: {},
+      },
     } as any;
 
     await launchProviderRun({
       activeRun,
       adapter,
-      agentProfile: { id: 'agent-1', name: 'Agent', model: 'm', systemPrompt: '', enabledTools: [] } as any,
+      agentProfile: {
+        id: 'agent-1',
+        name: 'Agent',
+        model: 'm',
+        systemPrompt: '',
+        enabledTools: [],
+      } as any,
       broadcastSessionCatalogUpdate: vi.fn(),
       client: { ws: {} as any } as any,
       cwd: '/tmp/project',
@@ -545,7 +622,12 @@ describe('ws/run-provider-launch', () => {
       enabledTools: [],
       forcedPlanBySession: false,
       images: [],
-      message: { type: 'run_start', sessionId: 'session-1', clientRequestId: 'req-1', input: '/release-notes ZOOM-1 Great feature' },
+      message: {
+        type: 'run_start',
+        sessionId: 'session-1',
+        clientRequestId: 'req-1',
+        input: '/release-notes ZOOM-1 Great feature',
+      },
       modeValue: 'default',
       permissionCallback: vi.fn(),
       processedInput: '/release-notes ZOOM-1 Great feature',
@@ -576,12 +658,12 @@ describe('ws/run-provider-launch', () => {
     expect(prepareDirectSkillInvocationMock).toHaveBeenCalledWith(
       activeRun.skillState,
       '/release-notes ZOOM-1 Great feature',
-      expect.objectContaining({ agentProfile: expect.any(Object) }),
+      expect.objectContaining({ agentProfile: expect.any(Object) })
     );
     expect(adapter.run).toHaveBeenCalledWith(
       'ZOOM-1 Great feature',
       expect.any(Object),
-      expect.any(Function),
+      expect.any(Function)
     );
   });
 
@@ -604,7 +686,12 @@ describe('ws/run-provider-launch', () => {
       pendingSteers: [],
       contentBlocks: [],
       fullContent: '',
-      skillState: { discoverableSkills: [], pinnedSkills: [], loadedSkills: [], loadedSkillContents: {} },
+      skillState: {
+        discoverableSkills: [],
+        pinnedSkills: [],
+        loadedSkills: [],
+        loadedSkillContents: {},
+      },
       phase: 'running',
       phaseEmitter: { emit: vi.fn() },
     } as any;
@@ -612,7 +699,13 @@ describe('ws/run-provider-launch', () => {
     const result = await launchProviderRun({
       activeRun,
       adapter,
-      agentProfile: { id: 'agent-1', name: 'Agent', model: 'm', systemPrompt: '', enabledTools: [] } as any,
+      agentProfile: {
+        id: 'agent-1',
+        name: 'Agent',
+        model: 'm',
+        systemPrompt: '',
+        enabledTools: [],
+      } as any,
       broadcastSessionCatalogUpdate: vi.fn(),
       client: { ws: {} as any } as any,
       cwd: '/tmp/project',
@@ -620,7 +713,12 @@ describe('ws/run-provider-launch', () => {
       enabledTools: [],
       forcedPlanBySession: false,
       images: [],
-      message: { type: 'run_start', sessionId: 'session-1', clientRequestId: 'req-1', input: '/model-only' },
+      message: {
+        type: 'run_start',
+        sessionId: 'session-1',
+        clientRequestId: 'req-1',
+        input: '/model-only',
+      },
       modeValue: 'default',
       permissionCallback: vi.fn(),
       processedInput: '/model-only',
@@ -651,15 +749,19 @@ describe('ws/run-provider-launch', () => {
     expect(adapter.run).not.toHaveBeenCalled();
     expect(activeRun.fullContent).toContain('can only be invoked by the model');
     expect(upsertAssistantMessageMock).toHaveBeenCalledWith(activeRun, { indexMetadata: true });
-    expect(sendRunEvent).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'delta',
-      content: expect.stringContaining('can only be invoked by the model'),
-    }));
-    expect(sendRunEvent).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'run_completed',
-      runId: 'run-1',
-      sessionId: 'session-1',
-    }));
+    expect(sendRunEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'delta',
+        content: expect.stringContaining('can only be invoked by the model'),
+      })
+    );
+    expect(sendRunEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'run_completed',
+        runId: 'run-1',
+        sessionId: 'session-1',
+      })
+    );
     expect(result.providerRunner).toBeTruthy();
   });
 
@@ -690,7 +792,12 @@ describe('ws/run-provider-launch', () => {
       pendingSteers: [],
       contentBlocks: [],
       fullContent: '',
-      skillState: { discoverableSkills: [], pinnedSkills: [], loadedSkills: [], loadedSkillContents: {} },
+      skillState: {
+        discoverableSkills: [],
+        pinnedSkills: [],
+        loadedSkills: [],
+        loadedSkillContents: {},
+      },
       phase: 'running',
       phaseEmitter: { emit: vi.fn() },
     } as any;
@@ -698,7 +805,13 @@ describe('ws/run-provider-launch', () => {
     await launchProviderRun({
       activeRun,
       adapter,
-      agentProfile: { id: 'agent-1', name: 'Agent', model: 'm', systemPrompt: '', enabledTools: [] } as any,
+      agentProfile: {
+        id: 'agent-1',
+        name: 'Agent',
+        model: 'm',
+        systemPrompt: '',
+        enabledTools: [],
+      } as any,
       broadcastSessionCatalogUpdate: vi.fn(),
       client: { ws: {} as any } as any,
       cwd: '/tmp/project',
@@ -706,7 +819,12 @@ describe('ws/run-provider-launch', () => {
       enabledTools: ['Read', 'Grep', 'Write'],
       forcedPlanBySession: false,
       images: [],
-      message: { type: 'run_start', sessionId: 'session-1', clientRequestId: 'req-1', input: '/security-audit auth changes' },
+      message: {
+        type: 'run_start',
+        sessionId: 'session-1',
+        clientRequestId: 'req-1',
+        input: '/security-audit auth changes',
+      },
       modeValue: 'default',
       permissionCallback: vi.fn(),
       processedInput: '/security-audit auth changes',
@@ -744,18 +862,22 @@ describe('ws/run-provider-launch', () => {
         agentProfile: expect.any(Object),
         llmProfileConfig: expect.any(Object),
         permissionCallback: expect.any(Function),
-      }),
+      })
     );
     expect(activeRun.fullContent).toBe('Fork result: reviewed auth changes.');
-    expect(sendRunEvent).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'delta',
-      content: 'Fork result: reviewed auth changes.',
-    }));
-    expect(sendRunEvent).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'run_completed',
-      runId: 'run-1',
-      sessionId: 'session-1',
-    }));
+    expect(sendRunEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'delta',
+        content: 'Fork result: reviewed auth changes.',
+      })
+    );
+    expect(sendRunEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'run_completed',
+        runId: 'run-1',
+        sessionId: 'session-1',
+      })
+    );
     expect(upsertAssistantMessageMock).toHaveBeenCalledWith(activeRun, { indexMetadata: true });
   });
 });

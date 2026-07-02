@@ -12,37 +12,52 @@ export interface ToolExecutionObserver {
   afterToolExecute?: (event: ToolExecutionEvent) => void | Promise<void>;
 }
 
+type ToolExecute = AgentTool['execute'];
+type ToolSignal = Parameters<ToolExecute>[2];
+type ToolUpdate = Parameters<ToolExecute>[3];
+
 export function toolParams(first: unknown, second: unknown): Record<string, unknown> {
   const candidate = second ?? first;
-  return candidate && typeof candidate === 'object'
-    ? candidate as Record<string, unknown>
-    : {};
+  return candidate && typeof candidate === 'object' ? (candidate as Record<string, unknown>) : {};
 }
 
 export function extractTouchedPaths(toolName: ToolName, params: Record<string, unknown>): string[] {
   const value = (() => {
-    if (toolName === 'Read' || toolName === 'Write' || toolName === 'Edit' || toolName === 'MultiEdit' || toolName === 'ReadSymbol' || toolName === 'EditSymbol') return params.path ?? params.file_path;
+    if (
+      toolName === 'Read' ||
+      toolName === 'Write' ||
+      toolName === 'Edit' ||
+      toolName === 'MultiEdit' ||
+      toolName === 'ReadSymbol' ||
+      toolName === 'EditSymbol'
+    )
+      return params.path ?? params.file_path;
     if (toolName === 'Grep' || toolName === 'Glob' || toolName === 'LS') return params.path;
     return undefined;
   })();
   return typeof value === 'string' && value.trim() ? [value.trim()] : [];
 }
 
-export function withToolName(tool: AgentTool<any>, name: ToolName, label: string = name): AgentTool<any> {
-  return { ...tool, name, label } as AgentTool<any>;
+export function withToolName(tool: AgentTool, name: ToolName, label: string = name): AgentTool {
+  return { ...tool, name, label };
 }
 
 export function withToolExecutionObserver(
-  tool: AgentTool<any>,
+  tool: AgentTool,
   name: ToolName,
   cwd: string,
-  observer?: ToolExecutionObserver,
-): AgentTool<any> {
+  observer?: ToolExecutionObserver
+): AgentTool {
   const originalExecute = tool.execute;
   if (!originalExecute) return tool;
   return {
     ...tool,
-    execute: async (toolCallId: string, params: unknown, signal?: AbortSignal, onUpdate?: any) => {
+    execute: async (
+      toolCallId: string,
+      params: unknown,
+      signal?: ToolSignal,
+      onUpdate?: ToolUpdate
+    ) => {
       const result = await originalExecute(toolCallId, params, signal, onUpdate);
       if (observer?.afterToolExecute) {
         const eventParams = toolParams(toolCallId, params);
@@ -55,5 +70,5 @@ export function withToolExecutionObserver(
       }
       return result;
     },
-  } as AgentTool<any>;
+  };
 }

@@ -51,8 +51,14 @@ async function checkHealth(port: number = DEFAULT_PORT): Promise<boolean> {
  * `Stdio::null()` for stdin and returns as fast as a direct PowerShell
  * invocation.
  */
-async function wslExec(args: string[], timeoutSecs?: number): Promise<{ code: number; stdout: string; stderr: string }> {
-  return await invoke<{ code: number; stdout: string; stderr: string }>('wsl_exec', { args, timeoutSecs });
+async function wslExec(
+  args: string[],
+  timeoutSecs?: number
+): Promise<{ code: number; stdout: string; stderr: string }> {
+  return await invoke<{ code: number; stdout: string; stderr: string }>('wsl_exec', {
+    args,
+    timeoutSecs,
+  });
 }
 
 /**

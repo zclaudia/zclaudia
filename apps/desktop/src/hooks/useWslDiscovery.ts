@@ -97,39 +97,42 @@ export function useWslDiscovery() {
   /**
    * Check if server is running at the specified address
    */
-  const checkServerHealth = useCallback(async (address: string = `localhost:${DEFAULT_PORT}`): Promise<boolean> => {
-    const url = `http://${address}/health`;
+  const checkServerHealth = useCallback(
+    async (address: string = `localhost:${DEFAULT_PORT}`): Promise<boolean> => {
+      const url = `http://${address}/health`;
 
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT);
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT);
 
-      const resp = await fetch(url, {
-        method: 'GET',
-        signal: controller.signal,
-      });
+        const resp = await fetch(url, {
+          method: 'GET',
+          signal: controller.signal,
+        });
 
-      clearTimeout(timeoutId);
+        clearTimeout(timeoutId);
 
-      if (resp.ok) {
-        setState(prev => ({
-          ...prev,
-          serverRunning: true,
-          serverAddress: address,
-        }));
-        return true;
+        if (resp.ok) {
+          setState(prev => ({
+            ...prev,
+            serverRunning: true,
+            serverAddress: address,
+          }));
+          return true;
+        }
+      } catch {
+        // Server not running or not reachable
       }
-    } catch {
-      // Server not running or not reachable
-    }
 
-    setState(prev => ({
-      ...prev,
-      serverRunning: false,
-      serverAddress: null,
-    }));
-    return false;
-  }, []);
+      setState(prev => ({
+        ...prev,
+        serverRunning: false,
+        serverAddress: null,
+      }));
+      return false;
+    },
+    []
+  );
 
   /**
    * Run full discovery: check WSL and server status
@@ -211,7 +214,9 @@ export function parseWslListOutput(output: string): WslDistro[] {
  * Check if server is running at localhost:3100 (one-time check)
  * Useful for quick polling without the full hook
  */
-export async function checkWslServerHealth(address: string = `localhost:${DEFAULT_PORT}`): Promise<boolean> {
+export async function checkWslServerHealth(
+  address: string = `localhost:${DEFAULT_PORT}`
+): Promise<boolean> {
   const url = `http://${address}/health`;
 
   try {

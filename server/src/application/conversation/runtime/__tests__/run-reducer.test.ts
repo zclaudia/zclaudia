@@ -23,7 +23,7 @@ function buildRun(overrides: Record<string, unknown> = {}): any {
 
 function event<TType extends Parameters<typeof createRunDomainEvent>[0]['type']>(
   type: TType,
-  payload: Parameters<typeof createRunDomainEvent<TType>>[0]['payload'],
+  payload: Parameters<typeof createRunDomainEvent<TType>>[0]['payload']
 ) {
   return createRunDomainEvent({
     eventId: `event-${type}`,
@@ -53,12 +53,15 @@ describe('run reducer', () => {
       recentToolCalls: Array.from({ length: 20 }, (_, index) => `old-${index}`),
     });
 
-    applyRunDomainEvent(run, event('tool.started', {
-      toolUseId: 'tool-1',
-      toolName: 'Read',
-      input: { file_path: '/repo/src/app.ts' },
-      semantic: 'plan_proposal',
-    }));
+    applyRunDomainEvent(
+      run,
+      event('tool.started', {
+        toolUseId: 'tool-1',
+        toolName: 'Read',
+        input: { file_path: '/repo/src/app.ts' },
+        semantic: 'plan_proposal',
+      })
+    );
 
     expect(run.recentToolCalls).toHaveLength(20);
     expect(run.recentToolCalls[0]).toBe('old-1');
@@ -82,13 +85,16 @@ describe('run reducer', () => {
       ],
     });
 
-    applyRunDomainEvent(run, event('tool.finished', {
-      toolUseId: 'tool-1',
-      toolName: 'Edit',
-      output: 'patched',
-      isError: false,
-      effect,
-    }));
+    applyRunDomainEvent(
+      run,
+      event('tool.finished', {
+        toolUseId: 'tool-1',
+        toolName: 'Edit',
+        output: 'patched',
+        isError: false,
+        effect,
+      })
+    );
 
     expect(run.collectedToolCalls[0]).toEqual({
       toolUseId: 'tool-1',
@@ -105,7 +111,10 @@ describe('run reducer', () => {
 
     applyRunDomainEvent(run, event('assistant.thinkingDelta', { content: 'reason' }));
     applyRunDomainEvent(run, event('assistant.thinkingDelta', { content: 'ing' }));
-    applyRunDomainEvent(run, event('assistant.thinkingDelta', { signature: 'sig-1', redacted: false }));
+    applyRunDomainEvent(
+      run,
+      event('assistant.thinkingDelta', { signature: 'sig-1', redacted: false })
+    );
 
     expect(run.thinkingBlocks).toEqual([
       { text: 'reasoning', signature: 'sig-1', redacted: false },
@@ -119,10 +128,13 @@ describe('run reducer', () => {
     expect(run.pendingBackgroundTasks).toBe(1);
     expect(run.phase).toBe('awaiting_followup');
 
-    applyRunDomainEvent(run, event('backgroundTask.finished', {
-      taskId: 'task-1',
-      status: 'completed',
-    }));
+    applyRunDomainEvent(
+      run,
+      event('backgroundTask.finished', {
+        taskId: 'task-1',
+        status: 'completed',
+      })
+    );
     expect(run.pendingBackgroundTasks).toBe(0);
     expect(run.phase).toBe('running');
   });

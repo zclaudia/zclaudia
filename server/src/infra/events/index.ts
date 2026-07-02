@@ -240,7 +240,7 @@ class PluginEventEmitter {
           if (result instanceof Promise) {
             // Wrap promise to catch errors gracefully
             promises.push(
-              result.catch((error) => {
+              result.catch(error => {
                 console.error(
                   `[PluginEvents] Error in async listener for "${event}":`,
                   error instanceof Error ? error.message : String(error)
@@ -264,7 +264,7 @@ class PluginEventEmitter {
           const result = sub.listener(data, sourcePluginId);
           if (result instanceof Promise) {
             promises.push(
-              result.catch((error) => {
+              result.catch(error => {
                 console.error(
                   `[PluginEvents] Error in async pattern listener for "${event}" (${pattern}):`,
                   error instanceof Error ? error.message : String(error)
@@ -293,7 +293,7 @@ class PluginEventEmitter {
           if (result instanceof Promise) {
             // Wrap promise to catch errors gracefully
             promises.push(
-              result.catch((error) => {
+              result.catch(error => {
                 console.error(
                   `[PluginEvents] Error in async once listener for "${event}":`,
                   error instanceof Error ? error.message : String(error)
@@ -320,7 +320,7 @@ class PluginEventEmitter {
           const result = sub.listener(data, sourcePluginId);
           if (result instanceof Promise) {
             promises.push(
-              result.catch((error) => {
+              result.catch(error => {
                 console.error(
                   `[PluginEvents] Error in async once pattern listener for "${event}" (${pattern}):`,
                   error instanceof Error ? error.message : String(error)

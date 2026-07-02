@@ -6,7 +6,7 @@ export const SYSTEM_INFO_COMMANDS = ['/status'];
 
 export function normalizeSessionWorkingDirectory(
   workingDirectory: string | null | undefined,
-  rootPath: string | null | undefined,
+  rootPath: string | null | undefined
 ): string | null {
   const normalize = (value: string | null | undefined): string | null => {
     if (!value) return null;
@@ -38,7 +38,12 @@ export function isSudoCommand(toolName: string, toolInput: unknown): boolean {
 
 export function isBashLikeTool(toolName: string): boolean {
   const lower = toolName.toLowerCase();
-  return lower === 'bash' || lower === 'execute_command' || lower === 'run_terminal_cmd' || lower === 'terminal';
+  return (
+    lower === 'bash' ||
+    lower === 'execute_command' ||
+    lower === 'run_terminal_cmd' ||
+    lower === 'terminal'
+  );
 }
 
 /**
@@ -50,9 +55,9 @@ export function isBashLikeTool(toolName: string): boolean {
  * No provider-type literals appear here; the runtime manifest passed by the
  * registry is the source of truth.
  */
-export function providerSupportsNativePlanMode(
-  manifest?: { permissionModeMap?: Record<string, string | undefined> },
-): boolean {
+export function providerSupportsNativePlanMode(manifest?: {
+  permissionModeMap?: Record<string, string | undefined>;
+}): boolean {
   if (!manifest?.permissionModeMap) return false;
   return 'plan_only' in manifest.permissionModeMap;
 }
@@ -99,7 +104,7 @@ export function rewriteSudoCommand(command: string, password: string): string {
   const escaped = password.replace(/'/g, "'\\''");
   return command.replace(
     /((?:^|(?:&&|\|\||;|\|)\s*))sudo\s+(?!-S\s)/gm,
-    (_, prefix) => `${prefix}printf '%s\\n' '${escaped}' | sudo -S `,
+    (_, prefix) => `${prefix}printf '%s\\n' '${escaped}' | sudo -S `
   );
 }
 
@@ -119,9 +124,7 @@ export function processAtMentions(input: string, projectRoot: string | null): st
 
   if (mentions.length === 0) return input;
 
-  const contextHint = mentions
-    .map(p => `Please read the file at ${p} for context.`)
-    .join('\n');
+  const contextHint = mentions.map(p => `Please read the file at ${p} for context.`).join('\n');
 
   return `[Context Reference]\n${contextHint}\n\n${input}`;
 }
@@ -149,7 +152,9 @@ export function buildStatusOutput(systemInfo: SystemInfo): string {
     lines.push(`  ${systemInfo.tools.join(', ')}`);
   }
   if (systemInfo.mcpServers && systemInfo.mcpServers.length > 0) {
-    lines.push(`**MCP Servers:** ${systemInfo.mcpServers.map(s => `${s.name} (${s.status})`).join(', ')}`);
+    lines.push(
+      `**MCP Servers:** ${systemInfo.mcpServers.map(s => `${s.name} (${s.status})`).join(', ')}`
+    );
   }
   if (systemInfo.slashCommands && systemInfo.slashCommands.length > 0) {
     lines.push(`**Slash Commands:** ${systemInfo.slashCommands.join(', ')}`);
@@ -163,7 +168,7 @@ export function buildStatusOutput(systemInfo: SystemInfo): string {
 export function formatProviderErrorMessage(
   raw: string,
   providerType?: string,
-  authErrorHint?: { matchAny: Array<string | string[]>; message: string },
+  authErrorHint?: { matchAny: Array<string | string[]>; message: string }
 ): string {
   const msg = raw.trim();
   const lower = msg.toLowerCase();
@@ -172,9 +177,9 @@ export function formatProviderErrorMessage(
   // Each provider's manifest can declare patterns that indicate auth expiry,
   // along with the hint message to show. The runtime stays provider-agnostic.
   if (authErrorHint) {
-    const matched = authErrorHint.matchAny.some((pattern) => {
+    const matched = authErrorHint.matchAny.some(pattern => {
       if (Array.isArray(pattern)) {
-        return pattern.every((p) => lower.includes(p.toLowerCase()));
+        return pattern.every(p => lower.includes(p.toLowerCase()));
       }
       return lower.includes(pattern.toLowerCase());
     });
@@ -212,10 +217,14 @@ export function isHardQuotaExceededError(raw: string): boolean {
 }
 
 const INTERACTION_TOOL_DESCRIPTIONS: Record<string, string> = {
-  update_todo_list: '**update_todo_list**: Show/update a visible task list for the user. Call this to track progress on multi-step tasks. Each call replaces the previous list.',
-  ask_user_form: '**ask_user_form**: Present a structured form when you need specific input from the user — multiple fields, choices, or confirmations. The form blocks until the user responds.',
-  request_approval: '**request_approval**: Request user approval before proceeding with a destructive, irreversible, or high-impact action. Blocks until the user approves or rejects. The response contains { approved: true/false, reason?: string }.',
-  push_file: '**push_file**: Push a local file to the user\'s device. Use this when you build, generate, or export files (images, APKs, binaries, archives, documents, etc.) that the user needs. Images and small files (<500KB) auto-download; larger files show a download notification. Prefer this over curl to push files.',
+  update_todo_list:
+    '**update_todo_list**: Show/update a visible task list for the user. Call this to track progress on multi-step tasks. Each call replaces the previous list.',
+  ask_user_form:
+    '**ask_user_form**: Present a structured form when you need specific input from the user — multiple fields, choices, or confirmations. The form blocks until the user responds.',
+  request_approval:
+    '**request_approval**: Request user approval before proceeding with a destructive, irreversible, or high-impact action. Blocks until the user approves or rejects. The response contains { approved: true/false, reason?: string }.',
+  push_file:
+    "**push_file**: Push a local file to the user's device. Use this when you build, generate, or export files (images, APKs, binaries, archives, documents, etc.) that the user needs. Images and small files (<500KB) auto-download; larger files show a download notification. Prefer this over curl to push files.",
 };
 
 export function buildInteractionToolPrompt(toolIds: string[]): string {

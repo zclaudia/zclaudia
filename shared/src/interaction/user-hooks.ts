@@ -76,7 +76,7 @@ export function parseUserHooks(raw: unknown): { hooks: UserHookDefinition[]; war
 export function matchesToolRule(
   rule: { toolName: string; pattern?: string },
   toolName: string,
-  detail: string,
+  detail: string
 ): boolean {
   if (rule.toolName !== '*' && rule.toolName !== toolName) return false;
   if (!rule.pattern) return true;

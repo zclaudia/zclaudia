@@ -92,7 +92,10 @@ describe('MessageInput', () => {
     fireEvent.change(textarea, { target: { value: 'draft text' } });
     expect(mockSetDraft).not.toHaveBeenCalled();
     vi.advanceTimersByTime(300);
-    expect(mockSetDraft).toHaveBeenCalledWith('session-1', { content: 'draft text', attachments: [] });
+    expect(mockSetDraft).toHaveBeenCalledWith('session-1', {
+      content: 'draft text',
+      attachments: [],
+    });
   });
 
   it('renders with initialValue', () => {
@@ -382,7 +385,9 @@ describe('MessageInput', () => {
 
     it('restores scrolling when switching to advanced mode', () => {
       const { rerender } = render(<MessageInput {...defaultProps} />);
-      const collapsedTextarea = screen.getByPlaceholderText(/Type a message/) as HTMLTextAreaElement;
+      const collapsedTextarea = screen.getByPlaceholderText(
+        /Type a message/
+      ) as HTMLTextAreaElement;
       fireEvent.change(collapsedTextarea, { target: { value: 'short' } });
       expect(collapsedTextarea.style.overflowY).toBe('hidden');
       rerender(<MessageInput {...defaultProps} advancedMode />);
@@ -393,7 +398,9 @@ describe('MessageInput', () => {
     it('keeps collapsed desktop textarea capped to a single-line height', () => {
       render(<MessageInput {...defaultProps} />);
       const textarea = screen.getByPlaceholderText(/Type a message/) as HTMLTextAreaElement;
-      fireEvent.change(textarea, { target: { value: 'long content that should still cap the collapsed composer height' } });
+      fireEvent.change(textarea, {
+        target: { value: 'long content that should still cap the collapsed composer height' },
+      });
       expect(textarea.style.maxHeight).toBe('24px');
     });
 
@@ -431,7 +438,9 @@ describe('MessageInput', () => {
       const row = screen.getByTestId('composer-box');
       expect(row.className).toContain('items-center');
       expect(row.className).not.toContain('items-end');
-      expect(screen.getByTitle('Add attachment (images, files)').className).not.toContain('self-end');
+      expect(screen.getByTitle('Add attachment (images, files)').className).not.toContain(
+        'self-end'
+      );
       expect(screen.getByTestId('send-button').className).not.toContain('self-end');
     });
   });
@@ -453,7 +462,13 @@ describe('MessageInput', () => {
 
     it('shows attachment preview with initialAttachments', () => {
       const initialAttachments = [
-        { id: 'att-1', type: 'image' as const, name: 'photo.png', data: 'data:image/png;base64,abc', mimeType: 'image/png' },
+        {
+          id: 'att-1',
+          type: 'image' as const,
+          name: 'photo.png',
+          data: 'data:image/png;base64,abc',
+          mimeType: 'image/png',
+        },
       ];
       render(<MessageInput {...defaultProps} initialAttachments={initialAttachments} />);
       expect(screen.getByLabelText('Remove attachment photo.png')).toBeInTheDocument();
@@ -461,7 +476,13 @@ describe('MessageInput', () => {
 
     it('removes attachment when remove button is clicked', () => {
       const initialAttachments = [
-        { id: 'att-1', type: 'image' as const, name: 'photo.png', data: 'data:image/png;base64,abc', mimeType: 'image/png' },
+        {
+          id: 'att-1',
+          type: 'image' as const,
+          name: 'photo.png',
+          data: 'data:image/png;base64,abc',
+          mimeType: 'image/png',
+        },
       ];
       render(<MessageInput {...defaultProps} initialAttachments={initialAttachments} />);
       fireEvent.click(screen.getByLabelText('Remove attachment photo.png'));
@@ -471,9 +492,17 @@ describe('MessageInput', () => {
     it('can send with only attachments and no text', () => {
       const onSend = vi.fn();
       const initialAttachments = [
-        { id: 'att-1', type: 'image' as const, name: 'photo.png', data: 'data:image/png;base64,abc', mimeType: 'image/png' },
+        {
+          id: 'att-1',
+          type: 'image' as const,
+          name: 'photo.png',
+          data: 'data:image/png;base64,abc',
+          mimeType: 'image/png',
+        },
       ];
-      render(<MessageInput {...defaultProps} onSend={onSend} initialAttachments={initialAttachments} />);
+      render(
+        <MessageInput {...defaultProps} onSend={onSend} initialAttachments={initialAttachments} />
+      );
       const sendBtn = screen.getByTestId('send-button');
       expect(sendBtn).not.toBeDisabled();
       fireEvent.click(sendBtn);
@@ -483,7 +512,13 @@ describe('MessageInput', () => {
     it('persists attachment-only draft after debounce', () => {
       vi.useFakeTimers();
       const initialAttachments = [
-        { id: 'att-1', type: 'image' as const, name: 'photo.png', data: 'data:image/png;base64,abc', mimeType: 'image/png' },
+        {
+          id: 'att-1',
+          type: 'image' as const,
+          name: 'photo.png',
+          data: 'data:image/png;base64,abc',
+          mimeType: 'image/png',
+        },
       ];
       render(<MessageInput {...defaultProps} initialAttachments={initialAttachments} />);
       fireEvent.click(screen.getByLabelText('Remove attachment photo.png'));

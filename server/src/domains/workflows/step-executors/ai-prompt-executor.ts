@@ -16,13 +16,13 @@ export class AIPromptStepExecutor implements StepExecutorPort {
 
   constructor(
     private readonly agentLoopRunner: AgentLoopRunnerPort,
-    private readonly agentRuntime: WorkflowAgentRuntimePort,
+    private readonly agentRuntime: WorkflowAgentRuntimePort
   ) {}
 
   async execute(
     node: WorkflowNodeDef,
     config: Record<string, unknown>,
-    ctx: StepContext,
+    ctx: StepContext
   ): Promise<StepResult> {
     const prompt = config.prompt as string;
     if (!prompt) return { status: 'failed', output: {}, error: 'No prompt specified' };
@@ -34,7 +34,8 @@ export class AIPromptStepExecutor implements StepExecutorPort {
 
     const toolsetId = typeof config.toolset === 'string' ? config.toolset : DEFAULT_TOOLSET_ID;
     const toolsetDescriptor = getAgentLoopToolsetDescriptor(toolsetId);
-    if (!toolsetDescriptor) return { status: 'failed', output: {}, error: `Unknown agent-loop toolset: ${toolsetId}` };
+    if (!toolsetDescriptor)
+      return { status: 'failed', output: {}, error: `Unknown agent-loop toolset: ${toolsetId}` };
 
     const maxTurns = typeof config.maxTurns === 'number' ? config.maxTurns : undefined;
 
@@ -48,7 +49,8 @@ export class AIPromptStepExecutor implements StepExecutorPort {
         llmProfileId,
         model: typeof config.model === 'string' ? config.model : undefined,
         baseSystemPrompt: typeof config.systemPrompt === 'string' ? config.systemPrompt : undefined,
-        systemContext: 'You are executing a workflow AI prompt. Return JSON that satisfies the requested contract.',
+        systemContext:
+          'You are executing a workflow AI prompt. Return JSON that satisfies the requested contract.',
       });
       const permissions = buildRuntimePermissions(runtime);
       const result = await this.agentLoopRunner.run({
@@ -107,7 +109,7 @@ export class AIPromptStepExecutor implements StepExecutorPort {
 }
 
 function buildRuntimePermissions(
-  runtime: Awaited<ReturnType<WorkflowAgentRuntimePort['resolve']>>,
+  runtime: Awaited<ReturnType<WorkflowAgentRuntimePort['resolve']>>
 ) {
   const userHooks = runtime.userHooks?.length ? runtime.userHooks : undefined;
   if (!userHooks && !runtime.permissionCallback && !runtime.toolSessionId) return undefined;

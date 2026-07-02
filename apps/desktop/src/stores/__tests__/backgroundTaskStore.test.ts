@@ -6,7 +6,11 @@ vi.mock('../../services/api', () => ({
   getProcessInfo: vi.fn(),
 }));
 
-const makeTask = (id: string, sessionId = 'sess-1', status: BackgroundTask['status'] = 'started'): BackgroundTask => ({
+const makeTask = (
+  id: string,
+  sessionId = 'sess-1',
+  status: BackgroundTask['status'] = 'started'
+): BackgroundTask => ({
   id,
   sessionId,
   description: `Task ${id}`,
@@ -102,7 +106,7 @@ describe('backgroundTaskStore', () => {
 
     const tasks = useBackgroundTaskStore.getState().getTasksBySession('sess-1');
     expect(tasks).toHaveLength(2);
-    expect(tasks.map((t) => t.id).sort()).toEqual(['t1', 't3']);
+    expect(tasks.map(t => t.id).sort()).toEqual(['t1', 't3']);
   });
 
   it('getTasksBySession returns empty for unknown session', () => {

@@ -15,12 +15,12 @@ interface Props {
 }
 
 export function AnonymousManagementPanel({ projectId }: Props): React.ReactElement {
-  const anonymous = useOpenSpecStore((s) =>
-    (s.issuesByProject[projectId] ?? []).filter((i) => i.isAnonymous),
+  const anonymous = useOpenSpecStore(s =>
+    (s.issuesByProject[projectId] ?? []).filter(i => i.isAnonymous)
   );
-  const upsertIssue = useOpenSpecStore((s) => s.upsertIssue);
-  const setIssues = useOpenSpecStore((s) => s.setIssues);
-  const patchView = useOpenSpecStore((s) => s.patchView);
+  const upsertIssue = useOpenSpecStore(s => s.upsertIssue);
+  const setIssues = useOpenSpecStore(s => s.setIssues);
+  const patchView = useOpenSpecStore(s => s.patchView);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,8 +28,8 @@ export function AnonymousManagementPanel({ projectId }: Props): React.ReactEleme
   const refresh = useCallback((): void => {
     api
       .listIssues(projectId)
-      .then((rows) => setIssues(projectId, rows))
-      .catch((e) => console.error('[openspec] listIssues failed', e));
+      .then(rows => setIssues(projectId, rows))
+      .catch(e => console.error('[openspec] listIssues failed', e));
   }, [projectId, setIssues]);
 
   useEffect(() => {
@@ -37,7 +37,7 @@ export function AnonymousManagementPanel({ projectId }: Props): React.ReactEleme
   }, [refresh]);
 
   const toggle = (id: string): void => {
-    setSelected((prev) => {
+    setSelected(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -48,10 +48,8 @@ export function AnonymousManagementPanel({ projectId }: Props): React.ReactEleme
   const selectAllOpen = (): void => {
     setSelected(
       new Set(
-        anonymous
-          .filter((i) => i.status !== 'closed' && i.status !== 'cancelled')
-          .map((i) => i.id),
-      ),
+        anonymous.filter(i => i.status !== 'closed' && i.status !== 'cancelled').map(i => i.id)
+      )
     );
   };
 
@@ -72,7 +70,7 @@ export function AnonymousManagementPanel({ projectId }: Props): React.ReactEleme
   };
 
   const closedCount = anonymous.filter(
-    (i) => i.status === 'closed' || i.status === 'cancelled',
+    i => i.status === 'closed' || i.status === 'cancelled'
   ).length;
   const openCount = anonymous.length - closedCount;
 
@@ -128,7 +126,7 @@ export function AnonymousManagementPanel({ projectId }: Props): React.ReactEleme
         </div>
       ) : (
         <ul className="space-y-1.5">
-          {anonymous.map((i) => (
+          {anonymous.map(i => (
             <li
               key={i.id}
               className="border border-border rounded-md p-2 bg-card flex items-center gap-2"

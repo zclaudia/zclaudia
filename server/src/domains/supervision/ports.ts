@@ -35,7 +35,10 @@ export interface SupervisionSchedulingPort {
 export interface SupervisionProjectPort {
   findById(id: string): Project | undefined;
   findAll(): Project[];
-  update(id: string, data: { agent?: ProjectAgent | null; contextSyncStatus?: 'synced' | 'error' }): Project;
+  update(
+    id: string,
+    data: { agent?: ProjectAgent | null; contextSyncStatus?: 'synced' | 'error' }
+  ): Project;
 }
 
 // ── Cross-domain: Sessions ───────────────────────────────────────────

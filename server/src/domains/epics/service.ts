@@ -57,7 +57,7 @@ export class EpicService {
     }
     return this.repo.update(epicId, {
       status: next,
-      closedAt: (next === 'closed' || next === 'cancelled') ? Date.now() : undefined,
+      closedAt: next === 'closed' || next === 'cancelled' ? Date.now() : undefined,
     });
   }
 
@@ -73,7 +73,7 @@ export class EpicService {
     const rows = db
       .prepare(`SELECT * FROM local_issues WHERE epic_id = ? ORDER BY created_at ASC`)
       .all(epicId) as Array<Record<string, unknown>>;
-    return rows.map((row) => ({
+    return rows.map(row => ({
       id: row.id as string,
       projectId: row.project_id as string,
       title: row.title as string,

@@ -54,19 +54,24 @@ export function normalizeAIReviewDecision(value: unknown): 'approve' | 'deny' | 
   }
 }
 
-export function normalizeAIReviewModelResponse(parsed: Record<string, unknown>): AIReviewModelResponse | null {
-  const normalizedType = typeof parsed.type === 'string' ? parsed.type.trim().toLowerCase() : undefined;
+export function normalizeAIReviewModelResponse(
+  parsed: Record<string, unknown>
+): AIReviewModelResponse | null {
+  const normalizedType =
+    typeof parsed.type === 'string' ? parsed.type.trim().toLowerCase() : undefined;
 
   if (
-    normalizedType === 'read_file'
-    || (typeof parsed.path === 'string' && normalizeAIReviewDecision(parsed.decision ?? parsed.label ?? parsed.verdict) === null)
+    normalizedType === 'read_file' ||
+    (typeof parsed.path === 'string' &&
+      normalizeAIReviewDecision(parsed.decision ?? parsed.label ?? parsed.verdict) === null)
   ) {
     if (typeof parsed.path !== 'string' || !parsed.path.trim()) return null;
-    const reason = typeof parsed.reason === 'string'
-      ? parsed.reason
-      : typeof parsed.reasoning === 'string'
-        ? parsed.reasoning
-        : undefined;
+    const reason =
+      typeof parsed.reason === 'string'
+        ? parsed.reason
+        : typeof parsed.reasoning === 'string'
+          ? parsed.reasoning
+          : undefined;
     return {
       type: 'read_file',
       path: parsed.path.trim(),
@@ -77,13 +82,14 @@ export function normalizeAIReviewModelResponse(parsed: Record<string, unknown>):
   const decision = normalizeAIReviewDecision(parsed.decision ?? parsed.label ?? parsed.verdict);
   if (!decision) return null;
 
-  const reasoning = typeof parsed.reasoning === 'string'
-    ? parsed.reasoning
-    : typeof parsed.reason === 'string'
-      ? parsed.reason
-      : typeof parsed.explanation === 'string'
-        ? parsed.explanation
-        : 'No reasoning provided';
+  const reasoning =
+    typeof parsed.reasoning === 'string'
+      ? parsed.reasoning
+      : typeof parsed.reason === 'string'
+        ? parsed.reason
+        : typeof parsed.explanation === 'string'
+          ? parsed.explanation
+          : 'No reasoning provided';
 
   return {
     type: 'final',
@@ -287,7 +293,10 @@ export function parseCandidateJSONObject(jsonCandidate: string): AIReviewModelRe
     parsed = JSON.parse(jsonCandidate) as Record<string, unknown>;
   } catch {
     try {
-      parsed = JSON.parse(sanitizeJSONControlCharsInStrings(jsonCandidate)) as Record<string, unknown>;
+      parsed = JSON.parse(sanitizeJSONControlCharsInStrings(jsonCandidate)) as Record<
+        string,
+        unknown
+      >;
     } catch {
       const salvaged = salvageMalformedAIReviewResponse(jsonCandidate);
       if (salvaged) return salvaged;

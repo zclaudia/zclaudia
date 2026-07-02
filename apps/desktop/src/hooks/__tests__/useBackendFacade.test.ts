@@ -91,7 +91,20 @@ describe('useBackendFacade run_event forwarding', () => {
     } as any);
     useSessionsStore.setState({
       remoteSessions: new Map([
-        ['remote-1', [{ id: 'session-1', projectId: '', name: 'Session 1', createdAt: 1, updatedAt: 1, isActive: true, type: 'regular' }]],
+        [
+          'remote-1',
+          [
+            {
+              id: 'session-1',
+              projectId: '',
+              name: 'Session 1',
+              createdAt: 1,
+              updatedAt: 1,
+              isActive: true,
+              type: 'regular',
+            },
+          ],
+        ],
       ]),
       activeSessionIdsByBackend: new Map([['remote-1', new Set(['session-1'])]]),
       recentlyCompletedSessions: [],
@@ -139,7 +152,7 @@ describe('useBackendFacade run_event forwarding', () => {
         serverId: 'local-standalone',
         backendId: 'local-standalone',
         logTag: 'Facade:local-standalone',
-      }),
+      })
     );
   });
 
@@ -162,7 +175,7 @@ describe('useBackendFacade run_event forwarding', () => {
         serverId: 'local-standalone',
         backendId: 'local-standalone',
         logTag: 'Facade:local-standalone',
-      }),
+      })
     );
   });
 
@@ -280,9 +293,7 @@ describe('useBackendFacade run_event forwarding', () => {
       ...useFacadeStore.getState(),
       facade: {
         getSnapshot: () => ({
-          backends: [
-            { backendId: 'remote-1', openState: 'unsubscribed', runtimeState: 'visible' },
-          ],
+          backends: [{ backendId: 'remote-1', openState: 'unsubscribed', runtimeState: 'visible' }],
         }),
         openBackend,
       } as any,
@@ -352,8 +363,12 @@ describe('useBackendFacade run_event forwarding', () => {
     } as any);
 
     expect(useRunStore.getState().activeRuns['run-1']).toBe('session-1');
-    expect(useProjectStore.getState().sessions.find((s) => s.id === 'session-1')?.lastRunStatus).toBeUndefined();
-    expect(Array.from(useSessionsStore.getState().activeSessionIdsByBackend.get('remote-1') ?? [])).toEqual(['session-1']);
+    expect(
+      useProjectStore.getState().sessions.find(s => s.id === 'session-1')?.lastRunStatus
+    ).toBeUndefined();
+    expect(
+      Array.from(useSessionsStore.getState().activeSessionIdsByBackend.get('remote-1') ?? [])
+    ).toEqual(['session-1']);
     expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
       type: 'error',
       title: 'Remote connection lost',
@@ -367,7 +382,14 @@ describe('useBackendFacade run_event forwarding', () => {
       backendId: 'remote-1',
       sessions: [
         { sessionId: 'session-1', title: 'Active', createdAt: 1, updatedAt: 2, runStatus: 'idle' },
-        { sessionId: 'session-archived', title: 'Archived', createdAt: 3, updatedAt: 4, runStatus: 'idle', archived: true },
+        {
+          sessionId: 'session-archived',
+          title: 'Archived',
+          createdAt: 3,
+          updatedAt: 4,
+          runStatus: 'idle',
+          archived: true,
+        },
       ],
       projects: [],
     } as any);
@@ -380,7 +402,16 @@ describe('useBackendFacade run_event forwarding', () => {
   it('backend_data_snapshot initializes recoveryStore data sync as ready and stamps ownership', () => {
     useRecoveryStore.setState({
       backends: {
-        'remote-1': { backendId: 'remote-1', status: 'ready', subscribed: true, dataReady: false, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() },
+        'remote-1': {
+          backendId: 'remote-1',
+          status: 'ready',
+          subscribed: true,
+          dataReady: false,
+          retryCount: 0,
+          lastError: null,
+          lastCloseReason: null,
+          statusEnteredAt: Date.now(),
+        },
       },
       dataSyncs: {},
       nextOwnershipVersion: 1,
@@ -463,14 +494,60 @@ describe('useBackendFacade run_event forwarding', () => {
     expect(useToastStore.getState().toasts).toEqual([]);
   });
 
+  it('cleans legacy stores when backends are removed from the registry', () => {
+    useProjectStore.getState().replaceProjectsForBackend('remote-1', [
+      {
+        id: 'project-1',
+        name: 'Remote Project',
+        type: 'code',
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ]);
+
+    expect(useSessionsStore.getState().remoteSessions.has('remote-1')).toBe(true);
+    expect(useOwnershipStore.getState().getSessionBackendId('session-1')).toBe('remote-1');
+    expect(useOwnershipStore.getState().getProjectBackendId('project-1')).toBe('remote-1');
+
+    syncToGatewayStore({
+      type: 'backends_removed',
+      backendIds: ['remote-1'],
+    } as any);
+
+    expect(useSessionsStore.getState().remoteSessions.has('remote-1')).toBe(false);
+    expect(useSessionsStore.getState().activeSessionIdsByBackend.has('remote-1')).toBe(false);
+    expect(useProjectStore.getState().projects).toEqual([]);
+    expect(useOwnershipStore.getState().getSessionBackendId('session-1')).toBeNull();
+    expect(useOwnershipStore.getState().getProjectBackendId('project-1')).toBeNull();
+  });
+
   it('removes archived sessions on backend data upsert events', () => {
     useSessionsStore.setState({
       ...useSessionsStore.getState(),
       remoteSessions: new Map([
-        ['remote-1', [
-          { id: 'session-1', projectId: '', name: 'Session 1', createdAt: 1, updatedAt: 1, isActive: false, type: 'regular' },
-          { id: 'session-2', projectId: '', name: 'Session 2', createdAt: 2, updatedAt: 2, isActive: false, type: 'regular' },
-        ]],
+        [
+          'remote-1',
+          [
+            {
+              id: 'session-1',
+              projectId: '',
+              name: 'Session 1',
+              createdAt: 1,
+              updatedAt: 1,
+              isActive: false,
+              type: 'regular',
+            },
+            {
+              id: 'session-2',
+              projectId: '',
+              name: 'Session 2',
+              createdAt: 2,
+              updatedAt: 2,
+              isActive: false,
+              type: 'regular',
+            },
+          ],
+        ],
       ]),
       activeSessionIdsByBackend: new Map([['remote-1', new Set()]]),
     } as any);
@@ -506,7 +583,9 @@ describe('useBackendFacade run_event forwarding', () => {
     });
     useProjectStore.setState({
       ...useProjectStore.getState(),
-      projects: [{ id: 'project-1', name: 'Local Project', type: 'code', createdAt: 1, updatedAt: 1 }],
+      projects: [
+        { id: 'project-1', name: 'Local Project', type: 'code', createdAt: 1, updatedAt: 1 },
+      ],
     } as any);
     useOwnershipStore.setState({
       ...useOwnershipStore.getState(),
@@ -631,17 +710,29 @@ describe('useBackendFacade run_event forwarding', () => {
       sendMessage: vi.fn(),
       getTheme: () => ({}) as any,
       factories: {
-        createTerminal: () => ({
-          cols: 80, rows: 24, options: {}, open: vi.fn(), dispose: vi.fn(),
-          loadAddon: vi.fn(), write: vi.fn(), writeln: vi.fn(), focus: vi.fn(),
-          onData: () => ({ dispose: vi.fn() }),
-        } as any),
-        createFitAddon: () => ({ fit: vi.fn(), dispose: vi.fn(), activate: vi.fn() } as any),
+        createTerminal: () =>
+          ({
+            cols: 80,
+            rows: 24,
+            options: {},
+            open: vi.fn(),
+            dispose: vi.fn(),
+            loadAddon: vi.fn(),
+            write: vi.fn(),
+            writeln: vi.fn(),
+            focus: vi.fn(),
+            onData: () => ({ dispose: vi.fn() }),
+          }) as any,
+        createFitAddon: () => ({ fit: vi.fn(), dispose: vi.fn(), activate: vi.fn() }) as any,
       },
     });
     // Drive controller into 'open' so detach is allowed
     t1.open({ projectId: 'project-1' });
-    t1.handleServerMessage({ type: 'terminal_opened', terminalId: 'terminal-1', success: true } as any);
+    t1.handleServerMessage({
+      type: 'terminal_opened',
+      terminalId: 'terminal-1',
+      success: true,
+    } as any);
 
     useTerminalStore.setState({
       ...useTerminalStore.getState(),
@@ -668,16 +759,28 @@ describe('useBackendFacade run_event forwarding', () => {
       sendMessage: vi.fn(),
       getTheme: () => ({}) as any,
       factories: {
-        createTerminal: () => ({
-          cols: 80, rows: 24, options: {}, open: vi.fn(), dispose: vi.fn(),
-          loadAddon: vi.fn(), write: vi.fn(), writeln: vi.fn(), focus: vi.fn(),
-          onData: () => ({ dispose: vi.fn() }),
-        } as any),
-        createFitAddon: () => ({ fit: vi.fn(), dispose: vi.fn(), activate: vi.fn() } as any),
+        createTerminal: () =>
+          ({
+            cols: 80,
+            rows: 24,
+            options: {},
+            open: vi.fn(),
+            dispose: vi.fn(),
+            loadAddon: vi.fn(),
+            write: vi.fn(),
+            writeln: vi.fn(),
+            focus: vi.fn(),
+            onData: () => ({ dispose: vi.fn() }),
+          }) as any,
+        createFitAddon: () => ({ fit: vi.fn(), dispose: vi.fn(), activate: vi.fn() }) as any,
       },
     });
     t1.open({ projectId: 'project-1' });
-    t1.handleServerMessage({ type: 'terminal_opened', terminalId: 'terminal-1', success: true } as any);
+    t1.handleServerMessage({
+      type: 'terminal_opened',
+      terminalId: 'terminal-1',
+      success: true,
+    } as any);
 
     useTerminalStore.setState({
       ...useTerminalStore.getState(),

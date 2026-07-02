@@ -15,13 +15,25 @@ export interface EvalBridgeToolOptions {
   sandboxReadOnly?: boolean;
 }
 
-function parseEvalTimeout(value: unknown): { ok: true; timeoutMs?: number } | { ok: false; message: string; details: Record<string, unknown> } {
+function parseEvalTimeout(
+  value: unknown
+):
+  | { ok: true; timeoutMs?: number }
+  | { ok: false; message: string; details: Record<string, unknown> } {
   if (value === undefined) return { ok: true };
   if (typeof value !== 'number' || !Number.isFinite(value) || !Number.isInteger(value)) {
-    return { ok: false, message: 'Eval timeout must be an integer number of seconds', details: { value } };
+    return {
+      ok: false,
+      message: 'Eval timeout must be an integer number of seconds',
+      details: { value },
+    };
   }
   if (value < 1 || value > 600) {
-    return { ok: false, message: 'Eval timeout must be between 1 and 600 seconds', details: { value, min: 1, max: 600 } };
+    return {
+      ok: false,
+      message: 'Eval timeout must be between 1 and 600 seconds',
+      details: { value, min: 1, max: 600 },
+    };
   }
   return { ok: true, timeoutMs: value * 1000 };
 }
@@ -30,14 +42,28 @@ export function createEvalBridgeTool(cwd: string, options?: EvalBridgeToolOption
   return {
     name: 'Eval',
     label: 'Eval',
-    description: 'Run JavaScript in a persistent per-session Node kernel. Best for arithmetic, parsing already-structured data (JSON in scope, numbers, dates), and transforms over values that live in kernel state from earlier cells. var/function/const declarations persist between cells. Cells containing `await` run in an async wrapper: use `return` for the result value and globalThis.x for cross-cell persistence. console output is captured. Runs under the same sandbox policy as Bash. Set reset:true to start a fresh kernel. Do NOT paste raw search/grep output into the code as string literals to filter it — unescaped quotes break parsing; pipe through Bash/Grep with the right flags (or write a small Bash one-liner) instead.',
+    description:
+      'Run JavaScript in a persistent per-session Node kernel. Best for arithmetic, parsing already-structured data (JSON in scope, numbers, dates), and transforms over values that live in kernel state from earlier cells. var/function/const declarations persist between cells. Cells containing `await` run in an async wrapper: use `return` for the result value and globalThis.x for cross-cell persistence. console output is captured. Runs under the same sandbox policy as Bash. Set reset:true to start a fresh kernel. Do NOT paste raw search/grep output into the code as string literals to filter it — unescaped quotes break parsing; pipe through Bash/Grep with the right flags (or write a small Bash one-liner) instead.',
     parameters: {
       type: 'object',
       properties: {
         code: { type: 'string', description: 'JavaScript code to evaluate' },
-        timeout: { type: 'number', description: 'Per-cell timeout in seconds (default 30, max 600). On timeout the kernel restarts and state is lost.' },
-        reset: { type: 'boolean', default: false, description: 'Discard kernel state before running' },
-        run_in_background: { type: 'boolean', default: false, description: 'Run this code as an isolated one-shot background task. Does not use or mutate the persistent Eval kernel.' },
+        timeout: {
+          type: 'number',
+          description:
+            'Per-cell timeout in seconds (default 30, max 600). On timeout the kernel restarts and state is lost.',
+        },
+        reset: {
+          type: 'boolean',
+          default: false,
+          description: 'Discard kernel state before running',
+        },
+        run_in_background: {
+          type: 'boolean',
+          default: false,
+          description:
+            'Run this code as an isolated one-shot background task. Does not use or mutate the persistent Eval kernel.',
+        },
       },
       required: ['code'],
     } as any,
@@ -58,11 +84,15 @@ export function createEvalBridgeTool(cwd: string, options?: EvalBridgeToolOption
           {
             path: sensitivePath.path,
             reason: sensitivePath.reason,
-          },
+          }
         );
       }
       if (args.run_in_background === true) {
-        if (!options?.db) return errorResult('missing_db_context', 'Eval background execution requires database context');
+        if (!options?.db)
+          return errorResult(
+            'missing_db_context',
+            'Eval background execution requires database context'
+          );
         const repo = new TaskRepository(options.db);
         const service = new TaskService(repo);
         const task = service.createTask({

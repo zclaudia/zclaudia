@@ -1,16 +1,43 @@
 import type { ContextGraph, GraphNode } from '@zclaudia/shared';
 
-export interface LayoutNode { nodeId: string; sessionId: string; x: number; y: number; node: GraphNode; archived: boolean; }
-export interface LayoutEdge {
-  id: string; kind: 'message' | 'fork';
-  fromX: number; fromY: number; toX: number; toY: number;
-  messageCount: number; dimmed: boolean;
+export interface LayoutNode {
+  nodeId: string;
+  sessionId: string;
+  x: number;
+  y: number;
+  node: GraphNode;
+  archived: boolean;
 }
-export interface LayoutBadge { branchNodeId: string; x: number; y: number; count: number; }
-export interface LayoutLaneLabel { sessionId: string; name: string | null; x: number; archived: boolean; }
+export interface LayoutEdge {
+  id: string;
+  kind: 'message' | 'fork';
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+  messageCount: number;
+  dimmed: boolean;
+}
+export interface LayoutBadge {
+  branchNodeId: string;
+  x: number;
+  y: number;
+  count: number;
+}
+export interface LayoutLaneLabel {
+  sessionId: string;
+  name: string | null;
+  x: number;
+  archived: boolean;
+}
 export interface LayoutModel {
-  nodes: LayoutNode[]; edges: LayoutEdge[]; badges: LayoutBadge[];
-  laneLabels: LayoutLaneLabel[]; width: number; height: number; truncated: boolean;
+  nodes: LayoutNode[];
+  edges: LayoutEdge[];
+  badges: LayoutBadge[];
+  laneLabels: LayoutLaneLabel[];
+  width: number;
+  height: number;
+  truncated: boolean;
 }
 
 export const LANE_GAP = 130;
@@ -21,9 +48,10 @@ export const MARGIN_TOP = 36;
 export const MAX_SUBLANES = 3;
 
 export function computeLayout(graph: ContextGraph): LayoutModel {
-  const nodeById = new Map(graph.nodes.map((n) => [n.nodeId, n]));
-  const laneBySession = new Map(graph.sessions.map((s) => [s.id, s]));
-  const baseX = (sessionId: string) => MARGIN_X + (laneBySession.get(sessionId)?.laneOrder ?? 0) * LANE_GAP;
+  const nodeById = new Map(graph.nodes.map(n => [n.nodeId, n]));
+  const laneBySession = new Map(graph.sessions.map(s => [s.id, s]));
+  const baseX = (sessionId: string) =>
+    MARGIN_X + (laneBySession.get(sessionId)?.laneOrder ?? 0) * LANE_GAP;
 
   const childrenByParent = new Map<string, GraphNode[]>();
   for (const n of graph.nodes) {
@@ -33,7 +61,10 @@ export function computeLayout(graph: ContextGraph): LayoutModel {
     childrenByParent.set(n.parentNodeId, arr);
   }
   for (const arr of childrenByParent.values()) {
-    arr.sort((a, b) => (Number(b.onActivePath) - Number(a.onActivePath)) || a.timestamp.localeCompare(b.timestamp));
+    arr.sort(
+      (a, b) =>
+        Number(b.onActivePath) - Number(a.onActivePath) || a.timestamp.localeCompare(b.timestamp)
+    );
   }
 
   // nodes grouped by session (built once; avoids filter-in-loop).
@@ -51,12 +82,13 @@ export function computeLayout(graph: ContextGraph): LayoutModel {
     const lane = laneBySession.get(sessionId);
     const inSession = nodesBySession.get(sessionId) ?? [];
     if (lane?.forkedFromSessionId && lane.forkEntryId) {
-      const fb = inSession.find((n) => n.isForkBase) ?? inSession.find((n) => n.entryId === lane.forkEntryId);
+      const fb =
+        inSession.find(n => n.isForkBase) ?? inSession.find(n => n.entryId === lane.forkEntryId);
       return fb ? [fb] : [];
     }
-    const explicit = inSession.find((n) => n.isRoot);
+    const explicit = inSession.find(n => n.isRoot);
     if (explicit) return [explicit];
-    return inSession.filter((n) => !n.parentNodeId || !nodeById.has(n.parentNodeId));
+    return inSession.filter(n => !n.parentNodeId || !nodeById.has(n.parentNodeId));
   };
 
   const depthByNodeId = new Map<string, number>();
@@ -83,14 +115,19 @@ export function computeLayout(graph: ContextGraph): LayoutModel {
         rootSublane = nextSublane++; // extra dangling root → its own dogleg column
       }
 
-      const stack: Array<{ node: GraphNode; depth: number; sublane: number }> = [{ node: root, depth: rootDepth, sublane: rootSublane }];
+      const stack: Array<{ node: GraphNode; depth: number; sublane: number }> = [
+        { node: root, depth: rootDepth, sublane: rootSublane },
+      ];
       while (stack.length) {
         const { node, depth, sublane } = stack.pop()!;
         if (placed.has(node.nodeId)) continue;
         depthByNodeId.set(node.nodeId, depth);
         placed.set(node.nodeId, {
-          nodeId: node.nodeId, sessionId: node.sessionId,
-          x: baseX(lane.id) + sublane * SUBLANE_GAP, y: MARGIN_TOP + depth * ROW_GAP, node,
+          nodeId: node.nodeId,
+          sessionId: node.sessionId,
+          x: baseX(lane.id) + sublane * SUBLANE_GAP,
+          y: MARGIN_TOP + depth * ROW_GAP,
+          node,
           archived: lane.archived,
         });
         const kids = childrenByParent.get(node.nodeId) ?? [];
@@ -98,9 +135,15 @@ export function computeLayout(graph: ContextGraph): LayoutModel {
         let degraded = 0;
         const frames: Array<{ node: GraphNode; depth: number; sublane: number }> = [];
         kids.forEach((kid, i) => {
-          if (i === 0) { frames.push({ node: kid, depth: depth + 1, sublane }); return; }
+          if (i === 0) {
+            frames.push({ node: kid, depth: depth + 1, sublane });
+            return;
+          }
           doglegCount++;
-          if (doglegCount >= MAX_SUBLANES) { degraded++; return; }
+          if (doglegCount >= MAX_SUBLANES) {
+            degraded++;
+            return;
+          }
           frames.push({ node: kid, depth: depth + 1, sublane: nextSublane++ });
         });
         if (degraded > 0) {
@@ -118,8 +161,12 @@ export function computeLayout(graph: ContextGraph): LayoutModel {
     if (p && p.sessionId === ln.sessionId) {
       const lane = laneBySession.get(ln.sessionId);
       edges.push({
-        id: `m:${p.nodeId}->${ln.nodeId}`, kind: 'message',
-        fromX: p.x, fromY: p.y, toX: ln.x, toY: ln.y,
+        id: `m:${p.nodeId}->${ln.nodeId}`,
+        kind: 'message',
+        fromX: p.x,
+        fromY: p.y,
+        toX: ln.x,
+        toY: ln.y,
         messageCount: ln.node.incomingMessageCount,
         dimmed: !ln.node.onActivePath || !!lane?.archived,
       });
@@ -131,18 +178,26 @@ export function computeLayout(graph: ContextGraph): LayoutModel {
     if (!from || !to) continue;
     const childLane = laneBySession.get(fe.toSessionId);
     edges.push({
-      id: `f:${fe.fromNodeId}->${fe.toNodeId}`, kind: 'fork',
-      fromX: from.x, fromY: from.y, toX: to.x, toY: to.y,
-      messageCount: 0, dimmed: !!childLane?.archived,
+      id: `f:${fe.fromNodeId}->${fe.toNodeId}`,
+      kind: 'fork',
+      fromX: from.x,
+      fromY: from.y,
+      toX: to.x,
+      toY: to.y,
+      messageCount: 0,
+      dimmed: !!childLane?.archived,
     });
   }
 
-  const laneLabels: LayoutLaneLabel[] = sessionsInOrder.map((s) => ({
-    sessionId: s.id, name: s.name, x: baseX(s.id), archived: s.archived,
+  const laneLabels: LayoutLaneLabel[] = sessionsInOrder.map(s => ({
+    sessionId: s.id,
+    name: s.name,
+    x: baseX(s.id),
+    archived: s.archived,
   }));
 
   const nodes = [...placed.values()];
-  const width = (nodes.length ? Math.max(...nodes.map((n) => n.x)) : MARGIN_X) + MARGIN_X;
-  const height = (nodes.length ? Math.max(...nodes.map((n) => n.y)) : MARGIN_TOP) + ROW_GAP;
+  const width = (nodes.length ? Math.max(...nodes.map(n => n.x)) : MARGIN_X) + MARGIN_X;
+  const height = (nodes.length ? Math.max(...nodes.map(n => n.y)) : MARGIN_TOP) + ROW_GAP;
   return { nodes, edges, badges, laneLabels, width, height, truncated: graph.truncated };
 }

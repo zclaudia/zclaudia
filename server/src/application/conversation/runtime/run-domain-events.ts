@@ -46,7 +46,7 @@ export const RUN_DOMAIN_EVENT_TYPES = [
   'run.phaseChanged',
 ] as const;
 
-export type RunDomainEventType = typeof RUN_DOMAIN_EVENT_TYPES[number];
+export type RunDomainEventType = (typeof RUN_DOMAIN_EVENT_TYPES)[number];
 
 export const PUBLIC_RUN_DOMAIN_EVENT_TYPES = [
   'run.started',
@@ -70,11 +70,13 @@ export const PUBLIC_RUN_DOMAIN_EVENT_TYPES = [
   'run.phaseChanged',
 ] as const satisfies readonly RunDomainEventType[];
 
-export type PublicRunDomainEventType = typeof PUBLIC_RUN_DOMAIN_EVENT_TYPES[number];
+export type PublicRunDomainEventType = (typeof PUBLIC_RUN_DOMAIN_EVENT_TYPES)[number];
 
 const PUBLIC_RUN_DOMAIN_EVENT_TYPE_SET = new Set<RunDomainEventType>(PUBLIC_RUN_DOMAIN_EVENT_TYPES);
 
-export function isPublicRunDomainEventType(type: RunDomainEventType): type is PublicRunDomainEventType {
+export function isPublicRunDomainEventType(
+  type: RunDomainEventType
+): type is PublicRunDomainEventType {
   return PUBLIC_RUN_DOMAIN_EVENT_TYPE_SET.has(type);
 }
 

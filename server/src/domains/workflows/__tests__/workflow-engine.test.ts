@@ -1,7 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const mockRunRepo = {
-  create: vi.fn().mockReturnValue({ id: 'r1', workflowId: 'w1', projectId: 'p1', status: 'running', startedAt: Date.now() }),
+  create: vi.fn().mockReturnValue({
+    id: 'r1',
+    workflowId: 'w1',
+    projectId: 'p1',
+    status: 'running',
+    startedAt: Date.now(),
+  }),
   update: vi.fn().mockImplementation((_id: string, data: any) => data),
   findById: vi.fn(),
 };
@@ -9,7 +15,11 @@ const mockRunRepo = {
 const stepRunStore = new Map<string, any>();
 const mockStepRunRepo = {
   create: vi.fn().mockImplementation((data: any) => {
-    const sr = { id: data.id ?? `sr-${data.stepId ?? 's1'}`, ...data, status: data.status ?? 'pending' };
+    const sr = {
+      id: data.id ?? `sr-${data.stepId ?? 's1'}`,
+      ...data,
+      status: data.status ?? 'pending',
+    };
     stepRunStore.set(sr.id, sr);
     return sr;
   }),
@@ -24,23 +34,41 @@ const mockStepRunRepo = {
   findByRunAndStep: vi.fn(),
 };
 const mockProjectRepo = {
-  findById: vi.fn().mockReturnValue({ id: 'p1', defaultAgentProfileId: 'prov1', rootPath: '/test' }),
+  findById: vi
+    .fn()
+    .mockReturnValue({ id: 'p1', defaultAgentProfileId: 'prov1', rootPath: '/test' }),
 };
 const mockSessionRepo = {
   create: vi.fn().mockReturnValue({ id: 'sess1' }),
 };
 
 vi.mock('../workflow-run-repository.js', () => ({
-  WorkflowRunRepository: class { constructor() { Object.assign(this, mockRunRepo); } },
+  WorkflowRunRepository: class {
+    constructor() {
+      Object.assign(this, mockRunRepo);
+    }
+  },
 }));
 vi.mock('../workflow-step-run-repository.js', () => ({
-  WorkflowStepRunRepository: class { constructor() { Object.assign(this, mockStepRunRepo); } },
+  WorkflowStepRunRepository: class {
+    constructor() {
+      Object.assign(this, mockStepRunRepo);
+    }
+  },
 }));
 vi.mock('../../projects/repository.js', () => ({
-  ProjectRepository: class { constructor() { Object.assign(this, mockProjectRepo); } },
+  ProjectRepository: class {
+    constructor() {
+      Object.assign(this, mockProjectRepo);
+    }
+  },
 }));
 vi.mock('../../sessions/repository.js', () => ({
-  SessionRepository: class { constructor() { Object.assign(this, mockSessionRepo); } },
+  SessionRepository: class {
+    constructor() {
+      Object.assign(this, mockSessionRepo);
+    }
+  },
 }));
 vi.mock('../../../events/index.js', () => ({
   pluginEvents: { emit: vi.fn().mockResolvedValue(undefined), on: vi.fn() },
@@ -118,10 +146,20 @@ describe('WorkflowEngine', () => {
     vi.clearAllMocks();
     // Reset defaults after clearAllMocks
     stepRunStore.clear();
-    mockRunRepo.create.mockReturnValue({ id: 'r1', workflowId: 'w1', projectId: 'p1', status: 'running', startedAt: Date.now() });
+    mockRunRepo.create.mockReturnValue({
+      id: 'r1',
+      workflowId: 'w1',
+      projectId: 'p1',
+      status: 'running',
+      startedAt: Date.now(),
+    });
     mockRunRepo.update.mockImplementation((_id: string, data: any) => data);
     mockStepRunRepo.create.mockImplementation((data: any) => {
-      const sr = { id: data.id ?? `sr-${data.stepId ?? 's1'}`, ...data, status: data.status ?? 'pending' };
+      const sr = {
+        id: data.id ?? `sr-${data.stepId ?? 's1'}`,
+        ...data,
+        status: data.status ?? 'pending',
+      };
       stepRunStore.set(sr.id, sr);
       return sr;
     });
@@ -141,7 +179,11 @@ describe('WorkflowEngine', () => {
       }
       return null;
     });
-    mockProjectRepo.findById.mockReturnValue({ id: 'p1', defaultAgentProfileId: 'prov1', rootPath: '/test' });
+    mockProjectRepo.findById.mockReturnValue({
+      id: 'p1',
+      defaultAgentProfileId: 'prov1',
+      rootPath: '/test',
+    });
     mockSessionRepo.create.mockReturnValue({ id: 'sess1' });
     mockWorkflowAiRunPort.startVirtualRun.mockReset();
     mockAgentLoopRunner.run.mockReset();
@@ -174,16 +216,31 @@ describe('WorkflowEngine', () => {
         get: vi.fn().mockImplementation(() => {
           if (sql.includes('FROM agent_profiles')) {
             return {
-              id: 'agent-1', name: 'mock', description: null, llm_profile_id: 'prov1',
-              model: 'm', system_prompt: '', enabled_tools: '["read"]', thinking_level: null,
-              is_default: 1, created_at: 1, updated_at: 1,
+              id: 'agent-1',
+              name: 'mock',
+              description: null,
+              llm_profile_id: 'prov1',
+              model: 'm',
+              system_prompt: '',
+              enabled_tools: '["read"]',
+              thinking_level: null,
+              is_default: 1,
+              created_at: 1,
+              updated_at: 1,
             };
           }
           if (sql.includes('FROM llm_profiles')) {
             return {
-              id: 'prov1', name: 'mock', provider_type: 'anthropic',
-              base_url: null, api_key: null, compat: null, env: null,
-              is_default: 1, created_at: 1, updated_at: 1,
+              id: 'prov1',
+              name: 'mock',
+              provider_type: 'anthropic',
+              base_url: null,
+              api_key: null,
+              compat: null,
+              env: null,
+              is_default: 1,
+              created_at: 1,
+              updated_at: 1,
             };
           }
           return undefined;
@@ -286,7 +343,9 @@ describe('WorkflowEngine', () => {
 
     it('leaves unresolved variables as-is', () => {
       const results = new Map<string, StepResult>();
-      expect(engine.resolveTemplate('${missing.output.val}', results)).toBe('${missing.output.val}');
+      expect(engine.resolveTemplate('${missing.output.val}', results)).toBe(
+        '${missing.output.val}'
+      );
       expect(engine.resolveTemplate('${missing.status}', results)).toBe('${missing.status}');
     });
 
@@ -321,11 +380,18 @@ describe('WorkflowEngine', () => {
       results.set('prev', { status: 'completed', output: { summary: 'done' } });
 
       const config = {
-        prompt: 'Event={{event.status}} Trigger={{trigger.type}} Step={{steps.prev.summary}} Workflow={{workflow.id}}',
+        prompt:
+          'Event={{event.status}} Trigger={{trigger.type}} Step={{steps.prev.summary}} Workflow={{workflow.id}}',
       };
       const resolved = engine.resolveConfig(config, results, {
         results,
-        run: { id: 'run-1', workflowId: 'wf-1', status: 'running', startedAt: Date.now(), triggerSource: 'event' } as any,
+        run: {
+          id: 'run-1',
+          workflowId: 'wf-1',
+          status: 'running',
+          startedAt: Date.now(),
+          triggerSource: 'event',
+        } as any,
         projectId: 'p1',
         eventPayload: { status: 'ok' },
         triggerContext: { type: 'event' },
@@ -369,9 +435,26 @@ describe('WorkflowEngine', () => {
 
   describe('startRun', () => {
     it('allows concurrent runs for the same workflow', async () => {
-      const def = { triggers: [], entryNodeId: 'n1', nodes: [{ id: 'n1', type: 'notify', name: 'Test', config: { message: 'hi' } }], edges: [] };
-      const run1 = engine.startRun({ workflowId: 'w1', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
-      const run2 = engine.startRun({ workflowId: 'w1', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      const def = {
+        triggers: [],
+        entryNodeId: 'n1',
+        nodes: [{ id: 'n1', type: 'notify', name: 'Test', config: { message: 'hi' } }],
+        edges: [],
+      };
+      const run1 = engine.startRun({
+        workflowId: 'w1',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
+      const run2 = engine.startRun({
+        workflowId: 'w1',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       // Both should succeed without throwing
       await expect(run1).resolves.toBeDefined();
       await expect(run2).resolves.toBeDefined();
@@ -383,7 +466,15 @@ describe('WorkflowEngine', () => {
         nodes: [{ id: 'a' }],
         edges: [{ id: 'e1', source: 'a', target: 'a', type: 'success' }],
       };
-      await expect(engine.startRun({ workflowId: 'w2', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' })).rejects.toThrow('Invalid workflow graph');
+      await expect(
+        engine.startRun({
+          workflowId: 'w2',
+          projectId: 'p1',
+          definition: def as any,
+          triggerSource: 'manual',
+          initiator: 'manual',
+        })
+      ).rejects.toThrow('Invalid workflow graph');
     });
 
     it('creates run and step run records', async () => {
@@ -397,14 +488,22 @@ describe('WorkflowEngine', () => {
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
 
-      const run = await engine.startRun({ workflowId: 'w3', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
-      expect(run.id).toBe('r1');
-      expect(mockRunRepo.create).toHaveBeenCalledWith(expect.objectContaining({
+      const run = await engine.startRun({
         workflowId: 'w3',
         projectId: 'p1',
-        status: 'running',
+        definition: def as any,
         triggerSource: 'manual',
-      }));
+        initiator: 'manual',
+      });
+      expect(run.id).toBe('r1');
+      expect(mockRunRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workflowId: 'w3',
+          projectId: 'p1',
+          status: 'running',
+          triggerSource: 'manual',
+        })
+      );
       expect(mockStepRunRepo.create).toHaveBeenCalled();
 
       // Wait for async execution
@@ -423,9 +522,12 @@ describe('WorkflowEngine', () => {
       mockStepRunRepo.findByRun.mockReturnValue([]);
 
       expect(engine.cancelRun('r1')).toBe(true);
-      expect(mockRunRepo.update).toHaveBeenCalledWith('r1', expect.objectContaining({
-        status: 'cancelled',
-      }));
+      expect(mockRunRepo.update).toHaveBeenCalledWith(
+        'r1',
+        expect.objectContaining({
+          status: 'cancelled',
+        })
+      );
     });
 
     it('returns false for completed run', () => {
@@ -440,7 +542,10 @@ describe('WorkflowEngine', () => {
       mockStepRunRepo.findByRun.mockReturnValue([{ id: 'sr1' }]);
 
       engine.cancelRun('r1');
-      expect(mockRunRepo.update).toHaveBeenCalledWith('r1', expect.objectContaining({ status: 'cancelled' }));
+      expect(mockRunRepo.update).toHaveBeenCalledWith(
+        'r1',
+        expect.objectContaining({ status: 'cancelled' })
+      );
     });
   });
 
@@ -467,11 +572,20 @@ describe('WorkflowEngine', () => {
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
 
-      const run = await engine.startRun({ workflowId: 'wf-notify', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      const run = await engine.startRun({
+        workflowId: 'wf-notify',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
       // Run should be marked completed
-      expect(mockRunRepo.update).toHaveBeenCalledWith('r1', expect.objectContaining({ status: 'completed' }));
+      expect(mockRunRepo.update).toHaveBeenCalledWith(
+        'r1',
+        expect.objectContaining({ status: 'completed' })
+      );
     });
 
     it('handles cancelled run mid-execution', async () => {
@@ -485,11 +599,20 @@ describe('WorkflowEngine', () => {
       // Return cancelled status when checked
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'cancelled', projectId: 'p1' });
 
-      await engine.startRun({ workflowId: 'wf-cancel', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-cancel',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
       // Should not mark as completed since it was cancelled
-      expect(mockRunRepo.update).not.toHaveBeenCalledWith('r1', expect.objectContaining({ status: 'completed' }));
+      expect(mockRunRepo.update).not.toHaveBeenCalledWith(
+        'r1',
+        expect.objectContaining({ status: 'completed' })
+      );
     });
 
     it('handles missing node definition during execution', async () => {
@@ -501,13 +624,22 @@ describe('WorkflowEngine', () => {
       };
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
 
-      await engine.startRun({ workflowId: 'wf-missing-node', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-missing-node',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(mockRunRepo.update).toHaveBeenCalledWith('r1', expect.objectContaining({
-        status: 'failed',
-        error: expect.stringContaining('not found in workflow definition'),
-      }));
+      expect(mockRunRepo.update).toHaveBeenCalledWith(
+        'r1',
+        expect.objectContaining({
+          status: 'failed',
+          error: expect.stringContaining('not found in workflow definition'),
+        })
+      );
     });
 
     it('follows success edges between nodes', async () => {
@@ -517,9 +649,7 @@ describe('WorkflowEngine', () => {
           { id: 'n1', type: 'notify', name: 'Step 1', config: { message: 'first' } },
           { id: 'n2', type: 'notify', name: 'Step 2', config: { message: 'second' } },
         ],
-        edges: [
-          { id: 'e1', source: 'n1', target: 'n2', type: 'success' },
-        ],
+        edges: [{ id: 'e1', source: 'n1', target: 'n2', type: 'success' }],
         entryNodeId: 'n1',
       };
       let stepRunCallCount = 0;
@@ -533,21 +663,34 @@ describe('WorkflowEngine', () => {
       });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
 
-      await engine.startRun({ workflowId: 'wf-chain', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-chain',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
       // Both steps should have been executed
-      expect(mockStepRunRepo.update).toHaveBeenCalledWith('sr-n1', expect.objectContaining({ status: 'completed' }));
-      expect(mockStepRunRepo.update).toHaveBeenCalledWith('sr-n2', expect.objectContaining({ status: 'completed' }));
-      expect(mockRunRepo.update).toHaveBeenCalledWith('r1', expect.objectContaining({ status: 'completed' }));
+      expect(mockStepRunRepo.update).toHaveBeenCalledWith(
+        'sr-n1',
+        expect.objectContaining({ status: 'completed' })
+      );
+      expect(mockStepRunRepo.update).toHaveBeenCalledWith(
+        'sr-n2',
+        expect.objectContaining({ status: 'completed' })
+      );
+      expect(mockRunRepo.update).toHaveBeenCalledWith(
+        'r1',
+        expect.objectContaining({ status: 'completed' })
+      );
     });
 
     it('aborts on failed step with default onError', async () => {
       const def = {
         triggers: [],
-        nodes: [
-          { id: 'n1', type: 'unknown_type', name: 'Bad Step', config: {} },
-        ],
+        nodes: [{ id: 'n1', type: 'unknown_type', name: 'Bad Step', config: {} }],
         edges: [],
         entryNodeId: 'n1',
       };
@@ -555,10 +698,19 @@ describe('WorkflowEngine', () => {
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
       (mockWorkflowStepRegistry as any).has.mockReturnValue(false);
 
-      await engine.startRun({ workflowId: 'wf-fail', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-fail',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(mockRunRepo.update).toHaveBeenCalledWith('r1', expect.objectContaining({ status: 'failed' }));
+      expect(mockRunRepo.update).toHaveBeenCalledWith(
+        'r1',
+        expect.objectContaining({ status: 'failed' })
+      );
     });
 
     it('skips unvisited nodes when graph completes', async () => {
@@ -580,11 +732,20 @@ describe('WorkflowEngine', () => {
       });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
 
-      await engine.startRun({ workflowId: 'wf-skip', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-skip',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
       // n2 should be marked as skipped
-      expect(mockStepRunRepo.update).toHaveBeenCalledWith('sr-n2', expect.objectContaining({ status: 'skipped' }));
+      expect(mockStepRunRepo.update).toHaveBeenCalledWith(
+        'sr-n2',
+        expect.objectContaining({ status: 'skipped' })
+      );
     });
 
     it('handles step with onError=skip — continues execution', async () => {
@@ -594,9 +755,7 @@ describe('WorkflowEngine', () => {
           { id: 'n1', type: 'unknown_type', name: 'Fail Skip', config: {}, onError: 'skip' },
           { id: 'n2', type: 'notify', name: 'After', config: { message: 'after' } },
         ],
-        edges: [
-          { id: 'e1', source: 'n1', target: 'n2', type: 'success' },
-        ],
+        edges: [{ id: 'e1', source: 'n1', target: 'n2', type: 'success' }],
         entryNodeId: 'n1',
       };
       mockStepRunRepo.findByRunAndStep.mockImplementation((_runId: string, stepId: string) => {
@@ -609,12 +768,24 @@ describe('WorkflowEngine', () => {
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
       (mockWorkflowStepRegistry as any).has.mockReturnValue(false);
 
-      await engine.startRun({ workflowId: 'wf-skip-err', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-skip-err',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
       // n1 should be marked skipped (onError=skip), n2 should execute
-      expect(mockStepRunRepo.update).toHaveBeenCalledWith('sr-n1', expect.objectContaining({ status: 'skipped' }));
-      expect(mockStepRunRepo.update).toHaveBeenCalledWith('sr-n2', expect.objectContaining({ status: 'completed' }));
+      expect(mockStepRunRepo.update).toHaveBeenCalledWith(
+        'sr-n1',
+        expect.objectContaining({ status: 'skipped' })
+      );
+      expect(mockStepRunRepo.update).toHaveBeenCalledWith(
+        'sr-n2',
+        expect.objectContaining({ status: 'completed' })
+      );
     });
 
     it('handles step with onError=route — follows error edges', async () => {
@@ -641,11 +812,20 @@ describe('WorkflowEngine', () => {
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
       (mockWorkflowStepRegistry as any).has.mockReturnValue(false);
 
-      await engine.startRun({ workflowId: 'wf-route', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-route',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
       // Should follow error edge to n_err, not n_ok
-      expect(mockStepRunRepo.update).toHaveBeenCalledWith('sr-n_err', expect.objectContaining({ status: 'completed' }));
+      expect(mockStepRunRepo.update).toHaveBeenCalledWith(
+        'sr-n_err',
+        expect.objectContaining({ status: 'completed' })
+      );
     });
 
     it('handles condition node with true branch', async () => {
@@ -653,7 +833,13 @@ describe('WorkflowEngine', () => {
         triggers: [],
         nodes: [
           { id: 'n1', type: 'notify', name: 'Start', config: { message: 'start' } },
-          { id: 'cond', type: 'condition', name: 'Check', config: {}, condition: { expression: '${n1.status} == completed' } },
+          {
+            id: 'cond',
+            type: 'condition',
+            name: 'Check',
+            config: {},
+            condition: { expression: '${n1.status} == completed' },
+          },
           { id: 'n_true', type: 'notify', name: 'True', config: { message: 'true' } },
           { id: 'n_false', type: 'notify', name: 'False', config: { message: 'false' } },
         ],
@@ -673,21 +859,40 @@ describe('WorkflowEngine', () => {
       });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
 
-      await engine.startRun({ workflowId: 'wf-cond', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-cond',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
       // n1 completed, condition evaluates to true, should go to n_true
-      expect(mockStepRunRepo.update).toHaveBeenCalledWith('sr-n_true', expect.objectContaining({ status: 'completed' }));
+      expect(mockStepRunRepo.update).toHaveBeenCalledWith(
+        'sr-n_true',
+        expect.objectContaining({ status: 'completed' })
+      );
       // n_false should be skipped (unvisited)
-      expect(mockStepRunRepo.update).toHaveBeenCalledWith('sr-n_false', expect.objectContaining({ status: 'skipped' }));
+      expect(mockStepRunRepo.update).toHaveBeenCalledWith(
+        'sr-n_false',
+        expect.objectContaining({ status: 'skipped' })
+      );
     });
 
     it('handles step with onError=retry', async () => {
-      let callCount = 0;
+      const callCount = 0;
       const def = {
         triggers: [],
         nodes: [
-          { id: 'n1', type: 'shell', name: 'Retry', config: { command: 'false' }, onError: 'retry', retryCount: 2 },
+          {
+            id: 'n1',
+            type: 'shell',
+            name: 'Retry',
+            config: { command: 'false' },
+            onError: 'retry',
+            retryCount: 2,
+          },
         ],
         edges: [],
         entryNodeId: 'n1',
@@ -697,7 +902,13 @@ describe('WorkflowEngine', () => {
       // execFileAsync always fails
       mockExecFileAsync.mockRejectedValue(new Error('command failed'));
 
-      await engine.startRun({ workflowId: 'wf-retry', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-retry',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(200);
 
       // Should have attempted 3 times (1 original + 2 retries)
@@ -717,11 +928,20 @@ describe('WorkflowEngine', () => {
       mockStepRunRepo.findByRunAndStep.mockReturnValue(null);
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
 
-      await engine.startRun({ workflowId: 'wf-no-sr', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-no-sr',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
       // Should fail — step run record not found
-      expect(mockRunRepo.update).toHaveBeenCalledWith('r1', expect.objectContaining({ status: 'failed' }));
+      expect(mockRunRepo.update).toHaveBeenCalledWith(
+        'r1',
+        expect.objectContaining({ status: 'failed' })
+      );
     });
 
     it('uses plugin step registry for custom step types', async () => {
@@ -734,9 +954,18 @@ describe('WorkflowEngine', () => {
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
       (mockWorkflowStepRegistry as any).has.mockReturnValue(true);
-      (mockWorkflowStepRegistry as any).execute.mockResolvedValue({ status: 'completed', output: { pluginResult: true } });
+      (mockWorkflowStepRegistry as any).execute.mockResolvedValue({
+        status: 'completed',
+        output: { pluginResult: true },
+      });
 
-      await engine.startRun({ workflowId: 'wf-plugin', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-plugin',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
       expect((mockWorkflowStepRegistry as any).execute).toHaveBeenCalledWith(
@@ -744,7 +973,10 @@ describe('WorkflowEngine', () => {
         expect.objectContaining({ key: 'val' }),
         expect.objectContaining({ projectId: 'p1' })
       );
-      expect(mockRunRepo.update).toHaveBeenCalledWith('r1', expect.objectContaining({ status: 'completed' }));
+      expect(mockRunRepo.update).toHaveBeenCalledWith(
+        'r1',
+        expect.objectContaining({ status: 'completed' })
+      );
     });
 
     it('executes graph definitions without requiring a version field', async () => {
@@ -757,7 +989,13 @@ describe('WorkflowEngine', () => {
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
 
-      const run = await engine.startRun({ workflowId: 'wf-v1', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      const run = await engine.startRun({
+        workflowId: 'wf-v1',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       expect(run.id).toBe('r1');
       await vi.advanceTimersByTimeAsync(100);
     });
@@ -775,13 +1013,22 @@ describe('WorkflowEngine', () => {
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
       mockExecFileAsync.mockResolvedValue({ stdout: 'hello\n', stderr: '' });
 
-      await engine.startRun({ workflowId: 'wf-shell', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-shell',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(mockStepRunRepo.update).toHaveBeenCalledWith('sr1', expect.objectContaining({
-        status: 'completed',
-        output: expect.objectContaining({ stdout: 'hello', exitCode: 0 }),
-      }));
+      expect(mockStepRunRepo.update).toHaveBeenCalledWith(
+        'sr1',
+        expect.objectContaining({
+          status: 'completed',
+          output: expect.objectContaining({ stdout: 'hello', exitCode: 0 }),
+        })
+      );
     });
 
     it('fails on empty command', async () => {
@@ -794,10 +1041,19 @@ describe('WorkflowEngine', () => {
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
 
-      await engine.startRun({ workflowId: 'wf-shell-empty', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-shell-empty',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(mockRunRepo.update).toHaveBeenCalledWith('r1', expect.objectContaining({ status: 'failed' }));
+      expect(mockRunRepo.update).toHaveBeenCalledWith(
+        'r1',
+        expect.objectContaining({ status: 'failed' })
+      );
     });
 
     it('handles command timeout', async () => {
@@ -811,10 +1067,19 @@ describe('WorkflowEngine', () => {
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
       mockExecFileAsync.mockRejectedValue({ code: undefined, killed: true });
 
-      await engine.startRun({ workflowId: 'wf-shell-timeout', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-shell-timeout',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(mockRunRepo.update).toHaveBeenCalledWith('r1', expect.objectContaining({ status: 'failed' }));
+      expect(mockRunRepo.update).toHaveBeenCalledWith(
+        'r1',
+        expect.objectContaining({ status: 'failed' })
+      );
     });
 
     it('handles command failure with exit code', async () => {
@@ -826,12 +1091,27 @@ describe('WorkflowEngine', () => {
       };
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
-      mockExecFileAsync.mockRejectedValue({ code: 1, killed: false, stdout: '', stderr: 'error output', message: 'exit code 1' });
+      mockExecFileAsync.mockRejectedValue({
+        code: 1,
+        killed: false,
+        stdout: '',
+        stderr: 'error output',
+        message: 'exit code 1',
+      });
 
-      await engine.startRun({ workflowId: 'wf-shell-fail', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-shell-fail',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(mockRunRepo.update).toHaveBeenCalledWith('r1', expect.objectContaining({ status: 'failed' }));
+      expect(mockRunRepo.update).toHaveBeenCalledWith(
+        'r1',
+        expect.objectContaining({ status: 'failed' })
+      );
     });
   });
 
@@ -846,20 +1126,36 @@ describe('WorkflowEngine', () => {
 
       const def = {
         triggers: [],
-        nodes: [{ id: 'n1', type: 'webhook', name: 'Hook', config: { url: 'http://example.com', method: 'POST', body: '{}' } }],
+        nodes: [
+          {
+            id: 'n1',
+            type: 'webhook',
+            name: 'Hook',
+            config: { url: 'http://example.com', method: 'POST', body: '{}' },
+          },
+        ],
         edges: [],
         entryNodeId: 'n1',
       };
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
 
-      await engine.startRun({ workflowId: 'wf-webhook', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-webhook',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(mockStepRunRepo.update).toHaveBeenCalledWith('sr1', expect.objectContaining({
-        status: 'completed',
-        output: expect.objectContaining({ statusCode: 200 }),
-      }));
+      expect(mockStepRunRepo.update).toHaveBeenCalledWith(
+        'sr1',
+        expect.objectContaining({
+          status: 'completed',
+          output: expect.objectContaining({ statusCode: 200 }),
+        })
+      );
       globalThis.fetch = originalFetch;
     });
 
@@ -873,10 +1169,19 @@ describe('WorkflowEngine', () => {
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
 
-      await engine.startRun({ workflowId: 'wf-webhook-no-url', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-webhook-no-url',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(mockRunRepo.update).toHaveBeenCalledWith('r1', expect.objectContaining({ status: 'failed' }));
+      expect(mockRunRepo.update).toHaveBeenCalledWith(
+        'r1',
+        expect.objectContaining({ status: 'failed' })
+      );
     });
 
     it('handles HTTP error response', async () => {
@@ -896,10 +1201,19 @@ describe('WorkflowEngine', () => {
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
 
-      await engine.startRun({ workflowId: 'wf-webhook-err', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-webhook-err',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(mockRunRepo.update).toHaveBeenCalledWith('r1', expect.objectContaining({ status: 'failed' }));
+      expect(mockRunRepo.update).toHaveBeenCalledWith(
+        'r1',
+        expect.objectContaining({ status: 'failed' })
+      );
       globalThis.fetch = originalFetch;
     });
 
@@ -913,20 +1227,36 @@ describe('WorkflowEngine', () => {
 
       const def = {
         triggers: [],
-        nodes: [{ id: 'n1', type: 'webhook', name: 'Hook', config: { url: 'http://example.com', method: 'GET' } }],
+        nodes: [
+          {
+            id: 'n1',
+            type: 'webhook',
+            name: 'Hook',
+            config: { url: 'http://example.com', method: 'GET' },
+          },
+        ],
         edges: [],
         entryNodeId: 'n1',
       };
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
 
-      await engine.startRun({ workflowId: 'wf-webhook-get', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-webhook-get',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(globalThis.fetch).toHaveBeenCalledWith('http://example.com', expect.objectContaining({
-        method: 'GET',
-        body: undefined,
-      }));
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        'http://example.com',
+        expect.objectContaining({
+          method: 'GET',
+          body: undefined,
+        })
+      );
       globalThis.fetch = originalFetch;
     });
   });
@@ -938,20 +1268,36 @@ describe('WorkflowEngine', () => {
 
       const def = {
         triggers: [],
-        nodes: [{ id: 'n1', type: 'notify', name: 'Webhook Notify', config: { message: 'alert', type: 'webhook', url: 'http://hook.com' } }],
+        nodes: [
+          {
+            id: 'n1',
+            type: 'notify',
+            name: 'Webhook Notify',
+            config: { message: 'alert', type: 'webhook', url: 'http://hook.com' },
+          },
+        ],
         edges: [],
         entryNodeId: 'n1',
       };
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
 
-      await engine.startRun({ workflowId: 'wf-notify-hook', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-notify-hook',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(globalThis.fetch).toHaveBeenCalledWith('http://hook.com', expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ message: 'alert' }),
-      }));
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        'http://hook.com',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ message: 'alert' }),
+        })
+      );
       globalThis.fetch = originalFetch;
     });
   });
@@ -967,10 +1313,19 @@ describe('WorkflowEngine', () => {
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
 
-      await engine.startRun({ workflowId: 'wf-cond-no-expr', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-cond-no-expr',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(mockRunRepo.update).toHaveBeenCalledWith('r1', expect.objectContaining({ status: 'failed' }));
+      expect(mockRunRepo.update).toHaveBeenCalledWith(
+        'r1',
+        expect.objectContaining({ status: 'failed' })
+      );
     });
   });
 
@@ -978,37 +1333,65 @@ describe('WorkflowEngine', () => {
     it('executes timeout wait', async () => {
       const def = {
         triggers: [],
-        nodes: [{ id: 'n1', type: 'wait', name: 'Wait', config: { type: 'timeout', timeoutMs: 10 } }],
+        nodes: [
+          { id: 'n1', type: 'wait', name: 'Wait', config: { type: 'timeout', timeoutMs: 10 } },
+        ],
         edges: [],
         entryNodeId: 'n1',
       };
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
 
-      await engine.startRun({ workflowId: 'wf-wait', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-wait',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(200);
 
-      expect(mockStepRunRepo.update).toHaveBeenCalledWith('sr1', expect.objectContaining({
-        status: 'completed',
-        output: expect.objectContaining({ waited: true }),
-      }));
+      expect(mockStepRunRepo.update).toHaveBeenCalledWith(
+        'sr1',
+        expect.objectContaining({
+          status: 'completed',
+          output: expect.objectContaining({ waited: true }),
+        })
+      );
     });
 
     it('handles approval wait with approve', async () => {
       const def = {
         triggers: [],
-        nodes: [{ id: 'n1', type: 'wait', name: 'Approve', config: { type: 'approval' }, timeoutMs: 5000 }],
+        nodes: [
+          {
+            id: 'n1',
+            type: 'wait',
+            name: 'Approve',
+            config: { type: 'approval' },
+            timeoutMs: 5000,
+          },
+        ],
         edges: [],
         entryNodeId: 'n1',
       };
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
 
-      await engine.startRun({ workflowId: 'wf-approve', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-approve',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(50);
 
       // Step should be waiting
-      expect(mockStepRunRepo.update).toHaveBeenCalledWith('sr1', expect.objectContaining({ status: 'waiting' }));
+      expect(mockStepRunRepo.update).toHaveBeenCalledWith(
+        'sr1',
+        expect.objectContaining({ status: 'waiting' })
+      );
 
       // Approve it
       const approved = engine.approveStep('sr1');
@@ -1016,23 +1399,34 @@ describe('WorkflowEngine', () => {
 
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(mockStepRunRepo.update).toHaveBeenCalledWith('sr1', expect.objectContaining({
-        status: 'completed',
-        output: expect.objectContaining({ approved: true }),
-      }));
+      expect(mockStepRunRepo.update).toHaveBeenCalledWith(
+        'sr1',
+        expect.objectContaining({
+          status: 'completed',
+          output: expect.objectContaining({ approved: true }),
+        })
+      );
     });
 
     it('handles approval wait with reject', async () => {
       const def = {
         triggers: [],
-        nodes: [{ id: 'n1', type: 'wait', name: 'Reject', config: { type: 'approval' }, timeoutMs: 5000 }],
+        nodes: [
+          { id: 'n1', type: 'wait', name: 'Reject', config: { type: 'approval' }, timeoutMs: 5000 },
+        ],
         edges: [],
         entryNodeId: 'n1',
       };
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
 
-      await engine.startRun({ workflowId: 'wf-reject', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-reject',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(50);
 
       const rejected = engine.rejectStep('sr1');
@@ -1041,7 +1435,10 @@ describe('WorkflowEngine', () => {
       await vi.advanceTimersByTimeAsync(100);
 
       // Rejected approval marks as failed
-      expect(mockRunRepo.update).toHaveBeenCalledWith('r1', expect.objectContaining({ status: 'failed' }));
+      expect(mockRunRepo.update).toHaveBeenCalledWith(
+        'r1',
+        expect.objectContaining({ status: 'failed' })
+      );
     });
   });
 
@@ -1049,26 +1446,37 @@ describe('WorkflowEngine', () => {
     it('commits changes successfully', async () => {
       const def = {
         triggers: [],
-        nodes: [{ id: 'n1', type: 'git_commit', name: 'Commit', config: { message: 'auto commit' } }],
+        nodes: [
+          { id: 'n1', type: 'git_commit', name: 'Commit', config: { message: 'auto commit' } },
+        ],
         edges: [],
         entryNodeId: 'n1',
       };
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
       mockExecFileAsync
-        .mockResolvedValueOnce({ stdout: 'M file.ts\n', stderr: '' })  // git status
-        .mockResolvedValueOnce({ stdout: '', stderr: '' })              // git add
-        .mockResolvedValueOnce({ stdout: '1 file changed\n', stderr: '' })  // git diff --stat
-        .mockResolvedValueOnce({ stdout: '', stderr: '' })              // git commit
-        .mockResolvedValueOnce({ stdout: 'abc123\n', stderr: '' });     // git rev-parse
+        .mockResolvedValueOnce({ stdout: 'M file.ts\n', stderr: '' }) // git status
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // git add
+        .mockResolvedValueOnce({ stdout: '1 file changed\n', stderr: '' }) // git diff --stat
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // git commit
+        .mockResolvedValueOnce({ stdout: 'abc123\n', stderr: '' }); // git rev-parse
 
-      await engine.startRun({ workflowId: 'wf-commit', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-commit',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(mockStepRunRepo.update).toHaveBeenCalledWith('sr1', expect.objectContaining({
-        status: 'completed',
-        output: expect.objectContaining({ commitSha: 'abc123', message: 'auto commit' }),
-      }));
+      expect(mockStepRunRepo.update).toHaveBeenCalledWith(
+        'sr1',
+        expect.objectContaining({
+          status: 'completed',
+          output: expect.objectContaining({ commitSha: 'abc123', message: 'auto commit' }),
+        })
+      );
     });
 
     it('handles no changes to commit', async () => {
@@ -1082,13 +1490,22 @@ describe('WorkflowEngine', () => {
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
       mockExecFileAsync.mockResolvedValueOnce({ stdout: '', stderr: '' }); // git status empty
 
-      await engine.startRun({ workflowId: 'wf-commit-empty', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-commit-empty',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(mockStepRunRepo.update).toHaveBeenCalledWith('sr1', expect.objectContaining({
-        status: 'completed',
-        output: expect.objectContaining({ commitSha: null }),
-      }));
+      expect(mockStepRunRepo.update).toHaveBeenCalledWith(
+        'sr1',
+        expect.objectContaining({
+          status: 'completed',
+          output: expect.objectContaining({ commitSha: null }),
+        })
+      );
     });
 
     it('fails when no working directory', async () => {
@@ -1100,13 +1517,27 @@ describe('WorkflowEngine', () => {
       };
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
-      mockProjectRepo.findById.mockReturnValue({ id: 'p1', rootPath: undefined, defaultAgentProfileId: 'prov1' });
+      mockProjectRepo.findById.mockReturnValue({
+        id: 'p1',
+        rootPath: undefined,
+        defaultAgentProfileId: 'prov1',
+      });
 
-      await engine.startRun({ workflowId: 'wf-commit-no-cwd', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-commit-no-cwd',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
       // Reset project repo
-      mockProjectRepo.findById.mockReturnValue({ id: 'p1', defaultAgentProfileId: 'prov1', rootPath: '/test' });
+      mockProjectRepo.findById.mockReturnValue({
+        id: 'p1',
+        defaultAgentProfileId: 'prov1',
+        rootPath: '/test',
+      });
     });
   });
 
@@ -1114,44 +1545,71 @@ describe('WorkflowEngine', () => {
     it('merges successfully', async () => {
       const def = {
         triggers: [],
-        nodes: [{ id: 'n1', type: 'git_merge', name: 'Merge', config: { branch: 'feature', baseBranch: 'main' } }],
+        nodes: [
+          {
+            id: 'n1',
+            type: 'git_merge',
+            name: 'Merge',
+            config: { branch: 'feature', baseBranch: 'main' },
+          },
+        ],
         edges: [],
         entryNodeId: 'n1',
       };
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
       mockExecFileAsync
-        .mockResolvedValueOnce({ stdout: '', stderr: '' })  // git checkout
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // git checkout
         .mockResolvedValueOnce({ stdout: '', stderr: '' }); // git merge
 
-      await engine.startRun({ workflowId: 'wf-merge', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-merge',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(mockStepRunRepo.update).toHaveBeenCalledWith('sr1', expect.objectContaining({
-        status: 'completed',
-        output: expect.objectContaining({ success: true, branch: 'feature' }),
-      }));
+      expect(mockStepRunRepo.update).toHaveBeenCalledWith(
+        'sr1',
+        expect.objectContaining({
+          status: 'completed',
+          output: expect.objectContaining({ success: true, branch: 'feature' }),
+        })
+      );
     });
 
     it('handles merge conflicts', async () => {
       const def = {
         triggers: [],
-        nodes: [{ id: 'n1', type: 'git_merge', name: 'Merge', config: { branch: 'conflict-branch' } }],
+        nodes: [
+          { id: 'n1', type: 'git_merge', name: 'Merge', config: { branch: 'conflict-branch' } },
+        ],
         edges: [],
         entryNodeId: 'n1',
       };
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
       mockExecFileAsync
-        .mockResolvedValueOnce({ stdout: '', stderr: '' })  // git checkout
-        .mockRejectedValueOnce(new Error('merge conflict'))  // git merge fails
-        .mockResolvedValueOnce({ stdout: 'file1.ts\nfile2.ts\n', stderr: '' })  // git diff --name-only
+        .mockResolvedValueOnce({ stdout: '', stderr: '' }) // git checkout
+        .mockRejectedValueOnce(new Error('merge conflict')) // git merge fails
+        .mockResolvedValueOnce({ stdout: 'file1.ts\nfile2.ts\n', stderr: '' }) // git diff --name-only
         .mockResolvedValueOnce({ stdout: '', stderr: '' }); // git merge --abort
 
-      await engine.startRun({ workflowId: 'wf-merge-conflict', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-merge-conflict',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(mockRunRepo.update).toHaveBeenCalledWith('r1', expect.objectContaining({ status: 'failed' }));
+      expect(mockRunRepo.update).toHaveBeenCalledWith(
+        'r1',
+        expect.objectContaining({ status: 'failed' })
+      );
     });
 
     it('fails when no branch specified', async () => {
@@ -1164,10 +1622,19 @@ describe('WorkflowEngine', () => {
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
 
-      await engine.startRun({ workflowId: 'wf-merge-no-branch', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-merge-no-branch',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(mockRunRepo.update).toHaveBeenCalledWith('r1', expect.objectContaining({ status: 'failed' }));
+      expect(mockRunRepo.update).toHaveBeenCalledWith(
+        'r1',
+        expect.objectContaining({ status: 'failed' })
+      );
     });
   });
 
@@ -1175,7 +1642,9 @@ describe('WorkflowEngine', () => {
     it('creates worktree successfully', async () => {
       const def = {
         triggers: [],
-        nodes: [{ id: 'n1', type: 'create_worktree', name: 'WT', config: { branchName: 'feature-1' } }],
+        nodes: [
+          { id: 'n1', type: 'create_worktree', name: 'WT', config: { branchName: 'feature-1' } },
+        ],
         edges: [],
         entryNodeId: 'n1',
       };
@@ -1183,13 +1652,22 @@ describe('WorkflowEngine', () => {
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
       mockExecFileAsync.mockResolvedValueOnce({ stdout: '', stderr: '' });
 
-      await engine.startRun({ workflowId: 'wf-wt', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-wt',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(mockStepRunRepo.update).toHaveBeenCalledWith('sr1', expect.objectContaining({
-        status: 'completed',
-        output: expect.objectContaining({ branch: 'feature-1' }),
-      }));
+      expect(mockStepRunRepo.update).toHaveBeenCalledWith(
+        'sr1',
+        expect.objectContaining({
+          status: 'completed',
+          output: expect.objectContaining({ branch: 'feature-1' }),
+        })
+      );
     });
 
     it('fails when no branch name', async () => {
@@ -1202,10 +1680,19 @@ describe('WorkflowEngine', () => {
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
 
-      await engine.startRun({ workflowId: 'wf-wt-no-branch', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-wt-no-branch',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(mockRunRepo.update).toHaveBeenCalledWith('r1', expect.objectContaining({ status: 'failed' }));
+      expect(mockRunRepo.update).toHaveBeenCalledWith(
+        'r1',
+        expect.objectContaining({ status: 'failed' })
+      );
     });
   });
 
@@ -1220,16 +1707,25 @@ describe('WorkflowEngine', () => {
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
       mockExecFileAsync
-        .mockResolvedValueOnce({ stdout: 'feature-branch\n', stderr: '' })  // rev-parse
+        .mockResolvedValueOnce({ stdout: 'feature-branch\n', stderr: '' }) // rev-parse
         .mockResolvedValueOnce({ stdout: '3 files changed\n', stderr: '' }); // diff --stat
 
-      await engine.startRun({ workflowId: 'wf-pr', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-pr',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(mockStepRunRepo.update).toHaveBeenCalledWith('sr1', expect.objectContaining({
-        status: 'completed',
-        output: expect.objectContaining({ title: 'My PR', branchName: 'feature-branch' }),
-      }));
+      expect(mockStepRunRepo.update).toHaveBeenCalledWith(
+        'sr1',
+        expect.objectContaining({
+          status: 'completed',
+          output: expect.objectContaining({ title: 'My PR', branchName: 'feature-branch' }),
+        })
+      );
     });
 
     it('fails when no working directory', async () => {
@@ -1241,13 +1737,27 @@ describe('WorkflowEngine', () => {
       };
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
-      mockProjectRepo.findById.mockReturnValue({ id: 'p1', rootPath: undefined, defaultAgentProfileId: 'prov1' });
+      mockProjectRepo.findById.mockReturnValue({
+        id: 'p1',
+        rootPath: undefined,
+        defaultAgentProfileId: 'prov1',
+      });
 
-      await engine.startRun({ workflowId: 'wf-pr-no-cwd', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-pr-no-cwd',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
       // Reset
-      mockProjectRepo.findById.mockReturnValue({ id: 'p1', defaultAgentProfileId: 'prov1', rootPath: '/test' });
+      mockProjectRepo.findById.mockReturnValue({
+        id: 'p1',
+        defaultAgentProfileId: 'prov1',
+        rootPath: '/test',
+      });
     });
   });
 
@@ -1262,10 +1772,19 @@ describe('WorkflowEngine', () => {
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
 
-      await engine.startRun({ workflowId: 'wf-ai-no-prompt', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-ai-no-prompt',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(mockRunRepo.update).toHaveBeenCalledWith('r1', expect.objectContaining({ status: 'failed' }));
+      expect(mockRunRepo.update).toHaveBeenCalledWith(
+        'r1',
+        expect.objectContaining({ status: 'failed' })
+      );
     });
 
     it('fails when no provider configured', async () => {
@@ -1277,7 +1796,11 @@ describe('WorkflowEngine', () => {
       };
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
-      mockProjectRepo.findById.mockReturnValue({ id: 'p1', rootPath: '/test', defaultAgentProfileId: undefined });
+      mockProjectRepo.findById.mockReturnValue({
+        id: 'p1',
+        rootPath: '/test',
+        defaultAgentProfileId: undefined,
+      });
 
       // Force resolver to throw NoAgentAvailableError so the step sees no LLM.
       // The default mockDb returns an agent for FROM agent_profiles — override
@@ -1291,11 +1814,24 @@ describe('WorkflowEngine', () => {
       } as any;
       const noAgentEngine = createEngineWithDb(noAgentDb, mockBroadcast);
 
-      await noAgentEngine.startRun({ workflowId: 'wf-ai-no-provider', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await noAgentEngine.startRun({
+        workflowId: 'wf-ai-no-provider',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(mockRunRepo.update).toHaveBeenCalledWith('r1', expect.objectContaining({ status: 'failed' }));
-      mockProjectRepo.findById.mockReturnValue({ id: 'p1', defaultAgentProfileId: 'prov1', rootPath: '/test' });
+      expect(mockRunRepo.update).toHaveBeenCalledWith(
+        'r1',
+        expect.objectContaining({ status: 'failed' })
+      );
+      mockProjectRepo.findById.mockReturnValue({
+        id: 'p1',
+        defaultAgentProfileId: 'prov1',
+        rootPath: '/test',
+      });
     });
 
     it('completes when agent loop returns JSON result', async () => {
@@ -1314,21 +1850,32 @@ describe('WorkflowEngine', () => {
         contextId: 'ctx-ai-prompt',
       });
 
-      await engine.startRun({ workflowId: 'wf-ai-complete', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-ai-complete',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(200);
 
-      expect(mockStepRunRepo.update).toHaveBeenCalledWith('sr1', expect.objectContaining({
-        status: 'completed',
-        output: expect.objectContaining({
-          result: 'analysis complete',
-          contextId: 'ctx-ai-prompt',
-        }),
-      }));
-      expect(mockAgentLoopRunner.run).toHaveBeenCalledWith(expect.objectContaining({
-        purpose: 'workflow.ai_prompt',
-        toolset: { id: 'workflow-prompt' },
-        context: { policy: 'workflow-artifacts', key: 'n1' },
-      }));
+      expect(mockStepRunRepo.update).toHaveBeenCalledWith(
+        'sr1',
+        expect.objectContaining({
+          status: 'completed',
+          output: expect.objectContaining({
+            result: 'analysis complete',
+            contextId: 'ctx-ai-prompt',
+          }),
+        })
+      );
+      expect(mockAgentLoopRunner.run).toHaveBeenCalledWith(
+        expect.objectContaining({
+          purpose: 'workflow.ai_prompt',
+          toolset: { id: 'workflow-prompt' },
+          context: { policy: 'workflow-artifacts', key: 'n1' },
+        })
+      );
       expect(mockWorkflowAiRunPort.startVirtualRun).not.toHaveBeenCalled();
     });
 
@@ -1348,10 +1895,19 @@ describe('WorkflowEngine', () => {
         error: 'AI failed',
       });
 
-      await engine.startRun({ workflowId: 'wf-ai-fail', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-ai-fail',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(200);
 
-      expect(mockRunRepo.update).toHaveBeenCalledWith('r1', expect.objectContaining({ status: 'failed' }));
+      expect(mockRunRepo.update).toHaveBeenCalledWith(
+        'r1',
+        expect.objectContaining({ status: 'failed' })
+      );
     });
   });
 
@@ -1365,7 +1921,11 @@ describe('WorkflowEngine', () => {
       };
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
-      mockProjectRepo.findById.mockReturnValue({ id: 'p1', rootPath: '/test', defaultAgentProfileId: undefined });
+      mockProjectRepo.findById.mockReturnValue({
+        id: 'p1',
+        rootPath: '/test',
+        defaultAgentProfileId: undefined,
+      });
 
       // See sibling test above: force resolver to throw NoAgentAvailableError.
       const noAgentDb = {
@@ -1377,11 +1937,24 @@ describe('WorkflowEngine', () => {
       } as any;
       const noAgentEngine = createEngineWithDb(noAgentDb, mockBroadcast);
 
-      await noAgentEngine.startRun({ workflowId: 'wf-review-no-prov', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await noAgentEngine.startRun({
+        workflowId: 'wf-review-no-prov',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(mockRunRepo.update).toHaveBeenCalledWith('r1', expect.objectContaining({ status: 'failed' }));
-      mockProjectRepo.findById.mockReturnValue({ id: 'p1', defaultAgentProfileId: 'prov1', rootPath: '/test' });
+      expect(mockRunRepo.update).toHaveBeenCalledWith(
+        'r1',
+        expect.objectContaining({ status: 'failed' })
+      );
+      mockProjectRepo.findById.mockReturnValue({
+        id: 'p1',
+        defaultAgentProfileId: 'prov1',
+        rootPath: '/test',
+      });
     });
 
     it('completes with review passed', async () => {
@@ -1400,16 +1973,31 @@ describe('WorkflowEngine', () => {
           get: vi.fn().mockImplementation(() => {
             if (sql.includes('FROM agent_profiles')) {
               return {
-                id: 'agent-1', name: 'mock', description: null, llm_profile_id: 'prov1',
-                model: 'm', system_prompt: '', enabled_tools: '["read"]', thinking_level: null,
-                is_default: 1, created_at: 1, updated_at: 1,
+                id: 'agent-1',
+                name: 'mock',
+                description: null,
+                llm_profile_id: 'prov1',
+                model: 'm',
+                system_prompt: '',
+                enabled_tools: '["read"]',
+                thinking_level: null,
+                is_default: 1,
+                created_at: 1,
+                updated_at: 1,
               };
             }
             if (sql.includes('FROM llm_profiles')) {
               return {
-                id: 'prov1', name: 'mock', provider_type: 'anthropic',
-                base_url: null, api_key: null, compat: null, env: null,
-                is_default: 1, created_at: 1, updated_at: 1,
+                id: 'prov1',
+                name: 'mock',
+                provider_type: 'anthropic',
+                base_url: null,
+                api_key: null,
+                compat: null,
+                env: null,
+                is_default: 1,
+                created_at: 1,
+                updated_at: 1,
               };
             }
             return undefined;
@@ -1430,22 +2018,33 @@ describe('WorkflowEngine', () => {
         contextId: 'ctx-review',
       });
 
-      await engineWithDb.startRun({ workflowId: 'wf-review-pass', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engineWithDb.startRun({
+        workflowId: 'wf-review-pass',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(200);
 
-      expect(mockStepRunRepo.update).toHaveBeenCalledWith('sr1', expect.objectContaining({
-        status: 'completed',
-        output: expect.objectContaining({
-          reviewPassed: true,
-          reviewNotes: 'Code looks good.',
-          contextId: 'ctx-review',
-        }),
-      }));
-      expect(mockAgentLoopRunner.run).toHaveBeenCalledWith(expect.objectContaining({
-        purpose: 'workflow.ai_review',
-        toolset: { id: 'code-review-readonly' },
-        context: { policy: 'workflow-artifacts', key: 'n1' },
-      }));
+      expect(mockStepRunRepo.update).toHaveBeenCalledWith(
+        'sr1',
+        expect.objectContaining({
+          status: 'completed',
+          output: expect.objectContaining({
+            reviewPassed: true,
+            reviewNotes: 'Code looks good.',
+            contextId: 'ctx-review',
+          }),
+        })
+      );
+      expect(mockAgentLoopRunner.run).toHaveBeenCalledWith(
+        expect.objectContaining({
+          purpose: 'workflow.ai_review',
+          toolset: { id: 'code-review-readonly' },
+          context: { policy: 'workflow-artifacts', key: 'n1' },
+        })
+      );
       expect(mockWorkflowAiRunPort.startVirtualRun).not.toHaveBeenCalled();
     });
   });
@@ -1461,12 +2060,21 @@ describe('WorkflowEngine', () => {
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
 
-      await engine.startRun({ workflowId: 'wf-broadcast', projectId: 'p1', definition: def as any, triggerSource: 'manual', initiator: 'manual' });
+      await engine.startRun({
+        workflowId: 'wf-broadcast',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'manual',
+        initiator: 'manual',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(mockBroadcast).toHaveBeenCalledWith('p1', expect.objectContaining({
-        type: 'workflow_run_update',
-      }));
+      expect(mockBroadcast).toHaveBeenCalledWith(
+        'p1',
+        expect.objectContaining({
+          type: 'workflow_run_update',
+        })
+      );
     });
 
     it('does not broadcast when run not found', () => {
@@ -1488,13 +2096,22 @@ describe('WorkflowEngine', () => {
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
 
-      await engine.startRun({ workflowId: 'wf-detail', projectId: 'p1', definition: def as any, triggerSource: 'schedule', initiator: 'manual', triggerDetail: 'cron: * * * * *' });
+      await engine.startRun({
+        workflowId: 'wf-detail',
+        projectId: 'p1',
+        definition: def as any,
+        triggerSource: 'schedule',
+        initiator: 'manual',
+        triggerDetail: 'cron: * * * * *',
+      });
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(mockRunRepo.create).toHaveBeenCalledWith(expect.objectContaining({
-        triggerSource: 'schedule',
-        triggerDetail: 'cron: * * * * *',
-      }));
+      expect(mockRunRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          triggerSource: 'schedule',
+          triggerDetail: 'cron: * * * * *',
+        })
+      );
     });
   });
 });

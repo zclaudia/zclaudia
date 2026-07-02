@@ -19,7 +19,11 @@ type Update = {
   archivedAt?: number | null;
 };
 
-export class MetaWorkflowReusePoolRepository extends BaseRepository<ReusablePoolItem, Create, Update> {
+export class MetaWorkflowReusePoolRepository extends BaseRepository<
+  ReusablePoolItem,
+  Create,
+  Update
+> {
   constructor(db: Database) {
     super(db, 'meta_workflow_reuse_pool');
   }
@@ -50,7 +54,10 @@ export class MetaWorkflowReusePoolRepository extends BaseRepository<ReusablePool
         source_type, metadata, created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       params: [
-        id, data.kind, data.entityId, data.phaseType,
+        id,
+        data.kind,
+        data.entityId,
+        data.phaseType,
         data.description ?? null,
         JSON.stringify(data.tags),
         data.sourceType,
@@ -64,14 +71,26 @@ export class MetaWorkflowReusePoolRepository extends BaseRepository<ReusablePool
     const sets: string[] = [];
     const params: unknown[] = [];
 
-    if (data.description !== undefined) { sets.push('description = ?'); params.push(data.description ?? null); }
-    if (data.tags !== undefined) { sets.push('tags = ?'); params.push(JSON.stringify(data.tags)); }
-    if (data.sourceType !== undefined) { sets.push('source_type = ?'); params.push(data.sourceType); }
+    if (data.description !== undefined) {
+      sets.push('description = ?');
+      params.push(data.description ?? null);
+    }
+    if (data.tags !== undefined) {
+      sets.push('tags = ?');
+      params.push(JSON.stringify(data.tags));
+    }
+    if (data.sourceType !== undefined) {
+      sets.push('source_type = ?');
+      params.push(data.sourceType);
+    }
     if (data.metadata !== undefined) {
       sets.push('metadata = ?');
       params.push(data.metadata ? JSON.stringify(data.metadata) : null);
     }
-    if (data.archivedAt !== undefined) { sets.push('archived_at = ?'); params.push(data.archivedAt ?? null); }
+    if (data.archivedAt !== undefined) {
+      sets.push('archived_at = ?');
+      params.push(data.archivedAt ?? null);
+    }
 
     if (sets.length === 0) {
       return { sql: `SELECT 1 FROM meta_workflow_reuse_pool WHERE id = ?`, params: [id] };
@@ -87,12 +106,14 @@ export class MetaWorkflowReusePoolRepository extends BaseRepository<ReusablePool
    * Find non-archived items for a given phaseType (used by the search service).
    */
   findByPhaseType(phaseType: PhaseType): ReusablePoolItem[] {
-    const rows = this.db.prepare(
-      `SELECT * FROM meta_workflow_reuse_pool
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM meta_workflow_reuse_pool
          WHERE phase_type = ? AND archived_at IS NULL
-         ORDER BY source_type DESC, created_at DESC`,
-    ).all(phaseType);
-    return rows.map((r) => this.mapRow(r));
+         ORDER BY source_type DESC, created_at DESC`
+      )
+      .all(phaseType);
+    return rows.map(r => this.mapRow(r));
   }
 
   /**
@@ -101,23 +122,27 @@ export class MetaWorkflowReusePoolRepository extends BaseRepository<ReusablePool
    */
   listActive(phaseType?: string): ReusablePoolItem[] {
     const rows = phaseType
-      ? this.db.prepare(
-          `SELECT * FROM meta_workflow_reuse_pool
+      ? this.db
+          .prepare(
+            `SELECT * FROM meta_workflow_reuse_pool
              WHERE phase_type = ? AND archived_at IS NULL
-             ORDER BY source_type DESC, created_at DESC`,
-        ).all(phaseType)
-      : this.db.prepare(
-          `SELECT * FROM meta_workflow_reuse_pool
+             ORDER BY source_type DESC, created_at DESC`
+          )
+          .all(phaseType)
+      : this.db
+          .prepare(
+            `SELECT * FROM meta_workflow_reuse_pool
              WHERE archived_at IS NULL
-             ORDER BY source_type DESC, created_at DESC`,
-        ).all();
-    return rows.map((r) => this.mapRow(r));
+             ORDER BY source_type DESC, created_at DESC`
+          )
+          .all();
+    return rows.map(r => this.mapRow(r));
   }
 
   archive(id: string): void {
-    this.db.prepare(
-      `UPDATE meta_workflow_reuse_pool SET archived_at = ? WHERE id = ?`,
-    ).run(Date.now(), id);
+    this.db
+      .prepare(`UPDATE meta_workflow_reuse_pool SET archived_at = ? WHERE id = ?`)
+      .run(Date.now(), id);
   }
 
   /**

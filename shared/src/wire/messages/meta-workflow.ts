@@ -93,3 +93,20 @@ export interface MetaWorkflowImpactRecommendationMessage {
   phaseId: string;
   recommendation: { kind: 'rerun' | 'ignore' | 'minor-fix'; reason: string };
 }
+
+export type MetaWorkflowClientMessage =
+  | CreateMetaWorkflowRunMessage
+  | SubmitMetaWorkflowRequirementsMessage
+  | ResolveMetaWorkflowRequirementsMessage
+  | SetMetaWorkflowPhasesMessage
+  | CancelMetaWorkflowRunMessage
+  | RunMetaWorkflowPhaseMessage
+  | RerunMetaWorkflowPhaseMessage
+  | IgnoreMetaWorkflowPhaseStaleMessage
+  | EvaluateMetaWorkflowPhaseImpactMessage
+  | CascadeRerunMetaWorkflowPhaseMessage;
+
+export type MetaWorkflowServerMessage =
+  | MetaWorkflowRunUpdateMessage
+  | MetaWorkflowPhaseUpdateMessage
+  | MetaWorkflowImpactRecommendationMessage;

@@ -33,8 +33,8 @@ const ItemRow = memo(function ItemRow({
   const steerTitle = !canSteer
     ? 'No active run to steer right now'
     : hasAttachments
-    ? "Queued items with attachments can't be steered — they'll send as a new run"
-    : 'Inject into the active run now (delivered next turn)';
+      ? "Queued items with attachments can't be steered — they'll send as a new run"
+      : 'Inject into the active run now (delivered next turn)';
 
   return (
     <div
@@ -86,12 +86,15 @@ const ItemRow = memo(function ItemRow({
  * ends; the user may also "Steer now" to inject an item mid-run, or remove it.
  */
 export function SendQueueBar({ sessionId, canSteer, onSteer }: SendQueueBarProps) {
-  const items = useSendQueueStore((s) => s.queues[sessionId] ?? []);
-  const removeItem = useSendQueueStore((s) => s.removeItem);
+  const items = useSendQueueStore(s => s.queues[sessionId] ?? []);
+  const removeItem = useSendQueueStore(s => s.removeItem);
 
-  const handleRemove = useCallback((item: QueueItem) => {
-    removeItem(sessionId, item.id);
-  }, [removeItem, sessionId]);
+  const handleRemove = useCallback(
+    (item: QueueItem) => {
+      removeItem(sessionId, item.id);
+    },
+    [removeItem, sessionId]
+  );
 
   if (items.length === 0) return null;
 
@@ -104,7 +107,7 @@ export function SendQueueBar({ sessionId, canSteer, onSteer }: SendQueueBarProps
         </span>
         <span>{items.length} queued</span>
       </div>
-      {items.map((item) => (
+      {items.map(item => (
         <ItemRow
           key={item.id}
           item={item}

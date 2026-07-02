@@ -103,7 +103,8 @@ describe('workflowStore', () => {
       vi.mocked(apiCreateWorkflow).mockResolvedValue(wf as any);
 
       const result = await useWorkflowStore.getState().createWorkflow('proj-1', {
-        name: 'New', definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] },
+        name: 'New',
+        definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] },
       });
 
       expect(result).toEqual(wf);
@@ -125,7 +126,9 @@ describe('workflowStore', () => {
 
   describe('deleteWorkflow', () => {
     it('removes workflow from state', async () => {
-      useWorkflowStore.setState({ workflows: { 'proj-1': [mockWorkflow('w1'), mockWorkflow('w2')] as any[] } });
+      useWorkflowStore.setState({
+        workflows: { 'proj-1': [mockWorkflow('w1'), mockWorkflow('w2')] as any[] },
+      });
       vi.mocked(apiDeleteWorkflow).mockResolvedValue(undefined as any);
 
       await useWorkflowStore.getState().deleteWorkflow('w1', 'proj-1');
@@ -227,7 +230,9 @@ describe('workflowStore', () => {
 
   describe('removeWorkflow', () => {
     it('removes workflow from project', () => {
-      useWorkflowStore.setState({ workflows: { 'proj-1': [mockWorkflow('w1'), mockWorkflow('w2')] as any[] } });
+      useWorkflowStore.setState({
+        workflows: { 'proj-1': [mockWorkflow('w1'), mockWorkflow('w2')] as any[] },
+      });
 
       useWorkflowStore.getState().removeWorkflow('proj-1', 'w1');
 

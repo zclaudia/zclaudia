@@ -14,14 +14,14 @@ interface ChangeListItemProps {
 }
 
 export function ChangeListItem({ entry, projectRoot, expanded, onToggle }: ChangeListItemProps) {
-  const openFile = useFileViewerStore((s) => s.openFile);
+  const openFile = useFileViewerStore(s => s.openFile);
 
   const toolChips = useMemo(
     () =>
       Object.entries(entry.toolCounts)
         .filter(([, n]) => n > 0)
         .map(([tool, n]) => `${tool}${n > 1 ? ` ×${n}` : ''}`),
-    [entry.toolCounts],
+    [entry.toolCounts]
   );
 
   const handleOpenInViewer = (e: React.MouseEvent) => {
@@ -46,12 +46,10 @@ export function ChangeListItem({ entry, projectRoot, expanded, onToggle }: Chang
             <ChevronRight className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
           )}
           <FileText className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-          <span className="text-xs font-mono truncate flex-1 min-w-0">
-            {entry.path}
-          </span>
+          <span className="text-xs font-mono truncate flex-1 min-w-0">{entry.path}</span>
         </button>
         <div className="text-[10px] text-muted-foreground flex items-center gap-1 flex-shrink-0">
-          {toolChips.map((chip) => (
+          {toolChips.map(chip => (
             <span key={chip} className="px-1.5 py-0.5 rounded bg-secondary/70">
               {chip}
             </span>
@@ -79,7 +77,8 @@ export function ChangeListItem({ entry, projectRoot, expanded, onToggle }: Chang
                   <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                     <div className="flex-1 h-px bg-border" />
                     <span className="truncate max-w-[260px]">
-                      since "{group.sinceUserMessagePreview}" · {timeAgo(group.sinceUserMessageTimestamp)}
+                      since "{group.sinceUserMessagePreview}" ·{' '}
+                      {timeAgo(group.sinceUserMessageTimestamp)}
                     </span>
                     <div className="flex-1 h-px bg-border" />
                   </div>

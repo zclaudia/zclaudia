@@ -5,7 +5,7 @@ interface BottomPanelState {
   setActiveTab: (tab: string) => void;
 }
 
-export const useBottomPanelStore = create<BottomPanelState>((set) => ({
+export const useBottomPanelStore = create<BottomPanelState>(set => ({
   activeTab: 'terminal',
-  setActiveTab: (tab) => set({ activeTab: tab }),
+  setActiveTab: tab => set({ activeTab: tab }),
 }));

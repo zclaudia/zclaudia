@@ -1,4 +1,8 @@
-import type { WorkflowNodeDef, WorkflowStepOnError, BuiltinWorkflowStepType } from '@zclaudia/shared';
+import type {
+  WorkflowNodeDef,
+  WorkflowStepOnError,
+  BuiltinWorkflowStepType,
+} from '@zclaudia/shared';
 import { useWorkflowStore } from '../store';
 import { JsonSchemaConfigForm } from './JsonSchemaConfigForm';
 import { Select } from '../../../components/ui/Select';
@@ -30,7 +34,7 @@ const BUILTIN_STEP_TYPE_LABELS: Record<BuiltinWorkflowStepType, string> = {
 function getStepTypeLabel(type: string): string {
   const builtin = BUILTIN_STEP_TYPE_LABELS[type as BuiltinWorkflowStepType];
   if (builtin) return builtin;
-  const meta = useWorkflowStore.getState().stepTypes.find((s) => s.type === type);
+  const meta = useWorkflowStore.getState().stepTypes.find(s => s.type === type);
   return meta?.name ?? type;
 }
 
@@ -38,8 +42,16 @@ function updateConfig(step: WorkflowNodeDef, key: string, value: unknown): Workf
   return { ...step, config: { ...step.config, [key]: value } };
 }
 
-function TextInput({ label, value, onChange, placeholder }: {
-  label: string; value: string; onChange: (v: string) => void; placeholder?: string;
+function TextInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
 }) {
   return (
     <div>
@@ -47,7 +59,7 @@ function TextInput({ label, value, onChange, placeholder }: {
       <input
         type="text"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
         className="w-full px-2.5 py-1.5 text-sm rounded-md border border-border bg-background focus:outline-none focus:border-primary"
       />
@@ -55,15 +67,25 @@ function TextInput({ label, value, onChange, placeholder }: {
   );
 }
 
-function TextArea({ label, value, onChange, placeholder, rows = 3 }: {
-  label: string; value: string; onChange: (v: string) => void; placeholder?: string; rows?: number;
+function TextArea({
+  label,
+  value,
+  onChange,
+  placeholder,
+  rows = 3,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  rows?: number;
 }) {
   return (
     <div>
       <label className="text-xs font-medium text-muted-foreground block mb-1">{label}</label>
       <textarea
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
         rows={rows}
         className="w-full px-2.5 py-1.5 text-sm rounded-md border border-border bg-background focus:outline-none focus:border-primary resize-none font-mono"
@@ -83,13 +105,13 @@ function renderTypeConfig(step: WorkflowNodeDef, onChange: (s: WorkflowNodeDef) 
           <TextArea
             label="Command"
             value={(step.config.command as string) ?? ''}
-            onChange={(v) => onChange(updateConfig(step, 'command', v))}
+            onChange={v => onChange(updateConfig(step, 'command', v))}
             placeholder="npm run test"
           />
           <TextInput
             label="Working Directory"
             value={(step.config.cwd as string) ?? ''}
-            onChange={(v) => onChange(updateConfig(step, 'cwd', v))}
+            onChange={v => onChange(updateConfig(step, 'cwd', v))}
             placeholder="(project root)"
           />
         </>
@@ -101,21 +123,21 @@ function renderTypeConfig(step: WorkflowNodeDef, onChange: (s: WorkflowNodeDef) 
           <TextArea
             label="Prompt"
             value={(step.config.prompt as string) ?? ''}
-            onChange={(v) => onChange(updateConfig(step, 'prompt', v))}
+            onChange={v => onChange(updateConfig(step, 'prompt', v))}
             placeholder="Review the code changes..."
             rows={5}
           />
           <TextInput
             label="Working Directory"
             value={(step.config.workingDirectory as string) ?? ''}
-            onChange={(v) => onChange(updateConfig(step, 'workingDirectory', v))}
+            onChange={v => onChange(updateConfig(step, 'workingDirectory', v))}
             placeholder="(project root)"
           />
           <div>
             <label className="text-xs font-medium text-muted-foreground block mb-1">Toolset</label>
             <Select
               value={(step.config.toolset as string) || 'workflow-prompt'}
-              onChange={(v) => onChange(updateConfig(step, 'toolset', v))}
+              onChange={v => onChange(updateConfig(step, 'toolset', v))}
               options={[
                 { value: 'workflow-prompt', label: 'Read / Write' },
                 { value: 'workflow-prompt-readonly', label: 'Read Only' },
@@ -127,16 +149,22 @@ function renderTypeConfig(step: WorkflowNodeDef, onChange: (s: WorkflowNodeDef) 
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground block mb-1">Max Turns</label>
+            <label className="text-xs font-medium text-muted-foreground block mb-1">
+              Max Turns
+            </label>
             <input
               type="number"
               min={1}
               value={typeof step.config.maxTurns === 'number' ? step.config.maxTurns : ''}
-              onChange={(e) => onChange(updateConfig(
-                step,
-                'maxTurns',
-                e.target.value ? (parseInt(e.target.value) || 1) : undefined,
-              ))}
+              onChange={e =>
+                onChange(
+                  updateConfig(
+                    step,
+                    'maxTurns',
+                    e.target.value ? parseInt(e.target.value) || 1 : undefined
+                  )
+                )
+              }
               className="w-24 px-2.5 py-1.5 text-sm rounded-md border border-border bg-background"
             />
           </div>
@@ -148,7 +176,7 @@ function renderTypeConfig(step: WorkflowNodeDef, onChange: (s: WorkflowNodeDef) 
         <TextInput
           label="Worktree Path"
           value={(step.config.worktreePath as string) ?? ''}
-          onChange={(v) => onChange(updateConfig(step, 'worktreePath', v))}
+          onChange={v => onChange(updateConfig(step, 'worktreePath', v))}
           placeholder="(project root)"
         />
       );
@@ -159,13 +187,13 @@ function renderTypeConfig(step: WorkflowNodeDef, onChange: (s: WorkflowNodeDef) 
           <TextInput
             label="Worktree Path"
             value={(step.config.worktreePath as string) ?? ''}
-            onChange={(v) => onChange(updateConfig(step, 'worktreePath', v))}
+            onChange={v => onChange(updateConfig(step, 'worktreePath', v))}
             placeholder="(project root)"
           />
           <TextInput
             label="Commit Message"
             value={(step.config.message as string) ?? ''}
-            onChange={(v) => onChange(updateConfig(step, 'message', v))}
+            onChange={v => onChange(updateConfig(step, 'message', v))}
             placeholder="(auto-generated from diff)"
           />
         </>
@@ -177,13 +205,13 @@ function renderTypeConfig(step: WorkflowNodeDef, onChange: (s: WorkflowNodeDef) 
           <TextInput
             label="Branch to Merge"
             value={(step.config.branch as string) ?? ''}
-            onChange={(v) => onChange(updateConfig(step, 'branch', v))}
+            onChange={v => onChange(updateConfig(step, 'branch', v))}
             placeholder="feature-branch"
           />
           <TextInput
             label="Base Branch"
             value={(step.config.baseBranch as string) ?? ''}
-            onChange={(v) => onChange(updateConfig(step, 'baseBranch', v))}
+            onChange={v => onChange(updateConfig(step, 'baseBranch', v))}
             placeholder="main"
           />
         </>
@@ -195,13 +223,13 @@ function renderTypeConfig(step: WorkflowNodeDef, onChange: (s: WorkflowNodeDef) 
           <TextInput
             label="Branch Name"
             value={(step.config.branchName as string) ?? ''}
-            onChange={(v) => onChange(updateConfig(step, 'branchName', v))}
+            onChange={v => onChange(updateConfig(step, 'branchName', v))}
             placeholder="feature/new-feature"
           />
           <TextInput
             label="Base Branch"
             value={(step.config.baseBranch as string) ?? ''}
-            onChange={(v) => onChange(updateConfig(step, 'baseBranch', v))}
+            onChange={v => onChange(updateConfig(step, 'baseBranch', v))}
             placeholder="main"
           />
         </>
@@ -213,13 +241,13 @@ function renderTypeConfig(step: WorkflowNodeDef, onChange: (s: WorkflowNodeDef) 
           <TextInput
             label="Title"
             value={(step.config.title as string) ?? ''}
-            onChange={(v) => onChange(updateConfig(step, 'title', v))}
+            onChange={v => onChange(updateConfig(step, 'title', v))}
             placeholder="(auto-generated)"
           />
           <TextInput
             label="Base Branch"
             value={(step.config.baseBranch as string) ?? ''}
-            onChange={(v) => onChange(updateConfig(step, 'baseBranch', v))}
+            onChange={v => onChange(updateConfig(step, 'baseBranch', v))}
             placeholder="main"
           />
         </>
@@ -231,14 +259,14 @@ function renderTypeConfig(step: WorkflowNodeDef, onChange: (s: WorkflowNodeDef) 
           <TextInput
             label="URL"
             value={(step.config.url as string) ?? ''}
-            onChange={(v) => onChange(updateConfig(step, 'url', v))}
+            onChange={v => onChange(updateConfig(step, 'url', v))}
             placeholder="https://example.com/webhook"
           />
           <div>
             <label className="text-xs font-medium text-muted-foreground block mb-1">Method</label>
             <Select
               value={(step.config.method as string) ?? 'POST'}
-              onChange={(next) => onChange(updateConfig(step, 'method', next))}
+              onChange={next => onChange(updateConfig(step, 'method', next))}
               block
               size="md"
               options={[
@@ -258,7 +286,7 @@ function renderTypeConfig(step: WorkflowNodeDef, onChange: (s: WorkflowNodeDef) 
             <label className="text-xs font-medium text-muted-foreground block mb-1">Type</label>
             <Select
               value={(step.config.type as string) ?? 'system'}
-              onChange={(next) => onChange(updateConfig(step, 'type', next))}
+              onChange={next => onChange(updateConfig(step, 'type', next))}
               block
               size="md"
               options={[
@@ -270,7 +298,7 @@ function renderTypeConfig(step: WorkflowNodeDef, onChange: (s: WorkflowNodeDef) 
           <TextArea
             label="Message"
             value={(step.config.message as string) ?? ''}
-            onChange={(v) => onChange(updateConfig(step, 'message', v))}
+            onChange={v => onChange(updateConfig(step, 'message', v))}
             placeholder="Workflow notification..."
           />
         </>
@@ -281,7 +309,7 @@ function renderTypeConfig(step: WorkflowNodeDef, onChange: (s: WorkflowNodeDef) 
         <TextInput
           label="Expression"
           value={step.condition?.expression ?? ''}
-          onChange={(v) => onChange({ ...step, condition: { expression: v } })}
+          onChange={v => onChange({ ...step, condition: { expression: v } })}
           placeholder="${review.output.reviewPassed} == true"
         />
       );
@@ -292,7 +320,7 @@ function renderTypeConfig(step: WorkflowNodeDef, onChange: (s: WorkflowNodeDef) 
           <label className="text-xs font-medium text-muted-foreground block mb-1">Wait Type</label>
           <Select
             value={(step.config.type as string) ?? 'approval'}
-            onChange={(next) => onChange(updateConfig(step, 'type', next))}
+            onChange={next => onChange(updateConfig(step, 'type', next))}
             block
             size="md"
             options={[
@@ -305,17 +333,21 @@ function renderTypeConfig(step: WorkflowNodeDef, onChange: (s: WorkflowNodeDef) 
 
     default: {
       // Check if this is a plugin step type with a JSON Schema config
-      const meta = useWorkflowStore.getState().stepTypes.find((s) => s.type === step.type);
+      const meta = useWorkflowStore.getState().stepTypes.find(s => s.type === step.type);
       if (meta?.configSchema) {
         return (
           <JsonSchemaConfigForm
             schema={meta.configSchema}
             config={step.config}
-            onChange={(newConfig) => onChange({ ...step, config: newConfig })}
+            onChange={newConfig => onChange({ ...step, config: newConfig })}
           />
         );
       }
-      return <p className="text-xs text-muted-foreground">No configuration available for this step type.</p>;
+      return (
+        <p className="text-xs text-muted-foreground">
+          No configuration available for this step type.
+        </p>
+      );
     }
   }
 }
@@ -338,14 +370,14 @@ export function StepConfigForm({ step, onChange, onDelete }: StepConfigFormProps
       <TextInput
         label="Name"
         value={step.name}
-        onChange={(v) => onChange({ ...step, name: v })}
+        onChange={v => onChange({ ...step, name: v })}
         placeholder="Step name"
       />
 
       <TextInput
         label="Node ID"
         value={step.id}
-        onChange={(v) => onChange({ ...step, id: v })}
+        onChange={v => onChange({ ...step, id: v })}
         placeholder="node_1"
       />
 
@@ -365,7 +397,7 @@ export function StepConfigForm({ step, onChange, onDelete }: StepConfigFormProps
       <div>
         <label className="text-xs font-medium text-muted-foreground block mb-1">On Error</label>
         <div className="flex flex-wrap gap-2">
-          {onErrorOptions.map((opt) => (
+          {onErrorOptions.map(opt => (
             <button
               key={opt}
               onClick={() => onChange({ ...step, onError: opt })}
@@ -390,25 +422,29 @@ export function StepConfigForm({ step, onChange, onDelete }: StepConfigFormProps
 
       {step.onError === 'retry' && (
         <div>
-          <label className="text-xs font-medium text-muted-foreground block mb-1">Max Retries</label>
+          <label className="text-xs font-medium text-muted-foreground block mb-1">
+            Max Retries
+          </label>
           <input
             type="number"
             min={1}
             max={10}
             value={step.retryCount ?? 1}
-            onChange={(e) => onChange({ ...step, retryCount: parseInt(e.target.value) || 1 })}
+            onChange={e => onChange({ ...step, retryCount: parseInt(e.target.value) || 1 })}
             className="w-20 px-2.5 py-1.5 text-sm rounded-full border border-border bg-background"
           />
         </div>
       )}
 
       <div>
-        <label className="text-xs font-medium text-muted-foreground block mb-1">Timeout (seconds)</label>
+        <label className="text-xs font-medium text-muted-foreground block mb-1">
+          Timeout (seconds)
+        </label>
         <input
           type="number"
           min={5}
           value={Math.floor((step.timeoutMs ?? 600000) / 1000)}
-          onChange={(e) => onChange({ ...step, timeoutMs: (parseInt(e.target.value) || 600) * 1000 })}
+          onChange={e => onChange({ ...step, timeoutMs: (parseInt(e.target.value) || 600) * 1000 })}
           className="w-24 px-2.5 py-1.5 text-sm rounded-full border border-border bg-background"
         />
       </div>

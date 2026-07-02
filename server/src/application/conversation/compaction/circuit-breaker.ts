@@ -40,17 +40,24 @@ export function resolveBreaker(
   state: BreakerState | undefined,
   nowMs: number,
   maxFailures: number,
-  cooldownMs: number,
+  cooldownMs: number
 ): BreakerDecision {
   const failures = Math.max(0, state?.consecutiveFailures ?? 0);
   if (failures < maxFailures) return { action: 'allow', wasHalfOpen: false };
 
   let nextRetryAtMs = state?.nextRetryAtMs;
-  if ((typeof nextRetryAtMs !== 'number' || !Number.isFinite(nextRetryAtMs))
-    && typeof state?.lastFailureAtMs === 'number' && Number.isFinite(state.lastFailureAtMs)) {
+  if (
+    (typeof nextRetryAtMs !== 'number' || !Number.isFinite(nextRetryAtMs)) &&
+    typeof state?.lastFailureAtMs === 'number' &&
+    Number.isFinite(state.lastFailureAtMs)
+  ) {
     nextRetryAtMs = state.lastFailureAtMs + cooldownMs;
   }
-  if (typeof nextRetryAtMs === 'number' && Number.isFinite(nextRetryAtMs) && nowMs < nextRetryAtMs) {
+  if (
+    typeof nextRetryAtMs === 'number' &&
+    Number.isFinite(nextRetryAtMs) &&
+    nowMs < nextRetryAtMs
+  ) {
     return { action: 'skip', nextRetryAtMs };
   }
   return { action: 'allow', wasHalfOpen: true };
@@ -68,7 +75,12 @@ export class CompactionCircuitBreaker {
   constructor(private readonly softCap = DEFAULT_SOFT_CAP) {}
 
   evaluate(sessionId: string, nowMs: number): BreakerDecision {
-    return resolveBreaker(this.map.get(sessionId), nowMs, resolveMaxFailures(), resolveCooldownMs());
+    return resolveBreaker(
+      this.map.get(sessionId),
+      nowMs,
+      resolveMaxFailures(),
+      resolveCooldownMs()
+    );
   }
 
   recordFailure(sessionId: string, nowMs: number): void {
@@ -82,14 +94,28 @@ export class CompactionCircuitBreaker {
     this.enforceSoftCap();
   }
 
-  recordSuccess(sessionId: string): void { this.map.delete(sessionId); }
-  reset(sessionId: string): void { this.map.delete(sessionId); }
-  evict(sessionId: string): void { this.map.delete(sessionId); }
-  size(): number { return this.map.size; }
-  clear(): void { this.map.clear(); }
+  recordSuccess(sessionId: string): void {
+    this.map.delete(sessionId);
+  }
+  reset(sessionId: string): void {
+    this.map.delete(sessionId);
+  }
+  evict(sessionId: string): void {
+    this.map.delete(sessionId);
+  }
+  size(): number {
+    return this.map.size;
+  }
+  clear(): void {
+    this.map.clear();
+  }
 
   /** Snapshot for building wire events after a recordFailure. */
-  snapshot(sessionId: string): { consecutiveFailures: number; breakerOpen: boolean; nextRetryAtMs?: number } {
+  snapshot(sessionId: string): {
+    consecutiveFailures: number;
+    breakerOpen: boolean;
+    nextRetryAtMs?: number;
+  } {
     const s = this.map.get(sessionId);
     const consecutiveFailures = s?.consecutiveFailures ?? 0;
     return {
@@ -102,7 +128,7 @@ export class CompactionCircuitBreaker {
   private enforceSoftCap(): void {
     if (this.map.size <= this.softCap) return;
     const entries = [...this.map.entries()].sort(
-      (a, b) => (a[1].lastFailureAtMs ?? 0) - (b[1].lastFailureAtMs ?? 0),
+      (a, b) => (a[1].lastFailureAtMs ?? 0) - (b[1].lastFailureAtMs ?? 0)
     );
     const toRemove = this.map.size - this.softCap;
     for (let i = 0; i < toRemove; i++) this.map.delete(entries[i][0]);

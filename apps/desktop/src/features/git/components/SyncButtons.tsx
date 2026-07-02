@@ -20,8 +20,8 @@ export function SyncButtons({ projectId, worktreePath, onAfter }: SyncButtonsPro
       kind === 'fetch'
         ? () => api.fetchGit(projectId, worktreePath)
         : kind === 'pull'
-        ? () => api.pullGit(projectId, worktreePath)
-        : () => api.pushGit(projectId, worktreePath);
+          ? () => api.pullGit(projectId, worktreePath)
+          : () => api.pushGit(projectId, worktreePath);
     await runWithToast(label, projectId, fn);
     setBusy(null);
     if (onAfter) await onAfter();
@@ -32,15 +32,33 @@ export function SyncButtons({ projectId, worktreePath, onAfter }: SyncButtonsPro
 
   return (
     <div className="flex items-center gap-1.5">
-      <button type="button" onClick={() => run('fetch')} disabled={!!busy} className={baseBtn} title="git fetch origin">
+      <button
+        type="button"
+        onClick={() => run('fetch')}
+        disabled={!!busy}
+        className={baseBtn}
+        title="git fetch origin"
+      >
         <Download className="w-3 h-3 opacity-70" />
         {busy === 'fetch' ? 'Fetching…' : 'Fetch'}
       </button>
-      <button type="button" onClick={() => run('pull')} disabled={!!busy} className={baseBtn} title="git pull --ff-only">
+      <button
+        type="button"
+        onClick={() => run('pull')}
+        disabled={!!busy}
+        className={baseBtn}
+        title="git pull --ff-only"
+      >
         <ArrowDownToLine className="w-3 h-3 opacity-70" />
         {busy === 'pull' ? 'Pulling…' : 'Pull'}
       </button>
-      <button type="button" onClick={() => run('push')} disabled={!!busy} className={baseBtn} title="git push">
+      <button
+        type="button"
+        onClick={() => run('push')}
+        disabled={!!busy}
+        className={baseBtn}
+        title="git push"
+      >
         <ArrowUpFromLine className="w-3 h-3 opacity-70" />
         {busy === 'push' ? 'Pushing…' : 'Push'}
       </button>

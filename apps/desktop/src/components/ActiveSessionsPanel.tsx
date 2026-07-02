@@ -8,7 +8,11 @@ import {
 } from '../stores/sessionsStore';
 import { useServerStore } from '../stores/serverStore';
 import { useProjectStore } from '../stores/projectStore';
-import { parseBackendId, shouldShowNonCurrentInstanceBackend, useGatewayStore } from '../stores/gatewayStore';
+import {
+  parseBackendId,
+  shouldShowNonCurrentInstanceBackend,
+  useGatewayStore,
+} from '../stores/gatewayStore';
 import { useFacadeStore } from '../stores/facadeStore';
 import { LEGACY_LOCAL_SERVER_ID } from '../utils/controlPlane';
 import { isMobileBackendUsable } from '../services/mobileConnectionState';
@@ -29,15 +33,21 @@ function formatTimeAgo(ts: number): string {
 export function ActiveSessionsPanel({ onSessionSelect }: ActiveSessionsPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [, forceUpdate] = useState(0);
-  const { remoteSessions, activeSessionIdsByBackend, recentlyCompletedSessions, dismissRecentlyCompleted, clearAllRecentlyCompleted } = useSessionsStore();
-  const activeServerId = useServerStore((s) => s.activeServerId);
-  const localSessions = useProjectStore((s) => s.sessions);
-  const projects = useProjectStore((s) => s.projects);
-  const showLocalBackend = useGatewayStore((s) => s.showLocalBackend);
-  const facadeBackends = useFacadeStore((s) => s.backends);
-  const facadeConnectionState = useFacadeStore((s) => s.connectionState);
-  const localBackendId = useFacadeStore((s) => s.localBackendId);
-  const currentInstanceId = useFacadeStore((s) => s.currentInstanceId);
+  const {
+    remoteSessions,
+    activeSessionIdsByBackend,
+    recentlyCompletedSessions,
+    dismissRecentlyCompleted,
+    clearAllRecentlyCompleted,
+  } = useSessionsStore();
+  const activeServerId = useServerStore(s => s.activeServerId);
+  const localSessions = useProjectStore(s => s.sessions);
+  const projects = useProjectStore(s => s.projects);
+  const showLocalBackend = useGatewayStore(s => s.showLocalBackend);
+  const facadeBackends = useFacadeStore(s => s.backends);
+  const facadeConnectionState = useFacadeStore(s => s.connectionState);
+  const localBackendId = useFacadeStore(s => s.localBackendId);
+  const currentInstanceId = useFacadeStore(s => s.currentInstanceId);
   const hasDirectLocalConnection = isMobileBackendUsable({
     backendId: localBackendId ?? 'local',
     connectionState: facadeConnectionState,
@@ -60,7 +70,7 @@ export function ActiveSessionsPanel({ onSessionSelect }: ActiveSessionsPanelProp
   }, [activeServerId]);
 
   const isVisibleGatewayBackend = (backendId: string): boolean => {
-    const backend = facadeBackends.find((item) => item.backendId === backendId);
+    const backend = facadeBackends.find(item => item.backendId === backendId);
     if (!backend) return true;
     return shouldShowNonCurrentInstanceBackend(backend, currentInstanceId, showLocalBackend);
   };
@@ -82,7 +92,7 @@ export function ActiveSessionsPanel({ onSessionSelect }: ActiveSessionsPanelProp
     const result = new Map<string, RemoteSession[]>();
     const localSourceBackendIds = [LOCAL_BACKEND_KEY, ...localAliasBackendIds]
       .filter((backendId, index, list) => list.indexOf(backendId) === index)
-      .filter((backendId) => (activeSessionIdsByBackend.get(backendId)?.size ?? 0) > 0);
+      .filter(backendId => (activeSessionIdsByBackend.get(backendId)?.size ?? 0) > 0);
 
     if (localSourceBackendIds.length > 0) {
       const mergedActiveIds = new Set<string>();
@@ -158,7 +168,15 @@ export function ActiveSessionsPanel({ onSessionSelect }: ActiveSessionsPanelProp
     });
 
     return result;
-  }, [activeSessionIdsByBackend, remoteSessions, localSessions, localAliasBackendIds, facadeBackends, currentInstanceId, showLocalBackend]);
+  }, [
+    activeSessionIdsByBackend,
+    remoteSessions,
+    localSessions,
+    localAliasBackendIds,
+    facadeBackends,
+    currentInstanceId,
+    showLocalBackend,
+  ]);
 
   // Don't show if not connected to any backend
   if (!activeServerId) {
@@ -189,11 +207,19 @@ export function ActiveSessionsPanel({ onSessionSelect }: ActiveSessionsPanelProp
     return project?.name || null;
   };
 
-  const totalActive = Array.from(allActiveSessionsByBackend.values()).reduce((sum, s) => sum + s.length, 0);
-  const visibleRecentlyCompletedSessions = recentlyCompletedSessions.filter(({ ownerBackendId, backendId }) => {
-    const resolvedOwnerBackendId = ownerBackendId ?? backendId;
-    return isLocalBucketOrAlias(resolvedOwnerBackendId) || isVisibleGatewayBackend(resolvedOwnerBackendId);
-  });
+  const totalActive = Array.from(allActiveSessionsByBackend.values()).reduce(
+    (sum, s) => sum + s.length,
+    0
+  );
+  const visibleRecentlyCompletedSessions = recentlyCompletedSessions.filter(
+    ({ ownerBackendId, backendId }) => {
+      const resolvedOwnerBackendId = ownerBackendId ?? backendId;
+      return (
+        isLocalBucketOrAlias(resolvedOwnerBackendId) ||
+        isVisibleGatewayBackend(resolvedOwnerBackendId)
+      );
+    }
+  );
   const hasRecentlyCompleted = visibleRecentlyCompletedSessions.length > 0;
 
   if (!hasActiveSessions && !hasRecentlyCompleted) return null;
@@ -206,13 +232,9 @@ export function ActiveSessionsPanel({ onSessionSelect }: ActiveSessionsPanelProp
           onClick={() => setIsCollapsed(!isCollapsed)}
           className="w-full flex items-center gap-1.5 px-2 py-1 rounded-lg text-muted-foreground hover:text-foreground transition-colors"
         >
-          <span className="text-[11px] font-semibold uppercase tracking-wide">
-            Active Sessions
-          </span>
+          <span className="text-[11px] font-semibold uppercase tracking-wide">Active Sessions</span>
           {hasActiveSessions && (
-            <span className="text-[10px] text-muted-foreground/50">
-              {totalActive}
-            </span>
+            <span className="text-[10px] text-muted-foreground/50">{totalActive}</span>
           )}
           <svg
             className={`ml-auto w-2.5 h-2.5 opacity-40 transition-transform duration-200 ${
@@ -236,9 +258,14 @@ export function ActiveSessionsPanel({ onSessionSelect }: ActiveSessionsPanelProp
                   <div className="flex items-center gap-1.5 px-2 py-0.5">
                     <svg
                       className="w-3 h-3 text-muted-foreground/50 shrink-0"
-                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
                         d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"
                       />
                     </svg>
@@ -252,13 +279,20 @@ export function ActiveSessionsPanel({ onSessionSelect }: ActiveSessionsPanelProp
 
                   {/* Session items */}
                   <ul className="space-y-0.5">
-                    {sortedSessions.map((session) => (
+                    {sortedSessions.map(session => (
                       <li key={session.id}>
                         <button
                           onClick={() => {
-                            if (isLocalBucketOrAlias(backendId) || isLocalSessionBucketKey(backendId)) {
-                              const resolvedBackendId = resolveSessionBucketBackendId(backendId, localBackendId);
-                              if (resolvedBackendId) onSessionSelect?.(resolvedBackendId, session.id);
+                            if (
+                              isLocalBucketOrAlias(backendId) ||
+                              isLocalSessionBucketKey(backendId)
+                            ) {
+                              const resolvedBackendId = resolveSessionBucketBackendId(
+                                backendId,
+                                localBackendId
+                              );
+                              if (resolvedBackendId)
+                                onSessionSelect?.(resolvedBackendId, session.id);
                             } else {
                               onSessionSelect?.(backendId, session.id);
                             }
@@ -299,44 +333,62 @@ export function ActiveSessionsPanel({ onSessionSelect }: ActiveSessionsPanelProp
               </button>
             </div>
             <div className="max-h-[150px] overflow-y-auto space-y-0.5">
-              {visibleRecentlyCompletedSessions.map(({ session, ownerBackendId, backendId, completedAt }) => (
-                <div key={session.id} className="flex items-center gap-1">
-                  <button
-                    onClick={() => {
-                      const resolvedOwnerBackendId = ownerBackendId ?? backendId;
-                      if (isLocalBucketOrAlias(resolvedOwnerBackendId) || isLocalSessionBucketKey(resolvedOwnerBackendId)) {
-                        const resolvedBackendId = resolveSessionBucketBackendId(resolvedOwnerBackendId, localBackendId);
-                        if (resolvedBackendId) onSessionSelect?.(resolvedBackendId, session.id);
-                      } else {
-                        onSessionSelect?.(resolvedOwnerBackendId, session.id);
-                      }
-                    }}
-                    className="flex-1 min-w-0 text-left h-7 px-2 rounded-lg text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors flex items-center gap-1.5"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30 shrink-0" />
-                    <span className="truncate flex-1">
-                      {session.name || `Session ${session.id.slice(0, 8)}`}
-                    </span>
-                    <span className="text-[9px] text-muted-foreground/40 shrink-0">
-                      {formatTimeAgo(completedAt)}
-                    </span>
-                    {getProjectName(session.projectId) && (
-                      <span className="text-[9px] text-muted-foreground/30 shrink-0 truncate max-w-[50px]">
-                        {getProjectName(session.projectId)}
+              {visibleRecentlyCompletedSessions.map(
+                ({ session, ownerBackendId, backendId, completedAt }) => (
+                  <div key={session.id} className="flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        const resolvedOwnerBackendId = ownerBackendId ?? backendId;
+                        if (
+                          isLocalBucketOrAlias(resolvedOwnerBackendId) ||
+                          isLocalSessionBucketKey(resolvedOwnerBackendId)
+                        ) {
+                          const resolvedBackendId = resolveSessionBucketBackendId(
+                            resolvedOwnerBackendId,
+                            localBackendId
+                          );
+                          if (resolvedBackendId) onSessionSelect?.(resolvedBackendId, session.id);
+                        } else {
+                          onSessionSelect?.(resolvedOwnerBackendId, session.id);
+                        }
+                      }}
+                      className="flex-1 min-w-0 text-left h-7 px-2 rounded-lg text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors flex items-center gap-1.5"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30 shrink-0" />
+                      <span className="truncate flex-1">
+                        {session.name || `Session ${session.id.slice(0, 8)}`}
                       </span>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => dismissRecentlyCompleted(session.id)}
-                    className="w-5 h-5 flex items-center justify-center text-muted-foreground/30 hover:text-muted-foreground transition-colors shrink-0"
-                    aria-label="Dismiss"
-                  >
-                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              ))}
+                      <span className="text-[9px] text-muted-foreground/40 shrink-0">
+                        {formatTimeAgo(completedAt)}
+                      </span>
+                      {getProjectName(session.projectId) && (
+                        <span className="text-[9px] text-muted-foreground/30 shrink-0 truncate max-w-[50px]">
+                          {getProjectName(session.projectId)}
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => dismissRecentlyCompleted(session.id)}
+                      className="w-5 h-5 flex items-center justify-center text-muted-foreground/30 hover:text-muted-foreground transition-colors shrink-0"
+                      aria-label="Dismiss"
+                    >
+                      <svg
+                        className="w-2.5 h-2.5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                )
+              )}
             </div>
           </div>
         )}

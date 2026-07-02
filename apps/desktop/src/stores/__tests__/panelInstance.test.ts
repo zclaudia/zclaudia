@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  MULTI_INSTANCE_PANELS,
-  isSingleton,
-} from '../panelInstance';
+import { MULTI_INSTANCE_PANELS, isSingleton } from '../panelInstance';
 
 describe('panelInstance', () => {
   describe('MULTI_INSTANCE_PANELS / isSingleton', () => {

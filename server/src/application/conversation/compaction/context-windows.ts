@@ -1,4 +1,7 @@
-import { tryGetRegistryModel, findInRegistryCrossProvider } from '../../../infra/providers/pi-runtime/registry-search.js';
+import {
+  tryGetRegistryModel,
+  findInRegistryCrossProvider,
+} from '../../../infra/providers/pi-runtime/registry-search.js';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { ContextWindowSource } from '@zclaudia/shared/wire/messages/core';
 
@@ -67,13 +70,13 @@ export interface ResolvedContextWindow {
 export function resolveContextWindow(
   agentProfile: { model: string } | null,
   modelOverride?: string,
-  llmProfileConfig?: LlmProfileConfig,
+  llmProfileConfig?: LlmProfileConfig
 ): ResolvedContextWindow {
   const modelId = agentProfile?.model ?? modelOverride;
   const providerType = llmProfileConfig?.providerType ?? DEFAULT_PROVIDER;
 
   if (modelId && llmProfileConfig?.models) {
-    const entry = llmProfileConfig.models.find((m) => m.modelId === modelId);
+    const entry = llmProfileConfig.models.find(m => m.modelId === modelId);
     if (entry?.contextWindow && entry.contextWindow > 0) {
       return { value: entry.contextWindow, source: 'profile_entry' };
     }

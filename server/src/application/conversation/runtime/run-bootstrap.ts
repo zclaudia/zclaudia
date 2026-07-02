@@ -5,8 +5,15 @@ import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import { resolveSkillSelection, skillRefKey } from '@zclaudia/shared/core/skills';
 import type { McpToolRef, PluginToolRef, ToolName } from '@zclaudia/shared/core/tools';
-import { getEligibleDiscoveredSkills, loadDiscoveredSkillContentSync, type DiscoveredSkill } from '../../../application/plugins/skill-tools.js';
-import { createSkillRuntimeState, type ExternalToolRuntimeState } from '../../../infra/providers/pi-runtime/index.js';
+import {
+  getEligibleDiscoveredSkills,
+  loadDiscoveredSkillContentSync,
+  type DiscoveredSkill,
+} from '../../../application/plugins/skill-tools.js';
+import {
+  createSkillRuntimeState,
+  type ExternalToolRuntimeState,
+} from '../../../infra/providers/pi-runtime/index.js';
 import type { SkillRuntimeState } from '../../../infra/providers/pi-runtime/index.js';
 import { sendMessage, broadcastToOtherAuthenticatedClients } from '../transport/broadcast.js';
 import type { ActiveRun, ConnectedClient } from '../transport/types.js';
@@ -24,7 +31,10 @@ import type { TraceRecorder } from '../../../utils/provider-trace.js';
 import { resolveAgentForSession } from '../../../domains/agent-profiles/agent-resolver.js';
 import { PhaseEmitter, isTerminalPhase } from './active-run-phase.js';
 import { attachRunPhaseDomainEventEmitter } from './run-phase-domain-events.js';
-import { appendMessagesToTree, buildUserMessage } from '../../../infra/providers/pi-runtime/session-tree/write-path.js';
+import {
+  appendMessagesToTree,
+  buildUserMessage,
+} from '../../../infra/providers/pi-runtime/session-tree/write-path.js';
 
 export interface RunStartMessage extends Record<string, unknown> {
   type: 'run_start';
@@ -35,7 +45,9 @@ export interface RunStartMessage extends Record<string, unknown> {
   /** User-selected mode id (matches one of `ProviderCapabilities.modes`). Typical
    *  values: `'default'` | `'plan'`. */
   mode?: string;
-  permissionOverride?: Partial<import('@zclaudia/shared/interaction/permissions').UnifiedPermissionPolicy>;
+  permissionOverride?: Partial<
+    import('@zclaudia/shared/interaction/permissions').UnifiedPermissionPolicy
+  >;
   systemContext?: string;
   workingDirectory?: string;
   resend?: boolean;
@@ -96,10 +108,12 @@ export interface RunBootstrapResult {
 
 function buildExternalToolRuntimeState(profile: AgentProfileConfig): ExternalToolRuntimeState {
   const selection = profile.toolSelection;
-  const pinnedExternalTools = (selection?.include ?? []).flatMap((ref): Array<McpToolRef | PluginToolRef> => {
-    if (ref.source === 'mcp' || ref.source === 'plugin') return [ref];
-    return [];
-  });
+  const pinnedExternalTools = (selection?.include ?? []).flatMap(
+    (ref): Array<McpToolRef | PluginToolRef> => {
+      if (ref.source === 'mcp' || ref.source === 'plugin') return [ref];
+      return [];
+    }
+  );
   return {
     discoverableProviders: selection?.providers ?? [],
     pinnedExternalTools,
@@ -110,7 +124,7 @@ function buildExternalToolRuntimeState(profile: AgentProfileConfig): ExternalToo
 export function buildSkillRuntimeState(
   profile: AgentProfileConfig,
   eligibleSkills: DiscoveredSkill[] = getEligibleDiscoveredSkills(),
-  loadContent: typeof loadDiscoveredSkillContentSync = loadDiscoveredSkillContentSync,
+  loadContent: typeof loadDiscoveredSkillContentSync = loadDiscoveredSkillContentSync
 ): SkillRuntimeState {
   const resolved = resolveSkillSelection(eligibleSkills, profile.skillSelection);
   const state = createSkillRuntimeState(resolved.discoverable, resolved.pinned);
@@ -127,14 +141,18 @@ export function buildSkillRuntimeState(
   return state;
 }
 
-export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunBootstrapResult | null {
+export function initializeRunBootstrap(
+  input: InitializeRunBootstrapInput
+): RunBootstrapResult | null {
   const { activeRuns, client, clients, db, message, runId, sessionSync, trace } = input;
   const connectedClients = clients ?? new Map<string, ConnectedClient>();
 
   // Load the session row + project root_path. LLM/agent resolution happens below
   // via AgentProfileRepository → LlmProfileRepository so the runtime can read all
   // resolved fields (model, systemPrompt, enabledTools, thinkingLevel) — not just llm_profile_id.
-  const session = db.prepare(`
+  const session = db
+    .prepare(
+      `
     SELECT s.id, s.project_id, s.name, s.sdk_session_id, s.type as session_type,
            s.working_directory, s.project_role, s.plan_status, s.task_id,
            s.agent_profile_id,
@@ -142,10 +160,17 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
     FROM sessions s
     LEFT JOIN projects p ON s.project_id = p.id
     WHERE s.id = ?
-  `).get(message.sessionId) as RunSessionRecord | undefined;
+  `
+    )
+    .get(message.sessionId) as RunSessionRecord | undefined;
 
   if (!session) {
-    trace.log('server_norm', 'run_start_rejected', { reason: 'SESSION_NOT_FOUND' }, 'session not found');
+    trace.log(
+      'server_norm',
+      'run_start_rejected',
+      { reason: 'SESSION_NOT_FOUND' },
+      'session not found'
+    );
     sendMessage(client.ws, {
       type: 'error',
       code: 'SESSION_NOT_FOUND',
@@ -161,7 +186,12 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
     return null;
   })();
   if (existingRunId) {
-    trace.log('server_norm', 'run_start_rejected', { reason: 'SESSION_BUSY', existingRunId }, 'session busy');
+    trace.log(
+      'server_norm',
+      'run_start_rejected',
+      { reason: 'SESSION_BUSY', existingRunId },
+      'session busy'
+    );
     sendMessage(client.ws, {
       type: 'error',
       code: 'SESSION_BUSY',
@@ -177,7 +207,7 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
   // agent_profile_id is canonical; project default only matters at session-create time.
   const { agent: agentProfile, llm: providerConfig } = resolveAgentForSession(
     db as unknown as import('better-sqlite3').Database,
-    { explicitAgentId: session.agent_profile_id ?? undefined },
+    { explicitAgentId: session.agent_profile_id ?? undefined }
   );
   const llmProfileId = providerConfig?.id ?? null;
   const enabledTools = agentProfile.enabledTools as ToolName[];
@@ -197,21 +227,24 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
   const requestedMode = message.mode && message.mode !== 'default' ? message.mode : undefined;
   const preservesSessionOnModeSwitch = providerPolicy?.modeSwitchSessionPolicy === 'preserve';
   const modeRequiresNewSession = Boolean(
-    requestedMode
-      && session.sdk_session_id
-      && !preservesSessionOnModeSwitch
+    requestedMode && session.sdk_session_id && !preservesSessionOnModeSwitch
   );
-  const effectiveSdkSessionId = modeRequiresNewSession ? undefined : (session.sdk_session_id || undefined);
+  const effectiveSdkSessionId = modeRequiresNewSession
+    ? undefined
+    : session.sdk_session_id || undefined;
 
-  const requestedCwd = message.workingDirectory
-    || session.working_directory
-    || session.root_path
-    || process.cwd();
+  const requestedCwd =
+    message.workingDirectory || session.working_directory || session.root_path || process.cwd();
   if (modeRequiresNewSession) {
-    trace.log('server_norm', 'mode_switch_new_session', {
-      requestedMode,
-      previousSdkSession: session.sdk_session_id,
-    }, `mode=${requestedMode} forces new SDK session`);
+    trace.log(
+      'server_norm',
+      'mode_switch_new_session',
+      {
+        requestedMode,
+        previousSdkSession: session.sdk_session_id,
+      },
+      `mode=${requestedMode} forces new SDK session`
+    );
   }
 
   const cwd = resolveProviderCwd({
@@ -261,8 +294,11 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
   activeRuns.set(runId, activeRun);
   attachRunPhaseDomainEventEmitter(activeRun);
 
-  db.prepare('UPDATE sessions SET last_run_status = ?, updated_at = ? WHERE id = ?')
-    .run('running', Date.now(), message.sessionId);
+  db.prepare('UPDATE sessions SET last_run_status = ?, updated_at = ? WHERE id = ?').run(
+    'running',
+    Date.now(),
+    message.sessionId
+  );
 
   let userMessageId: string | undefined;
   if (!message.resend) {
@@ -280,24 +316,30 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
     if (message.userMessageMetadata != null && typeof message.userMessageMetadata === 'object') {
       Object.assign(userMsgMetadata, message.userMessageMetadata as Record<string, unknown>);
     }
-    const userMsgMetadataJson = Object.keys(userMsgMetadata).length > 0
-      ? JSON.stringify(userMsgMetadata)
-      : null;
+    const userMsgMetadataJson =
+      Object.keys(userMsgMetadata).length > 0 ? JSON.stringify(userMsgMetadata) : null;
 
     db.transaction(() => {
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO messages (id, session_id, role, content, metadata, created_at, offset)
         VALUES (?, ?, 'user', ?, ?, ?, ?)
-      `).run(
+      `
+      ).run(
         userMessageId,
         message.sessionId,
         parsedInput.text,
         userMsgMetadataJson,
         Date.now(),
-        userOffset,
+        userOffset
       );
-      const entryIds = appendMessagesToTree(db, message.sessionId, [buildUserMessage(parsedInput.text, parsedInput.attachments)]);
-      db.prepare(`UPDATE messages SET tree_entry_id = ? WHERE id = ?`).run(entryIds[0], userMessageId);
+      const entryIds = appendMessagesToTree(db, message.sessionId, [
+        buildUserMessage(parsedInput.text, parsedInput.attachments),
+      ]);
+      db.prepare(`UPDATE messages SET tree_entry_id = ? WHERE id = ?`).run(
+        entryIds[0],
+        userMessageId
+      );
     })();
   }
 
@@ -305,7 +347,8 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
   // Used by run-lifecycle, run-permissions, etc. via activeRun.broadcast.
   activeRun.broadcast = (msg: ServerMessage) => {
     sendMessage(client.ws, msg);
-    if (connectedClients.size > 0) broadcastToOtherAuthenticatedClients(connectedClients, client.id, msg);
+    if (connectedClients.size > 0)
+      broadcastToOtherAuthenticatedClients(connectedClients, client.id, msg);
   };
 
   const sendRunEvent = (event: ServerMessage) => {
@@ -321,22 +364,30 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
     sdkSessionId: effectiveSdkSessionId,
   };
 
-  let persistedWorkingDirectory = normalizeSessionWorkingDirectory(session.working_directory, session.root_path);
+  let persistedWorkingDirectory = normalizeSessionWorkingDirectory(
+    session.working_directory,
+    session.root_path
+  );
   trace.setMeta({
     provider: providerConfig?.providerType,
     cwd: message.workingDirectory || persistedWorkingDirectory || session.root_path || undefined,
   });
 
   const persistSessionWorkingDirectory = (nextWorkingDirectory: string | null | undefined) => {
-    const normalizedNext = normalizeSessionWorkingDirectory(nextWorkingDirectory, session.root_path);
+    const normalizedNext = normalizeSessionWorkingDirectory(
+      nextWorkingDirectory,
+      session.root_path
+    );
     if (normalizedNext === persistedWorkingDirectory) return;
 
     const now = Date.now();
-    db.prepare(`
+    db.prepare(
+      `
       UPDATE sessions
       SET working_directory = ?, updated_at = ?
       WHERE id = ?
-    `).run(normalizedNext, now, message.sessionId);
+    `
+    ).run(normalizedNext, now, message.sessionId);
 
     persistedWorkingDirectory = normalizedNext;
 
@@ -348,8 +399,11 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
   };
 
   const markPendingResolutionResumed = () => {
-    db.prepare('UPDATE sessions SET last_run_status = ?, updated_at = ? WHERE id = ?')
-      .run('running', Date.now(), activeRun.sessionId);
+    db.prepare('UPDATE sessions SET last_run_status = ?, updated_at = ? WHERE id = ?').run(
+      'running',
+      Date.now(),
+      activeRun.sessionId
+    );
 
     if (sessionType === 'background') {
       activeRun.broadcast!({

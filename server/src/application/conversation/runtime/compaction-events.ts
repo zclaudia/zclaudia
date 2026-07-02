@@ -1,8 +1,5 @@
 import type { CompactionOutcome } from '../compaction/compaction-service.js';
-import {
-  createRunDomainEvent,
-  type RunDomainEvent,
-} from './run-domain-events.js';
+import { createRunDomainEvent, type RunDomainEvent } from './run-domain-events.js';
 
 export function compactionDomainEventFor(input: {
   outcome: CompactionOutcome;

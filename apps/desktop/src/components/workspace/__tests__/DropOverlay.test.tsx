@@ -4,7 +4,14 @@ import { DropOverlay } from '../DropOverlay';
 import { useDragSplitStore } from '../dragSplit';
 
 describe('DropOverlay', () => {
-  beforeEach(() => useDragSplitStore.setState({ active: null, hoverPaneId: null, hoverZone: null, disabled: new Set() }));
+  beforeEach(() =>
+    useDragSplitStore.setState({
+      active: null,
+      hoverPaneId: null,
+      hoverZone: null,
+      disabled: new Set(),
+    })
+  );
   afterEach(() => cleanup());
 
   it('renders nothing when no drag is active', () => {

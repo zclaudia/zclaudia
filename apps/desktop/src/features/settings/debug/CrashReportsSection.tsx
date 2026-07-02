@@ -49,14 +49,18 @@ export function CrashReportsSection({ embeddedServerStatus }: { embeddedServerSt
       control={
         <>
           <button
-            onClick={() => { void loadCrashReports(); }}
+            onClick={() => {
+              void loadCrashReports();
+            }}
             disabled={crashReportsLoading || embeddedServerStatus === 'disabled'}
             className="px-2 py-1 text-xs bg-secondary hover:bg-secondary/80 disabled:bg-muted disabled:text-muted-foreground text-secondary-foreground rounded-lg transition-colors"
           >
             {crashReportsLoading ? 'Refreshing…' : 'Refresh'}
           </button>
           <button
-            onClick={() => { void handleCopyJSON(); }}
+            onClick={() => {
+              void handleCopyJSON();
+            }}
             disabled={crashReports.length === 0}
             className="px-2 py-1 text-xs bg-muted/60 hover:bg-muted disabled:bg-muted disabled:text-muted-foreground text-foreground rounded-lg transition-colors"
           >
@@ -67,19 +71,15 @@ export function CrashReportsSection({ embeddedServerStatus }: { embeddedServerSt
     >
       <div className="space-y-3">
         {crashReportsPath && (
-          <div className="text-[11px] text-muted-foreground break-all">
-            {crashReportsPath}
-          </div>
+          <div className="text-[11px] text-muted-foreground break-all">{crashReportsPath}</div>
         )}
-        {crashReportsError && (
-          <div className="text-xs text-destructive">{crashReportsError}</div>
-        )}
+        {crashReportsError && <div className="text-xs text-destructive">{crashReportsError}</div>}
         {!crashReportsError && crashReports.length === 0 && !crashReportsLoading && (
           <div className="text-xs text-muted-foreground">No crash reports recorded.</div>
         )}
         {crashReports.length > 0 && (
           <div className="space-y-2">
-            {crashReports.map((report) => (
+            {crashReports.map(report => (
               <div key={report.id} className="p-3 bg-secondary/40 rounded-md space-y-1.5">
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-xs font-medium">{report.event}</div>

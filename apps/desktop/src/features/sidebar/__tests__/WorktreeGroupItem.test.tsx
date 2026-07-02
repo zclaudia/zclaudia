@@ -23,7 +23,7 @@ describe('WorktreeGroupItem', () => {
     const { container } = render(
       <WorktreeGroupItem group={group} isExpanded={false} onToggle={() => {}}>
         <li>child</li>
-      </WorktreeGroupItem>,
+      </WorktreeGroupItem>
     );
     expect(container.textContent).toContain('feature/cool');
   });
@@ -33,7 +33,7 @@ describe('WorktreeGroupItem', () => {
     const { container } = render(
       <WorktreeGroupItem group={group} isExpanded={false} onToggle={() => {}}>
         <li>child</li>
-      </WorktreeGroupItem>,
+      </WorktreeGroupItem>
     );
     expect(container.textContent).toContain('2');
   });
@@ -43,7 +43,7 @@ describe('WorktreeGroupItem', () => {
     const { container } = render(
       <WorktreeGroupItem group={group} isExpanded={false} onToggle={() => {}}>
         <li>child-content</li>
-      </WorktreeGroupItem>,
+      </WorktreeGroupItem>
     );
     expect(container.textContent).not.toContain('child-content');
   });
@@ -53,7 +53,7 @@ describe('WorktreeGroupItem', () => {
     const { container } = render(
       <WorktreeGroupItem group={group} isExpanded={true} onToggle={() => {}}>
         <li>child-content</li>
-      </WorktreeGroupItem>,
+      </WorktreeGroupItem>
     );
     expect(container.textContent).toContain('child-content');
   });
@@ -64,7 +64,7 @@ describe('WorktreeGroupItem', () => {
     const { container } = render(
       <WorktreeGroupItem group={group} isExpanded={false} onToggle={onToggle}>
         <li>child</li>
-      </WorktreeGroupItem>,
+      </WorktreeGroupItem>
     );
     const button = container.querySelector('button')!;
     fireEvent.click(button);
@@ -76,7 +76,7 @@ describe('WorktreeGroupItem', () => {
     const { container } = render(
       <WorktreeGroupItem group={group} isExpanded={false} onToggle={() => {}} isMobile>
         <li>child</li>
-      </WorktreeGroupItem>,
+      </WorktreeGroupItem>
     );
     const button = container.querySelector('button')!;
     expect(button.className).toContain('min-h-[36px]');
@@ -87,7 +87,7 @@ describe('WorktreeGroupItem', () => {
     const { container } = render(
       <WorktreeGroupItem group={group} isExpanded={true} onToggle={() => {}}>
         <li>child</li>
-      </WorktreeGroupItem>,
+      </WorktreeGroupItem>
     );
     const chevronSvg = container.querySelector('button svg');
     expect(chevronSvg?.classList.toString()).toContain('rotate-90');
@@ -106,7 +106,7 @@ describe('WorktreeGroupItem', () => {
         onDelete={onDelete}
       >
         <li>child</li>
-      </WorktreeGroupItem>,
+      </WorktreeGroupItem>
     );
 
     fireEvent.click(getByRole('button', { name: 'Remove worktree' }));

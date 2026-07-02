@@ -40,7 +40,7 @@ describe('hooks/useAndroidBack', () => {
     dispatchAndroidBack = () => {
       const listeners = eventListeners.get('android-back');
       if (listeners) {
-        listeners.forEach((listener) => listener(new Event('android-back')));
+        listeners.forEach(listener => listener(new Event('android-back')));
       }
     };
   });
@@ -128,10 +128,9 @@ describe('hooks/useAndroidBack', () => {
     const handler1 = vi.fn();
     const handler2 = vi.fn();
 
-    const { rerender } = renderHook(
-      ({ handler }) => useAndroidBack(handler, true, 10),
-      { initialProps: { handler: handler1 } }
-    );
+    const { rerender } = renderHook(({ handler }) => useAndroidBack(handler, true, 10), {
+      initialProps: { handler: handler1 },
+    });
 
     rerender({ handler: handler2 });
 
@@ -151,10 +150,9 @@ describe('hooks/useAndroidBack', () => {
     const { useAndroidBack } = await import('../useAndroidBack.js');
     const handler = vi.fn();
 
-    const { rerender } = renderHook(
-      ({ priority }) => useAndroidBack(handler, true, priority),
-      { initialProps: { priority: 10 } }
-    );
+    const { rerender } = renderHook(({ priority }) => useAndroidBack(handler, true, priority), {
+      initialProps: { priority: 10 },
+    });
 
     dispatchAndroidBack();
     expect(handler).toHaveBeenCalledTimes(1);
@@ -169,10 +167,9 @@ describe('hooks/useAndroidBack', () => {
     const { useAndroidBack } = await import('../useAndroidBack.js');
     const handler = vi.fn();
 
-    const { rerender } = renderHook(
-      ({ enabled }) => useAndroidBack(handler, enabled, 10),
-      { initialProps: { enabled: true } }
-    );
+    const { rerender } = renderHook(({ enabled }) => useAndroidBack(handler, enabled, 10), {
+      initialProps: { enabled: true },
+    });
 
     dispatchAndroidBack();
     expect(handler).toHaveBeenCalledTimes(1);

@@ -32,8 +32,18 @@ describe('WorkflowRunRepository (generalized)', () => {
   });
 
   it('finds runs by initiator', () => {
-    repo.create({ status: 'running', triggerSource: 'manual', initiator: 'automation:a1', startedAt: 1 });
-    repo.create({ status: 'running', triggerSource: 'manual', initiator: 'automation:a2', startedAt: 2 });
+    repo.create({
+      status: 'running',
+      triggerSource: 'manual',
+      initiator: 'automation:a1',
+      startedAt: 1,
+    });
+    repo.create({
+      status: 'running',
+      triggerSource: 'manual',
+      initiator: 'automation:a2',
+      startedAt: 2,
+    });
     expect(repo.findByInitiator('automation:a1')).toHaveLength(1);
   });
 });

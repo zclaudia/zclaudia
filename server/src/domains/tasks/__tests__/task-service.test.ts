@@ -79,7 +79,9 @@ describe('TaskService', () => {
     service.startTask(task.id);
     service.stopTask(task.id, { error: 'Stopped by user' });
 
-    expect(() => service.completeTask(task.id, { text: 'late result' })).toThrow(TaskLifecycleError);
+    expect(() => service.completeTask(task.id, { text: 'late result' })).toThrow(
+      TaskLifecycleError
+    );
     expect(repo.findById(task.id)?.status).toBe('stopped');
     expect(repo.listEvents(task.id).map(event => event.type)).toEqual([
       'created',

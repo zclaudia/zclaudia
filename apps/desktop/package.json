@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "pnpm --filter @zclaudia/shared run build && tsc && vite build",
+    "build": "corepack pnpm --filter @zclaudia/shared run build && tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
@@ -17,7 +17,7 @@
     "test:unit": "vitest run --config=vitest.unit.config.ts",
     "test:hooks": "vitest run --config=vitest.hooks.config.ts",
     "test:ui": "vitest run --config=vitest.ui.config.ts",
-    "test:all": "pnpm test:unit && pnpm test:hooks && pnpm test:ui",
+    "test:all": "corepack pnpm test:unit && corepack pnpm test:hooks && corepack pnpm test:ui",
     "test:parallel": "node scripts/test-parallel.mjs",
     "test:parallel:coverage": "node scripts/test-parallel.mjs --coverage",
     "test:parallel:fast": "node scripts/test-parallel-fast.mjs",

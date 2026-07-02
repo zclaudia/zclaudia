@@ -39,7 +39,10 @@ function deriveRuntimeState(record: BackendRuntimeRecord): BackendRuntimeState {
   return 'ready';
 }
 
-function createDefaultRecord(backendId: string, presence: BackendPresence | null): BackendRuntimeRecord {
+function createDefaultRecord(
+  backendId: string,
+  presence: BackendPresence | null
+): BackendRuntimeRecord {
   return {
     backendId,
     presence,
@@ -56,12 +59,9 @@ function makeDiff(
   backendId: string,
   prev: BackendRuntimeRecord | undefined,
   next: BackendRuntimeRecord,
-  reason?: string,
+  reason?: string
 ): BackendStateDiff | null {
-  if (
-    prev?.runtimeState === next.runtimeState &&
-    prev?.openState === next.openState
-  ) {
+  if (prev?.runtimeState === next.runtimeState && prev?.openState === next.openState) {
     return null;
   }
   return {
@@ -130,7 +130,10 @@ export class FacadeRegistryStore {
           currentEpoch: null,
           subscribed: false,
           dataInitialized: false,
-          openState: prev.openState === 'subscribed' || prev.openState === 'subscribing' ? 'error' : prev.openState,
+          openState:
+            prev.openState === 'subscribed' || prev.openState === 'subscribing'
+              ? 'error'
+              : prev.openState,
           capabilities: [],
         };
         updateDerived(next);
@@ -165,7 +168,10 @@ export class FacadeRegistryStore {
         prev.openState = prev.openState === 'subscribed' ? 'error' : 'unsubscribed';
         prev.capabilities = [];
         updateDerived(prev);
-        if (prev.runtimeState !== prevState.runtimeState || prev.openState !== prevState.openState) {
+        if (
+          prev.runtimeState !== prevState.runtimeState ||
+          prev.openState !== prevState.openState
+        ) {
           diffs.push({
             backendId: item.backendId,
             previousRuntimeState: prevState.runtimeState,
@@ -207,11 +213,7 @@ export class FacadeRegistryStore {
     return diff ? [diff] : [];
   }
 
-  markSubscribed(
-    backendId: string,
-    epoch: number,
-    capabilities: string[],
-  ): BackendStateDiff[] {
+  markSubscribed(backendId: string, epoch: number, capabilities: string[]): BackendStateDiff[] {
     const prev = this.records.get(backendId);
     if (!prev) return [];
 
@@ -230,10 +232,7 @@ export class FacadeRegistryStore {
     return diff ? [diff] : [];
   }
 
-  markUnsubscribed(
-    backendId: string,
-    reason: string,
-  ): BackendStateDiff[] {
+  markUnsubscribed(backendId: string, reason: string): BackendStateDiff[] {
     const prev = this.records.get(backendId);
     if (!prev) return [];
 
@@ -303,5 +302,4 @@ export class FacadeRegistryStore {
   getAllBackends(): BackendRuntimeRecord[] {
     return Array.from(this.records.values());
   }
-
 }

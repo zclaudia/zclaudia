@@ -101,15 +101,19 @@ describe('EmbeddedFacadeClient', () => {
     client.openBackend('backend-1');
     client.openSessionStream('backend-1', 'session-1');
 
-    expect(firstWs.send).toHaveBeenCalledWith(JSON.stringify({
-      type: 'open_backend',
-      backendId: 'backend-1',
-    }));
-    expect(firstWs.send).toHaveBeenCalledWith(JSON.stringify({
-      type: 'open_session_stream',
-      backendId: 'backend-1',
-      sessionId: 'session-1',
-    }));
+    expect(firstWs.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        type: 'open_backend',
+        backendId: 'backend-1',
+      })
+    );
+    expect(firstWs.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        type: 'open_session_stream',
+        backendId: 'backend-1',
+        sessionId: 'session-1',
+      })
+    );
 
     firstWs.onclose?.();
     vi.runAllTimers();
@@ -119,21 +123,25 @@ describe('EmbeddedFacadeClient', () => {
 
     secondWs.onopen?.();
 
-    expect(secondWs.send).toHaveBeenCalledWith(JSON.stringify({
-      type: 'open_backend',
-      backendId: 'backend-1',
-    }));
-    expect(secondWs.send).toHaveBeenCalledWith(JSON.stringify({
-      type: 'open_session_stream',
-      backendId: 'backend-1',
-      sessionId: 'session-1',
-    }));
+    expect(secondWs.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        type: 'open_backend',
+        backendId: 'backend-1',
+      })
+    );
+    expect(secondWs.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        type: 'open_session_stream',
+        backendId: 'backend-1',
+        sessionId: 'session-1',
+      })
+    );
   });
 
   it('emits reconnecting and connected connection state events across reconnects', () => {
     const client = new EmbeddedFacadeClient(3100);
     const events: string[] = [];
-    client.onEvent((event) => {
+    client.onEvent(event => {
       if (event.type === 'connection_state_changed') {
         events.push(event.state);
       }
@@ -154,7 +162,7 @@ describe('EmbeddedFacadeClient', () => {
   it('suppresses server-relayed connection_state_changed events', () => {
     const client = new EmbeddedFacadeClient(3100);
     const events: any[] = [];
-    client.onEvent((event) => events.push(event));
+    client.onEvent(event => events.push(event));
 
     client.connect();
     const ws = MockWebSocket.instances[0];
@@ -178,10 +186,15 @@ describe('EmbeddedFacadeClient', () => {
       data: JSON.stringify({
         type: 'facade_snapshot',
         snapshot: {
-          snapshotVersion: 1, capturedAt: 1, mode: 'embedded',
-          connectionState: 'connected', localBackendId: null,
-          currentInstanceId: null, currentDeviceId: null,
-          backends: [], sessionStreams: {},
+          snapshotVersion: 1,
+          capturedAt: 1,
+          mode: 'embedded',
+          connectionState: 'connected',
+          localBackendId: null,
+          currentInstanceId: null,
+          currentDeviceId: null,
+          backends: [],
+          sessionStreams: {},
         },
       }),
     });
@@ -197,7 +210,7 @@ describe('EmbeddedFacadeClient', () => {
   it('still emits client-side connection_state_changed on ws open/close', () => {
     const client = new EmbeddedFacadeClient(3100);
     const states: string[] = [];
-    client.onEvent((event) => {
+    client.onEvent(event => {
       if (event.type === 'connection_state_changed') states.push(event.state);
     });
 

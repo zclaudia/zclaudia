@@ -19,7 +19,9 @@ export function ManagedProcessesSection({ embeddedServerStatus }: ManagedProcess
       setManagedProcesses(records);
       setManagedProcessesError(null);
     } catch (err) {
-      setManagedProcessesError(err instanceof Error ? err.message : 'Failed to load managed processes');
+      setManagedProcessesError(
+        err instanceof Error ? err.message : 'Failed to load managed processes'
+      );
     } finally {
       setManagedProcessesLoading(false);
     }
@@ -35,8 +37,13 @@ export function ManagedProcessesSection({ embeddedServerStatus }: ManagedProcess
       try {
         const records = await api.getManagedProcesses();
         if (!cancelled) {
-          setManagedProcesses((prev) => {
-            if (prev.length === records.length && prev.every((p, i) => p.processId === records[i].processId && p.status === records[i].status)) {
+          setManagedProcesses(prev => {
+            if (
+              prev.length === records.length &&
+              prev.every(
+                (p, i) => p.processId === records[i].processId && p.status === records[i].status
+              )
+            ) {
               return prev;
             }
             return records;
@@ -45,7 +52,9 @@ export function ManagedProcessesSection({ embeddedServerStatus }: ManagedProcess
         }
       } catch (err) {
         if (!cancelled) {
-          setManagedProcessesError(err instanceof Error ? err.message : 'Failed to load managed processes');
+          setManagedProcessesError(
+            err instanceof Error ? err.message : 'Failed to load managed processes'
+          );
         }
       }
     };
@@ -69,7 +78,9 @@ export function ManagedProcessesSection({ embeddedServerStatus }: ManagedProcess
       description="Read-only process registry for product-owned commands and adopted roots."
       control={
         <button
-          onClick={() => { void handleRefreshProcesses(); }}
+          onClick={() => {
+            void handleRefreshProcesses();
+          }}
           disabled={managedProcessesLoading || embeddedServerStatus === 'disabled'}
           className="px-3 py-1 text-xs bg-secondary hover:bg-secondary/80 disabled:bg-muted disabled:text-muted-foreground text-secondary-foreground rounded-lg font-medium transition-colors"
         >
@@ -86,7 +97,7 @@ export function ManagedProcessesSection({ embeddedServerStatus }: ManagedProcess
         )}
         {managedProcesses.length > 0 && (
           <div className="space-y-2 max-h-72 overflow-auto">
-            {managedProcesses.map((process) => (
+            {managedProcesses.map(process => (
               <div key={process.processId} className="p-3 bg-secondary/40 rounded-md space-y-1.5">
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-xs font-medium break-all">
@@ -99,7 +110,9 @@ export function ManagedProcessesSection({ embeddedServerStatus }: ManagedProcess
                 <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
                   <span>{process.source}</span>
                   <span>pid {process.rootPid ?? process.pid ?? 'n/a'}</span>
-                  <span>{process.childCount} {process.childCount === 1 ? 'child' : 'children'}</span>
+                  <span>
+                    {process.childCount} {process.childCount === 1 ? 'child' : 'children'}
+                  </span>
                   {process.adopted && <span>adopted</span>}
                   {process.tags.length > 0 && <span>{process.tags.join(', ')}</span>}
                 </div>

@@ -1,4 +1,9 @@
-import type { StepExecutorPort, StepResult, StepContext, NotificationPort } from '../ports/step-executor.js';
+import type {
+  StepExecutorPort,
+  StepResult,
+  StepContext,
+  NotificationPort,
+} from '../ports/step-executor.js';
 import type { WorkflowNodeDef } from '@zclaudia/shared/features/workflows';
 
 export class NotifyStepExecutor implements StepExecutorPort {
@@ -9,10 +14,10 @@ export class NotifyStepExecutor implements StepExecutorPort {
   async execute(
     _node: WorkflowNodeDef,
     config: Record<string, unknown>,
-    _ctx: StepContext,
+    _ctx: StepContext
   ): Promise<StepResult> {
-    const message = config.message as string ?? 'Workflow notification';
-    const notifyType = config.type as string ?? 'system';
+    const message = (config.message as string) ?? 'Workflow notification';
+    const notifyType = (config.type as string) ?? 'system';
 
     if (notifyType === 'webhook' && config.url) {
       const response = await fetch(config.url as string, {

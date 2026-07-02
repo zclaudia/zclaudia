@@ -9,12 +9,7 @@ export function SidebarFooter({ onShowSettings, isMobile }: SidebarFooterProps) 
           data-testid="settings-button"
           className="w-full text-left px-3 py-3 rounded-md text-sm text-muted-foreground hover:bg-secondary active:bg-secondary hover:text-foreground flex items-center gap-2"
         >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -41,12 +36,7 @@ export function SidebarFooter({ onShowSettings, isMobile }: SidebarFooterProps) 
         data-testid="settings-button"
         className="w-full text-left px-2 py-1.5 rounded-md text-sm text-muted-foreground hover:bg-secondary hover:text-foreground flex items-center gap-2"
       >
-        <svg
-          className="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             strokeLinecap="round"
             strokeLinejoin="round"

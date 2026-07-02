@@ -40,7 +40,7 @@ describe('Gateway API Integration Tests', () => {
       connected: false,
       gatewayBackendId: null,
       gatewayUrl: null,
-      backendName: null
+      backendName: null,
     });
 
     mockConnectGateway = vi.fn().mockResolvedValue(undefined);
@@ -49,12 +49,10 @@ describe('Gateway API Integration Tests', () => {
     // Setup Express app
     app = express();
     app.use(express.json());
-    app.use('/api/gateway', createGatewayRouter(
-      db,
-      mockGetGatewayStatus,
-      mockConnectGateway,
-      mockDisconnectGateway
-    ));
+    app.use(
+      '/api/gateway',
+      createGatewayRouter(db, mockGetGatewayStatus, mockConnectGateway, mockDisconnectGateway)
+    );
   });
 
   afterEach(() => {
@@ -64,9 +62,7 @@ describe('Gateway API Integration Tests', () => {
 
   describe('GET /api/gateway/config', () => {
     it('should return gateway configuration with default values', async () => {
-      const response = await request(app)
-        .get('/api/gateway/config')
-        .expect(200);
+      const response = await request(app).get('/api/gateway/config').expect(200);
 
       expect(response.body.success).toBe(true);
       expect(response.body.data).toMatchObject({
@@ -78,7 +74,7 @@ describe('Gateway API Integration Tests', () => {
         gatewayBackendId: null,
         proxyUrl: null,
         proxyUsername: null,
-        proxyPassword: null
+        proxyPassword: null,
       });
       expect(response.body.data.createdAt).toBeDefined();
       expect(response.body.data.updatedAt).toBeDefined();
@@ -86,15 +82,15 @@ describe('Gateway API Integration Tests', () => {
 
     it('should mask gatewaySecret when present', async () => {
       // Update config with secret
-      db.prepare(`
+      db.prepare(
+        `
         UPDATE gateway_config
         SET gateway_url = ?, gateway_secret = ?
         WHERE id = 1
-      `).run('https://gateway.example.com', 'my-secret-key');
+      `
+      ).run('https://gateway.example.com', 'my-secret-key');
 
-      const response = await request(app)
-        .get('/api/gateway/config')
-        .expect(200);
+      const response = await request(app).get('/api/gateway/config').expect(200);
 
       expect(response.body.success).toBe(true);
       expect(response.body.data.gatewayUrl).toBe('https://gateway.example.com');
@@ -103,15 +99,15 @@ describe('Gateway API Integration Tests', () => {
 
     it('should mask proxyPassword when present', async () => {
       // Update config with proxy credentials
-      db.prepare(`
+      db.prepare(
+        `
         UPDATE gateway_config
         SET proxy_url = ?, proxy_username = ?, proxy_password = ?
         WHERE id = 1
-      `).run('http://proxy.example.com:8080', 'proxyuser', 'proxypass123');
+      `
+      ).run('http://proxy.example.com:8080', 'proxyuser', 'proxypass123');
 
-      const response = await request(app)
-        .get('/api/gateway/config')
-        .expect(200);
+      const response = await request(app).get('/api/gateway/config').expect(200);
 
       expect(response.body.success).toBe(true);
       expect(response.body.data.proxyUrl).toBe('http://proxy.example.com:8080');
@@ -121,11 +117,13 @@ describe('Gateway API Integration Tests', () => {
 
     it('should mask both gatewaySecret and proxyPassword when both present', async () => {
       // Update config with both secrets
-      db.prepare(`
+      db.prepare(
+        `
         UPDATE gateway_config
         SET gateway_url = ?, gateway_secret = ?, proxy_url = ?, proxy_username = ?, proxy_password = ?
         WHERE id = 1
-      `).run(
+      `
+      ).run(
         'https://gateway.example.com',
         'gateway-secret',
         'http://proxy.example.com:8080',
@@ -133,9 +131,7 @@ describe('Gateway API Integration Tests', () => {
         'proxypass'
       );
 
-      const response = await request(app)
-        .get('/api/gateway/config')
-        .expect(200);
+      const response = await request(app).get('/api/gateway/config').expect(200);
 
       expect(response.body.success).toBe(true);
       expect(response.body.data.gatewaySecret).toBe('********');
@@ -143,9 +139,7 @@ describe('Gateway API Integration Tests', () => {
     });
 
     it('should return null for secrets when not set', async () => {
-      const response = await request(app)
-        .get('/api/gateway/config')
-        .expect(200);
+      const response = await request(app).get('/api/gateway/config').expect(200);
 
       expect(response.body.success).toBe(true);
       expect(response.body.data.gatewaySecret).toBe(null);
@@ -155,9 +149,7 @@ describe('Gateway API Integration Tests', () => {
     it('should handle database errors gracefully', async () => {
       db.close();
 
-      const response = await request(app)
-        .get('/api/gateway/config')
-        .expect(200);
+      const response = await request(app).get('/api/gateway/config').expect(200);
 
       expect(response.body.success).toBe(false);
       expect(response.body.error.code).toBe('DATABASE_ERROR');
@@ -173,7 +165,7 @@ describe('Gateway API Integration Tests', () => {
           enabled: true,
           gatewayUrl: 'https://gateway.example.com',
           gatewaySecret: 'my-secret-key',
-          backendName: 'Test Backend'
+          backendName: 'Test Backend',
         })
         .expect(200);
 
@@ -182,7 +174,7 @@ describe('Gateway API Integration Tests', () => {
         enabled: true,
         gatewayUrl: 'https://gateway.example.com',
         gatewaySecret: '********',
-        backendName: 'Test Backend'
+        backendName: 'Test Backend',
       });
 
       // Verify database was updated
@@ -199,7 +191,7 @@ describe('Gateway API Integration Tests', () => {
         .send({
           proxyUrl: 'http://proxy.example.com:8080',
           proxyUsername: 'proxyuser',
-          proxyPassword: 'proxypass123'
+          proxyPassword: 'proxypass123',
         })
         .expect(200);
 
@@ -207,7 +199,7 @@ describe('Gateway API Integration Tests', () => {
       expect(response.body.data).toMatchObject({
         proxyUrl: 'http://proxy.example.com:8080',
         proxyUsername: 'proxyuser',
-        proxyPassword: '********'
+        proxyPassword: '********',
       });
 
       // Verify database was updated
@@ -227,7 +219,7 @@ describe('Gateway API Integration Tests', () => {
           backendName: 'My Backend',
           proxyUrl: 'http://proxy.example.com:8080',
           proxyUsername: 'proxyuser',
-          proxyPassword: 'proxypass123'
+          proxyPassword: 'proxypass123',
         })
         .expect(200);
 
@@ -247,7 +239,7 @@ describe('Gateway API Integration Tests', () => {
         .send({
           enabled: true,
           gatewayUrl: 'https://gateway.example.com',
-          gatewaySecret: 'my-secret-key'
+          gatewaySecret: 'my-secret-key',
         })
         .expect(200);
 
@@ -256,20 +248,18 @@ describe('Gateway API Integration Tests', () => {
         expect.objectContaining({
           enabled: true,
           gatewayUrl: 'https://gateway.example.com',
-          gatewaySecret: 'my-secret-key'
+          gatewaySecret: 'my-secret-key',
         })
       );
     });
 
     it('should call disconnectGateway when disabling', async () => {
       // First enable
-      await request(app)
-        .put('/api/gateway/config')
-        .send({
-          enabled: true,
-          gatewayUrl: 'https://gateway.example.com',
-          gatewaySecret: 'my-secret-key'
-        });
+      await request(app).put('/api/gateway/config').send({
+        enabled: true,
+        gatewayUrl: 'https://gateway.example.com',
+        gatewaySecret: 'my-secret-key',
+      });
 
       mockConnectGateway.mockClear();
 
@@ -277,7 +267,7 @@ describe('Gateway API Integration Tests', () => {
       await request(app)
         .put('/api/gateway/config')
         .send({
-          enabled: false
+          enabled: false,
         })
         .expect(200);
 
@@ -289,7 +279,7 @@ describe('Gateway API Integration Tests', () => {
       const response = await request(app)
         .put('/api/gateway/config')
         .send({
-          enabled: true
+          enabled: true,
           // Missing gatewayUrl and gatewaySecret
         })
         .expect(200);
@@ -304,7 +294,7 @@ describe('Gateway API Integration Tests', () => {
         .put('/api/gateway/config')
         .send({
           enabled: true,
-          gatewaySecret: 'my-secret-key'
+          gatewaySecret: 'my-secret-key',
           // Missing gatewayUrl
         })
         .expect(200);
@@ -318,7 +308,7 @@ describe('Gateway API Integration Tests', () => {
         .put('/api/gateway/config')
         .send({
           enabled: true,
-          gatewayUrl: 'https://gateway.example.com'
+          gatewayUrl: 'https://gateway.example.com',
           // Missing gatewaySecret
         })
         .expect(200);
@@ -331,7 +321,7 @@ describe('Gateway API Integration Tests', () => {
       const response = await request(app)
         .put('/api/gateway/config')
         .send({
-          backendName: 'New Backend Name'
+          backendName: 'New Backend Name',
         })
         .expect(200);
 
@@ -342,17 +332,19 @@ describe('Gateway API Integration Tests', () => {
 
     it('should update only specified fields', async () => {
       // Set initial values
-      db.prepare(`
+      db.prepare(
+        `
         UPDATE gateway_config
         SET gateway_url = ?, gateway_secret = ?, backend_name = ?
         WHERE id = 1
-      `).run('https://old.example.com', 'old-secret', 'Old Name');
+      `
+      ).run('https://old.example.com', 'old-secret', 'Old Name');
 
       // Update only backend_name
       const response = await request(app)
         .put('/api/gateway/config')
         .send({
-          backendName: 'New Name'
+          backendName: 'New Name',
         })
         .expect(200);
 
@@ -364,11 +356,13 @@ describe('Gateway API Integration Tests', () => {
 
     it('should allow clearing fields with null', async () => {
       // Set initial values
-      db.prepare(`
+      db.prepare(
+        `
         UPDATE gateway_config
         SET proxy_url = ?, proxy_username = ?, proxy_password = ?
         WHERE id = 1
-      `).run('http://proxy.example.com', 'user', 'pass');
+      `
+      ).run('http://proxy.example.com', 'user', 'pass');
 
       // Clear proxy settings
       const response = await request(app)
@@ -376,7 +370,7 @@ describe('Gateway API Integration Tests', () => {
         .send({
           proxyUrl: null,
           proxyUsername: null,
-          proxyPassword: null
+          proxyPassword: null,
         })
         .expect(200);
 
@@ -392,7 +386,7 @@ describe('Gateway API Integration Tests', () => {
       await request(app)
         .put('/api/gateway/config')
         .send({
-          backendName: 'Test'
+          backendName: 'Test',
         })
         .expect(200);
 
@@ -408,7 +402,7 @@ describe('Gateway API Integration Tests', () => {
         .send({
           enabled: true,
           gatewayUrl: 'https://gateway.example.com',
-          gatewaySecret: 'my-secret-key'
+          gatewaySecret: 'my-secret-key',
         })
         .expect(200);
 
@@ -425,7 +419,7 @@ describe('Gateway API Integration Tests', () => {
         .send({
           enabled: true,
           gatewayUrl: 'https://gateway.example.com',
-          gatewaySecret: 'my-secret-key'
+          gatewaySecret: 'my-secret-key',
         })
         .expect(200);
 
@@ -438,7 +432,7 @@ describe('Gateway API Integration Tests', () => {
         .put('/api/gateway/config')
         .send({
           proxyUsername: 'user',
-          proxyPassword: 'pass'
+          proxyPassword: 'pass',
         })
         .expect(200);
 
@@ -451,7 +445,7 @@ describe('Gateway API Integration Tests', () => {
       const response = await request(app)
         .put('/api/gateway/config')
         .send({
-          proxyUrl: 'http://proxy.example.com:8080'
+          proxyUrl: 'http://proxy.example.com:8080',
         })
         .expect(200);
 
@@ -470,7 +464,7 @@ describe('Gateway API Integration Tests', () => {
           gatewaySecret: 'secret',
           proxyUrl: 'http://proxy.example.com:8080',
           proxyUsername: 'proxyuser',
-          proxyPassword: 'proxypass'
+          proxyPassword: 'proxypass',
         })
         .expect(200);
 
@@ -478,7 +472,7 @@ describe('Gateway API Integration Tests', () => {
         expect.objectContaining({
           proxyUrl: 'http://proxy.example.com:8080',
           proxyUsername: 'proxyuser',
-          proxyPassword: 'proxypass'
+          proxyPassword: 'proxypass',
         })
       );
     });
@@ -491,12 +485,10 @@ describe('Gateway API Integration Tests', () => {
         connected: true,
         gatewayBackendId: 'backend-123',
         gatewayUrl: 'https://gateway.example.com',
-        backendName: 'Test Backend'
+        backendName: 'Test Backend',
       });
 
-      const response = await request(app)
-        .get('/api/gateway/status')
-        .expect(200);
+      const response = await request(app).get('/api/gateway/status').expect(200);
 
       expect(response.body.success).toBe(true);
       expect(response.body.data).toMatchObject({
@@ -504,7 +496,7 @@ describe('Gateway API Integration Tests', () => {
         connected: true,
         gatewayBackendId: 'backend-123',
         gatewayUrl: 'https://gateway.example.com',
-        backendName: 'Test Backend'
+        backendName: 'Test Backend',
       });
     });
 
@@ -514,12 +506,10 @@ describe('Gateway API Integration Tests', () => {
         connected: false,
         gatewayBackendId: null,
         gatewayUrl: null,
-        backendName: null
+        backendName: null,
       });
 
-      const response = await request(app)
-        .get('/api/gateway/status')
-        .expect(200);
+      const response = await request(app).get('/api/gateway/status').expect(200);
 
       expect(response.body.success).toBe(true);
       expect(response.body.data.connected).toBe(false);
@@ -530,9 +520,7 @@ describe('Gateway API Integration Tests', () => {
         throw new Error('Status error');
       });
 
-      const response = await request(app)
-        .get('/api/gateway/status')
-        .expect(200);
+      const response = await request(app).get('/api/gateway/status').expect(200);
 
       expect(response.body.success).toBe(false);
       expect(response.body.error.code).toBe('STATUS_ERROR');
@@ -543,17 +531,17 @@ describe('Gateway API Integration Tests', () => {
   describe('POST /api/gateway/connect', () => {
     beforeEach(() => {
       // Setup enabled gateway config
-      db.prepare(`
+      db.prepare(
+        `
         UPDATE gateway_config
         SET enabled = 1, gateway_url = ?, gateway_secret = ?
         WHERE id = 1
-      `).run('https://gateway.example.com', 'my-secret-key');
+      `
+      ).run('https://gateway.example.com', 'my-secret-key');
     });
 
     it('should connect to gateway successfully', async () => {
-      const response = await request(app)
-        .post('/api/gateway/connect')
-        .expect(200);
+      const response = await request(app).post('/api/gateway/connect').expect(200);
 
       expect(response.body.success).toBe(true);
       expect(response.body.data.message).toBe('Connecting to gateway...');
@@ -562,15 +550,15 @@ describe('Gateway API Integration Tests', () => {
 
     it('should pass full config to connectGateway', async () => {
       // Add proxy settings
-      db.prepare(`
+      db.prepare(
+        `
         UPDATE gateway_config
         SET proxy_url = ?, proxy_username = ?, proxy_password = ?
         WHERE id = 1
-      `).run('http://proxy.example.com', 'proxyuser', 'proxypass');
+      `
+      ).run('http://proxy.example.com', 'proxyuser', 'proxypass');
 
-      await request(app)
-        .post('/api/gateway/connect')
-        .expect(200);
+      await request(app).post('/api/gateway/connect').expect(200);
 
       expect(mockConnectGateway).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -579,7 +567,7 @@ describe('Gateway API Integration Tests', () => {
           gatewaySecret: 'my-secret-key',
           proxyUrl: 'http://proxy.example.com',
           proxyUsername: 'proxyuser',
-          proxyPassword: 'proxypass'
+          proxyPassword: 'proxypass',
         })
       );
     });
@@ -587,9 +575,7 @@ describe('Gateway API Integration Tests', () => {
     it('should fail if gateway is disabled', async () => {
       db.prepare('UPDATE gateway_config SET enabled = 0 WHERE id = 1').run();
 
-      const response = await request(app)
-        .post('/api/gateway/connect')
-        .expect(200);
+      const response = await request(app).post('/api/gateway/connect').expect(200);
 
       expect(response.body.success).toBe(false);
       expect(response.body.error.code).toBe('DISABLED');
@@ -600,9 +586,7 @@ describe('Gateway API Integration Tests', () => {
     it('should fail if gateway URL is not configured', async () => {
       db.prepare('UPDATE gateway_config SET gateway_url = NULL WHERE id = 1').run();
 
-      const response = await request(app)
-        .post('/api/gateway/connect')
-        .expect(200);
+      const response = await request(app).post('/api/gateway/connect').expect(200);
 
       expect(response.body.success).toBe(false);
       expect(response.body.error.code).toBe('NOT_CONFIGURED');
@@ -612,9 +596,7 @@ describe('Gateway API Integration Tests', () => {
     it('should fail if gateway secret is not configured', async () => {
       db.prepare('UPDATE gateway_config SET gateway_secret = NULL WHERE id = 1').run();
 
-      const response = await request(app)
-        .post('/api/gateway/connect')
-        .expect(200);
+      const response = await request(app).post('/api/gateway/connect').expect(200);
 
       expect(response.body.success).toBe(false);
       expect(response.body.error.code).toBe('NOT_CONFIGURED');
@@ -624,9 +606,7 @@ describe('Gateway API Integration Tests', () => {
     it('should handle connection errors gracefully', async () => {
       mockConnectGateway.mockRejectedValueOnce(new Error('Connection timeout'));
 
-      const response = await request(app)
-        .post('/api/gateway/connect')
-        .expect(200);
+      const response = await request(app).post('/api/gateway/connect').expect(200);
 
       expect(response.body.success).toBe(false);
       expect(response.body.error.code).toBe('CONNECT_FAILED');
@@ -636,9 +616,7 @@ describe('Gateway API Integration Tests', () => {
     it('should handle database errors gracefully', async () => {
       db.close();
 
-      const response = await request(app)
-        .post('/api/gateway/connect')
-        .expect(200);
+      const response = await request(app).post('/api/gateway/connect').expect(200);
 
       expect(response.body.success).toBe(false);
       expect(response.body.error.code).toBe('CONNECT_FAILED');
@@ -647,9 +625,7 @@ describe('Gateway API Integration Tests', () => {
 
   describe('POST /api/gateway/disconnect', () => {
     it('should disconnect from gateway successfully', async () => {
-      const response = await request(app)
-        .post('/api/gateway/disconnect')
-        .expect(200);
+      const response = await request(app).post('/api/gateway/disconnect').expect(200);
 
       expect(response.body.success).toBe(true);
       expect(response.body.data.message).toBe('Disconnected from gateway');
@@ -659,9 +635,7 @@ describe('Gateway API Integration Tests', () => {
     it('should handle disconnection errors gracefully', async () => {
       mockDisconnectGateway.mockRejectedValueOnce(new Error('Disconnect failed'));
 
-      const response = await request(app)
-        .post('/api/gateway/disconnect')
-        .expect(200);
+      const response = await request(app).post('/api/gateway/disconnect').expect(200);
 
       expect(response.body.success).toBe(false);
       expect(response.body.error.code).toBe('DISCONNECT_FAILED');
@@ -672,16 +646,16 @@ describe('Gateway API Integration Tests', () => {
   describe('Security Tests', () => {
     it('should never expose actual gateway secret in responses', async () => {
       const secret = 'super-secret-key-12345';
-      db.prepare(`
+      db.prepare(
+        `
         UPDATE gateway_config
         SET gateway_secret = ?
         WHERE id = 1
-      `).run(secret);
+      `
+      ).run(secret);
 
       // GET config
-      const getResponse = await request(app)
-        .get('/api/gateway/config')
-        .expect(200);
+      const getResponse = await request(app).get('/api/gateway/config').expect(200);
       expect(getResponse.body.data.gatewaySecret).toBe('********');
       expect(JSON.stringify(getResponse.body)).not.toContain(secret);
 
@@ -696,16 +670,16 @@ describe('Gateway API Integration Tests', () => {
 
     it('should never expose actual proxy password in responses', async () => {
       const password = 'super-proxy-password-12345';
-      db.prepare(`
+      db.prepare(
+        `
         UPDATE gateway_config
         SET proxy_password = ?
         WHERE id = 1
-      `).run(password);
+      `
+      ).run(password);
 
       // GET config
-      const getResponse = await request(app)
-        .get('/api/gateway/config')
-        .expect(200);
+      const getResponse = await request(app).get('/api/gateway/config').expect(200);
       expect(getResponse.body.data.proxyPassword).toBe('********');
       expect(JSON.stringify(getResponse.body)).not.toContain(password);
 
@@ -723,7 +697,7 @@ describe('Gateway API Integration Tests', () => {
         .put('/api/gateway/config')
         .send({
           backendName: "'; DROP TABLE gateway_config; --",
-          gatewayUrl: "https://evil.com' OR '1'='1"
+          gatewayUrl: "https://evil.com' OR '1'='1",
         })
         .expect(200);
 
@@ -741,7 +715,7 @@ describe('Gateway API Integration Tests', () => {
         .put('/api/gateway/config')
         .send({
           proxyUsername: specialChars,
-          proxyPassword: specialChars
+          proxyPassword: specialChars,
         })
         .expect(200);
 
@@ -758,7 +732,7 @@ describe('Gateway API Integration Tests', () => {
         .put('/api/gateway/config')
         .send({
           backendName: unicodeText,
-          proxyUsername: unicodeText
+          proxyUsername: unicodeText,
         })
         .expect(200);
 
@@ -773,7 +747,7 @@ describe('Gateway API Integration Tests', () => {
         .put('/api/gateway/config')
         .send({
           backendName: longString,
-          gatewaySecret: longString
+          gatewaySecret: longString,
         })
         .expect(200);
 
@@ -790,7 +764,7 @@ describe('Gateway API Integration Tests', () => {
         .put('/api/gateway/config')
         .send({
           backendName: '',
-          proxyUsername: ''
+          proxyUsername: '',
         })
         .expect(200);
 
@@ -803,7 +777,7 @@ describe('Gateway API Integration Tests', () => {
         .put('/api/gateway/config')
         .send({
           backendName: null,
-          proxyUsername: null
+          proxyUsername: null,
         })
         .expect(200);
 
@@ -820,14 +794,14 @@ describe('Gateway API Integration Tests', () => {
         'https://gateway.example.com:8443',
         'https://sub.domain.example.com/path',
         'https://192.168.1.1:8443',
-        'https://[::1]:8443'
+        'https://[::1]:8443',
       ];
 
       for (const url of validUrls) {
         const response = await request(app)
           .put('/api/gateway/config')
           .send({
-            gatewayUrl: url
+            gatewayUrl: url,
           })
           .expect(200);
 
@@ -841,14 +815,14 @@ describe('Gateway API Integration Tests', () => {
         'http://proxy.example.com:8080',
         'https://proxy.example.com:8443',
         'http://192.168.1.1:3128',
-        'socks5://proxy.example.com:1080'
+        'socks5://proxy.example.com:1080',
       ];
 
       for (const url of validUrls) {
         const response = await request(app)
           .put('/api/gateway/config')
           .send({
-            proxyUrl: url
+            proxyUrl: url,
           })
           .expect(200);
 
@@ -865,14 +839,14 @@ describe('Gateway API Integration Tests', () => {
         'ftp://example.com',
         'javascript:alert(1)',
         'data:text/html,<script>alert(1)</script>',
-        '../../../etc/passwd'
+        '../../../etc/passwd',
       ];
 
       for (const url of urls) {
         const response = await request(app)
           .put('/api/gateway/config')
           .send({
-            gatewayUrl: url
+            gatewayUrl: url,
           })
           .expect(200);
 
@@ -885,9 +859,7 @@ describe('Gateway API Integration Tests', () => {
   describe('Integration Tests', () => {
     it('should handle complete gateway setup flow', async () => {
       // Step 1: Get initial config
-      let response = await request(app)
-        .get('/api/gateway/config')
-        .expect(200);
+      let response = await request(app).get('/api/gateway/config').expect(200);
       expect(response.body.data.enabled).toBe(false);
 
       // Step 2: Configure gateway
@@ -899,7 +871,7 @@ describe('Gateway API Integration Tests', () => {
           backendName: 'My Backend',
           proxyUrl: 'http://proxy.example.com:8080',
           proxyUsername: 'proxyuser',
-          proxyPassword: 'proxypass'
+          proxyPassword: 'proxypass',
         })
         .expect(200);
       expect(response.body.success).toBe(true);
@@ -910,7 +882,7 @@ describe('Gateway API Integration Tests', () => {
         .send({
           enabled: true,
           gatewayUrl: 'https://gateway.example.com',
-          gatewaySecret: 'my-secret'
+          gatewaySecret: 'my-secret',
         })
         .expect(200);
       expect(response.body.success).toBe(true);
@@ -922,24 +894,20 @@ describe('Gateway API Integration Tests', () => {
         connected: true,
         gatewayBackendId: 'backend-123',
         gatewayUrl: 'https://gateway.example.com',
-        backendName: 'My Backend'
+        backendName: 'My Backend',
       });
 
-      response = await request(app)
-        .get('/api/gateway/status')
-        .expect(200);
+      response = await request(app).get('/api/gateway/status').expect(200);
       expect(response.body.data.connected).toBe(true);
     });
 
     it('should handle gateway disable flow', async () => {
       // Setup enabled gateway
-      await request(app)
-        .put('/api/gateway/config')
-        .send({
-          enabled: true,
-          gatewayUrl: 'https://gateway.example.com',
-          gatewaySecret: 'secret'
-        });
+      await request(app).put('/api/gateway/config').send({
+        enabled: true,
+        gatewayUrl: 'https://gateway.example.com',
+        gatewaySecret: 'secret',
+      });
 
       mockConnectGateway.mockClear();
 
@@ -947,7 +915,7 @@ describe('Gateway API Integration Tests', () => {
       const response = await request(app)
         .put('/api/gateway/config')
         .send({
-          enabled: false
+          enabled: false,
         })
         .expect(200);
 
@@ -958,13 +926,11 @@ describe('Gateway API Integration Tests', () => {
 
     it('should handle proxy update while gateway is enabled', async () => {
       // Setup enabled gateway
-      await request(app)
-        .put('/api/gateway/config')
-        .send({
-          enabled: true,
-          gatewayUrl: 'https://gateway.example.com',
-          gatewaySecret: 'secret'
-        });
+      await request(app).put('/api/gateway/config').send({
+        enabled: true,
+        gatewayUrl: 'https://gateway.example.com',
+        gatewaySecret: 'secret',
+      });
 
       mockConnectGateway.mockClear();
 
@@ -974,7 +940,7 @@ describe('Gateway API Integration Tests', () => {
         .send({
           proxyUrl: 'http://new-proxy.example.com:8080',
           proxyUsername: 'newuser',
-          proxyPassword: 'newpass'
+          proxyPassword: 'newpass',
         })
         .expect(200);
 
@@ -984,46 +950,38 @@ describe('Gateway API Integration Tests', () => {
           enabled: true,
           proxyUrl: 'http://new-proxy.example.com:8080',
           proxyUsername: 'newuser',
-          proxyPassword: 'newpass'
+          proxyPassword: 'newpass',
         })
       );
     });
 
     it('should maintain configuration integrity across multiple updates', async () => {
       // Update 1: Set gateway config
-      await request(app)
-        .put('/api/gateway/config')
-        .send({
-          gatewayUrl: 'https://gateway.example.com',
-          gatewaySecret: 'secret1'
-        });
+      await request(app).put('/api/gateway/config').send({
+        gatewayUrl: 'https://gateway.example.com',
+        gatewaySecret: 'secret1',
+      });
 
       // Update 2: Add proxy config
-      await request(app)
-        .put('/api/gateway/config')
-        .send({
-          proxyUrl: 'http://proxy.example.com:8080',
-          proxyPassword: 'proxypass'
-        });
+      await request(app).put('/api/gateway/config').send({
+        proxyUrl: 'http://proxy.example.com:8080',
+        proxyPassword: 'proxypass',
+      });
 
       // Update 3: Change backend name
-      await request(app)
-        .put('/api/gateway/config')
-        .send({
-          backendName: 'Final Name'
-        });
+      await request(app).put('/api/gateway/config').send({
+        backendName: 'Final Name',
+      });
 
       // Verify all values are preserved
-      const response = await request(app)
-        .get('/api/gateway/config')
-        .expect(200);
+      const response = await request(app).get('/api/gateway/config').expect(200);
 
       expect(response.body.data).toMatchObject({
         gatewayUrl: 'https://gateway.example.com',
         gatewaySecret: '********',
         backendName: 'Final Name',
         proxyUrl: 'http://proxy.example.com:8080',
-        proxyPassword: '********'
+        proxyPassword: '********',
       });
     });
   });

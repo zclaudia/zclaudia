@@ -80,7 +80,7 @@ export function lastAssistantPromptTokens(messages: readonly AgentMessage[]): nu
 export function estimateContextTokensForThreshold(
   messages: readonly AgentMessage[],
   contextWindow: number,
-  charsEstimator: (m: readonly AgentMessage[]) => number = structuralContextTokens,
+  charsEstimator: (m: readonly AgentMessage[]) => number = structuralContextTokens
 ): number {
   const charsEstimate = charsEstimator(messages);
   const anchor = lastAssistantPromptTokens(messages);

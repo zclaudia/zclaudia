@@ -14,7 +14,7 @@ function freshDb(): Database.Database {
   db.prepare(`INSERT INTO projects (id) VALUES (?)`).run('proj-1');
   db.prepare(
     `INSERT INTO meta_workflow_runs (id, project_id, title, status, reject_count, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
   ).run('run-1', 'proj-1', 't', 'executing', 0, 0, 0);
   return db;
 }
@@ -27,9 +27,14 @@ const phaseDef: PhaseDef = {
   dependsOn: [],
   inputs: [],
   outputs: [{ kind: 'commit', description: 'commit' }],
-  acceptanceGates: [{
-    id: 'compile', description: 'compile', command: 'mvn compile', expect: { exitCode: 0 },
-  }],
+  acceptanceGates: [
+    {
+      id: 'compile',
+      description: 'compile',
+      command: 'mvn compile',
+      expect: { exitCode: 0 },
+    },
+  ],
 };
 
 describe('MetaWorkflowPhaseAggregate', () => {

@@ -62,17 +62,21 @@ export function LocalPRsPanel({ projectId, projectRootPath }: LocalPRsPanelProps
     Promise.all([
       loadPRs(projectId),
       getProjectWorktrees(projectId)
-        .then((wt) => { if (!cancelled) setWorktrees(wt); })
+        .then(wt => {
+          if (!cancelled) setWorktrees(wt);
+        })
         .catch(() => {}),
       getWorktreeConfigs(projectId)
-        .then((configs) => {
+        .then(configs => {
           if (cancelled) return;
           const map: Record<string, WorktreeConfig> = {};
           for (const c of configs) map[c.worktreePath] = c;
           setWtConfigs(map);
         })
         .catch(() => {}),
-    ]).finally(() => { if (!cancelled) setLoading(false); });
+    ]).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
     return () => {
       cancelled = true;
     };
@@ -86,45 +90,43 @@ export function LocalPRsPanel({ projectId, projectRootPath }: LocalPRsPanelProps
 
   // Worktrees that don't have an active PR
   const activePRPaths = useMemo(
-    () => new Set(
-      projectPRs
-        .filter((pr) => !['merged', 'closed'].includes(pr.status))
-        .map((pr) => pr.worktreePath),
-    ),
-    [projectPRs],
+    () =>
+      new Set(
+        projectPRs
+          .filter(pr => !['merged', 'closed'].includes(pr.status))
+          .map(pr => pr.worktreePath)
+      ),
+    [projectPRs]
   );
-  const allNonMainWorktrees = useMemo(
-    () => worktrees.filter((wt) => !wt.isMain),
-    [worktrees],
-  );
+  const allNonMainWorktrees = useMemo(() => worktrees.filter(wt => !wt.isMain), [worktrees]);
 
   // Group by status
   const grouped = STATUS_ORDER.reduce<Partial<Record<LocalPRStatus, typeof projectPRs>>>(
     (acc, status) => {
-      const items = projectPRs.filter((pr) => pr.status === status);
+      const items = projectPRs.filter(pr => pr.status === status);
       if (items.length > 0) acc[status] = items;
       return acc;
     },
-    {},
+    {}
   );
 
-  const activePRs = projectPRs.filter(
-    (pr) => !['merged', 'closed'].includes(pr.status),
-  ).length;
+  const activePRs = projectPRs.filter(pr => !['merged', 'closed'].includes(pr.status)).length;
 
   const handleQuickCreate = async (worktreePath: string) => {
     setCreatingPath(worktreePath);
-    setCreateErrorByPath((prev) => ({ ...prev, [worktreePath]: '' }));
+    setCreateErrorByPath(prev => ({ ...prev, [worktreePath]: '' }));
     try {
       const config = wtConfigs[worktreePath];
       await createPR(projectId, worktreePath, {
         autoReview: config?.autoReview || undefined,
       });
-      const precheck = await precheckLocalPRCreation(projectId, worktreePath).catch(() => ({ canCreate: false }));
-      setEligibility((prev) => ({ ...prev, [worktreePath]: precheck }));
+      const precheck = await precheckLocalPRCreation(projectId, worktreePath).catch(() => ({
+        canCreate: false,
+      }));
+      setEligibility(prev => ({ ...prev, [worktreePath]: precheck }));
     } catch (err) {
       console.error('Failed to create PR:', err);
-      setCreateErrorByPath((prev) => ({
+      setCreateErrorByPath(prev => ({
         ...prev,
         [worktreePath]: err instanceof Error ? err.message : 'Failed to create PR',
       }));
@@ -133,41 +135,40 @@ export function LocalPRsPanel({ projectId, projectRootPath }: LocalPRsPanelProps
     }
   };
 
-  const handleToggleConfig = useCallback(async (
-    worktreePath: string,
-    field: 'autoCreatePR' | 'autoReview',
-    value: boolean,
-  ) => {
-    const current = wtConfigs[worktreePath] ?? {
-      projectId,
-      worktreePath,
-      autoCreatePR: false,
-      autoReview: false,
-    };
-    const updated = { ...current, [field]: value };
-    setWtConfigs((prev) => ({ ...prev, [worktreePath]: updated }));
-    try {
-      await upsertWorktreeConfig(projectId, {
+  const handleToggleConfig = useCallback(
+    async (worktreePath: string, field: 'autoCreatePR' | 'autoReview', value: boolean) => {
+      const current = wtConfigs[worktreePath] ?? {
+        projectId,
         worktreePath,
-        autoCreatePR: updated.autoCreatePR,
-        autoReview: updated.autoReview,
-      });
-    } catch (err) {
-      console.error('Failed to update worktree config:', err);
-      // Revert on error
-      setWtConfigs((prev) => ({ ...prev, [worktreePath]: current }));
-    }
-  }, [projectId, wtConfigs]);
+        autoCreatePR: false,
+        autoReview: false,
+      };
+      const updated = { ...current, [field]: value };
+      setWtConfigs(prev => ({ ...prev, [worktreePath]: updated }));
+      try {
+        await upsertWorktreeConfig(projectId, {
+          worktreePath,
+          autoCreatePR: updated.autoCreatePR,
+          autoReview: updated.autoReview,
+        });
+      } catch (err) {
+        console.error('Failed to update worktree config:', err);
+        // Revert on error
+        setWtConfigs(prev => ({ ...prev, [worktreePath]: current }));
+      }
+    },
+    [projectId, wtConfigs]
+  );
 
   useEffect(() => {
     const targetPaths = allNonMainWorktrees
-      .filter((wt) => !activePRPaths.has(wt.path))
-      .map((wt) => wt.path);
+      .filter(wt => !activePRPaths.has(wt.path))
+      .map(wt => wt.path);
 
     if (targetPaths.length === 0) return;
     let cancelled = false;
 
-    setEligibility((prev) => {
+    setEligibility(prev => {
       const next = { ...prev };
       for (const p of targetPaths) {
         next[p] = { ...(next[p] || {}), loading: true };
@@ -176,7 +177,7 @@ export function LocalPRsPanel({ projectId, projectRootPath }: LocalPRsPanelProps
     });
 
     Promise.all(
-      targetPaths.map(async (worktreePath) => {
+      targetPaths.map(async worktreePath => {
         try {
           const result = await precheckLocalPRCreation(projectId, worktreePath);
           return [worktreePath, { ...result, loading: false }] as const;
@@ -185,9 +186,9 @@ export function LocalPRsPanel({ projectId, projectRootPath }: LocalPRsPanelProps
           return [worktreePath, { canCreate: false, reason, loading: false }] as const;
         }
       })
-    ).then((entries) => {
+    ).then(entries => {
       if (cancelled) return;
-      setEligibility((prev) => {
+      setEligibility(prev => {
         const next = { ...prev };
         for (const [path, info] of entries) next[path] = info;
         return next;
@@ -222,9 +223,7 @@ export function LocalPRsPanel({ projectId, projectRootPath }: LocalPRsPanelProps
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-4">
-        {loading && (
-          <p className="text-xs text-muted-foreground text-center py-4">Loading…</p>
-        )}
+        {loading && <p className="text-xs text-muted-foreground text-center py-4">Loading…</p>}
 
         {/* Worktree Configs */}
         {!loading && allNonMainWorktrees.length > 0 && (
@@ -233,7 +232,7 @@ export function LocalPRsPanel({ projectId, projectRootPath }: LocalPRsPanelProps
               Worktrees
             </h3>
             <div className="space-y-1.5">
-              {allNonMainWorktrees.map((wt) => {
+              {allNonMainWorktrees.map(wt => {
                 const config = wtConfigs[wt.path];
                 const hasActivePR = activePRPaths.has(wt.path);
                 const canCreate = eligibility[wt.path]?.canCreate ?? true;
@@ -253,7 +252,9 @@ export function LocalPRsPanel({ projectId, projectRootPath }: LocalPRsPanelProps
                       </div>
                       {!hasActivePR && (
                         <span
-                          title={disableCreate ? precheckReason || 'PR cannot be created now' : undefined}
+                          title={
+                            disableCreate ? precheckReason || 'PR cannot be created now' : undefined
+                          }
                           className="shrink-0 inline-flex"
                         >
                           <button
@@ -282,7 +283,9 @@ export function LocalPRsPanel({ projectId, projectRootPath }: LocalPRsPanelProps
                         <input
                           type="checkbox"
                           checked={config?.autoCreatePR ?? false}
-                          onChange={(e) => handleToggleConfig(wt.path, 'autoCreatePR', e.target.checked)}
+                          onChange={e =>
+                            handleToggleConfig(wt.path, 'autoCreatePR', e.target.checked)
+                          }
                           className="rounded-md border-border w-3 h-3"
                         />
                         <span className="text-[11px] text-muted-foreground">Auto Create PR</span>
@@ -291,7 +294,9 @@ export function LocalPRsPanel({ projectId, projectRootPath }: LocalPRsPanelProps
                         <input
                           type="checkbox"
                           checked={config?.autoReview ?? false}
-                          onChange={(e) => handleToggleConfig(wt.path, 'autoReview', e.target.checked)}
+                          onChange={e =>
+                            handleToggleConfig(wt.path, 'autoReview', e.target.checked)
+                          }
                           className="rounded-md border-border w-3 h-3"
                         />
                         <span className="text-[11px] text-muted-foreground">Auto Review</span>
@@ -309,23 +314,26 @@ export function LocalPRsPanel({ projectId, projectRootPath }: LocalPRsPanelProps
             <GitPullRequest className="w-8 h-8 mx-auto mb-2 opacity-40" />
             <p className="text-sm">No local pull requests yet</p>
             <p className="text-xs mt-1">
-              When a worktree feature is done, create a pull request to trigger AI review and auto-merge.
+              When a worktree feature is done, create a pull request to trigger AI review and
+              auto-merge.
             </p>
           </div>
         )}
 
-        {(Object.entries(grouped) as [LocalPRStatus, typeof projectPRs][]).map(([status, items]) => (
-          <div key={status}>
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-              {GROUP_LABELS[status] ?? status}
-            </h3>
-            <div className="space-y-2">
-              {items.map((pr) => (
-                <LocalPRCard key={pr.id} pr={pr} projectId={projectId} />
-              ))}
+        {(Object.entries(grouped) as [LocalPRStatus, typeof projectPRs][]).map(
+          ([status, items]) => (
+            <div key={status}>
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                {GROUP_LABELS[status] ?? status}
+              </h3>
+              <div className="space-y-2">
+                {items.map(pr => (
+                  <LocalPRCard key={pr.id} pr={pr} projectId={projectId} />
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        )}
       </div>
 
       {createOpen && (

@@ -50,7 +50,7 @@ describe('TaskWorkflowStepExecutor', () => {
         results: new Map(),
         resolveTemplate: (value: string) => value,
         setSessionId: vi.fn(),
-      },
+      }
     );
 
     expect(result).toEqual({
@@ -62,25 +62,31 @@ describe('TaskWorkflowStepExecutor', () => {
       },
     });
     const taskId = result.output.taskId as string;
-    expect(start).toHaveBeenCalledWith(expect.objectContaining({
-      id: taskId,
-      type: 'agent',
-      status: 'queued',
-      title: 'Run Agent',
-      parentRunId: 'wf-run-1',
-      metadata: expect.objectContaining({
-        workflowRunId: 'wf-run-1',
-        workflowStepRunId: 'step-run-1',
-        workflowNodeId: 'n1',
-        prompt: 'Summarize repo',
-      }),
-    }));
+    expect(start).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: taskId,
+        type: 'agent',
+        status: 'queued',
+        title: 'Run Agent',
+        parentRunId: 'wf-run-1',
+        metadata: expect.objectContaining({
+          workflowRunId: 'wf-run-1',
+          workflowStepRunId: 'step-run-1',
+          workflowNodeId: 'n1',
+          prompt: 'Summarize repo',
+        }),
+      })
+    );
     expect(wait).toHaveBeenCalledWith('executor-task-1', { timeoutMs: undefined });
     expect(taskRepo.findById(taskId)).toMatchObject({
       type: 'agent',
       status: 'completed',
       result: { text: 'agent summary' },
     });
-    expect(taskRepo.listEvents(taskId).map(event => event.type)).toEqual(['created', 'started', 'completed']);
+    expect(taskRepo.listEvents(taskId).map(event => event.type)).toEqual([
+      'created',
+      'started',
+      'completed',
+    ]);
   });
 });

@@ -28,7 +28,9 @@ export function maybeWipeDevDataDir(dataDir: string): { wiped: boolean; reason?:
   }
   if (recorded === CURRENT_SCHEMA_VERSION) return { wiped: false };
 
-  console.warn(`[dev-clear] schema version mismatch (recorded='${recorded}', current='${CURRENT_SCHEMA_VERSION}') — wiping ${dataDir}`);
+  console.warn(
+    `[dev-clear] schema version mismatch (recorded='${recorded}', current='${CURRENT_SCHEMA_VERSION}') — wiping ${dataDir}`
+  );
   rmSync(dataDir, { recursive: true, force: true });
   return { wiped: true, reason: `version-mismatch: ${recorded} → ${CURRENT_SCHEMA_VERSION}` };
 }

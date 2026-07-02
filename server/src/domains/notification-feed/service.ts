@@ -1,6 +1,12 @@
 import type Database from 'better-sqlite3';
-import type { NotificationItem, NotificationStatus } from '@zclaudia/shared/features/notification-feed';
-import type { NotificationReadMessage, NotificationUpdateMessage } from '@zclaudia/shared/wire/messages';
+import type {
+  NotificationItem,
+  NotificationStatus,
+} from '@zclaudia/shared/features/notification-feed';
+import type {
+  NotificationReadMessage,
+  NotificationUpdateMessage,
+} from '@zclaudia/shared/wire/messages';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import { NotificationRepository } from './repository.js';
 
@@ -22,7 +28,11 @@ export class NotificationService {
   }
 
   /** Post a new feed item — persists to DB, broadcasts to clients, optionally sends push notification */
-  postItem(item: Omit<NotificationItem, 'id' | 'createdAt' | 'ownerBackendId'> & { ownerBackendId?: string }): NotificationItem {
+  postItem(
+    item: Omit<NotificationItem, 'id' | 'createdAt' | 'ownerBackendId'> & {
+      ownerBackendId?: string;
+    }
+  ): NotificationItem {
     const created = this.repo.create({
       ...item,
       ownerBackendId: item.ownerBackendId ?? 'local-standalone',
@@ -37,7 +47,7 @@ export class NotificationService {
     // Push notification for completed items
     if (created.status === 'completed' || created.status === 'failed') {
       this.notifyFn?.(created)?.catch(err =>
-        console.error('[NotificationService] notifyFn error:', err),
+        console.error('[NotificationService] notifyFn error:', err)
       );
     }
 
@@ -45,7 +55,11 @@ export class NotificationService {
   }
 
   /** Update an existing feed item's status */
-  updateItemStatus(id: string, status: NotificationStatus, extra?: { summary?: string; error?: string }): void {
+  updateItemStatus(
+    id: string,
+    status: NotificationStatus,
+    extra?: { summary?: string; error?: string }
+  ): void {
     this.repo.updateStatus(id, status, {
       ...extra,
       completedAt: status === 'completed' || status === 'failed' ? Date.now() : undefined,
@@ -60,7 +74,7 @@ export class NotificationService {
 
       if (status === 'completed' || status === 'failed') {
         this.notifyFn?.(updated)?.catch(err =>
-          console.error('[NotificationService] notifyFn error:', err),
+          console.error('[NotificationService] notifyFn error:', err)
         );
       }
     }

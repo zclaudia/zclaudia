@@ -1,4 +1,5 @@
-import { test as base, Page } from '@playwright/test';
+import { test as base } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { setupCleanDB } from './db-setup';
 
 // Extended test fixtures
@@ -34,7 +35,9 @@ export async function ensureServerConnection(page: Page): Promise<boolean> {
     await page.waitForTimeout(500);
 
     // Look for a server option to click
-    const serverOption = page.locator('[data-testid="server-option"], [class*="server-item"]').first();
+    const serverOption = page
+      .locator('[data-testid="server-option"], [class*="server-item"]')
+      .first();
     const hasOption = await serverOption.isVisible({ timeout: 2000 }).catch(() => false);
 
     if (hasOption) {

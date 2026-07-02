@@ -75,7 +75,7 @@ function runAssertion(assertion: EditToolSelectionEvalAssertion): void {
         assertion.tool,
         assertion.args,
         assertion.details,
-        assertion.attempts,
+        assertion.attempts
       );
       if (assertion.nextTool) {
         expect(recovery?.nextTool).toBe(assertion.nextTool);
@@ -94,7 +94,7 @@ describe('edit tool selection offline eval fixtures', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it.each(EDIT_TOOL_SELECTION_EVAL_FIXTURES)('$id', (fixture) => {
+  it.each(EDIT_TOOL_SELECTION_EVAL_FIXTURES)('$id', fixture => {
     expect(fixture.task.trim().length).toBeGreaterThan(20);
     expect(fixture.expectedPrimaryTools.length).toBeGreaterThan(0);
 

@@ -2,7 +2,7 @@
  * System Task API Routes
  */
 
-import { Router, Request, Response } from 'express';
+import { Router, type Request, type Response } from 'express';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import type { SystemTaskInfo } from '@zclaudia/shared/features/system-tasks';
 import { systemTaskRegistry } from '../../application/services/system-task-registry.js';
@@ -18,7 +18,10 @@ export function createSystemTaskRoutes(): Router {
     } catch (error) {
       res.status(500).json({
         success: false,
-        error: { code: 'INTERNAL_ERROR', message: error instanceof Error ? error.message : String(error) },
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: error instanceof Error ? error.message : String(error),
+        },
       });
     }
   });

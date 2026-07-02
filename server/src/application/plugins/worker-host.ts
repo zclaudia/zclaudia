@@ -5,6 +5,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { Worker } from 'worker_threads';
+import type { ExecFileException } from 'child_process';
+import type { Database } from 'better-sqlite3';
+import type { CommandExecuteResponse } from '@zclaudia/shared/features/commands';
 import type { Permission } from '@zclaudia/shared/plugin-types';
 import { commandRegistry } from '../commands/registry.js';
 import { pluginEvents } from '../../infra/events/index.js';
@@ -14,7 +17,7 @@ import { pluginStorageManager } from './storage.js';
 import { toolRegistry } from './tool-registry.js';
 
 interface PendingCall {
-  resolve: (value: any) => void;
+  resolve: (value: unknown) => void;
   timeout: NodeJS.Timeout;
   cleanup: () => void;
 }
@@ -25,7 +28,7 @@ interface WorkerEntry {
   activatedPromise: Promise<void>;
   toolHandlers: Map<string, string>;
   commandHandlers: Map<string, string>;
-  eventListeners: Map<string, (data: any) => void>;
+  eventListeners: Map<string, (data: unknown) => void>;
   pendingCalls: Map<string, PendingCall>;
 }
 
@@ -36,6 +39,15 @@ interface RPCRequest {
   args: unknown[];
 }
 
+interface WorkerMessage {
+  type?: string;
+  id?: string;
+  error?: string;
+  result?: unknown;
+}
+
+type WorkerCommandResult = CommandExecuteResponse & Record<string, unknown>;
+
 const ACTIVATION_TIMEOUT_MS = 30_000;
 
 const WORKER_RESOURCE_LIMITS = {
@@ -45,14 +57,14 @@ const WORKER_RESOURCE_LIMITS = {
 
 export class WorkerHost {
   private workers = new Map<string, WorkerEntry>();
-  private db: import('better-sqlite3').Database | null = null;
-  private broadcastFn: ((msg: any) => void) | null = null;
+  private db: Database | null = null;
+  private broadcastFn: ((msg: unknown) => void) | null = null;
 
-  setDatabase(db: import('better-sqlite3').Database): void {
+  setDatabase(db: Database): void {
     this.db = db;
   }
 
-  setBroadcast(fn: (msg: any) => void): void {
+  setBroadcast(fn: (msg: unknown) => void): void {
     this.broadcastFn = fn;
   }
 
@@ -87,10 +99,13 @@ export class WorkerHost {
         worker.off('message', onMessage);
         void worker.terminate().catch(() => {});
         this.workers.delete(pluginId);
-        reject(new Error(`Plugin ${pluginId} activation timed out after ${ACTIVATION_TIMEOUT_MS}ms`));
+        reject(
+          new Error(`Plugin ${pluginId} activation timed out after ${ACTIVATION_TIMEOUT_MS}ms`)
+        );
       }, ACTIVATION_TIMEOUT_MS);
 
-      const onMessage = (msg: any) => {
+      const onMessage = (rawMessage: unknown) => {
+        const msg = rawMessage as WorkerMessage;
         if (msg.type === 'activated') {
           clearTimeout(timeout);
           worker.off('message', onMessage);
@@ -100,7 +115,7 @@ export class WorkerHost {
           worker.off('message', onMessage);
           void worker.terminate().catch(() => {});
           this.workers.delete(pluginId);
-          reject(new Error(msg.error));
+          reject(new Error(msg.error ?? 'Plugin activation failed'));
         }
       };
 
@@ -109,16 +124,18 @@ export class WorkerHost {
 
     this.setupRPCHandler(entry);
 
-    worker.on('error', (error) => {
+    worker.on('error', error => {
       console.error(`[WorkerHost] Worker error for ${pluginId}:`, error.message);
-      void pluginEvents.emit('plugin.error', { pluginId, error: error.message }, pluginId).catch(() => {});
+      void pluginEvents
+        .emit('plugin.error', { pluginId, error: error.message }, pluginId)
+        .catch(() => {});
     });
 
-    worker.on('exit', (code) => {
+    worker.on('exit', code => {
       if (code !== 0) {
         console.error(`[WorkerHost] Worker for ${pluginId} exited with code ${code}`);
       }
-      for (const [callId, pending] of entry.pendingCalls) {
+      for (const pending of entry.pendingCalls.values()) {
         clearTimeout(pending.timeout);
         pending.cleanup();
         pending.resolve(JSON.stringify({ error: `Worker for ${pluginId} exited (code ${code})` }));
@@ -145,7 +162,8 @@ export class WorkerHost {
           reject(new Error('Deactivation timed out'));
         }, 10_000);
 
-        const onMessage = (msg: any) => {
+        const onMessage = (rawMessage: unknown) => {
+          const msg = rawMessage as WorkerMessage;
           if (msg.type === 'deactivated' || msg.type === 'deactivate_error') {
             clearTimeout(timeout);
             entry.worker.off('message', onMessage);
@@ -164,7 +182,7 @@ export class WorkerHost {
     } catch (error) {
       console.warn(
         `[WorkerHost] Error during deactivation of ${pluginId}:`,
-        error instanceof Error ? error.message : String(error),
+        error instanceof Error ? error.message : String(error)
       );
     }
 
@@ -200,7 +218,8 @@ export class WorkerHost {
   private setupRPCHandler(entry: WorkerEntry): void {
     const { worker, pluginId } = entry;
 
-    worker.on('message', async (msg: any) => {
+    worker.on('message', async (rawMessage: unknown) => {
+      const msg = rawMessage as WorkerMessage;
       if (msg.type !== 'rpc_request') {
         return;
       }
@@ -227,7 +246,7 @@ export class WorkerHost {
     pluginId: string,
     entry: WorkerEntry,
     method: string,
-    args: unknown[],
+    args: unknown[]
   ): Promise<unknown> {
     switch (method) {
       case 'storage.get': {
@@ -252,7 +271,7 @@ export class WorkerHost {
       }
       case 'events.on': {
         const eventName = args[0] as string;
-        const listener = (data: any) => {
+        const listener = (data: unknown) => {
           try {
             entry.worker.postMessage({ type: 'event_forward', event: eventName, data });
           } catch {
@@ -274,7 +293,7 @@ export class WorkerHost {
       }
       case 'events.once': {
         const eventName = args[0] as string;
-        const listener = (data: any) => {
+        const listener = (data: unknown) => {
           try {
             entry.worker.postMessage({ type: 'event_forward', event: eventName, data });
           } catch {
@@ -287,7 +306,11 @@ export class WorkerHost {
         return undefined;
       }
       case 'events.emit': {
-        await pluginEvents.emit(args[0] as string, args[1] as Record<string, unknown> | undefined, pluginId);
+        await pluginEvents.emit(
+          args[0] as string,
+          args[1] as Record<string, unknown> | undefined,
+          pluginId
+        );
         return undefined;
       }
       case 'commands.register': {
@@ -296,7 +319,7 @@ export class WorkerHost {
         commandRegistry.register({
           command,
           description: `Worker command from ${pluginId}`,
-          handler: async (cmdArgs) => this.forwardCommandCall(entry, command, cmdArgs),
+          handler: async cmdArgs => this.forwardCommandCall(entry, command, cmdArgs),
           source: 'plugin',
           pluginId,
         });
@@ -317,7 +340,7 @@ export class WorkerHost {
             type: 'function',
             function: { name, description, parameters: parameters as Record<string, unknown> },
           },
-          handler: async (toolArgs) => this.forwardToolCall(entry, toolId, toolArgs),
+          handler: async toolArgs => this.forwardToolCall(entry, toolId, toolArgs),
           source: 'plugin',
           pluginId,
         });
@@ -385,7 +408,10 @@ export class WorkerHost {
         if (!permissionManager.hasPermission(pluginId, 'network.fetch' as Permission)) {
           throw new Error('Permission denied: network.fetch');
         }
-        const response = await globalThis.fetch(args[0] as string, args[1] as RequestInit | undefined);
+        const response = await globalThis.fetch(
+          args[0] as string,
+          args[1] as RequestInit | undefined
+        );
         const body = await response.text();
         return { ok: response.ok, status: response.status, body };
       }
@@ -397,12 +423,12 @@ export class WorkerHost {
         const command = args[0] as string;
         const cmdArgs = (args[1] as string[]) || [];
         const options = (args[2] as { cwd?: string }) || {};
-        return new Promise((resolve) => {
+        return new Promise(resolve => {
           execFile(command, cmdArgs, { cwd: options.cwd }, (error, stdout, stderr) => {
             resolve({
               stdout: stdout || '',
               stderr: stderr || '',
-              code: error ? (typeof (error as any).code === 'number' ? (error as any).code : 1) : 0,
+              code: this.getExecExitCode(error),
             });
           });
         });
@@ -411,11 +437,13 @@ export class WorkerHost {
         if (!permissionManager.hasPermission(pluginId, 'notification' as Permission)) {
           throw new Error('Permission denied: notification');
         }
-        void pluginEvents.emit('plugin.notification', {
-          pluginId,
-          title: args[0] as string,
-          body: args[1] as string,
-        }).catch(() => {});
+        void pluginEvents
+          .emit('plugin.notification', {
+            pluginId,
+            title: args[0] as string,
+            body: args[1] as string,
+          })
+          .catch(() => {});
         this.broadcastFn?.({
           type: 'plugin_notification',
           pluginId,
@@ -440,7 +468,7 @@ export class WorkerHost {
           async () => {
             await this.forwardSchedulerTick(entry, taskId);
           },
-          immediate,
+          immediate
         );
         return undefined;
       }
@@ -469,8 +497,12 @@ export class WorkerHost {
     }
   }
 
-  private forwardToolCall(entry: WorkerEntry, toolId: string, args: Record<string, unknown>): Promise<string> {
-    return new Promise((resolve) => {
+  private forwardToolCall(
+    entry: WorkerEntry,
+    toolId: string,
+    args: Record<string, unknown>
+  ): Promise<string> {
+    return new Promise(resolve => {
       const callId = `tc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
       const settled = () => {
@@ -478,11 +510,12 @@ export class WorkerHost {
         entry.pendingCalls.delete(callId);
       };
 
-      const onMessage = (msg: any) => {
+      const onMessage = (rawMessage: unknown) => {
+        const msg = rawMessage as WorkerMessage;
         if (msg.type === 'tool_result' && msg.id === callId) {
           clearTimeout(timeout);
           settled();
-          resolve(msg.error ? JSON.stringify({ error: msg.error }) : msg.result);
+          resolve(msg.error ? JSON.stringify({ error: msg.error }) : (msg.result as string));
         }
       };
 
@@ -494,7 +527,7 @@ export class WorkerHost {
       }, 30_000);
 
       entry.pendingCalls.set(callId, {
-        resolve,
+        resolve: value => resolve(value as string),
         timeout,
         cleanup: () => entry.worker.off('message', onMessage),
       });
@@ -508,8 +541,12 @@ export class WorkerHost {
     });
   }
 
-  private forwardCommandCall(entry: WorkerEntry, command: string, args: string[]): Promise<any> {
-    return new Promise((resolve) => {
+  private forwardCommandCall(
+    entry: WorkerEntry,
+    command: string,
+    args: string[]
+  ): Promise<WorkerCommandResult> {
+    return new Promise(resolve => {
       const callId = `cc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
       const settled = () => {
@@ -517,11 +554,12 @@ export class WorkerHost {
         entry.pendingCalls.delete(callId);
       };
 
-      const onMessage = (msg: any) => {
+      const onMessage = (rawMessage: unknown) => {
+        const msg = rawMessage as WorkerMessage;
         if (msg.type === 'command_result' && msg.id === callId) {
           clearTimeout(timeout);
           settled();
-          resolve(msg.result);
+          resolve(msg.result as WorkerCommandResult);
         }
       };
 
@@ -533,7 +571,7 @@ export class WorkerHost {
       }, 30_000);
 
       entry.pendingCalls.set(callId, {
-        resolve,
+        resolve: value => resolve(value as WorkerCommandResult),
         timeout,
         cleanup: () => entry.worker.off('message', onMessage),
       });
@@ -548,7 +586,7 @@ export class WorkerHost {
   }
 
   private forwardSchedulerTick(entry: WorkerEntry, taskId: string): Promise<void> {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       const callId = `st_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
       const settled = () => {
@@ -556,7 +594,8 @@ export class WorkerHost {
         entry.pendingCalls.delete(callId);
       };
 
-      const onMessage = (msg: any) => {
+      const onMessage = (rawMessage: unknown) => {
+        const msg = rawMessage as WorkerMessage;
         if (msg.type === 'scheduler_tick_result' && msg.id === callId) {
           clearTimeout(timeout);
           settled();
@@ -576,7 +615,7 @@ export class WorkerHost {
       }, 60_000);
 
       entry.pendingCalls.set(callId, {
-        resolve,
+        resolve: () => resolve(),
         timeout,
         cleanup: () => entry.worker.off('message', onMessage),
       });
@@ -587,6 +626,13 @@ export class WorkerHost {
         taskId,
       });
     });
+  }
+
+  private getExecExitCode(error: ExecFileException | null): number {
+    if (!error) {
+      return 0;
+    }
+    return typeof error.code === 'number' ? error.code : 1;
   }
 }
 

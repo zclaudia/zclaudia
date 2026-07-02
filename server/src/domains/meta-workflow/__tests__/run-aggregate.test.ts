@@ -55,7 +55,10 @@ describe('MetaWorkflowRunAggregate', () => {
     const run = agg.create({ projectId: 'proj-1', title: 't' });
     agg.submitRequirements(run.id, 'r.md');
     agg.approveRequirements(run.id);
-    const updated = agg.setPhasesJson(run.id, '{"version":"1","phases":[],"smokePath":[],"metadata":{"generatedAt":0,"requirementsPath":"r.md"}}');
+    const updated = agg.setPhasesJson(
+      run.id,
+      '{"version":"1","phases":[],"smokePath":[],"metadata":{"generatedAt":0,"requirementsPath":"r.md"}}'
+    );
     expect(updated.status).toBe('executing');
     expect(updated.phasesJson).toContain('"version":"1"');
   });
@@ -64,7 +67,10 @@ describe('MetaWorkflowRunAggregate', () => {
     const run = agg.create({ projectId: 'proj-1', title: 't' });
     agg.submitRequirements(run.id, 'r.md');
     agg.approveRequirements(run.id);
-    agg.setPhasesJson(run.id, '{"version":"1","phases":[],"smokePath":[],"metadata":{"generatedAt":0,"requirementsPath":"r.md"}}');
+    agg.setPhasesJson(
+      run.id,
+      '{"version":"1","phases":[],"smokePath":[],"metadata":{"generatedAt":0,"requirementsPath":"r.md"}}'
+    );
     agg.enterReviewing(run.id);
     const updated = agg.complete(run.id);
     expect(updated.status).toBe('completed');

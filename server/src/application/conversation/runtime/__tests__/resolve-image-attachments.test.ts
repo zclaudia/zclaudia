@@ -26,7 +26,12 @@ function createTestDb(): Database.Database {
   return db;
 }
 
-const att = (fileId: string, name = 'a.png') => ({ fileId, name, mimeType: 'image/png', type: 'image' as const });
+const att = (fileId: string, name = 'a.png') => ({
+  fileId,
+  name,
+  mimeType: 'image/png',
+  type: 'image' as const,
+});
 
 describe('resolveImageAttachments', () => {
   let db: Database.Database;
@@ -61,14 +66,23 @@ describe('resolveImageAttachments', () => {
   });
 
   it('resolves stored images to base64 entries', () => {
-    const fileId = fileStore.storeFile('a.png', 'image/png', Buffer.from('fakepng').toString('base64'));
+    const fileId = fileStore.storeFile(
+      'a.png',
+      'image/png',
+      Buffer.from('fakepng').toString('base64')
+    );
     const { images, notices } = resolveImageAttachments([att(fileId)], fileStore);
-    expect(images).toEqual([{ name: 'a.png', mimeType: 'image/png', data: Buffer.from('fakepng').toString('base64') }]);
+    expect(images).toEqual([
+      { name: 'a.png', mimeType: 'image/png', data: Buffer.from('fakepng').toString('base64') },
+    ]);
     expect(notices).toEqual([]);
   });
 
   it('skips non-image attachments silently', () => {
-    const { images, notices } = resolveImageAttachments([{ fileId: 'x', name: 'doc.pdf', mimeType: 'application/pdf', type: 'file' }], fileStore);
+    const { images, notices } = resolveImageAttachments(
+      [{ fileId: 'x', name: 'doc.pdf', mimeType: 'application/pdf', type: 'file' }],
+      fileStore
+    );
     expect(images).toEqual([]);
     expect(notices).toEqual([]);
   });
@@ -80,7 +94,11 @@ describe('resolveImageAttachments', () => {
   });
 
   it('emits a notice for oversize images', () => {
-    const bigId = fileStore.storeFile('big.png', 'image/png', Buffer.alloc(5 * 1024 * 1024 + 1).toString('base64'));
+    const bigId = fileStore.storeFile(
+      'big.png',
+      'image/png',
+      Buffer.alloc(5 * 1024 * 1024 + 1).toString('base64')
+    );
     const { images, notices } = resolveImageAttachments([att(bigId, 'big.png')], fileStore);
     expect(images).toEqual([]);
     expect(notices).toEqual(['[Image attached: big.png — skipped, exceeds 5MB limit]']);
@@ -90,7 +108,10 @@ describe('resolveImageAttachments', () => {
     const ids = Array.from({ length: MAX_IMAGES_PER_MESSAGE + 2 }, (_, i) =>
       fileStore.storeFile(`i${i}.png`, 'image/png', Buffer.from('x').toString('base64'))
     );
-    const { images, notices } = resolveImageAttachments(ids.map((id, i) => att(id, `i${i}.png`)), fileStore);
+    const { images, notices } = resolveImageAttachments(
+      ids.map((id, i) => att(id, `i${i}.png`)),
+      fileStore
+    );
     expect(images).toHaveLength(MAX_IMAGES_PER_MESSAGE);
     expect(notices).toHaveLength(2);
     expect(notices[0]).toContain('max 10 images');

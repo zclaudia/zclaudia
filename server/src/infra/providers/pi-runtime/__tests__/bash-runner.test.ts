@@ -38,7 +38,12 @@ describe('runBash', () => {
 
   it('returns aborted immediately for an already-aborted signal', async () => {
     const dir = TMP();
-    const r = await runBash({ command: 'echo hi', cwd: dir, timeoutSec: 10, signal: AbortSignal.abort() });
+    const r = await runBash({
+      command: 'echo hi',
+      cwd: dir,
+      timeoutSec: 10,
+      signal: AbortSignal.abort(),
+    });
     rmSync(dir, { recursive: true, force: true });
     expect(r.aborted).toBe(true);
   });
@@ -55,7 +60,12 @@ describe('runBash', () => {
 
   it('truncates to the tail by line count and keeps full output', async () => {
     const dir = TMP();
-    const r = await runBash({ command: "printf 'a\\nb\\nc\\nd\\ne\\n'", cwd: dir, timeoutSec: 10, maxLines: 2 });
+    const r = await runBash({
+      command: "printf 'a\\nb\\nc\\nd\\ne\\n'",
+      cwd: dir,
+      timeoutSec: 10,
+      maxLines: 2,
+    });
     rmSync(dir, { recursive: true, force: true });
     expect(r.truncated).toBe(true);
     expect(r.output).toBe('d\ne\n');
@@ -78,7 +88,12 @@ describe('runBash', () => {
 
   it('feeds stdin to the child process', async () => {
     const dir = TMP();
-    const result = await runBash({ command: 'cat -', cwd: dir, timeoutSec: 10, stdin: 'hello stdin' });
+    const result = await runBash({
+      command: 'cat -',
+      cwd: dir,
+      timeoutSec: 10,
+      stdin: 'hello stdin',
+    });
     rmSync(dir, { recursive: true, force: true });
     expect(result.exitCode).toBe(0);
     expect(result.fullOutput).toContain('hello stdin');
@@ -86,14 +101,23 @@ describe('runBash', () => {
 
   it('merges extraEnv over process.env', async () => {
     const dir = TMP();
-    const result = await runBash({ command: 'echo "$ZC_TEST_VAR"', cwd: dir, timeoutSec: 10, extraEnv: { ZC_TEST_VAR: 'zc-42' } });
+    const result = await runBash({
+      command: 'echo "$ZC_TEST_VAR"',
+      cwd: dir,
+      timeoutSec: 10,
+      extraEnv: { ZC_TEST_VAR: 'zc-42' },
+    });
     rmSync(dir, { recursive: true, force: true });
     expect(result.fullOutput).toContain('zc-42');
   });
 
   it('captures stderr separately in stderrOutput', async () => {
     const dir = TMP();
-    const result = await runBash({ command: 'echo out; echo err >&2; exit 2', cwd: dir, timeoutSec: 10 });
+    const result = await runBash({
+      command: 'echo out; echo err >&2; exit 2',
+      cwd: dir,
+      timeoutSec: 10,
+    });
     rmSync(dir, { recursive: true, force: true });
     expect(result.exitCode).toBe(2);
     expect(result.stderrOutput).toContain('err');
@@ -108,9 +132,9 @@ describe('runBash', () => {
     process.env.ZCLAUDIA_DATA_DIR = dataDir;
     try {
       const result = await runBash({
-        command: "python3 -c \"import sys; sys.stderr.write('e' * 100000)\" ; exit 0",
+        command: 'python3 -c "import sys; sys.stderr.write(\'e\' * 100000)" ; exit 0',
         cwd: dir,
-        timeoutSec: 10
+        timeoutSec: 10,
       });
       expect(result.exitCode).toBe(0);
       expect(result.stderrOutput.length).toBeLessThanOrEqual(66 * 1024); // ~64KB capture cap (+ at most one chunk)
@@ -141,7 +165,7 @@ describe('runBash', () => {
       const newer = persistBashFullOutput('newer'); // triggers the sweep
 
       expect(existsSync(stale)).toBe(false); // swept
-      expect(existsSync(fresh)).toBe(true);  // recent, kept
+      expect(existsSync(fresh)).toBe(true); // recent, kept
       expect(existsSync(newer)).toBe(true);
     } finally {
       if (prev === undefined) delete process.env.ZCLAUDIA_DATA_DIR;

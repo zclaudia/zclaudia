@@ -6,9 +6,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useConfirmDialogStore } from '../stores/confirmDialogStore';
 
 export function ConfirmDialog() {
-  const current = useConfirmDialogStore((s) => s.current);
-  const confirm = useConfirmDialogStore((s) => s.confirm);
-  const cancel = useConfirmDialogStore((s) => s.cancel);
+  const current = useConfirmDialogStore(s => s.current);
+  const confirm = useConfirmDialogStore(s => s.confirm);
+  const cancel = useConfirmDialogStore(s => s.cancel);
 
   const [inputValue, setInputValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -45,7 +45,7 @@ export function ConfirmDialog() {
   return (
     <div
       className="fixed inset-0 bg-black/40 flex items-center justify-center z-[100]"
-      onMouseDown={(e) => {
+      onMouseDown={e => {
         // Backdrop click cancels; ignore clicks that bubble from the panel.
         if (e.target === e.currentTarget) cancel();
       }}
@@ -70,7 +70,7 @@ export function ConfirmDialog() {
               ref={inputRef}
               type="text"
               value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
+              onChange={e => setInputValue(e.target.value)}
               placeholder={current.input.placeholder}
               className="w-full px-2.5 py-1.5 text-sm rounded-md bg-input border border-border focus:outline-none focus:ring-1 focus:ring-ring"
             />

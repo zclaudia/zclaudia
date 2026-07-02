@@ -19,12 +19,15 @@ function validate(body: AutomationBody): string | null {
   if (!body.name?.trim()) return 'name is required';
   if (!body.trigger?.type) return 'trigger.type is required';
   if (!body.action?.kind) return 'action.kind is required';
-  if (body.action.kind !== 'activity' && body.action.kind !== 'workflow') return "action.kind must be 'activity' or 'workflow'";
+  if (body.action.kind !== 'activity' && body.action.kind !== 'workflow')
+    return "action.kind must be 'activity' or 'workflow'";
   if (!body.action.ref?.trim()) return 'action.ref is required';
   const t = body.trigger;
   if (t.type === 'cron' && !t.cron?.trim()) return 'trigger.cron is required for cron triggers';
-  if (t.type === 'interval' && (!t.intervalMinutes || t.intervalMinutes < 1)) return 'trigger.intervalMinutes must be >= 1';
-  if (t.type === 'once' && typeof t.onceAt !== 'number') return 'trigger.onceAt is required for one-time triggers';
+  if (t.type === 'interval' && (!t.intervalMinutes || t.intervalMinutes < 1))
+    return 'trigger.intervalMinutes must be >= 1';
+  if (t.type === 'once' && typeof t.onceAt !== 'number')
+    return 'trigger.onceAt is required for one-time triggers';
   if (t.type === 'event' && !t.event?.trim()) return 'trigger.event is required for event triggers';
   return null;
 }
@@ -91,7 +94,10 @@ export function createAutomationRoutes(automationService: AutomationService): Ro
 
   router.post('/:id/trigger', async (req: Request, res: Response) => {
     try {
-      const run = await automationService.runAction(req.params.id, { initiator: `automation:${req.params.id}`, triggerSource: 'manual' });
+      const run = await automationService.runAction(req.params.id, {
+        initiator: `automation:${req.params.id}`,
+        triggerSource: 'manual',
+      });
       res.json({ success: true, data: run });
     } catch (error) {
       fail(res, 500, error instanceof Error ? error.message : String(error), 'INTERNAL_ERROR');

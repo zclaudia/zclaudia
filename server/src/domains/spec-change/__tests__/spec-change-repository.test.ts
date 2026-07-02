@@ -12,12 +12,12 @@ describe('SpecChangeRepository', () => {
     db.pragma('foreign_keys = ON');
     applyMigrations(db);
     db.prepare(
-      `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
     ).run('proj-1', 'P', 'code', 0, 0);
     db.prepare(
       `INSERT INTO local_issues
         (id, project_id, title, description, status, priority, labels, created_at, updated_at, type, is_anonymous)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run('issue-1', 'proj-1', 't', null, 'open', 'medium', '[]', 0, 0, 'implement', 0);
     repo = new SpecChangeRepository(db);
   });
@@ -63,7 +63,7 @@ describe('SpecChangeRepository', () => {
     });
     expect(repo.findBySubIssue('issue-1')!.id).toBe(sc.id);
     expect(repo.findBySlug('proj-1', 'add-2fa')!.id).toBe(sc.id);
-    expect(repo.listByProject('proj-1').map((s) => s.id)).toEqual([sc.id]);
+    expect(repo.listByProject('proj-1').map(s => s.id)).toEqual([sc.id]);
     expect(repo.findBySubIssue('nope')).toBeNull();
   });
 
@@ -86,9 +86,9 @@ describe('SpecChangeRepository', () => {
           `INSERT INTO spec_changes
             (id, project_id, sub_issue_id, slug, title, status,
              proposal_path, design_path, tasks_path, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
-        .run('bad', 'proj-1', 'issue-1', 'x', 'X', 'invalid', 'p', 'd', 't', 0, 0),
+        .run('bad', 'proj-1', 'issue-1', 'x', 'X', 'invalid', 'p', 'd', 't', 0, 0)
     ).toThrow();
   });
 });

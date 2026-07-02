@@ -10,7 +10,9 @@ function makeClient() {
     client: {
       ws: {
         readyState: 1,
-        send: (msg: string) => { sent.push(JSON.parse(msg)); },
+        send: (msg: string) => {
+          sent.push(JSON.parse(msg));
+        },
       },
     } as never,
   };
@@ -40,13 +42,15 @@ describe('handleRunSteer', () => {
       client,
       { type: 'run_steer', runId: 'r1', content: '  also fix typo  ' },
       activeRuns,
-      broadcastMock,
+      broadcastMock
     );
-    expect(steerSpy).toHaveBeenCalledWith(expect.objectContaining({
-      role: 'user',
-      content: [{ type: 'text', text: 'also fix typo' }],
-      timestamp: expect.any(Number),
-    }));
+    expect(steerSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: 'user',
+        content: [{ type: 'text', text: 'also fix typo' }],
+        timestamp: expect.any(Number),
+      })
+    );
     expect(activeRuns.get('r1')!.pendingSteers).toHaveLength(1);
     expect(broadcastMock).toHaveBeenCalledWith(
       activeRuns.get('r1'),
@@ -57,7 +61,7 @@ describe('handleRunSteer', () => {
         role: 'user',
         content: 'also fix typo',
         steered: true,
-      }),
+      })
     );
     expect(sent).toHaveLength(0);
   });
@@ -75,7 +79,7 @@ describe('handleRunSteer', () => {
       client,
       { type: 'run_steer', runId: 'r1', content: '   ' },
       activeRuns,
-      broadcastMock,
+      broadcastMock
     );
     expect(steerSpy).not.toHaveBeenCalled();
     expect(broadcastMock).not.toHaveBeenCalled();
@@ -88,7 +92,7 @@ describe('handleRunSteer', () => {
       client,
       { type: 'run_steer', runId: 'r-nope', content: 'x' },
       activeRuns,
-      broadcastMock,
+      broadcastMock
     );
     expect(steerSpy).not.toHaveBeenCalled();
     expect(sent[0]).toMatchObject({ type: 'error', code: 'STEER_NO_ACTIVE_RUN' });
@@ -106,7 +110,7 @@ describe('handleRunSteer', () => {
       client,
       { type: 'run_steer', runId: 'r1', content: 'x' },
       activeRuns,
-      broadcastMock,
+      broadcastMock
     );
     expect(steerSpy).not.toHaveBeenCalled();
     expect(sent[0]).toMatchObject({ type: 'error', code: 'STEER_NOT_READY' });
@@ -125,7 +129,7 @@ describe('handleRunSteer', () => {
       client,
       { type: 'run_steer', runId: 'r1', content: 'x' },
       activeRuns,
-      broadcastMock,
+      broadcastMock
     );
     expect(steerSpy).not.toHaveBeenCalled();
     expect(sent[0]).toMatchObject({ type: 'error', code: 'STEER_NO_ACTIVE_RUN' });
@@ -133,7 +137,9 @@ describe('handleRunSteer', () => {
 
   it('returns STEER_FAILED when steerHandle.steer throws', async () => {
     const { client, sent } = makeClient();
-    const throwingSteer = vi.fn().mockImplementation(() => { throw new Error('queue closed'); });
+    const throwingSteer = vi.fn().mockImplementation(() => {
+      throw new Error('queue closed');
+    });
     activeRuns.set('r1', {
       runId: 'r1',
       sessionId: 's1',
@@ -145,11 +151,11 @@ describe('handleRunSteer', () => {
       client,
       { type: 'run_steer', runId: 'r1', content: 'x' },
       activeRuns,
-      broadcastMock,
+      broadcastMock
     );
     expect(throwingSteer).toHaveBeenCalled();
-    expect(activeRuns.get('r1')!.pendingSteers).toHaveLength(0);   // not pushed
-    expect(broadcastMock).not.toHaveBeenCalled();                   // not broadcast
+    expect(activeRuns.get('r1')!.pendingSteers).toHaveLength(0); // not pushed
+    expect(broadcastMock).not.toHaveBeenCalled(); // not broadcast
     expect(sent[0]).toMatchObject({ type: 'error', code: 'STEER_FAILED' });
   });
 });
@@ -187,14 +193,21 @@ describe('handleRunSteer — persistence', () => {
           return [];
         }),
       })),
-      transaction: vi.fn(<T>(fn: (...a: unknown[]) => T) => (...args: unknown[]) => fn(...args)),
+      transaction: vi.fn(
+        <T>(fn: (...a: unknown[]) => T) =>
+          (...args: unknown[]) =>
+            fn(...args)
+      ),
       __stmts: stmts,
     };
     return mockDb;
   }
 
   /** Builds an ActiveRun wired to the mock DB. */
-  function makeRun(db: ReturnType<typeof makeMockDb>, overrides: Partial<ActiveRun> = {}): ActiveRun {
+  function makeRun(
+    db: ReturnType<typeof makeMockDb>,
+    overrides: Partial<ActiveRun> = {}
+  ): ActiveRun {
     return {
       runId: 'r1',
       sessionId: 's1',
@@ -218,7 +231,7 @@ describe('handleRunSteer — persistence', () => {
       client,
       { type: 'run_steer', runId: 'r1', content: 'fix the typo too' },
       activeRuns,
-      broadcastMock,
+      broadcastMock
     );
 
     // steer was accepted first (persistence only happens after a successful steer).
@@ -227,7 +240,7 @@ describe('handleRunSteer — persistence', () => {
     // messages-table INSERT for the user message. Note `'user'` is a SQL literal
     // (VALUES (?, ?, 'user', ...)), so only id/sessionId/content/metadata/time/offset
     // arrive as bound args.
-    const insertCall = db.__stmts.find((s) => s.sql.includes('INSERT INTO messages'));
+    const insertCall = db.__stmts.find(s => s.sql.includes('INSERT INTO messages'));
     expect(insertCall).toBeTruthy();
     expect(insertCall!.sql).toContain("'user'");
     const [id, , content, metadataJson, createdAt] = insertCall!.args;
@@ -239,11 +252,11 @@ describe('handleRunSteer — persistence', () => {
     expect(id).toBe(`steer-r1-${createdAt}`);
 
     // session-tree was appended (session_entries write + leaf advance).
-    const treeWrite = db.__stmts.find((s) => s.sql.includes('INSERT INTO session_entries'));
+    const treeWrite = db.__stmts.find(s => s.sql.includes('INSERT INTO session_entries'));
     expect(treeWrite).toBeTruthy();
 
     // messages row back-linked to the tree entry.
-    const treeLink = db.__stmts.find((s) => s.sql.includes('UPDATE messages SET tree_entry_id'));
+    const treeLink = db.__stmts.find(s => s.sql.includes('UPDATE messages SET tree_entry_id'));
     expect(treeLink).toBeTruthy();
 
     // The steered message was broadcast so every client renders it immediately.
@@ -254,7 +267,7 @@ describe('handleRunSteer — persistence', () => {
         role: 'user',
         content: 'fix the typo too',
         steered: true,
-      }),
+      })
     );
   });
 
@@ -269,11 +282,11 @@ describe('handleRunSteer — persistence', () => {
       client,
       { type: 'run_steer', runId: 'r1', content: 'x' },
       activeRuns,
-      vi.fn(),
+      vi.fn()
     );
 
-    expect(db.__stmts.find((s) => s.sql.includes('INSERT INTO messages'))).toBeUndefined();
-    expect(db.__stmts.find((s) => s.sql.includes('INSERT INTO session_entries'))).toBeUndefined();
+    expect(db.__stmts.find(s => s.sql.includes('INSERT INTO messages'))).toBeUndefined();
+    expect(db.__stmts.find(s => s.sql.includes('INSERT INTO session_entries'))).toBeUndefined();
   });
 
   it('keeps steer ids unique when two steers land in the same millisecond', async () => {
@@ -286,15 +299,23 @@ describe('handleRunSteer — persistence', () => {
     // Freeze the wall clock so both steers would otherwise derive the same id.
     const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(1000);
     try {
-      await handleRunSteer(client, { type: 'run_steer', runId: 'r1', content: 'first' }, activeRuns, vi.fn());
-      await handleRunSteer(client, { type: 'run_steer', runId: 'r1', content: 'second' }, activeRuns, vi.fn());
+      await handleRunSteer(
+        client,
+        { type: 'run_steer', runId: 'r1', content: 'first' },
+        activeRuns,
+        vi.fn()
+      );
+      await handleRunSteer(
+        client,
+        { type: 'run_steer', runId: 'r1', content: 'second' },
+        activeRuns,
+        vi.fn()
+      );
     } finally {
       nowSpy.mockRestore();
     }
 
-    const ids = db.__stmts
-      .filter((s) => s.sql.includes('INSERT INTO messages'))
-      .map((s) => s.args[0]);
+    const ids = db.__stmts.filter(s => s.sql.includes('INSERT INTO messages')).map(s => s.args[0]);
     expect(ids).toHaveLength(2);
     expect(ids[0]).not.toBe(ids[1]);
     // Second id is bumped one ms past the first so the PRIMARY KEY can't collide.

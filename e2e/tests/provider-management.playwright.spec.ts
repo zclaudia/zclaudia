@@ -23,7 +23,9 @@ test.describe('Provider Management', () => {
 
   // Helper: Open settings page
   async function openSettings(page: any): Promise<boolean> {
-    const settingsButton = page.locator('button[title*="Settings"], button[aria-label*="Settings"]').first();
+    const settingsButton = page
+      .locator('button[title*="Settings"], button[aria-label*="Settings"]')
+      .first();
     const hasSettings = await settingsButton.isVisible({ timeout: 2000 }).catch(() => false);
 
     if (hasSettings) {
@@ -69,7 +71,9 @@ test.describe('Provider Management', () => {
       await openProvidersSection(page);
 
       // Check for provider list
-      const providerList = page.locator('[data-testid="provider-list"], .provider-list, [class*="provider"]').first();
+      const providerList = page
+        .locator('[data-testid="provider-list"], .provider-list, [class*="provider"]')
+        .first();
       const hasList = await providerList.isVisible({ timeout: 3000 }).catch(() => false);
 
       if (hasList) {
@@ -103,7 +107,9 @@ test.describe('Provider Management', () => {
       await openProvidersSection(page);
 
       // Look for add provider button
-      const addButton = page.locator('button:has-text("Add"), button:has-text("New Provider"), button[title*="Add"]').first();
+      const addButton = page
+        .locator('button:has-text("Add"), button:has-text("New Provider"), button[title*="Add"]')
+        .first();
       const hasAddButton = await addButton.isVisible({ timeout: 2000 }).catch(() => false);
 
       if (hasAddButton) {
@@ -125,7 +131,9 @@ test.describe('Provider Management', () => {
           }
 
           // Save provider
-          const saveButton = page.locator('button:has-text("Save"), button:has-text("Add")').first();
+          const saveButton = page
+            .locator('button:has-text("Save"), button:has-text("Add")')
+            .first();
           if (await saveButton.isVisible({ timeout: 1000 }).catch(() => false)) {
             await saveButton.click();
             await page.waitForTimeout(500);
@@ -162,7 +170,9 @@ test.describe('Provider Management', () => {
     if (settingsOpened) {
       await openProvidersSection(page);
 
-      const addButton = page.locator('button:has-text("Add"), button:has-text("New Provider")').first();
+      const addButton = page
+        .locator('button:has-text("Add"), button:has-text("New Provider")')
+        .first();
       const hasAddButton = await addButton.isVisible({ timeout: 2000 }).catch(() => false);
 
       if (hasAddButton) {
@@ -178,13 +188,17 @@ test.describe('Provider Management', () => {
           await page.waitForTimeout(300);
 
           // Fill in API key field if present
-          const apiKeyInput = page.locator('input[placeholder*="API key"], input[name*="apiKey"], input[type="password"]').first();
+          const apiKeyInput = page
+            .locator('input[placeholder*="API key"], input[name*="apiKey"], input[type="password"]')
+            .first();
           if (await apiKeyInput.isVisible({ timeout: 1000 }).catch(() => false)) {
             await apiKeyInput.fill('test-api-key-for-testing');
           }
 
           // Save provider
-          const saveButton = page.locator('button:has-text("Save"), button:has-text("Add")').first();
+          const saveButton = page
+            .locator('button:has-text("Save"), button:has-text("Add")')
+            .first();
           if (await saveButton.isVisible({ timeout: 1000 }).catch(() => false)) {
             await saveButton.click();
             await page.waitForTimeout(500);
@@ -216,7 +230,9 @@ test.describe('Provider Management', () => {
       await openProvidersSection(page);
 
       // Look for provider items to switch
-      const providerItems = page.locator('[data-testid="provider-item"], .provider-item, [class*="provider-card"]');
+      const providerItems = page.locator(
+        '[data-testid="provider-item"], .provider-item, [class*="provider-card"]'
+      );
       const count = await providerItems.count();
 
       if (count > 1) {
@@ -227,7 +243,11 @@ test.describe('Provider Management', () => {
         await secondProvider.hover();
         await page.waitForTimeout(300);
 
-        const switchButton = secondProvider.locator('button:has-text("Default"), button:has-text("Switch"), button:has-text("Select")').first();
+        const switchButton = secondProvider
+          .locator(
+            'button:has-text("Default"), button:has-text("Switch"), button:has-text("Select")'
+          )
+          .first();
         const hasSwitch = await switchButton.isVisible({ timeout: 1000 }).catch(() => false);
 
         if (hasSwitch) {
@@ -265,7 +285,7 @@ test.describe('Provider Management', () => {
 
       // Find a non-default provider to delete
       const providerItems = page.locator('[data-testid="provider-item"], .provider-item').filter({
-        hasNot: page.locator('[class*="default"], [data-default="true"]')
+        hasNot: page.locator('[class*="default"], [data-default="true"]'),
       });
 
       const count = await providerItems.count();
@@ -276,14 +296,18 @@ test.describe('Provider Management', () => {
         await page.waitForTimeout(300);
 
         // Click delete button
-        const deleteButton = firstDeletable.locator('button[title*="Delete"], button[title*="Remove"], button:has-text("Delete")').first();
+        const deleteButton = firstDeletable
+          .locator('button[title*="Delete"], button[title*="Remove"], button:has-text("Delete")')
+          .first();
         const hasDelete = await deleteButton.isVisible({ timeout: 1000 }).catch(() => false);
 
         if (hasDelete) {
           await deleteButton.click();
 
           // Confirm deletion
-          const confirmButton = page.locator('button:has-text("Confirm"), button:has-text("Delete")').first();
+          const confirmButton = page
+            .locator('button:has-text("Confirm"), button:has-text("Delete")')
+            .first();
           if (await confirmButton.isVisible({ timeout: 2000 }).catch(() => false)) {
             await confirmButton.click();
             await page.waitForTimeout(500);
@@ -318,7 +342,9 @@ test.describe('Provider Management', () => {
       const initialCount = await providerItems.count();
 
       // Close and reopen settings
-      const closeButton = page.locator('button[title*="Close"], button[aria-label*="Close"]').first();
+      const closeButton = page
+        .locator('button[title*="Close"], button[aria-label*="Close"]')
+        .first();
       if (await closeButton.isVisible({ timeout: 1000 }).catch(() => false)) {
         await closeButton.click();
         await page.waitForTimeout(500);
@@ -357,7 +383,9 @@ test.describe('Provider Management', () => {
     if (settingsOpened) {
       await openProvidersSection(page);
 
-      const addButton = page.locator('button:has-text("Add"), button:has-text("New Provider")').first();
+      const addButton = page
+        .locator('button:has-text("Add"), button:has-text("New Provider")')
+        .first();
       const hasAddButton = await addButton.isVisible({ timeout: 2000 }).catch(() => false);
 
       if (hasAddButton) {

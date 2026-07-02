@@ -8,7 +8,12 @@ import type {
   PermissionCategory,
   UnifiedPermissionPolicy,
 } from '@zclaudia/shared/interaction/permissions';
-import { DEFAULT_GLOBAL_GUARDS, DEFAULT_UNIFIED_POLICY, DEFAULT_UNIFIED_PROFILE, DEFAULT_AI_REVIEW_CONFIG } from '@zclaudia/shared/interaction/permissions';
+import {
+  DEFAULT_GLOBAL_GUARDS,
+  DEFAULT_UNIFIED_POLICY,
+  DEFAULT_UNIFIED_PROFILE,
+  DEFAULT_AI_REVIEW_CONFIG,
+} from '@zclaudia/shared/interaction/permissions';
 import {
   PermissionEvaluator,
   evaluateMcpToolTrustPolicy,
@@ -46,7 +51,9 @@ function makePolicy(overrides: Partial<UnifiedPermissionPolicy> = {}): UnifiedPe
   };
 }
 
-function makeUnifiedPolicy(overrides: Partial<UnifiedPermissionPolicy> = {}): UnifiedPermissionPolicy {
+function makeUnifiedPolicy(
+  overrides: Partial<UnifiedPermissionPolicy> = {}
+): UnifiedPermissionPolicy {
   return {
     enabled: true,
     profile: { ...DEFAULT_UNIFIED_PROFILE },
@@ -87,15 +94,19 @@ function makeMockDb(rows: Record<string, unknown> = {}) {
         return undefined;
       },
       all: (..._args: unknown[]) => {
-        if (sql.includes('permission_memories')) return (rows['permission_memories'] as any[]) ?? [];
-        if (sql.includes('permission_outside_workspace_roots')) return (rows['permission_outside_workspace_roots'] as any[]) ?? [];
+        if (sql.includes('permission_memories'))
+          return (rows['permission_memories'] as any[]) ?? [];
+        if (sql.includes('permission_outside_workspace_roots'))
+          return (rows['permission_outside_workspace_roots'] as any[]) ?? [];
         return [];
       },
       run: (...args: unknown[]) => {
         if (sql.includes('permission_memories')) {
           const list = ((rows['permission_memories'] as any[]) ??= []);
           const [sessionId, rememberKey, decision] = args;
-          const idx = list.findIndex((row) => row.session_id === sessionId && row.remember_key === rememberKey);
+          const idx = list.findIndex(
+            row => row.session_id === sessionId && row.remember_key === rememberKey
+          );
           const row = { session_id: sessionId, remember_key: rememberKey, decision };
           if (idx >= 0) list[idx] = row;
           else list.push(row);
@@ -103,7 +114,9 @@ function makeMockDb(rows: Record<string, unknown> = {}) {
         if (sql.includes('permission_outside_workspace_roots')) {
           const list = ((rows['permission_outside_workspace_roots'] as any[]) ??= []);
           const [projectId, allowedRoot] = args;
-          const idx = list.findIndex((row) => row.project_id === projectId && row.allowed_root === allowedRoot);
+          const idx = list.findIndex(
+            row => row.project_id === projectId && row.allowed_root === allowedRoot
+          );
           const row = { project_id: projectId, allowed_root: allowedRoot };
           if (idx >= 0) list[idx] = row;
           else list.push(row);
@@ -145,7 +158,16 @@ describe('classify', () => {
   });
 
   it('should classify safe bash commands as shellSafe', () => {
-    const safeCmds = ['ls -la', 'cat file.txt', 'npm install', 'npm test', 'git status', 'git diff', 'tsc --noEmit', 'node script.js'];
+    const safeCmds = [
+      'ls -la',
+      'cat file.txt',
+      'npm install',
+      'npm test',
+      'git status',
+      'git diff',
+      'tsc --noEmit',
+      'node script.js',
+    ];
     for (const cmd of safeCmds) {
       expect(classify('Bash', { command: cmd }, cmd)).toBe('shellSafe' as PermissionCategory);
     }
@@ -191,17 +213,29 @@ describe('classify', () => {
 
   it('should classify blocking interaction tools as userQuestions', () => {
     expect(classify('ask_user_form', {}, '')).toBe('userQuestions' as PermissionCategory);
-    expect(classify('mcp:claudia-plugins:request_approval', {}, '')).toBe('userQuestions' as PermissionCategory);
+    expect(classify('mcp:claudia-plugins:request_approval', {}, '')).toBe(
+      'userQuestions' as PermissionCategory
+    );
     expect(classify('ExitPlanMode', {}, '')).toBe('userQuestions' as PermissionCategory);
   });
 
   it('classifies Memory permissions by command risk', () => {
     expect(classify('Memory', { command: 'view', path: '/memories/a.md' }, '')).toBe('fileRead');
     expect(classify('Memory', { command: 'create', path: '/memories/a.md' }, '')).toBe('fileWrite');
-    expect(classify('Memory', { command: 'str_replace', path: '/memories/a.md' }, '')).toBe('fileWrite');
+    expect(classify('Memory', { command: 'str_replace', path: '/memories/a.md' }, '')).toBe(
+      'fileWrite'
+    );
     expect(classify('Memory', { command: 'insert', path: '/memories/a.md' }, '')).toBe('fileWrite');
-    expect(classify('Memory', { command: 'rename', old_path: '/memories/a.md', new_path: '/memories/b.md' }, '')).toBe('fileWrite');
-    expect(classify('Memory', { command: 'delete', path: '/memories/a.md' }, '')).toBe('destructiveOps');
+    expect(
+      classify(
+        'Memory',
+        { command: 'rename', old_path: '/memories/a.md', new_path: '/memories/b.md' },
+        ''
+      )
+    ).toBe('fileWrite');
+    expect(classify('Memory', { command: 'delete', path: '/memories/a.md' }, '')).toBe(
+      'destructiveOps'
+    );
   });
 
   it('should classify unknown tools as shellSafe', () => {
@@ -220,7 +254,9 @@ describe('classify', () => {
 
   it('should fall back to detail string when command not in toolInput', () => {
     expect(classify('Bash', {}, 'ls -la')).toBe('shellSafe' as PermissionCategory);
-    expect(classify('Bash', {}, 'curl https://example.com')).toBe('networkOps' as PermissionCategory);
+    expect(classify('Bash', {}, 'curl https://example.com')).toBe(
+      'networkOps' as PermissionCategory
+    );
   });
 
   it('should detect internal interaction tools with normalized or mcp-prefixed names', () => {
@@ -244,47 +280,55 @@ describe('classify', () => {
 
 describe('evaluateMcpToolTrustPolicy', () => {
   it('uses explicit risk actions before the default risk action', () => {
-    expect(evaluateMcpToolTrustPolicy(
-      { riskLevel: 'low', declaredReadOnly: false },
-      {
-        trustLevel: 'untrusted',
-        trustReadOnlyHint: false,
-        defaultRiskAction: 'ask',
-        riskActions: { low: 'auto-approve', high: 'deny' },
-      },
-    )).toBe('approve');
+    expect(
+      evaluateMcpToolTrustPolicy(
+        { riskLevel: 'low', declaredReadOnly: false },
+        {
+          trustLevel: 'untrusted',
+          trustReadOnlyHint: false,
+          defaultRiskAction: 'ask',
+          riskActions: { low: 'auto-approve', high: 'deny' },
+        }
+      )
+    ).toBe('approve');
 
-    expect(evaluateMcpToolTrustPolicy(
-      { riskLevel: 'high', declaredReadOnly: false },
-      {
-        trustLevel: 'trusted',
-        trustReadOnlyHint: false,
-        defaultRiskAction: 'ask',
-        riskActions: { low: 'auto-approve', high: 'deny' },
-      },
-    )).toBe('deny');
+    expect(
+      evaluateMcpToolTrustPolicy(
+        { riskLevel: 'high', declaredReadOnly: false },
+        {
+          trustLevel: 'trusted',
+          trustReadOnlyHint: false,
+          defaultRiskAction: 'ask',
+          riskActions: { low: 'auto-approve', high: 'deny' },
+        }
+      )
+    ).toBe('deny');
   });
 
   it('trusts readonly MCP hints only when the server policy allows it', () => {
-    expect(evaluateMcpToolTrustPolicy(
-      { riskLevel: 'medium', declaredReadOnly: true },
-      {
-        trustLevel: 'trusted-readonly',
-        trustReadOnlyHint: true,
-        defaultRiskAction: 'ask',
-        riskActions: {},
-      },
-    )).toBe('approve');
+    expect(
+      evaluateMcpToolTrustPolicy(
+        { riskLevel: 'medium', declaredReadOnly: true },
+        {
+          trustLevel: 'trusted-readonly',
+          trustReadOnlyHint: true,
+          defaultRiskAction: 'ask',
+          riskActions: {},
+        }
+      )
+    ).toBe('approve');
 
-    expect(evaluateMcpToolTrustPolicy(
-      { riskLevel: 'medium', declaredReadOnly: true },
-      {
-        trustLevel: 'trusted-readonly',
-        trustReadOnlyHint: false,
-        defaultRiskAction: 'ask',
-        riskActions: {},
-      },
-    )).toBe('escalate');
+    expect(
+      evaluateMcpToolTrustPolicy(
+        { riskLevel: 'medium', declaredReadOnly: true },
+        {
+          trustLevel: 'trusted-readonly',
+          trustReadOnlyHint: false,
+          defaultRiskAction: 'ask',
+          riskActions: {},
+        }
+      )
+    ).toBe('escalate');
   });
 });
 
@@ -337,21 +381,39 @@ describe('PermissionEvaluator', () => {
         profile: makeProfile({ fileWrite: 'auto-approve' }),
         globalGuards: { blockSensitiveFiles: false, blockOutsideWorkspace: false },
       });
-      expect(evaluator.evaluate('Write', { file_path: '/home/user/project/main.ts' }, '', policy, makeContext())).toBe('approve');
+      expect(
+        evaluator.evaluate(
+          'Write',
+          { file_path: '/home/user/project/main.ts' },
+          '',
+          policy,
+          makeContext()
+        )
+      ).toBe('approve');
     });
 
     it('shellSafe ask returns escalate', () => {
       const policy = makePolicy({
         profile: makeProfile({ shellSafe: 'ask' }),
       });
-      expect(evaluator.evaluate('Bash', { command: 'ls' }, 'ls', policy, makeContext())).toBe('escalate');
+      expect(evaluator.evaluate('Bash', { command: 'ls' }, 'ls', policy, makeContext())).toBe(
+        'escalate'
+      );
     });
 
     it('networkOps block returns deny', () => {
       const policy = makePolicy({
         profile: makeProfile({ networkOps: 'block' }),
       });
-      expect(evaluator.evaluate('Bash', { command: 'curl https://example.com' }, '', policy, makeContext())).toBe('deny');
+      expect(
+        evaluator.evaluate(
+          'Bash',
+          { command: 'curl https://example.com' },
+          '',
+          policy,
+          makeContext()
+        )
+      ).toBe('deny');
     });
 
     it('destructiveOps block returns deny', () => {
@@ -359,7 +421,9 @@ describe('PermissionEvaluator', () => {
         profile: makeProfile({ destructiveOps: 'block' }),
         globalGuards: { blockSensitiveFiles: false, blockOutsideWorkspace: false },
       });
-      expect(evaluator.evaluate('Bash', { command: 'rm -rf /' }, '', policy, makeContext())).toBe('deny');
+      expect(evaluator.evaluate('Bash', { command: 'rm -rf /' }, '', policy, makeContext())).toBe(
+        'deny'
+      );
     });
 
     it('userQuestions ask returns escalate', () => {
@@ -380,21 +444,45 @@ describe('PermissionEvaluator', () => {
       const policy = makePolicy({
         profile: makeProfile({ shellSafe: 'auto-approve' }),
       });
-      expect(evaluator.evaluate('Bash', { command: 'ls' }, 'ls', policy, makeContext({ sessionType: 'regular' }))).toBe('approve');
+      expect(
+        evaluator.evaluate(
+          'Bash',
+          { command: 'ls' },
+          'ls',
+          policy,
+          makeContext({ sessionType: 'regular' })
+        )
+      ).toBe('approve');
     });
 
     it('should use same profile for background sessions', () => {
       const policy = makePolicy({
         profile: makeProfile({ shellSafe: 'auto-approve' }),
       });
-      expect(evaluator.evaluate('Bash', { command: 'ls' }, 'ls', policy, makeContext({ sessionType: 'background' }))).toBe('approve');
+      expect(
+        evaluator.evaluate(
+          'Bash',
+          { command: 'ls' },
+          'ls',
+          policy,
+          makeContext({ sessionType: 'background' })
+        )
+      ).toBe('approve');
     });
 
     it('should use same profile for agent sessions', () => {
       const policy = makePolicy({
         profile: makeProfile({ shellSafe: 'ask' }),
       });
-      expect(evaluator.evaluate('Bash', { command: 'ls' }, 'ls', policy, makeContext({ sessionType: 'agent' }))).toBe('escalate');
+      expect(
+        evaluator.evaluate(
+          'Bash',
+          { command: 'ls' },
+          'ls',
+          policy,
+          makeContext({ sessionType: 'agent' })
+        )
+      ).toBe('escalate');
     });
 
     it('should use profile when no context', () => {
@@ -413,46 +501,84 @@ describe('PermissionEvaluator', () => {
       const policy = makePolicy({
         globalGuards: { blockSensitiveFiles: true, blockOutsideWorkspace: false },
       });
-      expect(evaluator.evaluate('Read', { file_path: '/home/user/.env' }, '', policy, makeContext())).toBe('escalate');
-      expect(evaluator.evaluate('Write', { file_path: '/home/user/cert.pem' }, '', policy, makeContext())).toBe('escalate');
-      expect(evaluator.evaluate('Read', { file_path: '/home/user/id_rsa' }, '', policy, makeContext())).toBe('escalate');
-      expect(evaluator.evaluate('Edit', { file_path: '/home/user/my-secret.json' }, '', policy, makeContext())).toBe('escalate');
+      expect(
+        evaluator.evaluate('Read', { file_path: '/home/user/.env' }, '', policy, makeContext())
+      ).toBe('escalate');
+      expect(
+        evaluator.evaluate('Write', { file_path: '/home/user/cert.pem' }, '', policy, makeContext())
+      ).toBe('escalate');
+      expect(
+        evaluator.evaluate('Read', { file_path: '/home/user/id_rsa' }, '', policy, makeContext())
+      ).toBe('escalate');
+      expect(
+        evaluator.evaluate(
+          'Edit',
+          { file_path: '/home/user/my-secret.json' },
+          '',
+          policy,
+          makeContext()
+        )
+      ).toBe('escalate');
     });
 
     it('should not escalate sensitive files when blockSensitiveFiles=false', () => {
       const policy = makePolicy({
         globalGuards: { blockSensitiveFiles: false, blockOutsideWorkspace: false },
       });
-      expect(evaluator.evaluate('Read', { file_path: '/home/user/.env' }, '', policy, makeContext())).toBe('approve');
+      expect(
+        evaluator.evaluate('Read', { file_path: '/home/user/.env' }, '', policy, makeContext())
+      ).toBe('approve');
     });
 
     it('should escalate when targeting outside workspace (blockOutsideWorkspace=true)', () => {
       const policy = makePolicy({
         globalGuards: { blockSensitiveFiles: false, blockOutsideWorkspace: true },
       });
-      expect(evaluator.evaluate('Write', { file_path: '/etc/passwd' }, '', policy, makeContext())).toBe('escalate');
-      expect(evaluator.evaluate('Read', { file_path: '/etc/hosts' }, '', policy, makeContext())).toBe('escalate');
+      expect(
+        evaluator.evaluate('Write', { file_path: '/etc/passwd' }, '', policy, makeContext())
+      ).toBe('escalate');
+      expect(
+        evaluator.evaluate('Read', { file_path: '/etc/hosts' }, '', policy, makeContext())
+      ).toBe('escalate');
     });
 
     it('should not escalate outside workspace when blockOutsideWorkspace=false', () => {
       const policy = makePolicy({
         globalGuards: { blockSensitiveFiles: false, blockOutsideWorkspace: false },
       });
-      expect(evaluator.evaluate('Write', { file_path: '/etc/passwd' }, '', policy, makeContext())).toBe('approve');
+      expect(
+        evaluator.evaluate('Write', { file_path: '/etc/passwd' }, '', policy, makeContext())
+      ).toBe('approve');
     });
 
     it('should approve files inside workspace', () => {
       const policy = makePolicy({
         globalGuards: { blockSensitiveFiles: true, blockOutsideWorkspace: true },
       });
-      expect(evaluator.evaluate('Write', { file_path: '/home/user/project/src/app.ts' }, '', policy, makeContext())).toBe('approve');
+      expect(
+        evaluator.evaluate(
+          'Write',
+          { file_path: '/home/user/project/src/app.ts' },
+          '',
+          policy,
+          makeContext()
+        )
+      ).toBe('approve');
     });
 
     it('should escalate Bash touching sensitive files', () => {
       const policy = makePolicy({
         globalGuards: { blockSensitiveFiles: true, blockOutsideWorkspace: false },
       });
-      expect(evaluator.evaluate('Bash', { command: 'cat /home/user/project/.env' }, 'cat /home/user/project/.env', policy, makeContext())).toBe('escalate');
+      expect(
+        evaluator.evaluate(
+          'Bash',
+          { command: 'cat /home/user/project/.env' },
+          'cat /home/user/project/.env',
+          policy,
+          makeContext()
+        )
+      ).toBe('escalate');
     });
 
     // §12-3: .env classifier coverage — relative path forms must also be flagged
@@ -461,18 +587,38 @@ describe('PermissionEvaluator', () => {
         globalGuards: { blockSensitiveFiles: true, blockOutsideWorkspace: false },
       });
       // bare dotfile: cat .env
-      expect(evaluator.evaluate('Bash', { command: 'cat .env' }, 'cat .env', policy, makeContext())).toBe('escalate');
+      expect(
+        evaluator.evaluate('Bash', { command: 'cat .env' }, 'cat .env', policy, makeContext())
+      ).toBe('escalate');
       // relative path: cat ./config/.env
-      expect(evaluator.evaluate('Bash', { command: 'cat ./config/.env' }, 'cat ./config/.env', policy, makeContext())).toBe('escalate');
+      expect(
+        evaluator.evaluate(
+          'Bash',
+          { command: 'cat ./config/.env' },
+          'cat ./config/.env',
+          policy,
+          makeContext()
+        )
+      ).toBe('escalate');
       // source builtin: source .env
-      expect(evaluator.evaluate('Bash', { command: 'source .env' }, 'source .env', policy, makeContext())).toBe('escalate');
+      expect(
+        evaluator.evaluate('Bash', { command: 'source .env' }, 'source .env', policy, makeContext())
+      ).toBe('escalate');
     });
 
     it('should escalate Bash touching outside workspace', () => {
       const policy = makePolicy({
         globalGuards: { blockSensitiveFiles: false, blockOutsideWorkspace: true },
       });
-      expect(evaluator.evaluate('Bash', { command: 'cat /etc/hosts' }, 'cat /etc/hosts', policy, makeContext())).toBe('escalate');
+      expect(
+        evaluator.evaluate(
+          'Bash',
+          { command: 'cat /etc/hosts' },
+          'cat /etc/hosts',
+          policy,
+          makeContext()
+        )
+      ).toBe('escalate');
     });
 
     it('should ignore git commit message text when checking outside workspace', () => {
@@ -480,7 +626,9 @@ describe('PermissionEvaluator', () => {
         globalGuards: { blockSensitiveFiles: false, blockOutsideWorkspace: true },
       });
       const command = 'git commit -m "document /tmp/logs for follow-up"';
-      expect(evaluator.evaluate('Bash', { command }, command, policy, makeContext())).toBe('approve');
+      expect(evaluator.evaluate('Bash', { command }, command, policy, makeContext())).toBe(
+        'approve'
+      );
     });
 
     it('should still detect quoted absolute path arguments', () => {
@@ -488,7 +636,9 @@ describe('PermissionEvaluator', () => {
         globalGuards: { blockSensitiveFiles: false, blockOutsideWorkspace: true },
       });
       const command = 'cat "/etc/hosts"';
-      expect(evaluator.evaluate('Bash', { command }, command, policy, makeContext())).toBe('escalate');
+      expect(evaluator.evaluate('Bash', { command }, command, policy, makeContext())).toBe(
+        'escalate'
+      );
     });
 
     // §fix: relative Bash paths must resolve against workspace root, not process.cwd()
@@ -499,9 +649,19 @@ describe('PermissionEvaluator', () => {
         profile: makeProfile({ shellSafe: 'auto-approve' }),
       });
       // in-workspace relative path → NOT outside workspace → approve
-      expect(evaluator.evaluate('Bash', { command: 'cat ./src/app.ts' }, 'cat ./src/app.ts', policy, { rootPath: root, sessionType: 'regular' })).toBe('approve');
+      expect(
+        evaluator.evaluate('Bash', { command: 'cat ./src/app.ts' }, 'cat ./src/app.ts', policy, {
+          rootPath: root,
+          sessionType: 'regular',
+        })
+      ).toBe('approve');
       // absolute path outside the workspace → IS outside workspace → escalate
-      expect(evaluator.evaluate('Bash', { command: 'cat /etc/passwd' }, 'cat /etc/passwd', policy, { rootPath: root, sessionType: 'regular' })).toBe('escalate');
+      expect(
+        evaluator.evaluate('Bash', { command: 'cat /etc/passwd' }, 'cat /etc/passwd', policy, {
+          rootPath: root,
+          sessionType: 'regular',
+        })
+      ).toBe('escalate');
     });
 
     it('should detect outside workspace paths passed through echo into xargs', () => {
@@ -509,7 +669,9 @@ describe('PermissionEvaluator', () => {
         globalGuards: { blockSensitiveFiles: false, blockOutsideWorkspace: true },
       });
       const command = 'echo /etc/hosts | xargs cat';
-      expect(evaluator.evaluate('Bash', { command }, command, policy, makeContext())).toBe('escalate');
+      expect(evaluator.evaluate('Bash', { command }, command, policy, makeContext())).toBe(
+        'escalate'
+      );
     });
 
     it('should not escalate shell wrapper executables outside workspace', () => {
@@ -517,10 +679,12 @@ describe('PermissionEvaluator', () => {
         globalGuards: { blockSensitiveFiles: false, blockOutsideWorkspace: true },
       });
       const command = `/bin/zsh -lc '../node_modules/.bin/vitest run src/domains/conversation/agent/__tests__/review-payload-guard.test.ts src/domains/conversation/agent/__tests__/delegation-evaluator.test.ts src/domains/conversation/agent/__tests__/ai-review-queue.test.ts'`;
-      expect(evaluator.evaluate('Bash', { command }, command, policy, {
-        rootPath: '/Users/dev/SourceCode/zclaudia/server',
-        sessionType: 'regular',
-      })).toBe('approve');
+      expect(
+        evaluator.evaluate('Bash', { command }, command, policy, {
+          rootPath: '/Users/dev/SourceCode/zclaudia/server',
+          sessionType: 'regular',
+        })
+      ).toBe('approve');
     });
   });
 
@@ -573,7 +737,9 @@ describe('PermissionEvaluator', () => {
         customRules: [{ toolName: 'Bash', pattern: 'npm\\s+test', action: 'approve' }],
         profile: makeProfile({ shellSafe: 'ask' }),
       });
-      expect(evaluator.evaluate('Bash', { command: 'npm test' }, 'npm test', policy, makeContext())).toBe('approve');
+      expect(
+        evaluator.evaluate('Bash', { command: 'npm test' }, 'npm test', policy, makeContext())
+      ).toBe('approve');
     });
 
     it('should skip rule when pattern does not match', () => {
@@ -581,7 +747,9 @@ describe('PermissionEvaluator', () => {
         customRules: [{ toolName: 'Bash', pattern: 'npm\\s+test', action: 'approve' }],
         profile: makeProfile({ shellSafe: 'ask' }),
       });
-      expect(evaluator.evaluate('Bash', { command: 'ls' }, 'ls', policy, makeContext())).toBe('escalate');
+      expect(evaluator.evaluate('Bash', { command: 'ls' }, 'ls', policy, makeContext())).toBe(
+        'escalate'
+      );
     });
 
     it('should skip invalid regex gracefully', () => {
@@ -589,7 +757,9 @@ describe('PermissionEvaluator', () => {
         customRules: [{ toolName: 'Bash', pattern: '[invalid(regex', action: 'deny' }],
       });
       // Invalid regex is skipped, falls through to category evaluation
-      expect(evaluator.evaluate('Bash', { command: 'ls' }, 'ls', policy, makeContext())).toBe('approve');
+      expect(evaluator.evaluate('Bash', { command: 'ls' }, 'ls', policy, makeContext())).toBe(
+        'approve'
+      );
     });
 
     it('should apply first matching rule (first match wins)', () => {
@@ -606,7 +776,9 @@ describe('PermissionEvaluator', () => {
       const policy = makePolicy({
         customRules: [{ toolName: 'Bash', action: 'continue' }],
       });
-      expect(evaluator.evaluate('Bash', { command: 'ls' }, 'ls', policy, makeContext())).toBe('approve');
+      expect(evaluator.evaluate('Bash', { command: 'ls' }, 'ls', policy, makeContext())).toBe(
+        'approve'
+      );
     });
 
     it('custom rules do NOT bypass global guards (guards run first)', () => {
@@ -616,7 +788,9 @@ describe('PermissionEvaluator', () => {
         customRules: [{ toolName: 'Write', action: 'approve' }],
         globalGuards: { blockSensitiveFiles: true, blockOutsideWorkspace: true },
       });
-      expect(evaluator.evaluate('Write', { file_path: '/tmp/.env' }, '', policy, makeContext())).toBe('escalate');
+      expect(
+        evaluator.evaluate('Write', { file_path: '/tmp/.env' }, '', policy, makeContext())
+      ).toBe('escalate');
     });
   });
 
@@ -629,7 +803,13 @@ describe('PermissionEvaluator', () => {
         customRules: [{ toolName: 'Read', pattern: '^.*$', action: 'approve' }],
         globalGuards: { blockSensitiveFiles: true, blockOutsideWorkspace: false },
       });
-      const result = new PermissionEvaluator().evaluate('Read', { file_path: '/repo/.env' }, '', policy, makeContext());
+      const result = new PermissionEvaluator().evaluate(
+        'Read',
+        { file_path: '/repo/.env' },
+        '',
+        policy,
+        makeContext()
+      );
       expect(result).toBe('escalate');
     });
 
@@ -638,7 +818,15 @@ describe('PermissionEvaluator', () => {
         customRules: [{ toolName: 'Bash', pattern: '^git(\\s.*)?$', action: 'approve' }],
         profile: makeProfile({ shellSafe: 'ask' }),
       });
-      expect(new PermissionEvaluator().evaluate('Bash', { command: 'git status' }, 'git status', policy, makeContext())).toBe('approve');
+      expect(
+        new PermissionEvaluator().evaluate(
+          'Bash',
+          { command: 'git status' },
+          'git status',
+          policy,
+          makeContext()
+        )
+      ).toBe('approve');
     });
 
     it('an explicit deny rule still hard-denies even when a guard also matches', () => {
@@ -646,7 +834,15 @@ describe('PermissionEvaluator', () => {
         customRules: [{ toolName: 'Bash', action: 'deny' }],
         globalGuards: { blockSensitiveFiles: true, blockOutsideWorkspace: false },
       });
-      expect(new PermissionEvaluator().evaluate('Bash', { command: 'cat /repo/.env' }, 'cat /repo/.env', policy, makeContext())).toBe('deny');
+      expect(
+        new PermissionEvaluator().evaluate(
+          'Bash',
+          { command: 'cat /repo/.env' },
+          'cat /repo/.env',
+          policy,
+          makeContext()
+        )
+      ).toBe('deny');
     });
 
     it('allow rules still cannot bypass guards (unchanged)', () => {
@@ -655,7 +851,15 @@ describe('PermissionEvaluator', () => {
         customRules: [{ toolName: 'Read', pattern: '^.*$', action: 'approve' }],
         globalGuards: { blockSensitiveFiles: true, blockOutsideWorkspace: false },
       });
-      expect(new PermissionEvaluator().evaluate('Read', { file_path: '/repo/.env' }, '', policy, makeContext())).toBe('escalate');
+      expect(
+        new PermissionEvaluator().evaluate(
+          'Read',
+          { file_path: '/repo/.env' },
+          '',
+          policy,
+          makeContext()
+        )
+      ).toBe('escalate');
     });
   });
 
@@ -698,8 +902,12 @@ describe('buildRememberKey', () => {
   });
 
   it('should use the fully normalized bash command as primary key', () => {
-    expect(buildRememberKey('Bash', { command: 'git push origin main' }, '')).toBe('Bash:git push origin main');
-    expect(buildRememberKey('Bash', { command: 'npm install express lodash' }, '')).toBe('Bash:npm install express lodash');
+    expect(buildRememberKey('Bash', { command: 'git push origin main' }, '')).toBe(
+      'Bash:git push origin main'
+    );
+    expect(buildRememberKey('Bash', { command: 'npm install express lodash' }, '')).toBe(
+      'Bash:npm install express lodash'
+    );
   });
 
   it('should handle single-token bash command', () => {
@@ -717,7 +925,13 @@ describe('buildRememberKey', () => {
 
 describe('buildRememberKeys', () => {
   it('should include split keys for compound bash commands', () => {
-    expect(buildRememberKeys('Bash', { command: 'curl http://localhost:1420 | grep 200 && tail -30 /tmp/x.log' }, '')).toEqual([
+    expect(
+      buildRememberKeys(
+        'Bash',
+        { command: 'curl http://localhost:1420 | grep 200 && tail -30 /tmp/x.log' },
+        ''
+      )
+    ).toEqual([
       'Bash:curl http://localhost:1420 | grep 200 && tail -30 /tmp/x.log',
       'Bash:curl http://localhost:1420',
       'Bash:grep 200',
@@ -726,9 +940,16 @@ describe('buildRememberKeys', () => {
   });
 
   it('should extract executable commands from for/if shell blocks', () => {
-    expect(buildRememberKeys('Bash', {
-      command: 'for i in $(seq 1 30); do if curl -s http://localhost:1420 | grep -q 200; then echo READY; exit 0; fi; sleep 1; done; echo TIMEOUT; tail -30 /tmp/out.log',
-    }, '')).toEqual([
+    expect(
+      buildRememberKeys(
+        'Bash',
+        {
+          command:
+            'for i in $(seq 1 30); do if curl -s http://localhost:1420 | grep -q 200; then echo READY; exit 0; fi; sleep 1; done; echo TIMEOUT; tail -30 /tmp/out.log',
+        },
+        ''
+      )
+    ).toEqual([
       'Bash:for i in $(seq 1 30); do if curl -s http://localhost:1420 | grep -q 200; then echo READY; exit 0; fi; sleep 1; done; echo TIMEOUT; tail -30 /tmp/out.log',
       'Bash:seq 1 30',
       'Bash:curl -s http://localhost:1420',
@@ -742,9 +963,15 @@ describe('buildRememberKeys', () => {
   });
 
   it('should extract commands from while blocks and backtick substitutions', () => {
-    expect(buildRememberKeys('Bash', {
-      command: 'while git status >/dev/null; do echo `date +%s`; sleep 1; done',
-    }, '')).toEqual([
+    expect(
+      buildRememberKeys(
+        'Bash',
+        {
+          command: 'while git status >/dev/null; do echo `date +%s`; sleep 1; done',
+        },
+        ''
+      )
+    ).toEqual([
       'Bash:while git status >/dev/null; do echo `date +%s`; sleep 1; done',
       'Bash:git status >/dev/null',
       'Bash:date +%s',
@@ -754,9 +981,15 @@ describe('buildRememberKeys', () => {
   });
 
   it('should extract commands from case branches', () => {
-    expect(buildRememberKeys('Bash', {
-      command: 'case "$mode" in start) echo start ;; stop) tail -30 /tmp/app.log ;; esac',
-    }, '')).toEqual([
+    expect(
+      buildRememberKeys(
+        'Bash',
+        {
+          command: 'case "$mode" in start) echo start ;; stop) tail -30 /tmp/app.log ;; esac',
+        },
+        ''
+      )
+    ).toEqual([
       'Bash:case "$mode" in start) echo start ;; stop) tail -30 /tmp/app.log ;; esac',
       'Bash:echo start',
       'Bash:tail -30 /tmp/app.log',
@@ -764,9 +997,15 @@ describe('buildRememberKeys', () => {
   });
 
   it('should extract commands from subshell and brace groups', () => {
-    expect(buildRememberKeys('Bash', {
-      command: '(cd /tmp && ls) | grep app && { echo ${USER}; tail -30 /tmp/app.log; }',
-    }, '')).toEqual([
+    expect(
+      buildRememberKeys(
+        'Bash',
+        {
+          command: '(cd /tmp && ls) | grep app && { echo ${USER}; tail -30 /tmp/app.log; }',
+        },
+        ''
+      )
+    ).toEqual([
       'Bash:(cd /tmp && ls) | grep app && { echo ${USER}; tail -30 /tmp/app.log; }',
       'Bash:cd /tmp',
       'Bash:ls',
@@ -777,9 +1016,15 @@ describe('buildRememberKeys', () => {
   });
 
   it('should recursively extract compound commands inside command substitutions', () => {
-    expect(buildRememberKeys('Bash', {
-      command: 'echo $(cd /tmp && ls | grep app)',
-    }, '')).toEqual([
+    expect(
+      buildRememberKeys(
+        'Bash',
+        {
+          command: 'echo $(cd /tmp && ls | grep app)',
+        },
+        ''
+      )
+    ).toEqual([
       'Bash:echo $(cd /tmp && ls | grep app)',
       'Bash:cd /tmp',
       'Bash:ls',
@@ -788,9 +1033,15 @@ describe('buildRememberKeys', () => {
   });
 
   it('should extract underlying commands from find -exec and xargs', () => {
-    expect(buildRememberKeys('Bash', {
-      command: 'find . -name "*.log" -exec tail -30 {} \\; | xargs -I{} rm {}',
-    }, '')).toEqual([
+    expect(
+      buildRememberKeys(
+        'Bash',
+        {
+          command: 'find . -name "*.log" -exec tail -30 {} \\; | xargs -I{} rm {}',
+        },
+        ''
+      )
+    ).toEqual([
       'Bash:find . -name "*.log" -exec tail -30 {} \\; | xargs -I{} rm {}',
       'Bash:tail -30 {}',
       'Bash:find . -name "*.log" -exec tail -30 {} \\;',
@@ -800,9 +1051,15 @@ describe('buildRememberKeys', () => {
   });
 
   it('should extract commands from sh -c style wrappers', () => {
-    expect(buildRememberKeys('Bash', {
-      command: 'bash -lc "cd /tmp && ls | grep app"',
-    }, '')).toEqual([
+    expect(
+      buildRememberKeys(
+        'Bash',
+        {
+          command: 'bash -lc "cd /tmp && ls | grep app"',
+        },
+        ''
+      )
+    ).toEqual([
       'Bash:bash -lc "cd /tmp && ls | grep app"',
       'Bash:cd /tmp',
       'Bash:ls',
@@ -811,18 +1068,28 @@ describe('buildRememberKeys', () => {
   });
 
   it('should extract the executable prefix of heredoc commands', () => {
-    expect(buildRememberKeys('Bash', {
-      command: 'cat >/tmp/demo.txt <<EOF echo hello EOF',
-    }, '')).toEqual([
-      'Bash:cat >/tmp/demo.txt <<EOF echo hello EOF',
-      'Bash:cat >/tmp/demo.txt',
-    ]);
+    expect(
+      buildRememberKeys(
+        'Bash',
+        {
+          command: 'cat >/tmp/demo.txt <<EOF echo hello EOF',
+        },
+        ''
+      )
+    ).toEqual(['Bash:cat >/tmp/demo.txt <<EOF echo hello EOF', 'Bash:cat >/tmp/demo.txt']);
   });
 
   it('should extract commands from sudo env shell wrappers', () => {
-    expect(buildRememberKeys('Bash', {
-      command: 'sudo env FOO=bar BAR="baz qux" bash -lc "cd /srv && ls && tail -30 /tmp/app.log"',
-    }, '')).toEqual([
+    expect(
+      buildRememberKeys(
+        'Bash',
+        {
+          command:
+            'sudo env FOO=bar BAR="baz qux" bash -lc "cd /srv && ls && tail -30 /tmp/app.log"',
+        },
+        ''
+      )
+    ).toEqual([
       'Bash:sudo env FOO=bar BAR="baz qux" bash -lc "cd /srv && ls && tail -30 /tmp/app.log"',
       'Bash:cd /srv',
       'Bash:ls',
@@ -831,9 +1098,15 @@ describe('buildRememberKeys', () => {
   });
 
   it('should extract commands from docker exec shell wrappers', () => {
-    expect(buildRememberKeys('Bash', {
-      command: 'docker exec -it app sh -c "cd /app && grep error /tmp/app.log"',
-    }, '')).toEqual([
+    expect(
+      buildRememberKeys(
+        'Bash',
+        {
+          command: 'docker exec -it app sh -c "cd /app && grep error /tmp/app.log"',
+        },
+        ''
+      )
+    ).toEqual([
       'Bash:docker exec -it app sh -c "cd /app && grep error /tmp/app.log"',
       'Bash:cd /app',
       'Bash:grep error /tmp/app.log',
@@ -841,9 +1114,15 @@ describe('buildRememberKeys', () => {
   });
 
   it('should extract commands from ssh remote shell wrappers', () => {
-    expect(buildRememberKeys('Bash', {
-      command: 'ssh user@host "cd /srv && ls && tail -30 /tmp/app.log"',
-    }, '')).toEqual([
+    expect(
+      buildRememberKeys(
+        'Bash',
+        {
+          command: 'ssh user@host "cd /srv && ls && tail -30 /tmp/app.log"',
+        },
+        ''
+      )
+    ).toEqual([
       'Bash:ssh user@host "cd /srv && ls && tail -30 /tmp/app.log"',
       'Bash:cd /srv',
       'Bash:ls',
@@ -852,9 +1131,15 @@ describe('buildRememberKeys', () => {
   });
 
   it('should extract commands from tmux shell wrappers', () => {
-    expect(buildRememberKeys('Bash', {
-      command: 'tmux new-session -d "cd /app && grep error /tmp/app.log"',
-    }, '')).toEqual([
+    expect(
+      buildRememberKeys(
+        'Bash',
+        {
+          command: 'tmux new-session -d "cd /app && grep error /tmp/app.log"',
+        },
+        ''
+      )
+    ).toEqual([
       'Bash:tmux new-session -d "cd /app && grep error /tmp/app.log"',
       'Bash:cd /app',
       'Bash:grep error /tmp/app.log',
@@ -862,9 +1147,15 @@ describe('buildRememberKeys', () => {
   });
 
   it('should extract commands from nohup shell wrappers', () => {
-    expect(buildRememberKeys('Bash', {
-      command: 'nohup bash -lc "cd /srv && ls && tail -30 /tmp/app.log"',
-    }, '')).toEqual([
+    expect(
+      buildRememberKeys(
+        'Bash',
+        {
+          command: 'nohup bash -lc "cd /srv && ls && tail -30 /tmp/app.log"',
+        },
+        ''
+      )
+    ).toEqual([
       'Bash:nohup bash -lc "cd /srv && ls && tail -30 /tmp/app.log"',
       'Bash:cd /srv',
       'Bash:ls',
@@ -873,9 +1164,15 @@ describe('buildRememberKeys', () => {
   });
 
   it('should extract commands from gnu parallel payloads', () => {
-    expect(buildRememberKeys('Bash', {
-      command: 'parallel "grep error {} && tail -30 {}" ::: /tmp/a.log /tmp/b.log',
-    }, '')).toEqual([
+    expect(
+      buildRememberKeys(
+        'Bash',
+        {
+          command: 'parallel "grep error {} && tail -30 {}" ::: /tmp/a.log /tmp/b.log',
+        },
+        ''
+      )
+    ).toEqual([
       'Bash:parallel "grep error {} && tail -30 {}" ::: /tmp/a.log /tmp/b.log',
       'Bash:grep error {}',
       'Bash:tail -30 {}',
@@ -885,10 +1182,10 @@ describe('buildRememberKeys', () => {
 
 describe('resolveRememberedDecision', () => {
   it('should match an exact remembered command first', () => {
-    const remembered = new Map([
-      ['Bash:git status', 'allow' as const],
-    ]);
-    expect(resolveRememberedDecision(remembered, 'Bash', { command: 'git status' }, '')).toBe('allow');
+    const remembered = new Map([['Bash:git status', 'allow' as const]]);
+    expect(resolveRememberedDecision(remembered, 'Bash', { command: 'git status' }, '')).toBe(
+      'allow'
+    );
   });
 
   it('should not synthesize an allow from remembered subcommands', () => {
@@ -896,7 +1193,14 @@ describe('resolveRememberedDecision', () => {
       ['Bash:curl http://localhost:1420', 'allow' as const],
       ['Bash:grep 200', 'allow' as const],
     ]);
-    expect(resolveRememberedDecision(remembered, 'Bash', { command: 'curl http://localhost:1420 | grep 200' }, '')).toBeNull();
+    expect(
+      resolveRememberedDecision(
+        remembered,
+        'Bash',
+        { command: 'curl http://localhost:1420 | grep 200' },
+        ''
+      )
+    ).toBeNull();
   });
 
   it('should not synthesize a deny from remembered subcommands', () => {
@@ -904,7 +1208,14 @@ describe('resolveRememberedDecision', () => {
       ['Bash:curl http://localhost:1420', 'allow' as const],
       ['Bash:tail -30 /tmp/x.log', 'deny' as const],
     ]);
-    expect(resolveRememberedDecision(remembered, 'Bash', { command: 'curl http://localhost:1420 && tail -30 /tmp/x.log' }, '')).toBeNull();
+    expect(
+      resolveRememberedDecision(
+        remembered,
+        'Bash',
+        { command: 'curl http://localhost:1420 && tail -30 /tmp/x.log' },
+        ''
+      )
+    ).toBeNull();
   });
 });
 
@@ -929,42 +1240,50 @@ describe('session remembered decisions', () => {
 
 describe('outside workspace allowlist', () => {
   it('extracts real absolute path arguments but skips git commit message text', () => {
-    expect(getOutsideWorkspacePaths(
-      'Bash',
-      { command: 'git commit -m "document /private/tmp/app/output.log in release notes"' },
-      '',
-      '/Users/dev/SourceCode/zclaudia'
-    )).toEqual([]);
+    expect(
+      getOutsideWorkspacePaths(
+        'Bash',
+        { command: 'git commit -m "document /private/tmp/app/output.log in release notes"' },
+        '',
+        '/Users/dev/SourceCode/zclaudia'
+      )
+    ).toEqual([]);
   });
 
   it('ignores shell wrapper executable paths when checking outside workspace', () => {
-    expect(getOutsideWorkspacePaths(
-      'Bash',
-      { command: `/bin/zsh -lc '../node_modules/.bin/vitest run src/domains/conversation/agent/__tests__/review-payload-guard.test.ts'` },
-      '',
-      '/Users/dev/SourceCode/zclaudia/server'
-    )).toEqual([]);
+    expect(
+      getOutsideWorkspacePaths(
+        'Bash',
+        {
+          command: `/bin/zsh -lc '../node_modules/.bin/vitest run src/domains/conversation/agent/__tests__/review-payload-guard.test.ts'`,
+        },
+        '',
+        '/Users/dev/SourceCode/zclaudia/server'
+      )
+    ).toEqual([]);
   });
 
   it('derives rememberable outside-workspace roots', () => {
-    expect(getOutsideWorkspaceRootsToRemember(
-      'Bash',
-      { command: 'tail -30 /private/tmp/app/output.log' },
-      '',
-      '/Users/dev/SourceCode/zclaudia'
-    )).toEqual([
-      '/private/tmp/app',
-    ]);
+    expect(
+      getOutsideWorkspaceRootsToRemember(
+        'Bash',
+        { command: 'tail -30 /private/tmp/app/output.log' },
+        '',
+        '/Users/dev/SourceCode/zclaudia'
+      )
+    ).toEqual(['/private/tmp/app']);
   });
 
   it('auto-approves when all outside-workspace paths are inside remembered roots', () => {
-    expect(isOutsideWorkspacePathAllowed(
-      'Bash',
-      { command: 'tail -30 /private/tmp/app/output.log' },
-      '',
-      '/Users/dev/SourceCode/zclaudia',
-      new Set(['/private/tmp/app'])
-    )).toBe(true);
+    expect(
+      isOutsideWorkspacePathAllowed(
+        'Bash',
+        { command: 'tail -30 /private/tmp/app/output.log' },
+        '',
+        '/Users/dev/SourceCode/zclaudia',
+        new Set(['/private/tmp/app'])
+      )
+    ).toBe(true);
   });
 
   it('persists and reloads remembered outside-workspace roots', () => {
@@ -980,18 +1299,22 @@ describe('outside workspace allowlist', () => {
     const realRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'zclaudia-ws-'));
 
     it('does not flag in-workspace relative paths', () => {
-      expect(getOutsideWorkspacePaths('Bash', { command: 'cat ./src/app.ts' }, '', realRoot)).toEqual([]);
+      expect(
+        getOutsideWorkspacePaths('Bash', { command: 'cat ./src/app.ts' }, '', realRoot)
+      ).toEqual([]);
       expect(getOutsideWorkspacePaths('Bash', { command: 'cat .env' }, '', realRoot)).toEqual([]);
     });
 
     it('still flags absolute paths outside the workspace', () => {
-      expect(getOutsideWorkspacePaths('Bash', { command: 'cat /etc/hosts' }, '', realRoot))
-        .toEqual(['/etc/hosts']);
+      expect(getOutsideWorkspacePaths('Bash', { command: 'cat /etc/hosts' }, '', realRoot)).toEqual(
+        ['/etc/hosts']
+      );
     });
 
     it('still flags relative paths that escape the workspace', () => {
-      expect(getOutsideWorkspacePaths('Bash', { command: 'cat ./../../etc/passwd' }, '', realRoot))
-        .toEqual([path.resolve(realRoot, './../../etc/passwd')]);
+      expect(
+        getOutsideWorkspacePaths('Bash', { command: 'cat ./../../etc/passwd' }, '', realRoot)
+      ).toEqual([path.resolve(realRoot, './../../etc/passwd')]);
     });
 
     it('evaluator approves in-workspace relative path and escalates absolute escape', () => {
@@ -1000,8 +1323,12 @@ describe('outside workspace allowlist', () => {
         globalGuards: { blockSensitiveFiles: false, blockOutsideWorkspace: true },
       });
       const ctx = { rootPath: realRoot, sessionType: 'regular' as const };
-      expect(evaluator.evaluate('Bash', { command: 'cat ./src/app.ts' }, 'cat ./src/app.ts', policy, ctx)).toBe('approve');
-      expect(evaluator.evaluate('Bash', { command: 'cat /etc/hosts' }, 'cat /etc/hosts', policy, ctx)).toBe('escalate');
+      expect(
+        evaluator.evaluate('Bash', { command: 'cat ./src/app.ts' }, 'cat ./src/app.ts', policy, ctx)
+      ).toBe('approve');
+      expect(
+        evaluator.evaluate('Bash', { command: 'cat /etc/hosts' }, 'cat /etc/hosts', policy, ctx)
+      ).toBe('escalate');
     });
   });
 });
@@ -1157,15 +1484,23 @@ describe('getAgentPermissionPolicy', () => {
   });
 
   it('should return null when null policy', () => {
-    expect(getAgentPermissionPolicy(makeMockDb({ agent_config: { permission_policy: null } }))).toBeNull();
+    expect(
+      getAgentPermissionPolicy(makeMockDb({ agent_config: { permission_policy: null } }))
+    ).toBeNull();
   });
 
   it('should return null for invalid JSON', () => {
-    expect(getAgentPermissionPolicy(makeMockDb({ agent_config: { permission_policy: 'bad{' } }))).toBeNull();
+    expect(
+      getAgentPermissionPolicy(makeMockDb({ agent_config: { permission_policy: 'bad{' } }))
+    ).toBeNull();
   });
 
   it('should return null when DB throws', () => {
-    const db = { prepare: () => { throw new Error('DB error'); } };
+    const db = {
+      prepare: () => {
+        throw new Error('DB error');
+      },
+    };
     expect(getAgentPermissionPolicy(db as any)).toBeNull();
   });
 });
@@ -1190,15 +1525,29 @@ describe('getProjectPermissionOverride', () => {
   });
 
   it('should return null when null override', () => {
-    expect(getProjectPermissionOverride(makeMockDb({ projects: { agent_permission_override: null } }), 'p-1')).toBeNull();
+    expect(
+      getProjectPermissionOverride(
+        makeMockDb({ projects: { agent_permission_override: null } }),
+        'p-1'
+      )
+    ).toBeNull();
   });
 
   it('should return null for invalid JSON', () => {
-    expect(getProjectPermissionOverride(makeMockDb({ projects: { agent_permission_override: '{{bad' } }), 'p-1')).toBeNull();
+    expect(
+      getProjectPermissionOverride(
+        makeMockDb({ projects: { agent_permission_override: '{{bad' } }),
+        'p-1'
+      )
+    ).toBeNull();
   });
 
   it('should return null when DB throws', () => {
-    const db = { prepare: () => { throw new Error('DB error'); } };
+    const db = {
+      prepare: () => {
+        throw new Error('DB error');
+      },
+    };
     expect(getProjectPermissionOverride(db as any, 'p-1')).toBeNull();
   });
 });
@@ -1217,7 +1566,9 @@ describe('integration: mergePolicy + evaluate', () => {
     const merged = mergePolicy(global, {
       profile: makeProfile({ shellSafe: 'auto-approve' }),
     });
-    expect(evaluator.evaluate('Bash', { command: 'ls' }, 'ls', merged, makeContext())).toBe('approve');
+    expect(evaluator.evaluate('Bash', { command: 'ls' }, 'ls', merged, makeContext())).toBe(
+      'approve'
+    );
   });
 
   it('project override disables policy', () => {
@@ -1240,6 +1591,14 @@ describe('integration: mergePolicy + evaluate', () => {
 
     const merged = mergePolicy(global, projectOverride);
     // Global → shellSafe ask, project override → auto-approve
-    expect(evaluator.evaluate('Bash', { command: 'ls' }, 'ls', merged, makeContext({ sessionType: 'regular' }))).toBe('approve');
+    expect(
+      evaluator.evaluate(
+        'Bash',
+        { command: 'ls' },
+        'ls',
+        merged,
+        makeContext({ sessionType: 'regular' })
+      )
+    ).toBe('approve');
   });
 });

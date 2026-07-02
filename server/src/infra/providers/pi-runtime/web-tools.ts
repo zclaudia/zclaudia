@@ -8,6 +8,12 @@ import { extractPdfText } from './rich-read.js';
 import { htmlToMarkdown, stripHtmlToText, shouldExtractAsHtml } from './web-extract.js';
 import { errorResult, jsonResult, textResult, toolParams, truncateText } from './tool-common.js';
 
+type AgentToolParameters = AgentTool['parameters'];
+
+function agentToolParameters(schema: Record<string, unknown>): AgentToolParameters {
+  return schema as AgentToolParameters;
+}
+
 const USER_AGENT = 'ZClaudia-Agent/1.0';
 const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_REDIRECTS = 8;
@@ -114,13 +120,13 @@ function escapeRegExp(value: string): string {
 
 function pathMatchesFilter(pathname: string, filterPath: string): boolean {
   if (filterPath.includes('*')) {
-    const pattern = filterPath
-      .split('*')
-      .map(escapeRegExp)
-      .join('[^/]*');
+    const pattern = filterPath.split('*').map(escapeRegExp).join('[^/]*');
     return new RegExp(`^${pattern}`).test(pathname);
   }
-  return pathname === filterPath || pathname.startsWith(filterPath.endsWith('/') ? filterPath : `${filterPath}/`);
+  return (
+    pathname === filterPath ||
+    pathname.startsWith(filterPath.endsWith('/') ? filterPath : `${filterPath}/`)
+  );
 }
 
 function filterMatchesUrl(rawUrl: string, filters: string[]): boolean {
@@ -131,7 +137,7 @@ function filterMatchesUrl(rawUrl: string, filters: string[]): boolean {
     return false;
   }
   const domain = parsed.hostname.toLowerCase().replace(/^www\./, '');
-  return filters.some((filter) => {
+  return filters.some(filter => {
     const { domain: filterDomain, path } = splitDomainFilter(filter);
     if (!domainMatches(domain, [filterDomain])) return false;
     return !path || pathMatchesFilter(parsed.pathname, path);
@@ -141,7 +147,7 @@ function filterMatchesUrl(rawUrl: string, filters: string[]): boolean {
 function validateDomainAccess(
   rawUrl: string,
   allowedDomains: string[],
-  blockedDomains: string[],
+  blockedDomains: string[]
 ): { ok: true } | { ok: false; reason: string } {
   if (allowedDomains.length > 0 && !filterMatchesUrl(rawUrl, allowedDomains)) {
     return { ok: false, reason: 'blocked_by_allowed_domains' };
@@ -177,22 +183,32 @@ function domainMatches(domain: string, filters: string[]): boolean {
   return filters.some(filter => domain === filter || domain.endsWith(`.${filter}`));
 }
 
-function parseDuckDuckGoResults(html: string): Array<{ title: string; url: string; domain: string; snippet: string }> {
-  return [...html.matchAll(/<div[^>]+class="[^"]*result[^"]*"[^>]*>([\s\S]*?)(?=<div[^>]+class="[^"]*result[^"]*"|$)/gi)]
-    .flatMap((blockMatch) => {
-      const block = blockMatch[1] || '';
-      const linkMatch = /<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i.exec(block);
-      if (!linkMatch) return [];
-      const url = decodeSearchUrl(linkMatch[1] || '');
-      return [{
+function parseDuckDuckGoResults(
+  html: string
+): Array<{ title: string; url: string; domain: string; snippet: string }> {
+  return [
+    ...html.matchAll(
+      /<div[^>]+class="[^"]*result[^"]*"[^>]*>([\s\S]*?)(?=<div[^>]+class="[^"]*result[^"]*"|$)/gi
+    ),
+  ].flatMap(blockMatch => {
+    const block = blockMatch[1] || '';
+    const linkMatch =
+      /<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i.exec(block);
+    if (!linkMatch) return [];
+    const url = decodeSearchUrl(linkMatch[1] || '');
+    return [
+      {
         title: stripHtml(linkMatch[2] || ''),
         url,
         domain: urlDomain(url),
-        snippet: stripHtml((/<a[^>]+class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/a>/i.exec(block)?.[1])
-          ?? (/<div[^>]+class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/div>/i.exec(block)?.[1])
-          ?? ''),
-      }];
-    });
+        snippet: stripHtml(
+          /<a[^>]+class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/a>/i.exec(block)?.[1] ??
+            /<div[^>]+class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/div>/i.exec(block)?.[1] ??
+            ''
+        ),
+      },
+    ];
+  });
 }
 
 interface WebSearchResult {
@@ -228,13 +244,17 @@ class WebSearchProviderError extends Error {
     message: string,
     readonly provider: string,
     readonly status?: number,
-    readonly statusText?: string,
+    readonly statusText?: string
   ) {
     super(message);
   }
 }
 
-async function fetchTextProvider(url: string, provider: string, headers?: Record<string, string>): Promise<string> {
+async function fetchTextProvider(
+  url: string,
+  provider: string,
+  headers?: Record<string, string>
+): Promise<string> {
   const response = await fetch(url, {
     headers: { 'User-Agent': USER_AGENT, ...(headers ?? {}) },
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -244,13 +264,17 @@ async function fetchTextProvider(url: string, provider: string, headers?: Record
       `${provider} failed: ${response.status} ${response.statusText}`,
       provider,
       response.status,
-      response.statusText,
+      response.statusText
     );
   }
   return response.text();
 }
 
-async function fetchJsonProvider<T>(url: string, provider: string, headers?: Record<string, string>): Promise<T> {
+async function fetchJsonProvider<T>(
+  url: string,
+  provider: string,
+  headers?: Record<string, string>
+): Promise<T> {
   const text = await fetchTextProvider(url, provider, headers);
   return JSON.parse(text) as T;
 }
@@ -292,26 +316,36 @@ function normalizeFreshness(value: unknown): string | undefined {
 
 function searxngTimeRange(freshness: string | undefined): string | undefined {
   switch (freshness) {
-    case 'pd': return 'day';
-    case 'pw': return 'week';
-    case 'pm': return 'month';
-    case 'py': return 'year';
-    default: return undefined;
+    case 'pd':
+      return 'day';
+    case 'pw':
+      return 'week';
+    case 'pm':
+      return 'month';
+    case 'py':
+      return 'year';
+    default:
+      return undefined;
   }
 }
 
 function searxngSafeSearch(value: WebSearchOptions['safeSearch']): string | undefined {
   switch (value) {
-    case 'off': return '0';
-    case 'moderate': return '1';
-    case 'strict': return '2';
-    default: return undefined;
+    case 'off':
+      return '0';
+    case 'moderate':
+      return '1';
+    case 'strict':
+      return '2';
+    default:
+      return undefined;
   }
 }
 
 function parseSafeSearch(value: unknown): WebSearchOptions['safeSearch'] | undefined {
   const safeSearch = optionalStringParam(value)?.toLowerCase();
-  if (safeSearch === 'off' || safeSearch === 'moderate' || safeSearch === 'strict') return safeSearch;
+  if (safeSearch === 'off' || safeSearch === 'moderate' || safeSearch === 'strict')
+    return safeSearch;
   return undefined;
 }
 
@@ -320,7 +354,10 @@ function createDuckDuckGoSearchProvider(): WebSearchProvider {
     name: 'duckduckgo-html',
     search: async (query, options) => {
       const url = `https://duckduckgo.com/html/?q=${encodeURIComponent(queryWithDomainOperators(query, options))}`;
-      return parseDuckDuckGoResults(await fetchTextProvider(url, 'duckduckgo-html')).slice(0, options.maxResults);
+      return parseDuckDuckGoResults(await fetchTextProvider(url, 'duckduckgo-html')).slice(
+        0,
+        options.maxResults
+      );
     },
   };
 }
@@ -337,18 +374,27 @@ function createSearxngSearchProvider(baseUrl: string): WebSearchProvider {
       const timeRange = searxngTimeRange(options.freshness);
       if (timeRange) endpoint.searchParams.set('time_range', timeRange);
       const payload = await fetchJsonProvider<{
-        results?: Array<{ title?: string; url?: string; content?: string; snippet?: string; score?: number; publishedDate?: string }>;
+        results?: Array<{
+          title?: string;
+          url?: string;
+          content?: string;
+          snippet?: string;
+          score?: number;
+          publishedDate?: string;
+        }>;
       }>(endpoint.toString(), 'searxng');
-      return (payload.results ?? []).slice(0, options.maxResults).flatMap((result) => {
+      return (payload.results ?? []).slice(0, options.maxResults).flatMap(result => {
         if (!result.url) return [];
-        return [{
-          title: stripHtml(result.title ?? ''),
-          url: result.url,
-          domain: urlDomain(result.url),
-          snippet: stripHtml(result.content ?? result.snippet ?? ''),
-          ...(typeof result.score === 'number' ? { score: result.score } : {}),
-          ...(result.publishedDate ? { publishedDate: result.publishedDate } : {}),
-        }];
+        return [
+          {
+            title: stripHtml(result.title ?? ''),
+            url: result.url,
+            domain: urlDomain(result.url),
+            snippet: stripHtml(result.content ?? result.snippet ?? ''),
+            ...(typeof result.score === 'number' ? { score: result.score } : {}),
+            ...(result.publishedDate ? { publishedDate: result.publishedDate } : {}),
+          },
+        ];
       });
     },
   };
@@ -383,18 +429,24 @@ function createBraveSearchProvider(apiKey: string): WebSearchProvider {
         Accept: 'application/json',
         'X-Subscription-Token': apiKey,
       });
-      return (payload.web?.results ?? []).slice(0, providerMaxResults).flatMap((result) => {
+      return (payload.web?.results ?? []).slice(0, providerMaxResults).flatMap(result => {
         if (!result.url) return [];
-        return [{
-          title: stripHtml(result.title ?? ''),
-          url: result.url,
-          domain: urlDomain(result.url),
-          snippet: stripHtml(result.description ?? ''),
-          ...(result.age || result.page_age ? { pageAge: result.age ?? result.page_age } : {}),
-          ...(Array.isArray(result.extra_snippets) ? {
-            extraSnippets: result.extra_snippets.map(snippet => stripHtml(snippet)).filter(Boolean),
-          } : {}),
-        }];
+        return [
+          {
+            title: stripHtml(result.title ?? ''),
+            url: result.url,
+            domain: urlDomain(result.url),
+            snippet: stripHtml(result.description ?? ''),
+            ...(result.age || result.page_age ? { pageAge: result.age ?? result.page_age } : {}),
+            ...(Array.isArray(result.extra_snippets)
+              ? {
+                  extraSnippets: result.extra_snippets
+                    .map(snippet => stripHtml(snippet))
+                    .filter(Boolean),
+                }
+              : {}),
+          },
+        ];
       });
     },
   };
@@ -416,31 +468,37 @@ function isPrivateIpAddress(address: string): boolean {
   if (version === 0) return false;
   if (version === 6) {
     const lower = address.toLowerCase();
-    return lower === '::1'
-      || lower === '::'
-      || lower.startsWith('fc')
-      || lower.startsWith('fd')
-      || lower.startsWith('fe80:')
-      || lower.startsWith('::ffff:127.')
-      || lower.startsWith('::ffff:10.')
-      || lower.startsWith('::ffff:192.168.')
-      || /^::ffff:172\.(1[6-9]|2\d|3[01])\./.test(lower);
+    return (
+      lower === '::1' ||
+      lower === '::' ||
+      lower.startsWith('fc') ||
+      lower.startsWith('fd') ||
+      lower.startsWith('fe80:') ||
+      lower.startsWith('::ffff:127.') ||
+      lower.startsWith('::ffff:10.') ||
+      lower.startsWith('::ffff:192.168.') ||
+      /^::ffff:172\.(1[6-9]|2\d|3[01])\./.test(lower)
+    );
   }
 
   const parts = address.split('.').map(part => Number(part));
   const [a, b] = parts;
-  return a === 10
-    || a === 127
-    || (a === 169 && b === 254)
-    || (a === 172 && b >= 16 && b <= 31)
-    || (a === 192 && b === 168)
-    || (a === 100 && b >= 64 && b <= 127)
-    || (a === 192 && b === 0)
-    || (a >= 224)
-    || a === 0;
+  return (
+    a === 10 ||
+    a === 127 ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 192 && b === 0) ||
+    a >= 224 ||
+    a === 0
+  );
 }
 
-async function validatePublicHttpUrl(rawUrl: string): Promise<{ ok: true; url: URL } | { ok: false; reason: string }> {
+async function validatePublicHttpUrl(
+  rawUrl: string
+): Promise<{ ok: true; url: URL } | { ok: false; reason: string }> {
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);
@@ -481,15 +539,21 @@ interface FetchBodyResult {
 
 async function readResponseBody(response: Response, maxBytes: number): Promise<FetchBodyResult> {
   const contentLengthHeader = response.headers?.get?.('content-length') ?? undefined;
-  const contentLength = contentLengthHeader && /^\d+$/.test(contentLengthHeader)
-    ? Number(contentLengthHeader)
-    : undefined;
+  const contentLength =
+    contentLengthHeader && /^\d+$/.test(contentLengthHeader)
+      ? Number(contentLengthHeader)
+      : undefined;
 
   if (!response.body) {
     const text = await response.text();
     const body = Buffer.from(text);
     if (body.byteLength <= maxBytes) {
-      return { body, bytesRead: body.byteLength, truncated: false, ...(contentLength !== undefined ? { contentLength } : {}) };
+      return {
+        body,
+        bytesRead: body.byteLength,
+        truncated: false,
+        ...(contentLength !== undefined ? { contentLength } : {}),
+      };
     }
     return {
       body: body.subarray(0, maxBytes),
@@ -521,7 +585,11 @@ async function readResponseBody(response: Response, maxBytes: number): Promise<F
       bytesRead += chunk.byteLength;
     }
 
-    if (!truncated && bytesRead >= maxBytes && (contentLength === undefined || contentLength > maxBytes)) {
+    if (
+      !truncated &&
+      bytesRead >= maxBytes &&
+      (contentLength === undefined || contentLength > maxBytes)
+    ) {
       truncated = true;
       await reader.cancel();
     }
@@ -554,7 +622,7 @@ async function fetchPublicHttpBody(
     allowedDomains: string[];
     blockedDomains: string[];
     useCache: boolean;
-  },
+  }
 ): Promise<
   | { ok: true; value: FetchedPublicBody }
   | { ok: false; code: string; message: string; details: Record<string, unknown> }
@@ -573,7 +641,11 @@ async function fetchPublicHttpBody(
       };
     }
 
-    const domainAccess = validateDomainAccess(validation.url.toString(), options.allowedDomains, options.blockedDomains);
+    const domainAccess = validateDomainAccess(
+      validation.url.toString(),
+      options.allowedDomains,
+      options.blockedDomains
+    );
     if (!domainAccess.ok) {
       return {
         ok: false,
@@ -588,7 +660,8 @@ async function fetchPublicHttpBody(
       cache: options.useCache ? 'default' : 'no-store',
       headers: {
         'User-Agent': USER_AGENT,
-        Accept: 'text/html,application/xhtml+xml,application/json,text/plain,text/markdown,application/pdf,*/*;q=0.8',
+        Accept:
+          'text/html,application/xhtml+xml,application/json,text/plain,text/markdown,application/pdf,*/*;q=0.8',
       },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     } as RequestInit & { cache?: 'default' | 'no-store' };
@@ -659,16 +732,18 @@ function isTextLikeContentType(contentType: string): boolean {
   const ct = contentType.toLowerCase().split(';', 1)[0]?.trim() ?? '';
   if (!ct) return true;
   if (ct.startsWith('text/')) return true;
-  return ct === 'application/json'
-    || ct === 'application/xml'
-    || ct === 'application/xhtml+xml'
-    || ct === 'application/javascript'
-    || ct === 'application/x-javascript'
-    || ct === 'application/ld+json'
-    || ct === 'application/rss+xml'
-    || ct === 'application/atom+xml'
-    || ct.endsWith('+json')
-    || ct.endsWith('+xml');
+  return (
+    ct === 'application/json' ||
+    ct === 'application/xml' ||
+    ct === 'application/xhtml+xml' ||
+    ct === 'application/javascript' ||
+    ct === 'application/x-javascript' ||
+    ct === 'application/ld+json' ||
+    ct === 'application/rss+xml' ||
+    ct === 'application/atom+xml' ||
+    ct.endsWith('+json') ||
+    ct.endsWith('+xml')
+  );
 }
 
 function decodeBodyText(body: Buffer): string {
@@ -679,25 +754,47 @@ function looksBinary(text: string): boolean {
   return text.slice(0, 8192).includes('\u0000');
 }
 
-export function createWebFetchTool(): AgentTool<any> {
+export function createWebFetchTool(): AgentTool {
   return {
     name: 'WebFetch',
     label: 'WebFetch',
-    description: 'Fetch a public URL and return its content. Redirects are followed only after each target is revalidated. HTML pages are extracted to clean Markdown; PDFs are text-extracted; JSON/plain text/markdown are returned as-is. Supports domain filters, cache bypass, and response size limits.',
-    parameters: {
+    description:
+      'Fetch a public URL and return its content. Redirects are followed only after each target is revalidated. HTML pages are extracted to clean Markdown; PDFs are text-extracted; JSON/plain text/markdown are returned as-is. Supports domain filters, cache bypass, and response size limits.',
+    parameters: agentToolParameters({
       type: 'object',
       properties: {
         url: { type: 'string' },
         format: { type: 'string', enum: ['markdown', 'text', 'raw'], default: 'markdown' },
-        allowed_domains: { type: 'array', items: { type: 'string' }, description: 'Only fetch URLs on these domains or paths, e.g. "example.com" or "docs.example.com/api".' },
-        blocked_domains: { type: 'array', items: { type: 'string' }, description: 'Do not fetch URLs on these domains or paths.' },
-        max_bytes: { type: 'number', default: DEFAULT_FETCH_MAX_BYTES, description: 'Maximum response bytes to read before truncating.' },
-        max_content_chars: { type: 'number', default: DEFAULT_OUTPUT_CHARS, description: 'Maximum characters returned to the model.' },
-        use_cache: { type: 'boolean', default: true, description: 'Set false to bypass HTTP caches when fresh content is required.' },
+        allowed_domains: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Only fetch URLs on these domains or paths, e.g. "example.com" or "docs.example.com/api".',
+        },
+        blocked_domains: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Do not fetch URLs on these domains or paths.',
+        },
+        max_bytes: {
+          type: 'number',
+          default: DEFAULT_FETCH_MAX_BYTES,
+          description: 'Maximum response bytes to read before truncating.',
+        },
+        max_content_chars: {
+          type: 'number',
+          default: DEFAULT_OUTPUT_CHARS,
+          description: 'Maximum characters returned to the model.',
+        },
+        use_cache: {
+          type: 'boolean',
+          default: true,
+          description: 'Set false to bypass HTTP caches when fresh content is required.',
+        },
         pages: { type: 'string', description: 'For PDFs: page range like "1-5" or "2,7".' },
       },
       required: ['url'],
-    } as any,
+    }),
     execute: async (toolCallId: string, params: unknown) => {
       const args = toolParams(toolCallId, params);
       const url = String(args.url || '');
@@ -712,11 +809,24 @@ export function createWebFetchTool(): AgentTool<any> {
         });
       }
       if (allowed.filters.length > 0 && blocked.filters.length > 0) {
-        return errorResult('invalid_domain_filters', 'Use either allowed_domains or blocked_domains, not both');
+        return errorResult(
+          'invalid_domain_filters',
+          'Use either allowed_domains or blocked_domains, not both'
+        );
       }
 
-      const maxBytes = clampNumberParam(args.max_bytes, DEFAULT_FETCH_MAX_BYTES, 1, HARD_FETCH_MAX_BYTES);
-      const maxContentChars = clampNumberParam(args.max_content_chars, DEFAULT_OUTPUT_CHARS, 1_000, HARD_OUTPUT_CHARS);
+      const maxBytes = clampNumberParam(
+        args.max_bytes,
+        DEFAULT_FETCH_MAX_BYTES,
+        1,
+        HARD_FETCH_MAX_BYTES
+      );
+      const maxContentChars = clampNumberParam(
+        args.max_content_chars,
+        DEFAULT_OUTPUT_CHARS,
+        1_000,
+        HARD_OUTPUT_CHARS
+      );
       let fetched: FetchedPublicBody;
       try {
         const result = await fetchPublicHttpBody(url, {
@@ -750,24 +860,32 @@ export function createWebFetchTool(): AgentTool<any> {
           pdfInfo = { totalPages: extracted.totalPages, pages: extracted.pages };
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
-          return errorResult('pdf_extract_failed', `WebFetch could not extract PDF text: ${message}`, {
-            url: finalUrl,
-            status: response.status,
-            contentType,
-          });
+          return errorResult(
+            'pdf_extract_failed',
+            `WebFetch could not extract PDF text: ${message}`,
+            {
+              url: finalUrl,
+              status: response.status,
+              contentType,
+            }
+          );
         }
       } else if (format === 'raw') {
         content = bodyText;
         extractMode = 'raw';
       } else if (!shouldExtractAsHtml(contentType, bodyText)) {
         if (!isTextLikeContentType(contentType) || looksBinary(bodyText)) {
-          return errorResult('unsupported_binary_content', 'WebFetch received non-text content that cannot be returned safely', {
-            url: finalUrl,
-            status: response.status,
-            contentType: contentType || 'unknown',
-            bytesRead: fetched.bytesRead,
-            bodyTruncated: fetched.bodyTruncated,
-          });
+          return errorResult(
+            'unsupported_binary_content',
+            'WebFetch received non-text content that cannot be returned safely',
+            {
+              url: finalUrl,
+              status: response.status,
+              contentType: contentType || 'unknown',
+              bytesRead: fetched.bytesRead,
+              bodyTruncated: fetched.bodyTruncated,
+            }
+          );
         }
         content = bodyText;
         extractMode = 'passthrough';
@@ -789,37 +907,35 @@ export function createWebFetchTool(): AgentTool<any> {
         ...(fetched.bodyTruncated ? [`Body: truncated after ${fetched.bytesRead} bytes`] : []),
         ...(title ? [`Title: ${title}`] : []),
       ].join('\n');
-      return textResult(
-        truncateText(`${header}\n\n${content}`, maxContentChars),
-        {
-          ok: response.ok,
-          status: response.status,
-          statusText: response.statusText,
-          contentType,
-          url: finalUrl,
-          redirects: fetched.redirects,
-          bytesRead: fetched.bytesRead,
-          bodyTruncated: fetched.bodyTruncated,
-          maxBytes,
-          maxContentChars,
-          allowedDomains: allowed.filters,
-          blockedDomains: blocked.filters,
-          ...(fetched.contentLength !== undefined ? { contentLength: fetched.contentLength } : {}),
-          ...(extractMode ? { extractMode } : {}),
-          ...(title ? { title } : {}),
-          ...(pdfInfo ? { pdf: pdfInfo } : {}),
-        },
-      );
+      return textResult(truncateText(`${header}\n\n${content}`, maxContentChars), {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+        contentType,
+        url: finalUrl,
+        redirects: fetched.redirects,
+        bytesRead: fetched.bytesRead,
+        bodyTruncated: fetched.bodyTruncated,
+        maxBytes,
+        maxContentChars,
+        allowedDomains: allowed.filters,
+        blockedDomains: blocked.filters,
+        ...(fetched.contentLength !== undefined ? { contentLength: fetched.contentLength } : {}),
+        ...(extractMode ? { extractMode } : {}),
+        ...(title ? { title } : {}),
+        ...(pdfInfo ? { pdf: pdfInfo } : {}),
+      });
     },
-  } as unknown as AgentTool<any>;
+  };
 }
 
-export function createWebSearchTool(db?: Database): AgentTool<any> {
+export function createWebSearchTool(db?: Database): AgentTool {
   return {
     name: 'WebSearch',
     label: 'WebSearch',
-    description: 'Search the web for current information. Supports domain filters, freshness, locale, SafeSearch, and richer provider snippets when available.',
-    parameters: {
+    description:
+      'Search the web for current information. Supports domain filters, freshness, locale, SafeSearch, and richer provider snippets when available.',
+    parameters: agentToolParameters({
       type: 'object',
       properties: {
         query: { type: 'string' },
@@ -828,16 +944,26 @@ export function createWebSearchTool(db?: Database): AgentTool<any> {
         blocked_domains: { type: 'array', items: { type: 'string' } },
         freshness: {
           type: 'string',
-          description: 'Freshness filter: day/week/month/year, pd/pw/pm/py, or Brave custom YYYY-MM-DDtoYYYY-MM-DD range.',
+          description:
+            'Freshness filter: day/week/month/year, pd/pw/pm/py, or Brave custom YYYY-MM-DDtoYYYY-MM-DD range.',
         },
-        country: { type: 'string', description: 'Two-letter country code for providers that support localization.' },
-        search_lang: { type: 'string', description: 'Search result language, e.g. "en" or "zh-CN".' },
-        ui_lang: { type: 'string', description: 'Provider UI language for metadata when supported.' },
+        country: {
+          type: 'string',
+          description: 'Two-letter country code for providers that support localization.',
+        },
+        search_lang: {
+          type: 'string',
+          description: 'Search result language, e.g. "en" or "zh-CN".',
+        },
+        ui_lang: {
+          type: 'string',
+          description: 'Provider UI language for metadata when supported.',
+        },
         safe_search: { type: 'string', enum: ['off', 'moderate', 'strict'], default: 'moderate' },
         extra_snippets: { type: 'boolean', default: false },
       },
       required: ['query'],
-    } as any,
+    }),
     execute: async (toolCallId: string, params: unknown) => {
       const args = toolParams(toolCallId, params);
       const query = String(args.query || '').trim();
@@ -852,12 +978,16 @@ export function createWebSearchTool(db?: Database): AgentTool<any> {
         });
       }
       if (allowed.filters.length > 0 && blocked.filters.length > 0) {
-        return errorResult('invalid_domain_filters', 'Use either allowed_domains or blocked_domains, not both');
+        return errorResult(
+          'invalid_domain_filters',
+          'Use either allowed_domains or blocked_domains, not both'
+        );
       }
       const searchOptions: WebSearchOptions = {
-        maxResults: allowed.filters.length > 0 || blocked.filters.length > 0
-          ? Math.min(Math.max(maxResults * 5, 20), 50)
-          : maxResults,
+        maxResults:
+          allowed.filters.length > 0 || blocked.filters.length > 0
+            ? Math.min(Math.max(maxResults * 5, 20), 50)
+            : maxResults,
         allowedDomains: allowed.filters,
         blockedDomains: blocked.filters,
         freshness: normalizeFreshness(args.freshness),
@@ -873,10 +1003,20 @@ export function createWebSearchTool(db?: Database): AgentTool<any> {
           const providerResults = await provider.search(query, searchOptions);
           const results = providerResults
             .filter(result => result.url && result.domain)
-            .filter(result => allowed.filters.length === 0 || filterMatchesUrl(result.url, allowed.filters))
-            .filter(result => blocked.filters.length === 0 || !filterMatchesUrl(result.url, blocked.filters))
+            .filter(
+              result =>
+                allowed.filters.length === 0 || filterMatchesUrl(result.url, allowed.filters)
+            )
+            .filter(
+              result =>
+                blocked.filters.length === 0 || !filterMatchesUrl(result.url, blocked.filters)
+            )
             .slice(0, maxResults);
-          if (results.length === 0 && providerResults.length > 0 && (allowed.filters.length > 0 || blocked.filters.length > 0)) {
+          if (
+            results.length === 0 &&
+            providerResults.length > 0 &&
+            (allowed.filters.length > 0 || blocked.filters.length > 0)
+          ) {
             fallbacks.push({
               provider: provider.name,
               message: 'no results matched domain filters',
@@ -884,55 +1024,68 @@ export function createWebSearchTool(db?: Database): AgentTool<any> {
             });
             continue;
           }
-          return textResult(JSON.stringify({
-            query,
-            results,
-            source: provider.name,
-            fallbacks,
-            options: {
-              max_results: maxResults,
+          return textResult(
+            JSON.stringify(
+              {
+                query,
+                results,
+                source: provider.name,
+                fallbacks,
+                options: {
+                  max_results: maxResults,
+                  ...(searchOptions.freshness ? { freshness: searchOptions.freshness } : {}),
+                  ...(searchOptions.country ? { country: searchOptions.country } : {}),
+                  ...(searchOptions.searchLang ? { search_lang: searchOptions.searchLang } : {}),
+                  ...(searchOptions.uiLang ? { ui_lang: searchOptions.uiLang } : {}),
+                  safe_search: searchOptions.safeSearch,
+                  extra_snippets: searchOptions.extraSnippets,
+                  allowed_domains: allowed.filters,
+                  blocked_domains: blocked.filters,
+                },
+              },
+              null,
+              2
+            ),
+            {
+              ok: true,
+              provider: provider.name,
+              query,
+              total: results.length,
+              results,
+              allowedDomains: allowed.filters,
+              blockedDomains: blocked.filters,
               ...(searchOptions.freshness ? { freshness: searchOptions.freshness } : {}),
               ...(searchOptions.country ? { country: searchOptions.country } : {}),
-              ...(searchOptions.searchLang ? { search_lang: searchOptions.searchLang } : {}),
-              ...(searchOptions.uiLang ? { ui_lang: searchOptions.uiLang } : {}),
-              safe_search: searchOptions.safeSearch,
-              extra_snippets: searchOptions.extraSnippets,
-              allowed_domains: allowed.filters,
-              blocked_domains: blocked.filters,
-            },
-          }, null, 2), {
-            ok: true,
-            provider: provider.name,
-            query,
-            total: results.length,
-            results,
-            allowedDomains: allowed.filters,
-            blockedDomains: blocked.filters,
-            ...(searchOptions.freshness ? { freshness: searchOptions.freshness } : {}),
-            ...(searchOptions.country ? { country: searchOptions.country } : {}),
-            ...(searchOptions.searchLang ? { searchLang: searchOptions.searchLang } : {}),
-            ...(searchOptions.uiLang ? { uiLang: searchOptions.uiLang } : {}),
-            safeSearch: searchOptions.safeSearch,
-            extraSnippets: searchOptions.extraSnippets,
-            fallbacks,
-          });
+              ...(searchOptions.searchLang ? { searchLang: searchOptions.searchLang } : {}),
+              ...(searchOptions.uiLang ? { uiLang: searchOptions.uiLang } : {}),
+              safeSearch: searchOptions.safeSearch,
+              extraSnippets: searchOptions.extraSnippets,
+              fallbacks,
+            }
+          );
         } catch (err) {
           const providerError = err as Partial<WebSearchProviderError>;
           fallbacks.push({
             provider: provider.name,
             message: err instanceof Error ? err.message : String(err),
             ...(typeof providerError.status === 'number' && { status: providerError.status }),
-            ...(typeof providerError.statusText === 'string' && { statusText: providerError.statusText }),
+            ...(typeof providerError.statusText === 'string' && {
+              statusText: providerError.statusText,
+            }),
           });
         }
       }
       const last = fallbacks[fallbacks.length - 1] ?? {};
-      return errorResult('provider_error', `WebSearch provider failed: ${String(last.message ?? 'all providers failed')}`, {
-        provider: String(last.provider ?? 'unknown'),
-        ...(typeof last.status === 'number' && { status: last.status }),
-        ...(typeof last.statusText === 'string' && { statusText: last.statusText }),
-        fallbacks,
-      });
+      return errorResult(
+        'provider_error',
+        `WebSearch provider failed: ${String(last.message ?? 'all providers failed')}`,
+        {
+          provider: String(last.provider ?? 'unknown'),
+          ...(typeof last.status === 'number' && { status: last.status }),
+          ...(typeof last.statusText === 'string' && { statusText: last.statusText }),
+          fallbacks,
+        }
+      );
     },
-  } as unknown as AgentTool<any>;
+  };
 }

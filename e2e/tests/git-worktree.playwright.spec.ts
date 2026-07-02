@@ -42,7 +42,9 @@ test.describe('Git Worktree Management', () => {
   // Helper: Open worktree panel/dialog
   async function openWorktreePanel(page: any): Promise<boolean> {
     // Look for worktree button in project context
-    const worktreeButton = page.locator('button[title*="Worktree"], button[title*="worktree"]').first();
+    const worktreeButton = page
+      .locator('button[title*="Worktree"], button[title*="worktree"]')
+      .first();
     const hasButton = await worktreeButton.isVisible({ timeout: 2000 }).catch(() => false);
 
     if (hasButton) {
@@ -52,7 +54,9 @@ test.describe('Git Worktree Management', () => {
     }
 
     // Alternative: Look in project settings or context menu
-    const projectMenu = page.locator('button[title="Project options"], button[aria-label*="menu"]').first();
+    const projectMenu = page
+      .locator('button[title="Project options"], button[aria-label*="menu"]')
+      .first();
     if (await projectMenu.isVisible({ timeout: 2000 }).catch(() => false)) {
       await projectMenu.click();
       await page.waitForTimeout(300);
@@ -74,7 +78,11 @@ test.describe('Git Worktree Management', () => {
     console.log('Test WT1: List worktrees');
 
     // Create a test project (using current git repo path)
-    const projectCreated = await createGitProject(page, 'Worktree Test', '/tmp/test-worktree-project');
+    const projectCreated = await createGitProject(
+      page,
+      'Worktree Test',
+      '/tmp/test-worktree-project'
+    );
     if (!projectCreated) {
       console.log('  ⚠️ Could not create test project (server may not be connected)');
       console.log('✅ WT1: Test passed (prerequisites not met)');
@@ -114,7 +122,11 @@ test.describe('Git Worktree Management', () => {
   test('WT2: create new worktree', async ({ page }) => {
     console.log('Test WT2: Create worktree');
 
-    const projectCreated = await createGitProject(page, 'Worktree Create Test', '/tmp/test-worktree-create');
+    const projectCreated = await createGitProject(
+      page,
+      'Worktree Create Test',
+      '/tmp/test-worktree-create'
+    );
     if (!projectCreated) {
       console.log('  ⚠️ Could not create test project (server may not be connected)');
       console.log('✅ WT2: Test passed (prerequisites not met)');
@@ -125,7 +137,11 @@ test.describe('Git Worktree Management', () => {
 
     if (panelOpened) {
       // Look for create/add worktree button
-      const createButton = page.locator('button:has-text("New Worktree"), button:has-text("Create"), button[title*="Create worktree"]').first();
+      const createButton = page
+        .locator(
+          'button:has-text("New Worktree"), button:has-text("Create"), button[title*="Create worktree"]'
+        )
+        .first();
       const hasCreateButton = await createButton.isVisible({ timeout: 2000 }).catch(() => false);
 
       if (hasCreateButton) {
@@ -133,11 +149,15 @@ test.describe('Git Worktree Management', () => {
         await page.waitForTimeout(500);
 
         // Fill in worktree details
-        const branchInput = page.locator('input[placeholder*="branch"], input[name*="branch"]').first();
+        const branchInput = page
+          .locator('input[placeholder*="branch"], input[name*="branch"]')
+          .first();
         if (await branchInput.isVisible({ timeout: 2000 }).catch(() => false)) {
           await branchInput.fill('test-feature-branch');
 
-          const confirmButton = page.locator('button:has-text("Create"), button:has-text("Confirm")').first();
+          const confirmButton = page
+            .locator('button:has-text("Create"), button:has-text("Confirm")')
+            .first();
           await confirmButton.click();
 
           await page.waitForTimeout(1000);
@@ -168,7 +188,11 @@ test.describe('Git Worktree Management', () => {
   test('WT3: switch between worktrees', async ({ page }) => {
     console.log('Test WT3: Switch worktrees');
 
-    const projectCreated = await createGitProject(page, 'Worktree Switch Test', '/tmp/test-worktree-switch');
+    const projectCreated = await createGitProject(
+      page,
+      'Worktree Switch Test',
+      '/tmp/test-worktree-switch'
+    );
     if (!projectCreated) {
       console.log('  ⚠️ Could not create test project (server may not be connected)');
       console.log('✅ WT3: Test passed (prerequisites not met)');
@@ -213,7 +237,11 @@ test.describe('Git Worktree Management', () => {
   test('WT4: delete worktree', async ({ page }) => {
     console.log('Test WT4: Delete worktree');
 
-    const projectCreated = await createGitProject(page, 'Worktree Delete Test', '/tmp/test-worktree-delete');
+    const projectCreated = await createGitProject(
+      page,
+      'Worktree Delete Test',
+      '/tmp/test-worktree-delete'
+    );
     if (!projectCreated) {
       console.log('  ⚠️ Could not create test project (server may not be connected)');
       console.log('✅ WT4: Test passed (prerequisites not met)');
@@ -225,7 +253,7 @@ test.describe('Git Worktree Management', () => {
     if (panelOpened) {
       // Look for non-main worktrees to delete
       const worktreeItems = page.locator('[data-testid="worktree-item"], .worktree-item').filter({
-        hasNot: page.locator('text=/main|master/')
+        hasNot: page.locator('text=/main|master/'),
       });
 
       const count = await worktreeItems.count();
@@ -237,14 +265,18 @@ test.describe('Git Worktree Management', () => {
         await page.waitForTimeout(300);
 
         // Click delete button
-        const deleteButton = firstDeletable.locator('button[title*="Delete"], button[title*="Remove"]').first();
+        const deleteButton = firstDeletable
+          .locator('button[title*="Delete"], button[title*="Remove"]')
+          .first();
         const hasDelete = await deleteButton.isVisible({ timeout: 1000 }).catch(() => false);
 
         if (hasDelete) {
           await deleteButton.click();
 
           // Confirm deletion
-          const confirmButton = page.locator('button:has-text("Confirm"), button:has-text("Delete")').first();
+          const confirmButton = page
+            .locator('button:has-text("Confirm"), button:has-text("Delete")')
+            .first();
           if (await confirmButton.isVisible({ timeout: 2000 }).catch(() => false)) {
             await confirmButton.click();
             await page.waitForTimeout(500);
@@ -269,7 +301,11 @@ test.describe('Git Worktree Management', () => {
   test('WT5: worktree status sync', async ({ page }) => {
     console.log('Test WT5: Worktree status sync');
 
-    const projectCreated = await createGitProject(page, 'Worktree Sync Test', '/tmp/test-worktree-sync');
+    const projectCreated = await createGitProject(
+      page,
+      'Worktree Sync Test',
+      '/tmp/test-worktree-sync'
+    );
     if (!projectCreated) {
       console.log('  ⚠️ Could not create test project (server may not be connected)');
       console.log('✅ WT5: Test passed (prerequisites not met)');
@@ -310,7 +346,9 @@ test.describe('Git Worktree Management', () => {
     const panelOpened = await openWorktreePanel(page);
 
     if (panelOpened) {
-      const createButton = page.locator('button:has-text("New Worktree"), button:has-text("Create")').first();
+      const createButton = page
+        .locator('button:has-text("New Worktree"), button:has-text("Create")')
+        .first();
       const hasCreateButton = await createButton.isVisible({ timeout: 2000 }).catch(() => false);
 
       if (hasCreateButton) {
@@ -318,12 +356,16 @@ test.describe('Git Worktree Management', () => {
         await page.waitForTimeout(500);
 
         // Try to create worktree with invalid branch name
-        const branchInput = page.locator('input[placeholder*="branch"], input[name*="branch"]').first();
+        const branchInput = page
+          .locator('input[placeholder*="branch"], input[name*="branch"]')
+          .first();
         if (await branchInput.isVisible({ timeout: 2000 }).catch(() => false)) {
           // Invalid branch name with special characters
           await branchInput.fill('invalid..branch..name');
 
-          const confirmButton = page.locator('button:has-text("Create"), button:has-text("Confirm")').first();
+          const confirmButton = page
+            .locator('button:has-text("Create"), button:has-text("Confirm")')
+            .first();
           await confirmButton.click();
 
           await page.waitForTimeout(1000);
@@ -358,7 +400,10 @@ test.describe('Git Worktree Management', () => {
     console.log('Test WT7: Non-git directory handling');
 
     // Create project with non-git directory
-    const projectCreated = await projectPage.createProject('Non-Git Project', '/tmp/non-git-dir-test');
+    const projectCreated = await projectPage.createProject(
+      'Non-Git Project',
+      '/tmp/non-git-dir-test'
+    );
     if (!projectCreated) {
       console.log('✅ WT7: Test passed (prerequisites not met)');
       return;

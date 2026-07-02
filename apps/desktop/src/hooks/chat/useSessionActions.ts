@@ -29,8 +29,8 @@ export function useSessionActions({
   setIsRenamingSession,
   isSessionRunning,
 }: UseSessionActionsParams) {
-  const addPoppedOutSession = useUIStore((s) => s.addPoppedOutSession);
-  const removePoppedOutSession = useUIStore((s) => s.removePoppedOutSession);
+  const addPoppedOutSession = useUIStore(s => s.addPoppedOutSession);
+  const removePoppedOutSession = useUIStore(s => s.removePoppedOutSession);
 
   const handleSessionRename = useCallback(async () => {
     const newName = renameValue.trim();
@@ -109,7 +109,14 @@ export function useSessionActions({
     } catch (err) {
       console.error('[ChatInterface] Pop out failed:', err);
     }
-  }, [sessionId, currentSession?.projectId, currentSession?.name, currentProject?.name, addPoppedOutSession, removePoppedOutSession]);
+  }, [
+    sessionId,
+    currentSession?.projectId,
+    currentSession?.name,
+    currentProject?.name,
+    addPoppedOutSession,
+    removePoppedOutSession,
+  ]);
 
   const handleFocusPoppedOutWindow = useCallback(async (windowLabel: string) => {
     if (!isDesktopTauri()) return;
@@ -121,19 +128,22 @@ export function useSessionActions({
     }
   }, []);
 
-  const handleBringBackHere = useCallback(async (windowLabel: string) => {
-    if (!isDesktopTauri()) {
+  const handleBringBackHere = useCallback(
+    async (windowLabel: string) => {
+      if (!isDesktopTauri()) {
+        removePoppedOutSession(sessionId);
+        return;
+      }
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        await invoke('close_window', { label: windowLabel });
+      } catch (err) {
+        console.error('[ChatInterface] Close popped-out window failed:', err);
+      }
       removePoppedOutSession(sessionId);
-      return;
-    }
-    try {
-      const { invoke } = await import('@tauri-apps/api/core');
-      await invoke('close_window', { label: windowLabel });
-    } catch (err) {
-      console.error('[ChatInterface] Close popped-out window failed:', err);
-    }
-    removePoppedOutSession(sessionId);
-  }, [sessionId, removePoppedOutSession]);
+    },
+    [sessionId, removePoppedOutSession]
+  );
 
   return {
     handleSessionRename,

@@ -96,8 +96,8 @@ export function tokenizeShellWords(command: string): ShellToken[] {
 
 export function getCommandSignature(tokens: ShellToken[]): string | null {
   const commandTokens = tokens
-    .map((token) => token.value)
-    .filter((value) => value && !value.includes('='));
+    .map(token => token.value)
+    .filter(value => value && !value.includes('='));
   if (commandTokens.length === 0) return null;
   if (commandTokens[0] === 'git' && commandTokens[1]) {
     return `git ${commandTokens[1]}`;
@@ -119,11 +119,16 @@ export function shouldSkipTokenAsTextArgument(tokens: ShellToken[], index: numbe
   return rules.has(previous);
 }
 
-export function shouldIgnoreOutsideWorkspaceExecutable(tokens: ShellToken[], index: number): boolean {
+export function shouldIgnoreOutsideWorkspaceExecutable(
+  tokens: ShellToken[],
+  index: number
+): boolean {
   const token = tokens[index]?.value;
   if (!token?.startsWith('/') && !token?.startsWith('./')) return false;
 
-  const firstCommandIndex = tokens.findIndex((candidate) => candidate.value && !candidate.value.includes('='));
+  const firstCommandIndex = tokens.findIndex(
+    candidate => candidate.value && !candidate.value.includes('=')
+  );
   if (firstCommandIndex !== index) return false;
 
   return OUTSIDE_WORKSPACE_EXECUTABLE_BASENAMES.has(path.basename(token).toLowerCase());
@@ -135,9 +140,11 @@ export function shouldIgnoreOutsideWorkspaceExecutable(tokens: ShellToken[], ind
 
 /** Returns true when a token looks like a path argument (absolute, relative `./`, or bare dotfile). */
 function isPathLikeToken(value: string): boolean {
-  return value.startsWith('/')   // absolute: /etc/hosts
-    || value.startsWith('./')    // relative: ./config/.env
-    || (value.startsWith('.') && value.length > 1 && !value.startsWith('..'));  // bare dotfile: .env, .env.local
+  return (
+    value.startsWith('/') || // absolute: /etc/hosts
+    value.startsWith('./') || // relative: ./config/.env
+    (value.startsWith('.') && value.length > 1 && !value.startsWith('..'))
+  ); // bare dotfile: .env, .env.local
 }
 
 export function extractPathsFromCommand(command: string): string[] {
@@ -224,19 +231,39 @@ export function splitCompoundCommand(command: string): string[] {
       continue;
     }
 
-    if (!inSingle && !inDouble && !backtickSubstitution && commandSubstitutionDepth === 0 && ch === '(') {
+    if (
+      !inSingle &&
+      !inDouble &&
+      !backtickSubstitution &&
+      commandSubstitutionDepth === 0 &&
+      ch === '('
+    ) {
       current += ch;
       groupDepth += 1;
       continue;
     }
 
-    if (!inSingle && !inDouble && !backtickSubstitution && commandSubstitutionDepth === 0 && ch === ')' && groupDepth > 0) {
+    if (
+      !inSingle &&
+      !inDouble &&
+      !backtickSubstitution &&
+      commandSubstitutionDepth === 0 &&
+      ch === ')' &&
+      groupDepth > 0
+    ) {
       current += ch;
       groupDepth -= 1;
       continue;
     }
 
-    if (!inSingle && !inDouble && !backtickSubstitution && commandSubstitutionDepth === 0 && ch === '{' && command[i - 1] !== '$') {
+    if (
+      !inSingle &&
+      !inDouble &&
+      !backtickSubstitution &&
+      commandSubstitutionDepth === 0 &&
+      ch === '{' &&
+      command[i - 1] !== '$'
+    ) {
       current += ch;
       braceDepth += 1;
       continue;
@@ -248,7 +275,15 @@ export function splitCompoundCommand(command: string): string[] {
       continue;
     }
 
-    if (!inSingle && !inDouble && !backtickSubstitution && commandSubstitutionDepth === 0 && parameterExpansionDepth === 0 && ch === '}' && braceDepth > 0) {
+    if (
+      !inSingle &&
+      !inDouble &&
+      !backtickSubstitution &&
+      commandSubstitutionDepth === 0 &&
+      parameterExpansionDepth === 0 &&
+      ch === '}' &&
+      braceDepth > 0
+    ) {
       current += ch;
       braceDepth -= 1;
       continue;
@@ -278,7 +313,14 @@ export function splitCompoundCommand(command: string): string[] {
       continue;
     }
 
-    if (!inSingle && !inDouble && !backtickSubstitution && commandSubstitutionDepth === 0 && groupDepth === 0 && braceDepth === 0) {
+    if (
+      !inSingle &&
+      !inDouble &&
+      !backtickSubstitution &&
+      commandSubstitutionDepth === 0 &&
+      groupDepth === 0 &&
+      braceDepth === 0
+    ) {
       const tripleSep = `${ch}${next || ''}${command[i + 2] || ''}`;
       const doubleSep = `${ch}${next || ''}`;
       if (tripleSep === ';;&') {
@@ -370,7 +412,7 @@ export function extractCommandSubstitutions(command: string): string[] {
       continue;
     }
 
-    if (inSingle || (ch !== '$' || next !== '(')) {
+    if (inSingle || ch !== '$' || next !== '(') {
       continue;
     }
 
@@ -459,7 +501,7 @@ export function normalizeRememberableShellFragment(fragment: string): string | n
     .trim();
 
   if (!normalized) return null;
-  if (STRUCTURAL_PREFIXES.some((pattern) => pattern.test(normalized))) {
+  if (STRUCTURAL_PREFIXES.some(pattern => pattern.test(normalized))) {
     return null;
   }
   return normalized;
@@ -469,7 +511,10 @@ export function unwrapGroupedFragment(fragment: string): string | null {
   const normalized = fragment.trim();
   if (normalized.length < 2) return null;
 
-  const pairs: Array<[string, string]> = [['(', ')'], ['{', '}']];
+  const pairs: Array<[string, string]> = [
+    ['(', ')'],
+    ['{', '}'],
+  ];
   for (const [open, close] of pairs) {
     if (!normalized.startsWith(open) || !normalized.endsWith(close)) continue;
 
@@ -521,14 +566,12 @@ export function unwrapGroupedFragment(fragment: string): string | null {
 
 export function extractFindExecCommands(fragment: string): string[] {
   const matches = fragment.matchAll(/(?:^|\s)-exec\s+(.+?)(?:\s+(?:\\;|;|\+)|$)/g);
-  return [...matches]
-    .map((match) => match[1]?.trim())
-    .filter((value): value is string => !!value);
+  return [...matches].map(match => match[1]?.trim()).filter((value): value is string => !!value);
 }
 
 export function extractXargsCommands(fragment: string): string[] {
   const tokens = fragment.trim().split(/\s+/);
-  const xargsIndex = tokens.findIndex((token) => token === 'xargs');
+  const xargsIndex = tokens.findIndex(token => token === 'xargs');
   if (xargsIndex === -1) return [];
 
   const optionsWithValues = new Set(['-E', '-I', '-L', '-n', '-P', '-d']);
@@ -538,12 +581,19 @@ export function extractXargsCommands(fragment: string): string[] {
     const token = tokens[index];
     if (!token.startsWith('-')) break;
 
-    if (token === '-I' || token === '-E' || token === '-L' || token === '-n' || token === '-P' || token === '-d') {
+    if (
+      token === '-I' ||
+      token === '-E' ||
+      token === '-L' ||
+      token === '-n' ||
+      token === '-P' ||
+      token === '-d'
+    ) {
       index += 2;
       continue;
     }
 
-    if ([...optionsWithValues].some((flag) => token.startsWith(flag) && token !== flag)) {
+    if ([...optionsWithValues].some(flag => token.startsWith(flag) && token !== flag)) {
       index += 1;
       continue;
     }

@@ -8,11 +8,7 @@ import {
   closestCenter,
   type DragEndEvent,
 } from '@dnd-kit/core';
-import {
-  SortableContext,
-  arrayMove,
-  rectSortingStrategy,
-} from '@dnd-kit/sortable';
+import { SortableContext, arrayMove, rectSortingStrategy } from '@dnd-kit/sortable';
 import { AttachmentThumbnail } from './AttachmentThumbnail';
 import { SortableAttachmentThumbnail } from './SortableAttachmentThumbnail';
 import { ImageLightbox } from './ImageLightbox';
@@ -47,7 +43,7 @@ export function AttachmentList({
   ownerId,
 }: AttachmentListProps) {
   const [previewItem, setPreviewItem] = useState<Attachment | null>(null);
-  const reorder = useAttachmentsStore((s) => s.reorderAttachments);
+  const reorder = useAttachmentsStore(s => s.reorderAttachments);
 
   // PointerSensor with a small distance threshold lets click-to-open still
   // work; only horizontal/vertical movement of >= 5px starts a drag.
@@ -55,9 +51,7 @@ export function AttachmentList({
 
   if (items.length === 0) {
     if (!emptyText) return null;
-    return (
-      <div className="text-xs text-muted-foreground italic">{emptyText}</div>
-    );
+    return <div className="text-xs text-muted-foreground italic">{emptyText}</div>;
   }
 
   const handleClick = (att: Attachment) => {
@@ -77,7 +71,7 @@ export function AttachmentList({
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    const ids = items.map((i) => i.id);
+    const ids = items.map(i => i.id);
     const oldIndex = ids.indexOf(String(active.id));
     const newIndex = ids.indexOf(String(over.id));
     if (oldIndex < 0 || newIndex < 0) return;
@@ -94,7 +88,7 @@ export function AttachmentList({
 
   const renderStatic = () => (
     <div {...containerProps}>
-      {items.map((att) => (
+      {items.map(att => (
         <AttachmentThumbnail
           key={att.id}
           attachment={att}
@@ -109,9 +103,9 @@ export function AttachmentList({
 
   const renderSortable = () => (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-      <SortableContext items={items.map((i) => i.id)} strategy={rectSortingStrategy}>
+      <SortableContext items={items.map(i => i.id)} strategy={rectSortingStrategy}>
         <div {...containerProps}>
-          {items.map((att) => (
+          {items.map(att => (
             <SortableAttachmentThumbnail
               key={att.id}
               attachment={att}

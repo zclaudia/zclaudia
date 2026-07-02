@@ -1,17 +1,25 @@
 import { spawn, type ChildProcess } from 'child_process';
 import { randomUUID } from 'crypto';
-import { appendFileSync, existsSync, mkdirSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'fs';
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
 export interface BashRunOptions {
   command: string;
   cwd: string;
-  timeoutSec: number;             // 0 disables the timeout
+  timeoutSec: number; // 0 disables the timeout
   signal?: AbortSignal;
-  onChunk?: (accumulatedText: string) => void;  // called per output chunk; tool layer throttles
-  maxLines?: number;              // default 2000
-  maxBytes?: number;              // default 50*1024
+  onChunk?: (accumulatedText: string) => void; // called per output chunk; tool layer throttles
+  maxLines?: number; // default 2000
+  maxBytes?: number; // default 50*1024
   /** When set, spawn this sandbox-wrapped argv directly (shell:false) instead of `shell -c command`. */
   sandbox?: { argv: string[]; env: NodeJS.ProcessEnv };
   /** Write this to the child's stdin then close it. Default: stdin ignored. */
@@ -35,8 +43,8 @@ export interface BashHandoff {
 }
 
 export interface BashRunResult {
-  exitCode: number | null;        // null when killed (timeout/abort) or spawn error
-  output: string;                 // truncated (tail) display text
+  exitCode: number | null; // null when killed (timeout/abort) or spawn error
+  output: string; // truncated (tail) display text
   // In-memory merged output. Complete when small; once it exceeds maxBytes it is
   // tail-capped (same as `output`) and the complete content lives at fullOutputPath.
   fullOutput: string;
@@ -101,7 +109,9 @@ export function resolveShell(): { shell: string; args: string[] } {
   if (process.platform === 'win32') {
     const candidates = [
       process.env.ProgramFiles ? `${process.env.ProgramFiles}\\Git\\bin\\bash.exe` : undefined,
-      process.env['ProgramFiles(x86)'] ? `${process.env['ProgramFiles(x86)']}\\Git\\bin\\bash.exe` : undefined,
+      process.env['ProgramFiles(x86)']
+        ? `${process.env['ProgramFiles(x86)']}\\Git\\bin\\bash.exe`
+        : undefined,
     ].filter((p): p is string => typeof p === 'string');
     for (const p of candidates) if (existsSync(p)) return { shell: p, args: ['-c'] };
     return { shell: 'bash', args: ['-c'] };
@@ -114,14 +124,24 @@ export function resolveShell(): { shell: string; args: string[] } {
 export function killProcessTree(pid: number): void {
   if (process.platform === 'win32') {
     try {
-      spawn('taskkill', ['/F', '/T', '/PID', String(pid)], { stdio: 'ignore', detached: true, windowsHide: true });
-    } catch { /* ignore */ }
+      spawn('taskkill', ['/F', '/T', '/PID', String(pid)], {
+        stdio: 'ignore',
+        detached: true,
+        windowsHide: true,
+      });
+    } catch {
+      /* ignore */
+    }
     return;
   }
   try {
     process.kill(-pid, 'SIGKILL');
   } catch {
-    try { process.kill(pid, 'SIGKILL'); } catch { /* already gone */ }
+    try {
+      process.kill(pid, 'SIGKILL');
+    } catch {
+      /* already gone */
+    }
   }
 }
 
@@ -150,26 +170,44 @@ function waitForChild(child: ChildProcess): Promise<number | null> {
     const maybeFinalize = () => {
       if (exited && !settled && stdoutEnded && stderrEnded) finalize(exitCode);
     };
-    child.stdout?.on('end', () => { stdoutEnded = true; maybeFinalize(); });
-    child.stderr?.on('end', () => { stderrEnded = true; maybeFinalize(); });
-    child.on('exit', (code) => {
+    child.stdout?.on('end', () => {
+      stdoutEnded = true;
+      maybeFinalize();
+    });
+    child.stderr?.on('end', () => {
+      stderrEnded = true;
+      maybeFinalize();
+    });
+    child.on('exit', code => {
       exited = true;
       exitCode = code;
       maybeFinalize();
       if (!settled) timer = setTimeout(() => finalize(code), STDIO_GRACE_MS);
     });
-    child.on('close', (code) => finalize(code));
-    child.on('error', (err) => { if (!settled) { settled = true; reject(err); } });
+    child.on('close', code => finalize(code));
+    child.on('error', err => {
+      if (!settled) {
+        settled = true;
+        reject(err);
+      }
+    });
   });
 }
 
 /** Keep the last `maxLines` lines, then cap to the last `maxBytes` bytes. Trailing-newline aware. */
-function truncateTail(full: string, maxLines: number, maxBytes: number): { display: string; truncated: boolean } {
+function truncateTail(
+  full: string,
+  maxLines: number,
+  maxBytes: number
+): { display: string; truncated: boolean } {
   let truncated = false;
   const hadTrailingNewline = full.endsWith('\n');
   const body = hadTrailingNewline ? full.slice(0, -1) : full;
   let lines = body.length === 0 ? [] : body.split('\n');
-  if (lines.length > maxLines) { lines = lines.slice(-maxLines); truncated = true; }
+  if (lines.length > maxLines) {
+    lines = lines.slice(-maxLines);
+    truncated = true;
+  }
   let display = lines.join('\n');
   if (hadTrailingNewline && display.length) display += '\n';
   if (Buffer.byteLength(display, 'utf8') > maxBytes) {
@@ -186,9 +224,18 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
   const maxBytes = opts.maxBytes ?? DEFAULT_MAX_BYTES;
   const startedAt = Date.now();
 
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     if (signal?.aborted) {
-      resolve({ exitCode: null, output: '', fullOutput: '', truncated: false, timedOut: false, aborted: true, durationMs: 0, stderrOutput: '' });
+      resolve({
+        exitCode: null,
+        output: '',
+        fullOutput: '',
+        truncated: false,
+        timedOut: false,
+        aborted: true,
+        durationMs: 0,
+        stderrOutput: '',
+      });
       return;
     }
     const stdinMode = opts.stdin !== undefined ? 'pipe' : 'ignore';
@@ -213,7 +260,9 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
     }
 
     if (opts.stdin !== undefined && child.stdin) {
-      child.stdin.on('error', () => { /* EPIPE when child exits early — harmless */ });
+      child.stdin.on('error', () => {
+        /* EPIPE when child exits early — harmless */
+      });
       child.stdin.write(opts.stdin);
       child.stdin.end();
     }
@@ -237,7 +286,9 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
       }
       onChunk?.(full);
     };
-    const onData = (chunk: Buffer) => { appendOutput(chunk.toString('utf8')); };
+    const onData = (chunk: Buffer) => {
+      appendOutput(chunk.toString('utf8'));
+    };
     const onStderrData = (chunk: Buffer) => {
       const text = chunk.toString('utf8');
       if (stderrBytes < STDERR_CAPTURE_LIMIT) {
@@ -251,9 +302,15 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
 
     let timer: NodeJS.Timeout | undefined;
     if (timeoutSec > 0) {
-      timer = setTimeout(() => { timedOut = true; if (child.pid) killProcessTree(child.pid); }, timeoutSec * 1000);
+      timer = setTimeout(() => {
+        timedOut = true;
+        if (child.pid) killProcessTree(child.pid);
+      }, timeoutSec * 1000);
     }
-    const onAbort = () => { aborted = true; if (child.pid) killProcessTree(child.pid); };
+    const onAbort = () => {
+      aborted = true;
+      if (child.pid) killProcessTree(child.pid);
+    };
     if (signal) signal.addEventListener('abort', onAbort, { once: true });
 
     let handedOff = false;
@@ -270,8 +327,13 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
       opts.backgroundSignal?.removeEventListener('abort', performHandoff);
       const { display, truncated } = truncateTail(full, maxLines, maxBytes);
       resolve({
-        exitCode: null, output: display, fullOutput: full, truncated: truncated || Boolean(fullOutputPath),
-        timedOut: false, aborted: false, durationMs: Date.now() - startedAt,
+        exitCode: null,
+        output: display,
+        fullOutput: full,
+        truncated: truncated || Boolean(fullOutputPath),
+        timedOut: false,
+        aborted: false,
+        durationMs: Date.now() - startedAt,
         stderrOutput: stderrChunks.join(''),
         ...(fullOutputPath ? { fullOutputPath } : {}),
         handoff: {
@@ -309,9 +371,11 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
       });
     };
 
-    waitForChild(child).then(finish).catch((err) => {
-      full += (full ? '\n' : '') + (err instanceof Error ? err.message : String(err));
-      finish(null);
-    });
+    waitForChild(child)
+      .then(finish)
+      .catch(err => {
+        full += (full ? '\n' : '') + (err instanceof Error ? err.message : String(err));
+        finish(null);
+      });
   });
 }

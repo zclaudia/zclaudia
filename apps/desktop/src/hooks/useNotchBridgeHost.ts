@@ -33,13 +33,13 @@ const SPAWN_DEBOUNCE_MS = 40;
  */
 export function useNotchBridgeHost(params: { enabled: boolean }): void {
   const { enabled } = params;
-  const showNotchPanel = useUIStore((s) => s.showNotchPanel);
-  const notchMonitor = useUIStore((s) => s.notchMonitor);
+  const showNotchPanel = useUIStore(s => s.showNotchPanel);
+  const notchMonitor = useUIStore(s => s.notchMonitor);
   const shouldEnable = enabled && showNotchPanel && isTauri();
   const { sendMessage, isConnected } = useConnection();
   const { selectSession } = useSelectionCoordinator();
-  const notificationHydrated = useNotificationFeedStore((s) => s.hydrated);
-  const notificationLoading = useNotificationFeedStore((s) => s.loading);
+  const notificationHydrated = useNotificationFeedStore(s => s.hydrated);
+  const notificationLoading = useNotificationFeedStore(s => s.loading);
 
   // Keep the latest callbacks without re-subscribing listeners.
   const handlersRef = useRef({ sendMessage, selectSession });
@@ -79,7 +79,7 @@ export function useNotchBridgeHost(params: { enabled: boolean }): void {
   // Move notch to a different monitor when the setting changes.
   useEffect(() => {
     if (!spawnedRef.current || notchMonitor === null) return;
-    invoke('move_notch_to_monitor', { monitorIndex: notchMonitor }).catch((err) => {
+    invoke('move_notch_to_monitor', { monitorIndex: notchMonitor }).catch(err => {
       console.warn('[NotchBridge] move_notch_to_monitor failed:', err);
     });
   }, [notchMonitor]);
@@ -108,13 +108,18 @@ export function useNotchBridgeHost(params: { enabled: boolean }): void {
     let lastMonitorSnapshot = '';
     const poll = setInterval(async () => {
       try {
-        const monitors = await invoke<Array<{ name: string | null; width: number; height: number; scale_factor: number }>>('list_monitors');
+        const monitors =
+          await invoke<
+            Array<{ name: string | null; width: number; height: number; scale_factor: number }>
+          >('list_monitors');
         const snapshot = JSON.stringify(monitors);
         if (lastMonitorSnapshot && snapshot !== lastMonitorSnapshot) {
           recenter();
         }
         lastMonitorSnapshot = snapshot;
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }, 5000);
 
     return () => {
@@ -134,9 +139,9 @@ export function useNotchBridgeHost(params: { enabled: boolean }): void {
     const publish = () => {
       const toasts = useToastStore.getState().toasts;
       const feed = useNotificationFeedStore.getState();
-      const projects = useProjectStore.getState().projects.map((p) => ({ id: p.id, name: p.name }));
+      const projects = useProjectStore.getState().projects.map(p => ({ id: p.id, name: p.name }));
       const hasPendingAttention = toasts.some(
-        (t) => t.icon === 'permission' || t.icon === 'error' || t.type === 'error',
+        t => t.icon === 'permission' || t.icon === 'error' || t.type === 'error'
       );
       const snapshot: NotchStateSnapshot = {
         toasts,
@@ -176,7 +181,7 @@ export function useNotchBridgeHost(params: { enabled: boolean }): void {
 
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
-      unsubs.forEach((u) => u());
+      unsubs.forEach(u => u());
     };
   }, [shouldEnable]);
 
@@ -186,33 +191,35 @@ export function useNotchBridgeHost(params: { enabled: boolean }): void {
     const unlisteners: Array<Promise<() => void>> = [];
 
     unlisteners.push(
-      listen<NotchOpenSessionPayload>(NOTCH_EVENT.openSession, async (e) => {
+      listen<NotchOpenSessionPayload>(NOTCH_EVENT.openSession, async e => {
         const { sessionId, backendId } = e.payload;
         try {
           const win = getCurrentWindow();
           await win.show().catch(() => undefined);
           await win.unminimize().catch(() => undefined);
           await win.setFocus().catch(() => undefined);
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
         handlersRef.current.selectSession(sessionId, backendId ? { backendId } : undefined);
-      }),
+      })
     );
 
     unlisteners.push(
-      listen<NotchMarkReadPayload>(NOTCH_EVENT.markRead, (e) => {
+      listen<NotchMarkReadPayload>(NOTCH_EVENT.markRead, e => {
         const { ids } = e.payload;
         if (ids.length === 0) return;
         handlersRef.current.sendMessage({ type: 'mark_notifications_read', itemIds: ids });
         useNotificationFeedStore.getState().markRead(ids);
-      }),
+      })
     );
 
     unlisteners.push(
-      listen<NotchDismissItemPayload>(NOTCH_EVENT.dismissItem, (e) => {
+      listen<NotchDismissItemPayload>(NOTCH_EVENT.dismissItem, e => {
         const { id } = e.payload;
         handlersRef.current.sendMessage({ type: 'dismiss_notifications', itemIds: [id] });
         useNotificationFeedStore.getState().removeItem(id);
-      }),
+      })
     );
 
     unlisteners.push(
@@ -220,24 +227,24 @@ export function useNotchBridgeHost(params: { enabled: boolean }): void {
         if (useNotificationFeedStore.getState().unreadCount === 0) return;
         handlersRef.current.sendMessage({ type: 'mark_all_notifications_read' });
         useNotificationFeedStore.getState().markAllRead();
-      }),
+      })
     );
 
     unlisteners.push(
       listen(NOTCH_EVENT.clearRead, () => {
         handlersRef.current.sendMessage({ type: 'clear_read_notifications' });
         useNotificationFeedStore.getState().clearRead();
-      }),
+      })
     );
 
     unlisteners.push(
-      listen<NotchSetTabPayload>(NOTCH_EVENT.setTab, (e) => {
+      listen<NotchSetTabPayload>(NOTCH_EVENT.setTab, e => {
         useNotchPanelStore.getState().setActiveTab(e.payload.tab);
-      }),
+      })
     );
 
     return () => {
-      unlisteners.forEach((p) => p.then((u) => u()).catch(() => undefined));
+      unlisteners.forEach(p => p.then(u => u()).catch(() => undefined));
     };
   }, [shouldEnable]);
 }

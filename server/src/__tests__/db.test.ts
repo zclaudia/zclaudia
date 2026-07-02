@@ -98,10 +98,12 @@ describe('Database Operations', () => {
       const id = newId();
       const now = Date.now();
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO llm_profiles (id, name, provider_type, is_default, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run(id, 'Test Provider', 'anthropic', 1, now, now);
+      `
+      ).run(id, 'Test Provider', 'anthropic', 1, now, now);
 
       const provider = db.prepare('SELECT * FROM llm_profiles WHERE id = ?').get(id) as {
         id: string;
@@ -121,10 +123,12 @@ describe('Database Operations', () => {
       const now = Date.now();
       const env = { ANTHROPIC_API_KEY: 'test-key', HOME: '/custom/home' };
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO llm_profiles (id, name, provider_type, env, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run(id, 'Custom Provider', 'anthropic', JSON.stringify(env), now, now);
+      `
+      ).run(id, 'Custom Provider', 'anthropic', JSON.stringify(env), now, now);
 
       const provider = db.prepare('SELECT * FROM llm_profiles WHERE id = ?').get(id) as {
         env: string;
@@ -140,10 +144,12 @@ describe('Database Operations', () => {
       const id = newId();
       const now = Date.now();
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, root_path, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run(id, 'Test Project', 'code', '/path/to/project', now, now);
+      `
+      ).run(id, 'Test Project', 'code', '/path/to/project', now, now);
 
       const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id) as {
         id: string;
@@ -162,14 +168,18 @@ describe('Database Operations', () => {
       const id = newId();
       const now = Date.now();
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run(id, 'Original', 'code', now, now);
+      `
+      ).run(id, 'Original', 'code', now, now);
 
-      db.prepare(`
+      db.prepare(
+        `
         UPDATE projects SET name = ?, root_path = ?, updated_at = ? WHERE id = ?
-      `).run('Updated', '/new/path', Date.now(), id);
+      `
+      ).run('Updated', '/new/path', Date.now(), id);
 
       const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id) as {
         name: string;
@@ -184,10 +194,12 @@ describe('Database Operations', () => {
       const id = newId();
       const now = Date.now();
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run(id, 'To Delete', 'code', now, now);
+      `
+      ).run(id, 'To Delete', 'code', now, now);
 
       db.prepare('DELETE FROM projects WHERE id = ?').run(id);
 
@@ -201,20 +213,26 @@ describe('Database Operations', () => {
       const projectId = newId();
       const now = Date.now();
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO llm_profiles (id, name, provider_type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run(llmProfileId, 'Provider', 'anthropic', now, now);
+      `
+      ).run(llmProfileId, 'Provider', 'anthropic', now, now);
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO agent_profiles (id, name, llm_profile_id, model, system_prompt, enabled_tools, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(agentProfileId, 'Agent', llmProfileId, 'm', '', '["read"]', now, now);
+      `
+      ).run(agentProfileId, 'Agent', llmProfileId, 'm', '', '["read"]', now, now);
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, default_agent_profile_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run(projectId, 'Project', 'code', agentProfileId, now, now);
+      `
+      ).run(projectId, 'Project', 'code', agentProfileId, now, now);
 
       const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(projectId) as {
         default_agent_profile_id: string;
@@ -230,15 +248,19 @@ describe('Database Operations', () => {
       const sessionId = newId();
       const now = Date.now();
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run(projectId, 'Project', 'code', now, now);
+      `
+      ).run(projectId, 'Project', 'code', now, now);
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run(sessionId, projectId, 'Test Session', now, now);
+      `
+      ).run(sessionId, projectId, 'Test Session', now, now);
 
       const session = db.prepare('SELECT * FROM sessions WHERE id = ?').get(sessionId) as {
         id: string;
@@ -256,15 +278,19 @@ describe('Database Operations', () => {
       const sessionId = newId();
       const now = Date.now();
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run(projectId, 'Project', 'code', now, now);
+      `
+      ).run(projectId, 'Project', 'code', now, now);
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run(sessionId, projectId, 'Session', now, now);
+      `
+      ).run(sessionId, projectId, 'Session', now, now);
 
       db.prepare('DELETE FROM projects WHERE id = ?').run(projectId);
 
@@ -278,15 +304,19 @@ describe('Database Operations', () => {
       const sdkSessionId = 'sdk-session-123';
       const now = Date.now();
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run(projectId, 'Project', 'code', now, now);
+      `
+      ).run(projectId, 'Project', 'code', now, now);
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, sdk_session_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run(sessionId, projectId, sdkSessionId, now, now);
+      `
+      ).run(sessionId, projectId, sdkSessionId, now, now);
 
       const session = db.prepare('SELECT * FROM sessions WHERE id = ?').get(sessionId) as {
         sdk_session_id: string;
@@ -303,20 +333,26 @@ describe('Database Operations', () => {
       const messageId = newId();
       const now = Date.now();
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run(projectId, 'Project', 'code', now, now);
+      `
+      ).run(projectId, 'Project', 'code', now, now);
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, created_at, updated_at)
         VALUES (?, ?, ?, ?)
-      `).run(sessionId, projectId, now, now);
+      `
+      ).run(sessionId, projectId, now, now);
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO messages (id, session_id, role, content, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run(messageId, sessionId, 'user', 'Hello world', now);
+      `
+      ).run(messageId, sessionId, 'user', 'Hello world', now);
 
       const message = db.prepare('SELECT * FROM messages WHERE id = ?').get(messageId) as {
         id: string;
@@ -336,35 +372,49 @@ describe('Database Operations', () => {
       const sessionId = newId();
       const now = Date.now();
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run(projectId, 'Project', 'code', now, now);
+      `
+      ).run(projectId, 'Project', 'code', now, now);
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, created_at, updated_at)
         VALUES (?, ?, ?, ?)
-      `).run(sessionId, projectId, now, now);
+      `
+      ).run(sessionId, projectId, now, now);
 
       // Insert messages in order
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO messages (id, session_id, role, content, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('m1', sessionId, 'user', 'First', now);
+      `
+      ).run('m1', sessionId, 'user', 'First', now);
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO messages (id, session_id, role, content, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('m2', sessionId, 'assistant', 'Second', now + 1);
+      `
+      ).run('m2', sessionId, 'assistant', 'Second', now + 1);
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO messages (id, session_id, role, content, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('m3', sessionId, 'user', 'Third', now + 2);
+      `
+      ).run('m3', sessionId, 'user', 'Third', now + 2);
 
-      const messages = db.prepare(`
+      const messages = db
+        .prepare(
+          `
         SELECT * FROM messages WHERE session_id = ? ORDER BY created_at ASC
-      `).all(sessionId) as Array<{ content: string }>;
+      `
+        )
+        .all(sessionId) as Array<{ content: string }>;
 
       expect(messages).toHaveLength(3);
       expect(messages[0].content).toBe('First');
@@ -378,20 +428,26 @@ describe('Database Operations', () => {
       const messageId = newId();
       const now = Date.now();
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run(projectId, 'Project', 'code', now, now);
+      `
+      ).run(projectId, 'Project', 'code', now, now);
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, created_at, updated_at)
         VALUES (?, ?, ?, ?)
-      `).run(sessionId, projectId, now, now);
+      `
+      ).run(sessionId, projectId, now, now);
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO messages (id, session_id, role, content, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run(messageId, sessionId, 'user', 'Test', now);
+      `
+      ).run(messageId, sessionId, 'user', 'Test', now);
 
       db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId);
 
@@ -406,31 +462,41 @@ describe('Database Operations', () => {
       const sessionId = newId();
       const now = Date.now();
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run(projectId, 'Project', 'code', now, now);
+      `
+      ).run(projectId, 'Project', 'code', now, now);
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, created_at, updated_at)
         VALUES (?, ?, ?, ?)
-      `).run(sessionId, projectId, now, now);
+      `
+      ).run(sessionId, projectId, now, now);
 
       // These should all succeed
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO messages (id, session_id, role, content, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('m1', sessionId, 'user', 'User message', now);
+      `
+      ).run('m1', sessionId, 'user', 'User message', now);
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO messages (id, session_id, role, content, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('m2', sessionId, 'assistant', 'Assistant message', now);
+      `
+      ).run('m2', sessionId, 'assistant', 'Assistant message', now);
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO messages (id, session_id, role, content, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('m3', sessionId, 'system', 'System message', now);
+      `
+      ).run('m3', sessionId, 'system', 'System message', now);
 
       const count = db.prepare('SELECT COUNT(*) as count FROM messages').get() as { count: number };
       expect(count.count).toBe(3);
@@ -441,21 +507,27 @@ describe('Database Operations', () => {
       const sessionId = newId();
       const now = Date.now();
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run(projectId, 'Project', 'code', now, now);
+      `
+      ).run(projectId, 'Project', 'code', now, now);
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO sessions (id, project_id, created_at, updated_at)
         VALUES (?, ?, ?, ?)
-      `).run(sessionId, projectId, now, now);
+      `
+      ).run(sessionId, projectId, now, now);
 
       expect(() => {
-        db.prepare(`
+        db.prepare(
+          `
           INSERT INTO messages (id, session_id, role, content, created_at)
           VALUES (?, ?, ?, ?, ?)
-        `).run('m1', sessionId, 'invalid_role', 'Test', now);
+        `
+        ).run('m1', sessionId, 'invalid_role', 'Test', now);
       }).toThrow();
     });
   });
@@ -464,15 +536,19 @@ describe('Database Operations', () => {
     it('allows valid types: code, chat_only', () => {
       const now = Date.now();
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('p1', 'Code Project', 'code', now, now);
+      `
+      ).run('p1', 'Code Project', 'code', now, now);
 
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO projects (id, name, type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run('p2', 'Chat Project', 'chat_only', now, now);
+      `
+      ).run('p2', 'Chat Project', 'chat_only', now, now);
 
       const count = db.prepare('SELECT COUNT(*) as count FROM projects').get() as { count: number };
       expect(count.count).toBe(2);
@@ -482,10 +558,12 @@ describe('Database Operations', () => {
       const now = Date.now();
 
       expect(() => {
-        db.prepare(`
+        db.prepare(
+          `
           INSERT INTO projects (id, name, type, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?)
-        `).run('p1', 'Invalid', 'invalid_type', now, now);
+        `
+        ).run('p1', 'Invalid', 'invalid_type', now, now);
       }).toThrow();
     });
   });

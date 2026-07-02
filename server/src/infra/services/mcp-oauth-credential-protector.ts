@@ -14,7 +14,10 @@ function base64Url(buffer: Buffer): string {
 }
 
 function fromBase64Url(value: string): Buffer {
-  const padded = value.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(value.length / 4) * 4, '=');
+  const padded = value
+    .replace(/-/g, '+')
+    .replace(/_/g, '/')
+    .padEnd(Math.ceil(value.length / 4) * 4, '=');
   return Buffer.from(padded, 'base64');
 }
 
@@ -47,14 +50,21 @@ export function protectMcpOAuthCredentials(value: unknown): string | null {
   const plaintext = Buffer.from(JSON.stringify(normalized), 'utf8');
   const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
   const tag = cipher.getAuthTag();
-  return `${PREFIX}${base64Url(Buffer.from(JSON.stringify({
-    iv: base64Url(iv),
-    tag: base64Url(tag),
-    data: base64Url(ciphertext),
-  }), 'utf8'))}`;
+  return `${PREFIX}${base64Url(
+    Buffer.from(
+      JSON.stringify({
+        iv: base64Url(iv),
+        tag: base64Url(tag),
+        data: base64Url(ciphertext),
+      }),
+      'utf8'
+    )
+  )}`;
 }
 
-export function unprotectMcpOAuthCredentials(raw: string | null | undefined): McpOAuthCredentials | undefined {
+export function unprotectMcpOAuthCredentials(
+  raw: string | null | undefined
+): McpOAuthCredentials | undefined {
   if (!raw) return undefined;
   if (!raw.startsWith(PREFIX)) {
     try {
@@ -69,7 +79,11 @@ export function unprotectMcpOAuthCredentials(raw: string | null | undefined): Mc
       tag?: unknown;
       data?: unknown;
     };
-    if (typeof envelope.iv !== 'string' || typeof envelope.tag !== 'string' || typeof envelope.data !== 'string') {
+    if (
+      typeof envelope.iv !== 'string' ||
+      typeof envelope.tag !== 'string' ||
+      typeof envelope.data !== 'string'
+    ) {
       return undefined;
     }
     const decipher = createDecipheriv('aes-256-gcm', encryptionKey(), fromBase64Url(envelope.iv));
@@ -85,23 +99,31 @@ export function unprotectMcpOAuthCredentials(raw: string | null | undefined): Mc
 }
 
 export function backfillProtectedMcpOAuthCredentials(db: Database.Database): number {
-  const table = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'mcp_servers'").get();
+  const table = db
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'mcp_servers'")
+    .get();
   if (!table) return 0;
   const columns = db.prepare('PRAGMA table_info(mcp_servers)').all() as Array<{ name: string }>;
-  if (!columns.some((column) => column.name === 'oauth_credentials')) return 0;
+  if (!columns.some(column => column.name === 'oauth_credentials')) return 0;
 
-  const rows = db.prepare(`
+  const rows = db
+    .prepare(
+      `
     SELECT id, oauth_credentials
     FROM mcp_servers
     WHERE oauth_credentials IS NOT NULL AND oauth_credentials != ''
-  `).all() as Array<{ id: string; oauth_credentials: string }>;
+  `
+    )
+    .all() as Array<{ id: string; oauth_credentials: string }>;
   const update = db.prepare('UPDATE mcp_servers SET oauth_credentials = ? WHERE id = ?');
   let changed = 0;
 
   const run = db.transaction(() => {
     for (const row of rows) {
       if (row.oauth_credentials.startsWith(PREFIX)) continue;
-      const protectedValue = protectMcpOAuthCredentials(unprotectMcpOAuthCredentials(row.oauth_credentials));
+      const protectedValue = protectMcpOAuthCredentials(
+        unprotectMcpOAuthCredentials(row.oauth_credentials)
+      );
       if (!protectedValue) continue;
       update.run(protectedValue, row.id);
       changed += 1;

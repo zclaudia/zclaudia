@@ -17,9 +17,9 @@ describe('buildFileDiff', () => {
     // file. Old code reported +1008/-1001 (whole file). Correct answer: -4/+11.
     const old = lines(1065);
     const updated = [
-      ...old.slice(0, 47),               // lines 1..47 unchanged
-      ...lines(11, 'NEW'),               // 11 replacement lines at line 48
-      ...old.slice(51),                  // lines 52..1065 unchanged (shifted +7)
+      ...old.slice(0, 47), // lines 1..47 unchanged
+      ...lines(11, 'NEW'), // 11 replacement lines at line 48
+      ...old.slice(51), // lines 52..1065 unchanged (shifted +7)
     ];
     const r = buildFileDiff('kanban.py', join(old), join(updated));
 

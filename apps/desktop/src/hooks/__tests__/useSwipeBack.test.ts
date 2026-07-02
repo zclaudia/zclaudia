@@ -48,7 +48,9 @@ describe('hooks/useSwipeBack', () => {
     handlers = {};
     mockElement = document.createElement('div');
     Object.defineProperty(mockElement, 'clientWidth', {
-      value: 375, writable: true, configurable: true,
+      value: 375,
+      writable: true,
+      configurable: true,
     });
     vi.spyOn(mockElement, 'getBoundingClientRect').mockReturnValue({
       x: 0,
@@ -65,17 +67,16 @@ describe('hooks/useSwipeBack', () => {
 
   function setupHook(options: Parameters<typeof useSwipeBack>[0]) {
     // Create a fresh element that captures addEventListener calls
-    const addSpy = vi.spyOn(mockElement, 'addEventListener').mockImplementation(
-      (type: string, handler: any) => {
+    const addSpy = vi
+      .spyOn(mockElement, 'addEventListener')
+      .mockImplementation((type: string, handler: any) => {
         handlers[type] = handler;
-      }
-    );
+      });
     const removeSpy = vi.spyOn(mockElement, 'removeEventListener');
 
-    const { result, rerender, unmount } = renderHook(
-      (props) => useSwipeBack(props),
-      { initialProps: options }
-    );
+    const { result, rerender, unmount } = renderHook(props => useSwipeBack(props), {
+      initialProps: options,
+    });
     // Mutate the ref to point to our mock element
     (result.current as any).current = mockElement;
 
@@ -90,8 +91,10 @@ describe('hooks/useSwipeBack', () => {
 
   function makeTouchEvent(type: string, x: number, y: number): TouchEvent {
     const touch = new MockTouch({
-      identifier: 0, target: mockElement,
-      clientX: x, clientY: y,
+      identifier: 0,
+      target: mockElement,
+      clientX: x,
+      clientY: y,
     });
     return new TouchEvent(type, {
       touches: type === 'touchend' ? [] : [touch as unknown as Touch],
@@ -100,7 +103,14 @@ describe('hooks/useSwipeBack', () => {
     });
   }
 
-  function fireHandlers(startX: number, startY: number, endX: number, endY: number, moveX?: number, moveY?: number) {
+  function fireHandlers(
+    startX: number,
+    startY: number,
+    endX: number,
+    endY: number,
+    moveX?: number,
+    moveY?: number
+  ) {
     handlers.touchstart?.(makeTouchEvent('touchstart', startX, startY));
     if (moveX !== undefined && moveY !== undefined) {
       handlers.touchmove?.(makeTouchEvent('touchmove', moveX, moveY));
@@ -128,7 +138,13 @@ describe('hooks/useSwipeBack', () => {
   describe('swipe right from left edge', () => {
     it('triggers onSwipe when distance exceeds threshold', () => {
       const onSwipe = vi.fn();
-      setupHook({ onSwipe, direction: 'right', edgeWidth: 30, threshold: 80, velocityThreshold: 0.3 });
+      setupHook({
+        onSwipe,
+        direction: 'right',
+        edgeWidth: 30,
+        threshold: 80,
+        velocityThreshold: 0.3,
+      });
 
       fireHandlers(10, 100, 100, 100); // start in edge, moved 90 > 80
       expect(onSwipe).toHaveBeenCalledTimes(1);
@@ -144,7 +160,13 @@ describe('hooks/useSwipeBack', () => {
 
     it('does not trigger when swiped in wrong direction', () => {
       const onSwipe = vi.fn();
-      setupHook({ onSwipe, direction: 'right', edgeWidth: 30, threshold: 80, velocityThreshold: 0.3 });
+      setupHook({
+        onSwipe,
+        direction: 'right',
+        edgeWidth: 30,
+        threshold: 80,
+        velocityThreshold: 0.3,
+      });
 
       fireHandlers(10, 100, 5, 100); // swiped left (wrong direction)
       expect(onSwipe).not.toHaveBeenCalled();
@@ -154,7 +176,13 @@ describe('hooks/useSwipeBack', () => {
   describe('swipe left from right edge', () => {
     it('triggers onSwipe for leftward swipe from right edge', () => {
       const onSwipe = vi.fn();
-      setupHook({ onSwipe, direction: 'left', edgeWidth: 30, threshold: 80, velocityThreshold: 0.3 });
+      setupHook({
+        onSwipe,
+        direction: 'left',
+        edgeWidth: 30,
+        threshold: 80,
+        velocityThreshold: 0.3,
+      });
 
       fireHandlers(365, 100, 250, 100); // right edge, moved left 115 > 80
       expect(onSwipe).toHaveBeenCalledTimes(1);
@@ -162,7 +190,13 @@ describe('hooks/useSwipeBack', () => {
 
     it('does not trigger for wrong direction', () => {
       const onSwipe = vi.fn();
-      setupHook({ onSwipe, direction: 'left', edgeWidth: 30, threshold: 80, velocityThreshold: 100 });
+      setupHook({
+        onSwipe,
+        direction: 'left',
+        edgeWidth: 30,
+        threshold: 80,
+        velocityThreshold: 100,
+      });
 
       fireHandlers(365, 100, 400, 100); // swiped right, not left
       expect(onSwipe).not.toHaveBeenCalled();
@@ -224,7 +258,13 @@ describe('hooks/useSwipeBack', () => {
         left: 80,
         toJSON: () => ({}),
       });
-      setupHook({ onSwipe, direction: 'left', edgeWidth: 30, threshold: 80, velocityThreshold: 0.3 });
+      setupHook({
+        onSwipe,
+        direction: 'left',
+        edgeWidth: 30,
+        threshold: 80,
+        velocityThreshold: 0.3,
+      });
 
       fireHandlers(365, 100, 250, 100);
       expect(onSwipe).toHaveBeenCalledTimes(1);
@@ -254,14 +294,15 @@ describe('hooks/useSwipeBack', () => {
       const onSwipe = vi.fn();
       // When disabled, setupHook won't toggle the effect, handlers may not be set
       handlers = {};
-      const addSpy = vi.spyOn(mockElement, 'addEventListener').mockImplementation(
-        (type: string, handler: any) => { handlers[type] = handler; }
-      );
+      const addSpy = vi
+        .spyOn(mockElement, 'addEventListener')
+        .mockImplementation((type: string, handler: any) => {
+          handlers[type] = handler;
+        });
 
-      const { result } = renderHook(
-        (props) => useSwipeBack(props),
-        { initialProps: { onSwipe, enabled: false } }
-      );
+      const { result } = renderHook(props => useSwipeBack(props), {
+        initialProps: { onSwipe, enabled: false },
+      });
       (result.current as any).current = mockElement;
 
       // Handlers should be registered but the touchstart handler checks `enabled` internally

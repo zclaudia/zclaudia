@@ -8,7 +8,8 @@ export function estimateMessageTokens(msg: Message): number {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const m = msg as any;
   // A compactionSummary message carries its text in `summary`, not `content`.
-  if (m.role === 'compactionSummary') return estimateTokens(typeof m.summary === 'string' ? m.summary : '');
+  if (m.role === 'compactionSummary')
+    return estimateTokens(typeof m.summary === 'string' ? m.summary : '');
   const content = m.content;
   if (typeof content === 'string') return estimateTokens(content);
   if (!Array.isArray(content)) return 0;
@@ -17,7 +18,8 @@ export function estimateMessageTokens(msg: Message): number {
   for (const block of content) {
     if (!block || typeof block !== 'object') continue;
     if (block.type === 'text' && typeof block.text === 'string') text += block.text;
-    else if (block.type === 'thinking' && typeof block.thinking === 'string') text += block.thinking;
+    else if (block.type === 'thinking' && typeof block.thinking === 'string')
+      text += block.thinking;
     else if (block.type === 'toolCall') text += JSON.stringify(block.arguments ?? {});
     else if (block.type === 'image') images += 1;
   }
@@ -31,7 +33,10 @@ function trimOldest(messages: Message[], budget: number): Message[] {
   let cut = messages.length;
   for (let i = messages.length - 1; i >= 0; i--) {
     const t = estimateMessageTokens(messages[i]);
-    if (acc + t > budget && i + 1 < messages.length) { cut = i + 1; break; }
+    if (acc + t > budget && i + 1 < messages.length) {
+      cut = i + 1;
+      break;
+    }
     acc += t;
     cut = i;
   }
@@ -74,7 +79,7 @@ export interface ImageResolver {
  * without image refs pass through untouched.
  */
 export function resolveImagesInMessages(messages: Message[], resolver: ImageResolver): Message[] {
-  return messages.map((m) => {
+  return messages.map(m => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mm = m as any;
     if (mm.role !== 'user' || !Array.isArray(mm.content)) return m;
@@ -83,10 +88,19 @@ export function resolveImagesInMessages(messages: Message[], resolver: ImageReso
       .map((b: any) => b.attachmentRef as MessageAttachment);
     if (refs.length === 0) return m;
     const { images, notices } = resolver.resolve(refs);
-    const baseText = mm.content.filter((b: any) => b?.type === 'text').map((b: any) => b.text).join('\n');
+    const baseText = mm.content
+      .filter((b: any) => b?.type === 'text')
+      .map((b: any) => b.text)
+      .join('\n');
     const text = notices.length ? `${baseText}\n\n${notices.join('\n')}` : baseText;
     if (images.length > 0) {
-      return { ...mm, content: [{ type: 'text', text }, ...images.map((img) => ({ type: 'image', data: img.data, mimeType: img.mimeType }))] };
+      return {
+        ...mm,
+        content: [
+          { type: 'text', text },
+          ...images.map(img => ({ type: 'image', data: img.data, mimeType: img.mimeType })),
+        ],
+      };
     }
     return { ...mm, content: text };
   });

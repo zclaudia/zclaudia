@@ -17,7 +17,12 @@ import { activatePanel } from '../../utils/openPanel';
 const FILE_REF_REGEX = /(^|[\s(])(@[a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)/g;
 const FILE_REF_TEST_REGEX = /@[a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+/;
 
-function pushTextPart(parts: ReactNode[], text: string, replaceEmojiIcons: boolean, keyPrefix: string) {
+function pushTextPart(
+  parts: ReactNode[],
+  text: string,
+  replaceEmojiIcons: boolean,
+  keyPrefix: string
+) {
   if (!text) return;
   if (replaceEmojiIcons) {
     pushTextWithInlineMarkdownIcons(parts, text, keyPrefix);
@@ -39,21 +44,22 @@ export function TextWithFileRefs({
   variant?: 'default' | 'user';
   replaceEmojiIcons?: boolean;
 }) {
-  const openFile = useFileViewerStore((s) => s.openFile);
-  const projects = useProjectStore((s) => s.projects);
+  const openFile = useFileViewerStore(s => s.openFile);
+  const projects = useProjectStore(s => s.projects);
 
   const handleClick = (filePath: string) => {
     // Find project root from the first project with a rootPath
-    const project = Object.values(projects).find((p) => p.rootPath);
+    const project = Object.values(projects).find(p => p.rootPath);
     if (project?.rootPath) {
       openFile(project.rootPath, filePath);
       activatePanel('file-viewer');
     }
   };
 
-  const refClassName = variant === 'user'
-    ? 'font-mono inline rounded-md px-1 py-0.5 border border-primary-foreground/40 bg-primary-foreground/20 text-foreground hover:bg-primary-foreground/30 hover:underline cursor-pointer'
-    : 'text-primary hover:underline cursor-pointer font-mono inline';
+  const refClassName =
+    variant === 'user'
+      ? 'font-mono inline rounded-md px-1 py-0.5 border border-primary-foreground/40 bg-primary-foreground/20 text-foreground hover:bg-primary-foreground/30 hover:underline cursor-pointer'
+      : 'text-primary hover:underline cursor-pointer font-mono inline';
 
   const parts: ReactNode[] = [];
   let lastIndex = 0;
@@ -64,7 +70,7 @@ export function TextWithFileRefs({
 
   while ((match = FILE_REF_REGEX.exec(text)) !== null) {
     const prefix = match[1]; // whitespace or start
-    const ref = match[2];    // @path/to/file.ext
+    const ref = match[2]; // @path/to/file.ext
     const fullMatchStart = match.index;
 
     // Add text before this match (including the prefix whitespace)
@@ -110,7 +116,7 @@ export function TextWithFileRefs({
 }
 
 function replaceMarkdownInlineContent(children: ReactNode): ReactNode {
-  return Children.map(children, (child) => {
+  return Children.map(children, child => {
     if (typeof child === 'string' && FILE_REF_TEST_REGEX.test(child)) {
       return <TextWithFileRefs text={child} replaceEmojiIcons />;
     }
@@ -135,9 +141,5 @@ function replaceMarkdownInlineContent(children: ReactNode): ReactNode {
  * with clickable file references, and known emoji with app-native inline icons.
  */
 export function MarkdownChildrenWithFileRefs({ children }: { children: ReactNode }) {
-  return (
-    <>
-      {replaceMarkdownInlineContent(children)}
-    </>
-  );
+  return <>{replaceMarkdownInlineContent(children)}</>;
 }

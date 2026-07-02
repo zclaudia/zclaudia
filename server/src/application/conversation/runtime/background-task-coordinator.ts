@@ -27,12 +27,14 @@ export interface HandleTaskNotificationInput {
   state: BackgroundTaskState;
 }
 
-export function trackBackgroundTaskFromToolResult(input: TrackBackgroundTaskFromToolResultInput): void {
+export function trackBackgroundTaskFromToolResult(
+  input: TrackBackgroundTaskFromToolResultInput
+): void {
   if (input.isError) return;
   const backgroundTaskKey = getToolResultBackgroundTaskKey(
     input.toolName,
     input.toolUseId,
-    input.result,
+    input.result
   );
   if (backgroundTaskKey) {
     markBackgroundTaskStarted(input.activeRun, input.state, backgroundTaskKey);
@@ -88,7 +90,9 @@ export function handleTaskNotification(input: HandleTaskNotificationInput): void
         if (!resolvedRootPid && refreshed.event.taskCommand) {
           const matchedPids = await findProcessPidsByTaskCommand(
             refreshed.event.taskCommand,
-            [refreshed.event.cliPid, refreshed.event.taskRootPid].filter((pid): pid is number => typeof pid === 'number'),
+            [refreshed.event.cliPid, refreshed.event.taskRootPid].filter(
+              (pid): pid is number => typeof pid === 'number'
+            )
           );
           resolvedRootPid = matchedPids[0];
         }
@@ -110,7 +114,11 @@ export function handleTaskNotification(input: HandleTaskNotificationInput): void
   }
 }
 
-function markBackgroundTaskStarted(activeRun: ActiveRun, state: BackgroundTaskState, key?: string): void {
+function markBackgroundTaskStarted(
+  activeRun: ActiveRun,
+  state: BackgroundTaskState,
+  key?: string
+): void {
   if (!key) {
     activeRun.pendingBackgroundTasks = (activeRun.pendingBackgroundTasks || 0) + 1;
     recomputePhase(activeRun, computeBlockers(activeRun));
@@ -123,7 +131,11 @@ function markBackgroundTaskStarted(activeRun: ActiveRun, state: BackgroundTaskSt
   recomputePhase(activeRun, computeBlockers(activeRun));
 }
 
-function markBackgroundTaskFinished(activeRun: ActiveRun, state: BackgroundTaskState, key?: string): void {
+function markBackgroundTaskFinished(
+  activeRun: ActiveRun,
+  state: BackgroundTaskState,
+  key?: string
+): void {
   if (key && state.backgroundTaskKeys?.has(key)) {
     state.backgroundTaskKeys.delete(key);
     activeRun.pendingBackgroundTasks = Math.max(0, (activeRun.pendingBackgroundTasks || 0) - 1);
@@ -153,7 +165,7 @@ function extractText(value: unknown): string {
 function getToolResultBackgroundTaskKey(
   toolName: string,
   toolUseId: string | undefined,
-  result: unknown,
+  result: unknown
 ): string | undefined {
   const text = extractText(result);
   if (!text) return undefined;

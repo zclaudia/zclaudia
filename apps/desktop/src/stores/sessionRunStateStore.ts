@@ -93,24 +93,25 @@ function recordKey(backendId: string, sessionId: string): string {
   return `${backendId}::${sessionId}`;
 }
 
-function resolveRunSessionId(runId: string, records: Record<string, SessionRunRecord>): string | null {
+function resolveRunSessionId(
+  runId: string,
+  records: Record<string, SessionRunRecord>
+): string | null {
   for (const record of Object.values(records)) {
     if (record.foregroundRunIds.includes(runId)) return record.sessionId;
   }
   return useRunStore.getState().activeRuns?.[runId] ?? null;
 }
 
-function setLegacySessionActive(
-  backendId: string,
-  sessionId: string,
-  isActive: boolean,
-): void {
+function setLegacySessionActive(backendId: string, sessionId: string, isActive: boolean): void {
   const projectStore = useProjectStore.getState() as ReturnType<typeof useProjectStore.getState> & {
     setSessionActive?: (sessionId: string, isActive: boolean) => void;
   };
   projectStore.setSessionActive?.(sessionId, isActive);
 
-  const sessionsStore = useSessionsStore.getState() as ReturnType<typeof useSessionsStore.getState> & {
+  const sessionsStore = useSessionsStore.getState() as ReturnType<
+    typeof useSessionsStore.getState
+  > & {
     setSessionActiveFlag?: (backendId: string, sessionId: string, isActive: boolean) => void;
     setSessionActiveById?: (backendId: string, sessionId: string, isActive: boolean) => void;
   };
@@ -121,17 +122,23 @@ function setLegacySessionActive(
 }
 
 function clearSessionBlockingState(sessionId: string): void {
-  const permissionStore = usePermissionStore.getState() as ReturnType<typeof usePermissionStore.getState> & {
+  const permissionStore = usePermissionStore.getState() as ReturnType<
+    typeof usePermissionStore.getState
+  > & {
     clearRequestsForSession?: (sessionId: string) => void;
   };
   permissionStore.clearRequestsForSession?.(sessionId);
 
-  const promptStore = usePromptRequestStore.getState() as ReturnType<typeof usePromptRequestStore.getState> & {
+  const promptStore = usePromptRequestStore.getState() as ReturnType<
+    typeof usePromptRequestStore.getState
+  > & {
     clearRequestsForSession?: (sessionId: string) => void;
   };
   promptStore.clearRequestsForSession?.(sessionId);
 
-  const interactionStore = useInteractionStore.getState() as ReturnType<typeof useInteractionStore.getState> & {
+  const interactionStore = useInteractionStore.getState() as ReturnType<
+    typeof useInteractionStore.getState
+  > & {
     clearSession?: (sessionId: string) => void;
   };
   interactionStore.clearSession?.(sessionId);
@@ -139,7 +146,7 @@ function clearSessionBlockingState(sessionId: string): void {
 
 function cleanupForegroundChatRunsForSession(
   sessionId: string,
-  allowedRunIds: Set<string> = new Set(),
+  allowedRunIds: Set<string> = new Set()
 ): void {
   const chatStore = useRunStore.getState() as ReturnType<typeof useRunStore.getState> & {
     activeRuns?: Record<string, string>;
@@ -160,7 +167,7 @@ function cleanupForegroundChatRunsForSession(
 function cleanupForegroundChatRunsForBackend(
   backendId: string,
   activeRunIds: Set<string>,
-  knownSessionIds: Set<string>,
+  knownSessionIds: Set<string>
 ): void {
   const chatStore = useRunStore.getState() as ReturnType<typeof useRunStore.getState> & {
     activeRuns?: Record<string, string>;
@@ -168,7 +175,9 @@ function cleanupForegroundChatRunsForBackend(
     finalizeRunToMessage?: (runId: string) => void;
     endRun?: (runId: string) => void;
   };
-  const ownershipStore = useOwnershipStore.getState() as ReturnType<typeof useOwnershipStore.getState> & {
+  const ownershipStore = useOwnershipStore.getState() as ReturnType<
+    typeof useOwnershipStore.getState
+  > & {
     sessionBackendIds?: Record<string, string>;
     getSessionBackendId?: (sessionId: string) => string | undefined;
   };
@@ -176,8 +185,9 @@ function cleanupForegroundChatRunsForBackend(
   for (const [runId, sessionId] of Object.entries(chatStore.activeRuns ?? {})) {
     if (chatStore.backgroundRunIds?.has(runId)) continue;
     if (activeRunIds.has(runId)) continue;
-    const ownerBackendId = ownershipStore.sessionBackendIds?.[sessionId]
-      ?? ownershipStore.getSessionBackendId?.(sessionId);
+    const ownerBackendId =
+      ownershipStore.sessionBackendIds?.[sessionId] ??
+      ownershipStore.getSessionBackendId?.(sessionId);
     const belongsToBackend = ownerBackendId === backendId || knownSessionIds.has(sessionId);
     if (!belongsToBackend) continue;
     chatStore.finalizeRunToMessage?.(runId);
@@ -200,7 +210,7 @@ export const useSessionRunStateStore = create<SessionRunState>((set, get) => ({
     if (!isForegroundRun(sessionType)) return;
     const normalizedBackendId = normalizeBackendId(backendId);
     const key = recordKey(normalizedBackendId, sessionId);
-    set((state) => {
+    set(state => {
       const existing = state.records[key];
       const runIds = new Set(existing?.foregroundRunIds ?? []);
       runIds.add(runId);
@@ -221,26 +231,35 @@ export const useSessionRunStateStore = create<SessionRunState>((set, get) => ({
     setLegacySessionActive(normalizedBackendId, sessionId, true);
   },
 
-  markRunEnded: ({ backendId, runId, sessionId, source = 'run_event', cleanupChatRuns = false }) => {
+  markRunEnded: ({
+    backendId,
+    runId,
+    sessionId,
+    source = 'run_event',
+    cleanupChatRuns = false,
+  }) => {
     const normalizedBackendId = normalizeBackendId(backendId);
     const resolvedSessionId = sessionId || resolveRunSessionId(runId, get().records);
     if (!resolvedSessionId) return;
 
     let nextPhase: SessionRunPhase = 'idle';
-    set((state) => {
+    set(state => {
       const records = { ...state.records };
-      const candidateKeys = Object.keys(records).filter((key) => {
+      const candidateKeys = Object.keys(records).filter(key => {
         const record = records[key];
-        return record.sessionId === resolvedSessionId
-          && (!backendId || record.backendId === normalizedBackendId);
+        return (
+          record.sessionId === resolvedSessionId &&
+          (!backendId || record.backendId === normalizedBackendId)
+        );
       });
-      const keys = candidateKeys.length > 0
-        ? candidateKeys
-        : [recordKey(normalizedBackendId, resolvedSessionId)];
+      const keys =
+        candidateKeys.length > 0
+          ? candidateKeys
+          : [recordKey(normalizedBackendId, resolvedSessionId)];
 
       for (const key of keys) {
         const existing = records[key];
-        const remaining = (existing?.foregroundRunIds ?? []).filter((id) => id !== runId);
+        const remaining = (existing?.foregroundRunIds ?? []).filter(id => id !== runId);
         nextPhase = remaining.length > 0 ? 'running' : 'idle';
         records[key] = {
           backendId: existing?.backendId ?? normalizedBackendId,
@@ -272,7 +291,7 @@ export const useSessionRunStateStore = create<SessionRunState>((set, get) => ({
 
     const normalizedBackendId = normalizeBackendId(backendId);
     const key = recordKey(normalizedBackendId, sessionId);
-    set((state) => {
+    set(state => {
       const existing = state.records[key];
       return {
         records: {
@@ -293,8 +312,8 @@ export const useSessionRunStateStore = create<SessionRunState>((set, get) => ({
 
   reconcileBackendActiveRuns: ({ backendId, activeRuns, source }) => {
     const normalizedBackendId = normalizeBackendId(backendId);
-    const foregroundRuns = activeRuns.filter((run) => isForegroundRun(run.sessionType));
-    const activeRunIds = new Set(foregroundRuns.map((run) => run.runId));
+    const foregroundRuns = activeRuns.filter(run => isForegroundRun(run.sessionType));
+    const activeRunIds = new Set(foregroundRuns.map(run => run.runId));
     const activeSessionRunIds = new Map<string, Set<string>>();
     for (const run of foregroundRuns) {
       const runIds = activeSessionRunIds.get(run.sessionId) ?? new Set<string>();
@@ -304,7 +323,7 @@ export const useSessionRunStateStore = create<SessionRunState>((set, get) => ({
 
     const staleSessionIds = new Set<string>();
     const knownSessionIds = new Set<string>(activeSessionRunIds.keys());
-    set((state) => {
+    set(state => {
       const records = { ...state.records };
       for (const record of Object.values(records)) {
         if (record.backendId !== normalizedBackendId) continue;
@@ -348,13 +367,10 @@ export const useSessionRunStateStore = create<SessionRunState>((set, get) => ({
   reconcileBackendSessionStatuses: ({ backendId, sessions, knownSessionIds = [], source }) => {
     const normalizedBackendId = normalizeBackendId(backendId);
     const activeSessionIds = new Set<string>();
-    const presentSessionIds = new Set(sessions.map((session) => session.sessionId));
-    const cleanupKnownSessionIds = new Set([
-      ...knownSessionIds,
-      ...presentSessionIds,
-    ]);
+    const presentSessionIds = new Set(sessions.map(session => session.sessionId));
+    const cleanupKnownSessionIds = new Set([...knownSessionIds, ...presentSessionIds]);
 
-    set((state) => {
+    set(state => {
       const records = { ...state.records };
       for (const session of sessions) {
         const phase = runStatusToPhase(session.runStatus, session.isActive);
@@ -412,7 +428,7 @@ export const useSessionRunStateStore = create<SessionRunState>((set, get) => ({
   markSessionInactive: ({ backendId, sessionId, source, cleanupChatRuns = true }) => {
     const normalizedBackendId = normalizeBackendId(backendId);
     const key = recordKey(normalizedBackendId, sessionId);
-    set((state) => ({
+    set(state => ({
       records: {
         ...state.records,
         [key]: {
@@ -432,11 +448,13 @@ export const useSessionRunStateStore = create<SessionRunState>((set, get) => ({
     setLegacySessionActive(normalizedBackendId, sessionId, false);
   },
 
-  clearBackend: (backendId) => {
+  clearBackend: backendId => {
     const normalizedBackendId = normalizeBackendId(backendId);
-    set((state) => ({
+    set(state => ({
       records: Object.fromEntries(
-        Object.entries(state.records).filter(([, record]) => record.backendId !== normalizedBackendId),
+        Object.entries(state.records).filter(
+          ([, record]) => record.backendId !== normalizedBackendId
+        )
       ),
     }));
   },

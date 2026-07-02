@@ -48,14 +48,12 @@ describe('debug routes', () => {
   it('returns a pending-pi-agent placeholder from simulate-ai-review', async () => {
     const app = createTestApp(db, [undefined, db, undefined]);
 
-    const res = await request(app)
-      .post('/api/debug/simulate-ai-review')
-      .send({
-        toolName: 'Bash',
-        detail: 'echo hello',
-        cwd: '/workspace',
-        mode: 'quick',
-      });
+    const res = await request(app).post('/api/debug/simulate-ai-review').send({
+      toolName: 'Bash',
+      detail: 'echo hello',
+      cwd: '/workspace',
+      mode: 'quick',
+    });
 
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({
@@ -72,9 +70,7 @@ describe('debug routes', () => {
   it('rejects simulate-ai-review without required fields', async () => {
     const app = createTestApp(db, [undefined, db, undefined]);
 
-    const res = await request(app)
-      .post('/api/debug/simulate-ai-review')
-      .send({ toolName: 'Bash' });
+    const res = await request(app).post('/api/debug/simulate-ai-review').send({ toolName: 'Bash' });
 
     expect(res.status).toBe(400);
     expect(res.body).toMatchObject({
@@ -84,14 +80,18 @@ describe('debug routes', () => {
   });
 
   it('resolves the effective permission workflow for a project', async () => {
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO workflows (id, project_id, name, status, definition, is_system, created_at, updated_at)
       VALUES ('wf-project', NULL, 'Project Workflow', 'active', '{"triggers":[],"nodes":[],"edges":[],"entryNodeId":""}', 0, 1, 1)
-    `).run();
-    db.prepare(`
+    `
+    ).run();
+    db.prepare(
+      `
       INSERT INTO projects (id, name, type, permission_workflow_override_id, created_at, updated_at)
       VALUES ('project-1', 'Project', 'code', 'wf-project', 1, 1)
-    `).run();
+    `
+    ).run();
     const permissionWorkflowResolver = {
       resolve: vi.fn(() => ({
         workflowId: 'wf-project',

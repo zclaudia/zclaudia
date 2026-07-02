@@ -7,13 +7,10 @@ import type {
   TaskResult,
   SupervisionLogEvent,
 } from '@zclaudia/shared/features/supervision';
-import { SupervisionTaskRepository } from './repositories/supervision-task.js';
+import { type SupervisionTaskRepository } from './repositories/supervision-task.js';
 import type { SupervisionProjectPort } from './ports.js';
 import type { ContextManager, WorkflowAction } from './context-manager.js';
-import {
-  assertTaskStatus,
-  assertTaskTransition,
-} from './status-machine.js';
+import { assertTaskStatus, assertTaskTransition } from './status-machine.js';
 
 const execAsync = promisify(exec);
 const TASK_RESULT_REGEX = /\[TASK_RESULT\]([\s\S]*?)\[\/TASK_RESULT\]/;
@@ -30,9 +27,9 @@ export class TaskRunner {
       projectId: string,
       event: SupervisionLogEvent,
       detail?: Record<string, unknown>,
-      taskId?: string,
+      taskId?: string
     ) => void,
-    private onReadyForReview: (task: SupervisionTask) => Promise<void>,
+    private onReadyForReview: (task: SupervisionTask) => Promise<void>
   ) {}
 
   /**
@@ -66,10 +63,7 @@ export class TaskRunner {
     // 2. Execute workflow actions (onTaskComplete)
     const cm = this.getContextManager(projectId);
     const workflow = cm.getWorkflow();
-    const workflowOutputs = await this.executeWorkflowActions(
-      workflow.onTaskComplete,
-      cwd,
-    );
+    const workflowOutputs = await this.executeWorkflowActions(workflow.onTaskComplete, cwd);
     const taskResult: TaskResult = result
       ? { ...result, workflowOutputs }
       : { summary: 'Completed (no structured result)', filesChanged: [], workflowOutputs };
@@ -91,7 +85,7 @@ export class TaskRunner {
       projectId,
       'task_status_changed',
       { taskId, from: 'running', to: 'reviewing' },
-      taskId,
+      taskId
     );
 
     // 6. Trigger review
@@ -100,7 +94,7 @@ export class TaskRunner {
       await this.withTimeout(
         this.onReadyForReview(updatedTask),
         REVIEW_TRIGGER_TIMEOUT_MS,
-        'onReadyForReview timed out',
+        'onReadyForReview timed out'
       );
     } catch (err) {
       this.logFn(
@@ -111,7 +105,7 @@ export class TaskRunner {
           timedOut: true,
           error: err instanceof Error ? err.message : String(err),
         },
-        taskId,
+        taskId
       );
     }
   }
@@ -125,7 +119,7 @@ export class TaskRunner {
         .prepare(
           `SELECT content FROM messages
            WHERE session_id = ? AND role = 'assistant'
-           ORDER BY created_at DESC LIMIT 5`,
+           ORDER BY created_at DESC LIMIT 5`
         )
         .all(sessionId) as { content: string }[];
 
@@ -146,7 +140,7 @@ export class TaskRunner {
             filesChanged: filesMatch[1].trim()
               ? filesMatch[1]
                   .split(',')
-                  .map((f) => f.trim())
+                  .map(f => f.trim())
                   .filter(Boolean)
               : [],
             workflowOutputs: testsMatch
@@ -167,7 +161,7 @@ export class TaskRunner {
    */
   async executeWorkflowActions(
     actions: WorkflowAction[],
-    cwd: string,
+    cwd: string
   ): Promise<Array<{ action: string; output: string; success: boolean }>> {
     const results: Array<{ action: string; output: string; success: boolean }> = [];
 
@@ -209,7 +203,7 @@ export class TaskRunner {
       await execAsync('git add -A', { cwd });
       await execAsync(
         `git commit -m "chore(supervision): auto-commit remaining changes for task ${taskId}"`,
-        { cwd },
+        { cwd }
       );
     } catch {
       // Non-critical: if commit fails, continue
@@ -221,10 +215,10 @@ export class TaskRunner {
    */
   async collectGitEvidence(cwd: string, baseCommit: string): Promise<string> {
     try {
-      const { stdout } = await execAsync(
-        `git diff ${baseCommit}..HEAD`,
-        { cwd, maxBuffer: 1024 * 1024 },
-      );
+      const { stdout } = await execAsync(`git diff ${baseCommit}..HEAD`, {
+        cwd,
+        maxBuffer: 1024 * 1024,
+      });
       if (stdout.length > 50_000) {
         return stdout.slice(0, 50_000) + '\n\n[... diff truncated at 50KB ...]';
       }
@@ -276,14 +270,14 @@ export class TaskRunner {
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error(message)), timeoutMs);
       promise.then(
-        (value) => {
+        value => {
           clearTimeout(timer);
           resolve(value);
         },
-        (err) => {
+        err => {
           clearTimeout(timer);
           reject(err);
-        },
+        }
       );
     });
   }

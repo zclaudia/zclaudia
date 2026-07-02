@@ -8,7 +8,7 @@ describe('isIgnorableProcessError', () => {
       stack: [
         'Error: write EPIPE',
         '    at WriteWrap.onWriteComplete (node:internal/stream_base_commons:87:19)',
-        'Emitted \'error\' event on Socket instance at:',
+        "Emitted 'error' event on Socket instance at:",
         '    at emitErrorNT (node:internal/streams/destroy:170:8)',
       ].join('\n'),
     });

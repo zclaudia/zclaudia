@@ -28,18 +28,14 @@ interface SupervisorAgentDeps {
     projectId: string,
     event: SupervisionLogEvent,
     detail?: Record<string, unknown>,
-    taskId?: string,
+    taskId?: string
   ) => void;
 }
 
 export class SupervisorAgentManager {
   constructor(private deps: SupervisorAgentDeps) {}
 
-  initAgent(
-    projectId: string,
-    config?: Partial<SupervisorConfig>,
-    mode?: AgentMode,
-  ): ProjectAgent {
+  initAgent(projectId: string, config?: Partial<SupervisorConfig>, mode?: AgentMode): ProjectAgent {
     const project = this.deps.projectRepo.findById(projectId);
     if (!project) {
       throw new Error(`Project not found: ${projectId}`);
@@ -97,7 +93,7 @@ export class SupervisorAgentManager {
 
   updateAgentPhase(
     projectId: string,
-    action: 'pause' | 'resume' | 'archive' | 'approve_setup',
+    action: 'pause' | 'resume' | 'archive' | 'approve_setup'
   ): ProjectAgent {
     const project = this.deps.projectRepo.findById(projectId);
     if (!project?.agent) {
@@ -111,7 +107,7 @@ export class SupervisorAgentManager {
       case 'pause': {
         if (!canPauseAgentPhase(agent.phase)) {
           throw new Error(
-            `Cannot pause agent in phase '${agent.phase}'; must be 'active' or 'idle'`,
+            `Cannot pause agent in phase '${agent.phase}'; must be 'active' or 'idle'`
           );
         }
         agent.phase = 'paused';
@@ -132,7 +128,7 @@ export class SupervisorAgentManager {
         agent.phase = 'archived';
         agent.pausedReason = undefined;
         agent.pausedAt = undefined;
-        this.deps.worktreeManager.cleanupPool(projectId).catch((err) => {
+        this.deps.worktreeManager.cleanupPool(projectId).catch(err => {
           console.error(`[Supervisor] Failed to cleanup pool for ${projectId}:`, err);
         });
         break;
@@ -140,7 +136,7 @@ export class SupervisorAgentManager {
       case 'approve_setup': {
         if (!canApproveSetupPhase(agent.phase)) {
           throw new Error(
-            `Cannot approve setup for agent in phase '${agent.phase}'; must be 'setup' or 'initializing'`,
+            `Cannot approve setup for agent in phase '${agent.phase}'; must be 'setup' or 'initializing'`
           );
         }
         const tasks = this.deps.taskRepo.findByStatus(projectId, 'pending', 'queued', 'running');

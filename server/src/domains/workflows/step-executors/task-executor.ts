@@ -55,13 +55,13 @@ export class TaskWorkflowStepExecutor implements StepExecutorPort {
 
   constructor(
     private readonly taskService: TaskService,
-    private readonly taskExecutors: TaskExecutorRegistry,
+    private readonly taskExecutors: TaskExecutorRegistry
   ) {}
 
   async execute(
     node: WorkflowNodeDef,
     config: Record<string, unknown>,
-    ctx: StepContext,
+    ctx: StepContext
   ): Promise<StepResult> {
     try {
       const taskType = taskTypeValue(config.taskType ?? config.type);

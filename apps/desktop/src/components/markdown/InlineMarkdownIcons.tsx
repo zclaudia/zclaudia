@@ -83,22 +83,35 @@ const INLINE_MARKDOWN_ICONS: Record<string, InlineMarkdownIconDefinition> = {
   '❕': { Icon: AlertTriangle, label: 'Important', className: 'text-warning' },
   '❓': { Icon: HelpCircle, label: 'Question', className: 'text-muted-foreground' },
   '❔': { Icon: HelpCircle, label: 'Question', className: 'text-muted-foreground' },
-  'ℹ️': { Icon: Info, label: 'Info', className: 'text-primary' },
-  'ℹ': { Icon: Info, label: 'Info', className: 'text-primary' },
+  ℹ️: { Icon: Info, label: 'Info', className: 'text-primary' },
+  ℹ: { Icon: Info, label: 'Info', className: 'text-primary' },
   '🔴': { Icon: Circle, label: 'P0', className: 'text-red-500', filled: true },
   '🟠': { Icon: Circle, label: 'P1', className: 'text-orange-500', filled: true },
   '🟡': { Icon: Circle, label: 'P2', className: 'text-yellow-500', filled: true },
   '🟢': { Icon: Circle, label: 'P3', className: 'text-green-500', filled: true },
   '🔵': { Icon: Circle, label: 'P4', className: 'text-blue-500', filled: true },
   '🟣': { Icon: Circle, label: 'Purple status', className: 'text-purple-500', filled: true },
-  '🟤': { Icon: Circle, label: 'Brown status', className: 'text-amber-800 dark:text-amber-600', filled: true },
+  '🟤': {
+    Icon: Circle,
+    label: 'Brown status',
+    className: 'text-amber-800 dark:text-amber-600',
+    filled: true,
+  },
   '⚪': { Icon: Circle, label: 'White status', className: 'text-muted-foreground', filled: true },
   '⚫': { Icon: Circle, label: 'Black status', className: 'text-foreground', filled: true },
   '💬': { Icon: MessageCircle, label: 'Community chat', className: 'text-muted-foreground' },
   '🗨️': { Icon: MessageCircle, label: 'Comment', className: 'text-muted-foreground' },
   '🗨': { Icon: MessageCircle, label: 'Comment', className: 'text-muted-foreground' },
-  '📚': { Icon: BookOpen, label: 'Documentation', className: 'text-emerald-600 dark:text-emerald-400' },
-  '📖': { Icon: BookOpen, label: 'Documentation', className: 'text-emerald-600 dark:text-emerald-400' },
+  '📚': {
+    Icon: BookOpen,
+    label: 'Documentation',
+    className: 'text-emerald-600 dark:text-emerald-400',
+  },
+  '📖': {
+    Icon: BookOpen,
+    label: 'Documentation',
+    className: 'text-emerald-600 dark:text-emerald-400',
+  },
   '🔌': { Icon: Plug, label: 'Integration', className: 'text-muted-foreground' },
   '🐛': { Icon: Bug, label: 'Issue', className: 'text-yellow-600 dark:text-yellow-400' },
   '📊': { Icon: BarChart3, label: 'Stats', className: 'text-sky-600 dark:text-sky-400' },
@@ -126,7 +139,11 @@ const INLINE_MARKDOWN_ICONS: Record<string, InlineMarkdownIconDefinition> = {
   '⌛': { Icon: Hourglass, label: 'Waiting', className: 'text-muted-foreground' },
   '🕒': { Icon: Clock3, label: 'Time', className: 'text-muted-foreground' },
   '📅': { Icon: Calendar, label: 'Date', className: 'text-muted-foreground' },
-  '🧪': { Icon: FlaskConical, label: 'Experiment', className: 'text-purple-600 dark:text-purple-400' },
+  '🧪': {
+    Icon: FlaskConical,
+    label: 'Experiment',
+    className: 'text-purple-600 dark:text-purple-400',
+  },
   '💡': { Icon: Lightbulb, label: 'Idea', className: 'text-yellow-500' },
   '🧠': { Icon: Brain, label: 'Thinking', className: 'text-thinking' },
   '🔒': { Icon: Lock, label: 'Locked', className: 'text-muted-foreground' },
@@ -171,11 +188,10 @@ function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-const INLINE_MARKDOWN_ICON_TOKENS = Object.keys(INLINE_MARKDOWN_ICONS)
-  .sort((a, b) => b.length - a.length);
-const INLINE_MARKDOWN_ICON_PATTERN = INLINE_MARKDOWN_ICON_TOKENS
-  .map(escapeRegex)
-  .join('|');
+const INLINE_MARKDOWN_ICON_TOKENS = Object.keys(INLINE_MARKDOWN_ICONS).sort(
+  (a, b) => b.length - a.length
+);
+const INLINE_MARKDOWN_ICON_PATTERN = INLINE_MARKDOWN_ICON_TOKENS.map(escapeRegex).join('|');
 const EMOJI_FALLBACK_PATTERN = String.raw`(?:\p{Regional_Indicator}{2}|[0-9#*]\uFE0F?\u20E3|\p{Extended_Pictographic}(?:\uFE0F|\uFE0E|\p{Emoji_Modifier})*(?:\u200D\p{Extended_Pictographic}(?:\uFE0F|\uFE0E|\p{Emoji_Modifier})*)*)`;
 const INLINE_MARKDOWN_EMOJI_PATTERN = INLINE_MARKDOWN_ICON_PATTERN
   ? `(?:${INLINE_MARKDOWN_ICON_PATTERN})|(?:${EMOJI_FALLBACK_PATTERN})`
@@ -191,11 +207,7 @@ function InlineMarkdownIcon({ symbol }: { symbol: string }) {
   const definition = INLINE_MARKDOWN_ICONS[symbol];
   if (!definition) {
     return (
-      <span
-        aria-label={symbol}
-        role="img"
-        className="inline-markdown-emoji"
-      >
+      <span aria-label={symbol} role="img" className="inline-markdown-emoji">
         {symbol}
       </span>
     );
@@ -213,7 +225,11 @@ function InlineMarkdownIcon({ symbol }: { symbol: string }) {
   );
 }
 
-export function pushTextWithInlineMarkdownIcons(parts: ReactNode[], text: string, keyPrefix: string) {
+export function pushTextWithInlineMarkdownIcons(
+  parts: ReactNode[],
+  text: string,
+  keyPrefix: string
+) {
   if (!text) return;
   if (!hasInlineMarkdownIcon(text)) {
     parts.push(text);
@@ -230,10 +246,7 @@ export function pushTextWithInlineMarkdownIcons(parts: ReactNode[], text: string
     }
 
     parts.push(
-      <InlineMarkdownIcon
-        key={`${keyPrefix}-icon-${match.index}-${match[0]}`}
-        symbol={match[0]}
-      />
+      <InlineMarkdownIcon key={`${keyPrefix}-icon-${match.index}-${match[0]}`} symbol={match[0]} />
     );
     lastIndex = match.index + match[0].length;
   }
@@ -252,7 +265,7 @@ export function TextWithInlineMarkdownIcons({ text }: { text: string }) {
 }
 
 function replaceInlineMarkdownIcons(children: ReactNode): ReactNode {
-  return Children.map(children, (child) => {
+  return Children.map(children, child => {
     if (typeof child === 'string' && hasInlineMarkdownIcon(child)) {
       return <TextWithInlineMarkdownIcons text={child} />;
     }

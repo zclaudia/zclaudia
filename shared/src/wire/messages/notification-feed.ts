@@ -1,5 +1,10 @@
 // Notification Feed protocol messages
 
+import type {
+  NotificationItem,
+  NotificationUnreadCountsByTab,
+} from '../../features/notification-feed.js';
+
 // Client → Server messages
 
 export interface GetNotificationsMessage {
@@ -31,15 +36,15 @@ export interface ClearReadNotificationsMessage {
 
 export interface NotificationUpdateMessage {
   type: 'notification_update';
-  item: import('../../features/notification-feed.js').NotificationItem;
+  item: NotificationItem;
 }
 
 export interface NotificationListMessage {
   type: 'notification_list';
-  items: import('../../features/notification-feed.js').NotificationItem[];
+  items: NotificationItem[];
   hasMore: boolean;
   unreadCount: number;
-  unreadCountsByTab: import('../../features/notification-feed.js').NotificationUnreadCountsByTab;
+  unreadCountsByTab: NotificationUnreadCountsByTab;
   append?: boolean;
 }
 
@@ -48,5 +53,17 @@ export interface NotificationReadMessage {
   itemIds: string[];
   readAt: number;
   unreadCount: number;
-  unreadCountsByTab: import('../../features/notification-feed.js').NotificationUnreadCountsByTab;
+  unreadCountsByTab: NotificationUnreadCountsByTab;
 }
+
+export type NotificationFeedClientMessage =
+  | GetNotificationsMessage
+  | MarkNotificationsReadMessage
+  | MarkAllNotificationsReadMessage
+  | DismissNotificationsMessage
+  | ClearReadNotificationsMessage;
+
+export type NotificationFeedServerMessage =
+  | NotificationUpdateMessage
+  | NotificationListMessage
+  | NotificationReadMessage;

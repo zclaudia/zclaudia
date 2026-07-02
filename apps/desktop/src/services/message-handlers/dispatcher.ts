@@ -1,6 +1,6 @@
 export type MessageHandlerFn<TMessage extends { type: string }, TContext> = (
   message: TMessage,
-  context: TContext,
+  context: TContext
 ) => void | boolean;
 
 export interface MessageHandlerRegistration<TMessage extends { type: string }, TContext> {
@@ -14,7 +14,7 @@ export interface MessageDispatcher<TMessage extends { type: string }, TContext> 
 }
 
 export function createMessageDispatcher<TMessage extends { type: string }, TContext>(
-  registrations: readonly MessageHandlerRegistration<TMessage, TContext>[],
+  registrations: readonly MessageHandlerRegistration<TMessage, TContext>[]
 ): MessageDispatcher<TMessage, TContext> {
   const handlers = new Map<string, MessageHandlerFn<TMessage, TContext>>();
 

@@ -50,17 +50,11 @@ export function createCrudHandlers<T, TCreate, TUpdate>(
     try {
       const items = await repository.findAll();
 
-      return successResponse(
-        ctx.request,
-        `${entityName}_list`,
-        { [entityName]: items }
-      );
+      return successResponse(ctx.request, `${entityName}_list`, { [entityName]: items });
     } catch (error) {
-      throw new AppError(
-        'DATABASE_ERROR',
-        `Failed to list ${entityName}`,
-        { error: error instanceof Error ? error.message : 'Unknown error' }
-      );
+      throw new AppError('DATABASE_ERROR', `Failed to list ${entityName}`, {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
   };
 
@@ -71,11 +65,9 @@ export function createCrudHandlers<T, TCreate, TUpdate>(
 
       // Validate payload exists first
       if (!payload || typeof payload !== 'object') {
-        throw new AppError(
-          'VALIDATION_ERROR',
-          `Invalid ${entityName} data`,
-          { payload: ctx.request.payload }
-        );
+        throw new AppError('VALIDATION_ERROR', `Invalid ${entityName} data`, {
+          payload: ctx.request.payload,
+        });
       }
 
       // Old-format messages nest entity data under the singular key
@@ -84,29 +76,21 @@ export function createCrudHandlers<T, TCreate, TUpdate>(
 
       // Validate data exists
       if (!data || typeof data !== 'object') {
-        throw new AppError(
-          'VALIDATION_ERROR',
-          `Invalid ${entityName} data`,
-          { payload: ctx.request.payload }
-        );
+        throw new AppError('VALIDATION_ERROR', `Invalid ${entityName} data`, {
+          payload: ctx.request.payload,
+        });
       }
 
       const created = await repository.create(data);
 
-      return successResponse(
-        ctx.request,
-        `${entityName}_created`,
-        { [singularName]: created }
-      );
+      return successResponse(ctx.request, `${entityName}_created`, { [singularName]: created });
     } catch (error) {
       if (error instanceof AppError) {
         throw error;
       }
-      throw new AppError(
-        'DATABASE_ERROR',
-        `Failed to create ${singularName}`,
-        { error: error instanceof Error ? error.message : 'Unknown error' }
-      );
+      throw new AppError('DATABASE_ERROR', `Failed to create ${singularName}`, {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
   };
 
@@ -121,29 +105,21 @@ export function createCrudHandlers<T, TCreate, TUpdate>(
 
       // Validate ID
       if (!id || typeof id !== 'string') {
-        throw new AppError(
-          'VALIDATION_ERROR',
-          'Entity ID is required',
-          { payload: ctx.request.payload }
-        );
+        throw new AppError('VALIDATION_ERROR', 'Entity ID is required', {
+          payload: ctx.request.payload,
+        });
       }
 
       const updated = await repository.update(id, data as TUpdate);
 
-      return successResponse(
-        ctx.request,
-        `${entityName}_updated`,
-        { [singularName]: updated }
-      );
+      return successResponse(ctx.request, `${entityName}_updated`, { [singularName]: updated });
     } catch (error) {
       if (error instanceof AppError) {
         throw error;
       }
-      throw new AppError(
-        'DATABASE_ERROR',
-        `Failed to update ${singularName}`,
-        { error: error instanceof Error ? error.message : 'Unknown error' }
-      );
+      throw new AppError('DATABASE_ERROR', `Failed to update ${singularName}`, {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
   };
 
@@ -155,37 +131,25 @@ export function createCrudHandlers<T, TCreate, TUpdate>(
 
       // Validate ID
       if (!id || typeof id !== 'string') {
-        throw new AppError(
-          'VALIDATION_ERROR',
-          'Entity ID is required',
-          { payload: ctx.request.payload }
-        );
+        throw new AppError('VALIDATION_ERROR', 'Entity ID is required', {
+          payload: ctx.request.payload,
+        });
       }
 
       const deleted = await repository.delete(id);
 
       if (!deleted) {
-        throw new AppError(
-          'NOT_FOUND',
-          `${singularName} not found`,
-          { id }
-        );
+        throw new AppError('NOT_FOUND', `${singularName} not found`, { id });
       }
 
-      return successResponse(
-        ctx.request,
-        `${entityName}_deleted`,
-        { success: true, id }
-      );
+      return successResponse(ctx.request, `${entityName}_deleted`, { success: true, id });
     } catch (error) {
       if (error instanceof AppError) {
         throw error;
       }
-      throw new AppError(
-        'DATABASE_ERROR',
-        `Failed to delete ${singularName}`,
-        { error: error instanceof Error ? error.message : 'Unknown error' }
-      );
+      throw new AppError('DATABASE_ERROR', `Failed to delete ${singularName}`, {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
   };
 
@@ -193,7 +157,7 @@ export function createCrudHandlers<T, TCreate, TUpdate>(
     list,
     create,
     update,
-    delete: deleteHandler
+    delete: deleteHandler,
   };
 }
 
@@ -221,20 +185,14 @@ export function createHandler<T>(
     try {
       const result = await handler(ctx);
 
-      return successResponse(
-        ctx.request,
-        `${entityName}_result`,
-        result
-      );
+      return successResponse(ctx.request, `${entityName}_result`, result);
     } catch (error) {
       if (error instanceof AppError) {
         throw error;
       }
-      throw new AppError(
-        'HANDLER_ERROR',
-        `Failed to handle ${entityName} request`,
-        { error: error instanceof Error ? error.message : 'Unknown error' }
-      );
+      throw new AppError('HANDLER_ERROR', `Failed to handle ${entityName} request`, {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
   };
 }

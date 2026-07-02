@@ -7,10 +7,18 @@ import { buildPopoutUrl, openPopoutWindow } from '../../utils/popoutWindow';
 
 interface InlinePermissionRequestProps {
   request: PermissionRequest;
-  onDecision: (requestId: string, allow: boolean, remember?: boolean, credential?: string, feedback?: string) => void;
+  onDecision: (
+    requestId: string,
+    allow: boolean,
+    remember?: boolean,
+    credential?: string,
+    feedback?: string
+  ) => void;
 }
 
-function buildAIReviewMetadataHint(result: ReturnType<typeof usePermissionStore.getState>['aiReviewResults'][string] | undefined): string | null {
+function buildAIReviewMetadataHint(
+  result: ReturnType<typeof usePermissionStore.getState>['aiReviewResults'][string] | undefined
+): string | null {
   const metadata = result?.metadata;
   if (!metadata) return null;
 
@@ -35,12 +43,12 @@ export function InlinePermissionRequest({ request, onDecision }: InlinePermissio
   const [countdownStopped, setCountdownStopped] = useState(false);
   const credentialInputRef = useRef<HTMLInputElement>(null);
   const onDecisionRef = useRef(onDecision);
-  const feedback = usePermissionStore((state) => state.feedbackDrafts[request.requestId] || '');
-  const setFeedbackDraft = usePermissionStore((state) => state.setFeedbackDraft);
-  const clearFeedbackDraft = usePermissionStore((state) => state.clearFeedbackDraft);
-  const aiReviewResult = usePermissionStore((state) => state.aiReviewResults[request.requestId]);
+  const feedback = usePermissionStore(state => state.feedbackDrafts[request.requestId] || '');
+  const setFeedbackDraft = usePermissionStore(state => state.setFeedbackDraft);
+  const clearFeedbackDraft = usePermissionStore(state => state.clearFeedbackDraft);
+  const aiReviewResult = usePermissionStore(state => state.aiReviewResults[request.requestId]);
   const aiReviewMetadataHint = buildAIReviewMetadataHint(aiReviewResult);
-  const workflowProgress = usePermissionStore((state) => state.workflowProgress[request.requestId]);
+  const workflowProgress = usePermissionStore(state => state.workflowProgress[request.requestId]);
   // Detect plan-proposal requests by inspecting the tool input shape, not the
   // tool name. Anything carrying a non-empty `plan` markdown string opts into
   // the Comment textarea + "Deny + Comment" path, so the same UX applies to
@@ -49,9 +57,12 @@ export function InlinePermissionRequest({ request, onDecision }: InlinePermissio
   const isPlanProposalRequest = ((): boolean => {
     try {
       const parsed = JSON.parse(request.detail);
-      return !!parsed && typeof parsed === 'object'
-        && typeof (parsed as Record<string, unknown>).plan === 'string'
-        && ((parsed as Record<string, unknown>).plan as string).length > 0;
+      return (
+        !!parsed &&
+        typeof parsed === 'object' &&
+        typeof (parsed as Record<string, unknown>).plan === 'string' &&
+        ((parsed as Record<string, unknown>).plan as string).length > 0
+      );
     } catch {
       return false;
     }
@@ -107,7 +118,7 @@ export function InlinePermissionRequest({ request, onDecision }: InlinePermissio
     }
 
     const interval = setInterval(() => {
-      setRemainingTime((prev) => {
+      setRemainingTime(prev => {
         if (countdownStopped) return prev;
         if (prev <= 1) {
           // Backend handles timeout resolution (AI review or auto-approve/deny).
@@ -148,16 +159,19 @@ export function InlinePermissionRequest({ request, onDecision }: InlinePermissio
 
   const hasTimeout = request.timeoutSec > 0;
   const progressPercent = hasTimeout ? (remainingTime / request.timeoutSec) * 100 : 0;
-  const credentialLabel = request.credentialHint === 'sudo_password' ? 'sudo password' : 'credential';
+  const credentialLabel =
+    request.credentialHint === 'sudo_password' ? 'sudo password' : 'credential';
   const isCredential = request.requiresCredential;
   const borderColor = isCredential ? 'border-l-amber-500' : 'border-l-warning';
 
   // Resolved compact state
   if (resolved) {
     return (
-      <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border border-border/50 bg-secondary/30 text-xs ${
-        resolved === 'allow' ? 'text-success' : 'text-muted-foreground'
-      }`}>
+      <div
+        className={`flex items-center gap-2 px-3 py-2 rounded-lg border border-border/50 bg-secondary/30 text-xs ${
+          resolved === 'allow' ? 'text-success' : 'text-muted-foreground'
+        }`}
+      >
         {resolved === 'allow' ? (
           <Check size={14} strokeWidth={2} className="flex-shrink-0" />
         ) : (
@@ -222,17 +236,15 @@ export function InlinePermissionRequest({ request, onDecision }: InlinePermissio
               ref={credentialInputRef}
               type="password"
               value={credential}
-              onChange={(e) => setCredential(e.target.value)}
-              onKeyDown={(e) => {
+              onChange={e => setCredential(e.target.value)}
+              onKeyDown={e => {
                 if (e.key === 'Enter' && credential) handleAllow();
               }}
               placeholder={`Enter ${credentialLabel}`}
               autoComplete="off"
               className="w-full px-2.5 py-1.5 bg-input border border-border rounded-md text-sm text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
             />
-            <p className="text-[10px] text-muted-foreground mt-0.5">
-              Encrypted end-to-end
-            </p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">Encrypted end-to-end</p>
           </div>
         )}
         {isPlanProposalRequest && (
@@ -242,7 +254,7 @@ export function InlinePermissionRequest({ request, onDecision }: InlinePermissio
             </label>
             <textarea
               value={feedback}
-              onChange={(e) => setFeedbackDraft(request.requestId, e.target.value)}
+              onChange={e => setFeedbackDraft(request.requestId, e.target.value)}
               placeholder="Why do you reject exiting plan mode?"
               rows={2}
               className="w-full px-2.5 py-1.5 bg-input border border-border rounded-md text-sm text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary resize-none"
@@ -283,9 +295,11 @@ export function InlinePermissionRequest({ request, onDecision }: InlinePermissio
           {/* AI Review status (populated by workflow's ai_risk_analysis step) */}
           {aiReviewResult && (
             <div className="flex flex-col gap-0.5">
-              <span className={`text-xs flex items-center gap-1 ${
-                aiReviewResult.decision === 'deny' ? 'text-destructive' : 'text-muted-foreground'
-              }`}>
+              <span
+                className={`text-xs flex items-center gap-1 ${
+                  aiReviewResult.decision === 'deny' ? 'text-destructive' : 'text-muted-foreground'
+                }`}
+              >
                 <Bot size={12} />
                 {aiReviewResult.decision === 'deny'
                   ? `AI: unsafe (${Math.round(aiReviewResult.confidence * 100)}%) — ${aiReviewResult.reasoning?.slice(0, 60) || ''}`
@@ -294,9 +308,7 @@ export function InlinePermissionRequest({ request, onDecision }: InlinePermissio
                     : `AI: safe (${Math.round(aiReviewResult.confidence * 100)}%) — ${aiReviewResult.reasoning?.slice(0, 60) || ''}`}
               </span>
               {aiReviewMetadataHint && (
-                <span className="text-[11px] text-muted-foreground">
-                  {aiReviewMetadataHint}
-                </span>
+                <span className="text-[11px] text-muted-foreground">{aiReviewMetadataHint}</span>
               )}
             </div>
           )}
@@ -306,7 +318,7 @@ export function InlinePermissionRequest({ request, onDecision }: InlinePermissio
             <input
               type="checkbox"
               checked={remember}
-              onChange={(e) => setRemember(e.target.checked)}
+              onChange={e => setRemember(e.target.checked)}
               className="w-3.5 h-3.5 rounded-md border-input bg-background text-primary focus:ring-primary"
             />
             Remember

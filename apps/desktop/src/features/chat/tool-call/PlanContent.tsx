@@ -7,9 +7,8 @@ function PlanContent({ content }: { content: string }) {
   const [isFullyExpanded, setIsFullyExpanded] = useState(false);
   const lines = content.split('\n');
   const needsCollapse = lines.length > PLAN_PREVIEW_LINES;
-  const displayLines = needsCollapse && !isFullyExpanded
-    ? lines.slice(0, PLAN_PREVIEW_LINES)
-    : lines;
+  const displayLines =
+    needsCollapse && !isFullyExpanded ? lines.slice(0, PLAN_PREVIEW_LINES) : lines;
 
   return (
     <div className="rounded-lg border border-border overflow-hidden">
@@ -18,30 +17,56 @@ function PlanContent({ content }: { content: string }) {
           const trimmed = line.trimStart();
           // Headings
           if (trimmed.startsWith('### '))
-            return <div key={i} className="font-semibold text-foreground mt-2 mb-0.5">{trimmed.slice(4)}</div>;
+            return (
+              <div key={i} className="font-semibold text-foreground mt-2 mb-0.5">
+                {trimmed.slice(4)}
+              </div>
+            );
           if (trimmed.startsWith('## '))
-            return <div key={i} className="font-bold text-foreground mt-3 mb-0.5 text-sm">{trimmed.slice(3)}</div>;
+            return (
+              <div key={i} className="font-bold text-foreground mt-3 mb-0.5 text-sm">
+                {trimmed.slice(3)}
+              </div>
+            );
           if (trimmed.startsWith('# '))
-            return <div key={i} className="font-bold text-foreground mt-3 mb-1 text-base">{trimmed.slice(2)}</div>;
+            return (
+              <div key={i} className="font-bold text-foreground mt-3 mb-1 text-base">
+                {trimmed.slice(2)}
+              </div>
+            );
           // List items
           if (trimmed.startsWith('- ') || trimmed.startsWith('* '))
-            return <div key={i} className="ml-3 text-foreground">• {trimmed.slice(2)}</div>;
+            return (
+              <div key={i} className="ml-3 text-foreground">
+                • {trimmed.slice(2)}
+              </div>
+            );
           if (/^\d+\.\s/.test(trimmed)) {
             const match = trimmed.match(/^(\d+\.)\s(.*)$/);
-            return <div key={i} className="ml-3 text-foreground"><span className="text-muted-foreground">{match?.[1]}</span> {match?.[2]}</div>;
+            return (
+              <div key={i} className="ml-3 text-foreground">
+                <span className="text-muted-foreground">{match?.[1]}</span> {match?.[2]}
+              </div>
+            );
           }
           // Code blocks (inline indicator)
           if (trimmed.startsWith('```'))
-            return <div key={i} className="text-muted-foreground font-mono">{trimmed}</div>;
+            return (
+              <div key={i} className="text-muted-foreground font-mono">
+                {trimmed}
+              </div>
+            );
           // Bold text
           if (trimmed.includes('**')) {
             const parts = trimmed.split(/(\*\*[^*]+\*\*)/g);
             return (
               <div key={i} className="text-foreground">
                 {parts.map((part, j) =>
-                  part.startsWith('**') && part.endsWith('**')
-                    ? <strong key={j}>{part.slice(2, -2)}</strong>
-                    : part
+                  part.startsWith('**') && part.endsWith('**') ? (
+                    <strong key={j}>{part.slice(2, -2)}</strong>
+                  ) : (
+                    part
+                  )
                 )}
               </div>
             );
@@ -49,7 +74,11 @@ function PlanContent({ content }: { content: string }) {
           // Empty line
           if (!trimmed) return <div key={i} className="h-1" />;
           // Regular text
-          return <div key={i} className="text-foreground">{line}</div>;
+          return (
+            <div key={i} className="text-foreground">
+              {line}
+            </div>
+          );
         })}
       </div>
       {needsCollapse && (

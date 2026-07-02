@@ -40,7 +40,9 @@ describe('agent-loop builtin toolsets', () => {
   });
 
   it('rejects unknown toolsets', () => {
-    expect(() => buildAgentLoopTools({ cwd: '/tmp', toolsetId: 'unknown' })).toThrow('Unknown agent-loop toolset: unknown');
+    expect(() => buildAgentLoopTools({ cwd: '/tmp', toolsetId: 'unknown' })).toThrow(
+      'Unknown agent-loop toolset: unknown'
+    );
   });
 
   it('builds no tools for none', () => {
@@ -57,7 +59,12 @@ describe('agent-loop builtin toolsets', () => {
     const mutablePermissionTools = descriptor!.permissionTools as string[] | undefined;
     expect(mutablePermissionTools).toBeUndefined();
 
-    expect(getAgentLoopToolsetDescriptor('permission-review')?.tools).toEqual(['Read', 'Glob', 'Grep', 'LS']);
+    expect(getAgentLoopToolsetDescriptor('permission-review')?.tools).toEqual([
+      'Read',
+      'Glob',
+      'Grep',
+      'LS',
+    ]);
     expect(buildAgentLoopTools({ cwd: '/tmp', toolsetId: 'permission-review' })).toHaveLength(4);
   });
 
@@ -75,16 +82,9 @@ describe('agent-loop builtin toolsets', () => {
   });
 
   it('builds writable tools for workflow prompts', () => {
-    expect(buildAgentLoopTools({ cwd: '/tmp', toolsetId: 'workflow-prompt' }).map((tool) => tool.name)).toEqual([
-      'Read',
-      'Glob',
-      'Grep',
-      'LS',
-      'Bash',
-      'Edit',
-      'MultiEdit',
-      'Write',
-    ]);
+    expect(
+      buildAgentLoopTools({ cwd: '/tmp', toolsetId: 'workflow-prompt' }).map(tool => tool.name)
+    ).toEqual(['Read', 'Glob', 'Grep', 'LS', 'Bash', 'Edit', 'MultiEdit', 'Write']);
   });
 
   it('passes permission callbacks into tool construction', async () => {
@@ -96,16 +96,20 @@ describe('agent-loop builtin toolsets', () => {
       cwd: '/tmp',
       toolsetId: 'workflow-prompt',
       permissionCallback,
-    }).find((tool) => tool.name === 'Bash') as { execute: (id: string, args: unknown) => Promise<unknown> } | undefined;
+    }).find(tool => tool.name === 'Bash') as
+      | { execute: (id: string, args: unknown) => Promise<unknown> }
+      | undefined;
 
     expect(bash).toBeDefined();
-    const result = await bash!.execute('bash-1', { command: 'rm -rf /' }) as {
+    const result = (await bash!.execute('bash-1', { command: 'rm -rf /' })) as {
       details?: Record<string, unknown>;
     };
 
-    expect(permissionCallback).toHaveBeenCalledWith(expect.objectContaining({
-      toolName: 'CriticalBashCommand',
-    }));
+    expect(permissionCallback).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolName: 'CriticalBashCommand',
+      })
+    );
     expect(result.details).toMatchObject({
       ok: false,
       error: 'critical_command_blocked',

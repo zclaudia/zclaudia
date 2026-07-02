@@ -6,10 +6,7 @@
 
 import type { AIReviewConfig, AIReviewResult } from '@zclaudia/shared/interaction/permissions';
 import { classify } from './permission-evaluator.js';
-import {
-  guardReviewText,
-  type ReviewPayloadDisposition,
-} from './review-payload-guard.js';
+import { guardReviewText, type ReviewPayloadDisposition } from './review-payload-guard.js';
 import { resolve, isAbsolute } from 'path';
 import {
   isRateLimited,
@@ -47,7 +44,10 @@ export {
 
 /** Provider interface for AI review LLM calls */
 export interface AIReviewProvider {
-  runPrompt: (prompt: string, sessionId?: string) => Promise<{ response: string; sessionId?: string }>;
+  runPrompt: (
+    prompt: string,
+    sessionId?: string
+  ) => Promise<{ response: string; sessionId?: string }>;
 }
 
 export interface AIReviewContext {
@@ -80,7 +80,7 @@ export interface AIReviewResultWithSession extends AIReviewResult {
 
 export async function evaluateAIReview(
   config: AIReviewConfig,
-  ctx: AIReviewContext,
+  ctx: AIReviewContext
 ): Promise<AIReviewResultWithSession> {
   // 1. Rate limit
   if (isRateLimited(config.maxAutoApprovalsPerMinute)) {
@@ -95,10 +95,14 @@ export async function evaluateAIReview(
   }
 
   try {
-    console.log(`[AI Review] Running LLM analysis for: ${ctx.toolName} (sessionId=${ctx.sessionId || 'new'})`);
+    console.log(
+      `[AI Review] Running LLM analysis for: ${ctx.toolName} (sessionId=${ctx.sessionId || 'new'})`
+    );
     const llmResult = await analyzeLLMRisk(ctx);
 
-    console.log(`[AI Review] LLM result: decision=${llmResult.decision} confidence=${llmResult.confidence} reasoning=${llmResult.reasoning?.slice(0, 100)}`);
+    console.log(
+      `[AI Review] LLM result: decision=${llmResult.decision} confidence=${llmResult.confidence} reasoning=${llmResult.reasoning?.slice(0, 100)}`
+    );
 
     if (llmResult.confidence >= config.confidenceThreshold) {
       if (llmResult.decision === 'approve') recordApproval();
@@ -117,7 +121,8 @@ export async function evaluateAIReview(
     console.error(`[AI Review] LLM analysis failed:`, err);
     return {
       decision: 'uncertain',
-      reasoning: 'AI review could not produce a reliable result; keeping this request pending for user review',
+      reasoning:
+        'AI review could not produce a reliable result; keeping this request pending for user review',
       confidence: 0,
     };
   }
@@ -127,8 +132,11 @@ export async function evaluateAIReview(
 async function analyzeLLMRisk(ctx: AIReviewContext): Promise<AIReviewResultWithSession> {
   const command = (ctx.toolInput as { command?: string } | undefined)?.command || ctx.detail || '';
   const workspaceRoot = resolve(ctx.cwd || process.cwd());
-  const candidateScripts = collectCandidateScripts(command, workspaceRoot).slice(0, MAX_REVIEW_FILES);
-  const allowedFiles = new Map(candidateScripts.map((item) => [item.resolvedPath, item]));
+  const candidateScripts = collectCandidateScripts(command, workspaceRoot).slice(
+    0,
+    MAX_REVIEW_FILES
+  );
+  const allowedFiles = new Map(candidateScripts.map(item => [item.resolvedPath, item]));
   const reviewedFiles = new Set<string>();
   let totalBytesUsed = 0;
   const detailGuard = guardReviewText(ctx.detail);
@@ -136,7 +144,8 @@ async function analyzeLLMRisk(ctx: AIReviewContext): Promise<AIReviewResultWithS
   const payloadDisposition: ReviewPayloadDisposition =
     detailGuard.disposition === 'do_not_send' || inputGuard.disposition === 'do_not_send'
       ? 'do_not_send'
-      : detailGuard.disposition === 'send_with_redaction' || inputGuard.disposition === 'send_with_redaction'
+      : detailGuard.disposition === 'send_with_redaction' ||
+          inputGuard.disposition === 'send_with_redaction'
         ? 'send_with_redaction'
         : 'safe_to_send';
   const redactionCount = detailGuard.redactionCount + inputGuard.redactionCount;
@@ -153,13 +162,21 @@ async function analyzeLLMRisk(ctx: AIReviewContext): Promise<AIReviewResultWithS
     };
   }
 
-  let reviewPrompt = buildInitialReviewPrompt(ctx, candidateScripts, detailGuard.text, inputGuard.text);
+  let reviewPrompt = buildInitialReviewPrompt(
+    ctx,
+    candidateScripts,
+    detailGuard.text,
+    inputGuard.text
+  );
   let currentSessionId = ctx.sessionId;
   let attemptedFormatRepair = false;
 
   for (let turn = 0; turn < MAX_REVIEW_TURNS; turn += 1) {
     logAIReviewPayload('prompt', turn + 1, currentSessionId, reviewPrompt);
-    const { response, sessionId: returnedSessionId } = await ctx.analysisProvider!.runPrompt(reviewPrompt, currentSessionId);
+    const { response, sessionId: returnedSessionId } = await ctx.analysisProvider!.runPrompt(
+      reviewPrompt,
+      currentSessionId
+    );
     currentSessionId = returnedSessionId || currentSessionId;
     logAIReviewPayload('response', turn + 1, currentSessionId, response);
     let parsed: AIReviewModelResponse;
@@ -216,7 +233,13 @@ async function analyzeLLMRisk(ctx: AIReviewContext): Promise<AIReviewResultWithS
       };
     }
 
-    const fileResult = await readReviewFile(parsed.path, workspaceRoot, allowedFiles, totalBytesUsed, command);
+    const fileResult = await readReviewFile(
+      parsed.path,
+      workspaceRoot,
+      allowedFiles,
+      totalBytesUsed,
+      command
+    );
     if (fileResult.ok && fileResult.bytesReturned) {
       reviewedFiles.add(fileResult.resolvedPath!);
       totalBytesUsed += fileResult.bytesReturned;
@@ -236,4 +259,3 @@ async function analyzeLLMRisk(ctx: AIReviewContext): Promise<AIReviewResultWithS
     } as ExtendedAIReviewMetadata,
   };
 }
-

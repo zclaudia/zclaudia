@@ -51,9 +51,9 @@ export class SessionMessageRepository {
   }
 
   countBySession(sessionId: string): number {
-    const row = this.db.prepare(
-      'SELECT COUNT(*) as total FROM messages WHERE session_id = ?'
-    ).get(sessionId) as { total: number };
+    const row = this.db
+      .prepare('SELECT COUNT(*) as total FROM messages WHERE session_id = ?')
+      .get(sessionId) as { total: number };
     return row.total;
   }
 
@@ -64,6 +64,14 @@ export class SessionMessageRepository {
     return row.total;
   }
 
+  listRecentAssistantContents(sessionId: string, limit: number): Array<{ content: string }> {
+    return this.db
+      .prepare(
+        `SELECT content FROM messages WHERE session_id = ? AND role = 'assistant' ORDER BY created_at DESC LIMIT ?`
+      )
+      .all(sessionId, limit) as Array<{ content: string }>;
+  }
+
   listBySession(sessionId: string, options: SessionMessageListOptions): StoredSessionMessage[] {
     const { limit, before, after, afterOffset, aroundMessageId } = options;
 
@@ -71,11 +79,15 @@ export class SessionMessageRepository {
     let params: Array<string | number>;
 
     if (aroundMessageId) {
-      const target = this.db.prepare(`
+      const target = this.db
+        .prepare(
+          `
         SELECT offset
         FROM messages
         WHERE session_id = ? AND id = ?
-      `).get(sessionId, aroundMessageId) as { offset: number } | undefined;
+      `
+        )
+        .get(sessionId, aroundMessageId) as { offset: number } | undefined;
 
       if (!target) {
         throw new Error(`message not found: ${aroundMessageId}`);
@@ -136,23 +148,31 @@ export class SessionMessageRepository {
   }
 
   create(input: CreateSessionMessageInput): StoredSessionMessage {
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO messages (id, session_id, role, content, metadata, created_at)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run(
-      input.id,
-      input.sessionId,
-      input.role,
-      input.content,
-      input.metadata ? JSON.stringify(input.metadata) : null,
-      input.createdAt,
-    );
+    `
+      )
+      .run(
+        input.id,
+        input.sessionId,
+        input.role,
+        input.content,
+        input.metadata ? JSON.stringify(input.metadata) : null,
+        input.createdAt
+      );
 
-    const row = this.db.prepare(`
+    const row = this.db
+      .prepare(
+        `
       SELECT id, session_id as sessionId, role, content, metadata, created_at as createdAt, offset, tree_entry_id as treeEntryId
       FROM messages
       WHERE id = ?
-    `).get(input.id);
+    `
+      )
+      .get(input.id);
 
     if (!row) {
       throw new Error(`failed to create message: ${input.id}`);
@@ -162,7 +182,9 @@ export class SessionMessageRepository {
   }
 
   findRowIdById(id: string): number | null {
-    const row = this.db.prepare('SELECT rowid FROM messages WHERE id = ?').get(id) as { rowid: number } | undefined;
+    const row = this.db.prepare('SELECT rowid FROM messages WHERE id = ?').get(id) as
+      | { rowid: number }
+      | undefined;
     return row?.rowid ?? null;
   }
 

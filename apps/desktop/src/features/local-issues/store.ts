@@ -14,12 +14,18 @@ interface LocalIssueState {
   loadIssues: (projectId: string) => Promise<void>;
   createIssue: (
     projectId: string,
-    data: { title: string; description?: string; priority?: string; labels?: string[] },
+    data: { title: string; description?: string; priority?: string; labels?: string[] }
   ) => Promise<LocalIssue>;
   updateIssue: (
     issueId: string,
     projectId: string,
-    data: { title?: string; description?: string; priority?: string; labels?: string[]; status?: LocalIssueStatus },
+    data: {
+      title?: string;
+      description?: string;
+      priority?: string;
+      labels?: string[];
+      status?: LocalIssueStatus;
+    }
   ) => Promise<void>;
   closeIssue: (issueId: string, projectId: string) => Promise<void>;
   reopenIssue: (issueId: string, projectId: string) => Promise<void>;
@@ -31,9 +37,9 @@ interface LocalIssueState {
 export const useLocalIssueStore = create<LocalIssueState>((set, get) => ({
   issues: {},
 
-  loadIssues: async (projectId) => {
+  loadIssues: async projectId => {
     const issues = await listLocalIssues(projectId);
-    set((state) => ({ issues: { ...state.issues, [projectId]: issues } }));
+    set(state => ({ issues: { ...state.issues, [projectId]: issues } }));
   },
 
   createIssue: async (projectId, data) => {
@@ -63,17 +69,17 @@ export const useLocalIssueStore = create<LocalIssueState>((set, get) => ({
   },
 
   upsertIssue: (projectId, issue) =>
-    set((state) => {
+    set(state => {
       const existing = state.issues[projectId] ?? [];
-      const idx = existing.findIndex((i) => i.id === issue.id);
+      const idx = existing.findIndex(i => i.id === issue.id);
       const updated =
         idx >= 0 ? existing.map((i, n) => (n === idx ? issue : i)) : [issue, ...existing];
       return { issues: { ...state.issues, [projectId]: updated } };
     }),
 
   removeIssue: (projectId, issueId) =>
-    set((state) => {
+    set(state => {
       const existing = state.issues[projectId] ?? [];
-      return { issues: { ...state.issues, [projectId]: existing.filter((i) => i.id !== issueId) } };
+      return { issues: { ...state.issues, [projectId]: existing.filter(i => i.id !== issueId) } };
     }),
 }));

@@ -3,13 +3,17 @@ import type { WorkflowNodeDef } from '@zclaudia/shared/features/workflows';
 
 export interface PluginStepRegistry {
   has(type: string): boolean;
-  execute(type: string, config: Record<string, unknown>, context: {
-    projectId?: string;
-    projectRootPath?: string;
-    llmProfileId?: string;
-    stepRunId: string;
-    runId: string;
-  }): Promise<StepResult>;
+  execute(
+    type: string,
+    config: Record<string, unknown>,
+    context: {
+      projectId?: string;
+      projectRootPath?: string;
+      llmProfileId?: string;
+      stepRunId: string;
+      runId: string;
+    }
+  ): Promise<StepResult>;
 }
 
 export class PluginStepExecutor implements StepExecutorPort {
@@ -17,7 +21,9 @@ export class PluginStepExecutor implements StepExecutorPort {
 
   constructor(private registry: PluginStepRegistry) {}
 
-  get dynamicSupport(): boolean { return true; }
+  get dynamicSupport(): boolean {
+    return true;
+  }
 
   supports(type: string): boolean {
     return this.registry.has(type);
@@ -26,7 +32,7 @@ export class PluginStepExecutor implements StepExecutorPort {
   async execute(
     node: WorkflowNodeDef,
     config: Record<string, unknown>,
-    ctx: StepContext,
+    ctx: StepContext
   ): Promise<StepResult> {
     return this.registry.execute(node.type, config, {
       projectId: ctx.projectId,

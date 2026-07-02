@@ -2,9 +2,18 @@ import type { Project, PermissionPolicy, ProjectType } from '@zclaudia/shared/co
 
 type ProjectStateFields = Pick<
   Project,
-  'name' | 'type' | 'defaultAgentProfileId' | 'rootPath' | 'systemPrompt' |
-  'reviewLlmProfileId' | 'permissionWorkflowOverrideId' | 'agent' | 'permissionPolicy' | 'agentPermissionOverride' |
-  'sortOrder' | 'hooksOverride'
+  | 'name'
+  | 'type'
+  | 'defaultAgentProfileId'
+  | 'rootPath'
+  | 'systemPrompt'
+  | 'reviewLlmProfileId'
+  | 'permissionWorkflowOverrideId'
+  | 'agent'
+  | 'permissionPolicy'
+  | 'agentPermissionOverride'
+  | 'sortOrder'
+  | 'hooksOverride'
 >;
 
 type ProjectPatch = {
@@ -40,7 +49,16 @@ function assertRequiredProjectFields(project: Pick<Project, 'name' | 'type'>): v
 }
 
 export function assertValidProjectState(
-  project: Pick<Project, 'name' | 'type' | 'reviewLlmProfileId' | 'permissionWorkflowOverrideId' | 'agent' | 'permissionPolicy' | 'agentPermissionOverride'>,
+  project: Pick<
+    Project,
+    | 'name'
+    | 'type'
+    | 'reviewLlmProfileId'
+    | 'permissionWorkflowOverrideId'
+    | 'agent'
+    | 'permissionPolicy'
+    | 'agentPermissionOverride'
+  >
 ): void {
   assertRequiredProjectFields(project);
   assertJsonObject(project.permissionPolicy, 'permissionPolicy');
@@ -61,18 +79,18 @@ function hasOwn(body: Record<string, unknown>, key: string): boolean {
 }
 
 export function isProjectValidationError(error: unknown): error is Error {
-  return error instanceof Error
-    && (
-      error.message.includes('must')
-      || error.message.includes('only')
-      || error.message.includes('include')
-      || error.message.includes('required')
-    );
+  return (
+    error instanceof Error &&
+    (error.message.includes('must') ||
+      error.message.includes('only') ||
+      error.message.includes('include') ||
+      error.message.includes('required'))
+  );
 }
 
 export function buildProjectCreateState(
   body: Record<string, unknown>,
-  sortOrder: number,
+  sortOrder: number
 ): Omit<Project, 'id' | 'createdAt' | 'updatedAt'> {
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   if (!name) {
@@ -83,13 +101,19 @@ export function buildProjectCreateState(
   const project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'> = {
     name,
     type,
-    defaultAgentProfileId: typeof body.defaultAgentProfileId === 'string' ? body.defaultAgentProfileId : undefined,
+    defaultAgentProfileId:
+      typeof body.defaultAgentProfileId === 'string' ? body.defaultAgentProfileId : undefined,
     rootPath: typeof body.rootPath === 'string' ? body.rootPath : undefined,
     systemPrompt: typeof body.systemPrompt === 'string' ? body.systemPrompt : undefined,
     permissionPolicy: (body.permissionPolicy as PermissionPolicy | undefined) ?? undefined,
-    agentPermissionOverride: (body.agentPermissionOverride as Project['agentPermissionOverride'] | undefined) ?? undefined,
-    reviewLlmProfileId: typeof body.reviewLlmProfileId === 'string' ? body.reviewLlmProfileId : undefined,
-    permissionWorkflowOverrideId: typeof body.permissionWorkflowOverrideId === 'string' ? body.permissionWorkflowOverrideId : undefined,
+    agentPermissionOverride:
+      (body.agentPermissionOverride as Project['agentPermissionOverride'] | undefined) ?? undefined,
+    reviewLlmProfileId:
+      typeof body.reviewLlmProfileId === 'string' ? body.reviewLlmProfileId : undefined,
+    permissionWorkflowOverrideId:
+      typeof body.permissionWorkflowOverrideId === 'string'
+        ? body.permissionWorkflowOverrideId
+        : undefined,
     agent: (body.agent as Project['agent'] | undefined) ?? undefined,
     sortOrder,
   };
@@ -102,37 +126,66 @@ export function buildProjectPatch(body: Record<string, unknown>): ProjectPatch {
   const patch: ProjectPatch = {};
 
   if (hasOwn(body, 'name')) patch.name = body.name == null ? null : String(body.name).trim();
-  if (hasOwn(body, 'type')) patch.type = body.type == null ? null : body.type as ProjectType;
-  if (hasOwn(body, 'defaultAgentProfileId')) patch.defaultAgentProfileId = body.defaultAgentProfileId == null ? null : String(body.defaultAgentProfileId);
-  if (hasOwn(body, 'rootPath')) patch.rootPath = body.rootPath == null ? null : String(body.rootPath);
-  if (hasOwn(body, 'systemPrompt')) patch.systemPrompt = body.systemPrompt == null ? null : String(body.systemPrompt);
-  if (hasOwn(body, 'permissionPolicy')) patch.permissionPolicy = (body.permissionPolicy ?? null) as PermissionPolicy | null;
-  if (hasOwn(body, 'agentPermissionOverride')) patch.agentPermissionOverride = (body.agentPermissionOverride ?? null) as Project['agentPermissionOverride'] | null;
-  if (hasOwn(body, 'reviewLlmProfileId')) patch.reviewLlmProfileId = body.reviewLlmProfileId == null ? null : String(body.reviewLlmProfileId);
-  if (hasOwn(body, 'permissionWorkflowOverrideId')) patch.permissionWorkflowOverrideId = body.permissionWorkflowOverrideId == null ? null : String(body.permissionWorkflowOverrideId);
+  if (hasOwn(body, 'type')) patch.type = body.type == null ? null : (body.type as ProjectType);
+  if (hasOwn(body, 'defaultAgentProfileId'))
+    patch.defaultAgentProfileId =
+      body.defaultAgentProfileId == null ? null : String(body.defaultAgentProfileId);
+  if (hasOwn(body, 'rootPath'))
+    patch.rootPath = body.rootPath == null ? null : String(body.rootPath);
+  if (hasOwn(body, 'systemPrompt'))
+    patch.systemPrompt = body.systemPrompt == null ? null : String(body.systemPrompt);
+  if (hasOwn(body, 'permissionPolicy'))
+    patch.permissionPolicy = (body.permissionPolicy ?? null) as PermissionPolicy | null;
+  if (hasOwn(body, 'agentPermissionOverride'))
+    patch.agentPermissionOverride = (body.agentPermissionOverride ?? null) as
+      | Project['agentPermissionOverride']
+      | null;
+  if (hasOwn(body, 'reviewLlmProfileId'))
+    patch.reviewLlmProfileId =
+      body.reviewLlmProfileId == null ? null : String(body.reviewLlmProfileId);
+  if (hasOwn(body, 'permissionWorkflowOverrideId'))
+    patch.permissionWorkflowOverrideId =
+      body.permissionWorkflowOverrideId == null ? null : String(body.permissionWorkflowOverrideId);
   if (hasOwn(body, 'agent')) patch.agent = (body.agent ?? null) as Project['agent'] | null;
-  if (hasOwn(body, 'hooksOverride')) patch.hooksOverride = (body.hooksOverride ?? null) as Project['hooksOverride'] | null;
+  if (hasOwn(body, 'hooksOverride'))
+    patch.hooksOverride = (body.hooksOverride ?? null) as Project['hooksOverride'] | null;
 
   return patch;
 }
 
-export function applyProjectPatch(
-  existing: Project,
-  patch: ProjectPatch,
-): ProjectStateFields {
+export function applyProjectPatch(existing: Project, patch: ProjectPatch): ProjectStateFields {
   const nextState: ProjectStateFields = {
     name: patch.name === undefined ? existing.name : (patch.name ?? ''),
-    type: patch.type === undefined ? existing.type : (patch.type ?? '' as ProjectType),
-    defaultAgentProfileId: patch.defaultAgentProfileId === undefined ? existing.defaultAgentProfileId : patch.defaultAgentProfileId ?? undefined,
-    rootPath: patch.rootPath === undefined ? existing.rootPath : patch.rootPath ?? undefined,
-    systemPrompt: patch.systemPrompt === undefined ? existing.systemPrompt : patch.systemPrompt ?? undefined,
-    permissionPolicy: patch.permissionPolicy === undefined ? existing.permissionPolicy : patch.permissionPolicy ?? undefined,
-    agentPermissionOverride: patch.agentPermissionOverride === undefined ? existing.agentPermissionOverride : patch.agentPermissionOverride ?? undefined,
-    reviewLlmProfileId: patch.reviewLlmProfileId === undefined ? existing.reviewLlmProfileId : patch.reviewLlmProfileId ?? undefined,
-    permissionWorkflowOverrideId: patch.permissionWorkflowOverrideId === undefined ? existing.permissionWorkflowOverrideId : patch.permissionWorkflowOverrideId ?? undefined,
-    agent: patch.agent === undefined ? existing.agent : patch.agent ?? undefined,
+    type: patch.type === undefined ? existing.type : (patch.type ?? ('' as ProjectType)),
+    defaultAgentProfileId:
+      patch.defaultAgentProfileId === undefined
+        ? existing.defaultAgentProfileId
+        : (patch.defaultAgentProfileId ?? undefined),
+    rootPath: patch.rootPath === undefined ? existing.rootPath : (patch.rootPath ?? undefined),
+    systemPrompt:
+      patch.systemPrompt === undefined ? existing.systemPrompt : (patch.systemPrompt ?? undefined),
+    permissionPolicy:
+      patch.permissionPolicy === undefined
+        ? existing.permissionPolicy
+        : (patch.permissionPolicy ?? undefined),
+    agentPermissionOverride:
+      patch.agentPermissionOverride === undefined
+        ? existing.agentPermissionOverride
+        : (patch.agentPermissionOverride ?? undefined),
+    reviewLlmProfileId:
+      patch.reviewLlmProfileId === undefined
+        ? existing.reviewLlmProfileId
+        : (patch.reviewLlmProfileId ?? undefined),
+    permissionWorkflowOverrideId:
+      patch.permissionWorkflowOverrideId === undefined
+        ? existing.permissionWorkflowOverrideId
+        : (patch.permissionWorkflowOverrideId ?? undefined),
+    agent: patch.agent === undefined ? existing.agent : (patch.agent ?? undefined),
     sortOrder: existing.sortOrder,
-    hooksOverride: patch.hooksOverride === undefined ? existing.hooksOverride : patch.hooksOverride ?? undefined,
+    hooksOverride:
+      patch.hooksOverride === undefined
+        ? existing.hooksOverride
+        : (patch.hooksOverride ?? undefined),
   };
 
   assertRequiredProjectFields(nextState);

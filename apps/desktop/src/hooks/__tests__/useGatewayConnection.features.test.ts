@@ -7,12 +7,7 @@ import { useGatewayConnection } from '../useGatewayConnection';
 // ---------------------------------------------------------------------------
 // Hoisted mocks
 // ---------------------------------------------------------------------------
-const {
-  mockFacade,
-  mockFacadeStoreState,
-  mockGatewayStoreState,
-  mockSetState,
-} = vi.hoisted(() => {
+const { mockFacade, mockFacadeStoreState, mockGatewayStoreState, mockSetState } = vi.hoisted(() => {
   const mockFacade = {
     openBackend: vi.fn(),
     sendToBackend: vi.fn(),
@@ -46,15 +41,12 @@ const {
 // ---------------------------------------------------------------------------
 vi.mock('../../stores/facadeStore', () => ({
   useFacadeStore: Object.assign(
-    vi.fn((selector?: any) =>
-      selector ? selector(mockFacadeStoreState) : mockFacadeStoreState,
-    ),
+    vi.fn((selector?: any) => (selector ? selector(mockFacadeStoreState) : mockFacadeStoreState)),
     {
       getState: () => mockFacadeStoreState,
-    },
+    }
   ),
 }));
-
 
 vi.mock('../../stores/gatewayStore', () => ({
   useGatewayStore: Object.assign(
@@ -63,7 +55,7 @@ vi.mock('../../stores/gatewayStore', () => ({
       getState: () => mockGatewayStoreState,
       setState: mockSetState,
       subscribe: vi.fn(() => vi.fn()),
-    },
+    }
   ),
   toGatewayServerId: vi.fn((id: string) => `gw:${id}`),
   isGatewayTarget: vi.fn((id: string) => id.startsWith('gw:')),
@@ -78,7 +70,7 @@ vi.mock('../../services/api', () => ({
       gatewayUrl: null,
       gatewaySecret: null,
       connected: false,
-    }),
+    })
   ),
 }));
 
@@ -95,7 +87,6 @@ describe('useGatewayConnection facade delegation', () => {
     mockFacadeStoreState.facade = mockFacade as any;
     mockFacadeStoreState.backends = [];
     mockFacadeStoreState.connectionState = 'connected';
-
   });
 
   afterEach(() => {
@@ -124,9 +115,7 @@ describe('useGatewayConnection facade delegation', () => {
   });
 
   it('isBackendConnected uses isMobileBackendUsable', () => {
-    mockFacadeStoreState.backends = [
-      { backendId: 'b1', runtimeState: 'ready' },
-    ];
+    mockFacadeStoreState.backends = [{ backendId: 'b1', runtimeState: 'ready' }];
 
     const { result } = renderHook(() => useGatewayConnection());
 
@@ -134,9 +123,7 @@ describe('useGatewayConnection facade delegation', () => {
   });
 
   it('isBackendConnected returns false when backend not ready', () => {
-    mockFacadeStoreState.backends = [
-      { backendId: 'b1', runtimeState: 'offline' },
-    ];
+    mockFacadeStoreState.backends = [{ backendId: 'b1', runtimeState: 'offline' }];
 
     const { result } = renderHook(() => useGatewayConnection());
 

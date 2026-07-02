@@ -15,7 +15,7 @@ export interface UseAttachmentSrcResult {
  */
 export function useAttachmentSrc(
   id: string | null | undefined,
-  enabled: boolean = true,
+  enabled: boolean = true
 ): UseAttachmentSrcResult {
   const [src, setSrc] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -33,7 +33,7 @@ export function useAttachmentSrc(
     setError(null);
 
     fetchAttachmentBlobUrl(id)
-      .then((blobUrl) => {
+      .then(blobUrl => {
         if (revoked) {
           URL.revokeObjectURL(blobUrl);
           return;
@@ -41,7 +41,7 @@ export function useAttachmentSrc(
         url = blobUrl;
         setSrc(blobUrl);
       })
-      .catch((err) => {
+      .catch(err => {
         if (revoked) return;
         setError(err instanceof Error ? err : new Error(String(err)));
       })

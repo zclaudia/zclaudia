@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 
-interface Props { md: string; }
+interface Props {
+  md: string;
+}
 
 export function SpecMarkdownPreview({ md }: Props): React.ReactElement {
   const [open, setOpen] = useState(false);

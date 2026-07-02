@@ -60,10 +60,12 @@ describe('mcp-servers routes', () => {
     });
 
     it('returns created servers', async () => {
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO mcp_servers (id, name, command, args, env, enabled, source, created_at, updated_at)
         VALUES ('s1', 'test', 'node', '["server.js"]', '{"PORT":"3000"}', 1, 'user', 1000, 1000)
-      `).run();
+      `
+      ).run();
 
       const res = await request(app).get('/api/mcp-servers');
       expect(res.body.data).toHaveLength(1);
@@ -74,12 +76,14 @@ describe('mcp-servers routes', () => {
     });
 
     it('redacts OAuth access and refresh tokens from list and status responses', async () => {
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO mcp_servers (
           id, name, command, enabled, source, transport, url, oauth_config, oauth_credentials, created_at, updated_at
         )
         VALUES ('s1', 'remote', '', 1, 'user', 'streamable-http', 'https://mcp.example.com/mcp', ?, ?, 1000, 1000)
-      `).run(
+      `
+      ).run(
         JSON.stringify({
           enabled: true,
           authorizationEndpoint: 'https://auth.example.com/oauth/authorize',
@@ -92,7 +96,7 @@ describe('mcp-servers routes', () => {
           tokenType: 'Bearer',
           expiresAt: 2000,
           scope: 'repo',
-        }),
+        })
       );
 
       const list = await request(app).get('/api/mcp-servers');
@@ -125,23 +129,17 @@ describe('mcp-servers routes', () => {
     });
 
     it('returns 400 without name', async () => {
-      const res = await request(app)
-        .post('/api/mcp-servers')
-        .send({ command: 'node' });
+      const res = await request(app).post('/api/mcp-servers').send({ command: 'node' });
       expect(res.status).toBe(400);
     });
 
     it('returns 400 without command', async () => {
-      const res = await request(app)
-        .post('/api/mcp-servers')
-        .send({ name: 'test' });
+      const res = await request(app).post('/api/mcp-servers').send({ name: 'test' });
       expect(res.status).toBe(400);
     });
 
     it('returns 409 for duplicate name', async () => {
-      await request(app)
-        .post('/api/mcp-servers')
-        .send({ name: 'my-server', command: 'node' });
+      await request(app).post('/api/mcp-servers').send({ name: 'my-server', command: 'node' });
       const res = await request(app)
         .post('/api/mcp-servers')
         .send({ name: 'my-server', command: 'python' });
@@ -181,20 +179,18 @@ describe('mcp-servers routes', () => {
     });
 
     it('returns 404 for non-existent server', async () => {
-      const res = await request(app)
-        .put('/api/mcp-servers/nonexistent')
-        .send({ name: 'test' });
+      const res = await request(app).put('/api/mcp-servers/nonexistent').send({ name: 'test' });
       expect(res.status).toBe(404);
     });
 
     it('returns 409 for duplicate name', async () => {
       await request(app).post('/api/mcp-servers').send({ name: 'srv1', command: 'node' });
-      const create2 = await request(app).post('/api/mcp-servers').send({ name: 'srv2', command: 'node' });
+      const create2 = await request(app)
+        .post('/api/mcp-servers')
+        .send({ name: 'srv2', command: 'node' });
       const id2 = create2.body.data.id;
 
-      const res = await request(app)
-        .put(`/api/mcp-servers/${id2}`)
-        .send({ name: 'srv1' });
+      const res = await request(app).put(`/api/mcp-servers/${id2}`).send({ name: 'srv1' });
       expect(res.status).toBe(409);
     });
   });
@@ -244,16 +240,19 @@ describe('mcp-servers routes', () => {
 
   describe('lifecycle status endpoints', () => {
     it('lists configured, disabled, and connected server status', async () => {
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO mcp_servers (id, name, command, enabled, source, created_at, updated_at)
         VALUES ('s1', 'connected-server', 'node', 1, 'user', 1000, 1000),
                ('s2', 'disabled-server', 'node', 0, 'user', 1000, 1000)
-      `).run();
-      vi.spyOn(mcpClientManager, 'getStatus').mockImplementation((name: string) => (
-        name === 'connected-server'
-          ? { name, state: 'connected', lastConnectedAt: 1234 }
-          : { name, state: 'configured' }
-      ) as any);
+      `
+      ).run();
+      vi.spyOn(mcpClientManager, 'getStatus').mockImplementation(
+        (name: string) =>
+          (name === 'connected-server'
+            ? { name, state: 'connected', lastConnectedAt: 1234 }
+            : { name, state: 'configured' }) as any
+      );
 
       const res = await request(app).get('/api/mcp-servers/status');
 
@@ -265,67 +264,111 @@ describe('mcp-servers routes', () => {
     });
 
     it('connects, disconnects, and refreshes a server by name', async () => {
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO mcp_servers (id, name, command, args, env, enabled, source, created_at, updated_at)
         VALUES ('s1', 'srv', 'node', '["server.js"]', '{"A":"1"}', 1, 'user', 1000, 1000)
-      `).run();
+      `
+      ).run();
       vi.spyOn(mcpClientManager, 'connect').mockResolvedValue(undefined as any);
       vi.spyOn(mcpClientManager, 'disconnect').mockResolvedValue(undefined as any);
       vi.spyOn(mcpClientManager, 'refresh').mockResolvedValue(undefined as any);
       vi.spyOn(mcpClientManager, 'listTools').mockResolvedValue([]);
       vi.spyOn(mcpClientManager, 'listResources').mockResolvedValue([]);
       vi.spyOn(mcpClientManager, 'listPrompts').mockResolvedValue([]);
-      vi.spyOn(mcpClientManager, 'getStatus').mockReturnValue({ name: 'srv', state: 'connected' } as any);
+      vi.spyOn(mcpClientManager, 'getStatus').mockReturnValue({
+        name: 'srv',
+        state: 'connected',
+      } as any);
 
-      await expect(request(app).post('/api/mcp-servers/srv/connect')).resolves.toMatchObject({ status: 200 });
-      await expect(request(app).post('/api/mcp-servers/srv/disconnect')).resolves.toMatchObject({ status: 200 });
-      await expect(request(app).post('/api/mcp-servers/srv/refresh')).resolves.toMatchObject({ status: 200 });
-      expect(mcpClientManager.connect).toHaveBeenCalledWith('srv', { transport: 'stdio', command: 'node', args: ['server.js'], env: { A: '1' } });
+      await expect(request(app).post('/api/mcp-servers/srv/connect')).resolves.toMatchObject({
+        status: 200,
+      });
+      await expect(request(app).post('/api/mcp-servers/srv/disconnect')).resolves.toMatchObject({
+        status: 200,
+      });
+      await expect(request(app).post('/api/mcp-servers/srv/refresh')).resolves.toMatchObject({
+        status: 200,
+      });
+      expect(mcpClientManager.connect).toHaveBeenCalledWith('srv', {
+        transport: 'stdio',
+        command: 'node',
+        args: ['server.js'],
+        env: { A: '1' },
+      });
       expect(mcpClientManager.disconnect).toHaveBeenCalledWith('srv');
-      expect(mcpClientManager.refresh).toHaveBeenCalledWith('srv', { transport: 'stdio', command: 'node', args: ['server.js'], env: { A: '1' } });
+      expect(mcpClientManager.refresh).toHaveBeenCalledWith('srv', {
+        transport: 'stdio',
+        command: 'node',
+        args: ['server.js'],
+        env: { A: '1' },
+      });
     });
 
     it('passes OAuth persistence callback when refreshing remote MCP servers', async () => {
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO mcp_servers (
           id, name, command, enabled, source, transport, url, headers_helper, oauth_config, oauth_credentials, created_at, updated_at
         )
         VALUES ('s1', 'remote', '', 1, 'user', 'streamable-http', 'https://mcp.example.com/mcp', 'node ./headers-helper.js', ?, ?, 1000, 1000)
-      `).run(
-        JSON.stringify({ enabled: true, tokenEndpoint: 'https://auth.example.com/token', clientId: 'client' }),
-        JSON.stringify({ accessToken: 'old-token', refreshToken: 'refresh-token', tokenType: 'Bearer', expiresAt: 1 }),
+      `
+      ).run(
+        JSON.stringify({
+          enabled: true,
+          tokenEndpoint: 'https://auth.example.com/token',
+          clientId: 'client',
+        }),
+        JSON.stringify({
+          accessToken: 'old-token',
+          refreshToken: 'refresh-token',
+          tokenType: 'Bearer',
+          expiresAt: 1,
+        })
       );
       vi.spyOn(mcpClientManager, 'refresh').mockResolvedValue(undefined as any);
       vi.spyOn(mcpClientManager, 'listTools').mockResolvedValue([]);
       vi.spyOn(mcpClientManager, 'listResources').mockResolvedValue([]);
       vi.spyOn(mcpClientManager, 'listPrompts').mockResolvedValue([]);
-      vi.spyOn(mcpClientManager, 'getStatus').mockReturnValue({ name: 'remote', state: 'connected' } as any);
+      vi.spyOn(mcpClientManager, 'getStatus').mockReturnValue({
+        name: 'remote',
+        state: 'connected',
+      } as any);
 
       const res = await request(app).post('/api/mcp-servers/remote/refresh');
 
       expect(res.status).toBe(200);
-      expect(mcpClientManager.refresh).toHaveBeenCalledWith('remote', expect.objectContaining({
-        transport: 'streamable-http',
-        url: 'https://mcp.example.com/mcp',
-        headersHelper: 'node ./headers-helper.js',
-        oauthConfig: expect.objectContaining({ tokenEndpoint: 'https://auth.example.com/token' }),
-        oauthCredentials: expect.objectContaining({ accessToken: 'old-token' }),
-        onOAuthCredentials: expect.any(Function),
-      }));
+      expect(mcpClientManager.refresh).toHaveBeenCalledWith(
+        'remote',
+        expect.objectContaining({
+          transport: 'streamable-http',
+          url: 'https://mcp.example.com/mcp',
+          headersHelper: 'node ./headers-helper.js',
+          oauthConfig: expect.objectContaining({ tokenEndpoint: 'https://auth.example.com/token' }),
+          oauthCredentials: expect.objectContaining({ accessToken: 'old-token' }),
+          onOAuthCredentials: expect.any(Function),
+        })
+      );
 
       const config = vi.mocked(mcpClientManager.refresh).mock.calls[0][1] as any;
       config.onOAuthCredentials({ accessToken: 'fresh-token', tokenType: 'Bearer' });
-      const row = db.prepare('SELECT oauth_credentials FROM mcp_servers WHERE name = ?').get('remote') as { oauth_credentials: string };
+      const row = db
+        .prepare('SELECT oauth_credentials FROM mcp_servers WHERE name = ?')
+        .get('remote') as { oauth_credentials: string };
       expect(row.oauth_credentials).toMatch(/^zclaudia:v1:/);
       expect(row.oauth_credentials).not.toContain('fresh-token');
-      expect(unprotectMcpOAuthCredentials(row.oauth_credentials)).toEqual(expect.objectContaining({ accessToken: 'fresh-token' }));
+      expect(unprotectMcpOAuthCredentials(row.oauth_credentials)).toEqual(
+        expect.objectContaining({ accessToken: 'fresh-token' })
+      );
     });
 
     it('returns cached inventory details with tool risk metadata after refresh', async () => {
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO mcp_servers (id, name, command, args, env, enabled, source, created_at, updated_at)
         VALUES ('s1', 'srv', 'node', '["server.js"]', '{"A":"1"}', 1, 'user', 1000, 1000)
-      `).run();
+      `
+      ).run();
       vi.spyOn(mcpClientManager, 'refresh').mockResolvedValue(undefined as any);
       vi.spyOn(mcpClientManager, 'listTools').mockResolvedValue([
         {
@@ -336,10 +379,19 @@ describe('mcp-servers routes', () => {
         } as any,
       ]);
       vi.spyOn(mcpClientManager, 'listResources').mockResolvedValue([
-        { uri: 'file://readme', name: 'README', description: 'Project readme', mimeType: 'text/markdown' },
+        {
+          uri: 'file://readme',
+          name: 'README',
+          description: 'Project readme',
+          mimeType: 'text/markdown',
+        },
       ]);
       vi.spyOn(mcpClientManager, 'listPrompts').mockResolvedValue([
-        { name: 'summarize', description: 'Summarize content', arguments: [{ name: 'topic', required: true }] },
+        {
+          name: 'summarize',
+          description: 'Summarize content',
+          arguments: [{ name: 'topic', required: true }],
+        },
       ]);
       vi.spyOn(mcpClientManager, 'getStatus').mockReturnValue({
         name: 'srv',
@@ -351,31 +403,40 @@ describe('mcp-servers routes', () => {
       const status = await request(app).get('/api/mcp-servers/status');
 
       expect(refresh.status).toBe(200);
-      expect(status.body.data[0]).toEqual(expect.objectContaining({
-        name: 'srv',
-        inventory: expect.objectContaining({ tools: 1, resources: 1, prompts: 1 }),
-        inventoryDetail: {
-          tools: [
-            expect.objectContaining({
-              name: 'read_issue',
-              description: 'Read an issue',
-              inputSchema: { type: 'object', properties: { id: { type: 'string' } } },
-              annotations: { readOnlyHint: true },
-              permissionSummary: expect.objectContaining({
-                declaredReadOnly: true,
-                trustedReadOnly: false,
-                requiresNetwork: true,
+      expect(status.body.data[0]).toEqual(
+        expect.objectContaining({
+          name: 'srv',
+          inventory: expect.objectContaining({ tools: 1, resources: 1, prompts: 1 }),
+          inventoryDetail: {
+            tools: [
+              expect.objectContaining({
+                name: 'read_issue',
+                description: 'Read an issue',
+                inputSchema: { type: 'object', properties: { id: { type: 'string' } } },
+                annotations: { readOnlyHint: true },
+                permissionSummary: expect.objectContaining({
+                  declaredReadOnly: true,
+                  trustedReadOnly: false,
+                  requiresNetwork: true,
+                }),
               }),
-            }),
-          ],
-          resources: [
-            expect.objectContaining({ uri: 'file://readme', name: 'README', mimeType: 'text/markdown' }),
-          ],
-          prompts: [
-            expect.objectContaining({ name: 'summarize', arguments: [{ name: 'topic', required: true }] }),
-          ],
-        },
-      }));
+            ],
+            resources: [
+              expect.objectContaining({
+                uri: 'file://readme',
+                name: 'README',
+                mimeType: 'text/markdown',
+              }),
+            ],
+            prompts: [
+              expect.objectContaining({
+                name: 'summarize',
+                arguments: [{ name: 'topic', required: true }],
+              }),
+            ],
+          },
+        })
+      );
     });
   });
 
@@ -392,20 +453,26 @@ describe('mcp-servers routes', () => {
         }),
         text: async () => '',
       } as any);
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO mcp_servers (
           id, name, command, enabled, source, transport, url, oauth_config, created_at, updated_at
         )
         VALUES ('s1', 'remote', '', 1, 'user', 'streamable-http', 'https://mcp.example.com/mcp', ?, 1000, 1000)
-      `).run(JSON.stringify({
-        enabled: true,
-        authorizationEndpoint: 'https://auth.example.com/oauth/authorize',
-        tokenEndpoint: 'https://auth.example.com/oauth/token',
-        clientId: 'zclaudia-client',
-        scopes: ['repo', 'read:user'],
-      }));
+      `
+      ).run(
+        JSON.stringify({
+          enabled: true,
+          authorizationEndpoint: 'https://auth.example.com/oauth/authorize',
+          tokenEndpoint: 'https://auth.example.com/oauth/token',
+          clientId: 'zclaudia-client',
+          scopes: ['repo', 'read:user'],
+        })
+      );
 
-      const start = await request(app).post('/api/mcp-servers/remote/oauth/start').send({ method: 'browser' });
+      const start = await request(app)
+        .post('/api/mcp-servers/remote/oauth/start')
+        .send({ method: 'browser' });
       expect(start.status).toBe(200);
       expect(start.body.data.method).toBe('browser');
       expect(start.body.data.authUrl).toContain('https://auth.example.com/oauth/authorize');
@@ -418,19 +485,26 @@ describe('mcp-servers routes', () => {
       expect(callback.status).toBe(200);
       expect(callback.text).toContain('MCP authentication complete');
 
-      const row = db.prepare('SELECT oauth_credentials FROM mcp_servers WHERE name = ?').get('remote') as { oauth_credentials: string };
+      const row = db
+        .prepare('SELECT oauth_credentials FROM mcp_servers WHERE name = ?')
+        .get('remote') as { oauth_credentials: string };
       expect(row.oauth_credentials).toMatch(/^zclaudia:v1:/);
       expect(row.oauth_credentials).not.toContain('access-token');
       expect(row.oauth_credentials).not.toContain('refresh-token');
-      expect(unprotectMcpOAuthCredentials(row.oauth_credentials)).toEqual(expect.objectContaining({
-        accessToken: 'access-token',
-        refreshToken: 'refresh-token',
-        tokenType: 'Bearer',
-        scope: 'repo read:user',
-      }));
-      expect(fetchMock).toHaveBeenCalledWith('https://auth.example.com/oauth/token', expect.objectContaining({
-        method: 'POST',
-      }));
+      expect(unprotectMcpOAuthCredentials(row.oauth_credentials)).toEqual(
+        expect.objectContaining({
+          accessToken: 'access-token',
+          refreshToken: 'refresh-token',
+          tokenType: 'Bearer',
+          scope: 'repo read:user',
+        })
+      );
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://auth.example.com/oauth/token',
+        expect.objectContaining({
+          method: 'POST',
+        })
+      );
     });
 
     it('starts device-code flow and persists credentials after token polling succeeds', async () => {
@@ -455,38 +529,52 @@ describe('mcp-servers routes', () => {
           }),
           text: async () => '',
         } as any);
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO mcp_servers (
           id, name, command, enabled, source, transport, url, oauth_config, created_at, updated_at
         )
         VALUES ('s1', 'remote', '', 1, 'user', 'streamable-http', 'https://mcp.example.com/mcp', ?, 1000, 1000)
-      `).run(JSON.stringify({
-        enabled: true,
-        tokenEndpoint: 'https://auth.example.com/oauth/token',
-        deviceAuthorizationEndpoint: 'https://auth.example.com/oauth/device',
-        clientId: 'zclaudia-client',
-        scopes: ['repo'],
-      }));
+      `
+      ).run(
+        JSON.stringify({
+          enabled: true,
+          tokenEndpoint: 'https://auth.example.com/oauth/token',
+          deviceAuthorizationEndpoint: 'https://auth.example.com/oauth/device',
+          clientId: 'zclaudia-client',
+          scopes: ['repo'],
+        })
+      );
 
-      const start = await request(app).post('/api/mcp-servers/remote/oauth/start').send({ method: 'device_code' });
+      const start = await request(app)
+        .post('/api/mcp-servers/remote/oauth/start')
+        .send({ method: 'device_code' });
       expect(start.status).toBe(200);
-      expect(start.body.data).toEqual(expect.objectContaining({
-        method: 'device_code',
-        userCode: 'ABCD-1234',
-        verificationUri: 'https://auth.example.com/device',
-      }));
+      expect(start.body.data).toEqual(
+        expect.objectContaining({
+          method: 'device_code',
+          userCode: 'ABCD-1234',
+          verificationUri: 'https://auth.example.com/device',
+        })
+      );
 
-      await new Promise((resolve) => setTimeout(resolve, 20));
-      const status = await request(app).get(`/api/mcp-servers/remote/oauth/status/${start.body.data.sessionId}`);
+      await new Promise(resolve => setTimeout(resolve, 20));
+      const status = await request(app).get(
+        `/api/mcp-servers/remote/oauth/status/${start.body.data.sessionId}`
+      );
       expect(status.body.data.state).toBe('success');
 
-      const row = db.prepare('SELECT oauth_credentials FROM mcp_servers WHERE name = ?').get('remote') as { oauth_credentials: string };
+      const row = db
+        .prepare('SELECT oauth_credentials FROM mcp_servers WHERE name = ?')
+        .get('remote') as { oauth_credentials: string };
       expect(row.oauth_credentials).toMatch(/^zclaudia:v1:/);
       expect(row.oauth_credentials).not.toContain('device-access-token');
-      expect(unprotectMcpOAuthCredentials(row.oauth_credentials)).toEqual(expect.objectContaining({
-        accessToken: 'device-access-token',
-        tokenType: 'Bearer',
-      }));
+      expect(unprotectMcpOAuthCredentials(row.oauth_credentials)).toEqual(
+        expect.objectContaining({
+          accessToken: 'device-access-token',
+          tokenType: 'Bearer',
+        })
+      );
     });
   });
 
@@ -543,9 +631,7 @@ describe('mcp-servers routes', () => {
       });
       const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      const res = await request(app)
-        .put(`/api/mcp-servers/${id}`)
-        .send({ name: 'updated' });
+      const res = await request(app).put(`/api/mcp-servers/${id}`).send({ name: 'updated' });
 
       expect(res.status).toBe(500);
       expect(res.body.success).toBe(false);
@@ -583,7 +669,6 @@ describe('mcp-servers routes', () => {
       spy.mockRestore();
       errorSpy.mockRestore();
     });
-
   });
 
   describe('POST /api/mcp-servers - disabled creation', () => {

@@ -91,12 +91,12 @@ class AppLifecycleManager {
   }
 
   private onForeground(): void {
-    const wasBackgroundMs = this.backgroundSince
-      ? Date.now() - this.backgroundSince
-      : 0;
+    const wasBackgroundMs = this.backgroundSince ? Date.now() - this.backgroundSince : 0;
     this.backgroundSince = null;
 
-    console.log(`[AppLifecycleManager] App returned to foreground (background for ${Math.round(wasBackgroundMs / 1000)}s)`);
+    console.log(
+      `[AppLifecycleManager] App returned to foreground (background for ${Math.round(wasBackgroundMs / 1000)}s)`
+    );
 
     this.triggerResumeReconnect('foreground');
 
@@ -120,7 +120,7 @@ class AppLifecycleManager {
     try {
       const result = this.onResume?.();
       if (result && typeof (result as Promise<void>).catch === 'function') {
-        void (result as Promise<void>).catch((err) => {
+        void (result as Promise<void>).catch(err => {
           console.warn('[AppLifecycleManager] Resume hook failed:', err);
         });
       }
@@ -144,7 +144,9 @@ class AppLifecycleManager {
       // foreground resume — this doesn't depend on visibilitychange which may
       // not fire reliably on all Android WebView implementations.
       if (elapsed > HEALTH_PROBE_INTERVAL_MS * 2) {
-        console.log(`[AppLifecycleManager] Freeze detected: ${Math.round(elapsed / 1000)}s since last tick (expected ${HEALTH_PROBE_INTERVAL_MS / 1000}s)`);
+        console.log(
+          `[AppLifecycleManager] Freeze detected: ${Math.round(elapsed / 1000)}s since last tick (expected ${HEALTH_PROBE_INTERVAL_MS / 1000}s)`
+        );
         // Don't go through onForeground() — backgroundSince may be null if
         // visibilitychange never fired. Force reconnect unconditionally.
         this.triggerResumeReconnect('freeze detected');
@@ -182,7 +184,7 @@ class AppLifecycleManager {
       const staleDuration = now - conn.lastHeartbeatAt;
       if (staleDuration > HEARTBEAT_STALE_THRESHOLD_MS && conn.connectionQuality !== 'degraded') {
         console.warn(
-          `[AppLifecycleManager] Heartbeat stale for ${serverId}: ${Math.round(staleDuration / 1000)}s since last heartbeat — marking degraded`,
+          `[AppLifecycleManager] Heartbeat stale for ${serverId}: ${Math.round(staleDuration / 1000)}s since last heartbeat — marking degraded`
         );
         store.setConnectionQuality(serverId, 'degraded');
 
@@ -198,13 +200,15 @@ class AppLifecycleManager {
    * Uses REST API (independent of WebSocket heartbeat) to fetch current state.
    */
   private triggerStateRecovery(serverId: string): void {
-    import('./sessionSync').then(({ eagerSyncCurrentSession, recoverCurrentSessionTail }) => {
-      console.log(`[AppLifecycleManager] Triggering state recovery for ${serverId}`);
-      void eagerSyncCurrentSession(serverId);
-      void recoverCurrentSessionTail(serverId);
-    }).catch((err) => {
-      console.error('[AppLifecycleManager] Failed to trigger state recovery:', err);
-    });
+    import('./sessionSync')
+      .then(({ eagerSyncCurrentSession, recoverCurrentSessionTail }) => {
+        console.log(`[AppLifecycleManager] Triggering state recovery for ${serverId}`);
+        void eagerSyncCurrentSession(serverId);
+        void recoverCurrentSessionTail(serverId);
+      })
+      .catch(err => {
+        console.error('[AppLifecycleManager] Failed to trigger state recovery:', err);
+      });
   }
 }
 

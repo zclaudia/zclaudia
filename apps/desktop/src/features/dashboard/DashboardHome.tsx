@@ -1,5 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Bot, ClipboardList, GitBranch, GitPullRequest, CircleDot, Workflow, ChevronRight, Zap, ExternalLink, FileText } from 'lucide-react';
+import {
+  Bot,
+  ClipboardList,
+  GitBranch,
+  GitPullRequest,
+  CircleDot,
+  Workflow,
+  ChevronRight,
+  Zap,
+  ExternalLink,
+  FileText,
+} from 'lucide-react';
 import type { Automation } from '@zclaudia/shared';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSupervisionStore } from '../../features/supervision/store';
@@ -66,7 +77,9 @@ const TASK_STATUS_COLORS: Record<string, string> = {
 
 function StatusBadge({ status, colors }: { status: string; colors: Record<string, string> }) {
   return (
-    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${colors[status] ?? 'bg-gray-500/10 text-gray-400'}`}>
+    <span
+      className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${colors[status] ?? 'bg-gray-500/10 text-gray-400'}`}
+    >
       {status.replace('_', ' ')}
     </span>
   );
@@ -85,57 +98,58 @@ const PHASE_CONFIG: Record<string, { label: string; color: string }> = {
   archived: { label: 'Archived', color: 'text-gray-500' },
 };
 
-export function DashboardHome({ projectId, onNavigate, onOpenAutomations, onOpenDashboardWindow }: DashboardHomeProps) {
-  const project = useProjectStore((s) => s.projects.find((p) => p.id === projectId));
+export function DashboardHome({
+  projectId,
+  onNavigate,
+  onOpenAutomations,
+  onOpenDashboardWindow,
+}: DashboardHomeProps) {
+  const project = useProjectStore(s => s.projects.find(p => p.id === projectId));
 
   // Supervisor agent
-  const agent = useSupervisionStore((s) => s.agents[projectId]) ?? null;
-  const agentPhase = agent ? PHASE_CONFIG[agent.phase] ?? { label: agent.phase, color: 'text-gray-400' } : null;
+  const agent = useSupervisionStore(s => s.agents[projectId]) ?? null;
+  const agentPhase = agent
+    ? (PHASE_CONFIG[agent.phase] ?? { label: agent.phase, color: 'text-gray-400' })
+    : null;
 
   // Tasks
-  const tasks = useSupervisionStore((s) => s.tasks[projectId]) ?? [];
-  const activeTasks = tasks.filter((t) =>
-    ['running', 'planning', 'reviewing'].includes(t.status),
+  const tasks = useSupervisionStore(s => s.tasks[projectId]) ?? [];
+  const activeTasks = tasks.filter(t => ['running', 'planning', 'reviewing'].includes(t.status));
+  const needsAttentionTasks = tasks.filter(t =>
+    ['proposed', 'merge_conflict', 'failed', 'rejected', 'blocked'].includes(t.status)
   );
-  const needsAttentionTasks = tasks.filter((t) =>
-    ['proposed', 'merge_conflict', 'failed', 'rejected', 'blocked'].includes(t.status),
-  );
-  const queuedTasks = tasks.filter((t) =>
-    ['queued', 'pending'].includes(t.status),
-  );
+  const queuedTasks = tasks.filter(t => ['queued', 'pending'].includes(t.status));
 
   // Local PRs
-  const prs = useLocalPRStore((s) => s.prs[projectId] ?? []);
-  const loadPRs = useLocalPRStore((s) => s.loadPRs);
-  const activePRs = prs.filter((pr) => !['merged', 'closed'].includes(pr.status));
-  const needsAttentionPRs = prs.filter((pr) =>
-    ['review_failed', 'conflict'].includes(pr.status),
-  );
+  const prs = useLocalPRStore(s => s.prs[projectId] ?? []);
+  const loadPRs = useLocalPRStore(s => s.loadPRs);
+  const activePRs = prs.filter(pr => !['merged', 'closed'].includes(pr.status));
+  const needsAttentionPRs = prs.filter(pr => ['review_failed', 'conflict'].includes(pr.status));
 
   // Local Issues
-  const allIssues = useLocalIssueStore((s) => s.issues[projectId] ?? []);
-  const loadIssues = useLocalIssueStore((s) => s.loadIssues);
-  const openIssues = allIssues.filter((i) => i.status === 'open');
-  const inProgressIssues = allIssues.filter((i) => i.status === 'tracked');
+  const allIssues = useLocalIssueStore(s => s.issues[projectId] ?? []);
+  const loadIssues = useLocalIssueStore(s => s.loadIssues);
+  const openIssues = allIssues.filter(i => i.status === 'open');
+  const inProgressIssues = allIssues.filter(i => i.status === 'tracked');
 
   // Git worktrees
-  const worktrees = useGitStore((s) => s.worktrees[projectId] ?? []);
-  const statusByPath = useGitStore((s) => s.statusByPath);
-  const dirtyWorktrees = worktrees.filter((w) => {
+  const worktrees = useGitStore(s => s.worktrees[projectId] ?? []);
+  const statusByPath = useGitStore(s => s.statusByPath);
+  const dirtyWorktrees = worktrees.filter(w => {
     const status = statusByPath[`${projectId}::${w.path}`];
     return status && !status.clean;
   });
 
   // Workflows (from /api/workflows — all real workflows now)
-  const allWorkflows = useWorkflowStore((s) => s.workflows[projectId] ?? []);
-  const loadWorkflows = useWorkflowStore((s) => s.loadWorkflows);
+  const allWorkflows = useWorkflowStore(s => s.workflows[projectId] ?? []);
+  const loadWorkflows = useWorkflowStore(s => s.loadWorkflows);
   const workflows = allWorkflows;
-  const activeWorkflows = workflows.filter((w) => w.status === 'active');
-  const runs = useWorkflowStore((s) => s.runs);
+  const activeWorkflows = workflows.filter(w => w.status === 'active');
+  const runs = useWorkflowStore(s => s.runs);
 
   // Automations (from /api/automations)
   const [automations, setAutomations] = useState<Automation[]>([]);
-  const activeAutomations = automations.filter((a) => a.enabled);
+  const activeAutomations = automations.filter(a => a.enabled);
 
   // Load data on mount
   useEffect(() => {
@@ -147,7 +161,10 @@ export function DashboardHome({ projectId, onNavigate, onOpenAutomations, onOpen
   useEffect(() => {
     if (!projectId) return;
     const backendId = useOwnershipStore.getState().getProjectBackendId(projectId);
-    apiCallForBackend<Automation[]>(backendId, `/api/automations?projectId=${encodeURIComponent(projectId)}`)
+    apiCallForBackend<Automation[]>(
+      backendId,
+      `/api/automations?projectId=${encodeURIComponent(projectId)}`
+    )
       .then(setAutomations)
       .catch(() => {});
   }, [projectId]);
@@ -188,7 +205,9 @@ export function DashboardHome({ projectId, onNavigate, onOpenAutomations, onOpen
             {agent ? (
               <>
                 <div className="flex items-center gap-2">
-                  <span className={`text-sm font-semibold ${agentPhase?.color}`}>{agentPhase?.label}</span>
+                  <span className={`text-sm font-semibold ${agentPhase?.color}`}>
+                    {agentPhase?.label}
+                  </span>
                   {agent.phase === 'active' && (
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                   )}
@@ -216,7 +235,9 @@ export function DashboardHome({ projectId, onNavigate, onOpenAutomations, onOpen
             <ChevronRight className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
           <div className="space-y-1">
-            <div className="text-xs text-muted-foreground">Project knowledge &amp; specifications</div>
+            <div className="text-xs text-muted-foreground">
+              Project knowledge &amp; specifications
+            </div>
           </div>
         </button>
 
@@ -236,7 +257,9 @@ export function DashboardHome({ projectId, onNavigate, onOpenAutomations, onOpen
             <div className="text-2xl font-bold">{activeTasks.length}</div>
             <div className="text-xs text-muted-foreground">active</div>
             {needsAttentionTasks.length > 0 && (
-              <div className="text-xs text-red-500">{needsAttentionTasks.length} needs attention</div>
+              <div className="text-xs text-red-500">
+                {needsAttentionTasks.length} needs attention
+              </div>
             )}
             {queuedTasks.length > 0 && (
               <div className="text-xs text-muted-foreground">{queuedTasks.length} queued</div>
@@ -300,7 +323,9 @@ export function DashboardHome({ projectId, onNavigate, onOpenAutomations, onOpen
           </div>
           <div className="space-y-1">
             <div className="text-2xl font-bold">{worktrees.length}</div>
-            <div className="text-xs text-muted-foreground">worktree{worktrees.length === 1 ? '' : 's'}</div>
+            <div className="text-xs text-muted-foreground">
+              worktree{worktrees.length === 1 ? '' : 's'}
+            </div>
             {dirtyWorktrees.length > 0 && (
               <div className="text-xs text-orange-500">{dirtyWorktrees.length} with changes</div>
             )}
@@ -325,7 +350,9 @@ export function DashboardHome({ projectId, onNavigate, onOpenAutomations, onOpen
                 <div className="text-2xl font-bold">{activeWorkflows.length}</div>
                 <div className="text-xs text-muted-foreground">active</div>
                 {workflows.length > activeWorkflows.length && (
-                  <div className="text-xs text-muted-foreground">{workflows.length - activeWorkflows.length} disabled</div>
+                  <div className="text-xs text-muted-foreground">
+                    {workflows.length - activeWorkflows.length} disabled
+                  </div>
                 )}
               </div>
             </button>
@@ -346,7 +373,9 @@ export function DashboardHome({ projectId, onNavigate, onOpenAutomations, onOpen
                 <div className="text-2xl font-bold">{activeAutomations.length}</div>
                 <div className="text-xs text-muted-foreground">active</div>
                 {automations.length > activeAutomations.length && (
-                  <div className="text-xs text-muted-foreground">{automations.length - activeAutomations.length} disabled</div>
+                  <div className="text-xs text-muted-foreground">
+                    {automations.length - activeAutomations.length} disabled
+                  </div>
                 )}
               </div>
             </button>
@@ -356,16 +385,15 @@ export function DashboardHome({ projectId, onNavigate, onOpenAutomations, onOpen
 
       {/* Local Pull Requests Preview */}
       {activePRs.length > 0 && (
-        <PreviewSection
-          title="Local Pull Requests"
-          onViewAll={() => onNavigate('local-prs')}
-        >
-          {activePRs.slice(0, 3).map((pr) => (
+        <PreviewSection title="Local Pull Requests" onViewAll={() => onNavigate('local-prs')}>
+          {activePRs.slice(0, 3).map(pr => (
             <div key={pr.id} className="flex items-center justify-between py-1.5">
               <div className="flex items-center gap-2 min-w-0">
                 <StatusBadge status={pr.status} colors={PR_STATUS_COLORS} />
                 <span className="text-sm truncate">{pr.title}</span>
-                <span className="text-xs text-muted-foreground font-mono truncate">{pr.branchName}</span>
+                <span className="text-xs text-muted-foreground font-mono truncate">
+                  {pr.branchName}
+                </span>
               </div>
             </div>
           ))}
@@ -373,15 +401,13 @@ export function DashboardHome({ projectId, onNavigate, onOpenAutomations, onOpen
       )}
 
       {/* Tasks Preview */}
-      {tasks.filter((t) => !['completed', 'integrated', 'cancelled'].includes(t.status)).length > 0 && (
-        <PreviewSection
-          title="Tasks"
-          onViewAll={() => onNavigate('tasks')}
-        >
+      {tasks.filter(t => !['completed', 'integrated', 'cancelled'].includes(t.status)).length >
+        0 && (
+        <PreviewSection title="Tasks" onViewAll={() => onNavigate('tasks')}>
           {tasks
-            .filter((t) => !['completed', 'integrated', 'cancelled'].includes(t.status))
+            .filter(t => !['completed', 'integrated', 'cancelled'].includes(t.status))
             .slice(0, 3)
-            .map((task) => (
+            .map(task => (
               <div key={task.id} className="flex items-center justify-between py-1.5">
                 <div className="flex items-center gap-2 min-w-0">
                   <StatusBadge status={task.status} colors={TASK_STATUS_COLORS} />
@@ -399,7 +425,7 @@ export function DashboardHome({ projectId, onNavigate, onOpenAutomations, onOpen
           title="Workflows"
           onViewAll={() => onOpenAutomations?.({ tab: 'workflows', projectId })}
         >
-          {activeWorkflows.slice(0, 3).map((wf) => {
+          {activeWorkflows.slice(0, 3).map(wf => {
             const latestRun = (runs[wf.id] ?? [])[0];
             const RUN_STATUS_COLORS: Record<string, string> = {
               pending: 'bg-gray-500/10 text-gray-400',
@@ -414,9 +440,7 @@ export function DashboardHome({ projectId, onNavigate, onOpenAutomations, onOpen
                   <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-green-500" />
                   <span className="text-sm truncate">{wf.name}</span>
                 </div>
-                {latestRun && (
-                  <StatusBadge status={latestRun.status} colors={RUN_STATUS_COLORS} />
-                )}
+                {latestRun && <StatusBadge status={latestRun.status} colors={RUN_STATUS_COLORS} />}
               </div>
             );
           })}
@@ -424,21 +448,20 @@ export function DashboardHome({ projectId, onNavigate, onOpenAutomations, onOpen
       )}
 
       {/* Issues Preview */}
-      {allIssues.filter((i) => i.status !== 'closed').length > 0 && (
-        <PreviewSection
-          title="Issues"
-          onViewAll={() => onNavigate('issues')}
-        >
+      {allIssues.filter(i => i.status !== 'closed').length > 0 && (
+        <PreviewSection title="Issues" onViewAll={() => onNavigate('issues')}>
           {allIssues
-            .filter((i) => i.status !== 'closed')
+            .filter(i => i.status !== 'closed')
             .slice(0, 3)
-            .map((issue) => (
+            .map(issue => (
               <div key={issue.id} className="flex items-center justify-between py-1.5">
                 <div className="flex items-center gap-2 min-w-0">
                   <StatusBadge status={issue.status} colors={ISSUE_STATUS_COLORS} />
                   <span className="text-sm truncate">{issue.title}</span>
                 </div>
-                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${ISSUE_PRIORITY_COLORS[issue.priority] ?? ''}`}>
+                <span
+                  className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${ISSUE_PRIORITY_COLORS[issue.priority] ?? ''}`}
+                >
                   {issue.priority}
                 </span>
               </div>
@@ -447,14 +470,17 @@ export function DashboardHome({ projectId, onNavigate, onOpenAutomations, onOpen
       )}
 
       {/* Empty state */}
-      {tasks.length === 0 && prs.length === 0 && allIssues.length === 0 && allWorkflows.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground">
-          <p className="text-sm">No activity yet.</p>
-          <p className="text-xs mt-1">
-            Create tasks, local PRs, issues, or workflow automations to see them here.
-          </p>
-        </div>
-      )}
+      {tasks.length === 0 &&
+        prs.length === 0 &&
+        allIssues.length === 0 &&
+        allWorkflows.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground">
+            <p className="text-sm">No activity yet.</p>
+            <p className="text-xs mt-1">
+              Create tasks, local PRs, issues, or workflow automations to see them here.
+            </p>
+          </div>
+        )}
     </div>
   );
 }

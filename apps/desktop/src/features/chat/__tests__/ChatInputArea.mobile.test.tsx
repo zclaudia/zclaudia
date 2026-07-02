@@ -17,7 +17,11 @@ vi.mock('../PermissionSelector', () => ({
 
 vi.mock('../ModeSelector', () => ({
   ModeSelector: (props: { value: string; locked?: boolean }) => (
-    <div data-testid="mode-selector" data-value={String(props.value)} data-locked={String(Boolean(props.locked))} />
+    <div
+      data-testid="mode-selector"
+      data-value={String(props.value)}
+      data-locked={String(Boolean(props.locked))}
+    />
   ),
 }));
 
@@ -28,7 +32,6 @@ vi.mock('../WorktreeSelector', () => ({
 vi.mock('../TokenUsageDisplay', () => ({
   TokenUsageDisplay: () => <div data-testid="token-usage" />,
 }));
-
 
 vi.mock('../../../services/api', () => ({
   unlockSession: vi.fn(),
@@ -43,7 +46,7 @@ vi.mock('../../../stores/serverStore', () => ({
     vi.fn(() => serverStoreState),
     {
       getState: () => serverStoreState,
-    },
+    }
   ),
 }));
 
@@ -59,10 +62,11 @@ const terminalStoreState = {
 vi.mock('../../../stores/terminalStore', () => ({
   useTerminalStore: Object.assign(
     vi.fn((selector?: (state: typeof terminalStoreState) => unknown) =>
-      selector ? selector(terminalStoreState) : terminalStoreState),
+      selector ? selector(terminalStoreState) : terminalStoreState
+    ),
     {
       getState: () => terminalStoreState,
-    },
+    }
   ),
 }));
 
@@ -87,7 +91,7 @@ vi.mock('../../../stores/fileViewerStore', () => ({
     vi.fn(() => fileViewerState),
     {
       getState: () => fileViewerState,
-    },
+    }
   ),
 }));
 
@@ -101,15 +105,18 @@ const pluginStoreState = {
 vi.mock('../../../stores/pluginStore', () => ({
   usePluginStore: Object.assign(
     vi.fn((selector?: (state: typeof pluginStoreState) => unknown) =>
-      selector ? selector(pluginStoreState) : pluginStoreState),
+      selector ? selector(pluginStoreState) : pluginStoreState
+    ),
     {
       getState: () => pluginStoreState,
-    },
+    }
   ),
   getEffectivePlacement: (state: typeof pluginStoreState, panelId: string) => {
-    return state.panelPlacements[panelId]
-      ?? state.panels.find((p) => p.id === panelId)?.defaultPlacement
-      ?? 'bottom';
+    return (
+      state.panelPlacements[panelId] ??
+      state.panels.find(p => p.id === panelId)?.defaultPlacement ??
+      'bottom'
+    );
   },
 }));
 
@@ -123,12 +130,18 @@ const rightSidebarState = {
 vi.mock('../../../stores/rightSidebarStore', () => ({
   useRightSidebarStore: Object.assign(
     vi.fn((selector?: (state: typeof rightSidebarState) => unknown) =>
-      selector ? selector(rightSidebarState) : rightSidebarState),
+      selector ? selector(rightSidebarState) : rightSidebarState
+    ),
     {
       getState: () => rightSidebarState,
-    },
+    }
   ),
-  RIGHT_SIDEBAR_LIMITS: { MIN_WIDTH_PX: 240, MIN_WIDTH_FRACTION: 0.15, MAX_WIDTH_FRACTION: 0.5, DEFAULT_WIDTH_FRACTION: 0.26 },
+  RIGHT_SIDEBAR_LIMITS: {
+    MIN_WIDTH_PX: 240,
+    MIN_WIDTH_FRACTION: 0.15,
+    MAX_WIDTH_FRACTION: 0.5,
+    DEFAULT_WIDTH_FRACTION: 0.26,
+  },
 }));
 
 const draftEditorState = {
@@ -141,10 +154,11 @@ const draftEditorState = {
 vi.mock('../../../stores/draftEditorStore', () => ({
   useDraftEditorStore: Object.assign(
     vi.fn((selector?: (state: typeof draftEditorState) => unknown) =>
-      selector ? selector(draftEditorState) : draftEditorState),
+      selector ? selector(draftEditorState) : draftEditorState
+    ),
     {
       getState: () => draftEditorState,
-    },
+    }
   ),
 }));
 
@@ -163,10 +177,11 @@ const projectStoreState = {
 vi.mock('../../../stores/projectStore', () => ({
   useProjectStore: Object.assign(
     vi.fn((selector?: (state: typeof projectStoreState) => unknown) =>
-      selector ? selector(projectStoreState) : projectStoreState),
+      selector ? selector(projectStoreState) : projectStoreState
+    ),
     {
       getState: () => projectStoreState,
-    },
+    }
   ),
 }));
 
@@ -178,10 +193,11 @@ const rightWorkspaceStoreState = {
 vi.mock('../../../stores/rightWorkspaceStore', () => ({
   useRightWorkspaceStore: Object.assign(
     vi.fn((selector?: (state: typeof rightWorkspaceStoreState) => unknown) =>
-      selector ? selector(rightWorkspaceStoreState) : rightWorkspaceStoreState),
+      selector ? selector(rightWorkspaceStoreState) : rightWorkspaceStoreState
+    ),
     {
       getState: () => rightWorkspaceStoreState,
-    },
+    }
   ),
   findPaneWithTool: vi.fn(() => null),
 }));
@@ -248,7 +264,9 @@ describe('ChatInputArea mobile selectors', () => {
   });
 
   it('shows mode selector + permission selector + worktree + terminal tool on mobile', () => {
-    serverStoreState.activeServerSupports.mockImplementation((feature: string) => feature === 'remoteTerminal');
+    serverStoreState.activeServerSupports.mockImplementation(
+      (feature: string) => feature === 'remoteTerminal'
+    );
 
     render(<ChatInputArea {...baseProps} />);
 

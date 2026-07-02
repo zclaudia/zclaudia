@@ -6,15 +6,26 @@ import { useTopLevelViewStore } from '../../../stores/topLevelViewStore';
 
 function makeApiWith(workflows: any[]) {
   return {
-    get: vi.fn().mockImplementation((path: string) =>
-      path.includes('workflow-templates') ? Promise.resolve([]) : Promise.resolve(workflows)),
+    get: vi
+      .fn()
+      .mockImplementation((path: string) =>
+        path.includes('workflow-templates') ? Promise.resolve([]) : Promise.resolve(workflows)
+      ),
     post: vi.fn().mockResolvedValue({}),
     patch: vi.fn().mockResolvedValue({}),
     del: vi.fn().mockResolvedValue(undefined),
   };
 }
 
-const userWorkflow = { id: 'wf-user', name: 'My Flow', isSystem: false, status: 'inactive', projectId: 'p1', authoringMode: 'graph', definition: { nodes: [], edges: [], entryNodeId: '' } };
+const userWorkflow = {
+  id: 'wf-user',
+  name: 'My Flow',
+  isSystem: false,
+  status: 'inactive',
+  projectId: 'p1',
+  authoringMode: 'graph',
+  definition: { nodes: [], edges: [], entryNodeId: '' },
+};
 
 const baseProps = {
   projects: [{ id: 'p1', name: 'proj-one' }],
@@ -34,7 +45,9 @@ describe('AutomationWorkflowList', () => {
   });
 
   it('disables + New when scoped globally', async () => {
-    render(<AutomationWorkflowList api={makeApiWith([]) as never} {...baseProps} projectId={undefined} />);
+    render(
+      <AutomationWorkflowList api={makeApiWith([]) as never} {...baseProps} projectId={undefined} />
+    );
     expect(await screen.findByRole('button', { name: 'New' })).toBeDisabled();
   });
 

@@ -1,7 +1,13 @@
 import { FolderOpen, Server } from 'lucide-react';
 
 /** Compact context bar showing backend + project info for standalone windows */
-export function WindowContextBar({ serverName, projectId }: { serverName?: string; projectId?: string }) {
+export function WindowContextBar({
+  serverName,
+  projectId,
+}: {
+  serverName?: string;
+  projectId?: string;
+}) {
   if (!serverName && !projectId) return null;
   return (
     <div

@@ -33,7 +33,7 @@ testAllModes('should stream response deltas', async (browser, mode) => {
 
   for (let i = 0; i < 10; i++) {
     await browser.waitForTimeout(500);
-    const currentText = await assistantMsg.textContent().catch(() => '') || '';
+    const currentText = (await assistantMsg.textContent().catch(() => '')) || '';
 
     if (currentText !== previousText && currentText.length > previousText.length) {
       updateCount++;

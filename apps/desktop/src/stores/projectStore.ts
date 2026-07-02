@@ -1,11 +1,21 @@
 import { create } from 'zustand';
-import type { Project, Session, SlashCommand, LlmProfileConfig, ProviderCapabilities } from '@zclaudia/shared';
+import type {
+  Project,
+  Session,
+  SlashCommand,
+  LlmProfileConfig,
+  ProviderCapabilities,
+} from '@zclaudia/shared';
 import { useRunStore } from './runStore';
 import { useLlmProfileMetaStore } from './llmProfileMetaStore';
 import { useServerStore } from './serverStore';
 import { useOwnershipStore } from './ownershipStore';
 import { parseBackendId } from './gatewayStore';
-import { getControlPlaneMode, resolveCanonicalBackendId, resolveLocalBackendId } from '../utils/controlPlane';
+import {
+  getControlPlaneMode,
+  resolveCanonicalBackendId,
+  resolveLocalBackendId,
+} from '../utils/controlPlane';
 import { useSelectionStore } from './selectionStore';
 import { useRightWorkspaceStore } from './rightWorkspaceStore';
 
@@ -68,7 +78,7 @@ interface ProjectState {
   setProviderCapabilities: (llmProfileId: string, capabilities: ProviderCapabilities) => void;
 }
 
-export const useProjectStore = create<ProjectState>((set) => ({
+export const useProjectStore = create<ProjectState>(set => ({
   projects: [],
   sessions: [],
   providers: [],
@@ -81,19 +91,22 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
   // ── Project actions ──
 
-  setProjects: (projects) => {
+  setProjects: projects => {
     const activeBackendId = resolveOwnershipBackendId();
     if (activeBackendId) {
       useOwnershipStore.getState().removeProjectOwnersByBackend(activeBackendId);
-      useOwnershipStore.getState().setProjectOwners(projects.map((p) => p.id), activeBackendId);
+      useOwnershipStore.getState().setProjectOwners(
+        projects.map(p => p.id),
+        activeBackendId
+      );
     }
     set({ projects });
   },
 
   replaceProjectsForBackend: (backendId, projects) =>
-    set((state) => {
+    set(state => {
       const ownership = useOwnershipStore.getState();
-      const acceptedProjects = projects.filter((project) => {
+      const acceptedProjects = projects.filter(project => {
         const ownerBackendId = ownership.getProjectBackendId(project.id);
         if (ownerBackendId && ownerBackendId !== backendId) {
           console.warn(
@@ -103,15 +116,15 @@ export const useProjectStore = create<ProjectState>((set) => ({
         }
         return true;
       });
-      const acceptedById = new Map(acceptedProjects.map((p) => [p.id, p]));
+      const acceptedById = new Map(acceptedProjects.map(p => [p.id, p]));
 
       // Shallow equality short-circuit: same set + same updatedAt for this backend
       const currentBackendProjects = state.projects.filter(
-        (project) => ownership.getProjectBackendId(project.id) === backendId
+        project => ownership.getProjectBackendId(project.id) === backendId
       );
       if (
         currentBackendProjects.length === acceptedProjects.length &&
-        currentBackendProjects.every((cur) => {
+        currentBackendProjects.every(cur => {
           const incoming = acceptedById.get(cur.id);
           return incoming !== undefined && cur.updatedAt === incoming.updatedAt;
         })
@@ -144,12 +157,15 @@ export const useProjectStore = create<ProjectState>((set) => ({
       }
 
       ownership.removeProjectOwnersByBackend(backendId);
-      ownership.setProjectOwners(acceptedProjects.map((project) => project.id), backendId);
+      ownership.setProjectOwners(
+        acceptedProjects.map(project => project.id),
+        backendId
+      );
       return { projects: next };
     }),
 
   upsertProjectForBackend: (backendId, project) =>
-    set((state) => {
+    set(state => {
       const ownership = useOwnershipStore.getState();
       const existingOwnerBackendId = ownership.getProjectBackendId(project.id);
 
@@ -161,10 +177,12 @@ export const useProjectStore = create<ProjectState>((set) => ({
       }
 
       ownership.setProjectOwner(project.id, backendId);
-      const existingIndex = state.projects.findIndex((existingProject) => existingProject.id === project.id);
+      const existingIndex = state.projects.findIndex(
+        existingProject => existingProject.id === project.id
+      );
       const mergedProject = mergeProjectPreservingFields(
         existingIndex >= 0 ? state.projects[existingIndex] : undefined,
-        project,
+        project
       );
 
       // Preserve array position whenever the project already exists — even if
@@ -181,7 +199,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
     }),
 
   removeProjectForBackend: (backendId, projectId) =>
-    set((state) => {
+    set(state => {
       const ownership = useOwnershipStore.getState();
       if (ownership.getProjectBackendId(projectId) !== backendId) {
         return state;
@@ -189,20 +207,19 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
       ownership.removeProjectOwner(projectId);
       return {
-        projects: state.projects.filter((project) => project.id !== projectId),
-        sessions: state.sessions.filter((session) => session.projectId !== projectId),
-        selectedProjectId:
-          state.selectedProjectId === projectId ? null : state.selectedProjectId,
+        projects: state.projects.filter(project => project.id !== projectId),
+        sessions: state.sessions.filter(session => session.projectId !== projectId),
+        selectedProjectId: state.selectedProjectId === projectId ? null : state.selectedProjectId,
         selectedSessionId:
-          state.sessions.find((session) => session.id === state.selectedSessionId)
-            ?.projectId === projectId
+          state.sessions.find(session => session.id === state.selectedSessionId)?.projectId ===
+          projectId
             ? null
             : state.selectedSessionId,
       };
     }),
 
-  addProject: (project) =>
-    set((state) => {
+  addProject: project =>
+    set(state => {
       const activeBackendId = resolveOwnershipBackendId();
       if (activeBackendId) {
         useOwnershipStore.getState().setProjectOwner(project.id, activeBackendId);
@@ -210,7 +227,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       // Dedup by id: WebSocket project_upsert may have already added this project
       // before the HTTP response returned (race window common with remote backends
       // through the gateway). Without this guard the list shows the same project twice.
-      const existingIndex = state.projects.findIndex((p) => p.id === project.id);
+      const existingIndex = state.projects.findIndex(p => p.id === project.id);
       if (existingIndex >= 0) {
         const next = state.projects.slice();
         next[existingIndex] = mergeProjectPreservingFields(next[existingIndex], project);
@@ -220,34 +237,28 @@ export const useProjectStore = create<ProjectState>((set) => ({
     }),
 
   updateProject: (id, updates) =>
-    set((state) => ({
-      projects: state.projects.map((p) =>
-        p.id === id ? { ...p, ...updates } : p
-      ),
+    set(state => ({
+      projects: state.projects.map(p => (p.id === id ? { ...p, ...updates } : p)),
     })),
 
-  deleteProject: (id) =>
-    set((state) => {
+  deleteProject: id =>
+    set(state => {
       useOwnershipStore.getState().removeProjectOwner(id);
       return {
-        projects: state.projects.filter((p) => p.id !== id),
-        sessions: state.sessions.filter((s) => s.projectId !== id),
-        selectedProjectId:
-          state.selectedProjectId === id ? null : state.selectedProjectId,
+        projects: state.projects.filter(p => p.id !== id),
+        sessions: state.sessions.filter(s => s.projectId !== id),
+        selectedProjectId: state.selectedProjectId === id ? null : state.selectedProjectId,
         selectedSessionId:
-          state.sessions.find((s) => s.id === state.selectedSessionId)
-            ?.projectId === id
+          state.sessions.find(s => s.id === state.selectedSessionId)?.projectId === id
             ? null
             : state.selectedSessionId,
       };
     }),
 
-  reorderProjects: (orderedIds) =>
-    set((state) => {
-      const idToProject = new Map(state.projects.map((p) => [p.id, p]));
-      const reordered = orderedIds
-        .map((id) => idToProject.get(id))
-        .filter((p): p is Project => !!p);
+  reorderProjects: orderedIds =>
+    set(state => {
+      const idToProject = new Map(state.projects.map(p => [p.id, p]));
+      const reordered = orderedIds.map(id => idToProject.get(id)).filter((p): p is Project => !!p);
       for (const p of state.projects) {
         if (!orderedIds.includes(p.id)) reordered.push(p);
       }
@@ -256,16 +267,16 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
   // ── Session actions ──
 
-  setSessions: (sessions) => {
+  setSessions: sessions => {
     assignSessionOwnersForSessions(sessions);
     set({ sessions });
   },
 
-  mergeSessions: (incoming) =>
-    set((state) => {
+  mergeSessions: incoming =>
+    set(state => {
       assignSessionOwnersForSessions(incoming);
-      const merged = incoming.map((s) => {
-        const existing = state.sessions.find((e) => e.id === s.id);
+      const merged = incoming.map(s => {
+        const existing = state.sessions.find(e => e.id === s.id);
         if (!existing) {
           return { ...s, isActive: Boolean((s as Session & { isActive?: boolean }).isActive) };
         }
@@ -274,7 +285,10 @@ export const useProjectStore = create<ProjectState>((set) => ({
         const hasIncomingActive = typeof incomingIsActive === 'boolean';
 
         if (!hasIncomingActive) {
-          return { ...s, isActive: Boolean((existing as Session & { isActive?: boolean }).isActive) };
+          return {
+            ...s,
+            isActive: Boolean((existing as Session & { isActive?: boolean }).isActive),
+          };
         }
 
         if (existing.isActive && incomingIsActive === false) {
@@ -292,46 +306,39 @@ export const useProjectStore = create<ProjectState>((set) => ({
       return { sessions: merged };
     }),
 
-  addSession: (session) =>
-    set((state) => {
+  addSession: session =>
+    set(state => {
       assignSessionOwnersForSessions([session]);
       return { sessions: [...state.sessions, session] };
     }),
 
   updateSession: (id, updates) =>
-    set((state) => ({
-      sessions: state.sessions.map((s) =>
-        s.id === id ? { ...s, ...updates } : s
-      ),
+    set(state => ({
+      sessions: state.sessions.map(s => (s.id === id ? { ...s, ...updates } : s)),
     })),
 
-  deleteSession: (id) =>
-    set((state) => {
+  deleteSession: id =>
+    set(state => {
       useOwnershipStore.getState().removeSessionOwner(id);
       useRightWorkspaceStore.getState().removeSession(id);
       return {
-        sessions: state.sessions.filter((s) => s.id !== id),
-        selectedSessionId:
-          state.selectedSessionId === id ? null : state.selectedSessionId,
+        sessions: state.sessions.filter(s => s.id !== id),
+        selectedSessionId: state.selectedSessionId === id ? null : state.selectedSessionId,
       };
     }),
 
   setSessionActive: (sessionId, isActive) =>
-    set((state) => ({
-      sessions: state.sessions.map((s) =>
-        s.id === sessionId ? { ...s, isActive } : s
-      ),
+    set(state => ({
+      sessions: state.sessions.map(s => (s.id === sessionId ? { ...s, isActive } : s)),
     })),
 
   reorderSessions: (projectId, orderedIds) =>
-    set((state) => {
+    set(state => {
       const projectSessionIds = new Set(orderedIds);
       const idToSession = new Map(
-        state.sessions.filter((s) => s.projectId === projectId).map((s) => [s.id, s])
+        state.sessions.filter(s => s.projectId === projectId).map(s => [s.id, s])
       );
-      const reordered = orderedIds
-        .map((id) => idToSession.get(id))
-        .filter((s): s is Session => !!s);
+      const reordered = orderedIds.map(id => idToSession.get(id)).filter((s): s is Session => !!s);
       for (const s of state.sessions) {
         if (s.projectId === projectId && !projectSessionIds.has(s.id)) reordered.push(s);
       }
@@ -355,17 +362,18 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
   // ── Provider actions (synced to llmProfileMetaStore) ──
 
-  setProviders: (providers) => {
-    const getState = (useServerStore as { getState?: () => { activeServerId?: string | null } }).getState;
+  setProviders: providers => {
+    const getState = (useServerStore as { getState?: () => { activeServerId?: string | null } })
+      .getState;
     useLlmProfileMetaStore.getState().setProviders(providers, getState?.().activeServerId);
   },
 
-  setDataServerId: (serverId) => set({ dataServerId: serverId }),
+  setDataServerId: serverId => set({ dataServerId: serverId }),
 
   // ── Selection & UI actions ──
 
-  selectProject: (id) =>
-    set((state) => {
+  selectProject: id =>
+    set(state => {
       if (state.selectedProjectId === id) {
         return state;
       }
@@ -374,12 +382,12 @@ export const useProjectStore = create<ProjectState>((set) => ({
     }),
 
   selectSession: (id, projectId) =>
-    set((state) => {
+    set(state => {
       if (state.selectedSessionId === id) {
         return state;
       }
 
-      const session = state.sessions.find((s) => s.id === id);
+      const session = state.sessions.find(s => s.id === id);
       const nextSelectedProjectId = projectId ?? session?.projectId ?? state.selectedProjectId;
       useSelectionStore.getState().setSelectedSessionId(id);
       useSelectionStore.getState().setSelectedProjectId(nextSelectedProjectId);
@@ -391,7 +399,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
     }),
 
   setDashboardView: (projectId, view) =>
-    set((state) => {
+    set(state => {
       useSelectionStore.getState().setDashboardView(projectId, view);
       return {
         dashboardViews: {
@@ -430,20 +438,26 @@ function syncSelectionSnapshot(): void {
   });
 }
 
-const providerMetaSubscribe = (useLlmProfileMetaStore as typeof useLlmProfileMetaStore & {
-  subscribe?: (listener: () => void) => () => void;
-}).subscribe;
+const providerMetaSubscribe = (
+  useLlmProfileMetaStore as typeof useLlmProfileMetaStore & {
+    subscribe?: (listener: () => void) => () => void;
+  }
+).subscribe;
 
 providerMetaSubscribe?.(() => {
   syncLegacyProviderSnapshot(useServerStore.getState().activeServerId);
 });
 
-const serverStoreSubscribe = (useServerStore as typeof useServerStore & {
-  subscribe?: (listener: (
-    state: ReturnType<typeof useServerStore.getState>,
-    prevState: ReturnType<typeof useServerStore.getState>,
-  ) => void) => () => void;
-}).subscribe;
+const serverStoreSubscribe = (
+  useServerStore as typeof useServerStore & {
+    subscribe?: (
+      listener: (
+        state: ReturnType<typeof useServerStore.getState>,
+        prevState: ReturnType<typeof useServerStore.getState>
+      ) => void
+    ) => () => void;
+  }
+).subscribe;
 
 serverStoreSubscribe?.((state, prevState) => {
   if (state.activeServerId !== prevState.activeServerId) {
@@ -451,44 +465,14 @@ serverStoreSubscribe?.((state, prevState) => {
   }
 });
 
-const selectionStoreSubscribe = (useSelectionStore as typeof useSelectionStore & {
-  subscribe?: (listener: () => void) => () => void;
-}).subscribe;
+const selectionStoreSubscribe = (
+  useSelectionStore as typeof useSelectionStore & {
+    subscribe?: (listener: () => void) => () => void;
+  }
+).subscribe;
 
 selectionStoreSubscribe?.(() => {
   syncSelectionSnapshot();
-});
-
-const projectStoreSubscribe = (useProjectStore as typeof useProjectStore & {
-  subscribe?: (listener: (
-    state: ReturnType<typeof useProjectStore.getState>,
-    prevState: ReturnType<typeof useProjectStore.getState>,
-  ) => void) => () => void;
-}).subscribe;
-
-projectStoreSubscribe?.((state, prevState) => {
-  const selectionState = useSelectionStore.getState();
-  if (
-    state.selectedProjectId === prevState.selectedProjectId
-    && state.selectedSessionId === prevState.selectedSessionId
-    && state.dashboardViews === prevState.dashboardViews
-  ) {
-    return;
-  }
-
-  if (state.selectedProjectId !== selectionState.selectedProjectId) {
-    useSelectionStore.getState().setSelectedProjectId(state.selectedProjectId);
-  }
-  if (state.selectedSessionId !== selectionState.selectedSessionId) {
-    useSelectionStore.getState().setSelectedSessionId(state.selectedSessionId);
-  }
-  if (state.dashboardViews !== selectionState.dashboardViews) {
-    for (const [projectId, view] of Object.entries(state.dashboardViews)) {
-      if (selectionState.dashboardViews[projectId] !== view) {
-        useSelectionStore.getState().setDashboardView(projectId, view);
-      }
-    }
-  }
 });
 
 function resolveOwnershipBackendId(): string | null {

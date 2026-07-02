@@ -1,8 +1,13 @@
-import { Router, Request, Response } from 'express';
+import { type Router, type Request, type Response } from 'express';
 import { newId } from '../../utils/uuid.js';
 import type Database from 'better-sqlite3';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
-import type { Message, MessageMetadata, MessageRole, CompactionMarker } from '@zclaudia/shared/core/message';
+import type {
+  Message,
+  MessageMetadata,
+  MessageRole,
+  CompactionMarker,
+} from '@zclaudia/shared/core/message';
 import { extractAndIndexMetadata } from '../../infra/storage/metadata-extractor.js';
 import { findForegroundActiveRunIdForSession } from '../../utils/run-state.js';
 import { parsePersistedMessageMetadata } from '../../utils/persisted-message.js';
@@ -40,7 +45,11 @@ function compactionToTimelineEntry(compaction: SessionCompaction): Message {
   };
 }
 
-export function mountMessageRoutes(router: Router, db: Database.Database, activeRuns: ActiveRunsMap): void {
+export function mountMessageRoutes(
+  router: Router,
+  db: Database.Database,
+  activeRuns: ActiveRunsMap
+): void {
   const repo = new SessionMessageRepository(db);
 
   router.get('/:id/messages', (req: Request, res: Response) => {
@@ -48,7 +57,9 @@ export function mountMessageRoutes(router: Router, db: Database.Database, active
       const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
       const before = req.query.before ? parseInt(req.query.before as string) : undefined;
       const after = req.query.after ? parseInt(req.query.after as string) : undefined;
-      const afterOffset = req.query.afterOffset ? parseInt(req.query.afterOffset as string) : undefined;
+      const afterOffset = req.query.afterOffset
+        ? parseInt(req.query.afterOffset as string)
+        : undefined;
       const aroundMessageId = req.query.aroundMessageId as string | undefined;
 
       let messages;
@@ -62,7 +73,10 @@ export function mountMessageRoutes(router: Router, db: Database.Database, active
         });
       } catch (error) {
         if (error instanceof Error && error.message.startsWith('message not found:')) {
-          res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Message not found in session' } });
+          res.status(404).json({
+            success: false,
+            error: { code: 'NOT_FOUND', message: 'Message not found in session' },
+          });
           return;
         }
         throw error;
@@ -74,7 +88,7 @@ export function mountMessageRoutes(router: Router, db: Database.Database, active
         trimmed.reverse();
       }
 
-      const parsedMessages = trimmed.map((message) => ({
+      const parsedMessages = trimmed.map(message => ({
         ...message,
         metadata: parsePersistedMessageMetadata<MessageMetadata>(message.metadata),
       }));
@@ -84,10 +98,11 @@ export function mountMessageRoutes(router: Router, db: Database.Database, active
       // don't surface them in an empty / out-of-band slot. For the common "no
       // filter" full-history view this becomes the entire compaction list.
       const oldestInPage = parsedMessages.length > 0 ? parsedMessages[0].createdAt : undefined;
-      const newestInPage = parsedMessages.length > 0 ? parsedMessages[parsedMessages.length - 1].createdAt : undefined;
+      const newestInPage =
+        parsedMessages.length > 0 ? parsedMessages[parsedMessages.length - 1].createdAt : undefined;
       const allCompactions = listCompactions(db, req.params.id);
       const markerEntries = allCompactions
-        .filter((c) => {
+        .filter(c => {
           if (oldestInPage == null || newestInPage == null) return parsedMessages.length === 0;
           return c.createdAt >= oldestInPage && c.createdAt <= newestInPage;
         })
@@ -98,19 +113,28 @@ export function mountMessageRoutes(router: Router, db: Database.Database, active
       // The cast is necessary because StoredSessionMessage uses `offset:
       // number | null` while Message uses `offset?: number`; the marker shape
       // omits offset entirely. Both shapes round-trip safely through the API.
-      const result = markerEntries.length === 0
-        ? parsedMessages
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        : ([...parsedMessages, ...(markerEntries as any)] as typeof parsedMessages).sort((a, b) => a.createdAt - b.createdAt);
+      const result =
+        markerEntries.length === 0
+          ? parsedMessages
+          : // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            ([...parsedMessages, ...(markerEntries as any)] as typeof parsedMessages).sort(
+              (a, b) => a.createdAt - b.createdAt
+            );
 
       const total = repo.countBySession(req.params.id);
-      const hasMore = wasTrimmed
-        || (before || after || afterOffset != null || aroundMessageId ? messages.length === limit : total > limit);
+      const hasMore =
+        wasTrimmed ||
+        (before || after || afterOffset != null || aroundMessageId
+          ? messages.length === limit
+          : total > limit);
 
       const oldestTimestamp = result.length > 0 ? result[0].createdAt : undefined;
       const newestTimestamp = result.length > 0 ? result[result.length - 1].createdAt : undefined;
-      const maxOffset = result.reduce((max: number | undefined, message: any) =>
-        message.offset != null ? Math.max(max ?? 0, message.offset) : max, undefined);
+      const maxOffset = result.reduce(
+        (max: number | undefined, message: any) =>
+          message.offset != null ? Math.max(max ?? 0, message.offset) : max,
+        undefined
+      );
 
       const activeRunId = findForegroundActiveRunIdForSession(activeRuns, req.params.id);
       const activeRun = activeRunId ? { runId: activeRunId } : null;
@@ -197,7 +221,7 @@ export function mountMessageRoutes(router: Router, db: Database.Database, active
             messageRowid,
             req.params.id,
             metadata as Parameters<typeof extractAndIndexMetadata>[4],
-            now,
+            now
           );
         }
       }

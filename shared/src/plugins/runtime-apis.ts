@@ -32,7 +32,10 @@ export interface FileSystemAPI {
 }
 
 export interface NetworkAPI {
-  fetch(url: string, options?: Record<string, unknown>): Promise<{ ok: boolean; status: number; body: string }>;
+  fetch(
+    url: string,
+    options?: Record<string, unknown>
+  ): Promise<{ ok: boolean; status: number; body: string }>;
 }
 
 export interface NotificationAPI {
@@ -45,7 +48,11 @@ export interface ClipboardAPI {
 }
 
 export interface ShellAPI {
-  execute(command: string, args?: string[], options?: { cwd?: string }): Promise<{ stdout: string; stderr: string; code: number }>;
+  execute(
+    command: string,
+    args?: string[],
+    options?: { cwd?: string }
+  ): Promise<{ stdout: string; stderr: string; code: number }>;
 }
 
 export interface SessionAPI {
@@ -144,7 +151,11 @@ export interface McpAPI {
   /** List tools available on a specific MCP server */
   listTools(serverName: string): Promise<McpToolInfo[]>;
   /** Call a tool on a specific MCP server */
-  callTool<T = unknown>(serverName: string, tool: string, args: Record<string, unknown>): Promise<T>;
+  callTool<T = unknown>(
+    serverName: string,
+    tool: string,
+    args: Record<string, unknown>
+  ): Promise<T>;
 }
 
 export interface PluginSchedulerTask {

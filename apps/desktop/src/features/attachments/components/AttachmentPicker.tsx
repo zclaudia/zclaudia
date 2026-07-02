@@ -39,7 +39,7 @@ export function AttachmentPicker({
       e.target.value = '';
       if (files.length > 0) onFiles(files);
     },
-    [onFiles],
+    [onFiles]
   );
 
   return (

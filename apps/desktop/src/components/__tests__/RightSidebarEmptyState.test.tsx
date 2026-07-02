@@ -71,8 +71,10 @@ beforeEach(() => {
   });
 });
 
-function renderEmpty() {
-  return render(<RightSidebarEmptyState sessionId="s1" projectId="p1" projectRoot="/repo" />);
+function renderEmpty(props: { branchName?: string } = {}) {
+  return render(
+    <RightSidebarEmptyState sessionId="s1" projectId="p1" projectRoot="/repo" {...props} />
+  );
 }
 
 describe('RightSidebarEmptyState', () => {
@@ -88,21 +90,25 @@ describe('RightSidebarEmptyState', () => {
   it('calls openToolInWorkspace when a tile is clicked', () => {
     renderEmpty();
     fireEvent.click(screen.getByText('Terminal'));
-    expect(openToolInWorkspace).toHaveBeenCalledWith('s1', 'terminal', expect.objectContaining({ projectId: 'p1' }));
+    expect(openToolInWorkspace).toHaveBeenCalledWith(
+      's1',
+      'terminal',
+      expect.objectContaining({ projectId: 'p1' })
+    );
   });
 
   it('calls openToolInWorkspace with the correct toolId for changes tile', () => {
     renderEmpty();
     fireEvent.click(screen.getByText('Changes'));
-    expect(openToolInWorkspace).toHaveBeenCalledWith('s1', 'session-changes', expect.objectContaining({ projectId: 'p1' }));
+    expect(openToolInWorkspace).toHaveBeenCalledWith(
+      's1',
+      'session-changes',
+      expect.objectContaining({ projectId: 'p1' })
+    );
   });
 
-  it('shows the branch when git data is present', () => {
-    gitStateMock.mockReturnValue({
-      worktrees: { p1: [{ path: '/wt', branch: 'main' }] },
-      selectedWorktree: { p1: '/wt' },
-    });
-    renderEmpty();
+  it('shows the branch when a branchName prop is present', () => {
+    renderEmpty({ branchName: 'main' });
     expect(screen.getByText('main')).toBeInTheDocument();
   });
 
@@ -114,25 +120,31 @@ describe('RightSidebarEmptyState', () => {
   it('shows the changes count when there are changes', () => {
     changesMock.mockReturnValue([{}, {}, {}]);
     renderEmpty();
-    expect(screen.getByText('Changes').closest('button')).toHaveAttribute('title', '3 files to review');
+    expect(screen.getByText('Changes').closest('button')).toHaveAttribute(
+      'title',
+      '3 files to review'
+    );
   });
 
   it('hides the changes count and uses the static subtitle at zero', () => {
     renderEmpty();
     expect(screen.queryByText(/to review/)).toBeNull();
-    expect(screen.getByText('Changes').closest('button')).toHaveAttribute('title', 'View session changes');
+    expect(screen.getByText('Changes').closest('button')).toHaveAttribute(
+      'title',
+      'View session changes'
+    );
   });
 
   it('moves the changes tile to the front when there are changes', () => {
     changesMock.mockReturnValue([{}, {}]);
     renderEmpty();
-    const labels = screen.getAllByTestId('empty-tile-label').map((n) => n.textContent);
+    const labels = screen.getAllByTestId('empty-tile-label').map(n => n.textContent);
     expect(labels[0]).toBe('Changes');
   });
 
   it('keeps declared order when there are no changes', () => {
     renderEmpty();
-    const labels = screen.getAllByTestId('empty-tile-label').map((n) => n.textContent);
+    const labels = screen.getAllByTestId('empty-tile-label').map(n => n.textContent);
     // Order follows plugin store registration order (terminal=0, changes=1, file=2, draft=3, lineage=4)
     expect(labels).toEqual(['Terminal', 'Changes', 'File', 'Draft', 'Lineage']);
   });

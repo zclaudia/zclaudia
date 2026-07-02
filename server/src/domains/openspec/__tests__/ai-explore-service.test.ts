@@ -43,7 +43,10 @@ describe('parseExploreResponse', () => {
               name: 'Login',
               body: 'System MUST authenticate users.',
               scenarios: [
-                { name: 'Valid creds', bodyLines: ['- **WHEN** valid', '- **THEN** SHALL return token'] },
+                {
+                  name: 'Valid creds',
+                  bodyLines: ['- **WHEN** valid', '- **THEN** SHALL return token'],
+                },
               ],
             },
           ],
@@ -202,19 +205,28 @@ describe('AiExploreService (integration with mock aiRunPort)', () => {
         async startVirtualRun(args: any) {
           calls += 1;
           if (calls === 1) {
-            args.onMessage?.({ kind: 'assistant', content: 'I think it has these capabilities... no JSON here' });
+            args.onMessage?.({
+              kind: 'assistant',
+              content: 'I think it has these capabilities... no JSON here',
+            });
             args.onMessage?.({ kind: 'run_completed' });
           } else {
             args.onMessage?.({
               kind: 'assistant',
-              content: JSON.stringify({ capabilities: [{ name: 'a', description: 'x' }], uncertainties: [] }),
+              content: JSON.stringify({
+                capabilities: [{ name: 'a', description: 'x' }],
+                uncertainties: [],
+              }),
             });
             args.onMessage?.({ kind: 'run_completed' });
           }
         },
       };
       const svc = new AiExploreService({ aiRunPort: fakePort, timeoutMs: 1000 });
-      const result = await svc.discoverCapabilities({ projectId: 'p1', workingDirectory: '/tmp/x' });
+      const result = await svc.discoverCapabilities({
+        projectId: 'p1',
+        workingDirectory: '/tmp/x',
+      });
       expect(calls).toBe(2);
       expect(result.capabilities).toHaveLength(1);
     });
@@ -227,8 +239,9 @@ describe('AiExploreService (integration with mock aiRunPort)', () => {
         },
       };
       const svc = new AiExploreService({ aiRunPort: fakePort, timeoutMs: 1000 });
-      await expect(svc.discoverCapabilities({ projectId: 'p1', workingDirectory: '/tmp/x' }))
-        .rejects.toThrow(/parse|JSON/);
+      await expect(
+        svc.discoverCapabilities({ projectId: 'p1', workingDirectory: '/tmp/x' })
+      ).rejects.toThrow(/parse|JSON/);
     });
   });
 
@@ -253,7 +266,8 @@ describe('AiExploreService (integration with mock aiRunPort)', () => {
     });
 
     it('repairs once when first output fails validation', async () => {
-      const invalidMd = '## Requirements\n\n### Requirement: Foo\n\nfoo.\n\n#### Scenario: bar\n\n- **WHEN** x\n- **THEN** y\n';
+      const invalidMd =
+        '## Requirements\n\n### Requirement: Foo\n\nfoo.\n\n#### Scenario: bar\n\n- **WHEN** x\n- **THEN** y\n';
       let calls = 0;
       const fakePort = {
         async startVirtualRun(args: any) {
@@ -282,10 +296,12 @@ describe('AiExploreService (integration with mock aiRunPort)', () => {
         },
       };
       const svc = new AiExploreService({ aiRunPort: fakePort, timeoutMs: 1000 });
-      await expect(svc.generateCapabilitySpec({
-        capability: { name: 'auth', description: 'login' },
-        workingDirectory: '/tmp/x',
-      })).rejects.toThrow(/Validation failed/);
+      await expect(
+        svc.generateCapabilitySpec({
+          capability: { name: 'auth', description: 'login' },
+          workingDirectory: '/tmp/x',
+        })
+      ).rejects.toThrow(/Validation failed/);
     });
 
     it('reports failure when output has no <spec> tags', async () => {
@@ -296,10 +312,12 @@ describe('AiExploreService (integration with mock aiRunPort)', () => {
         },
       };
       const svc = new AiExploreService({ aiRunPort: fakePort, timeoutMs: 1000 });
-      await expect(svc.generateCapabilitySpec({
-        capability: { name: 'auth', description: 'login' },
-        workingDirectory: '/tmp/x',
-      })).rejects.toThrow();
+      await expect(
+        svc.generateCapabilitySpec({
+          capability: { name: 'auth', description: 'login' },
+          workingDirectory: '/tmp/x',
+        })
+      ).rejects.toThrow();
     });
   });
 });

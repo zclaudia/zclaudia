@@ -74,7 +74,7 @@ export class EmbeddedFacadeClient implements BackendFacade {
       this.flushPendingMessages();
     };
 
-    ws.onmessage = (event) => {
+    ws.onmessage = event => {
       try {
         const msg = JSON.parse(event.data as string);
         this.handleMessage(msg);
@@ -123,17 +123,30 @@ export class EmbeddedFacadeClient implements BackendFacade {
       import.meta.env.DEV &&
       (msg.type === 'backend_state_changed' || msg.type === 'connection_state_changed')
     ) {
-      console.log(`[EmbeddedFacadeClient] ${msg.type}:`, msg.type === 'backend_state_changed' ? `backend=${msg.backendId} state=${msg.state} error=${msg.error}` : `state=${msg.state}`);
+      console.log(
+        `[EmbeddedFacadeClient] ${msg.type}:`,
+        msg.type === 'backend_state_changed'
+          ? `backend=${msg.backendId} state=${msg.state} error=${msg.error}`
+          : `state=${msg.state}`
+      );
     }
     switch (msg.type) {
       case 'facade_snapshot':
         this.latestSnapshot = msg.snapshot;
         for (const listener of this.snapshotListeners) {
-          try { listener(msg.snapshot); } catch { /* ignore */ }
+          try {
+            listener(msg.snapshot);
+          } catch {
+            /* ignore */
+          }
         }
         // Also emit as event
         for (const listener of this.eventListeners) {
-          try { listener({ type: 'snapshot_updated', snapshot: msg.snapshot }); } catch { /* ignore */ }
+          try {
+            listener({ type: 'snapshot_updated', snapshot: msg.snapshot });
+          } catch {
+            /* ignore */
+          }
         }
         break;
 
@@ -145,7 +158,11 @@ export class EmbeddedFacadeClient implements BackendFacade {
       case 'snapshot_updated':
         this.latestSnapshot = msg.snapshot;
         for (const listener of this.eventListeners) {
-          try { listener(msg as BackendFacadeEvent); } catch { /* ignore */ }
+          try {
+            listener(msg as BackendFacadeEvent);
+          } catch {
+            /* ignore */
+          }
         }
         break;
 
@@ -160,14 +177,22 @@ export class EmbeddedFacadeClient implements BackendFacade {
 
       case 'backend_state_changed':
         for (const listener of this.eventListeners) {
-          try { listener(msg as BackendFacadeEvent); } catch { /* ignore */ }
+          try {
+            listener(msg as BackendFacadeEvent);
+          } catch {
+            /* ignore */
+          }
         }
         break;
 
       default:
         // All other messages are BackendFacadeEvent
         for (const listener of this.eventListeners) {
-          try { listener(msg as BackendFacadeEvent); } catch { /* ignore */ }
+          try {
+            listener(msg as BackendFacadeEvent);
+          } catch {
+            /* ignore */
+          }
         }
         break;
     }
@@ -178,17 +203,19 @@ export class EmbeddedFacadeClient implements BackendFacade {
   // --------------------------------------------------------------------------
 
   getSnapshot(): BackendFacadeSnapshot {
-    return this.latestSnapshot ?? {
-      snapshotVersion: 0,
-      capturedAt: Date.now(),
-      mode: 'embedded',
-      connectionState: 'idle',
-      localBackendId: null,
-      currentInstanceId: null,
-      currentDeviceId: null,
-      backends: [],
-      sessionStreams: {},
-    };
+    return (
+      this.latestSnapshot ?? {
+        snapshotVersion: 0,
+        capturedAt: Date.now(),
+        mode: 'embedded',
+        connectionState: 'idle',
+        localBackendId: null,
+        currentInstanceId: null,
+        currentDeviceId: null,
+        backends: [],
+        sessionStreams: {},
+      }
+    );
   }
 
   subscribe(listener: (snapshot: BackendFacadeSnapshot) => void): () => void {
@@ -300,7 +327,11 @@ export class EmbeddedFacadeClient implements BackendFacade {
 
   private emitEvent(event: BackendFacadeEvent): void {
     for (const listener of this.eventListeners) {
-      try { listener(event); } catch { /* ignore */ }
+      try {
+        listener(event);
+      } catch {
+        /* ignore */
+      }
     }
   }
 }

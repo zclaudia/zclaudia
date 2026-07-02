@@ -11,32 +11,79 @@ const selectionMocks = {
 const neverSettles = new Promise(() => {});
 
 // Mock child components to isolate Sidebar
-vi.mock('../ProjectSettings', () => ({ ProjectSettings: ({ isOpen, onClose }: any) => isOpen ? <div data-testid="project-settings"><button onClick={onClose}>close-project-settings</button></div> : null }));
-vi.mock('../SearchFilters', () => ({ SearchFilters: ({ onClose, onFiltersChange }: any) => <div data-testid="search-filters"><button onClick={onClose}>close-filters</button><button onClick={() => onFiltersChange({ sessionId: 's1' })}>apply-filter</button></div> }));
-vi.mock('../ActiveSessionsPanel', () => ({ ActiveSessionsPanel: ({ onSessionSelect }: any) => <div data-testid="active-sessions"><button onClick={() => onSessionSelect('local', 'sess-1')}>select-active</button><button onClick={() => onSessionSelect('backend-1', 'sess-2')}>select-gw</button></div> }));
+vi.mock('../ProjectSettings', () => ({
+  ProjectSettings: ({ isOpen, onClose }: any) =>
+    isOpen ? (
+      <div data-testid="project-settings">
+        <button onClick={onClose}>close-project-settings</button>
+      </div>
+    ) : null,
+}));
+vi.mock('../SearchFilters', () => ({
+  SearchFilters: ({ onClose, onFiltersChange }: any) => (
+    <div data-testid="search-filters">
+      <button onClick={onClose}>close-filters</button>
+      <button onClick={() => onFiltersChange({ sessionId: 's1' })}>apply-filter</button>
+    </div>
+  ),
+}));
+vi.mock('../ActiveSessionsPanel', () => ({
+  ActiveSessionsPanel: ({ onSessionSelect }: any) => (
+    <div data-testid="active-sessions">
+      <button onClick={() => onSessionSelect('local', 'sess-1')}>select-active</button>
+      <button onClick={() => onSessionSelect('backend-1', 'sess-2')}>select-gw</button>
+    </div>
+  ),
+}));
 vi.mock('../PluginPermissionDialog', () => ({ PluginPermissionDialog: () => null }));
 vi.mock('../../features/sidebar/SessionItem', () => ({
-  SessionItem: ({ session, onSelect, isSelected, hasPending, isActive, providerName, worktreeBranch, isMobile, onPopOut }: any) => (
-    <div data-testid="session-item" data-selected={isSelected} data-pending={hasPending} data-active={isActive} data-mobile={isMobile}>
+  SessionItem: ({
+    session,
+    onSelect,
+    isSelected,
+    hasPending,
+    isActive,
+    providerName,
+    worktreeBranch,
+    isMobile,
+    onPopOut,
+  }: any) => (
+    <div
+      data-testid="session-item"
+      data-selected={isSelected}
+      data-pending={hasPending}
+      data-active={isActive}
+      data-mobile={isMobile}
+    >
       <span>{session.name}</span>
       {providerName && <span data-testid="provider-name">{providerName}</span>}
       {worktreeBranch && <span data-testid="worktree-branch">{worktreeBranch}</span>}
       <button onClick={() => onSelect(session.id)}>select-{session.id}</button>
-      {onPopOut && <button onClick={onPopOut} data-testid="pop-out">pop-out</button>}
+      {onPopOut && (
+        <button onClick={onPopOut} data-testid="pop-out">
+          pop-out
+        </button>
+      )}
     </div>
-  )
+  ),
 }));
-vi.mock('../../features/sidebar/WorktreeGroupItem', () => ({ WorktreeGroupItem: ({ children }: any) => <div data-testid="worktree-group">{children}</div> }));
+vi.mock('../../features/sidebar/WorktreeGroupItem', () => ({
+  WorktreeGroupItem: ({ children }: any) => <div data-testid="worktree-group">{children}</div>,
+}));
 vi.mock('../../features/sidebar/ProjectWorkspaceItem', () => ({
   ProjectWorkspaceItem: ({ onSelect, taskChildren, taskCount, phase }: any) => (
     <div data-testid="supervisor-group" data-phase={phase} data-task-count={taskCount}>
       <button onClick={onSelect}>select-supervisor</button>
       {taskChildren}
     </div>
-  )
+  ),
 }));
-vi.mock('../../features/sidebar/worktreeGrouping', () => ({ groupSessionsByWorktree: vi.fn().mockReturnValue([]) }));
-vi.mock('../../hooks/useSwipeBack', () => ({ useSwipeBack: vi.fn().mockReturnValue({ current: null }) }));
+vi.mock('../../features/sidebar/worktreeGrouping', () => ({
+  groupSessionsByWorktree: vi.fn().mockReturnValue([]),
+}));
+vi.mock('../../hooks/useSwipeBack', () => ({
+  useSwipeBack: vi.fn().mockReturnValue({ current: null }),
+}));
 vi.mock('../../features/automation/AutomationTree', () => ({
   AutomationTree: ({ tab }: any) => <div data-testid="automation-tree" data-tab={tab} />,
 }));
@@ -50,23 +97,36 @@ vi.mock('../../hooks/useSelectionCoordinator', () => ({
 }));
 
 // Mock services
-vi.mock('../../services/api', async (importOriginal) => {
+vi.mock('../../services/api', async importOriginal => {
   const mod = await importOriginal<Record<string, any>>();
   const stubbed: Record<string, any> = {};
   for (const key of Object.keys(mod)) {
-    stubbed[key] = key === 'ApiError'
-      ? mod[key]
-      : typeof mod[key] === 'function'
-        ? vi.fn(() => Promise.resolve(null))
-        : mod[key];
+    stubbed[key] =
+      key === 'ApiError'
+        ? mod[key]
+        : typeof mod[key] === 'function'
+          ? vi.fn(() => Promise.resolve(null))
+          : mod[key];
   }
   stubbed.getProjectWorktrees = vi.fn(() => neverSettles);
   stubbed.searchSessions = vi.fn().mockResolvedValue({ results: [], total: 0 });
   stubbed.getSearchHistory = vi.fn(() => neverSettles);
   stubbed.searchMessages = vi.fn().mockResolvedValue([]);
   stubbed.clearSearchHistory = vi.fn().mockResolvedValue(undefined);
-  stubbed.createProject = vi.fn().mockResolvedValue({ id: 'new-proj', name: 'New Project', rootPath: '/tmp/new', createdAt: Date.now(), updatedAt: Date.now() });
-  stubbed.createSession = vi.fn().mockResolvedValue({ id: 'new-sess', name: 'New Session', projectId: 'proj-1', createdAt: Date.now(), updatedAt: Date.now() });
+  stubbed.createProject = vi.fn().mockResolvedValue({
+    id: 'new-proj',
+    name: 'New Project',
+    rootPath: '/tmp/new',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  });
+  stubbed.createSession = vi.fn().mockResolvedValue({
+    id: 'new-sess',
+    name: 'New Session',
+    projectId: 'proj-1',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  });
   stubbed.deleteProject = vi.fn().mockResolvedValue(undefined);
   return stubbed;
 });
@@ -92,7 +152,7 @@ import { groupSessionsByWorktree } from '../../features/sidebar/worktreeGrouping
 import { isAndroid } from '../../utils/platform';
 import { resolveCanonicalBackendId } from '../../utils/controlPlane';
 
-vi.mock('../../utils/platform', async (importOriginal) => {
+vi.mock('../../utils/platform', async importOriginal => {
   const mod = await importOriginal<Record<string, any>>();
   return {
     ...mod,
@@ -101,8 +161,20 @@ vi.mock('../../utils/platform', async (importOriginal) => {
   };
 });
 
-const baseProject = { id: 'proj-1', name: 'Project One', rootPath: '/tmp/proj1', createdAt: Date.now(), updatedAt: Date.now() };
-const baseSession = { id: 'sess-1', name: 'Session 1', projectId: 'proj-1', createdAt: Date.now(), updatedAt: Date.now() };
+const baseProject = {
+  id: 'proj-1',
+  name: 'Project One',
+  rootPath: '/tmp/proj1',
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
+};
+const baseSession = {
+  id: 'sess-1',
+  name: 'Session 1',
+  projectId: 'proj-1',
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
+};
 const LOCAL_BACKEND_ID = 'local-standalone';
 
 function setupStores(overrides: Record<string, any> = {}) {
@@ -134,13 +206,22 @@ function setupStores(overrides: Record<string, any> = {}) {
   } as any);
 
   useServerStore.setState({
-    servers: [{ id: 'local', name: 'Local', address: 'localhost:3100', isDefault: true, createdAt: 0 }],
+    servers: [
+      { id: 'local', name: 'Local', address: 'localhost:3100', isDefault: true, createdAt: 0 },
+    ],
     activeServerId: LOCAL_BACKEND_ID,
     connections: {
-      [LOCAL_BACKEND_ID]: { status: 'connected', error: null, isLocalConnection: true, features: [] },
+      [LOCAL_BACKEND_ID]: {
+        status: 'connected',
+        error: null,
+        isLocalConnection: true,
+        features: [],
+      },
     },
     setActiveServer: vi.fn(),
-    getDefaultServer: vi.fn().mockReturnValue({ id: LOCAL_BACKEND_ID, name: 'Local', address: 'localhost:3100' }),
+    getDefaultServer: vi
+      .fn()
+      .mockReturnValue({ id: LOCAL_BACKEND_ID, name: 'Local', address: 'localhost:3100' }),
     ...overrides.serverStore,
   } as any);
 
@@ -156,7 +237,14 @@ function setupStores(overrides: Record<string, any> = {}) {
   useFacadeStore.setState({
     connectionState: 'connected',
     backends: [
-      { backendId: LOCAL_BACKEND_ID, runtimeState: 'ready', online: true, name: 'Local', isThisInstance: true, channel: 'local' },
+      {
+        backendId: LOCAL_BACKEND_ID,
+        runtimeState: 'ready',
+        online: true,
+        name: 'Local',
+        isThisInstance: true,
+        channel: 'local',
+      },
     ],
     localBackendId: LOCAL_BACKEND_ID,
     currentInstanceId: null,
@@ -272,7 +360,9 @@ describe('Sidebar', () => {
       },
       facadeStore: {
         connectionState: 'connected',
-        backends: [{ backendId: 'backend-a', runtimeState: 'ready', online: true, name: 'Backend A' }],
+        backends: [
+          { backendId: 'backend-a', runtimeState: 'ready', online: true, name: 'Backend A' },
+        ],
       },
     });
     useOwnershipStore.setState({
@@ -346,7 +436,9 @@ describe('Sidebar', () => {
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
     // When the backend is not online, no BackendRow is rendered so there is no + button.
     // Creating a project is effectively unavailable.
-    const newProjectButtons = Array.from(container.querySelectorAll<HTMLButtonElement>('button[aria-label="New project"]'));
+    const newProjectButtons = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('button[aria-label="New project"]')
+    );
     expect(newProjectButtons.length).toBe(0);
   });
 
@@ -417,10 +509,12 @@ describe('Sidebar', () => {
 
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
     const buttons = Array.from(container.querySelectorAll('button'));
-    const projBtn = buttons.find((b) => b.textContent?.includes('Project One'))!;
+    const projBtn = buttons.find(b => b.textContent?.includes('Project One'))!;
     fireEvent.click(projBtn);
 
-    expect(container.querySelector('[data-testid="session-item"]')?.getAttribute('data-pending')).toBe('true');
+    expect(
+      container.querySelector('[data-testid="session-item"]')?.getAttribute('data-pending')
+    ).toBe('true');
   });
 
   // ---- Pending indicators ----
@@ -513,7 +607,9 @@ describe('Sidebar', () => {
     const projBtn = buttons.find(b => b.textContent?.includes('Project One'))!;
     fireEvent.click(projBtn);
 
-    expect(container.querySelector('[data-testid="worktree-branch"]')?.textContent).toBe('feature-branch');
+    expect(container.querySelector('[data-testid="worktree-branch"]')?.textContent).toBe(
+      'feature-branch'
+    );
   });
 
   // ---- Background sessions filtered out ----
@@ -522,7 +618,13 @@ describe('Sidebar', () => {
     setupStores({
       projectStore: {
         sessions: [
-          { ...baseSession, id: 'sess-bg', name: 'BG Session', type: 'background', projectId: 'proj-1' },
+          {
+            ...baseSession,
+            id: 'sess-bg',
+            name: 'BG Session',
+            type: 'background',
+            projectId: 'proj-1',
+          },
           baseSession,
         ],
       },
@@ -557,7 +659,9 @@ describe('Sidebar', () => {
 
   it('shows New Project button when connected', () => {
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const newProjectBtns = Array.from(container.querySelectorAll<HTMLButtonElement>('button[aria-label="New project"]'));
+    const newProjectBtns = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('button[aria-label="New project"]')
+    );
     expect(newProjectBtns.length).toBeGreaterThan(0);
     expect(newProjectBtns[0].disabled).toBe(false);
   });
@@ -567,20 +671,30 @@ describe('Sidebar', () => {
       facadeStore: {
         connectionState: 'disconnected',
         backends: [
-          { backendId: LOCAL_BACKEND_ID, runtimeState: 'offline', name: 'Local', isThisInstance: true, channel: 'local' },
+          {
+            backendId: LOCAL_BACKEND_ID,
+            runtimeState: 'offline',
+            name: 'Local',
+            isThisInstance: true,
+            channel: 'local',
+          },
         ],
       },
     });
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
     // When disconnected there are no online backends — no BackendRow renders, so the
     // + button is absent entirely (new project creation is unavailable).
-    const newProjectBtns = Array.from(container.querySelectorAll<HTMLButtonElement>('button[aria-label="New project"]'));
+    const newProjectBtns = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('button[aria-label="New project"]')
+    );
     expect(newProjectBtns.length).toBe(0);
   });
 
   it('shows new project form when New Project is clicked', () => {
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const newProjectBtn = container.querySelector<HTMLButtonElement>('button[aria-label="New project"]')!;
+    const newProjectBtn = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="New project"]'
+    )!;
     fireEvent.click(newProjectBtn);
 
     const inputs = container.querySelectorAll('input');
@@ -593,7 +707,10 @@ describe('Sidebar', () => {
 
   it('blocks new project creation when readiness is initially unknown and refresh reports no usable agent', async () => {
     const refresh = vi.fn(async () => {
-      useAgentReadinessStore.setState({ readiness: { usable: false, reason: 'no_agent' }, loading: false });
+      useAgentReadinessStore.setState({
+        readiness: { usable: false, reason: 'no_agent' },
+        loading: false,
+      });
     });
     setupStores({
       agentReadinessStore: {
@@ -603,7 +720,9 @@ describe('Sidebar', () => {
     });
 
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const newProjectBtn = container.querySelector<HTMLButtonElement>('button[aria-label="New project"]')!;
+    const newProjectBtn = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="New project"]'
+    )!;
     fireEvent.click(newProjectBtn);
 
     await waitFor(() => {
@@ -616,7 +735,10 @@ describe('Sidebar', () => {
   it('opens top-level Settings from the agent setup dialog configure action', async () => {
     const onOpenSettings = vi.fn();
     const refresh = vi.fn(async () => {
-      useAgentReadinessStore.setState({ readiness: { usable: false, reason: 'no_agent' }, loading: false });
+      useAgentReadinessStore.setState({
+        readiness: { usable: false, reason: 'no_agent' },
+        loading: false,
+      });
     });
     setupStores({
       agentReadinessStore: {
@@ -628,7 +750,9 @@ describe('Sidebar', () => {
     const { container } = render(
       <Sidebar collapsed={false} onToggle={vi.fn()} onOpenSettings={onOpenSettings} />
     );
-    const newProjectBtn = container.querySelector<HTMLButtonElement>('button[aria-label="New project"]')!;
+    const newProjectBtn = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="New project"]'
+    )!;
     fireEvent.click(newProjectBtn);
 
     await waitFor(() => {
@@ -649,7 +773,9 @@ describe('Sidebar', () => {
 
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
     // Open form
-    const newProjectBtn = container.querySelector<HTMLButtonElement>('button[aria-label="New project"]')!;
+    const newProjectBtn = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="New project"]'
+    )!;
     fireEvent.click(newProjectBtn);
 
     const inputs = container.querySelectorAll('input');
@@ -663,11 +789,14 @@ describe('Sidebar', () => {
       fireEvent.click(createBtn);
     });
 
-    expect(api.createProject).toHaveBeenCalledWith({
-      name: 'My New Project',
-      type: 'code',
-      rootPath: undefined,
-    }, 'local-standalone');
+    expect(api.createProject).toHaveBeenCalledWith(
+      {
+        name: 'My New Project',
+        type: 'code',
+        rootPath: undefined,
+      },
+      'local-standalone'
+    );
   });
 
   it('blocks project submit when readiness becomes unusable while the form is open', async () => {
@@ -688,7 +817,9 @@ describe('Sidebar', () => {
     });
 
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const newProjectBtn = container.querySelector<HTMLButtonElement>('button[aria-label="New project"]')!;
+    const newProjectBtn = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="New project"]'
+    )!;
     fireEvent.click(newProjectBtn);
 
     const nameInput = container.querySelector('input[placeholder="Project name"]')!;
@@ -696,7 +827,9 @@ describe('Sidebar', () => {
     shouldFailReadiness = true;
     useAgentReadinessStore.setState({ readiness: null, refresh } as any);
 
-    const createBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Create')!;
+    const createBtn = Array.from(container.querySelectorAll('button')).find(
+      b => b.textContent === 'Create'
+    )!;
     await act(async () => {
       fireEvent.click(createBtn);
     });
@@ -709,7 +842,9 @@ describe('Sidebar', () => {
 
   it('cancels new project form', () => {
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const newProjectBtn = container.querySelector<HTMLButtonElement>('button[aria-label="New project"]')!;
+    const newProjectBtn = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="New project"]'
+    )!;
     fireEvent.click(newProjectBtn);
 
     // Click Cancel
@@ -725,7 +860,9 @@ describe('Sidebar', () => {
 
   it('cancels new project form on Escape key', () => {
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const newProjectBtn = container.querySelector<HTMLButtonElement>('button[aria-label="New project"]')!;
+    const newProjectBtn = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="New project"]'
+    )!;
     fireEvent.click(newProjectBtn);
 
     const inputs = container.querySelectorAll('input');
@@ -733,7 +870,9 @@ describe('Sidebar', () => {
     fireEvent.keyDown(nameInput, { key: 'Escape' });
 
     // Form should be gone
-    const nameInputAfter = Array.from(container.querySelectorAll('input')).find(i => i.placeholder === 'Project name');
+    const nameInputAfter = Array.from(container.querySelectorAll('input')).find(
+      i => i.placeholder === 'Project name'
+    );
     expect(nameInputAfter).toBeFalsy();
   });
 
@@ -742,7 +881,9 @@ describe('Sidebar', () => {
     setupStores({ projectStore: { addProject } });
 
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const newProjectBtn = container.querySelector<HTMLButtonElement>('button[aria-label="New project"]')!;
+    const newProjectBtn = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="New project"]'
+    )!;
     fireEvent.click(newProjectBtn);
 
     const inputs = container.querySelectorAll('input');
@@ -755,11 +896,14 @@ describe('Sidebar', () => {
       fireEvent.keyDown(pathInput, { key: 'Enter' });
     });
 
-    expect(api.createProject).toHaveBeenCalledWith({
-      name: 'Test Project',
-      type: 'code',
-      rootPath: '/tmp/test',
-    }, 'local-standalone');
+    expect(api.createProject).toHaveBeenCalledWith(
+      {
+        name: 'Test Project',
+        type: 'code',
+        rootPath: '/tmp/test',
+      },
+      'local-standalone'
+    );
   });
 
   // ---- Context menu ----
@@ -797,9 +941,13 @@ describe('Sidebar', () => {
       fireEvent.click(dotsButtons[0], { clientX: 100, clientY: 100 });
 
       // Find Settings button in portal
-      const allSettingsButtons = Array.from(document.querySelectorAll('button')).filter(b => b.textContent?.trim() === 'Settings');
+      const allSettingsButtons = Array.from(document.querySelectorAll('button')).filter(
+        b => b.textContent?.trim() === 'Settings'
+      );
       // Click the one inside the context menu (not the sidebar settings button)
-      const contextSettingsBtn = allSettingsButtons.find(b => b.closest('.fixed.w-36') || b.closest('.fixed.w-44'));
+      const contextSettingsBtn = allSettingsButtons.find(
+        b => b.closest('.fixed.w-36') || b.closest('.fixed.w-44')
+      );
       if (contextSettingsBtn) {
         fireEvent.click(contextSettingsBtn);
         expect(document.querySelector('[data-testid="project-settings"]')).toBeTruthy();
@@ -819,7 +967,9 @@ describe('Sidebar', () => {
     if (dotsButtons.length > 0) {
       fireEvent.click(dotsButtons[0], { clientX: 100, clientY: 100 });
 
-      const deleteBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.trim() === 'Delete');
+      const deleteBtn = Array.from(document.querySelectorAll('button')).find(
+        b => b.textContent?.trim() === 'Delete'
+      );
       if (deleteBtn) {
         await act(async () => {
           fireEvent.click(deleteBtn);
@@ -843,11 +993,15 @@ describe('Sidebar', () => {
 
     if (dotsButtons.length > 0) {
       fireEvent.click(dotsButtons[0], { clientX: 100, clientY: 100 });
-      const newSessionBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.trim() === 'New Session');
+      const newSessionBtn = Array.from(document.querySelectorAll('button')).find(
+        b => b.textContent?.trim() === 'New Session'
+      );
       if (newSessionBtn) {
         fireEvent.click(newSessionBtn);
         // Should show session creation form
-        const sessionInput = container.querySelector('input[placeholder="Session name (optional)"]');
+        const sessionInput = container.querySelector(
+          'input[placeholder="Session name (optional)"]'
+        );
         expect(sessionInput).toBeTruthy();
       }
     }
@@ -873,15 +1027,21 @@ describe('Sidebar', () => {
 
     if (dotsButtons.length > 0) {
       fireEvent.click(dotsButtons[0], { clientX: 100, clientY: 100 });
-      const newSessionBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.trim() === 'New Session');
+      const newSessionBtn = Array.from(document.querySelectorAll('button')).find(
+        b => b.textContent?.trim() === 'New Session'
+      );
       if (newSessionBtn) {
         fireEvent.click(newSessionBtn);
         // Fill session name
-        const sessionInput = container.querySelector('input[placeholder="Session name (optional)"]')!;
+        const sessionInput = container.querySelector(
+          'input[placeholder="Session name (optional)"]'
+        )!;
         fireEvent.change(sessionInput, { target: { value: 'My Session' } });
 
         // Click Create
-        const createBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Create')!;
+        const createBtn = Array.from(container.querySelectorAll('button')).find(
+          b => b.textContent === 'Create'
+        )!;
         await act(async () => {
           fireEvent.click(createBtn);
         });
@@ -907,10 +1067,14 @@ describe('Sidebar', () => {
 
     if (dotsButtons.length > 0) {
       fireEvent.click(dotsButtons[0], { clientX: 100, clientY: 100 });
-      const newSessionBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.trim() === 'New Session');
+      const newSessionBtn = Array.from(document.querySelectorAll('button')).find(
+        b => b.textContent?.trim() === 'New Session'
+      );
       if (newSessionBtn) {
         fireEvent.click(newSessionBtn);
-        const sessionInput = container.querySelector('input[placeholder="Session name (optional)"]')!;
+        const sessionInput = container.querySelector(
+          'input[placeholder="Session name (optional)"]'
+        )!;
         fireEvent.keyDown(sessionInput, { key: 'Escape' });
         expect(container.querySelector('input[placeholder="Session name (optional)"]')).toBeFalsy();
       }
@@ -930,10 +1094,14 @@ describe('Sidebar', () => {
 
     if (dotsButtons.length > 0) {
       fireEvent.click(dotsButtons[0], { clientX: 100, clientY: 100 });
-      const newSessionBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.trim() === 'New Session');
+      const newSessionBtn = Array.from(document.querySelectorAll('button')).find(
+        b => b.textContent?.trim() === 'New Session'
+      );
       if (newSessionBtn) {
         fireEvent.click(newSessionBtn);
-        const sessionInput = container.querySelector('input[placeholder="Session name (optional)"]')!;
+        const sessionInput = container.querySelector(
+          'input[placeholder="Session name (optional)"]'
+        )!;
         fireEvent.change(sessionInput, { target: { value: 'Enter Session' } });
         await act(async () => {
           fireEvent.keyDown(sessionInput, { key: 'Enter' });
@@ -964,7 +1132,9 @@ describe('Sidebar', () => {
     const projBtn = buttons.find(b => b.textContent?.includes('Project One'))!;
     fireEvent.click(projBtn);
 
-    const newSessionBtn = projBtn.closest('div')!.querySelector('button[aria-label="New session"]') as HTMLButtonElement;
+    const newSessionBtn = projBtn
+      .closest('div')!
+      .querySelector('button[aria-label="New session"]') as HTMLButtonElement;
     fireEvent.click(newSessionBtn);
 
     const sessionInput = container.querySelector('input[placeholder="Session name (optional)"]')!;
@@ -972,7 +1142,9 @@ describe('Sidebar', () => {
     shouldFailReadiness = true;
     useAgentReadinessStore.setState({ readiness: null, refresh } as any);
 
-    const createBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Create')!;
+    const createBtn = Array.from(container.querySelectorAll('button')).find(
+      b => b.textContent === 'Create'
+    )!;
     await act(async () => {
       fireEvent.click(createBtn);
     });
@@ -990,7 +1162,10 @@ describe('Sidebar', () => {
       },
     });
     (api.createSession as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
-      new api.ApiError('No usable agent profile is available.', 'AGENT_NOT_READY', { usable: false, reason: 'no_credential' }),
+      new api.ApiError('No usable agent profile is available.', 'AGENT_NOT_READY', {
+        usable: false,
+        reason: 'no_credential',
+      })
     );
 
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
@@ -998,10 +1173,14 @@ describe('Sidebar', () => {
     const projBtn = buttons.find(b => b.textContent?.includes('Project One'))!;
     fireEvent.click(projBtn);
 
-    const newSessionBtn = projBtn.closest('div')!.querySelector('button[aria-label="New session"]') as HTMLButtonElement;
+    const newSessionBtn = projBtn
+      .closest('div')!
+      .querySelector('button[aria-label="New session"]') as HTMLButtonElement;
     fireEvent.click(newSessionBtn);
 
-    const createBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Create')!;
+    const createBtn = Array.from(container.querySelectorAll('button')).find(
+      b => b.textContent === 'Create'
+    )!;
     await act(async () => {
       fireEvent.click(createBtn);
     });
@@ -1022,7 +1201,9 @@ describe('Sidebar', () => {
 
   it('shows "Searching..." while search is in progress', async () => {
     // Make searchMessages hang to test loading state
-    (api.searchMessages as ReturnType<typeof vi.fn>).mockImplementation(() => new Promise(() => {}));
+    (api.searchMessages as ReturnType<typeof vi.fn>).mockImplementation(
+      () => new Promise(() => {})
+    );
 
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
     const searchInput = getSearchInput(container)!;
@@ -1057,7 +1238,13 @@ describe('Sidebar', () => {
   it('displays search results', async () => {
     vi.useFakeTimers();
     (api.searchMessages as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { id: 'r1', sessionId: 'sess-1', sessionName: 'Test Session', content: 'Hello world', ownerBackendId: 'local' },
+      {
+        id: 'r1',
+        sessionId: 'sess-1',
+        sessionName: 'Test Session',
+        content: 'Hello world',
+        ownerBackendId: 'local',
+      },
     ]);
     (api.getSearchHistory as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
@@ -1078,7 +1265,13 @@ describe('Sidebar', () => {
   it('selects session from search results', async () => {
     vi.useFakeTimers();
     (api.searchMessages as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { id: 'r1', sessionId: 'sess-1', sessionName: 'Test Session', content: 'Hello world', ownerBackendId: 'local' },
+      {
+        id: 'r1',
+        sessionId: 'sess-1',
+        sessionName: 'Test Session',
+        content: 'Hello world',
+        ownerBackendId: 'local',
+      },
     ]);
     (api.getSearchHistory as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
@@ -1091,7 +1284,9 @@ describe('Sidebar', () => {
     await advanceDebounce(350);
 
     // Click the search result
-    const resultButtons = Array.from(document.body.querySelectorAll('button')).filter(b => b.textContent?.includes('Test Session'));
+    const resultButtons = Array.from(document.body.querySelectorAll('button')).filter(b =>
+      b.textContent?.includes('Test Session')
+    );
     if (resultButtons.length > 0) {
       fireEvent.click(resultButtons[0]);
       expect(selectionMocks.selectSession).toHaveBeenCalledWith('sess-1', { backendId: 'local' });
@@ -1102,7 +1297,13 @@ describe('Sidebar', () => {
   it('selects remote session from search results using owner backend id', async () => {
     vi.useFakeTimers();
     (api.searchMessages as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { id: 'r1', sessionId: 'sess-2', sessionName: 'Remote Session', content: 'Hello remote', ownerBackendId: 'backend-1' },
+      {
+        id: 'r1',
+        sessionId: 'sess-2',
+        sessionName: 'Remote Session',
+        content: 'Hello remote',
+        ownerBackendId: 'backend-1',
+      },
     ]);
     (api.getSearchHistory as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
@@ -1114,10 +1315,14 @@ describe('Sidebar', () => {
     });
     await advanceDebounce(350);
 
-    const resultButtons = Array.from(document.body.querySelectorAll('button')).filter(b => b.textContent?.includes('Remote Session'));
+    const resultButtons = Array.from(document.body.querySelectorAll('button')).filter(b =>
+      b.textContent?.includes('Remote Session')
+    );
     if (resultButtons.length > 0) {
       fireEvent.click(resultButtons[0]);
-      expect(selectionMocks.selectSession).toHaveBeenCalledWith('sess-2', { backendId: 'backend-1' });
+      expect(selectionMocks.selectSession).toHaveBeenCalledWith('sess-2', {
+        backendId: 'backend-1',
+      });
     }
     vi.useRealTimers();
   });
@@ -1125,7 +1330,14 @@ describe('Sidebar', () => {
   it('shows search result type badge for file results', async () => {
     vi.useFakeTimers();
     (api.searchMessages as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { id: 'r1', sessionId: 'sess-1', sessionName: 'Sess', content: 'file content', resultType: 'file', ownerBackendId: 'local' },
+      {
+        id: 'r1',
+        sessionId: 'sess-1',
+        sessionName: 'Sess',
+        content: 'file content',
+        resultType: 'file',
+        ownerBackendId: 'local',
+      },
     ]);
     (api.getSearchHistory as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
@@ -1144,7 +1356,14 @@ describe('Sidebar', () => {
   it('shows search result type badge for tool results', async () => {
     vi.useFakeTimers();
     (api.searchMessages as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { id: 'r1', sessionId: 'sess-1', sessionName: 'Sess', content: 'tool content', resultType: 'tool', ownerBackendId: 'local' },
+      {
+        id: 'r1',
+        sessionId: 'sess-1',
+        sessionName: 'Sess',
+        content: 'tool content',
+        resultType: 'tool',
+        ownerBackendId: 'local',
+      },
     ]);
     (api.getSearchHistory as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
@@ -1163,7 +1382,10 @@ describe('Sidebar', () => {
   it('shows Load More button when there are more results', async () => {
     vi.useFakeTimers();
     const fiftyResults = Array.from({ length: 50 }, (_, i) => ({
-      id: `r${i}`, sessionId: 'sess-1', sessionName: `Session ${i}`, content: `content ${i}`,
+      id: `r${i}`,
+      sessionId: 'sess-1',
+      sessionName: `Session ${i}`,
+      content: `content ${i}`,
     }));
     (api.searchMessages as ReturnType<typeof vi.fn>).mockResolvedValue(fiftyResults);
     (api.getSearchHistory as ReturnType<typeof vi.fn>).mockResolvedValue([]);
@@ -1206,7 +1428,13 @@ describe('Sidebar', () => {
       facadeStore: {
         connectionState: 'disconnected',
         backends: [
-          { backendId: LOCAL_BACKEND_ID, runtimeState: 'offline', name: 'Local', isThisInstance: true, channel: 'local' },
+          {
+            backendId: LOCAL_BACKEND_ID,
+            runtimeState: 'offline',
+            name: 'Local',
+            isThisInstance: true,
+            channel: 'local',
+          },
         ],
       },
     });
@@ -1214,7 +1442,9 @@ describe('Sidebar', () => {
 
     // When disconnected there are no online backends — no BackendRow renders,
     // so the + button is absent entirely (new project creation is unavailable).
-    const newProjectBtns = Array.from(container.querySelectorAll<HTMLButtonElement>('button[aria-label="New project"]'));
+    const newProjectBtns = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('button[aria-label="New project"]')
+    );
     expect(newProjectBtns.length).toBe(0);
   });
 
@@ -1223,7 +1453,13 @@ describe('Sidebar', () => {
   it('renders as overlay drawer in mobile mode when open', () => {
     const onClose = vi.fn();
     const { container } = render(
-      <Sidebar collapsed={false} onToggle={vi.fn()} isMobile={true} isOpen={true} onClose={onClose} />
+      <Sidebar
+        collapsed={false}
+        onToggle={vi.fn()}
+        isMobile={true}
+        isOpen={true}
+        onClose={onClose}
+      />
     );
     // Should show mobile header with ZClaudia title
     expect(container.textContent).toContain('ZClaudia');
@@ -1234,7 +1470,13 @@ describe('Sidebar', () => {
 
   it('returns null in mobile mode when not open', () => {
     const { container } = render(
-      <Sidebar collapsed={false} onToggle={vi.fn()} isMobile={true} isOpen={false} onClose={vi.fn()} />
+      <Sidebar
+        collapsed={false}
+        onToggle={vi.fn()}
+        isMobile={true}
+        isOpen={false}
+        onClose={vi.fn()}
+      />
     );
     expect(container.innerHTML).toBe('');
   });
@@ -1242,7 +1484,13 @@ describe('Sidebar', () => {
   it('closes mobile drawer when backdrop is clicked', () => {
     const onClose = vi.fn();
     const { container } = render(
-      <Sidebar collapsed={false} onToggle={vi.fn()} isMobile={true} isOpen={true} onClose={onClose} />
+      <Sidebar
+        collapsed={false}
+        onToggle={vi.fn()}
+        isMobile={true}
+        isOpen={true}
+        onClose={onClose}
+      />
     );
     const backdrop = container.querySelector('.fixed.inset-0');
     if (backdrop) {
@@ -1254,7 +1502,13 @@ describe('Sidebar', () => {
   it('shows close button in mobile mode', () => {
     const onClose = vi.fn();
     const { container } = render(
-      <Sidebar collapsed={false} onToggle={vi.fn()} isMobile={true} isOpen={true} onClose={onClose} />
+      <Sidebar
+        collapsed={false}
+        onToggle={vi.fn()}
+        isMobile={true}
+        isOpen={true}
+        onClose={onClose}
+      />
     );
     const closeBtn = container.querySelector('button[title="Close menu"]');
     expect(closeBtn).toBeTruthy();
@@ -1270,14 +1524,22 @@ describe('Sidebar', () => {
     setupStores({ projectStore: { selectSession } });
 
     const { container } = render(
-      <Sidebar collapsed={false} onToggle={vi.fn()} isMobile={true} isOpen={true} onClose={onClose} />
+      <Sidebar
+        collapsed={false}
+        onToggle={vi.fn()}
+        isMobile={true}
+        isOpen={true}
+        onClose={onClose}
+      />
     );
     // Expand project
     const buttons = Array.from(container.querySelectorAll('button'));
     const projBtn = buttons.find(b => b.textContent?.includes('Project One'))!;
     fireEvent.click(projBtn);
 
-    const sessBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'select-sess-1');
+    const sessBtn = Array.from(container.querySelectorAll('button')).find(
+      b => b.textContent === 'select-sess-1'
+    );
     if (sessBtn) {
       fireEvent.click(sessBtn);
       expect(onClose).toHaveBeenCalled();
@@ -1293,7 +1555,9 @@ describe('Sidebar', () => {
 
   it('handles active session selection for local backend', () => {
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const localBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'select-active');
+    const localBtn = Array.from(container.querySelectorAll('button')).find(
+      b => b.textContent === 'select-active'
+    );
     if (localBtn) {
       fireEvent.click(localBtn);
       expect(selectionMocks.selectSessionOnBackend).toHaveBeenCalledWith(
@@ -1305,7 +1569,9 @@ describe('Sidebar', () => {
 
   it('handles active session selection for remote backend', () => {
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const remoteBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'select-gw');
+    const remoteBtn = Array.from(container.querySelectorAll('button')).find(
+      b => b.textContent === 'select-gw'
+    );
     if (remoteBtn) {
       fireEvent.click(remoteBtn);
       expect(selectionMocks.selectSessionOnBackend).toHaveBeenCalledWith('backend-1', 'sess-2');
@@ -1321,8 +1587,12 @@ describe('Sidebar', () => {
       },
     });
 
-    const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} isMobile={true} isOpen={true} />);
-    const projBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent?.includes('Project One'))!;
+    const { container } = render(
+      <Sidebar collapsed={false} onToggle={vi.fn()} isMobile={true} isOpen={true} />
+    );
+    const projBtn = Array.from(container.querySelectorAll('button')).find(b =>
+      b.textContent?.includes('Project One')
+    )!;
     fireEvent.click(projBtn);
 
     expect(container.querySelector('[aria-label="Workspace active"]')).toBeTruthy();
@@ -1335,8 +1605,12 @@ describe('Sidebar', () => {
       },
     });
 
-    const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} isMobile={true} isOpen={true} />);
-    const projBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent?.includes('Project One'))!;
+    const { container } = render(
+      <Sidebar collapsed={false} onToggle={vi.fn()} isMobile={true} isOpen={true} />
+    );
+    const projBtn = Array.from(container.querySelectorAll('button')).find(b =>
+      b.textContent?.includes('Project One')
+    )!;
     fireEvent.click(projBtn);
 
     expect(container.querySelector('[aria-label="Workspace paused"]')).toBeTruthy();
@@ -1351,8 +1625,21 @@ describe('Sidebar', () => {
       },
       projectStore: {
         sessions: [
-          { ...baseSession, id: 'main-sess', name: 'Main', projectRole: 'main', projectId: 'proj-1' },
-          { ...baseSession, id: 'task-1', name: 'Task 1', projectRole: 'task', parentSessionId: 'main-sess', projectId: 'proj-1' },
+          {
+            ...baseSession,
+            id: 'main-sess',
+            name: 'Main',
+            projectRole: 'main',
+            projectId: 'proj-1',
+          },
+          {
+            ...baseSession,
+            id: 'task-1',
+            name: 'Task 1',
+            projectRole: 'task',
+            parentSessionId: 'main-sess',
+            projectId: 'proj-1',
+          },
         ],
       },
     });
@@ -1371,9 +1658,7 @@ describe('Sidebar', () => {
         agents: { 'proj-1': { phase: 'idle', mainSessionId: 'main-sess' } },
       },
       projectStore: {
-        sessions: [
-          { ...baseSession, id: 'regular-1', name: 'Regular 1', projectId: 'proj-1' },
-        ],
+        sessions: [{ ...baseSession, id: 'regular-1', name: 'Regular 1', projectId: 'proj-1' }],
       },
     });
 
@@ -1388,11 +1673,15 @@ describe('Sidebar', () => {
   it('renders supervisor group from project agent before supervision store hydration', () => {
     setupStores({
       projectStore: {
-        projects: [
-          { ...baseProject, agent: { phase: 'idle', mainSessionId: 'main-sess' } },
-        ],
+        projects: [{ ...baseProject, agent: { phase: 'idle', mainSessionId: 'main-sess' } }],
         sessions: [
-          { ...baseSession, id: 'main-sess', name: 'Main', projectRole: 'main', projectId: 'proj-1' },
+          {
+            ...baseSession,
+            id: 'main-sess',
+            name: 'Main',
+            projectRole: 'main',
+            projectId: 'proj-1',
+          },
         ],
       },
     });
@@ -1413,7 +1702,13 @@ describe('Sidebar', () => {
     setupStores({
       projectStore: {
         sessions: [
-          { ...baseSession, id: 'main-sess', name: 'Main', projectRole: 'main', projectId: 'proj-1' },
+          {
+            ...baseSession,
+            id: 'main-sess',
+            name: 'Main',
+            projectRole: 'main',
+            projectId: 'proj-1',
+          },
         ],
       },
     });
@@ -1447,8 +1742,21 @@ describe('Sidebar', () => {
       },
       projectStore: {
         sessions: [
-          { ...baseSession, id: 'main-sess', name: 'Main', projectRole: 'main', projectId: 'proj-1' },
-          { ...baseSession, id: 'task-1', name: 'Task 1', projectRole: 'task', parentSessionId: 'main-sess', projectId: 'proj-1' },
+          {
+            ...baseSession,
+            id: 'main-sess',
+            name: 'Main',
+            projectRole: 'main',
+            projectId: 'proj-1',
+          },
+          {
+            ...baseSession,
+            id: 'task-1',
+            name: 'Task 1',
+            projectRole: 'task',
+            parentSessionId: 'main-sess',
+            projectId: 'proj-1',
+          },
           { ...baseSession, id: 'regular-1', name: 'Regular 1', projectId: 'proj-1' },
           { ...baseSession, id: 'regular-2', name: 'Regular 2', projectId: 'proj-1' },
         ],
@@ -1473,9 +1781,30 @@ describe('Sidebar', () => {
       },
       projectStore: {
         sessions: [
-          { ...baseSession, id: 'main-sess', name: 'Main', projectRole: 'main', projectId: 'proj-1', workingDirectory: '/tmp/proj1' },
-          { ...baseSession, id: 'task-1', name: 'Task 1', projectRole: 'task', parentSessionId: 'main-sess', projectId: 'proj-1', workingDirectory: '/tmp/proj1' },
-          { ...baseSession, id: 'regular-1', name: 'Regular 1', projectId: 'proj-1', workingDirectory: '/tmp/proj1/wt-test1' },
+          {
+            ...baseSession,
+            id: 'main-sess',
+            name: 'Main',
+            projectRole: 'main',
+            projectId: 'proj-1',
+            workingDirectory: '/tmp/proj1',
+          },
+          {
+            ...baseSession,
+            id: 'task-1',
+            name: 'Task 1',
+            projectRole: 'task',
+            parentSessionId: 'main-sess',
+            projectId: 'proj-1',
+            workingDirectory: '/tmp/proj1',
+          },
+          {
+            ...baseSession,
+            id: 'regular-1',
+            name: 'Regular 1',
+            projectId: 'proj-1',
+            workingDirectory: '/tmp/proj1/wt-test1',
+          },
         ],
       },
     });
@@ -1503,7 +1832,13 @@ describe('Sidebar', () => {
       },
       projectStore: {
         sessions: [
-          { ...baseSession, id: 'main-sess', name: 'Main', projectRole: 'main', projectId: 'proj-1' },
+          {
+            ...baseSession,
+            id: 'main-sess',
+            name: 'Main',
+            projectRole: 'main',
+            projectId: 'proj-1',
+          },
         ],
       },
     });
@@ -1515,7 +1850,9 @@ describe('Sidebar', () => {
     const projBtn = buttons.find(b => b.textContent?.includes('Project One'))!;
     fireEvent.click(projBtn);
 
-    const selectSupervisorBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'select-supervisor');
+    const selectSupervisorBtn = Array.from(container.querySelectorAll('button')).find(
+      b => b.textContent === 'select-supervisor'
+    );
     if (selectSupervisorBtn) {
       fireEvent.click(selectSupervisorBtn);
       expect(onOpenDashboard).toHaveBeenCalledWith('proj-1');
@@ -1529,7 +1866,13 @@ describe('Sidebar', () => {
       projectStore: {
         projects: [
           baseProject,
-          { id: 'proj-2', name: 'Project Two', rootPath: '/tmp/proj2', createdAt: Date.now(), updatedAt: Date.now() },
+          {
+            id: 'proj-2',
+            name: 'Project Two',
+            rootPath: '/tmp/proj2',
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          },
         ],
       },
     });
@@ -1545,7 +1888,7 @@ describe('Sidebar', () => {
     setupStores({
       agentProfileMetaStore: {
         profiles: {
-          'a1': {
+          a1: {
             id: 'a1',
             name: 'Default Coding Agent',
             llmProfileId: 'l1',
@@ -1556,7 +1899,7 @@ describe('Sidebar', () => {
             createdAt: 0,
             updatedAt: 0,
           },
-          'a2': {
+          a2: {
             id: 'a2',
             name: 'Doc Writer',
             llmProfileId: 'l1',
@@ -1578,25 +1921,25 @@ describe('Sidebar', () => {
     fireEvent.click(projBtn);
 
     // Open context menu (dots button next to project)
-    const dotsButtons = Array.from(container.querySelectorAll('button')).filter(b =>
-      b.className.includes('flex-shrink-0') && b.textContent?.trim() === ''
+    const dotsButtons = Array.from(container.querySelectorAll('button')).filter(
+      b => b.className.includes('flex-shrink-0') && b.textContent?.trim() === ''
     );
 
     // Mirrors the guard used by the existing context-menu tests; the supervisor
     // / multi-button layout means the dots button isn't always present in jsdom.
     if (dotsButtons.length > 0) {
       fireEvent.click(dotsButtons[0], { clientX: 100, clientY: 100 });
-      const newSessionBtn = Array.from(document.querySelectorAll('button')).find(b =>
-        b.textContent?.trim() === 'New Session'
+      const newSessionBtn = Array.from(document.querySelectorAll('button')).find(
+        b => b.textContent?.trim() === 'New Session'
       );
 
       if (newSessionBtn) {
         fireEvent.click(newSessionBtn);
 
         // Agent Select trigger shows "Default (from project)" before any agent picked.
-        const agentTrigger = Array.from(container.querySelectorAll<HTMLButtonElement>(
-          'button[aria-haspopup="listbox"]'
-        )).find((b) => b.textContent?.includes('Default (from project)'));
+        const agentTrigger = Array.from(
+          container.querySelectorAll<HTMLButtonElement>('button[aria-haspopup="listbox"]')
+        ).find(b => b.textContent?.includes('Default (from project)'));
         expect(agentTrigger).toBeTruthy();
         fireEvent.click(agentTrigger!);
 
@@ -1609,9 +1952,13 @@ describe('Sidebar', () => {
 
         // Pick Doc Writer, then submit.
         fireEvent.click(docOpt as Element);
-        const sessionInput = container.querySelector('input[placeholder="Session name (optional)"]')!;
+        const sessionInput = container.querySelector(
+          'input[placeholder="Session name (optional)"]'
+        )!;
         fireEvent.change(sessionInput, { target: { value: 'My Session' } });
-        const createBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Create')!;
+        const createBtn = Array.from(container.querySelectorAll('button')).find(
+          b => b.textContent === 'Create'
+        )!;
         await act(async () => {
           fireEvent.click(createBtn);
         });
@@ -1630,7 +1977,12 @@ describe('Sidebar', () => {
   it('normalizes search preview whitespace', async () => {
     vi.useFakeTimers();
     (api.searchMessages as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { id: 'r1', sessionId: 'sess-1', sessionName: 'Sess', content: '  hello   world  \n\n  foo  ' },
+      {
+        id: 'r1',
+        sessionId: 'sess-1',
+        sessionName: 'Sess',
+        content: '  hello   world  \n\n  foo  ',
+      },
     ]);
     (api.getSearchHistory as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
@@ -1699,7 +2051,9 @@ describe('Sidebar', () => {
     const searchInput = getSearchInput(container)!;
     fireEvent.focus(searchInput);
 
-    const clearBtn = Array.from(document.body.querySelectorAll('button')).find(b => b.textContent?.trim() === 'Clear');
+    const clearBtn = Array.from(document.body.querySelectorAll('button')).find(
+      b => b.textContent?.trim() === 'Clear'
+    );
     if (clearBtn) {
       await act(async () => {
         fireEvent.click(clearBtn);
@@ -1723,7 +2077,9 @@ describe('Sidebar', () => {
     const searchInput = getSearchInput(container)!;
     fireEvent.focus(searchInput);
 
-    const historyBtn = Array.from(document.body.querySelectorAll('button')).find(b => b.textContent?.includes('old search'));
+    const historyBtn = Array.from(document.body.querySelectorAll('button')).find(b =>
+      b.textContent?.includes('old search')
+    );
     if (historyBtn) {
       fireEvent.click(historyBtn);
       // Wait for the 300ms debounce in handleSearch

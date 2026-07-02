@@ -9,7 +9,10 @@ import type {
   InteractionResolvedMessage,
 } from '@zclaudia/shared/interaction/forms';
 import type { ConnectedClient, ActiveRun } from '../transport/types.js';
-import { handlePermissionDecision, handlePromptAnswer } from '../interactions/permission-handler.js';
+import {
+  handlePermissionDecision,
+  handlePromptAnswer,
+} from '../interactions/permission-handler.js';
 import { interactionDispatcher } from '../interactions/interaction-dispatcher.js';
 import { permissionManager as pluginPermissionManager } from '../../../application/plugins/index.js';
 import { broadcastRunMessage } from '../transport/broadcast.js';
@@ -20,15 +23,21 @@ export function handlePermission(
   activeRuns: Map<string, ActiveRun>,
   connectedClients: Map<string, ConnectedClient>,
   permissionBridge?: PermissionBridge,
-  cancelWorkflowRun?: (runId: string) => void,
+  cancelWorkflowRun?: (runId: string) => void
 ): void {
-  handlePermissionDecision(message, activeRuns, connectedClients, permissionBridge, cancelWorkflowRun);
+  handlePermissionDecision(
+    message,
+    activeRuns,
+    connectedClients,
+    permissionBridge,
+    cancelWorkflowRun
+  );
 }
 
 export function handlePromptAnswerMessage(
   message: PromptAnswerMessage,
   activeRuns: Map<string, ActiveRun>,
-  connectedClients: Map<string, ConnectedClient>,
+  connectedClients: Map<string, ConnectedClient>
 ): void {
   handlePromptAnswer(message, activeRuns, connectedClients);
 }
@@ -36,7 +45,7 @@ export function handlePromptAnswerMessage(
 export function handleInteractionResponse(
   message: InteractionResponseMessage,
   activeRuns: Map<string, ActiveRun>,
-  clients: Map<string, ConnectedClient>,
+  clients: Map<string, ConnectedClient>
 ): void {
   const resolved = interactionDispatcher.resolve(message.interactionId, message.response);
   if (resolved) {
@@ -58,7 +67,7 @@ export function handleInteractionResponse(
 
 export function handlePluginPermissionResponse(
   message: PluginPermissionResponseMessage,
-  broadcastPluginState: () => void,
+  broadcastPluginState: () => void
 ): void {
   const { pluginId, granted, permanently } = message;
   pluginPermissionManager.respondToRequest(pluginId, granted, permanently);

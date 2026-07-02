@@ -217,7 +217,6 @@ describe('FileViewerPanel', () => {
     expect(screen.queryByTestId('file-tree')).not.toBeInTheDocument();
     expect(screen.getByTestId('code-viewer')).toBeInTheDocument();
   });
-
 });
 
 describe('FileViewerActions', () => {
@@ -244,7 +243,9 @@ describe('FileViewerActions', () => {
   it('shows copied state after copy button is clicked', async () => {
     mockFileViewerState.content = 'some content';
     const { container } = render(<FileViewerActions />);
-    const copyBtn = container.querySelector('button[title="Copy file content"]') as HTMLButtonElement;
+    const copyBtn = container.querySelector(
+      'button[title="Copy file content"]'
+    ) as HTMLButtonElement;
 
     // Mock clipboard
     vi.stubGlobal('navigator', {
@@ -265,7 +266,9 @@ describe('FileViewerActions', () => {
   it('toggles search open state when search button is clicked', () => {
     mockFileViewerState.searchOpen = false;
     const { container } = render(<FileViewerActions />);
-    const searchBtn = container.querySelector('button[title="Search files (Cmd+P)"]') as HTMLButtonElement;
+    const searchBtn = container.querySelector(
+      'button[title="Search files (Cmd+P)"]'
+    ) as HTMLButtonElement;
 
     searchBtn.click();
     expect(mockFileViewerState.setSearchOpen).toHaveBeenCalledWith(true);
@@ -295,7 +298,9 @@ describe('FileViewerActions', () => {
     mockFileViewerState.filePath = 'src/index.ts';
     mockFileViewerState.showTree = true;
     const { container } = render(<FileViewerActions />);
-    const toggleBtn = container.querySelector('button[title="Hide file tree"]') as HTMLButtonElement;
+    const toggleBtn = container.querySelector(
+      'button[title="Hide file tree"]'
+    ) as HTMLButtonElement;
     expect(toggleBtn).toBeInTheDocument();
     toggleBtn.click();
     expect(mockFileViewerState.toggleTree).toHaveBeenCalled();

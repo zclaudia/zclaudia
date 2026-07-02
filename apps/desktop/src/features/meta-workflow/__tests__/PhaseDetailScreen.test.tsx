@@ -5,7 +5,9 @@ import userEvent from '@testing-library/user-event';
 
 vi.mock('../../workflows/components/WorkflowRunViewer.js', () => ({
   WorkflowRunViewer: ({ runId }: { runId: string }) => (
-    <div data-testid="sub-workflow-stub" data-run-id={runId}>SUB:{runId}</div>
+    <div data-testid="sub-workflow-stub" data-run-id={runId}>
+      SUB:{runId}
+    </div>
   ),
 }));
 
@@ -34,7 +36,7 @@ function makeRun(overrides: Partial<MetaWorkflowRun> = {}): MetaWorkflowRun {
 
 function makePhase(
   overrides: Partial<MetaWorkflowPhase> = {},
-  status: MetaWorkflowPhaseStatus = 'pending',
+  status: MetaWorkflowPhaseStatus = 'pending'
 ): MetaWorkflowPhase {
   const gates: AcceptanceGate[] = [
     {
@@ -80,7 +82,7 @@ describe('PhaseDetailScreen', () => {
         run={makeRun()}
         phaseId="missing-phase"
         socket={{ send: vi.fn() }}
-      />,
+      />
     );
     expect(screen.getByText(/Phase not found\./i)).toBeInTheDocument();
 
@@ -96,12 +98,7 @@ describe('PhaseDetailScreen', () => {
       phases: { 'run-1': [makePhase()] },
     });
     render(
-      <PhaseDetailScreen
-        projectId="p1"
-        run={makeRun()}
-        phaseId="p1"
-        socket={{ send: vi.fn() }}
-      />,
+      <PhaseDetailScreen projectId="p1" run={makeRun()} phaseId="p1" socket={{ send: vi.fn() }} />
     );
     // Phase id heading.
     expect(screen.getByRole('heading', { name: 'p1' })).toBeInTheDocument();
@@ -122,14 +119,7 @@ describe('PhaseDetailScreen', () => {
     const runSpy = vi.spyOn(api, 'sendRunPhase').mockImplementation(() => {});
     const user = userEvent.setup();
     const socket = { send: vi.fn() };
-    render(
-      <PhaseDetailScreen
-        projectId="p1"
-        run={makeRun()}
-        phaseId="p1"
-        socket={socket}
-      />,
-    );
+    render(<PhaseDetailScreen projectId="p1" run={makeRun()} phaseId="p1" socket={socket} />);
     await user.click(screen.getByRole('button', { name: /^Run$/ }));
     expect(runSpy).toHaveBeenCalledWith(socket, { runId: 'run-1', phaseId: 'p1' });
     // Re-run and Cascade Re-run must NOT be visible for a pending phase.
@@ -145,14 +135,7 @@ describe('PhaseDetailScreen', () => {
     const ignoreSpy = vi.spyOn(api, 'sendIgnoreStale').mockImplementation(() => {});
     const user = userEvent.setup();
     const socket = { send: vi.fn() };
-    render(
-      <PhaseDetailScreen
-        projectId="p1"
-        run={makeRun()}
-        phaseId="p1"
-        socket={socket}
-      />,
-    );
+    render(<PhaseDetailScreen projectId="p1" run={makeRun()} phaseId="p1" socket={socket} />);
     // For stale, Re-run / Evaluate Impact / Cascade Re-run / Ignore Stale all appear.
     expect(screen.getByRole('button', { name: /^Re-run$/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Evaluate Impact/i })).toBeInTheDocument();
@@ -178,12 +161,7 @@ describe('PhaseDetailScreen', () => {
       },
     });
     render(
-      <PhaseDetailScreen
-        projectId="p1"
-        run={makeRun()}
-        phaseId="p1"
-        socket={{ send: vi.fn() }}
-      />,
+      <PhaseDetailScreen projectId="p1" run={makeRun()} phaseId="p1" socket={{ send: vi.fn() }} />
     );
     expect(screen.getByText(/Impact recommendation/i)).toBeInTheDocument();
     expect(screen.getByText(/minor-fix/)).toBeInTheDocument();
@@ -195,12 +173,7 @@ describe('PhaseDetailScreen', () => {
       phases: { 'run-1': [makePhase({ currentRunId: 'sub-run-xyz' })] },
     });
     render(
-      <PhaseDetailScreen
-        projectId="p1"
-        run={makeRun()}
-        phaseId="p1"
-        socket={{ send: vi.fn() }}
-      />,
+      <PhaseDetailScreen projectId="p1" run={makeRun()} phaseId="p1" socket={{ send: vi.fn() }} />
     );
     const stub = screen.getByTestId('sub-workflow-stub');
     expect(stub).toHaveAttribute('data-run-id', 'sub-run-xyz');
@@ -211,12 +184,7 @@ describe('PhaseDetailScreen', () => {
       phases: { 'run-1': [makePhase()] },
     });
     render(
-      <PhaseDetailScreen
-        projectId="p1"
-        run={makeRun()}
-        phaseId="p1"
-        socket={{ send: vi.fn() }}
-      />,
+      <PhaseDetailScreen projectId="p1" run={makeRun()} phaseId="p1" socket={{ send: vi.fn() }} />
     );
     expect(screen.queryByTestId('sub-workflow-stub')).not.toBeInTheDocument();
   });

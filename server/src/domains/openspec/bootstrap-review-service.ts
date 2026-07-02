@@ -6,7 +6,10 @@ import type { DeltaDoc, ParsedRequirement, ParsedSpec } from './markdown/types.j
 import { parseSpec } from './markdown/spec-parser.js';
 import { formatSpec } from './markdown/spec-formatter.js';
 import { applyDelta } from './delta-merger.js';
-import { BootstrapScanRepository, type BootstrapScan } from './repositories/bootstrap-scan-repository.js';
+import {
+  BootstrapScanRepository,
+  type BootstrapScan,
+} from './repositories/bootstrap-scan-repository.js';
 import {
   BootstrapReviewItemRepository,
   type BootstrapReviewItem,
@@ -64,7 +67,7 @@ export class BootstrapReviewService {
     if (pending.length > 0) return null;
 
     const all = this.reviewRepo.listByScan(scanId);
-    const approved = all.filter((i) => i.status === 'approved');
+    const approved = all.filter(i => i.status === 'approved');
     const projectRoot = this.deps.getProjectRoot(scan.projectId);
 
     // Group by capability, build a delta containing only the approved entries.
@@ -89,7 +92,10 @@ export class BootstrapReviewService {
       const corpus = readOrEmptyCorpus(projectRoot, capability);
       const merge = applyDelta(corpus, delta);
       writeCorpus(projectRoot, capability, merge.spec);
-      mergedSummary[capability] = { modified: merge.modified.length, removed: merge.removed.length };
+      mergedSummary[capability] = {
+        modified: merge.modified.length,
+        removed: merge.removed.length,
+      };
     }
 
     const updated = this.scanRepo.update(scanId, {
@@ -118,6 +124,6 @@ function bumpCorpusMeta(db: Database, projectId: string): void {
   db.prepare(
     `INSERT INTO project_spec_corpus_meta (project_id, initialized, last_bootstrap_at, capabilities_json)
      VALUES (?, 1, ?, '[]')
-     ON CONFLICT(project_id) DO UPDATE SET initialized = 1, last_bootstrap_at = excluded.last_bootstrap_at`,
+     ON CONFLICT(project_id) DO UPDATE SET initialized = 1, last_bootstrap_at = excluded.last_bootstrap_at`
   ).run(projectId, Date.now());
 }

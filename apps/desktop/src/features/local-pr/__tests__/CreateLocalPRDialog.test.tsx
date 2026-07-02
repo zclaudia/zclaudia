@@ -118,12 +118,7 @@ describe('CreateLocalPRDialog', () => {
     ]);
     (listLocalPRs as any).mockResolvedValueOnce([]);
 
-    render(
-      <CreateLocalPRDialog
-        {...defaultProps}
-        defaultWorktreePath="/wt/feat"
-      />
-    );
+    render(<CreateLocalPRDialog {...defaultProps} defaultWorktreePath="/wt/feat" />);
 
     await waitFor(() => {
       // The dropdown is now a button trigger displaying the selected label,

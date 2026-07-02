@@ -17,7 +17,7 @@ export class AIReviewStepExecutor implements StepExecutorPort {
   async execute(
     node: WorkflowNodeDef,
     config: Record<string, unknown>,
-    ctx: StepContext,
+    ctx: StepContext
   ): Promise<StepResult> {
     const llmProfileId = (config.llmProfileId as string) ?? ctx.llmProfileId;
     if (!llmProfileId) return { status: 'failed', output: {}, error: 'No provider configured' };
@@ -92,5 +92,7 @@ function buildReviewInput(ctx: StepContext): string {
     'Review the current working directory changes.',
     'Use git diff or read/search tools as needed.',
     artifacts.length ? `Workflow artifacts:\n${artifacts.join('\n')}` : '',
-  ].filter(Boolean).join('\n\n');
+  ]
+    .filter(Boolean)
+    .join('\n\n');
 }

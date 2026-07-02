@@ -13,7 +13,11 @@ describe('ActivityRegistry.invoke configSchema validation', () => {
       name: 'Demo',
       description: 'Demo activity',
       category: 'Test',
-      configSchema: { type: 'object', required: ['name'], properties: { name: { type: 'string' } } },
+      configSchema: {
+        type: 'object',
+        required: ['name'],
+        properties: { name: { type: 'string' } },
+      },
       invoke: invokeSpy,
     };
     registry.register(activity);
@@ -32,7 +36,11 @@ describe('ActivityRegistry.invoke configSchema validation', () => {
       name: 'Demo',
       description: 'Demo activity',
       category: 'Test',
-      configSchema: { type: 'object', required: ['name'], properties: { name: { type: 'string' } } },
+      configSchema: {
+        type: 'object',
+        required: ['name'],
+        properties: { name: { type: 'string' } },
+      },
       invoke: invokeSpy,
     };
     registry.register(activity);

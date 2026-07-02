@@ -11,67 +11,85 @@ import type { ClientMessage } from '@zclaudia/shared';
 import { useServerStore } from '../stores/serverStore';
 import { useGatewayConnection } from './useGatewayConnection';
 import { useFacadeStore } from '../stores/facadeStore';
-import { getUsableMobileBackendIds, isMobileBackendUsable } from '../services/mobileConnectionState';
+import {
+  getUsableMobileBackendIds,
+  isMobileBackendUsable,
+} from '../services/mobileConnectionState';
 import { useOwnershipStore } from '../stores/ownershipStore';
 import { resolveMessageTarget } from '../utils/messageRouting';
 
 export function useMultiServerSocket() {
   const gatewayConnection = useGatewayConnection();
-  const activeServerId = useServerStore((s) => s.activeServerId);
-  const facade = useFacadeStore((s) => s.facade);
-  useFacadeStore((s) => s.connectionState);
-  useFacadeStore((s) =>
+  const activeServerId = useServerStore(s => s.activeServerId);
+  const facade = useFacadeStore(s => s.facade);
+  useFacadeStore(s => s.connectionState);
+  useFacadeStore(s =>
     activeServerId
-      ? s.backends.find((backend) => backend.backendId === activeServerId)?.runtimeState ?? null
+      ? (s.backends.find(backend => backend.backendId === activeServerId)?.runtimeState ?? null)
       : null
   );
 
-  const connectServer = useCallback((backendId: string) => {
-    if (facade) {
-      facade.openBackend(backendId);
-      return;
-    }
-    gatewayConnection.openChannel(backendId);
-  }, [facade, gatewayConnection]);
+  const connectServer = useCallback(
+    (backendId: string) => {
+      if (facade) {
+        facade.openBackend(backendId);
+        return;
+      }
+      gatewayConnection.openChannel(backendId);
+    },
+    [facade, gatewayConnection]
+  );
 
-  const disconnectServer = useCallback((backendId: string) => {
-    if (facade) {
-      facade.closeBackend(backendId);
-    }
-  }, [facade]);
+  const disconnectServer = useCallback(
+    (backendId: string) => {
+      if (facade) {
+        facade.closeBackend(backendId);
+      }
+    },
+    [facade]
+  );
 
-  const sendToServer = useCallback((backendId: string, message: ClientMessage) => {
-    if (facade) {
-      facade.sendToBackend(backendId, message);
-      return;
-    }
-    gatewayConnection.sendToBackend(backendId, message);
-  }, [facade, gatewayConnection]);
+  const sendToServer = useCallback(
+    (backendId: string, message: ClientMessage) => {
+      if (facade) {
+        facade.sendToBackend(backendId, message);
+        return;
+      }
+      gatewayConnection.sendToBackend(backendId, message);
+    },
+    [facade, gatewayConnection]
+  );
 
-  const sendMessage = useCallback((message: ClientMessage) => {
-    const ownership = useOwnershipStore.getState();
-    const target = resolveMessageTarget(message, {
-      getSessionBackendId: (id) => ownership.getSessionBackendId(id),
-      getProjectBackendId: (id) => ownership.getProjectBackendId(id),
-      fallbackBackendId: activeServerId,
-    });
-    if (!target) {
-      console.error('[Socket] Cannot send message: no target backend');
-      return;
-    }
-    sendToServer(target, message);
-  }, [activeServerId, sendToServer]);
-
-  const isServerConnected = useCallback((backendId: string) => {
-    if (facade) {
-      return isMobileBackendUsable({
-        backendId,
-        connectionState: useFacadeStore.getState().connectionState,
-        backends: useFacadeStore.getState().backends,
+  const sendMessage = useCallback(
+    (message: ClientMessage) => {
+      const ownership = useOwnershipStore.getState();
+      const target = resolveMessageTarget(message, {
+        getSessionBackendId: id => ownership.getSessionBackendId(id),
+        getProjectBackendId: id => ownership.getProjectBackendId(id),
+        fallbackBackendId: activeServerId,
       });
-    }
-    return gatewayConnection.isBackendConnected(backendId);
-  }, [facade, gatewayConnection]);
+      if (!target) {
+        console.error('[Socket] Cannot send message: no target backend');
+        return;
+      }
+      sendToServer(target, message);
+    },
+    [activeServerId, sendToServer]
+  );
+
+  const isServerConnected = useCallback(
+    (backendId: string) => {
+      if (facade) {
+        return isMobileBackendUsable({
+          backendId,
+          connectionState: useFacadeStore.getState().connectionState,
+          backends: useFacadeStore.getState().backends,
+        });
+      }
+      return gatewayConnection.isBackendConnected(backendId);
+    },
+    [facade, gatewayConnection]
+  );
 
   const isConnected = useCallback(() => {
     if (!activeServerId) return false;
@@ -82,10 +100,7 @@ export function useMultiServerSocket() {
   const getConnectedServers = useCallback(() => {
     if (!facade) return [];
     const facadeState = useFacadeStore.getState();
-    return getUsableMobileBackendIds(
-      facadeState.connectionState,
-      facadeState.backends,
-    );
+    return getUsableMobileBackendIds(facadeState.connectionState, facadeState.backends);
   }, [facade]);
 
   const connect = useCallback(() => {
@@ -98,15 +113,28 @@ export function useMultiServerSocket() {
 
   const isConnectedValue = isConnected();
 
-  return useMemo(() => ({
-    connectServer,
-    disconnectServer,
-    sendToServer,
-    isServerConnected,
-    getConnectedServers,
-    sendMessage,
-    isConnected: isConnectedValue,
-    connect,
-    disconnect,
-  }), [connectServer, disconnectServer, sendToServer, isServerConnected, getConnectedServers, sendMessage, isConnectedValue, connect, disconnect]);
+  return useMemo(
+    () => ({
+      connectServer,
+      disconnectServer,
+      sendToServer,
+      isServerConnected,
+      getConnectedServers,
+      sendMessage,
+      isConnected: isConnectedValue,
+      connect,
+      disconnect,
+    }),
+    [
+      connectServer,
+      disconnectServer,
+      sendToServer,
+      isServerConnected,
+      getConnectedServers,
+      sendMessage,
+      isConnectedValue,
+      connect,
+      disconnect,
+    ]
+  );
 }

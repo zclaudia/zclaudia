@@ -18,7 +18,7 @@ const CENTER_X = 300;
 export function autoLayoutGraph(
   nodes: WorkflowNodeDef[],
   edges: WorkflowEdgeDef[],
-  entryNodeId: string,
+  entryNodeId: string
 ): WorkflowNodeDef[] {
   if (nodes.length === 0) return [];
 

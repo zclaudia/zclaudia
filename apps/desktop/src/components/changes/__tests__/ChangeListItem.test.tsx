@@ -5,6 +5,7 @@ import { usePluginStore } from '../../../stores/pluginStore';
 import { useRightSidebarStore } from '../../../stores/rightSidebarStore';
 import { useBottomPanelStore } from '../../../stores/bottomPanelStore';
 import { useProjectStore } from '../../../stores/projectStore';
+import { useSelectionStore } from '../../../stores/selectionStore';
 import { useServerStore } from '../../../stores/serverStore';
 import { useRightWorkspaceStore, findPaneWithTool } from '../../../stores/rightWorkspaceStore';
 import type { ModifiedEntry } from '../useSessionChanges';
@@ -18,12 +19,14 @@ const entry: ModifiedEntry = {
   path: 'src/index.ts',
   absolutePath: '/repo/src/index.ts',
   toolCounts: { Edit: 1 },
-  groups: [{
-    sinceUserMessageId: 'u1',
-    sinceUserMessagePreview: 'change file',
-    sinceUserMessageTimestamp: 100,
-    fragments: [],
-  }],
+  groups: [
+    {
+      sinceUserMessageId: 'u1',
+      sinceUserMessagePreview: 'change file',
+      sinceUserMessageTimestamp: 100,
+      fragments: [],
+    },
+  ],
   lastTimestamp: 110,
 };
 
@@ -33,14 +36,16 @@ describe('ChangeListItem', () => {
   beforeEach(() => {
     mockOpenFile.mockClear();
     usePluginStore.setState({
-      panels: [{
-        id: 'file-viewer',
-        pluginId: 'com.claudia.file-viewer',
-        type: 'panel',
-        label: 'File',
-        component: () => null,
-        visible: true,
-      }],
+      panels: [
+        {
+          id: 'file-viewer',
+          pluginId: 'com.claudia.file-viewer',
+          type: 'panel',
+          label: 'File',
+          component: () => null,
+          visible: true,
+        },
+      ],
       panelPlacements: { 'file-viewer': 'right' },
     });
     useRightSidebarStore.setState({ activeTab: 'session-changes', collapsed: false });
@@ -50,6 +55,7 @@ describe('ChangeListItem', () => {
       selectedSessionId: SESSION_ID,
       sessions: [{ id: SESSION_ID, projectId: 'proj-1' } as any],
     });
+    useSelectionStore.setState({ selectedSessionId: SESSION_ID });
     useServerStore.setState({ activeServerId: 'server-1' } as any);
     // Reset workspace so each test starts clean
     useRightWorkspaceStore.setState({ bySession: {}, order: [] });
@@ -57,12 +63,7 @@ describe('ChangeListItem', () => {
 
   it('opens the file and activates the file viewer panel', () => {
     render(
-      <ChangeListItem
-        entry={entry}
-        projectRoot="/repo"
-        expanded={false}
-        onToggle={vi.fn()}
-      />,
+      <ChangeListItem entry={entry} projectRoot="/repo" expanded={false} onToggle={vi.fn()} />
     );
 
     fireEvent.click(screen.getByTitle('Open in File Viewer'));

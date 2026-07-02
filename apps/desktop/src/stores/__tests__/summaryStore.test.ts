@@ -59,7 +59,9 @@ describe('summaryStore', () => {
   it('generate transitions loading → ready and stores the summary', async () => {
     let resolveGen: (v: { summary: typeof sampleSummary; fromCache: boolean }) => void = () => {};
     mockedGenerateTurnSummary.mockReturnValueOnce(
-      new Promise((res) => { resolveGen = res; }),
+      new Promise(res => {
+        resolveGen = res;
+      })
     );
     const promise = useSummaryStore.getState().generate('sess-1', 'u1');
     expect(useSummaryStore.getState().getEntry('sess-1', 'u1')?.status).toBe('loading');
@@ -88,8 +90,14 @@ describe('summaryStore', () => {
   it('clearSession drops entries and hydration mark for that session only', async () => {
     mockedListTurnSummaries.mockResolvedValueOnce([sampleSummary]);
     await useSummaryStore.getState().hydrateSession('sess-1');
-    useSummaryStore.setState((s) => ({
-      entries: { ...s.entries, 'sess-2:u9': { status: 'ready', summary: { ...sampleSummary, sessionId: 'sess-2', userMessageId: 'u9' } } },
+    useSummaryStore.setState(s => ({
+      entries: {
+        ...s.entries,
+        'sess-2:u9': {
+          status: 'ready',
+          summary: { ...sampleSummary, sessionId: 'sess-2', userMessageId: 'u9' },
+        },
+      },
     }));
     useSummaryStore.getState().clearSession('sess-1');
     expect(useSummaryStore.getState().getEntry('sess-1', 'u1')).toBeUndefined();

@@ -93,7 +93,7 @@ describe('useAttachmentCounts', () => {
   it('skips fetching for empty id list', async () => {
     renderHook(() => useAttachmentCounts('local_issue', []));
     // give the effect a chance to run
-    await new Promise((r) => setTimeout(r, 0));
+    await new Promise(r => setTimeout(r, 0));
     expect(listAttachmentCounts).not.toHaveBeenCalled();
   });
 });

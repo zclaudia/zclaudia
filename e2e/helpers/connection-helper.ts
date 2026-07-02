@@ -1,4 +1,4 @@
-import { Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 /**
  * Helper functions for managing server connection in tests
@@ -46,7 +46,9 @@ export async function ensureServerConnection(page: Page): Promise<boolean> {
     await page.waitForTimeout(500);
 
     // Look for a server option to connect to
-    const serverOption = page.locator('[class*="server-item"], [class*="ServerItem"], text=/Local|localhost/i').first();
+    const serverOption = page
+      .locator('[class*="server-item"], [class*="ServerItem"], text=/Local|localhost/i')
+      .first();
     const optionVisible = await serverOption.isVisible({ timeout: 2000 }).catch(() => false);
 
     if (optionVisible) {
@@ -140,14 +142,18 @@ export async function createTestProject(page: Page, name: string, path: string):
   await page.waitForTimeout(500);
 
   // Fill in form
-  const nameInput = page.locator('input[placeholder*="Project name"], input[placeholder*="Name"]').first();
+  const nameInput = page
+    .locator('input[placeholder*="Project name"], input[placeholder*="Name"]')
+    .first();
   const nameVisible = await nameInput.isVisible({ timeout: 2000 }).catch(() => false);
 
   if (nameVisible) {
     await nameInput.fill(name);
   }
 
-  const pathInput = page.locator('input[placeholder*="Working directory"], input[placeholder*="Path"]').first();
+  const pathInput = page
+    .locator('input[placeholder*="Working directory"], input[placeholder*="Path"]')
+    .first();
   const pathVisible = await pathInput.isVisible({ timeout: 2000 }).catch(() => false);
 
   if (pathVisible) {

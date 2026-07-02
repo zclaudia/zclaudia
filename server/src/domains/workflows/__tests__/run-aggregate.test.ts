@@ -130,9 +130,13 @@ describe('WorkflowRunAggregate', () => {
     it('creates a run and step runs, emits run_started', () => {
       const def = makeDefinition();
       const agg = WorkflowRunAggregate.start(
-        def, 'wf-1', 'proj-1', 'manual',
-        runRepo, stepRunRepo,
-        { initiator: 'workflow:wf-1' },
+        def,
+        'wf-1',
+        'proj-1',
+        'manual',
+        runRepo,
+        stepRunRepo,
+        { initiator: 'workflow:wf-1' }
       );
 
       expect(runRepo.create).toHaveBeenCalledOnce();
@@ -153,9 +157,12 @@ describe('WorkflowRunAggregate', () => {
 
       agg.completeRun();
 
-      expect(runRepo.update).toHaveBeenCalledWith('run-1', expect.objectContaining({
-        status: 'completed',
-      }));
+      expect(runRepo.update).toHaveBeenCalledWith(
+        'run-1',
+        expect.objectContaining({
+          status: 'completed',
+        })
+      );
       const events = agg.releaseEvents();
       expect(events).toHaveLength(1);
       expect(events[0].type).toBe('run_completed');
@@ -181,10 +188,13 @@ describe('WorkflowRunAggregate', () => {
 
       agg.failRun('Something broke');
 
-      expect(runRepo.update).toHaveBeenCalledWith('run-1', expect.objectContaining({
-        status: 'failed',
-        error: 'Something broke',
-      }));
+      expect(runRepo.update).toHaveBeenCalledWith(
+        'run-1',
+        expect.objectContaining({
+          status: 'failed',
+          error: 'Something broke',
+        })
+      );
       const events = agg.releaseEvents();
       expect(events).toHaveLength(1);
       expect(events[0].type).toBe('run_failed');
@@ -205,9 +215,12 @@ describe('WorkflowRunAggregate', () => {
 
       agg.cancelRun();
 
-      expect(runRepo.update).toHaveBeenCalledWith('run-1', expect.objectContaining({
-        status: 'cancelled',
-      }));
+      expect(runRepo.update).toHaveBeenCalledWith(
+        'run-1',
+        expect.objectContaining({
+          status: 'cancelled',
+        })
+      );
       const events = agg.releaseEvents();
       expect(events).toHaveLength(1);
       expect(events[0].type).toBe('run_cancelled');
@@ -234,10 +247,13 @@ describe('WorkflowRunAggregate', () => {
 
       agg.startStep('step-1', 1);
 
-      expect(stepRunRepo.update).toHaveBeenCalledWith('sr-1', expect.objectContaining({
-        status: 'running',
-        attempt: 1,
-      }));
+      expect(stepRunRepo.update).toHaveBeenCalledWith(
+        'sr-1',
+        expect.objectContaining({
+          status: 'running',
+          attempt: 1,
+        })
+      );
       const events = agg.releaseEvents();
       expect(events).toHaveLength(1);
       expect(events[0].type).toBe('step_started');
@@ -267,10 +283,13 @@ describe('WorkflowRunAggregate', () => {
 
       agg.completeStep('step-1', { result: 'ok' });
 
-      expect(stepRunRepo.update).toHaveBeenCalledWith('sr-1', expect.objectContaining({
-        status: 'completed',
-        output: { result: 'ok' },
-      }));
+      expect(stepRunRepo.update).toHaveBeenCalledWith(
+        'sr-1',
+        expect.objectContaining({
+          status: 'completed',
+          output: { result: 'ok' },
+        })
+      );
       const events = agg.releaseEvents();
       expect(events).toHaveLength(1);
       expect(events[0].type).toBe('step_completed');
@@ -292,10 +311,13 @@ describe('WorkflowRunAggregate', () => {
 
       agg.failStep('step-1', 'timeout');
 
-      expect(stepRunRepo.update).toHaveBeenCalledWith('sr-1', expect.objectContaining({
-        status: 'failed',
-        error: 'timeout',
-      }));
+      expect(stepRunRepo.update).toHaveBeenCalledWith(
+        'sr-1',
+        expect.objectContaining({
+          status: 'failed',
+          error: 'timeout',
+        })
+      );
       const events = agg.releaseEvents();
       expect(events).toHaveLength(1);
       expect(events[0].type).toBe('step_failed');
@@ -316,9 +338,12 @@ describe('WorkflowRunAggregate', () => {
 
       agg.skipStep('step-1');
 
-      expect(stepRunRepo.update).toHaveBeenCalledWith('sr-1', expect.objectContaining({
-        status: 'skipped',
-      }));
+      expect(stepRunRepo.update).toHaveBeenCalledWith(
+        'sr-1',
+        expect.objectContaining({
+          status: 'skipped',
+        })
+      );
       const events = agg.releaseEvents();
       expect(events).toHaveLength(1);
       expect(events[0].type).toBe('step_skipped');
@@ -350,9 +375,12 @@ describe('WorkflowRunAggregate', () => {
 
       agg.markStepWaiting('step-1');
 
-      expect(stepRunRepo.update).toHaveBeenCalledWith('sr-1', expect.objectContaining({
-        status: 'waiting',
-      }));
+      expect(stepRunRepo.update).toHaveBeenCalledWith(
+        'sr-1',
+        expect.objectContaining({
+          status: 'waiting',
+        })
+      );
       const events = agg.releaseEvents();
       expect(events).toHaveLength(1);
       expect(events[0].type).toBe('step_waiting_for_approval');
@@ -376,9 +404,12 @@ describe('WorkflowRunAggregate', () => {
 
       agg.markStepResumed('step-1');
 
-      expect(stepRunRepo.update).toHaveBeenCalledWith('sr-1', expect.objectContaining({
-        status: 'running',
-      }));
+      expect(stepRunRepo.update).toHaveBeenCalledWith(
+        'sr-1',
+        expect.objectContaining({
+          status: 'running',
+        })
+      );
       const events = agg.releaseEvents();
       expect(events).toHaveLength(1);
       expect(events[0].type).toBe('step_approved');
@@ -430,16 +461,26 @@ describe('WorkflowRunAggregate.start with action metadata', () => {
 
   it('records initiator/action on the run row', () => {
     const def: WorkflowDefinition = {
-      nodes: [{ id: 'n1', name: 'Commit', type: 'git_commit', config: {}, position: { x: 0, y: 0 } }],
+      nodes: [
+        { id: 'n1', name: 'Commit', type: 'git_commit', config: {}, position: { x: 0, y: 0 } },
+      ],
       edges: [],
       entryNodeId: 'n1',
     };
-    const agg = WorkflowRunAggregate.start(def, undefined, undefined, 'schedule', runRepo, stepRepo, {
-      initiator: 'automation:a1',
-      actionKind: 'activity',
-      actionRef: 'git_commit',
-      triggerDetail: 'interval: 30min',
-    });
+    const agg = WorkflowRunAggregate.start(
+      def,
+      undefined,
+      undefined,
+      'schedule',
+      runRepo,
+      stepRepo,
+      {
+        initiator: 'automation:a1',
+        actionKind: 'activity',
+        actionRef: 'git_commit',
+        triggerDetail: 'interval: 30min',
+      }
+    );
     const run = runRepo.findById(agg.id)!;
     expect(run.initiator).toBe('automation:a1');
     expect(run.actionKind).toBe('activity');

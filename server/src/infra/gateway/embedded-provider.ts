@@ -6,10 +6,7 @@
  *
  */
 
-import {
-  BackendFacadeRuntimeCore,
-  DEFAULT_GC_INTERVAL,
-} from '@zclaudia/shared/facade/index';
+import { BackendFacadeRuntimeCore, DEFAULT_GC_INTERVAL } from '@zclaudia/shared/facade/index';
 import type {
   BackendFacade,
   BackendFacadeEvent,
@@ -30,15 +27,14 @@ export class EmbeddedBackendFacadeProvider implements BackendFacade {
   constructor(
     gatewayClient: GatewayClient,
     localHandler: LocalBackendHandler | null,
-    serverPort: number,
+    serverPort: number
   ) {
     this.adapter = new EmbeddedGatewayAdapter(gatewayClient, localHandler, serverPort);
     this.core = new BackendFacadeRuntimeCore({
       adapter: this.adapter,
       mode: 'embedded',
-      localBackendMatcher: (presence, identity) =>
-        presence.instanceId === identity.instanceId,
-      onLocalBackendIdChanged: (backendId) => {
+      localBackendMatcher: (presence, identity) => presence.instanceId === identity.instanceId,
+      onLocalBackendIdChanged: backendId => {
         this.adapter.setLocalBackendId(backendId);
       },
     });
@@ -65,26 +61,50 @@ export class EmbeddedBackendFacadeProvider implements BackendFacade {
   // BackendFacade delegation
   // --------------------------------------------------------------------------
 
-  getSnapshot(): BackendFacadeSnapshot { return this.core.getSnapshot(); }
-  subscribe(listener: (snapshot: BackendFacadeSnapshot) => void): () => void { return this.core.subscribe(listener); }
-  onEvent(listener: (event: BackendFacadeEvent) => void): () => void { return this.core.onEvent(listener); }
+  getSnapshot(): BackendFacadeSnapshot {
+    return this.core.getSnapshot();
+  }
+  subscribe(listener: (snapshot: BackendFacadeSnapshot) => void): () => void {
+    return this.core.subscribe(listener);
+  }
+  onEvent(listener: (event: BackendFacadeEvent) => void): () => void {
+    return this.core.onEvent(listener);
+  }
 
-  openBackend(backendId: string): void { this.core.openBackend(backendId); }
-  closeBackend(backendId: string): void { this.core.closeBackend(backendId); }
-  sendToBackend(backendId: string, message: ClientMessage): void { this.core.sendToBackend(backendId, message); }
+  openBackend(backendId: string): void {
+    this.core.openBackend(backendId);
+  }
+  closeBackend(backendId: string): void {
+    this.core.closeBackend(backendId);
+  }
+  sendToBackend(backendId: string, message: ClientMessage): void {
+    this.core.sendToBackend(backendId, message);
+  }
 
-  openSessionStream(backendId: string, sessionId: string): void { this.core.openSessionStream(backendId, sessionId); }
-  closeSessionStream(backendId: string, sessionId: string): void { this.core.closeSessionStream(backendId, sessionId); }
-  catchUpContent(backendId: string, sessionId: string, afterOffset: number): void { this.core.catchUpContent(backendId, sessionId, afterOffset); }
+  openSessionStream(backendId: string, sessionId: string): void {
+    this.core.openSessionStream(backendId, sessionId);
+  }
+  closeSessionStream(backendId: string, sessionId: string): void {
+    this.core.closeSessionStream(backendId, sessionId);
+  }
+  catchUpContent(backendId: string, sessionId: string, afterOffset: number): void {
+    this.core.catchUpContent(backendId, sessionId, afterOffset);
+  }
 
-  getHttpBaseUrl(backendId: string): string | null { return this.core.getHttpBaseUrl(backendId); }
-  getHttpHeaders(): Record<string, string> { return this.core.getHttpHeaders(); }
+  getHttpBaseUrl(backendId: string): string | null {
+    return this.core.getHttpBaseUrl(backendId);
+  }
+  getHttpHeaders(): Record<string, string> {
+    return this.core.getHttpHeaders();
+  }
 
   // --------------------------------------------------------------------------
   // WsHub access (for attaching to express/http server)
   // --------------------------------------------------------------------------
 
-  getWsHub(): FacadeWsHub { return this.hub; }
+  getWsHub(): FacadeWsHub {
+    return this.hub;
+  }
 
   // --------------------------------------------------------------------------
   // GC Timer

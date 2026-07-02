@@ -24,7 +24,7 @@ interface Props {
 }
 
 export function LegacyRescanView({ scanId, onClose }: Props): React.ReactElement {
-  const setCorpus = useOpenSpecStore((s) => s.setCorpus);
+  const setCorpus = useOpenSpecStore(s => s.setCorpus);
   const [scan, setScan] = useState<BootstrapScan | null>(null);
   const [items, setItems] = useState<BootstrapReviewItem[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
@@ -165,9 +165,8 @@ export function LegacyRescanView({ scanId, onClose }: Props): React.ReactElement
         scan.pendingCount === 0 &&
         !scan.errorMessage && (
           <div className="border border-amber-500/40 rounded-md p-2 bg-amber-500/10 text-xs text-amber-700">
-            AI scan completed but did not extract any requirements. Make sure the project
-            has a default AI provider configured and check the server log for the raw AI
-            response.
+            AI scan completed but did not extract any requirements. Make sure the project has a
+            default AI provider configured and check the server log for the raw AI response.
           </div>
         )}
 
@@ -175,7 +174,7 @@ export function LegacyRescanView({ scanId, onClose }: Props): React.ReactElement
         <div>
           <div className="text-sm font-medium mb-2">Pending review ({items.length})</div>
           <ul className="space-y-2">
-            {items.map((it) => {
+            {items.map(it => {
               let preview = '';
               try {
                 const obj = JSON.parse(it.payloadJson) as { name?: string; body?: string };

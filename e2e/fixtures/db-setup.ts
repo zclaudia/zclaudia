@@ -30,7 +30,7 @@ export async function setupCleanDB(): Promise<void> {
       'settings',
       'permissions',
       'file_references',
-      'cached_responses'
+      'cached_responses',
     ];
 
     for (const table of tables) {

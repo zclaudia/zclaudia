@@ -13,12 +13,31 @@ interface StatChip {
 
 function doneChips(s: TurnStats): StatChip[] {
   const out: StatChip[] = [];
-  if (s.fileCount > 0) out.push({ label: `${s.fileCount} ${s.fileCount === 1 ? 'file' : 'files'}`, value: s.fileCount });
-  if (s.editCount > 0) out.push({ label: `${s.editCount} ${s.editCount === 1 ? 'edit' : 'edits'}`, value: s.editCount });
-  if (s.writeCount > 0) out.push({ label: `${s.writeCount} ${s.writeCount === 1 ? 'write' : 'writes'}`, value: s.writeCount });
-  if (s.notebookEditCount > 0) out.push({ label: `${s.notebookEditCount} notebook edit${s.notebookEditCount === 1 ? '' : 's'}`, value: s.notebookEditCount });
+  if (s.fileCount > 0)
+    out.push({
+      label: `${s.fileCount} ${s.fileCount === 1 ? 'file' : 'files'}`,
+      value: s.fileCount,
+    });
+  if (s.editCount > 0)
+    out.push({
+      label: `${s.editCount} ${s.editCount === 1 ? 'edit' : 'edits'}`,
+      value: s.editCount,
+    });
+  if (s.writeCount > 0)
+    out.push({
+      label: `${s.writeCount} ${s.writeCount === 1 ? 'write' : 'writes'}`,
+      value: s.writeCount,
+    });
+  if (s.notebookEditCount > 0)
+    out.push({
+      label: `${s.notebookEditCount} notebook edit${s.notebookEditCount === 1 ? '' : 's'}`,
+      value: s.notebookEditCount,
+    });
   if (s.destructiveBashCount > 0) {
-    out.push({ label: `${s.destructiveBashCount} destructive bash`, value: s.destructiveBashCount });
+    out.push({
+      label: `${s.destructiveBashCount} destructive bash`,
+      value: s.destructiveBashCount,
+    });
   } else if (s.bashCount > 0) {
     out.push({ label: `${s.bashCount} bash`, value: s.bashCount });
   }
@@ -37,7 +56,10 @@ export function TurnSummaryCard({ turn }: TurnSummaryCardProps) {
   return (
     <div className="border border-border rounded-md bg-card overflow-hidden">
       <div className="px-2 py-1.5 border-b border-border/70 flex items-baseline gap-2 min-w-0">
-        <span className="text-xs font-medium truncate flex-1 min-w-0" title={turn.userMessagePreview}>
+        <span
+          className="text-xs font-medium truncate flex-1 min-w-0"
+          title={turn.userMessagePreview}
+        >
           {turn.userMessagePreview || '(empty user message)'}
         </span>
         <span className="text-[10px] text-muted-foreground flex-shrink-0">
@@ -51,8 +73,11 @@ export function TurnSummaryCard({ turn }: TurnSummaryCardProps) {
             <span className="text-muted-foreground italic">nothing yet</span>
           ) : (
             <span className="flex flex-wrap gap-1 min-w-0">
-              {done.map((chip) => (
-                <span key={chip.label} className="px-1.5 py-0.5 rounded bg-secondary/70 text-foreground">
+              {done.map(chip => (
+                <span
+                  key={chip.label}
+                  className="px-1.5 py-0.5 rounded bg-secondary/70 text-foreground"
+                >
                   {chip.label}
                 </span>
               ))}
@@ -86,9 +111,7 @@ export function TurnSummaryCard({ turn }: TurnSummaryCardProps) {
                 all completed
               </span>
             )}
-            {idle && (
-              <span className="text-muted-foreground italic">no activity</span>
-            )}
+            {idle && <span className="text-muted-foreground italic">no activity</span>}
           </span>
         </div>
       </div>

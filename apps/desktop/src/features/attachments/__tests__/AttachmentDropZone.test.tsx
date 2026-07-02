@@ -7,7 +7,7 @@ describe('AttachmentDropZone', () => {
     render(
       <AttachmentDropZone onFiles={vi.fn()}>
         <span>drop here</span>
-      </AttachmentDropZone>,
+      </AttachmentDropZone>
     );
     expect(screen.getByText('drop here')).toBeInTheDocument();
   });
@@ -17,7 +17,7 @@ describe('AttachmentDropZone', () => {
     render(
       <AttachmentDropZone onFiles={onFiles}>
         <span>zone</span>
-      </AttachmentDropZone>,
+      </AttachmentDropZone>
     );
     const region = screen.getByRole('region');
     const file = new File(['x'], 'x.png', { type: 'image/png' });
@@ -33,7 +33,7 @@ describe('AttachmentDropZone', () => {
     render(
       <AttachmentDropZone onFiles={onFiles}>
         <span>zone</span>
-      </AttachmentDropZone>,
+      </AttachmentDropZone>
     );
     const region = screen.getByRole('region');
     fireEvent.dragOver(region, { dataTransfer: { types: ['text/plain'] } });
@@ -45,7 +45,7 @@ describe('AttachmentDropZone', () => {
     render(
       <AttachmentDropZone onFiles={onFiles} disabled>
         <span>zone</span>
-      </AttachmentDropZone>,
+      </AttachmentDropZone>
     );
     const region = screen.getByRole('region');
     const file = new File(['x'], 'x.png');

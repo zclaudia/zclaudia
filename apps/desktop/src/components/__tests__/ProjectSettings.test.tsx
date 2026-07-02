@@ -10,7 +10,7 @@ import { useFacadeStore } from '../../stores/facadeStore';
 import { useSupervisionStore } from '../../stores/supervisionStore';
 import { isAndroid } from '../../utils/platform';
 
-vi.mock('../../utils/platform', async (importOriginal) => {
+vi.mock('../../utils/platform', async importOriginal => {
   const mod = await importOriginal<Record<string, any>>();
   return {
     ...mod,
@@ -56,12 +56,7 @@ async function renderProjectSettings(props: Partial<Parameters<typeof ProjectSet
   let view!: ReturnType<typeof render>;
   await act(async () => {
     view = render(
-      <ProjectSettings
-        project={mockProject as any}
-        isOpen={true}
-        onClose={() => {}}
-        {...props}
-      />
+      <ProjectSettings project={mockProject as any} isOpen={true} onClose={() => {}} {...props} />
     );
     await Promise.resolve();
   });
@@ -132,9 +127,7 @@ describe('ProjectSettings', () => {
     } as any);
 
     useProjectStore.setState({
-      providers: [
-        { id: 'prov-1', name: 'Claude', type: 'claude', isDefault: true },
-      ],
+      providers: [{ id: 'prov-1', name: 'Claude', type: 'claude', isDefault: true }],
       updateProject: vi.fn(),
       setProviders: vi.fn(),
     } as any);
@@ -186,15 +179,19 @@ describe('ProjectSettings', () => {
     await renderProjectSettings();
     // Default Agent picker is a Select (button[aria-haspopup="listbox"]); open it
     // by clicking the trigger that shows the currently-selected agent.
-    const triggers = screen.getAllByRole('button', { expanded: false }).filter((b) =>
-      b.getAttribute('aria-haspopup') === 'listbox'
-    );
-    const agentTrigger = triggers.find((b) => b.textContent?.includes('Default Coding Agent'));
+    const triggers = screen
+      .getAllByRole('button', { expanded: false })
+      .filter(b => b.getAttribute('aria-haspopup') === 'listbox');
+    const agentTrigger = triggers.find(b => b.textContent?.includes('Default Coding Agent'));
     expect(agentTrigger).toBeTruthy();
     fireEvent.click(agentTrigger!);
 
-    expect(screen.getByRole('option', { name: 'No default — use global default' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'Default Coding Agent (global default)' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('option', { name: 'No default — use global default' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('option', { name: 'Default Coding Agent (global default)' })
+    ).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Doc Writer' })).toBeInTheDocument();
   });
 
@@ -202,10 +199,10 @@ describe('ProjectSettings', () => {
     const api = await import('../../services/api');
 
     await renderProjectSettings();
-    const triggers = screen.getAllByRole('button', { expanded: false }).filter((b) =>
-      b.getAttribute('aria-haspopup') === 'listbox'
-    );
-    const agentTrigger = triggers.find((b) => b.textContent?.includes('Default Coding Agent'));
+    const triggers = screen
+      .getAllByRole('button', { expanded: false })
+      .filter(b => b.getAttribute('aria-haspopup') === 'listbox');
+    const agentTrigger = triggers.find(b => b.textContent?.includes('Default Coding Agent'));
     fireEvent.click(agentTrigger!);
     fireEvent.click(screen.getByRole('option', { name: 'Doc Writer' }));
 
@@ -213,7 +210,7 @@ describe('ProjectSettings', () => {
 
     expect(api.updateProject).toHaveBeenCalledWith(
       'proj-1',
-      expect.objectContaining({ defaultAgentProfileId: 'agent-2' }),
+      expect.objectContaining({ defaultAgentProfileId: 'agent-2' })
     );
   });
 
@@ -221,10 +218,10 @@ describe('ProjectSettings', () => {
     const api = await import('../../services/api');
 
     await renderProjectSettings();
-    const triggers = screen.getAllByRole('button', { expanded: false }).filter((b) =>
-      b.getAttribute('aria-haspopup') === 'listbox'
-    );
-    const agentTrigger = triggers.find((b) => b.textContent?.includes('Default Coding Agent'));
+    const triggers = screen
+      .getAllByRole('button', { expanded: false })
+      .filter(b => b.getAttribute('aria-haspopup') === 'listbox');
+    const agentTrigger = triggers.find(b => b.textContent?.includes('Default Coding Agent'));
     fireEvent.click(agentTrigger!);
     fireEvent.click(screen.getByRole('option', { name: 'No default — use global default' }));
 
@@ -232,7 +229,7 @@ describe('ProjectSettings', () => {
 
     expect(api.updateProject).toHaveBeenCalledWith(
       'proj-1',
-      expect.objectContaining({ defaultAgentProfileId: null }),
+      expect.objectContaining({ defaultAgentProfileId: null })
     );
   });
 
@@ -309,10 +306,33 @@ describe('ProjectSettings', () => {
   it('loads active non-system workflows for permission override', async () => {
     const workflowApi = await import('../../features/workflows/api');
     vi.mocked(workflowApi.listAllWorkflows).mockResolvedValueOnce([
-      { id: 'wf-global', name: 'Global Review', status: 'active', definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] } } as any,
-      { id: 'wf-project', name: 'Project Review', projectId: 'proj-1', status: 'active', definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] } } as any,
-      { id: 'wf-other', name: 'Other Project Review', projectId: 'proj-2', status: 'active', definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] } } as any,
-      { id: 'wf-system', name: 'System Fallback', status: 'active', isSystem: true, definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] } } as any,
+      {
+        id: 'wf-global',
+        name: 'Global Review',
+        status: 'active',
+        definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] },
+      } as any,
+      {
+        id: 'wf-project',
+        name: 'Project Review',
+        projectId: 'proj-1',
+        status: 'active',
+        definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] },
+      } as any,
+      {
+        id: 'wf-other',
+        name: 'Other Project Review',
+        projectId: 'proj-2',
+        status: 'active',
+        definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] },
+      } as any,
+      {
+        id: 'wf-system',
+        name: 'System Fallback',
+        status: 'active',
+        isSystem: true,
+        definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] },
+      } as any,
     ]);
 
     await renderProjectSettings();
@@ -322,9 +342,9 @@ describe('ProjectSettings', () => {
     });
 
     // Open the workflow override Select panel to inspect options
-    const triggers = screen.getAllByRole('button', { expanded: false }).filter(b =>
-      b.getAttribute('aria-haspopup') === 'listbox'
-    );
+    const triggers = screen
+      .getAllByRole('button', { expanded: false })
+      .filter(b => b.getAttribute('aria-haspopup') === 'listbox');
     const overrideTrigger = triggers.find(b => b.textContent?.includes('Inherit global'));
     fireEvent.click(overrideTrigger!);
     expect(screen.getByRole('option', { name: '[Global] Global Review' })).toBeInTheDocument();
@@ -395,13 +415,13 @@ describe('ProjectSettings', () => {
     await renderProjectSettings();
     // Find the toggle button for permission override
     const toggleBtns = screen.getAllByRole('button');
-    const overrideToggle = toggleBtns.find(b =>
-      b.className?.includes('rounded-full')
-    );
+    const overrideToggle = toggleBtns.find(b => b.className?.includes('rounded-full'));
     if (overrideToggle) {
       await clickAsync(overrideToggle);
       // Now category permission section should be visible (e.g., File Read dropdown)
-      expect(screen.queryByText('File Read') || screen.queryByText('Agent Permission Override')).toBeTruthy();
+      expect(
+        screen.queryByText('File Read') || screen.queryByText('Agent Permission Override')
+      ).toBeTruthy();
     }
   });
 
@@ -432,20 +452,16 @@ describe('ProjectSettings', () => {
     await renderProjectSettings();
     // The supervisor toggle is a rounded-full button near the Supervisor Agent label
     // Toggle switches use w-10 h-5; other rounded-full buttons (e.g. Select triggers) don't.
-    const toggleButtons = screen.getAllByRole('button').filter(b =>
-      b.className?.includes('w-10') && b.className?.includes('rounded-full')
-    );
+    const toggleButtons = screen
+      .getAllByRole('button')
+      .filter(b => b.className?.includes('w-10') && b.className?.includes('rounded-full'));
     // Second rounded-full button is the supervisor toggle (first is permission override)
     if (toggleButtons.length >= 2) {
       await clickAsync(toggleButtons[1]);
     }
 
     await waitFor(() => {
-      expect(api.initSupervisionAgent).toHaveBeenCalledWith(
-        'proj-1',
-        expect.any(Object),
-        'lite'
-      );
+      expect(api.initSupervisionAgent).toHaveBeenCalledWith('proj-1', expect.any(Object), 'lite');
     });
   });
 
@@ -459,9 +475,9 @@ describe('ProjectSettings', () => {
 
     await renderProjectSettings();
     // Toggle switches use w-10 h-5; other rounded-full buttons (e.g. Select triggers) don't.
-    const toggleButtons = screen.getAllByRole('button').filter(b =>
-      b.className?.includes('w-10') && b.className?.includes('rounded-full')
-    );
+    const toggleButtons = screen
+      .getAllByRole('button')
+      .filter(b => b.className?.includes('w-10') && b.className?.includes('rounded-full'));
     if (toggleButtons.length >= 2) {
       await clickAsync(toggleButtons[1]);
     }
@@ -503,15 +519,21 @@ describe('ProjectSettings', () => {
     const api = await import('../../services/api');
     const workflowApi = await import('../../features/workflows/api');
     vi.mocked(workflowApi.listAllWorkflows).mockResolvedValueOnce([
-      { id: 'wf-project', name: 'Project Review', projectId: 'proj-1', status: 'active', definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] } } as any,
+      {
+        id: 'wf-project',
+        name: 'Project Review',
+        projectId: 'proj-1',
+        status: 'active',
+        definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] },
+      } as any,
     ]);
 
     await renderProjectSettings();
 
     // Open the workflow override Select and click the Project Review option
-    const triggers = screen.getAllByRole('button', { expanded: false }).filter(b =>
-      b.getAttribute('aria-haspopup') === 'listbox'
-    );
+    const triggers = screen
+      .getAllByRole('button', { expanded: false })
+      .filter(b => b.getAttribute('aria-haspopup') === 'listbox');
     const overrideTrigger = triggers.find(b => b.textContent?.includes('Inherit global'));
     fireEvent.click(overrideTrigger!);
     fireEvent.click(screen.getByRole('option', { name: '[Project] Project Review' }));
@@ -519,7 +541,7 @@ describe('ProjectSettings', () => {
 
     expect(api.updateProject).toHaveBeenCalledWith(
       'proj-1',
-      expect.objectContaining({ permissionWorkflowOverrideId: 'wf-project' }),
+      expect.objectContaining({ permissionWorkflowOverrideId: 'wf-project' })
     );
   });
 

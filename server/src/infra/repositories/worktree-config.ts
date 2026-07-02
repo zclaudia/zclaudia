@@ -17,7 +17,7 @@ export class WorktreeConfigRepository {
     const rows = this.db
       .prepare('SELECT * FROM worktree_configs WHERE project_id = ?')
       .all(projectId);
-    return rows.map((r) => this.mapRow(r));
+    return rows.map(r => this.mapRow(r));
   }
 
   findOne(projectId: string, worktreePath: string): WorktreeConfig | null {
@@ -33,13 +33,13 @@ export class WorktreeConfigRepository {
         `INSERT INTO worktree_configs (project_id, worktree_path, auto_create_pr, auto_review)
          VALUES (?, ?, ?, ?)
          ON CONFLICT (project_id, worktree_path)
-         DO UPDATE SET auto_create_pr = excluded.auto_create_pr, auto_review = excluded.auto_review`,
+         DO UPDATE SET auto_create_pr = excluded.auto_create_pr, auto_review = excluded.auto_review`
       )
       .run(
         config.projectId,
         config.worktreePath,
         config.autoCreatePR ? 1 : 0,
-        config.autoReview ? 1 : 0,
+        config.autoReview ? 1 : 0
       );
     return this.findOne(config.projectId, config.worktreePath)!;
   }

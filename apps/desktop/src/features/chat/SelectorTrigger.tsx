@@ -22,12 +22,13 @@ export function SelectorTrigger({
   children,
 }: SelectorTriggerProps) {
   const effectiveDisabled = !!(disabled || locked);
-  const effectiveTitle = locked ? (lockReason || title || 'Locked') : title;
-  const stateClass = (disabled && !locked)
-    ? 'opacity-50 cursor-not-allowed text-muted-foreground'
-    : locked
-      ? 'cursor-not-allowed text-amber-600 bg-amber-500/10 border border-amber-500/30 dark:text-amber-400'
-      : 'hover:bg-muted active:bg-muted/80 cursor-pointer text-muted-foreground hover:text-foreground';
+  const effectiveTitle = locked ? lockReason || title || 'Locked' : title;
+  const stateClass =
+    disabled && !locked
+      ? 'opacity-50 cursor-not-allowed text-muted-foreground'
+      : locked
+        ? 'cursor-not-allowed text-amber-600 bg-amber-500/10 border border-amber-500/30 dark:text-amber-400'
+        : 'hover:bg-muted active:bg-muted/80 cursor-pointer text-muted-foreground hover:text-foreground';
 
   return (
     <button

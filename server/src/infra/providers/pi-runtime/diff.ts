@@ -46,8 +46,8 @@ type DiffOp = { type: 'eq' | 'del' | 'ins'; text: string };
  * re-emitted as delete+insert.
  */
 function diffMiddle(oldMid: string[], newMid: string[]): DiffOp[] {
-  if (oldMid.length === 0) return newMid.map((text) => ({ type: 'ins', text }));
-  if (newMid.length === 0) return oldMid.map((text) => ({ type: 'del', text }));
+  if (oldMid.length === 0) return newMid.map(text => ({ type: 'ins', text }));
+  if (newMid.length === 0) return oldMid.map(text => ({ type: 'del', text }));
   if (oldMid.length * newMid.length > MAX_LCS_CELLS) {
     return [
       ...oldMid.map((text): DiffOp => ({ type: 'del', text })),
@@ -61,21 +61,36 @@ function diffMiddle(oldMid: string[], newMid: string[]): DiffOp[] {
   const dp = new Int32Array((m + 1) * width);
   for (let i = m - 1; i >= 0; i -= 1) {
     for (let j = n - 1; j >= 0; j -= 1) {
-      dp[i * width + j] = oldMid[i] === newMid[j]
-        ? dp[(i + 1) * width + (j + 1)] + 1
-        : Math.max(dp[(i + 1) * width + j], dp[i * width + (j + 1)]);
+      dp[i * width + j] =
+        oldMid[i] === newMid[j]
+          ? dp[(i + 1) * width + (j + 1)] + 1
+          : Math.max(dp[(i + 1) * width + j], dp[i * width + (j + 1)]);
     }
   }
   const ops: DiffOp[] = [];
   let i = 0;
   let j = 0;
   while (i < m && j < n) {
-    if (oldMid[i] === newMid[j]) { ops.push({ type: 'eq', text: oldMid[i] }); i += 1; j += 1; }
-    else if (dp[(i + 1) * width + j] >= dp[i * width + (j + 1)]) { ops.push({ type: 'del', text: oldMid[i] }); i += 1; }
-    else { ops.push({ type: 'ins', text: newMid[j] }); j += 1; }
+    if (oldMid[i] === newMid[j]) {
+      ops.push({ type: 'eq', text: oldMid[i] });
+      i += 1;
+      j += 1;
+    } else if (dp[(i + 1) * width + j] >= dp[i * width + (j + 1)]) {
+      ops.push({ type: 'del', text: oldMid[i] });
+      i += 1;
+    } else {
+      ops.push({ type: 'ins', text: newMid[j] });
+      j += 1;
+    }
   }
-  while (i < m) { ops.push({ type: 'del', text: oldMid[i] }); i += 1; }
-  while (j < n) { ops.push({ type: 'ins', text: newMid[j] }); j += 1; }
+  while (i < m) {
+    ops.push({ type: 'del', text: oldMid[i] });
+    i += 1;
+  }
+  while (j < n) {
+    ops.push({ type: 'ins', text: newMid[j] });
+    j += 1;
+  }
   return ops;
 }
 
@@ -86,15 +101,19 @@ function diffLines(oldLines: string[], newLines: string[]): DiffOp[] {
   while (p < minLen && oldLines[p] === newLines[p]) p += 1;
   let s = 0;
   while (
-    s < oldLines.length - p
-    && s < newLines.length - p
-    && oldLines[oldLines.length - 1 - s] === newLines[newLines.length - 1 - s]
-  ) s += 1;
+    s < oldLines.length - p &&
+    s < newLines.length - p &&
+    oldLines[oldLines.length - 1 - s] === newLines[newLines.length - 1 - s]
+  )
+    s += 1;
 
   const ops: DiffOp[] = [];
   for (let k = 0; k < p; k += 1) ops.push({ type: 'eq', text: oldLines[k] });
-  ops.push(...diffMiddle(oldLines.slice(p, oldLines.length - s), newLines.slice(p, newLines.length - s)));
-  for (let k = oldLines.length - s; k < oldLines.length; k += 1) ops.push({ type: 'eq', text: oldLines[k] });
+  ops.push(
+    ...diffMiddle(oldLines.slice(p, oldLines.length - s), newLines.slice(p, newLines.length - s))
+  );
+  for (let k = oldLines.length - s; k < oldLines.length; k += 1)
+    ops.push({ type: 'eq', text: oldLines[k] });
   return ops;
 }
 
@@ -103,7 +122,11 @@ interface AnnotatedOp extends DiffOp {
   newNo: number;
 }
 
-export function buildFileDiff(path: string, oldContent: string, newContent: string): FileDiffResult {
+export function buildFileDiff(
+  path: string,
+  oldContent: string,
+  newContent: string
+): FileDiffResult {
   const oldLines = splitComparableLines(oldContent);
   const newLines = splitComparableLines(newContent);
   const ops = diffLines(oldLines, newLines);
@@ -163,13 +186,27 @@ export function buildFileDiff(path: string, oldContent: string, newContent: stri
     let newCount = 0;
     const hunkLines: string[] = [];
     for (const op of slice) {
-      if (op.type === 'eq') { hunkLines.push(` ${op.text}`); oldCount += 1; newCount += 1; }
-      else if (op.type === 'del') { hunkLines.push(`-${op.text}`); oldCount += 1; }
-      else { hunkLines.push(`+${op.text}`); newCount += 1; }
+      if (op.type === 'eq') {
+        hunkLines.push(` ${op.text}`);
+        oldCount += 1;
+        newCount += 1;
+      } else if (op.type === 'del') {
+        hunkLines.push(`-${op.text}`);
+        oldCount += 1;
+      } else {
+        hunkLines.push(`+${op.text}`);
+        newCount += 1;
+      }
     }
     const oldStart = slice[0].oldNo;
     const newStart = slice[0].newNo;
-    structuredPatch.push({ oldStart, oldLines: oldCount, newStart, newLines: newCount, lines: hunkLines });
+    structuredPatch.push({
+      oldStart,
+      oldLines: oldCount,
+      newStart,
+      newLines: newCount,
+      lines: hunkLines,
+    });
     diffOut.push(`@@ -${oldStart},${oldCount} +${newStart},${newCount} @@`, ...hunkLines);
   }
 

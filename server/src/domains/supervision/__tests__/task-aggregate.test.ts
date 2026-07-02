@@ -83,7 +83,7 @@ describe('TaskAggregate', () => {
           source: 'user',
         },
         'medium',
-        repo,
+        repo
       );
 
       expect(repo.create).toHaveBeenCalledOnce();
@@ -102,12 +102,10 @@ describe('TaskAggregate', () => {
           source: 'agent_discovered',
         },
         'low',
-        repo,
+        repo
       );
 
-      expect(repo.create).toHaveBeenCalledWith(
-        expect.objectContaining({ status: 'proposed' }),
-      );
+      expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ status: 'proposed' }));
       const events = agg.releaseEvents();
       expect(events[0].type).toBe('task_created');
     });
@@ -120,12 +118,10 @@ describe('TaskAggregate', () => {
           description: 'Manual',
         },
         'low',
-        repo,
+        repo
       );
 
-      expect(repo.create).toHaveBeenCalledWith(
-        expect.objectContaining({ status: 'pending' }),
-      );
+      expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ status: 'pending' }));
     });
   });
 
@@ -361,7 +357,9 @@ describe('TaskAggregate', () => {
 
       agg.markLiteStarted('sess-lite');
 
-      expect(repo.updateStatus).toHaveBeenCalledWith('task-1', 'running', { sessionId: 'sess-lite' });
+      expect(repo.updateStatus).toHaveBeenCalledWith('task-1', 'running', {
+        sessionId: 'sess-lite',
+      });
       const events = agg.releaseEvents();
       expect(events).toHaveLength(1);
       expect(events[0].type).toBe('lite_task_started');
@@ -476,9 +474,13 @@ describe('TaskAggregate', () => {
 
       agg.markLiteFailed('Final failure');
 
-      expect(repo.updateStatus).toHaveBeenCalledWith('task-1', 'failed', expect.objectContaining({
-        attempt: 4,
-      }));
+      expect(repo.updateStatus).toHaveBeenCalledWith(
+        'task-1',
+        'failed',
+        expect.objectContaining({
+          attempt: 4,
+        })
+      );
       const events = agg.releaseEvents();
       expect((events[0] as any).nextStatus).toBe('failed');
     });
@@ -511,11 +513,15 @@ describe('TaskAggregate', () => {
 
       agg.markMergeConflict(['file-a.ts', 'file-b.ts']);
 
-      expect(repo.updateStatus).toHaveBeenCalledWith('task-1', 'merge_conflict', expect.objectContaining({
-        result: expect.objectContaining({
-          reviewNotes: 'Merge conflicts: file-a.ts, file-b.ts',
-        }),
-      }));
+      expect(repo.updateStatus).toHaveBeenCalledWith(
+        'task-1',
+        'merge_conflict',
+        expect.objectContaining({
+          result: expect.objectContaining({
+            reviewNotes: 'Merge conflicts: file-a.ts, file-b.ts',
+          }),
+        })
+      );
       const events = agg.releaseEvents();
       expect(events).toHaveLength(1);
       expect(events[0].type).toBe('task_merge_conflict');
@@ -533,9 +539,13 @@ describe('TaskAggregate', () => {
 
       agg.rejectResult('Needs improvement');
 
-      expect(repo.updateStatus).toHaveBeenCalledWith('task-1', 'queued', expect.objectContaining({
-        attempt: 2,
-      }));
+      expect(repo.updateStatus).toHaveBeenCalledWith(
+        'task-1',
+        'queued',
+        expect.objectContaining({
+          attempt: 2,
+        })
+      );
       const events = agg.releaseEvents();
       expect(events).toHaveLength(1);
       const ev = events[0] as any;
@@ -551,9 +561,13 @@ describe('TaskAggregate', () => {
 
       agg.rejectResult('Still wrong');
 
-      expect(repo.updateStatus).toHaveBeenCalledWith('task-1', 'failed', expect.objectContaining({
-        attempt: 4,
-      }));
+      expect(repo.updateStatus).toHaveBeenCalledWith(
+        'task-1',
+        'failed',
+        expect.objectContaining({
+          attempt: 4,
+        })
+      );
       const events = agg.releaseEvents();
       expect((events[0] as any).nextStatus).toBe('failed');
     });

@@ -6,7 +6,7 @@
 export function resolveEffectiveWorktree(
   override: string | null | undefined,
   workingDirectory: string | null | undefined,
-  projectRoot: string | null | undefined,
+  projectRoot: string | null | undefined
 ): string | null {
   return override ?? workingDirectory ?? projectRoot ?? null;
 }

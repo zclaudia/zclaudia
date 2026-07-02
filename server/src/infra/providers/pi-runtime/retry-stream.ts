@@ -55,11 +55,23 @@ export function computeDelay(failedAttempt: number, retryAfterHeader?: string): 
 
 /** Resolves true if aborted before the delay elapsed. */
 function interruptibleDelay(ms: number, signal?: AbortSignal): Promise<boolean> {
-  return new Promise((resolve) => {
-    if (signal?.aborted) { resolve(true); return; }
-    const onAbort = () => { cleanup(); resolve(true); };
-    const timer = setTimeout(() => { cleanup(); resolve(false); }, ms);
-    const cleanup = () => { clearTimeout(timer); signal?.removeEventListener('abort', onAbort); };
+  return new Promise(resolve => {
+    if (signal?.aborted) {
+      resolve(true);
+      return;
+    }
+    const onAbort = () => {
+      cleanup();
+      resolve(true);
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      resolve(false);
+    }, ms);
+    const cleanup = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+    };
     signal?.addEventListener('abort', onAbort, { once: true });
   });
 }
@@ -100,7 +112,7 @@ async function pump(
   context: Parameters<StreamFn>[1],
   streamOpts: SimpleStreamOptions | undefined,
   out: AssistantMessageEventStream,
-  opts: WithStreamRetryOptions,
+  opts: WithStreamRetryOptions
 ): Promise<void> {
   try {
     const signal = streamOpts?.signal;
@@ -123,7 +135,10 @@ async function pump(
             out.push({
               type: 'error',
               reason: 'error',
-              error: syntheticErrorMessage(err instanceof Error ? err.message : String(err), 'error'),
+              error: syntheticErrorMessage(
+                err instanceof Error ? err.message : String(err),
+                'error'
+              ),
             });
             out.end();
           }
@@ -133,8 +148,15 @@ async function pump(
       let pendingStart: AssistantMessageEvent | undefined;
       let forwardedContent = false;
 
-      const scheduleRetryOrGiveUp = async (errorEvent: AssistantMessageEvent & { type: 'error' }): Promise<'retry' | 'done'> => {
-        if (errorEvent.reason === 'aborted' || forwardedContent || attempt >= MAX_ATTEMPTS || !isRetryable(status)) {
+      const scheduleRetryOrGiveUp = async (
+        errorEvent: AssistantMessageEvent & { type: 'error' }
+      ): Promise<'retry' | 'done'> => {
+        if (
+          errorEvent.reason === 'aborted' ||
+          forwardedContent ||
+          attempt >= MAX_ATTEMPTS ||
+          !isRetryable(status)
+        ) {
           out.push(errorEvent);
           out.end();
           return 'done';
@@ -143,7 +165,11 @@ async function pump(
         opts.onRetry?.({ attempt: attempt + 1, maxAttempts: MAX_ATTEMPTS, delayMs, status });
         const aborted = await interruptibleDelay(delayMs, signal);
         if (aborted) {
-          out.push({ type: 'error', reason: 'aborted', error: syntheticErrorMessage('aborted during retry backoff', 'aborted') });
+          out.push({
+            type: 'error',
+            reason: 'aborted',
+            error: syntheticErrorMessage('aborted during retry backoff', 'aborted'),
+          });
           out.end();
           return 'done';
         }
@@ -190,7 +216,11 @@ async function pump(
       }
       if (!retrying) {
         // Inner stream ended without done/error (contract violation) — surface it.
-        out.push({ type: 'error', reason: 'error', error: syntheticErrorMessage('inner stream ended without terminal event', 'error') });
+        out.push({
+          type: 'error',
+          reason: 'error',
+          error: syntheticErrorMessage('inner stream ended without terminal event', 'error'),
+        });
         out.end();
         return;
       }

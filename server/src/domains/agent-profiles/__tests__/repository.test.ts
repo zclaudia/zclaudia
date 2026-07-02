@@ -93,7 +93,9 @@ describe('AgentProfileRepository', () => {
       },
     });
 
-    const raw = db.prepare('SELECT tool_selection FROM agent_profiles WHERE id = ?').get(created.id) as {
+    const raw = db
+      .prepare('SELECT tool_selection FROM agent_profiles WHERE id = ?')
+      .get(created.id) as {
       tool_selection: string;
     };
     const fetched = repo.findById(created.id);
@@ -104,8 +106,26 @@ describe('AgentProfileRepository', () => {
       include: [{ source: 'plugin', pluginId: 'jira', toolId: 'search' }],
       exclude: [{ source: 'builtin', name: 'Bash' }],
     });
-    expect(fetched!.enabledTools).toEqual(['Read', 'Write', 'Edit', 'MultiEdit', 'ReadSymbol', 'EditSymbol', 'Eval', 'Grep', 'Glob', 'LS', 'EnterPlanMode', 'ExitPlanMode', 'Memory']);
-    expect(fetched!.resolvedTools).toContainEqual({ source: 'plugin', pluginId: 'jira', toolId: 'search' });
+    expect(fetched!.enabledTools).toEqual([
+      'Read',
+      'Write',
+      'Edit',
+      'MultiEdit',
+      'ReadSymbol',
+      'EditSymbol',
+      'Eval',
+      'Grep',
+      'Glob',
+      'LS',
+      'EnterPlanMode',
+      'ExitPlanMode',
+      'Memory',
+    ]);
+    expect(fetched!.resolvedTools).toContainEqual({
+      source: 'plugin',
+      pluginId: 'jira',
+      toolId: 'search',
+    });
   });
 
   it('persists discoverable external providers and pinned external tools', () => {
@@ -126,7 +146,9 @@ describe('AgentProfileRepository', () => {
       },
     });
 
-    const raw = db.prepare('SELECT tool_selection FROM agent_profiles WHERE id = ?').get(created.id) as {
+    const raw = db
+      .prepare('SELECT tool_selection FROM agent_profiles WHERE id = ?')
+      .get(created.id) as {
       tool_selection: string;
     };
     const fetched = repo.findById(created.id);
@@ -168,7 +190,9 @@ describe('AgentProfileRepository', () => {
       },
     });
 
-    const raw = db.prepare('SELECT skill_selection FROM agent_profiles WHERE id = ?').get(created.id) as {
+    const raw = db
+      .prepare('SELECT skill_selection FROM agent_profiles WHERE id = ?')
+      .get(created.id) as {
       skill_selection: string;
     };
     const fetched = repo.findById(created.id);
@@ -226,7 +250,9 @@ describe('AgentProfileRepository', () => {
       },
     });
 
-    const raw = db.prepare('SELECT skill_execution FROM agent_profiles WHERE id = ?').get(created.id) as {
+    const raw = db
+      .prepare('SELECT skill_execution FROM agent_profiles WHERE id = ?')
+      .get(created.id) as {
       skill_execution: string;
     };
     const fetched = repo.findById(created.id);
@@ -281,7 +307,9 @@ describe('AgentProfileRepository', () => {
       systemPrompt: '',
       enabledTools: ['read'],
     });
-    db.prepare('UPDATE agent_profiles SET enabled_tools = ?, tool_selection = NULL WHERE id = ?').run('{broken', created.id);
+    db.prepare(
+      'UPDATE agent_profiles SET enabled_tools = ?, tool_selection = NULL WHERE id = ?'
+    ).run('{broken', created.id);
     const fetched = repo.findById(created.id);
     expect(fetched!.enabledTools.sort()).toEqual([...ALL_TOOL_NAMES].sort());
   });
@@ -298,7 +326,10 @@ describe('AgentProfileRepository', () => {
         pinned: [{ source: 'workspace', id: 'guidelines' }],
       },
     });
-    db.prepare('UPDATE agent_profiles SET skill_selection = ? WHERE id = ?').run('{broken', created.id);
+    db.prepare('UPDATE agent_profiles SET skill_selection = ? WHERE id = ?').run(
+      '{broken',
+      created.id
+    );
     const fetched = repo.findById(created.id);
     expect(fetched!.skillSelection).toBeUndefined();
   });
@@ -314,7 +345,10 @@ describe('AgentProfileRepository', () => {
         overrides: [{ ref: { source: 'workspace', id: 'guidelines' }, defaultMode: 'inline' }],
       },
     });
-    db.prepare('UPDATE agent_profiles SET skill_execution = ? WHERE id = ?').run('{broken', created.id);
+    db.prepare('UPDATE agent_profiles SET skill_execution = ? WHERE id = ?').run(
+      '{broken',
+      created.id
+    );
     const fetched = repo.findById(created.id);
     expect(fetched!.skillExecution).toBeUndefined();
   });
@@ -327,7 +361,10 @@ describe('AgentProfileRepository', () => {
       systemPrompt: '',
       enabledTools: ['read'],
     });
-    db.prepare('UPDATE agent_profiles SET thinking_level = ? WHERE id = ?').run('extreme', created.id);
+    db.prepare('UPDATE agent_profiles SET thinking_level = ? WHERE id = ?').run(
+      'extreme',
+      created.id
+    );
     const fetched = repo.findById(created.id);
     expect(fetched!.thinkingLevel).toBeUndefined();
   });
@@ -355,10 +392,30 @@ describe('AgentProfileRepository', () => {
       enabledTools: ['read'],
       isDefault: true,
     });
-    const b = repo.create({ name: 'b', llmProfileId, model: 'm', systemPrompt: '', enabledTools: ['read'] });
+    const b = repo.create({
+      name: 'b',
+      llmProfileId,
+      model: 'm',
+      systemPrompt: '',
+      enabledTools: ['read'],
+    });
     repo.setDefault(b.id);
     expect(repo.findById(a.id)!.isDefault).toBe(false);
     expect(repo.findById(b.id)!.isDefault).toBe(true);
+  });
+
+  it('setDefault keeps the previous default when the target is missing', () => {
+    const a = repo.create({
+      name: 'a',
+      llmProfileId,
+      model: 'm',
+      systemPrompt: '',
+      enabledTools: ['read'],
+      isDefault: true,
+    });
+
+    expect(() => repo.setDefault('missing-agent')).toThrow('AgentProfile not found: missing-agent');
+    expect(repo.findById(a.id)!.isDefault).toBe(true);
   });
 
   it('FK RESTRICT prevents deleting an llm_profile referenced by an agent', () => {
@@ -381,5 +438,4 @@ describe('AgentProfileRepository', () => {
     expect(updated!.model).toBe('new-model');
     expect(updated!.systemPrompt).toBe('');
   });
-
 });

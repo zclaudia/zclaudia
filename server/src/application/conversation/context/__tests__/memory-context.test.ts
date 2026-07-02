@@ -29,13 +29,20 @@ describe('buildMemoryContext', () => {
   });
 
   it('truncates oversized indexes by lines and bytes with a marker', () => {
-    const manyLines = Array.from({ length: MAX_INDEX_LINES + 50 }, (_, i) => `- line ${i}`).join('\n');
+    const manyLines = Array.from({ length: MAX_INDEX_LINES + 50 }, (_, i) => `- line ${i}`).join(
+      '\n'
+    );
     fs.writeFileSync(path.join(memoryDir, 'MEMORY.md'), manyLines);
     const byLines = buildMemoryContext(memoryDir)!;
     expect(byLines).toContain('[index truncated');
     expect(byLines).not.toContain(`- line ${MAX_INDEX_LINES + 10}`);
 
-    const cjkLines = Array.from({ length: 90 }, (_, i) => `- 记忆与缓存${i}：` + '构建顺序与缓存稳定性的踩坑教训记录设计模式权限规则钩子订阅事件流'.repeat(3)).join('\n');
+    const cjkLines = Array.from(
+      { length: 90 },
+      (_, i) =>
+        `- 记忆与缓存${i}：` +
+        '构建顺序与缓存稳定性的踩坑教训记录设计模式权限规则钩子订阅事件流'.repeat(3)
+    ).join('\n');
     fs.writeFileSync(path.join(memoryDir, 'MEMORY.md'), cjkLines);
     const byBytes = buildMemoryContext(memoryDir)!;
     expect(Buffer.byteLength(byBytes, 'utf8')).toBeLessThan(MAX_INDEX_BYTES + 2000);

@@ -1,9 +1,30 @@
-import { useState, useMemo, useCallback, memo, useRef, useEffect, createContext, useContext } from 'react';
+import {
+  useState,
+  useMemo,
+  useCallback,
+  memo,
+  useRef,
+  useEffect,
+  createContext,
+  useContext,
+} from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Brain, ChevronRight, Image, Copy, Check, Terminal, MoreHorizontal, GitFork, GitBranch, Compass, Target } from 'lucide-react';
+import {
+  Brain,
+  ChevronRight,
+  Image,
+  Copy,
+  Check,
+  Terminal,
+  MoreHorizontal,
+  GitFork,
+  GitBranch,
+  Compass,
+  Target,
+} from 'lucide-react';
 import { ToolCallList } from './tool-call/ToolCallList';
 import { FilePushCard } from './FilePushNotification';
 import { FilePreviewModal } from './FilePreviewModal';
@@ -27,9 +48,13 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useConnection } from '../../contexts/ConnectionContext';
 import { useServerStore } from '../../stores/serverStore';
 import { TextWithFileRefs, MarkdownChildrenWithFileRefs } from './FileReference';
-import { hasInlineMarkdownIcon, TextWithInlineMarkdownIcons } from '../../components/markdown/InlineMarkdownIcons';
+import {
+  hasInlineMarkdownIcon,
+  TextWithInlineMarkdownIcons,
+} from '../../components/markdown/InlineMarkdownIcons';
 import { FileLineReference, INLINE_FILE_REF_REGEX } from './FileLineReference';
 import { activatePanel } from '../../utils/openPanel';
+import { formatMessageTimestamp } from './messageTimestamp';
 
 interface FileRefContextValue {
   projectRoot?: string;
@@ -61,7 +86,11 @@ function ThinkingBlock({ content }: { content: string }) {
         className="flex items-center gap-1.5 w-full px-3 py-1.5 text-thinking hover:text-foreground transition-colors"
       >
         <Brain size={14} strokeWidth={1.5} className="flex-shrink-0" />
-        <ChevronRight size={12} strokeWidth={2} className={`transition-transform flex-shrink-0 ${expanded ? 'rotate-90' : ''}`} />
+        <ChevronRight
+          size={12}
+          strokeWidth={2}
+          className={`transition-transform flex-shrink-0 ${expanded ? 'rotate-90' : ''}`}
+        />
         <span className="font-medium">Thinking</span>
         {/* Line count */}
         <span className="text-thinking/50 ml-auto text-[10px]">
@@ -107,7 +136,11 @@ function ThinkingBlocksCard({ blocks }: { blocks: ThinkingBlockMeta[] }) {
         className="flex items-center gap-1.5 w-full px-3 py-1.5 text-thinking hover:text-foreground transition-colors"
       >
         <Brain size={14} strokeWidth={1.5} className="flex-shrink-0" />
-        <ChevronRight size={12} strokeWidth={2} className={`transition-transform flex-shrink-0 ${expanded ? 'rotate-90' : ''}`} />
+        <ChevronRight
+          size={12}
+          strokeWidth={2}
+          className={`transition-transform flex-shrink-0 ${expanded ? 'rotate-90' : ''}`}
+        />
         <span className="font-medium">Thinking</span>
         <span className="text-thinking/50 ml-auto text-[10px]">
           {count} block{count !== 1 ? 's' : ''}
@@ -159,28 +192,6 @@ const VIRTUALIZE_THRESHOLD = 80;
 const VIRTUAL_ESTIMATED_HEIGHT = 120;
 const VIRTUAL_OVERSCAN_PX = 900;
 
-export function formatMessageTimestamp(timestamp: number, now: number = Date.now()): string {
-  const messageDate = new Date(timestamp);
-  const currentDate = new Date(now);
-  const isToday =
-    messageDate.getFullYear() === currentDate.getFullYear() &&
-    messageDate.getMonth() === currentDate.getMonth() &&
-    messageDate.getDate() === currentDate.getDate();
-
-  if (isToday) {
-    return messageDate.toLocaleTimeString();
-  }
-
-  return messageDate.toLocaleString(undefined, {
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    second: '2-digit',
-  });
-}
-
 export const MessageList = memo(function MessageList({
   messages,
   streamingContentBlocks,
@@ -198,12 +209,12 @@ export const MessageList = memo(function MessageList({
 }: MessageListProps) {
   const fileRefContextValue = useMemo<FileRefContextValue>(
     () => ({ projectRoot: fileReferenceRoot, backendId: fileReferenceBackendId }),
-    [fileReferenceRoot, fileReferenceBackendId],
+    [fileReferenceRoot, fileReferenceBackendId]
   );
   // Subscribe to filePushStore for download status updates
-  const filePushItems = useFilePushStore((state) => state.items);
+  const filePushItems = useFilePushStore(state => state.items);
   const [previewItem, setPreviewItem] = useState<FilePushItem | null>(null);
-  const [heightVersion, setHeightVersion] = useState(0);
+  const [itemHeights, setItemHeights] = useState<ReadonlyMap<number, number>>(() => new Map());
   const itemHeightsRef = useRef<Map<number, number>>(new Map());
   const observersRef = useRef<Map<number, ResizeObserver>>(new Map());
 
@@ -211,7 +222,7 @@ export const MessageList = memo(function MessageList({
   // Compaction markers ride on synthetic system messages with empty content, so they would
   // otherwise be filtered out below — keep them by detecting the metadata sentinel.
   const filteredMessages = useMemo(() => {
-    return (messages || []).filter((message) => {
+    return (messages || []).filter(message => {
       // Compaction markers and /context cards always pass — even though their role is 'system' and content is empty.
       if (message.metadata?.compactionMarker) return true;
       if (message.metadata?.contextUsage) return true;
@@ -231,8 +242,8 @@ export const MessageList = memo(function MessageList({
 
       const parsed = tryParseMessageInput(message.content);
       const textContent = parsed?.text ?? message.content;
-      const hasAttachments = (parsed?.attachments?.length ?? 0) > 0
-        || (message.metadata?.attachments?.length ?? 0) > 0;
+      const hasAttachments =
+        (parsed?.attachments?.length ?? 0) > 0 || (message.metadata?.attachments?.length ?? 0) > 0;
       return textContent.trim().length > 0 || hasAttachments;
     });
   }, [messages]);
@@ -247,25 +258,29 @@ export const MessageList = memo(function MessageList({
       }
       observersRef.current.clear();
       itemHeightsRef.current.clear();
-      setHeightVersion(v => v + 1);
+      setItemHeights(new Map());
       prevFirstMessageIdRef.current = firstMessageId;
     }
   }, [firstMessageId]);
 
   useEffect(() => {
+    const observers = observersRef.current;
     return () => {
-      for (const ro of observersRef.current.values()) {
+      for (const ro of observers.values()) {
         ro.disconnect();
       }
-      observersRef.current.clear();
+      observers.clear();
     };
   }, []);
 
   const shouldVirtualize = filteredMessages.length >= VIRTUALIZE_THRESHOLD && viewportHeight > 0;
 
-  const getHeight = useCallback((index: number) => {
-    return itemHeightsRef.current.get(index) ?? VIRTUAL_ESTIMATED_HEIGHT;
-  }, [itemHeightsRef]);
+  const getHeight = useCallback(
+    (index: number) => {
+      return itemHeights.get(index) ?? VIRTUAL_ESTIMATED_HEIGHT;
+    },
+    [itemHeights]
+  );
 
   const setMeasuredRef = useCallback((index: number, element: HTMLDivElement | null) => {
     const existing = observersRef.current.get(index);
@@ -281,20 +296,20 @@ export const MessageList = memo(function MessageList({
       const prev = itemHeightsRef.current.get(index);
       if (prev !== nextHeight) {
         itemHeightsRef.current.set(index, nextHeight);
-        setHeightVersion(v => v + 1);
+        setItemHeights(new Map(itemHeightsRef.current));
       }
     };
 
     updateHeight(Math.ceil(element.getBoundingClientRect().height));
 
-    const ro = new ResizeObserver((entries) => {
+    const ro = new ResizeObserver(entries => {
       for (const entry of entries) {
         updateHeight(Math.ceil(entry.contentRect.height));
       }
     });
     ro.observe(element);
     observersRef.current.set(index, ro);
-  }, [itemHeightsRef, observersRef]);
+  }, []);
 
   // Precompute the index of the last assistant message for streaming block assignment
   const lastAssistantIndex = useMemo(() => {
@@ -304,94 +319,106 @@ export const MessageList = memo(function MessageList({
     return -1;
   }, [filteredMessages]);
 
-  const renderMessage = useCallback((message: MessageWithToolCalls, index: number) => {
-    const isHighlighted = highlightedMessageId === message.id;
+  const renderMessage = useCallback(
+    (message: MessageWithToolCalls, index: number) => {
+      const isHighlighted = highlightedMessageId === message.id;
 
-    // Compaction marker dispatch — synthetic system message whose metadata carries the marker payload.
-    // The server interleaves these into the messages list (see sessions message-routes.ts) and emits
-    // a `compaction_completed` wire event so live sessions can append without a full reload.
-    if (message.metadata?.compactionMarker) {
+      // Compaction marker dispatch — synthetic system message whose metadata carries the marker payload.
+      // The server interleaves these into the messages list (see sessions message-routes.ts) and emits
+      // a `compaction_completed` wire event so live sessions can append without a full reload.
+      if (message.metadata?.compactionMarker) {
+        return (
+          <div
+            key={message.id}
+            data-message-id={message.id}
+            className={`max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl min-w-0 scroll-mt-24 rounded-2xl transition-colors ${isHighlighted ? 'ring-2 ring-primary/40 bg-muted/40' : ''}`}
+          >
+            <CompactionMarkerCard marker={message.metadata.compactionMarker} />
+          </div>
+        );
+      }
+
+      // /context card dispatch — synthetic, frontend-only system message.
+      if (message.metadata?.contextUsage) {
+        return (
+          <div
+            key={message.id}
+            data-message-id={message.id}
+            className={`max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl min-w-0 scroll-mt-24 rounded-2xl transition-colors ${isHighlighted ? 'ring-2 ring-primary/40 bg-muted/40' : ''}`}
+          >
+            <ContextUsageCard usage={message.metadata.contextUsage} />
+          </div>
+        );
+      }
+
+      if (message.metadata?.filePush) {
+        const fp = message.metadata.filePush;
+        const storeItem = filePushItems.find(i => i.fileId === fp.fileId);
+        const item: FilePushItem = {
+          fileId: fp.fileId,
+          fileName: fp.fileName,
+          mimeType: fp.mimeType,
+          fileSize: fp.fileSize,
+          sessionId: message.sessionId,
+          description: fp.description,
+          autoDownload: fp.autoDownload,
+          status: storeItem?.status ?? 'pending',
+          downloadProgress: storeItem?.downloadProgress ?? 0,
+          savedPath: storeItem?.savedPath,
+          privatePath: storeItem?.privatePath,
+          error: storeItem?.error,
+          serverId: storeItem?.serverId,
+          createdAt: message.createdAt,
+        };
+        return (
+          <div
+            key={message.id}
+            data-message-id={message.id}
+            className={`max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl min-w-0 scroll-mt-24 rounded-2xl transition-colors ${isHighlighted ? 'ring-2 ring-primary/40 bg-muted/40' : ''}`}
+          >
+            <FilePushCard item={item} onPreview={setPreviewItem} />
+          </div>
+        );
+      }
+
+      // Pass streaming blocks to the last assistant message (not necessarily the absolute
+      // last message — system messages like task_notification can be appended after it).
+      const isLastAssistant = Boolean(streamingContentBlocks && index === lastAssistantIndex);
+
       return (
         <div
           key={message.id}
           data-message-id={message.id}
-          className={`max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl min-w-0 scroll-mt-24 rounded-2xl transition-colors ${isHighlighted ? 'ring-2 ring-primary/40 bg-muted/40' : ''}`}
+          className={`scroll-mt-24 rounded-2xl transition-colors min-w-0 max-w-full ${isHighlighted ? 'ring-2 ring-primary/40 bg-muted/40' : ''}`}
         >
-          <CompactionMarkerCard marker={message.metadata.compactionMarker} />
+          <MessageItem
+            message={message}
+            streamingContentBlocks={isLastAssistant ? streamingContentBlocks : undefined}
+            streamingToolCalls={isLastAssistant ? streamingToolCalls : undefined}
+            showResend={message.id === resendTargetMessageId}
+            onResend={message.id === resendTargetMessageId ? onResendTarget : undefined}
+            resendDisabled={resendDisabled}
+            onFork={onFork}
+            onBranch={onBranch}
+            isLeaf={index === filteredMessages.length - 1}
+          />
         </div>
       );
-    }
-
-    // /context card dispatch — synthetic, frontend-only system message.
-    if (message.metadata?.contextUsage) {
-      return (
-        <div
-          key={message.id}
-          data-message-id={message.id}
-          className={`max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl min-w-0 scroll-mt-24 rounded-2xl transition-colors ${isHighlighted ? 'ring-2 ring-primary/40 bg-muted/40' : ''}`}
-        >
-          <ContextUsageCard usage={message.metadata.contextUsage} />
-        </div>
-      );
-    }
-
-    if (message.metadata?.filePush) {
-      const fp = message.metadata.filePush;
-      const storeItem = filePushItems.find(i => i.fileId === fp.fileId);
-      const item: FilePushItem = {
-        fileId: fp.fileId,
-        fileName: fp.fileName,
-        mimeType: fp.mimeType,
-        fileSize: fp.fileSize,
-        sessionId: message.sessionId,
-        description: fp.description,
-        autoDownload: fp.autoDownload,
-        status: storeItem?.status ?? 'pending',
-        downloadProgress: storeItem?.downloadProgress ?? 0,
-        savedPath: storeItem?.savedPath,
-        privatePath: storeItem?.privatePath,
-        error: storeItem?.error,
-        serverId: storeItem?.serverId,
-        createdAt: message.createdAt,
-      };
-      return (
-        <div
-          key={message.id}
-          data-message-id={message.id}
-          className={`max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl min-w-0 scroll-mt-24 rounded-2xl transition-colors ${isHighlighted ? 'ring-2 ring-primary/40 bg-muted/40' : ''}`}
-        >
-          <FilePushCard item={item} onPreview={setPreviewItem} />
-        </div>
-      );
-    }
-
-    // Pass streaming blocks to the last assistant message (not necessarily the absolute
-    // last message — system messages like task_notification can be appended after it).
-    const isLastAssistant = Boolean(
-      streamingContentBlocks &&
-      index === lastAssistantIndex
-    );
-
-    return (
-      <div
-        key={message.id}
-        data-message-id={message.id}
-        className={`scroll-mt-24 rounded-2xl transition-colors min-w-0 max-w-full ${isHighlighted ? 'ring-2 ring-primary/40 bg-muted/40' : ''}`}
-      >
-        <MessageItem
-          message={message}
-          streamingContentBlocks={isLastAssistant ? streamingContentBlocks : undefined}
-          streamingToolCalls={isLastAssistant ? streamingToolCalls : undefined}
-          showResend={message.id === resendTargetMessageId}
-          onResend={message.id === resendTargetMessageId ? onResendTarget : undefined}
-          resendDisabled={resendDisabled}
-          onFork={onFork}
-          onBranch={onBranch}
-          isLeaf={index === filteredMessages.length - 1}
-        />
-      </div>
-    );
-  }, [filePushItems, filteredMessages.length, highlightedMessageId, lastAssistantIndex, streamingContentBlocks, streamingToolCalls, resendTargetMessageId, onResendTarget, resendDisabled, onFork, onBranch]);
+    },
+    [
+      filePushItems,
+      filteredMessages.length,
+      highlightedMessageId,
+      lastAssistantIndex,
+      streamingContentBlocks,
+      streamingToolCalls,
+      resendTargetMessageId,
+      onResendTarget,
+      resendDisabled,
+      onFork,
+      onBranch,
+    ]
+  );
 
   const virtualWindow = useMemo(() => {
     if (!shouldVirtualize) {
@@ -432,7 +459,7 @@ export const MessageList = memo(function MessageList({
       topPadding: y,
       bottomPadding: Math.max(0, totalHeight - renderedBottom),
     };
-  }, [filteredMessages.length, getHeight, heightVersion, scrollTop, shouldVirtualize, viewportHeight]);
+  }, [filteredMessages.length, getHeight, scrollTop, shouldVirtualize, viewportHeight]);
 
   if (filteredMessages.length === 0) {
     return null;
@@ -456,24 +483,20 @@ export const MessageList = memo(function MessageList({
   return (
     <FileRefContext.Provider value={fileRefContextValue}>
       <div data-testid="message-list" className="min-w-0 max-w-full">
-        {virtualWindow.topPadding > 0 && (
-          <div style={{ height: virtualWindow.topPadding }} />
-        )}
+        {virtualWindow.topPadding > 0 && <div style={{ height: virtualWindow.topPadding }} />}
         {filteredMessages.slice(virtualWindow.start, virtualWindow.end).map((message, idx) => {
           const absoluteIndex = virtualWindow.start + idx;
           return (
             <div
               key={message.id}
-              ref={(el) => setMeasuredRef(absoluteIndex, el)}
+              ref={el => setMeasuredRef(absoluteIndex, el)}
               className="mb-4 min-w-0 max-w-full"
             >
               {renderMessage(message, absoluteIndex)}
             </div>
           );
         })}
-        {virtualWindow.bottomPadding > 0 && (
-          <div style={{ height: virtualWindow.bottomPadding }} />
-        )}
+        {virtualWindow.bottomPadding > 0 && <div style={{ height: virtualWindow.bottomPadding }} />}
       </div>
       {previewModal}
     </FileRefContext.Provider>
@@ -482,13 +505,7 @@ export const MessageList = memo(function MessageList({
 
 const SHELL_LANGUAGES = new Set(['bash', 'shell', 'sh', 'zsh']);
 
-function CodeBlock({
-  language,
-  children,
-}: {
-  language: string;
-  children: string;
-}) {
+function CodeBlock({ language, children }: { language: string; children: string }) {
   const [copied, setCopied] = useState(false);
   const { resolvedTheme } = useTheme();
   const { sendMessage } = useConnection();
@@ -541,10 +558,7 @@ function CodeBlock({
             onClick={handleCopy}
             className={`
               flex items-center gap-1.5 text-xs transition-colors
-              ${copied
-                ? 'text-success'
-                : 'text-muted-foreground hover:text-foreground'
-              }
+              ${copied ? 'text-success' : 'text-muted-foreground hover:text-foreground'}
             `}
           >
             {copied ? (
@@ -615,9 +629,7 @@ function AttachmentDisplay({ attachment }: { attachment: MessageAttachment }) {
             className="block max-w-full h-auto"
             style={{ maxHeight: '300px' }}
           />
-          <div className="px-2 py-1 bg-black/20 text-xs text-foreground/70">
-            {attachment.name}
-          </div>
+          <div className="px-2 py-1 bg-black/20 text-xs text-foreground/70">{attachment.name}</div>
         </div>
       );
     }
@@ -639,7 +651,9 @@ function AttachmentDisplay({ attachment }: { attachment: MessageAttachment }) {
         <div className="flex items-center justify-center h-24 text-muted-foreground">
           <div className="text-center">
             <Image size={32} strokeWidth={1.5} className="mx-auto mb-1 opacity-50" />
-            <div className="text-xs">{error ? 'Load failed — click to retry' : 'Click to load image'}</div>
+            <div className="text-xs">
+              {error ? 'Load failed — click to retry' : 'Click to load image'}
+            </div>
           </div>
         </div>
         <div className="px-2 py-1 bg-secondary text-xs text-muted-foreground border-t border-border">
@@ -651,9 +665,7 @@ function AttachmentDisplay({ attachment }: { attachment: MessageAttachment }) {
 
   // Fallback for other file types
   return (
-    <div className="px-2 py-1 bg-secondary text-xs rounded-md inline-block">
-      {attachment.name}
-    </div>
+    <div className="px-2 py-1 bg-secondary text-xs rounded-md inline-block">{attachment.name}</div>
   );
 }
 
@@ -672,7 +684,11 @@ function CollapsedTextBlock({ content }: { content: string }) {
         onClick={() => setExpanded(!expanded)}
         className="flex items-center gap-1.5 w-full px-3 py-1.5 text-muted-foreground hover:text-foreground transition-colors"
       >
-        <ChevronRight size={12} strokeWidth={2} className={`transition-transform flex-shrink-0 ${expanded ? 'rotate-90' : ''}`} />
+        <ChevronRight
+          size={12}
+          strokeWidth={2}
+          className={`transition-transform flex-shrink-0 ${expanded ? 'rotate-90' : ''}`}
+        />
         <span className="truncate text-left">{preview || '...'}</span>
       </button>
       {expanded && (
@@ -784,7 +800,10 @@ const SegmentedContent = memo(function SegmentedContent({
 
         // Intermediate text block: collapsed
         return (
-          <div key={`text-${i}`} className="w-full max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl min-w-0">
+          <div
+            key={`text-${i}`}
+            className="w-full max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl min-w-0"
+          >
             <CollapsedTextBlock content={segment.content} />
           </div>
         );
@@ -830,7 +849,10 @@ function MessageActionsMenu({
   return (
     <div ref={menuRef} className="relative">
       <button
-        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+        onClick={e => {
+          e.stopPropagation();
+          setOpen(v => !v);
+        }}
         className="flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/70 transition-colors"
         title="Message actions"
         aria-label="Message actions"
@@ -839,21 +861,38 @@ function MessageActionsMenu({
       </button>
 
       {open && (
-        <div className={`absolute ${anchor === 'left' ? 'left-0' : 'right-0'} bottom-7 z-50 min-w-[200px] rounded-lg border border-border bg-popover shadow-md py-1 text-sm`}>
+        <div
+          className={`absolute ${anchor === 'left' ? 'left-0' : 'right-0'} bottom-7 z-50 min-w-[200px] rounded-lg border border-border bg-popover shadow-md py-1 text-sm`}
+        >
           <button
             className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-muted/60 transition-colors"
-            onClick={(e) => { e.stopPropagation(); setOpen(false); onFork(treeEntryId); }}
+            onClick={e => {
+              e.stopPropagation();
+              setOpen(false);
+              onFork(treeEntryId);
+            }}
           >
             <GitFork size={14} strokeWidth={1.5} className="flex-shrink-0 text-muted-foreground" />
             <span>Fork into new session</span>
           </button>
           <button
             disabled={!canBranch}
-            title={canBranch ? undefined : 'Already at the latest point — branch from an earlier message'}
+            title={
+              canBranch ? undefined : 'Already at the latest point — branch from an earlier message'
+            }
             className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-muted/60 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-            onClick={(e) => { e.stopPropagation(); if (!canBranch) return; setOpen(false); onBranch(treeEntryId); }}
+            onClick={e => {
+              e.stopPropagation();
+              if (!canBranch) return;
+              setOpen(false);
+              onBranch(treeEntryId);
+            }}
           >
-            <GitBranch size={14} strokeWidth={1.5} className="flex-shrink-0 text-muted-foreground" />
+            <GitBranch
+              size={14}
+              strokeWidth={1.5}
+              className="flex-shrink-0 text-muted-foreground"
+            />
             <span>Branch from here (rewind)</span>
           </button>
         </div>
@@ -862,7 +901,17 @@ function MessageActionsMenu({
   );
 }
 
-const MessageItem = memo(function MessageItem({ message, streamingContentBlocks, streamingToolCalls, showResend, onResend, resendDisabled, onFork, onBranch, isLeaf }: {
+const MessageItem = memo(function MessageItem({
+  message,
+  streamingContentBlocks,
+  streamingToolCalls,
+  showResend,
+  onResend,
+  resendDisabled,
+  onFork,
+  onBranch,
+  isLeaf,
+}: {
   message: MessageWithToolCalls;
   streamingContentBlocks?: ContentBlock[];
   streamingToolCalls?: ToolCallState[];
@@ -879,43 +928,54 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
   const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
   const hasContentBlocks = message.contentBlocks && message.contentBlocks.length > 0;
   const streamingHasTextBlocks = Boolean(
-    streamingContentBlocks?.some((block) => block.type === 'text' && block.content.trim().length > 0)
+    streamingContentBlocks?.some(block => block.type === 'text' && block.content.trim().length > 0)
   );
   // Use segmented rendering: completed messages OR active streaming with blocks
-  const hasStreamingBlocks = streamingContentBlocks && streamingContentBlocks.length > 0 && streamingToolCalls && streamingToolCalls.length > 0;
-  const useSegmented = !isUser && !isSystem && ((hasContentBlocks && hasToolCalls) || hasStreamingBlocks);
+  const hasStreamingBlocks =
+    streamingContentBlocks &&
+    streamingContentBlocks.length > 0 &&
+    streamingToolCalls &&
+    streamingToolCalls.length > 0;
+  const useSegmented =
+    !isUser && !isSystem && ((hasContentBlocks && hasToolCalls) || hasStreamingBlocks);
 
   const parsedInput = tryParseMessageInput(message.content);
   const textContent: string = parsedInput?.text ?? message.content;
   // New-format rows store plain text in content and attachment refs in metadata.attachments.
   // Legacy rows store a JSON MessageInput envelope in content. Fall back to metadata when
   // no legacy envelope is present so thumbnails survive a session reload.
-  const attachments: MessageAttachment[] = parsedInput?.attachments ?? message.metadata?.attachments ?? [];
+  const attachments: MessageAttachment[] =
+    parsedInput?.attachments ?? message.metadata?.attachments ?? [];
 
   // Extract thinking blocks for assistant messages (rendered outside bubble for consistent width)
   const { thinking, content: mainContent } = useMemo(
-    () => (!isUser && !isSystem ? extractThinking(message.content) : { thinking: '', content: message.content }),
+    () =>
+      !isUser && !isSystem
+        ? extractThinking(message.content)
+        : { thinking: '', content: message.content },
     [message.content, isUser, isSystem]
   );
 
   // Structured thinking blocks from message metadata (populated by pi-runtime).
   // Distinct from the inline `<thinking>` tag content extracted above.
-  const metadataThinkingBlocks = !isUser && !isSystem ? message.metadata?.thinkingBlocks : undefined;
-  const hasMetadataThinking = Boolean(metadataThinkingBlocks && metadataThinkingBlocks.length > 0);
+  const metadataThinkingBlocks =
+    !isUser && !isSystem ? (message.metadata?.thinkingBlocks ?? []) : [];
+  const hasMetadataThinking = metadataThinkingBlocks.length > 0;
 
   // Show the actions menu when the message has a treeEntryId and callbacks are provided.
   // Rendered unconditionally (not hover-gated) so it doesn't reflow the timestamp row
   // on hover — the trigger is a low-contrast icon that only fills in on hover.
-  const showActionsMenu = Boolean(message.treeEntryId && onFork && onBranch);
+  const messageActions =
+    message.treeEntryId && onFork && onBranch
+      ? { treeEntryId: message.treeEntryId, onFork, onBranch }
+      : null;
 
   if (useSegmented) {
     // Segmented rendering: streaming blocks take priority over finalized blocks
-    const blocks = streamingContentBlocks || message.contentBlocks!;
-    const toolCalls = streamingToolCalls || message.toolCalls!;
+    const blocks = streamingContentBlocks ?? message.contentBlocks ?? [];
+    const toolCalls = streamingToolCalls ?? message.toolCalls ?? [];
     const shouldRenderFallbackContent = Boolean(
-      streamingContentBlocks
-      && !streamingHasTextBlocks
-      && mainContent.trim().length > 0
+      streamingContentBlocks && !streamingHasTextBlocks && mainContent.trim().length > 0
     );
     return (
       <div
@@ -924,7 +984,7 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
       >
         {hasMetadataThinking && (
           <div className="w-full max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl min-w-0">
-            <ThinkingBlocksCard blocks={metadataThinkingBlocks!} />
+            <ThinkingBlocksCard blocks={metadataThinkingBlocks} />
           </div>
         )}
         {shouldRenderFallbackContent && (
@@ -939,8 +999,14 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
         />
         <div className="mt-1 flex items-center gap-2 px-3">
           <span className="text-xs opacity-50">{formatMessageTimestamp(message.createdAt)}</span>
-          {showActionsMenu && (
-            <MessageActionsMenu treeEntryId={message.treeEntryId!} onFork={onFork!} onBranch={onBranch!} anchor="left" canBranch={!isLeaf} />
+          {messageActions && (
+            <MessageActionsMenu
+              treeEntryId={messageActions.treeEntryId}
+              onFork={messageActions.onFork}
+              onBranch={messageActions.onBranch}
+              anchor="left"
+              canBranch={!isLeaf}
+            />
           )}
         </div>
       </div>
@@ -957,14 +1023,14 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
       {/* Structured thinking blocks from metadata (pi-runtime) */}
       {hasMetadataThinking && (
         <div className="w-full max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl min-w-0">
-          <ThinkingBlocksCard blocks={metadataThinkingBlocks!} />
+          <ThinkingBlocksCard blocks={metadataThinkingBlocks} />
         </div>
       )}
 
       {/* Tool calls section (shown before the message content for assistant) — legacy rendering */}
       {!isUser && hasToolCalls && (
         <div className="w-full max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl mb-2 min-w-0">
-          <ToolCallList toolCalls={message.toolCalls!} defaultCollapsed />
+          <ToolCallList toolCalls={message.toolCalls ?? []} defaultCollapsed />
         </div>
       )}
 
@@ -980,8 +1046,8 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
           isUser
             ? 'max-w-[85%] md:max-w-3xl lg:max-w-4xl xl:max-w-5xl bg-muted/60 text-foreground shadow-apple-sm'
             : isSystem
-            ? 'max-w-[85%] md:max-w-3xl lg:max-w-4xl xl:max-w-5xl bg-muted text-muted-foreground text-sm'
-            : 'w-full max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl bg-card text-card-foreground min-w-0'
+              ? 'max-w-[85%] md:max-w-3xl lg:max-w-4xl xl:max-w-5xl bg-muted text-muted-foreground text-sm'
+              : 'w-full max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl bg-card text-card-foreground min-w-0'
         }`}
       >
         {isUser ? (
@@ -1011,21 +1077,29 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
             {/* Display attachments */}
             {attachments.length > 0 && (
               <div className="space-y-2 mb-2">
-                {attachments.map((att) => (
+                {attachments.map(att => (
                   <AttachmentDisplay key={att.fileId} attachment={att} />
                 ))}
               </div>
             )}
             {/* Display text */}
-            <p className="whitespace-pre-wrap leading-relaxed"><TextWithFileRefs text={textContent} variant="user" /></p>
+            <p className="whitespace-pre-wrap leading-relaxed">
+              <TextWithFileRefs text={textContent} variant="user" />
+            </p>
           </div>
         ) : (
           <AssistantContent content={mainContent} />
         )}
         <div className="mt-1 flex items-center gap-2">
           <span className="text-xs opacity-50">{formatMessageTimestamp(message.createdAt)}</span>
-          {showActionsMenu && (
-            <MessageActionsMenu treeEntryId={message.treeEntryId!} onFork={onFork!} onBranch={onBranch!} anchor={isUser ? 'right' : 'left'} canBranch={!isLeaf} />
+          {messageActions && (
+            <MessageActionsMenu
+              treeEntryId={messageActions.treeEntryId}
+              onFork={messageActions.onFork}
+              onBranch={messageActions.onBranch}
+              anchor={isUser ? 'right' : 'left'}
+              canBranch={!isLeaf}
+            />
           )}
         </div>
       </div>
@@ -1035,7 +1109,9 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
             onClick={onResend}
             disabled={resendDisabled}
             className="text-xs px-2 py-1 rounded-full border border-border text-muted-foreground hover:text-foreground hover:bg-secondary/60 disabled:opacity-50 disabled:cursor-not-allowed"
-            title={resendDisabled ? 'This message cannot be resent as plain text' : 'Resend this message'}
+            title={
+              resendDisabled ? 'This message cannot be resent as plain text' : 'Resend this message'
+            }
           >
             Resend
           </button>
@@ -1083,7 +1159,9 @@ const AssistantContent = memo(function AssistantContent({ content }: { content: 
                   >
                     {hasInlineMarkdownIcon(codeText) ? (
                       <TextWithInlineMarkdownIcons text={codeText} />
-                    ) : children}
+                    ) : (
+                      children
+                    )}
                   </code>
                 );
               }
@@ -1132,28 +1210,60 @@ const AssistantContent = memo(function AssistantContent({ content }: { content: 
               );
             },
             h1({ children }) {
-              return <h1><MarkdownChildrenWithFileRefs>{children}</MarkdownChildrenWithFileRefs></h1>;
+              return (
+                <h1>
+                  <MarkdownChildrenWithFileRefs>{children}</MarkdownChildrenWithFileRefs>
+                </h1>
+              );
             },
             h2({ children }) {
-              return <h2><MarkdownChildrenWithFileRefs>{children}</MarkdownChildrenWithFileRefs></h2>;
+              return (
+                <h2>
+                  <MarkdownChildrenWithFileRefs>{children}</MarkdownChildrenWithFileRefs>
+                </h2>
+              );
             },
             h3({ children }) {
-              return <h3><MarkdownChildrenWithFileRefs>{children}</MarkdownChildrenWithFileRefs></h3>;
+              return (
+                <h3>
+                  <MarkdownChildrenWithFileRefs>{children}</MarkdownChildrenWithFileRefs>
+                </h3>
+              );
             },
             h4({ children }) {
-              return <h4><MarkdownChildrenWithFileRefs>{children}</MarkdownChildrenWithFileRefs></h4>;
+              return (
+                <h4>
+                  <MarkdownChildrenWithFileRefs>{children}</MarkdownChildrenWithFileRefs>
+                </h4>
+              );
             },
             h5({ children }) {
-              return <h5><MarkdownChildrenWithFileRefs>{children}</MarkdownChildrenWithFileRefs></h5>;
+              return (
+                <h5>
+                  <MarkdownChildrenWithFileRefs>{children}</MarkdownChildrenWithFileRefs>
+                </h5>
+              );
             },
             h6({ children }) {
-              return <h6><MarkdownChildrenWithFileRefs>{children}</MarkdownChildrenWithFileRefs></h6>;
+              return (
+                <h6>
+                  <MarkdownChildrenWithFileRefs>{children}</MarkdownChildrenWithFileRefs>
+                </h6>
+              );
             },
             p({ children }) {
-              return <p><MarkdownChildrenWithFileRefs>{children}</MarkdownChildrenWithFileRefs></p>;
+              return (
+                <p>
+                  <MarkdownChildrenWithFileRefs>{children}</MarkdownChildrenWithFileRefs>
+                </p>
+              );
             },
             li({ children }) {
-              return <li><MarkdownChildrenWithFileRefs>{children}</MarkdownChildrenWithFileRefs></li>;
+              return (
+                <li>
+                  <MarkdownChildrenWithFileRefs>{children}</MarkdownChildrenWithFileRefs>
+                </li>
+              );
             },
           }}
         >

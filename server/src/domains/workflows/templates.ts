@@ -10,7 +10,8 @@ export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
   {
     id: PERMISSION_WORKFLOW_TEMPLATE_ID,
     name: 'Permission Escalation (Default)',
-    description: 'Handles escalated permission requests: classifies the request, runs AI risk analysis, and auto-approves or keeps waiting for user.',
+    description:
+      'Handles escalated permission requests: classifies the request, runs AI risk analysis, and auto-approves or keeps waiting for user.',
     category: 'permission',
     definition: {
       entryNodeId: 'classify',
@@ -72,7 +73,8 @@ export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
           config: {
             type: 'system',
             title: 'AI Review',
-            message: 'AI review result: ${ai_review.output.decision} — ${ai_review.output.reasoning}',
+            message:
+              'AI review result: ${ai_review.output.decision} — ${ai_review.output.reasoning}',
             priority: 'normal',
           },
           position: { x: 300, y: 600 },
@@ -84,7 +86,8 @@ export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
           config: {
             type: 'system',
             title: 'AI Review Error',
-            message: 'AI risk analysis failed: ${ai_review.output.error}. Waiting for manual decision.',
+            message:
+              'AI risk analysis failed: ${ai_review.output.error}. Waiting for manual decision.',
             priority: 'high',
           },
           position: { x: 450, y: 450 },
@@ -99,7 +102,12 @@ export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         // AI review path
         { id: 'e6', source: 'ai_review', target: 'check_confidence', type: 'success' },
         { id: 'e7', source: 'check_confidence', target: 'decide_approve', type: 'condition_true' },
-        { id: 'e8', source: 'check_confidence', target: 'notify_review_done', type: 'condition_false' },
+        {
+          id: 'e8',
+          source: 'check_confidence',
+          target: 'notify_review_done',
+          type: 'condition_false',
+        },
         { id: 'e9', source: 'ai_review', target: 'notify_review_failed', type: 'error' },
       ],
     },
@@ -107,7 +115,8 @@ export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
   {
     id: 'local-pr-review-merge',
     name: 'Local PR: Review & Merge',
-    description: 'Auto-commit changes, AI-review, and merge if approved. On merge conflict, start AI resolution session.',
+    description:
+      'Auto-commit changes, AI-review, and merge if approved. On merge conflict, start AI resolution session.',
     category: 'git',
     definition: {
       entryNodeId: 'commit',
@@ -162,7 +171,8 @@ export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
           name: 'AI Conflict Resolution',
           type: 'ai_prompt',
           config: {
-            prompt: 'There is a merge conflict. Run "git status" to see conflicted files. Resolve all conflicts, stage changes, and complete the merge.',
+            prompt:
+              'There is a merge conflict. Run "git status" to see conflicted files. Resolve all conflicts, stage changes, and complete the merge.',
           },
           position: { x: 0, y: 600 },
         },
@@ -189,7 +199,8 @@ export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
           name: 'AI Review',
           type: 'ai_prompt',
           config: {
-            prompt: 'Review the recent git changes. Run "git log --oneline --since=\'24 hours ago\'" and "git diff HEAD~5" (or fewer if less than 5 commits exist). Provide a summary and any potential issues.',
+            prompt:
+              'Review the recent git changes. Run "git log --oneline --since=\'24 hours ago\'" and "git diff HEAD~5" (or fewer if less than 5 commits exist). Provide a summary and any potential issues.',
           },
           position: { x: 300, y: 0 },
         },
@@ -210,7 +221,8 @@ export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
           name: 'Auto Commit',
           type: 'ai_prompt',
           config: {
-            prompt: 'Check if there are uncommitted changes using "git status". If there are changes, review with "git diff", stage all, write a conventional commit message, and commit. If no changes, respond "No uncommitted changes found."',
+            prompt:
+              'Check if there are uncommitted changes using "git status". If there are changes, review with "git diff", stage all, write a conventional commit message, and commit. If no changes, respond "No uncommitted changes found."',
           },
           position: { x: 300, y: 0 },
         },
@@ -230,7 +242,10 @@ export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
           id: 'lint',
           name: 'Run Lint & Typecheck',
           type: 'shell',
-          config: { command: 'npm run lint 2>&1 || true; npx tsc --noEmit 2>&1 || true', timeoutMs: 120000 },
+          config: {
+            command: 'npm run lint 2>&1 || true; npx tsc --noEmit 2>&1 || true',
+            timeoutMs: 120000,
+          },
           position: { x: 300, y: 0 },
           onError: 'skip',
         },
@@ -239,14 +254,13 @@ export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
           name: 'AI Analysis',
           type: 'ai_prompt',
           config: {
-            prompt: 'Here are the lint/typecheck results:\n${lint.output.stdout}\n\nAnalyze the errors and suggest fixes for the most critical issues.',
+            prompt:
+              'Here are the lint/typecheck results:\n${lint.output.stdout}\n\nAnalyze the errors and suggest fixes for the most critical issues.',
           },
           position: { x: 300, y: 150 },
         },
       ],
-      edges: [
-        { id: 'e1', source: 'lint', target: 'analyze', type: 'success' },
-      ],
+      edges: [{ id: 'e1', source: 'lint', target: 'analyze', type: 'success' }],
     },
   },
   {
@@ -285,7 +299,8 @@ export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
           name: 'AI Fix Test Failures',
           type: 'ai_prompt',
           config: {
-            prompt: 'The following tests failed. Fix the source code to make tests pass. Do NOT modify test files.\n\nTest command: pnpm test\nTest output:\n${run_tests.output.stderr}\n${run_tests.output.stdout}',
+            prompt:
+              'The following tests failed. Fix the source code to make tests pass. Do NOT modify test files.\n\nTest command: pnpm test\nTest output:\n${run_tests.output.stderr}\n${run_tests.output.stdout}',
             workingDirectory: '${create_wt.output.worktreePath}',
           },
           position: { x: 500, y: 300 },
@@ -397,7 +412,8 @@ export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
           name: 'AI Conflict Resolution',
           type: 'ai_prompt',
           config: {
-            prompt: 'There is a merge conflict. Run "git status" to see conflicted files. Resolve all conflicts, stage changes, and complete the merge.',
+            prompt:
+              'There is a merge conflict. Run "git status" to see conflicted files. Resolve all conflicts, stage changes, and complete the merge.',
             workingDirectory: '${create_wt.output.worktreePath}',
           },
           position: { x: -200, y: 1150 },
@@ -413,7 +429,12 @@ export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         { id: 'e7', source: 'create_pr', target: 'review', type: 'success' },
         { id: 'e8', source: 'review', target: 'check_review', type: 'success' },
         { id: 'e9', source: 'check_review', target: 'notify_ready', type: 'condition_true' },
-        { id: 'e10', source: 'check_review', target: 'notify_review_failed', type: 'condition_false' },
+        {
+          id: 'e10',
+          source: 'check_review',
+          target: 'notify_review_failed',
+          type: 'condition_false',
+        },
         { id: 'e11', source: 'notify_ready', target: 'await_merge', type: 'success' },
         { id: 'e12', source: 'await_merge', target: 'merge', type: 'success' },
         { id: 'e13', source: 'merge', target: 'resolve_conflict', type: 'error' },
@@ -423,7 +444,8 @@ export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
   {
     id: AI_AUTO_COMMIT_TEMPLATE_ID,
     name: 'AI Auto Commit',
-    description: 'Stages all changes, generates a Conventional-Commits message with AI, and commits. Bind a trigger via an Automation to enable.',
+    description:
+      'Stages all changes, generates a Conventional-Commits message with AI, and commits. Bind a trigger via an Automation to enable.',
     category: 'git',
     definition: {
       entryNodeId: 'stage',
@@ -457,7 +479,11 @@ export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
           id: 'commit',
           name: 'Commit',
           type: 'git_commit',
-          config: { stageAll: false, messageMode: 'explicit', message: '${generate.output.message}' },
+          config: {
+            stageAll: false,
+            messageMode: 'explicit',
+            message: '${generate.output.message}',
+          },
           position: { x: 300, y: 450 },
           onError: 'abort',
         },

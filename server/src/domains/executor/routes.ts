@@ -64,26 +64,39 @@ export function createExecutorRoutes(deps: ExecutorRoutesDeps): Router {
     }
   });
 
-  const op =
-    (action: (id: string) => Promise<void>) =>
-    async (req: Request, res: Response) => {
-      try {
-        await action(req.params.id);
-        const inst = repo.findById(req.params.id);
-        res.json(ok({ executorInstance: inst }));
-      } catch (e) {
-        res.status(400).json(err('OPENSPEC_ERROR', (e as Error).message));
-      }
-    };
-  router.post('/executor-instances/:id/start', op((id) => deps.executorService.start(id)));
-  router.post('/executor-instances/:id/pause', op((id) => deps.executorService.pause(id)));
-  router.post('/executor-instances/:id/resume', op((id) => deps.executorService.resume(id)));
-  router.post('/executor-instances/:id/cancel', op((id) => deps.executorService.cancel(id)));
+  const op = (action: (id: string) => Promise<void>) => async (req: Request, res: Response) => {
+    try {
+      await action(req.params.id);
+      const inst = repo.findById(req.params.id);
+      res.json(ok({ executorInstance: inst }));
+    } catch (e) {
+      res.status(400).json(err('OPENSPEC_ERROR', (e as Error).message));
+    }
+  };
+  router.post(
+    '/executor-instances/:id/start',
+    op(id => deps.executorService.start(id))
+  );
+  router.post(
+    '/executor-instances/:id/pause',
+    op(id => deps.executorService.pause(id))
+  );
+  router.post(
+    '/executor-instances/:id/resume',
+    op(id => deps.executorService.resume(id))
+  );
+  router.post(
+    '/executor-instances/:id/cancel',
+    op(id => deps.executorService.cancel(id))
+  );
   router.post(
     '/executor-instances/:id/mark-completed',
-    op((id) => deps.executorService.markCompleted(id)),
+    op(id => deps.executorService.markCompleted(id))
   );
-  router.post('/executor-instances/:id/refresh', op((id) => deps.executorService.refresh(id)));
+  router.post(
+    '/executor-instances/:id/refresh',
+    op(id => deps.executorService.refresh(id))
+  );
 
   router.get('/legacy-classic-change-ids', (req: Request, res: Response) => {
     const projectId = req.query.projectId as string | undefined;
@@ -91,17 +104,7 @@ export function createExecutorRoutes(deps: ExecutorRoutesDeps): Router {
       res.status(400).json(err('VALIDATION', 'projectId required'));
       return;
     }
-    const rows = deps.db
-      .prepare(
-        `SELECT pc.id FROM project_changes pc
-         WHERE pc.project_id = ?
-           AND NOT EXISTS (
-             SELECT 1 FROM executor_instances ei
-             WHERE ei.underlying_id = pc.id AND ei.type = 'classic'
-           )`,
-      )
-      .all(projectId) as { id: string }[];
-    res.json(ok({ legacyIds: rows.map((r) => r.id) }));
+    res.json(ok({ legacyIds: repo.listClassicChangeIdsWithoutExecutor(projectId) }));
   });
 
   router.get('/legacy-meta-workflow-run-ids', (req: Request, res: Response) => {
@@ -110,17 +113,7 @@ export function createExecutorRoutes(deps: ExecutorRoutesDeps): Router {
       res.status(400).json(err('VALIDATION', 'projectId required'));
       return;
     }
-    const rows = deps.db
-      .prepare(
-        `SELECT mr.id FROM meta_workflow_runs mr
-         WHERE mr.project_id = ?
-           AND NOT EXISTS (
-             SELECT 1 FROM executor_instances ei
-             WHERE ei.underlying_id = mr.id AND ei.type = 'meta-workflow'
-           )`,
-      )
-      .all(projectId) as { id: string }[];
-    res.json(ok({ legacyIds: rows.map((r) => r.id) }));
+    res.json(ok({ legacyIds: repo.listMetaWorkflowRunIdsWithoutExecutor(projectId) }));
   });
 
   return router;

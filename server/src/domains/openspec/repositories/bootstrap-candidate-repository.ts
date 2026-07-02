@@ -89,23 +89,25 @@ export class BootstrapCandidateRepository {
   create(data: BootstrapCandidateCreate): BootstrapCandidate {
     const id = newId();
     const now = Date.now();
-    this.db.prepare(
-      `INSERT INTO bootstrap_candidates
+    this.db
+      .prepare(
+        `INSERT INTO bootstrap_candidates
         (id, scan_id, capability, title, description, source, selected, phase,
          generation_attempts, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`
-    ).run(
-      id,
-      data.scanId,
-      data.capability,
-      data.title,
-      data.description,
-      data.source,
-      data.selected === false ? 0 : 1,
-      data.phase ?? 'discovered',
-      now,
-      now,
-    );
+      )
+      .run(
+        id,
+        data.scanId,
+        data.capability,
+        data.title,
+        data.description,
+        data.source,
+        data.selected === false ? 0 : 1,
+        data.phase ?? 'discovered',
+        now,
+        now
+      );
     return this.findById(id)!;
   }
 
@@ -118,7 +120,7 @@ export class BootstrapCandidateRepository {
     const rows = this.db
       .prepare(`SELECT * FROM bootstrap_candidates WHERE scan_id = ? ORDER BY created_at`)
       .all(scanId);
-    return rows.map((r) => this.mapRow(r));
+    return rows.map(r => this.mapRow(r));
   }
 
   listSelected(scanId: string): BootstrapCandidate[] {
@@ -129,24 +131,47 @@ export class BootstrapCandidateRepository {
          ORDER BY created_at`
       )
       .all(scanId);
-    return rows.map((r) => this.mapRow(r));
+    return rows.map(r => this.mapRow(r));
   }
 
   update(id: string, data: BootstrapCandidateUpdate): BootstrapCandidate {
     const sets: string[] = [];
     const params: unknown[] = [];
-    if (data.title !== undefined)               { sets.push('title = ?');               params.push(data.title); }
-    if (data.description !== undefined)         { sets.push('description = ?');         params.push(data.description); }
-    if (data.selected !== undefined)            { sets.push('selected = ?');            params.push(data.selected ? 1 : 0); }
-    if (data.phase !== undefined)               { sets.push('phase = ?');               params.push(data.phase); }
-    if (data.generated_md !== undefined)        { sets.push('generated_md = ?');        params.push(data.generated_md); }
-    if (data.generation_attempts !== undefined) { sets.push('generation_attempts = ?'); params.push(data.generation_attempts); }
-    if (data.error_message !== undefined)       { sets.push('error_message = ?');       params.push(data.error_message); }
+    if (data.title !== undefined) {
+      sets.push('title = ?');
+      params.push(data.title);
+    }
+    if (data.description !== undefined) {
+      sets.push('description = ?');
+      params.push(data.description);
+    }
+    if (data.selected !== undefined) {
+      sets.push('selected = ?');
+      params.push(data.selected ? 1 : 0);
+    }
+    if (data.phase !== undefined) {
+      sets.push('phase = ?');
+      params.push(data.phase);
+    }
+    if (data.generated_md !== undefined) {
+      sets.push('generated_md = ?');
+      params.push(data.generated_md);
+    }
+    if (data.generation_attempts !== undefined) {
+      sets.push('generation_attempts = ?');
+      params.push(data.generation_attempts);
+    }
+    if (data.error_message !== undefined) {
+      sets.push('error_message = ?');
+      params.push(data.error_message);
+    }
     sets.push('updated_at = ?');
     params.push(Date.now());
     params.push(id);
     if (sets.length > 1) {
-      this.db.prepare(`UPDATE bootstrap_candidates SET ${sets.join(', ')} WHERE id = ?`).run(...params);
+      this.db
+        .prepare(`UPDATE bootstrap_candidates SET ${sets.join(', ')} WHERE id = ?`)
+        .run(...params);
     }
     return this.findById(id)!;
   }

@@ -1,5 +1,12 @@
 import { streamSimple } from '@earendil-works/pi-ai';
-import { Agent, convertToLlm, type AgentEvent, type AgentMessage, type AgentTool, type StreamFn } from '@earendil-works/pi-agent-core';
+import {
+  Agent,
+  convertToLlm,
+  type AgentEvent,
+  type AgentMessage,
+  type AgentTool,
+  type StreamFn,
+} from '@earendil-works/pi-agent-core';
 import type { ProviderRuntimeEvent, RunOptions } from '../types.js';
 import { CodexOAuthError } from '../../../domains/llm-profiles/codex-oauth-errors.js';
 import type { AgentHooksOutput } from './agent-hooks.js';
@@ -9,7 +16,12 @@ import type { TranslateContext } from './message-event-translator.js';
 import { translateEvent } from './message-event-translator.js';
 import { translateToolEvent } from './tool-event-translator.js';
 import { withStreamRetry } from './retry-stream.js';
-import { extractErrorStop, extractLastCallUsage, extractUsage, withContextUsedTokens } from './usage-extractor.js';
+import {
+  extractErrorStop,
+  extractLastCallUsage,
+  extractUsage,
+  withContextUsedTokens,
+} from './usage-extractor.js';
 import { recordPiContextUsage } from './context-observer.js';
 
 export async function* runPiAgentStream(input: {
@@ -87,7 +99,7 @@ export async function* runPiAgentStream(input: {
   // Retry wrapping is unconditional: pre-first-token transient failures
   // (429/529/5xx/network) back off and retry instead of failing the run.
   agentOpts.streamFn = withStreamRetry(cachedStreamFn, {
-    onRetry: (info) => {
+    onRetry: info => {
       queue.push({
         type: 'retry_scheduled',
         retryInfo: info,
@@ -171,16 +183,23 @@ export async function* runPiAgentStream(input: {
   let promptInput = userInput;
   let promptImages: Array<{ type: 'image'; data: string; mimeType: string }> | undefined;
   if (resolvedImages.length > 0 && supportsVision) {
-    promptImages = resolvedImages.map((img) => ({ type: 'image' as const, data: img.data, mimeType: img.mimeType }));
+    promptImages = resolvedImages.map(img => ({
+      type: 'image' as const,
+      data: img.data,
+      mimeType: img.mimeType,
+    }));
   } else if (resolvedImages.length > 0) {
     // Vision degradation: the conversation continues with a textual stand-in
     // per image instead of failing the run on a text-only model.
     promptInput = `${userInput}\n\n${resolvedImages
-      .map((img) => `[Image attached: ${img.name} — current model does not support vision]`)
+      .map(img => `[Image attached: ${img.name} — current model does not support vision]`)
       .join('\n')}`;
   }
-  agent.prompt(promptInput, promptImages)
-    .then(() => { queue.close(); })
+  agent
+    .prompt(promptInput, promptImages)
+    .then(() => {
+      queue.close();
+    })
     .catch(err => {
       const errorMsg: ProviderRuntimeEvent = {
         type: 'error',

@@ -17,7 +17,14 @@ import { DashboardHome } from './DashboardHome';
 import { useSelectionStore } from '../../stores/selectionStore';
 import type { OpenAutomationsOptions } from '../automation/automation-types';
 
-export type DashboardView = 'home' | 'tasks' | 'local-prs' | 'issues' | 'spec' | 'supervisor' | 'git';
+export type DashboardView =
+  | 'home'
+  | 'tasks'
+  | 'local-prs'
+  | 'issues'
+  | 'spec'
+  | 'supervisor'
+  | 'git';
 
 const VIEW_LABELS: Record<DashboardView, string> = {
   home: 'Dashboard',
@@ -36,31 +43,39 @@ interface ProjectDashboardProps {
   onOpenDashboardWindow?: (projectId: string) => void;
 }
 
-export function ProjectDashboard({ projectId, projectRootPath, onOpenAutomations, onOpenDashboardWindow }: ProjectDashboardProps) {
-  const agent = useSupervisionStore((s) => s.agents[projectId]) ?? null;
-  const tasks = useSupervisionStore((s) => s.tasks[projectId]) ?? [];
-  const setAgent = useSupervisionStore((s) => s.setAgent);
-  const setTasks = useSupervisionStore((s) => s.setTasks);
-  const setActiveChange = useSupervisionStore((s) => s.setActiveChange);
-  const setExecutionPlan = useSupervisionStore((s) => s.setExecutionPlan);
-  const savedView = useSelectionStore((s) => s.dashboardViews[projectId] ?? 'home');
-  const setDashboardView = useSelectionStore((s) => s.setDashboardView);
+export function ProjectDashboard({
+  projectId,
+  projectRootPath,
+  onOpenAutomations,
+  onOpenDashboardWindow,
+}: ProjectDashboardProps) {
+  const agent = useSupervisionStore(s => s.agents[projectId]) ?? null;
+  const tasks = useSupervisionStore(s => s.tasks[projectId]) ?? [];
+  const setAgent = useSupervisionStore(s => s.setAgent);
+  const setTasks = useSupervisionStore(s => s.setTasks);
+  const setActiveChange = useSupervisionStore(s => s.setActiveChange);
+  const setExecutionPlan = useSupervisionStore(s => s.setExecutionPlan);
+  const savedView = useSelectionStore(s => s.dashboardViews[projectId] ?? 'home');
+  const setDashboardView = useSelectionStore(s => s.setDashboardView);
   const [view, setView] = useState<DashboardView>(savedView);
   const [supervisorPane, setSupervisorPane] = useState<'workspace' | 'chat'>('workspace');
   // Lifted from LocalIssuesPanel — kept here so the dashboard breadcrumb can
   // include the issue title as a third segment when an issue is open.
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
-  const selectedIssueTitle = useLocalIssueStore((s) => {
+  const selectedIssueTitle = useLocalIssueStore(s => {
     if (!selectedIssueId) return null;
-    const issue = (s.issues[projectId] ?? []).find((i) => i.id === selectedIssueId);
+    const issue = (s.issues[projectId] ?? []).find(i => i.id === selectedIssueId);
     return issue?.title ?? null;
   });
 
-  const navigate = useCallback((nextView: DashboardView) => {
-    setView(nextView);
-    setDashboardView(projectId, nextView);
-    setSelectedIssueId(null);
-  }, [projectId, setDashboardView]);
+  const navigate = useCallback(
+    (nextView: DashboardView) => {
+      setView(nextView);
+      setDashboardView(projectId, nextView);
+      setSelectedIssueId(null);
+    },
+    [projectId, setDashboardView]
+  );
 
   // Restore last dashboard sub-view for this project
   useEffect(() => {
@@ -118,7 +133,10 @@ export function ProjectDashboard({ projectId, projectRootPath, onOpenAutomations
                 {VIEW_LABELS.issues}
               </button>
               <span className="text-xs text-muted-foreground flex-shrink-0">/</span>
-              <span className="text-xs font-medium truncate" title={selectedIssueTitle ?? undefined}>
+              <span
+                className="text-xs font-medium truncate"
+                title={selectedIssueTitle ?? undefined}
+              >
                 {selectedIssueTitle ?? 'Issue'}
               </span>
             </>
@@ -187,7 +205,7 @@ export function ProjectDashboard({ projectId, projectRootPath, onOpenAutomations
         <div className="flex-1 overflow-hidden">
           <div className="flex h-full flex-col overflow-hidden">
             <div className="flex items-center gap-2 border-b border-border px-4 py-2">
-              {(['workspace', 'chat'] as const).map((pane) => (
+              {(['workspace', 'chat'] as const).map(pane => (
                 <button
                   key={pane}
                   type="button"
@@ -212,7 +230,14 @@ export function ProjectDashboard({ projectId, projectRootPath, onOpenAutomations
                   <div className="text-center">
                     <p className="text-sm">No supervisor agent configured.</p>
                     <p className="text-xs mt-1">
-                      Go to <button onClick={() => navigate('tasks')} className="text-primary hover:underline">Tasks</button> to initialize a supervisor agent.
+                      Go to{' '}
+                      <button
+                        onClick={() => navigate('tasks')}
+                        className="text-primary hover:underline"
+                      >
+                        Tasks
+                      </button>{' '}
+                      to initialize a supervisor agent.
                     </p>
                   </div>
                 </div>

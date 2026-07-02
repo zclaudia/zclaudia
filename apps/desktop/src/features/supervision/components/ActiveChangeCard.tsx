@@ -1,4 +1,10 @@
-import type { AcceptanceDecision, ChangeExecutionPlan, ExecutionGateDecision, ProjectChange, SupervisionTask } from '@zclaudia/shared';
+import type {
+  AcceptanceDecision,
+  ChangeExecutionPlan,
+  ExecutionGateDecision,
+  ProjectChange,
+  SupervisionTask,
+} from '@zclaudia/shared';
 import { LegacyBadge } from '../../openspec/components/LegacyBadge.js';
 import { changeStatusLabel, getNextAction } from './supervisor-utils';
 
@@ -45,14 +51,15 @@ export function ActiveChangeCard({
   const canApproveAcceptance = activeChange.status === 'accepting';
   const canRequestSync = false;
   const canCompleteChange = activeChange.status === 'syncing';
-  const showActionNotes = canRequestDesign
-    || canApproveDesign
-    || canRequestExecution
-    || canApproveExecution
-    || canRequestAcceptance
-    || canApproveAcceptance
-    || canRequestSync
-    || canCompleteChange;
+  const showActionNotes =
+    canRequestDesign ||
+    canApproveDesign ||
+    canRequestExecution ||
+    canApproveExecution ||
+    canRequestAcceptance ||
+    canApproveAcceptance ||
+    canRequestSync ||
+    canCompleteChange;
   const nextAction = getNextAction(activeChange.status);
 
   return (
@@ -73,8 +80,12 @@ export function ActiveChangeCard({
 
       {executionPlan && (
         <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-          <div>Strategy: <span className="text-foreground">{executionPlan.automation.strategy}</span></div>
-          <div>Tasks: <span className="text-foreground">{changeTasks.length}</span></div>
+          <div>
+            Strategy: <span className="text-foreground">{executionPlan.automation.strategy}</span>
+          </div>
+          <div>
+            Tasks: <span className="text-foreground">{changeTasks.length}</span>
+          </div>
         </div>
       )}
 
@@ -90,13 +101,16 @@ export function ActiveChangeCard({
 
       {showActionNotes && (
         <div className="mt-3 space-y-1">
-          <label htmlFor="supervisor-action-notes" className="text-[11px] font-medium text-muted-foreground">
+          <label
+            htmlFor="supervisor-action-notes"
+            className="text-[11px] font-medium text-muted-foreground"
+          >
             Review / Sync Notes
           </label>
           <textarea
             id="supervisor-action-notes"
             value={actionNotes}
-            onChange={(event) => onActionNotesChange(event.target.value)}
+            onChange={event => onActionNotesChange(event.target.value)}
             placeholder="Optional notes for the next gate or sync action..."
             rows={2}
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs resize-none"

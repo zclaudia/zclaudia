@@ -40,7 +40,7 @@ class InteractionDispatcher {
     interactionId: string,
     sessionId: string,
     event: ServerMessage,
-    timeoutMs = DEFAULT_TIMEOUT_MS,
+    timeoutMs = DEFAULT_TIMEOUT_MS
   ): Promise<Record<string, unknown>> {
     const sendFn = this.sendFn;
     if (!sendFn) {
@@ -48,7 +48,7 @@ class InteractionDispatcher {
       return { error: 'Interaction dispatcher not initialized' };
     }
 
-    return new Promise<Record<string, unknown>>((resolve) => {
+    return new Promise<Record<string, unknown>>(resolve => {
       const timeout = setTimeout(() => {
         this.pending.delete(interactionId);
         console.log(`[InteractionDispatcher] Interaction ${interactionId} timed out`);

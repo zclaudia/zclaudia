@@ -13,14 +13,14 @@ function getBackendIdForSession(sessionId: string): string | null {
 export async function listTurnSummaries(sessionId: string): Promise<TurnSummary[]> {
   return apiCallForBackend<TurnSummary[]>(
     getBackendIdForSession(sessionId),
-    `/api/sessions/${sessionId}/turn-summaries`,
+    `/api/sessions/${sessionId}/turn-summaries`
   );
 }
 
 export async function generateTurnSummary(
   sessionId: string,
   userMessageId: string,
-  body: GenerateTurnSummaryRequest = {},
+  body: GenerateTurnSummaryRequest = {}
 ): Promise<GenerateTurnSummaryResponse> {
   return apiCallForBackend<GenerateTurnSummaryResponse>(
     getBackendIdForSession(sessionId),
@@ -28,6 +28,6 @@ export async function generateTurnSummary(
     {
       method: 'POST',
       body: JSON.stringify(body),
-    },
+    }
   );
 }

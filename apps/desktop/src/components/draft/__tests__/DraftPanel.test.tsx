@@ -25,7 +25,7 @@ function buildState() {
 vi.mock('../../../stores/draftEditorStore', () => ({
   useDraftEditorStore: Object.assign(
     (sel?: (s: Record<string, unknown>) => unknown) => (sel ? sel(state) : state),
-    { getState: () => ({ ...state, openEditor }) },
+    { getState: () => ({ ...state, openEditor }) }
   ),
 }));
 vi.mock('../../../stores/selectionStore', () => ({

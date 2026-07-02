@@ -106,7 +106,9 @@ describe('ServerGatewayConfig', () => {
     });
 
     // Enter a proxy URL
-    const proxyInput = container.querySelector('[data-testid="proxy-url-input"]') as HTMLInputElement;
+    const proxyInput = container.querySelector(
+      '[data-testid="proxy-url-input"]'
+    ) as HTMLInputElement;
     expect(proxyInput).toBeTruthy();
     fireEvent.change(proxyInput, { target: { value: 'socks5://127.0.0.1:1080' } });
 

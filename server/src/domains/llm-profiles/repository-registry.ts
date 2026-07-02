@@ -10,7 +10,9 @@ export function registerLlmProfileRepository(repo: LlmProfileRepository): void {
 
 export function getLlmProfileWriter(): OAuthCredentialsWriter {
   if (!registered) {
-    throw new Error('LlmProfileRepository not registered (forgot to call registerLlmProfileRepository on boot?)');
+    throw new Error(
+      'LlmProfileRepository not registered (forgot to call registerLlmProfileRepository on boot?)'
+    );
   }
   const repo = registered;
   return {

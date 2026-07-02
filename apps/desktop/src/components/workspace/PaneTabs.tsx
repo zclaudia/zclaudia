@@ -1,6 +1,10 @@
 import { Fragment, useState, useRef, useEffect, useCallback } from 'react';
 import { X, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useRightWorkspaceStore, type PaneNode, type ToolRef } from '../../stores/rightWorkspaceStore';
+import {
+  useRightWorkspaceStore,
+  type PaneNode,
+  type ToolRef,
+} from '../../stores/rightWorkspaceStore';
 import { usePluginStore } from '../../stores/pluginStore';
 import { iconForPanel } from '../rightSidebarToolIcons';
 import { closeTabInWorkspace } from '../../utils/workspaceActions';
@@ -17,9 +21,9 @@ interface PaneTabsProps {
 }
 
 export function PaneTabs({ sessionId, pane, focused, projectId }: PaneTabsProps) {
-  const panels = usePluginStore((s) => s.panels);
-  const hoverTabPaneId = useDragSplitStore((s) => s.hoverTabPaneId);
-  const hoverTabIndex = useDragSplitStore((s) => s.hoverTabIndex);
+  const panels = usePluginStore(s => s.panels);
+  const hoverTabPaneId = useDragSplitStore(s => s.hoverTabPaneId);
+  const hoverTabIndex = useDragSplitStore(s => s.hoverTabIndex);
   const [launcherOpen, setLauncherOpen] = useState(false);
   const launcherRef = useRef<HTMLDivElement>(null);
 
@@ -59,10 +63,12 @@ export function PaneTabs({ sessionId, pane, focused, projectId }: PaneTabsProps)
         }
       : undefined;
 
-  const activePanel = panels.find((p) => p.id === pane.activeToolId);
+  const activePanel = panels.find(p => p.id === pane.activeToolId);
 
   const onActivate = (ref: ToolRef) =>
-    useRightWorkspaceStore.getState().setActiveTool(sessionId, pane.id, ref.toolId, ref.instanceKey);
+    useRightWorkspaceStore
+      .getState()
+      .setActiveTool(sessionId, pane.id, ref.toolId, ref.instanceKey);
 
   const onClose = (e: React.MouseEvent, ref: ToolRef) => {
     e.stopPropagation();
@@ -79,81 +85,82 @@ export function PaneTabs({ sessionId, pane, focused, projectId }: PaneTabsProps)
           launcher dropdown isn't clipped by overflow (overflow-x:auto → overflow-y:auto).
           The relative wrapper hosts the edge chevrons that overlay the faded edges. */}
       <div className="relative flex min-w-0">
-      <div
-        ref={scrollRef}
-        onScroll={updateScrollState}
-        style={maskStyle}
-        className="flex items-stretch gap-0.5 min-w-0 flex-1 overflow-x-auto scrollbar-hidden"
-      >
-      {pane.tools.map((ref, index) => {
-        const panel = panels.find((p) => p.id === ref.toolId);
-        const Icon = iconForPanel(ref.toolId);
-        const isActive = ref.toolId === pane.activeToolId && ref.instanceKey === pane.activeInstanceKey;
-        const label = panel?.label ?? ref.toolId;
-        return (
-          <Fragment key={`${ref.toolId}:${ref.instanceKey ?? ''}`}>
-            {hoverTabPaneId === pane.id && hoverTabIndex === index && (
-              <div className="w-0.5 my-1.5 rounded bg-foreground/60 flex-shrink-0" />
-            )}
-            <div
-              data-tab-index={index}
-              data-active={isActive ? 'true' : 'false'}
-              onClick={() => onActivate(ref)}
-              onPointerDown={(e) => {
-                if (e.pointerType === 'mouse' && (e.buttons & 1) === 0) return;
-                useDragSplitStore.getState().startDrag({
-                  toolId: ref.toolId,
-                  instanceKey: ref.instanceKey,
-                  multiInstance: MULTI_INSTANCE_PANELS.has(ref.toolId),
-                  sourcePaneId: pane.id,
-                  sourceIndex: index,
-                });
-              }}
-              className={`group flex items-center gap-1.5 px-2.5 cursor-pointer max-w-[140px] ${
-                isActive
-                  ? 'text-foreground shadow-[inset_0_-2px_0_hsl(var(--muted-foreground))]'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-              title={label}
-            >
-              <Icon className="w-3.5 h-3.5 flex-shrink-0 opacity-70" />
-              <span className="text-xs truncate">{label}</span>
-              <button
-                aria-label={`Close ${label}`}
-                onClick={(e) => onClose(e, ref)}
-                onPointerDown={(e) => e.stopPropagation()}
-                className="ml-0.5 rounded p-0.5 text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-background hover:text-foreground flex-shrink-0"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </div>
-          </Fragment>
-        );
-      })}
-      {hoverTabPaneId === pane.id && hoverTabIndex === pane.tools.length && (
-        <div className="w-0.5 my-1.5 rounded bg-foreground/60 flex-shrink-0" />
-      )}
-      </div>
-      {canScroll.left && (
-        <button
-          aria-label="Scroll tabs left"
-          title="Scroll tabs left"
-          onClick={() => scrollByStep(-1)}
-          className="absolute inset-y-0 left-0 z-10 flex items-center pl-0.5 pr-2 bg-gradient-to-r from-card via-card/90 to-transparent text-muted-foreground hover:text-foreground"
+        <div
+          ref={scrollRef}
+          onScroll={updateScrollState}
+          style={maskStyle}
+          className="flex items-stretch gap-0.5 min-w-0 flex-1 overflow-x-auto scrollbar-hidden"
         >
-          <ChevronLeft className="w-4 h-4" />
-        </button>
-      )}
-      {canScroll.right && (
-        <button
-          aria-label="Scroll tabs right"
-          title="Scroll tabs right"
-          onClick={() => scrollByStep(1)}
-          className="absolute inset-y-0 right-0 z-10 flex items-center pr-0.5 pl-2 bg-gradient-to-l from-card via-card/90 to-transparent text-muted-foreground hover:text-foreground"
-        >
-          <ChevronRight className="w-4 h-4" />
-        </button>
-      )}
+          {pane.tools.map((ref, index) => {
+            const panel = panels.find(p => p.id === ref.toolId);
+            const Icon = iconForPanel(ref.toolId);
+            const isActive =
+              ref.toolId === pane.activeToolId && ref.instanceKey === pane.activeInstanceKey;
+            const label = panel?.label ?? ref.toolId;
+            return (
+              <Fragment key={`${ref.toolId}:${ref.instanceKey ?? ''}`}>
+                {hoverTabPaneId === pane.id && hoverTabIndex === index && (
+                  <div className="w-0.5 my-1.5 rounded bg-foreground/60 flex-shrink-0" />
+                )}
+                <div
+                  data-tab-index={index}
+                  data-active={isActive ? 'true' : 'false'}
+                  onClick={() => onActivate(ref)}
+                  onPointerDown={e => {
+                    if (e.pointerType === 'mouse' && (e.buttons & 1) === 0) return;
+                    useDragSplitStore.getState().startDrag({
+                      toolId: ref.toolId,
+                      instanceKey: ref.instanceKey,
+                      multiInstance: MULTI_INSTANCE_PANELS.has(ref.toolId),
+                      sourcePaneId: pane.id,
+                      sourceIndex: index,
+                    });
+                  }}
+                  className={`group flex items-center gap-1.5 px-2.5 cursor-pointer max-w-[140px] ${
+                    isActive
+                      ? 'text-foreground shadow-[inset_0_-2px_0_hsl(var(--muted-foreground))]'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                  title={label}
+                >
+                  <Icon className="w-3.5 h-3.5 flex-shrink-0 opacity-70" />
+                  <span className="text-xs truncate">{label}</span>
+                  <button
+                    aria-label={`Close ${label}`}
+                    onClick={e => onClose(e, ref)}
+                    onPointerDown={e => e.stopPropagation()}
+                    className="ml-0.5 rounded p-0.5 text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-background hover:text-foreground flex-shrink-0"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              </Fragment>
+            );
+          })}
+          {hoverTabPaneId === pane.id && hoverTabIndex === pane.tools.length && (
+            <div className="w-0.5 my-1.5 rounded bg-foreground/60 flex-shrink-0" />
+          )}
+        </div>
+        {canScroll.left && (
+          <button
+            aria-label="Scroll tabs left"
+            title="Scroll tabs left"
+            onClick={() => scrollByStep(-1)}
+            className="absolute inset-y-0 left-0 z-10 flex items-center pl-0.5 pr-2 bg-gradient-to-r from-card via-card/90 to-transparent text-muted-foreground hover:text-foreground"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+        )}
+        {canScroll.right && (
+          <button
+            aria-label="Scroll tabs right"
+            title="Scroll tabs right"
+            onClick={() => scrollByStep(1)}
+            className="absolute inset-y-0 right-0 z-10 flex items-center pr-0.5 pl-2 bg-gradient-to-l from-card via-card/90 to-transparent text-muted-foreground hover:text-foreground"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       <div className="relative flex items-center" ref={launcherRef}>
@@ -162,14 +169,19 @@ export function PaneTabs({ sessionId, pane, focused, projectId }: PaneTabsProps)
           title="Add tool"
           onClick={() => {
             useRightWorkspaceStore.getState().focusPane(sessionId, pane.id);
-            setLauncherOpen((v) => !v);
+            setLauncherOpen(v => !v);
           }}
           className="p-1 rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground flex-shrink-0"
         >
           <Plus className="w-3.5 h-3.5" />
         </button>
         {launcherOpen && (
-          <ToolLauncherMenu sessionId={sessionId} projectId={projectId} anchorRef={launcherRef} onPick={() => setLauncherOpen(false)} />
+          <ToolLauncherMenu
+            sessionId={sessionId}
+            projectId={projectId}
+            anchorRef={launcherRef}
+            onPick={() => setLauncherOpen(false)}
+          />
         )}
       </div>
 

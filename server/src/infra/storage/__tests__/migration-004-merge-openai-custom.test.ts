@@ -12,7 +12,7 @@ import type { Migration } from '../migrations/types.js';
  */
 describe('migration 004 — merge openai-custom into openai', () => {
   function findMigration(name: string): Migration {
-    const found = migrations.find((m) => m.name === name);
+    const found = migrations.find(m => m.name === name);
     if (!found) throw new Error(`migration ${name} not registered`);
     return found;
   }
@@ -39,22 +39,19 @@ describe('migration 004 — merge openai-custom into openai', () => {
 
     // Apply only the migrations that precede 004 so we can seed legacy data
     // before the rewrite runs.
-    applyOnly(
-      db,
-      '001_initial_schema',
-      '002_request_headers',
-      '003_llm_profile_models',
-    );
+    applyOnly(db, '001_initial_schema', '002_request_headers', '003_llm_profile_models');
 
     // Seed a row in the pre-004 shape. base_url is non-null because the
     // legacy editor required it for openai-custom; the migration must keep
     // every other column untouched.
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO llm_profiles
         (id, name, provider_type, base_url, api_key, compat, request_headers, models, is_default, created_at, updated_at)
       VALUES
         (?,  ?,    ?,             ?,        ?,       ?,      ?,               ?,      ?,          ?,          ?)
-    `).run(
+    `
+    ).run(
       'p1',
       'DeepSeek',
       'openai-custom',
@@ -65,7 +62,7 @@ describe('migration 004 — merge openai-custom into openai', () => {
       JSON.stringify([{ modelId: 'deepseek-chat' }]),
       1,
       111,
-      222,
+      222
     );
 
     // Apply migration 004.
@@ -99,16 +96,13 @@ describe('migration 004 — merge openai-custom into openai', () => {
   it('leaves anthropic rows unchanged', () => {
     const db = new Database(':memory:');
     db.pragma('foreign_keys = ON');
-    applyOnly(
-      db,
-      '001_initial_schema',
-      '002_request_headers',
-      '003_llm_profile_models',
-    );
-    db.prepare(`
+    applyOnly(db, '001_initial_schema', '002_request_headers', '003_llm_profile_models');
+    db.prepare(
+      `
       INSERT INTO llm_profiles (id, name, provider_type, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
-    `).run('p2', 'A', 'anthropic', 1, 2);
+    `
+    ).run('p2', 'A', 'anthropic', 1, 2);
 
     applyOnly(db, '004_merge_openai_custom');
 
@@ -126,12 +120,14 @@ describe('migration 004 — merge openai-custom into openai', () => {
 
     // A fresh DB has no rows, but the SELECT must still succeed against the
     // post-004 schema — verifying the migration tracking entry is recorded.
-    const count = db.prepare(
-      "SELECT COUNT(*) AS n FROM llm_profiles WHERE provider_type = 'openai-custom'",
-    ).get() as { n: number };
+    const count = db
+      .prepare("SELECT COUNT(*) AS n FROM llm_profiles WHERE provider_type = 'openai-custom'")
+      .get() as { n: number };
     expect(count.n).toBe(0);
 
-    const applied = db.prepare("SELECT name FROM migrations WHERE name = '004_merge_openai_custom'").get();
+    const applied = db
+      .prepare("SELECT name FROM migrations WHERE name = '004_merge_openai_custom'")
+      .get();
     expect(applied).toBeDefined();
 
     db.close();

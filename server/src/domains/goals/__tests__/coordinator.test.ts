@@ -9,15 +9,21 @@ import { GoalEvaluator, type EvaluatorLlmPort } from '../evaluator.js';
 function makeDb() {
   const db = new Database(':memory:');
   applyMigrations(db);
-  db.prepare(`INSERT INTO projects (id, name, root_path, created_at, updated_at)
-              VALUES ('p1', 'p', '/tmp/p', ?, ?)`).run(Date.now(), Date.now());
-  db.prepare(`INSERT INTO llm_profiles (id, name, created_at, updated_at)
-              VALUES ('lp1', 'lp', ?, ?)`).run(Date.now(), Date.now());
-  db.prepare(`INSERT INTO agent_profiles (id, name, llm_profile_id, created_at, updated_at)
-              VALUES ('ap1', 'ap', 'lp1', ?, ?)`).run(Date.now(), Date.now());
+  db.prepare(
+    `INSERT INTO projects (id, name, root_path, created_at, updated_at)
+              VALUES ('p1', 'p', '/tmp/p', ?, ?)`
+  ).run(Date.now(), Date.now());
+  db.prepare(
+    `INSERT INTO llm_profiles (id, name, created_at, updated_at)
+              VALUES ('lp1', 'lp', ?, ?)`
+  ).run(Date.now(), Date.now());
+  db.prepare(
+    `INSERT INTO agent_profiles (id, name, llm_profile_id, created_at, updated_at)
+              VALUES ('ap1', 'ap', 'lp1', ?, ?)`
+  ).run(Date.now(), Date.now());
   db.prepare(
     `INSERT INTO sessions (id, project_id, agent_profile_id, created_at, updated_at)
-     VALUES (?, 'p1', 'ap1', ?, ?)`,
+     VALUES (?, 'p1', 'ap1', ?, ?)`
   ).run('s1', Date.now(), Date.now());
   return db;
 }
@@ -32,7 +38,7 @@ function makeHarness(verdict: 'done' | 'continue' | 'blocked'): Harness {
   const db = makeDb();
   const repo = new GoalRepository(db);
   const events: unknown[] = [];
-  const svc = new GoalService(repo, { publish: (e) => events.push(e) });
+  const svc = new GoalService(repo, { publish: e => events.push(e) });
   const llm: EvaluatorLlmPort = {
     async evaluate() {
       return { kind: verdict, reason: `${verdict}-reason`, inputTokens: 50, outputTokens: 10 };
@@ -113,7 +119,7 @@ describe('GoalCoordinator', () => {
     const db = makeDb();
     const repo = new GoalRepository(db);
     const events: unknown[] = [];
-    const svc = new GoalService(repo, { publish: (e) => events.push(e) });
+    const svc = new GoalService(repo, { publish: e => events.push(e) });
     const llm: EvaluatorLlmPort = {
       async evaluate() {
         throw new Error('llm down');
@@ -124,21 +130,27 @@ describe('GoalCoordinator', () => {
       service: svc,
       evaluator: new GoalEvaluator(llm),
       transcript: { read: async () => [] },
-      continuer: { appendAndRun: async (sid, text, meta) => { continueCalls.push({ sid, text, meta }); } },
+      continuer: {
+        appendAndRun: async (sid, text, meta) => {
+          continueCalls.push({ sid, text, meta });
+        },
+      },
       resolveLlmProfile: () => 'lp1',
     });
     const goal = svc.setGoal('s1', { objective: 'x' });
     await coord.onTurnCompleted('s1');
     expect(svc.get(goal.id)?.status).toBe('active');
     expect(continueCalls).toHaveLength(0);
-    expect(events.some((e: any) => e.type === 'goal:evaluator-verdict' && e.kind === 'error')).toBe(true);
+    expect(events.some((e: any) => e.type === 'goal:evaluator-verdict' && e.kind === 'error')).toBe(
+      true
+    );
   });
 
   it('marks goal budget-limited when continuer.appendAndRun throws', async () => {
     const db = makeDb();
     const repo = new GoalRepository(db);
     const events: unknown[] = [];
-    const svc = new GoalService(repo, { publish: (e) => events.push(e) });
+    const svc = new GoalService(repo, { publish: e => events.push(e) });
     const llm: EvaluatorLlmPort = {
       async evaluate() {
         return { kind: 'continue', reason: 'wip', inputTokens: 10, outputTokens: 5 };
@@ -148,7 +160,11 @@ describe('GoalCoordinator', () => {
       service: svc,
       evaluator: new GoalEvaluator(llm),
       transcript: { read: async () => [] },
-      continuer: { appendAndRun: async () => { throw new Error('runtime not ready'); } },
+      continuer: {
+        appendAndRun: async () => {
+          throw new Error('runtime not ready');
+        },
+      },
       resolveLlmProfile: () => 'lp1',
     });
     const goal = svc.setGoal('s1', { objective: 'x' });
@@ -180,7 +196,11 @@ describe('GoalCoordinator', () => {
           return [];
         },
       },
-      continuer: { appendAndRun: async () => { throw new Error('should not reach'); } },
+      continuer: {
+        appendAndRun: async () => {
+          throw new Error('should not reach');
+        },
+      },
       resolveLlmProfile: () => 'lp1',
     });
     const goal = svc.setGoal('s1', { objective: 'x' });

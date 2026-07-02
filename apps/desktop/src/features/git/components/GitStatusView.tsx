@@ -13,13 +13,17 @@ interface GitStatusViewProps {
 
 export function GitStatusView({ projectId, worktreePath }: GitStatusViewProps) {
   const status = useGitStore(selectStatus(projectId, worktreePath));
-  const setStatus = useGitStore((s) => s.setStatus);
+  const setStatus = useGitStore(s => s.setStatus);
   const [loading, setLoading] = useState(false);
   const [committing, setCommitting] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [message, setMessage] = useState('');
-  const [expandedDiff, setExpandedDiff] = useState<{ file: string; kind: GitFileDiffKind } | null>(null);
-  const [diffs, setDiffs] = useState<Record<string, { loading: boolean; diff?: string; error?: string }>>({});
+  const [expandedDiff, setExpandedDiff] = useState<{ file: string; kind: GitFileDiffKind } | null>(
+    null
+  );
+  const [diffs, setDiffs] = useState<
+    Record<string, { loading: boolean; diff?: string; error?: string }>
+  >({});
 
   const diffKey = (file: string, kind: GitFileDiffKind) => `${kind}:${file}`;
   const clearDiffs = () => {
@@ -43,7 +47,7 @@ export function GitStatusView({ projectId, worktreePath }: GitStatusViewProps) {
 
   const stage = async (files: string[]) => {
     const ok = await runWithToast(`Stage ${files.length} file(s)`, projectId, () =>
-      api.stageGitFiles(projectId, worktreePath, files),
+      api.stageGitFiles(projectId, worktreePath, files)
     );
     if (ok !== null) {
       clearDiffs();
@@ -53,7 +57,7 @@ export function GitStatusView({ projectId, worktreePath }: GitStatusViewProps) {
 
   const unstage = async (files: string[]) => {
     const ok = await runWithToast(`Unstage ${files.length} file(s)`, projectId, () =>
-      api.unstageGitFiles(projectId, worktreePath, files),
+      api.unstageGitFiles(projectId, worktreePath, files)
     );
     if (ok !== null) {
       clearDiffs();
@@ -66,7 +70,7 @@ export function GitStatusView({ projectId, worktreePath }: GitStatusViewProps) {
     if (!msg || committing) return;
     setCommitting(true);
     const ok = await runWithToast('Commit', projectId, () =>
-      api.commitGit(projectId, worktreePath, msg),
+      api.commitGit(projectId, worktreePath, msg)
     );
     setCommitting(false);
     if (ok) {
@@ -80,7 +84,7 @@ export function GitStatusView({ projectId, worktreePath }: GitStatusViewProps) {
     if (generating || !status || status.staged.length === 0) return;
     setGenerating(true);
     const result = await runWithToast('Generate commit message', projectId, () =>
-      api.generateCommitMessage(projectId, worktreePath),
+      api.generateCommitMessage(projectId, worktreePath)
     );
     setGenerating(false);
     if (result) setMessage(result.message);
@@ -96,13 +100,13 @@ export function GitStatusView({ projectId, worktreePath }: GitStatusViewProps) {
     setExpandedDiff({ file, kind });
     if (diffs[key]?.diff || diffs[key]?.loading) return;
 
-    setDiffs((prev) => ({ ...prev, [key]: { loading: true } }));
+    setDiffs(prev => ({ ...prev, [key]: { loading: true } }));
     try {
       const result = await api.getGitFileDiff(projectId, worktreePath, file, kind);
-      setDiffs((prev) => ({ ...prev, [key]: { loading: false, diff: result.diff } }));
+      setDiffs(prev => ({ ...prev, [key]: { loading: false, diff: result.diff } }));
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load diff';
-      setDiffs((prev) => ({ ...prev, [key]: { loading: false, error: message } }));
+      setDiffs(prev => ({ ...prev, [key]: { loading: false, error: message } }));
     }
   };
 
@@ -135,7 +139,7 @@ export function GitStatusView({ projectId, worktreePath }: GitStatusViewProps) {
               files={status.staged}
               diffKind="staged"
               action="unstage"
-              onItem={(f) => unstage([f])}
+              onItem={f => unstage([f])}
               onAll={status.staged.length ? () => unstage(status.staged) : undefined}
               expandedDiff={expandedDiff}
               diffs={diffs}
@@ -146,7 +150,7 @@ export function GitStatusView({ projectId, worktreePath }: GitStatusViewProps) {
               files={status.unstaged}
               diffKind="unstaged"
               action="stage"
-              onItem={(f) => stage([f])}
+              onItem={f => stage([f])}
               onAll={status.unstaged.length ? () => stage(status.unstaged) : undefined}
               expandedDiff={expandedDiff}
               diffs={diffs}
@@ -157,7 +161,7 @@ export function GitStatusView({ projectId, worktreePath }: GitStatusViewProps) {
               files={status.untracked}
               diffKind="untracked"
               action="stage"
-              onItem={(f) => stage([f])}
+              onItem={f => stage([f])}
               onAll={status.untracked.length ? () => stage(status.untracked) : undefined}
               expandedDiff={expandedDiff}
               diffs={diffs}
@@ -177,15 +181,23 @@ export function GitStatusView({ projectId, worktreePath }: GitStatusViewProps) {
             onClick={generate}
             disabled={generating || !status || status.staged.length === 0}
             className="flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium text-primary transition-colors hover:bg-muted/60 disabled:opacity-50 disabled:cursor-not-allowed"
-            title={status && status.staged.length === 0 ? 'Stage files to generate a message' : 'Generate commit message'}
+            title={
+              status && status.staged.length === 0
+                ? 'Stage files to generate a message'
+                : 'Generate commit message'
+            }
           >
-            {generating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+            {generating ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Sparkles className="h-3 w-3" />
+            )}
             {generating ? 'Generating…' : 'Generate'}
           </button>
         </div>
         <textarea
           value={message}
-          onChange={(e) => setMessage(e.target.value)}
+          onChange={e => setMessage(e.target.value)}
           placeholder="Commit message…"
           rows={2}
           className="w-full text-xs px-2 py-1.5 rounded-lg bg-background border border-border focus:border-primary outline-none resize-none"
@@ -251,7 +263,7 @@ function FileSection({
         )}
       </div>
       <div className="bg-secondary/30 border border-border rounded-lg divide-y divide-border overflow-hidden">
-        {files.map((file) => {
+        {files.map(file => {
           const key = `${diffKind}:${file}`;
           const isExpanded = expandedDiff?.file === file && expandedDiff.kind === diffKind;
           const diffState = diffs[key];
@@ -264,12 +276,16 @@ function FileSection({
                   className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
                   title="Show diff"
                 >
-                  <ChevronRight className={`h-3 w-3 flex-shrink-0 text-muted-foreground transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-                  <span className="text-xs font-mono truncate" title={file}>{file}</span>
+                  <ChevronRight
+                    className={`h-3 w-3 flex-shrink-0 text-muted-foreground transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                  />
+                  <span className="text-xs font-mono truncate" title={file}>
+                    {file}
+                  </span>
                 </button>
                 <button
                   type="button"
-                  onClick={(event) => {
+                  onClick={event => {
                     event.stopPropagation();
                     onItem(file);
                   }}

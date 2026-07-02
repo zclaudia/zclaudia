@@ -40,30 +40,30 @@
 
 ```ts
 type ToolRef = {
-  toolId: string;        // 对应注册表里的 Tool.id（即原来的 panel.id）
-  instanceKey?: string;  // 通用"按 scope 实例"键（终端：`${backendId}::${projectId}`）
+  toolId: string; // 对应注册表里的 Tool.id（即原来的 panel.id）
+  instanceKey?: string; // 通用"按 scope 实例"键（终端：`${backendId}::${projectId}`）
 };
 
 type PaneNode = {
   id: string;
   kind: 'pane';
-  tools: ToolRef[];      // tab-ready：现阶段恒为 1 项
-  activeToolId: string;  // 当前激活 tab；现阶段 == tools[0].toolId
+  tools: ToolRef[]; // tab-ready：现阶段恒为 1 项
+  activeToolId: string; // 当前激活 tab；现阶段 == tools[0].toolId
 };
 
 type GroupNode = {
   id: string;
   kind: 'group';
   dir: 'row' | 'col';
-  ratio: number;                       // 第一个子节点占比，clamp [0.1, 0.9]
-  children: [LayoutNode, LayoutNode];  // 二叉
+  ratio: number; // 第一个子节点占比，clamp [0.1, 0.9]
+  children: [LayoutNode, LayoutNode]; // 二叉
 };
 
 type LayoutNode = PaneNode | GroupNode;
 
 type SessionWorkspace = {
-  root: LayoutNode | null;       // null = 空 → 显示 launcher
-  primaryPaneId: string | null;  // openTool 的默认落点
+  root: LayoutNode | null; // null = 空 → 显示 launcher
+  primaryPaneId: string | null; // openTool 的默认落点
   focusedPaneId: string | null;
 };
 
@@ -71,9 +71,9 @@ interface RightWorkspaceState {
   bySession: Record<string, SessionWorkspace>;
   openTool(sessionId: string, toolId: string, opts?: OpenToolOpts): void;
   closePane(sessionId: string, paneId: string): void;
-  closeTool(sessionId: string, paneId: string, toolId: string): void;  // tab-ready
+  closeTool(sessionId: string, paneId: string, toolId: string): void; // tab-ready
   splitPane(sessionId, fromPaneId, dir, toolId, instanceKey?): SplitResult;
-  replaceTool(sessionId, paneId, toolId, instanceKey?): SplitResult;   // center-drop
+  replaceTool(sessionId, paneId, toolId, instanceKey?): SplitResult; // center-drop
   setRatio(sessionId, groupId, ratio): void;
   focusPane(sessionId, paneId): void;
   resetSession(sessionId): void;
@@ -81,7 +81,7 @@ interface RightWorkspaceState {
 
 type OpenToolOpts = {
   instanceKey?: string;
-  target?: 'primary' | 'focused' | 'new-split';  // 覆盖工具默认 openMode
+  target?: 'primary' | 'focused' | 'new-split'; // 覆盖工具默认 openMode
 };
 ```
 
@@ -96,22 +96,24 @@ type Tool = {
   id: string;
   label: string;
   icon?: string;
-  component?: unknown;        // builtin 组件（同现 UIExtension）
-  iframeUrl?: string;         // 第三方 iframe 工具
-  actions?: unknown;          // tab/pane 级动作按钮
-  openMode: 'shared' | 'dedicated';  // 默认落点；可被 OpenToolOpts.target 覆盖
-  multiInstance?: boolean;    // 终端 = true，其余单例
+  component?: unknown; // builtin 组件（同现 UIExtension）
+  iframeUrl?: string; // 第三方 iframe 工具
+  actions?: unknown; // tab/pane 级动作按钮
+  openMode: 'shared' | 'dedicated'; // 默认落点；可被 OpenToolOpts.target 覆盖
+  multiInstance?: boolean; // 终端 = true，其余单例
   scopeKey?: (ctx) => string; // multiInstance 工具如何算 instanceKey
-  alwaysMount?: boolean;      // 隐藏时仍保留 DOM（终端 xterm）
+  alwaysMount?: boolean; // 隐藏时仍保留 DOM（终端 xterm）
   platforms?: ('desktop' | 'mobile')[];
 };
 ```
 
 `openMode` 含义（对决定 3 的一般化）：
+
 - **`shared`**（file-viewer / draft / session-changes / memory）→ 落**主 pane**，替换激活工具。
 - **`dedicated`**（terminal / notifications / lineage）→ **自己独占一个 pane**；已存在则聚焦不重复 → 永不被开文件劫持，且不依赖用户记得先手动拆分。
 
 `openMode` 与 `target` 的关系（三层语义，互斥只在第一层）：
+
 1. **作为工具默认值**：单选，一个工具要么 shared 要么 dedicated。
 2. **作为运行时能力：不互斥**。shared 工具照样能被手动拖拽拆进独立 pane；dedicated 工具在 workspace 为空时自己就是主 pane；调用点可用 `target` 按次覆盖。
 3. **pane 不存 mode**：pane 只装 `ToolRef`；mode 只在"打开那一刻"被读一次用于路由。

@@ -20,10 +20,10 @@ interface ChangesPanelState {
 
 export const useChangesPanelStore = create<ChangesPanelState>()(
   persist(
-    (set) => ({
+    set => ({
       pickedSinceBySession: {},
       setPickedSince: (sessionId, sinceMessageId) =>
-        set((state) => {
+        set(state => {
           const current = state.pickedSinceBySession[sessionId];
           // No-op guard: skip the re-render + localStorage write when nothing
           // would change. Mirrors selectionStore's same-ref short-circuit.
@@ -37,8 +37,8 @@ export const useChangesPanelStore = create<ChangesPanelState>()(
             },
           };
         }),
-      clearPickedSince: (sessionId) =>
-        set((state) => {
+      clearPickedSince: sessionId =>
+        set(state => {
           if (!(sessionId in state.pickedSinceBySession)) return state;
           const { [sessionId]: _removed, ...rest } = state.pickedSinceBySession;
           return { pickedSinceBySession: rest };
@@ -46,9 +46,9 @@ export const useChangesPanelStore = create<ChangesPanelState>()(
     }),
     {
       name: 'claudia-changes-panel',
-      partialize: (state) => ({
+      partialize: state => ({
         pickedSinceBySession: state.pickedSinceBySession,
       }),
-    },
-  ),
+    }
+  )
 );

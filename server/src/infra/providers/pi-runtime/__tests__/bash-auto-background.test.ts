@@ -7,13 +7,16 @@ import { runBash, killProcessTree } from '../bash-runner.js';
 import { buildTools } from '../tool-bridge.js';
 import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
 import { TaskRepository } from '../../../../domains/tasks/repository.js';
-import { commandTaskLogPath, pidAlive } from '../../../../domains/tasks/executors/command-executor.js';
+import {
+  commandTaskLogPath,
+  pidAlive,
+} from '../../../../domains/tasks/executors/command-executor.js';
 
 async function waitUntil(predicate: () => boolean, timeoutMs = 5000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (predicate()) return true;
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise(r => setTimeout(r, 50));
   }
   return predicate();
 }
@@ -62,7 +65,7 @@ describe('runBash auto-background handoff', () => {
     });
     try {
       expect(res.handoff).toBeDefined();
-      await new Promise((r) => setTimeout(r, 1300));
+      await new Promise(r => setTimeout(r, 1300));
       // 1s kill timer would have fired by now if it were still armed
       expect(pidAlive(res.handoff!.child.pid!)).toBe(true);
     } finally {
@@ -92,15 +95,15 @@ describe('Bash auto-background (tool integration)', () => {
     db.close();
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function bashTool(dir: string, options: Record<string, unknown> = {}): any {
     return buildTools(dir, { enabled: ['Bash'], ...options }).find((t: any) => t.name === 'Bash');
   }
 
   it('moves a long-running foreground command into a background task', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-autobg-'));
-    const res = await bashTool(dir, { db, bashAutoBackgroundMs: 300 })
-      .execute('ab1', { command: 'echo early; sleep 1; echo late' });
+    const res = await bashTool(dir, { db, bashAutoBackgroundMs: 300 }).execute('ab1', {
+      command: 'echo early; sleep 1; echo late',
+    });
 
     expect(res.details.background).toBe(true);
     expect(res.details.autoBackgrounded).toBe(true);
@@ -129,8 +132,9 @@ describe('Bash auto-background (tool integration)', () => {
       'process.stdout.write("\\nEARLY_END\\n");',
       'setTimeout(() => console.log("LATE_MARKER"), 500);',
     ].join('');
-    const res = await bashTool(dir, { db, bashAutoBackgroundMs: 200 })
-      .execute('ab-spilled', { command: `${JSON.stringify(process.execPath)} -e ${JSON.stringify(script)}` });
+    const res = await bashTool(dir, { db, bashAutoBackgroundMs: 200 }).execute('ab-spilled', {
+      command: `${JSON.stringify(process.execPath)} -e ${JSON.stringify(script)}`,
+    });
 
     expect(res.details.background).toBe(true);
     expect(res.details.autoBackgrounded).toBe(true);
@@ -149,8 +153,9 @@ describe('Bash auto-background (tool integration)', () => {
 
   it('marks the adopted task failed when the command exits non-zero', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-autobg-'));
-    const res = await bashTool(dir, { db, bashAutoBackgroundMs: 200 })
-      .execute('ab2', { command: 'sleep 1; exit 3' });
+    const res = await bashTool(dir, { db, bashAutoBackgroundMs: 200 }).execute('ab2', {
+      command: 'sleep 1; exit 3',
+    });
     expect(res.details.autoBackgrounded).toBe(true);
     const repo = new TaskRepository(db);
     const taskId = res.details.taskId as string;
@@ -161,8 +166,9 @@ describe('Bash auto-background (tool integration)', () => {
 
   it('does not auto-background without db context (waits to completion)', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-autobg-'));
-    const res = await bashTool(dir, { bashAutoBackgroundMs: 200 })
-      .execute('ab3', { command: 'sleep 1; echo fin' });
+    const res = await bashTool(dir, { bashAutoBackgroundMs: 200 }).execute('ab3', {
+      command: 'sleep 1; echo fin',
+    });
     expect(res.details.background).toBeUndefined();
     expect(res.details.exitCode).toBe(0);
     expect(res.content[0].text).toContain('fin');
@@ -171,8 +177,10 @@ describe('Bash auto-background (tool integration)', () => {
 
   it('an explicit timeout disables auto-background and is honored', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-autobg-'));
-    const res = await bashTool(dir, { db, bashAutoBackgroundMs: 200 })
-      .execute('ab4', { command: 'sleep 3; echo fin', timeout: 1 });
+    const res = await bashTool(dir, { db, bashAutoBackgroundMs: 200 }).execute('ab4', {
+      command: 'sleep 3; echo fin',
+      timeout: 1,
+    });
     expect(res.details.background).toBeUndefined();
     expect(res.details.timedOut).toBe(true);
     rmSync(dir, { recursive: true, force: true });
@@ -180,8 +188,9 @@ describe('Bash auto-background (tool integration)', () => {
 
   it('short commands behave exactly as before', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-autobg-'));
-    const res = await bashTool(dir, { db, bashAutoBackgroundMs: 5000 })
-      .execute('ab5', { command: 'echo quick' });
+    const res = await bashTool(dir, { db, bashAutoBackgroundMs: 5000 }).execute('ab5', {
+      command: 'echo quick',
+    });
     expect(res.details.ok).toBe(true);
     expect(res.details.background).toBeUndefined();
     expect(res.content[0].text).toContain('quick');

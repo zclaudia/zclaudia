@@ -27,17 +27,15 @@ describe('FileSearchInput', () => {
   });
 
   it('shows placeholder text', () => {
-    render(
-      <FileSearchInput projectRoot="/root" onSelect={() => {}} onClose={() => {}} />
-    );
+    render(<FileSearchInput projectRoot="/root" onSelect={() => {}} onClose={() => {}} />);
     expect(screen.getByPlaceholderText('Search files by name...')).toBeInTheDocument();
   });
 
   it('fetches results when query changes', () => {
-    const { listDirectory } = { listDirectory: vi.fn().mockResolvedValue({ entries: mockEntries }) };
-    render(
-      <FileSearchInput projectRoot="/root" onSelect={() => {}} onClose={() => {}} />
-    );
+    const { listDirectory } = {
+      listDirectory: vi.fn().mockResolvedValue({ entries: mockEntries }),
+    };
+    render(<FileSearchInput projectRoot="/root" onSelect={() => {}} onClose={() => {}} />);
 
     const input = screen.getByPlaceholderText('Search files by name...');
     fireEvent.change(input, { target: { value: 'test' } });
@@ -47,9 +45,7 @@ describe('FileSearchInput', () => {
   });
 
   it('clears results when query is empty', () => {
-    render(
-      <FileSearchInput projectRoot="/root" onSelect={() => {}} onClose={() => {}} />
-    );
+    render(<FileSearchInput projectRoot="/root" onSelect={() => {}} onClose={() => {}} />);
 
     const input = screen.getByPlaceholderText('Search files by name...');
 
@@ -68,9 +64,7 @@ describe('FileSearchInput', () => {
       const { listDirectory } = await import('../../../services/api');
       (listDirectory as any).mockResolvedValueOnce({ entries: mockEntries });
 
-      render(
-        <FileSearchInput projectRoot="/root" onSelect={() => {}} onClose={() => {}} />
-      );
+      render(<FileSearchInput projectRoot="/root" onSelect={() => {}} onClose={() => {}} />);
 
       const input = screen.getByPlaceholderText('Search files by name...');
       fireEvent.change(input, { target: { value: 'ts' } });
@@ -90,9 +84,7 @@ describe('FileSearchInput', () => {
   it('calls onSelect when a result is clicked', () => {
     const onSelect = vi.fn();
 
-    render(
-      <FileSearchInput projectRoot="/root" onSelect={onSelect} onClose={() => {}} />
-    );
+    render(<FileSearchInput projectRoot="/root" onSelect={onSelect} onClose={() => {}} />);
 
     const input = screen.getByPlaceholderText('Search files by name...');
     fireEvent.change(input, { target: { value: '' } });
@@ -102,9 +94,7 @@ describe('FileSearchInput', () => {
   });
 
   it('shows "No files found" when query has no results', () => {
-    render(
-      <FileSearchInput projectRoot="/root" onSelect={() => {}} onClose={() => {}} />
-    );
+    render(<FileSearchInput projectRoot="/root" onSelect={() => {}} onClose={() => {}} />);
 
     const input = screen.getByPlaceholderText('Search files by name...');
     // Just verify the input exists and accepts input
@@ -114,9 +104,7 @@ describe('FileSearchInput', () => {
   it('handles Escape key to call onClose', () => {
     const onClose = vi.fn();
 
-    render(
-      <FileSearchInput projectRoot="/root" onSelect={() => {}} onClose={onClose} />
-    );
+    render(<FileSearchInput projectRoot="/root" onSelect={() => {}} onClose={onClose} />);
 
     const input = screen.getByPlaceholderText('Search files by name...');
     fireEvent.keyDown(input, { key: 'Escape' });
@@ -129,9 +117,7 @@ describe('FileSearchInput', () => {
     const { listDirectory } = await import('../../../services/api');
     (listDirectory as any).mockResolvedValue({ entries: mockEntries });
 
-    render(
-      <FileSearchInput projectRoot="/root" onSelect={onSelect} onClose={() => {}} />
-    );
+    render(<FileSearchInput projectRoot="/root" onSelect={onSelect} onClose={() => {}} />);
 
     const input = screen.getByPlaceholderText('Search files by name...');
 
@@ -147,9 +133,7 @@ describe('FileSearchInput', () => {
     const { listDirectory } = await import('../../../services/api');
     (listDirectory as any).mockResolvedValue({ entries: mockEntries });
 
-    render(
-      <FileSearchInput projectRoot="/root" onSelect={onSelect} onClose={() => {}} />
-    );
+    render(<FileSearchInput projectRoot="/root" onSelect={onSelect} onClose={() => {}} />);
 
     const input = screen.getByPlaceholderText('Search files by name...');
 
@@ -161,9 +145,7 @@ describe('FileSearchInput', () => {
   });
 
   it('handles Ctrl+N to move selection down', () => {
-    render(
-      <FileSearchInput projectRoot="/root" onSelect={() => {}} onClose={() => {}} />
-    );
+    render(<FileSearchInput projectRoot="/root" onSelect={() => {}} onClose={() => {}} />);
 
     const input = screen.getByPlaceholderText('Search files by name...');
     fireEvent.keyDown(input, { key: 'n', ctrlKey: true });
@@ -171,9 +153,7 @@ describe('FileSearchInput', () => {
   });
 
   it('handles Ctrl+P to move selection up', () => {
-    render(
-      <FileSearchInput projectRoot="/root" onSelect={() => {}} onClose={() => {}} />
-    );
+    render(<FileSearchInput projectRoot="/root" onSelect={() => {}} onClose={() => {}} />);
 
     const input = screen.getByPlaceholderText('Search files by name...');
     fireEvent.keyDown(input, { key: 'p', ctrlKey: true });
@@ -183,9 +163,7 @@ describe('FileSearchInput', () => {
   it('handles Enter key to select current result', () => {
     const onSelect = vi.fn();
 
-    render(
-      <FileSearchInput projectRoot="/root" onSelect={onSelect} onClose={() => {}} />
-    );
+    render(<FileSearchInput projectRoot="/root" onSelect={onSelect} onClose={() => {}} />);
 
     const input = screen.getByPlaceholderText('Search files by name...');
     fireEvent.keyDown(input, { key: 'Enter' });
@@ -196,9 +174,7 @@ describe('FileSearchInput', () => {
   it('does not select when results are empty on Enter', () => {
     const onSelect = vi.fn();
 
-    render(
-      <FileSearchInput projectRoot="/root" onSelect={onSelect} onClose={() => {}} />
-    );
+    render(<FileSearchInput projectRoot="/root" onSelect={onSelect} onClose={() => {}} />);
 
     const input = screen.getByPlaceholderText('Search files by name...');
     fireEvent.keyDown(input, { key: 'Enter' });
@@ -207,18 +183,14 @@ describe('FileSearchInput', () => {
   });
 
   it('filters out directory entries', () => {
-    render(
-      <FileSearchInput projectRoot="/root" onSelect={() => {}} onClose={() => {}} />
-    );
+    render(<FileSearchInput projectRoot="/root" onSelect={() => {}} onClose={() => {}} />);
 
     const input = screen.getByPlaceholderText('Search files by name...');
     expect(input).toBeTruthy();
   });
 
   it('handles API errors gracefully', () => {
-    render(
-      <FileSearchInput projectRoot="/root" onSelect={() => {}} onClose={() => {}} />
-    );
+    render(<FileSearchInput projectRoot="/root" onSelect={() => {}} onClose={() => {}} />);
 
     const input = screen.getByPlaceholderText('Search files by name...');
     expect(input).toBeTruthy();

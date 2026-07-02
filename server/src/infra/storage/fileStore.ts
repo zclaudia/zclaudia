@@ -28,6 +28,19 @@ class FileStore {
     }
   }
 
+  private resolveStoredFilePath(fileId: string): string | null {
+    if (!fileId || path.isAbsolute(fileId) || fileId !== path.basename(fileId)) {
+      return null;
+    }
+
+    const storageRoot = path.resolve(this.storageDir);
+    const resolved = path.resolve(storageRoot, fileId);
+    if (resolved === storageRoot || !resolved.startsWith(storageRoot + path.sep)) {
+      return null;
+    }
+    return resolved;
+  }
+
   storeFile(name: string, mimeType: string, data: string): string {
     const fileId = newId();
     const size = Buffer.from(data, 'base64').length;
@@ -38,24 +51,31 @@ class FileStore {
     fs.writeFileSync(filePath, Buffer.from(data, 'base64'));
 
     // Insert metadata into DB
-    this.db.prepare(
-      'INSERT INTO files (id, name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?)'
-    ).run(fileId, name, mimeType, size, createdAt);
+    this.db
+      .prepare('INSERT INTO files (id, name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?)')
+      .run(fileId, name, mimeType, size, createdAt);
 
     console.log(`[FileStore] Stored file ${fileId} (${name}, ${size} bytes)`);
     return fileId;
   }
 
   getFile(fileId: string): StoredFile | null {
-    const row = this.db.prepare(
-      'SELECT id, name, mime_type, size, created_at FROM files WHERE id = ?'
-    ).get(fileId) as { id: string; name: string; mime_type: string; size: number; created_at: number } | undefined;
+    const row = this.db
+      .prepare('SELECT id, name, mime_type, size, created_at FROM files WHERE id = ?')
+      .get(fileId) as
+      | { id: string; name: string; mime_type: string; size: number; created_at: number }
+      | undefined;
 
     if (!row) {
       return null;
     }
 
-    const filePath = path.join(this.storageDir, fileId);
+    const filePath = this.resolveStoredFilePath(fileId);
+    if (!filePath) {
+      this.db.prepare('DELETE FROM files WHERE id = ?').run(fileId);
+      console.warn(`[FileStore] Unsafe file id ${fileId}, removed metadata`);
+      return null;
+    }
     if (!fs.existsSync(filePath)) {
       // Metadata exists but file is missing on disk — clean up
       this.db.prepare('DELETE FROM files WHERE id = ?').run(fileId);
@@ -78,9 +98,9 @@ class FileStore {
   deleteFile(fileId: string): boolean {
     const changes = this.db.prepare('DELETE FROM files WHERE id = ?').run(fileId).changes;
 
-    const filePath = path.join(this.storageDir, fileId);
+    const filePath = this.resolveStoredFilePath(fileId);
     try {
-      if (fs.existsSync(filePath)) {
+      if (filePath && fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
       }
     } catch (error) {
@@ -98,9 +118,9 @@ class FileStore {
     const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
     const cutoff = now - maxAge;
 
-    const rows = this.db.prepare(
-      'SELECT id FROM files WHERE created_at < ?'
-    ).all(cutoff) as Array<{ id: string }>;
+    const rows = this.db.prepare('SELECT id FROM files WHERE created_at < ?').all(cutoff) as Array<{
+      id: string;
+    }>;
 
     for (const row of rows) {
       this.deleteFile(row.id);
@@ -123,9 +143,9 @@ class FileStore {
     const filePath = path.join(this.storageDir, fileId);
     fs.writeFileSync(filePath, buffer);
 
-    this.db.prepare(
-      'INSERT INTO files (id, name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?)'
-    ).run(fileId, name, mimeType, size, createdAt);
+    this.db
+      .prepare('INSERT INTO files (id, name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?)')
+      .run(fileId, name, mimeType, size, createdAt);
 
     console.log(`[FileStore] Stored file from buffer ${fileId} (${name}, ${size} bytes)`);
     return fileId;
@@ -145,7 +165,7 @@ class FileStore {
     const destPath = path.join(this.storageDir, fileId);
     try {
       fs.renameSync(sourcePath, destPath);
-    } catch (renameError) {
+    } catch (_renameError) {
       // Cross-device fallback
       fs.copyFileSync(sourcePath, destPath);
       try {
@@ -155,9 +175,9 @@ class FileStore {
       }
     }
 
-    this.db.prepare(
-      'INSERT INTO files (id, name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?)'
-    ).run(fileId, name, mimeType, size, createdAt);
+    this.db
+      .prepare('INSERT INTO files (id, name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?)')
+      .run(fileId, name, mimeType, size, createdAt);
 
     console.log(`[FileStore] Stored file by moving ${fileId} (${name}, ${size} bytes)`);
     return fileId;
@@ -178,9 +198,9 @@ class FileStore {
     fs.copyFileSync(sourcePath, destPath);
 
     // Insert metadata into DB
-    this.db.prepare(
-      'INSERT INTO files (id, name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?)'
-    ).run(fileId, name, mimeType, size, createdAt);
+    this.db
+      .prepare('INSERT INTO files (id, name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?)')
+      .run(fileId, name, mimeType, size, createdAt);
 
     console.log(`[FileStore] Stored file from path ${fileId} (${name}, ${size} bytes)`);
     return fileId;
@@ -191,7 +211,10 @@ class FileStore {
    * Returns null if the file doesn't exist in the store.
    */
   getFilePath(fileId: string): string | null {
-    const filePath = path.join(this.storageDir, fileId);
+    const filePath = this.resolveStoredFilePath(fileId);
+    if (!filePath) {
+      return null;
+    }
     if (!fs.existsSync(filePath)) {
       return null;
     }
@@ -201,10 +224,14 @@ class FileStore {
   /**
    * Get file metadata without reading the file data.
    */
-  getFileMetadata(fileId: string): { id: string; name: string; mimeType: string; size: number; createdAt: number } | null {
-    const row = this.db.prepare(
-      'SELECT id, name, mime_type, size, created_at FROM files WHERE id = ?'
-    ).get(fileId) as { id: string; name: string; mime_type: string; size: number; created_at: number } | undefined;
+  getFileMetadata(
+    fileId: string
+  ): { id: string; name: string; mimeType: string; size: number; createdAt: number } | null {
+    const row = this.db
+      .prepare('SELECT id, name, mime_type, size, created_at FROM files WHERE id = ?')
+      .get(fileId) as
+      | { id: string; name: string; mime_type: string; size: number; created_at: number }
+      | undefined;
 
     if (!row) {
       return null;
@@ -220,9 +247,9 @@ class FileStore {
   }
 
   getStats() {
-    const row = this.db.prepare(
-      'SELECT COUNT(*) as count, COALESCE(SUM(size), 0) as totalSize FROM files'
-    ).get() as { count: number; totalSize: number };
+    const row = this.db
+      .prepare('SELECT COUNT(*) as count, COALESCE(SUM(size), 0) as totalSize FROM files')
+      .get() as { count: number; totalSize: number };
 
     return {
       count: row.count,
@@ -255,16 +282,23 @@ export function initFileStore(db: Database.Database): void {
     category: 'maintenance',
     intervalMs: 60 * 60 * 1000,
   });
-  cleanupInterval = setInterval(() => {
-    systemTaskRegistry.markRunStart('system:filestore_cleanup');
-    const start = Date.now();
-    try {
-      instance?.cleanup();
-      systemTaskRegistry.markRunComplete('system:filestore_cleanup', Date.now() - start);
-    } catch (err) {
-      systemTaskRegistry.markRunComplete('system:filestore_cleanup', Date.now() - start, String(err));
-    }
-  }, 60 * 60 * 1000);
+  cleanupInterval = setInterval(
+    () => {
+      systemTaskRegistry.markRunStart('system:filestore_cleanup');
+      const start = Date.now();
+      try {
+        instance?.cleanup();
+        systemTaskRegistry.markRunComplete('system:filestore_cleanup', Date.now() - start);
+      } catch (err) {
+        systemTaskRegistry.markRunComplete(
+          'system:filestore_cleanup',
+          Date.now() - start,
+          String(err)
+        );
+      }
+    },
+    60 * 60 * 1000
+  );
 
   const stats = instance.getStats();
   console.log(`[FileStore] Initialized: ${stats.count} files, ${stats.totalSizeMB} MB`);
@@ -288,6 +322,6 @@ export function getFileStore(): FileStore {
 // This allows existing `import { fileStore }` to keep working
 export const fileStore = new Proxy({} as FileStore, {
   get(_target, prop) {
-    return (getFileStore() as any)[prop];
+    return Reflect.get(getFileStore(), prop);
   },
 });

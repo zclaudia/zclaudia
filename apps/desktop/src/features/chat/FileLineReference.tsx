@@ -33,7 +33,10 @@ function parseInlineFileRef(text: string): ParsedInlineFileRef | null {
   const [, pathOrName, startStr, endStr] = match;
   const start = startStr ? parseInt(startStr, 10) : undefined;
   const end = endStr ? parseInt(endStr, 10) : undefined;
-  if ((start !== undefined && !Number.isFinite(start)) || (end !== undefined && !Number.isFinite(end))) {
+  if (
+    (start !== undefined && !Number.isFinite(start)) ||
+    (end !== undefined && !Number.isFinite(end))
+  ) {
     return null;
   }
   return { pathOrName, start, end };
@@ -61,7 +64,7 @@ interface Props {
  * first basename hit.
  */
 export function FileLineReference({ text, projectRoot, backendId }: Props) {
-  const openFile = useFileViewerStore((s) => s.openFile);
+  const openFile = useFileViewerStore(s => s.openFile);
 
   const handleClick = async () => {
     const parsed = parseInlineFileRef(text);
@@ -91,7 +94,7 @@ export function FileLineReference({ text, projectRoot, backendId }: Props) {
         query: basename,
         maxResults: 20,
       });
-      const fileEntries = result.entries.filter((e) => e.type === 'file');
+      const fileEntries = result.entries.filter(e => e.type === 'file');
 
       // Resolution priority:
       //   1. exact path match
@@ -99,11 +102,11 @@ export function FileLineReference({ text, projectRoot, backendId }: Props) {
       //      matches "apps/desktop/src/app/Foo.tsx")
       //   3. exact basename match
       //   4. first basename hit
-      const exact = fileEntries.find((e) => e.path === pathOrName);
+      const exact = fileEntries.find(e => e.path === pathOrName);
       const suffix = pathOrName.includes('/')
-        ? fileEntries.find((e) => e.path === pathOrName || e.path.endsWith('/' + pathOrName))
+        ? fileEntries.find(e => e.path === pathOrName || e.path.endsWith('/' + pathOrName))
         : undefined;
-      const byName = fileEntries.find((e) => e.name === basename);
+      const byName = fileEntries.find(e => e.name === basename);
       const chosen = exact ?? suffix ?? byName ?? fileEntries[0];
 
       if (!chosen) {

@@ -24,7 +24,10 @@ const reviewContract: JsonOutputContract = {
 
 describe('parseJsonOutput', () => {
   it('parses fenced JSON and validates required fields', () => {
-    const parsed = parseJsonOutput('```json\n{"reviewPassed":true,"reviewNotes":"ok"}\n```', reviewContract);
+    const parsed = parseJsonOutput(
+      '```json\n{"reviewPassed":true,"reviewNotes":"ok"}\n```',
+      reviewContract
+    );
     expect(parsed).toEqual({
       ok: true,
       output: { reviewPassed: true, reviewNotes: 'ok' },
@@ -35,7 +38,9 @@ describe('parseJsonOutput', () => {
     const parsed = parseJsonOutput('review passed', reviewContract);
     expect(parsed.ok).toBe(false);
     expect(parsed.error).toContain('valid JSON object');
-    expect(buildJsonRepairPrompt('review passed', [parsed.error], reviewContract)).toContain('Return valid JSON only');
+    expect(buildJsonRepairPrompt('review passed', [parsed.error], reviewContract)).toContain(
+      'Return valid JSON only'
+    );
   });
 
   it('rejects missing required fields', () => {
@@ -45,7 +50,10 @@ describe('parseJsonOutput', () => {
   });
 
   it('rejects enum values outside the contract', () => {
-    const parsed = parseJsonOutput('{"reviewPassed":true,"reviewNotes":"ok","decision":"maybe"}', reviewContract);
+    const parsed = parseJsonOutput(
+      '{"reviewPassed":true,"reviewNotes":"ok","decision":"maybe"}',
+      reviewContract
+    );
     expect(parsed.ok).toBe(false);
     expect(parsed.error).toContain('decision');
   });
@@ -62,7 +70,11 @@ describe('buildJsonContractPrompt', () => {
   });
 
   it('keeps the schema in repair prompts', () => {
-    const prompt = buildJsonRepairPrompt('review passed', ['$.reviewPassed is required'], reviewContract);
+    const prompt = buildJsonRepairPrompt(
+      'review passed',
+      ['$.reviewPassed is required'],
+      reviewContract
+    );
 
     expect(prompt).toContain('"reviewPassed"');
     expect(prompt).toContain('$.reviewPassed is required');
@@ -80,8 +92,6 @@ describe('createObjectJsonContract', () => {
   });
 
   it('rejects non-object schema roots', () => {
-    expect(() => createObjectJsonContract({ type: 'array' })).toThrow(
-      /object schema root/i,
-    );
+    expect(() => createObjectJsonContract({ type: 'array' })).toThrow(/object schema root/i);
   });
 });

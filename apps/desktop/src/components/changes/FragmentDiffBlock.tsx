@@ -24,32 +24,20 @@ export function FragmentDiffBlock({ fragment, index, filePath }: FragmentDiffBlo
             </span>
           )}
         </div>
-        <DiffViewer
-          oldString={fragment.oldText}
-          newString={fragment.newText}
-          filePath={filePath}
-        />
+        <DiffViewer oldString={fragment.oldText} newString={fragment.newText} filePath={filePath} />
       </div>
     );
   }
 
   if (fragment.kind === 'write') {
     return (
-      <WriteFragmentBlock
-        content={fragment.content}
-        index={index}
-        toolName={fragment.toolName}
-      />
+      <WriteFragmentBlock content={fragment.content} index={index} toolName={fragment.toolName} />
     );
   }
 
   if (fragment.kind === 'summary') {
     return (
-      <SummaryFragmentBlock
-        summary={fragment.summary}
-        index={index}
-        toolName={fragment.toolName}
-      />
+      <SummaryFragmentBlock summary={fragment.summary} index={index} toolName={fragment.toolName} />
     );
   }
 
@@ -58,9 +46,7 @@ export function FragmentDiffBlock({ fragment, index, filePath }: FragmentDiffBlo
       <div className="text-[10px] font-mono text-muted-foreground flex items-center gap-2">
         <span>{index})</span>
         <span>NotebookEdit</span>
-        <span className="px-1 rounded bg-muted text-muted-foreground/80">
-          {fragment.editMode}
-        </span>
+        <span className="px-1 rounded bg-muted text-muted-foreground/80">{fragment.editMode}</span>
         {fragment.cellId && (
           <span className="px-1 rounded bg-muted text-muted-foreground/80 truncate max-w-[180px]">
             cell: {fragment.cellId}
@@ -90,9 +76,7 @@ function SummaryFragmentBlock({
       </div>
       <div className="rounded-md border border-border overflow-hidden">
         <div className="overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch] bg-muted/30 text-foreground">
-          <pre className="text-xs leading-5 font-mono whitespace-pre px-3 py-1">
-            {summary}
-          </pre>
+          <pre className="text-xs leading-5 font-mono whitespace-pre px-3 py-1">{summary}</pre>
         </div>
       </div>
     </div>
@@ -141,10 +125,10 @@ function CodeBlock({ content, tone }: { content: string; tone: 'add' | 'remove' 
       : 'bg-red-500/10 text-red-700 dark:text-red-300';
   return (
     <div className="rounded-md border border-border overflow-hidden">
-      <div className={`overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch] ${toneClass}`}>
-        <pre className="text-xs leading-5 font-mono whitespace-pre px-3 py-1">
-          {content}
-        </pre>
+      <div
+        className={`overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch] ${toneClass}`}
+      >
+        <pre className="text-xs leading-5 font-mono whitespace-pre px-3 py-1">{content}</pre>
       </div>
     </div>
   );

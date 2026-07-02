@@ -10,51 +10,73 @@ interface SearchFiltersProps {
   onClose?: () => void;
 }
 
-export function SearchFilters({ filters, sessions = [], onFiltersChange, onClose }: SearchFiltersProps) {
+export function SearchFilters({
+  filters,
+  sessions = [],
+  onFiltersChange,
+  onClose,
+}: SearchFiltersProps) {
   const [localFilters, setLocalFilters] = useState<Filters>(filters);
 
-  const handleRoleChange = useCallback((role: 'user' | 'assistant' | undefined) => {
-    const newFilters = { ...localFilters, role };
-    setLocalFilters(newFilters);
-    onFiltersChange(newFilters);
-  }, [localFilters, onFiltersChange]);
+  const handleRoleChange = useCallback(
+    (role: 'user' | 'assistant' | undefined) => {
+      const newFilters = { ...localFilters, role };
+      setLocalFilters(newFilters);
+      onFiltersChange(newFilters);
+    },
+    [localFilters, onFiltersChange]
+  );
 
-  const handleSessionToggle = useCallback((sessionId: string) => {
-    const currentIds = localFilters.sessionIds || [];
-    const newIds = currentIds.includes(sessionId)
-      ? currentIds.filter(id => id !== sessionId)
-      : [...currentIds, sessionId];
-    const newFilters = { ...localFilters, sessionIds: newIds.length > 0 ? newIds : undefined };
-    setLocalFilters(newFilters);
-    onFiltersChange(newFilters);
-  }, [localFilters, onFiltersChange]);
+  const handleSessionToggle = useCallback(
+    (sessionId: string) => {
+      const currentIds = localFilters.sessionIds || [];
+      const newIds = currentIds.includes(sessionId)
+        ? currentIds.filter(id => id !== sessionId)
+        : [...currentIds, sessionId];
+      const newFilters = { ...localFilters, sessionIds: newIds.length > 0 ? newIds : undefined };
+      setLocalFilters(newFilters);
+      onFiltersChange(newFilters);
+    },
+    [localFilters, onFiltersChange]
+  );
 
-  const handleSortChange = useCallback((sort: 'relevance' | 'newest' | 'oldest' | 'session') => {
-    const newFilters = { ...localFilters, sort };
-    setLocalFilters(newFilters);
-    onFiltersChange(newFilters);
-  }, [localFilters, onFiltersChange]);
+  const handleSortChange = useCallback(
+    (sort: 'relevance' | 'newest' | 'oldest' | 'session') => {
+      const newFilters = { ...localFilters, sort };
+      setLocalFilters(newFilters);
+      onFiltersChange(newFilters);
+    },
+    [localFilters, onFiltersChange]
+  );
 
-  const handleDateRangeChange = useCallback((type: 'start' | 'end', value: string) => {
-    const timestamp = new Date(value).getTime();
-    const newDateRange = localFilters.dateRange ? { ...localFilters.dateRange } : { start: 0, end: Date.now() };
+  const handleDateRangeChange = useCallback(
+    (type: 'start' | 'end', value: string) => {
+      const timestamp = new Date(value).getTime();
+      const newDateRange = localFilters.dateRange
+        ? { ...localFilters.dateRange }
+        : { start: 0, end: Date.now() };
 
-    if (type === 'start') {
-      newDateRange.start = timestamp;
-    } else {
-      newDateRange.end = timestamp;
-    }
+      if (type === 'start') {
+        newDateRange.start = timestamp;
+      } else {
+        newDateRange.end = timestamp;
+      }
 
-    const newFilters = { ...localFilters, dateRange: newDateRange };
-    setLocalFilters(newFilters);
-    onFiltersChange(newFilters);
-  }, [localFilters, onFiltersChange]);
+      const newFilters = { ...localFilters, dateRange: newDateRange };
+      setLocalFilters(newFilters);
+      onFiltersChange(newFilters);
+    },
+    [localFilters, onFiltersChange]
+  );
 
-  const handleScopeChange = useCallback((scope: SearchScope) => {
-    const newFilters = { ...localFilters, scope };
-    setLocalFilters(newFilters);
-    onFiltersChange(newFilters);
-  }, [localFilters, onFiltersChange]);
+  const handleScopeChange = useCallback(
+    (scope: SearchScope) => {
+      const newFilters = { ...localFilters, scope };
+      setLocalFilters(newFilters);
+      onFiltersChange(newFilters);
+    },
+    [localFilters, onFiltersChange]
+  );
 
   const clearFilters = useCallback(() => {
     const clearedFilters: Filters = { projectId: localFilters.projectId };
@@ -62,7 +84,12 @@ export function SearchFilters({ filters, sessions = [], onFiltersChange, onClose
     onFiltersChange(clearedFilters);
   }, [localFilters.projectId, onFiltersChange]);
 
-  const hasActiveFilters = !!(localFilters.role || localFilters.sessionIds?.length || localFilters.dateRange || (localFilters.scope && localFilters.scope !== 'messages'));
+  const hasActiveFilters = !!(
+    localFilters.role ||
+    localFilters.sessionIds?.length ||
+    localFilters.dateRange ||
+    (localFilters.scope && localFilters.scope !== 'messages')
+  );
 
   return (
     <div className="bg-card border border-border rounded-lg shadow-lg p-4 space-y-4">
@@ -79,12 +106,14 @@ export function SearchFilters({ filters, sessions = [], onFiltersChange, onClose
             </button>
           )}
           {onClose && (
-            <button
-              onClick={onClose}
-              className="text-muted-foreground hover:text-foreground p-1"
-            >
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           )}
@@ -93,12 +122,14 @@ export function SearchFilters({ filters, sessions = [], onFiltersChange, onClose
 
       {/* Search Scope */}
       <div>
-        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Search Scope</label>
+        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+          Search Scope
+        </label>
         <div className="grid grid-cols-2 gap-2">
           <button
             onClick={() => handleScopeChange('messages')}
             className={`px-3 py-1.5 rounded-md text-xs ${
-              (!localFilters.scope || localFilters.scope === 'messages')
+              !localFilters.scope || localFilters.scope === 'messages'
                 ? 'bg-muted/60 text-foreground'
                 : 'bg-secondary text-foreground hover:bg-secondary/80'
             }`}
@@ -140,7 +171,9 @@ export function SearchFilters({ filters, sessions = [], onFiltersChange, onClose
 
       {/* Role Filter */}
       <div>
-        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Message Role</label>
+        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+          Message Role
+        </label>
         <div className="flex gap-2">
           <button
             onClick={() => handleRoleChange(undefined)}
@@ -199,7 +232,7 @@ export function SearchFilters({ filters, sessions = [], onFiltersChange, onClose
             Sessions ({localFilters.sessionIds?.length || 0} selected)
           </label>
           <div className="max-h-32 overflow-y-auto space-y-1 border border-border rounded-md p-2">
-            {sessions.map((session) => (
+            {sessions.map(session => (
               <label
                 key={session.id}
                 className="flex items-center gap-2 px-2 py-1 hover:bg-secondary rounded-md cursor-pointer"
@@ -225,8 +258,12 @@ export function SearchFilters({ filters, sessions = [], onFiltersChange, onClose
             <label className="text-xs text-muted-foreground mb-0.5 block">From</label>
             <input
               type="date"
-              value={localFilters.dateRange?.start ? new Date(localFilters.dateRange.start).toISOString().split('T')[0] : ''}
-              onChange={(e) => handleDateRangeChange('start', e.target.value)}
+              value={
+                localFilters.dateRange?.start
+                  ? new Date(localFilters.dateRange.start).toISOString().split('T')[0]
+                  : ''
+              }
+              onChange={e => handleDateRangeChange('start', e.target.value)}
               className="w-full px-2 py-1 bg-secondary border border-border rounded-md text-xs focus:outline-none focus:border-primary"
             />
           </div>
@@ -234,8 +271,12 @@ export function SearchFilters({ filters, sessions = [], onFiltersChange, onClose
             <label className="text-xs text-muted-foreground mb-0.5 block">To</label>
             <input
               type="date"
-              value={localFilters.dateRange?.end ? new Date(localFilters.dateRange.end).toISOString().split('T')[0] : ''}
-              onChange={(e) => handleDateRangeChange('end', e.target.value)}
+              value={
+                localFilters.dateRange?.end
+                  ? new Date(localFilters.dateRange.end).toISOString().split('T')[0]
+                  : ''
+              }
+              onChange={e => handleDateRangeChange('end', e.target.value)}
               className="w-full px-2 py-1 bg-secondary border border-border rounded-md text-xs focus:outline-none focus:border-primary"
             />
           </div>

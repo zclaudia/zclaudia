@@ -34,7 +34,7 @@ function renderPopover() {
   return render(
     <ContextUsagePopover sessionId="s1">
       <span>indicator</span>
-    </ContextUsagePopover>,
+    </ContextUsagePopover>
   );
 }
 
@@ -70,7 +70,7 @@ describe('ContextUsagePopover', () => {
         <ContextUsagePopover sessionId="s1">
           <span>indicator</span>
         </ContextUsagePopover>
-      </StrictMode>,
+      </StrictMode>
     );
     fireEvent.mouseEnter(container.firstChild as HTMLElement);
     await screen.findByTestId('context-usage-card');
@@ -97,7 +97,7 @@ describe('ContextUsagePopover', () => {
     // Leave the anchor but enter the popover within the close delay (bridge).
     fireEvent.mouseLeave(anchor);
     fireEvent.mouseEnter(popover);
-    await new Promise((r) => setTimeout(r, 250));
+    await new Promise(r => setTimeout(r, 250));
     expect(screen.queryByTestId('context-usage-card')).not.toBeNull();
 
     // Leave the popover too — it closes after the delay.
@@ -110,12 +110,12 @@ describe('ContextUsagePopover', () => {
     const { container } = render(
       <ContextUsagePopover sessionId="s1" latestCacheRead={4200}>
         <span>indicator</span>
-      </ContextUsagePopover>,
+      </ContextUsagePopover>
     );
     fireEvent.mouseEnter(container.firstChild as HTMLElement);
     await screen.findByTestId('context-usage-card');
     expect(screen.getByTestId('popover-cache-line').textContent).toMatch(
-      /Prompt cache:\s*4K read this turn/i,
+      /Prompt cache:\s*4K read this turn/i
     );
   });
 
@@ -124,7 +124,7 @@ describe('ContextUsagePopover', () => {
     const { container } = render(
       <ContextUsagePopover sessionId="s1" latestCacheRead={0}>
         <span>indicator</span>
-      </ContextUsagePopover>,
+      </ContextUsagePopover>
     );
     fireEvent.mouseEnter(container.firstChild as HTMLElement);
     await screen.findByTestId('context-usage-card');

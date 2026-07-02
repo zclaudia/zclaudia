@@ -12,25 +12,19 @@ describe('DiffViewerModal', () => {
 +const c = 4;`;
 
   it('renders title and diff content', () => {
-    const { getByText } = render(
-      <DiffViewerModal title="My PR" diff={diff} onClose={() => {}} />
-    );
+    const { getByText } = render(<DiffViewerModal title="My PR" diff={diff} onClose={() => {}} />);
     expect(getByText('My PR')).toBeTruthy();
   });
 
   it('applies correct classes for add/remove lines', () => {
-    const { container } = render(
-      <DiffViewerModal title="Test" diff={diff} onClose={() => {}} />
-    );
+    const { container } = render(<DiffViewerModal title="Test" diff={diff} onClose={() => {}} />);
     expect(container.innerHTML).toContain('bg-green-500/15');
     expect(container.innerHTML).toContain('bg-red-500/15');
   });
 
   it('calls onClose when close button clicked', () => {
     const onClose = vi.fn();
-    const { container } = render(
-      <DiffViewerModal title="Test" diff={diff} onClose={onClose} />
-    );
+    const { container } = render(<DiffViewerModal title="Test" diff={diff} onClose={onClose} />);
     const closeBtn = container.querySelector('button');
     if (closeBtn) fireEvent.click(closeBtn);
     expect(onClose).toHaveBeenCalled();
@@ -38,9 +32,7 @@ describe('DiffViewerModal', () => {
 
   it('calls onClose when backdrop clicked', () => {
     const onClose = vi.fn();
-    const { container } = render(
-      <DiffViewerModal title="Test" diff={diff} onClose={onClose} />
-    );
+    const { container } = render(<DiffViewerModal title="Test" diff={diff} onClose={onClose} />);
     // Click the outermost fixed div (backdrop)
     const backdrop = container.firstElementChild as HTMLElement;
     fireEvent.click(backdrop);
@@ -48,9 +40,7 @@ describe('DiffViewerModal', () => {
   });
 
   it('renders empty diff without errors', () => {
-    const { container } = render(
-      <DiffViewerModal title="Empty" diff="" onClose={() => {}} />
-    );
+    const { container } = render(<DiffViewerModal title="Empty" diff="" onClose={() => {}} />);
     expect(container.querySelector('pre')).toBeInTheDocument();
   });
 

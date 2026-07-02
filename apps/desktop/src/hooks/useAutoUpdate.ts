@@ -21,7 +21,10 @@ export function areUpdatesEnabledForBuild(): boolean {
   return typeof __UPDATES_ENABLED__ !== 'undefined' ? __UPDATES_ENABLED__ : true;
 }
 
-export function isDevAppIdentity(identifier: string | null | undefined, appName?: string | null): boolean {
+export function isDevAppIdentity(
+  identifier: string | null | undefined,
+  appName?: string | null
+): boolean {
   const normalizedIdentifier = identifier?.toLowerCase() ?? '';
   const normalizedName = appName?.toLowerCase() ?? '';
   return normalizedIdentifier.endsWith('.dev') || normalizedName.includes(' dev');
@@ -46,7 +49,10 @@ function isNewerVersion(remote: string, local: string): boolean {
   return coreCompare > 0;
 }
 
-export function hasDesktopUpdateCandidate(currentVersion: string, updatesEnabled = areUpdatesEnabledForBuild()): boolean {
+export function hasDesktopUpdateCandidate(
+  currentVersion: string,
+  updatesEnabled = areUpdatesEnabledForBuild()
+): boolean {
   // Dev builds are local installs — never overwrite with a release version.
   // Only release builds should auto-update from GitHub.
   // (Actual version comparison is handled by the Tauri updater plugin
@@ -110,9 +116,9 @@ async function checkForAndroidUpdates(manual: boolean): Promise<void> {
   } catch (err) {
     console.warn('[AutoUpdate:Android] Check failed:', err);
     if (manual) {
-      useUpdateStore.getState().setError(
-        err instanceof Error ? err.message : 'Update check failed'
-      );
+      useUpdateStore
+        .getState()
+        .setError(err instanceof Error ? err.message : 'Update check failed');
     } else {
       useUpdateStore.getState().setStatus('idle');
     }
@@ -177,9 +183,7 @@ export async function downloadAndInstallApk(): Promise<void> {
     store.setStatus('ready');
   } catch (err) {
     console.warn('[AutoUpdate:Android] Download failed:', err);
-    useUpdateStore.getState().setError(
-      err instanceof Error ? err.message : 'APK download failed'
-    );
+    useUpdateStore.getState().setError(err instanceof Error ? err.message : 'APK download failed');
   }
 }
 
@@ -205,7 +209,7 @@ export async function checkForUpdates(manual = false): Promise<void> {
     const { check } = await import('@tauri-apps/plugin-updater');
     const { getVersion } = await import('@tauri-apps/api/app');
 
-    const currentVersion = getDesktopAppVersion() || await getVersion();
+    const currentVersion = getDesktopAppVersion() || (await getVersion());
     useUpdateStore.setState({ currentVersion });
 
     if (!(await shouldCheckDesktopUpdates(currentVersion))) {
@@ -244,7 +248,7 @@ export async function checkForUpdates(manual = false): Promise<void> {
     let downloaded = 0;
     let contentLength = 0;
 
-    await update.downloadAndInstall((event) => {
+    await update.downloadAndInstall(event => {
       switch (event.event) {
         case 'Started':
           contentLength = event.data.contentLength ?? 0;
@@ -267,9 +271,9 @@ export async function checkForUpdates(manual = false): Promise<void> {
   } catch (err) {
     console.warn('[AutoUpdate] Check failed:', err);
     if (manual) {
-      useUpdateStore.getState().setError(
-        err instanceof Error ? err.message : 'Update check failed'
-      );
+      useUpdateStore
+        .getState()
+        .setError(err instanceof Error ? err.message : 'Update check failed');
     } else {
       // Silent failure for automatic checks
       useUpdateStore.getState().setStatus('idle');

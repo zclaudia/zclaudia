@@ -10,11 +10,7 @@ import {
   createConcreteMcpTool,
   externalToolKey,
 } from './external-tools.js';
-import {
-  buildActiveSkillContext,
-  buildSkillCatalog,
-  buildSkillMetaTools,
-} from './skills.js';
+import { buildActiveSkillContext, buildSkillCatalog, buildSkillMetaTools } from './skills.js';
 import { buildTools } from './tool-bridge.js';
 
 export interface PiRunToolBundle {
@@ -35,9 +31,10 @@ export function buildPiRunToolBundle(input: {
   permissionCallback?: PermissionCallback;
 }): PiRunToolBundle {
   const { options, effectiveTools, supportsVision, isPlanMode, permissionCallback } = input;
-  const sandboxAllowedDomains = options.db && options.claudiaSessionId
-    ? loadSessionSandboxDomains(options.db, options.claudiaSessionId)
-    : [];
+  const sandboxAllowedDomains =
+    options.db && options.claudiaSessionId
+      ? loadSessionSandboxDomains(options.db, options.claudiaSessionId)
+      : [];
   const tools = buildTools(options.cwd, {
     enabled: effectiveTools,
     supportsVision,
@@ -56,32 +53,38 @@ export function buildPiRunToolBundle(input: {
   if (options.externalToolState) {
     for (const ref of options.externalToolState.loadedExternalTools) {
       if (ref.source === 'mcp') {
-        tools.push(createConcreteMcpTool(
-          ref,
-          options.db,
-          options.externalToolState.loadedExternalToolSchemas?.[externalToolKey(ref)],
-        ));
+        tools.push(
+          createConcreteMcpTool(
+            ref,
+            options.db,
+            options.externalToolState.loadedExternalToolSchemas?.[externalToolKey(ref)]
+          )
+        );
       }
     }
-    tools.push(...buildExternalMetaTools({
-      db: options.db,
-      state: options.externalToolState,
-      toolsArray: tools,
-    }));
+    tools.push(
+      ...buildExternalMetaTools({
+        db: options.db,
+        state: options.externalToolState,
+        toolsArray: tools,
+      })
+    );
   }
   if (options.skillState) {
-    tools.push(...buildSkillMetaTools({
-      state: options.skillState,
-      execution: {
-        cwd: options.cwd,
-        db: options.db,
-        enabledTools: effectiveTools,
-        llmProfileConfig: options.llmProfileConfig,
-        agentProfile: options.agentProfile,
-        permissionOverride: options.permissionOverride,
-        permissionCallback,
-      },
-    }));
+    tools.push(
+      ...buildSkillMetaTools({
+        state: options.skillState,
+        execution: {
+          cwd: options.cwd,
+          db: options.db,
+          enabledTools: effectiveTools,
+          llmProfileConfig: options.llmProfileConfig,
+          agentProfile: options.agentProfile,
+          permissionOverride: options.permissionOverride,
+          permissionCallback,
+        },
+      })
+    );
   }
 
   const externalProviderCatalog = options.externalToolState
@@ -90,12 +93,12 @@ export function buildPiRunToolBundle(input: {
   const skillCatalog = options.skillState
     ? buildSkillCatalog(options.skillState, options.agentProfile)
     : '';
-  const activeSkillContext = options.skillState
-    ? buildActiveSkillContext(options.skillState)
-    : '';
+  const activeSkillContext = options.skillState ? buildActiveSkillContext(options.skillState) : '';
 
   const hooks = buildAgentHooks({
-    permissionCallback: permissionCallback ?? (async () => ({ behavior: 'deny', message: 'no permission callback provided' })),
+    permissionCallback:
+      permissionCallback ??
+      (async () => ({ behavior: 'deny', message: 'no permission callback provided' })),
     userHooks: options.userHooks,
     cwd: options.cwd,
     sessionId: options.claudiaSessionId,
@@ -103,7 +106,7 @@ export function buildPiRunToolBundle(input: {
 
   return {
     tools,
-    visibleToolNames: tools.map((tool) => tool.name),
+    visibleToolNames: tools.map(tool => tool.name),
     externalProviderCatalog,
     skillCatalog,
     activeSkillContext,

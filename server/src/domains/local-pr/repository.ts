@@ -1,6 +1,11 @@
 import { BaseRepository } from '../../infra/repositories/base.js';
 import type { Database } from 'better-sqlite3';
-import type { LocalPR, LocalPRStatus, ExecutionState, PendingAction } from '@zclaudia/shared/features/local-pr';
+import type {
+  LocalPR,
+  LocalPRStatus,
+  ExecutionState,
+  PendingAction,
+} from '@zclaudia/shared/features/local-pr';
 import { newId } from '../../utils/uuid.js';
 
 type LocalPRCreate = Omit<LocalPR, 'id' | 'createdAt' | 'updatedAt'>;
@@ -84,21 +89,66 @@ export class LocalPRRepository extends BaseRepository<LocalPR, LocalPRCreate, Lo
     const sets: string[] = ['updated_at = ?'];
     const params: unknown[] = [now];
 
-    if (data.status !== undefined) { sets.push('status = ?'); params.push(data.status); }
-    if (data.title !== undefined) { sets.push('title = ?'); params.push(data.title); }
-    if (data.description !== undefined) { sets.push('description = ?'); params.push(data.description); }
-    if (data.commits !== undefined) { sets.push('commits = ?'); params.push(JSON.stringify(data.commits)); }
-    if (data.diffSummary !== undefined) { sets.push('diff_summary = ?'); params.push(data.diffSummary); }
-    if (data.reviewSessionId !== undefined) { sets.push('review_session_id = ?'); params.push(data.reviewSessionId); }
-    if (data.conflictSessionId !== undefined) { sets.push('conflict_session_id = ?'); params.push(data.conflictSessionId); }
-    if (data.reviewNotes !== undefined) { sets.push('review_notes = ?'); params.push(data.reviewNotes); }
-    if (data.statusMessage !== undefined) { sets.push('status_message = ?'); params.push(data.statusMessage); }
-    if (data.autoReview !== undefined) { sets.push('auto_review = ?'); params.push(data.autoReview ? 1 : 0); }
-    if (data.mergedAt !== undefined) { sets.push('merged_at = ?'); params.push(data.mergedAt); }
-    if (data.mergeCommitSha !== undefined) { sets.push('merged_commit_sha = ?'); params.push(data.mergeCommitSha); }
-    if (data.executionState !== undefined) { sets.push('execution_state = ?'); params.push(data.executionState); }
-    if (data.pendingAction !== undefined) { sets.push('pending_action = ?'); params.push(data.pendingAction); }
-    if (data.executionError !== undefined) { sets.push('execution_error = ?'); params.push(data.executionError); }
+    if (data.status !== undefined) {
+      sets.push('status = ?');
+      params.push(data.status);
+    }
+    if (data.title !== undefined) {
+      sets.push('title = ?');
+      params.push(data.title);
+    }
+    if (data.description !== undefined) {
+      sets.push('description = ?');
+      params.push(data.description);
+    }
+    if (data.commits !== undefined) {
+      sets.push('commits = ?');
+      params.push(JSON.stringify(data.commits));
+    }
+    if (data.diffSummary !== undefined) {
+      sets.push('diff_summary = ?');
+      params.push(data.diffSummary);
+    }
+    if (data.reviewSessionId !== undefined) {
+      sets.push('review_session_id = ?');
+      params.push(data.reviewSessionId);
+    }
+    if (data.conflictSessionId !== undefined) {
+      sets.push('conflict_session_id = ?');
+      params.push(data.conflictSessionId);
+    }
+    if (data.reviewNotes !== undefined) {
+      sets.push('review_notes = ?');
+      params.push(data.reviewNotes);
+    }
+    if (data.statusMessage !== undefined) {
+      sets.push('status_message = ?');
+      params.push(data.statusMessage);
+    }
+    if (data.autoReview !== undefined) {
+      sets.push('auto_review = ?');
+      params.push(data.autoReview ? 1 : 0);
+    }
+    if (data.mergedAt !== undefined) {
+      sets.push('merged_at = ?');
+      params.push(data.mergedAt);
+    }
+    if (data.mergeCommitSha !== undefined) {
+      sets.push('merged_commit_sha = ?');
+      params.push(data.mergeCommitSha);
+    }
+    if (data.executionState !== undefined) {
+      sets.push('execution_state = ?');
+      params.push(data.executionState);
+    }
+    if (data.pendingAction !== undefined) {
+      sets.push('pending_action = ?');
+      params.push(data.pendingAction);
+    }
+    if (data.executionError !== undefined) {
+      sets.push('execution_error = ?');
+      params.push(data.executionError);
+    }
 
     params.push(id);
     return {
@@ -111,14 +161,14 @@ export class LocalPRRepository extends BaseRepository<LocalPR, LocalPRCreate, Lo
     const rows = this.db
       .prepare('SELECT * FROM local_prs WHERE project_id = ? ORDER BY created_at DESC')
       .all(projectId);
-    return rows.map((r) => this.mapRow(r));
+    return rows.map(r => this.mapRow(r));
   }
 
   findByStatus(status: LocalPRStatus): LocalPR[] {
     const rows = this.db
       .prepare('SELECT * FROM local_prs WHERE status = ? ORDER BY created_at ASC')
       .all(status);
-    return rows.map((r) => this.mapRow(r));
+    return rows.map(r => this.mapRow(r));
   }
 
   /** PRs ready to start reviewing (open + no active review session). */
@@ -126,15 +176,17 @@ export class LocalPRRepository extends BaseRepository<LocalPR, LocalPRCreate, Lo
     const rows = this.db
       .prepare(`SELECT * FROM local_prs WHERE status = 'open' ORDER BY created_at ASC`)
       .all();
-    return rows.map((r) => this.mapRow(r));
+    return rows.map(r => this.mapRow(r));
   }
 
   /** PRs with auto_review enabled, ready for automatic review pickup. */
   findPendingAutoReview(): LocalPR[] {
     const rows = this.db
-      .prepare(`SELECT * FROM local_prs WHERE status = 'open' AND auto_review = 1 ORDER BY created_at ASC`)
+      .prepare(
+        `SELECT * FROM local_prs WHERE status = 'open' AND auto_review = 1 ORDER BY created_at ASC`
+      )
       .all();
-    return rows.map((r) => this.mapRow(r));
+    return rows.map(r => this.mapRow(r));
   }
 
   /** PRs approved and ready to merge. */
@@ -142,22 +194,24 @@ export class LocalPRRepository extends BaseRepository<LocalPR, LocalPRCreate, Lo
     const rows = this.db
       .prepare(`SELECT * FROM local_prs WHERE status = 'approved' ORDER BY created_at ASC`)
       .all();
-    return rows.map((r) => this.mapRow(r));
+    return rows.map(r => this.mapRow(r));
   }
 
   /** PRs currently in-progress (reviewing or merging). */
   findInProgress(): LocalPR[] {
     const rows = this.db
-      .prepare(`SELECT * FROM local_prs WHERE status IN ('reviewing', 'merging') ORDER BY updated_at ASC`)
+      .prepare(
+        `SELECT * FROM local_prs WHERE status IN ('reviewing', 'merging') ORDER BY updated_at ASC`
+      )
       .all();
-    return rows.map((r) => this.mapRow(r));
+    return rows.map(r => this.mapRow(r));
   }
 
   /** Check if an open/reviewing/approved PR already exists for a worktree path. */
   findActiveByWorktree(worktreePath: string): LocalPR | null {
     const row = this.db
       .prepare(
-        `SELECT * FROM local_prs WHERE worktree_path = ? AND status NOT IN ('merged','closed','review_failed') LIMIT 1`,
+        `SELECT * FROM local_prs WHERE worktree_path = ? AND status NOT IN ('merged','closed','review_failed') LIMIT 1`
       )
       .get(worktreePath);
     return row ? this.mapRow(row) : null;
@@ -168,7 +222,7 @@ export class LocalPRRepository extends BaseRepository<LocalPR, LocalPRCreate, Lo
     const rows = this.db
       .prepare('SELECT * FROM local_prs WHERE execution_state = ? ORDER BY updated_at ASC')
       .all(state);
-    return rows.map((r) => this.mapRow(r));
+    return rows.map(r => this.mapRow(r));
   }
 
   /** Find PRs that are queued and ready to run. */

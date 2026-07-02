@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, type Request, type Response } from 'express';
 import type { Express, RequestHandler } from 'express';
 import type Database from 'better-sqlite3';
 import { mountCapabilityRoutes } from '../../interfaces/http/provider-capabilities.js';

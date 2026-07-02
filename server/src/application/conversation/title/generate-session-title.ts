@@ -46,7 +46,7 @@ export async function generateSessionTitle(input: TitleGenerateInput): Promise<s
   const result = await completeSimple(
     built.model,
     { systemPrompt: TITLE_SYSTEM_PROMPT, messages: contextMessages },
-    { apiKey, maxTokens: 32 },
+    { apiKey, maxTokens: 32 }
   );
 
   const title = extractTitle(result.content);

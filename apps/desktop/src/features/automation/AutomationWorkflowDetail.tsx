@@ -15,7 +15,11 @@ interface AutomationWorkflowDetailProps {
   projectId?: string;
 }
 
-export function AutomationWorkflowDetail({ api, projects, projectId }: AutomationWorkflowDetailProps) {
+export function AutomationWorkflowDetail({
+  api,
+  projects,
+  projectId,
+}: AutomationWorkflowDetailProps) {
   const selectedId = useTopLevelViewStore(s => s.selectedAutomationItemId);
   const selectItem = useTopLevelViewStore(s => s.selectAutomationItem);
   const bump = useTopLevelViewStore(s => s.bumpAutomationListRefresh);
@@ -55,17 +59,29 @@ interface EmptyStatePanelProps {
   onTemplateEnabled: () => void;
 }
 
-function EmptyStatePanel({ api, effectiveProjectId, selectedIsGlobal, onTemplateEnabled }: EmptyStatePanelProps) {
+function EmptyStatePanel({
+  api,
+  effectiveProjectId,
+  selectedIsGlobal,
+  onTemplateEnabled,
+}: EmptyStatePanelProps) {
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
 
   useEffect(() => {
     let cancelled = false;
-    api.get('/api/workflow-templates').then((tpls: WorkflowTemplate[]) => {
-      if (!cancelled) {
-        setTemplates(tpls.filter((t: WorkflowTemplate) => t.id !== PERMISSION_FALLBACK_TEMPLATE_ID));
-      }
-    }).catch(() => {});
-    return () => { cancelled = true; };
+    api
+      .get('/api/workflow-templates')
+      .then((tpls: WorkflowTemplate[]) => {
+        if (!cancelled) {
+          setTemplates(
+            tpls.filter((t: WorkflowTemplate) => t.id !== PERMISSION_FALLBACK_TEMPLATE_ID)
+          );
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [api]);
 
   const handleEnableTemplate = async (templateId: string, projId: string) => {
@@ -86,16 +102,23 @@ function EmptyStatePanel({ api, effectiveProjectId, selectedIsGlobal, onTemplate
           </h3>
           <div className="grid grid-cols-3 gap-2">
             {templates.map(t => (
-              <div key={t.id} className="rounded-lg border border-border bg-card p-3 flex flex-col gap-2">
+              <div
+                key={t.id}
+                className="rounded-lg border border-border bg-card p-3 flex flex-col gap-2"
+              >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="text-xs font-medium">{t.name}</div>
                     {t.description && (
-                      <div className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">{t.description}</div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">
+                        {t.description}
+                      </div>
                     )}
                   </div>
                   {(t as any).category && (
-                    <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-medium shrink-0 ${CATEGORY_COLORS[(t as any).category] ?? 'bg-muted text-muted-foreground'}`}>
+                    <span
+                      className={`px-1.5 py-0.5 rounded-md text-[9px] font-medium shrink-0 ${CATEGORY_COLORS[(t as any).category] ?? 'bg-muted text-muted-foreground'}`}
+                    >
                       {(t as any).category}
                     </span>
                   )}
@@ -127,7 +150,13 @@ interface WorkflowDetailPanelProps {
   bump: () => void;
 }
 
-function WorkflowDetailPanel({ api, selectedId, effectiveProjectId, selectItem, bump }: WorkflowDetailPanelProps) {
+function WorkflowDetailPanel({
+  api,
+  selectedId,
+  effectiveProjectId,
+  selectItem,
+  bump,
+}: WorkflowDetailPanelProps) {
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -153,7 +182,9 @@ function WorkflowDetailPanel({ api, selectedId, effectiveProjectId, selectItem, 
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [api, selectedId]);
 
   if (loading) {

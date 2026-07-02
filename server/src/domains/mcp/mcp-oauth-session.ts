@@ -1,10 +1,20 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import type { McpOAuthConfig, McpOAuthCredentials, McpServerConfig } from '@zclaudia/shared/core/mcp';
+import type {
+  McpOAuthConfig,
+  McpOAuthCredentials,
+  McpServerConfig,
+} from '@zclaudia/shared/core/mcp';
 import { discoverMcpOAuthConfig } from './mcp-oauth-discovery.js';
 
 export type McpOAuthStartResult =
   | { sessionId: string; method: 'browser'; authUrl: string; expiresAt: number }
-  | { sessionId: string; method: 'device_code'; userCode: string; verificationUri: string; expiresAt: number };
+  | {
+      sessionId: string;
+      method: 'device_code';
+      userCode: string;
+      verificationUri: string;
+      expiresAt: number;
+    };
 
 export type McpOAuthStatus =
   | { state: 'pending' }
@@ -13,7 +23,10 @@ export type McpOAuthStatus =
   | { state: 'cancelled' };
 
 export interface McpOAuthCredentialWriter {
-  updateOAuthCredentials(serverName: string, credentials: McpOAuthCredentials | null): Promise<void> | void;
+  updateOAuthCredentials(
+    serverName: string,
+    credentials: McpOAuthCredentials | null
+  ): Promise<void> | void;
 }
 
 interface Session {
@@ -62,9 +75,10 @@ function credentialsFromTokenResponse(token: {
   if (typeof token.access_token !== 'string' || !token.access_token) {
     throw new Error('OAuth token response did not include access_token');
   }
-  const expiresIn = typeof token.expires_in === 'number' && Number.isFinite(token.expires_in)
-    ? token.expires_in
-    : undefined;
+  const expiresIn =
+    typeof token.expires_in === 'number' && Number.isFinite(token.expires_in)
+      ? token.expires_in
+      : undefined;
   return {
     accessToken: token.access_token,
     refreshToken: typeof token.refresh_token === 'string' ? token.refresh_token : undefined,
@@ -79,13 +93,18 @@ export class McpOAuthSessionManager {
 
   constructor(
     private readonly writer: McpOAuthCredentialWriter,
-    private readonly fetchFn?: typeof fetch,
+    private readonly fetchFn?: typeof fetch
   ) {}
 
   async startBrowserFlow(server: McpServerConfig, origin: string): Promise<McpOAuthStartResult> {
-    const config = await this.resolveOAuthConfig(server, (cfg) => !!cfg.authorizationEndpoint && !!cfg.tokenEndpoint);
+    const config = await this.resolveOAuthConfig(
+      server,
+      cfg => !!cfg.authorizationEndpoint && !!cfg.tokenEndpoint
+    );
     if (!config.authorizationEndpoint || !config.tokenEndpoint) {
-      throw new Error('OAuth authorizationEndpoint and tokenEndpoint are required for browser flow');
+      throw new Error(
+        'OAuth authorizationEndpoint and tokenEndpoint are required for browser flow'
+      );
     }
 
     const sessionId = randomUUID();
@@ -123,19 +142,23 @@ export class McpOAuthSessionManager {
 
   async finishBrowserFlow(server: McpServerConfig, sessionId: string, code: string): Promise<void> {
     const session = this.requireSession(server.name, sessionId);
-    const config = await this.resolveOAuthConfig(server, (cfg) => !!cfg.tokenEndpoint);
+    const config = await this.resolveOAuthConfig(server, cfg => !!cfg.tokenEndpoint);
     if (!config.tokenEndpoint || !session.codeVerifier || !session.redirectUri) {
       throw new Error('OAuth session is missing token exchange state');
     }
     try {
-      const token = await this.fetchToken(config.tokenEndpoint, {
-        grant_type: 'authorization_code',
-        code,
-        code_verifier: session.codeVerifier,
-        redirect_uri: session.redirectUri,
-        client_id: config.clientId,
-        client_secret: config.clientSecret,
-      }, session.abortController.signal);
+      const token = await this.fetchToken(
+        config.tokenEndpoint,
+        {
+          grant_type: 'authorization_code',
+          code,
+          code_verifier: session.codeVerifier,
+          redirect_uri: session.redirectUri,
+          client_id: config.clientId,
+          client_secret: config.clientSecret,
+        },
+        session.abortController.signal
+      );
       await this.markSuccess(session, token);
     } catch (err) {
       this.markError(session, 'OAUTH_TOKEN_EXCHANGE_FAILED', err);
@@ -144,9 +167,14 @@ export class McpOAuthSessionManager {
   }
 
   async startDeviceCodeFlow(server: McpServerConfig): Promise<McpOAuthStartResult> {
-    const config = await this.resolveOAuthConfig(server, (cfg) => !!cfg.deviceAuthorizationEndpoint && !!cfg.tokenEndpoint);
+    const config = await this.resolveOAuthConfig(
+      server,
+      cfg => !!cfg.deviceAuthorizationEndpoint && !!cfg.tokenEndpoint
+    );
     if (!config.deviceAuthorizationEndpoint || !config.tokenEndpoint) {
-      throw new Error('OAuth deviceAuthorizationEndpoint and tokenEndpoint are required for device-code flow');
+      throw new Error(
+        'OAuth deviceAuthorizationEndpoint and tokenEndpoint are required for device-code flow'
+      );
     }
 
     const sessionId = randomUUID();
@@ -161,7 +189,7 @@ export class McpOAuthSessionManager {
       signal: controller.signal,
     });
     if (!response.ok) throw new Error(await response.text());
-    const device = await response.json() as {
+    const device = (await response.json()) as {
       device_code?: string;
       user_code?: string;
       verification_uri?: string;
@@ -182,7 +210,13 @@ export class McpOAuthSessionManager {
       abortController: controller,
     };
     this.sessions.set(sessionId, session);
-    void this.pollDeviceToken(server, session, device.device_code, Math.max(1, device.interval ?? 5), config);
+    void this.pollDeviceToken(
+      server,
+      session,
+      device.device_code,
+      Math.max(1, device.interval ?? 5),
+      config
+    );
 
     return {
       sessionId,
@@ -218,18 +252,23 @@ export class McpOAuthSessionManager {
     session: Session,
     deviceCode: string,
     intervalSeconds: number,
-    resolvedConfig?: McpOAuthConfig,
+    resolvedConfig?: McpOAuthConfig
   ): Promise<void> {
-    const config = resolvedConfig ?? await this.resolveOAuthConfig(server, (cfg) => !!cfg.tokenEndpoint);
+    const config =
+      resolvedConfig ?? (await this.resolveOAuthConfig(server, cfg => !!cfg.tokenEndpoint));
     try {
       while (session.status.state === 'pending' && !session.abortController.signal.aborted) {
-        await new Promise((resolve) => setTimeout(resolve, intervalSeconds * 10));
-        const token = await this.fetchToken(config.tokenEndpoint!, {
-          grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-          device_code: deviceCode,
-          client_id: config.clientId,
-          client_secret: config.clientSecret,
-        }, session.abortController.signal);
+        await new Promise(resolve => setTimeout(resolve, intervalSeconds * 10));
+        const token = await this.fetchToken(
+          config.tokenEndpoint!,
+          {
+            grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+            device_code: deviceCode,
+            client_id: config.clientId,
+            client_secret: config.clientSecret,
+          },
+          session.abortController.signal
+        );
         await this.markSuccess(session, token);
         return;
       }
@@ -246,20 +285,25 @@ export class McpOAuthSessionManager {
 
   private requireSession(serverName: string, sessionId: string): Session {
     const session = this.sessions.get(sessionId);
-    if (!session || session.serverName !== serverName) throw new Error('OAuth session not found or expired');
+    if (!session || session.serverName !== serverName)
+      throw new Error('OAuth session not found or expired');
     return session;
   }
 
   private async resolveOAuthConfig(
     server: McpServerConfig,
-    hasRequiredEndpoints: (config: McpOAuthConfig) => boolean,
+    hasRequiredEndpoints: (config: McpOAuthConfig) => boolean
   ): Promise<McpOAuthConfig> {
     const config = requireOAuthConfig(server);
     if (hasRequiredEndpoints(config)) return config;
     return discoverMcpOAuthConfig(config, server.url, (input, init) => this.fetch(input, init));
   }
 
-  private async fetchToken(tokenEndpoint: string, params: Record<string, string | undefined>, signal: AbortSignal): Promise<McpOAuthCredentials> {
+  private async fetchToken(
+    tokenEndpoint: string,
+    params: Record<string, string | undefined>,
+    signal: AbortSignal
+  ): Promise<McpOAuthCredentials> {
     const response = await this.fetch(tokenEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -267,13 +311,15 @@ export class McpOAuthSessionManager {
       signal,
     });
     if (!response.ok) throw new Error(await response.text());
-    return credentialsFromTokenResponse(await response.json() as {
-      access_token?: unknown;
-      refresh_token?: unknown;
-      token_type?: unknown;
-      expires_in?: unknown;
-      scope?: unknown;
-    });
+    return credentialsFromTokenResponse(
+      (await response.json()) as {
+        access_token?: unknown;
+        refresh_token?: unknown;
+        token_type?: unknown;
+        expires_in?: unknown;
+        scope?: unknown;
+      }
+    );
   }
 
   private async markSuccess(session: Session, credentials: McpOAuthCredentials): Promise<void> {
@@ -281,7 +327,10 @@ export class McpOAuthSessionManager {
     await this.writer.updateOAuthCredentials(session.serverName, credentials);
   }
 
-  private fetch(input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]): Promise<Response> {
+  private fetch(
+    input: Parameters<typeof fetch>[0],
+    init?: Parameters<typeof fetch>[1]
+  ): Promise<Response> {
     return (this.fetchFn ?? globalThis.fetch)(input, init);
   }
 

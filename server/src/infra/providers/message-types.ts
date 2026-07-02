@@ -17,9 +17,7 @@ export interface PermissionDecision {
   message?: string;
 }
 
-export type PermissionCallback = (
-  request: PermissionRequest
-) => Promise<PermissionDecision>;
+export type PermissionCallback = (request: PermissionRequest) => Promise<PermissionDecision>;
 
 export interface ModeTransition {
   /** Canonical target mode (e.g. 'plan', 'default'). */
@@ -70,14 +68,9 @@ export const PROVIDER_RUNTIME_EVENT_TYPES = [
   'retry_scheduled',
 ] as const;
 
-export type ProviderRuntimeEventType = typeof PROVIDER_RUNTIME_EVENT_TYPES[number];
+export type ProviderRuntimeEventType = (typeof PROVIDER_RUNTIME_EVENT_TYPES)[number];
 
-type LegacyProviderRuntimeEventType =
-  | 'assistant'
-  | 'result'
-  | 'tool_use'
-  | 'tool_result'
-  | 'error';
+type LegacyProviderRuntimeEventType = 'assistant' | 'result' | 'tool_use' | 'tool_result' | 'error';
 
 export interface ProviderRuntimeEvent {
   type:

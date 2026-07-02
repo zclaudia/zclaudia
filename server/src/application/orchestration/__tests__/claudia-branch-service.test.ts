@@ -64,7 +64,9 @@ describe('ClaudiaBranchService', () => {
 
     expect(branch.activeSessionId).toBeNull();
 
-    const stored = db.prepare('SELECT active_session_id FROM claudia_branches WHERE id = ?').get(branch.id) as { active_session_id: string | null };
+    const stored = db
+      .prepare('SELECT active_session_id FROM claudia_branches WHERE id = ?')
+      .get(branch.id) as { active_session_id: string | null };
     expect(stored.active_session_id).toBeNull();
   });
 
@@ -73,10 +75,12 @@ describe('ClaudiaBranchService', () => {
       hostProjectId: 'project-a',
       title: 'Other project',
     });
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO sessions (id, project_id, name, type, parent_session_id, created_at, updated_at)
       VALUES (?, ?, ?, ?, NULL, ?, ?)
-    `).run('session-a', 'project-a', 'Session', 'agent', 1, 1);
+    `
+    ).run('session-a', 'project-a', 'Session', 'agent', 1, 1);
     service.attachSession(foreignBranch.id, 'session-a');
 
     const allocation = service.allocateBranch({
@@ -96,8 +100,9 @@ describe('ClaudiaBranchService', () => {
       hostProjectId: 'project-1',
       title: 'Conversation',
     });
-    db.prepare('INSERT INTO tasks (id, type, status, metadata, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
-      .run('task-1', 'agent', 'waiting', JSON.stringify({ branchId: branch.id }), 1, 1);
+    db.prepare(
+      'INSERT INTO tasks (id, type, status, metadata, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run('task-1', 'agent', 'waiting', JSON.stringify({ branchId: branch.id }), 1, 1);
 
     const allocation = service.allocateBranch({
       hostProjectId: 'project-1',
@@ -128,7 +133,10 @@ describe('ClaudiaBranchService', () => {
       title: 'Conversation',
     });
     db.pragma('foreign_keys = OFF');
-    db.prepare('UPDATE claudia_branches SET active_session_id = ? WHERE id = ?').run('missing-session', branch.id);
+    db.prepare('UPDATE claudia_branches SET active_session_id = ? WHERE id = ?').run(
+      'missing-session',
+      branch.id
+    );
     db.pragma('foreign_keys = ON');
 
     const allocation = service.allocateBranch({
@@ -152,7 +160,10 @@ describe('ClaudiaBranchService', () => {
       title: 'Conversation',
     });
     db.pragma('foreign_keys = OFF');
-    db.prepare('UPDATE claudia_branches SET active_session_id = ? WHERE id = ?').run('missing-session', branch.id);
+    db.prepare('UPDATE claudia_branches SET active_session_id = ? WHERE id = ?').run(
+      'missing-session',
+      branch.id
+    );
     db.pragma('foreign_keys = ON');
 
     const allocation = service.allocateForContinue({

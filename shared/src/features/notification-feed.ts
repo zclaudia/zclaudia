@@ -54,7 +54,7 @@ export interface NotificationItem {
 }
 
 export function classifyNotificationItemTab(
-  item: Pick<NotificationItem, 'initiator' | 'delegationContext' | 'source' | 'pluginTab'>,
+  item: Pick<NotificationItem, 'initiator' | 'delegationContext' | 'source' | 'pluginTab'>
 ): NotificationInboxTab | `plugin:${string}` {
   if (item.pluginTab) return `plugin:${item.pluginTab}`;
   if (item.initiator === 'claudia' && !item.delegationContext) return 'claudia';

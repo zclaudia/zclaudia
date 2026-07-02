@@ -37,7 +37,7 @@ interface AttachmentsState {
     kind: AttachmentOwnerKind,
     id: string,
     file: File,
-    options?: UploadAttachmentOptions,
+    options?: UploadAttachmentOptions
   ) => Promise<Attachment>;
   removeAttachment: (id: string, kind: AttachmentOwnerKind, ownerId: string) => Promise<void>;
   renameAttachment: (id: string, name: string) => Promise<Attachment>;
@@ -49,7 +49,7 @@ interface AttachmentsState {
   reorderAttachments: (
     kind: AttachmentOwnerKind,
     ownerId: string,
-    orderedIds: string[],
+    orderedIds: string[]
   ) => Promise<void>;
 
   // Realtime helpers used by the websocket dispatcher.
@@ -80,10 +80,10 @@ export const useAttachmentsStore = create<AttachmentsState>((set, get) => ({
     if (get().loadingOwners[key]) {
       return get().byOwner[key] ?? [];
     }
-    set((state) => ({ loadingOwners: { ...state.loadingOwners, [key]: true } }));
+    set(state => ({ loadingOwners: { ...state.loadingOwners, [key]: true } }));
     try {
       const items = sortAttachments(await listAttachments(kind, id));
-      set((state) => {
+      set(state => {
         // Drop the standalone count for this owner — `byOwner.length` is now
         // the source of truth.
         const { [key]: _, ...restCounts } = state.countsByOwner;
@@ -95,7 +95,7 @@ export const useAttachmentsStore = create<AttachmentsState>((set, get) => ({
       });
       return items;
     } catch (error) {
-      set((state) => ({ loadingOwners: { ...state.loadingOwners, [key]: false } }));
+      set(state => ({ loadingOwners: { ...state.loadingOwners, [key]: false } }));
       throw error;
     }
   },
@@ -104,10 +104,10 @@ export const useAttachmentsStore = create<AttachmentsState>((set, get) => ({
     if (ids.length === 0) return;
     const state = get();
     // Skip owners whose full list is already cached — `byOwner.length` wins.
-    const targets = ids.filter((id) => !(ownerKey(kind, id) in state.byOwner));
+    const targets = ids.filter(id => !(ownerKey(kind, id) in state.byOwner));
     if (targets.length === 0) return;
     const results = await listAttachmentCounts(kind, targets);
-    set((prev) => {
+    set(prev => {
       const next = { ...prev.countsByOwner };
       // Initialize every requested id (including missing ones) so the UI
       // can distinguish "loaded with 0" from "not yet loaded".
@@ -148,7 +148,7 @@ export const useAttachmentsStore = create<AttachmentsState>((set, get) => ({
     // Build the new list from existing rows in the requested order. Anything
     // not in `orderedIds` (e.g. concurrent additions) keeps its original
     // position at the tail.
-    const byId = new Map(existing.map((a) => [a.id, a]));
+    const byId = new Map(existing.map(a => [a.id, a]));
     const reordered: Attachment[] = [];
     for (let i = 0; i < orderedIds.length; i++) {
       const a = byId.get(orderedIds[i]);
@@ -164,30 +164,31 @@ export const useAttachmentsStore = create<AttachmentsState>((set, get) => ({
       }
     }
 
-    set((state) => ({ byOwner: { ...state.byOwner, [key]: reordered } }));
+    set(state => ({ byOwner: { ...state.byOwner, [key]: reordered } }));
 
     // Persist concurrently. If any fails we surface it; the server's eventual
     // broadcast will fix any divergence.
     await Promise.all(
       reordered.map((a, i) =>
-        updateAttachment(a.id, { sortOrder: i }).catch((err) => {
+        updateAttachment(a.id, { sortOrder: i }).catch(err => {
           console.error('[attachments] reorder PATCH failed for', a.id, err);
           throw err;
-        }),
-      ),
+        })
+      )
     );
   },
 
-  upsertFromRemote: (attachment) => {
+  upsertFromRemote: attachment => {
     const key = ownerKey(attachment.ownerKind, attachment.ownerId);
-    set((state) => {
+    set(state => {
       const existing = state.byOwner[key];
       // Owner already fully loaded — update the array. Count is derived.
       if (existing) {
-        const idx = existing.findIndex((a) => a.id === attachment.id);
-        const next = idx >= 0
-          ? existing.map((a, i) => (i === idx ? attachment : a))
-          : [...existing, attachment];
+        const idx = existing.findIndex(a => a.id === attachment.id);
+        const next =
+          idx >= 0
+            ? existing.map((a, i) => (i === idx ? attachment : a))
+            : [...existing, attachment];
         return { byOwner: { ...state.byOwner, [key]: sortAttachments(next) } };
       }
       // Owner only has a count cached — bump it. We deliberately don't
@@ -207,11 +208,11 @@ export const useAttachmentsStore = create<AttachmentsState>((set, get) => ({
 
   removeFromRemote: (kind, ownerId, id) => {
     const key = ownerKey(kind, ownerId);
-    set((state) => {
+    set(state => {
       const existing = state.byOwner[key];
       if (existing) {
         return {
-          byOwner: { ...state.byOwner, [key]: existing.filter((a) => a.id !== id) },
+          byOwner: { ...state.byOwner, [key]: existing.filter(a => a.id !== id) },
         };
       }
       if (key in state.countsByOwner) {

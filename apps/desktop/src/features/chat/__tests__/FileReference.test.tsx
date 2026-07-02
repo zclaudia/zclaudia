@@ -102,28 +102,18 @@ describe('MarkdownChildrenWithFileRefs', () => {
   });
 
   it('passes through strings without file refs', () => {
-    render(
-      <MarkdownChildrenWithFileRefs>
-        {'Just plain text'}
-      </MarkdownChildrenWithFileRefs>
-    );
+    render(<MarkdownChildrenWithFileRefs>{'Just plain text'}</MarkdownChildrenWithFileRefs>);
     expect(screen.getByText('Just plain text')).toBeInTheDocument();
   });
 
   it('replaces known markdown emoji with inline icons', () => {
-    render(
-      <MarkdownChildrenWithFileRefs>
-        {'2 ✅'}
-      </MarkdownChildrenWithFileRefs>
-    );
+    render(<MarkdownChildrenWithFileRefs>{'2 ✅'}</MarkdownChildrenWithFileRefs>);
     expect(screen.getByRole('img', { name: 'Completed' })).toBeInTheDocument();
   });
 
   it('handles file refs and markdown emoji in the same string', () => {
     render(
-      <MarkdownChildrenWithFileRefs>
-        {'🟢 See @src/index.ts ✅'}
-      </MarkdownChildrenWithFileRefs>
+      <MarkdownChildrenWithFileRefs>{'🟢 See @src/index.ts ✅'}</MarkdownChildrenWithFileRefs>
     );
     expect(screen.getByRole('img', { name: 'P3' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /@src\/index\.ts/ })).toBeInTheDocument();

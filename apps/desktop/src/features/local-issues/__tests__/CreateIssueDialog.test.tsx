@@ -100,11 +100,7 @@ describe('CreateIssueDialog (with attachments)', () => {
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalled());
     await waitFor(() => expect(mockUploadAttachment).toHaveBeenCalled());
-    expect(mockUploadAttachment).toHaveBeenCalledWith(
-      'local_issue',
-      'created-1',
-      expect.any(File),
-    );
+    expect(mockUploadAttachment).toHaveBeenCalledWith('local_issue', 'created-1', expect.any(File));
     // createIssue must run before the upload.
     const createOrder = mockCreate.mock.invocationCallOrder[0];
     const uploadOrder = mockUploadAttachment.mock.invocationCallOrder[0];
@@ -156,7 +152,9 @@ describe('CreateIssueDialog (with attachments)', () => {
   it('creates an issue with built-in and custom labels without duplicates', async () => {
     render(<CreateIssueDialog projectId="p" onClose={vi.fn()} />);
 
-    fireEvent.change(screen.getByPlaceholderText('Issue title'), { target: { value: 'Tagged issue' } });
+    fireEvent.change(screen.getByPlaceholderText('Issue title'), {
+      target: { value: 'Tagged issue' },
+    });
     fireEvent.click(screen.getByRole('button', { name: /toggle bug tag/i }));
 
     const customInput = screen.getByPlaceholderText('Add custom tag...');
@@ -168,9 +166,12 @@ describe('CreateIssueDialog (with attachments)', () => {
     fireEvent.click(screen.getByRole('button', { name: /^create$/i }));
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalled());
-    expect(mockCreate).toHaveBeenCalledWith('p', expect.objectContaining({
-      title: 'Tagged issue',
-      labels: ['bug', 'needs-review'],
-    }));
+    expect(mockCreate).toHaveBeenCalledWith(
+      'p',
+      expect.objectContaining({
+        title: 'Tagged issue',
+        labels: ['bug', 'needs-review'],
+      })
+    );
   });
 });

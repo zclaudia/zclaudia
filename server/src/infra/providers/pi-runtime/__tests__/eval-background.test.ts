@@ -15,7 +15,7 @@ async function eventually<T>(fn: () => T, predicate: (value: T) => boolean): Pro
   const deadline = Date.now() + 5_000;
   let value = fn();
   while (!predicate(value) && Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, 100));
     value = fn();
   }
   return value;
@@ -67,7 +67,7 @@ describe('Eval background runtime', () => {
     });
     const completed = await eventually(
       () => repo.findById(taskId),
-      (task) => task?.status === 'completed' || task?.status === 'failed',
+      task => task?.status === 'completed' || task?.status === 'failed'
     );
 
     expect(completed).toMatchObject({

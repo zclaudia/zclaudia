@@ -14,11 +14,15 @@ export class PermissionClassifyStepExecutor implements StepExecutorPort {
   async execute(
     _node: WorkflowNodeDef,
     _config: Record<string, unknown>,
-    ctx: StepContext,
+    ctx: StepContext
   ): Promise<StepResult> {
     const event = ctx.eventPayload;
     if (!event) {
-      return { status: 'failed', output: {}, error: 'No event payload — permission_classify requires a permission.escalated trigger' };
+      return {
+        status: 'failed',
+        output: {},
+        error: 'No event payload — permission_classify requires a permission.escalated trigger',
+      };
     }
 
     const requestId = event.requestId as string;
@@ -31,7 +35,11 @@ export class PermissionClassifyStepExecutor implements StepExecutorPort {
     const aiInitiatedPlanMode = event.aiInitiatedPlanMode as boolean | undefined;
 
     if (!requestId || !toolName) {
-      return { status: 'failed', output: {}, error: 'Missing requestId or toolName in event payload' };
+      return {
+        status: 'failed',
+        output: {},
+        error: 'Missing requestId or toolName in event payload',
+      };
     }
 
     return {

@@ -23,11 +23,9 @@ export class LocalIssueCommentRepository {
 
   findByIssue(issueId: string): LocalIssueComment[] {
     const rows = this.db
-      .prepare(
-        'SELECT * FROM local_issue_comments WHERE issue_id = ? ORDER BY created_at ASC',
-      )
+      .prepare('SELECT * FROM local_issue_comments WHERE issue_id = ? ORDER BY created_at ASC')
       .all(issueId);
-    return rows.map((r) => this.mapRow(r));
+    return rows.map(r => this.mapRow(r));
   }
 
   create(issueId: string, body: string): LocalIssueComment {
@@ -36,7 +34,7 @@ export class LocalIssueCommentRepository {
     this.db
       .prepare(
         `INSERT INTO local_issue_comments (id, issue_id, body, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?)`
       )
       .run(id, issueId, body, now, now);
     const created = this.findById(id);

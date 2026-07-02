@@ -37,7 +37,7 @@ export class SessionQueryError extends Error {
   constructor(
     readonly status: number,
     readonly code: string,
-    message: string,
+    message: string
   ) {
     super(message);
   }
@@ -47,51 +47,71 @@ export class SessionQueryService {
   constructor(
     private readonly db: Database.Database,
     private readonly activeRuns: ActiveRunsMap,
-    private readonly now: () => number = () => Date.now(),
+    private readonly now: () => number = () => Date.now()
   ) {}
 
   listSessions(projectId?: string, includeArchived = false): Session[] {
     if (projectId && includeArchived) {
-      return this.db.prepare(`
+      return this.db
+        .prepare(
+          `
         SELECT ${SESSION_SELECT}
         FROM sessions
         WHERE project_id = ?
         ORDER BY sort_order ASC, updated_at DESC
-      `).all(projectId) as Session[];
+      `
+        )
+        .all(projectId) as Session[];
     }
 
     if (projectId) {
-      return this.db.prepare(`
+      return this.db
+        .prepare(
+          `
         SELECT ${SESSION_SELECT}
         FROM sessions
         WHERE project_id = ? AND archived_at IS NULL
         ORDER BY sort_order ASC, updated_at DESC
-      `).all(projectId) as Session[];
+      `
+        )
+        .all(projectId) as Session[];
     }
 
     if (includeArchived) {
-      return this.db.prepare(`
+      return this.db
+        .prepare(
+          `
         SELECT ${SESSION_SELECT}
         FROM sessions
         ORDER BY sort_order ASC, updated_at DESC
-      `).all() as Session[];
+      `
+        )
+        .all() as Session[];
     }
 
-    return this.db.prepare(`
+    return this.db
+      .prepare(
+        `
       SELECT ${SESSION_SELECT}
       FROM sessions
       WHERE archived_at IS NULL
       ORDER BY sort_order ASC, updated_at DESC
-    `).all() as Session[];
+    `
+      )
+      .all() as Session[];
   }
 
   listArchivedSessions(): Session[] {
-    return this.db.prepare(`
+    return this.db
+      .prepare(
+        `
       SELECT ${SESSION_SELECT}
       FROM sessions
       WHERE archived_at IS NOT NULL
       ORDER BY archived_at DESC
-    `).all() as Session[];
+    `
+      )
+      .all() as Session[];
   }
 
   syncSessions(since: string | undefined): SessionSyncResult {
@@ -100,7 +120,9 @@ export class SessionQueryService {
       throw new SessionQueryError(400, 'VALIDATION_ERROR', 'Invalid since parameter');
     }
 
-    const sessions = this.db.prepare(`
+    const sessions = this.db
+      .prepare(
+        `
       SELECT s.id, s.project_id as projectId, s.name, s.agent_profile_id as agentProfileId,
              s.sdk_session_id as sdkSessionId, s.type, s.parent_session_id as parentSessionId,
              s.working_directory as workingDirectory,
@@ -113,9 +135,11 @@ export class SessionQueryService {
       FROM sessions s
       WHERE s.updated_at > ? AND s.archived_at IS NULL
       ORDER BY s.updated_at DESC
-    `).all(sinceTimestamp) as (Session & { lastMessageOffset: number | null })[];
+    `
+      )
+      .all(sinceTimestamp) as (Session & { lastMessageOffset: number | null })[];
 
-    const syncedSessions: SyncedSessionSummary[] = sessions.map((session) => ({
+    const syncedSessions: SyncedSessionSummary[] = sessions.map(session => ({
       id: session.id,
       projectId: session.projectId,
       name: session.name,

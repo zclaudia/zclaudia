@@ -95,8 +95,8 @@ describe('initBuiltinPanels', () => {
 
     const unflagged = registerSpy.mock.calls
       .map(([panel]) => panel)
-      .filter((panel) => panel.builtin !== true)
-      .map((panel) => panel.pluginId);
+      .filter(panel => panel.builtin !== true)
+      .map(panel => panel.pluginId);
     expect(unflagged).toEqual([]);
   });
 
@@ -109,7 +109,7 @@ describe('initBuiltinPanels', () => {
 
     for (const id of ['terminal', 'file-viewer', 'draft', 'session-changes']) {
       expect(registerSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ id, defaultPlacement: 'right' }),
+        expect.objectContaining({ id, defaultPlacement: 'right' })
       );
     }
   });
@@ -128,7 +128,7 @@ describe('initBuiltinPanels', () => {
         platforms: ['desktop'],
         component: expect.any(Function),
         actions: expect.any(Function),
-      }),
+      })
     );
   });
 });
@@ -145,7 +145,7 @@ describe('builtinPanels openMode', () => {
 
   it('marks terminal / notifications / lineage as dedicated', () => {
     const panels = usePluginStore.getState().panels;
-    const byId = (id: string) => panels.find((p) => p.id === id);
+    const byId = (id: string) => panels.find(p => p.id === id);
     expect(byId('terminal')?.openMode).toBe('dedicated');
     expect(byId('notifications')?.openMode).toBe('dedicated');
     expect(byId('lineage')?.openMode).toBe('dedicated');
@@ -153,7 +153,7 @@ describe('builtinPanels openMode', () => {
 
   it('marks file-viewer / draft / session-changes / memory / git as shared', () => {
     const panels = usePluginStore.getState().panels;
-    const byId = (id: string) => panels.find((p) => p.id === id);
+    const byId = (id: string) => panels.find(p => p.id === id);
     expect(byId('file-viewer')?.openMode).toBe('shared');
     expect(byId('draft')?.openMode).toBe('shared');
     expect(byId('session-changes')?.openMode).toBe('shared');

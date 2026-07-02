@@ -24,10 +24,12 @@ export const MESSAGE_PAGE_MIN_MESSAGES = 10;
  *
  * `wasTrimmed` feeds the route's `hasMore` so the client keeps paginating.
  */
-export function applyMessagePageBudget<T extends { content?: string | null; metadata?: string | null }>(
+export function applyMessagePageBudget<
+  T extends { content?: string | null; metadata?: string | null },
+>(
   messages: T[],
   maxBytes: number = MESSAGE_PAGE_MAX_BYTES,
-  minMessages: number = MESSAGE_PAGE_MIN_MESSAGES,
+  minMessages: number = MESSAGE_PAGE_MIN_MESSAGES
 ): { trimmed: T[]; wasTrimmed: boolean } {
   let cumSize = 0;
   let keepCount = messages.length;

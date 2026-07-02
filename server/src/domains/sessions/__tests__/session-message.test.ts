@@ -47,19 +47,23 @@ describe('SessionMessageRepository', () => {
     db.exec('DELETE FROM sessions');
 
     const now = Date.now();
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO sessions (id, project_id, name, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
-    `).run('s1', 'project-1', 'Session 1', now, now);
+    `
+    ).run('s1', 'project-1', 'Session 1', now, now);
   });
 
   it('lists latest messages for a session', () => {
     const now = Date.now();
     for (let i = 0; i < 3; i++) {
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO messages (id, session_id, role, content, metadata, created_at, offset)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(`m${i}`, 's1', 'user', `Message ${i}`, null, now + i, i);
+      `
+      ).run(`m${i}`, 's1', 'user', `Message ${i}`, null, now + i, i);
     }
 
     const messages = repo.listBySession('s1', { limit: 2 });
@@ -72,10 +76,12 @@ describe('SessionMessageRepository', () => {
   it('returns a window around target message', () => {
     const now = Date.now();
     for (let i = 0; i < 6; i++) {
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO messages (id, session_id, role, content, metadata, created_at, offset)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(`m${i}`, 's1', 'user', `Message ${i}`, null, now + i, i + 1);
+      `
+      ).run(`m${i}`, 's1', 'user', `Message ${i}`, null, now + i, i + 1);
     }
 
     const messages = repo.listBySession('s1', { limit: 5, aroundMessageId: 'm3' });
@@ -99,12 +105,41 @@ describe('SessionMessageRepository', () => {
     expect(repo.findRowIdById('m1')).not.toBeNull();
   });
 
+  it('lists recent assistant message contents newest first', () => {
+    const now = Date.now();
+    db.prepare(
+      `
+      INSERT INTO messages (id, session_id, role, content, metadata, created_at, offset)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `
+    ).run('user-1', 's1', 'user', 'Ignore me', null, now, 1);
+    db.prepare(
+      `
+      INSERT INTO messages (id, session_id, role, content, metadata, created_at, offset)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `
+    ).run('assistant-1', 's1', 'assistant', 'Older assistant', null, now + 1, 2);
+    db.prepare(
+      `
+      INSERT INTO messages (id, session_id, role, content, metadata, created_at, offset)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `
+    ).run('assistant-2', 's1', 'assistant', 'Newer assistant', null, now + 2, 3);
+
+    expect(repo.listRecentAssistantContents('s1', 5)).toEqual([
+      { content: 'Newer assistant' },
+      { content: 'Older assistant' },
+    ]);
+  });
+
   it('updates session timestamp', () => {
     const updatedAt = Date.now() + 1000;
 
     repo.updateSessionTimestamp('s1', updatedAt);
 
-    const row = db.prepare('SELECT updated_at FROM sessions WHERE id = ?').get('s1') as { updated_at: number };
+    const row = db.prepare('SELECT updated_at FROM sessions WHERE id = ?').get('s1') as {
+      updated_at: number;
+    };
     expect(row.updated_at).toBe(updatedAt);
   });
 });

@@ -109,11 +109,11 @@ function PinButton({
       type="button"
       aria-label={pinned ? 'Unpin skill' : 'Pin skill'}
       disabled={!enabled}
-      onClick={(e) => {
+      onClick={e => {
         e.stopPropagation();
         onClick();
       }}
-      onMouseDown={(e) => e.stopPropagation()} // prevent textarea blur
+      onMouseDown={e => e.stopPropagation()} // prevent textarea blur
       className={`shrink-0 rounded p-1 transition-colors ${
         pinned
           ? 'text-primary opacity-100'
@@ -127,7 +127,7 @@ function PinButton({
 
 export const SlashMenu = forwardRef<HTMLDivElement, SlashMenuProps>(function SlashMenu(
   { suggestions, selectedIndex, pinEnabled, onSelect, onTogglePin },
-  ref,
+  ref
 ) {
   const groups = useMemo(() => groupSuggestions(suggestions), [suggestions]);
 
@@ -136,13 +136,13 @@ export const SlashMenu = forwardRef<HTMLDivElement, SlashMenuProps>(function Sla
       ref={ref}
       className="absolute bottom-full left-0 right-0 mb-1 bg-popover border border-border rounded-lg shadow-apple-md overflow-y-auto max-h-64 z-10"
     >
-      {groups.map((group) => (
+      {groups.map(group => (
         <div key={group.key} className="py-1">
           <div className="flex items-center gap-1.5 px-3 pt-1.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             <group.icon size={11} strokeWidth={2} />
             {group.label}
           </div>
-          {group.items.map((suggestion) => {
+          {group.items.map(suggestion => {
             const selected = suggestion.index === selectedIndex;
             const isSkill = suggestion.type === 'skill';
             return (

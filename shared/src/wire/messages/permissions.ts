@@ -25,7 +25,7 @@ export interface PermissionDecisionMessage {
 export interface PromptAnswerMessage {
   type: 'prompt_answer';
   requestId: string;
-  formattedAnswer: string;  // Pre-formatted readable text for Claude
+  formattedAnswer: string; // Pre-formatted readable text for Claude
 }
 
 // Plugin permission response (Client → Server)
@@ -64,7 +64,7 @@ export interface AgentPermissionInterceptedMessage {
   toolName: string;
   decision: 'approve' | 'deny';
   reason: string;
-  sessionId: string;     // The session whose permission was intercepted
+  sessionId: string; // The session whose permission was intercepted
   runId: string;
 }
 
@@ -122,3 +122,17 @@ export interface PluginPermissionRequestMessage {
   pluginName: string;
   permissions: string[];
 }
+
+export type PermissionsClientMessage =
+  | PermissionDecisionMessage
+  | PromptAnswerMessage
+  | PluginPermissionResponseMessage;
+
+export type PermissionsServerMessage =
+  | PermissionRequestMessage
+  | AgentPermissionInterceptedMessage
+  | PermissionResolvedMessage
+  | PermissionAutoResolvedMessage
+  | AIReviewCompletedMessage
+  | PermissionWorkflowProgressMessage
+  | PluginPermissionRequestMessage;

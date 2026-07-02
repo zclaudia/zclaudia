@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useProjectStore } from '../projectStore';
 import { useOwnershipStore } from '../ownershipStore';
+import { useSelectionStore } from '../selectionStore';
 import type { Project, Session } from '@zclaudia/shared';
 
 const mockSetActiveServer = vi.fn();
@@ -12,9 +13,7 @@ const mockServerStoreState = {
 vi.mock('../sessionsStore', () => ({
   useSessionsStore: {
     getState: () => ({
-      remoteSessions: new Map([
-        ['b1', [{ id: 'remote-s1', projectId: 'p-remote' }]],
-      ]),
+      remoteSessions: new Map([['b1', [{ id: 'remote-s1', projectId: 'p-remote' }]]]),
     }),
   },
 }));
@@ -28,7 +27,10 @@ vi.mock('../serverStore', () => ({
 vi.mock('../../utils/controlPlane', () => ({
   getControlPlaneMode: () => 'embedded-local',
   resolveLocalBackendId: () => 'local-backend-1',
-  resolveCanonicalBackendId: (backendId: string | null | undefined, fallback: string | null = null) => backendId ?? fallback,
+  resolveCanonicalBackendId: (
+    backendId: string | null | undefined,
+    fallback: string | null = null
+  ) => backendId ?? fallback,
 }));
 
 vi.mock('../runStore', () => ({
@@ -56,6 +58,11 @@ describe('projectStore', () => {
       dashboardViews: {},
       providerCommands: {},
       providerCapabilities: {},
+    });
+    useSelectionStore.setState({
+      selectedProjectId: null,
+      selectedSessionId: null,
+      dashboardViews: {},
     });
     useOwnershipStore.getState().clearSessionOwners();
     useOwnershipStore.getState().clearProjectOwners();
@@ -104,10 +111,7 @@ describe('projectStore', () => {
 
       useProjectStore.getState().replaceProjectsForBackend('local-backend-1', [localNew]);
 
-      expect(useProjectStore.getState().projects).toEqual([
-        remoteKeep,
-        localNew,
-      ]);
+      expect(useProjectStore.getState().projects).toEqual([remoteKeep, localNew]);
       expect(useOwnershipStore.getState().getProjectBackendId('remote-p1')).toBe('remote-1');
       expect(useOwnershipStore.getState().getProjectBackendId('local-p1')).toBeNull();
       expect(useOwnershipStore.getState().getProjectBackendId('local-p2')).toBe('local-backend-1');
@@ -161,11 +165,15 @@ describe('projectStore', () => {
 
       // Server replays the remote-1 snapshot with bumped updatedAt for remote-1
       useProjectStore.getState().replaceProjectsForBackend('remote-1', [
-        createProject({ id: 'remote-1', name: 'Remote 1 Updated', updatedAt: remote1.updatedAt + 1 }),
+        createProject({
+          id: 'remote-1',
+          name: 'Remote 1 Updated',
+          updatedAt: remote1.updatedAt + 1,
+        }),
         createProject({ id: 'remote-2', name: 'Remote 2', updatedAt: remote2.updatedAt }),
       ]);
 
-      const ids = useProjectStore.getState().projects.map((p) => p.id);
+      const ids = useProjectStore.getState().projects.map(p => p.id);
       expect(ids).toEqual(['local-1', 'remote-1', 'local-2', 'remote-2']);
       expect(useProjectStore.getState().projects[1].name).toBe('Remote 1 Updated');
     });
@@ -182,7 +190,7 @@ describe('projectStore', () => {
       // Snapshot loses 'b'
       useProjectStore.getState().replaceProjectsForBackend('remote-1', [a, c]);
 
-      const ids = useProjectStore.getState().projects.map((p) => p.id);
+      const ids = useProjectStore.getState().projects.map(p => p.id);
       expect(ids).toEqual(['a', 'c']);
       expect(useOwnershipStore.getState().getProjectBackendId('b')).toBeFalsy();
     });
@@ -194,13 +202,11 @@ describe('projectStore', () => {
       useOwnershipStore.getState().setProjectOwner('b', 'remote-1');
       useProjectStore.setState({ projects: [a, b] });
 
-      useProjectStore.getState().replaceProjectsForBackend('remote-1', [
-        a,
-        b,
-        createProject({ id: 'c', name: 'C' }),
-      ]);
+      useProjectStore
+        .getState()
+        .replaceProjectsForBackend('remote-1', [a, b, createProject({ id: 'c', name: 'C' })]);
 
-      const ids = useProjectStore.getState().projects.map((p) => p.id);
+      const ids = useProjectStore.getState().projects.map(p => p.id);
       expect(ids).toEqual(['a', 'b', 'c']);
     });
 
@@ -223,7 +229,7 @@ describe('projectStore', () => {
       useProjectStore.getState().upsertProjectForBackend('remote-1', project);
       useProjectStore.getState().addProject(project);
 
-      const ids = useProjectStore.getState().projects.map((p) => p.id);
+      const ids = useProjectStore.getState().projects.map(p => p.id);
       expect(ids).toEqual(['race-1']);
     });
 
@@ -236,11 +242,14 @@ describe('projectStore', () => {
         projects: [remoteOriginal, localKeep],
       });
 
-      useProjectStore.getState().upsertProjectForBackend('remote-1', createProject({
-        id: 'shared-id',
-        name: 'Remote Updated',
-        updatedAt: remoteOriginal.updatedAt + 1,
-      }));
+      useProjectStore.getState().upsertProjectForBackend(
+        'remote-1',
+        createProject({
+          id: 'shared-id',
+          name: 'Remote Updated',
+          updatedAt: remoteOriginal.updatedAt + 1,
+        })
+      );
 
       expect(useProjectStore.getState().projects).toEqual([
         expect.objectContaining({ id: 'shared-id', name: 'Remote Updated' }),
@@ -261,13 +270,16 @@ describe('projectStore', () => {
         projects: [remoteOriginal],
       });
 
-      useProjectStore.getState().upsertProjectForBackend('remote-1', createProject({
-        id: 'shared-id',
-        name: 'Remote Updated',
-        rootPath: undefined,
-        defaultAgentProfileId: undefined,
-        updatedAt: remoteOriginal.updatedAt + 1,
-      }));
+      useProjectStore.getState().upsertProjectForBackend(
+        'remote-1',
+        createProject({
+          id: 'shared-id',
+          name: 'Remote Updated',
+          rootPath: undefined,
+          defaultAgentProfileId: undefined,
+          updatedAt: remoteOriginal.updatedAt + 1,
+        })
+      );
 
       expect(useProjectStore.getState().projects).toEqual([
         expect.objectContaining({
@@ -305,13 +317,16 @@ describe('projectStore', () => {
       // Note: no setProjectOwner calls — this is the bug condition.
       expect(useOwnershipStore.getState().getProjectBackendId('p-b')).toBeFalsy();
 
-      useProjectStore.getState().upsertProjectForBackend('remote-1', createProject({
-        id: 'p-b',
-        name: 'B Updated',
-        updatedAt: b.updatedAt + 1,
-      }));
+      useProjectStore.getState().upsertProjectForBackend(
+        'remote-1',
+        createProject({
+          id: 'p-b',
+          name: 'B Updated',
+          updatedAt: b.updatedAt + 1,
+        })
+      );
 
-      const ids = useProjectStore.getState().projects.map((p) => p.id);
+      const ids = useProjectStore.getState().projects.map(p => p.id);
       expect(ids).toEqual(['p-a', 'p-b', 'p-c']);
       expect(useProjectStore.getState().projects[1].name).toBe('B Updated');
       expect(useOwnershipStore.getState().getProjectBackendId('p-b')).toBe('remote-1');
@@ -321,12 +336,15 @@ describe('projectStore', () => {
       const a = createProject({ id: 'p-a', name: 'A' });
       useProjectStore.setState({ projects: [a] });
 
-      useProjectStore.getState().upsertProjectForBackend('remote-1', createProject({
-        id: 'p-new',
-        name: 'New',
-      }));
+      useProjectStore.getState().upsertProjectForBackend(
+        'remote-1',
+        createProject({
+          id: 'p-new',
+          name: 'New',
+        })
+      );
 
-      const ids = useProjectStore.getState().projects.map((p) => p.id);
+      const ids = useProjectStore.getState().projects.map(p => p.id);
       expect(ids).toEqual(['p-a', 'p-new']);
     });
 
@@ -337,10 +355,13 @@ describe('projectStore', () => {
         projects: [remoteProject],
       });
 
-      useProjectStore.getState().upsertProjectForBackend('local-backend-1', createProject({
-        id: 'shared-id',
-        name: 'Local Collision',
-      }));
+      useProjectStore.getState().upsertProjectForBackend(
+        'local-backend-1',
+        createProject({
+          id: 'shared-id',
+          name: 'Local Collision',
+        })
+      );
 
       expect(useProjectStore.getState().projects).toEqual([remoteProject]);
       expect(useOwnershipStore.getState().getProjectBackendId('shared-id')).toBe('remote-1');
@@ -356,10 +377,12 @@ describe('projectStore', () => {
         projects: [remoteProject],
       });
 
-      useProjectStore.getState().replaceProjectsForBackend('local-backend-1', [
-        createProject({ id: 'shared-id', name: 'Local Collision' }),
-        createProject({ id: 'local-p1', name: 'Local Project' }),
-      ]);
+      useProjectStore
+        .getState()
+        .replaceProjectsForBackend('local-backend-1', [
+          createProject({ id: 'shared-id', name: 'Local Collision' }),
+          createProject({ id: 'local-p1', name: 'Local Project' }),
+        ]);
 
       expect(useProjectStore.getState().projects).toEqual([
         remoteProject,
@@ -533,7 +556,7 @@ describe('projectStore', () => {
 
       useProjectStore.getState().reorderSessions('p1', ['s2', 's1']);
 
-      expect(useProjectStore.getState().sessions.map((s) => s.id)).toEqual(['s3', 's2', 's1']);
+      expect(useProjectStore.getState().sessions.map(s => s.id)).toEqual(['s3', 's2', 's1']);
     });
   });
 
@@ -542,6 +565,34 @@ describe('projectStore', () => {
       useProjectStore.getState().selectProject('p1');
 
       expect(useProjectStore.getState().selectedProjectId).toBe('p1');
+    });
+
+    it('mirrors selectionStore updates back to projectStore compatibility fields', () => {
+      useSelectionStore.getState().setSelectedProjectId('p1');
+      useSelectionStore.getState().setSelectedSessionId('s1');
+      useSelectionStore.getState().setDashboardView('p1', 'tasks');
+
+      expect(useProjectStore.getState().selectedProjectId).toBe('p1');
+      expect(useProjectStore.getState().selectedSessionId).toBe('s1');
+      expect(useProjectStore.getState().dashboardViews.p1).toBe('tasks');
+    });
+
+    it('does not let direct projectStore compatibility writes update selectionStore', () => {
+      useSelectionStore.getState().setSelectedProjectId('canonical-project');
+      useSelectionStore.getState().setSelectedSessionId('canonical-session');
+      useSelectionStore.getState().setDashboardView('canonical-project', 'home');
+
+      useProjectStore.setState({
+        selectedProjectId: 'legacy-project',
+        selectedSessionId: 'legacy-session',
+        dashboardViews: { 'legacy-project': 'tasks' },
+      });
+
+      expect(useSelectionStore.getState().selectedProjectId).toBe('canonical-project');
+      expect(useSelectionStore.getState().selectedSessionId).toBe('canonical-session');
+      expect(useSelectionStore.getState().dashboardViews).toEqual({
+        'canonical-project': 'home',
+      });
     });
 
     it('selectProject can set to null', () => {
@@ -628,14 +679,20 @@ describe('projectStore', () => {
     });
 
     it('preserves existing isActive when incoming has no isActive', () => {
-      useProjectStore.setState({ sessions: [{ ...createSession({ id: 's1' }), isActive: true } as any] });
+      useProjectStore.setState({
+        sessions: [{ ...createSession({ id: 's1' }), isActive: true } as any],
+      });
       useProjectStore.getState().mergeSessions([createSession({ id: 's1', name: 'Updated' })]);
       expect((useProjectStore.getState().sessions[0] as any).isActive).toBe(true);
     });
 
     it('updates isActive when incoming has boolean isActive', () => {
-      useProjectStore.setState({ sessions: [{ ...createSession({ id: 's1' }), isActive: true } as any] });
-      useProjectStore.getState().mergeSessions([{ ...createSession({ id: 's1' }), isActive: false } as any]);
+      useProjectStore.setState({
+        sessions: [{ ...createSession({ id: 's1' }), isActive: true } as any],
+      });
+      useProjectStore
+        .getState()
+        .mergeSessions([{ ...createSession({ id: 's1' }), isActive: false } as any]);
       expect((useProjectStore.getState().sessions[0] as any).isActive).toBe(false);
     });
   });

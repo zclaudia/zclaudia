@@ -29,16 +29,21 @@ const STATUS_BADGE: Record<TaskStatus, { label: string; className: string }> = {
 const STORAGE_KEY = 'task-card-strip-collapsed';
 
 export function TaskCardStrip({ projectId }: TaskCardStripProps) {
-  const tasks = useSupervisionStore((s) => s.tasks[projectId] || []);
-  const setTasks = useSupervisionStore((s) => s.setTasks);
+  const tasks = useSupervisionStore(s => s.tasks[projectId] || []);
+  const setTasks = useSupervisionStore(s => s.setTasks);
   const [collapsed, setCollapsed] = useState(() => {
-    try { return localStorage.getItem(STORAGE_KEY) === 'true'; } catch { return false; }
+    try {
+      return localStorage.getItem(STORAGE_KEY) === 'true';
+    } catch {
+      return false;
+    }
   });
 
   // Fetch tasks on mount
   useEffect(() => {
-    api.getSupervisionTasks(projectId)
-      .then((t) => setTasks(projectId, t))
+    api
+      .getSupervisionTasks(projectId)
+      .then(t => setTasks(projectId, t))
       .catch(() => {});
   }, [projectId, setTasks]);
 
@@ -57,9 +62,20 @@ export function TaskCardStrip({ projectId }: TaskCardStripProps) {
   // Sort: active tasks first (running, queued, pending), then completed
   const sortedTasks = [...tasks].sort((a, b) => {
     const priority: Record<string, number> = {
-      running: 0, planning: 1, queued: 2, pending: 3, proposed: 4,
-      reviewing: 4, approved: 5, merge_conflict: 6, blocked: 7,
-      completed: 8, integrated: 8, failed: 9, rejected: 10, cancelled: 11,
+      running: 0,
+      planning: 1,
+      queued: 2,
+      pending: 3,
+      proposed: 4,
+      reviewing: 4,
+      approved: 5,
+      merge_conflict: 6,
+      blocked: 7,
+      completed: 8,
+      integrated: 8,
+      failed: 9,
+      rejected: 10,
+      cancelled: 11,
     };
     return (priority[a.status] ?? 99) - (priority[b.status] ?? 99);
   });
@@ -74,24 +90,27 @@ export function TaskCardStrip({ projectId }: TaskCardStripProps) {
         {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
         <span className="font-medium">Tasks ({tasks.length})</span>
         {/* Quick status summary when collapsed */}
-        {collapsed && (() => {
-          const running = tasks.filter(t => t.status === 'running').length;
-          const pending = tasks.filter(t => ['pending', 'queued', 'planning', 'proposed'].includes(t.status)).length;
-          return (
-            <span className="text-[10px] text-muted-foreground/70 ml-1">
-              {running > 0 && `${running} running`}
-              {running > 0 && pending > 0 && ', '}
-              {pending > 0 && `${pending} pending`}
-            </span>
-          );
-        })()}
+        {collapsed &&
+          (() => {
+            const running = tasks.filter(t => t.status === 'running').length;
+            const pending = tasks.filter(t =>
+              ['pending', 'queued', 'planning', 'proposed'].includes(t.status)
+            ).length;
+            return (
+              <span className="text-[10px] text-muted-foreground/70 ml-1">
+                {running > 0 && `${running} running`}
+                {running > 0 && pending > 0 && ', '}
+                {pending > 0 && `${pending} pending`}
+              </span>
+            );
+          })()}
       </button>
 
       {/* Cards */}
       {!collapsed && (
         <div className="px-3 pb-2 overflow-x-auto">
           <div className="flex gap-2">
-            {sortedTasks.map((task) => (
+            {sortedTasks.map(task => (
               <TaskMiniCard key={task.id} task={task} />
             ))}
           </div>
@@ -103,14 +122,18 @@ export function TaskCardStrip({ projectId }: TaskCardStripProps) {
 
 function TaskMiniCard({ task }: { task: SupervisionTask }) {
   const [loading, setLoading] = useState(false);
-  const upsertTask = useSupervisionStore((s) => s.upsertTask);
-  const badge = STATUS_BADGE[task.status] ?? { label: task.status, className: 'bg-gray-500/15 text-gray-400' };
+  const upsertTask = useSupervisionStore(s => s.upsertTask);
+  const badge = STATUS_BADGE[task.status] ?? {
+    label: task.status,
+    className: 'bg-gray-500/15 text-gray-400',
+  };
   const hasSession = !!task.sessionId;
   const isActive = ['running', 'reviewing'].includes(task.status);
   const isEditable = ['pending', 'proposed', 'queued'].includes(task.status);
   const canRetry = task.status === 'failed';
   const canCancel = ['running', 'queued', 'pending', 'planning'].includes(task.status);
-  const canRunNow = task.scheduleEnabled && ['completed', 'failed', 'cancelled'].includes(task.status);
+  const canRunNow =
+    task.scheduleEnabled && ['completed', 'failed', 'cancelled'].includes(task.status);
 
   const handleOpen = async () => {
     setLoading(true);
@@ -204,7 +227,7 @@ function TaskMiniCard({ task }: { task: SupervisionTask }) {
         {/* Retry button */}
         {canRetry && (
           <button
-            onClick={(e) => handleAction(e, 'retry')}
+            onClick={e => handleAction(e, 'retry')}
             disabled={loading}
             className="flex items-center justify-center w-6 py-0.5 text-[10px] rounded-md bg-orange-500/10 hover:bg-orange-500/20 text-orange-500 transition-colors disabled:opacity-50"
             title="Retry"
@@ -216,7 +239,7 @@ function TaskMiniCard({ task }: { task: SupervisionTask }) {
         {/* Run Now button */}
         {canRunNow && (
           <button
-            onClick={(e) => handleAction(e, 'runNow')}
+            onClick={e => handleAction(e, 'runNow')}
             disabled={loading}
             className="flex items-center justify-center w-6 py-0.5 text-[10px] rounded-md bg-green-500/10 hover:bg-green-500/20 text-green-500 transition-colors disabled:opacity-50"
             title="Run now"
@@ -228,7 +251,7 @@ function TaskMiniCard({ task }: { task: SupervisionTask }) {
         {/* Cancel button */}
         {canCancel && (
           <button
-            onClick={(e) => handleAction(e, 'cancel')}
+            onClick={e => handleAction(e, 'cancel')}
             disabled={loading}
             className="flex items-center justify-center w-6 py-0.5 text-[10px] rounded-md bg-red-500/10 hover:bg-red-500/20 text-red-500 transition-colors disabled:opacity-50"
             title="Cancel"

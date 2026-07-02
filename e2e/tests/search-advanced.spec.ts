@@ -58,7 +58,8 @@ describe('Advanced Search', () => {
       method: 'POST',
       body: JSON.stringify({
         role: 'assistant',
-        content: 'Here is how to implement authentication using JWT in Node.js with middleware validation.',
+        content:
+          'Here is how to implement authentication using JWT in Node.js with middleware validation.',
       }),
     });
     await client.fetch(`/api/sessions/${sessionId}/messages`, {
@@ -100,7 +101,10 @@ describe('Advanced Search', () => {
 
       if (resultCount > 0) {
         console.log(`  Found ${resultCount} search result element(s) in UI`);
-        const firstText = await resultItems.first().textContent().catch(() => '');
+        const firstText = await resultItems
+          .first()
+          .textContent()
+          .catch(() => '');
         expect(firstText?.toLowerCase()).toContain('authentication');
         console.log('  Result text matches keyword');
       } else {
@@ -168,14 +172,18 @@ describe('Advanced Search', () => {
     console.log(`  Keyword "Prisma" search returned ${prismaData.data.results.length} result(s)`);
 
     // Search with role filter
-    const roleRes = await client.fetch('/api/sessions/search/messages?q=authentication&role=assistant');
+    const roleRes = await client.fetch(
+      '/api/sessions/search/messages?q=authentication&role=assistant'
+    );
     const roleData = await roleRes.json();
 
     expect(roleData.success).toBe(true);
     for (const result of roleData.data.results) {
       expect(result.role).toBe('assistant');
     }
-    console.log(`  Role-filtered search returned ${roleData.data.results.length} assistant result(s)`);
+    console.log(
+      `  Role-filtered search returned ${roleData.data.results.length} assistant result(s)`
+    );
 
     console.log('SA2: Search API test completed');
   }, 30000);
@@ -219,7 +227,9 @@ describe('Advanced Search', () => {
     expect(historyData2.success).toBe(true);
     const queries2 = historyData2.data.history.map((h: { query: string }) => h.query);
     expect(queries2).toContain('Prisma');
-    console.log(`  After second search, history has ${historyData2.data.history.length} entry/entries`);
+    console.log(
+      `  After second search, history has ${historyData2.data.history.length} entry/entries`
+    );
 
     console.log('SA3: Search history test completed');
   }, 30000);
@@ -260,16 +270,20 @@ describe('Advanced Search', () => {
       await browser.waitForTimeout(1000); // Wait for debounce + results
 
       // Check for "no results" indicator or empty state
-      const noResults = browser.locator(
-        'text=No results, text=no results, text=No matches, [class*="empty"], [data-testid*="no-result"]'
-      ).first();
+      const noResults = browser
+        .locator(
+          'text=No results, text=no results, text=No matches, [class*="empty"], [data-testid*="no-result"]'
+        )
+        .first();
       const hasNoResults = await noResults.isVisible({ timeout: 3000 }).catch(() => false);
 
       if (hasNoResults) {
         console.log('  UI shows "no results" state');
       } else {
         // Verify no search result items are displayed
-        const resultItems = browser.locator('[class*="search-result"], [data-testid*="search-result"]');
+        const resultItems = browser.locator(
+          '[class*="search-result"], [data-testid*="search-result"]'
+        );
         const resultCount = await resultItems.count().catch(() => 0);
         expect(resultCount).toBe(0);
         console.log('  UI shows zero search result items');

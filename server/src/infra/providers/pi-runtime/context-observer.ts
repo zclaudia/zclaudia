@@ -2,7 +2,11 @@ import type { Usage } from '@earendil-works/pi-ai';
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type { ContextWindowSource } from '@zclaudia/shared/wire/messages/core';
 import type { PiRunPromptBundle } from './run-prompt.js';
-import { captureContextSnapshot, diffPrefixForCacheAudit, recordContextUsage } from '../context-snapshot.js';
+import {
+  captureContextSnapshot,
+  diffPrefixForCacheAudit,
+  recordContextUsage,
+} from '../context-snapshot.js';
 
 export function capturePiRunContextSnapshot(input: {
   sessionId?: string;
@@ -14,7 +18,7 @@ export function capturePiRunContextSnapshot(input: {
   tools: AgentTool<any>[];
 }): void {
   if (!input.sessionId) return;
-  const toolDescriptors = input.tools.map((t) => ({
+  const toolDescriptors = input.tools.map(t => ({
     name: t.name,
     description: t.description,
     parameters: t.parameters,
@@ -33,14 +37,16 @@ export function capturePiRunContextSnapshot(input: {
       input.sessionId,
       input.prompt.snapshotSystemPromptText,
       input.prompt.snapshotSkillCatalogText,
-      toolDescriptors,
+      toolDescriptors
     );
     if (!audit.firstRun && (!audit.promptStable || !audit.toolsStable)) {
       console.warn(
-        `[CacheAudit] session=${input.sessionId} PREFIX CHANGED promptStable=${audit.promptStable} toolsStable=${audit.toolsStable} (prompt=${audit.promptHash} tools=${audit.toolsHash}) — provider prefix cache invalidated at this run boundary`,
+        `[CacheAudit] session=${input.sessionId} PREFIX CHANGED promptStable=${audit.promptStable} toolsStable=${audit.toolsStable} (prompt=${audit.promptHash} tools=${audit.toolsHash}) — provider prefix cache invalidated at this run boundary`
       );
     } else {
-      console.log(`[CacheAudit] session=${input.sessionId} prefix stable=${!audit.firstRun} prompt=${audit.promptHash} tools=${audit.toolsHash}`);
+      console.log(
+        `[CacheAudit] session=${input.sessionId} prefix stable=${!audit.firstRun} prompt=${audit.promptHash} tools=${audit.toolsHash}`
+      );
     }
   }
 }
@@ -63,6 +69,8 @@ export function recordPiContextUsage(input: {
     const inputTokens = lastCallUsage.input ?? 0;
     const cacheableBase = read + write + inputTokens;
     const hitPct = cacheableBase > 0 ? Math.round((read / cacheableBase) * 1000) / 10 : 0;
-    console.log(`[CacheAudit] session=${input.sessionId} cacheRead=${read} cacheWrite=${write} input=${inputTokens} hit=${hitPct}%`);
+    console.log(
+      `[CacheAudit] session=${input.sessionId} cacheRead=${read} cacheWrite=${write} input=${inputTokens} hit=${hitPct}%`
+    );
   }
 }

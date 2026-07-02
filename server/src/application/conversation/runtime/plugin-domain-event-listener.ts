@@ -1,8 +1,5 @@
 import { pluginEvents } from '../../../infra/events/index.js';
-import {
-  PUBLIC_RUN_DOMAIN_EVENT_TYPES,
-  type RunDomainEvent,
-} from './run-domain-events.js';
+import { PUBLIC_RUN_DOMAIN_EVENT_TYPES, type RunDomainEvent } from './run-domain-events.js';
 import {
   runDomainEventListeners,
   type RunDomainEventListenerRegistry,
@@ -12,7 +9,7 @@ import { projectRunDomainEventToPluginEvents } from './plugin-projector.js';
 const registrations = new WeakMap<RunDomainEventListenerRegistry, () => void>();
 
 export function registerPluginDomainEventListener(
-  registry: RunDomainEventListenerRegistry = runDomainEventListeners,
+  registry: RunDomainEventListenerRegistry = runDomainEventListeners
 ): () => void {
   const existing = registrations.get(registry);
   if (existing) return existing;
@@ -20,7 +17,7 @@ export function registerPluginDomainEventListener(
   const unsubscribes = PUBLIC_RUN_DOMAIN_EVENT_TYPES.map(type =>
     registry.on(type, event => {
       emitProjectedPluginEvents(event as RunDomainEvent);
-    }),
+    })
   );
 
   const unsubscribe = () => {
@@ -37,7 +34,10 @@ export function registerPluginDomainEventListener(
 function emitProjectedPluginEvents(event: RunDomainEvent): void {
   for (const projection of projectRunDomainEventToPluginEvents(event)) {
     pluginEvents.emit(projection.name, projection.payload).catch((err: unknown) => {
-      console.warn('[PluginEvents] Event emission failed:', err instanceof Error ? err.message : err);
+      console.warn(
+        '[PluginEvents] Event emission failed:',
+        err instanceof Error ? err.message : err
+      );
     });
   }
 }

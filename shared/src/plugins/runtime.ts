@@ -1,9 +1,4 @@
-export type {
-  PluginContext,
-  PluginInstance,
-  PluginModule,
-  CommandHandler,
-} from './context.js';
+export type { PluginContext, PluginInstance, PluginModule, CommandHandler } from './context.js';
 
 export type {
   ClipboardAPI,
@@ -23,11 +18,6 @@ export type {
   UIComponents,
 } from './runtime-apis.js';
 
-export type {
-  ToolHandler,
-  ToolRegistration,
-} from './tools.js';
+export type { ToolHandler, ToolRegistration } from './tools.js';
 
-export type {
-  UIExtensionRegistration,
-} from './contributions.js';
+export type { UIExtensionRegistration } from './contributions.js';

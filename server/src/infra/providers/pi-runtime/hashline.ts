@@ -14,7 +14,9 @@ export function hashlineSnapshotId(path: string, content: string): string {
   return `${path}#${hashlineTag(content)}`;
 }
 
-export function parseHashlineOperation(operation: unknown): { type: 'replace'; hash: string } | undefined {
+export function parseHashlineOperation(
+  operation: unknown
+): { type: 'replace'; hash: string } | undefined {
   if (typeof operation !== 'string') return undefined;
   const match = /^replace:([a-f0-9]{12})$/i.exec(operation.trim());
   if (!match) return undefined;
@@ -33,7 +35,11 @@ export function buildHashlineEntries(lines: string[], startLine = 1): HashlineEn
   }));
 }
 
-export function formatHashlineOutput(path: string, content: string, entries: HashlineEntry[]): string {
+export function formatHashlineOutput(
+  path: string,
+  content: string,
+  entries: HashlineEntry[]
+): string {
   return [
     `[${path}#${hashlineTag(content)}]`,
     ...entries.map(entry => `${entry.hash}|${entry.text}`),
@@ -42,13 +48,21 @@ export function formatHashlineOutput(path: string, content: string, entries: Has
 
 function splitLines(content: string): { lines: string[]; hasTrailingNewline: boolean } {
   const hasTrailingNewline = content.endsWith('\n');
-  return { lines: (hasTrailingNewline ? content.slice(0, -1) : content).split('\n'), hasTrailingNewline };
+  return {
+    lines: (hasTrailingNewline ? content.slice(0, -1) : content).split('\n'),
+    hasTrailingNewline,
+  };
 }
 
 /** Lines of surrounding context compared on each side when disambiguating. */
 const ANCHOR_CONTEXT_LINES = 2;
 
-function contextScore(current: string[], candidate: number, snapshot: string[], anchor: number): number {
+function contextScore(
+  current: string[],
+  candidate: number,
+  snapshot: string[],
+  anchor: number
+): number {
   let score = 0;
   for (let offset = -ANCHOR_CONTEXT_LINES; offset <= ANCHOR_CONTEXT_LINES; offset++) {
     if (offset === 0) continue;
@@ -63,7 +77,11 @@ function contextScore(current: string[], candidate: number, snapshot: string[], 
  * matches several lines (duplicate text), the snapshot — the file as the model
  * last saw it — disambiguates by comparing surrounding context.
  */
-export function resolveHashlineTargetIndex(currentLines: string[], lineHash: string, snapshot?: string): number {
+export function resolveHashlineTargetIndex(
+  currentLines: string[],
+  lineHash: string,
+  snapshot?: string
+): number {
   const matches: number[] = [];
   for (let index = 0; index < currentLines.length; index++) {
     if (hashlineForLine(currentLines[index]) === lineHash) matches.push(index);
@@ -91,7 +109,7 @@ export function replaceHashlineLine(
   content: string,
   lineHash: string,
   replacement: string,
-  snapshot?: string,
+  snapshot?: string
 ): string | undefined {
   const { lines, hasTrailingNewline } = splitLines(content);
   const index = resolveHashlineTargetIndex(lines, lineHash, snapshot);

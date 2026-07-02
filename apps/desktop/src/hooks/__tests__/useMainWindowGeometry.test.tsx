@@ -17,11 +17,17 @@ const tauriWindowMock = vi.hoisted(() => {
   };
 
   class MockPhysicalPosition {
-    constructor(public x: number, public y: number) {}
+    constructor(
+      public x: number,
+      public y: number
+    ) {}
   }
 
   class MockPhysicalSize {
-    constructor(public width: number, public height: number) {}
+    constructor(
+      public width: number,
+      public height: number
+    ) {}
   }
 
   const windowMock = {
@@ -115,7 +121,7 @@ describe('useMainWindowGeometry', () => {
   it('clamps restored bounds to the visible work area', () => {
     const bounds = resolveRestoredMainWindowBounds(
       { x: -100, y: -50, width: 2200, height: 1200, maximized: false },
-      [monitor({ x: 0, y: 0, width: 1920, height: 1040 })],
+      [monitor({ x: 0, y: 0, width: 1920, height: 1040 })]
     );
 
     expect(bounds).toEqual({
@@ -130,32 +136,39 @@ describe('useMainWindowGeometry', () => {
   it('ignores saved bounds that are fully offscreen', () => {
     const bounds = resolveRestoredMainWindowBounds(
       { x: 3000, y: 2000, width: 900, height: 700, maximized: false },
-      [monitor({ x: 0, y: 0, width: 1920, height: 1040 })],
+      [monitor({ x: 0, y: 0, width: 1920, height: 1040 })]
     );
 
     expect(bounds).toBeNull();
   });
 
   it('restores saved main window bounds on desktop Tauri', async () => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      x: 100,
-      y: 120,
-      width: 1000,
-      height: 720,
-      maximized: false,
-    }));
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        x: 100,
+        y: 120,
+        width: 1000,
+        height: 720,
+        maximized: false,
+      })
+    );
 
     renderHook(() => useMainWindowGeometry());
     await flushEffects();
 
-    expect(windowMock.setSize).toHaveBeenCalledWith(expect.objectContaining({
-      width: 1000,
-      height: 720,
-    }));
-    expect(windowMock.setPosition).toHaveBeenCalledWith(expect.objectContaining({
-      x: 100,
-      y: 120,
-    }));
+    expect(windowMock.setSize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        width: 1000,
+        height: 720,
+      })
+    );
+    expect(windowMock.setPosition).toHaveBeenCalledWith(
+      expect.objectContaining({
+        x: 100,
+        y: 120,
+      })
+    );
     expect(windowMock.maximize).not.toHaveBeenCalled();
   });
 
@@ -183,13 +196,16 @@ describe('useMainWindowGeometry', () => {
   });
 
   it('continues installing save listeners when restore fails', async () => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      x: 100,
-      y: 120,
-      width: 1000,
-      height: 720,
-      maximized: false,
-    }));
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        x: 100,
+        y: 120,
+        width: 1000,
+        height: 720,
+        maximized: false,
+      })
+    );
     windowMock.setSize.mockRejectedValueOnce(new Error('permission denied'));
 
     renderHook(() => useMainWindowGeometry());

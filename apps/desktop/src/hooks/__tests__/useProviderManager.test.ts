@@ -81,9 +81,9 @@ describe('hooks/useProviderManager', () => {
 
       const { result } = renderHook(() => useProviderManager());
 
-      await expect(
-        result.current.addProvider({ name: 'test', type: 'claude' })
-      ).rejects.toThrow('API error');
+      await expect(result.current.addProvider({ name: 'test', type: 'claude' })).rejects.toThrow(
+        'API error'
+      );
     });
   });
 
@@ -131,15 +131,14 @@ describe('hooks/useProviderManager', () => {
 
       const { result } = renderHook(() => useProviderManager());
 
-      await expect(
-        result.current.deleteProvider('provider-1')
-      ).rejects.toThrow('Delete failed');
+      await expect(result.current.deleteProvider('provider-1')).rejects.toThrow('Delete failed');
     });
   });
 
   describe('integration scenarios', () => {
     it('can perform CRUD operations in sequence', async () => {
-      const { createLlmProfile, updateLlmProfile, deleteLlmProfile } = await import('../../services/api.js');
+      const { createLlmProfile, updateLlmProfile, deleteLlmProfile } =
+        await import('../../services/api.js');
 
       const { result } = renderHook(() => useProviderManager());
 

@@ -19,8 +19,10 @@ export const codeRefactorTemplate: PhaseTemplate = {
       `Use the self-healing pattern: refactor → run tests → if behavior changed, revise.`,
       ``,
       `Acceptance gates that MUST pass:`,
-      ...phase.acceptanceGates.map((g) => `  - ${g.id}: ${g.command}`),
+      ...phase.acceptanceGates.map(g => `  - ${g.id}: ${g.command}`),
     ].join('\n');
   },
-  defaultGates(_phase: PhaseDef) { return []; },
+  defaultGates(_phase: PhaseDef) {
+    return [];
+  },
 };

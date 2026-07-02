@@ -24,15 +24,15 @@ vi.mock('../../stores/ownershipStore', () => ({
 vi.mock('../../stores/facadeStore', () => ({
   useFacadeStore: {
     getState: () => ({
-      backends: [
-        { backendId: 'remote-1', name: 'Remote One' },
-      ],
+      backends: [{ backendId: 'remote-1', name: 'Remote One' }],
     }),
   },
 }));
 
 vi.mock('../../stores/gatewayStore', async () => {
-  const actual = await vi.importActual<typeof import('../../stores/gatewayStore')>('../../stores/gatewayStore');
+  const actual = await vi.importActual<typeof import('../../stores/gatewayStore')>(
+    '../../stores/gatewayStore'
+  );
   return {
     ...actual,
     useGatewayStore: {
@@ -50,7 +50,10 @@ vi.mock('../../services/api/base', () => ({
 }));
 
 vi.mock('../controlPlane', () => ({
-  resolveCanonicalBackendId: (backendId: string | null | undefined, fallback: string | null = null) => backendId ?? fallback,
+  resolveCanonicalBackendId: (
+    backendId: string | null | undefined,
+    fallback: string | null = null
+  ) => backendId ?? fallback,
   resolveLocalBackendId: () => 'local-backend-1',
 }));
 

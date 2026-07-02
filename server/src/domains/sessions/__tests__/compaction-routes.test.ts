@@ -24,7 +24,7 @@ function insertCompactionEntry(
     readFiles?: string[];
     modifiedFiles?: string[];
     createdAt: number;
-  },
+  }
 ): void {
   const payload = JSON.stringify({
     summary: input.summary,
@@ -40,8 +40,14 @@ function insertCompactionEntry(
   });
   db.prepare(
     `INSERT INTO session_entries (id, session_id, parent_id, type, payload, timestamp)
-     VALUES (?, ?, ?, 'compaction', ?, ?)`,
-  ).run(input.id, sessionId, input.firstKeptEntryId, payload, new Date(input.createdAt).toISOString());
+     VALUES (?, ?, ?, 'compaction', ?, ?)`
+  ).run(
+    input.id,
+    sessionId,
+    input.firstKeptEntryId,
+    payload,
+    new Date(input.createdAt).toISOString()
+  );
 }
 
 vi.mock('../../../infra/events/index.js', () => ({
@@ -53,17 +59,22 @@ vi.mock('../../../infra/storage/metadata-extractor.js', () => ({
 }));
 
 function seedSession(db: Database.Database): { sessionId: string; messageId: string } {
-  db.prepare(`INSERT INTO llm_profiles (id, name, provider_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`)
-    .run('lp1', 'p', 'anthropic', 0, 0);
-  db.prepare(`INSERT INTO agent_profiles (id, name, llm_profile_id, model, system_prompt, enabled_tools, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run('ap1', 'a', 'lp1', 'm', '', '[]', 0, 0);
-  db.prepare(`INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`)
-    .run('p1', 'P', 'code', 0, 0);
-  db.prepare(`INSERT INTO sessions (id, project_id, agent_profile_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`)
-    .run('s1', 'p1', 'ap1', 0, 0);
+  db.prepare(
+    `INSERT INTO llm_profiles (id, name, provider_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
+  ).run('lp1', 'p', 'anthropic', 0, 0);
+  db.prepare(
+    `INSERT INTO agent_profiles (id, name, llm_profile_id, model, system_prompt, enabled_tools, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run('ap1', 'a', 'lp1', 'm', '', '[]', 0, 0);
+  db.prepare(
+    `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
+  ).run('p1', 'P', 'code', 0, 0);
+  db.prepare(
+    `INSERT INTO sessions (id, project_id, agent_profile_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
+  ).run('s1', 'p1', 'ap1', 0, 0);
   const messageId = newId();
-  db.prepare(`INSERT INTO messages (id, session_id, role, content, created_at, offset) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(messageId, 's1', 'user', 'hello', 1000, 1);
+  db.prepare(
+    `INSERT INTO messages (id, session_id, role, content, created_at, offset) VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(messageId, 's1', 'user', 'hello', 1000, 1);
   return { sessionId: 's1', messageId };
 }
 
@@ -128,8 +139,9 @@ describe('sessions compaction routes', () => {
     it('interleaves compaction markers chronologically with messages', async () => {
       const { messageId } = seedSession(db);
       // Add a second message AFTER the compaction so the marker sits in the middle.
-      db.prepare(`INSERT INTO messages (id, session_id, role, content, created_at, offset) VALUES (?, ?, ?, ?, ?, ?)`)
-        .run(newId(), 's1', 'assistant', 'reply', 3000, 2);
+      db.prepare(
+        `INSERT INTO messages (id, session_id, role, content, created_at, offset) VALUES (?, ?, ?, ?, ?, ?)`
+      ).run(newId(), 's1', 'assistant', 'reply', 3000, 2);
 
       const cid = newId();
       insertCompactionEntry(db, 's1', {
@@ -146,7 +158,12 @@ describe('sessions compaction routes', () => {
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
 
-      const items = res.body.data.messages as Array<{ id: string; createdAt: number; role: string; metadata?: { compactionMarker?: { compactionId: string } } }>;
+      const items = res.body.data.messages as Array<{
+        id: string;
+        createdAt: number;
+        role: string;
+        metadata?: { compactionMarker?: { compactionId: string } };
+      }>;
       // Should be ordered: user@1000, marker@2000, assistant@3000
       expect(items).toHaveLength(3);
       expect(items[0].createdAt).toBe(1000);
@@ -158,13 +175,18 @@ describe('sessions compaction routes', () => {
 
     it('omits compaction markers outside the requested page window', async () => {
       const { messageId } = seedSession(db);
-      db.prepare(`INSERT INTO messages (id, session_id, role, content, created_at, offset) VALUES (?, ?, ?, ?, ?, ?)`)
-        .run(newId(), 's1', 'assistant', 'reply', 3000, 2);
+      db.prepare(
+        `INSERT INTO messages (id, session_id, role, content, created_at, offset) VALUES (?, ?, ?, ?, ?, ?)`
+      ).run(newId(), 's1', 'assistant', 'reply', 3000, 2);
 
       // Marker BEFORE the page window (createdAt < oldest message)
       insertCompactionEntry(db, 's1', {
-        id: newId(), summary: 'stale', firstKeptEntryId: messageId,
-        tokensBefore: 1, source: 'auto', createdAt: 500,
+        id: newId(),
+        summary: 'stale',
+        firstKeptEntryId: messageId,
+        tokensBefore: 1,
+        source: 'auto',
+        createdAt: 500,
       });
 
       const app = createApp(db);
@@ -172,8 +194,11 @@ describe('sessions compaction routes', () => {
       // messages fit (createdAt 1000 and 3000); the marker at 500 is older
       // than the oldest message in the page and should NOT appear.
       const res = await request(app).get('/api/sessions/s1/messages');
-      const items = res.body.data.messages as Array<{ role: string; metadata?: { compactionMarker?: unknown } }>;
-      const markers = items.filter((m) => m.metadata?.compactionMarker);
+      const items = res.body.data.messages as Array<{
+        role: string;
+        metadata?: { compactionMarker?: unknown };
+      }>;
+      const markers = items.filter(m => m.metadata?.compactionMarker);
       expect(markers).toHaveLength(0);
     });
   });

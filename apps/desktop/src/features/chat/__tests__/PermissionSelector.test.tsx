@@ -17,23 +17,13 @@ describe('PermissionSelector', () => {
   };
 
   it('should render without crashing', () => {
-    render(
-      <PermissionSelector
-        value={null}
-        onChange={() => {}}
-      />
-    );
+    render(<PermissionSelector value={null} onChange={() => {}} />);
 
     expect(screen.getByRole('button')).toBeInTheDocument();
   });
 
   it('should display current override when set', () => {
-    render(
-      <PermissionSelector
-        value={defaultOverride}
-        onChange={() => {}}
-      />
-    );
+    render(<PermissionSelector value={defaultOverride} onChange={() => {}} />);
 
     // Should show some indication of the active preset
     expect(screen.getByRole('button')).toBeInTheDocument();
@@ -41,10 +31,7 @@ describe('PermissionSelector', () => {
 
   it('should show override styling when override is active', () => {
     const { container } = render(
-      <PermissionSelector
-        value={defaultOverride}
-        onChange={() => {}}
-      />
+      <PermissionSelector value={defaultOverride} onChange={() => {}} />
     );
 
     const button = container.querySelector('button');
@@ -53,24 +40,14 @@ describe('PermissionSelector', () => {
   });
 
   it('should NOT show ring when using project default', () => {
-    const { container } = render(
-      <PermissionSelector
-        value={null}
-        onChange={() => {}}
-      />
-    );
+    const { container } = render(<PermissionSelector value={null} onChange={() => {}} />);
 
     const button = container.querySelector('button');
     expect(button).not.toHaveClass('ring-2');
   });
 
   it('should open dropdown when clicked', () => {
-    render(
-      <PermissionSelector
-        value={null}
-        onChange={() => {}}
-      />
-    );
+    render(<PermissionSelector value={null} onChange={() => {}} />);
 
     fireEvent.click(screen.getByRole('button'));
 
@@ -83,12 +60,7 @@ describe('PermissionSelector', () => {
   });
 
   it('should close dropdown when clicking outside', () => {
-    render(
-      <PermissionSelector
-        value={null}
-        onChange={() => {}}
-      />
-    );
+    render(<PermissionSelector value={null} onChange={() => {}} />);
 
     fireEvent.click(screen.getByRole('button'));
     expect(screen.getByText('Session Permission Override')).toBeInTheDocument();
@@ -102,12 +74,7 @@ describe('PermissionSelector', () => {
   it('should call onChange with selected preset', () => {
     const handleChange = vi.fn();
 
-    render(
-      <PermissionSelector
-        value={null}
-        onChange={handleChange}
-      />
-    );
+    render(<PermissionSelector value={null} onChange={handleChange} />);
 
     fireEvent.click(screen.getByRole('button'));
     fireEvent.click(screen.getByText(/Power User/));
@@ -124,12 +91,7 @@ describe('PermissionSelector', () => {
   it('should call onChange with null when selecting project default', () => {
     const handleChange = vi.fn();
 
-    render(
-      <PermissionSelector
-        value={defaultOverride}
-        onChange={handleChange}
-      />
-    );
+    render(<PermissionSelector value={defaultOverride} onChange={handleChange} />);
 
     fireEvent.click(screen.getByRole('button'));
     fireEvent.click(screen.getByText(/Project Default/));
@@ -182,9 +144,7 @@ describe('PermissionSelector', () => {
   });
 
   it('should NOT show warning styling when value is null (project default)', () => {
-    const { container } = render(
-      <PermissionSelector value={null} onChange={() => {}} />
-    );
+    const { container } = render(<PermissionSelector value={null} onChange={() => {}} />);
 
     const button = container.querySelector('button');
     expect(button?.className).not.toContain('warning');
@@ -212,26 +172,14 @@ describe('PermissionSelector', () => {
   });
 
   it('should be disabled when disabled prop is true', () => {
-    render(
-      <PermissionSelector
-        value={null}
-        onChange={() => {}}
-        disabled={true}
-      />
-    );
+    render(<PermissionSelector value={null} onChange={() => {}} disabled={true} />);
 
     const button = screen.getByRole('button');
     expect(button).toBeDisabled();
   });
 
   it('should not open dropdown when disabled', () => {
-    render(
-      <PermissionSelector
-        value={null}
-        onChange={() => {}}
-        disabled={true}
-      />
-    );
+    render(<PermissionSelector value={null} onChange={() => {}} disabled={true} />);
 
     fireEvent.click(screen.getByRole('button'));
 
@@ -239,12 +187,7 @@ describe('PermissionSelector', () => {
   });
 
   it('should show temporary override info in footer', () => {
-    render(
-      <PermissionSelector
-        value={null}
-        onChange={() => {}}
-      />
-    );
+    render(<PermissionSelector value={null} onChange={() => {}} />);
 
     fireEvent.click(screen.getByRole('button'));
 

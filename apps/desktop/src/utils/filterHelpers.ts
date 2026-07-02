@@ -5,18 +5,14 @@
 import type { Session } from '@zclaudia/shared';
 import type { FilterState } from '../types/filter';
 
-export function filterSessions(
-  sessions: Session[],
-  filterState: FilterState
-): Session[] {
+export function filterSessions(sessions: Session[], filterState: FilterState): Session[] {
   let filtered = sessions;
 
   // Search query filter
   if (filterState.searchQuery) {
     const query = filterState.searchQuery.toLowerCase();
-    filtered = filtered.filter(s =>
-      s.name?.toLowerCase().includes(query) ||
-      s.id.toLowerCase().includes(query)
+    filtered = filtered.filter(
+      s => s.name?.toLowerCase().includes(query) || s.id.toLowerCase().includes(query)
     );
   }
 

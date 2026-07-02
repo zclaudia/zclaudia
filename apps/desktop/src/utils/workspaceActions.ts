@@ -18,8 +18,12 @@ function resolveInstanceKey(toolId: string, ctx: OpenToolCtx): string | undefine
   return undefined;
 }
 
-export function openToolInWorkspace(sessionId: string, toolId: string, ctx: OpenToolCtx = {}): void {
-  const panel = usePluginStore.getState().panels.find((p) => p.id === toolId);
+export function openToolInWorkspace(
+  sessionId: string,
+  toolId: string,
+  ctx: OpenToolCtx = {}
+): void {
+  const panel = usePluginStore.getState().panels.find(p => p.id === toolId);
   const openMode = panel?.openMode ?? 'shared';
   const multiInstance = MULTI_INSTANCE_PANELS.has(toolId);
   useRightWorkspaceStore.getState().openTool(sessionId, toolId, {
@@ -41,18 +45,29 @@ export function closeToolInWorkspace(sessionId: string, toolId: string): void {
   if (!paneId) return;
   useRightWorkspaceStore.getState().closePane(sessionId, paneId);
   // Preserve panel-specific cleanup (terminal drawer, file viewer, draft store).
-  usePluginStore.getState().panels.find((p) => p.id === toolId)?.onClose?.();
+  usePluginStore
+    .getState()
+    .panels.find(p => p.id === toolId)
+    ?.onClose?.();
 }
 
 /** Close a single tab in a pane and run the panel's onClose lifecycle. */
-export function closeTabInWorkspace(sessionId: string, paneId: string, toolId: string, instanceKey?: string): void {
+export function closeTabInWorkspace(
+  sessionId: string,
+  paneId: string,
+  toolId: string,
+  instanceKey?: string
+): void {
   useRightWorkspaceStore.getState().closeTool(sessionId, paneId, toolId, instanceKey);
-  usePluginStore.getState().panels.find((p) => p.id === toolId)?.onClose?.();
+  usePluginStore
+    .getState()
+    .panels.find(p => p.id === toolId)
+    ?.onClose?.();
 }
 
 /** Reactive: is `toolId` present anywhere in the session's workspace tree? */
 export function useToolOpenState(sessionId: string, toolId: string): boolean {
-  return useRightWorkspaceStore((s) => {
+  return useRightWorkspaceStore(s => {
     const root = s.bySession[sessionId]?.root ?? null;
     return findPaneWithTool(root, toolId, undefined, true) !== null;
   });

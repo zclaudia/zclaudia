@@ -205,11 +205,15 @@ describe('services/sessionSync', () => {
       facadeState.localBackendId = 'local-standalone';
       facadeState.backends = [
         ...facadeState.backends,
-        { backendId: 'remote-1', name: 'Remote', online: true, runtimeState: 'ready', isThisInstance: false },
+        {
+          backendId: 'remote-1',
+          name: 'Remote',
+          online: true,
+          runtimeState: 'ready',
+          isThisInstance: false,
+        },
       ];
-      sessionsState.remoteSessions = new Map([
-        ['remote-1', [{ id: 'existing', updatedAt: 1 }]],
-      ]);
+      sessionsState.remoteSessions = new Map([['remote-1', [{ id: 'existing', updatedAt: 1 }]]]);
       (global.fetch as any).mockImplementation(() =>
         createFetchResponse({
           success: true,
@@ -282,11 +286,9 @@ describe('services/sessionSync', () => {
         afterOffset: 5,
         limit: 100,
       });
-      expect(chatState.appendMessages).toHaveBeenCalledWith(
-        'session-1',
-        [{ id: 'message-6' }],
-        { maxOffset: 6 }
-      );
+      expect(chatState.appendMessages).toHaveBeenCalledWith('session-1', [{ id: 'message-6' }], {
+        maxOffset: 6,
+      });
     });
 
     it('skips when there is no selected session or pagination offset', async () => {
@@ -314,11 +316,9 @@ describe('services/sessionSync', () => {
       await recoverCurrentSessionTail('backend-1', 'session-1');
 
       expect(mockGetSessionMessages).toHaveBeenCalledWith('session-1', { limit: 100 });
-      expect(chatState.mergeMessages).toHaveBeenCalledWith(
-        'session-1',
-        [{ id: 'message-10' }],
-        { maxOffset: 10 }
-      );
+      expect(chatState.mergeMessages).toHaveBeenCalledWith('session-1', [{ id: 'message-10' }], {
+        maxOffset: 10,
+      });
     });
 
     it('coalesces concurrent recovery calls and runs one trailing retry', async () => {
@@ -330,7 +330,7 @@ describe('services/sessionSync', () => {
       mockGetSessionMessages
         .mockImplementationOnce(
           () =>
-            new Promise((resolve) => {
+            new Promise(resolve => {
               resolveFirst = resolve;
             })
         )

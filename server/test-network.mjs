@@ -12,14 +12,14 @@ console.log(`Node: ${process.execPath}`);
 console.log(`---`);
 
 for (const { host, port, label } of targets) {
-  await new Promise((resolve) => {
+  await new Promise(resolve => {
     const s = net.createConnection({ host, port, timeout: 3000 });
     s.on('connect', () => {
       console.log(`${label.padEnd(25)} -> SUCCESS`);
       s.destroy();
       resolve();
     });
-    s.on('error', (e) => {
+    s.on('error', e => {
       console.log(`${label.padEnd(25)} -> FAILED: ${e.message}`);
       resolve();
     });

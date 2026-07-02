@@ -2,13 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, fireEvent, waitFor } from '@testing-library/react';
 
 // Hoist mocks so factories can safely reference vi.fn()
-const { fetchContextGraph, requestMessageJump, selectSession, getSessionBackendId, add } = vi.hoisted(() => ({
-  fetchContextGraph: vi.fn(),
-  requestMessageJump: vi.fn(),
-  selectSession: vi.fn(),
-  getSessionBackendId: vi.fn(() => 'b1'),
-  add: vi.fn(),
-}));
+const { fetchContextGraph, requestMessageJump, selectSession, getSessionBackendId, add } =
+  vi.hoisted(() => ({
+    fetchContextGraph: vi.fn(),
+    requestMessageJump: vi.fn(),
+    selectSession: vi.fn(),
+    getSessionBackendId: vi.fn(() => 'b1'),
+    add: vi.fn(),
+  }));
 
 vi.mock('../../../services/api/context-graph', () => ({ fetchContextGraph }));
 
@@ -42,12 +43,39 @@ import { LineageActions, LineagePanel } from '../LineagePanel';
 import { useLineageStore } from '../lineageStore';
 
 const linearGraph = {
-  rootSessionId: 'S0', focusSessionId: 'S0', truncated: false, forkEdges: [],
-  sessions: [{ id: 'S0', name: 'main', forkedFromSessionId: null, forkEntryId: null, createdAt: 1, archived: false, laneOrder: 0 }],
+  rootSessionId: 'S0',
+  focusSessionId: 'S0',
+  truncated: false,
+  forkEdges: [],
+  sessions: [
+    {
+      id: 'S0',
+      name: 'main',
+      forkedFromSessionId: null,
+      forkEntryId: null,
+      createdAt: 1,
+      archived: false,
+      laneOrder: 0,
+    },
+  ],
   nodes: [
-    { nodeId: 'S0:r', sessionId: 'S0', entryId: 'r', entryType: 'message', isRoot: true, isBranchPoint: false,
-      isForkPoint: false, isForkBase: false, isActiveLeaf: false, isBranchTip: false, onActivePath: true,
-      parentNodeId: null, incomingMessageCount: 0, timestamp: 't', jump: { messageId: 'm-root', compactionId: null } },
+    {
+      nodeId: 'S0:r',
+      sessionId: 'S0',
+      entryId: 'r',
+      entryType: 'message',
+      isRoot: true,
+      isBranchPoint: false,
+      isForkPoint: false,
+      isForkBase: false,
+      isActiveLeaf: false,
+      isBranchTip: false,
+      onActivePath: true,
+      parentNodeId: null,
+      incomingMessageCount: 0,
+      timestamp: 't',
+      jump: { messageId: 'm-root', compactionId: null },
+    },
   ],
 };
 
@@ -92,7 +120,7 @@ describe('LineagePanel', () => {
       <>
         <LineagePanel />
         <LineageActions />
-      </>,
+      </>
     );
     await waitFor(() => expect(fetchContextGraph).toHaveBeenCalledTimes(1));
     fireEvent.click(getByLabelText('Refresh lineage'));
@@ -105,7 +133,7 @@ describe('LineagePanel', () => {
       <>
         <LineagePanel />
         <LineageActions />
-      </>,
+      </>
     );
     await waitFor(() => expect(getByTestId('lineage-node-S0:r')).toBeTruthy());
     expect(getByText('1 session')).toBeTruthy();
@@ -120,13 +148,29 @@ describe('LineagePanel', () => {
   it('ignores a stale response when the session changed mid-flight', async () => {
     let resolveS0!: (v: unknown) => void;
     let resolveS1!: (v: unknown) => void;
-    const p0 = new Promise((r) => { resolveS0 = r; });
-    const p1 = new Promise((r) => { resolveS1 = r; });
+    const p0 = new Promise(r => {
+      resolveS0 = r;
+    });
+    const p1 = new Promise(r => {
+      resolveS1 = r;
+    });
     fetchContextGraph.mockReturnValueOnce(p0).mockReturnValueOnce(p1);
 
     const graphS1 = {
-      ...linearGraph, rootSessionId: 'S1', focusSessionId: 'S1',
-      sessions: [{ id: 'S1', name: 'one', forkedFromSessionId: null, forkEntryId: null, createdAt: 2, archived: false, laneOrder: 0 }],
+      ...linearGraph,
+      rootSessionId: 'S1',
+      focusSessionId: 'S1',
+      sessions: [
+        {
+          id: 'S1',
+          name: 'one',
+          forkedFromSessionId: null,
+          forkEntryId: null,
+          createdAt: 2,
+          archived: false,
+          laneOrder: 0,
+        },
+      ],
       nodes: [{ ...linearGraph.nodes[0], nodeId: 'S1:r', sessionId: 'S1' }],
     };
 
@@ -139,7 +183,7 @@ describe('LineagePanel', () => {
     await waitFor(() => expect(queryByTestId('lineage-node-S1:r')).toBeTruthy());
 
     resolveS0(linearGraph); // stale — must be ignored
-    await new Promise((r) => setTimeout(r, 0));
+    await new Promise(r => setTimeout(r, 0));
     expect(queryByTestId('lineage-node-S0:r')).toBeNull();
     expect(queryByTestId('lineage-node-S1:r')).toBeTruthy();
   });

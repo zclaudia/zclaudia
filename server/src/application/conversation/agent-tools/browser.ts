@@ -8,25 +8,27 @@ import { isBlockedHostname } from './network-guard.js';
 
 /** Simple HTML to text conversion (strip tags, decode entities) */
 function htmlToText(html: string): string {
-  return html
-    // Remove script and style blocks
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    // Replace block elements with newlines
-    .replace(/<\/?(p|div|br|h[1-6]|li|tr)[^>]*>/gi, '\n')
-    // Remove remaining tags
-    .replace(/<[^>]+>/g, '')
-    // Decode common HTML entities
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    // Collapse whitespace
-    .replace(/[ \t]+/g, ' ')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+  return (
+    html
+      // Remove script and style blocks
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      // Replace block elements with newlines
+      .replace(/<\/?(p|div|br|h[1-6]|li|tr)[^>]*>/gi, '\n')
+      // Remove remaining tags
+      .replace(/<[^>]+>/g, '')
+      // Decode common HTML entities
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&nbsp;/g, ' ')
+      // Collapse whitespace
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+  );
 }
 
 export function registerBrowserTool(): void {
@@ -38,18 +40,24 @@ export function registerBrowserTool(): void {
       type: 'function',
       function: {
         name: 'agent_browser',
-        description: 'Fetch a URL and return its text content. Useful for reading documentation, API responses, or web pages. Does not execute JavaScript.',
+        description:
+          'Fetch a URL and return its text content. Useful for reading documentation, API responses, or web pages. Does not execute JavaScript.',
         parameters: {
           type: 'object',
           properties: {
             url: { type: 'string', description: 'URL to fetch' },
-            format: { type: 'string', enum: ['text', 'html', 'raw'], description: 'Output format: text (default, strips HTML), html (raw HTML), raw (for JSON/API responses)' },
+            format: {
+              type: 'string',
+              enum: ['text', 'html', 'raw'],
+              description:
+                'Output format: text (default, strips HTML), html (raw HTML), raw (for JSON/API responses)',
+            },
           },
           required: ['url'],
         },
       },
     },
-    handler: async (args) => {
+    handler: async args => {
       const urlStr = args.url as string;
       const format = (args.format as string) || 'text';
 
@@ -62,14 +70,17 @@ export function registerBrowserTool(): void {
         const response = await fetch(urlStr, {
           headers: {
             'User-Agent': 'ZClaudia-Agent/1.0',
-            'Accept': 'text/html, application/json, text/plain, */*',
+            Accept: 'text/html, application/json, text/plain, */*',
           },
           redirect: 'error',
           signal: AbortSignal.timeout(15000),
         });
 
         if (!response.ok) {
-          return JSON.stringify({ error: `HTTP ${response.status}: ${response.statusText}`, url: urlStr });
+          return JSON.stringify({
+            error: `HTTP ${response.status}: ${response.statusText}`,
+            url: urlStr,
+          });
         }
 
         const body = await response.text();
@@ -84,7 +95,10 @@ export function registerBrowserTool(): void {
             return JSON.stringify({ url: urlStr, content: htmlToText(body).slice(0, 8000) });
         }
       } catch (err: unknown) {
-        return JSON.stringify({ error: err instanceof Error ? err.message : String(err), url: urlStr });
+        return JSON.stringify({
+          error: err instanceof Error ? err.message : String(err),
+          url: urlStr,
+        });
       }
     },
   });

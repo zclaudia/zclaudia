@@ -15,9 +15,7 @@ export interface SdkVersionReport {
 }
 
 /** SDK packages to monitor for updates. */
-const SDK_PACKAGES = [
-  '@modelcontextprotocol/sdk',
-];
+const SDK_PACKAGES = ['@modelcontextprotocol/sdk'];
 
 /** Module-level cached report, set after checkSdkVersions() completes. */
 let cachedReport: SdkVersionReport | null = null;
@@ -33,9 +31,7 @@ export function getSdkVersionReport(): SdkVersionReport | null {
  * Caches the result for later retrieval via getSdkVersionReport().
  */
 export async function checkSdkVersions(): Promise<SdkVersionReport> {
-  const sdks = await Promise.all(
-    SDK_PACKAGES.map(pkg => checkSingleSdk(pkg)),
-  );
+  const sdks = await Promise.all(SDK_PACKAGES.map(pkg => checkSingleSdk(pkg)));
 
   const report: SdkVersionReport = {
     checkedAt: Date.now(),
@@ -92,10 +88,10 @@ async function fetchLatestVersion(pkg: string): Promise<string | null> {
   try {
     const response = await fetch(
       `https://registry.npmjs.org/${encodeURIComponent(pkg).replace('%40', '@')}/latest`,
-      { signal: AbortSignal.timeout(5000) },
+      { signal: AbortSignal.timeout(5000) }
     );
     if (!response.ok) return null;
-    const data = await response.json() as { version?: string };
+    const data = (await response.json()) as { version?: string };
     return data.version || null;
   } catch {
     return null;

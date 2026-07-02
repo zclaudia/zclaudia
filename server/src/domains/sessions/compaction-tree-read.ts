@@ -63,19 +63,27 @@ function mapRow(row: CompactionEntryRow, sessionId: string): SessionCompaction {
 
 /** All compaction entries for a session, oldest first (chronological for the timeline). */
 export function listCompactions(db: Database, sessionId: string): SessionCompaction[] {
-  const rows = db.prepare(
-    `SELECT id, payload, timestamp FROM session_entries
+  const rows = db
+    .prepare(
+      `SELECT id, payload, timestamp FROM session_entries
      WHERE session_id = ? AND type = 'compaction'
-     ORDER BY timestamp ASC, id ASC`,
-  ).all(sessionId) as CompactionEntryRow[];
-  return rows.map((r) => mapRow(r, sessionId));
+     ORDER BY timestamp ASC, id ASC`
+    )
+    .all(sessionId) as CompactionEntryRow[];
+  return rows.map(r => mapRow(r, sessionId));
 }
 
 /** Single compaction entry by id, or null when it doesn't exist / isn't in this session. */
-export function getCompactionById(db: Database, sessionId: string, compactionId: string): SessionCompaction | null {
-  const row = db.prepare(
-    `SELECT id, payload, timestamp FROM session_entries
-     WHERE session_id = ? AND id = ? AND type = 'compaction'`,
-  ).get(sessionId, compactionId) as CompactionEntryRow | undefined;
+export function getCompactionById(
+  db: Database,
+  sessionId: string,
+  compactionId: string
+): SessionCompaction | null {
+  const row = db
+    .prepare(
+      `SELECT id, payload, timestamp FROM session_entries
+     WHERE session_id = ? AND id = ? AND type = 'compaction'`
+    )
+    .get(sessionId, compactionId) as CompactionEntryRow | undefined;
   return row ? mapRow(row, sessionId) : null;
 }

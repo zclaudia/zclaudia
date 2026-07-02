@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { SessionLifecycleError, SessionLifecycleService } from '../lifecycle-service.js';
-import { createAgentProfilesTable, seedDefaultAgent } from '../../../test-helpers/seed-default-agent.js';
+import {
+  createAgentProfilesTable,
+  seedDefaultAgent,
+} from '../../../test-helpers/seed-default-agent.js';
 
 function createTestDb(): Database.Database {
   const db = new Database(':memory:');
@@ -53,10 +56,12 @@ describe('SessionLifecycleService', () => {
   beforeEach(() => {
     db = createTestDb();
     const now = Date.now();
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO projects (id, name, type, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
-    `).run('project-1', 'Test Project', 'code', now, now);
+    `
+    ).run('project-1', 'Test Project', 'code', now, now);
     seedDefaultAgent(db);
   });
 
@@ -82,18 +87,26 @@ describe('SessionLifecycleService', () => {
 
     expect(session.projectId).toBe('project-1');
     expect(session.type).toBe('background');
-    expect(broadcastSessionEvent).toHaveBeenCalledWith('created', expect.objectContaining({ id: session.id }));
-    expect(emitPluginEvent).toHaveBeenCalledWith('session.created', expect.objectContaining({ sessionId: session.id }));
+    expect(broadcastSessionEvent).toHaveBeenCalledWith(
+      'created',
+      expect.objectContaining({ id: session.id })
+    );
+    expect(emitPluginEvent).toHaveBeenCalledWith(
+      'session.created',
+      expect.objectContaining({ sessionId: session.id })
+    );
   });
 
   it('rejects regular sessions with a parent session', () => {
     const service = new SessionLifecycleService(db, { pathExists: () => true });
 
-    expect(() => service.createSession({
-      projectId: 'project-1',
-      type: 'regular',
-      parentSessionId: 'parent-1',
-    })).toThrowError('Regular sessions cannot have a parent session');
+    expect(() =>
+      service.createSession({
+        projectId: 'project-1',
+        type: 'regular',
+        parentSessionId: 'parent-1',
+      })
+    ).toThrowError('Regular sessions cannot have a parent session');
   });
 
   it('archives and restores sessions with updated side effects', () => {
@@ -104,58 +117,75 @@ describe('SessionLifecycleService', () => {
       emitPluginEvent,
     });
     const now = Date.now();
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO sessions (id, project_id, name, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
-    `).run('s1', 'project-1', 'Session 1', now, now);
+    `
+    ).run('s1', 'project-1', 'Session 1', now, now);
 
     expect(service.archiveSessions(['s1'])).toEqual({ archived: 1 });
-    let row = db.prepare('SELECT archived_at FROM sessions WHERE id = ?').get('s1') as { archived_at: number | null };
+    let row = db.prepare('SELECT archived_at FROM sessions WHERE id = ?').get('s1') as {
+      archived_at: number | null;
+    };
     expect(row.archived_at).not.toBeNull();
 
     expect(service.restoreSessions(['s1'])).toEqual({ restored: 1 });
-    row = db.prepare('SELECT archived_at FROM sessions WHERE id = ?').get('s1') as { archived_at: number | null };
+    row = db.prepare('SELECT archived_at FROM sessions WHERE id = ?').get('s1') as {
+      archived_at: number | null;
+    };
     expect(row.archived_at).toBeNull();
-    expect(broadcastSessionEvent).toHaveBeenCalledWith('updated', expect.objectContaining({ id: 's1' }));
+    expect(broadcastSessionEvent).toHaveBeenCalledWith(
+      'updated',
+      expect.objectContaining({ id: 's1' })
+    );
     expect(emitPluginEvent).toHaveBeenCalledWith('session.archived', { sessionId: 's1' });
     expect(emitPluginEvent).toHaveBeenCalledWith('session.restored', { sessionId: 's1' });
   });
 
   it('rejects archive when any target session is still running', () => {
     const service = new SessionLifecycleService(db, {
-      isSessionRunning: (id) => id === 's-running',
+      isSessionRunning: id => id === 's-running',
     });
     const now = Date.now();
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO sessions (id, project_id, name, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
-    `).run('s-running', 'project-1', 'Running', now, now);
-    db.prepare(`
+    `
+    ).run('s-running', 'project-1', 'Running', now, now);
+    db.prepare(
+      `
       INSERT INTO sessions (id, project_id, name, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
-    `).run('s-idle', 'project-1', 'Idle', now, now);
+    `
+    ).run('s-idle', 'project-1', 'Idle', now, now);
 
     expect(() => service.archiveSessions(['s-idle', 's-running'])).toThrowError(
-      expect.objectContaining({ status: 409, code: 'SESSION_RUNNING' }),
+      expect.objectContaining({ status: 409, code: 'SESSION_RUNNING' })
     );
 
     // Atomic: idle session must not have been archived either.
-    const row = db.prepare('SELECT archived_at FROM sessions WHERE id = ?').get('s-idle') as { archived_at: number | null };
+    const row = db.prepare('SELECT archived_at FROM sessions WHERE id = ?').get('s-idle') as {
+      archived_at: number | null;
+    };
     expect(row.archived_at).toBeNull();
   });
 
   it('rejects delete when the session is still running', () => {
     const service = new SessionLifecycleService(db, {
-      isSessionRunning: (id) => id === 's-running',
+      isSessionRunning: id => id === 's-running',
     });
     const now = Date.now();
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO sessions (id, project_id, name, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
-    `).run('s-running', 'project-1', 'Running', now, now);
+    `
+    ).run('s-running', 'project-1', 'Running', now, now);
 
     expect(() => service.deleteSession('s-running')).toThrowError(
-      expect.objectContaining({ status: 409, code: 'SESSION_RUNNING' }),
+      expect.objectContaining({ status: 409, code: 'SESSION_RUNNING' })
     );
     const row = db.prepare('SELECT id FROM sessions WHERE id = ?').get('s-running');
     expect(row).toBeDefined();
@@ -167,10 +197,12 @@ describe('SessionLifecycleService', () => {
       broadcastSessionEvent,
     });
     const now = Date.now();
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO sessions (id, project_id, name, agent_profile_id, sdk_session_id, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run('s1', 'project-1', 'Session 1', 'default-agent', 'sdk-1', now, now);
+    `
+    ).run('s1', 'project-1', 'Session 1', 'default-agent', 'sdk-1', now, now);
 
     const updated = service.updateSessionMetadata('s1', {
       name: 'Updated',
@@ -179,48 +211,63 @@ describe('SessionLifecycleService', () => {
 
     expect(updated.name).toBe('Updated');
     expect(updated.sdkSessionId).toBe('sdk-2');
-    expect(broadcastSessionEvent).toHaveBeenCalledWith('updated', expect.objectContaining({ id: 's1' }));
+    expect(broadcastSessionEvent).toHaveBeenCalledWith(
+      'updated',
+      expect.objectContaining({ id: 's1' })
+    );
   });
 
   it('rejects working directory updates while planning task session is locked', () => {
     const service = new SessionLifecycleService(db, { pathExists: () => true });
     const now = Date.now();
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO sessions (id, project_id, name, project_role, plan_status, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run('s1', 'project-1', 'Task Session', 'task', 'planning', now, now);
+    `
+    ).run('s1', 'project-1', 'Task Session', 'task', 'planning', now, now);
 
-    expect(() => service.updateWorkingDirectory('s1', '/tmp/other')).toThrowError(SessionLifecycleError);
+    expect(() => service.updateWorkingDirectory('s1', '/tmp/other')).toThrowError(
+      SessionLifecycleError
+    );
   });
 
   it('clears provider sdk session when working directory changes', () => {
     const service = new SessionLifecycleService(db, { pathExists: () => true });
     const now = Date.now();
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO sessions (id, project_id, name, sdk_session_id, working_directory, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run('s1', 'project-1', 'Session', 'sdk-123', '/tmp/project', now, now);
+    `
+    ).run('s1', 'project-1', 'Session', 'sdk-123', '/tmp/project', now, now);
 
     const updated = service.updateWorkingDirectory('s1', '/tmp/project/.worktrees/fix');
 
     expect(updated.workingDirectory).toBe('/tmp/project/.worktrees/fix');
     expect(updated.sdkSessionId).toBeUndefined();
-    const row = db.prepare('SELECT sdk_session_id FROM sessions WHERE id = ?').get('s1') as { sdk_session_id: string | null };
+    const row = db.prepare('SELECT sdk_session_id FROM sessions WHERE id = ?').get('s1') as {
+      sdk_session_id: string | null;
+    };
     expect(row.sdk_session_id).toBeNull();
   });
 
   it('keeps provider sdk session when working directory is unchanged', () => {
     const service = new SessionLifecycleService(db, { pathExists: () => true });
     const now = Date.now();
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO sessions (id, project_id, name, sdk_session_id, working_directory, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run('s1', 'project-1', 'Session', 'sdk-123', '/tmp/project', now, now);
+    `
+    ).run('s1', 'project-1', 'Session', 'sdk-123', '/tmp/project', now, now);
 
     const updated = service.updateWorkingDirectory('s1', '/tmp/project/');
 
     expect(updated.sdkSessionId).toBe('sdk-123');
-    const row = db.prepare('SELECT sdk_session_id FROM sessions WHERE id = ?').get('s1') as { sdk_session_id: string | null };
+    const row = db.prepare('SELECT sdk_session_id FROM sessions WHERE id = ?').get('s1') as {
+      sdk_session_id: string | null;
+    };
     expect(row.sdk_session_id).toBe('sdk-123');
   });
 
@@ -232,21 +279,34 @@ describe('SessionLifecycleService', () => {
       emitPluginEvent,
     });
     const now = Date.now();
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO sessions (id, project_id, name, sdk_session_id, is_read_only, project_role, plan_status, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run('s1', 'project-1', 'Session', 'sdk-123', 1, 'task', 'ready', now, now);
+    `
+    ).run('s1', 'project-1', 'Session', 'sdk-123', 1, 'task', 'ready', now, now);
 
     const unlocked = service.unlockSession('s1');
     expect(unlocked.isReadOnly).toBeUndefined();
     expect(unlocked.planStatus).toBe('planning');
-    expect(emitPluginEvent).toHaveBeenCalledWith('session.updated', expect.objectContaining({ sessionId: 's1' }));
+    expect(emitPluginEvent).toHaveBeenCalledWith(
+      'session.updated',
+      expect.objectContaining({ sessionId: 's1' })
+    );
 
     expect(service.resetSdkSession('s1')).toEqual({ sessionId: 's1', reset: true });
-    const row = db.prepare('SELECT sdk_session_id FROM sessions WHERE id = ?').get('s1') as { sdk_session_id: string | null };
+    const row = db.prepare('SELECT sdk_session_id FROM sessions WHERE id = ?').get('s1') as {
+      sdk_session_id: string | null;
+    };
     expect(row.sdk_session_id).toBeNull();
-    expect(emitPluginEvent).toHaveBeenCalledWith('session.updated', expect.objectContaining({ sessionId: 's1' }));
-    expect(broadcastSessionEvent).toHaveBeenCalledWith('updated', expect.objectContaining({ id: 's1' }));
+    expect(emitPluginEvent).toHaveBeenCalledWith(
+      'session.updated',
+      expect.objectContaining({ sessionId: 's1' })
+    );
+    expect(broadcastSessionEvent).toHaveBeenCalledWith(
+      'updated',
+      expect.objectContaining({ id: 's1' })
+    );
   });
 
   it('dismisses interrupted status and emits updated side effects', () => {
@@ -257,17 +317,27 @@ describe('SessionLifecycleService', () => {
       emitPluginEvent,
     });
     const now = Date.now();
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO sessions (id, project_id, name, last_run_status, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run('s1', 'project-1', 'Interrupted Session', 'interrupted', now, now);
+    `
+    ).run('s1', 'project-1', 'Interrupted Session', 'interrupted', now, now);
 
     service.dismissInterrupted('s1');
 
-    const row = db.prepare('SELECT last_run_status FROM sessions WHERE id = ?').get('s1') as { last_run_status: string | null };
+    const row = db.prepare('SELECT last_run_status FROM sessions WHERE id = ?').get('s1') as {
+      last_run_status: string | null;
+    };
     expect(row.last_run_status).toBeNull();
-    expect(broadcastSessionEvent).toHaveBeenCalledWith('updated', expect.objectContaining({ id: 's1' }));
-    expect(emitPluginEvent).toHaveBeenCalledWith('session.updated', expect.objectContaining({ sessionId: 's1' }));
+    expect(broadcastSessionEvent).toHaveBeenCalledWith(
+      'updated',
+      expect.objectContaining({ id: 's1' })
+    );
+    expect(emitPluginEvent).toHaveBeenCalledWith(
+      'session.updated',
+      expect.objectContaining({ sessionId: 's1' })
+    );
   });
 
   it('deletes sessions and reorders project sessions', () => {
@@ -278,17 +348,24 @@ describe('SessionLifecycleService', () => {
       emitPluginEvent,
     });
     const now = Date.now();
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO sessions (id, project_id, name, sort_order, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run('s1', 'project-1', 'Session 1', 0, now, now);
-    db.prepare(`
+    `
+    ).run('s1', 'project-1', 'Session 1', 0, now, now);
+    db.prepare(
+      `
       INSERT INTO sessions (id, project_id, name, sort_order, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run('s2', 'project-1', 'Session 2', 1, now, now);
+    `
+    ).run('s2', 'project-1', 'Session 2', 1, now, now);
 
     service.reorderSessions('project-1', ['s2', 's1']);
-    let rows = db.prepare('SELECT id, sort_order FROM sessions ORDER BY id').all() as Array<{ id: string; sort_order: number }>;
+    let rows = db.prepare('SELECT id, sort_order FROM sessions ORDER BY id').all() as Array<{
+      id: string;
+      sort_order: number;
+    }>;
     expect(rows).toEqual([
       { id: 's1', sort_order: 1 },
       { id: 's2', sort_order: 0 },
@@ -297,22 +374,42 @@ describe('SessionLifecycleService', () => {
     service.deleteSession('s1');
     rows = db.prepare('SELECT id FROM sessions ORDER BY id').all() as Array<{ id: string }>;
     expect(rows).toEqual([{ id: 's2' }]);
-    expect(broadcastSessionEvent).toHaveBeenCalledWith('deleted', expect.objectContaining({ id: 's1' }));
-    expect(emitPluginEvent).toHaveBeenCalledWith('session.deleted', expect.objectContaining({ sessionId: 's1' }));
+    expect(broadcastSessionEvent).toHaveBeenCalledWith(
+      'deleted',
+      expect.objectContaining({ id: 's1' })
+    );
+    expect(emitPluginEvent).toHaveBeenCalledWith(
+      'session.deleted',
+      expect.objectContaining({ sessionId: 's1' })
+    );
   });
 
   it('deleteSession removes the session tree rows (session_entries lack an FK cascade)', () => {
     const service = new SessionLifecycleService(db, {});
     const now = Date.now();
-    db.prepare(`INSERT INTO sessions (id, project_id, name, sort_order, created_at, updated_at) VALUES (?,?,?,?,?,?)`)
-      .run('s1', 'project-1', 'S1', 0, now, now);
-    db.prepare(`INSERT INTO session_entries (id, session_id, parent_id, type, payload, timestamp) VALUES (?,?,?,?,?,?)`)
-      .run('e1', 's1', null, 'message', '{}', '2026-06-21T00:00:00.000Z');
+    db.prepare(
+      `INSERT INTO sessions (id, project_id, name, sort_order, created_at, updated_at) VALUES (?,?,?,?,?,?)`
+    ).run('s1', 'project-1', 'S1', 0, now, now);
+    db.prepare(
+      `INSERT INTO session_entries (id, session_id, parent_id, type, payload, timestamp) VALUES (?,?,?,?,?,?)`
+    ).run('e1', 's1', null, 'message', '{}', '2026-06-21T00:00:00.000Z');
     db.prepare(`INSERT INTO session_leaf (session_id, leaf_id) VALUES (?, ?)`).run('s1', 'e1');
 
     service.deleteSession('s1');
 
-    expect((db.prepare(`SELECT count(*) AS c FROM session_entries WHERE session_id='s1'`).get() as { c: number }).c).toBe(0);
-    expect((db.prepare(`SELECT count(*) AS c FROM session_leaf WHERE session_id='s1'`).get() as { c: number }).c).toBe(0);
+    expect(
+      (
+        db.prepare(`SELECT count(*) AS c FROM session_entries WHERE session_id='s1'`).get() as {
+          c: number;
+        }
+      ).c
+    ).toBe(0);
+    expect(
+      (
+        db.prepare(`SELECT count(*) AS c FROM session_leaf WHERE session_id='s1'`).get() as {
+          c: number;
+        }
+      ).c
+    ).toBe(0);
   });
 });

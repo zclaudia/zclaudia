@@ -18,17 +18,23 @@ describe('SidebarNav', () => {
 
   it('marks Home active when isHomeActive is true', () => {
     render(<SidebarNav onHome={vi.fn()} isHomeActive={true} />);
-    expect(screen.getByRole('button', { name: 'Home' }).className).not.toContain('text-muted-foreground');
+    expect(screen.getByRole('button', { name: 'Home' }).className).not.toContain(
+      'text-muted-foreground'
+    );
   });
 
   it('does not mark Home active when isHomeActive is false', () => {
     render(<SidebarNav onHome={vi.fn()} isHomeActive={false} />);
-    expect(screen.getByRole('button', { name: 'Home' }).className).toContain('text-muted-foreground');
+    expect(screen.getByRole('button', { name: 'Home' }).className).toContain(
+      'text-muted-foreground'
+    );
   });
 
   it('renders Automations and fires its callback when provided', () => {
     const onOpenAutomations = vi.fn();
-    render(<SidebarNav onHome={vi.fn()} isHomeActive={false} onOpenAutomations={onOpenAutomations} />);
+    render(
+      <SidebarNav onHome={vi.fn()} isHomeActive={false} onOpenAutomations={onOpenAutomations} />
+    );
     const automations = screen.getByRole('button', { name: 'Automations' });
     fireEvent.click(automations);
     expect(onOpenAutomations).toHaveBeenCalledTimes(1);
@@ -62,7 +68,7 @@ describe('SidebarNav', () => {
         onHome={vi.fn()}
         isHomeActive={false}
         automationMode={{ tab: 'automations', onBack, onSelectTab }}
-      />,
+      />
     );
     fireEvent.click(screen.getByRole('button', { name: 'Back to app' }));
     expect(onBack).toHaveBeenCalledTimes(1);
@@ -76,10 +82,14 @@ describe('SidebarNav', () => {
         onHome={vi.fn()}
         isHomeActive={false}
         automationMode={{ tab: 'workflows', onBack: vi.fn(), onSelectTab: vi.fn() }}
-      />,
+      />
     );
-    expect(screen.getByRole('button', { name: 'Workflows' }).className).not.toContain('text-muted-foreground');
-    expect(screen.getByRole('button', { name: 'Runs' }).className).toContain('text-muted-foreground');
+    expect(screen.getByRole('button', { name: 'Workflows' }).className).not.toContain(
+      'text-muted-foreground'
+    );
+    expect(screen.getByRole('button', { name: 'Runs' }).className).toContain(
+      'text-muted-foreground'
+    );
   });
 });
 
@@ -87,7 +97,12 @@ const base = { onHome: () => {}, isHomeActive: false };
 
 describe('SidebarNav automation mode', () => {
   it('renders the automation tab rows with visible labels', () => {
-    render(<SidebarNav {...base} automationMode={{ tab: 'workflows', onSelectTab: () => {}, onBack: () => {} }} />);
+    render(
+      <SidebarNav
+        {...base}
+        automationMode={{ tab: 'workflows', onSelectTab: () => {}, onBack: () => {} }}
+      />
+    );
     for (const name of ['Automations', 'Activity', 'Workflows', 'Runs', 'System']) {
       expect(screen.getByRole('button', { name })).toHaveTextContent(name);
     }
@@ -95,14 +110,21 @@ describe('SidebarNav automation mode', () => {
 
   it('fires onSelectTab with "activity" when the Activity row is clicked', () => {
     const onSelectTab = vi.fn();
-    render(<SidebarNav {...base} automationMode={{ tab: 'automations', onSelectTab, onBack: () => {} }} />);
+    render(
+      <SidebarNav
+        {...base}
+        automationMode={{ tab: 'automations', onSelectTab, onBack: () => {} }}
+      />
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Activity' }));
     expect(onSelectTab).toHaveBeenCalledWith('activity');
   });
 
   it('calls onSelectTab when a row is clicked', () => {
     const onSelectTab = vi.fn();
-    render(<SidebarNav {...base} automationMode={{ tab: 'workflows', onSelectTab, onBack: () => {} }} />);
+    render(
+      <SidebarNav {...base} automationMode={{ tab: 'workflows', onSelectTab, onBack: () => {} }} />
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Runs' }));
     expect(onSelectTab).toHaveBeenCalledWith('runs');
   });

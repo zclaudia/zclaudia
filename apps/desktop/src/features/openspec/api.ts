@@ -77,14 +77,14 @@ export interface CorpusDetail {
 
 export async function listCorpus(projectId: string): Promise<CapabilitySummary[]> {
   const body = await apiCall<{ capabilities: CapabilitySummary[] }>(
-    `/api/openspec/corpus?projectId=${encodeURIComponent(projectId)}`,
+    `/api/openspec/corpus?projectId=${encodeURIComponent(projectId)}`
   );
   return body.capabilities;
 }
 
 export async function getCapability(projectId: string, capability: string): Promise<CorpusDetail> {
   return apiCall<CorpusDetail>(
-    `/api/openspec/corpus/${encodeURIComponent(capability)}?projectId=${encodeURIComponent(projectId)}`,
+    `/api/openspec/corpus/${encodeURIComponent(capability)}?projectId=${encodeURIComponent(projectId)}`
   );
 }
 
@@ -92,7 +92,7 @@ export async function getCapability(projectId: string, capability: string): Prom
 
 export async function listSpecChanges(projectId: string): Promise<SpecChange[]> {
   const body = await apiCall<{ specChanges: SpecChange[] }>(
-    `/api/openspec/spec-changes?projectId=${encodeURIComponent(projectId)}`,
+    `/api/openspec/spec-changes?projectId=${encodeURIComponent(projectId)}`
   );
   return body.specChanges;
 }
@@ -124,14 +124,14 @@ export function readTasks(id: string): Promise<string> {
 export function readDeltaSpec(id: string, capability: string): Promise<string> {
   return fetchText(
     `/api/openspec/spec-changes/${id}/delta/${encodeURIComponent(capability)}`,
-    'readDeltaSpec',
+    'readDeltaSpec'
   );
 }
 
 export async function writeProposal(id: string, content: string): Promise<SpecChange> {
   const body = await apiCall<{ specChange: SpecChange }>(
     `/api/openspec/spec-changes/${id}/proposal`,
-    { method: 'PUT', body: JSON.stringify({ content }) },
+    { method: 'PUT', body: JSON.stringify({ content }) }
   );
   return body.specChange;
 }
@@ -139,27 +139,27 @@ export async function writeProposal(id: string, content: string): Promise<SpecCh
 export async function writeDesign(id: string, content: string): Promise<SpecChange> {
   const body = await apiCall<{ specChange: SpecChange }>(
     `/api/openspec/spec-changes/${id}/design`,
-    { method: 'PUT', body: JSON.stringify({ content }) },
+    { method: 'PUT', body: JSON.stringify({ content }) }
   );
   return body.specChange;
 }
 
 export async function writeTasks(id: string, content: string): Promise<SpecChange> {
-  const body = await apiCall<{ specChange: SpecChange }>(
-    `/api/openspec/spec-changes/${id}/tasks`,
-    { method: 'PUT', body: JSON.stringify({ content }) },
-  );
+  const body = await apiCall<{ specChange: SpecChange }>(`/api/openspec/spec-changes/${id}/tasks`, {
+    method: 'PUT',
+    body: JSON.stringify({ content }),
+  });
   return body.specChange;
 }
 
 export async function writeDeltaSpec(
   id: string,
   capability: string,
-  content: string,
+  content: string
 ): Promise<SpecChange> {
   const body = await apiCall<{ specChange: SpecChange }>(
     `/api/openspec/spec-changes/${id}/delta/${encodeURIComponent(capability)}`,
-    { method: 'PUT', body: JSON.stringify({ content }) },
+    { method: 'PUT', body: JSON.stringify({ content }) }
   );
   return body.specChange;
 }
@@ -168,7 +168,7 @@ export async function writeDeltaSpec(
 
 export async function listExecutors(specChangeId: string): Promise<ExecutorInstance[]> {
   const body = await apiCall<{ executorInstances: ExecutorInstance[] }>(
-    `/api/openspec/executor-instances?specChangeId=${encodeURIComponent(specChangeId)}`,
+    `/api/openspec/executor-instances?specChangeId=${encodeURIComponent(specChangeId)}`
   );
   return body.executorInstances;
 }
@@ -183,7 +183,7 @@ export interface CreateExecutorInput {
 export async function createExecutor(input: CreateExecutorInput): Promise<ExecutorInstance> {
   const body = await apiCall<{ executorInstance: ExecutorInstance }>(
     '/api/openspec/executor-instances',
-    { method: 'POST', body: JSON.stringify(input) },
+    { method: 'POST', body: JSON.stringify(input) }
   );
   return body.executorInstance;
 }
@@ -191,31 +191,35 @@ export async function createExecutor(input: CreateExecutorInput): Promise<Execut
 async function executorAction(id: string, action: string): Promise<ExecutorInstance> {
   const body = await apiCall<{ executorInstance: ExecutorInstance }>(
     `/api/openspec/executor-instances/${id}/${action}`,
-    { method: 'POST', body: JSON.stringify({}) },
+    { method: 'POST', body: JSON.stringify({}) }
   );
   return body.executorInstance;
 }
 
 export async function listLegacyClassicChangeIds(projectId: string): Promise<string[]> {
   const body = await apiCall<{ legacyIds: string[] }>(
-    `/api/openspec/legacy-classic-change-ids?projectId=${encodeURIComponent(projectId)}`,
+    `/api/openspec/legacy-classic-change-ids?projectId=${encodeURIComponent(projectId)}`
   );
   return body.legacyIds;
 }
 
 export async function listLegacyMetaWorkflowRunIds(projectId: string): Promise<string[]> {
   const body = await apiCall<{ legacyIds: string[] }>(
-    `/api/openspec/legacy-meta-workflow-run-ids?projectId=${encodeURIComponent(projectId)}`,
+    `/api/openspec/legacy-meta-workflow-run-ids?projectId=${encodeURIComponent(projectId)}`
   );
   return body.legacyIds;
 }
 
 export const startExecutor = (id: string): Promise<ExecutorInstance> => executorAction(id, 'start');
 export const pauseExecutor = (id: string): Promise<ExecutorInstance> => executorAction(id, 'pause');
-export const resumeExecutor = (id: string): Promise<ExecutorInstance> => executorAction(id, 'resume');
-export const cancelExecutor = (id: string): Promise<ExecutorInstance> => executorAction(id, 'cancel');
-export const completeExecutor = (id: string): Promise<ExecutorInstance> => executorAction(id, 'mark-completed');
-export const refreshExecutor = (id: string): Promise<ExecutorInstance> => executorAction(id, 'refresh');
+export const resumeExecutor = (id: string): Promise<ExecutorInstance> =>
+  executorAction(id, 'resume');
+export const cancelExecutor = (id: string): Promise<ExecutorInstance> =>
+  executorAction(id, 'cancel');
+export const completeExecutor = (id: string): Promise<ExecutorInstance> =>
+  executorAction(id, 'mark-completed');
+export const refreshExecutor = (id: string): Promise<ExecutorInstance> =>
+  executorAction(id, 'refresh');
 
 // ---------- Issues ----------
 
@@ -248,7 +252,7 @@ export async function createEpic(input: CreateEpicInput): Promise<Epic> {
 
 export async function listEpics(projectId: string): Promise<Epic[]> {
   const body = await apiCall<{ epics: Epic[] }>(
-    `/api/epics?projectId=${encodeURIComponent(projectId)}`,
+    `/api/epics?projectId=${encodeURIComponent(projectId)}`
   );
   return body.epics;
 }
@@ -272,7 +276,7 @@ export async function listIssuesByEpic(epicId: string): Promise<LocalIssue[]> {
 }
 
 export async function createSubIssue(
-  input: CreateSubIssueInput,
+  input: CreateSubIssueInput
 ): Promise<{ issue: LocalIssue; specChange: SpecChange }> {
   return apiCall<{ issue: LocalIssue; specChange: SpecChange }>('/api/issues/sub', {
     method: 'POST',
@@ -297,7 +301,7 @@ export async function getIssue(id: string): Promise<LocalIssue> {
 
 export async function listIssues(projectId: string): Promise<LocalIssue[]> {
   const body = await apiCall<{ issues: LocalIssue[] }>(
-    `/api/issues?projectId=${encodeURIComponent(projectId)}`,
+    `/api/issues?projectId=${encodeURIComponent(projectId)}`
   );
   return body.issues;
 }
@@ -318,11 +322,11 @@ export interface ArchiveOutcome {
 }
 
 export async function closeAndArchive(
-  id: string,
+  id: string
 ): Promise<{ issue: LocalIssue; archive?: ArchiveOutcome }> {
   return apiCall<{ issue: LocalIssue; archive?: ArchiveOutcome }>(
     `/api/issues/${id}/close-and-archive`,
-    { method: 'POST', body: JSON.stringify({}) },
+    { method: 'POST', body: JSON.stringify({}) }
   );
 }
 
@@ -336,7 +340,7 @@ export interface StartBootstrapResult {
 
 export async function startBootstrap(
   projectId: string,
-  mode: 'initial' | 'rescan',
+  mode: 'initial' | 'rescan'
 ): Promise<StartBootstrapResult> {
   return apiCall<StartBootstrapResult>('/api/openspec/bootstrap/scans', {
     method: 'POST',
@@ -346,7 +350,7 @@ export async function startBootstrap(
 
 export async function listBootstrapScans(projectId: string): Promise<BootstrapScan[]> {
   const body = await apiCall<{ scans: BootstrapScan[] }>(
-    `/api/openspec/bootstrap/scans?projectId=${encodeURIComponent(projectId)}`,
+    `/api/openspec/bootstrap/scans?projectId=${encodeURIComponent(projectId)}`
   );
   return body.scans;
 }
@@ -358,10 +362,10 @@ export async function getBootstrapScan(id: string): Promise<BootstrapScan> {
 
 export async function listBootstrapItems(
   scanId: string,
-  status: 'pending' | 'all' = 'all',
+  status: 'pending' | 'all' = 'all'
 ): Promise<BootstrapReviewItem[]> {
   const body = await apiCall<{ items: BootstrapReviewItem[] }>(
-    `/api/openspec/bootstrap/scans/${scanId}/items?status=${status}`,
+    `/api/openspec/bootstrap/scans/${scanId}/items?status=${status}`
   );
   return body.items;
 }
@@ -369,7 +373,7 @@ export async function listBootstrapItems(
 export async function approveBootstrapItem(itemId: string): Promise<BootstrapReviewItem> {
   const body = await apiCall<{ item: BootstrapReviewItem }>(
     `/api/openspec/bootstrap/items/${itemId}/approve`,
-    { method: 'POST', body: JSON.stringify({}) },
+    { method: 'POST', body: JSON.stringify({}) }
   );
   return body.item;
 }
@@ -377,7 +381,7 @@ export async function approveBootstrapItem(itemId: string): Promise<BootstrapRev
 export async function rejectBootstrapItem(itemId: string): Promise<BootstrapReviewItem> {
   const body = await apiCall<{ item: BootstrapReviewItem }>(
     `/api/openspec/bootstrap/items/${itemId}/reject`,
-    { method: 'POST', body: JSON.stringify({}) },
+    { method: 'POST', body: JSON.stringify({}) }
   );
   return body.item;
 }
@@ -385,7 +389,7 @@ export async function rejectBootstrapItem(itemId: string): Promise<BootstrapRevi
 export async function cancelBootstrapScan(scanId: string): Promise<BootstrapScan> {
   const body = await apiCall<{ scan: BootstrapScan }>(
     `/api/openspec/bootstrap/scans/${scanId}/cancel`,
-    { method: 'POST', body: JSON.stringify({}) },
+    { method: 'POST', body: JSON.stringify({}) }
   );
   return body.scan;
 }
@@ -396,10 +400,10 @@ export interface FinalizeBootstrapResult {
 }
 
 export async function finalizeBootstrap(scanId: string): Promise<FinalizeBootstrapResult> {
-  return apiCall<FinalizeBootstrapResult>(
-    `/api/openspec/bootstrap/scans/${scanId}/finalize`,
-    { method: 'POST', body: JSON.stringify({}) },
-  );
+  return apiCall<FinalizeBootstrapResult>(`/api/openspec/bootstrap/scans/${scanId}/finalize`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
 }
 
 // ---------- AI Drafting (G7) ----------
@@ -410,37 +414,43 @@ export interface DraftResponse {
 }
 
 export async function draftProposal(specChangeId: string): Promise<DraftResponse> {
-  return apiCall<DraftResponse>(
-    `/api/openspec/spec-changes/${specChangeId}/draft-proposal`,
-    { method: 'POST', body: JSON.stringify({}) },
-  );
+  return apiCall<DraftResponse>(`/api/openspec/spec-changes/${specChangeId}/draft-proposal`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
 }
 
 export async function draftDesign(specChangeId: string): Promise<DraftResponse> {
-  return apiCall<DraftResponse>(
-    `/api/openspec/spec-changes/${specChangeId}/draft-design`,
-    { method: 'POST', body: JSON.stringify({}) },
-  );
+  return apiCall<DraftResponse>(`/api/openspec/spec-changes/${specChangeId}/draft-design`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
 }
 
 export async function draftTasks(specChangeId: string): Promise<DraftResponse> {
-  return apiCall<DraftResponse>(
-    `/api/openspec/spec-changes/${specChangeId}/draft-tasks`,
-    { method: 'POST', body: JSON.stringify({}) },
-  );
+  return apiCall<DraftResponse>(`/api/openspec/spec-changes/${specChangeId}/draft-tasks`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
 }
 
 export async function draftDelta(specChangeId: string, capability: string): Promise<DraftResponse> {
   return apiCall<DraftResponse>(
     `/api/openspec/spec-changes/${specChangeId}/draft-delta/${encodeURIComponent(capability)}`,
-    { method: 'POST', body: JSON.stringify({}) },
+    { method: 'POST', body: JSON.stringify({}) }
   );
 }
 
 // ---------- Candidates (init flow) ----------
 
 export type CandidatePhase =
-  | 'discovered' | 'excluded' | 'generating' | 'generated' | 'approved' | 'rejected' | 'failed';
+  | 'discovered'
+  | 'excluded'
+  | 'generating'
+  | 'generated'
+  | 'approved'
+  | 'rejected'
+  | 'failed';
 
 export type CandidateSource = 'ai_discovered' | 'user_added';
 
@@ -462,45 +472,50 @@ export interface Candidate {
 
 export async function listBootstrapCandidates(scanId: string): Promise<Candidate[]> {
   const body = await apiCall<{ candidates: Candidate[] }>(
-    `/api/openspec/bootstrap/scans/${scanId}/candidates`,
+    `/api/openspec/bootstrap/scans/${scanId}/candidates`
   );
   return body.candidates;
 }
 
-export async function addCandidate(scanId: string, input: { name: string; description: string }): Promise<Candidate> {
+export async function addCandidate(
+  scanId: string,
+  input: { name: string; description: string }
+): Promise<Candidate> {
   const body = await apiCall<{ candidate: Candidate }>(
     `/api/openspec/bootstrap/scans/${scanId}/candidates`,
-    { method: 'POST', body: JSON.stringify(input) },
+    { method: 'POST', body: JSON.stringify(input) }
   );
   return body.candidate;
 }
 
-export async function patchCandidate(id: string, patch: Partial<Pick<Candidate, 'title' | 'description' | 'selected'>>): Promise<Candidate> {
-  const body = await apiCall<{ candidate: Candidate }>(
-    `/api/openspec/bootstrap/candidates/${id}`,
-    { method: 'PATCH', body: JSON.stringify(patch) },
-  );
+export async function patchCandidate(
+  id: string,
+  patch: Partial<Pick<Candidate, 'title' | 'description' | 'selected'>>
+): Promise<Candidate> {
+  const body = await apiCall<{ candidate: Candidate }>(`/api/openspec/bootstrap/candidates/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
   return body.candidate;
 }
 
 export async function deleteCandidate(id: string): Promise<void> {
-  await apiCall<{ ok: true }>(
-    `/api/openspec/bootstrap/candidates/${id}`,
-    { method: 'DELETE' },
-  );
+  await apiCall<{ ok: true }>(`/api/openspec/bootstrap/candidates/${id}`, { method: 'DELETE' });
 }
 
-export async function commitGeneration(scanId: string): Promise<{ scan: BootstrapScan; candidates: Candidate[] }> {
+export async function commitGeneration(
+  scanId: string
+): Promise<{ scan: BootstrapScan; candidates: Candidate[] }> {
   return apiCall<{ scan: BootstrapScan; candidates: Candidate[] }>(
     `/api/openspec/bootstrap/scans/${scanId}/generate`,
-    { method: 'POST', body: JSON.stringify({}) },
+    { method: 'POST', body: JSON.stringify({}) }
   );
 }
 
 export async function approveCandidate(id: string): Promise<Candidate> {
   const body = await apiCall<{ candidate: Candidate }>(
     `/api/openspec/bootstrap/candidates/${id}/approve`,
-    { method: 'POST', body: JSON.stringify({}) },
+    { method: 'POST', body: JSON.stringify({}) }
   );
   return body.candidate;
 }
@@ -508,7 +523,7 @@ export async function approveCandidate(id: string): Promise<Candidate> {
 export async function rejectCandidate(id: string): Promise<Candidate> {
   const body = await apiCall<{ candidate: Candidate }>(
     `/api/openspec/bootstrap/candidates/${id}/reject`,
-    { method: 'POST', body: JSON.stringify({}) },
+    { method: 'POST', body: JSON.stringify({}) }
   );
   return body.candidate;
 }
@@ -516,7 +531,7 @@ export async function rejectCandidate(id: string): Promise<Candidate> {
 export async function retryCandidate(id: string): Promise<Candidate> {
   const body = await apiCall<{ candidate: Candidate }>(
     `/api/openspec/bootstrap/candidates/${id}/retry`,
-    { method: 'POST', body: JSON.stringify({}) },
+    { method: 'POST', body: JSON.stringify({}) }
   );
   return body.candidate;
 }

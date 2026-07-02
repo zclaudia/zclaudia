@@ -33,9 +33,13 @@ const PRIORITY_ORDER: Record<string, number> = {
   low: 3,
 };
 
-export function LocalIssuesPanel({ projectId, selectedIssueId, onSelectIssue }: LocalIssuesPanelProps) {
-  const issues = useLocalIssueStore((s) => s.issues[projectId] ?? []);
-  const loadIssues = useLocalIssueStore((s) => s.loadIssues);
+export function LocalIssuesPanel({
+  projectId,
+  selectedIssueId,
+  onSelectIssue,
+}: LocalIssuesPanelProps) {
+  const issues = useLocalIssueStore(s => s.issues[projectId] ?? []);
+  const loadIssues = useLocalIssueStore(s => s.loadIssues);
   const [filter, setFilter] = useState<FilterStatus>('all');
   const [actionableOnly, setActionableOnly] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
@@ -46,12 +50,12 @@ export function LocalIssuesPanel({ projectId, selectedIssueId, onSelectIssue }: 
 
   // Batch fetch attachment counts so every card shows its badge without
   // each card making its own request.
-  const issueIds = useMemo(() => issues.map((i) => i.id), [issues]);
+  const issueIds = useMemo(() => issues.map(i => i.id), [issues]);
   useAttachmentCounts('local_issue', issueIds);
 
   const selectedIssue = useMemo(
-    () => (selectedIssueId ? issues.find((i) => i.id === selectedIssueId) ?? null : null),
-    [selectedIssueId, issues],
+    () => (selectedIssueId ? (issues.find(i => i.id === selectedIssueId) ?? null) : null),
+    [selectedIssueId, issues]
   );
 
   // If the selected issue was deleted (e.g. via WS broadcast), drop selection.
@@ -70,8 +74,8 @@ export function LocalIssuesPanel({ projectId, selectedIssueId, onSelectIssue }: 
   }
 
   const filtered = issues
-    .filter((issue) => filter === 'all' || issue.status === filter)
-    .filter((issue) => !actionableOnly || issue.labels.includes(ACTIONABLE_LABEL))
+    .filter(issue => filter === 'all' || issue.status === filter)
+    .filter(issue => !actionableOnly || issue.labels.includes(ACTIONABLE_LABEL))
     .sort((a, b) => {
       // Open/in_progress first, then by priority, then by creation time
       const statusOrder = (s: string) => (s === 'closed' ? 1 : 0);
@@ -84,10 +88,10 @@ export function LocalIssuesPanel({ projectId, selectedIssueId, onSelectIssue }: 
 
   const counts: Record<FilterStatus, number> = {
     all: issues.length,
-    open: issues.filter((i) => i.status === 'open').length,
-    tracked: issues.filter((i) => i.status === 'tracked').length,
-    closed: issues.filter((i) => i.status === 'closed').length,
-    cancelled: issues.filter((i) => i.status === 'cancelled').length,
+    open: issues.filter(i => i.status === 'open').length,
+    tracked: issues.filter(i => i.status === 'tracked').length,
+    closed: issues.filter(i => i.status === 'closed').length,
+    cancelled: issues.filter(i => i.status === 'cancelled').length,
   };
 
   return (
@@ -95,7 +99,7 @@ export function LocalIssuesPanel({ projectId, selectedIssueId, onSelectIssue }: 
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <div className="flex items-center gap-2">
-          {FILTER_OPTIONS.map((opt) => (
+          {FILTER_OPTIONS.map(opt => (
             <button
               key={opt.value}
               onClick={() => setFilter(opt.value)}
@@ -111,7 +115,7 @@ export function LocalIssuesPanel({ projectId, selectedIssueId, onSelectIssue }: 
           ))}
           <button
             type="button"
-            onClick={() => setActionableOnly((v) => !v)}
+            onClick={() => setActionableOnly(v => !v)}
             aria-pressed={actionableOnly}
             className={`text-xs px-2 py-1 rounded-md border transition-colors ${
               actionableOnly
@@ -143,7 +147,7 @@ export function LocalIssuesPanel({ projectId, selectedIssueId, onSelectIssue }: 
             </p>
           </div>
         ) : (
-          filtered.map((issue) => (
+          filtered.map(issue => (
             <LocalIssueCard
               key={issue.id}
               issue={issue}
@@ -156,10 +160,7 @@ export function LocalIssuesPanel({ projectId, selectedIssueId, onSelectIssue }: 
 
       {/* Dialogs */}
       {showCreate && (
-        <CreateIssueDialog
-          projectId={projectId}
-          onClose={() => setShowCreate(false)}
-        />
+        <CreateIssueDialog projectId={projectId} onClose={() => setShowCreate(false)} />
       )}
     </div>
   );

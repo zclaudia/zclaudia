@@ -1,5 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { isSessionRunActive, useSessionRunStateStore, type SessionRunRecord } from '../../stores/sessionRunStateStore';
+import {
+  isSessionRunActive,
+  useSessionRunStateStore,
+  type SessionRunRecord,
+} from '../../stores/sessionRunStateStore';
 import { useSendQueueStore } from '../../stores/sendQueueStore';
 import { useToastStore } from '../../stores/toastStore';
 import type { Attachment } from '../../features/chat/MessageInput';
@@ -36,7 +40,10 @@ const SHIP_ACTIVE_TIMEOUT_MS = 10_000;
  * Scope: client-only, per-session. The session must be mounted (ChatInterface
  * is open) for the queue to drain. Queue items are held in-memory only.
  */
-export function useSendQueueConsumer({ sessionId, sendAsNewRun }: UseSendQueueConsumerParams): void {
+export function useSendQueueConsumer({
+  sessionId,
+  sendAsNewRun,
+}: UseSendQueueConsumerParams): void {
   // True between "decided to ship an item" and "the shipped run went active".
   const consumingRef = useRef(false);
   // Fallback timer that force-releases the lock if no active transition arrives.
@@ -50,7 +57,7 @@ export function useSendQueueConsumer({ sessionId, sendAsNewRun }: UseSendQueueCo
 
   useEffect(() => {
     const sessionIsActive = (records: Record<string, SessionRunRecord>): boolean =>
-      Object.values(records).some((r) => r.sessionId === sessionId && isSessionRunActive(r));
+      Object.values(records).some(r => r.sessionId === sessionId && isSessionRunActive(r));
 
     const clearUnlockTimer = (): void => {
       if (unlockTimerRef.current !== null) {
@@ -67,7 +74,7 @@ export function useSendQueueConsumer({ sessionId, sendAsNewRun }: UseSendQueueCo
     const drainOne = async (): Promise<void> => {
       if (consumingRef.current) return;
       const store = useSendQueueStore.getState();
-      const items = (store.queues[sessionId] ?? []).filter((i) => i.intent === 'queue');
+      const items = (store.queues[sessionId] ?? []).filter(i => i.intent === 'queue');
       if (items.length === 0) return;
       // Re-check idleness right before shipping — a manual run_start (e.g. via
       // resend) may have flipped the session active since the transition fired.

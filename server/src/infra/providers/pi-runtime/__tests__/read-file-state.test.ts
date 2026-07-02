@@ -17,8 +17,13 @@ describe('read-file-state edit guards', () => {
     const file = await fixture('a\nb\nc\n');
     const store = createReadFileStateStore();
     await store.recordRead(file, {
-      content: 'a\nb\nc\n', offset: 1, limit: 3, totalLines: 3, returnedLines: 1,
-      isPartialView: true, hasFullContent: true,
+      content: 'a\nb\nc\n',
+      offset: 1,
+      limit: 3,
+      totalLines: 3,
+      returnedLines: 1,
+      isPartialView: true,
+      hasFullContent: true,
     });
     expect(store.assertEditable(file, 'a\nb\nc\n')).toEqual({ ok: true });
   });
@@ -27,20 +32,35 @@ describe('read-file-state edit guards', () => {
     const file = await fixture('a\nb\nc\n');
     const store = createReadFileStateStore();
     await store.recordRead(file, {
-      content: 'a\n', offset: 1, limit: 1, totalLines: 3, returnedLines: 1,
-      isPartialView: true, hasFullContent: false,
+      content: 'a\n',
+      offset: 1,
+      limit: 1,
+      totalLines: 3,
+      returnedLines: 1,
+      isPartialView: true,
+      hasFullContent: false,
     });
-    expect(store.assertEditable(file, 'a\nb\nc\n')).toMatchObject({ ok: false, code: 'partial_read' });
+    expect(store.assertEditable(file, 'a\nb\nc\n')).toMatchObject({
+      ok: false,
+      code: 'partial_read',
+    });
   });
 
   it('assertEditable rejects when the file changed since read', async () => {
     const file = await fixture('a\nb\nc\n');
     const store = createReadFileStateStore();
     await store.recordRead(file, {
-      content: 'a\nb\nc\n', offset: 1, limit: 3, totalLines: 3, returnedLines: 3,
+      content: 'a\nb\nc\n',
+      offset: 1,
+      limit: 3,
+      totalLines: 3,
+      returnedLines: 3,
       hasFullContent: true,
     });
-    expect(store.assertEditable(file, 'a\nb\nDIFFERENT\n')).toMatchObject({ ok: false, code: 'file_modified_since_read' });
+    expect(store.assertEditable(file, 'a\nb\nDIFFERENT\n')).toMatchObject({
+      ok: false,
+      code: 'file_modified_since_read',
+    });
   });
 
   it('assertEditable rejects when never read', async () => {
@@ -53,8 +73,13 @@ describe('read-file-state edit guards', () => {
     const file = await fixture('a\nb\n');
     const store = createReadFileStateStore();
     await store.recordRead(file, {
-      content: 'a\nb\n', offset: 1, limit: 2, totalLines: 2, returnedLines: 1,
-      isPartialView: true, hasFullContent: true,
+      content: 'a\nb\n',
+      offset: 1,
+      limit: 2,
+      totalLines: 2,
+      returnedLines: 1,
+      isPartialView: true,
+      hasFullContent: true,
     });
     expect(store.assertEditableHashline(file)).toEqual({ ok: true });
   });
@@ -63,8 +88,13 @@ describe('read-file-state edit guards', () => {
     const file = await fixture('a\nb\nc\n');
     const store = createReadFileStateStore();
     await store.recordRead(file, {
-      content: 'a\nb\nc\n', offset: 1, limit: 3, totalLines: 3, returnedLines: 1,
-      isPartialView: true, hasFullContent: true,
+      content: 'a\nb\nc\n',
+      offset: 1,
+      limit: 3,
+      totalLines: 3,
+      returnedLines: 1,
+      isPartialView: true,
+      hasFullContent: true,
     });
     const check = await store.assertSafeToWrite(file, 'a\nb\nc\n');
     expect(check).toMatchObject({ ok: false, code: 'partial_read' });

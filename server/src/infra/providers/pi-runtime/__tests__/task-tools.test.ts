@@ -5,7 +5,14 @@ import { createAgentTool, createMonitorTool, createTaskOutputTool } from '../tas
 
 describe('task bridge tools', () => {
   it('Agent reports missing executor or database context without launching', async () => {
-    const missingExecutor = createAgentTool('/tmp', undefined, undefined, undefined, undefined, undefined) as any;
+    const missingExecutor = createAgentTool(
+      '/tmp',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined
+    ) as any;
     const missingDb = createAgentTool('/tmp', undefined, undefined, undefined, undefined, {
       start: async () => ({ executorRef: {} }),
       wait: async () => ({ status: 'completed', result: {} }),
@@ -24,21 +31,35 @@ describe('task bridge tools', () => {
     const monitor = createMonitorTool() as any;
 
     const taskResult = await taskOutput.execute('task-output-1', { task_id: 'task-1' });
-    const monitorResult = await monitor.execute('monitor-1', { action: 'status', task_id: 'task-1' });
+    const monitorResult = await monitor.execute('monitor-1', {
+      action: 'status',
+      task_id: 'task-1',
+    });
 
     expect(taskResult.details).toMatchObject({ ok: false, error: 'missing_db_context' });
     expect(monitorResult.details).toMatchObject({ ok: false, error: 'missing_db_context' });
   });
 
   it('parses TaskOutput window params strictly', () => {
-    const parse = (taskTools as any).parseTaskOutputWindowParams as undefined | ((args: Record<string, unknown>) => any);
+    const parse = (taskTools as any).parseTaskOutputWindowParams as
+      | undefined
+      | ((args: Record<string, unknown>) => any);
     expect(typeof parse).toBe('function');
 
     expect(parse!({ output_offset: 10 })).toEqual({ ok: true, outputOffset: 10 });
     expect(parse!({ tail_lines: 20 })).toEqual({ ok: true, outputOffset: 0, tailLines: 20 });
-    expect(parse!({ output_offset: 1.5 })).toMatchObject({ ok: false, code: 'invalid_output_offset' });
-    expect(parse!({ output_offset: '2' })).toMatchObject({ ok: false, code: 'invalid_output_offset' });
+    expect(parse!({ output_offset: 1.5 })).toMatchObject({
+      ok: false,
+      code: 'invalid_output_offset',
+    });
+    expect(parse!({ output_offset: '2' })).toMatchObject({
+      ok: false,
+      code: 'invalid_output_offset',
+    });
     expect(parse!({ tail_lines: 0 })).toMatchObject({ ok: false, code: 'invalid_tail_lines' });
-    expect(parse!({ tail_lines: Number.POSITIVE_INFINITY })).toMatchObject({ ok: false, code: 'invalid_tail_lines' });
+    expect(parse!({ tail_lines: Number.POSITIVE_INFINITY })).toMatchObject({
+      ok: false,
+      code: 'invalid_tail_lines',
+    });
   });
 });

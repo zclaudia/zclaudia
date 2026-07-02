@@ -63,7 +63,8 @@ export function renderNotebook(raw: string): string {
   parsed.cells.forEach((cell, index) => {
     const kind = cell.cell_type ?? 'code';
     const header = `── Cell ${index + 1} [${kind}]${
-      typeof cell.execution_count === 'number' ? ` (execution ${cell.execution_count})` : ''} ──`;
+      typeof cell.execution_count === 'number' ? ` (execution ${cell.execution_count})` : ''
+    } ──`;
     const lines = [header, joinSource(cell.source).trimEnd()];
     const outputs = (cell.outputs ?? []).flatMap(renderOutput);
     if (outputs.length > 0) {
@@ -110,7 +111,9 @@ export async function extractPdfText(buffer: Buffer, pageSpec?: string): Promise
   const { extractText } = await import('unpdf');
   const { totalPages, text } = await extractText(new Uint8Array(buffer), { mergePages: false });
   const pages = parsePageSpec(pageSpec, totalPages);
-  const sections = pages.map(page => `── Page ${page} of ${totalPages} ──\n${(text[page - 1] ?? '').trim()}`);
+  const sections = pages.map(
+    page => `── Page ${page} of ${totalPages} ──\n${(text[page - 1] ?? '').trim()}`
+  );
   return { text: sections.join('\n\n'), totalPages, pages };
 }
 
@@ -126,7 +129,10 @@ export interface CompressedImage {
  * models accept regardless of the source format). Returns undefined when the
  * format is unsupported or compression cannot reach the limit.
  */
-export async function compressImageToLimit(buffer: Buffer, maxBytes: number): Promise<CompressedImage | undefined> {
+export async function compressImageToLimit(
+  buffer: Buffer,
+  maxBytes: number
+): Promise<CompressedImage | undefined> {
   try {
     const { Jimp } = await import('jimp');
     const image = await Jimp.read(buffer);

@@ -10,9 +10,15 @@ import { useFacadeStore } from '../../stores/facadeStore';
 describe('ActiveSessionsPanel', () => {
   beforeEach(() => {
     // Reset stores
-    useSessionsStore.setState({ remoteSessions: new Map(), activeSessionIdsByBackend: new Map(), recentlyCompletedSessions: [] });
+    useSessionsStore.setState({
+      remoteSessions: new Map(),
+      activeSessionIdsByBackend: new Map(),
+      recentlyCompletedSessions: [],
+    });
     useServerStore.setState({
-      servers: [{ id: 'local', name: 'Local', address: 'localhost:3100', isDefault: true, createdAt: 0 }],
+      servers: [
+        { id: 'local', name: 'Local', address: 'localhost:3100', isDefault: true, createdAt: 0 },
+      ],
       activeServerId: 'local',
       connections: {
         local: { status: 'connected', error: null, isLocalConnection: true, features: [] },
@@ -22,7 +28,11 @@ describe('ActiveSessionsPanel', () => {
       isLocalConnection: true,
     });
     useProjectStore.setState({ sessions: [] });
-    useGatewayStore.setState({ gatewayUrl: null, gatewaySecret: null, showLocalBackend: false } as any);
+    useGatewayStore.setState({
+      gatewayUrl: null,
+      gatewaySecret: null,
+      showLocalBackend: false,
+    } as any);
     useFacadeStore.setState({
       backends: [],
       localBackendId: null,
@@ -50,16 +60,21 @@ describe('ActiveSessionsPanel', () => {
         connectionStatus: 'connected',
       });
       useFacadeStore.setState({
-        backends: [
-          { backendId, name: 'Test Backend', online: true, isThisInstance: false } as any,
-        ],
+        backends: [{ backendId, name: 'Test Backend', online: true, isThisInstance: false } as any],
         connectionState: 'connected',
       });
 
       // Add an active session from this backend
       const remoteSessions = new Map();
       remoteSessions.set(backendId, [
-        { id: sessionId, name: 'Active Session', projectId: 'proj-1', isActive: true, createdAt: Date.now(), updatedAt: Date.now() },
+        {
+          id: sessionId,
+          name: 'Active Session',
+          projectId: 'proj-1',
+          isActive: true,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
       ]);
       useSessionsStore.setState({ remoteSessions });
       useSessionsStore.getState().setActiveSessionsForBackend(backendId, new Set([sessionId]));
@@ -80,10 +95,19 @@ describe('ActiveSessionsPanel', () => {
 
       useProjectStore.setState({
         sessions: [
-          { id: sessionId, name: 'Local Session', projectId: 'proj-1', isActive: true, createdAt: Date.now(), updatedAt: Date.now() } as any,
+          {
+            id: sessionId,
+            name: 'Local Session',
+            projectId: 'proj-1',
+            isActive: true,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          } as any,
         ],
       });
-      useSessionsStore.getState().setActiveSessionsForBackend(LOCAL_BACKEND_KEY, new Set([sessionId]));
+      useSessionsStore
+        .getState()
+        .setActiveSessionsForBackend(LOCAL_BACKEND_KEY, new Set([sessionId]));
 
       const onSessionSelect = vi.fn();
       render(<ActiveSessionsPanel onSessionSelect={onSessionSelect} />);
@@ -105,18 +129,32 @@ describe('ActiveSessionsPanel', () => {
       useFacadeStore.setState({
         localBackendId,
         backends: [
-          { backendId: localBackendId, name: 'My Local Backend', online: true, isThisInstance: true } as any,
+          {
+            backendId: localBackendId,
+            name: 'My Local Backend',
+            online: true,
+            isThisInstance: true,
+          } as any,
         ],
       });
       useProjectStore.setState({ sessions: [] }); // stale: no local active session
 
       const remoteSessions = new Map();
       remoteSessions.set(localBackendId, [
-        { id: sessionId, name: 'Recovered Local Session', projectId: 'proj-1', isActive: true, createdAt: Date.now(), updatedAt: Date.now() },
+        {
+          id: sessionId,
+          name: 'Recovered Local Session',
+          projectId: 'proj-1',
+          isActive: true,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
       ]);
       useSessionsStore.setState({ remoteSessions });
       useSessionsStore.getState().setActiveSessionsForBackend(localBackendId, new Set([sessionId]));
-      useSessionsStore.getState().setActiveSessionsForBackend(LOCAL_BACKEND_KEY, new Set([sessionId]));
+      useSessionsStore
+        .getState()
+        .setActiveSessionsForBackend(LOCAL_BACKEND_KEY, new Set([sessionId]));
 
       render(<ActiveSessionsPanel />);
 
@@ -138,16 +176,32 @@ describe('ActiveSessionsPanel', () => {
       useFacadeStore.setState({ localBackendId: null });
       useProjectStore.setState({
         sessions: [
-          { id: localSessionId, name: 'Direct Local Session', projectId: 'proj-1', isActive: true, createdAt: Date.now(), updatedAt: Date.now() } as any,
+          {
+            id: localSessionId,
+            name: 'Direct Local Session',
+            projectId: 'proj-1',
+            isActive: true,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          } as any,
         ],
       });
 
       const remoteSessions = new Map();
       remoteSessions.set('local', [
-        { id: gwSessionId, name: 'Gateway Local Session', projectId: 'proj-2', isActive: true, createdAt: Date.now(), updatedAt: Date.now() },
+        {
+          id: gwSessionId,
+          name: 'Gateway Local Session',
+          projectId: 'proj-2',
+          isActive: true,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
       ]);
       useSessionsStore.setState({ remoteSessions });
-      useSessionsStore.getState().setActiveSessionsForBackend(LOCAL_BACKEND_KEY, new Set([localSessionId]));
+      useSessionsStore
+        .getState()
+        .setActiveSessionsForBackend(LOCAL_BACKEND_KEY, new Set([localSessionId]));
       useSessionsStore.getState().setActiveSessionsForBackend('local', new Set([gwSessionId]));
 
       render(<ActiveSessionsPanel />);
@@ -165,7 +219,9 @@ describe('ActiveSessionsPanel', () => {
         connectionStatus: 'connected',
       });
       useProjectStore.setState({ sessions: [] });
-      useSessionsStore.getState().setActiveSessionsForBackend(LOCAL_BACKEND_KEY, new Set([missingSessionId]));
+      useSessionsStore
+        .getState()
+        .setActiveSessionsForBackend(LOCAL_BACKEND_KEY, new Set([missingSessionId]));
 
       render(<ActiveSessionsPanel />);
 
@@ -181,13 +237,26 @@ describe('ActiveSessionsPanel', () => {
         localBackendId,
         currentInstanceId: 'inst-1',
         backends: [
-          { backendId: localBackendId, name: 'This Machine', online: true, isThisInstance: true, instanceId: 'inst-1' } as any,
+          {
+            backendId: localBackendId,
+            name: 'This Machine',
+            online: true,
+            isThisInstance: true,
+            instanceId: 'inst-1',
+          } as any,
         ],
       });
 
       const remoteSessions = new Map();
       remoteSessions.set(localBackendId, [
-        { id: sessionId, name: 'Recovered Local Only', projectId: 'proj-1', isActive: true, createdAt: Date.now(), updatedAt: Date.now() },
+        {
+          id: sessionId,
+          name: 'Recovered Local Only',
+          projectId: 'proj-1',
+          isActive: true,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
       ]);
       useSessionsStore.setState({ remoteSessions });
       useSessionsStore.getState().setActiveSessionsForBackend(localBackendId, new Set([sessionId]));
@@ -210,15 +279,20 @@ describe('ActiveSessionsPanel', () => {
         connectionStatus: 'connected',
       });
       useFacadeStore.setState({
-        backends: [
-          { backendId, name: 'My Backend', online: true, isThisInstance: false } as any,
-        ],
+        backends: [{ backendId, name: 'My Backend', online: true, isThisInstance: false } as any],
         connectionState: 'connected',
       });
 
       const remoteSessions = new Map();
       remoteSessions.set(backendId, [
-        { id: 'sess-1', name: 'Test Session', projectId: 'proj-1', isActive: true, createdAt: Date.now(), updatedAt: Date.now() },
+        {
+          id: 'sess-1',
+          name: 'Test Session',
+          projectId: 'proj-1',
+          isActive: true,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
       ]);
       useSessionsStore.setState({ remoteSessions });
       useSessionsStore.getState().setActiveSessionsForBackend(backendId, new Set(['sess-1']));
@@ -235,7 +309,9 @@ describe('ActiveSessionsPanel', () => {
 
       useServerStore.setState({
         activeServerId: 'local',
-        servers: [{ id: 'local', name: 'Local', address: 'localhost:3100', isDefault: true, createdAt: 0 }],
+        servers: [
+          { id: 'local', name: 'Local', address: 'localhost:3100', isDefault: true, createdAt: 0 },
+        ],
       });
       useFacadeStore.setState({
         backends: [
@@ -245,7 +321,14 @@ describe('ActiveSessionsPanel', () => {
 
       const remoteSessions = new Map();
       remoteSessions.set(backendId, [
-        { id: 'sess-1', name: 'Test Session', projectId: 'proj-1', isActive: true, createdAt: Date.now(), updatedAt: Date.now() },
+        {
+          id: 'sess-1',
+          name: 'Test Session',
+          projectId: 'proj-1',
+          isActive: true,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
       ]);
       useSessionsStore.setState({ remoteSessions });
       useSessionsStore.getState().setActiveSessionsForBackend(backendId, new Set(['sess-1']));
@@ -266,19 +349,38 @@ describe('ActiveSessionsPanel', () => {
       useFacadeStore.setState({
         currentInstanceId: 'inst-1',
         backends: [
-          { backendId, name: 'HomeMac', online: true, isThisInstance: true, instanceId: 'inst-1' } as any,
+          {
+            backendId,
+            name: 'HomeMac',
+            online: true,
+            isThisInstance: true,
+            instanceId: 'inst-1',
+          } as any,
         ],
       });
 
       const remoteSessions = new Map();
       remoteSessions.set(backendId, [
-        { id: 'sess-1', name: 'Self Session', projectId: 'proj-1', isActive: true, createdAt: Date.now(), updatedAt: Date.now() },
+        {
+          id: 'sess-1',
+          name: 'Self Session',
+          projectId: 'proj-1',
+          isActive: true,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
       ]);
       useSessionsStore.setState({
         remoteSessions,
         recentlyCompletedSessions: [
           {
-            session: { id: 'done-1', name: 'Self Completed', projectId: 'proj-1', createdAt: Date.now(), updatedAt: Date.now() } as any,
+            session: {
+              id: 'done-1',
+              name: 'Self Completed',
+              projectId: 'proj-1',
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            } as any,
             backendId,
             ownerBackendId: backendId,
             completedAt: Date.now(),
@@ -314,10 +416,19 @@ describe('ActiveSessionsPanel', () => {
       const sessionId = 'sess-1';
       useProjectStore.setState({
         sessions: [
-          { id: sessionId, name: 'My Session', projectId: 'proj-1', isActive: true, createdAt: Date.now(), updatedAt: Date.now() } as any,
+          {
+            id: sessionId,
+            name: 'My Session',
+            projectId: 'proj-1',
+            isActive: true,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          } as any,
         ],
       });
-      useSessionsStore.getState().setActiveSessionsForBackend(LOCAL_BACKEND_KEY, new Set([sessionId]));
+      useSessionsStore
+        .getState()
+        .setActiveSessionsForBackend(LOCAL_BACKEND_KEY, new Set([sessionId]));
 
       render(<ActiveSessionsPanel />);
 
@@ -337,11 +448,27 @@ describe('ActiveSessionsPanel', () => {
     it('shows total active session count', () => {
       useProjectStore.setState({
         sessions: [
-          { id: 's1', name: 'Session 1', projectId: 'p1', isActive: true, createdAt: Date.now(), updatedAt: Date.now() } as any,
-          { id: 's2', name: 'Session 2', projectId: 'p1', isActive: true, createdAt: Date.now(), updatedAt: Date.now() } as any,
+          {
+            id: 's1',
+            name: 'Session 1',
+            projectId: 'p1',
+            isActive: true,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          } as any,
+          {
+            id: 's2',
+            name: 'Session 2',
+            projectId: 'p1',
+            isActive: true,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          } as any,
         ],
       });
-      useSessionsStore.getState().setActiveSessionsForBackend(LOCAL_BACKEND_KEY, new Set(['s1', 's2']));
+      useSessionsStore
+        .getState()
+        .setActiveSessionsForBackend(LOCAL_BACKEND_KEY, new Set(['s1', 's2']));
 
       render(<ActiveSessionsPanel />);
       // The session count is shown next to the "Active Sessions" header
@@ -352,11 +479,16 @@ describe('ActiveSessionsPanel', () => {
     it('shows project name next to session', () => {
       useProjectStore.setState({
         sessions: [
-          { id: 's1', name: 'Session 1', projectId: 'proj-1', isActive: true, createdAt: Date.now(), updatedAt: Date.now() } as any,
+          {
+            id: 's1',
+            name: 'Session 1',
+            projectId: 'proj-1',
+            isActive: true,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          } as any,
         ],
-        projects: [
-          { id: 'proj-1', name: 'My Project' } as any,
-        ],
+        projects: [{ id: 'proj-1', name: 'My Project' } as any],
       });
       useSessionsStore.getState().setActiveSessionsForBackend(LOCAL_BACKEND_KEY, new Set(['s1']));
 
@@ -368,7 +500,13 @@ describe('ActiveSessionsPanel', () => {
       useSessionsStore.setState({
         recentlyCompletedSessions: [
           {
-            session: { id: 'done-1', name: 'Done Session', projectId: 'p1', createdAt: Date.now(), updatedAt: Date.now() } as any,
+            session: {
+              id: 'done-1',
+              name: 'Done Session',
+              projectId: 'p1',
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            } as any,
             backendId: LOCAL_BACKEND_KEY,
             ownerBackendId: LOCAL_BACKEND_KEY,
             completedAt: Date.now() - 30000,
@@ -387,7 +525,13 @@ describe('ActiveSessionsPanel', () => {
       useSessionsStore.setState({
         recentlyCompletedSessions: [
           {
-            session: { id: 'done-1', name: 'Done Session', projectId: 'p1', createdAt: Date.now(), updatedAt: Date.now() } as any,
+            session: {
+              id: 'done-1',
+              name: 'Done Session',
+              projectId: 'p1',
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            } as any,
             backendId: LOCAL_BACKEND_KEY,
             ownerBackendId: LOCAL_BACKEND_KEY,
             completedAt: Date.now(),
@@ -406,7 +550,13 @@ describe('ActiveSessionsPanel', () => {
       useSessionsStore.setState({
         recentlyCompletedSessions: [
           {
-            session: { id: 'done-1', name: 'Done Session', projectId: 'p1', createdAt: Date.now(), updatedAt: Date.now() } as any,
+            session: {
+              id: 'done-1',
+              name: 'Done Session',
+              projectId: 'p1',
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            } as any,
             backendId: LOCAL_BACKEND_KEY,
             ownerBackendId: LOCAL_BACKEND_KEY,
             completedAt: Date.now(),
@@ -425,7 +575,13 @@ describe('ActiveSessionsPanel', () => {
       useSessionsStore.setState({
         recentlyCompletedSessions: [
           {
-            session: { id: 'done-1', name: 'Completed Local', projectId: 'p1', createdAt: Date.now(), updatedAt: Date.now() } as any,
+            session: {
+              id: 'done-1',
+              name: 'Completed Local',
+              projectId: 'p1',
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            } as any,
             backendId: LOCAL_BACKEND_KEY,
             ownerBackendId: LOCAL_BACKEND_KEY,
             completedAt: Date.now(),
@@ -443,7 +599,13 @@ describe('ActiveSessionsPanel', () => {
       useSessionsStore.setState({
         recentlyCompletedSessions: [
           {
-            session: { id: 'done-1', name: 'Completed Remote', projectId: 'p1', createdAt: Date.now(), updatedAt: Date.now() } as any,
+            session: {
+              id: 'done-1',
+              name: 'Completed Remote',
+              projectId: 'p1',
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            } as any,
             backendId: 'remote-backend-1',
             ownerBackendId: 'remote-backend-1',
             completedAt: Date.now(),
@@ -462,13 +624,25 @@ describe('ActiveSessionsPanel', () => {
         localBackendId,
         currentInstanceId: 'inst-1',
         backends: [
-          { backendId: localBackendId, name: 'This Machine', online: true, isThisInstance: true, instanceId: 'inst-1' } as any,
+          {
+            backendId: localBackendId,
+            name: 'This Machine',
+            online: true,
+            isThisInstance: true,
+            instanceId: 'inst-1',
+          } as any,
         ],
       });
       useSessionsStore.setState({
         recentlyCompletedSessions: [
           {
-            session: { id: 'done-local', name: 'Completed Local Hidden', projectId: 'p1', createdAt: Date.now(), updatedAt: Date.now() } as any,
+            session: {
+              id: 'done-local',
+              name: 'Completed Local Hidden',
+              projectId: 'p1',
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            } as any,
             backendId: localBackendId,
             ownerBackendId: localBackendId,
             completedAt: Date.now(),

@@ -18,7 +18,14 @@ import { minimatch } from 'minimatch';
 import { formatSkillsForSystemPrompt } from '@earendil-works/pi-agent-core';
 import { workspaceService } from '../services/workspace.js';
 import type { ExecutionEnv } from '../../infra/execution-env.js';
-import { loadAllSkills, type SkillExecutionMetadata, type SkillFrontmatterMetadata, type SkillLoadDiagnostic, type SkillSource, type SourcedSkill } from './skill-loader.js';
+import {
+  loadAllSkills,
+  type SkillExecutionMetadata,
+  type SkillFrontmatterMetadata,
+  type SkillLoadDiagnostic,
+  type SkillSource,
+  type SourcedSkill,
+} from './skill-loader.js';
 import { meetsRequirements } from './skill-requirements.js';
 
 /**
@@ -87,21 +94,22 @@ function skillUsageFor(s: SourcedSkill): SkillUsage | undefined {
 function readSkillUsageStore(): Map<string, SkillUsage> {
   if (!dbInstance) return new Map(skillUsage);
   try {
-    const row = dbInstance.prepare(
-      `SELECT value FROM app_config WHERE key = 'skill_usage'`,
-    ).get() as { value: string } | undefined;
+    const row = dbInstance
+      .prepare(`SELECT value FROM app_config WHERE key = 'skill_usage'`)
+      .get() as { value: string } | undefined;
     if (!row) return new Map();
     const parsed = JSON.parse(row.value) as unknown;
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return new Map();
-    const entries = Object.entries(parsed)
-      .filter((entry): entry is [string, SkillUsage] => {
-        const value = entry[1] as SkillUsage;
-        return value &&
-          typeof value.count === 'number' &&
-          Number.isFinite(value.count) &&
-          typeof value.lastUsedAt === 'number' &&
-          Number.isFinite(value.lastUsedAt);
-      });
+    const entries = Object.entries(parsed).filter((entry): entry is [string, SkillUsage] => {
+      const value = entry[1] as SkillUsage;
+      return (
+        value &&
+        typeof value.count === 'number' &&
+        Number.isFinite(value.count) &&
+        typeof value.lastUsedAt === 'number' &&
+        Number.isFinite(value.lastUsedAt)
+      );
+    });
     return new Map(entries);
   } catch {
     return new Map();
@@ -111,10 +119,14 @@ function readSkillUsageStore(): Map<string, SkillUsage> {
 function writeSkillUsageStore(): void {
   if (!dbInstance) return;
   try {
-    dbInstance.prepare(`
+    dbInstance
+      .prepare(
+        `
       INSERT INTO app_config (key, value) VALUES ('skill_usage', ?)
       ON CONFLICT(key) DO UPDATE SET value = excluded.value
-    `).run(JSON.stringify(Object.fromEntries(skillUsage)));
+    `
+      )
+      .run(JSON.stringify(Object.fromEntries(skillUsage)));
   } catch {
     // Usage ranking is best-effort and should never break skill loading.
   }
@@ -203,14 +215,16 @@ export function activateConditionalSkillsForPaths(filePaths: string[], cwd: stri
   const activated: string[] = [];
   for (const skill of cached) {
     const id = skillId(skill);
-    const patterns = [...(skill.metadata?.paths ?? []), ...(skill.metadata?.hookTriggers?.paths ?? [])];
+    const patterns = [
+      ...(skill.metadata?.paths ?? []),
+      ...(skill.metadata?.hookTriggers?.paths ?? []),
+    ];
     if (!patterns?.length || activatedConditionalSkillIds.has(id)) continue;
-    const matched = filePaths.some((filePath) => {
-      const relativePath = path.isAbsolute(filePath)
-        ? path.relative(cwd, filePath)
-        : filePath;
-      if (!relativePath || relativePath.startsWith('..') || path.isAbsolute(relativePath)) return false;
-      return patterns.some((pattern) => minimatch(relativePath, pattern, { dot: true }));
+    const matched = filePaths.some(filePath => {
+      const relativePath = path.isAbsolute(filePath) ? path.relative(cwd, filePath) : filePath;
+      if (!relativePath || relativePath.startsWith('..') || path.isAbsolute(relativePath))
+        return false;
+      return patterns.some(pattern => minimatch(relativePath, pattern, { dot: true }));
     });
     if (matched) {
       activatedConditionalSkillIds.add(id);
@@ -221,13 +235,13 @@ export function activateConditionalSkillsForPaths(filePaths: string[], cwd: stri
 }
 
 export function activateConditionalSkillsForToolNames(toolNames: string[]): string[] {
-  const requestedTools = new Set(toolNames.map((tool) => tool.toLowerCase()));
+  const requestedTools = new Set(toolNames.map(tool => tool.toLowerCase()));
   const activated: string[] = [];
   for (const skill of cached) {
     const id = skillId(skill);
     const tools = skill.metadata?.hookTriggers?.tools;
     if (!tools?.length || activatedConditionalSkillIds.has(id)) continue;
-    if (tools.some((tool) => requestedTools.has(tool.toLowerCase()))) {
+    if (tools.some(tool => requestedTools.has(tool.toLowerCase()))) {
       activatedConditionalSkillIds.add(id);
       activated.push(id);
     }
@@ -237,7 +251,7 @@ export function activateConditionalSkillsForToolNames(toolNames: string[]): stri
 
 function findCachedSkill(ref: SkillRef): SourcedSkill | undefined {
   if (path.basename(ref.id) !== ref.id || ref.id.includes('..')) return undefined;
-  return cached.find((s) => s.source === ref.source && skillId(s) === ref.id);
+  return cached.find(s => s.source === ref.source && skillId(s) === ref.id);
 }
 
 export async function loadDiscoveredSkillContent(ref: SkillRef): Promise<string | null> {
@@ -263,9 +277,9 @@ export function loadDiscoveredSkillContentSync(ref: SkillRef): string | null {
 export function getExternalSkillDirs(): string[] {
   if (!dbInstance) return [];
   try {
-    const row = dbInstance.prepare(
-      `SELECT value FROM app_config WHERE key = 'skill_extra_dirs'`,
-    ).get() as { value: string } | undefined;
+    const row = dbInstance
+      .prepare(`SELECT value FROM app_config WHERE key = 'skill_extra_dirs'`)
+      .get() as { value: string } | undefined;
     if (!row) return [];
     const dirs = JSON.parse(row.value);
     return Array.isArray(dirs) ? dirs : [];
@@ -276,19 +290,20 @@ export function getExternalSkillDirs(): string[] {
 
 export function saveExternalSkillDirs(dirs: string[]): void {
   if (!dbInstance) return;
-  dbInstance.prepare(`
+  dbInstance
+    .prepare(
+      `
     INSERT INTO app_config (key, value) VALUES ('skill_extra_dirs', ?)
     ON CONFLICT(key) DO UPDATE SET value = excluded.value
-  `).run(JSON.stringify(dirs));
+  `
+    )
+    .run(JSON.stringify(dirs));
 }
 
 function getWellKnownSkillDirs(): string[] {
   const home = process.env.HOME || process.env.USERPROFILE || '';
   if (!home) return [];
-  return [
-    path.join(home, '.zclaudia', 'skills'),
-    path.join(home, '.agents', 'skills'),
-  ];
+  return [path.join(home, '.zclaudia', 'skills'), path.join(home, '.agents', 'skills')];
 }
 
 export function getWorkspaceSkillDir(): string {
@@ -296,11 +311,7 @@ export function getWorkspaceSkillDir(): string {
 }
 
 export function getSkillWatchDirs(): string[] {
-  return [
-    getWorkspaceSkillDir(),
-    ...getWellKnownSkillDirs(),
-    ...getExternalSkillDirs(),
-  ];
+  return [getWorkspaceSkillDir(), ...getWellKnownSkillDirs(), ...getExternalSkillDirs()];
 }
 
 /**
@@ -316,7 +327,7 @@ export async function loadAndCacheSkills(env: ExecutionEnv): Promise<number> {
 
   const inputs: Array<{ path: string; source: SkillSource }> = [
     { path: workspaceDir, source: 'workspace' },
-    ...externalDirs.map((p) => ({ path: p, source: 'external' as const })),
+    ...externalDirs.map(p => ({ path: p, source: 'external' as const })),
   ];
 
   const result = await loadAllSkills(env, inputs);
@@ -331,22 +342,24 @@ export async function loadAndCacheSkills(env: ExecutionEnv): Promise<number> {
   }
   cached = deduped;
   cachedDiagnostics = result.diagnostics;
-  activatedConditionalSkillIds = new Set([...activatedConditionalSkillIds].filter((id) =>
-    deduped.some((skill) => skillId(skill) === id),
-  ));
+  activatedConditionalSkillIds = new Set(
+    [...activatedConditionalSkillIds].filter(id => deduped.some(skill => skillId(skill) === id))
+  );
 
   for (const d of result.diagnostics) {
     console.warn(`[SkillLoader] ${d.code} (${d.source}): ${d.message} — ${d.path}`);
   }
   if (cached.length > 0) {
-    console.log(`[SkillLoader] loaded ${cached.length} skill(s): ${cached.map((s) => s.skill.name).join(', ')}`);
+    console.log(
+      `[SkillLoader] loaded ${cached.length} skill(s): ${cached.map(s => s.skill.name).join(', ')}`
+    );
   }
   return cached.length;
 }
 
 export async function refreshSkillCache(
   env: ExecutionEnv,
-  pluginReloader?: PluginSkillReloader,
+  pluginReloader?: PluginSkillReloader
 ): Promise<number> {
   cached = [];
   cachedDiagnostics = [];
@@ -363,7 +376,7 @@ export async function refreshSkillCache(
  * Called by skill-bootstrap.loadAndCachePluginSkills in T3.
  */
 export function addPluginSkills(skills: SourcedSkill[]): void {
-  const seen = new Set(cached.map((s) => skillId(s)));
+  const seen = new Set(cached.map(s => skillId(s)));
   for (const s of skills) {
     const id = skillId(s);
     if (seen.has(id)) continue;
@@ -379,9 +392,9 @@ export function addPluginSkills(skills: SourcedSkill[]): void {
  */
 export function buildSkillDirectoryHint(): string {
   const eligible = cached
-    .filter((s) => meetsRequirements(s.requirements))
+    .filter(s => meetsRequirements(s.requirements))
     .filter(isConditionalSkillActive)
-    .map((s) => s.skill);
+    .map(s => s.skill);
   if (eligible.length === 0) return '';
   return formatSkillsForSystemPrompt(eligible);
 }

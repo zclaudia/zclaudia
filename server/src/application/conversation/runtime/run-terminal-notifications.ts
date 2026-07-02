@@ -21,14 +21,21 @@ interface TerminalRunNotificationInput {
   notificationsService?: NotificationService;
 }
 
-function getSessionProjectId(db: SqliteLikeDb | null | undefined, sessionId: string): string | undefined {
+function getSessionProjectId(
+  db: SqliteLikeDb | null | undefined,
+  sessionId: string
+): string | undefined {
   if (!db?.prepare) return undefined;
   try {
-    const row = db.prepare(`
+    const row = db
+      .prepare(
+        `
       SELECT project_id as projectId
       FROM sessions
       WHERE id = ?
-    `).get(sessionId);
+    `
+      )
+      .get(sessionId);
     return typeof row?.projectId === 'string' && row.projectId.trim() ? row.projectId : undefined;
   } catch {
     return undefined;
@@ -40,11 +47,13 @@ function hasRecentRunNotification(
   sessionId: string,
   title: string,
   status: 'completed' | 'failed',
-  now = Date.now(),
+  now = Date.now()
 ): boolean {
   if (!db?.prepare) return false;
   try {
-    const row = db.prepare(`
+    const row = db
+      .prepare(
+        `
       SELECT id
       FROM notifications
       WHERE session_id = ?
@@ -53,7 +62,9 @@ function hasRecentRunNotification(
         AND created_at >= ?
       ORDER BY created_at DESC
       LIMIT 1
-    `).get(sessionId, title, status, now - RUN_NOTIFICATION_DEDUPE_WINDOW_MS);
+    `
+      )
+      .get(sessionId, title, status, now - RUN_NOTIFICATION_DEDUPE_WINDOW_MS);
     return !!row?.id;
   } catch {
     return false;
@@ -93,7 +104,7 @@ export function postRunCompletedNotification(input: TerminalRunNotificationInput
 }
 
 export function postRunFailedNotification(
-  input: TerminalRunNotificationInput & { error: string },
+  input: TerminalRunNotificationInput & { error: string }
 ): void {
   const { db, error, sessionId, notificationSender, notificationsService } = input;
   const sessionName = getSessionDisplayName(db, sessionId);

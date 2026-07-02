@@ -97,7 +97,7 @@ test('I2: Tab switching', async () => {
     await browser.waitForTimeout(300);
 
     // Verify tab is active (has primary background color)
-    const isActive = await tabButton.evaluate((el) => {
+    const isActive = await tabButton.evaluate(el => {
       return el.classList.contains('bg-primary');
     });
     expect(isActive).toBe(true);
@@ -135,7 +135,10 @@ test('I3: Theme toggle', async () => {
   await browser.waitForTimeout(300);
 
   // Find theme toggle button
-  const themeToggle = browser.locator('button').filter({ hasText: /Light|Dark|System/ }).first();
+  const themeToggle = browser
+    .locator('button')
+    .filter({ hasText: /Light|Dark|System/ })
+    .first();
   await themeToggle.click();
   await browser.waitForTimeout(300);
 
@@ -304,7 +307,7 @@ test('I6: Settings panel close', async () => {
   try {
     await browser.click('body', { position: { x: 5, y: 100 }, timeout: 1000 });
     await browser.waitForTimeout(300);
-  } catch (e) {
+  } catch {
     // If click fails, that's fine - just cleanup attempt
   }
 }, 30000);

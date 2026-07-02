@@ -1,6 +1,21 @@
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { GitCommit, GitMerge, GitBranch, GitPullRequest, Bot, Terminal, Globe, Bell, HelpCircle, Pause, Puzzle, Shield, ShieldCheck, ShieldAlert } from 'lucide-react';
+import {
+  GitCommit,
+  GitMerge,
+  GitBranch,
+  GitPullRequest,
+  Bot,
+  Terminal,
+  Globe,
+  Bell,
+  HelpCircle,
+  Pause,
+  Puzzle,
+  Shield,
+  ShieldCheck,
+  ShieldAlert,
+} from 'lucide-react';
 import type { BuiltinWorkflowStepType } from '@zclaudia/shared';
 import { useWorkflowStore } from '../../store';
 
@@ -37,14 +52,18 @@ export const StepNode = memo(function StepNode({ data, selected }: NodeProps) {
   const nodeData = data as StepNodeData;
   const isCondition = nodeData.stepType === 'condition';
   const hasErrorRoute = nodeData.onError === 'route';
-  const supportsLoop = useWorkflowStore((state) =>
-    !isCondition && state.stepTypes.some((m) => m.type === nodeData.stepType && m.supportsLoop === true),
+  const supportsLoop = useWorkflowStore(
+    state =>
+      !isCondition &&
+      state.stepTypes.some(m => m.type === nodeData.stepType && m.supportsLoop === true)
   );
 
   return (
-    <div className={`px-4 py-3 rounded-lg border-2 shadow-sm min-w-[180px] transition-colors ${
-      selected ? 'border-primary bg-muted/40' : 'border-border bg-card'
-    }`}>
+    <div
+      className={`px-4 py-3 rounded-lg border-2 shadow-sm min-w-[180px] transition-colors ${
+        selected ? 'border-primary bg-muted/40' : 'border-border bg-card'
+      }`}
+    >
       {/* Target handle: incoming connection */}
       <Handle
         type="target"
@@ -54,9 +73,7 @@ export const StepNode = memo(function StepNode({ data, selected }: NodeProps) {
 
       {/* Node content */}
       <div className="flex items-center gap-2">
-        <div className="text-muted-foreground shrink-0">
-          {getStepIcon(nodeData.stepType)}
-        </div>
+        <div className="text-muted-foreground shrink-0">{getStepIcon(nodeData.stepType)}</div>
         <div className="min-w-0 flex-1">
           <div className="text-sm font-medium truncate">{nodeData.label}</div>
           <div className="text-[11px] text-muted-foreground">{nodeData.stepType}</div>
@@ -79,7 +96,10 @@ export const StepNode = memo(function StepNode({ data, selected }: NodeProps) {
             className="!w-3 !h-3 !bg-green-500 !border-2 !border-background"
             style={{ left: '30%' }}
           />
-          <span className="absolute text-[9px] text-green-600 font-medium" style={{ bottom: -16, left: '22%' }}>
+          <span
+            className="absolute text-[9px] text-green-600 font-medium"
+            style={{ bottom: -16, left: '22%' }}
+          >
             True
           </span>
           {/* False branch: bottom-right */}
@@ -90,7 +110,10 @@ export const StepNode = memo(function StepNode({ data, selected }: NodeProps) {
             className="!w-3 !h-3 !bg-red-500 !border-2 !border-background"
             style={{ left: '70%' }}
           />
-          <span className="absolute text-[9px] text-red-600 font-medium" style={{ bottom: -16, left: '62%' }}>
+          <span
+            className="absolute text-[9px] text-red-600 font-medium"
+            style={{ bottom: -16, left: '62%' }}
+          >
             False
           </span>
         </>
@@ -105,7 +128,10 @@ export const StepNode = memo(function StepNode({ data, selected }: NodeProps) {
                 className="!w-3 !h-3 !bg-amber-500 !border-2 !border-background"
                 style={{ left: '20%' }}
               />
-              <span className="absolute text-[9px] text-amber-600 font-medium" style={{ bottom: -16, left: '14%' }}>
+              <span
+                className="absolute text-[9px] text-amber-600 font-medium"
+                style={{ bottom: -16, left: '14%' }}
+              >
                 Loop
               </span>
             </>
@@ -126,7 +152,10 @@ export const StepNode = memo(function StepNode({ data, selected }: NodeProps) {
                 className="!w-3 !h-3 !bg-rose-500 !border-2 !border-background"
                 style={{ left: '80%' }}
               />
-              <span className="absolute text-[9px] text-rose-600 font-medium" style={{ bottom: -16, left: '66%' }}>
+              <span
+                className="absolute text-[9px] text-rose-600 font-medium"
+                style={{ bottom: -16, left: '66%' }}
+              >
                 Exhausted
               </span>
             </>

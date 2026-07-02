@@ -45,7 +45,10 @@ export interface CaptureContextSnapshotInput {
 
 const snapshots = new Map<string, ContextSnapshot>();
 
-interface PrefixHashes { promptHash: string; toolsHash: string }
+interface PrefixHashes {
+  promptHash: string;
+  toolsHash: string;
+}
 const prefixHashes = new Map<string, PrefixHashes>();
 
 export interface PrefixCacheAuditResult {
@@ -70,10 +73,12 @@ export function diffPrefixForCacheAudit(
   sessionId: string,
   systemPromptText: string,
   skillCatalogText: string,
-  tools: ReadonlyArray<{ name: string; description?: string; parameters?: unknown }>,
+  tools: ReadonlyArray<{ name: string; description?: string; parameters?: unknown }>
 ): PrefixCacheAuditResult {
   const promptHash = sha(systemPromptText + ' ' + skillCatalogText);
-  const toolsHash = sha(JSON.stringify(tools.map((t) => [t.name, t.description ?? '', t.parameters ?? null])));
+  const toolsHash = sha(
+    JSON.stringify(tools.map(t => [t.name, t.description ?? '', t.parameters ?? null]))
+  );
   const prev = prefixHashes.get(sessionId);
   prefixHashes.set(sessionId, { promptHash, toolsHash });
   return {
@@ -93,10 +98,12 @@ export function estimateTokens(text: string): number {
 
 export function captureContextSnapshot(input: CaptureContextSnapshotInput): void {
   const toolTokens = input.tools.reduce(
-    (sum, t) => sum + estimateTokens(
-      `${t.name}${t.description ?? ''}${t.parameters ? JSON.stringify(t.parameters) : ''}`,
-    ),
-    0,
+    (sum, t) =>
+      sum +
+      estimateTokens(
+        `${t.name}${t.description ?? ''}${t.parameters ? JSON.stringify(t.parameters) : ''}`
+      ),
+    0
   );
   // Keep the previous run's usage so a query mid-run still reports the last
   // known real occupancy instead of degrading to estimates.
@@ -129,12 +136,11 @@ export function getContextSnapshot(sessionId: string): ContextSnapshot | undefin
 }
 
 export function computeContextUsage(snapshot: ContextSnapshot): ContextUsagePayload {
-  const estimateSum = snapshot.systemPromptTokens + snapshot.toolTokens + snapshot.skillCatalogTokens;
+  const estimateSum =
+    snapshot.systemPromptTokens + snapshot.toolTokens + snapshot.skillCatalogTokens;
   const lastUsage = snapshot.lastUsage;
   const fromUsage = lastUsage !== undefined;
-  const usedTokens = lastUsage !== undefined
-    ? lastUsage.input + lastUsage.cacheRead
-    : estimateSum;
+  const usedTokens = lastUsage !== undefined ? lastUsage.input + lastUsage.cacheRead : estimateSum;
   const rawResidual = usedTokens - estimateSum;
   const freeTokens = Math.max(0, snapshot.contextWindow - usedTokens);
   return {
@@ -154,9 +160,10 @@ export function computeContextUsage(snapshot: ContextSnapshot): ContextUsagePayl
       },
       freeSpace: {
         tokens: freeTokens,
-        percent: snapshot.contextWindow > 0
-          ? Math.round((freeTokens / snapshot.contextWindow) * 1000) / 10
-          : 0,
+        percent:
+          snapshot.contextWindow > 0
+            ? Math.round((freeTokens / snapshot.contextWindow) * 1000) / 10
+            : 0,
       },
     },
     capturedAt: snapshot.capturedAt,

@@ -34,13 +34,19 @@ export function handleToolUseInteraction(input: HandleToolUseInteractionInput): 
   });
   if (!todoInteraction) return;
 
-  for (const update of trackAndAutoComplete(sessionId, todoInteraction.interactionId, todoInteraction.todos)) {
-    sendRunEvent(buildTodoUpdateMessage({
-      activeRun,
-      providerType,
-      runId,
-      update,
-    }));
+  for (const update of trackAndAutoComplete(
+    sessionId,
+    todoInteraction.interactionId,
+    todoInteraction.todos
+  )) {
+    sendRunEvent(
+      buildTodoUpdateMessage({
+        activeRun,
+        providerType,
+        runId,
+        update,
+      })
+    );
   }
   sendRunEvent(todoInteraction);
 }
@@ -48,12 +54,14 @@ export function handleToolUseInteraction(input: HandleToolUseInteractionInput): 
 export function finalizeRunInteractions(input: FinalizeRunInteractionsInput): void {
   const { activeRun, providerType, runId, sendRunEvent, sessionId } = input;
   for (const update of finalizeSession(sessionId)) {
-    sendRunEvent(buildTodoUpdateMessage({
-      activeRun,
-      providerType,
-      runId,
-      update,
-    }));
+    sendRunEvent(
+      buildTodoUpdateMessage({
+        activeRun,
+        providerType,
+        runId,
+        update,
+      })
+    );
   }
 }
 
@@ -61,7 +69,10 @@ function buildTodoUpdateMessage(input: {
   activeRun: ActiveRun;
   providerType: string;
   runId: string;
-  update: { interactionId: string; todos: import('@zclaudia/shared/interaction/forms').NormalizedTodoItem[] };
+  update: {
+    interactionId: string;
+    todos: import('@zclaudia/shared/interaction/forms').NormalizedTodoItem[];
+  };
 }): Extract<ServerMessage, { type: 'interaction_todo_update' }> {
   const { activeRun, providerType, runId, update } = input;
   return {

@@ -61,7 +61,8 @@ export function parseApplyPatch(input: string): ApplyPatchOperation[] {
     if (line.startsWith('*** Rename File: ')) {
       const spec = line.slice('*** Rename File: '.length).trim();
       const match = /^(.*?)\s*->\s*(.*?)$/.exec(spec);
-      if (!match?.[1] || !match[2]) throw new Error(`Invalid rename operation at line ${index + 1}`);
+      if (!match?.[1] || !match[2])
+        throw new Error(`Invalid rename operation at line ${index + 1}`);
       operations.push({ type: 'rename', from: match[1].trim(), to: match[2].trim() });
       index += 1;
       continue;

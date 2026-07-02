@@ -49,7 +49,11 @@ function getToolCallSummary(tc: ToolCallState): string {
     } else if (Object.keys(input).length > 0) {
       planText = JSON.stringify(input);
     }
-    const title = planText.split('\n').find(l => l.trim())?.replace(/^#+\s*/, '') || 'Plan';
+    const title =
+      planText
+        .split('\n')
+        .find(l => l.trim())
+        ?.replace(/^#+\s*/, '') || 'Plan';
     return title.substring(0, 25);
   }
 
@@ -109,10 +113,14 @@ function getToolCallSummary(tc: ToolCallState): string {
 // Get status icon as Lucide component
 function getStatusIconComponent(status: ToolCallState['status']) {
   switch (status) {
-    case 'completed': return <CheckCircle2 size={10} className="text-success" />;
-    case 'error': return <XCircle size={10} className="text-destructive" />;
-    case 'running': return <Loader2 size={10} className="animate-spin text-primary" />;
-    default: return null;
+    case 'completed':
+      return <CheckCircle2 size={10} className="text-success" />;
+    case 'error':
+      return <XCircle size={10} className="text-destructive" />;
+    case 'running':
+      return <Loader2 size={10} className="animate-spin text-primary" />;
+    default:
+      return null;
   }
 }
 
@@ -128,9 +136,11 @@ function getToolCallDisplayStatus(tc: ToolCallState): ToolCallState['status'] {
 const MAX_VISIBLE_TOOLS = 5;
 
 function SummaryBar({ toolCalls, onClick }: { toolCalls: ToolCallState[]; onClick: () => void }) {
-  const completedCount = toolCalls.filter((tc) => getToolCallDisplayStatus(tc) === 'completed').length;
-  const errorCount = toolCalls.filter((tc) => getToolCallDisplayStatus(tc) === 'error').length;
-  const runningCount = toolCalls.filter((tc) => getToolCallDisplayStatus(tc) === 'running').length;
+  const completedCount = toolCalls.filter(
+    tc => getToolCallDisplayStatus(tc) === 'completed'
+  ).length;
+  const errorCount = toolCalls.filter(tc => getToolCallDisplayStatus(tc) === 'error').length;
+  const runningCount = toolCalls.filter(tc => getToolCallDisplayStatus(tc) === 'running').length;
 
   return (
     <div
@@ -143,11 +153,28 @@ function SummaryBar({ toolCalls, onClick }: { toolCalls: ToolCallState[]; onClic
           {toolCalls.length} tool call{toolCalls.length > 1 ? 's' : ''}
         </span>
         <span className="flex items-center gap-1 text-muted-foreground">
-          {completedCount > 0 && <span className="flex items-center gap-0.5 text-success"><CheckCircle2 size={10} />{completedCount}</span>}
-          {errorCount > 0 && <span className="flex items-center gap-0.5 text-destructive ml-1"><XCircle size={10} />{errorCount}</span>}
-          {runningCount > 0 && <span className="flex items-center gap-0.5 text-primary ml-1"><Loader2 size={10} className="animate-spin" />{runningCount}</span>}
+          {completedCount > 0 && (
+            <span className="flex items-center gap-0.5 text-success">
+              <CheckCircle2 size={10} />
+              {completedCount}
+            </span>
+          )}
+          {errorCount > 0 && (
+            <span className="flex items-center gap-0.5 text-destructive ml-1">
+              <XCircle size={10} />
+              {errorCount}
+            </span>
+          )}
+          {runningCount > 0 && (
+            <span className="flex items-center gap-0.5 text-primary ml-1">
+              <Loader2 size={10} className="animate-spin" />
+              {runningCount}
+            </span>
+          )}
         </span>
-        <span className="flex items-center gap-0.5 text-muted-foreground ml-auto text-[10px]">Click to expand <ChevronRight size={10} /></span>
+        <span className="flex items-center gap-0.5 text-muted-foreground ml-auto text-[10px]">
+          Click to expand <ChevronRight size={10} />
+        </span>
       </div>
       <div className="flex flex-wrap gap-1.5">
         {toolCalls.map((tc, idx) => {
@@ -159,8 +186,8 @@ function SummaryBar({ toolCalls, onClick }: { toolCalls: ToolCallState[]; onClic
                 displayStatus === 'error'
                   ? 'bg-destructive/20 text-destructive'
                   : displayStatus === 'running'
-                  ? 'bg-muted text-primary'
-                  : 'bg-secondary text-muted-foreground'
+                    ? 'bg-muted text-primary'
+                    : 'bg-secondary text-muted-foreground'
               }`}
               title={formatToolInput(tc.toolName, tc.toolInput)}
             >
@@ -176,7 +203,11 @@ function SummaryBar({ toolCalls, onClick }: { toolCalls: ToolCallState[]; onClic
 
 type ToolCallListMode = 'streaming' | 'collapsed' | 'expanded';
 
-export const ToolCallList = memo(function ToolCallList({ toolCalls, defaultCollapsed = false, isStreaming = false }: ToolCallListProps) {
+export const ToolCallList = memo(function ToolCallList({
+  toolCalls,
+  defaultCollapsed = false,
+  isStreaming = false,
+}: ToolCallListProps) {
   const [userOverride, setUserOverride] = useState<ToolCallListMode | null>(null);
   const [showAll, setShowAll] = useState(false);
 
@@ -193,7 +224,11 @@ export const ToolCallList = memo(function ToolCallList({ toolCalls, defaultColla
 
   if (toolCalls.length === 0) return null;
 
-  const defaultMode: ToolCallListMode = defaultCollapsed ? 'collapsed' : isStreaming ? 'streaming' : 'expanded';
+  const defaultMode: ToolCallListMode = defaultCollapsed
+    ? 'collapsed'
+    : isStreaming
+      ? 'streaming'
+      : 'expanded';
   const mode: ToolCallListMode = userOverride ?? defaultMode;
 
   if (mode === 'collapsed') {
@@ -218,7 +253,7 @@ export const ToolCallList = memo(function ToolCallList({ toolCalls, defaultColla
         {olderTools.length > 0 && (
           <SummaryBar toolCalls={olderTools} onClick={() => setUserOverride('expanded')} />
         )}
-        {expandedTools.map((tc) => (
+        {expandedTools.map(tc => (
           <ToolCallItem key={tc.id} toolCall={tc} />
         ))}
       </div>
@@ -227,9 +262,7 @@ export const ToolCallList = memo(function ToolCallList({ toolCalls, defaultColla
 
   const hasMany = toolCalls.length > MAX_VISIBLE_TOOLS;
   const earlierCount = Math.max(0, toolCalls.length - MAX_VISIBLE_TOOLS);
-  const visibleToolCalls = !hasMany || showAll
-    ? toolCalls
-    : toolCalls.slice(-MAX_VISIBLE_TOOLS);
+  const visibleToolCalls = !hasMany || showAll ? toolCalls : toolCalls.slice(-MAX_VISIBLE_TOOLS);
 
   const collapseAll = () => {
     setUserOverride('collapsed');
@@ -248,17 +281,18 @@ export const ToolCallList = memo(function ToolCallList({ toolCalls, defaultColla
 
       {hasMany && (
         <button
-          onClick={() => setShowAll((v) => !v)}
+          onClick={() => setShowAll(v => !v)}
           className="px-3 py-1.5 text-xs bg-muted/50 rounded-md hover:bg-muted transition-colors cursor-pointer w-full text-left text-muted-foreground"
         >
           <span className="flex items-center gap-1">
             {showAll ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-            {showAll ? 'Hide' : 'Show'} {earlierCount} earlier tool call{earlierCount > 1 ? 's' : ''}
+            {showAll ? 'Hide' : 'Show'} {earlierCount} earlier tool call
+            {earlierCount > 1 ? 's' : ''}
           </span>
         </button>
       )}
 
-      {visibleToolCalls.map((tc) => (
+      {visibleToolCalls.map(tc => (
         <ToolCallItem key={tc.id} toolCall={tc} />
       ))}
     </div>
@@ -266,4 +300,10 @@ export const ToolCallList = memo(function ToolCallList({ toolCalls, defaultColla
 });
 
 export type { ToolCallListProps, ToolCallListMode };
-export { SummaryBar, getToolCallSummary, getStatusIconComponent, getToolCallDisplayStatus, MAX_VISIBLE_TOOLS };
+export {
+  SummaryBar,
+  getToolCallSummary,
+  getStatusIconComponent,
+  getToolCallDisplayStatus,
+  MAX_VISIBLE_TOOLS,
+};

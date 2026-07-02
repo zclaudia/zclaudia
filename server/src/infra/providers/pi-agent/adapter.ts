@@ -3,7 +3,12 @@ import { Session } from '@earendil-works/pi-agent-core';
 import type { PCPProviderManifest } from '@zclaudia/shared/core/pcp';
 import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
 import { ALL_TOOL_NAMES, normalizeToolName, type ToolName } from '@zclaudia/shared/core/tools';
-import type { PermissionCallback, ProviderAdapter, ProviderRuntimeEvent, RunOptions } from '../types.js';
+import type {
+  PermissionCallback,
+  ProviderAdapter,
+  ProviderRuntimeEvent,
+  RunOptions,
+} from '../types.js';
 import {
   AsyncQueue,
   buildModel,
@@ -23,7 +28,10 @@ import { isSandboxAvailable } from '../pi-runtime/sandbox.js';
 import { SANDBOX_NETWORK_ESCALATION_TOOL } from '../pi-runtime/sandbox-denial.js';
 import { formatMcpInstructionsForPrompt } from '../pi-runtime/index.js';
 import { SqliteSessionStorage } from '../pi-runtime/session-tree/index.js';
-import { trimMessagesToBudget, resolveImagesInMessages } from '../pi-runtime/session-tree/route-a-postprocess.js';
+import {
+  trimMessagesToBudget,
+  resolveImagesInMessages,
+} from '../pi-runtime/session-tree/route-a-postprocess.js';
 import { mcpClientManager } from '../../../utils/mcp-client-manager.js';
 import { resolveContextWindow } from '../../../application/conversation/compaction/context-windows.js';
 import { historyTokenBudget } from '../../../application/conversation/compaction/context-estimate.js';
@@ -69,7 +77,13 @@ const policy: ProviderPolicy = {
 
 export { resolvePlanModeTools, translateEvent };
 
-export const __testables = { AsyncQueue, buildModel, translateEvent, extractErrorStop, extractLastCallUsage };
+export const __testables = {
+  AsyncQueue,
+  buildModel,
+  translateEvent,
+  extractErrorStop,
+  extractLastCallUsage,
+};
 
 export class PiAgentProviderAdapter implements ProviderAdapter {
   readonly type = 'zclaudia';
@@ -79,7 +93,7 @@ export class PiAgentProviderAdapter implements ProviderAdapter {
   async *run(
     input: string,
     options: RunOptions,
-    onPermission?: PermissionCallback,
+    onPermission?: PermissionCallback
   ): AsyncGenerator<ProviderRuntimeEvent, void, void> {
     const sessionId = options.sessionId || `zclaudia-${Date.now()}`;
     // ctx.model surfaces in init.systemInfo (the UI's "Model:" badge) and in the
@@ -105,7 +119,7 @@ export class PiAgentProviderAdapter implements ProviderAdapter {
     try {
       const modelId = options.agentProfile?.model;
       const modelEntry = modelId
-        ? options.llmProfileConfig?.models?.find((m) => m.modelId === modelId)
+        ? options.llmProfileConfig?.models?.find(m => m.modelId === modelId)
         : undefined;
       modelInfo = buildModel(options.llmProfileConfig, modelId, modelEntry);
       // Refresh ctx.model to the canonical id post-resolution so the UI badge
@@ -144,7 +158,7 @@ export class PiAgentProviderAdapter implements ProviderAdapter {
     const resolvedWindow = resolveContextWindow(
       options.agentProfile ?? null,
       undefined,
-      options.llmProfileConfig,
+      options.llmProfileConfig
     );
     const effectiveContextWindow = resolvedWindow.value;
     const contextWindowSource = resolvedWindow.source;
@@ -154,12 +168,17 @@ export class PiAgentProviderAdapter implements ProviderAdapter {
     //    enabledTools to only the read-only subset (read/grep/find/ls).
     //    Non-plan modes pass through whatever the agent profile requested.
     const isPlanMode = options.mode === 'plan';
-    const requestedTools: ToolName[] = (options.enabledTools ?? [...ALL_TOOL_NAMES])
-      .flatMap((tool) => {
+    const requestedTools: ToolName[] = (options.enabledTools ?? [...ALL_TOOL_NAMES]).flatMap(
+      tool => {
         const normalized = normalizeToolName(tool);
         return normalized ? [normalized] : [];
-      });
-    const effectiveTools: ToolName[] = resolvePlanModeTools(requestedTools, isPlanMode, isSandboxAvailable());
+      }
+    );
+    const effectiveTools: ToolName[] = resolvePlanModeTools(
+      requestedTools,
+      isPlanMode,
+      isSandboxAvailable()
+    );
     const toolBundle = buildPiRunToolBundle({
       options,
       effectiveTools,
@@ -194,21 +213,27 @@ export class PiAgentProviderAdapter implements ProviderAdapter {
         // buildContext().messages is AgentMessage[] at runtime; postprocessors expect
         // pi-ai Message[] (structurally equivalent for user/assistant turns). Cast
         // through unknown for both directions.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let messages = (await session.buildContext()).messages as unknown as import('@earendil-works/pi-ai').Message[];
+
+        let messages = (await session.buildContext())
+          .messages as unknown as import('@earendil-works/pi-ai').Message[];
         messages = resolveImagesInMessages(messages, {
-          resolve: (atts) => {
+          resolve: atts => {
             const resolved = resolveImageAttachments(atts, getFileStore());
             if (supportsVision) return resolved;
             return {
               images: [],
-              notices: atts.map((a) => `[Image attached: ${a.name} — current model does not support vision]`),
+              notices: atts.map(
+                a => `[Image attached: ${a.name} — current model does not support vision]`
+              ),
             };
           },
         });
         messages = trimMessagesToBudget(messages, historyTokenBudget(effectiveContextWindow));
         // The trailing user message is the current input, passed separately to the agent loop.
-        if (messages.length && (messages[messages.length - 1] as { role?: string }).role === 'user') {
+        if (
+          messages.length &&
+          (messages[messages.length - 1] as { role?: string }).role === 'user'
+        ) {
           messages.pop();
         }
         history = messages as unknown as AgentMessage[];
@@ -228,9 +253,10 @@ export class PiAgentProviderAdapter implements ProviderAdapter {
     // The context tree dropped the old delta-in-history MCP notices, so this is
     // now the model's only path to MCP instructions.
     const mcpInstructions = formatMcpInstructionsForPrompt(
-      mcpClientManager.listStatuses()
-        .filter((s) => s.state === 'connected' && s.instructions?.trim())
-        .map((s) => ({ name: s.name, instructions: s.instructions as string })),
+      mcpClientManager
+        .listStatuses()
+        .filter(s => s.state === 'connected' && s.instructions?.trim())
+        .map(s => ({ name: s.name, instructions: s.instructions as string }))
     );
     const promptBundle = buildPiRunPrompt({
       systemPrompt: options.systemPrompt,

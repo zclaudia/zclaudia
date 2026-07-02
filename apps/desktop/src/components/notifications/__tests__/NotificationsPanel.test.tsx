@@ -11,7 +11,11 @@ describe('NotificationsPanel — close button', () => {
   beforeEach(() => {
     // Mark hydrated so the panel does not try to fetch on mount.
     useNotificationFeedStore.setState({
-      items: [], unreadCount: 0, hasMore: false, loading: false, hydrated: true,
+      items: [],
+      unreadCount: 0,
+      hasMore: false,
+      loading: false,
+      hydrated: true,
     } as any);
   });
 

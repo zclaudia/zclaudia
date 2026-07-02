@@ -28,12 +28,12 @@ interface ComposerState {
 }
 
 // Owns transient chat-input state (per-session drafts + one-shot prefills).
-export const useComposerStore = create<ComposerState>((set) => ({
+export const useComposerStore = create<ComposerState>(set => ({
   drafts: {},
   pendingPrefills: {},
 
   setDraft: (sessionId, draft) =>
-    set((state) => {
+    set(state => {
       const hasContent = draft.content.trim().length > 0;
       const hasAttachments = draft.attachments.length > 0;
       if (!hasContent && !hasAttachments) {
@@ -43,22 +43,22 @@ export const useComposerStore = create<ComposerState>((set) => ({
       return { drafts: { ...state.drafts, [sessionId]: draft } };
     }),
 
-  clearDraft: (sessionId) =>
-    set((state) => {
+  clearDraft: sessionId =>
+    set(state => {
       const { [sessionId]: _, ...rest } = state.drafts;
       return { drafts: rest };
     }),
 
   setPendingPrefill: (sessionId, content) =>
-    set((state) => ({
+    set(state => ({
       pendingPrefills: {
         ...state.pendingPrefills,
         [sessionId]: { content, ts: Date.now() },
       },
     })),
 
-  clearPendingPrefill: (sessionId) =>
-    set((state) => {
+  clearPendingPrefill: sessionId =>
+    set(state => {
       if (!state.pendingPrefills[sessionId]) return state;
       const { [sessionId]: _, ...rest } = state.pendingPrefills;
       return { pendingPrefills: rest };

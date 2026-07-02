@@ -4,7 +4,7 @@ import { WorktreeManager } from '../worktree-manager.js';
 describe('WorktreeManager', () => {
   it('deduplicates concurrent pool initialization', async () => {
     let releaseInit!: () => void;
-    const initPromise = new Promise<void>((resolve) => {
+    const initPromise = new Promise<void>(resolve => {
       releaseInit = resolve;
     });
 

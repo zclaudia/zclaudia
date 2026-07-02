@@ -25,7 +25,10 @@ function makeDb(type = 'regular'): Database.Database {
   return db;
 }
 
-const deps = (db: Database.Database, over: Partial<Parameters<typeof maybeGenerateSessionTitle>[0]> = {}) => ({
+const deps = (
+  db: Database.Database,
+  over: Partial<Parameters<typeof maybeGenerateSessionTitle>[0]> = {}
+) => ({
   db,
   sessionId: 's1',
   agentProfile: { model: 'test-model' } as any,
@@ -36,21 +39,28 @@ const deps = (db: Database.Database, over: Partial<Parameters<typeof maybeGenera
 });
 
 // maybeGenerateSessionTitle is fire-and-forget; flush microtasks before asserting.
-const flush = () => new Promise((r) => setImmediate(r));
+const flush = () => new Promise(r => setImmediate(r));
 
 describe('maybeGenerateSessionTitle', () => {
   let db: Database.Database;
-  beforeEach(() => { db = makeDb(); });
+  beforeEach(() => {
+    db = makeDb();
+  });
 
   it('persists the title and broadcasts sessions_updated on first message', async () => {
     const d = deps(db);
     maybeGenerateSessionTitle(d);
     await flush();
-    const row = db.prepare('SELECT auto_title, auto_title_msg_count FROM sessions WHERE id = ?').get('s1') as any;
+    const row = db
+      .prepare('SELECT auto_title, auto_title_msg_count FROM sessions WHERE id = ?')
+      .get('s1') as any;
     expect(row.auto_title).toBe('Project Overview');
     expect(row.auto_title_msg_count).toBe(1);
     expect(d.broadcast).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'sessions_updated', session: expect.objectContaining({ id: 's1', autoTitle: 'Project Overview' }) }),
+      expect.objectContaining({
+        type: 'sessions_updated',
+        session: expect.objectContaining({ id: 's1', autoTitle: 'Project Overview' }),
+      })
     );
   });
 
@@ -64,7 +74,9 @@ describe('maybeGenerateSessionTitle', () => {
   });
 
   it('does not regenerate before the threshold delta', async () => {
-    db.prepare("UPDATE sessions SET auto_title = 'Old', auto_title_msg_count = 1 WHERE id = 's1'").run();
+    db.prepare(
+      "UPDATE sessions SET auto_title = 'Old', auto_title_msg_count = 1 WHERE id = 's1'"
+    ).run();
     const d = deps(db); // still 1 user message → delta 0 < 3
     maybeGenerateSessionTitle(d);
     await flush();
@@ -73,19 +85,26 @@ describe('maybeGenerateSessionTitle', () => {
 
   it('does not start a second generation while one is in flight', async () => {
     let resolveGen: (v: string) => void = () => {};
-    const generate = vi.fn(() => new Promise<string>((r) => { resolveGen = r; }));
+    const generate = vi.fn(
+      () =>
+        new Promise<string>(r => {
+          resolveGen = r;
+        })
+    );
     const d = deps(db, { generate });
-    maybeGenerateSessionTitle(d);  // first call: runs synchronously until the generate() await, marking in-flight
+    maybeGenerateSessionTitle(d); // first call: runs synchronously until the generate() await, marking in-flight
     await flush();
-    maybeGenerateSessionTitle(d);  // second call: should be skipped while in-flight
+    maybeGenerateSessionTitle(d); // second call: should be skipped while in-flight
     await flush();
     expect(generate).toHaveBeenCalledTimes(1);
-    resolveGen('Some Title');       // let the first finish so in-flight is cleared
+    resolveGen('Some Title'); // let the first finish so in-flight is cleared
     await flush();
   });
 
   it('swallows generator errors and leaves the prior value intact', async () => {
-    db.prepare("UPDATE sessions SET auto_title = 'Keep', auto_title_msg_count = 0 WHERE id = 's1'").run();
+    db.prepare(
+      "UPDATE sessions SET auto_title = 'Keep', auto_title_msg_count = 0 WHERE id = 's1'"
+    ).run();
     const d = deps(db, { generate: vi.fn().mockRejectedValue(new Error('boom')) });
     expect(() => maybeGenerateSessionTitle(d)).not.toThrow();
     await flush();

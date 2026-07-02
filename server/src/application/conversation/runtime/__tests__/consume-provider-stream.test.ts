@@ -31,9 +31,11 @@ describe('consumeProviderStream', () => {
       },
     };
 
-    handleProviderEventMock.mockImplementation(({ activeRun }: { activeRun: { phase: string } }) => {
-      activeRun.phase = 'completed';
-    });
+    handleProviderEventMock.mockImplementation(
+      ({ activeRun }: { activeRun: { phase: string } }) => {
+        activeRun.phase = 'completed';
+      }
+    );
 
     const { consumeProviderStream } = await import('../consume-provider-stream.js');
 
@@ -68,7 +70,9 @@ describe('consumeProviderStream', () => {
         toolUseIdToName: new Map(),
         trace: { log: vi.fn(), setMeta: vi.fn() } as any,
       }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('consumeProviderStream did not settle')), 100)),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('consumeProviderStream did not settle')), 100)
+      ),
     ]);
 
     expect(handleProviderEventMock).toHaveBeenCalledTimes(1);

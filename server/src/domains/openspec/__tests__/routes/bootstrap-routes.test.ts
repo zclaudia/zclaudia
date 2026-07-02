@@ -18,9 +18,7 @@ import { createBootstrapRoutes } from '../../routes/bootstrap-routes.js';
 
 function mkPort(jsonObj: unknown) {
   return {
-    async startVirtualRun(args: {
-      onMessage?: (m: { kind: string; content?: string }) => void;
-    }) {
+    async startVirtualRun(args: { onMessage?: (m: { kind: string; content?: string }) => void }) {
       args.onMessage?.({ kind: 'assistant', content: JSON.stringify(jsonObj) });
       args.onMessage?.({ kind: 'run_completed' });
     },
@@ -37,7 +35,7 @@ describe('Bootstrap routes', () => {
     db.pragma('foreign_keys = ON');
     applyMigrations(db);
     db.prepare(
-      `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO projects (id, name, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
     ).run('proj-1', 'P', 'code', 0, 0);
     projectRoot = mkdtempSync(join(tmpdir(), 'bootstrap-routes-'));
     const explore = new AiExploreService({
@@ -75,7 +73,7 @@ describe('Bootstrap routes', () => {
         reviewService,
         candidateRepo: new BootstrapCandidateRepository(db),
         scanRepo: new BootstrapScanRepository(db),
-      }),
+      })
     );
   });
 
@@ -85,7 +83,7 @@ describe('Bootstrap routes', () => {
   function makePickingScan(scanId = 'scan-pick'): string {
     db.prepare(
       `INSERT INTO bootstrap_scans (id, project_id, status, started_at, applied_count, pending_count, init_phase)
-       VALUES (?, 'proj-1', 'awaiting_review', ?, 0, 0, 'picking')`,
+       VALUES (?, 'proj-1', 'awaiting_review', ?, 0, 0, 'picking')`
     ).run(scanId, Date.now());
     return scanId;
   }
@@ -173,7 +171,7 @@ describe('Bootstrap routes', () => {
     db.prepare(`UPDATE bootstrap_scans SET status='awaiting_review' WHERE id = ?`).run(id);
     db.prepare(
       `INSERT INTO bootstrap_review_items (id, scan_id, capability, operation, payload_json, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).run('it', id, 'cap', 'modify', '{}', 'pending', Date.now());
     const res = await request(app).post(`/api/openspec/bootstrap/scans/${id}/finalize`).send({});
     expect(res.status).toBe(409);
@@ -186,7 +184,7 @@ describe('Bootstrap routes', () => {
     const id = start.body.data.scan.id;
     // Rewind to 'running' to simulate a stuck scan.
     db.prepare(`UPDATE bootstrap_scans SET status='running', finished_at=NULL WHERE id = ?`).run(
-      id,
+      id
     );
     const res = await request(app).post(`/api/openspec/bootstrap/scans/${id}/cancel`).send({});
     expect(res.status).toBe(200);
@@ -287,9 +285,9 @@ describe('Bootstrap routes', () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     // Verify the row is now in phase='excluded'
-    const row = db
-      .prepare(`SELECT phase FROM bootstrap_candidates WHERE id = ?`)
-      .get(id) as { phase: string };
+    const row = db.prepare(`SELECT phase FROM bootstrap_candidates WHERE id = ?`).get(id) as {
+      phase: string;
+    };
     expect(row.phase).toBe('excluded');
   });
 
@@ -340,7 +338,7 @@ describe('Bootstrap routes', () => {
       `INSERT INTO bootstrap_candidates
          (id, scan_id, capability, title, description, source, selected, phase,
           generated_md, generation_attempts, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, 'ai_discovered', 1, ?, ?, 1, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, 'ai_discovered', 1, ?, ?, 1, ?, ?)`
     ).run(
       args.id,
       args.scanId,
@@ -350,7 +348,7 @@ describe('Bootstrap routes', () => {
       args.phase,
       args.generated_md ?? null,
       now,
-      now,
+      now
     );
   }
 
@@ -399,9 +397,7 @@ describe('Bootstrap routes', () => {
   it('POST /bootstrap/candidates/:id/retry resets phase to discovered', async () => {
     const scanId = makePickingScan();
     insertCandidate({ id: 'cand-4', scanId, capability: 'auth', phase: 'failed' });
-    const res = await request(app)
-      .post('/api/openspec/bootstrap/candidates/cand-4/retry')
-      .send({});
+    const res = await request(app).post('/api/openspec/bootstrap/candidates/cand-4/retry').send({});
     expect(res.status).toBe(200);
     expect(res.body.data.candidate.phase).toBe('discovered');
   });
@@ -409,9 +405,7 @@ describe('Bootstrap routes', () => {
   it('POST /bootstrap/candidates/:id/retry returns 400 in wrong phase', async () => {
     const scanId = makePickingScan();
     insertCandidate({ id: 'cand-5', scanId, capability: 'auth', phase: 'discovered' });
-    const res = await request(app)
-      .post('/api/openspec/bootstrap/candidates/cand-5/retry')
-      .send({});
+    const res = await request(app).post('/api/openspec/bootstrap/candidates/cand-5/retry').send({});
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('OPENSPEC_ERROR');
   });
@@ -422,7 +416,7 @@ describe('Bootstrap routes', () => {
       .send({ projectId: 'proj-1', mode: 'initial' });
     db.prepare(
       `INSERT INTO bootstrap_review_items (id, scan_id, capability, operation, payload_json, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).run(
       'it',
       start.body.data.scan.id,
@@ -430,7 +424,7 @@ describe('Bootstrap routes', () => {
       'modify',
       '{"name":"x","body":"MUST","scenarios":[{"name":"s","bodyLines":["- **WHEN** x"]}]}',
       'pending',
-      Date.now(),
+      Date.now()
     );
     const res = await request(app).post('/api/openspec/bootstrap/items/it/approve').send({});
     expect(res.status).toBe(200);

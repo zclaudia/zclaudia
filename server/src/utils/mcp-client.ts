@@ -83,7 +83,9 @@ function validateCommand(command: string): string {
   const isSimpleName = /^[a-zA-Z0-9_-]+$/.test(command);
 
   if (!isAbsolute && !isSimpleName) {
-    throw new Error(`Invalid MCP command: "${command}" must be an absolute path or simple command name`);
+    throw new Error(
+      `Invalid MCP command: "${command}" must be an absolute path or simple command name`
+    );
   }
 
   // For absolute paths, reject directory traversal components
@@ -100,7 +102,10 @@ export class McpClient {
   private proc: ChildProcess | null = null;
   private nextId = 1;
   private readBuffer = Buffer.alloc(0);
-  private pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void; timeoutId: NodeJS.Timeout }>();
+  private pending = new Map<
+    number,
+    { resolve: (v: unknown) => void; reject: (e: Error) => void; timeoutId: NodeJS.Timeout }
+  >();
   private connected = false;
   private framingMode: 'content-length' | 'newline' | null = null;
   private serverInstructions: string | undefined;
@@ -108,7 +113,7 @@ export class McpClient {
   constructor(
     private command: string,
     private args: string[],
-    private env?: Record<string, string>,
+    private env?: Record<string, string>
   ) {
     // Validate command on construction
     validateCommand(command);
@@ -120,22 +125,29 @@ export class McpClient {
     if (this.connected) return;
 
     const mergedEnv = { ...process.env, ...this.env };
-    this.proc = spawn(this.command, this.args, {
+    const proc = spawn(this.command, this.args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: mergedEnv,
     });
 
-    this.proc.stdout!.on('data', (chunk: Buffer) => {
+    if (!proc.stdin || !proc.stdout || !proc.stderr) {
+      proc.kill('SIGTERM');
+      throw new Error('MCP server stdio pipes were not created');
+    }
+
+    this.proc = proc;
+
+    proc.stdout.on('data', (chunk: Buffer) => {
       this.readBuffer = Buffer.concat([this.readBuffer, chunk]);
       this.pumpResponses();
     });
 
-    this.proc.stderr!.on('data', (chunk: Buffer) => {
+    proc.stderr.on('data', (chunk: Buffer) => {
       const text = chunk.toString('utf-8').trim();
       if (text) console.error(`[McpClient:${this.command}] ${text}`);
     });
 
-    this.proc.on('exit', (code) => {
+    proc.on('exit', code => {
       this.connected = false;
       // Clear all pending requests and their timeouts
       for (const [, { reject, timeoutId }] of this.pending) {
@@ -147,18 +159,20 @@ export class McpClient {
     });
 
     // Initialize handshake
-    const result = await this.request('initialize', {
+    const result = (await this.request('initialize', {
       protocolVersion: '2024-11-05',
       capabilities: {},
       clientInfo: { name: 'claudia-mcp-client', version: '0.1.0' },
-    }) as { protocolVersion?: string; instructions?: string };
+    })) as { protocolVersion?: string; instructions?: string };
     this.serverInstructions = result?.instructions?.trim() || undefined;
 
     // Send initialized notification
     this.sendNotification('notifications/initialized');
     this.connected = true;
 
-    console.log(`[McpClient] Connected to ${this.command}, framing=${this.framingMode}, protocol=${result?.protocolVersion || 'unknown'}`);
+    console.log(
+      `[McpClient] Connected to ${this.command}, framing=${this.framingMode}, protocol=${result?.protocolVersion || 'unknown'}`
+    );
   }
 
   async disconnect(): Promise<void> {
@@ -176,7 +190,7 @@ export class McpClient {
     this.proc = null;
 
     proc.stdin?.end();
-    await new Promise<void>((resolve) => {
+    await new Promise<void>(resolve => {
       const timeout = setTimeout(() => {
         proc.kill('SIGTERM');
         resolve();
@@ -199,32 +213,37 @@ export class McpClient {
   // ── Public API ──────────────────────────────────────────
 
   async listTools(): Promise<McpToolDefinition[]> {
-    const result = await this.request('tools/list', {}) as { tools?: McpToolDefinition[] };
+    const result = (await this.request('tools/list', {})) as { tools?: McpToolDefinition[] };
     return result?.tools || [];
   }
 
   async callTool(name: string, args: Record<string, unknown>): Promise<McpToolResult> {
-    const result = await this.request('tools/call', { name, arguments: args }) as McpToolResult;
+    const result = (await this.request('tools/call', { name, arguments: args })) as McpToolResult;
     return result;
   }
 
   async listResources(): Promise<McpResourceDefinition[]> {
-    const result = await this.request('resources/list', {}) as { resources?: McpResourceDefinition[] };
+    const result = (await this.request('resources/list', {})) as {
+      resources?: McpResourceDefinition[];
+    };
     return result?.resources || [];
   }
 
   async readResource(uri: string): Promise<McpResourceResult> {
-    const result = await this.request('resources/read', { uri }) as McpResourceResult;
+    const result = (await this.request('resources/read', { uri })) as McpResourceResult;
     return result;
   }
 
   async listPrompts(): Promise<McpPromptDefinition[]> {
-    const result = await this.request('prompts/list', {}) as { prompts?: McpPromptDefinition[] };
+    const result = (await this.request('prompts/list', {})) as { prompts?: McpPromptDefinition[] };
     return result?.prompts || [];
   }
 
   async getPrompt(name: string, args?: Record<string, unknown>): Promise<McpPromptResult> {
-    const result = await this.request('prompts/get', { name, arguments: args ?? {} }) as McpPromptResult;
+    const result = (await this.request('prompts/get', {
+      name,
+      arguments: args ?? {},
+    })) as McpPromptResult;
     return result;
   }
 
@@ -263,16 +282,19 @@ export class McpClient {
   // ── Internal: Framing (write) ───────────────────────────
 
   private writeMessage(message: object): void {
+    const stdin = this.proc?.stdin;
+    if (!stdin?.writable) return;
+
     const json = JSON.stringify(message);
     try {
       if (this.framingMode === 'content-length') {
         const body = Buffer.from(json, 'utf-8');
         const header = Buffer.from(`Content-Length: ${body.length}\r\n\r\n`, 'utf-8');
-        this.proc!.stdin!.write(Buffer.concat([header, body]));
+        stdin.write(Buffer.concat([header, body]));
       } else {
         // Default to newline-delimited JSON (more widely compatible).
         // If server responds with Content-Length, we detect and switch on read.
-        this.proc!.stdin!.write(json + '\n');
+        stdin.write(json + '\n');
       }
     } catch {
       // stdin closed
@@ -306,7 +328,9 @@ export class McpClient {
             // Clear the timeout when response is received
             clearTimeout(pending.timeoutId);
             if (response.error) {
-              pending.reject(new Error(`MCP error ${response.error.code}: ${response.error.message}`));
+              pending.reject(
+                new Error(`MCP error ${response.error.code}: ${response.error.message}`)
+              );
             } else {
               pending.resolve(response.result);
             }
@@ -346,7 +370,7 @@ export class McpClient {
     const headerText = this.readBuffer.subarray(0, headerEnd).toString('utf-8');
     const contentLengthLine = headerText
       .split('\r\n')
-      .find((line) => line.toLowerCase().startsWith('content-length:'));
+      .find(line => line.toLowerCase().startsWith('content-length:'));
 
     if (!contentLengthLine) {
       this.readBuffer = this.readBuffer.subarray(headerEnd + separator.length);

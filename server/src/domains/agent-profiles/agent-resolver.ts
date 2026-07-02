@@ -42,7 +42,9 @@ export function resolveAgentForSession(db: Database, opts: ResolveOptions): Reso
   if (opts.explicitAgentId) {
     agent = agentRepo.findById(opts.explicitAgentId) ?? undefined;
     if (!agent) {
-      console.warn(`[agent-resolver] explicit agent_profile_id ${opts.explicitAgentId} not found, falling back`);
+      console.warn(
+        `[agent-resolver] explicit agent_profile_id ${opts.explicitAgentId} not found, falling back`
+      );
     }
   }
 
@@ -52,7 +54,9 @@ export function resolveAgentForSession(db: Database, opts: ResolveOptions): Reso
     if (projectDefaultId) {
       agent = agentRepo.findById(projectDefaultId) ?? undefined;
       if (!agent) {
-        console.warn(`[agent-resolver] project default agent_profile_id ${projectDefaultId} not found, falling back to global default`);
+        console.warn(
+          `[agent-resolver] project default agent_profile_id ${projectDefaultId} not found, falling back to global default`
+        );
       }
     }
   }
@@ -69,7 +73,9 @@ export function resolveAgentForSession(db: Database, opts: ResolveOptions): Reso
   if (agent.llmProfileId) {
     llm = llmRepo.findById(agent.llmProfileId) ?? undefined;
     if (!llm) {
-      console.warn(`[agent-resolver] agent.llm_profile_id ${agent.llmProfileId} not found, falling back to default LLM profile`);
+      console.warn(
+        `[agent-resolver] agent.llm_profile_id ${agent.llmProfileId} not found, falling back to default LLM profile`
+      );
       llm = llmRepo.findDefault() ?? undefined;
     }
   } else {

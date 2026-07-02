@@ -45,9 +45,7 @@ describe('AttachmentThumbnail', () => {
 
   it('renders icon for non-image kinds and skips blob fetch', () => {
     render(
-      <AttachmentThumbnail
-        attachment={att({ id: 'doc-1', kind: 'document', name: 'spec.pdf' })}
-      />,
+      <AttachmentThumbnail attachment={att({ id: 'doc-1', kind: 'document', name: 'spec.pdf' })} />
     );
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
     expect(fetchAttachmentBlobUrl).not.toHaveBeenCalled();
@@ -79,7 +77,7 @@ describe('AttachmentThumbnail', () => {
       <AttachmentThumbnail
         attachment={att({ id: 'doc-1', kind: 'document', name: 'spec.pdf' })}
         slotTopLeft={<span data-testid="custom-slot">handle</span>}
-      />,
+      />
     );
     expect(screen.getByTestId('custom-slot')).toBeInTheDocument();
   });

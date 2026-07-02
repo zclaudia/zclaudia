@@ -41,7 +41,8 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
 
   switch (msg.type) {
     case 'delta': {
-      if (ctx.isRunEventGap(msg.runId, msg.seq)) ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
+      if (ctx.isRunEventGap(msg.runId, msg.seq))
+        ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
       useRunStore.getState().clearRunRetryStatus(msg.runId);
       const deltaSession = msg.sessionId || useRunStore.getState().activeRuns[msg.runId];
@@ -54,7 +55,8 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
     }
 
     case 'run_started': {
-      if (ctx.isRunEventGap(msg.runId, msg.seq)) ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
+      if (ctx.isRunEventGap(msg.runId, msg.seq))
+        ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
       ctx.clearTerminalRunSeq(msg.runId);
       const targetSessionId = msg.sessionId;
@@ -80,7 +82,10 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
       if (serverId === activeServerId) {
         useSessionConfigStore.getState().clearSystemInfo(targetSessionId);
       }
-      if (userMsgId && clientReqId) useChatMessageStore.getState().updateMessageIdByClientMessageId(targetSessionId, clientReqId, userMsgId);
+      if (userMsgId && clientReqId)
+        useChatMessageStore
+          .getState()
+          .updateMessageIdByClientMessageId(targetSessionId, clientReqId, userMsgId);
       if (msg.assistantMessageId || !alreadyTrackingRun) {
         useChatMessageStore.getState().addMessage(targetSessionId, {
           id: assistantMsgId,
@@ -109,11 +114,14 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
     }
 
     case 'run_completed': {
-      if (ctx.isRunEventGap(msg.runId, msg.seq)) ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
+      if (ctx.isRunEventGap(msg.runId, msg.seq))
+        ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
       flushDeltaForRun(msg.runId);
       const completedSession = msg.sessionId || useRunStore.getState().activeRuns[msg.runId];
-      console.log(`[${logTag}] run_completed runId=${msg.runId} sessionId=${completedSession ?? 'unknown'} seq=${msg.seq ?? 'none'}`);
+      console.log(
+        `[${logTag}] run_completed runId=${msg.runId} sessionId=${completedSession ?? 'unknown'} seq=${msg.seq ?? 'none'}`
+      );
       if (completedSession) {
         usePromptRequestStore.getState().clearRequestsForSession(completedSession);
         usePermissionStore.getState().clearRequestsForSession(completedSession);
@@ -141,11 +149,14 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
     }
 
     case 'run_failed': {
-      if (ctx.isRunEventGap(msg.runId, msg.seq)) ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
+      if (ctx.isRunEventGap(msg.runId, msg.seq))
+        ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
       flushDeltaForRun(msg.runId);
       const failedSession = msg.sessionId || useRunStore.getState().activeRuns[msg.runId];
-      console.log(`[${logTag}] run_failed runId=${msg.runId} sessionId=${failedSession ?? 'unknown'} seq=${msg.seq ?? 'none'}`);
+      console.log(
+        `[${logTag}] run_failed runId=${msg.runId} sessionId=${failedSession ?? 'unknown'} seq=${msg.seq ?? 'none'}`
+      );
       if (failedSession) {
         usePromptRequestStore.getState().clearRequestsForSession(failedSession);
         usePermissionStore.getState().clearRequestsForSession(failedSession);
@@ -162,7 +173,9 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
               icon: 'error',
             });
           }
-          useChatMessageStore.getState().appendToLastMessage(failedSession, `\n\n**Error:** ${msg.error}`);
+          useChatMessageStore
+            .getState()
+            .appendToLastMessage(failedSession, `\n\n**Error:** ${msg.error}`);
         }
         useRunStore.getState().finalizeRunToMessage(msg.runId);
         useSessionRunStateStore.getState().markRunEnded({
@@ -192,7 +205,9 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
     case 'run_retrying': {
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
       const retryingSession = msg.sessionId || useRunStore.getState().activeRuns[msg.runId];
-      console.log(`[${logTag}] run_retrying runId=${msg.runId} attempt=${msg.attempt}/${msg.maxAttempts} delayMs=${msg.delayMs} status=${msg.status ?? 'network'}`);
+      console.log(
+        `[${logTag}] run_retrying runId=${msg.runId} attempt=${msg.attempt}/${msg.maxAttempts} delayMs=${msg.delayMs} status=${msg.status ?? 'network'}`
+      );
       if (retryingSession) {
         useRunStore.getState().updateRunRetryStatus(msg.runId, {
           sessionId: retryingSession,
@@ -230,12 +245,22 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
     }
 
     case 'tool_use': {
-      if (ctx.isRunEventGap(msg.runId, msg.seq)) ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
+      if (ctx.isRunEventGap(msg.runId, msg.seq))
+        ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
       useRunStore.getState().clearRunRetryStatus(msg.runId);
       const toolSession = msg.sessionId || useRunStore.getState().activeRuns[msg.runId];
       if (toolSession) {
-        useRunStore.getState().addToolCall(msg.runId, msg.toolUseId, msg.toolName, msg.toolInput, msg.semantic, msg.effect);
+        useRunStore
+          .getState()
+          .addToolCall(
+            msg.runId,
+            msg.toolUseId,
+            msg.toolName,
+            msg.toolInput,
+            msg.semantic,
+            msg.effect
+          );
         useRunStore.getState().addToolUseBlock(msg.runId, msg.toolUseId);
       } else if (msg.runId) {
         console.warn(`[${logTag}] tool_use for untracked run ${msg.runId}`);
@@ -244,12 +269,15 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
     }
 
     case 'tool_result': {
-      if (ctx.isRunEventGap(msg.runId, msg.seq)) ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
+      if (ctx.isRunEventGap(msg.runId, msg.seq))
+        ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
       useRunStore.getState().clearRunRetryStatus(msg.runId);
       const resultSession = msg.sessionId || useRunStore.getState().activeRuns[msg.runId];
       if (resultSession) {
-        useRunStore.getState().updateToolCallResult(msg.runId, msg.toolUseId, msg.result, msg.isError, msg.effect);
+        useRunStore
+          .getState()
+          .updateToolCallResult(msg.runId, msg.toolUseId, msg.result, msg.isError, msg.effect);
       } else if (msg.runId) {
         console.warn(`[${logTag}] tool_result for untracked run ${msg.runId}`);
       }
@@ -257,7 +285,8 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
     }
 
     case 'tool_activity': {
-      if (ctx.isRunEventGap(msg.runId, msg.seq)) ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
+      if (ctx.isRunEventGap(msg.runId, msg.seq))
+        ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
       useRunStore.getState().clearRunRetryStatus(msg.runId);
       if (msg.runId && msg.toolUseId && msg.content) {
@@ -267,7 +296,8 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
     }
 
     case 'mode_change':
-      if (ctx.isRunEventGap(msg.runId, msg.seq)) ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
+      if (ctx.isRunEventGap(msg.runId, msg.seq))
+        ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
       useSessionConfigStore.getState().setRuntimeMode(msg.sessionId, msg.mode);
       // Pass the mode string through directly so the UI selector stays
@@ -294,7 +324,9 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
         console.warn(`[${logTag}] compaction_failed missing sessionId, ignoring`);
         return true;
       }
-      console.warn(`[${logTag}] compaction_failed session=${sessionId} reason=${msg.reason} breakerOpen=${msg.breakerOpen}`);
+      console.warn(
+        `[${logTag}] compaction_failed session=${sessionId} reason=${msg.reason} breakerOpen=${msg.breakerOpen}`
+      );
       useSessionConfigStore.getState().setCompactionNotice(sessionId, {
         sessionId,
         reason: msg.reason,
@@ -319,7 +351,7 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
       }
       useSessionConfigStore.getState().clearCompactionNotice(sessionId);
       void getSessionCompaction(sessionId, compactionId)
-        .then((c) => {
+        .then(c => {
           useChatMessageStore.getState().addMessage(sessionId, {
             id: c.id,
             sessionId: c.sessionId,
@@ -341,7 +373,10 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
           });
         })
         .catch((err: unknown) => {
-          console.warn(`[${logTag}] compaction_completed: failed to fetch compaction ${compactionId}:`, err);
+          console.warn(
+            `[${logTag}] compaction_completed: failed to fetch compaction ${compactionId}:`,
+            err
+          );
         });
       return true;
     }
@@ -350,4 +385,3 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
       return false;
   }
 }
-

@@ -6,9 +6,7 @@ import { MarkdownPreview } from '../components/MarkdownPreview.js';
 describe('MarkdownPreview', () => {
   it('renders headings with custom classes', () => {
     render(
-      <MarkdownPreview
-        content={`# H1\n\n## H2\n\n### Requirement: Login\n\n#### Scenario: x`}
-      />,
+      <MarkdownPreview content={`# H1\n\n## H2\n\n### Requirement: Login\n\n#### Scenario: x`} />
     );
     expect(screen.getByText('H1')).toBeInTheDocument();
     expect(screen.getByText(/Requirement: Login/)).toBeInTheDocument();

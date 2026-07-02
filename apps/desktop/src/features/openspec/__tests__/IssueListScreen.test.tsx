@@ -13,7 +13,7 @@ function mkIssue(
     status: string;
     isAnonymous: boolean;
     epicId?: string;
-  }>,
+  }>
 ) {
   return {
     id: over.id ?? 'i',
@@ -140,7 +140,7 @@ describe('IssueListScreen', () => {
       issuesByProject: { p1: [mkIssue({ id: 's1', title: 'S', type: 'implement' })] },
     } as never);
     vi.spyOn(api, 'getIssue').mockResolvedValue(
-      mkIssue({ id: 's1', title: 'S', type: 'implement' }) as never,
+      mkIssue({ id: 's1', title: 'S', type: 'implement' }) as never
     );
     render(<IssueListScreen projectId="p1" />);
     fireEvent.click(screen.getByText('S'));
@@ -158,9 +158,9 @@ describe('IssueListScreen', () => {
   });
 
   it('calls listIssues on mount and populates store', async () => {
-    const spy = vi.spyOn(api, 'listIssues').mockResolvedValue([
-      mkIssue({ id: 'autoload-1', title: 'Loaded From Server' }),
-    ] as never);
+    const spy = vi
+      .spyOn(api, 'listIssues')
+      .mockResolvedValue([mkIssue({ id: 'autoload-1', title: 'Loaded From Server' })] as never);
     render(<IssueListScreen projectId="p1" />);
     await waitFor(() => expect(spy).toHaveBeenCalledWith('p1'));
     await waitFor(() => expect(screen.getByText('Loaded From Server')).toBeInTheDocument());

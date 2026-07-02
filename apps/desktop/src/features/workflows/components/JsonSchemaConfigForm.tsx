@@ -32,11 +32,12 @@ export function JsonSchemaConfigForm({ schema, config, onChange }: JsonSchemaCon
           return (
             <div key={key}>
               <label className="text-xs font-medium text-muted-foreground block mb-1">
-                {label}{isRequired ? ' *' : ''}
+                {label}
+                {isRequired ? ' *' : ''}
               </label>
               <Select
                 value={(value as string) ?? prop.default ?? ''}
-                onChange={(next) => updateField(key, next)}
+                onChange={next => updateField(key, next)}
                 block
                 size="md"
                 options={[
@@ -44,7 +45,9 @@ export function JsonSchemaConfigForm({ schema, config, onChange }: JsonSchemaCon
                   ...(prop.enum as string[]).map((opt: string) => ({ value: opt, label: opt })),
                 ]}
               />
-              {description && <p className="text-[10px] text-muted-foreground mt-0.5">{description}</p>}
+              {description && (
+                <p className="text-[10px] text-muted-foreground mt-0.5">{description}</p>
+              )}
             </div>
           );
         }
@@ -56,11 +59,13 @@ export function JsonSchemaConfigForm({ schema, config, onChange }: JsonSchemaCon
               <input
                 type="checkbox"
                 checked={(value as boolean) ?? prop.default ?? false}
-                onChange={(e) => updateField(key, e.target.checked)}
+                onChange={e => updateField(key, e.target.checked)}
                 className="rounded-md border-border"
               />
               <label className="text-xs font-medium text-muted-foreground">{label}</label>
-              {description && <span className="text-[10px] text-muted-foreground ml-1">({description})</span>}
+              {description && (
+                <span className="text-[10px] text-muted-foreground ml-1">({description})</span>
+              )}
             </div>
           );
         }
@@ -70,7 +75,8 @@ export function JsonSchemaConfigForm({ schema, config, onChange }: JsonSchemaCon
           return (
             <div key={key}>
               <label className="text-xs font-medium text-muted-foreground block mb-1">
-                {label}{isRequired ? ' *' : ''}
+                {label}
+                {isRequired ? ' *' : ''}
               </label>
               <input
                 type="number"
@@ -78,10 +84,14 @@ export function JsonSchemaConfigForm({ schema, config, onChange }: JsonSchemaCon
                 min={prop.minimum}
                 max={prop.maximum}
                 step={prop.type === 'integer' ? 1 : undefined}
-                onChange={(e) => updateField(key, e.target.value ? Number(e.target.value) : undefined)}
+                onChange={e =>
+                  updateField(key, e.target.value ? Number(e.target.value) : undefined)
+                }
                 className="w-full px-2.5 py-1.5 text-sm rounded-full border border-border bg-background focus:outline-none focus:border-primary"
               />
-              {description && <p className="text-[10px] text-muted-foreground mt-0.5">{description}</p>}
+              {description && (
+                <p className="text-[10px] text-muted-foreground mt-0.5">{description}</p>
+              )}
             </div>
           );
         }
@@ -92,16 +102,19 @@ export function JsonSchemaConfigForm({ schema, config, onChange }: JsonSchemaCon
           return (
             <div key={key}>
               <label className="text-xs font-medium text-muted-foreground block mb-1">
-                {label}{isRequired ? ' *' : ''}
+                {label}
+                {isRequired ? ' *' : ''}
               </label>
               <textarea
                 value={(value as string) ?? prop.default ?? ''}
-                onChange={(e) => updateField(key, e.target.value)}
+                onChange={e => updateField(key, e.target.value)}
                 placeholder={prop.placeholder ?? ''}
                 rows={3}
                 className="w-full px-2.5 py-1.5 text-sm rounded-md border border-border bg-background resize-none font-mono focus:outline-none focus:border-primary"
               />
-              {description && <p className="text-[10px] text-muted-foreground mt-0.5">{description}</p>}
+              {description && (
+                <p className="text-[10px] text-muted-foreground mt-0.5">{description}</p>
+              )}
             </div>
           );
         }
@@ -110,16 +123,19 @@ export function JsonSchemaConfigForm({ schema, config, onChange }: JsonSchemaCon
         return (
           <div key={key}>
             <label className="text-xs font-medium text-muted-foreground block mb-1">
-              {label}{isRequired ? ' *' : ''}
+              {label}
+              {isRequired ? ' *' : ''}
             </label>
             <input
               type={prop.format === 'password' ? 'password' : 'text'}
               value={(value as string) ?? prop.default ?? ''}
-              onChange={(e) => updateField(key, e.target.value)}
+              onChange={e => updateField(key, e.target.value)}
               placeholder={prop.placeholder ?? ''}
               className="w-full px-2.5 py-1.5 text-sm rounded-md border border-border bg-background focus:outline-none focus:border-primary"
             />
-            {description && <p className="text-[10px] text-muted-foreground mt-0.5">{description}</p>}
+            {description && (
+              <p className="text-[10px] text-muted-foreground mt-0.5">{description}</p>
+            )}
           </div>
         );
       })}

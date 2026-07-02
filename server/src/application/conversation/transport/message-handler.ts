@@ -2,11 +2,7 @@
  * WebSocket message dispatcher.
  * Routes ClientMessage to domain-specific handlers under ../handlers/.
  */
-import type {
-  ClientMessage,
-  PongMessage,
-  ErrorMessage,
-} from '@zclaudia/shared/wire/messages';
+import type { ClientMessage, PongMessage, ErrorMessage } from '@zclaudia/shared/wire/messages';
 import type { TerminalManager } from '../../../terminal-manager.js';
 import type { ProcessMonitor } from '../../../utils/process-monitor.js';
 import type { initDatabase } from '../../../infra/storage/db.js';
@@ -19,22 +15,39 @@ import { isTerminalPhase } from '../runtime/active-run-phase.js';
 
 // Domain handlers
 import {
-  handleTerminalOpen, handleTerminalInput, handleTerminalResize,
-  handleTerminalClose, handleTerminalDetach, handleTerminalAttach,
+  handleTerminalOpen,
+  handleTerminalInput,
+  handleTerminalResize,
+  handleTerminalClose,
+  handleTerminalDetach,
+  handleTerminalAttach,
 } from '../handlers/terminal.js';
 import {
-  handleGetNotifications, handleMarkNotificationsRead, handleMarkAllNotificationsRead, handleDismissNotifications, handleClearReadNotifications,
+  handleGetNotifications,
+  handleMarkNotificationsRead,
+  handleMarkAllNotificationsRead,
+  handleDismissNotifications,
+  handleClearReadNotifications,
 } from '../handlers/notification-feed.js';
 import {
-  handlePermission, handlePromptAnswerMessage, handleInteractionResponse, handlePluginPermissionResponse,
+  handlePermission,
+  handlePromptAnswerMessage,
+  handleInteractionResponse,
+  handlePluginPermissionResponse,
 } from '../../../application/conversation/interactions/ws-handlers.js';
 import {
-  handleKillLeakedProcesses, handleStopBackgroundTask, handleAgentCancel, handleRunSteer,
+  handleKillLeakedProcesses,
+  handleStopBackgroundTask,
+  handleAgentCancel,
+  handleRunSteer,
 } from '../handlers/run.js';
 import { requestBackgroundForCommand } from '../../../infra/providers/pi-runtime/inflight-bash-registry.js';
 import { broadcastRunMessage } from './broadcast.js';
 import {
-  handleClaudiaMessage, handleClaudiaTaskSubmit, handleClaudiaTaskContinue, handleClaudiaTaskCancel,
+  handleClaudiaMessage,
+  handleClaudiaTaskSubmit,
+  handleClaudiaTaskContinue,
+  handleClaudiaTaskCancel,
 } from '../handlers/claudia.js';
 import {
   handleCreateMetaWorkflowRun,
@@ -54,13 +67,22 @@ export interface MessageHandlerContext {
   activeRuns: Map<string, ActiveRun>;
   connectedClients: Map<string, ConnectedClient>;
   processMonitor: ProcessMonitor | null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- handleRunStart accepts various message shapes from different callers
-  handleRunStart: (client: ConnectedClient, message: any, db: ReturnType<typeof initDatabase>, options?: Record<string, unknown>, clients?: Map<string, ConnectedClient>) => Promise<void>;
+
+  handleRunStart: (
+    client: ConnectedClient,
+    message: any,
+    db: ReturnType<typeof initDatabase>,
+    options?: Record<string, unknown>,
+    clients?: Map<string, ConnectedClient>
+  ) => Promise<void>;
   cancelRun: (runId: string) => void;
   /** Pause the session's active goal when its run is interrupted (Codex-aligned). */
   pauseActiveGoalForSession?: (sessionId: string) => void;
   broadcastPluginState: () => void;
-  findProcessPidsByTaskCommand: (taskCommand?: string, excludedPids?: number[]) => Promise<number[]>;
+  findProcessPidsByTaskCommand: (
+    taskCommand?: string,
+    excludedPids?: number[]
+  ) => Promise<number[]>;
   notificationService?: NotificationService;
   taskCoordination?: TaskCoordinationPort;
   providerRegistry?: ProviderRegistryPort;
@@ -75,7 +97,7 @@ export async function handleClientMessage(
   db: ReturnType<typeof initDatabase>,
   clients: Map<string, ConnectedClient>,
   ctx: MessageHandlerContext,
-  termMgr?: TerminalManager,
+  termMgr?: TerminalManager
 ): Promise<void> {
   switch (message.type) {
     // ── Core ──
@@ -92,13 +114,19 @@ export async function handleClientMessage(
       break;
 
     case 'agent_start':
-      await ctx.handleRunStart(client, {
-        type: 'run_start',
-        clientRequestId: message.clientRequestId,
-        sessionId: message.sessionId,
-        input: message.input,
-        llmProfileId: message.llmProfileId,
-      }, db, {}, clients);
+      await ctx.handleRunStart(
+        client,
+        {
+          type: 'run_start',
+          clientRequestId: message.clientRequestId,
+          sessionId: message.sessionId,
+          input: message.input,
+          llmProfileId: message.llmProfileId,
+        },
+        db,
+        {},
+        clients
+      );
       break;
 
     case 'run_cancel': {
@@ -114,7 +142,14 @@ export async function handleClientMessage(
       break;
 
     case 'agent_cancel':
-      await handleAgentCancel(client, message.sessionId, ctx.activeRuns, ctx.cancelRun, db, ctx.taskCoordination);
+      await handleAgentCancel(
+        client,
+        message.sessionId,
+        ctx.activeRuns,
+        ctx.cancelRun,
+        db,
+        ctx.taskCoordination
+      );
       break;
 
     case 'kill_leaked_processes':
@@ -123,16 +158,31 @@ export async function handleClientMessage(
 
     case 'stop_background_task':
       if (!ctx.providerRegistry) {
-        sendMessage(client.ws, { type: 'error', code: 'NOT_READY', message: 'Provider registry not available' } as ErrorMessage);
+        sendMessage(client.ws, {
+          type: 'error',
+          code: 'NOT_READY',
+          message: 'Provider registry not available',
+        } as ErrorMessage);
         break;
       }
-      await handleStopBackgroundTask(client, message, db, ctx.activeRuns, ctx.findProcessPidsByTaskCommand, ctx.providerRegistry);
+      await handleStopBackgroundTask(
+        client,
+        message,
+        db,
+        ctx.activeRuns,
+        ctx.findProcessPidsByTaskCommand,
+        ctx.providerRegistry
+      );
       break;
 
     case 'background_running_command': {
       const conversion = requestBackgroundForCommand(message.sessionId, message.toolUseId);
       if (!conversion.ok) {
-        sendMessage(client.ws, { type: 'error', code: 'NO_INFLIGHT_COMMAND', message: conversion.reason } as ErrorMessage);
+        sendMessage(client.ws, {
+          type: 'error',
+          code: 'NO_INFLIGHT_COMMAND',
+          message: conversion.reason,
+        } as ErrorMessage);
       }
       // On success the tool result (background:true) and the task_notification
       // broadcast arrive through the normal run/task event flow.
@@ -167,7 +217,11 @@ export async function handleClientMessage(
 
     case 'claudia_task_submit':
       if (!ctx.taskCoordination) {
-        sendMessage(client.ws, { type: 'error', code: 'NO_ORCHESTRATOR', message: 'Task coordination not available' } as ErrorMessage);
+        sendMessage(client.ws, {
+          type: 'error',
+          code: 'NO_ORCHESTRATOR',
+          message: 'Task coordination not available',
+        } as ErrorMessage);
         break;
       }
       await handleClaudiaTaskSubmit(client, message, db, ctx.taskCoordination);
@@ -175,7 +229,11 @@ export async function handleClientMessage(
 
     case 'claudia_task_continue':
       if (!ctx.taskCoordination) {
-        sendMessage(client.ws, { type: 'error', code: 'NO_ORCHESTRATOR', message: 'Task coordination not available' } as ErrorMessage);
+        sendMessage(client.ws, {
+          type: 'error',
+          code: 'NO_ORCHESTRATOR',
+          message: 'Task coordination not available',
+        } as ErrorMessage);
         break;
       }
       await handleClaudiaTaskContinue(client, message, db, ctx.taskCoordination);
@@ -183,7 +241,11 @@ export async function handleClientMessage(
 
     case 'claudia_task_cancel':
       if (!ctx.taskCoordination) {
-        sendMessage(client.ws, { type: 'error', code: 'NO_ORCHESTRATOR', message: 'Task coordination not available' } as ErrorMessage);
+        sendMessage(client.ws, {
+          type: 'error',
+          code: 'NO_ORCHESTRATOR',
+          message: 'Task coordination not available',
+        } as ErrorMessage);
         break;
       }
       await handleClaudiaTaskCancel(client, message, ctx.taskCoordination);
@@ -191,7 +253,13 @@ export async function handleClientMessage(
 
     // ── Permissions ──
     case 'permission_decision':
-      handlePermission(message, ctx.activeRuns, ctx.connectedClients, ctx.permissionBridge, ctx.cancelWorkflowRun);
+      handlePermission(
+        message,
+        ctx.activeRuns,
+        ctx.connectedClients,
+        ctx.permissionBridge,
+        ctx.cancelWorkflowRun
+      );
       break;
 
     case 'prompt_answer':
@@ -208,43 +276,53 @@ export async function handleClientMessage(
 
     // ── Meta Workflow ──
     case 'create_meta_workflow_run':
-      if (ctx.metaWorkflowService) handleCreateMetaWorkflowRun(client, message, ctx.metaWorkflowService);
+      if (ctx.metaWorkflowService)
+        handleCreateMetaWorkflowRun(client, message, ctx.metaWorkflowService);
       break;
 
     case 'submit_meta_workflow_requirements':
-      if (ctx.metaWorkflowService) handleSubmitMetaWorkflowRequirements(client, message, ctx.metaWorkflowService);
+      if (ctx.metaWorkflowService)
+        handleSubmitMetaWorkflowRequirements(client, message, ctx.metaWorkflowService);
       break;
 
     case 'resolve_meta_workflow_requirements':
-      if (ctx.metaWorkflowService) handleResolveMetaWorkflowRequirements(client, message, ctx.metaWorkflowService);
+      if (ctx.metaWorkflowService)
+        handleResolveMetaWorkflowRequirements(client, message, ctx.metaWorkflowService);
       break;
 
     case 'set_meta_workflow_phases':
-      if (ctx.metaWorkflowService) handleSetMetaWorkflowPhases(client, message, ctx.metaWorkflowService);
+      if (ctx.metaWorkflowService)
+        handleSetMetaWorkflowPhases(client, message, ctx.metaWorkflowService);
       break;
 
     case 'cancel_meta_workflow_run':
-      if (ctx.metaWorkflowService) handleCancelMetaWorkflowRun(client, message, ctx.metaWorkflowService);
+      if (ctx.metaWorkflowService)
+        handleCancelMetaWorkflowRun(client, message, ctx.metaWorkflowService);
       break;
 
     case 'run_meta_workflow_phase':
-      if (ctx.metaWorkflowService) await handleRunMetaWorkflowPhase(client, message, ctx.metaWorkflowService);
+      if (ctx.metaWorkflowService)
+        await handleRunMetaWorkflowPhase(client, message, ctx.metaWorkflowService);
       break;
 
     case 'rerun_meta_workflow_phase':
-      if (ctx.metaWorkflowService) await handleRerunMetaWorkflowPhase(client, message, ctx.metaWorkflowService);
+      if (ctx.metaWorkflowService)
+        await handleRerunMetaWorkflowPhase(client, message, ctx.metaWorkflowService);
       break;
 
     case 'ignore_meta_workflow_phase_stale':
-      if (ctx.metaWorkflowService) handleIgnoreMetaWorkflowPhaseStale(client, message, ctx.metaWorkflowService);
+      if (ctx.metaWorkflowService)
+        handleIgnoreMetaWorkflowPhaseStale(client, message, ctx.metaWorkflowService);
       break;
 
     case 'evaluate_meta_workflow_phase_impact':
-      if (ctx.metaWorkflowService) await handleEvaluateMetaWorkflowPhaseImpact(client, message, ctx.metaWorkflowService);
+      if (ctx.metaWorkflowService)
+        await handleEvaluateMetaWorkflowPhaseImpact(client, message, ctx.metaWorkflowService);
       break;
 
     case 'cascade_rerun_meta_workflow_phase':
-      if (ctx.metaWorkflowService) await handleCascadeRerunMetaWorkflowPhase(client, message, ctx.metaWorkflowService);
+      if (ctx.metaWorkflowService)
+        await handleCascadeRerunMetaWorkflowPhase(client, message, ctx.metaWorkflowService);
       break;
 
     // ── Terminal ──
@@ -277,7 +355,7 @@ export async function handleClientMessage(
       sendMessage(client.ws, {
         type: 'error',
         code: 'UNKNOWN_MESSAGE_TYPE',
-        message: `Unknown message type: ${(message as { type: string }).type}`
+        message: `Unknown message type: ${(message as { type: string }).type}`,
       } as ErrorMessage);
   }
 }

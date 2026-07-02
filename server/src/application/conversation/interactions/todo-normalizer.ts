@@ -16,11 +16,16 @@ export const MAX_TODO_CONTENT_CHARS = 1000;
 
 export type TodoValidationResult =
   | { ok: true; todos: NormalizedTodoItem[] }
-  | { ok: false; code: 'invalid_todos' | 'too_many_todos' | 'todo_content_too_large'; message: string; details: Record<string, unknown> };
+  | {
+      ok: false;
+      code: 'invalid_todos' | 'too_many_todos' | 'todo_content_too_large';
+      message: string;
+      details: Record<string, unknown>;
+    };
 
 function coerceStatus(value: unknown): NormalizedTodoItem['status'] {
   const s = typeof value === 'string' ? value : 'pending';
-  return VALID_STATUSES.has(s) ? s as NormalizedTodoItem['status'] : 'pending';
+  return VALID_STATUSES.has(s) ? (s as NormalizedTodoItem['status']) : 'pending';
 }
 
 /**
@@ -48,7 +53,7 @@ export function normalizeTodoItems(value: unknown): NormalizedTodoItem[] {
 
   // Handle arrays
   if (Array.isArray(value)) {
-    return value.flatMap((item) => {
+    return value.flatMap(item => {
       if (!item || typeof item !== 'object') return [];
       const content = 'content' in item ? String(item.content ?? '') : '';
       if (!content) return [];
@@ -92,7 +97,7 @@ export function validateTodoItems(value: unknown): TodoValidationResult {
       details: { count: todos.length, max: MAX_TODO_ITEMS },
     };
   }
-  const oversizedIndex = todos.findIndex((todo) => todo.content.length > MAX_TODO_CONTENT_CHARS);
+  const oversizedIndex = todos.findIndex(todo => todo.content.length > MAX_TODO_CONTENT_CHARS);
   if (oversizedIndex >= 0) {
     return {
       ok: false,

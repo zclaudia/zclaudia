@@ -4,7 +4,9 @@ import { NotificationsModal } from '../NotificationsModal';
 
 vi.mock('../../../components/notifications/NotificationsPanel', () => ({
   NotificationsPanel: ({ onClose }: { onClose?: () => void }) => (
-    <button data-testid="panel" onClick={onClose}>panel</button>
+    <button data-testid="panel" onClick={onClose}>
+      panel
+    </button>
   ),
 }));
 
@@ -24,7 +26,9 @@ describe('NotificationsModal', () => {
   it('calls onClose on Escape', () => {
     const onClose = vi.fn();
     render(<NotificationsModal open onClose={onClose} />);
-    fireEvent.keyDown(screen.getByRole('dialog', { name: 'Notifications' }).parentElement!, { key: 'Escape' });
+    fireEvent.keyDown(screen.getByRole('dialog', { name: 'Notifications' }).parentElement!, {
+      key: 'Escape',
+    });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 

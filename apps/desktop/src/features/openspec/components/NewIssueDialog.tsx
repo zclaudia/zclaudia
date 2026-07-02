@@ -32,13 +32,9 @@ const SUB_TYPES: { value: LocalIssueType; label: string }[] = [
   { value: 'chore', label: 'Chore' },
 ];
 
-export function NewIssueDialog({
-  projectId,
-  parentEpicId,
-  onClose,
-}: Props): React.ReactElement {
-  const upsertIssue = useOpenSpecStore((s) => s.upsertIssue);
-  const setSpecChange = useOpenSpecStore((s) => s.setSpecChange);
+export function NewIssueDialog({ projectId, parentEpicId, onClose }: Props): React.ReactElement {
+  const upsertIssue = useOpenSpecStore(s => s.upsertIssue);
+  const setSpecChange = useOpenSpecStore(s => s.setSpecChange);
   const [mode, setMode] = useState<DialogMode>(parentEpicId ? 'implement' : 'epic');
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
@@ -84,9 +80,9 @@ export function NewIssueDialog({
               <select
                 className="w-full bg-background border border-border rounded-md px-2 py-1 text-sm"
                 value={mode as string}
-                onChange={(e) => setMode(e.target.value as DialogMode)}
+                onChange={e => setMode(e.target.value as DialogMode)}
               >
-                {SUB_TYPES.map((s) => (
+                {SUB_TYPES.map(s => (
                   <option key={s.value} value={s.value}>
                     {s.label}
                   </option>
@@ -96,10 +92,10 @@ export function NewIssueDialog({
               <select
                 className="w-full bg-background border border-border rounded-md px-2 py-1 text-sm"
                 value={mode as string}
-                onChange={(e) => setMode(e.target.value as DialogMode)}
+                onChange={e => setMode(e.target.value as DialogMode)}
               >
                 <option value="epic">Epic (organizational container)</option>
-                {SUB_TYPES.map((s) => (
+                {SUB_TYPES.map(s => (
                   <option key={s.value} value={s.value}>
                     {s.label} (standalone)
                   </option>
@@ -113,7 +109,7 @@ export function NewIssueDialog({
               type="text"
               className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={e => setTitle(e.target.value)}
               placeholder={mode === 'epic' ? 'Epic title' : 'Issue title'}
               autoFocus
             />

@@ -94,22 +94,30 @@ test.describe('Permission System', () => {
     await page.waitForTimeout(3000);
 
     // Look for permission dialog
-    const permissionDialog = page.locator('[data-testid="permission-dialog"], [class*="permission-modal"], [role="dialog"]').first();
+    const permissionDialog = page
+      .locator('[data-testid="permission-dialog"], [class*="permission-modal"], [role="dialog"]')
+      .first();
     const hasDialog = await permissionDialog.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (hasDialog) {
       console.log('  ✓ Permission dialog appeared');
 
       // Check dialog content
-      const toolName = permissionDialog.locator('[class*="tool-name"], text=/Bash|Read|Write|Delete/i').first();
+      const toolName = permissionDialog
+        .locator('[class*="tool-name"], text=/Bash|Read|Write|Delete/i')
+        .first();
       const hasToolName = await toolName.isVisible({ timeout: 1000 }).catch(() => false);
       if (hasToolName) {
         console.log('  ✓ Tool name displayed');
       }
 
       // Check for approve/deny buttons
-      const approveBtn = permissionDialog.locator('button:has-text("Approve"), button:has-text("Allow")').first();
-      const denyBtn = permissionDialog.locator('button:has-text("Deny"), button:has-text("Reject")').first();
+      const approveBtn = permissionDialog
+        .locator('button:has-text("Approve"), button:has-text("Allow")')
+        .first();
+      const denyBtn = permissionDialog
+        .locator('button:has-text("Deny"), button:has-text("Reject")')
+        .first();
 
       if (await approveBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
         console.log('  ✓ Approve button present');
@@ -204,14 +212,18 @@ test.describe('Permission System', () => {
 
     if (opened) {
       // Look for auto-approve configuration
-      const autoApproveSection = page.locator('[class*="auto-approve"], text=/Auto-approve/i').first();
+      const autoApproveSection = page
+        .locator('[class*="auto-approve"], text=/Auto-approve/i')
+        .first();
       const hasSection = await autoApproveSection.isVisible({ timeout: 2000 }).catch(() => false);
 
       if (hasSection) {
         console.log('  ✓ Auto-approve section found');
 
         // Look for tool checkboxes
-        const toolCheckboxes = page.locator('input[type="checkbox"]').filter({ hasText: /Read|Bash|Write/ });
+        const toolCheckboxes = page
+          .locator('input[type="checkbox"]')
+          .filter({ hasText: /Read|Bash|Write/ });
         const checkboxCount = await toolCheckboxes.count();
 
         if (checkboxCount > 0) {
@@ -242,8 +254,14 @@ test.describe('Permission System', () => {
     await page.waitForTimeout(2000);
 
     // Look for credential input field
-    const credentialInput = page.locator('input[type="password"], input[placeholder*="credential"], input[placeholder*="password"]').first();
-    const hasCredentialInput = await credentialInput.isVisible({ timeout: 5000 }).catch(() => false);
+    const credentialInput = page
+      .locator(
+        'input[type="password"], input[placeholder*="credential"], input[placeholder*="password"]'
+      )
+      .first();
+    const hasCredentialInput = await credentialInput
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
 
     if (hasCredentialInput) {
       console.log('  ✓ Credential input field appeared');
@@ -277,7 +295,9 @@ test.describe('Permission System', () => {
     await page.waitForTimeout(1000);
 
     // Look for timeout indicator
-    const timeoutIndicator = page.locator('[class*="timeout"], [class*="expires"], text=/expires|timeout/i').first();
+    const timeoutIndicator = page
+      .locator('[class*="timeout"], [class*="expires"], text=/expires|timeout/i')
+      .first();
     const hasTimeout = await timeoutIndicator.isVisible({ timeout: 2000 }).catch(() => false);
 
     if (hasTimeout) {
@@ -300,7 +320,9 @@ test.describe('Permission System', () => {
 
     if (opened) {
       // Look for history/logs section
-      const historySection = page.locator('[class*="history"], [class*="logs"], text=/History|Logs/i').first();
+      const historySection = page
+        .locator('[class*="history"], [class*="logs"], text=/History|Logs/i')
+        .first();
       const hasHistory = await historySection.isVisible({ timeout: 2000 }).catch(() => false);
 
       if (hasHistory) {
@@ -339,7 +361,9 @@ test.describe('Permission System', () => {
     await page.waitForTimeout(3000);
 
     // Look for approve all button
-    const approveAllBtn = page.locator('button:has-text("Approve All"), button:has-text("Allow All")').first();
+    const approveAllBtn = page
+      .locator('button:has-text("Approve All"), button:has-text("Allow All")')
+      .first();
     const hasApproveAll = await approveAllBtn.isVisible({ timeout: 3000 }).catch(() => false);
 
     if (hasApproveAll) {
@@ -369,7 +393,9 @@ test.describe('Permission System', () => {
     await page.waitForTimeout(2000);
 
     // Look for details expand button
-    const detailsBtn = page.locator('button:has-text("Details"), button[title*="Details"], [class*="expand-details"]').first();
+    const detailsBtn = page
+      .locator('button:has-text("Details"), button[title*="Details"], [class*="expand-details"]')
+      .first();
     const hasDetails = await detailsBtn.isVisible({ timeout: 3000 }).catch(() => false);
 
     if (hasDetails) {
@@ -404,7 +430,9 @@ test.describe('Permission System', () => {
     await page.waitForTimeout(2000);
 
     // Look for AI-initiated indicator
-    const aiIndicator = page.locator('[class*="ai-initiated"], text=/AI.*initiated|Requested by AI/i').first();
+    const aiIndicator = page
+      .locator('[class*="ai-initiated"], text=/AI.*initiated|Requested by AI/i')
+      .first();
     const hasIndicator = await aiIndicator.isVisible({ timeout: 3000 }).catch(() => false);
 
     if (hasIndicator) {

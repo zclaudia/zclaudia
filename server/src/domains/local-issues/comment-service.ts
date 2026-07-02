@@ -20,7 +20,7 @@ export class LocalIssueCommentService {
 
   constructor(
     db: Database,
-    private broadcastToProject: (projectId: string, msg: ServerMessage) => void,
+    private broadcastToProject: (projectId: string, msg: ServerMessage) => void
   ) {
     this.comments = new LocalIssueCommentRepository(db);
     this.issues = new LocalIssueRepository(db);

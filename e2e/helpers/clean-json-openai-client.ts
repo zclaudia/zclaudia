@@ -1,14 +1,12 @@
-import { OpenAI } from "openai";
-import { LLMClient } from "@browserbasehq/stagehand";
-import * as fs from "fs";
-import * as path from "path";
+import type { OpenAI } from 'openai';
+import { LLMClient } from '@browserbasehq/stagehand';
 
 /**
  * 自定义 OpenAI Client，处理模型返回 markdown 包裹的 JSON
  * 解决 MiniMax、GLM 等模型返回 ```json ... ``` 格式的问题
  */
 export class CleanJsonOpenAIClient extends LLMClient {
-  type = "openai" as const;
+  type = 'openai' as const;
   private client: OpenAI;
   private modelName: string;
 
@@ -41,13 +39,12 @@ export class CleanJsonOpenAIClient extends LLMClient {
 
   async createChatCompletion(options: any): Promise<any> {
     const {
-      options: { messages, temperature, top_p, frequency_penalty, presence_penalty, image },
-      response_model,
+      options: { messages, temperature, top_p, frequency_penalty, presence_penalty },
     } = options;
 
     // 增强 system prompt，明确要求 JSON 格式
     const enhancedMessages = messages.map((msg: any, index: number) => {
-      if (index === 0 && msg.role === "system") {
+      if (index === 0 && msg.role === 'system') {
         // 在系统提示中添加明确的 JSON 格式要求
         return {
           role: msg.role,
@@ -92,17 +89,17 @@ Required JSON format:
     // }
 
     // 简化日志输出（生产模式）
-    if (process.env.DEBUG_AI === "true") {
-      console.log("[CleanJsonOpenAIClient] Model:", this.modelName);
-      console.log("[CleanJsonOpenAIClient] Messages:", messages.length);
-      console.log("[CleanJsonOpenAIClient] Temperature:", requestOptions.temperature);
+    if (process.env.DEBUG_AI === 'true') {
+      console.log('[CleanJsonOpenAIClient] Model:', this.modelName);
+      console.log('[CleanJsonOpenAIClient] Messages:', messages.length);
+      console.log('[CleanJsonOpenAIClient] Temperature:', requestOptions.temperature);
     }
 
     // 调用 OpenAI API
     const response = await this.client.chat.completions.create(requestOptions);
 
     // 获取原始内容
-    const rawContent = response.choices[0]?.message?.content || "";
+    const rawContent = response.choices[0]?.message?.content || '';
 
     // 清理 markdown 代码块
     const cleanedContent = this.cleanMarkdownJson(rawContent);
@@ -112,9 +109,9 @@ Required JSON format:
     try {
       parsedContent = JSON.parse(cleanedContent);
     } catch (e) {
-      if (process.env.DEBUG_AI === "true") {
-        console.warn("[CleanJsonOpenAIClient] JSON parse failed:", e);
-        console.warn("[CleanJsonOpenAIClient] Content:", cleanedContent);
+      if (process.env.DEBUG_AI === 'true') {
+        console.warn('[CleanJsonOpenAIClient] JSON parse failed:', e);
+        console.warn('[CleanJsonOpenAIClient] Content:', cleanedContent);
       }
       parsedContent = {};
     }

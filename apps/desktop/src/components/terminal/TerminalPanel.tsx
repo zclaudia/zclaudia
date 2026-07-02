@@ -14,8 +14,8 @@ import { openPopoutWindow, buildWindowTitle, getConnectionParams } from '../../u
 const QUICK_KEYS: { label: string; data: string }[] = [
   { label: 'TAB', data: '\t' },
   { label: 'ESC', data: '\x1b' },
-  { label: '\u2191', data: '\x1b[A' },   // Up arrow
-  { label: '\u2193', data: '\x1b[B' },   // Down arrow
+  { label: '\u2191', data: '\x1b[A' }, // Up arrow
+  { label: '\u2193', data: '\x1b[B' }, // Down arrow
 ];
 
 interface TerminalPanelProps {
@@ -46,9 +46,11 @@ async function openTerminalInNewWindow(terminalId: string, projectId: string) {
 
 /** Terminal toolbar actions (reload + pop-out buttons) rendered in the shared BottomPanel header */
 export function TerminalActions({ projectId }: { projectId: string }) {
-  const activeServerId = useServerStore((s) => s.activeServerId);
-  const terminalId = useTerminalStore((s) => s.getTerminalId(projectId, activeServerId));
-  const isPoppedOut = useTerminalStore((s) => terminalId ? !!s.poppedOutTerminals[terminalId] : false);
+  const activeServerId = useServerStore(s => s.activeServerId);
+  const terminalId = useTerminalStore(s => s.getTerminalId(projectId, activeServerId));
+  const isPoppedOut = useTerminalStore(s =>
+    terminalId ? !!s.poppedOutTerminals[terminalId] : false
+  );
 
   // Match the file viewer's action buttons: roomy, centered, lucide icons. The
   // old hand-rolled SVGs at tight `p-1` made the reload read as oversized/heavy.
@@ -94,8 +96,8 @@ export function TerminalActions({ projectId }: { projectId: string }) {
 export function TerminalPanel({ projectId, workingDirectory }: TerminalPanelProps) {
   const { ctrlActive, toggleCtrl } = useTerminalStore();
   const isMobile = useIsMobile();
-  const activeServerId = useServerStore((s) => s.activeServerId);
-  const terminalId = useTerminalStore((s) => s.getTerminalId(projectId, activeServerId));
+  const activeServerId = useServerStore(s => s.activeServerId);
+  const terminalId = useTerminalStore(s => s.getTerminalId(projectId, activeServerId));
   const isCtrl = !!(terminalId && ctrlActive[terminalId]);
   const { sendMessage } = useConnection();
 
@@ -104,7 +106,7 @@ export function TerminalPanel({ projectId, workingDirectory }: TerminalPanelProp
       if (!terminalId) return;
       sendMessage({ type: 'terminal_input', terminalId, data });
     },
-    [terminalId, sendMessage],
+    [terminalId, sendMessage]
   );
 
   return (
@@ -115,14 +117,12 @@ export function TerminalPanel({ projectId, workingDirectory }: TerminalPanelProp
           <button
             onClick={() => toggleCtrl(terminalId)}
             className={`px-2 py-0.5 rounded-md text-[11px] font-mono whitespace-nowrap flex-shrink-0 ${
-              isCtrl
-                ? 'bg-muted/60 text-foreground'
-                : 'bg-secondary text-secondary-foreground'
+              isCtrl ? 'bg-muted/60 text-foreground' : 'bg-secondary text-secondary-foreground'
             }`}
           >
             CTRL
           </button>
-          {QUICK_KEYS.map((key) => (
+          {QUICK_KEYS.map(key => (
             <button
               key={key.label}
               onClick={() => sendKey(key.data)}

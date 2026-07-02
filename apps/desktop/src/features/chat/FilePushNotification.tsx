@@ -1,6 +1,13 @@
 import { useState } from 'react';
 import { useFilePushStore, type FilePushItem } from '../../stores/filePushStore';
-import { downloadPushedFile, formatFileSize, openFile, openFileAndroid, openFolder, isAndroid } from '../../services/fileDownload';
+import {
+  downloadPushedFile,
+  formatFileSize,
+  openFile,
+  openFileAndroid,
+  openFolder,
+  isAndroid,
+} from '../../services/fileDownload';
 import { isPreviewable, FilePreviewModal } from './FilePreviewModal';
 
 /** Icon based on MIME type */
@@ -8,7 +15,12 @@ function FileIcon({ mimeType }: { mimeType: string }) {
   if (mimeType.startsWith('image/')) {
     return (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.5}
+          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+        />
       </svg>
     );
   }
@@ -16,21 +28,36 @@ function FileIcon({ mimeType }: { mimeType: string }) {
     // Android APK icon
     return (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.5}
+          d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"
+        />
       </svg>
     );
   }
   if (mimeType.includes('zip') || mimeType.includes('tar') || mimeType.includes('gzip')) {
     return (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.5}
+          d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
+        />
       </svg>
     );
   }
   // Default file icon
   return (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={1.5}
+        d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+      />
     </svg>
   );
 }
@@ -51,7 +78,13 @@ function handleOpenFile(item: FilePushItem, setPreview: (item: FilePushItem) => 
   }
 }
 
-export function FilePushCard({ item, onPreview }: { item: FilePushItem; onPreview: (item: FilePushItem) => void }) {
+export function FilePushCard({
+  item,
+  onPreview,
+}: {
+  item: FilePushItem;
+  onPreview: (item: FilePushItem) => void;
+}) {
   const handleDownload = () => {
     if (item.status === 'downloading') return;
     downloadPushedFile(item.fileId);
@@ -94,9 +127,7 @@ export function FilePushCard({ item, onPreview }: { item: FilePushItem; onPrevie
           )}
 
           {item.status === 'downloading' && (
-            <span className="text-xs text-muted-foreground">
-              {item.downloadProgress}%
-            </span>
+            <span className="text-xs text-muted-foreground">{item.downloadProgress}%</span>
           )}
 
           {item.status === 'completed' && (
@@ -118,8 +149,18 @@ export function FilePushCard({ item, onPreview }: { item: FilePushItem; onPrevie
                       className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
                       title="Show in folder"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                        />
                       </svg>
                     </button>
                   )}
@@ -127,7 +168,12 @@ export function FilePushCard({ item, onPreview }: { item: FilePushItem; onPrevie
               ) : (
                 <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
                   </svg>
                   {isAutoCompleted ? 'Saved' : 'Downloaded'}
                 </div>
@@ -155,7 +201,12 @@ export function FilePushCard({ item, onPreview }: { item: FilePushItem; onPrevie
               aria-label="Dismiss"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           )}
@@ -180,9 +231,7 @@ interface FilePushNotificationListProps {
 }
 
 export function FilePushNotificationList({ sessionId }: FilePushNotificationListProps) {
-  const items = useFilePushStore((state) =>
-    state.items.filter((i) => i.sessionId === sessionId)
-  );
+  const items = useFilePushStore(state => state.items.filter(i => i.sessionId === sessionId));
   const [previewItem, setPreviewItem] = useState<FilePushItem | null>(null);
 
   if (items.length === 0) return null;
@@ -190,14 +239,12 @@ export function FilePushNotificationList({ sessionId }: FilePushNotificationList
   return (
     <>
       <div className="mt-4 space-y-2 max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl">
-        {items.map((item) => (
+        {items.map(item => (
           <FilePushCard key={item.fileId} item={item} onPreview={setPreviewItem} />
         ))}
       </div>
 
-      {previewItem && (
-        <FilePreviewModal item={previewItem} onClose={() => setPreviewItem(null)} />
-      )}
+      {previewItem && <FilePreviewModal item={previewItem} onClose={() => setPreviewItem(null)} />}
     </>
   );
 }

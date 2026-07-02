@@ -16,16 +16,21 @@ function freshDb(): Database.Database {
   db.prepare(`INSERT INTO projects (id) VALUES (?)`).run('proj-1');
   db.prepare(
     `INSERT INTO meta_workflow_runs (id, project_id, title, status, reject_count, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
   ).run('run-1', 'proj-1', 't', 'executing', 0, 0, 0);
   return db;
 }
 
 function basePhase(id: string, deps: string[] = []): PhaseDef {
   return {
-    id, name: id, description: '',
-    phaseType: 'code-implement', dependsOn: deps,
-    inputs: [], outputs: [], acceptanceGates: [{ id: 'g', description: 'g', command: 'true', expect: { exitCode: 0 } }],
+    id,
+    name: id,
+    description: '',
+    phaseType: 'code-implement',
+    dependsOn: deps,
+    inputs: [],
+    outputs: [],
+    acceptanceGates: [{ id: 'g', description: 'g', command: 'true', expect: { exitCode: 0 } }],
   };
 }
 
@@ -81,11 +86,14 @@ describe('StalePropagator', () => {
     bringToDone('B');
     const b = phaseRepo.findByRunAndPhaseId('run-1', 'B')!;
     artifactRepo.create({
-      phaseRecordId: b.id, version: 1, status: 'active', createdAt: Date.now(),
+      phaseRecordId: b.id,
+      version: 1,
+      status: 'active',
+      createdAt: Date.now(),
     });
     propagator.propagateUpstreamRerun('run-1', 'A', phasesDoc);
     const artifacts = artifactRepo.findByPhase(b.id);
-    expect(artifacts.every((a) => a.status === 'stale')).toBe(true);
+    expect(artifacts.every(a => a.status === 'stale')).toBe(true);
   });
 
   it('skips pending downstreams (no flag needed)', () => {

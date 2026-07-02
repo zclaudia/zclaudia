@@ -172,9 +172,7 @@ export class WorkspaceService {
       return '';
     }
 
-    return sections
-      .map((s) => `${s.title}\n\n${s.content}`)
-      .join('\n\n---\n\n');
+    return sections.map(s => `${s.title}\n\n${s.content}`).join('\n\n---\n\n');
   }
 
   /**
@@ -212,7 +210,7 @@ export class WorkspaceService {
           const content = await this.loadFile(path.join(skillsDir, skillId), 'SKILL.md');
           if (content) {
             // 从内容中提取 name 和 description（第一行和第二行）
-            const lines = content.split('\n').filter((l) => l.trim());
+            const lines = content.split('\n').filter(l => l.trim());
             const name = lines[0]?.replace(/^#\s*/, '') || skillId;
             const description = lines[1]?.replace(/^>\s*/, '') || '';
 
@@ -427,13 +425,20 @@ systemTaskRegistry.register({
   intervalMs: 5 * 60 * 1000, // 5 分钟
 });
 
-setInterval(() => {
-  systemTaskRegistry.markRunStart('system:workspace_cache_cleanup');
-  const start = Date.now();
-  try {
-    workspaceService.clearCache();
-    systemTaskRegistry.markRunComplete('system:workspace_cache_cleanup', Date.now() - start);
-  } catch (err) {
-    systemTaskRegistry.markRunComplete('system:workspace_cache_cleanup', Date.now() - start, String(err));
-  }
-}, 5 * 60 * 1000).unref();
+setInterval(
+  () => {
+    systemTaskRegistry.markRunStart('system:workspace_cache_cleanup');
+    const start = Date.now();
+    try {
+      workspaceService.clearCache();
+      systemTaskRegistry.markRunComplete('system:workspace_cache_cleanup', Date.now() - start);
+    } catch (err) {
+      systemTaskRegistry.markRunComplete(
+        'system:workspace_cache_cleanup',
+        Date.now() - start,
+        String(err)
+      );
+    }
+  },
+  5 * 60 * 1000
+).unref();

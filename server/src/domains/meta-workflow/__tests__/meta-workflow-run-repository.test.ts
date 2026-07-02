@@ -44,31 +44,56 @@ describe('MetaWorkflowRunRepository', () => {
   it('updates partial fields', () => {
     const now = Date.now();
     const created = repo.create({
-      projectId: 'proj-1', title: 't', status: 'requirement_draft',
-      rejectCount: 0, createdAt: now, updatedAt: now,
+      projectId: 'proj-1',
+      title: 't',
+      status: 'requirement_draft',
+      rejectCount: 0,
+      createdAt: now,
+      updatedAt: now,
     });
-    const updated = repo.update(created.id, { status: 'splitting', rejectCount: 1, updatedAt: now + 1 });
+    const updated = repo.update(created.id, {
+      status: 'splitting',
+      rejectCount: 1,
+      updatedAt: now + 1,
+    });
     expect(updated.status).toBe('splitting');
     expect(updated.rejectCount).toBe(1);
     expect(updated.title).toBe('t');
   });
 
   it('findByProject returns runs ordered by created_at desc', () => {
-    repo.create({ projectId: 'proj-1', title: 'r1', status: 'requirement_draft',
-                  rejectCount: 0, createdAt: 100, updatedAt: 100 });
-    repo.create({ projectId: 'proj-1', title: 'r2', status: 'requirement_draft',
-                  rejectCount: 0, createdAt: 200, updatedAt: 200 });
+    repo.create({
+      projectId: 'proj-1',
+      title: 'r1',
+      status: 'requirement_draft',
+      rejectCount: 0,
+      createdAt: 100,
+      updatedAt: 100,
+    });
+    repo.create({
+      projectId: 'proj-1',
+      title: 'r2',
+      status: 'requirement_draft',
+      rejectCount: 0,
+      createdAt: 200,
+      updatedAt: 200,
+    });
     const runs = repo.findByProject('proj-1');
-    expect(runs.map((r) => r.title)).toEqual(['r2', 'r1']);
+    expect(runs.map(r => r.title)).toEqual(['r2', 'r1']);
   });
 
   it('round-trips JSON config and phasesJson', () => {
     const now = Date.now();
     const created = repo.create({
-      projectId: 'proj-1', title: 't', status: 'requirement_draft',
-      rejectCount: 0, createdAt: now, updatedAt: now,
+      projectId: 'proj-1',
+      title: 't',
+      status: 'requirement_draft',
+      rejectCount: 0,
+      createdAt: now,
+      updatedAt: now,
       config: { maxRequirementRejects: 5, maxParallelPhases: 3 },
-      phasesJson: '{"version":"1","phases":[],"smokePath":[],"metadata":{"generatedAt":0,"requirementsPath":"x"}}',
+      phasesJson:
+        '{"version":"1","phases":[],"smokePath":[],"metadata":{"generatedAt":0,"requirementsPath":"x"}}',
     });
     const fetched = repo.findById(created.id);
     expect(fetched?.config).toEqual({ maxRequirementRejects: 5, maxParallelPhases: 3 });

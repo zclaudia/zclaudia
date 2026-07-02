@@ -27,14 +27,16 @@ export interface ResolveImagesResult {
 
 export function resolveImageAttachments(
   attachments: MessageAttachment[],
-  fileStore: ImageFileSource,
+  fileStore: ImageFileSource
 ): ResolveImagesResult {
   const images: ResolvedImage[] = [];
   const notices: string[] = [];
   for (const att of attachments) {
     if (att.type !== 'image') continue;
     if (images.length >= MAX_IMAGES_PER_MESSAGE) {
-      notices.push(`[Image attached: ${att.name} — skipped, max ${MAX_IMAGES_PER_MESSAGE} images per message]`);
+      notices.push(
+        `[Image attached: ${att.name} — skipped, max ${MAX_IMAGES_PER_MESSAGE} images per message]`
+      );
       continue;
     }
     const file = fileStore.getFile(att.fileId);

@@ -33,7 +33,9 @@ const mocks = vi.hoisted(() => {
     handleRequestMock,
     transportCloseMock,
     MockTransport,
-    resetSessionCounter: () => { sessionCounter = 0; },
+    resetSessionCounter: () => {
+      sessionCounter = 0;
+    },
   };
 });
 
@@ -67,11 +69,7 @@ vi.mock('../../../application/plugins/tool-registry.js', () => ({
   },
 }));
 
-import {
-  getMcpServerInfo,
-  handleMcpRequest,
-  handleMcpSessionClose,
-} from '../mcp-server.js';
+import { getMcpServerInfo, handleMcpRequest, handleMcpSessionClose } from '../mcp-server.js';
 
 function createReq(headers: Record<string, string> = {}): any {
   return { headers };
@@ -100,7 +98,9 @@ describe('mcp-server', () => {
 
   it('reuses the existing server/transport for the same session', async () => {
     await handleMcpRequest(createReq(), createRes(), { jsonrpc: '2.0' });
-    await handleMcpRequest(createReq({ 'mcp-session-id': 'session-1' }), createRes(), { jsonrpc: '2.0' });
+    await handleMcpRequest(createReq({ 'mcp-session-id': 'session-1' }), createRes(), {
+      jsonrpc: '2.0',
+    });
 
     expect(mocks.connectMock).toHaveBeenCalledTimes(1);
     expect(mocks.handleRequestMock).toHaveBeenCalledTimes(2);

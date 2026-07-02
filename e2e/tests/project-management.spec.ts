@@ -38,7 +38,9 @@ describe('Project & Session Management', () => {
     const nameInput = browser.locator('input[placeholder*="Project name"]');
     await nameInput.fill('My Test Project');
 
-    const pathInput = browser.locator('input[placeholder*="Working directory"], input[placeholder*="directory"]');
+    const pathInput = browser.locator(
+      'input[placeholder*="Working directory"], input[placeholder*="directory"]'
+    );
     const hasPathInput = await pathInput.isVisible({ timeout: 1000 }).catch(() => false);
     if (hasPathInput) {
       await pathInput.fill('/tmp/test-project');
@@ -102,7 +104,9 @@ describe('Project & Session Management', () => {
 
     await browser.locator('input[placeholder*="Project name"]').fill('Temp Project');
 
-    const cancelBtn = browser.locator('button:has-text("Cancel"), button:has-text("Close")').first();
+    const cancelBtn = browser
+      .locator('button:has-text("Cancel"), button:has-text("Close")')
+      .first();
     const hasCancelBtn = await cancelBtn.isVisible({ timeout: 2000 }).catch(() => false);
     if (hasCancelBtn) {
       await cancelBtn.click();
@@ -145,7 +149,9 @@ describe('Project & Session Management', () => {
     await projectItem.hover();
     await browser.waitForTimeout(500);
 
-    const deleteBtn = browser.locator('button[title*="Delete"], button[aria-label*="Delete"]').first();
+    const deleteBtn = browser
+      .locator('button[title*="Delete"], button[aria-label*="Delete"]')
+      .first();
     const hasDeleteBtn = await deleteBtn.isVisible({ timeout: 2000 }).catch(() => false);
 
     if (hasDeleteBtn) {
@@ -153,7 +159,9 @@ describe('Project & Session Management', () => {
       await deleteBtn.click();
       await browser.waitForTimeout(800);
 
-      const confirmBtn = browser.locator('button:has-text("Delete"), button:has-text("Confirm"), button:has-text("Yes")').first();
+      const confirmBtn = browser
+        .locator('button:has-text("Delete"), button:has-text("Confirm"), button:has-text("Yes")')
+        .first();
       const hasConfirmBtn = await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false);
       if (hasConfirmBtn) {
         console.log('  ✓ Confirm button found');
@@ -165,7 +173,10 @@ describe('Project & Session Management', () => {
       await browser.waitForTimeout(1000);
 
       // Verify project is gone
-      const projectStillExists = await browser.locator('text=Project To Delete').isVisible({ timeout: 1000 }).catch(() => false);
+      const projectStillExists = await browser
+        .locator('text=Project To Delete')
+        .isVisible({ timeout: 1000 })
+        .catch(() => false);
       expect(projectStillExists).toBe(false);
       console.log('✅ A5: Project deleted successfully');
     } else {
@@ -225,7 +236,10 @@ describe('Project & Session Management', () => {
     await browser.waitForLoadState('networkidle');
     await browser.waitForTimeout(1000);
 
-    const projectGone = !(await browser.locator('text=Project With Sessions').isVisible({ timeout: 1000 }).catch(() => false));
+    const projectGone = !(await browser
+      .locator('text=Project With Sessions')
+      .isVisible({ timeout: 1000 })
+      .catch(() => false));
     expect(projectGone).toBe(true);
     console.log('✅ A6: Project and sessions deleted together');
   });
@@ -252,7 +266,9 @@ describe('Project & Session Management', () => {
     await browser.waitForTimeout(500);
 
     const sessionNameInput = browser.locator('input[placeholder*="Session name"]');
-    const hasSessionNameInput = await sessionNameInput.isVisible({ timeout: 1000 }).catch(() => false);
+    const hasSessionNameInput = await sessionNameInput
+      .isVisible({ timeout: 1000 })
+      .catch(() => false);
     if (hasSessionNameInput) {
       await sessionNameInput.fill('My Named Session');
     }
@@ -311,7 +327,9 @@ describe('Project & Session Management', () => {
         await deleteBtn.click();
         await browser.waitForTimeout(500);
 
-        const confirmBtn = browser.locator('button:has-text("Delete"), button:has-text("Confirm")').first();
+        const confirmBtn = browser
+          .locator('button:has-text("Delete"), button:has-text("Confirm")')
+          .first();
         const hasConfirmBtn = await confirmBtn.isVisible({ timeout: 1000 }).catch(() => false);
         if (hasConfirmBtn) {
           await confirmBtn.click();
@@ -401,7 +419,11 @@ describe('Project & Session Management', () => {
     console.log('Test A10: Sidebar collapse/expand');
 
     // Look for collapse/toggle button (may change after clicking)
-    const toggleBtn = browser.locator('button[title*="Collapse"], button[aria-label*="Collapse"], button[title*="Toggle"], button[class*="collapse"], button[class*="toggle"]').first();
+    const toggleBtn = browser
+      .locator(
+        'button[title*="Collapse"], button[aria-label*="Collapse"], button[title*="Toggle"], button[class*="collapse"], button[class*="toggle"]'
+      )
+      .first();
     const hasToggleBtn = await toggleBtn.isVisible({ timeout: 3000 }).catch(() => false);
 
     if (hasToggleBtn) {
@@ -414,7 +436,11 @@ describe('Project & Session Management', () => {
       console.log(`  Sidebar collapsed: ${isCollapsed}`);
 
       // Expand again - button might have changed, find it again
-      const expandBtn = browser.locator('button[title*="Expand"], button[aria-label*="Expand"], button[title*="Toggle"], button[class*="collapse"], button[class*="toggle"]').first();
+      const expandBtn = browser
+        .locator(
+          'button[title*="Expand"], button[aria-label*="Expand"], button[title*="Toggle"], button[class*="collapse"], button[class*="toggle"]'
+        )
+        .first();
       const hasExpandBtn = await expandBtn.isVisible({ timeout: 2000 }).catch(() => false);
 
       if (hasExpandBtn) {
@@ -467,7 +493,7 @@ describe('Project & Session Management', () => {
 
     // Verify Alpha message is visible before switching
     let alphaMessage = browser.locator('text=Alpha secret message');
-    let alphaVisible = await alphaMessage.isVisible({ timeout: 1000 }).catch(() => false);
+    const alphaVisible = await alphaMessage.isVisible({ timeout: 1000 }).catch(() => false);
     console.log(`  Alpha message visible in Alpha project: ${alphaVisible}`);
 
     // Create Project Beta
@@ -480,7 +506,9 @@ describe('Project & Session Management', () => {
 
     // Ensure Beta project has a session too (to have a clean test environment)
     const betaNewSessionBtn = browser.locator('[data-testid="new-session-btn"]').first();
-    const hasBetaSessionBtn = await betaNewSessionBtn.isVisible({ timeout: 2000 }).catch(() => false);
+    const hasBetaSessionBtn = await betaNewSessionBtn
+      .isVisible({ timeout: 2000 })
+      .catch(() => false);
     if (hasBetaSessionBtn) {
       await betaNewSessionBtn.click();
       await browser.waitForTimeout(500);

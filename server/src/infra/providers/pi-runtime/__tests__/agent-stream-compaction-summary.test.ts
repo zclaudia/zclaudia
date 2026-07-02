@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  createAssistantMessageEventStream,
-  type AssistantMessage,
-} from '@earendil-works/pi-ai';
+import { createAssistantMessageEventStream, type AssistantMessage } from '@earendil-works/pi-ai';
 import {
   createCompactionSummaryMessage,
   type AgentMessage,
@@ -20,7 +17,7 @@ const am = (over: Partial<AssistantMessage> = {}): AssistantMessage =>
  */
 function captureStreamFn(): { fn: StreamFn; captured: { messages: unknown[] } } {
   const captured: { messages: unknown[] } = { messages: [] };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   const fn: StreamFn = (_model: any, llmContext: any) => {
     captured.messages = llmContext.messages;
     const stream = createAssistantMessageEventStream();
@@ -44,33 +41,53 @@ describe('runPiAgentStream — compaction summary delivery', () => {
   it('delivers the compaction summary to the provider (not dropped)', async () => {
     const SUMMARY = 'GOAL: Dockerize gen_csms_token.py into the llm-gateway-proxy service.';
     const history: AgentMessage[] = [
-      createCompactionSummaryMessage(SUMMARY, 1410063, new Date(0).toISOString()) as unknown as AgentMessage,
+      createCompactionSummaryMessage(
+        SUMMARY,
+        1410063,
+        new Date(0).toISOString()
+      ) as unknown as AgentMessage,
     ];
     const { fn, captured } = captureStreamFn();
 
     const gen = runPiAgentStream({
       userInput: '如果不用 docker 是不是就能解决这个问题了',
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       options: { claudiaSessionId: 's1' } as any,
       sessionId: 's1',
       ctx: { sessionId: 's1', model: 'test-model', cwd: '/tmp' },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      modelInfo: { model: { id: 'test-model', name: 'test', api: 'unknown', provider: 'test', baseUrl: '', reasoning: false, input: [], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1_000_000, maxTokens: 1024 } } as any,
+
+      modelInfo: {
+        model: {
+          id: 'test-model',
+          name: 'test',
+          api: 'unknown',
+          provider: 'test',
+          baseUrl: '',
+          reasoning: false,
+          input: [],
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+          contextWindow: 1_000_000,
+          maxTokens: 1024,
+        },
+      } as any,
       supportsVision: false,
       history,
       tools: [],
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       hooks: { streamFn: fn } as any,
       effectiveSystemPrompt: 'You are a helpful assistant.',
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    for await (const _event of gen) { /* drain to completion */ }
+    for await (const _event of gen) {
+      /* drain to completion */
+    }
 
     const serialized = JSON.stringify(captured.messages);
     expect(serialized).toContain(SUMMARY);
     // The special role must have been converted away (into a `user` turn).
-    expect((captured.messages as Array<{ role?: string }>).some((m) => m.role === 'compactionSummary')).toBe(false);
-    expect((captured.messages as Array<{ role?: string }>).some((m) => m.role === 'user')).toBe(true);
+    expect(
+      (captured.messages as Array<{ role?: string }>).some(m => m.role === 'compactionSummary')
+    ).toBe(false);
+    expect((captured.messages as Array<{ role?: string }>).some(m => m.role === 'user')).toBe(true);
   });
 });

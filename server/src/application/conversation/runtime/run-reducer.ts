@@ -48,7 +48,7 @@ function applyAssistantTextDelta(activeRun: ActiveRun, content: string): void {
 
 function applyThinkingDelta(
   activeRun: ActiveRun,
-  delta: { content?: string; signature?: string; redacted?: boolean },
+  delta: { content?: string; signature?: string; redacted?: boolean }
 ): void {
   activeRun.thinkingBlocks ??= [];
   let current = activeRun.thinkingBlocks[activeRun.thinkingBlocks.length - 1];
@@ -65,10 +65,14 @@ function applyThinkingDelta(
 
 function applyToolStarted(
   activeRun: ActiveRun,
-  payload: RunDomainEvent<'tool.started'>['payload'],
+  payload: RunDomainEvent<'tool.started'>['payload']
 ): void {
   const inputRecord = payload.input as Record<string, unknown> | undefined;
-  const toolSignature = generateToolSignature(payload.toolName, inputRecord, activeRun.providerType);
+  const toolSignature = generateToolSignature(
+    payload.toolName,
+    inputRecord,
+    activeRun.providerType
+  );
   activeRun.recentToolCalls.push(toolSignature);
   if (activeRun.recentToolCalls.length > 20) {
     activeRun.recentToolCalls.shift();
@@ -85,7 +89,7 @@ function applyToolStarted(
 
 function applyToolFinished(
   activeRun: ActiveRun,
-  payload: RunDomainEvent<'tool.finished'>['payload'],
+  payload: RunDomainEvent<'tool.finished'>['payload']
 ): void {
   const collected = activeRun.collectedToolCalls.find(tc => tc.toolUseId === payload.toolUseId);
   if (!collected) return;

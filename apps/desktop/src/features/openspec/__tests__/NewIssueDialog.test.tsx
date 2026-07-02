@@ -26,7 +26,7 @@ describe('NewIssueDialog', () => {
     render(<NewIssueDialog projectId="p1" parentEpicId="e1" onClose={() => {}} />);
     const select = screen.getByRole('combobox') as HTMLSelectElement;
     expect(select.value).toBe('implement');
-    expect(Array.from(select.options).map((o) => o.value)).not.toContain('epic');
+    expect(Array.from(select.options).map(o => o.value)).not.toContain('epic');
   });
 
   it('submits epic → calls createEpic and closes', async () => {
@@ -46,7 +46,7 @@ describe('NewIssueDialog', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
     await waitFor(() =>
-      expect(createSpy).toHaveBeenCalledWith({ projectId: 'p1', title: 'My Epic' }),
+      expect(createSpy).toHaveBeenCalledWith({ projectId: 'p1', title: 'My Epic' })
     );
     expect(onClose).toHaveBeenCalled();
   });
@@ -75,7 +75,7 @@ describe('NewIssueDialog', () => {
         type: 'bug',
         title: 'B',
         epicId: 'e1',
-      }),
+      })
     );
     expect(useOpenSpecStore.getState().specChangesById.sc1).toBeDefined();
   });

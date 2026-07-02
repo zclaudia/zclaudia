@@ -78,7 +78,9 @@ export function normalizeMcpOAuthConfig(value: unknown): McpOAuthConfig | undefi
   if (!value || typeof value !== 'object') return undefined;
   const input = value as Record<string, unknown>;
   const scopes = Array.isArray(input.scopes)
-    ? input.scopes.filter((scope): scope is string => typeof scope === 'string' && !!scope.trim()).map((scope) => scope.trim())
+    ? input.scopes
+        .filter((scope): scope is string => typeof scope === 'string' && !!scope.trim())
+        .map(scope => scope.trim())
     : undefined;
   const config: McpOAuthConfig = {
     enabled: input.enabled === true,
@@ -86,24 +88,35 @@ export function normalizeMcpOAuthConfig(value: unknown): McpOAuthConfig | undefi
     authorizationEndpoint: normalizeUrl(input.authorizationEndpoint),
     tokenEndpoint: normalizeUrl(input.tokenEndpoint),
     deviceAuthorizationEndpoint: normalizeUrl(input.deviceAuthorizationEndpoint),
-    clientId: typeof input.clientId === 'string' && input.clientId.trim() ? input.clientId.trim() : undefined,
-    clientSecret: typeof input.clientSecret === 'string' && input.clientSecret ? input.clientSecret : undefined,
+    clientId:
+      typeof input.clientId === 'string' && input.clientId.trim()
+        ? input.clientId.trim()
+        : undefined,
+    clientSecret:
+      typeof input.clientSecret === 'string' && input.clientSecret ? input.clientSecret : undefined,
     scopes: scopes && scopes.length > 0 ? scopes : undefined,
     redirectUri: normalizeUrl(input.redirectUri),
   };
-  return Object.values(config).some((field) => field !== undefined && field !== false) ? config : undefined;
+  return Object.values(config).some(field => field !== undefined && field !== false)
+    ? config
+    : undefined;
 }
 
 export function normalizeMcpOAuthCredentials(value: unknown): McpOAuthCredentials | undefined {
   if (!value || typeof value !== 'object') return undefined;
   const input = value as Record<string, unknown>;
-  const accessToken = typeof input.accessToken === 'string' && input.accessToken ? input.accessToken : undefined;
+  const accessToken =
+    typeof input.accessToken === 'string' && input.accessToken ? input.accessToken : undefined;
   if (!accessToken && input.hasAccessToken !== true) return undefined;
   return {
     accessToken,
-    refreshToken: typeof input.refreshToken === 'string' && input.refreshToken ? input.refreshToken : undefined,
+    refreshToken:
+      typeof input.refreshToken === 'string' && input.refreshToken ? input.refreshToken : undefined,
     tokenType: typeof input.tokenType === 'string' && input.tokenType ? input.tokenType : 'Bearer',
-    expiresAt: typeof input.expiresAt === 'number' && Number.isFinite(input.expiresAt) ? input.expiresAt : undefined,
+    expiresAt:
+      typeof input.expiresAt === 'number' && Number.isFinite(input.expiresAt)
+        ? input.expiresAt
+        : undefined,
     scope: typeof input.scope === 'string' && input.scope ? input.scope : undefined,
     hasAccessToken: input.hasAccessToken === true ? true : undefined,
     hasRefreshToken: input.hasRefreshToken === true ? true : undefined,
@@ -130,15 +143,18 @@ export const defaultMcpServerTrustPolicy: McpServerTrustPolicy = {
 export function normalizeMcpServerTrustPolicy(value: unknown): McpServerTrustPolicy | undefined {
   if (!value || typeof value !== 'object') return undefined;
   const input = value as Record<string, unknown>;
-  const trustLevel = input.trustLevel === 'trusted-readonly' || input.trustLevel === 'trusted'
-    ? input.trustLevel
-    : 'untrusted';
-  const riskAction = (candidate: unknown): McpRiskAction | undefined => (
-    candidate === 'auto-approve' || candidate === 'ask' || candidate === 'deny' ? candidate : undefined
-  );
-  const riskActionsInput = input.riskActions && typeof input.riskActions === 'object'
-    ? input.riskActions as Record<string, unknown>
-    : {};
+  const trustLevel =
+    input.trustLevel === 'trusted-readonly' || input.trustLevel === 'trusted'
+      ? input.trustLevel
+      : 'untrusted';
+  const riskAction = (candidate: unknown): McpRiskAction | undefined =>
+    candidate === 'auto-approve' || candidate === 'ask' || candidate === 'deny'
+      ? candidate
+      : undefined;
+  const riskActionsInput =
+    input.riskActions && typeof input.riskActions === 'object'
+      ? (input.riskActions as Record<string, unknown>)
+      : {};
   const riskActions: Partial<Record<'low' | 'medium' | 'high', McpRiskAction>> = {};
   for (const level of ['low', 'medium', 'high'] as const) {
     const action = riskAction(riskActionsInput[level]);
@@ -227,7 +243,7 @@ export const MCP_INSTRUCTIONS_DELTA_METADATA_TYPE = 'mcp_instructions_delta';
 export function computeMcpInstructionsDelta(
   currentSources: McpInstructionSource[],
   previousDeltas: McpInstructionsDelta[],
-  createdAt: number = Date.now(),
+  createdAt: number = Date.now()
 ): McpInstructionsDelta | null {
   const announced = new Set<string>();
   for (const delta of previousDeltas) {
@@ -236,19 +252,19 @@ export function computeMcpInstructionsDelta(
   }
 
   const current = currentSources
-    .filter((source) => source.instructions?.trim())
-    .map((source) => ({ name: source.name, instructions: source.instructions!.trim() }))
+    .map(source => ({ name: source.name, instructions: source.instructions?.trim() ?? '' }))
+    .filter(source => source.instructions)
     .sort((a, b) => a.name.localeCompare(b.name));
-  const currentNames = new Set(current.map((source) => source.name));
-  const added = current.filter((source) => !announced.has(source.name));
+  const currentNames = new Set(current.map(source => source.name));
+  const added = current.filter(source => !announced.has(source.name));
   const removedNames = [...announced]
-    .filter((name) => !currentNames.has(name))
+    .filter(name => !currentNames.has(name))
     .sort((a, b) => a.localeCompare(b));
 
   if (added.length === 0 && removedNames.length === 0) return null;
   return {
-    addedNames: added.map((source) => source.name),
-    addedBlocks: added.map((source) => `## ${source.name}\n${source.instructions}`),
+    addedNames: added.map(source => source.name),
+    addedBlocks: added.map(source => `## ${source.name}\n${source.instructions}`),
     removedNames,
     createdAt,
   };

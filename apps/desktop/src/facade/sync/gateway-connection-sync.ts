@@ -7,16 +7,16 @@ import { cleanupServerSyncState } from '../../services/messageHandler';
 import { isLegacyLocalBackendId } from '../../utils/controlPlane';
 import { clearAutoOpenFailures, scheduleAutoOpenBackends } from './state';
 
-export function syncSnapshotToGatewayStore(event: Extract<BackendFacadeEvent, { type: 'snapshot_updated' }>): void {
+export function syncSnapshotToGatewayStore(
+  event: Extract<BackendFacadeEvent, { type: 'snapshot_updated' }>
+): void {
   const snapshot = event.snapshot;
   const gwStore = useGatewayStore.getState();
   const serverState = useServerStore.getState();
 
   gwStore.setConnected(snapshot.connectionState === 'connected');
   const resolvedLocalBackendId =
-    snapshot.localBackendId
-    || snapshot.backends.find((b) => b.isThisInstance)?.backendId
-    || null;
+    snapshot.localBackendId || snapshot.backends.find(b => b.isThisInstance)?.backendId || null;
   for (const b of snapshot.backends) {
     serverState.setServerFeatures(b.backendId, b.capabilities as ServerFeature[]);
   }
@@ -26,9 +26,9 @@ export function syncSnapshotToGatewayStore(event: Extract<BackendFacadeEvent, { 
   } else if (resolvedLocalBackendId && !serverState.activeServerId) {
     serverState.setActiveServer(resolvedLocalBackendId);
   } else if (
-    resolvedLocalBackendId
-    && serverState.activeServerId
-    && !snapshot.backends.some(b => b.backendId === serverState.activeServerId)
+    resolvedLocalBackendId &&
+    serverState.activeServerId &&
+    !snapshot.backends.some(b => b.backendId === serverState.activeServerId)
   ) {
     serverState.setActiveServer(resolvedLocalBackendId);
   }
@@ -50,7 +50,9 @@ export function syncSnapshotToGatewayStore(event: Extract<BackendFacadeEvent, { 
   }
 }
 
-export function syncConnectionState(event: Extract<BackendFacadeEvent, { type: 'connection_state_changed' }>): void {
+export function syncConnectionState(
+  event: Extract<BackendFacadeEvent, { type: 'connection_state_changed' }>
+): void {
   useGatewayStore.getState().setConnected(event.state === 'connected');
   useRecoveryStore.getState().setTransportState(event.state, event.error);
   if (event.state === 'connected') {

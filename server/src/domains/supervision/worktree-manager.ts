@@ -5,7 +5,12 @@ import { WorktreePool } from './worktree-pool.js';
 export interface WorktreeManagerDeps {
   projectRepo: SupervisionProjectPort;
   sessionRepo: SupervisionSessionPort;
-  log: (projectId: string, event: SupervisionLogEvent, detail?: Record<string, unknown>, taskId?: string) => void;
+  log: (
+    projectId: string,
+    event: SupervisionLogEvent,
+    detail?: Record<string, unknown>,
+    taskId?: string
+  ) => void;
 }
 
 export class WorktreeManager {
@@ -83,9 +88,15 @@ export class WorktreeManager {
     ) {
       const pool = this.worktreePools.get(task.projectId);
       pool?.release(session.workingDirectory);
-      this.deps.log(task.projectId, 'worktree_released', {
-        taskId: task.id, worktreePath: session.workingDirectory,
-      }, task.id);
+      this.deps.log(
+        task.projectId,
+        'worktree_released',
+        {
+          taskId: task.id,
+          worktreePath: session.workingDirectory,
+        },
+        task.id
+      );
     }
   }
 

@@ -16,12 +16,7 @@ const mockSession = {
 describe('SessionItem', () => {
   it('renders session name', () => {
     render(
-      <SessionItem
-        session={mockSession}
-        isSelected={false}
-        onSelect={vi.fn()}
-        hasPending={false}
-      />
+      <SessionItem session={mockSession} isSelected={false} onSelect={vi.fn()} hasPending={false} />
     );
     expect(screen.getByText('Test Session')).toBeDefined();
   });
@@ -42,24 +37,14 @@ describe('SessionItem', () => {
 
   it('shows pending indicator', () => {
     render(
-      <SessionItem
-        session={mockSession}
-        isSelected={false}
-        onSelect={vi.fn()}
-        hasPending={true}
-      />
+      <SessionItem session={mockSession} isSelected={false} onSelect={vi.fn()} hasPending={true} />
     );
     expect(screen.getByText('waiting')).toBeDefined();
   });
 
   it('applies selected styles', () => {
     const { container } = render(
-      <SessionItem
-        session={mockSession}
-        isSelected={true}
-        onSelect={vi.fn()}
-        hasPending={false}
-      />
+      <SessionItem session={mockSession} isSelected={true} onSelect={vi.fn()} hasPending={false} />
     );
     expect(container.firstChild).toBeDefined();
   });

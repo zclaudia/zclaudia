@@ -21,7 +21,7 @@ export class PluginManagementError extends Error {
   constructor(
     readonly status: number,
     readonly code: string,
-    message: string,
+    message: string
   ) {
     super(message);
   }
@@ -41,17 +41,25 @@ export class PluginManagementService {
   }
 
   listPlugins() {
-    return this.loader.getPlugins().map((plugin) => {
+    return this.loader.getPlugins().map(plugin => {
       const contributes = plugin.manifest.contributes || {};
-      const panels = (contributes.panels || []).map((panel: { id: string; label: string; icon?: string; order?: number; frontend?: string }) => ({
-        id: panel.id,
-        label: panel.label,
-        icon: panel.icon,
-        order: panel.order,
-        iframeUrl: panel.frontend
-          ? `/api/plugins/${plugin.manifest.id}/frontend/${panel.frontend}`
-          : undefined,
-      }));
+      const panels = (contributes.panels || []).map(
+        (panel: {
+          id: string;
+          label: string;
+          icon?: string;
+          order?: number;
+          frontend?: string;
+        }) => ({
+          id: panel.id,
+          label: panel.label,
+          icon: panel.icon,
+          order: panel.order,
+          iframeUrl: panel.frontend
+            ? `/api/plugins/${plugin.manifest.id}/frontend/${panel.frontend}`
+            : undefined,
+        })
+      );
       return {
         id: plugin.manifest.id,
         name: plugin.manifest.name,
@@ -64,8 +72,10 @@ export class PluginManagementService {
         permissions: plugin.manifest.permissions || [],
         grantedPermissions: this.permissions.getGrantedPermissions(plugin.manifest.id),
         pendingPermissions: plugin.pendingPermissions || [],
-        tools: this.tools.getByPlugin(plugin.manifest.id).map((tool) => tool.definition.function.name),
-        commands: this.commands.getByPlugin(plugin.manifest.id).map((command) => command.command),
+        tools: this.tools
+          .getByPlugin(plugin.manifest.id)
+          .map(tool => tool.definition.function.name),
+        commands: this.commands.getByPlugin(plugin.manifest.id).map(command => command.command),
         path: plugin.path,
         panels,
       };
@@ -77,7 +87,11 @@ export class PluginManagementService {
     const result = await this.loader.activate(id);
     if (!result) {
       const plugin = this.loader.getPlugin(id);
-      throw new PluginManagementError(400, 'ACTIVATION_FAILED', plugin?.error || 'Activation failed');
+      throw new PluginManagementError(
+        400,
+        'ACTIVATION_FAILED',
+        plugin?.error || 'Activation failed'
+      );
     }
     return { activated: true };
   }
@@ -120,11 +134,11 @@ export class PluginManagementService {
   }
 
   updatePluginDirs(dirs: unknown): { dirs: string[] } {
-    if (!Array.isArray(dirs) || !dirs.every((dir) => typeof dir === 'string')) {
+    if (!Array.isArray(dirs) || !dirs.every(dir => typeof dir === 'string')) {
       throw new PluginManagementError(400, 'INVALID_INPUT', 'dirs must be an array of strings');
     }
 
-    const normalized = [...new Set(dirs.map((dir) => dir.trim()).filter(Boolean))];
+    const normalized = [...new Set(dirs.map(dir => dir.trim()).filter(Boolean))];
     this.loader.saveExtraDirs(normalized);
     this.autoActivateDiscoveredPlugins().catch(() => {});
 
@@ -135,7 +149,7 @@ export class PluginManagementService {
     const manifests = await this.autoActivateDiscoveredPlugins();
     return {
       discovered: manifests.length,
-      plugins: manifests.map((manifest) => ({
+      plugins: manifests.map(manifest => ({
         id: manifest.id,
         name: manifest.name,
         version: manifest.version,

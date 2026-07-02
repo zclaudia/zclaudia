@@ -49,8 +49,8 @@ export function StatusBadge({
  * their own `open/closed/cancelled` lifecycle.
  */
 export function IssueStatusBadge({ issue }: { issue: LocalIssue }): React.ReactElement {
-  const specChange = useOpenSpecStore((s) =>
-    issue.specChangeId ? s.specChangesById[issue.specChangeId] : undefined,
+  const specChange = useOpenSpecStore(s =>
+    issue.specChangeId ? s.specChangesById[issue.specChangeId] : undefined
   );
   const status: LocalIssueStatus | SpecChangeStatus = specChange ? specChange.status : issue.status;
   return <StatusBadge status={status} />;

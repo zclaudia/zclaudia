@@ -12,7 +12,16 @@ interface UsePlanStatusParams {
   currentSession: Session | undefined;
   currentProjectId: string | undefined;
   messagesLength: number;
-  addMessage: (sessionId: string, message: { id: string; sessionId: string; role: MessageRole; content: string; createdAt: number }) => void;
+  addMessage: (
+    sessionId: string,
+    message: {
+      id: string;
+      sessionId: string;
+      role: MessageRole;
+      content: string;
+      createdAt: number;
+    }
+  ) => void;
   scrollToBottom: () => void;
   handleSendMessage: (content: string) => void;
 }
@@ -43,8 +52,9 @@ export function usePlanStatus({
 
     let cancelled = false;
     setPlanStatusLoading(true);
-    api.getTaskPlanStatus(taskId)
-      .then((status) => {
+    api
+      .getTaskPlanStatus(taskId)
+      .then(status => {
         if (!cancelled) setTaskPlanStatus(status);
       })
       .catch(() => {
@@ -54,13 +64,17 @@ export function usePlanStatus({
         if (!cancelled) setPlanStatusLoading(false);
       });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [isConnected, isForcedPlanSession, currentSession?.taskId, messagesLength]);
 
   const handleRestorePlan = useCallback(() => {
     const taskId = currentSession?.taskId;
     if (!taskId) return;
-    handleSendMessage(`Please read the existing plan document at \`.supervision/plans/task-${taskId}.plan.md\` and summarize it. Then ask me whether I'd like to:\n1. Submit the plan and start implementation\n2. Continue refining the plan`);
+    handleSendMessage(
+      `Please read the existing plan document at \`.supervision/plans/task-${taskId}.plan.md\` and summarize it. Then ask me whether I'd like to:\n1. Submit the plan and start implementation\n2. Continue refining the plan`
+    );
   }, [currentSession?.taskId, handleSendMessage]);
 
   const handleDiscardPlan = useCallback(async () => {
@@ -103,7 +117,14 @@ export function usePlanStatus({
     } finally {
       setDiscardPlanLoading(false);
     }
-  }, [currentSession?.taskId, discardPlanLoading, currentProjectId, sessionId, addMessage, scrollToBottom]);
+  }, [
+    currentSession?.taskId,
+    discardPlanLoading,
+    currentProjectId,
+    sessionId,
+    addMessage,
+    scrollToBottom,
+  ]);
 
   const handleSubmitPlan = useCallback(async () => {
     const taskId = currentSession?.taskId;
@@ -138,7 +159,14 @@ export function usePlanStatus({
     } finally {
       setSubmitPlanLoading(false);
     }
-  }, [currentSession?.taskId, submitPlanLoading, sessionId, currentProjectId, addMessage, scrollToBottom]);
+  }, [
+    currentSession?.taskId,
+    submitPlanLoading,
+    sessionId,
+    currentProjectId,
+    addMessage,
+    scrollToBottom,
+  ]);
 
   return {
     taskPlanStatus,

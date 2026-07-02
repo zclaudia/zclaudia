@@ -117,7 +117,13 @@ describe('SessionHeader', () => {
     setupStores({
       messages: {
         'sess-1': [
-          { id: 'msg-1', sessionId: 'sess-1', role: 'user', content: '帮我修一下 Windows 下的编码问题', createdAt: 1 },
+          {
+            id: 'msg-1',
+            sessionId: 'sess-1',
+            role: 'user',
+            content: '帮我修一下 Windows 下的编码问题',
+            createdAt: 1,
+          },
           { id: 'msg-2', sessionId: 'sess-1', role: 'assistant', content: 'Sure!', createdAt: 2 },
         ],
       },
@@ -136,7 +142,7 @@ describe('SessionHeader', () => {
     // We verify by asserting the first user text is absent
     const spans = container.querySelectorAll('span[title]');
     // None of the titled spans should contain the test content
-    const chipSpan = Array.from(spans).find((s) => s.getAttribute('title')?.includes('帮我'));
+    const chipSpan = Array.from(spans).find(s => s.getAttribute('title')?.includes('帮我'));
     expect(chipSpan).toBeUndefined();
   });
 
@@ -145,7 +151,13 @@ describe('SessionHeader', () => {
     setupStores({
       messages: {
         'sess-1': [
-          { id: 'msg-1', sessionId: 'sess-1', role: 'user', content: '帮我修一下 Windows 下的编码问题', createdAt: 1 },
+          {
+            id: 'msg-1',
+            sessionId: 'sess-1',
+            role: 'user',
+            content: '帮我修一下 Windows 下的编码问题',
+            createdAt: 1,
+          },
         ],
       },
     });

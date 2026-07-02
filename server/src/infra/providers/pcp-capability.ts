@@ -3,10 +3,10 @@ import { hasCapability } from '@zclaudia/shared/core/pcp';
 
 /** Mapping from interaction tool name to PCP capability ID */
 const INTERACTION_TOOL_CAPABILITY_MAP: Record<string, PCPCapabilityId> = {
-  'ask_user_form': 'interaction.form',
-  'request_approval': 'interaction.approval',
-  'update_todo_list': 'interaction.todo',
-  'push_file': 'tool.inject',
+  ask_user_form: 'interaction.form',
+  request_approval: 'interaction.approval',
+  update_todo_list: 'interaction.todo',
+  push_file: 'tool.inject',
 };
 
 /**
@@ -15,7 +15,7 @@ const INTERACTION_TOOL_CAPABILITY_MAP: Record<string, PCPCapabilityId> = {
  */
 export function shouldExposeInteractionTool(
   toolName: string,
-  profile?: PCPEffectiveProfile,
+  profile?: PCPEffectiveProfile
 ): boolean {
   if (!profile) return true; // No profile → default to exposing all tools
 

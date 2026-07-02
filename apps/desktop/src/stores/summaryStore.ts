@@ -1,9 +1,6 @@
 import { create } from 'zustand';
 import type { TurnSummary } from '@zclaudia/shared';
-import {
-  listTurnSummaries,
-  generateTurnSummary,
-} from '../services/api/turn-summaries';
+import { listTurnSummaries, generateTurnSummary } from '../services/api/turn-summaries';
 
 type TurnKey = `${string}:${string}`;
 const turnKey = (sessionId: string, userMessageId: string): TurnKey =>
@@ -27,7 +24,11 @@ interface SummaryState {
   hydrateSession: (sessionId: string) => Promise<void>;
 
   /** Trigger generation. While running, the entry is in 'loading' status. */
-  generate: (sessionId: string, userMessageId: string, opts?: { force?: boolean; model?: string }) => Promise<void>;
+  generate: (
+    sessionId: string,
+    userMessageId: string,
+    opts?: { force?: boolean; model?: string }
+  ) => Promise<void>;
 
   /** Clear all entries belonging to a session — used when the user deletes it. */
   clearSession: (sessionId: string) => void;
@@ -39,11 +40,11 @@ export const useSummaryStore = create<SummaryState>((set, get) => ({
 
   getEntry: (sessionId, userMessageId) => get().entries[turnKey(sessionId, userMessageId)],
 
-  hydrateSession: async (sessionId) => {
+  hydrateSession: async sessionId => {
     if (get().hydratedSessions.has(sessionId)) return;
     try {
       const summaries = await listTurnSummaries(sessionId);
-      set((state) => {
+      set(state => {
         const nextEntries = { ...state.entries };
         for (const s of summaries) {
           nextEntries[turnKey(s.sessionId, s.userMessageId)] = { status: 'ready', summary: s };
@@ -60,17 +61,20 @@ export const useSummaryStore = create<SummaryState>((set, get) => ({
 
   generate: async (sessionId, userMessageId, opts = {}) => {
     const key = turnKey(sessionId, userMessageId);
-    set((state) => ({
-      entries: { ...state.entries, [key]: { status: 'loading', summary: state.entries[key]?.summary } },
+    set(state => ({
+      entries: {
+        ...state.entries,
+        [key]: { status: 'loading', summary: state.entries[key]?.summary },
+      },
     }));
     try {
       const { summary } = await generateTurnSummary(sessionId, userMessageId, opts);
-      set((state) => ({
+      set(state => ({
         entries: { ...state.entries, [key]: { status: 'ready', summary } },
       }));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to generate summary';
-      set((state) => ({
+      set(state => ({
         entries: {
           ...state.entries,
           [key]: { status: 'error', summary: state.entries[key]?.summary, error: message },
@@ -79,8 +83,8 @@ export const useSummaryStore = create<SummaryState>((set, get) => ({
     }
   },
 
-  clearSession: (sessionId) => {
-    set((state) => {
+  clearSession: sessionId => {
+    set(state => {
       const nextEntries: Record<TurnKey, SummaryEntry> = {};
       for (const [k, v] of Object.entries(state.entries) as [TurnKey, SummaryEntry][]) {
         if (!k.startsWith(`${sessionId}:`)) nextEntries[k] = v;

@@ -6,9 +6,7 @@ import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
  * human-readable error string on failure (network, non-2xx, or unexpected
  * payload shape).
  */
-export type FetchModelsResult =
-  | { ok: true; models: string[] }
-  | { ok: false; error: string };
+export type FetchModelsResult = { ok: true; models: string[] } | { ok: false; error: string };
 
 interface ProviderFetchSpec {
   url: string;
@@ -50,7 +48,9 @@ function resolveSpec(profile: LlmProfileConfig): ProviderFetchSpec | { error: st
       },
     };
   }
-  return { error: `Provider type "${profile.providerType}" does not expose a /models discovery endpoint` };
+  return {
+    error: `Provider type "${profile.providerType}" does not expose a /models discovery endpoint`,
+  };
 }
 
 /**
@@ -66,7 +66,11 @@ export async function fetchModelsForProfile(profile: LlmProfileConfig): Promise<
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(spec.url, { method: 'GET', headers: spec.headers, signal: controller.signal });
+    const res = await fetch(spec.url, {
+      method: 'GET',
+      headers: spec.headers,
+      signal: controller.signal,
+    });
     if (!res.ok) {
       const body = await res.text().catch(() => '');
       return {
@@ -74,15 +78,19 @@ export async function fetchModelsForProfile(profile: LlmProfileConfig): Promise<
         error: `Upstream returned ${res.status} ${res.statusText}${body ? ': ' + body.slice(0, 200) : ''}`,
       };
     }
-    const payload = await res.json().catch(() => null) as { data?: Array<{ id?: unknown }> } | null;
+    const payload = (await res.json().catch(() => null)) as {
+      data?: Array<{ id?: unknown }>;
+    } | null;
     if (!payload || !Array.isArray(payload.data)) {
       return { ok: false, error: 'Unexpected response shape: missing data[]' };
     }
-    const ids = Array.from(new Set(
-      payload.data
-        .map((row) => row?.id)
-        .filter((id): id is string => typeof id === 'string' && id.length > 0),
-    )).sort();
+    const ids = Array.from(
+      new Set(
+        payload.data
+          .map(row => row?.id)
+          .filter((id): id is string => typeof id === 'string' && id.length > 0)
+      )
+    ).sort();
     return { ok: true, models: ids };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

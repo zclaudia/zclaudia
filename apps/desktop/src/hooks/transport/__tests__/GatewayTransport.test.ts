@@ -2,22 +2,44 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GatewayTransport } from '../GatewayTransport';
 import type { ClientMessage, ServerMessage } from '@zclaudia/shared';
 
+const storeMocks = vi.hoisted(() => ({
+  clearBackendSessions: vi.fn(),
+  replaceProjectsForBackend: vi.fn(),
+  removeProjectOwnersByBackend: vi.fn(),
+}));
+
 // Mock stores
 vi.mock('../../../stores/sessionsStore', () => ({
   useSessionsStore: {
     getState: vi.fn(() => ({
       setRemoteSessions: vi.fn(),
       handleSessionEvent: vi.fn(),
-      clearBackendSessions: vi.fn(),
-      clearAllSessions: vi.fn()
-    }))
-  }
+      clearBackendSessions: storeMocks.clearBackendSessions,
+      clearAllSessions: vi.fn(),
+    })),
+  },
+}));
+
+vi.mock('../../../stores/projectStore', () => ({
+  useProjectStore: {
+    getState: vi.fn(() => ({
+      replaceProjectsForBackend: storeMocks.replaceProjectsForBackend,
+    })),
+  },
+}));
+
+vi.mock('../../../stores/ownershipStore', () => ({
+  useOwnershipStore: {
+    getState: vi.fn(() => ({
+      removeProjectOwnersByBackend: storeMocks.removeProjectOwnersByBackend,
+    })),
+  },
 }));
 
 // Mock sessionSync service
 vi.mock('../../../services/sessionSync', () => ({
   startSessionSync: vi.fn(),
-  stopSessionSync: vi.fn()
+  stopSessionSync: vi.fn(),
 }));
 
 describe('GatewayTransport', () => {
@@ -44,6 +66,7 @@ describe('GatewayTransport', () => {
       onRunStreamEvent: vi.fn(),
       onContentPatch: vi.fn(),
       onContentPatchError: vi.fn(),
+      onBackendsRemoved: vi.fn(),
     };
 
     transport = new GatewayTransport(mockConfig);
@@ -178,7 +201,7 @@ describe('GatewayTransport', () => {
         type: 'run_start',
         clientRequestId: 'test-request-id',
         sessionId: 'session-456',
-        input: 'Test'
+        input: 'Test',
       };
 
       transport.sendToBackend('backend-123', message);
@@ -192,7 +215,12 @@ describe('GatewayTransport', () => {
     it('logs error when not subscribed to backend', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      transport.sendToBackend('backend-123', { type: 'run_start', clientRequestId: 'test', sessionId: 'test', input: '' } as any);
+      transport.sendToBackend('backend-123', {
+        type: 'run_start',
+        clientRequestId: 'test',
+        sessionId: 'test',
+        input: '',
+      } as any);
 
       expect(consoleSpy).toHaveBeenCalledWith(
         '[GatewayTransport] Cannot send: not subscribed to backend',
@@ -265,11 +293,9 @@ describe('GatewayTransport', () => {
         recoveryToken: 'token-abc',
         registrySync: {
           mode: 'snapshot',
-          items: [
-            { backendId: 'backend-1', name: 'Backend 1', epoch: 1 }
-          ],
-          revision: 1
-        }
+          items: [{ backendId: 'backend-1', name: 'Backend 1', epoch: 1 }],
+          revision: 1,
+        },
       };
 
       mockWs.onmessage({ data: JSON.stringify(message) } as MessageEvent);
@@ -286,9 +312,7 @@ describe('GatewayTransport', () => {
 
       const message = {
         type: 'registry_snapshot',
-        items: [
-          { backendId: 'backend-1', name: 'Backend 1', epoch: 1 }
-        ],
+        items: [{ backendId: 'backend-1', name: 'Backend 1', epoch: 1 }],
       };
 
       mockWs.onmessage({ data: JSON.stringify(message) } as MessageEvent);
@@ -301,33 +325,67 @@ describe('GatewayTransport', () => {
       const mockWs = (transport as any).ws;
 
       // First snapshot
-      mockWs.onmessage({ data: JSON.stringify({
-        type: 'registry_snapshot',
-        items: [
-          { backendId: 'backend-1', name: 'Backend 1', epoch: 1 },
-          { backendId: 'backend-2', name: 'Backend 2', epoch: 1 },
-        ],
-      }) } as MessageEvent);
+      mockWs.onmessage({
+        data: JSON.stringify({
+          type: 'registry_snapshot',
+          items: [
+            { backendId: 'backend-1', name: 'Backend 1', epoch: 1 },
+            { backendId: 'backend-2', name: 'Backend 2', epoch: 1 },
+          ],
+        }),
+      } as MessageEvent);
 
       expect(transport.getRegistryItems().size).toBe(2);
 
       // Second snapshot removes backend-1
-      mockWs.onmessage({ data: JSON.stringify({
-        type: 'registry_snapshot',
-        items: [
-          { backendId: 'backend-2', name: 'Backend 2', epoch: 1 },
-        ],
-      }) } as MessageEvent);
+      mockWs.onmessage({
+        data: JSON.stringify({
+          type: 'registry_snapshot',
+          items: [{ backendId: 'backend-2', name: 'Backend 2', epoch: 1 }],
+        }),
+      } as MessageEvent);
 
       expect(transport.getRegistryItems().size).toBe(1);
       expect(transport.getRegistryItems().has('backend-1')).toBe(false);
       expect(transport.getRegistryItems().has('backend-2')).toBe(true);
     });
 
+    it('emits removed backend ids without mutating business stores', () => {
+      const mockWs = (transport as any).ws;
+
+      mockWs.onmessage({
+        data: JSON.stringify({
+          type: 'registry_snapshot',
+          items: [
+            { backendId: 'backend-1', name: 'Backend 1', epoch: 1 },
+            { backendId: 'backend-2', name: 'Backend 2', epoch: 1 },
+          ],
+        }),
+      } as MessageEvent);
+
+      mockWs.onmessage({
+        data: JSON.stringify({
+          type: 'registry_snapshot',
+          items: [{ backendId: 'backend-2', name: 'Backend 2', epoch: 1 }],
+        }),
+      } as MessageEvent);
+
+      expect(mockConfig.onBackendsRemoved).toHaveBeenCalledWith(['backend-1']);
+      expect(storeMocks.clearBackendSessions).not.toHaveBeenCalled();
+      expect(storeMocks.replaceProjectsForBackend).not.toHaveBeenCalled();
+      expect(storeMocks.removeProjectOwnersByBackend).not.toHaveBeenCalled();
+    });
+
     it('handles backend_resource_snapshot', () => {
       const mockWs = (transport as any).ws;
 
-      const sessionItem = { sessionId: 'session-1', title: 'Session 1', createdAt: 1, updatedAt: 1, runStatus: 'idle' };
+      const sessionItem = {
+        sessionId: 'session-1',
+        title: 'Session 1',
+        createdAt: 1,
+        updatedAt: 1,
+        runStatus: 'idle',
+      };
       const projectItem = { projectId: 'project-1', name: 'Project 1', createdAt: 1, updatedAt: 1 };
       const message = {
         type: 'backend_resource_snapshot',
@@ -340,7 +398,11 @@ describe('GatewayTransport', () => {
 
       mockWs.onmessage({ data: JSON.stringify(message) } as MessageEvent);
 
-      expect(mockConfig.onBackendDataSnapshot).toHaveBeenCalledWith('backend-1', [sessionItem], [projectItem]);
+      expect(mockConfig.onBackendDataSnapshot).toHaveBeenCalledWith(
+        'backend-1',
+        [sessionItem],
+        [projectItem]
+      );
     });
 
     it('handles backend_subscribed', () => {
@@ -350,7 +412,7 @@ describe('GatewayTransport', () => {
         type: 'backend_subscribed',
         backendId: 'backend-123',
         epoch: 1,
-        capabilities: ['run']
+        capabilities: ['run'],
       };
 
       mockWs.onmessage({ data: JSON.stringify(message) } as MessageEvent);
@@ -368,14 +430,17 @@ describe('GatewayTransport', () => {
       const message = {
         type: 'backend_unsubscribed',
         backendId: 'backend-123',
-        reason: 'Backend disconnected'
+        reason: 'Backend disconnected',
       };
 
       mockWs.onmessage({ data: JSON.stringify(message) } as MessageEvent);
 
       expect(transport.subscribedBackends.has('backend-123')).toBe(false);
       expect(transport.isBackendSubscribed('backend-123')).toBe(false);
-      expect(mockConfig.onBackendUnsubscribed).toHaveBeenCalledWith('backend-123', 'Backend disconnected');
+      expect(mockConfig.onBackendUnsubscribed).toHaveBeenCalledWith(
+        'backend-123',
+        'Backend disconnected'
+      );
     });
 
     it('handles backend_server_message', () => {
@@ -387,13 +452,13 @@ describe('GatewayTransport', () => {
         type: 'delta',
         runId: 'test-run-id',
         sessionId: 'test-session',
-        content: 'Hello'
+        content: 'Hello',
       };
 
       const message = {
         type: 'backend_server_message',
         backendId: 'backend-123',
-        message: innerMessage
+        message: innerMessage,
       };
 
       mockWs.onmessage({ data: JSON.stringify(message) } as MessageEvent);
@@ -407,7 +472,7 @@ describe('GatewayTransport', () => {
       const message = {
         type: 'gateway_error',
         code: 'GENERIC_ERROR',
-        message: 'Something went wrong'
+        message: 'Something went wrong',
       };
 
       mockWs.onmessage({ data: JSON.stringify(message) } as MessageEvent);
@@ -424,7 +489,7 @@ describe('GatewayTransport', () => {
         backendId: 'backend-1',
         channel: 'session-1',
         event: 'delta',
-        data: 'test'
+        data: 'test',
       };
 
       mockWs.onmessage({ data: JSON.stringify(message) } as MessageEvent);
@@ -442,7 +507,7 @@ describe('GatewayTransport', () => {
         backendId: 'backend-1',
         contentStreamId: 'session-1',
         patches,
-        latestOffset: 5
+        latestOffset: 5,
       };
 
       mockWs.onmessage({ data: JSON.stringify(message) } as MessageEvent);
@@ -459,12 +524,17 @@ describe('GatewayTransport', () => {
         backendId: 'backend-1',
         contentStreamId: 'session-1',
         afterOffset: 3,
-        message: 'Session not found'
+        message: 'Session not found',
       };
 
       mockWs.onmessage({ data: JSON.stringify(message) } as MessageEvent);
 
-      expect(mockConfig.onContentPatchError).toHaveBeenCalledWith('backend-1', 'session-1', 3, 'Session not found');
+      expect(mockConfig.onContentPatchError).toHaveBeenCalledWith(
+        'backend-1',
+        'session-1',
+        3,
+        'Session not found'
+      );
     });
   });
 

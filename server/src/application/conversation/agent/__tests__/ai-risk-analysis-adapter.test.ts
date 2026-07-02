@@ -54,7 +54,7 @@ describe('AIRiskAnalysisAdapter', () => {
         toolName: 'Bash',
         detail: 'Review this command',
         cwd: '/repo',
-      }),
+      })
     );
   });
 
@@ -100,14 +100,17 @@ describe('AIRiskAnalysisAdapter', () => {
       },
     });
 
-    expect(createProvider).toHaveBeenCalledWith('review-profile', expect.objectContaining({
-      cwd: '/repo',
-    }));
+    expect(createProvider).toHaveBeenCalledWith(
+      'review-profile',
+      expect.objectContaining({
+        cwd: '/repo',
+      })
+    );
     expect(mockEvaluateAIReview).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
         analysisProvider: provider,
-      }),
+      })
     );
   });
 });

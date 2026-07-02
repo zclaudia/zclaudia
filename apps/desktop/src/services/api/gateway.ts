@@ -23,7 +23,7 @@ export async function updateServerGatewayConfig(config: {
 }): Promise<ServerGatewayConfig> {
   const result = await fetchLocalApi<ServerGatewayConfig>('/api/server/gateway/config', {
     method: 'PUT',
-    body: JSON.stringify(config)
+    body: JSON.stringify(config),
   });
   if (!result.success || !result.data) {
     throw new Error(result.error?.message || 'Failed to update gateway config');
@@ -47,7 +47,7 @@ export async function getServerGatewayStatus(): Promise<ServerGatewayStatus> {
  */
 export async function connectServerToGateway(): Promise<{ message: string }> {
   const result = await fetchLocalApi<{ message: string }>('/api/server/gateway/connect', {
-    method: 'POST'
+    method: 'POST',
   });
   if (!result.success || !result.data) {
     throw new Error(result.error?.message || 'Failed to connect to gateway');
@@ -60,7 +60,7 @@ export async function connectServerToGateway(): Promise<{ message: string }> {
  */
 export async function disconnectServerFromGateway(): Promise<{ message: string }> {
   const result = await fetchLocalApi<{ message: string }>('/api/server/gateway/disconnect', {
-    method: 'POST'
+    method: 'POST',
   });
   if (!result.success || !result.data) {
     throw new Error(result.error?.message || 'Failed to disconnect from gateway');

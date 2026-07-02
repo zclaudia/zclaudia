@@ -26,11 +26,20 @@ function resolvePath(context: RenderContext, path: string): string {
   let value: unknown;
 
   switch (root) {
-    case 'event':   value = context.event; break;
-    case 'trigger': value = context.trigger; break;
-    case 'steps':   value = context.steps; break;
-    case 'workflow': value = context.workflow; break;
-    default: return '';
+    case 'event':
+      value = context.event;
+      break;
+    case 'trigger':
+      value = context.trigger;
+      break;
+    case 'steps':
+      value = context.steps;
+      break;
+    case 'workflow':
+      value = context.workflow;
+      break;
+    default:
+      return '';
   }
 
   for (let i = 1; i < parts.length; i++) {
@@ -58,7 +67,7 @@ export function renderTemplate(template: string, context: RenderContext): string
  */
 export function renderConfig(
   config: Record<string, unknown>,
-  context: RenderContext,
+  context: RenderContext
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(config)) {

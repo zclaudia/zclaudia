@@ -49,7 +49,10 @@ interface WorkflowState {
   loadTemplates: () => Promise<void>;
   loadStepTypes: () => Promise<void>;
   loadTriggerSources: () => Promise<void>;
-  createWorkflow: (projectId: string, data: { name: string; description?: string; definition: WorkflowDefinition }) => Promise<Workflow>;
+  createWorkflow: (
+    projectId: string,
+    data: { name: string; description?: string; definition: WorkflowDefinition }
+  ) => Promise<Workflow>;
   updateWorkflow: (workflowId: string, projectId: string, data: Partial<Workflow>) => Promise<void>;
   deleteWorkflow: (workflowId: string, projectId: string) => Promise<void>;
   createFromTemplate: (projectId: string, templateId: string) => Promise<Workflow>;
@@ -76,14 +79,14 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   stepTypes: [],
   triggerSources: [],
 
-  loadWorkflows: async (projectId) => {
+  loadWorkflows: async projectId => {
     const workflows = await listWorkflows(projectId);
-    set((state) => ({ workflows: { ...state.workflows, [projectId]: workflows } }));
+    set(state => ({ workflows: { ...state.workflows, [projectId]: workflows } }));
   },
 
   loadAllWorkflows: async () => {
     const workflows = await listAllWorkflows();
-    set((state) => ({ workflows: { ...state.workflows, [ALL_KEY]: workflows } }));
+    set(state => ({ workflows: { ...state.workflows, [ALL_KEY]: workflows } }));
   },
 
   loadTemplates: async () => {
@@ -123,71 +126,68 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     return workflow;
   },
 
-  triggerWorkflow: async (workflowId) => {
+  triggerWorkflow: async workflowId => {
     const run = await apiTriggerWorkflow(workflowId);
     get().upsertRun(run.projectId ?? '__all__', run);
     return run;
   },
 
-  loadRuns: async (workflowId) => {
+  loadRuns: async workflowId => {
     const runs = await listWorkflowRuns(workflowId);
-    set((state) => ({ runs: { ...state.runs, [workflowId]: runs } }));
+    set(state => ({ runs: { ...state.runs, [workflowId]: runs } }));
   },
 
-  loadRun: async (runId) => {
+  loadRun: async runId => {
     const { run, stepRuns } = await getWorkflowRun(runId);
     const runKey = run.workflowId ?? NO_WORKFLOW_KEY;
-    set((state) => ({
+    set(state => ({
       runs: {
         ...state.runs,
-        [runKey]: [
-          run,
-          ...(state.runs[runKey] ?? []).filter((r) => r.id !== run.id),
-        ],
+        [runKey]: [run, ...(state.runs[runKey] ?? []).filter(r => r.id !== run.id)],
       },
       stepRuns: { ...state.stepRuns, [runId]: stepRuns },
     }));
   },
 
-  cancelRun: async (runId) => {
+  cancelRun: async runId => {
     await cancelWorkflowRun(runId);
   },
 
-  approveStep: async (stepRunId) => {
+  approveStep: async stepRunId => {
     await approveWorkflowStep(stepRunId);
   },
 
-  rejectStep: async (stepRunId) => {
+  rejectStep: async stepRunId => {
     await rejectWorkflowStep(stepRunId);
   },
 
   // ── WebSocket handlers ──────────────────────────────────────
 
   upsertWorkflow: (projectId, workflow) =>
-    set((state) => {
+    set(state => {
       const existing = state.workflows[projectId] ?? [];
-      const idx = existing.findIndex((w) => w.id === workflow.id);
-      const updated = idx >= 0
-        ? existing.map((w, i) => (i === idx ? workflow : w))
-        : [workflow, ...existing];
+      const idx = existing.findIndex(w => w.id === workflow.id);
+      const updated =
+        idx >= 0 ? existing.map((w, i) => (i === idx ? workflow : w)) : [workflow, ...existing];
       return { workflows: { ...state.workflows, [projectId]: updated } };
     }),
 
   removeWorkflow: (projectId, workflowId) =>
-    set((state) => {
+    set(state => {
       const existing = state.workflows[projectId] ?? [];
-      return { workflows: { ...state.workflows, [projectId]: existing.filter((w) => w.id !== workflowId) } };
+      return {
+        workflows: { ...state.workflows, [projectId]: existing.filter(w => w.id !== workflowId) },
+      };
     }),
 
   upsertRun: (_projectId, run, stepRuns) =>
-    set((state) => {
+    set(state => {
       // Update runs
       const runKey = run.workflowId ?? NO_WORKFLOW_KEY;
       const existingRuns = state.runs[runKey] ?? [];
-      const runIdx = existingRuns.findIndex((r) => r.id === run.id);
-      const updatedRuns = runIdx >= 0
-        ? existingRuns.map((r, i) => (i === runIdx ? run : r))
-        : [run, ...existingRuns];
+      const runIdx = existingRuns.findIndex(r => r.id === run.id);
+      const updatedRuns =
+        runIdx >= 0 ? existingRuns.map((r, i) => (i === runIdx ? run : r)) : [run, ...existingRuns];
 
       const newState: Partial<WorkflowState> = {
         runs: { ...state.runs, [runKey]: updatedRuns },

@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, type Request, type Response } from 'express';
 import { PluginManagementError, PluginManagementService } from './management-service.js';
 import { PluginFrontendError, PluginFrontendService } from './frontend-service.js';
 import { sendApiError } from '../../interfaces/http/response.js';
@@ -22,7 +22,12 @@ export function createPluginRoutes(): Router {
         sendApiError(res, error.status, error.code, error.message);
         return;
       }
-      sendApiError(res, 500, 'INTERNAL_ERROR', error instanceof Error ? error.message : String(error));
+      sendApiError(
+        res,
+        500,
+        'INTERNAL_ERROR',
+        error instanceof Error ? error.message : String(error)
+      );
     }
   });
 
@@ -35,7 +40,12 @@ export function createPluginRoutes(): Router {
         sendApiError(res, error.status, error.code, error.message);
         return;
       }
-      sendApiError(res, 500, 'INTERNAL_ERROR', error instanceof Error ? error.message : String(error));
+      sendApiError(
+        res,
+        500,
+        'INTERNAL_ERROR',
+        error instanceof Error ? error.message : String(error)
+      );
     }
   });
 
@@ -48,7 +58,12 @@ export function createPluginRoutes(): Router {
         sendApiError(res, error.status, error.code, error.message);
         return;
       }
-      sendApiError(res, 500, 'INTERNAL_ERROR', error instanceof Error ? error.message : String(error));
+      sendApiError(
+        res,
+        500,
+        'INTERNAL_ERROR',
+        error instanceof Error ? error.message : String(error)
+      );
     }
   });
 
@@ -61,20 +76,33 @@ export function createPluginRoutes(): Router {
         sendApiError(res, error.status, error.code, error.message);
         return;
       }
-      sendApiError(res, 500, 'INTERNAL_ERROR', error instanceof Error ? error.message : String(error));
+      sendApiError(
+        res,
+        500,
+        'INTERNAL_ERROR',
+        error instanceof Error ? error.message : String(error)
+      );
     }
   });
 
   router.post('/:id/permissions/revoke', (req: Request, res: Response) => {
     try {
-      const result = pluginManagementService.revokePermissions(req.params.id, req.body?.permissions);
+      const result = pluginManagementService.revokePermissions(
+        req.params.id,
+        req.body?.permissions
+      );
       res.json({ success: true, data: result });
     } catch (error) {
       if (error instanceof PluginManagementError) {
         sendApiError(res, error.status, error.code, error.message);
         return;
       }
-      sendApiError(res, 500, 'INTERNAL_ERROR', error instanceof Error ? error.message : String(error));
+      sendApiError(
+        res,
+        500,
+        'INTERNAL_ERROR',
+        error instanceof Error ? error.message : String(error)
+      );
     }
   });
 
@@ -91,7 +119,12 @@ export function createPluginRoutes(): Router {
         sendApiError(res, error.status, error.code, error.message);
         return;
       }
-      sendApiError(res, 500, 'INTERNAL_ERROR', error instanceof Error ? error.message : String(error));
+      sendApiError(
+        res,
+        500,
+        'INTERNAL_ERROR',
+        error instanceof Error ? error.message : String(error)
+      );
     }
   });
 
@@ -104,7 +137,12 @@ export function createPluginRoutes(): Router {
         sendApiError(res, error.status, error.code, error.message);
         return;
       }
-      sendApiError(res, 500, 'INTERNAL_ERROR', error instanceof Error ? error.message : String(error));
+      sendApiError(
+        res,
+        500,
+        'INTERNAL_ERROR',
+        error instanceof Error ? error.message : String(error)
+      );
     }
   });
 
@@ -248,7 +286,7 @@ export function createPluginRoutes(): Router {
     try {
       const fullPath = pluginFrontendService.resolveFrontendFile(
         req.params.id,
-        (req.params as any)[0] as string,
+        (req.params as any)[0] as string
       );
       res.sendFile(fullPath);
     } catch (error) {
@@ -269,7 +307,12 @@ export function createPluginRoutes(): Router {
         sendApiError(res, error.status, error.code, error.message);
         return;
       }
-      sendApiError(res, 500, 'INTERNAL_ERROR', error instanceof Error ? error.message : String(error));
+      sendApiError(
+        res,
+        500,
+        'INTERNAL_ERROR',
+        error instanceof Error ? error.message : String(error)
+      );
     }
   });
 

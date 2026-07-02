@@ -50,19 +50,21 @@ export function NewProjectForm({
           <select
             aria-label="Create in backend"
             value={selectedBackendId ?? backends[0]?.backendId ?? ''}
-            onChange={(e) => onSelectedBackendIdChange(e.target.value)}
+            onChange={e => onSelectedBackendIdChange(e.target.value)}
             className="mb-2 w-full rounded-md border border-border bg-card px-2 py-1.5 text-sm text-foreground focus:outline-none"
           >
-            {backends.map((b) => (
-              <option key={b.backendId} value={b.backendId}>{b.name}</option>
+            {backends.map(b => (
+              <option key={b.backendId} value={b.backendId}>
+                {b.name}
+              </option>
             ))}
           </select>
         )}
         <input
           type="text"
           value={newProjectName}
-          onChange={(e) => onProjectNameChange(e.target.value)}
-          onKeyDown={(e) => {
+          onChange={e => onProjectNameChange(e.target.value)}
+          onKeyDown={e => {
             if (e.key === 'Escape') handleCancel();
           }}
           placeholder="Project name"
@@ -73,8 +75,8 @@ export function NewProjectForm({
           <input
             type="text"
             value={newProjectRootPath}
-            onChange={(e) => onProjectRootPathChange(e.target.value)}
-            onKeyDown={(e) => {
+            onChange={e => onProjectRootPathChange(e.target.value)}
+            onKeyDown={e => {
               if (e.key === 'Enter') onCreateProject();
               if (e.key === 'Escape') handleCancel();
             }}
@@ -91,16 +93,17 @@ export function NewProjectForm({
             <FolderOpen size={16} strokeWidth={1.75} />
           </button>
         </div>
-        {pickerOpen && createPortal(
-          <DirectoryPickerModal
-            open={pickerOpen}
-            backendId={selectedBackendId ?? backends[0]?.backendId ?? null}
-            initialPath={newProjectRootPath.trim() || undefined}
-            onClose={() => setPickerOpen(false)}
-            onSelect={(path) => onProjectRootPathChange(path)}
-          />,
-          document.body,
-        )}
+        {pickerOpen &&
+          createPortal(
+            <DirectoryPickerModal
+              open={pickerOpen}
+              backendId={selectedBackendId ?? backends[0]?.backendId ?? null}
+              initialPath={newProjectRootPath.trim() || undefined}
+              onClose={() => setPickerOpen(false)}
+              onSelect={path => onProjectRootPathChange(path)}
+            />,
+            document.body
+          )}
         <div className={buttonRowClass}>
           <button
             onClick={onCreateProject}
@@ -109,10 +112,7 @@ export function NewProjectForm({
           >
             {creatingProject ? 'Creating...' : 'Create'}
           </button>
-          <button
-            onClick={handleCancel}
-            className={cancelBtnClass}
-          >
+          <button onClick={handleCancel} className={cancelBtnClass}>
             Cancel
           </button>
         </div>

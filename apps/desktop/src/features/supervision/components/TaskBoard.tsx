@@ -29,7 +29,7 @@ export function TaskBoard({ projectId, tasks, changeId, title = 'Tasks' }: TaskB
   const groupedTasks = useMemo(() => {
     const groups: Record<string, SupervisionTask[]> = {};
     for (const group of statusGroups) {
-      groups[group.key] = tasks.filter((t) => group.statuses.includes(t.status));
+      groups[group.key] = tasks.filter(t => group.statuses.includes(t.status));
     }
     return groups;
   }, [tasks]);
@@ -37,11 +37,11 @@ export function TaskBoard({ projectId, tasks, changeId, title = 'Tasks' }: TaskB
   // Sort tasks within each group by priority
   const sortedGroups = useMemo(() => {
     return statusGroups
-      .map((g) => ({
+      .map(g => ({
         ...g,
         tasks: (groupedTasks[g.key] ?? []).sort((a, b) => a.priority - b.priority),
       }))
-      .filter((g) => g.tasks.length > 0);
+      .filter(g => g.tasks.length > 0);
   }, [groupedTasks]);
 
   return (
@@ -68,19 +68,15 @@ export function TaskBoard({ projectId, tasks, changeId, title = 'Tasks' }: TaskB
             No tasks yet. Click "Add Task" to create one.
           </div>
         ) : (
-          sortedGroups.map((group) => (
+          sortedGroups.map(group => (
             <div key={group.key}>
               <h4 className="text-xs font-medium text-muted-foreground uppercase mb-2">
                 {group.label}
                 <span className="ml-1 text-muted-foreground/50">({group.tasks.length})</span>
               </h4>
               <div className="space-y-1.5">
-                {group.tasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    onSelect={setSelectedTask}
-                  />
+                {group.tasks.map(task => (
+                  <TaskCard key={task.id} task={task} onSelect={setSelectedTask} />
                 ))}
               </div>
             </div>
@@ -89,12 +85,7 @@ export function TaskBoard({ projectId, tasks, changeId, title = 'Tasks' }: TaskB
       </div>
 
       {/* Task detail drawer */}
-      {selectedTask && (
-        <TaskDetail
-          task={selectedTask}
-          onClose={() => setSelectedTask(null)}
-        />
-      )}
+      {selectedTask && <TaskDetail task={selectedTask} onClose={() => setSelectedTask(null)} />}
 
       {/* Create task dialog */}
       <CreateTaskDialog

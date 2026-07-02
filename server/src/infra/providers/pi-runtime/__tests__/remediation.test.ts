@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { loopRecoveryForFailure, remediationForResult } from '../remediation.js';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function det(d: Record<string, unknown>): any {
   return d;
 }
@@ -23,7 +22,10 @@ describe('remediationForResult', () => {
   });
 
   it('suggests replace_all or more context on Edit not_unique', () => {
-    const hint = remediationForResult('Edit', det({ ok: false, error: 'not_unique', occurrences: 3 }));
+    const hint = remediationForResult(
+      'Edit',
+      det({ ok: false, error: 'not_unique', occurrences: 3 })
+    );
     expect(hint).toMatch(/replace_all|more context/i);
   });
 
@@ -33,7 +35,10 @@ describe('remediationForResult', () => {
   });
 
   it('suggests a qualified symbol name when ReadSymbol is ambiguous', () => {
-    const hint = remediationForResult('ReadSymbol', det({ ok: false, error: 'ambiguous_symbol', candidates: ['A.run', 'B.run'] }));
+    const hint = remediationForResult(
+      'ReadSymbol',
+      det({ ok: false, error: 'ambiguous_symbol', candidates: ['A.run', 'B.run'] })
+    );
     expect(hint).toMatch(/qualified|candidate|ReadSymbol/i);
   });
 
@@ -43,13 +48,18 @@ describe('remediationForResult', () => {
   });
 
   it('falls back to Read plus Edit for unsupported ReadSymbol file types', () => {
-    const hint = remediationForResult('ReadSymbol', det({ ok: false, error: 'unsupported_language' }));
+    const hint = remediationForResult(
+      'ReadSymbol',
+      det({ ok: false, error: 'unsupported_language' })
+    );
     expect(hint).toMatch(/Python|TypeScript|JavaScript/);
     expect(hint).toMatch(/Read .* Edit/i);
   });
 
   it('does not pile on when the loop guard already fired', () => {
-    expect(remediationForResult('Edit', det({ ok: false, error: 'edit_loop_detected' }))).toBeUndefined();
+    expect(
+      remediationForResult('Edit', det({ ok: false, error: 'edit_loop_detected' }))
+    ).toBeUndefined();
   });
 
   it('explains command-not-found Bash exits', () => {
@@ -63,7 +73,10 @@ describe('remediationForResult', () => {
   });
 
   it('explains stale-read write rejections', () => {
-    const hint = remediationForResult('Write', det({ ok: false, error: 'file_modified_since_read' }));
+    const hint = remediationForResult(
+      'Write',
+      det({ ok: false, error: 'file_modified_since_read' })
+    );
     expect(hint).toMatch(/read .* again|re-read/i);
   });
 
@@ -73,34 +86,45 @@ describe('remediationForResult', () => {
   });
 
   it('steers to a workspace-relative path on sandbox write-outside-workspace denial', () => {
-    const hint = remediationForResult('Bash', det({
-      ok: false,
-      exitCode: 1,
-      sandboxed: true,
-      sandboxFsDenied: 'write_outside_workspace',
-    }));
+    const hint = remediationForResult(
+      'Bash',
+      det({
+        ok: false,
+        exitCode: 1,
+        sandboxed: true,
+        sandboxFsDenied: 'write_outside_workspace',
+      })
+    );
     expect(hint).toMatch(/workspace-relative|workspace root/i);
     expect(hint).toMatch(/sandbox/i);
   });
 
   it('steers to ExitPlanMode on read-only sandbox denial', () => {
-    const hint = remediationForResult('Bash', det({
-      ok: false,
-      exitCode: 1,
-      sandboxed: true,
-      sandboxFsDenied: 'read_only',
-    }));
+    const hint = remediationForResult(
+      'Bash',
+      det({
+        ok: false,
+        exitCode: 1,
+        sandboxed: true,
+        sandboxFsDenied: 'read_only',
+      })
+    );
     expect(hint).toMatch(/ExitPlanMode|Plan mode/);
   });
 
   it('points at the full output file when a Bash result was persisted', () => {
-    const hint = remediationForResult('Bash', det({ ok: false, exitCode: 1, fullOutputPath: '/tmp/x.log' }));
+    const hint = remediationForResult(
+      'Bash',
+      det({ ok: false, exitCode: 1, fullOutputPath: '/tmp/x.log' })
+    );
     // exitCode 1 alone is generic; should not over-explain, but may surface the log
     expect(hint === undefined || /\/tmp\/x\.log|full output/.test(hint)).toBe(true);
   });
 
   it('returns undefined for unknown error codes', () => {
-    expect(remediationForResult('Grep', det({ ok: false, error: 'some_novel_error' }))).toBeUndefined();
+    expect(
+      remediationForResult('Grep', det({ ok: false, error: 'some_novel_error' }))
+    ).toBeUndefined();
   });
 
   describe('loopRecoveryForFailure', () => {
@@ -109,7 +133,7 @@ describe('remediationForResult', () => {
         'Edit',
         { file_path: 'src/app.ts', old_string: 'stale' },
         det({ ok: false, error: 'not_found' }),
-        3,
+        3
       );
       expect(recovery?.nextTool).toBe('Read');
       expect(recovery?.summary).toMatch(/3 times/);
@@ -122,7 +146,7 @@ describe('remediationForResult', () => {
         'EditSymbol',
         { file_path: 'src/app.ts', symbol: 'run' },
         det({ ok: false, error: 'stale_symbol' }),
-        3,
+        3
       );
       expect(recovery?.nextTool).toBe('ReadSymbol');
       expect(recovery?.steps.join(' ')).toMatch(/bodyDigest|expected_body_digest/);
@@ -133,7 +157,7 @@ describe('remediationForResult', () => {
         'MultiEdit',
         { file_path: 'src/app.ts', edits: 'bad' },
         det({ ok: false, error: 'invalid_edits' }),
-        3,
+        3
       );
       expect(recovery?.nextTool).toBe('MultiEdit');
       expect(recovery?.steps.join(' ')).toMatch(/array of objects/);
@@ -145,12 +169,14 @@ describe('remediationForResult', () => {
     it('returns undefined (self-explanatory) for tool_loop_detected even with a fallback-triggered hint context', () => {
       // With a .fullOutputPath that would normally trigger a hint for generic Bash failure,
       // tool_loop_detected should still suppress it (it's self-explanatory).
-      expect(remediationForResult('Bash', {
-        ok: false,
-        error: 'tool_loop_detected',
-        exitCode: 1,
-        fullOutputPath: '/tmp/output.log',
-      } as any)).toBeUndefined();
+      expect(
+        remediationForResult('Bash', {
+          ok: false,
+          error: 'tool_loop_detected',
+          exitCode: 1,
+          fullOutputPath: '/tmp/output.log',
+        } as any)
+      ).toBeUndefined();
     });
 
     it('suppresses the Bash fullOutputPath hint when the loop guard fires (load-bearing)', () => {
@@ -162,7 +188,7 @@ describe('remediationForResult', () => {
           error: 'tool_loop_detected',
           exitCode: 1,
           fullOutputPath: '/tmp/x.txt',
-        } as any),
+        } as any)
       ).toBeUndefined();
     });
   });

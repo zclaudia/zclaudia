@@ -26,7 +26,7 @@ export class WorkflowRunAggregate {
   constructor(
     private run: WorkflowRun,
     private runRepo: WorkflowRunRepository,
-    private stepRunRepo: WorkflowStepRunRepository,
+    private stepRunRepo: WorkflowStepRunRepository
   ) {}
 
   // ── Queries ──────────────────────────────────────────────────────
@@ -69,7 +69,7 @@ export class WorkflowRunAggregate {
       actionKind?: 'activity' | 'workflow';
       actionRef?: string;
       triggerDetail?: string;
-    },
+    }
   ): WorkflowRunAggregate {
     const run = runRepo.create({
       workflowId,

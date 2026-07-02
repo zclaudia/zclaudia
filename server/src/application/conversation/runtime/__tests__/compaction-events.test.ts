@@ -11,18 +11,20 @@ describe('compactionDomainEventFor', () => {
       sessionId: 's1',
     });
 
-    expect(event).toEqual(expect.objectContaining({
-      type: 'compaction.completed',
-      runId: 'r1',
-      sessionId: 's1',
-      providerType: 'zclaudia',
-      seq: 7,
-      source: 'runtime',
-      payload: {
-        compactionId: 'c1',
-        tokensBefore: 100,
-      },
-    }));
+    expect(event).toEqual(
+      expect.objectContaining({
+        type: 'compaction.completed',
+        runId: 'r1',
+        sessionId: 's1',
+        providerType: 'zclaudia',
+        seq: 7,
+        source: 'runtime',
+        payload: {
+          compactionId: 'c1',
+          tokensBefore: 100,
+        },
+      })
+    );
   });
 
   it('maps failed outcome to compaction.failed domain event with breaker fields', () => {
@@ -38,32 +40,38 @@ describe('compactionDomainEventFor', () => {
       sessionId: 's1',
     });
 
-    expect(event).toEqual(expect.objectContaining({
-      type: 'compaction.failed',
-      runId: 'r1',
-      sessionId: 's1',
-      seq: 8,
-      source: 'runtime',
-      payload: {
-        reason: 'error: x',
-        breakerOpen: true,
-        nextRetryAtMs: 999,
-      },
-    }));
+    expect(event).toEqual(
+      expect.objectContaining({
+        type: 'compaction.failed',
+        runId: 'r1',
+        sessionId: 's1',
+        seq: 8,
+        source: 'runtime',
+        payload: {
+          reason: 'error: x',
+          breakerOpen: true,
+          nextRetryAtMs: 999,
+        },
+      })
+    );
   });
 
   it('maps skipped and aborted outcomes to null', () => {
-    expect(compactionDomainEventFor({
-      outcome: { outcome: 'skipped', compacted: false, reason: 'circuit_open' },
-      runId: 'r1',
-      seq: 1,
-      sessionId: 's1',
-    })).toBeNull();
-    expect(compactionDomainEventFor({
-      outcome: { outcome: 'aborted', compacted: false, reason: 'aborted: x' },
-      runId: 'r1',
-      seq: 1,
-      sessionId: 's1',
-    })).toBeNull();
+    expect(
+      compactionDomainEventFor({
+        outcome: { outcome: 'skipped', compacted: false, reason: 'circuit_open' },
+        runId: 'r1',
+        seq: 1,
+        sessionId: 's1',
+      })
+    ).toBeNull();
+    expect(
+      compactionDomainEventFor({
+        outcome: { outcome: 'aborted', compacted: false, reason: 'aborted: x' },
+        runId: 'r1',
+        seq: 1,
+        sessionId: 's1',
+      })
+    ).toBeNull();
   });
 });

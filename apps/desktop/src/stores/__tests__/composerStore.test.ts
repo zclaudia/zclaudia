@@ -24,7 +24,13 @@ describe('composerStore', () => {
   });
 
   it('retains a draft that has attachments but no text content', () => {
-    const att = { id: 'a1', type: 'image' as const, name: 'x.png', data: 'd', mimeType: 'image/png' };
+    const att = {
+      id: 'a1',
+      type: 'image' as const,
+      name: 'x.png',
+      data: 'd',
+      mimeType: 'image/png',
+    };
     useComposerStore.getState().setDraft('s1', { content: '', attachments: [att] });
     expect(useComposerStore.getState().drafts.s1).toEqual({ content: '', attachments: [att] });
   });

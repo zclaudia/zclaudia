@@ -4,8 +4,15 @@ import { useOwnershipStore } from '../../stores/ownershipStore';
 import { useServerStore } from '../../stores/serverStore';
 import { useChatMessageStore } from '../../stores/chatMessageStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { getControlPlaneMode, resolveCanonicalBackendId, resolveLocalBackendId } from '../../utils/controlPlane';
-import { getMobileBackendViewState, isMobileBackendUsable } from '../../services/mobileConnectionState';
+import {
+  getControlPlaneMode,
+  resolveCanonicalBackendId,
+  resolveLocalBackendId,
+} from '../../utils/controlPlane';
+import {
+  getMobileBackendViewState,
+  isMobileBackendUsable,
+} from '../../services/mobileConnectionState';
 
 function getStreamKey(backendId: string, sessionId: string): string {
   return `${backendId}:${sessionId}`;
@@ -34,23 +41,23 @@ interface SessionRouteState {
 
 export function useSessionRoute(
   sessionId: string | null | undefined,
-  options: UseSessionRouteOptions = {},
+  options: UseSessionRouteOptions = {}
 ): SessionRouteState {
   const { maintainDesiredState = false } = options;
   // Facade — imperative calls + stream management only
-  const facade = useFacadeStore((s) => s.facade);
-  const backends = useFacadeStore((s) => s.backends);
-  const sessionStreams = useFacadeStore((s) => s.sessionStreams);
-  const facadeConnectionState = useFacadeStore((s) => s.connectionState);
-  const reconnectGeneration = useFacadeStore((s) => s.reconnectGeneration);
-  const activeServerId = useServerStore((s) => s.activeServerId);
-  const maxOffset = useChatMessageStore((s) =>
-    sessionId ? s.pagination[sessionId]?.maxOffset ?? 0 : 0
+  const facade = useFacadeStore(s => s.facade);
+  const backends = useFacadeStore(s => s.backends);
+  const sessionStreams = useFacadeStore(s => s.sessionStreams);
+  const facadeConnectionState = useFacadeStore(s => s.connectionState);
+  const reconnectGeneration = useFacadeStore(s => s.reconnectGeneration);
+  const activeServerId = useServerStore(s => s.activeServerId);
+  const maxOffset = useChatMessageStore(s =>
+    sessionId ? (s.pagination[sessionId]?.maxOffset ?? 0) : 0
   );
-  const localSessionProjectId = useProjectStore((s) =>
-    sessionId ? s.sessions.find((session) => session.id === sessionId)?.projectId ?? null : null,
+  const localSessionProjectId = useProjectStore(s =>
+    sessionId ? (s.sessions.find(session => session.id === sessionId)?.projectId ?? null) : null
   );
-  const ownerBackendId = useOwnershipStore((s) => {
+  const ownerBackendId = useOwnershipStore(s => {
     if (!sessionId) return null;
     const sessionBackendId = s.sessionBackendIds[sessionId] ?? null;
     const canonicalSessionBackendId = sessionBackendId
@@ -70,25 +77,21 @@ export function useSessionRoute(
       return localBackendId ?? activeServerId ?? null;
     }
     return activeServerId ?? localBackendId ?? null;
-  }, [
-    activeServerId,
-    ownerBackendId,
-    sessionId,
-  ]);
+  }, [activeServerId, ownerBackendId, sessionId]);
 
   const backend = useMemo(
-    () => (backendId ? backends.find((item) => item.backendId === backendId) ?? null : null),
+    () => (backendId ? (backends.find(item => item.backendId === backendId) ?? null) : null),
     [backendId, backends]
   );
   const streamKey = useMemo(
     () => (backendId && sessionId ? getStreamKey(backendId, sessionId) : null),
     [backendId, sessionId]
   );
-  const stream = streamKey ? sessionStreams[streamKey] ?? null : null;
+  const stream = streamKey ? (sessionStreams[streamKey] ?? null) : null;
   const mobileBackendViewState = getMobileBackendViewState(
     backendId,
     facadeConnectionState,
-    backends,
+    backends
   );
   const catchUpSignatureRef = useRef<string | null>(null);
   const prevStreamStateRef = useRef<string | undefined>(undefined);
@@ -121,13 +124,8 @@ export function useSessionRoute(
   }, [backendId, backendOpenState, facade, maintainDesiredState]);
 
   useEffect(() => {
-    if (
-      !maintainDesiredState
-      || !facade
-      || !backendId
-      || !sessionId
-      || reconnectGeneration === 0
-    ) return;
+    if (!maintainDesiredState || !facade || !backendId || !sessionId || reconnectGeneration === 0)
+      return;
     if (lastRecoveryGenerationRef.current === reconnectGeneration) return;
     lastRecoveryGenerationRef.current = reconnectGeneration;
 
@@ -137,12 +135,7 @@ export function useSessionRoute(
   }, [backendId, facade, maintainDesiredState, reconnectGeneration, sessionId]);
 
   useEffect(() => {
-    if (
-      !maintainDesiredState
-      || !facade
-      || !backendId
-      || !sessionId
-    ) return;
+    if (!maintainDesiredState || !facade || !backendId || !sessionId) return;
 
     facade.openSessionStream(backendId, sessionId);
 
@@ -152,20 +145,23 @@ export function useSessionRoute(
   }, [backendId, facade, maintainDesiredState, sessionId]);
 
   useEffect(() => {
-    if (
-      !maintainDesiredState
-      || !facade
-      || !backendId
-      || !sessionId
-      || !streamKey
-    ) return;
+    if (!maintainDesiredState || !facade || !backendId || !sessionId || !streamKey) return;
     if (stream?.state !== 'open') return;
 
     const signature = `${streamKey}:${maxOffset}`;
     if (catchUpSignatureRef.current === signature) return;
     catchUpSignatureRef.current = signature;
     facade.catchUpContent(backendId, sessionId, maxOffset);
-  }, [backendId, facade, maintainDesiredState, maxOffset, reconnectGeneration, sessionId, stream?.state, streamKey]);
+  }, [
+    backendId,
+    facade,
+    maintainDesiredState,
+    maxOffset,
+    reconnectGeneration,
+    sessionId,
+    stream?.state,
+    streamKey,
+  ]);
 
   const backendReady = mobileBackendViewState === 'ready';
   const backendErrored = mobileBackendViewState === 'error';
@@ -180,17 +176,18 @@ export function useSessionRoute(
   let phase: SessionRoutePhase;
   if (!backendId) {
     phase = ownerBackendId ? 'offline' : 'resolving';
-  } else if (
-    backendErrored
-    || stream?.state === 'error'
-    || facadeConnectionState === 'error'
-  ) {
+  } else if (backendErrored || stream?.state === 'error' || facadeConnectionState === 'error') {
     phase = 'error';
   } else if (!transportReady && !backendReady) {
     phase = 'offline';
   } else if (!backendReady) {
     phase = 'opening_backend';
-  } else if (!stream || stream.state === 'closed' || stream.state === 'opening' || stream.state === 'closing') {
+  } else if (
+    !stream ||
+    stream.state === 'closed' ||
+    stream.state === 'opening' ||
+    stream.state === 'closing'
+  ) {
     phase = 'opening_stream';
   } else {
     phase = 'ready';
@@ -202,8 +199,6 @@ export function useSessionRoute(
     canSend,
     canLoadMessages,
     ownerResolved: !!ownerBackendId,
-    lastError: stream?.lastError
-      ?? backend?.lastError
-      ?? null,
+    lastError: stream?.lastError ?? backend?.lastError ?? null,
   };
 }

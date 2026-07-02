@@ -2,12 +2,12 @@
 
 export interface BackendServer {
   id: string;
-  name: string;           // "家里的 Mac"、"公司 Mac"
-  address: string;        // "192.168.1.100:3100" 或 "mac-home.local:3100"
+  name: string; // "家里的 Mac"、"公司 Mac"
+  address: string; // "192.168.1.100:3100" 或 "mac-home.local:3100"
   isDefault: boolean;
   lastConnected?: number; // 上次连接时间
   createdAt: number;
-  clientId?: string;      // Optional client ID for multi-backend direct connections
+  clientId?: string; // Optional client ID for multi-backend direct connections
   // Legacy fields (kept for backward compatibility with existing DB entries)
   connectionMode?: 'direct' | 'gateway';
 }
@@ -17,14 +17,13 @@ export interface BackendServer {
 /** Features a server can advertise. Frontend uses these to decide
  *  whether to call certain API endpoints or show certain UI. */
 export type ServerFeature =
-  | 'providerCapabilities'   // GET /api/providers/:id/capabilities, /type/:type/capabilities
-  | 'providerCommands'       // GET /api/providers/:id/commands, /type/:type/commands
-  | 'setDefaultProvider'     // POST /api/llm-profiles/:id/set-default
-  | 'search'                 // GET /api/sessions/search/*
-  | 'fileUpload'             // POST /api/files/upload
-  | 'remoteTerminal'         // WebSocket-based PTY terminal
-  | 'filePush'               // POST /api/files/push — server-to-client file delivery
-  ;
+  | 'providerCapabilities' // GET /api/providers/:id/capabilities, /type/:type/capabilities
+  | 'providerCommands' // GET /api/providers/:id/commands, /type/:type/commands
+  | 'setDefaultProvider' // POST /api/llm-profiles/:id/set-default
+  | 'search' // GET /api/sessions/search/*
+  | 'fileUpload' // POST /api/files/upload
+  | 'remoteTerminal' // WebSocket-based PTY terminal
+  | 'filePush'; // POST /api/files/push — server-to-client file delivery
 
 /** All features supported by the current server version. */
 export const ALL_SERVER_FEATURES: ServerFeature[] = [
@@ -53,8 +52,8 @@ export interface SdkVersionReport {
 
 export interface ServerInfo {
   version: string;
-  isLocalConnection: boolean;  // Whether the client is connecting from localhost (determined by server)
-  features?: ServerFeature[];  // Server-advertised feature flags
+  isLocalConnection: boolean; // Whether the client is connecting from localhost (determined by server)
+  features?: ServerFeature[]; // Server-advertised feature flags
   /** PEM-encoded RSA-OAEP public key for E2E credential encryption */
   publicKey?: string;
   /** SDK version check results (populated asynchronously after server startup) */
@@ -67,8 +66,8 @@ export interface GatewayBackendInfo {
   backendId: string;
   name: string;
   online: boolean;
-  isThisInstance?: boolean;  // true if instanceId matches current instance
-  isThisDevice?: boolean;    // true if deviceId matches current device
+  isThisInstance?: boolean; // true if instanceId matches current instance
+  isThisDevice?: boolean; // true if deviceId matches current device
   instanceId?: string;
   deviceId?: string;
   channel?: string;

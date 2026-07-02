@@ -94,7 +94,9 @@ test.describe('Archive/Restore', () => {
     await page.waitForTimeout(300);
 
     // Look for archive option
-    const archiveBtn = sessionItem.locator('button[title*="Archive"], button:has-text("Archive")').first();
+    const archiveBtn = sessionItem
+      .locator('button[title*="Archive"], button:has-text("Archive")')
+      .first();
     const hasArchive = await archiveBtn.isVisible({ timeout: 1000 }).catch(() => false);
 
     if (hasArchive) {
@@ -144,7 +146,9 @@ test.describe('Archive/Restore', () => {
       await page.waitForTimeout(500);
 
       // Look for restore button on archived session
-      const restoreBtn = page.locator('button[title*="Restore"], button:has-text("Restore")').first();
+      const restoreBtn = page
+        .locator('button[title*="Restore"], button:has-text("Restore")')
+        .first();
       const hasRestore = await restoreBtn.isVisible({ timeout: 2000 }).catch(() => false);
 
       if (hasRestore) {
@@ -195,7 +199,9 @@ test.describe('Archive/Restore', () => {
       await page.waitForTimeout(300);
 
       // Select all
-      const selectAll = page.locator('input[type="checkbox"][title*="Select all"], button:has-text("Select All")').first();
+      const selectAll = page
+        .locator('input[type="checkbox"][title*="Select all"], button:has-text("Select All")')
+        .first();
       if (await selectAll.isVisible({ timeout: 1000 }).catch(() => false)) {
         await selectAll.click();
         await page.waitForTimeout(300);
@@ -235,7 +241,9 @@ test.describe('Archive/Restore', () => {
         await page.waitForTimeout(300);
 
         // Confirm deletion
-        const confirmBtn = page.locator('button:has-text("Confirm"), button:has-text("Delete Permanently")').first();
+        const confirmBtn = page
+          .locator('button:has-text("Confirm"), button:has-text("Delete Permanently")')
+          .first();
         if (await confirmBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
           await confirmBtn.click();
           await page.waitForTimeout(500);
@@ -383,7 +391,9 @@ test.describe('Archive/Restore', () => {
         console.log('  ✓ Auto-archive settings found');
 
         // Check for configuration options
-        const autoArchiveToggle = page.locator('input[type="checkbox"][name*="auto-archive"]').first();
+        const autoArchiveToggle = page
+          .locator('input[type="checkbox"][name*="auto-archive"]')
+          .first();
         const hasToggle = await autoArchiveToggle.isVisible({ timeout: 1000 }).catch(() => false);
 
         if (hasToggle) {

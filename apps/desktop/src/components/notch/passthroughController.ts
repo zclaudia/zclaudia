@@ -23,7 +23,7 @@ const DEFAULT_RETRY_DELAY_MS = 500;
 
 export function createPassthroughController(
   apply: SetPassthrough,
-  options: PassthroughControllerOptions = {},
+  options: PassthroughControllerOptions = {}
 ): PassthroughController {
   let requested: boolean | null = null;
   let applied: boolean | null = null;
@@ -74,7 +74,7 @@ export function createPassthroughController(
     clearRetry();
     if (!inFlight) {
       inFlight = flush()
-        .catch((error) => {
+        .catch(error => {
           scheduleRetry();
           throw error;
         })

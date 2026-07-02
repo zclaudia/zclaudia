@@ -1,11 +1,7 @@
 // server/src/domains/meta-workflow/run-entities/subagent-run-entity.ts
 import { existsSync } from 'node:fs';
 import { join, isAbsolute } from 'node:path';
-import type {
-  RunEntity,
-  SynthesizedEntity,
-  RunEntityOutcome,
-} from '../phase-executor.js';
+import type { RunEntity, SynthesizedEntity, RunEntityOutcome } from '../phase-executor.js';
 import type { MetaSubagentTemplate } from '@zclaudia/shared/features/meta-workflow';
 import type { MetaSubagentTerminationCondition } from '@zclaudia/shared/features/meta-workflow';
 
@@ -32,7 +28,7 @@ export interface CreateSubagentRunEntityOptions {
 function checkTermination(
   tmpl: MetaSubagentTemplate,
   cwd: string,
-  output: string | undefined,
+  output: string | undefined
 ): boolean {
   const cond = tmpl.terminationCondition;
   if (cond.kind === 'output-file') {
@@ -89,7 +85,7 @@ export interface CreateRunVirtualClientFromAiRunPortOptions {
 const COMPLETED_KINDS = new Set(['run_completed', 'completed', 'final']);
 
 export function createRunVirtualClientFromAiRunPort(
-  opts: CreateRunVirtualClientFromAiRunPortOptions,
+  opts: CreateRunVirtualClientFromAiRunPortOptions
 ): RunVirtualClient {
   const timeoutMs = opts.timeoutMs ?? 5 * 60 * 1000;
   return async (args: VirtualClientArgs): Promise<VirtualClientResult> => {
@@ -109,7 +105,7 @@ export function createRunVirtualClientFromAiRunPort(
       return false;
     };
 
-    const completion = new Promise<boolean>((resolveComplete) => {
+    const completion = new Promise<boolean>(resolveComplete => {
       const finish = (ok: boolean) => {
         if (resolved) return;
         resolved = true;
@@ -118,20 +114,22 @@ export function createRunVirtualClientFromAiRunPort(
       };
       const timer = setTimeout(() => finish(false), timeoutMs);
 
-      opts.aiRunPort.startVirtualRun({
-        input: args.systemPrompt,
-        workingDirectory: args.cwd,
-        llmProfileId: opts.defaultLlmProfileId,
-        onMessage: (m) => {
-          if (m.content) collected += m.content;
-          // Phase E2a: check termination on every message, not just completion.
-          if (checkTermination()) {
-            finish(true);
-            return;
-          }
-          if (COMPLETED_KINDS.has(m.kind)) finish(true);
-        },
-      }).catch(() => finish(false));
+      opts.aiRunPort
+        .startVirtualRun({
+          input: args.systemPrompt,
+          workingDirectory: args.cwd,
+          llmProfileId: opts.defaultLlmProfileId,
+          onMessage: m => {
+            if (m.content) collected += m.content;
+            // Phase E2a: check termination on every message, not just completion.
+            if (checkTermination()) {
+              finish(true);
+              return;
+            }
+            if (COMPLETED_KINDS.has(m.kind)) finish(true);
+          },
+        })
+        .catch(() => finish(false));
     });
 
     const ok = await completion;

@@ -12,10 +12,10 @@ function isLocal(backend: BackendSnapshot, localBackendId: string | null): boole
  */
 export function selectOnlineBackends(
   backends: BackendSnapshot[],
-  localBackendId: string | null,
+  localBackendId: string | null
 ): BackendSnapshot[] {
   return backends
-    .filter((b) => b.online)
+    .filter(b => b.online)
     .slice()
     .sort((a, c) => {
       const aLocal = isLocal(a, localBackendId);
@@ -27,7 +27,7 @@ export function selectOnlineBackends(
 
 /** Reactive online-backends list for components. */
 export function useOnlineBackends(): BackendSnapshot[] {
-  const backends = useFacadeStore((s) => s.backends);
-  const localBackendId = useFacadeStore((s) => s.localBackendId);
+  const backends = useFacadeStore(s => s.backends);
+  const localBackendId = useFacadeStore(s => s.localBackendId);
   return selectOnlineBackends(backends, localBackendId);
 }

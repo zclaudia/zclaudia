@@ -4,7 +4,11 @@ import type {
   SupervisionTask,
 } from '@zclaudia/shared/features/supervision';
 import type { SupervisionTaskRepository } from './repositories/supervision-task.js';
-import type { SupervisionProjectPort, SupervisionSessionPort, SupervisionSessionModelPort } from './ports.js';
+import type {
+  SupervisionProjectPort,
+  SupervisionSessionPort,
+  SupervisionSessionModelPort,
+} from './ports.js';
 import type { SupervisionTaskEvent } from './task-events.js';
 import type { EventDispatcher } from './event-dispatcher.js';
 import { computeNextCronRun } from '../../utils/cron.js';
@@ -42,7 +46,7 @@ interface TaskAdminDeps {
     projectId: string,
     event: SupervisionLogEvent,
     detail?: Record<string, unknown>,
-    taskId?: string,
+    taskId?: string
   ) => void;
 }
 
@@ -62,7 +66,7 @@ export class TaskAdmin {
       if (currentCount >= project.agent.config.maxTotalTasks) {
         this.deps.pauseAgent(projectId, 'budget');
         throw new Error(
-          `Budget limit exceeded: maxTotalTasks=${project.agent.config.maxTotalTasks} reached. Agent paused.`,
+          `Budget limit exceeded: maxTotalTasks=${project.agent.config.maxTotalTasks} reached. Agent paused.`
         );
       }
     }
@@ -93,7 +97,7 @@ export class TaskAdmin {
         retryDelayMs: data.retryDelayMs,
       },
       trustLevel,
-      this.deps.taskRepo,
+      this.deps.taskRepo
     );
 
     const task = agg.snapshot;
@@ -112,11 +116,16 @@ export class TaskAdmin {
 
     // Side effects: broadcast + log
     this.deps.broadcastTaskUpdate(task.id, projectId);
-    this.deps.log(projectId, 'task_created', {
-      taskId: task.id,
-      title: task.title,
-      status: task.status,
-    }, task.id);
+    this.deps.log(
+      projectId,
+      'task_created',
+      {
+        taskId: task.id,
+        title: task.title,
+        status: task.status,
+      },
+      task.id
+    );
 
     // Dispatch domain events
     this.deps.dispatcher.dispatchAll(agg.releaseEvents());
@@ -147,7 +156,7 @@ export class TaskAdmin {
         taskId: task.id,
         parentSessionId: project?.agent?.mainSessionId,
         workingDirectory: project?.rootPath,
-      }),
+      })
     );
 
     // Aggregate command: transition to planning
@@ -155,10 +164,15 @@ export class TaskAdmin {
     agg.openSession(taskSession.id);
 
     // Side effect: log
-    this.deps.log(task.projectId, 'task_session_opened', {
-      taskId: task.id,
-      sessionId: taskSession.id,
-    }, task.id);
+    this.deps.log(
+      task.projectId,
+      'task_session_opened',
+      {
+        taskId: task.id,
+        sessionId: taskSession.id,
+      },
+      task.id
+    );
 
     // Dispatch domain events
     this.deps.dispatcher.dispatchAll(agg.releaseEvents());
@@ -177,11 +191,16 @@ export class TaskAdmin {
 
     // Side effects: broadcast + log
     this.deps.broadcastTaskUpdate(taskId, task.projectId);
-    this.deps.log(task.projectId, 'task_status_changed', {
-      taskId,
-      from: 'proposed',
-      to: 'pending',
-    }, taskId);
+    this.deps.log(
+      task.projectId,
+      'task_status_changed',
+      {
+        taskId,
+        from: 'proposed',
+        to: 'pending',
+      },
+      taskId
+    );
 
     // Dispatch domain events
     this.deps.dispatcher.dispatchAll(agg.releaseEvents());
@@ -200,11 +219,16 @@ export class TaskAdmin {
 
     // Side effects: broadcast + log
     this.deps.broadcastTaskUpdate(taskId, task.projectId);
-    this.deps.log(task.projectId, 'task_status_changed', {
-      taskId,
-      from: 'proposed',
-      to: 'cancelled',
-    }, taskId);
+    this.deps.log(
+      task.projectId,
+      'task_status_changed',
+      {
+        taskId,
+        from: 'proposed',
+        to: 'cancelled',
+      },
+      taskId
+    );
 
     // Dispatch domain events
     this.deps.dispatcher.dispatchAll(agg.releaseEvents());
@@ -214,10 +238,20 @@ export class TaskAdmin {
 
   updateTask(
     taskId: string,
-    data: Partial<Pick<SupervisionTask,
-      'title' | 'description' | 'priority' | 'dependencies' | 'dependencyMode' |
-      'acceptanceCriteria' | 'relevantDocIds' | 'scope' | 'taskSpecificContext'
-    >>,
+    data: Partial<
+      Pick<
+        SupervisionTask,
+        | 'title'
+        | 'description'
+        | 'priority'
+        | 'dependencies'
+        | 'dependencyMode'
+        | 'acceptanceCriteria'
+        | 'relevantDocIds'
+        | 'scope'
+        | 'taskSpecificContext'
+      >
+    >
   ): SupervisionTask | undefined {
     const task = this.deps.taskRepo.findById(taskId);
     if (!task) {

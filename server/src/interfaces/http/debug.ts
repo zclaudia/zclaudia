@@ -2,7 +2,10 @@ import { Router, type Request, type Response } from 'express';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import type Database from 'better-sqlite3';
 import { getCrashLogFilePath, readCrashReports } from '../../utils/crash-log.js';
-import type { ProcessSupervisor, ManagedProcessRecord } from '../../infra/services/process-supervisor.js';
+import type {
+  ProcessSupervisor,
+  ManagedProcessRecord,
+} from '../../infra/services/process-supervisor.js';
 import type { PermissionWorkflowResolver } from '../../domains/workflows/permission-workflow-resolver.js';
 
 export interface PermissionLogEntry {
@@ -18,7 +21,7 @@ export interface PermissionLogEntry {
 export function createDebugRoutes(
   processSupervisor?: ProcessSupervisor,
   db?: Database.Database,
-  permissionWorkflowResolver?: PermissionWorkflowResolver,
+  permissionWorkflowResolver?: PermissionWorkflowResolver
 ): Router {
   const router = Router();
 
@@ -31,9 +34,10 @@ export function createDebugRoutes(
       return;
     }
 
-    const projectId = typeof req.body?.projectId === 'string' && req.body.projectId.trim()
-      ? req.body.projectId.trim()
-      : undefined;
+    const projectId =
+      typeof req.body?.projectId === 'string' && req.body.projectId.trim()
+        ? req.body.projectId.trim()
+        : undefined;
 
     const resolved = permissionWorkflowResolver.resolve(projectId);
     res.json({
@@ -132,8 +136,14 @@ export function createDebugRoutes(
 
     const where = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
 
-    const total = (db.prepare(`SELECT COUNT(*) as total FROM permission_logs${where}`).get(...params) as { total: number }).total;
-    const entries = db.prepare(`SELECT * FROM permission_logs${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`).all(...params, limit, offset) as PermissionLogEntry[];
+    const total = (
+      db.prepare(`SELECT COUNT(*) as total FROM permission_logs${where}`).get(...params) as {
+        total: number;
+      }
+    ).total;
+    const entries = db
+      .prepare(`SELECT * FROM permission_logs${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`)
+      .all(...params, limit, offset) as PermissionLogEntry[];
 
     res.json({
       success: true,
@@ -164,7 +174,8 @@ export function createDebugRoutes(
       success: true,
       data: {
         decision: 'uncertain',
-        reasoning: 'AI Review is pending pi-agent runtime integration. The simulator will return real results once the runtime is wired.',
+        reasoning:
+          'AI Review is pending pi-agent runtime integration. The simulator will return real results once the runtime is wired.',
         confidence: 0,
         durationMs: 0,
         mode: mode ?? 'quick',

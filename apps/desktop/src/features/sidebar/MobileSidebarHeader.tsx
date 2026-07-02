@@ -26,12 +26,7 @@ export function MobileSidebarHeader({
           className="p-2 min-w-[44px] min-h-[44px] rounded-md hover:bg-secondary active:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center"
           title="Close menu"
         >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -54,7 +49,9 @@ export function MobileSidebarHeader({
               onClose?.();
             }}
             className={`relative h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-full transition-colors ${
-              isNotificationsOpen ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+              isNotificationsOpen
+                ? 'bg-secondary text-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
             }`}
             title="Notifications"
             aria-label="Open notifications"
@@ -68,7 +65,10 @@ export function MobileSidebarHeader({
           </button>
           {isDesktopTauri() && (
             <button
-              onClick={() => { void openWindowManagerWindow(); onClose?.(); }}
+              onClick={() => {
+                void openWindowManagerWindow();
+                onClose?.();
+              }}
               className="relative h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-full transition-colors text-muted-foreground hover:text-foreground hover:bg-secondary"
               title="Windows"
               aria-label="Open window manager"
@@ -82,23 +82,26 @@ export function MobileSidebarHeader({
               onClose?.();
             }}
             className={`relative h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-full transition-colors ${
-              isClaudiaExpanded ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+              isClaudiaExpanded
+                ? 'bg-secondary text-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
             }`}
             title="Open Claudia"
             aria-label="Open Claudia"
           >
             <BrandMark className="w-[18px] h-[18px] object-contain" />
-            {(hasClaudiaPermissionPending || hasClaudiaUnread || hasClaudiaRunning) && !isClaudiaExpanded && (
-              <span
-                className={`absolute top-1 right-1 w-2 h-2 rounded-full ${
-                  hasClaudiaPermissionPending
-                    ? 'bg-orange-500'
-                    : hasClaudiaUnread
-                    ? 'bg-primary animate-pulse'
-                    : 'bg-amber-500 animate-pulse'
-                }`}
-              />
-            )}
+            {(hasClaudiaPermissionPending || hasClaudiaUnread || hasClaudiaRunning) &&
+              !isClaudiaExpanded && (
+                <span
+                  className={`absolute top-1 right-1 w-2 h-2 rounded-full ${
+                    hasClaudiaPermissionPending
+                      ? 'bg-orange-500'
+                      : hasClaudiaUnread
+                        ? 'bg-primary animate-pulse'
+                        : 'bg-amber-500 animate-pulse'
+                  }`}
+                />
+              )}
           </button>
         </div>
       </div>

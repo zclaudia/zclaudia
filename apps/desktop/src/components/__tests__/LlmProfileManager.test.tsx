@@ -53,9 +53,9 @@ const { mockProviderMetaState, useLlmProfileMetaStoreMock } = vi.hoisted(() => {
   };
 
   const store = Object.assign(
-    vi.fn((selector?: (currentState: typeof state) => unknown) => (
+    vi.fn((selector?: (currentState: typeof state) => unknown) =>
       typeof selector === 'function' ? selector(state) : state
-    )),
+    ),
     {
       getState: () => state,
     }
@@ -69,21 +69,21 @@ const { mockProviderMetaState, useLlmProfileMetaStoreMock } = vi.hoisted(() => {
 
 // Mock the serverStore with selector support
 vi.mock('../../stores/serverStore', () => ({
-  useServerStore: vi.fn((selector?: (state: typeof mockServerState) => unknown) => (
+  useServerStore: vi.fn((selector?: (state: typeof mockServerState) => unknown) =>
     typeof selector === 'function' ? selector(mockServerState) : mockServerState
-  )),
+  ),
 }));
 
 vi.mock('../../stores/recoveryStore', () => ({
-  useRecoveryStore: vi.fn((selector?: (state: typeof mockRecoveryState) => unknown) => (
+  useRecoveryStore: vi.fn((selector?: (state: typeof mockRecoveryState) => unknown) =>
     typeof selector === 'function' ? selector(mockRecoveryState) : mockRecoveryState
-  )),
+  ),
 }));
 
 vi.mock('../../stores/facadeStore', () => ({
-  useFacadeStore: vi.fn((selector?: (state: typeof mockFacadeState) => unknown) => (
+  useFacadeStore: vi.fn((selector?: (state: typeof mockFacadeState) => unknown) =>
     typeof selector === 'function' ? selector(mockFacadeState) : mockFacadeState
-  )),
+  ),
 }));
 
 vi.mock('../../utils/platform', () => ({
@@ -162,8 +162,15 @@ describe('ProviderManager', () => {
     vi.mocked(api.setDefaultLlmProfile).mockResolvedValue(undefined);
     vi.mocked(api.fetchModelsForLlmProfilePreview).mockResolvedValue({ ok: true, models: [] });
     vi.mocked(api.probeLlmProfileModelPreview).mockResolvedValue({ ok: true, latencyMs: 0 });
-    vi.mocked(api.resolveContextWindowPreview).mockResolvedValue({ value: 200_000, source: 'pi_ai_registry' });
-    vi.mocked(fetchCodexModels).mockResolvedValue({ models: [], fetchedAt: Date.now(), source: 'fallback' });
+    vi.mocked(api.resolveContextWindowPreview).mockResolvedValue({
+      value: 200_000,
+      source: 'pi_ai_registry',
+    });
+    vi.mocked(fetchCodexModels).mockResolvedValue({
+      models: [],
+      fetchedAt: Date.now(),
+      source: 'fallback',
+    });
     vi.mocked(updateCodexLlmProfile).mockResolvedValue(mockProviders[0]);
     vi.mocked(startCodexOAuth).mockResolvedValue({
       sessionId: 'oauth-session',
@@ -186,9 +193,7 @@ describe('ProviderManager', () => {
   });
 
   it('returns null when not open', () => {
-    const { container } = render(
-      <ProviderManager isOpen={false} onClose={mockOnClose} />
-    );
+    const { container } = render(<ProviderManager isOpen={false} onClose={mockOnClose} />);
     expect(container.firstChild).toBeNull();
   });
 
@@ -438,7 +443,9 @@ describe('ProviderManager', () => {
       // new "at least one model" gate. Add a model row before Update so the
       // payload-shape assertion below actually reaches the API call.
       await clickAsync(screen.getByText('+ Add model'));
-      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), { target: { value: 'm1' } });
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), {
+        target: { value: 'm1' },
+      });
 
       await clickAsync(screen.getByText('Update'));
 
@@ -634,7 +641,9 @@ describe('ProviderManager', () => {
       // F2: Save is gated on having at least one model row; add one so we
       // actually reach the headers JSON validator we're asserting on.
       await clickAsync(screen.getByText('+ Add model'));
-      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), { target: { value: 'm1' } });
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), {
+        target: { value: 'm1' },
+      });
 
       await clickAsync(screen.getByText('Create'));
 
@@ -662,7 +671,9 @@ describe('ProviderManager', () => {
 
       // F2: declared model required for Save to reach the headers validator.
       await clickAsync(screen.getByText('+ Add model'));
-      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), { target: { value: 'm1' } });
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), {
+        target: { value: 'm1' },
+      });
 
       await clickAsync(screen.getByText('Create'));
 
@@ -719,11 +730,15 @@ describe('ProviderManager', () => {
       });
 
       await clickAsync(screen.getByText('Add Provider'));
-      fireEvent.change(screen.getByPlaceholderText(/Local ZClaudia Agent/), { target: { value: 'New' } });
+      fireEvent.change(screen.getByPlaceholderText(/Local ZClaudia Agent/), {
+        target: { value: 'New' },
+      });
       // F2: add a model row so Save passes the empty-models validation and we
       // actually reach the api.createLlmProfile call that we want to fail.
       await clickAsync(screen.getByText('+ Add model'));
-      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), { target: { value: 'm1' } });
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), {
+        target: { value: 'm1' },
+      });
       await clickAsync(screen.getByText('Create'));
 
       await waitFor(() => {
@@ -781,7 +796,7 @@ describe('ProviderManager', () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText(/used by 3 agent profiles\. Edit those agents/i),
+          screen.getByText(/used by 3 agent profiles\. Edit those agents/i)
         ).toBeInTheDocument();
       });
       consoleSpy.mockRestore();
@@ -825,7 +840,10 @@ describe('ProviderManager', () => {
       await clickAsync(screen.getAllByTitle('Set as default')[0]);
 
       await waitFor(() => {
-        expect(consoleSpy).toHaveBeenCalledWith('Failed to set default provider:', expect.any(Error));
+        expect(consoleSpy).toHaveBeenCalledWith(
+          'Failed to set default provider:',
+          expect.any(Error)
+        );
       });
       consoleSpy.mockRestore();
     });
@@ -891,7 +909,7 @@ describe('ProviderManager', () => {
       await waitForFast(() => {
         expect(api.updateLlmProfile).toHaveBeenCalledWith(
           'p1',
-          expect.objectContaining({ name: 'After Save' }),
+          expect.objectContaining({ name: 'After Save' })
         );
       });
 
@@ -1016,7 +1034,7 @@ describe('ProviderManager', () => {
             requestHeaders: null,
             models: [],
             cacheRetention: null,
-          }),
+          })
         );
       });
     });
@@ -1034,7 +1052,10 @@ describe('ProviderManager', () => {
       await clickAsync(screen.getByRole('button', { name: 'Sign in with ChatGPT' }));
 
       await waitFor(() => {
-        expect(startCodexOAuth).toHaveBeenCalledWith('codex1', expect.stringMatching(/^(browser|device_code)$/));
+        expect(startCodexOAuth).toHaveBeenCalledWith(
+          'codex1',
+          expect.stringMatching(/^(browser|device_code)$/)
+        );
       });
       expect(api.updateLlmProfile).not.toHaveBeenCalled();
       expect(screen.getByText('ABCD-1234')).toBeInTheDocument();
@@ -1064,7 +1085,9 @@ describe('ProviderManager', () => {
 
       await clickAsync(screen.getByText('Provider Type').nextElementSibling as Element);
       await clickAsync(screen.getByText('OpenAI Codex (ChatGPT Plus/Pro)'));
-      expect(screen.queryByText('Save the profile first, then sign in with ChatGPT to authenticate.')).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('Save the profile first, then sign in with ChatGPT to authenticate.')
+      ).not.toBeInTheDocument();
 
       await clickAsync(screen.getByRole('button', { name: 'Sign in with ChatGPT' }));
 
@@ -1078,7 +1101,7 @@ describe('ProviderManager', () => {
             compat: null,
             requestHeaders: null,
             models: [],
-          }),
+          })
         );
       });
       await waitFor(() => {
@@ -1096,10 +1119,14 @@ describe('ProviderManager', () => {
       });
 
       await clickAsync(screen.getByText('Add Provider'));
-      fireEvent.change(screen.getByPlaceholderText(/Local ZClaudia Agent/), { target: { value: 'New' } });
+      fireEvent.change(screen.getByPlaceholderText(/Local ZClaudia Agent/), {
+        target: { value: 'New' },
+      });
       // F2: a declared model row is required for Save.
       await clickAsync(screen.getByText('+ Add model'));
-      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), { target: { value: 'm1' } });
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), {
+        target: { value: 'm1' },
+      });
 
       const checkbox = screen.getByLabelText('Set as default runtime');
       await clickAsync(checkbox);
@@ -1123,11 +1150,17 @@ describe('ProviderManager', () => {
       });
 
       await clickAsync(screen.getByText('Add Provider'));
-      fireEvent.change(screen.getByPlaceholderText(/Local ZClaudia Agent/), { target: { value: 'Custom' } });
-      fireEvent.change(screen.getByPlaceholderText(/api\.example\.com/), { target: { value: 'http://127.0.0.1:3000/v1' } });
+      fireEvent.change(screen.getByPlaceholderText(/Local ZClaudia Agent/), {
+        target: { value: 'Custom' },
+      });
+      fireEvent.change(screen.getByPlaceholderText(/api\.example\.com/), {
+        target: { value: 'http://127.0.0.1:3000/v1' },
+      });
       // F2: declared model is required.
       await clickAsync(screen.getByText('+ Add model'));
-      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), { target: { value: 'm1' } });
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), {
+        target: { value: 'm1' },
+      });
 
       await clickAsync(screen.getByText('Create'));
 
@@ -1218,7 +1251,9 @@ describe('ProviderManager', () => {
       // F2: still need a model row to get past the empty-models gate and
       // actually trigger the compat-JSON validation we're asserting on.
       await clickAsync(screen.getByText('+ Add model'));
-      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), { target: { value: 'm1' } });
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), {
+        target: { value: 'm1' },
+      });
 
       await clickAsync(screen.getByText('Create'));
 
@@ -1378,7 +1413,10 @@ describe('ProviderManager', () => {
       // F2: probe now hits the preview endpoint with the current form draft,
       // so we no longer need a saved fixture model row — we can type one in
       // and click Test immediately.
-      vi.mocked(api.probeLlmProfileModelPreview).mockResolvedValueOnce({ ok: true, latencyMs: 423 });
+      vi.mocked(api.probeLlmProfileModelPreview).mockResolvedValueOnce({
+        ok: true,
+        latencyMs: 423,
+      });
 
       await renderProviderManager({ onClose: mockOnClose });
 
@@ -1401,7 +1439,7 @@ describe('ProviderManager', () => {
       // plus the modelId — assert at least the providerType + modelId pair.
       expect(api.probeLlmProfileModelPreview).toHaveBeenCalledWith(
         expect.objectContaining({ providerType: 'anthropic' }),
-        'opus',
+        'opus'
       );
     });
 
@@ -1432,7 +1470,7 @@ describe('ProviderManager', () => {
 
       await waitFor(() => {
         const idInputs = screen.getAllByPlaceholderText(/model id \(e\.g\./);
-        const values = idInputs.map((el) => (el as HTMLInputElement).value);
+        const values = idInputs.map(el => (el as HTMLInputElement).value);
         expect(values).toContain('claude-opus-4-7');
         expect(values).toContain('claude-sonnet-4-6');
       });
@@ -1491,7 +1529,9 @@ describe('ProviderManager', () => {
       });
 
       await clickAsync(screen.getByText('Add Provider'));
-      fireEvent.change(screen.getByPlaceholderText(/Local ZClaudia Agent/), { target: { value: 'No Models' } });
+      fireEvent.change(screen.getByPlaceholderText(/Local ZClaudia Agent/), {
+        target: { value: 'No Models' },
+      });
 
       const createBtn = screen.getByText('Create');
       expect(createBtn).toBeDisabled();
@@ -1530,9 +1570,7 @@ describe('ProviderManager', () => {
       // validator scans rows in order and breaks at the first one with a
       // duplicate marker — row 0 sees row 1 as the dup, so it reports row 1.
       await waitFor(() => {
-        expect(
-          screen.getByText(/Fix model row 1 before saving/i)
-        ).toBeInTheDocument();
+        expect(screen.getByText(/Fix model row 1 before saving/i)).toBeInTheDocument();
       });
       expect(alertSpy).not.toHaveBeenCalled();
       expect(api.updateLlmProfile).not.toHaveBeenCalled();
@@ -1558,7 +1596,9 @@ describe('ProviderManager', () => {
 
       // Add a model so the save gate passes
       await clickAsync(screen.getByText('+ Add model'));
-      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), { target: { value: 'm1' } });
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), {
+        target: { value: 'm1' },
+      });
 
       // Change the cache retention select to 'long'
       const cacheSelect = screen.getByLabelText('Prompt cache retention');
@@ -1591,7 +1631,9 @@ describe('ProviderManager', () => {
 
       // Add a model so the save gate passes
       await clickAsync(screen.getByText('+ Add model'));
-      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), { target: { value: 'm1' } });
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), {
+        target: { value: 'm1' },
+      });
 
       // Expand Advanced and check the cache markers checkbox
       await clickAsync(screen.getByText(/Advanced \(compat\)/));
@@ -1687,9 +1729,7 @@ describe('ProviderManager', () => {
         target: { value: 'claude-opus-4-7' },
       });
 
-      const hint = await waitFor(() =>
-        screen.getByText(/Using 200,000 from registry/),
-      );
+      const hint = await waitFor(() => screen.getByText(/Using 200,000 from registry/));
       // No "(provider)" parenthetical when matchedProvider is absent.
       expect(hint.textContent).not.toMatch(/\(/);
       // F4: never expose "pi-ai" wording to the user.
@@ -1718,7 +1758,7 @@ describe('ProviderManager', () => {
       });
 
       const hint = await waitFor(() =>
-        screen.getByText(/Using 131,072 from registry \(deepseek\)/),
+        screen.getByText(/Using 131,072 from registry \(deepseek\)/)
       );
       expect(hint.textContent).not.toMatch(/pi-ai/i);
     });
@@ -1744,7 +1784,9 @@ describe('ProviderManager', () => {
       });
 
       const warning = await waitFor(() =>
-        screen.getByText(/Using 128,000 default for openai-compat\. No registry match for "mystery-openai-compat-model"/i),
+        screen.getByText(
+          /Using 128,000 default for openai-compat\. No registry match for "mystery-openai-compat-model"/i
+        )
       );
       const wrapper = warning.closest('p');
       expect(wrapper?.className).toMatch(/text-amber-600/);
@@ -1801,7 +1843,7 @@ describe('ProviderManager', () => {
 
       // Give the debounce window time to elapse so the assertion isn't
       // a no-op against a still-pending request that hasn't fired yet.
-      await new Promise((r) => setTimeout(r, 350));
+      await new Promise(r => setTimeout(r, 350));
 
       expect(screen.queryByText(/Using .* from registry/)).not.toBeInTheDocument();
       expect(screen.queryByText(/Falls back to \d/)).not.toBeInTheDocument();
@@ -1818,14 +1860,14 @@ describe('ProviderManager', () => {
 
       // Wait past the debounce window — the empty modelId must keep the
       // hint silent and the API mock untouched.
-      await new Promise((r) => setTimeout(r, 350));
+      await new Promise(r => setTimeout(r, 350));
 
       expect(api.resolveContextWindowPreview).not.toHaveBeenCalled();
       expect(screen.queryByText(/Using \d/)).not.toBeInTheDocument();
       expect(screen.queryByText(/Falls back to \d/)).not.toBeInTheDocument();
     });
 
-    it('strips the row\'s own contextWindow from models[] before calling (self-edit guard)', async () => {
+    it("strips the row's own contextWindow from models[] before calling (self-edit guard)", async () => {
       // Simulates the user typing a contextWindow then clearing it — the
       // entry still exists in formModels with contextWindow=undefined (which
       // draftsToEntries already drops), but importantly the resolve-preview
@@ -1855,7 +1897,7 @@ describe('ProviderManager', () => {
       // Find the entry for this modelId in the request payload — it must not
       // carry a contextWindow (or carry undefined), regardless of what other
       // rows look like.
-      const ourEntry = lastCall?.models?.find((m) => m.modelId === 'claude-opus-4-7');
+      const ourEntry = lastCall?.models?.find(m => m.modelId === 'claude-opus-4-7');
       // ourEntry may be undefined (row hasn't been serialized into draftsToEntries
       // because no contextWindow override was set) — either way, it must not
       // declare a contextWindow.

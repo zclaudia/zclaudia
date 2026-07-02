@@ -9,26 +9,36 @@ import { __resetSandboxCacheForTests } from '../sandbox.js';
 
 describe('detectSandboxFsDenial', () => {
   it('returns undefined when the command was not sandboxed', () => {
-    expect(detectSandboxFsDenial('/bin/bash: /tmp/x: Operation not permitted', false, false)).toBeUndefined();
+    expect(
+      detectSandboxFsDenial('/bin/bash: /tmp/x: Operation not permitted', false, false)
+    ).toBeUndefined();
   });
 
   it('returns undefined when no denial signature is present', () => {
-    expect(detectSandboxFsDenial('rm: cannot remove: No such file or directory', true, false)).toBeUndefined();
+    expect(
+      detectSandboxFsDenial('rm: cannot remove: No such file or directory', true, false)
+    ).toBeUndefined();
   });
 
   it('classifies EPERM under a writable sandbox as a write-outside-workspace denial', () => {
-    expect(detectSandboxFsDenial('/bin/bash: /tmp/x: Operation not permitted', true, false))
-      .toBe('write_outside_workspace');
+    expect(detectSandboxFsDenial('/bin/bash: /tmp/x: Operation not permitted', true, false)).toBe(
+      'write_outside_workspace'
+    );
   });
 
   it('classifies EPERM under a read-only sandbox as a read-only denial', () => {
-    expect(detectSandboxFsDenial('/bin/bash: /tmp/x: Operation not permitted', true, true))
-      .toBe('read_only');
+    expect(detectSandboxFsDenial('/bin/bash: /tmp/x: Operation not permitted', true, true)).toBe(
+      'read_only'
+    );
   });
 
   it('classifies EROFS as read-only regardless of mode', () => {
-    expect(detectSandboxFsDenial('touch: foo: Read-only file system', true, false)).toBe('read_only');
-    expect(detectSandboxFsDenial('touch: foo: Read-only file system', true, true)).toBe('read_only');
+    expect(detectSandboxFsDenial('touch: foo: Read-only file system', true, false)).toBe(
+      'read_only'
+    );
+    expect(detectSandboxFsDenial('touch: foo: Read-only file system', true, true)).toBe(
+      'read_only'
+    );
   });
 });
 
@@ -190,7 +200,9 @@ describe('Bash bridge tool module', () => {
     await writeFile(filePath, 'export const value = 1;\n');
     const bash = createBashBridgeTool(dir) as any;
 
-    const result = await bash.execute('bash-write-bypass', { command: 'echo "export const value = 2;" > src/app.ts' });
+    const result = await bash.execute('bash-write-bypass', {
+      command: 'echo "export const value = 2;" > src/app.ts',
+    });
     const onDisk = await readFile(filePath, 'utf8');
 
     await rm(dir, { recursive: true, force: true });
@@ -223,7 +235,7 @@ describe('Bash bridge tool module', () => {
     expect(result.truncated).toBe(true);
     expect(result.fullOutput.length).toBeLessThanOrEqual(20_000);
     expect(fullOutputPath.startsWith(path.join(dataDir, 'bash-logs'))).toBe(true);
-    expect((logStat.mode & 0o777)).toBe(0o600);
+    expect(logStat.mode & 0o777).toBe(0o600);
     expect(log.length).toBe(200000);
   });
 });

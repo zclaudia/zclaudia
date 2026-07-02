@@ -3,7 +3,7 @@ import type { SupervisionTask } from '@zclaudia/shared/features/supervision';
 export function buildTaskPrompt(
   task: SupervisionTask,
   projectName: string,
-  contextInjection: string,
+  contextInjection: string
 ): string {
   let prompt = `[SUPERVISED TASK]
 Project: ${projectName}

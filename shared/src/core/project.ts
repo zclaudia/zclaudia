@@ -14,12 +14,12 @@ export interface Project {
   rootPath?: string;
   systemPrompt?: string;
   permissionPolicy?: PermissionPolicy;
-  agentPermissionOverride?: Partial<UnifiedPermissionPolicy>;  // Project-level override of global agent policy
+  agentPermissionOverride?: Partial<UnifiedPermissionPolicy>; // Project-level override of global agent policy
   /** Project-level hooks; run IN ADDITION to global hooks (additive, not replace). */
   hooksOverride?: UserHookDefinition[];
-  isInternal?: boolean;  // Internal projects (e.g. Agent Assistant) are hidden from user-facing lists
-  reviewLlmProfileId?: string;  // LlmProfile used for Local PR reviews
-  permissionWorkflowOverrideId?: string;  // Project-level permission escalation workflow override
+  isInternal?: boolean; // Internal projects (e.g. Agent Assistant) are hidden from user-facing lists
+  reviewLlmProfileId?: string; // LlmProfile used for Local PR reviews
+  permissionWorkflowOverrideId?: string; // Project-level permission escalation workflow override
   sortOrder?: number;
   createdAt: number;
   updatedAt: number;
@@ -46,11 +46,11 @@ export interface WorktreeConfig {
 }
 
 export interface GitWorktree {
-  path: string;      // 绝对路径
-  branch: string;    // 分支名
-  isMain: boolean;   // 是否是主 worktree
-  commit?: string;   // HEAD commit hash（短）
-  managedBy?: 'supervisor';  // supervisor v2 worktree pool 管理的 slot
+  path: string; // 绝对路径
+  branch: string; // 分支名
+  isMain: boolean; // 是否是主 worktree
+  commit?: string; // HEAD commit hash（短）
+  managedBy?: 'supervisor'; // supervisor v2 worktree pool 管理的 slot
 }
 
 export interface GitWorktreeStatus {

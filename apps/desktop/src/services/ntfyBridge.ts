@@ -25,7 +25,17 @@ export function isNtfyBridgeSupported(): boolean {
   return isAndroid();
 }
 
-export async function registerNtfySubscription(config: Pick<NotificationConfig, 'ntfyUrl' | 'ntfyTopic' | 'ntfyAuthMode' | 'ntfySubscribeToken' | 'ntfyUsername' | 'ntfyPassword'>): Promise<void> {
+export async function registerNtfySubscription(
+  config: Pick<
+    NotificationConfig,
+    | 'ntfyUrl'
+    | 'ntfyTopic'
+    | 'ntfyAuthMode'
+    | 'ntfySubscribeToken'
+    | 'ntfyUsername'
+    | 'ntfyPassword'
+  >
+): Promise<void> {
   if (!isNtfyBridgeSupported()) return;
 
   const packageId = await getCurrentPackageId();
@@ -134,7 +144,7 @@ export async function getNtfyBridgeStatus(): Promise<NtfyBridgeStatusResponse> {
     if (!response.ok) {
       throw new Error(`status failed: ${response.status}`);
     }
-    return await response.json() as NtfyBridgeStatusResponse;
+    return (await response.json()) as NtfyBridgeStatusResponse;
   } catch {
     return { ok: false, subscriptions: {} };
   }

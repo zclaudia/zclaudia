@@ -31,7 +31,13 @@ describe('ToolLauncherMenu', () => {
     usePluginStore.setState({
       panels: [
         { id: 'terminal', pluginId: 'x', type: 'panel', label: 'Terminal' },
-        { id: 'notifications', pluginId: 'x', type: 'panel', label: 'Notifications', hideFromLauncher: true },
+        {
+          id: 'notifications',
+          pluginId: 'x',
+          type: 'panel',
+          label: 'Notifications',
+          hideFromLauncher: true,
+        },
       ] as any,
       disabledBuiltinPanels: [],
     });

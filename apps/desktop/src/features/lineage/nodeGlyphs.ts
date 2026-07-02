@@ -1,7 +1,11 @@
 import type { GraphNode } from '@zclaudia/shared';
 
 export type GlyphShape = 'dot' | 'square' | 'branch' | 'tag' | 'leaf' | 'tip';
-export interface Glyph { shape: GlyphShape; ring: boolean; dimmed: boolean; }
+export interface Glyph {
+  shape: GlyphShape;
+  ring: boolean;
+  dimmed: boolean;
+}
 
 /** Priority order resolves co-occurring roles to a single primary shape. */
 export function glyphFor(n: GraphNode): Glyph {
@@ -26,5 +30,7 @@ export const LANE_PALETTE = [
 ] as const;
 
 export function laneColor(laneOrder: number): string {
-  return LANE_PALETTE[((laneOrder % LANE_PALETTE.length) + LANE_PALETTE.length) % LANE_PALETTE.length];
+  return LANE_PALETTE[
+    ((laneOrder % LANE_PALETTE.length) + LANE_PALETTE.length) % LANE_PALETTE.length
+  ];
 }

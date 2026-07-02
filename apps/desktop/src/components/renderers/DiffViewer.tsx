@@ -63,18 +63,18 @@ export function computeDiff(oldStr: string, newStr: string): DiffLine[] {
 }
 
 export function parseUnifiedDiff(diff: string): UnifiedDiffLine[] {
-  return diff.split('\n').map((line) => {
+  return diff.split('\n').map(line => {
     if (line.startsWith('@@')) return { type: 'hunk', content: line };
     if (line.startsWith('--- ') || line.startsWith('+++ ')) return { type: 'file', content: line };
     if (line.startsWith('+')) return { type: 'add', content: line };
     if (line.startsWith('-')) return { type: 'remove', content: line };
     if (
-      line.startsWith('diff --git ')
-      || line.startsWith('index ')
-      || line.startsWith('new file mode ')
-      || line.startsWith('deleted file mode ')
-      || line.startsWith('rename from ')
-      || line.startsWith('rename to ')
+      line.startsWith('diff --git ') ||
+      line.startsWith('index ') ||
+      line.startsWith('new file mode ') ||
+      line.startsWith('deleted file mode ') ||
+      line.startsWith('rename from ') ||
+      line.startsWith('rename to ')
     ) {
       return { type: 'meta', content: line };
     }
@@ -89,7 +89,8 @@ function basename(path: string | undefined): string {
 
 function extractUnifiedDiffPath(diff: string): string | undefined {
   const lines = diff.split('\n');
-  const target = lines.find((line) => line.startsWith('+++ ')) || lines.find((line) => line.startsWith('--- '));
+  const target =
+    lines.find(line => line.startsWith('+++ ')) || lines.find(line => line.startsWith('--- '));
   if (!target) return undefined;
   return target
     .replace(/^\+\+\+\s+|^---\s+/, '')
@@ -114,12 +115,9 @@ function getUnifiedDiffLineClass(type: UnifiedDiffLine['type']): string {
 }
 
 export function UnifiedDiffViewer({ diff, filePath }: UnifiedDiffViewerProps) {
-  const diffLines = useMemo(
-    () => parseUnifiedDiff(diff),
-    [diff]
-  );
-  const addCount = diffLines.filter((l) => l.type === 'add').length;
-  const removeCount = diffLines.filter((l) => l.type === 'remove').length;
+  const diffLines = useMemo(() => parseUnifiedDiff(diff), [diff]);
+  const addCount = diffLines.filter(l => l.type === 'add').length;
+  const removeCount = diffLines.filter(l => l.type === 'remove').length;
   const displayPath = filePath || extractUnifiedDiffPath(diff);
 
   return (
@@ -132,9 +130,7 @@ export function UnifiedDiffViewer({ diff, filePath }: UnifiedDiffViewerProps) {
           {removeCount > 0 && (
             <span className="text-red-500 dark:text-red-400">-{removeCount}</span>
           )}
-          {addCount > 0 && (
-            <span className="text-green-500 dark:text-green-400">+{addCount}</span>
-          )}
+          {addCount > 0 && <span className="text-green-500 dark:text-green-400">+{addCount}</span>}
         </span>
       </div>
 
@@ -152,13 +148,10 @@ export function UnifiedDiffViewer({ diff, filePath }: UnifiedDiffViewerProps) {
 }
 
 export function DiffViewer({ oldString, newString, filePath }: DiffViewerProps) {
-  const diffLines = useMemo(
-    () => computeDiff(oldString, newString),
-    [oldString, newString]
-  );
+  const diffLines = useMemo(() => computeDiff(oldString, newString), [oldString, newString]);
 
-  const addCount = diffLines.filter((l) => l.type === 'add').length;
-  const removeCount = diffLines.filter((l) => l.type === 'remove').length;
+  const addCount = diffLines.filter(l => l.type === 'add').length;
+  const removeCount = diffLines.filter(l => l.type === 'remove').length;
 
   return (
     <div className="rounded-lg overflow-hidden border border-border">
@@ -171,9 +164,7 @@ export function DiffViewer({ oldString, newString, filePath }: DiffViewerProps) 
           {removeCount > 0 && (
             <span className="text-red-500 dark:text-red-400">-{removeCount}</span>
           )}
-          {addCount > 0 && (
-            <span className="text-green-500 dark:text-green-400">+{addCount}</span>
-          )}
+          {addCount > 0 && <span className="text-green-500 dark:text-green-400">+{addCount}</span>}
         </span>
       </div>
 

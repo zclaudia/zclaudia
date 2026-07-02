@@ -34,13 +34,15 @@ describe('run-terminal-notifications', () => {
       notificationsService: { postItem } as any,
     });
 
-    expect(postItem).toHaveBeenCalledWith(expect.objectContaining({
-      sessionId: 'session-1',
-      projectId: 'project-1',
-      title: 'Run completed: Build API',
-      summary: 'Session response is ready.',
-      status: 'completed',
-    }));
+    expect(postItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 'session-1',
+        projectId: 'project-1',
+        title: 'Run completed: Build API',
+        summary: 'Session response is ready.',
+        status: 'completed',
+      })
+    );
   });
 
   it('falls back to push sender when feed service is unavailable', () => {
@@ -57,11 +59,13 @@ describe('run-terminal-notifications', () => {
       notificationSender: { notify },
     });
 
-    expect(notify).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'run_failed',
-      title: 'Run failed',
-      body: expect.stringContaining('provider exploded'),
-    }));
+    expect(notify).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'run_failed',
+        title: 'Run failed',
+        body: expect.stringContaining('provider exploded'),
+      })
+    );
   });
 
   it('skips duplicate completed feed notifications within the dedupe window', () => {

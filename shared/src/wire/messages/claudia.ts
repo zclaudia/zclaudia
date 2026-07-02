@@ -1,13 +1,19 @@
 // Claudia Task protocol messages
 
-export type ClaudiaTaskStatus = 'queued' | 'running' | 'waiting' | 'completed' | 'failed' | 'cancelled';
+export type ClaudiaTaskStatus =
+  | 'queued'
+  | 'running'
+  | 'waiting'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
 export type BranchAction = 'reused' | 'forked' | 'created';
 
 // Client → Server: submit a new Claudia task
 export interface ClaudiaTaskSubmitMessage {
   type: 'claudia_task_submit';
   clientRequestId: string;
-  sessionId: string;     // Claudia hub session
+  sessionId: string; // Claudia hub session
   input: string;
   projectId: string;
   llmProfileId?: string;
@@ -19,9 +25,9 @@ export interface ClaudiaTaskSubmitMessage {
 export interface ClaudiaTaskContinueMessage {
   type: 'claudia_task_continue';
   clientRequestId: string;
-  taskId: string;          // Original task ID
-  sessionId: string;       // Original task's backend session
-  input: string;           // Follow-up instruction
+  taskId: string; // Original task ID
+  sessionId: string; // Original task's backend session
+  input: string; // Follow-up instruction
 }
 
 // Client → Server: cancel an existing Claudia task
@@ -36,12 +42,12 @@ export interface ClaudiaTaskCreatedMessage {
   clientRequestId: string;
   taskId: string;
   projectId: string;
-  sessionId: string;       // Backend task session
-  branchId: string;        // Branch this task belongs to
+  sessionId: string; // Backend task session
+  branchId: string; // Branch this task belongs to
   branchAction: BranchAction; // Whether branch was reused/forked/created
   title: string;
   status: 'queued';
-  contextReset?: boolean;  // True if session resume failed (context lost)
+  contextReset?: boolean; // True if session resume failed (context lost)
 }
 
 export interface ClaudiaTaskSnapshotTask {
@@ -88,8 +94,8 @@ export interface ClaudiaTaskUpdateMessage {
   updatedAt?: number;
   summary?: string;
   error?: string;
-  responseText?: string;   // Full assistant response (on completion)
-  toolCount?: number;      // Number of tool calls made
+  responseText?: string; // Full assistant response (on completion)
+  toolCount?: number; // Number of tool calls made
 }
 
 // Server → Client: streaming text for a running task
@@ -108,7 +114,7 @@ export interface ClaudiaMessageMessage {
   contextProjectIds?: string[];
   primaryContextProjectId?: string;
   llmProfileId?: string;
-  activeBranchId?: string;  // Current active branch for reuse/fork decision
+  activeBranchId?: string; // Current active branch for reuse/fork decision
   forceNewBranch?: boolean; // Force create new branch (new conversation)
 }
 
@@ -144,3 +150,19 @@ export interface ClaudiaMessagePromotedMessage {
   branchAction: BranchAction;
   contextReset?: boolean;
 }
+
+export type ClaudiaClientMessage =
+  | ClaudiaTaskSubmitMessage
+  | ClaudiaTaskContinueMessage
+  | ClaudiaTaskCancelMessage
+  | ClaudiaMessageMessage;
+
+export type ClaudiaServerMessage =
+  | ClaudiaTaskCreatedMessage
+  | ClaudiaTaskSnapshotMessage
+  | ClaudiaTaskUpdateMessage
+  | ClaudiaTaskDeltaMessage
+  | ClaudiaMessageDeltaMessage
+  | ClaudiaMessageCompletedMessage
+  | ClaudiaMessageFailedMessage
+  | ClaudiaMessagePromotedMessage;

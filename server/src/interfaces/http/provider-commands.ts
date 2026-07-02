@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { type Router, type Request, type Response } from 'express';
 import type Database from 'better-sqlite3';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import type { SlashCommand } from '@zclaudia/shared/features/commands';
@@ -9,7 +9,7 @@ import { commandRegistry } from '../../application/commands/registry.js';
 
 function deduplicateCommands(commands: SlashCommand[]): SlashCommand[] {
   const seen = new Set<string>();
-  return commands.filter((cmd) => {
+  return commands.filter(cmd => {
     if (seen.has(cmd.command)) return false;
     seen.add(cmd.command);
     return true;
@@ -30,8 +30,9 @@ async function getZClaudiaCommands(projectRoot?: string): Promise<SlashCommand[]
 
 export function mountCommandRoutes(router: Router, db: Database.Database): void {
   router.get('/:id/commands', async (req: Request, res: Response) => {
-    const row = db.prepare('SELECT id FROM llm_profiles WHERE id = ?')
-      .get(req.params.id) as { id: string } | undefined;
+    const row = db.prepare('SELECT id FROM llm_profiles WHERE id = ?').get(req.params.id) as
+      | { id: string }
+      | undefined;
 
     if (!row) {
       res.status(404).json({
@@ -42,7 +43,9 @@ export function mountCommandRoutes(router: Router, db: Database.Database): void 
     }
 
     const projectRoot = req.query.projectRoot as string | undefined;
-    res.json({ success: true, data: await getZClaudiaCommands(projectRoot) } as ApiResponse<SlashCommand[]>);
+    res.json({ success: true, data: await getZClaudiaCommands(projectRoot) } as ApiResponse<
+      SlashCommand[]
+    >);
   });
 
   router.get('/type/:type/commands', async (req: Request, res: Response) => {
@@ -55,6 +58,8 @@ export function mountCommandRoutes(router: Router, db: Database.Database): void 
     }
 
     const projectRoot = req.query.projectRoot as string | undefined;
-    res.json({ success: true, data: await getZClaudiaCommands(projectRoot) } as ApiResponse<SlashCommand[]>);
+    res.json({ success: true, data: await getZClaudiaCommands(projectRoot) } as ApiResponse<
+      SlashCommand[]
+    >);
   });
 }

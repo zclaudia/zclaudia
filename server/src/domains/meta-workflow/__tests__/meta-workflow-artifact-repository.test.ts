@@ -12,11 +12,11 @@ function freshDb(): Database.Database {
   db.prepare(`INSERT INTO projects (id) VALUES (?)`).run('proj-1');
   db.prepare(
     `INSERT INTO meta_workflow_runs (id, project_id, title, status, reject_count, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
   ).run('run-1', 'proj-1', 't', 'executing', 0, 0, 0);
   db.prepare(
     `INSERT INTO meta_workflow_phases (id, run_id, phase_id, phase_type, status, execute_entity, attempt, max_retries, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run('phase-rec-1', 'run-1', 'p1', 'code-implement', 'done', 'workflow', 0, 3, 0);
   return db;
 }
@@ -50,7 +50,7 @@ describe('MetaWorkflowArtifactRepository', () => {
     const now = Date.now();
     repo.create({ phaseRecordId: 'phase-rec-1', version: 1, status: 'active', createdAt: now });
     expect(() =>
-      repo.create({ phaseRecordId: 'phase-rec-1', version: 1, status: 'active', createdAt: now }),
+      repo.create({ phaseRecordId: 'phase-rec-1', version: 1, status: 'active', createdAt: now })
     ).toThrow(/UNIQUE/);
   });
 
@@ -66,6 +66,6 @@ describe('MetaWorkflowArtifactRepository', () => {
     repo.create({ phaseRecordId: 'phase-rec-1', version: 1, status: 'active', createdAt: 10 });
     repo.markAllStaleForPhase('phase-rec-1');
     const all = repo.findByPhase('phase-rec-1');
-    expect(all.every((a) => a.status === 'stale')).toBe(true);
+    expect(all.every(a => a.status === 'stale')).toBe(true);
   });
 });

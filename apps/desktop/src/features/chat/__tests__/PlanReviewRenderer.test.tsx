@@ -127,9 +127,9 @@ describe('PlanReviewRenderer — save as issue', () => {
   it('disables Approve/Deny/Save while a save is in-flight (prevents duplicate responses)', async () => {
     let resolveCreate: (issue: unknown) => void;
     createIssue.mockReturnValue(
-      new Promise((resolve) => {
+      new Promise(resolve => {
         resolveCreate = resolve;
-      }),
+      })
     );
 
     render(<InteractionItem interaction={interaction} />);
@@ -166,7 +166,7 @@ describe('PlanReviewRenderer — save as issue', () => {
     expect(sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         response: { approved: false, feedback: 'Saved as issue #iss-99 for later.' },
-      }),
+      })
     );
   });
 });
@@ -216,9 +216,7 @@ const setMode = vi.fn();
 
 function renderWithActions(ui: React.ReactNode) {
   return render(
-    <ChatActionsProvider value={{ handleSendMessage, setMode }}>
-      {ui}
-    </ChatActionsProvider>,
+    <ChatActionsProvider value={{ handleSendMessage, setMode }}>{ui}</ChatActionsProvider>
   );
 }
 
@@ -242,7 +240,7 @@ describe('PlanReviewRenderer — client_synth', () => {
       expect(handleSendMessage).toHaveBeenCalledWith(
         'Proceed with the plan above.',
         undefined,
-        'default',
+        'default'
       );
     });
     // does NOT send interaction_response

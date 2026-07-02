@@ -16,12 +16,16 @@ import type {
 import { ProjectChangeRepository } from './repositories/project-change.js';
 import { ChangeGateReviewRepository } from './repositories/change-gate-review.js';
 import { ChangeSyncRunRepository } from './repositories/change-sync-run.js';
-import { SupervisionTaskRepository } from './repositories/supervision-task.js';
-import type { SupervisionProjectPort, SupervisionSessionPort, SupervisionSessionModelPort } from './ports.js';
-import { ContextManager, type ContextDocument } from './context-manager.js';
+import { type SupervisionTaskRepository } from './repositories/supervision-task.js';
+import type {
+  SupervisionProjectPort,
+  SupervisionSessionPort,
+  SupervisionSessionModelPort,
+} from './ports.js';
+import { type ContextManager, type ContextDocument } from './context-manager.js';
 import { TaskRunner } from './task-runner.js';
 import { ReviewEngine } from './review-engine.js';
-import { WorktreePool } from './worktree-pool.js';
+import { type WorktreePool } from './worktree-pool.js';
 import type { CheckpointEngine } from './checkpoint-engine.js';
 import { validatePlanFile, type PlanValidationResult } from './plan-validator.js';
 import { TaskScheduler } from './task-scheduler.js';
@@ -69,7 +73,7 @@ export class SupervisorService {
     private aiRunPort: SupervisionAiRunPort,
     private changeRepo: ProjectChangeRepository = new ProjectChangeRepository(db),
     private gateReviewRepo: ChangeGateReviewRepository = new ChangeGateReviewRepository(db),
-    private syncRunRepo: ChangeSyncRunRepository = new ChangeSyncRunRepository(db),
+    private syncRunRepo: ChangeSyncRunRepository = new ChangeSyncRunRepository(db)
   ) {
     SupervisorService.installCleanupHooks();
 
@@ -86,7 +90,7 @@ export class SupervisorService {
       projectId: string,
       event: SupervisionLogEvent,
       detail?: Record<string, unknown>,
-      taskId?: string,
+      taskId?: string
     ) => this.log(projectId, event, detail, taskId);
 
     this.taskRunner = new TaskRunner(
@@ -96,7 +100,7 @@ export class SupervisorService {
       getContextManagerFn,
       broadcastTaskUpdateFn,
       logFn,
-      (task) => this.reviewEngine.createReview(task),
+      task => this.reviewEngine.createReview(task)
     );
 
     this.reviewEngine = new ReviewEngine(
@@ -109,7 +113,7 @@ export class SupervisorService {
       logFn,
       (cwd, baseCommit) => this.taskRunner.collectGitEvidence(cwd, baseCommit),
       this.aiRunPort,
-      (projectId) => this.worktreeManager.getWorktreePool(projectId),
+      projectId => this.worktreeManager.getWorktreePool(projectId)
     );
 
     this.guards = new SupervisorGuards({
@@ -141,7 +145,7 @@ export class SupervisorService {
       tick: () => this.tick(),
       broadcastTaskUpdate: broadcastTaskUpdateFn,
       broadcastAgentUpdate: (projectId, agent) => this.broadcastAgentUpdate(projectId, agent),
-      getTaskPlanStatus: (taskId) => this.getTaskPlanStatus(taskId),
+      getTaskPlanStatus: taskId => this.getTaskPlanStatus(taskId),
       log: logFn,
     });
 
@@ -152,12 +156,12 @@ export class SupervisorService {
       sessionRepo,
       broadcastTaskUpdate: broadcastTaskUpdateFn,
       broadcastAgentUpdate: (projectId, agent) => this.broadcastAgentUpdate(projectId, agent),
-      broadcastSessionCreated: (session) => this.broadcastSessionCreated(session),
-      broadcastSessionUpdated: (session) => this.broadcastSessionUpdated(session),
+      broadcastSessionCreated: session => this.broadcastSessionCreated(session),
+      broadcastSessionUpdated: session => this.broadcastSessionUpdated(session),
       log: logFn,
-      checkBudgetLimits: (projectId) => this.guards.checkBudgetLimits(projectId),
-      startTask: (task) => this.startTask(task),
-      startLiteTask: (task) => this.startLiteTask(task),
+      checkBudgetLimits: projectId => this.guards.checkBudgetLimits(projectId),
+      startTask: task => this.startTask(task),
+      startLiteTask: task => this.startLiteTask(task),
     });
 
     this.taskAdmin = new TaskAdmin({
@@ -184,7 +188,7 @@ export class SupervisorService {
       sessionRepo,
       worktreeManager: this.worktreeManager,
       getContextManager: (projectId, rootPath) => this.getContextManager(projectId, rootPath),
-      broadcastSessionCreated: (session) => this.broadcastSessionCreated(session),
+      broadcastSessionCreated: session => this.broadcastSessionCreated(session),
       broadcastAgentUpdate: (projectId, agent) => this.broadcastAgentUpdate(projectId, agent),
       log: logFn,
     });
@@ -285,7 +289,10 @@ export class SupervisorService {
     return this.agentManager.initAgent(projectId, config, mode);
   }
 
-  updateAgentPhase(projectId: string, action: 'pause' | 'resume' | 'archive' | 'approve_setup'): ProjectAgent {
+  updateAgentPhase(
+    projectId: string,
+    action: 'pause' | 'resume' | 'archive' | 'approve_setup'
+  ): ProjectAgent {
     return this.agentManager.updateAgentPhase(projectId, action);
   }
 
@@ -315,7 +322,7 @@ export class SupervisorService {
       scheduleCron?: string;
       scheduleEnabled?: boolean;
       retryDelayMs?: number;
-    },
+    }
   ): SupervisionTask {
     let resolvedChange = this.changeLifecycle.findChangeForTask(projectId, data.changeId);
     if (data.changeId) {
@@ -382,10 +389,23 @@ export class SupervisorService {
     return this.taskLifecycle.submitTaskPlan(taskId);
   }
 
-  updateTask(taskId: string, data: Partial<Pick<SupervisionTask,
-    'title' | 'description' | 'priority' | 'dependencies' | 'dependencyMode' |
-    'acceptanceCriteria' | 'relevantDocIds' | 'scope' | 'taskSpecificContext'
-  >>): SupervisionTask | undefined {
+  updateTask(
+    taskId: string,
+    data: Partial<
+      Pick<
+        SupervisionTask,
+        | 'title'
+        | 'description'
+        | 'priority'
+        | 'dependencies'
+        | 'dependencyMode'
+        | 'acceptanceCriteria'
+        | 'relevantDocIds'
+        | 'scope'
+        | 'taskSpecificContext'
+      >
+    >
+  ): SupervisionTask | undefined {
     const task = this.taskAdmin.updateTask(taskId, data);
     if (task?.changeId) {
       this.changeLifecycle.syncArtifacts(task.changeId);
@@ -409,7 +429,10 @@ export class SupervisorService {
   // Change management (delegates to changeLifecycle)
   // ========================================
 
-  createChange(projectId: string, data: Parameters<ChangeLifecycle['createChange']>[1]): ProjectChange {
+  createChange(
+    projectId: string,
+    data: Parameters<ChangeLifecycle['createChange']>[1]
+  ): ProjectChange {
     return this.changeLifecycle.createChange(projectId, data);
   }
 
@@ -441,7 +464,11 @@ export class SupervisorService {
     return this.changeLifecycle.requestExecutionGate(changeId, notes);
   }
 
-  resolveExecutionGate(changeId: string, decision: ExecutionGateDecision, notes?: string): ProjectChange {
+  resolveExecutionGate(
+    changeId: string,
+    decision: ExecutionGateDecision,
+    notes?: string
+  ): ProjectChange {
     return this.changeLifecycle.resolveExecutionGate(changeId, decision, notes);
   }
 
@@ -469,7 +496,11 @@ export class SupervisorService {
     return this.baselineService.getContextDocuments(projectId);
   }
 
-  updateChangeDocument(changeId: string, docType: 'design' | 'execution' | 'tasks', content: string): ProjectChange {
+  updateChangeDocument(
+    changeId: string,
+    docType: 'design' | 'execution' | 'tasks',
+    content: string
+  ): ProjectChange {
     return this.baselineService.updateChangeDocument(changeId, docType, content);
   }
 
@@ -518,7 +549,10 @@ export class SupervisorService {
   // Logging
   // ========================================
 
-  getLogs(projectId: string, limit = 100): Array<{
+  getLogs(
+    projectId: string,
+    limit = 100
+  ): Array<{
     id: string;
     projectId: string;
     taskId?: string;
@@ -526,15 +560,19 @@ export class SupervisorService {
     detail?: Record<string, unknown>;
     createdAt: number;
   }> {
-    const rows = this.db.prepare(`
+    const rows = this.db
+      .prepare(
+        `
       SELECT id, project_id, task_id, event, detail, created_at
       FROM supervision_logs
       WHERE project_id = ?
       ORDER BY created_at DESC
       LIMIT ?
-    `).all(projectId, limit) as Array<Record<string, unknown>>;
+    `
+      )
+      .all(projectId, limit) as Array<Record<string, unknown>>;
 
-    return rows.map((row) => ({
+    return rows.map(row => ({
       id: row.id as string,
       projectId: row.project_id as string,
       taskId: (row.task_id as string) || undefined,
@@ -584,7 +622,11 @@ export class SupervisorService {
     this.taskLifecycle.handleLiteTaskMessage(taskId, projectId, msg);
   }
 
-  private buildTaskPrompt(task: SupervisionTask, projectName: string, contextInjection: string): string {
+  private buildTaskPrompt(
+    task: SupervisionTask,
+    projectName: string,
+    contextInjection: string
+  ): string {
     return buildSupervisedTaskPrompt(task, projectName, contextInjection);
   }
 
@@ -614,7 +656,7 @@ export class SupervisorService {
     projectId: string,
     event: SupervisionLogEvent,
     detail?: Record<string, unknown>,
-    taskId?: string,
+    taskId?: string
   ): void {
     const id = newId();
     const now = Date.now();
@@ -622,7 +664,7 @@ export class SupervisorService {
       this.db
         .prepare(
           `INSERT INTO supervision_logs (id, project_id, task_id, event, detail, created_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?)`
         )
         .run(id, projectId, taskId ?? null, event, detail ? JSON.stringify(detail) : null, now);
     } catch (err) {
@@ -647,14 +689,22 @@ export class SupervisorService {
     if (SupervisorService.cleanupHooksInstalled) return;
     const cleanup = () => {
       for (const service of SupervisorService.activeServices) {
-        try { service.stop(); } catch (err) {
+        try {
+          service.stop();
+        } catch (err) {
           console.error('[Supervisor] Failed during process cleanup:', err);
         }
       }
     };
     process.once('exit', cleanup);
-    process.once('SIGINT', () => { cleanup(); process.exit(0); });
-    process.once('SIGTERM', () => { cleanup(); process.exit(0); });
+    process.once('SIGINT', () => {
+      cleanup();
+      process.exit(0);
+    });
+    process.once('SIGTERM', () => {
+      cleanup();
+      process.exit(0);
+    });
     SupervisorService.cleanupHooksInstalled = true;
   }
 }

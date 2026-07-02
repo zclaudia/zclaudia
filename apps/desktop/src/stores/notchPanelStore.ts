@@ -50,7 +50,7 @@ export const useNotchPanelStore = create<NotchPanelState>((set, get) => ({
   activeTab: 'sessions',
   lastActivityTab: 'sessions',
 
-  open: (opts) => {
+  open: opts => {
     clearAutoCollapse();
     const auto = !!opts?.auto;
     set({
@@ -84,7 +84,7 @@ export const useNotchPanelStore = create<NotchPanelState>((set, get) => ({
     }
   },
 
-  setHovering: (hovering) => {
+  setHovering: hovering => {
     set({ isHovering: hovering });
     // Hovering out while auto-expanded restarts the auto-collapse timer.
     if (!hovering && get().isAutoExpanded && get().isOpen) {
@@ -99,9 +99,9 @@ export const useNotchPanelStore = create<NotchPanelState>((set, get) => ({
     }
   },
 
-  setPreviewTitle: (title) => set({ lastPreviewTitle: title }),
-  setActiveTab: (tab) => set({ activeTab: tab }),
-  setLastActivityTab: (tab) => set({ lastActivityTab: tab }),
+  setPreviewTitle: title => set({ lastPreviewTitle: title }),
+  setActiveTab: tab => set({ activeTab: tab }),
+  setLastActivityTab: tab => set({ lastActivityTab: tab }),
 }));
 
 // Dev-only: expose for manual testing.

@@ -81,7 +81,7 @@ function rebuildModules(failed) {
   const storeArgs = storeDir ? ['--store-dir', storeDir] : [];
 
   console.log(
-    `\x1b[33m! Native module ABI mismatch for ${failed.join(', ')} under Node ${process.version} (ABI ${process.versions.modules}); rebuilding...\x1b[0m`,
+    `\x1b[33m! Native module ABI mismatch for ${failed.join(', ')} under Node ${process.version} (ABI ${process.versions.modules}); rebuilding...\x1b[0m`
   );
   execFileSync('pnpm', [...storeArgs, 'rebuild', ...failed], { stdio: 'inherit', cwd: repoRoot });
 }
@@ -96,7 +96,7 @@ if (initial.missing.length > 0) {
 if (initial.failed.length > 0) {
   if (!hasPnpm()) {
     console.error(
-      `\x1b[31m✗ Native module ABI mismatch for ${initial.failed.join(', ')} under Node ${process.version} (ABI ${process.versions.modules}), but pnpm is not available.\x1b[0m`,
+      `\x1b[31m✗ Native module ABI mismatch for ${initial.failed.join(', ')} under Node ${process.version} (ABI ${process.versions.modules}), but pnpm is not available.\x1b[0m`
     );
     console.error(`Run: pnpm rebuild ${initial.failed.join(' ')}`);
     process.exit(1);
@@ -105,15 +105,21 @@ if (initial.failed.length > 0) {
   try {
     rebuildModules(initial.failed);
   } catch {
-    console.error(`\x1b[31m✗ Failed to rebuild native modules. Try: pnpm rebuild ${initial.failed.join(' ')}\x1b[0m`);
+    console.error(
+      `\x1b[31m✗ Failed to rebuild native modules. Try: pnpm rebuild ${initial.failed.join(' ')}\x1b[0m`
+    );
     process.exit(1);
   }
 
   const after = checkModules();
   if (after.failed.length > 0) {
-    console.error(`\x1b[31m✗ Native modules still fail after rebuild: ${after.failed.join(', ')}\x1b[0m`);
+    console.error(
+      `\x1b[31m✗ Native modules still fail after rebuild: ${after.failed.join(', ')}\x1b[0m`
+    );
     process.exit(1);
   }
 
-  console.log(`\x1b[32m+ Native modules rebuilt for Node ${process.version} (ABI ${process.versions.modules})\x1b[0m`);
+  console.log(
+    `\x1b[32m+ Native modules rebuilt for Node ${process.version} (ABI ${process.versions.modules})\x1b[0m`
+  );
 }

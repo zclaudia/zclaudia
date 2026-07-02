@@ -153,8 +153,19 @@ describe('ToolRegistry', () => {
         },
       };
 
-      toolRegistry.register({ id: 'tool1', definition: definition1, handler: () => '1', source: 'builtin' });
-      toolRegistry.register({ id: 'tool2', definition: definition2, handler: () => '2', source: 'plugin', pluginId: 'test' });
+      toolRegistry.register({
+        id: 'tool1',
+        definition: definition1,
+        handler: () => '1',
+        source: 'builtin',
+      });
+      toolRegistry.register({
+        id: 'tool2',
+        definition: definition2,
+        handler: () => '2',
+        source: 'plugin',
+        pluginId: 'test',
+      });
 
       const definitions = toolRegistry.getAllDefinitions();
       expect(definitions).toHaveLength(2);
@@ -174,8 +185,19 @@ describe('ToolRegistry', () => {
         },
       };
 
-      toolRegistry.register({ id: 'builtin_tool', definition, handler: () => '1', source: 'builtin' });
-      toolRegistry.register({ id: 'plugin_tool', definition, handler: () => '2', source: 'plugin', pluginId: 'test' });
+      toolRegistry.register({
+        id: 'builtin_tool',
+        definition,
+        handler: () => '1',
+        source: 'builtin',
+      });
+      toolRegistry.register({
+        id: 'plugin_tool',
+        definition,
+        handler: () => '2',
+        source: 'plugin',
+        pluginId: 'test',
+      });
 
       const builtin = toolRegistry.getDefinitionsBySource('builtin');
       expect(builtin).toHaveLength(1);
@@ -247,7 +269,7 @@ describe('ToolRegistry', () => {
       toolRegistry.register({
         id: 'test_tool',
         definition,
-        handler: (args) => JSON.stringify({ received: args }),
+        handler: args => JSON.stringify({ received: args }),
         source: 'builtin',
       });
 
@@ -296,8 +318,20 @@ describe('ToolRegistry', () => {
         },
       };
 
-      toolRegistry.register({ id: 'tool1', definition, handler: () => '1', source: 'plugin', pluginId: 'plugin.a' });
-      toolRegistry.register({ id: 'tool2', definition, handler: () => '2', source: 'plugin', pluginId: 'plugin.b' });
+      toolRegistry.register({
+        id: 'tool1',
+        definition,
+        handler: () => '1',
+        source: 'plugin',
+        pluginId: 'plugin.a',
+      });
+      toolRegistry.register({
+        id: 'tool2',
+        definition,
+        handler: () => '2',
+        source: 'plugin',
+        pluginId: 'plugin.b',
+      });
       toolRegistry.register({ id: 'tool3', definition, handler: () => '3', source: 'builtin' });
 
       const pluginATools = toolRegistry.getByPlugin('plugin.a');
@@ -317,8 +351,20 @@ describe('ToolRegistry', () => {
         },
       };
 
-      toolRegistry.register({ id: 'tool1', definition, handler: () => '1', source: 'plugin', pluginId: 'plugin.a' });
-      toolRegistry.register({ id: 'tool2', definition, handler: () => '2', source: 'plugin', pluginId: 'plugin.b' });
+      toolRegistry.register({
+        id: 'tool1',
+        definition,
+        handler: () => '1',
+        source: 'plugin',
+        pluginId: 'plugin.a',
+      });
+      toolRegistry.register({
+        id: 'tool2',
+        definition,
+        handler: () => '2',
+        source: 'plugin',
+        pluginId: 'plugin.b',
+      });
       toolRegistry.register({ id: 'tool3', definition, handler: () => '3', source: 'builtin' });
 
       const count = toolRegistry.clearByPlugin('plugin.a');
@@ -341,7 +387,13 @@ describe('ToolRegistry', () => {
       };
 
       toolRegistry.register({ id: 'tool1', definition, handler: () => '1', source: 'builtin' });
-      toolRegistry.register({ id: 'tool2', definition, handler: () => '2', source: 'plugin', pluginId: 'test' });
+      toolRegistry.register({
+        id: 'tool2',
+        definition,
+        handler: () => '2',
+        source: 'plugin',
+        pluginId: 'test',
+      });
 
       toolRegistry.clear();
       expect(toolRegistry.size).toBe(0);
@@ -513,12 +565,8 @@ describe('ToolRegistry', () => {
         pluginId: 'plugin.second',
       });
 
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('plugin.first')
-      );
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('plugin.second')
-      );
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('plugin.first'));
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('plugin.second'));
       warnSpy.mockRestore();
     });
   });
@@ -537,13 +585,19 @@ describe('ToolRegistry', () => {
         pluginId: 'test.plugin',
       });
       expect(
-        toolRegistry.getDefinitionsByScope('main-session').find((t) => t.function.name === 'panel_only')
+        toolRegistry
+          .getDefinitionsByScope('main-session')
+          .find(t => t.function.name === 'panel_only')
       ).toBeUndefined();
       expect(
-        toolRegistry.getDefinitionsByScope('agent-assistant').find((t) => t.function.name === 'panel_only')
+        toolRegistry
+          .getDefinitionsByScope('agent-assistant')
+          .find(t => t.function.name === 'panel_only')
       ).toBeUndefined();
       expect(
-        toolRegistry.getDefinitionsByScope('plugin-panel').find((t) => t.function.name === 'panel_only')
+        toolRegistry
+          .getDefinitionsByScope('plugin-panel')
+          .find(t => t.function.name === 'panel_only')
       ).toBeDefined();
     });
 
@@ -574,10 +628,14 @@ describe('ToolRegistry', () => {
         source: 'builtin',
       });
       expect(
-        toolRegistry.getDefinitionsByScope('main-session').find((t) => t.function.name === 'legacy_tool')
+        toolRegistry
+          .getDefinitionsByScope('main-session')
+          .find(t => t.function.name === 'legacy_tool')
       ).toBeDefined();
       expect(
-        toolRegistry.getDefinitionsByScope('plugin-panel').find((t) => t.function.name === 'legacy_tool')
+        toolRegistry
+          .getDefinitionsByScope('plugin-panel')
+          .find(t => t.function.name === 'legacy_tool')
       ).toBeDefined();
     });
 
@@ -594,10 +652,14 @@ describe('ToolRegistry', () => {
       });
       // Listing exposes it in every caller scope
       expect(
-        toolRegistry.getDefinitionsByScope('main-session').find((t) => t.function.name === 'empty_scope_tool')
+        toolRegistry
+          .getDefinitionsByScope('main-session')
+          .find(t => t.function.name === 'empty_scope_tool')
       ).toBeDefined();
       expect(
-        toolRegistry.getDefinitionsByScope('plugin-panel').find((t) => t.function.name === 'empty_scope_tool')
+        toolRegistry
+          .getDefinitionsByScope('plugin-panel')
+          .find(t => t.function.name === 'empty_scope_tool')
       ).toBeDefined();
       // execute() also allows it from any scope (handler return passes through verbatim)
       const result = await toolRegistry.execute('empty_scope_tool', {}, undefined, 'main-session');

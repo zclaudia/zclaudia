@@ -17,7 +17,10 @@ describe('Write shebang auto-chmod', () => {
     const root = await tempRoot('zclaudia-shebang-');
     const write = createWriteBridgeTool(root) as any;
 
-    const result = await write.execute('w1', { file_path: 'run.sh', content: '#!/bin/bash\necho hi\n' });
+    const result = await write.execute('w1', {
+      file_path: 'run.sh',
+      content: '#!/bin/bash\necho hi\n',
+    });
 
     expect(result.details).toMatchObject({ ok: true, madeExecutable: true });
     const mode = (await stat(path.join(root, 'run.sh'))).mode;
@@ -57,11 +60,20 @@ describe('Write/Edit symlink passthrough', () => {
     const state = createReadFileStateStore();
     // The model reads via the link; reads follow the symlink to the target.
     await state.recordRead(path.join(root, 'link.ts'), {
-      content: 'const a = 1;\n', offset: 1, limit: 2000, totalLines: 1, returnedLines: 1, hasFullContent: true,
+      content: 'const a = 1;\n',
+      offset: 1,
+      limit: 2000,
+      totalLines: 1,
+      returnedLines: 1,
+      hasFullContent: true,
     });
     const edit = createEditBridgeTool(root, { readFileState: state }) as any;
 
-    const result = await edit.execute('e1', { file_path: 'link.ts', old_string: 'const a = 1;', new_string: 'const a = 2;' });
+    const result = await edit.execute('e1', {
+      file_path: 'link.ts',
+      old_string: 'const a = 1;',
+      new_string: 'const a = 2;',
+    });
 
     expect(result.details.ok).toBe(true);
     expect((await lstat(path.join(root, 'link.ts'))).isSymbolicLink()).toBe(true);

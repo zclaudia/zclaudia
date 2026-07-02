@@ -161,7 +161,9 @@ describe('fileViewerStore', () => {
       useFileViewerStore.getState().openFile('/project', 'file-new.ts');
       useFileViewerStore.getState().setContent('content-new');
 
-      expect(useFileViewerStore.getState().getCached('/project', 'file-0.ts')).toBe('content-0-updated');
+      expect(useFileViewerStore.getState().getCached('/project', 'file-0.ts')).toBe(
+        'content-0-updated'
+      );
       expect(useFileViewerStore.getState().getCached('/project', 'file-1.ts')).toBeUndefined();
     });
   });
@@ -294,8 +296,12 @@ describe('fileViewerStore', () => {
       useFileViewerStore.getState().openFile('/projectB', 'src/index.ts');
       useFileViewerStore.getState().setContent('content B');
 
-      expect(useFileViewerStore.getState().getCached('/projectA', 'src/index.ts')).toBe('content A');
-      expect(useFileViewerStore.getState().getCached('/projectB', 'src/index.ts')).toBe('content B');
+      expect(useFileViewerStore.getState().getCached('/projectA', 'src/index.ts')).toBe(
+        'content A'
+      );
+      expect(useFileViewerStore.getState().getCached('/projectB', 'src/index.ts')).toBe(
+        'content B'
+      );
     });
   });
 });

@@ -9,7 +9,9 @@ describe('isContextOverflowError', () => {
     expect(isContextOverflowError('Bad request', 'context_length_exceeded')).toBe(true);
   });
   it('matches generic "maximum context length"', () => {
-    expect(isContextOverflowError("This model's maximum context length is 128000 tokens")).toBe(true);
+    expect(isContextOverflowError("This model's maximum context length is 128000 tokens")).toBe(
+      true
+    );
   });
   it('matches HTTP 413 code', () => {
     expect(isContextOverflowError('Payload too large', '413')).toBe(true);
@@ -17,8 +19,8 @@ describe('isContextOverflowError', () => {
   it('matches openai-compat proxy "exceeded model token limit" phrasing', () => {
     expect(
       isContextOverflowError(
-        'LLM call failed: 400 Invalid request: Your request exceeded model token limit: 262144 (requested: 262492)',
-      ),
+        'LLM call failed: 400 Invalid request: Your request exceeded model token limit: 262144 (requested: 262492)'
+      )
     ).toBe(true);
   });
   it('does NOT match unrelated errors', () => {
@@ -26,7 +28,9 @@ describe('isContextOverflowError', () => {
     expect(isContextOverflowError('connection reset')).toBe(false);
     expect(isContextOverflowError('invalid api key', '401')).toBe(false);
     // a rate-limit on token throughput is not a context overflow
-    expect(isContextOverflowError('rate limit: token rate limit exceeded, retry later')).toBe(false);
+    expect(isContextOverflowError('rate limit: token rate limit exceeded, retry later')).toBe(
+      false
+    );
   });
   it('is case-insensitive', () => {
     expect(isContextOverflowError('PROMPT IS TOO LONG')).toBe(true);

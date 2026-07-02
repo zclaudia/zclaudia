@@ -7,10 +7,7 @@ import {
   assertTaskTransition,
   getLiteFailureTransition,
 } from './status-machine.js';
-import {
-  resolveCreatedTaskStatus,
-  getReviewRejectionOutcome,
-} from './model.js';
+import { resolveCreatedTaskStatus, getReviewRejectionOutcome } from './model.js';
 import type { TrustLevel } from '@zclaudia/shared/features/supervision';
 
 // ── Create input ────────────────────────────────────────────────────
@@ -42,7 +39,7 @@ export class TaskAggregate {
 
   constructor(
     private task: SupervisionTask,
-    private taskRepo: SupervisionTaskRepository,
+    private taskRepo: SupervisionTaskRepository
   ) {}
 
   // ── Queries ─────────────────────────────────────────────────────
@@ -72,7 +69,7 @@ export class TaskAggregate {
   static create(
     input: CreateTaskInput,
     trustLevel: TrustLevel,
-    taskRepo: SupervisionTaskRepository,
+    taskRepo: SupervisionTaskRepository
   ): TaskAggregate {
     const source = input.source ?? 'user';
     const status = resolveCreatedTaskStatus(source, trustLevel);
@@ -153,13 +150,23 @@ export class TaskAggregate {
     });
   }
 
-  update(data: Partial<Pick<SupervisionTask,
-    'title' | 'description' | 'priority' | 'dependencies' | 'dependencyMode' |
-    'acceptanceCriteria' | 'relevantDocIds' | 'scope' | 'taskSpecificContext'
-  >>): void {
-    const fields = Object.keys(data).filter(
-      (k) => data[k as keyof typeof data] !== undefined,
-    );
+  update(
+    data: Partial<
+      Pick<
+        SupervisionTask,
+        | 'title'
+        | 'description'
+        | 'priority'
+        | 'dependencies'
+        | 'dependencyMode'
+        | 'acceptanceCriteria'
+        | 'relevantDocIds'
+        | 'scope'
+        | 'taskSpecificContext'
+      >
+    >
+  ): void {
+    const fields = Object.keys(data).filter(k => data[k as keyof typeof data] !== undefined);
     if (fields.length === 0) return;
 
     this.taskRepo.update(this.task.id, data);
@@ -325,7 +332,7 @@ export class TaskAggregate {
   markLiteFailed(error: string): void {
     const { nextStatus, nextAttempt } = getLiteFailureTransition(
       this.task.attempt,
-      this.task.maxRetries,
+      this.task.maxRetries
     );
 
     if (nextStatus === 'failed') {
@@ -388,7 +395,7 @@ export class TaskAggregate {
     assertTaskStatus(this.task.status, 'reviewing', 'reject result for');
     const { nextStatus, nextAttempt } = getReviewRejectionOutcome(
       this.task.attempt,
-      this.task.maxRetries,
+      this.task.maxRetries
     );
 
     if (nextStatus === 'failed') {

@@ -12,7 +12,7 @@ function createLocalHandler(): TestLocalHandler {
     onStreamOpen: vi.fn(),
     onStreamClose: vi.fn(),
     onCatchUp: vi.fn(async () => []),
-    onServerEvent: (listener) => {
+    onServerEvent: listener => {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
@@ -35,7 +35,7 @@ describe('StandaloneFacadeAdapter', () => {
       localHandler,
     });
     const events: any[] = [];
-    adapter.events.subscribe((event) => events.push(event));
+    adapter.events.subscribe(event => events.push(event));
 
     adapter.commands.backend.subscribe('local-standalone');
     localHandler.emit({
@@ -64,7 +64,7 @@ describe('StandaloneFacadeAdapter', () => {
           sessionId: 'session-1',
           event: expect.objectContaining({ type: 'run_completed', runId: 'run-1' }),
         }),
-      ]),
+      ])
     );
   });
 });

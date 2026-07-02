@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, type Request, type Response } from 'express';
 import type Database from 'better-sqlite3';
 import type { BranchAction, ClaudiaTaskStatus } from '@zclaudia/shared/wire/messages';
 
@@ -36,7 +36,7 @@ function parseJsonObject(value: string | null): Record<string, unknown> {
   try {
     const parsed = JSON.parse(value);
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
+      ? (parsed as Record<string, unknown>)
       : {};
   } catch {
     return {};
@@ -60,23 +60,28 @@ export function createClaudiaRoutes(db: Database.Database): Router {
     try {
       const projectId = req.query.projectId as string;
       if (!projectId) {
-        res.status(400).json({ success: false, error: { code: 'MISSING_PROJECT_ID', message: 'projectId is required' } });
+        res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_PROJECT_ID', message: 'projectId is required' },
+        });
         return;
       }
 
       const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
 
-      const canonicalRows = db.prepare(
-        `SELECT id, session_id, status, title, description, result, metadata, created_at, updated_at
+      const canonicalRows = db
+        .prepare(
+          `SELECT id, session_id, status, title, description, result, metadata, created_at, updated_at
          FROM tasks
          WHERE type = 'agent'
            AND json_extract(metadata, '$.initiator') = 'claudia'
            AND json_extract(metadata, '$.projectId') = ?
          ORDER BY created_at DESC
          LIMIT ?`
-      ).all(projectId, limit) as CanonicalTaskRow[];
+        )
+        .all(projectId, limit) as CanonicalTaskRow[];
 
-      const canonicalTasks: ClaudiaTaskResponse[] = canonicalRows.map((row) => {
+      const canonicalTasks: ClaudiaTaskResponse[] = canonicalRows.map(row => {
         const metadata = parseJsonObject(row.metadata);
         const result = parseJsonObject(row.result);
         const input = stringValue(metadata.input) ?? row.description ?? row.title ?? '';
@@ -99,14 +104,15 @@ export function createClaudiaRoutes(db: Database.Database): Router {
         };
       });
 
-      const tasks = canonicalTasks
-        .sort((a, b) => b.createdAt - a.createdAt)
-        .slice(0, limit);
+      const tasks = canonicalTasks.sort((a, b) => b.createdAt - a.createdAt).slice(0, limit);
 
       res.json({ success: true, data: { tasks } });
     } catch (error) {
       console.error('Error listing claudia tasks:', error);
-      res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to list tasks' } });
+      res.status(500).json({
+        success: false,
+        error: { code: 'INTERNAL_ERROR', message: 'Failed to list tasks' },
+      });
     }
   });
 

@@ -30,7 +30,12 @@ export interface TaskSchedulerDeps {
   broadcastAgentUpdate: (projectId: string, agent: ProjectAgent) => void;
   broadcastSessionCreated: (session: Session) => void;
   broadcastSessionUpdated: (session: Session) => void;
-  log: (projectId: string, event: SupervisionLogEvent, detail?: Record<string, unknown>, taskId?: string) => void;
+  log: (
+    projectId: string,
+    event: SupervisionLogEvent,
+    detail?: Record<string, unknown>,
+    taskId?: string
+  ) => void;
   checkBudgetLimits: (projectId: string) => boolean;
   startTask: (task: SupervisionTask) => Promise<void>;
   startLiteTask: (task: SupervisionTask) => Promise<void>;
@@ -103,11 +108,16 @@ export class TaskScheduler {
         assertTaskTransition(task.status, 'queued');
         this.deps.taskRepo.updateStatus(task.id, 'queued');
         this.deps.broadcastTaskUpdate(task.id, projectId);
-        this.deps.log(projectId, 'task_status_changed', {
-          taskId: task.id,
-          from: 'pending',
-          to: 'queued',
-        }, task.id);
+        this.deps.log(
+          projectId,
+          'task_status_changed',
+          {
+            taskId: task.id,
+            from: 'pending',
+            to: 'queued',
+          },
+          task.id
+        );
       }
     }
 
@@ -126,7 +136,7 @@ export class TaskScheduler {
     let available: number;
     if (maxConcurrent <= 1) {
       // Serial mode: block if ANY task is running OR reviewing
-      available = (runningTasks.length === 0 && reviewingTasks.length === 0) ? 1 : 0;
+      available = runningTasks.length === 0 && reviewingTasks.length === 0 ? 1 : 0;
     } else {
       // Parallel mode: only count running tasks against the limit
       available = maxConcurrent - runningTasks.length;
@@ -137,12 +147,12 @@ export class TaskScheduler {
       const toStart = readyTasks.slice(0, available);
       for (const task of toStart) {
         if (isLite) {
-          this.deps.startLiteTask(task).catch((err) => {
+          this.deps.startLiteTask(task).catch(err => {
             console.error(`[Supervisor] Failed to start lite task ${task.id}:`, err);
             this.handleTaskStartFailure(task, 'start_lite_failed');
           });
         } else {
-          this.deps.startTask(task).catch((err) => {
+          this.deps.startTask(task).catch(err => {
             console.error(`[Supervisor] Failed to start task ${task.id}:`, err);
             this.handleTaskStartFailure(task, 'start_task_failed');
           });
@@ -161,7 +171,7 @@ export class TaskScheduler {
 
       // Trigger checkpoint on idle if configured (full mode only)
       if (!isLite && this.deps.checkpointEngine?.shouldTrigger(projectId, 'idle')) {
-        this.deps.checkpointEngine.runCheckpoint(projectId).catch((err) => {
+        this.deps.checkpointEngine.runCheckpoint(projectId).catch(err => {
           console.error(`[Supervisor] Idle checkpoint failed for ${projectId}:`, err);
         });
       }
@@ -173,31 +183,33 @@ export class TaskScheduler {
       return true;
     }
 
-    const depTasks = task.dependencies.map((depId) => this.deps.taskRepo.findById(depId));
+    const depTasks = task.dependencies.map(depId => this.deps.taskRepo.findById(depId));
     const terminalStatuses: TaskStatus[] = ['integrated', 'completed', 'failed', 'cancelled'];
 
     // In lite mode, 'completed' is the success status; in full mode, 'integrated'
     const isSuccess = (status: TaskStatus) =>
-      isLite ? (status === 'completed' || status === 'integrated')
-             : status === 'integrated';
+      isLite ? status === 'completed' || status === 'integrated' : status === 'integrated';
 
     if (task.dependencyMode === 'any') {
-      const anySuccess = depTasks.some((d) => d && isSuccess(d.status));
+      const anySuccess = depTasks.some(d => d && isSuccess(d.status));
       if (anySuccess) return true;
 
-      const allTerminal = depTasks.every(
-        (d) => d && terminalStatuses.includes(d.status),
-      );
+      const allTerminal = depTasks.every(d => d && terminalStatuses.includes(d.status));
       if (allTerminal) {
         assertTaskTransition(task.status, 'blocked');
         this.deps.taskRepo.updateStatus(task.id, 'blocked');
         this.deps.broadcastTaskUpdate(task.id, task.projectId);
-        this.deps.log(task.projectId, 'task_status_changed', {
-          taskId: task.id,
-          from: task.status,
-          to: 'blocked',
-          reason: 'all_dependencies_terminal_none_succeeded',
-        }, task.id);
+        this.deps.log(
+          task.projectId,
+          'task_status_changed',
+          {
+            taskId: task.id,
+            from: task.status,
+            to: 'blocked',
+            reason: 'all_dependencies_terminal_none_succeeded',
+          },
+          task.id
+        );
         return false;
       }
 
@@ -205,22 +217,25 @@ export class TaskScheduler {
     }
 
     // 'all' mode: every dependency must succeed
-    const allSuccess = depTasks.every((d) => d && isSuccess(d.status));
+    const allSuccess = depTasks.every(d => d && isSuccess(d.status));
     if (allSuccess) return true;
 
-    const anyFailed = depTasks.some(
-      (d) => d && (d.status === 'failed' || d.status === 'cancelled'),
-    );
+    const anyFailed = depTasks.some(d => d && (d.status === 'failed' || d.status === 'cancelled'));
     if (anyFailed) {
       assertTaskTransition(task.status, 'blocked');
       this.deps.taskRepo.updateStatus(task.id, 'blocked');
       this.deps.broadcastTaskUpdate(task.id, task.projectId);
-      this.deps.log(task.projectId, 'task_status_changed', {
-        taskId: task.id,
-        from: task.status,
-        to: 'blocked',
-        reason: 'dependency_failed_or_cancelled',
-      }, task.id);
+      this.deps.log(
+        task.projectId,
+        'task_status_changed',
+        {
+          taskId: task.id,
+          from: task.status,
+          to: 'blocked',
+          reason: 'dependency_failed_or_cancelled',
+        },
+        task.id
+      );
       return false;
     }
 
@@ -229,7 +244,7 @@ export class TaskScheduler {
 
   private handleTaskStartFailure(
     task: SupervisionTask,
-    reason: 'start_lite_failed' | 'start_task_failed',
+    reason: 'start_lite_failed' | 'start_task_failed'
   ): void {
     const currentTask = this.deps.taskRepo.findById(task.id);
     if (!currentTask || currentTask.status !== 'queued') {
@@ -244,22 +259,31 @@ export class TaskScheduler {
       },
     });
     this.deps.broadcastTaskUpdate(task.id, task.projectId);
-    this.deps.log(task.projectId, 'task_status_changed', {
-      taskId: task.id,
-      from: 'queued',
-      to: 'failed',
-      reason,
-    }, task.id);
+    this.deps.log(
+      task.projectId,
+      'task_status_changed',
+      {
+        taskId: task.id,
+        from: 'queued',
+        to: 'failed',
+        reason,
+      },
+      task.id
+    );
   }
 
   checkScheduledTasks(projectId: string): void {
     const now = Date.now();
-    const rows = this.deps.db.prepare(`
+    const rows = this.deps.db
+      .prepare(
+        `
       SELECT * FROM supervision_tasks
       WHERE project_id = ? AND schedule_enabled = 1 AND schedule_next_run <= ?
         AND status IN ('completed', 'failed', 'cancelled')
       ORDER BY schedule_next_run ASC
-    `).all(projectId, now) as Record<string, unknown>[];
+    `
+      )
+      .all(projectId, now) as Record<string, unknown>[];
 
     for (const row of rows) {
       const task = this.deps.taskRepo.mapRow(row);
@@ -271,14 +295,23 @@ export class TaskScheduler {
       // Compute next run time
       if (task.scheduleCron) {
         const nextRun = computeNextCronRun(task.scheduleCron, now);
-        this.deps.db.prepare('UPDATE supervision_tasks SET schedule_next_run = ? WHERE id = ?')
+        this.deps.db
+          .prepare('UPDATE supervision_tasks SET schedule_next_run = ? WHERE id = ?')
           .run(nextRun, task.id);
       }
 
       this.deps.broadcastTaskUpdate(task.id, projectId);
-      this.deps.log(projectId, 'task_status_changed', {
-        taskId: task.id, from: task.status, to: 'pending', trigger: 'schedule',
-      }, task.id);
+      this.deps.log(
+        projectId,
+        'task_status_changed',
+        {
+          taskId: task.id,
+          from: task.status,
+          to: 'pending',
+          trigger: 'schedule',
+        },
+        task.id
+      );
 
       // Transition agent to active if idle
       const project = this.deps.projectRepo.findById(projectId);
@@ -286,7 +319,11 @@ export class TaskScheduler {
         const agent = { ...project.agent, phase: 'active' as const, updatedAt: Date.now() };
         this.deps.projectRepo.update(projectId, { agent });
         this.deps.broadcastAgentUpdate(projectId, agent);
-        this.deps.log(projectId, 'phase_changed', { from: 'idle', to: 'active', reason: 'scheduled_task' });
+        this.deps.log(projectId, 'phase_changed', {
+          from: 'idle',
+          to: 'active',
+          reason: 'scheduled_task',
+        });
       }
     }
   }
@@ -295,10 +332,14 @@ export class TaskScheduler {
     const project = this.deps.projectRepo.findById(projectId);
     if (!project?.agent?.mainSessionId) return;
 
-    const row = this.deps.db.prepare(`
+    const row = this.deps.db
+      .prepare(
+        `
       SELECT COUNT(*) as count FROM messages
       WHERE session_id = ?
-    `).get(project.agent.mainSessionId) as { count: number };
+    `
+      )
+      .get(project.agent.mainSessionId) as { count: number };
 
     if (row.count > 200) {
       this.rotateMainSession(projectId);

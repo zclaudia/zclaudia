@@ -23,14 +23,16 @@ describe('run phase domain events', () => {
     setPhase(run, 'running');
 
     expect(listener).toHaveBeenCalledTimes(1);
-    expect(listener).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'run.phaseChanged',
-      runId: 'run-1',
-      sessionId: 'session-1',
-      payload: {
-        previousPhase: 'running',
-        nextPhase: 'awaiting_permission',
-      },
-    }));
+    expect(listener).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'run.phaseChanged',
+        runId: 'run-1',
+        sessionId: 'session-1',
+        payload: {
+          previousPhase: 'running',
+          nextPhase: 'awaiting_permission',
+        },
+      })
+    );
   });
 });

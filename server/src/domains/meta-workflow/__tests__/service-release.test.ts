@@ -18,15 +18,25 @@ function freshDb(): Database.Database {
 
 const samplePhasesJson = JSON.stringify({
   version: '1',
-  phases: [{
-    id: 'p1', name: 'P1', description: '',
-    phaseType: 'code-implement',
-    dependsOn: [], inputs: [],
-    outputs: [{ kind: 'commit', description: 'a' }],
-    acceptanceGates: [{
-      id: 'g', description: 'g', command: 'true', expect: { exitCode: 0 },
-    }],
-  }],
+  phases: [
+    {
+      id: 'p1',
+      name: 'P1',
+      description: '',
+      phaseType: 'code-implement',
+      dependsOn: [],
+      inputs: [],
+      outputs: [{ kind: 'commit', description: 'a' }],
+      acceptanceGates: [
+        {
+          id: 'g',
+          description: 'g',
+          command: 'true',
+          expect: { exitCode: 0 },
+        },
+      ],
+    },
+  ],
   smokePath: ['p1'],
   metadata: { generatedAt: 0, requirementsPath: 'design/req.md' },
 });

@@ -35,9 +35,11 @@ describe('createMessageDispatcher', () => {
   });
 
   it('throws when a message type is registered more than once', () => {
-    expect(() => createMessageDispatcher<TestMessage, TestContext>([
-      { types: ['foo'], handle: vi.fn() },
-      { types: ['foo'], handle: vi.fn() },
-    ])).toThrow('Duplicate message handler registration for type "foo"');
+    expect(() =>
+      createMessageDispatcher<TestMessage, TestContext>([
+        { types: ['foo'], handle: vi.fn() },
+        { types: ['foo'], handle: vi.fn() },
+      ])
+    ).toThrow('Duplicate message handler registration for type "foo"');
   });
 });

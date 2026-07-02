@@ -46,31 +46,31 @@ describe('plan-status-machine', () => {
 
     it('rejects null -> planned (must go through planning)', () => {
       expect(() => assertPlanStatusTransition(null, 'planned')).toThrow(
-        "Invalid plan-status transition: 'null' -> 'planned'",
+        "Invalid plan-status transition: 'null' -> 'planned'"
       );
     });
 
     it('rejects null -> executing (must go through planning)', () => {
       expect(() => assertPlanStatusTransition(null, 'executing')).toThrow(
-        "Invalid plan-status transition: 'null' -> 'executing'",
+        "Invalid plan-status transition: 'null' -> 'executing'"
       );
     });
 
     it('rejects executing -> planning (cannot go backwards)', () => {
       expect(() => assertPlanStatusTransition('executing', 'planning')).toThrow(
-        "Invalid plan-status transition: 'executing' -> 'planning'",
+        "Invalid plan-status transition: 'executing' -> 'planning'"
       );
     });
 
     it('rejects planned -> planning (cannot go backwards)', () => {
       expect(() => assertPlanStatusTransition('planned', 'planning')).toThrow(
-        "Invalid plan-status transition: 'planned' -> 'planning'",
+        "Invalid plan-status transition: 'planned' -> 'planning'"
       );
     });
 
     it('rejects executing -> planned (cannot go backwards)', () => {
       expect(() => assertPlanStatusTransition('executing', 'planned')).toThrow(
-        "Invalid plan-status transition: 'executing' -> 'planned'",
+        "Invalid plan-status transition: 'executing' -> 'planned'"
       );
     });
 
@@ -86,7 +86,7 @@ describe('plan-status-machine', () => {
 
     it('rejects unknown status -> executing (not an unlock target)', () => {
       expect(() => assertPlanStatusTransition('completed' as any, 'executing')).toThrow(
-        "Invalid plan-status transition: 'completed' -> 'executing'",
+        "Invalid plan-status transition: 'completed' -> 'executing'"
       );
     });
   });

@@ -12,23 +12,25 @@ type ExecFileCallback = (error: Error | null, result: { stdout: string; stderr?:
 const services = { agentLoopRunner: {} as never } as ActivityServices;
 
 function mockGitByArgs(map: (args: string[]) => string) {
-  mockExecFile.mockImplementation((_cmd: string, args: string[], _opts: unknown, cb: ExecFileCallback) => {
-    cb(null, { stdout: map(args) });
-  });
+  mockExecFile.mockImplementation(
+    (_cmd: string, args: string[], _opts: unknown, cb: ExecFileCallback) => {
+      cb(null, { stdout: map(args) });
+    }
+  );
 }
 
 describe('GitCommitActivity', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('returns no-op when the tree is clean', async () => {
-    mockGitByArgs((args) => (args[0] === 'status' ? '' : ''));
+    mockGitByArgs(args => (args[0] === 'status' ? '' : ''));
     const res = await new GitCommitActivity().invoke({ worktreePath: '/repo' }, services);
     expect(res.status).toBe('completed');
     expect(res.output.commitSha).toBeNull();
   });
 
   it('stat mode (default) builds an "auto:" message from diff --stat', async () => {
-    mockGitByArgs((args) => {
+    mockGitByArgs(args => {
       if (args[0] === 'status') return ' M a.ts';
       if (args[0] === 'diff') return ' a.ts | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)';
       if (args[0] === 'rev-parse') return 'abc123';
@@ -41,14 +43,14 @@ describe('GitCommitActivity', () => {
   });
 
   it('explicit mode uses the provided message', async () => {
-    mockGitByArgs((args) => {
+    mockGitByArgs(args => {
       if (args[0] === 'status') return ' M a.ts';
       if (args[0] === 'rev-parse') return 'def456';
       return '';
     });
     const res = await new GitCommitActivity().invoke(
       { worktreePath: '/repo', messageMode: 'explicit', message: 'fix: real bug' },
-      services,
+      services
     );
     expect(res.output.message).toBe('fix: real bug');
     expect(res.output.commitSha).toBe('def456');

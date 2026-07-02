@@ -9,20 +9,38 @@ import { useEffect, useRef } from 'react';
 
 // CSS variable names to forward (same as PluginPanelRenderer)
 const THEME_CSS_VARS = [
-  '--background', '--foreground',
-  '--card', '--card-foreground',
-  '--popover', '--popover-foreground',
-  '--primary', '--primary-foreground',
-  '--secondary', '--secondary-foreground',
-  '--muted', '--muted-foreground',
-  '--accent', '--accent-foreground',
-  '--destructive', '--destructive-foreground',
-  '--success', '--success-foreground',
-  '--warning', '--warning-foreground',
-  '--thinking', '--thinking-foreground',
-  '--border', '--input', '--ring', '--radius',
-  '--scrollbar-thumb', '--scrollbar-thumb-hover',
-  '--terminal-bg', '--terminal-fg', '--terminal-cursor', '--terminal-selection',
+  '--background',
+  '--foreground',
+  '--card',
+  '--card-foreground',
+  '--popover',
+  '--popover-foreground',
+  '--primary',
+  '--primary-foreground',
+  '--secondary',
+  '--secondary-foreground',
+  '--muted',
+  '--muted-foreground',
+  '--accent',
+  '--accent-foreground',
+  '--destructive',
+  '--destructive-foreground',
+  '--success',
+  '--success-foreground',
+  '--warning',
+  '--warning-foreground',
+  '--thinking',
+  '--thinking-foreground',
+  '--border',
+  '--input',
+  '--ring',
+  '--radius',
+  '--scrollbar-thumb',
+  '--scrollbar-thumb-hover',
+  '--terminal-bg',
+  '--terminal-fg',
+  '--terminal-cursor',
+  '--terminal-selection',
 ];
 
 function collectCSSVars(): Record<string, string> {
@@ -37,7 +55,7 @@ function collectCSSVars(): Record<string, string> {
 
 function getThemeClasses(): string[] {
   return Array.from(document.documentElement.classList).filter(
-    (c) => c === 'dark' || c.startsWith('dark-'),
+    c => c === 'dark' || c.startsWith('dark-')
   );
 }
 
@@ -61,7 +79,19 @@ export function PluginWindow({ pluginId, params }: PluginWindowProps) {
   // Collect extra params to forward to the iframe
   const extraParams: Record<string, string> = {};
   for (const [key, value] of params.entries()) {
-    if (!['pluginWindow', 'panelId', 'serverUrl', 'authToken', 'iframeUrl', 'serverId', 'serverName', 'gatewayUrl', 'gatewaySecret'].includes(key)) {
+    if (
+      ![
+        'pluginWindow',
+        'panelId',
+        'serverUrl',
+        'authToken',
+        'iframeUrl',
+        'serverId',
+        'serverName',
+        'gatewayUrl',
+        'gatewaySecret',
+      ].includes(key)
+    ) {
       extraParams[key] = value;
     }
   }
@@ -82,7 +112,7 @@ export function PluginWindow({ pluginId, params }: PluginWindowProps) {
         themeClasses: getThemeClasses(),
         cssVars: collectCSSVars(),
       },
-      '*',
+      '*'
     );
   }
 

@@ -37,7 +37,11 @@ describe('MarkdownChildrenWithInlineIcons', () => {
   });
 
   it('replaces common technical markdown emoji', () => {
-    render(<MarkdownChildrenWithInlineIcons>{'⚠️ check 🔧 config 📁 files 🚀 launch'}</MarkdownChildrenWithInlineIcons>);
+    render(
+      <MarkdownChildrenWithInlineIcons>
+        {'⚠️ check 🔧 config 📁 files 🚀 launch'}
+      </MarkdownChildrenWithInlineIcons>
+    );
     expect(screen.getByRole('img', { name: 'Warning' })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Tool' })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Folder' })).toBeInTheDocument();
@@ -51,7 +55,9 @@ describe('MarkdownChildrenWithInlineIcons', () => {
   });
 
   it('wraps common service/tool emoji without adding them to the lucide map', () => {
-    render(<MarkdownChildrenWithInlineIcons>{'🐦 🎮 🏠 ✉️ 📡 🎨 👁️ 🎬'}</MarkdownChildrenWithInlineIcons>);
+    render(
+      <MarkdownChildrenWithInlineIcons>{'🐦 🎮 🏠 ✉️ 📡 🎨 👁️ 🎬'}</MarkdownChildrenWithInlineIcons>
+    );
     for (const emoji of ['🐦', '🎮', '🏠', '✉️', '📡', '🎨', '👁️', '🎬']) {
       expect(screen.getByRole('img', { name: emoji })).toBeInTheDocument();
     }

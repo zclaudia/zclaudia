@@ -31,7 +31,7 @@ describe('createExpressAuthMiddleware', () => {
 
   it('accepts known client ids for remote requests', () => {
     vi.mocked(isLocalhost).mockReturnValue(false);
-    const middleware = createExpressAuthMiddleware((token) => token === 'client-123');
+    const middleware = createExpressAuthMiddleware(token => token === 'client-123');
     const req = {
       headers: { authorization: 'Bearer client-123' },
     } as unknown as Request;
@@ -59,7 +59,7 @@ describe('createExpressAuthMiddleware', () => {
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith({
       success: false,
-      error: { code: 'UNAUTHORIZED', message: 'Authentication required' }
+      error: { code: 'UNAUTHORIZED', message: 'Authentication required' },
     });
   });
 });

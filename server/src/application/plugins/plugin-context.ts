@@ -1,6 +1,16 @@
 import * as fs from 'fs';
-import type { Permission, PluginInstance } from '@zclaudia/shared/plugin-types';
-import { pluginEvents } from '../../infra/events/index.js';
+import type Database from 'better-sqlite3';
+import type {
+  CommandHandler as PluginCommandHandler,
+  Permission,
+  PluginContext,
+  PluginInstance,
+  ToolRegistration,
+  UIExtensionRegistration,
+  WorkflowStepHandler,
+} from '@zclaudia/shared/plugin-types';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages';
+import { pluginEvents, type EventData, type EventListener } from '../../infra/events/index.js';
 import { mcpClientManager } from '../../utils/mcp-client-manager.js';
 import { loadMcpServersFromDb } from '../../utils/mcp-config.js';
 import { commandRegistry } from '../commands/registry.js';
@@ -10,14 +20,17 @@ import { pluginScheduler } from './scheduler.js';
 import { pluginStorageManager } from './storage.js';
 import { toolRegistry } from './tool-registry.js';
 import { workflowStepRegistry } from './workflow-step-registry.js';
+import type { CommandHandler as ServerCommandHandler } from '../commands/registry.js';
 
-type PluginDatabase = import('better-sqlite3').Database;
+type PluginDatabase = Database.Database;
+type RuntimePluginContext = PluginContext & Record<string, unknown>;
+type RuntimeToolRegistration = ToolRegistration & { permissions?: Permission[] };
 
 export interface PluginContextOptions {
   pluginId: string;
   instance: PluginInstance | undefined;
   db: PluginDatabase | null;
-  broadcast: ((msg: any) => void) | null;
+  broadcast: ((msg: ServerMessage) => void) | null;
   pluginAPIs: Map<string, unknown>;
 }
 
@@ -27,7 +40,7 @@ export interface PluginContextOptions {
  * Keeping this out of PluginLoader makes the loader responsible for lifecycle
  * orchestration, while this module owns the plugin-facing API surface.
  */
-export function createPluginContext(options: PluginContextOptions): any {
+export function createPluginContext(options: PluginContextOptions): RuntimePluginContext {
   const { pluginId, instance, db, broadcast, pluginAPIs } = options;
   const manifest = instance?.manifest;
 
@@ -39,14 +52,17 @@ export function createPluginContext(options: PluginContextOptions): any {
     storage: pluginStorageManager.getStorage(pluginId),
 
     events: {
-      on: (event: string, handler: (data: any) => void | Promise<void>) => {
+      on: (event: string, handler: (data: unknown) => void | Promise<void>) => {
         return pluginEvents.on(event, handler, pluginId);
       },
-      once: (event: string, handler: (data: any) => void | Promise<void>) => {
+      once: (event: string, handler: (data: unknown) => void | Promise<void>) => {
         pluginEvents.once(event, handler, pluginId);
       },
-      emit: async (event: string, data: any = {}) => {
-        await pluginEvents.emit(event, data, pluginId);
+      off: (event: string, handler: (data: unknown) => void | Promise<void>) => {
+        pluginEvents.off(event, handler as EventListener);
+      },
+      emit: async (event: string, data: unknown = {}) => {
+        await pluginEvents.emit(event, data as EventData, pluginId);
       },
     },
 
@@ -66,16 +82,17 @@ export function createPluginContext(options: PluginContextOptions): any {
     },
 
     commands: {
-      registerCommand: (command: string, handler: any) => {
+      registerCommand: (command: string, handler: PluginCommandHandler) => {
         const normalized = command.startsWith('/') ? command : `/${command}`;
         const existing = commandRegistry.get(normalized);
-        const description = (existing?.pluginId === pluginId && existing.description)
-          ? existing.description
-          : `Command from ${pluginId}`;
+        const description =
+          existing?.pluginId === pluginId && existing.description
+            ? existing.description
+            : `Command from ${pluginId}`;
         commandRegistry.register({
           command: normalized,
           description,
-          handler,
+          handler: handler as ServerCommandHandler,
           source: 'plugin',
           pluginId,
         });
@@ -87,7 +104,7 @@ export function createPluginContext(options: PluginContextOptions): any {
     },
 
     tools: {
-      registerTool: (tool: any) => {
+      registerTool: (tool: RuntimeToolRegistration) => {
         toolRegistry.register({
           id: tool.id,
           definition: {
@@ -109,8 +126,14 @@ export function createPluginContext(options: PluginContextOptions): any {
       },
     },
 
+    registerUIExtension: (_extension: UIExtensionRegistration): void => {
+      throw new Error(
+        'Runtime UI extension registration is not available; declare UI in manifest.'
+      );
+    },
+
     workflowSteps: {
-      registerWorkflowStep: (stepId: string, handler: any) => {
+      registerWorkflowStep: (stepId: string, handler: WorkflowStepHandler) => {
         const fullType = `${pluginId}/${stepId}`;
         const existing = workflowStepRegistry.get(fullType);
         if (existing) {
@@ -193,7 +216,10 @@ export function createPluginContext(options: PluginContextOptions): any {
     // Network API (requires network.fetch permission)
     network: permissionManager.hasPermission(pluginId, 'network.fetch' as Permission)
       ? {
-          fetch: async (url: string, options?: Record<string, unknown>): Promise<{ ok: boolean; status: number; body: string }> => {
+          fetch: async (
+            url: string,
+            options?: Record<string, unknown>
+          ): Promise<{ ok: boolean; status: number; body: string }> => {
             if (!permissionManager.hasPermission(pluginId, 'network.fetch' as Permission))
               throw new Error('Permission denied: network.fetch');
             const response = await globalThis.fetch(url, options as RequestInit);
@@ -206,11 +232,15 @@ export function createPluginContext(options: PluginContextOptions): any {
     // Shell API (requires shell.execute permission)
     shell: permissionManager.hasPermission(pluginId, 'shell.execute' as Permission)
       ? {
-          execute: async (command: string, args?: string[], execOptions?: { cwd?: string }): Promise<{ stdout: string; stderr: string; code: number }> => {
+          execute: async (
+            command: string,
+            args?: string[],
+            execOptions?: { cwd?: string }
+          ): Promise<{ stdout: string; stderr: string; code: number }> => {
             if (!permissionManager.hasPermission(pluginId, 'shell.execute' as Permission))
               throw new Error('Permission denied: shell.execute');
             const { execFile } = await import('child_process');
-            return new Promise((resolve) => {
+            return new Promise(resolve => {
               execFile(command, args || [], { cwd: execOptions?.cwd }, (error, stdout, stderr) => {
                 resolve({
                   stdout: stdout || '',
@@ -226,11 +256,19 @@ export function createPluginContext(options: PluginContextOptions): any {
     // Notification API (requires notification permission)
     notification: permissionManager.hasPermission(pluginId, 'notification' as Permission)
       ? {
-          show: async (title: string, body: string, notificationOptions?: { notchTab?: string }): Promise<void> => {
+          show: async (
+            title: string,
+            body: string,
+            notificationOptions?: { notchTab?: string }
+          ): Promise<void> => {
             if (!permissionManager.hasPermission(pluginId, 'notification' as Permission))
               throw new Error('Permission denied: notification');
-            const notchTab = notificationOptions?.notchTab ? `${pluginId}/${notificationOptions.notchTab}` : undefined;
-            pluginEvents.emit('plugin.notification', { pluginId, title, body, notchTab }).catch(() => {});
+            const notchTab = notificationOptions?.notchTab
+              ? `${pluginId}/${notificationOptions.notchTab}`
+              : undefined;
+            pluginEvents
+              .emit('plugin.notification', { pluginId, title, body, notchTab })
+              .catch(() => {});
             broadcast?.({ type: 'plugin_notification', pluginId, title, body, notchTab });
           },
         }
@@ -241,7 +279,7 @@ export function createPluginContext(options: PluginContextOptions): any {
       ? {
           register: (
             task: { id: string; name: string; intervalMs: number; immediate?: boolean },
-            handler: () => Promise<void> | void,
+            handler: () => Promise<void> | void
           ) => {
             return pluginScheduler.register(
               pluginId,
@@ -249,7 +287,7 @@ export function createPluginContext(options: PluginContextOptions): any {
               task.name,
               task.intervalMs,
               handler,
-              task.immediate !== false,
+              task.immediate !== false
             );
           },
           unregister: (taskId: string) => {
@@ -277,78 +315,110 @@ export function createPluginContext(options: PluginContextOptions): any {
     })(),
 
     // Session API (requires session.read permission)
-    session: permissionManager.hasPermission(pluginId, 'session.read' as Permission) && db
-      ? {
-          getActive: async () => null,
-          getById: async (id: string) => {
-            return db.prepare(
-              'SELECT id, project_id as projectId, name, created_at as createdAt, updated_at as updatedAt FROM sessions WHERE id = ?'
-            ).get(id) || null;
-          },
-          list: async () => {
-            return db.prepare(
-              'SELECT id, project_id as projectId, name, created_at as createdAt, updated_at as updatedAt FROM sessions WHERE archived_at IS NULL ORDER BY updated_at DESC LIMIT 50'
-            ).all();
-          },
-        }
-      : undefined,
+    session:
+      permissionManager.hasPermission(pluginId, 'session.read' as Permission) && db
+        ? {
+            getActive: async () => null,
+            getById: async (id: string) => {
+              return (
+                db
+                  .prepare(
+                    'SELECT id, project_id as projectId, name, created_at as createdAt, updated_at as updatedAt FROM sessions WHERE id = ?'
+                  )
+                  .get(id) || null
+              );
+            },
+            list: async () => {
+              return db
+                .prepare(
+                  'SELECT id, project_id as projectId, name, created_at as createdAt, updated_at as updatedAt FROM sessions WHERE archived_at IS NULL ORDER BY updated_at DESC LIMIT 50'
+                )
+                .all();
+            },
+          }
+        : undefined,
 
     // Project API (requires project.read permission)
-    project: permissionManager.hasPermission(pluginId, 'project.read' as Permission) && db
-      ? {
-          getActive: async () => null,
-          getById: async (id: string) => {
-            return db.prepare(
-              'SELECT id, name, root_path as path FROM projects WHERE id = ?'
-            ).get(id) || null;
-          },
-          list: async () => {
-            return db.prepare(
-              'SELECT id, name, root_path as path FROM projects ORDER BY updated_at DESC LIMIT 50'
-            ).all();
-          },
-        }
-      : undefined,
+    project:
+      permissionManager.hasPermission(pluginId, 'project.read' as Permission) && db
+        ? {
+            getActive: async () => null,
+            getById: async (id: string) => {
+              return (
+                db
+                  .prepare('SELECT id, name, root_path as path FROM projects WHERE id = ?')
+                  .get(id) || null
+              );
+            },
+            list: async () => {
+              return db
+                .prepare(
+                  'SELECT id, name, root_path as path FROM projects ORDER BY updated_at DESC LIMIT 50'
+                )
+                .all();
+            },
+          }
+        : undefined,
 
     // Provider API (requires provider.call permission)
-    providers: db && permissionManager.hasPermission(pluginId, 'provider.call')
-      ? createProviderAPI(db, pluginId)
-      : undefined,
+    providers:
+      db && permissionManager.hasPermission(pluginId, 'provider.call')
+        ? createProviderAPI(db, pluginId)
+        : undefined,
 
     // MCP API (requires network.fetch permission; operates through server-side manager)
-    mcp: permissionManager.hasPermission(pluginId, 'network.fetch') && db
-      ? {
-          listServers: async () => {
-            const rows = db.prepare(
-              'SELECT name, enabled, description FROM mcp_servers ORDER BY name ASC',
-            ).all() as Array<{ name: string; enabled: number; description: string | null }>;
-            return rows.map((r) => ({ name: r.name, enabled: !!r.enabled, description: r.description || undefined }));
-          },
-          listTools: async (serverName: string) => {
-            const config = loadMcpServersFromDb(db)[serverName];
-            if (!config) return [];
-            const tools = await mcpClientManager.listTools(serverName, config);
-            return tools.map((t: { name: string; description?: string; inputSchema?: Record<string, unknown> }) => ({
-              name: t.name,
-              description: t.description,
-              inputSchema: t.inputSchema,
-            }));
-          },
-          callTool: async <T = unknown>(serverName: string, tool: string, args: Record<string, unknown>): Promise<T> => {
-            const config = loadMcpServersFromDb(db)[serverName];
-            if (!config) throw new Error(`MCP server "${serverName}" not found or disabled`);
-            const result = await mcpClientManager.callTool(serverName, config, tool, args);
-            const content = (result as { content?: Array<{ type: string; text?: string }> })?.content;
-            const text = content?.find((c) => c.type === 'text')?.text;
-            try {
-              return text ? JSON.parse(text) as T : result as T;
-            } catch {
-              console.debug(`[PluginContext] MCP callTool (${serverName}.${tool}) returned non-JSON:`, text?.slice(0, 100));
-              return (text ?? result) as T;
-            }
-          },
-        }
-      : undefined,
+    mcp:
+      permissionManager.hasPermission(pluginId, 'network.fetch') && db
+        ? {
+            listServers: async () => {
+              const rows = db
+                .prepare('SELECT name, enabled, description FROM mcp_servers ORDER BY name ASC')
+                .all() as Array<{ name: string; enabled: number; description: string | null }>;
+              return rows.map(r => ({
+                name: r.name,
+                enabled: !!r.enabled,
+                description: r.description || undefined,
+              }));
+            },
+            listTools: async (serverName: string) => {
+              const config = loadMcpServersFromDb(db)[serverName];
+              if (!config) return [];
+              const tools = await mcpClientManager.listTools(serverName, config);
+              return tools.map(
+                (t: {
+                  name: string;
+                  description?: string;
+                  inputSchema?: Record<string, unknown>;
+                }) => ({
+                  name: t.name,
+                  description: t.description,
+                  inputSchema: t.inputSchema,
+                })
+              );
+            },
+            callTool: async <T = unknown>(
+              serverName: string,
+              tool: string,
+              args: Record<string, unknown>
+            ): Promise<T> => {
+              const config = loadMcpServersFromDb(db)[serverName];
+              if (!config) throw new Error(`MCP server "${serverName}" not found or disabled`);
+              const result = await mcpClientManager.callTool(serverName, config, tool, args);
+              const content = (result as { content?: Array<{ type: string; text?: string }> })
+                ?.content;
+              const text = content?.find(c => c.type === 'text')?.text;
+              try {
+                return text ? (JSON.parse(text) as T) : (result as T);
+              } catch {
+                console.debug(
+                  `[PluginContext] MCP callTool (${serverName}.${tool}) returned non-JSON:`,
+                  text?.slice(0, 100)
+                );
+                return (text ?? result) as T;
+              }
+            },
+          }
+        : undefined,
 
     capabilities: instance?.capabilities,
 

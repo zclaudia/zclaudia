@@ -4,18 +4,29 @@ import { AgentRequiredDialog } from '../AgentRequiredDialog';
 
 describe('AgentRequiredDialog', () => {
   it('renders the body for the given reason', () => {
-    render(<AgentRequiredDialog open reason="no_credential" onClose={() => {}} onConfigure={() => {}} />);
+    render(
+      <AgentRequiredDialog open reason="no_credential" onClose={() => {}} onConfigure={() => {}} />
+    );
     expect(screen.getByText(/API key/i)).toBeTruthy();
   });
 
   it('does not render when closed', () => {
-    const { container } = render(<AgentRequiredDialog open={false} reason="no_agent" onClose={() => {}} onConfigure={() => {}} />);
+    const { container } = render(
+      <AgentRequiredDialog
+        open={false}
+        reason="no_agent"
+        onClose={() => {}}
+        onConfigure={() => {}}
+      />
+    );
     expect(container.textContent).toBe('');
   });
 
   it('primary button calls onConfigure with the mapped settings tab', () => {
     const onConfigure = vi.fn();
-    render(<AgentRequiredDialog open reason="no_agent" onClose={() => {}} onConfigure={onConfigure} />);
+    render(
+      <AgentRequiredDialog open reason="no_agent" onClose={() => {}} onConfigure={onConfigure} />
+    );
     fireEvent.click(screen.getByText('Configure →'));
     expect(onConfigure).toHaveBeenCalledWith('agents');
   });

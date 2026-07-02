@@ -20,7 +20,9 @@ test.describe('Multi-Server', () => {
 
   // Helper: Open server management
   async function openServerManagement(page: any): Promise<boolean> {
-    const serverBtn = page.locator('button[title*="Server"], [data-testid="server-management"]').first();
+    const serverBtn = page
+      .locator('button[title*="Server"], [data-testid="server-management"]')
+      .first();
     if (await serverBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
       await serverBtn.click();
       await page.waitForTimeout(500);
@@ -39,7 +41,9 @@ test.describe('Multi-Server', () => {
 
     if (opened) {
       // Look for server list
-      const serverList = page.locator('[class*="server-list"], [data-testid="server-list"]').first();
+      const serverList = page
+        .locator('[class*="server-list"], [data-testid="server-list"]')
+        .first();
       const hasList = await serverList.isVisible({ timeout: 2000 }).catch(() => false);
 
       if (hasList) {
@@ -116,7 +120,11 @@ test.describe('Multi-Server', () => {
       const firstIndicator = statusIndicators.first();
       const className = await firstIndicator.getAttribute('class').catch(() => '');
 
-      if (className.includes('connected') || className.includes('online') || className.includes('active')) {
+      if (
+        className.includes('connected') ||
+        className.includes('online') ||
+        className.includes('active')
+      ) {
         console.log('  ✓ Connected status shown');
       }
     }
@@ -169,7 +177,7 @@ test.describe('Multi-Server', () => {
     if (opened) {
       // Find non-active server to remove
       const serverItems = page.locator('[class*="server-item"]').filter({
-        hasNot: page.locator('[class*="active"]')
+        hasNot: page.locator('[class*="active"]'),
       });
 
       const count = await serverItems.count();
@@ -180,14 +188,18 @@ test.describe('Multi-Server', () => {
         await page.waitForTimeout(300);
 
         // Look for remove button
-        const removeBtn = firstRemovable.locator('button[title*="Remove"], button[title*="Delete"]').first();
+        const removeBtn = firstRemovable
+          .locator('button[title*="Remove"], button[title*="Delete"]')
+          .first();
         const hasRemove = await removeBtn.isVisible({ timeout: 1000 }).catch(() => false);
 
         if (hasRemove) {
           await removeBtn.click();
 
           // Confirm removal
-          const confirmBtn = page.locator('button:has-text("Confirm"), button:has-text("Remove")').first();
+          const confirmBtn = page
+            .locator('button:has-text("Confirm"), button:has-text("Remove")')
+            .first();
           if (await confirmBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
             await confirmBtn.click();
             await page.waitForTimeout(500);
@@ -210,7 +222,9 @@ test.describe('Multi-Server', () => {
 
     if (opened) {
       // Look for test connection button
-      const testBtn = page.locator('button:has-text("Test"), button[title*="Test Connection"]').first();
+      const testBtn = page
+        .locator('button:has-text("Test"), button[title*="Test Connection"]')
+        .first();
       const hasTest = await testBtn.isVisible({ timeout: 2000 }).catch(() => false);
 
       if (hasTest) {
@@ -218,7 +232,9 @@ test.describe('Multi-Server', () => {
         await page.waitForTimeout(2000);
 
         // Check for result
-        const resultIndicator = page.locator('[class*="test-result"], text=/Success|Failed/i').first();
+        const resultIndicator = page
+          .locator('[class*="test-result"], text=/Success|Failed/i')
+          .first();
         const hasResult = await resultIndicator.isVisible({ timeout: 3000 }).catch(() => false);
 
         if (hasResult) {
@@ -246,7 +262,9 @@ test.describe('Multi-Server', () => {
       await page.waitForTimeout(300);
 
       // Look for settings button
-      const settingsBtn = serverItem.locator('button[title*="Settings"], button[title*="Configure"]').first();
+      const settingsBtn = serverItem
+        .locator('button[title*="Settings"], button[title*="Configure"]')
+        .first();
       const hasSettings = await settingsBtn.isVisible({ timeout: 1000 }).catch(() => false);
 
       if (hasSettings) {
@@ -278,7 +296,9 @@ test.describe('Multi-Server', () => {
 
     if (count > 0) {
       // Check for server origin indicators
-      const serverOriginIndicators = page.locator('[class*="server-origin"], [class*="server-badge"]');
+      const serverOriginIndicators = page.locator(
+        '[class*="server-origin"], [class*="server-badge"]'
+      );
       const originCount = await serverOriginIndicators.count();
 
       if (originCount > 0) {
@@ -304,7 +324,9 @@ test.describe('Multi-Server', () => {
     }
 
     // Check for project filtering by server
-    const serverFilter = page.locator('[data-testid="server-filter"], select[name*="server"]').first();
+    const serverFilter = page
+      .locator('[data-testid="server-filter"], select[name*="server"]')
+      .first();
     const hasFilter = await serverFilter.isVisible({ timeout: 1000 }).catch(() => false);
 
     if (hasFilter) {
@@ -324,7 +346,9 @@ test.describe('Multi-Server', () => {
 
     if (opened) {
       // Look for set as default option
-      const defaultBtn = page.locator('button:has-text("Set as Default"), button[title*="Default"]').first();
+      const defaultBtn = page
+        .locator('button:has-text("Set as Default"), button[title*="Default"]')
+        .first();
       const hasDefault = await defaultBtn.isVisible({ timeout: 2000 }).catch(() => false);
 
       if (hasDefault) {
@@ -354,8 +378,12 @@ test.describe('Multi-Server', () => {
     await page.waitForTimeout(2000);
 
     // Look for reconnecting indicator
-    const reconnectingIndicator = page.locator('[class*="reconnecting"], text=/Reconnecting|Offline/i').first();
-    const hasReconnecting = await reconnectingIndicator.isVisible({ timeout: 3000 }).catch(() => false);
+    const reconnectingIndicator = page
+      .locator('[class*="reconnecting"], text=/Reconnecting|Offline/i')
+      .first();
+    const hasReconnecting = await reconnectingIndicator
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
 
     if (hasReconnecting) {
       console.log('  ✓ Reconnecting indicator shown');
@@ -383,7 +411,9 @@ test.describe('Multi-Server', () => {
     console.log('Test MS12: Server health monitoring');
 
     // Look for health indicators
-    const healthIndicator = page.locator('[class*="health"], [data-testid="server-health"]').first();
+    const healthIndicator = page
+      .locator('[class*="health"], [data-testid="server-health"]')
+      .first();
     const hasHealth = await healthIndicator.isVisible({ timeout: 2000 }).catch(() => false);
 
     if (hasHealth) {

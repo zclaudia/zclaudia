@@ -1,8 +1,5 @@
 import type { Database } from 'better-sqlite3';
-import type {
-  AttachmentKind,
-  AttachmentOwnerKind,
-} from '@zclaudia/shared/features/attachment';
+import type { AttachmentKind, AttachmentOwnerKind } from '@zclaudia/shared/features/attachment';
 import { newId } from '../../utils/uuid.js';
 import { BaseRepository } from '../../infra/repositories/base.js';
 
@@ -116,16 +113,13 @@ export class AttachmentRepository extends BaseRepository<
       .prepare(
         `SELECT * FROM attachments
          WHERE owner_kind = ? AND owner_id = ?
-         ORDER BY sort_order ASC, created_at ASC`,
+         ORDER BY sort_order ASC, created_at ASC`
       )
       .all(ownerKind, ownerId);
-    return rows.map((r) => this.mapRow(r));
+    return rows.map(r => this.mapRow(r));
   }
 
-  countByOwners(
-    ownerKind: AttachmentOwnerKind,
-    ownerIds: string[],
-  ): Map<string, number> {
+  countByOwners(ownerKind: AttachmentOwnerKind, ownerIds: string[]): Map<string, number> {
     const result = new Map<string, number>();
     if (ownerIds.length === 0) return result;
     const placeholders = ownerIds.map(() => '?').join(',');
@@ -134,7 +128,7 @@ export class AttachmentRepository extends BaseRepository<
         `SELECT owner_id, COUNT(*) AS count
          FROM attachments
          WHERE owner_kind = ? AND owner_id IN (${placeholders})
-         GROUP BY owner_id`,
+         GROUP BY owner_id`
       )
       .all(ownerKind, ...ownerIds) as Array<{ owner_id: string; count: number }>;
     for (const row of rows) {
@@ -143,10 +137,7 @@ export class AttachmentRepository extends BaseRepository<
     return result;
   }
 
-  deleteByOwner(
-    ownerKind: AttachmentOwnerKind,
-    ownerId: string,
-  ): AttachmentRow[] {
+  deleteByOwner(ownerKind: AttachmentOwnerKind, ownerId: string): AttachmentRow[] {
     const rows = this.findByOwner(ownerKind, ownerId);
     if (rows.length === 0) return rows;
     this.db

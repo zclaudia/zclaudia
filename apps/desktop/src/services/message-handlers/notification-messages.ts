@@ -8,28 +8,36 @@ import { parseBackendId } from '../../stores/gatewayStore';
 
 function resolveOwnerBackendId(backendId: string | null, serverId: string): string {
   const rawBackendId = backendId || parseBackendId(serverId) || serverId;
-  return resolveCanonicalBackendId(rawBackendId, resolveLocalBackendId() ?? rawBackendId) ?? rawBackendId;
+  return (
+    resolveCanonicalBackendId(rawBackendId, resolveLocalBackendId() ?? rawBackendId) ?? rawBackendId
+  );
 }
 
 export function handleNotificationMessage(
   msg: ServerMessage,
   serverId: string,
-  backendId: string | null,
+  backendId: string | null
 ): boolean {
   switch (msg.type) {
     case 'notification_update': {
       const { item } = msg as import('@zclaudia/shared').NotificationUpdateMessage;
       const ownerBackendId = resolveOwnerBackendId(backendId, serverId);
-      import('../../stores/notificationFeedStore').then(m => m.useNotificationFeedStore.getState().upsertItem({
-        ...item,
-        ownerBackendId: item.ownerBackendId ?? ownerBackendId,
-      }));
+      import('../../stores/notificationFeedStore').then(m =>
+        m.useNotificationFeedStore.getState().upsertItem({
+          ...item,
+          ownerBackendId: item.ownerBackendId ?? ownerBackendId,
+        })
+      );
       if (item.status === 'completed' || item.status === 'failed') {
-        const notchTab = item.initiator === 'claudia' ? 'claudia' as const : 'sessions' as const;
+        const notchTab =
+          item.initiator === 'claudia' ? ('claudia' as const) : ('sessions' as const);
         import('../../stores/toastStore').then(m => {
           m.useToastStore.getState().add({
             title: item.title,
-            message: item.status === 'completed' ? (item.summary?.slice(0, 100) || 'Task completed') : (item.error?.slice(0, 100) || 'Task failed'),
+            message:
+              item.status === 'completed'
+                ? item.summary?.slice(0, 100) || 'Task completed'
+                : item.error?.slice(0, 100) || 'Task failed',
             type: item.status === 'completed' ? 'success' : 'error',
             projectId: item.projectId,
             sessionId: item.sessionId,
@@ -48,14 +56,14 @@ export function handleNotificationMessage(
       const ownerBackendId = resolveOwnerBackendId(backendId, serverId);
       import('../../stores/notificationFeedStore').then(m => {
         m.useNotificationFeedStore.getState().setFeedList(
-          feedMsg.items.map((item) => ({
+          feedMsg.items.map(item => ({
             ...item,
             ownerBackendId: item.ownerBackendId ?? ownerBackendId,
           })),
           feedMsg.hasMore,
           feedMsg.unreadCount,
           feedMsg.unreadCountsByTab,
-          feedMsg.append,
+          feedMsg.append
         );
         m.useNotificationFeedStore.getState().setLoading(false);
       });
@@ -69,12 +77,14 @@ export function handleNotificationMessage(
           m.useNotificationFeedStore.getState().markAllRead(readMsg.readAt);
           return;
         }
-        m.useNotificationFeedStore.getState().markRead(
-          readMsg.itemIds,
-          readMsg.unreadCount,
-          readMsg.unreadCountsByTab,
-          readMsg.readAt,
-        );
+        m.useNotificationFeedStore
+          .getState()
+          .markRead(
+            readMsg.itemIds,
+            readMsg.unreadCount,
+            readMsg.unreadCountsByTab,
+            readMsg.readAt
+          );
       });
       return true;
     }

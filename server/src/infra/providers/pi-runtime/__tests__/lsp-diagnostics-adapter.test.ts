@@ -2,7 +2,11 @@ import { mkdtempSync, rmSync, writeFileSync } from 'fs';
 import * as path from 'path';
 import { tmpdir } from 'os';
 import { describe, expect, it, vi } from 'vitest';
-import { createLspDiagnosticsAdapter, filePathToUri, type LspTransport } from '../lsp-diagnostics-adapter.js';
+import {
+  createLspDiagnosticsAdapter,
+  filePathToUri,
+  type LspTransport,
+} from '../lsp-diagnostics-adapter.js';
 
 describe('lsp diagnostics adapter', () => {
   it('sends LSP document notifications and converts publishDiagnostics into write diagnostics', async () => {
@@ -17,12 +21,14 @@ describe('lsp diagnostics adapter', () => {
         if (method === 'textDocument/didSave') {
           handlers.get('textDocument/publishDiagnostics')?.({
             uri: filePathToUri(filePath),
-            diagnostics: [{
-              range: { start: { line: 0, character: 6 } },
-              severity: 1,
-              message: 'Type mismatch',
-              source: 'tsserver',
-            }],
+            diagnostics: [
+              {
+                range: { start: { line: 0, character: 6 } },
+                severity: 1,
+                message: 'Type mismatch',
+                source: 'tsserver',
+              },
+            ],
           });
         }
       }),
@@ -56,7 +62,14 @@ describe('lsp diagnostics adapter', () => {
       'textDocument/didSave',
     ]);
     expect(diagnostics).toEqual([
-      { path: 'f.ts', line: 1, column: 7, severity: 'error', message: 'Type mismatch', source: 'tsserver' },
+      {
+        path: 'f.ts',
+        line: 1,
+        column: 7,
+        severity: 'error',
+        message: 'Type mismatch',
+        source: 'tsserver',
+      },
     ]);
   });
 });

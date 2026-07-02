@@ -9,7 +9,7 @@ interface SupervisorContextDeps {
     projectId: string,
     event: SupervisionLogEvent,
     detail?: Record<string, unknown>,
-    taskId?: string,
+    taskId?: string
   ) => void;
 }
 

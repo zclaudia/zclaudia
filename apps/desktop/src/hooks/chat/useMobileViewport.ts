@@ -8,7 +8,10 @@ const KEYBOARD_OVERLAY_THRESHOLD_PX = 80;
  * alone. When the keyboard overlays the webview, pin the chat root to the
  * visual viewport so the composer remains visible.
  */
-export function useMobileViewport(chatRootRef: RefObject<HTMLDivElement | null>, isMobile: boolean) {
+export function useMobileViewport(
+  chatRootRef: RefObject<HTMLDivElement | null>,
+  isMobile: boolean
+) {
   useEffect(() => {
     if (!isMobile) return;
     const vv = window.visualViewport;
@@ -27,7 +30,8 @@ export function useMobileViewport(chatRootRef: RefObject<HTMLDivElement | null>,
       const el = chatRootRef.current;
       if (!el) return;
 
-      const keyboardOverlaysWebview = window.innerHeight - vv.height > KEYBOARD_OVERLAY_THRESHOLD_PX;
+      const keyboardOverlaysWebview =
+        window.innerHeight - vv.height > KEYBOARD_OVERLAY_THRESHOLD_PX;
       if (keyboardOverlaysWebview) {
         el.style.position = 'fixed';
         el.style.top = `${vv.offsetTop || 0}px`;

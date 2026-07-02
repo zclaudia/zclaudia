@@ -14,8 +14,8 @@ describe('LlmProfileRepository', () => {
       prepare: vi.fn().mockReturnValue({
         all: vi.fn(),
         get: vi.fn(),
-        run: vi.fn()
-      })
+        run: vi.fn(),
+      }),
     };
 
     repository = new LlmProfileRepository(mockDb);
@@ -33,7 +33,7 @@ describe('LlmProfileRepository', () => {
         request_headers: '{"X-Test-Header":"test-value"}',
         is_default: 1,
         created_at: 1000,
-        updated_at: 2000
+        updated_at: 2000,
       };
 
       const result = repository.mapRow(row);
@@ -48,7 +48,7 @@ describe('LlmProfileRepository', () => {
         requestHeaders: { 'X-Test-Header': 'test-value' },
         isDefault: true,
         createdAt: 1000,
-        updatedAt: 2000
+        updatedAt: 2000,
       });
     });
 
@@ -63,7 +63,7 @@ describe('LlmProfileRepository', () => {
         request_headers: null,
         is_default: 0,
         created_at: 1000,
-        updated_at: 2000
+        updated_at: 2000,
       };
 
       const result = repository.mapRow(row);
@@ -86,14 +86,14 @@ describe('LlmProfileRepository', () => {
         request_headers: '{"X-Header-1":"value1","X-Header-2":"value2"}',
         is_default: 0,
         created_at: 1000,
-        updated_at: 2000
+        updated_at: 2000,
       };
 
       const result = repository.mapRow(row);
 
       expect(result.requestHeaders).toEqual({
         'X-Header-1': 'value1',
-        'X-Header-2': 'value2'
+        'X-Header-2': 'value2',
       });
     });
   });
@@ -104,7 +104,7 @@ describe('LlmProfileRepository', () => {
         name: 'New Provider',
         providerType: 'anthropic',
         requestHeaders: { 'X-Api-Key': 'test' },
-        isDefault: true
+        isDefault: true,
       };
 
       const { sql, params } = repository.createQuery(data);
@@ -126,7 +126,7 @@ describe('LlmProfileRepository', () => {
 
     it('uses default provider type when not specified', () => {
       const data = {
-        name: 'Default Type'
+        name: 'Default Type',
       } as any;
 
       const { params } = repository.createQuery(data);
@@ -189,7 +189,7 @@ describe('LlmProfileRepository', () => {
 
     it('handles requestHeaders JSON serialization', () => {
       const { sql, params } = repository.updateQuery('prov-123', {
-        requestHeaders: { 'X-New-Header': 'new-value' }
+        requestHeaders: { 'X-New-Header': 'new-value' },
       });
 
       expect(sql).toContain('request_headers = ?');
@@ -206,7 +206,7 @@ describe('LlmProfileRepository', () => {
 
     it('converts isDefault to integer', () => {
       const { params } = repository.updateQuery('prov-123', {
-        isDefault: true
+        isDefault: true,
       });
 
       expect(params).toContain(1);
@@ -241,7 +241,12 @@ describe('LlmProfileRepository', () => {
       };
 
       const result = repository.mapRow(row);
-      expect(result.oauthCredentials).toEqual({ access: 'a', refresh: 'r', expires: 1, accountId: 'acct_x' });
+      expect(result.oauthCredentials).toEqual({
+        access: 'a',
+        refresh: 'r',
+        expires: 1,
+        accountId: 'acct_x',
+      });
     });
 
     it('mapRow yields undefined when oauth_credentials is null', () => {
@@ -295,7 +300,7 @@ describe('LlmProfileRepository', () => {
         compat: null,
         is_default: 1,
         created_at: 1000,
-        updated_at: 2000
+        updated_at: 2000,
       };
       mockDb.prepare().get.mockReturnValue(mockRow);
 
@@ -327,7 +332,7 @@ describe('LlmProfileRepository', () => {
         compat: null,
         is_default: 1,
         created_at: 1000,
-        updated_at: 2000
+        updated_at: 2000,
       };
 
       mockDb.prepare().run.mockReturnValue({ changes: 1 });
@@ -455,8 +460,8 @@ describe('LlmProfileRepository — new fields (baseUrl / apiKey / compat)', () =
       providerType: 'openai',
       requestHeaders: { 'X-Foo': 'bar' },
     });
-    repo.update(created.id, { requestHeaders: undefined });  // undefined = no change
-    repo.update(created.id, { requestHeaders: null as any });  // null = clear
+    repo.update(created.id, { requestHeaders: undefined }); // undefined = no change
+    repo.update(created.id, { requestHeaders: null as any }); // null = clear
     const found = repo.findById(created.id);
     expect(found?.requestHeaders).toBeUndefined();
   });

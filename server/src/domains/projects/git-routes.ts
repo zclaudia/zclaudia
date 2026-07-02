@@ -39,19 +39,27 @@ function sendError(res: Response, error: unknown, fallbackMessage: string): void
     return;
   }
   if (error instanceof WorktreeNotFoundError) {
-    res.status(404).json({ success: false, error: { code: 'WORKTREE_NOT_FOUND', message: error.message } });
+    res
+      .status(404)
+      .json({ success: false, error: { code: 'WORKTREE_NOT_FOUND', message: error.message } });
     return;
   }
   if (error instanceof ProjectRootPathMissingError) {
-    res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: error.message } });
+    res
+      .status(400)
+      .json({ success: false, error: { code: 'VALIDATION_ERROR', message: error.message } });
     return;
   }
   if (error instanceof SupervisorManagedWorktreeError) {
-    res.status(409).json({ success: false, error: { code: 'SUPERVISOR_MANAGED', message: error.message } });
+    res
+      .status(409)
+      .json({ success: false, error: { code: 'SUPERVISOR_MANAGED', message: error.message } });
     return;
   }
   if (error instanceof MainWorktreeError) {
-    res.status(409).json({ success: false, error: { code: 'MAIN_WORKTREE', message: error.message } });
+    res
+      .status(409)
+      .json({ success: false, error: { code: 'MAIN_WORKTREE', message: error.message } });
     return;
   }
   if (error instanceof GitOperationError) {
@@ -86,7 +94,9 @@ export function createGitRoutes(db: Database.Database, deps: GitRoutesDeps = {})
   router.delete('/:id/worktrees', async (req: Request, res: Response) => {
     const { path: worktreePath } = (req.body ?? {}) as { path?: string };
     if (!worktreePath || !worktreePath.trim()) {
-      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'path is required' } });
+      res
+        .status(400)
+        .json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'path is required' } });
       return;
     }
     try {
@@ -100,7 +110,9 @@ export function createGitRoutes(db: Database.Database, deps: GitRoutesDeps = {})
   router.get('/:id/worktrees/status', async (req: Request, res: Response) => {
     const wt = typeof req.query.path === 'string' ? req.query.path : '';
     if (!wt.trim()) {
-      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'path is required' } });
+      res
+        .status(400)
+        .json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'path is required' } });
       return;
     }
     try {
@@ -116,7 +128,10 @@ export function createGitRoutes(db: Database.Database, deps: GitRoutesDeps = {})
   router.get('/:id/git/branches', async (req: Request, res: Response) => {
     const wt = getWorktreeParam(req);
     if (!wt) {
-      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'worktree is required' } });
+      res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'worktree is required' },
+      });
       return;
     }
     try {
@@ -131,7 +146,10 @@ export function createGitRoutes(db: Database.Database, deps: GitRoutesDeps = {})
   router.get('/:id/git/status', async (req: Request, res: Response) => {
     const wt = getWorktreeParam(req);
     if (!wt) {
-      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'worktree is required' } });
+      res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'worktree is required' },
+      });
       return;
     }
     try {
@@ -148,7 +166,10 @@ export function createGitRoutes(db: Database.Database, deps: GitRoutesDeps = {})
     const file = typeof req.query.file === 'string' ? req.query.file : '';
     const kind = typeof req.query.kind === 'string' ? req.query.kind : '';
     if (!wt || !file.trim() || !['staged', 'unstaged', 'untracked'].includes(kind)) {
-      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'worktree, file and kind are required' } });
+      res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'worktree, file and kind are required' },
+      });
       return;
     }
     try {
@@ -163,7 +184,10 @@ export function createGitRoutes(db: Database.Database, deps: GitRoutesDeps = {})
   router.get('/:id/git/log', async (req: Request, res: Response) => {
     const wt = getWorktreeParam(req);
     if (!wt) {
-      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'worktree is required' } });
+      res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'worktree is required' },
+      });
       return;
     }
     const limitRaw = typeof req.query.limit === 'string' ? parseInt(req.query.limit, 10) : 50;
@@ -180,7 +204,10 @@ export function createGitRoutes(db: Database.Database, deps: GitRoutesDeps = {})
   router.get('/:id/git/stash', async (req: Request, res: Response) => {
     const wt = getWorktreeParam(req);
     if (!wt) {
-      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'worktree is required' } });
+      res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'worktree is required' },
+      });
       return;
     }
     try {
@@ -197,7 +224,10 @@ export function createGitRoutes(db: Database.Database, deps: GitRoutesDeps = {})
   router.post('/:id/git/stash', async (req: Request, res: Response) => {
     const wt = getWorktreeParam(req);
     if (!wt) {
-      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'worktree is required' } });
+      res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'worktree is required' },
+      });
       return;
     }
     const { message } = (req.body ?? {}) as { message?: string };
@@ -214,7 +244,10 @@ export function createGitRoutes(db: Database.Database, deps: GitRoutesDeps = {})
     const wt = getWorktreeParam(req);
     const { index } = (req.body ?? {}) as { index?: number };
     if (!wt || typeof index !== 'number') {
-      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'worktree and index are required' } });
+      res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'worktree and index are required' },
+      });
       return;
     }
     try {
@@ -230,7 +263,10 @@ export function createGitRoutes(db: Database.Database, deps: GitRoutesDeps = {})
     const wt = getWorktreeParam(req);
     const { index } = (req.body ?? {}) as { index?: number };
     if (!wt || typeof index !== 'number') {
-      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'worktree and index are required' } });
+      res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'worktree and index are required' },
+      });
       return;
     }
     try {
@@ -248,7 +284,10 @@ export function createGitRoutes(db: Database.Database, deps: GitRoutesDeps = {})
     const wt = getWorktreeParam(req);
     const { files } = (req.body ?? {}) as { files?: string[] };
     if (!wt || !Array.isArray(files)) {
-      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'worktree and files[] are required' } });
+      res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'worktree and files[] are required' },
+      });
       return;
     }
     try {
@@ -264,7 +303,10 @@ export function createGitRoutes(db: Database.Database, deps: GitRoutesDeps = {})
     const wt = getWorktreeParam(req);
     const { files } = (req.body ?? {}) as { files?: string[] };
     if (!wt || !Array.isArray(files)) {
-      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'worktree and files[] are required' } });
+      res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'worktree and files[] are required' },
+      });
       return;
     }
     try {
@@ -280,7 +322,10 @@ export function createGitRoutes(db: Database.Database, deps: GitRoutesDeps = {})
     const wt = getWorktreeParam(req);
     const { message } = (req.body ?? {}) as { message?: string };
     if (!wt || !message || !message.trim()) {
-      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'worktree and message are required' } });
+      res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'worktree and message are required' },
+      });
       return;
     }
     try {
@@ -295,11 +340,17 @@ export function createGitRoutes(db: Database.Database, deps: GitRoutesDeps = {})
   router.post('/:id/git/generate-commit-message', async (req: Request, res: Response) => {
     const wt = getWorktreeParam(req);
     if (!wt) {
-      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'worktree is required' } });
+      res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'worktree is required' },
+      });
       return;
     }
     if (!deps.activityRegistry || !deps.agentLoopRunner) {
-      res.status(503).json({ success: false, error: { code: 'NOT_AVAILABLE', message: 'Commit message generation is not available' } });
+      res.status(503).json({
+        success: false,
+        error: { code: 'NOT_AVAILABLE', message: 'Commit message generation is not available' },
+      });
       return;
     }
     try {
@@ -307,7 +358,7 @@ export function createGitRoutes(db: Database.Database, deps: GitRoutesDeps = {})
       const result = await deps.activityRegistry.invoke(
         'generate_commit_message',
         { worktreePath },
-        { agentLoopRunner: deps.agentLoopRunner },
+        { agentLoopRunner: deps.agentLoopRunner }
       );
       if (result.status !== 'completed') {
         const noStaged = result.error === 'No staged changes';
@@ -332,7 +383,10 @@ export function createGitRoutes(db: Database.Database, deps: GitRoutesDeps = {})
     const wt = getWorktreeParam(req);
     const { branch } = (req.body ?? {}) as { branch?: string };
     if (!wt || !branch || !branch.trim()) {
-      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'worktree and branch are required' } });
+      res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'worktree and branch are required' },
+      });
       return;
     }
     try {
@@ -347,10 +401,15 @@ export function createGitRoutes(db: Database.Database, deps: GitRoutesDeps = {})
   router.post('/:id/git/branch', async (req: Request, res: Response) => {
     const wt = getWorktreeParam(req);
     const { name, checkout, startPoint } = (req.body ?? {}) as {
-      name?: string; checkout?: boolean; startPoint?: string;
+      name?: string;
+      checkout?: boolean;
+      startPoint?: string;
     };
     if (!wt || !name || !name.trim()) {
-      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'worktree and name are required' } });
+      res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'worktree and name are required' },
+      });
       return;
     }
     try {
@@ -366,7 +425,10 @@ export function createGitRoutes(db: Database.Database, deps: GitRoutesDeps = {})
     const wt = getWorktreeParam(req);
     const { name, force } = (req.body ?? {}) as { name?: string; force?: boolean };
     if (!wt || !name || !name.trim()) {
-      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'worktree and name are required' } });
+      res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'worktree and name are required' },
+      });
       return;
     }
     try {
@@ -383,7 +445,10 @@ export function createGitRoutes(db: Database.Database, deps: GitRoutesDeps = {})
   router.post('/:id/git/fetch', async (req: Request, res: Response) => {
     const wt = getWorktreeParam(req);
     if (!wt) {
-      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'worktree is required' } });
+      res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'worktree is required' },
+      });
       return;
     }
     try {
@@ -398,7 +463,10 @@ export function createGitRoutes(db: Database.Database, deps: GitRoutesDeps = {})
   router.post('/:id/git/pull', async (req: Request, res: Response) => {
     const wt = getWorktreeParam(req);
     if (!wt) {
-      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'worktree is required' } });
+      res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'worktree is required' },
+      });
       return;
     }
     try {
@@ -414,7 +482,10 @@ export function createGitRoutes(db: Database.Database, deps: GitRoutesDeps = {})
     const wt = getWorktreeParam(req);
     const { force } = (req.body ?? {}) as { force?: boolean };
     if (!wt) {
-      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'worktree is required' } });
+      res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'worktree is required' },
+      });
       return;
     }
     try {

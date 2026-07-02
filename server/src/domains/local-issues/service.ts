@@ -1,7 +1,10 @@
 import type { Database } from 'better-sqlite3';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import type { LocalIssue } from '@zclaudia/shared/features/local-issue';
-import type { LocalIssueUpdateMessage, LocalIssueDeletedMessage } from '@zclaudia/shared/wire/messages/workflow';
+import type {
+  LocalIssueUpdateMessage,
+  LocalIssueDeletedMessage,
+} from '@zclaudia/shared/wire/messages/workflow';
 import { LocalIssueRepository } from './repository.js';
 
 export interface LocalIssueLifecycleHooks {
@@ -16,7 +19,7 @@ export class LocalIssueService {
   constructor(
     db: Database,
     private broadcastToProject: (projectId: string, msg: ServerMessage) => void,
-    private hooks: LocalIssueLifecycleHooks = {},
+    private hooks: LocalIssueLifecycleHooks = {}
   ) {
     this.repo = new LocalIssueRepository(db);
   }
@@ -25,12 +28,15 @@ export class LocalIssueService {
     return this.repo;
   }
 
-  createIssue(projectId: string, data: {
-    title: string;
-    description?: string;
-    priority?: string;
-    labels?: string[];
-  }): LocalIssue {
+  createIssue(
+    projectId: string,
+    data: {
+      title: string;
+      description?: string;
+      priority?: string;
+      labels?: string[];
+    }
+  ): LocalIssue {
     const issue = this.repo.create({
       projectId,
       title: data.title,
@@ -43,13 +49,16 @@ export class LocalIssueService {
     return issue;
   }
 
-  updateIssue(issueId: string, data: {
-    title?: string;
-    description?: string;
-    priority?: string;
-    labels?: string[];
-    status?: string;
-  }): LocalIssue {
+  updateIssue(
+    issueId: string,
+    data: {
+      title?: string;
+      description?: string;
+      priority?: string;
+      labels?: string[];
+      status?: string;
+    }
+  ): LocalIssue {
     // C2 invariant: status changes go through IssueLifecycle for state-machine
     // validation; the simple update path here can only touch non-status fields.
     // Callers that need status changes must use the lifecycle endpoint.
@@ -61,7 +70,7 @@ export class LocalIssueService {
       if (data.status === 'tracked' && !existing.specChangeId) {
         throw new Error(
           `Issue ${issueId} cannot enter 'tracked' without a SpecChange. ` +
-          `Upgrade it via the spec workflow first.`,
+            `Upgrade it via the spec workflow first.`
         );
       }
     }

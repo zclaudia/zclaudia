@@ -176,7 +176,9 @@ describe('Cross-Feature Workflows - Traditional Playwright', () => {
 
     // Verify the message from Project A is still there
     const projectAMessageAgain = browser.locator('text=Message from Project A').first();
-    const messageStillExists = await projectAMessageAgain.isVisible({ timeout: 3000 }).catch(() => false);
+    const messageStillExists = await projectAMessageAgain
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
 
     if (messageStillExists) {
       console.log('  ✓ Project A message persisted');

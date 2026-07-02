@@ -19,24 +19,26 @@ export type { ProviderCallOptions, ProviderCallResult, ProviderStreamChunk };
 export class PluginProviderAPI implements ProviderAPI {
   constructor(
     private db: import('better-sqlite3').Database,
-    private pluginId: string,
+    private pluginId: string
   ) {}
 
   async list(): Promise<ProviderInfo[]> {
     const providers = this.db
-      .prepare(`
+      .prepare(
+        `
         SELECT id, name, provider_type AS type, is_default
         FROM llm_profiles
         ORDER BY is_default DESC, name ASC
-      `)
+      `
+      )
       .all() as Array<{
-        id: string;
-        name: string;
-        type: string;
-        is_default: number;
-      }>;
+      id: string;
+      name: string;
+      type: string;
+      is_default: number;
+    }>;
 
-    return providers.map((provider) => ({
+    return providers.map(provider => ({
       id: provider.id,
       name: provider.name,
       type: provider.type,
@@ -47,17 +49,21 @@ export class PluginProviderAPI implements ProviderAPI {
 
   async get(providerId: string): Promise<ProviderInfo | undefined> {
     const provider = this.db
-      .prepare(`
+      .prepare(
+        `
         SELECT id, name, provider_type AS type, is_default
         FROM llm_profiles
         WHERE id = ?
-      `)
-      .get(providerId) as {
-        id: string;
-        name: string;
-        type: string;
-        is_default: number;
-      } | undefined;
+      `
+      )
+      .get(providerId) as
+      | {
+          id: string;
+          name: string;
+          type: string;
+          is_default: number;
+        }
+      | undefined;
 
     if (!provider) {
       return undefined;
@@ -76,17 +82,21 @@ export class PluginProviderAPI implements ProviderAPI {
     const { providerId, modelOverride, messages, systemPrompt } = options;
 
     const providerRow = this.db
-      .prepare(`
+      .prepare(
+        `
         SELECT id, name, provider_type AS type, base_url AS cli_path
         FROM llm_profiles
         WHERE id = ?
-      `)
-      .get(providerId) as {
-        id: string;
-        name: string;
-        type: string;
-        cli_path: string | null;
-      } | undefined;
+      `
+      )
+      .get(providerId) as
+      | {
+          id: string;
+          name: string;
+          type: string;
+          cli_path: string | null;
+        }
+      | undefined;
 
     if (!providerRow) {
       throw new Error(`Provider not found: ${providerId}`);
@@ -136,8 +146,8 @@ export class PluginProviderAPI implements ProviderAPI {
     }
 
     const content = collectedMessages
-      .filter((message) => message.content)
-      .map((message) => message.content)
+      .filter(message => message.content)
+      .map(message => message.content)
       .join('\n');
 
     const metadata = this.parseResponseMetadata(content);
@@ -160,17 +170,21 @@ export class PluginProviderAPI implements ProviderAPI {
     const { providerId, messages, systemPrompt } = options;
 
     const providerRow = this.db
-      .prepare(`
+      .prepare(
+        `
         SELECT id, name, provider_type AS type, base_url AS cli_path
         FROM llm_profiles
         WHERE id = ?
-      `)
-      .get(providerId) as {
-        id: string;
-        name: string;
-        type: string;
-        cli_path: string | null;
-      } | undefined;
+      `
+      )
+      .get(providerId) as
+      | {
+          id: string;
+          name: string;
+          type: string;
+          cli_path: string | null;
+        }
+      | undefined;
 
     if (!providerRow) {
       yield { type: 'error', error: `Provider not found: ${providerId}` };
@@ -194,7 +208,11 @@ export class PluginProviderAPI implements ProviderAPI {
     try {
       let fullContent = '';
 
-      for await (const msg of adapter.run(prompt, runOptions, async () => ({ behavior: 'deny' } as any))) {
+      for await (const msg of adapter.run(
+        prompt,
+        runOptions,
+        async () => ({ behavior: 'deny' }) as any
+      )) {
         const message = msg as { type: string; content?: string; result?: string };
         if (message.type === 'assistant' && message.content) {
           const delta = message.content.substring(fullContent.length);
@@ -232,7 +250,8 @@ export class PluginProviderAPI implements ProviderAPI {
     }
 
     for (const msg of messages) {
-      const roleLabel = msg.role === 'user' ? 'User' : msg.role === 'assistant' ? 'Assistant' : 'System';
+      const roleLabel =
+        msg.role === 'user' ? 'User' : msg.role === 'assistant' ? 'Assistant' : 'System';
       parts.push(`[${roleLabel}]\n${msg.content}`);
     }
 
@@ -260,7 +279,8 @@ export class PluginProviderAPI implements ProviderAPI {
     if (isCompleteMatch || scoreMatch) {
       return {
         isComplete:
-          isCompleteMatch?.[1]?.toLowerCase() === '否' || isCompleteMatch?.[1]?.toLowerCase() === 'no',
+          isCompleteMatch?.[1]?.toLowerCase() === '否' ||
+          isCompleteMatch?.[1]?.toLowerCase() === 'no',
         score: scoreMatch ? parseInt(scoreMatch[1], 10) : undefined,
       };
     }

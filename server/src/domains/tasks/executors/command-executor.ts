@@ -5,7 +5,7 @@ import * as path from 'path';
 import type { TaskRecord, TaskStatus } from '@zclaudia/shared/core/task';
 import { resolveShell, killProcessTree } from '../../../infra/providers/pi-runtime/bash-runner.js';
 import * as sandbox from '../../../infra/providers/pi-runtime/sandbox.js';
-import { TaskRepository } from '../repository.js';
+import { type TaskRepository } from '../repository.js';
 import { TaskService } from '../task-service.js';
 import type { TaskExecutor, TaskExecutorUpdate } from './types.js';
 
@@ -56,11 +56,12 @@ export class CommandTaskExecutor implements TaskExecutor {
     const command = typeof meta.command === 'string' ? meta.command.trim() : '';
     if (!command) throw new Error('command task requires metadata.command');
     const cwd = typeof meta.cwd === 'string' && meta.cwd ? meta.cwd : process.cwd();
-    const workspaceRoot = typeof meta.workspaceRoot === 'string' && meta.workspaceRoot
-      ? meta.workspaceRoot
-      : cwd;
+    const workspaceRoot =
+      typeof meta.workspaceRoot === 'string' && meta.workspaceRoot ? meta.workspaceRoot : cwd;
     const sandboxAllowedDomains = Array.isArray(meta.sandboxAllowedDomains)
-      ? meta.sandboxAllowedDomains.filter((domain): domain is string => typeof domain === 'string' && domain.trim().length > 0)
+      ? meta.sandboxAllowedDomains.filter(
+          (domain): domain is string => typeof domain === 'string' && domain.trim().length > 0
+        )
       : [];
 
     const wrap = await sandbox.wrapCommand(command, {
@@ -97,8 +98,8 @@ export class CommandTaskExecutor implements TaskExecutor {
       closeSync(fd);
     }
     child.unref();
-    child.on('error', (err) => this.finalize(task.id, null, `spawn error: ${err.message}`));
-    child.on('exit', (code) => this.finalize(task.id, code));
+    child.on('error', err => this.finalize(task.id, null, `spawn error: ${err.message}`));
+    child.on('exit', code => this.finalize(task.id, code));
     return { status: 'running', executorRef: { pid: child.pid, command } };
   }
 
@@ -109,13 +110,18 @@ export class CommandTaskExecutor implements TaskExecutor {
    * child's stdio is piped to this process, so output stops if the server dies;
    * reconcile() then settles the task by pid liveness as usual.
    */
-  adopt(task: TaskRecord, child: ChildProcess, initialOutput: string, initialOutputPath?: string): TaskExecutorUpdate {
+  adopt(
+    task: TaskRecord,
+    child: ChildProcess,
+    initialOutput: string,
+    initialOutputPath?: string
+  ): TaskExecutorUpdate {
     const meta = (task.metadata ?? {}) as { command?: unknown };
     const command = typeof meta.command === 'string' ? meta.command : '';
     const logPath = commandTaskLogPath(task.id);
     mkdirSync(path.dirname(logPath), { recursive: true });
     const stream = createWriteStream(logPath, { flags: 'a' });
-    stream.on('error', (err) => {
+    stream.on('error', err => {
       console.warn(`[CommandTaskExecutor] adopted task ${task.id} log stream error:`, err.message);
     });
     if (initialOutputPath) {
@@ -127,16 +133,28 @@ export class CommandTaskExecutor implements TaskExecutor {
     } else if (initialOutput) {
       stream.write(initialOutput);
     }
-    child.stdout?.on('data', (chunk) => stream.write(chunk));
-    child.stderr?.on('data', (chunk) => stream.write(chunk));
-    const closeStream = () => { try { stream.end(); } catch { /* already closed */ } };
-    child.on('error', (err) => { closeStream(); this.finalize(task.id, null, `adopted process error: ${err.message}`); });
+    child.stdout?.on('data', chunk => stream.write(chunk));
+    child.stderr?.on('data', chunk => stream.write(chunk));
+    const closeStream = () => {
+      try {
+        stream.end();
+      } catch {
+        /* already closed */
+      }
+    };
+    child.on('error', err => {
+      closeStream();
+      this.finalize(task.id, null, `adopted process error: ${err.message}`);
+    });
     if (child.exitCode !== null || child.signalCode !== null) {
       // Exited between handoff and adoption — settle immediately.
       closeStream();
       this.finalize(task.id, child.exitCode);
     } else {
-      child.on('exit', (code) => { closeStream(); this.finalize(task.id, code); });
+      child.on('exit', code => {
+        closeStream();
+        this.finalize(task.id, code);
+      });
     }
     return { status: 'running', executorRef: { pid: child.pid, command } };
   }
@@ -184,7 +202,7 @@ export class CommandTaskExecutor implements TaskExecutor {
       if (!task) return { status: 'stopped' };
       if (TERMINAL.has(task.status)) return { status: task.status, result: task.result };
       if (Date.now() >= deadline) return { status: task.status };
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 500));
     }
   }
 

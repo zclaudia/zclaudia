@@ -18,7 +18,7 @@ interface DetailView {
 
 export function MemoryPanel({ projectId, backendId: propBackendId }: MemoryPanelProps) {
   const resolvedBackendId = useOwnershipStore(
-    (s) => propBackendId ?? (projectId ? s.getProjectBackendId(projectId) : null),
+    s => propBackendId ?? (projectId ? s.getProjectBackendId(projectId) : null)
   );
 
   const [memoryDir, setMemoryDir] = useState<string | null>(null);
@@ -38,11 +38,18 @@ export function MemoryPanel({ projectId, backendId: propBackendId }: MemoryPanel
     setDetail(null);
     (async () => {
       try {
-        const { memoryDir: dir } = await getProjectMemoryDir({ projectId, backendId: resolvedBackendId });
-        const listing = await listDirectory({ projectRoot: dir, maxResults: 200, backendId: resolvedBackendId });
+        const { memoryDir: dir } = await getProjectMemoryDir({
+          projectId,
+          backendId: resolvedBackendId,
+        });
+        const listing = await listDirectory({
+          projectRoot: dir,
+          maxResults: 200,
+          backendId: resolvedBackendId,
+        });
         if (cancelled) return;
         setMemoryDir(dir);
-        setEntries((listing.entries ?? []).filter((e) => e.type !== 'directory'));
+        setEntries((listing.entries ?? []).filter(e => e.type !== 'directory'));
       } catch {
         if (!cancelled) {
           setMemoryDir(null);
@@ -60,11 +67,23 @@ export function MemoryPanel({ projectId, backendId: propBackendId }: MemoryPanel
   function openDetail(entry: FileEntry) {
     if (!memoryDir) return;
     setDetail({ name: entry.name, content: null, loading: true, error: null });
-    getFileContent({ projectRoot: memoryDir, relativePath: entry.name, backendId: resolvedBackendId })
-      .then((res) => setDetail((prev) => prev && prev.name === entry.name ? { ...prev, content: res.content, loading: false } : prev))
+    getFileContent({
+      projectRoot: memoryDir,
+      relativePath: entry.name,
+      backendId: resolvedBackendId,
+    })
+      .then(res =>
+        setDetail(prev =>
+          prev && prev.name === entry.name
+            ? { ...prev, content: res.content, loading: false }
+            : prev
+        )
+      )
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : 'Failed to load file';
-        setDetail((prev) => prev && prev.name === entry.name ? { ...prev, loading: false, error: msg } : prev);
+        setDetail(prev =>
+          prev && prev.name === entry.name ? { ...prev, loading: false, error: msg } : prev
+        );
       });
   }
 
@@ -107,7 +126,7 @@ export function MemoryPanel({ projectId, backendId: propBackendId }: MemoryPanel
   return (
     <div className="p-2">
       <ul>
-        {entries.map((entry) => (
+        {entries.map(entry => (
           <li key={entry.path}>
             <button
               type="button"

@@ -38,6 +38,12 @@ interface ReadSymbolOptions {
   readFileState?: ReadFileStateStore;
 }
 
+type AgentToolParameters = AgentTool['parameters'];
+
+function agentToolParameters(schema: Record<string, unknown>): AgentToolParameters {
+  return schema as AgentToolParameters;
+}
+
 function splitLines(content: string): LineInfo[] {
   const lines: LineInfo[] = [];
   let offset = 0;
@@ -45,9 +51,8 @@ function splitLines(content: string): LineInfo[] {
   while (offset < content.length) {
     const newline = content.indexOf('\n', offset);
     const endOffsetWithNewline = newline === -1 ? content.length : newline + 1;
-    const endOffset = newline === -1
-      ? content.length
-      : content[newline - 1] === '\r' ? newline - 1 : newline;
+    const endOffset =
+      newline === -1 ? content.length : content[newline - 1] === '\r' ? newline - 1 : newline;
     lines.push({
       number: lineNumber,
       text: content.slice(offset, endOffset),
@@ -105,14 +110,45 @@ function previousToken(content: string, index: number): string | undefined {
 function canStartRegexLiteral(content: string, index: number): boolean {
   const previous = previousToken(content, index);
   if (!previous) return true;
-  if (['return', 'throw', 'case', 'delete', 'typeof', 'void', 'new', 'in', 'of', 'yield', 'await'].includes(previous)) return true;
-  return ['(', '[', '{', '=', ':', ',', ';', '!', '&', '|', '?', '+', '-', '*', '~', '^', '<', '>'].includes(previous);
+  if (
+    [
+      'return',
+      'throw',
+      'case',
+      'delete',
+      'typeof',
+      'void',
+      'new',
+      'in',
+      'of',
+      'yield',
+      'await',
+    ].includes(previous)
+  )
+    return true;
+  return [
+    '(',
+    '[',
+    '{',
+    '=',
+    ':',
+    ',',
+    ';',
+    '!',
+    '&',
+    '|',
+    '?',
+    '+',
+    '-',
+    '*',
+    '~',
+    '^',
+    '<',
+    '>',
+  ].includes(previous);
 }
 
-function buildMatch(
-  input: Omit<SymbolMatch, 'text' | 'bodyDigest'>,
-  content: string,
-): SymbolMatch {
+function buildMatch(input: Omit<SymbolMatch, 'text' | 'bodyDigest'>, content: string): SymbolMatch {
   const text = content.slice(input.startOffset, input.endOffset);
   return {
     ...input,
@@ -141,22 +177,27 @@ function pythonSymbols(content: string): SymbolMatch[] {
     }
     while (endIndex > index && !lines[endIndex].text.trim()) endIndex -= 1;
     const kind: SymbolKind = match[3] === 'class' ? 'class' : 'function';
-    matches.push(buildMatch({
-      name: match[4],
-      qualifiedName: match[4],
-      kind,
-      startLine: lines[startIndex].number,
-      endLine: lines[endIndex].number,
-      startOffset: lines[startIndex].startOffset,
-      endOffset: lines[endIndex].endOffsetWithNewline,
-      indent,
-    }, content));
+    matches.push(
+      buildMatch(
+        {
+          name: match[4],
+          qualifiedName: match[4],
+          kind,
+          startLine: lines[startIndex].number,
+          endLine: lines[endIndex].number,
+          startOffset: lines[startIndex].startOffset,
+          endOffset: lines[endIndex].endOffsetWithNewline,
+          indent,
+        },
+        content
+      )
+    );
   }
   return qualifyNestedSymbols(matches);
 }
 
 function findOpeningBrace(content: string, startOffset: number, maxOffset: number): number {
-  let quote: '"' | '\'' | '`' | undefined;
+  let quote: '"' | "'" | '`' | undefined;
   let lineComment = false;
   let blockComment = false;
   let regex = false;
@@ -201,7 +242,7 @@ function findOpeningBrace(content: string, startOffset: number, maxOffset: numbe
       regexCharClass = false;
       continue;
     }
-    if (char === '"' || char === '\'' || char === '`') {
+    if (char === '"' || char === "'" || char === '`') {
       quote = char;
       continue;
     }
@@ -219,7 +260,7 @@ function findStatementEnd(lines: LineInfo[], startIndex: number): number {
 
 function findMatchingBrace(content: string, openOffset: number): number {
   let depth = 0;
-  let quote: '"' | '\'' | '`' | undefined;
+  let quote: '"' | "'" | '`' | undefined;
   let lineComment = false;
   let blockComment = false;
   let regex = false;
@@ -263,7 +304,7 @@ function findMatchingBrace(content: string, openOffset: number): number {
       regexCharClass = false;
       continue;
     }
-    if (char === '"' || char === '\'' || char === '`') {
+    if (char === '"' || char === "'" || char === '`') {
       quote = char;
       continue;
     }
@@ -277,18 +318,39 @@ function findMatchingBrace(content: string, openOffset: number): number {
 }
 
 function lineIndexForOffset(lines: LineInfo[], offset: number): number {
-  const index = lines.findIndex(line => offset >= line.startOffset && offset <= line.endOffsetWithNewline);
+  const index = lines.findIndex(
+    line => offset >= line.startOffset && offset <= line.endOffsetWithNewline
+  );
   return index === -1 ? lines.length - 1 : index;
 }
 
 function jsSymbols(content: string): SymbolMatch[] {
   const lines = splitLines(content);
   const matches: SymbolMatch[] = [];
-  const patterns: Array<{ kind: SymbolKind; regex: RegExp; limitBraceSearchToStatement?: boolean }> = [
-    { kind: 'function', regex: /^\s*(?:export\s+default\s+|export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\b/ },
-    { kind: 'class', regex: /^\s*(?:export\s+default\s+|export\s+)?(?:abstract\s+)?class\s+([A-Za-z_$][\w$]*)\b/ },
-    { kind: 'variable', regex: /^\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*(?:async\s*)?(?:function\b|\([^)]*\)\s*=>|[A-Za-z_$][\w$]*\s*=>)/, limitBraceSearchToStatement: true },
-    { kind: 'method', regex: /^\s*(?:(?:public|private|protected|static|async|get|set|readonly|override)\s+)*([A-Za-z_$][\w$]*)\s*\([^;{}]*\)\s*(?::[^{]+)?\{/ },
+  const patterns: Array<{
+    kind: SymbolKind;
+    regex: RegExp;
+    limitBraceSearchToStatement?: boolean;
+  }> = [
+    {
+      kind: 'function',
+      regex: /^\s*(?:export\s+default\s+|export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\b/,
+    },
+    {
+      kind: 'class',
+      regex: /^\s*(?:export\s+default\s+|export\s+)?(?:abstract\s+)?class\s+([A-Za-z_$][\w$]*)\b/,
+    },
+    {
+      kind: 'variable',
+      regex:
+        /^\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*(?:async\s*)?(?:function\b|\([^)]*\)\s*=>|[A-Za-z_$][\w$]*\s*=>)/,
+      limitBraceSearchToStatement: true,
+    },
+    {
+      kind: 'method',
+      regex:
+        /^\s*(?:(?:public|private|protected|static|async|get|set|readonly|override)\s+)*([A-Za-z_$][\w$]*)\s*\([^;{}]*\)\s*(?::[^{]+)?\{/,
+    },
   ];
   const ignoredMethodNames = new Set(['if', 'for', 'while', 'switch', 'catch', 'function']);
   for (let index = 0; index < lines.length; index += 1) {
@@ -306,16 +368,21 @@ function jsSymbols(content: string): SymbolMatch[] {
       const openBrace = findOpeningBrace(content, line.startOffset, searchEnd);
       const bodyEnd = openBrace === -1 ? -1 : findMatchingBrace(content, openBrace);
       const endIndex = bodyEnd === -1 ? statementEndIndex : lineIndexForOffset(lines, bodyEnd);
-      matches.push(buildMatch({
-        name: match[1],
-        qualifiedName: match[1],
-        kind: pattern.kind,
-        startLine: lines[startIndex].number,
-        endLine: lines[endIndex].number,
-        startOffset: lines[startIndex].startOffset,
-        endOffset: lines[endIndex].endOffsetWithNewline,
-        indent,
-      }, content));
+      matches.push(
+        buildMatch(
+          {
+            name: match[1],
+            qualifiedName: match[1],
+            kind: pattern.kind,
+            startLine: lines[startIndex].number,
+            endLine: lines[endIndex].number,
+            startOffset: lines[startIndex].startOffset,
+            endOffset: lines[endIndex].endOffsetWithNewline,
+            indent,
+          },
+          content
+        )
+      );
       break;
     }
   }
@@ -325,15 +392,18 @@ function jsSymbols(content: string): SymbolMatch[] {
 function qualifyNestedSymbols(symbols: SymbolMatch[]): SymbolMatch[] {
   return symbols.map(symbol => {
     const parents = symbols
-      .filter(candidate =>
-        candidate !== symbol
-        && candidate.startOffset <= symbol.startOffset
-        && candidate.endOffset >= symbol.endOffset
-        && candidate.indent < symbol.indent)
+      .filter(
+        candidate =>
+          candidate !== symbol &&
+          candidate.startOffset <= symbol.startOffset &&
+          candidate.endOffset >= symbol.endOffset &&
+          candidate.indent < symbol.indent
+      )
       .sort((a, b) => a.startOffset - b.startOffset);
     const qualifiedName = [...parents.map(parent => parent.name), symbol.name].join('.');
     const nearestParent = parents[parents.length - 1];
-    const kind = nearestParent?.kind === 'class' && symbol.kind === 'function' ? 'method' : symbol.kind;
+    const kind =
+      nearestParent?.kind === 'class' && symbol.kind === 'function' ? 'method' : symbol.kind;
     return { ...symbol, qualifiedName, kind };
   });
 }
@@ -341,37 +411,60 @@ function qualifyNestedSymbols(symbols: SymbolMatch[]): SymbolMatch[] {
 function symbolsForFile(content: string, filePath: string): SymbolMatch[] | undefined {
   const ext = path.extname(filePath).toLowerCase();
   if (['.py', '.pyw', '.pyi'].includes(ext)) return pythonSymbols(content);
-  if (['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts'].includes(ext)) return jsSymbols(content);
+  if (['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts'].includes(ext))
+    return jsSymbols(content);
   return undefined;
 }
 
-function findSymbol(content: string, filePath: string, symbol: string): { ok: true; match: SymbolMatch } | {
-  ok: false;
-  result: ReturnType<typeof errorResult>;
-} {
+function findSymbol(
+  content: string,
+  filePath: string,
+  symbol: string
+):
+  | { ok: true; match: SymbolMatch }
+  | {
+      ok: false;
+      result: ReturnType<typeof errorResult>;
+    } {
   const all = symbolsForFile(content, filePath);
   const relSymbol = symbol.trim();
   if (!all) {
-    return { ok: false, result: errorResult('unsupported_language', 'ReadSymbol/EditSymbol supports Python, TypeScript, and JavaScript files.') };
+    return {
+      ok: false,
+      result: errorResult(
+        'unsupported_language',
+        'ReadSymbol/EditSymbol supports Python, TypeScript, and JavaScript files.'
+      ),
+    };
   }
-  const candidates = all.filter(match =>
-    match.qualifiedName === relSymbol
-    || (!relSymbol.includes('.') && match.name === relSymbol));
+  const candidates = all.filter(
+    match =>
+      match.qualifiedName === relSymbol || (!relSymbol.includes('.') && match.name === relSymbol)
+  );
   if (candidates.length === 0) {
-    return { ok: false, result: errorResult('symbol_not_found', `Symbol not found: ${relSymbol}`, { symbol: relSymbol }) };
+    return {
+      ok: false,
+      result: errorResult('symbol_not_found', `Symbol not found: ${relSymbol}`, {
+        symbol: relSymbol,
+      }),
+    };
   }
   if (candidates.length > 1) {
     return {
       ok: false,
-      result: errorResult('ambiguous_symbol', `Symbol name is ambiguous: ${relSymbol}. Use a qualified name.`, {
-        symbol: relSymbol,
-        candidates: candidates.map(match => ({
-          symbol: match.qualifiedName,
-          kind: match.kind,
-          startLine: match.startLine,
-          endLine: match.endLine,
-        })),
-      }),
+      result: errorResult(
+        'ambiguous_symbol',
+        `Symbol name is ambiguous: ${relSymbol}. Use a qualified name.`,
+        {
+          symbol: relSymbol,
+          candidates: candidates.map(match => ({
+            symbol: match.qualifiedName,
+            kind: match.kind,
+            startLine: match.startLine,
+            endLine: match.endLine,
+          })),
+        }
+      ),
     };
   }
   return { ok: true, match: candidates[0] };
@@ -385,39 +478,46 @@ function formatSymbol(match: SymbolMatch): string {
     .join('\n');
 }
 
-export function createReadSymbolTool(cwd: string, options?: ReadSymbolOptions): AgentTool<any> {
+export function createReadSymbolTool(cwd: string, options?: ReadSymbolOptions): AgentTool {
   return {
     name: 'ReadSymbol',
     label: 'ReadSymbol',
-    description: 'Read one named function, method, class, or exported variable from a Python/TypeScript/JavaScript file. Prefer this over line-number reads when you know the symbol name.',
-    parameters: {
+    description:
+      'Read one named function, method, class, or exported variable from a Python/TypeScript/JavaScript file. Prefer this over line-number reads when you know the symbol name.',
+    parameters: agentToolParameters({
       type: 'object',
       properties: {
         file_path: { type: 'string', description: 'Workspace-relative source file path' },
         path: { type: 'string', description: 'Alias for file_path' },
-        symbol: { type: 'string', description: 'Symbol name, e.g. "run", "Client.connect", or "_schedule_chat"' },
+        symbol: {
+          type: 'string',
+          description: 'Symbol name, e.g. "run", "Client.connect", or "_schedule_chat"',
+        },
       },
       required: ['symbol'],
-      anyOf: [
-        { required: ['file_path'] },
-        { required: ['path'] },
-      ],
-    } as any,
+      anyOf: [{ required: ['file_path'] }, { required: ['path'] }],
+    }),
     execute: async (toolCallId: string, params: unknown) => {
       const args = toolParams(toolCallId, params);
       const requested = args.file_path ?? args.path;
-      if (typeof requested !== 'string' || !requested.trim()) return errorResult('missing_path', 'ReadSymbol requires file_path');
-      if (typeof args.symbol !== 'string' || !args.symbol.trim()) return errorResult('missing_symbol', 'ReadSymbol requires symbol');
+      if (typeof requested !== 'string' || !requested.trim())
+        return errorResult('missing_path', 'ReadSymbol requires file_path');
+      if (typeof args.symbol !== 'string' || !args.symbol.trim())
+        return errorResult('missing_symbol', 'ReadSymbol requires symbol');
       let filePath: string;
       try {
         filePath = resolveInsideWorkspace(cwd, requested);
       } catch (err) {
-        return errorResult('path_outside_workspace', err instanceof Error ? err.message : String(err));
+        return errorResult(
+          'path_outside_workspace',
+          err instanceof Error ? err.message : String(err)
+        );
       }
       const relPath = toWorkspaceRelative(cwd, filePath);
       try {
         const fileStat = await stat(filePath);
-        if (!fileStat.isFile()) return errorResult('not_a_file', `Path is not a file: ${relPath}`, { path: relPath });
+        if (!fileStat.isFile())
+          return errorResult('not_a_file', `Path is not a file: ${relPath}`, { path: relPath });
         if (fileStat.size > MAX_EDIT_FILE_BYTES) {
           return errorResult('file_too_large', `File is too large for symbol reads: ${relPath}`, {
             path: relPath,
@@ -455,56 +555,75 @@ export function createReadSymbolTool(cwd: string, options?: ReadSymbolOptions): 
             state: buildReadStateDescriptor({
               relPath,
               content: metadata.content,
-              range: buildRangeDescriptor(match.startLine, match.text.replace(/\n$/, '').split(/\r?\n/)),
+              range: buildRangeDescriptor(
+                match.startLine,
+                match.text.replace(/\n$/, '').split(/\r?\n/)
+              ),
               fullContentCaptured: true,
               partialView: true,
             }),
-          },
+          }
         );
       } catch (err) {
-        return errorResult('read_symbol_failed', err instanceof Error ? err.message : String(err), { path: relPath });
+        return errorResult('read_symbol_failed', err instanceof Error ? err.message : String(err), {
+          path: relPath,
+        });
       }
     },
-  } as unknown as AgentTool<any>;
+  };
 }
 
-export function createEditSymbolTool(cwd: string, options?: FileMutationToolOptions): AgentTool<any> {
+export function createEditSymbolTool(cwd: string, options?: FileMutationToolOptions): AgentTool {
   return {
     name: 'EditSymbol',
     label: 'EditSymbol',
-    description: 'Replace one named function, method, class, or exported variable in a Python/TypeScript/JavaScript file. ReadSymbol returns the bodyDigest you can pass as expected_body_digest to guard against stale symbol edits.',
-    parameters: {
+    description:
+      'Replace one named function, method, class, or exported variable in a Python/TypeScript/JavaScript file. ReadSymbol returns the bodyDigest you can pass as expected_body_digest to guard against stale symbol edits.',
+    parameters: agentToolParameters({
       type: 'object',
       properties: {
         file_path: { type: 'string', description: 'Workspace-relative source file path' },
         path: { type: 'string', description: 'Alias for file_path' },
-        symbol: { type: 'string', description: 'Symbol name, e.g. "run", "Client.connect", or "_schedule_chat"' },
-        new_body: { type: 'string', description: 'Full replacement text for the symbol, including its declaration line' },
-        expected_body_digest: { type: 'string', description: 'Optional bodyDigest from ReadSymbol' },
+        symbol: {
+          type: 'string',
+          description: 'Symbol name, e.g. "run", "Client.connect", or "_schedule_chat"',
+        },
+        new_body: {
+          type: 'string',
+          description: 'Full replacement text for the symbol, including its declaration line',
+        },
+        expected_body_digest: {
+          type: 'string',
+          description: 'Optional bodyDigest from ReadSymbol',
+        },
         preview_only: { type: 'boolean', default: false },
       },
       required: ['symbol', 'new_body'],
-      anyOf: [
-        { required: ['file_path'] },
-        { required: ['path'] },
-      ],
-    } as any,
+      anyOf: [{ required: ['file_path'] }, { required: ['path'] }],
+    }),
     execute: async (toolCallId: string, params: unknown) => {
       const args = toolParams(toolCallId, params);
       const requested = args.file_path ?? args.path;
-      if (typeof requested !== 'string' || !requested.trim()) return errorResult('missing_path', 'EditSymbol requires file_path');
-      if (typeof args.symbol !== 'string' || !args.symbol.trim()) return errorResult('missing_symbol', 'EditSymbol requires symbol');
-      if (typeof args.new_body !== 'string') return errorResult('missing_body', 'EditSymbol requires new_body');
+      if (typeof requested !== 'string' || !requested.trim())
+        return errorResult('missing_path', 'EditSymbol requires file_path');
+      if (typeof args.symbol !== 'string' || !args.symbol.trim())
+        return errorResult('missing_symbol', 'EditSymbol requires symbol');
+      if (typeof args.new_body !== 'string')
+        return errorResult('missing_body', 'EditSymbol requires new_body');
       let filePath: string;
       try {
         filePath = resolveInsideWorkspace(cwd, requested);
       } catch (err) {
-        return errorResult('path_outside_workspace', err instanceof Error ? err.message : String(err));
+        return errorResult(
+          'path_outside_workspace',
+          err instanceof Error ? err.message : String(err)
+        );
       }
       const relPath = toWorkspaceRelative(cwd, filePath);
       try {
         const fileStat = await stat(filePath);
-        if (!fileStat.isFile()) return errorResult('not_a_file', `Path is not a file: ${relPath}`, { path: relPath });
+        if (!fileStat.isFile())
+          return errorResult('not_a_file', `Path is not a file: ${relPath}`, { path: relPath });
         if (fileStat.size > MAX_EDIT_FILE_BYTES) {
           return errorResult('file_too_large', `File is too large for symbol edits: ${relPath}`, {
             path: relPath,
@@ -516,19 +635,25 @@ export function createEditSymbolTool(cwd: string, options?: FileMutationToolOpti
         const found = findSymbol(metadata.content, filePath, args.symbol);
         if (!found.ok) return found.result;
         const match = found.match;
-        if (typeof args.expected_body_digest === 'string'
-          && args.expected_body_digest.trim()
-          && args.expected_body_digest.trim() !== match.bodyDigest) {
-          return errorResult('stale_symbol', 'Symbol digest does not match expected_body_digest. ReadSymbol again before editing.', {
-            path: relPath,
-            symbol: match.qualifiedName,
-            expectedBodyDigest: args.expected_body_digest.trim(),
-            currentBodyDigest: match.bodyDigest,
-            retryable: true,
-            suggestedAction: 'read_symbol',
-          });
+        if (
+          typeof args.expected_body_digest === 'string' &&
+          args.expected_body_digest.trim() &&
+          args.expected_body_digest.trim() !== match.bodyDigest
+        ) {
+          return errorResult(
+            'stale_symbol',
+            'Symbol digest does not match expected_body_digest. ReadSymbol again before editing.',
+            {
+              path: relPath,
+              symbol: match.qualifiedName,
+              expectedBodyDigest: args.expected_body_digest.trim(),
+              currentBodyDigest: match.bodyDigest,
+              retryable: true,
+              suggestedAction: 'read_symbol',
+            }
+          );
         }
-        const edit = createEditBridgeTool(cwd, options) as any;
+        const edit = createEditBridgeTool(cwd, options);
         const result = await edit.execute(`${toolCallId}:edit`, {
           file_path: requested,
           old_string: match.text,
@@ -546,8 +671,10 @@ export function createEditSymbolTool(cwd: string, options?: FileMutationToolOpti
           },
         };
       } catch (err) {
-        return errorResult('edit_symbol_failed', err instanceof Error ? err.message : String(err), { path: relPath });
+        return errorResult('edit_symbol_failed', err instanceof Error ? err.message : String(err), {
+          path: relPath,
+        });
       }
     },
-  } as unknown as AgentTool<any>;
+  };
 }

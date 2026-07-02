@@ -28,10 +28,7 @@ export function DraftActions() {
   const effectiveReadOnly = isReadOnly || sessionArchived;
   const hasContent = !!localContent.trim();
   const charCount = localContent.length;
-  const byteSize = useMemo(
-    () => new TextEncoder().encode(localContent).length,
-    [localContent],
-  );
+  const byteSize = useMemo(() => new TextEncoder().encode(localContent).length, [localContent]);
   const sizePercent = Math.round((byteSize / MAX_CONTENT_BYTES) * 100);
 
   let statusText = '';

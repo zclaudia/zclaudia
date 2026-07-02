@@ -20,7 +20,7 @@ const initialState = {
 export const useLineageStore = create<LineageState>((set, get) => ({
   ...initialState,
 
-  reload: async (sessionId) => {
+  reload: async sessionId => {
     const requestId = get().requestId + 1;
 
     if (!sessionId) {
@@ -34,7 +34,9 @@ export const useLineageStore = create<LineageState>((set, get) => ({
       if (get().requestId === requestId) set({ graph: next });
     } catch {
       if (get().requestId === requestId) {
-        useToastStore.getState().add({ type: 'error', title: 'Lineage for this session is unavailable' });
+        useToastStore
+          .getState()
+          .add({ type: 'error', title: 'Lineage for this session is unavailable' });
         set({ graph: null });
       }
     } finally {

@@ -70,8 +70,8 @@ describe('ActivityRegistry', () => {
     r.register(new GitCommitActivity());
     r.register(new GitStageActivity());
     const meta = r.listMeta();
-    const commitMeta = meta.find((m) => m.type === 'git_commit');
-    const stageMeta = meta.find((m) => m.type === 'git_stage');
+    const commitMeta = meta.find(m => m.type === 'git_commit');
+    const stageMeta = meta.find(m => m.type === 'git_stage');
     expect(commitMeta).toBeDefined();
     expect(commitMeta?.supportsLoop).toBe(true);
     expect(stageMeta).toBeDefined();

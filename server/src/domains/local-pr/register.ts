@@ -30,7 +30,16 @@ export interface LocalPRDomainResult {
 }
 
 export function registerLocalPRDomain(deps: LocalPRDomainDeps): LocalPRDomainResult {
-  const { db, app, authMiddleware, broadcast, isWorktreeAvailable, startAISession, onProjectChanged, scheduling } = deps;
+  const {
+    db,
+    app,
+    authMiddleware,
+    broadcast,
+    isWorktreeAvailable,
+    startAISession,
+    onProjectChanged,
+    scheduling,
+  } = deps;
 
   const localPRService = new LocalPRService(db, broadcast, {
     startAISession,
@@ -41,15 +50,11 @@ export function registerLocalPRDomain(deps: LocalPRDomainDeps): LocalPRDomainRes
   app.use('/api', authMiddleware, createLocalPRRoutes(localPRService, db, onProjectChanged));
 
   // Auto-trigger Local PR when a regular session completes
-  pluginEvents.on('run.completed', async (data) => {
+  pluginEvents.on('run.completed', async data => {
     try {
       const sessionId = data.sessionId as string | undefined;
       if (!sessionId) return;
-      const sessionRow = db
-        .prepare('SELECT project_id, type, working_directory FROM sessions WHERE id = ?')
-        .get(sessionId) as { project_id: string; type: string; working_directory?: string } | undefined;
-      if (!sessionRow?.working_directory || sessionRow.type !== 'regular') return;
-      await localPRService.maybeAutoCreatePR(sessionRow.project_id, sessionRow.working_directory);
+      await localPRService.maybeAutoCreatePRForCompletedSession(sessionId);
     } catch (err) {
       console.error('[LocalPR] Auto-trigger error:', err);
     }

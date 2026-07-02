@@ -6,7 +6,7 @@ import { RunDomainEventListenerRegistry } from '../run-domain-event-listeners.js
 async function shortRace<T>(promise: Promise<T>): Promise<T | 'pending'> {
   return Promise.race([
     promise,
-    new Promise<'pending'>((resolve) => setTimeout(() => resolve('pending'), 5)),
+    new Promise<'pending'>(resolve => setTimeout(() => resolve('pending'), 5)),
   ]);
 }
 
@@ -86,8 +86,8 @@ vi.mock('../../agent/permission-evaluator.js', () => ({
   getProjectPermissionOverride: vi.fn(() => undefined),
   isInternalInteractionTool: vi.fn(() => false),
   isOutsideWorkspacePathAllowed: vi.fn(() => false),
-  mergePolicy: vi.fn((globalPolicy) => globalPolicy),
-  normalizePolicy: vi.fn((policy) => policy),
+  mergePolicy: vi.fn(globalPolicy => globalPolicy),
+  normalizePolicy: vi.fn(policy => policy),
   evaluateMcpToolTrustPolicy: evaluateMcpToolTrustPolicyMock,
   PermissionEvaluator: class {
     evaluate(...args: unknown[]) {
@@ -192,11 +192,13 @@ describe('createPermissionCallback workflow routing', () => {
     permissionEvaluatorEvaluateMock.mockReturnValue('ask');
     evaluateMcpToolTrustPolicyMock.mockReturnValue('escalate');
     mcpInventoryCacheMock.getCached.mockReturnValue({
-      tools: [{
-        name: 'read_issue',
-        annotations: { readOnlyHint: true, openWorldHint: false },
-        inputSchema: { type: 'object' },
-      }],
+      tools: [
+        {
+          name: 'read_issue',
+          annotations: { readOnlyHint: true, openWorldHint: false },
+          inputSchema: { type: 'object' },
+        },
+      ],
     });
   });
 
@@ -208,28 +210,32 @@ describe('createPermissionCallback workflow routing', () => {
     const input = { ...createInput(), listeners };
     const callback = createPermissionCallback(input as any);
 
-    const decision = await shortRace(callback({
-      requestId: 'mcp-approve-1',
-      toolName: 'mcp__github__read_issue',
-      toolInput: { id: '1' },
-      detail: '{"id":"1"}',
-      timeoutSeconds: 0,
-    }));
+    const decision = await shortRace(
+      callback({
+        requestId: 'mcp-approve-1',
+        toolName: 'mcp__github__read_issue',
+        toolInput: { id: '1' },
+        detail: '{"id":"1"}',
+        timeoutSeconds: 0,
+      })
+    );
 
     expect(decision).toEqual({ behavior: 'allow', updatedInput: { id: '1' } });
-    expect(autoResolvedListener).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'permission.autoResolved',
-      runId: 'run-1',
-      sessionId: 'session-1',
-      payload: {
-        requestId: 'mcp-approve-1',
-        behavior: 'allow',
-        reason: 'Auto-approved by MCP trust policy',
-      },
-    }));
+    expect(autoResolvedListener).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'permission.autoResolved',
+        runId: 'run-1',
+        sessionId: 'session-1',
+        payload: {
+          requestId: 'mcp-approve-1',
+          behavior: 'allow',
+          reason: 'Auto-approved by MCP trust policy',
+        },
+      })
+    );
     expect(evaluateMcpToolTrustPolicyMock).toHaveBeenCalledWith(
       expect.objectContaining({ declaredReadOnly: true, riskLevel: 'medium' }),
-      expect.objectContaining({ trustLevel: 'trusted-readonly' }),
+      expect.objectContaining({ trustLevel: 'trusted-readonly' })
     );
     expect(permissionEvaluatorEvaluateMock).not.toHaveBeenCalled();
     expect(permissionWorkflowResolverMock.triggerPermissionEscalation).not.toHaveBeenCalled();
@@ -245,28 +251,32 @@ describe('createPermissionCallback workflow routing', () => {
           tool: 'read_issue',
           policyDecision: 'approve',
         }),
-      }),
+      })
     );
   });
 
   it('denies MCP tools blocked by server trust policy', async () => {
     mcpInventoryCacheMock.getCached.mockReturnValue({
-      tools: [{
-        name: 'delete_issue',
-        annotations: { destructiveHint: true },
-        inputSchema: { type: 'object' },
-      }],
+      tools: [
+        {
+          name: 'delete_issue',
+          annotations: { destructiveHint: true },
+          inputSchema: { type: 'object' },
+        },
+      ],
     });
     evaluateMcpToolTrustPolicyMock.mockReturnValue('deny');
     const callback = createPermissionCallback(createInput() as any);
 
-    const decision = await shortRace(callback({
-      requestId: 'mcp-deny-1',
-      toolName: 'mcp__github__delete_issue',
-      toolInput: { id: '1' },
-      detail: '{"id":"1"}',
-      timeoutSeconds: 0,
-    }));
+    const decision = await shortRace(
+      callback({
+        requestId: 'mcp-deny-1',
+        toolName: 'mcp__github__delete_issue',
+        toolInput: { id: '1' },
+        detail: '{"id":"1"}',
+        timeoutSeconds: 0,
+      })
+    );
 
     expect(decision).not.toBe('pending');
     if (decision === 'pending') return;
@@ -285,7 +295,7 @@ describe('createPermissionCallback workflow routing', () => {
         server: 'github',
         tool: 'delete_issue',
         policyDecision: 'deny',
-      }),
+      })
     );
   });
 
@@ -317,7 +327,7 @@ describe('createPermissionCallback workflow routing', () => {
             maxAutoApprovalsPerMinute: 10,
           }),
         }),
-      }),
+      })
     );
     expect(broadcastRunMessageMock).toHaveBeenCalledWith(
       expect.anything(),
@@ -325,17 +335,19 @@ describe('createPermissionCallback workflow routing', () => {
         type: 'permission_request',
         requestId: 'req-1',
         workflowMode: true,
-      }),
+      })
     );
-    expect(requestedListener).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'permission.requested',
-      runId: 'run-1',
-      sessionId: 'session-1',
-      payload: {
-        requestId: 'req-1',
-        toolName: 'Bash',
-      },
-    }));
+    expect(requestedListener).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'permission.requested',
+        runId: 'run-1',
+        sessionId: 'session-1',
+        payload: {
+          requestId: 'req-1',
+          toolName: 'Bash',
+        },
+      })
+    );
     await Promise.resolve();
     expect(input.permissionBridge.setWorkflowRunId).toHaveBeenCalledWith('req-1', 'wf-run-1');
   });
@@ -388,7 +400,7 @@ describe('createPermissionCallback workflow routing', () => {
             analysisLlmProfileId: 'review-profile',
           },
         }),
-      }),
+      })
     );
   });
 
@@ -410,7 +422,7 @@ describe('createPermissionCallback workflow routing', () => {
         type: 'permission_request',
         requestId: 'req-2',
         workflowMode: true,
-      }),
+      })
     );
   });
 
@@ -437,10 +449,12 @@ describe('createPermissionCallback workflow routing', () => {
       requestId: 'question-1',
       toolName: 'AskUserQuestion',
       toolInput: {
-        questions: [{
-          question: 'Continue?',
-          options: [{ label: 'Yes', description: 'Proceed' }],
-        }],
+        questions: [
+          {
+            question: 'Continue?',
+            options: [{ label: 'Yes', description: 'Proceed' }],
+          },
+        ],
       },
       detail: '{"questions":[{"question":"Continue?"}]}',
       timeoutSeconds: 0,
@@ -450,20 +464,24 @@ describe('createPermissionCallback workflow routing', () => {
     expect(permissionEvaluatorEvaluateMock).not.toHaveBeenCalled();
     expect(input.permissionBridge.register).not.toHaveBeenCalled();
     expect(input.activeRun.pendingPermissions.has('question-1')).toBe(true);
-    expect(input.sendRunEvent).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'interaction_prompt',
-      interactionId: 'question-1',
-      responseMode: 'prompt_answer',
-    }));
-    expect(promptRequestedListener).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'interaction.promptRequested',
-      runId: 'run-1',
-      sessionId: 'session-1',
-      payload: {
+    expect(input.sendRunEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'interaction_prompt',
         interactionId: 'question-1',
-        title: 'Question',
-      },
-    }));
+        responseMode: 'prompt_answer',
+      })
+    );
+    expect(promptRequestedListener).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'interaction.promptRequested',
+        runId: 'run-1',
+        sessionId: 'session-1',
+        payload: {
+          interactionId: 'question-1',
+          title: 'Question',
+        },
+      })
+    );
   });
 });
 
@@ -482,8 +500,9 @@ describe('createPermissionCallback strict plan mode', () => {
   }
 
   function wasStrictDenied() {
-    return broadcastRunMessageMock.mock.calls.some(([, msg]) =>
-      typeof msg?.reason === 'string' && msg.reason.startsWith('Denied by strict Plan Mode'),
+    return broadcastRunMessageMock.mock.calls.some(
+      ([, msg]) =>
+        typeof msg?.reason === 'string' && msg.reason.startsWith('Denied by strict Plan Mode')
     );
   }
 
@@ -501,33 +520,37 @@ describe('createPermissionCallback strict plan mode', () => {
 
   it.each(['EnterPlanMode', 'ExitPlanMode', 'ReadSymbol', 'AstGrep', 'Memory'])(
     'does not strict-deny read-only tool %s',
-    async (toolName) => {
+    async toolName => {
       const callback = createPermissionCallback(planInput() as never);
-      const result = await shortRace(callback({
-        requestId: `req-${toolName}`,
-        toolName,
-        toolInput: {},
-        detail: toolName,
-      } as never));
+      const result = await shortRace(
+        callback({
+          requestId: `req-${toolName}`,
+          toolName,
+          toolInput: {},
+          detail: toolName,
+        } as never)
+      );
       // Falls through to the normal permission flow rather than being killed by
       // the strict-plan gate.
       expect(wasStrictDenied()).toBe(false);
       if (result !== 'pending') {
         expect(result.message ?? '').not.toContain('Denied by strict Plan Mode');
       }
-    },
+    }
   );
 
   it('allows Bash when the sandbox is available (read-only)', async () => {
     isBashLikeToolMock.mockReturnValue(true);
     isSandboxAvailableMock.mockReturnValue(true);
     const callback = createPermissionCallback(planInput() as never);
-    const result = await shortRace(callback({
-      requestId: 'req-bash-sandbox',
-      toolName: 'Bash',
-      toolInput: { command: 'ls' },
-      detail: 'ls',
-    } as never));
+    const result = await shortRace(
+      callback({
+        requestId: 'req-bash-sandbox',
+        toolName: 'Bash',
+        toolInput: { command: 'ls' },
+        detail: 'ls',
+      } as never)
+    );
     expect(wasStrictDenied()).toBe(false);
     if (result !== 'pending') {
       expect(result.message ?? '').not.toContain('Denied by strict Plan Mode');

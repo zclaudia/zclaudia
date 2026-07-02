@@ -15,7 +15,7 @@ describe('TokenUsageDisplay', () => {
 
   it('prefers the latest snapshot input over the cumulative total', () => {
     render(
-      <TokenUsageDisplay inputTokens={100_000} latestInputTokens={14_000} contextWindow={272_000} />,
+      <TokenUsageDisplay inputTokens={100_000} latestInputTokens={14_000} contextWindow={272_000} />
     );
     expect(screen.getByText('5%')).toBeInTheDocument();
   });
@@ -27,7 +27,7 @@ describe('TokenUsageDisplay', () => {
         latestInputTokens={0}
         contextUsedTokens={32_900}
         contextWindow={1_000_000}
-      />,
+      />
     );
     expect(screen.getByText('3%')).toBeInTheDocument();
   });
@@ -38,22 +38,30 @@ describe('TokenUsageDisplay', () => {
   });
 
   it('colors muted below 60% usage', () => {
-    const { container } = render(<TokenUsageDisplay inputTokens={50_000} contextWindow={272_000} />);
+    const { container } = render(
+      <TokenUsageDisplay inputTokens={50_000} contextWindow={272_000} />
+    );
     expect(container.firstChild).toHaveClass('text-muted-foreground'); // 18%
   });
 
   it('colors amber between 60% and 80% usage', () => {
-    const { container } = render(<TokenUsageDisplay inputTokens={180_000} contextWindow={272_000} />);
+    const { container } = render(
+      <TokenUsageDisplay inputTokens={180_000} contextWindow={272_000} />
+    );
     expect(container.firstChild).toHaveClass('text-yellow-500'); // 66%
   });
 
   it('colors red above 80% usage', () => {
-    const { container } = render(<TokenUsageDisplay inputTokens={240_000} contextWindow={272_000} />);
+    const { container } = render(
+      <TokenUsageDisplay inputTokens={240_000} contextWindow={272_000} />
+    );
     expect(container.firstChild).toHaveClass('text-destructive'); // 88%
   });
 
   it('renders only the ring — no cache glyph or warning icon', () => {
-    const { container } = render(<TokenUsageDisplay inputTokens={240_000} contextWindow={272_000} />);
+    const { container } = render(
+      <TokenUsageDisplay inputTokens={240_000} contextWindow={272_000} />
+    );
     expect(container.textContent).not.toContain('↺');
     expect(container.querySelectorAll('svg').length).toBe(1); // just the ring
   });

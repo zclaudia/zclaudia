@@ -22,20 +22,20 @@ export function ArchiveConfirmDialog({
   subIssueId,
   onClose,
 }: Props): React.ReactElement {
-  const issue = useOpenSpecStore((s) =>
-    (s.issuesByProject[projectId] ?? []).find((i) => i.id === subIssueId),
+  const issue = useOpenSpecStore(s =>
+    (s.issuesByProject[projectId] ?? []).find(i => i.id === subIssueId)
   );
-  const specChange = useOpenSpecStore((s) =>
-    issue?.specChangeId ? s.specChangesById[issue.specChangeId] : undefined,
+  const specChange = useOpenSpecStore(s =>
+    issue?.specChangeId ? s.specChangesById[issue.specChangeId] : undefined
   );
-  const upsertIssue = useOpenSpecStore((s) => s.upsertIssue);
+  const upsertIssue = useOpenSpecStore(s => s.upsertIssue);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ArchiveOutcome | null>(null);
   const [errors, setErrors] = useState<{ capability: string; issues: string[] }[]>([]);
 
   const deltaCaps = (specChange?.deltaSpecPaths ?? [])
-    .map((p) => p.split('/').slice(-2, -1)[0])
+    .map(p => p.split('/').slice(-2, -1)[0])
     .filter(Boolean) as string[];
 
   const onConfirm = async (): Promise<void> => {
@@ -82,7 +82,7 @@ export function ArchiveConfirmDialog({
                   Validate {deltaCaps.length} delta capabilities:{' '}
                   {deltaCaps.length === 0
                     ? '(none)'
-                    : deltaCaps.map((c) => (
+                    : deltaCaps.map(c => (
                         <code
                           key={c}
                           className="mx-0.5 px-1 py-0.5 rounded bg-muted font-mono text-xs"
@@ -112,7 +112,7 @@ export function ArchiveConfirmDialog({
                   <div className="font-medium text-red-600 mb-2">
                     Validation failed — fix these before archiving:
                   </div>
-                  {errors.map((capErr) => (
+                  {errors.map(capErr => (
                     <div key={capErr.capability} className="mb-2 last:mb-0">
                       <div className="text-xs font-mono">{capErr.capability}</div>
                       <ul className="list-disc pl-5 mt-1 space-y-0.5 text-xs text-muted-foreground">
@@ -124,9 +124,7 @@ export function ArchiveConfirmDialog({
                   ))}
                 </div>
               )}
-              {result !== null && (
-                <div className="text-xs text-green-600">Archive complete.</div>
-              )}
+              {result !== null && <div className="text-xs text-green-600">Archive complete.</div>}
             </>
           ) : (
             <div className="text-muted-foreground">Issue not found.</div>

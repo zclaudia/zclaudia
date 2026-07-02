@@ -1,11 +1,17 @@
 import { negotiateProfile } from '../../../infra/providers/pcp-negotiator.js';
 import type { ProviderAdapter, ProviderRuntimeEvent } from '../../../infra/providers/types.js';
-import type { ServerMessage } from '@zclaudia/shared/wire/messages';
+import type Database from 'better-sqlite3';
+import type { PermissionRequest } from '@zclaudia/shared/interaction/permissions';
+import type { UserHookDefinition } from '@zclaudia/shared/interaction/user-hooks';
+import type { BackgroundTaskUpdateMessage, ServerMessage } from '@zclaudia/shared/wire/messages';
 import type { ResolvedImage } from './resolve-image-attachments.js';
 import { buildRunContext } from './run-context.js';
 import { upsertAssistantMessage } from './run-lifecycle.js';
-import { PERIODIC_SAVE_INTERVAL_MS, type ActiveRun, type ConnectedClient } from '../transport/types.js';
-import { sendMessage } from '../transport/broadcast.js';
+import {
+  PERIODIC_SAVE_INTERVAL_MS,
+  type ActiveRun,
+  type ConnectedClient,
+} from '../transport/types.js';
 import type { RunStartMessage, RunSessionRecord } from './run-bootstrap.js';
 import type { TraceRecorder } from '../../../utils/provider-trace.js';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
@@ -14,7 +20,10 @@ import type { ToolName } from '@zclaudia/shared/core/tools';
 import type { PermissionDecision } from '../../../infra/providers/types.js';
 import type { TaskExecutor } from '../../../domains/tasks/executors/types.js';
 import { persistMcpInstructionsDeltaForSession } from './mcp-instructions-delta.js';
-import { executePreparedDirectSkillInvocation, prepareDirectSkillInvocation } from '../../../infra/providers/pi-runtime/skills.js';
+import {
+  executePreparedDirectSkillInvocation,
+  prepareDirectSkillInvocation,
+} from '../../../infra/providers/pi-runtime/skills.js';
 import { setPhase } from './active-run-phase.js';
 import { maybeCompact } from '../compaction/compaction-service.js';
 import { compactionDomainEventFor } from './compaction-events.js';
@@ -43,7 +52,7 @@ interface LaunchProviderRunInput {
   images: ResolvedImage[];
   message: RunStartMessage;
   modeValue: string;
-  permissionCallback: (request: import('@zclaudia/shared/interaction/permissions').PermissionRequest) => Promise<PermissionDecision>;
+  permissionCallback: (request: PermissionRequest) => Promise<PermissionDecision>;
   processedInput: string;
   providerConfig?: LlmProfileConfig;
   llmProfileId: string | null;
@@ -51,14 +60,14 @@ interface LaunchProviderRunInput {
   runId: string;
   agentTaskExecutor?: TaskExecutor;
   sdkSessionId?: string;
-  sendRunEvent: (event: import('@zclaudia/shared/wire/messages').ServerMessage) => void;
+  sendRunEvent: (event: ServerMessage) => void;
   listeners?: RunDomainEventListenerRegistry;
   serverPort: number | null;
   session: RunSessionRecord;
   sessionType: 'regular' | 'background' | 'agent';
   trace: TraceRecorder;
   userMessageId?: string;
-  userHooks?: import('@zclaudia/shared/interaction/user-hooks').UserHookDefinition[];
+  userHooks?: UserHookDefinition[];
 }
 
 export async function launchProviderRun(input: LaunchProviderRunInput): Promise<{
@@ -69,7 +78,6 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     adapter,
     agentProfile,
     broadcastSessionCatalogUpdate,
-    client,
     cwd,
     db,
     enabledTools,
@@ -95,7 +103,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
   } = input;
 
   const multimodalFallback = resolveMultimodalFallbackForRun({
-    db: db as import('better-sqlite3').Database,
+    db: db as Database.Database,
     agentProfile,
     llmProfile: providerConfig,
     images,
@@ -108,11 +116,16 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     activeRun.agentProfile = effectiveAgentProfile;
     activeRun.llmProfile = effectiveProviderConfig;
     activeRun.providerType = effectiveProviderType;
-    trace.log('server_norm', 'multimodal_fallback_applied', {
-      llmProfileId: effectiveLlmProfileId,
-      providerType: effectiveProviderType,
-      model: effectiveAgentProfile.model,
-    }, `multimodal fallback model=${effectiveAgentProfile.model}`);
+    trace.log(
+      'server_norm',
+      'multimodal_fallback_applied',
+      {
+        llmProfileId: effectiveLlmProfileId,
+        providerType: effectiveProviderType,
+        model: effectiveAgentProfile.model,
+      },
+      `multimodal fallback model=${effectiveAgentProfile.model}`
+    );
   }
 
   if (adapter.manifest) {
@@ -123,12 +136,17 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
       serverPort,
     });
     activeRun.effectiveProfile.sessionId = message.sessionId;
-    trace.log('server_norm', 'profile_negotiated', {
-      providerId: activeRun.effectiveProfile.providerId,
-      capabilities: activeRun.effectiveProfile.capabilities
-        .filter(c => c.enabled)
-        .map(c => `${c.id}:${c.mode}/${c.reliability}`),
-    }, 'PCP profile negotiated');
+    trace.log(
+      'server_norm',
+      'profile_negotiated',
+      {
+        providerId: activeRun.effectiveProfile.providerId,
+        capabilities: activeRun.effectiveProfile.capabilities
+          .filter(c => c.enabled)
+          .map(c => `${c.id}:${c.mode}/${c.reliability}`),
+      },
+      'PCP profile negotiated'
+    );
   }
 
   dispatchRunStartedDomainEvent({
@@ -151,13 +169,15 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
       type: 'background_task_update',
       sessionId: message.sessionId,
       status: 'running',
-    } as import('@zclaudia/shared/wire/messages').BackgroundTaskUpdateMessage);
+    } as BackgroundTaskUpdateMessage);
   }
 
-  persistMcpInstructionsDeltaForSession(db as import('better-sqlite3').Database, message.sessionId);
+  persistMcpInstructionsDeltaForSession(db as Database.Database, message.sessionId);
 
   let effectiveInput = processedInput;
-  const directSkill = await prepareDirectSkillInvocation(activeRun.skillState, processedInput, { agentProfile: effectiveAgentProfile });
+  const directSkill = await prepareDirectSkillInvocation(activeRun.skillState, processedInput, {
+    agentProfile: effectiveAgentProfile,
+  });
   if (directSkill.matched) {
     if (!directSkill.ok) {
       return completeRunLocally({
@@ -178,14 +198,18 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
           sendRunEvent,
         });
       }
-      const forkResult = await executePreparedDirectSkillInvocation(activeRun.skillState, directSkill, {
-        cwd,
-        db: db as import('better-sqlite3').Database,
-        enabledTools,
-        llmProfileConfig: effectiveProviderConfig,
-        agentProfile: effectiveAgentProfile,
-        permissionCallback,
-      });
+      const forkResult = await executePreparedDirectSkillInvocation(
+        activeRun.skillState,
+        directSkill,
+        {
+          cwd,
+          db: db as Database.Database,
+          enabledTools,
+          llmProfileConfig: effectiveProviderConfig,
+          agentProfile: effectiveAgentProfile,
+          permissionCallback,
+        }
+      );
       return completeRunLocally({
         activeRun,
         content: forkResult.ok ? forkResult.result : forkResult.message,
@@ -195,10 +219,15 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
       });
     }
     effectiveInput = directSkill.processedInput;
-    trace.log('server_norm', 'direct_skill_invoked', {
-      skillId: directSkill.ref.id,
-      skillSource: directSkill.ref.source,
-    }, directSkill.message);
+    trace.log(
+      'server_norm',
+      'direct_skill_invoked',
+      {
+        skillId: directSkill.ref.id,
+        skillSource: directSkill.ref.source,
+      },
+      directSkill.message
+    );
   }
 
   const { runOptions } = await buildRunContext({
@@ -229,22 +258,29 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
   // (not via activeRuns map) so registration is robust even if the run is
   // removed from the map mid-flight; the mutations are idempotent on a stale
   // reference and cancelRun's clears still win deterministically.
-  runOptions.onAgentReady = (handle) => {
+  runOptions.onAgentReady = handle => {
     activeRun.steerHandle = handle;
   };
   runOptions.onSteerConsumed = () => {
     activeRun.pendingSteers = [];
   };
 
-  console.log(`[Run Debug] session=${message.sessionId} sdk_session=${sdkSessionId || 'NEW'} provider=${effectiveProviderType} mode=${modeValue} model=${effectiveAgentProfile.model || 'default'} cwd=${cwd} baseUrl=${effectiveProviderConfig?.baseUrl || 'default'}`);
+  console.log(
+    `[Run Debug] session=${message.sessionId} sdk_session=${sdkSessionId || 'NEW'} provider=${effectiveProviderType} mode=${modeValue} model=${effectiveAgentProfile.model || 'default'} cwd=${cwd} baseUrl=${effectiveProviderConfig?.baseUrl || 'default'}`
+  );
   trace.setMeta({ provider: effectiveProviderType, cwd });
-  trace.log('server_norm', 'provider_runner_created', {
-    providerType: effectiveProviderType,
-    sdkSessionId,
-    modeValue,
-    model: effectiveAgentProfile.model,
-    cwd,
-  }, `provider runner ${effectiveProviderType}`);
+  trace.log(
+    'server_norm',
+    'provider_runner_created',
+    {
+      providerType: effectiveProviderType,
+      sdkSessionId,
+      modeValue,
+      model: effectiveAgentProfile.model,
+      cwd,
+    },
+    `provider runner ${effectiveProviderType}`
+  );
 
   // Pre-flight compaction. History is rebuilt from the DB inside adapter.run, so
   // if the stored history already exceeds the CURRENT model's threshold — e.g.
@@ -257,7 +293,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
   if (effectiveProviderConfig) {
     try {
       const preflight = await maybeCompact({
-        db: db as import('better-sqlite3').Database,
+        db: db as Database.Database,
         sessionId: message.sessionId,
         agentProfile: effectiveAgentProfile,
         llmProfile: effectiveProviderConfig,
@@ -265,7 +301,9 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
         signal: activeRun.abortController?.signal,
       });
       if (preflight.outcome === 'compacted') {
-        console.log(`[Compaction] preflight session=${message.sessionId} id=${preflight.compactionId} tokens=${preflight.tokensBefore}`);
+        console.log(
+          `[Compaction] preflight session=${message.sessionId} id=${preflight.compactionId} tokens=${preflight.tokensBefore}`
+        );
         sendRunEvent({
           type: 'delta',
           runId,
@@ -279,14 +317,18 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
           seq: (activeRun.eventSeq ?? 0) + 1,
           sessionId: message.sessionId,
         });
-        if (event) emitRunLaunchDomainEvent({
-          event,
-          listeners,
-          sendRunEvent,
-        });
+        if (event)
+          emitRunLaunchDomainEvent({
+            event,
+            listeners,
+            sendRunEvent,
+          });
       }
     } catch (err) {
-      console.warn(`[Compaction] preflight failed (non-fatal) session=${message.sessionId}:`, err instanceof Error ? err.message : err);
+      console.warn(
+        `[Compaction] preflight failed (non-fatal) session=${message.sessionId}:`,
+        err instanceof Error ? err.message : err
+      );
     }
   }
 
@@ -370,7 +412,7 @@ function completeRunLocally(input: {
   content: string;
   message: RunStartMessage;
   runId: string;
-  sendRunEvent: (event: import('@zclaudia/shared/wire/messages').ServerMessage) => void;
+  sendRunEvent: (event: ServerMessage) => void;
 }): { providerRunner: AsyncIterable<ProviderRuntimeEvent> } {
   const { activeRun, content, message, runId, sendRunEvent } = input;
   activeRun.fullContent = content;

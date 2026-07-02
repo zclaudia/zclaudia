@@ -20,7 +20,10 @@ function containsRfcKeyword(text: string): boolean {
   for (const kw of RFC_KEYWORDS) {
     const pattern = new RegExp(`\\b${kw.replace(' ', '\\s+')}\\b`);
     if (pattern.test(scratch)) return true;
-    scratch = scratch.replace(new RegExp(`\\b${kw.replace(' ', '\\s+')}\\b`, 'g'), ' '.repeat(kw.length));
+    scratch = scratch.replace(
+      new RegExp(`\\b${kw.replace(' ', '\\s+')}\\b`, 'g'),
+      ' '.repeat(kw.length)
+    );
   }
   return false;
 }
@@ -30,22 +33,28 @@ export function validateSpec(markdown: string): ValidationResult {
   const lines = markdown.split(/\r?\n/);
 
   // Rule 1: ## Purpose section required with at least one non-empty paragraph
-  const purposeIdx = lines.findIndex((l) => /^##\s+Purpose\s*$/.test(l));
+  const purposeIdx = lines.findIndex(l => /^##\s+Purpose\s*$/.test(l));
   if (purposeIdx === -1) {
     errors.push({ rule: 'purpose-required', message: 'Missing required `## Purpose` section.' });
   } else {
-    const nextSectionIdx = lines.slice(purposeIdx + 1).findIndex((l) => /^##\s+/.test(l));
+    const nextSectionIdx = lines.slice(purposeIdx + 1).findIndex(l => /^##\s+/.test(l));
     const end = nextSectionIdx === -1 ? lines.length : purposeIdx + 1 + nextSectionIdx;
-    const body = lines.slice(purposeIdx + 1, end).join('\n').trim();
+    const body = lines
+      .slice(purposeIdx + 1, end)
+      .join('\n')
+      .trim();
     if (body.length === 0) {
       errors.push({ rule: 'purpose-required', message: '`## Purpose` section is empty.' });
     }
   }
 
   // Rule 2: ## Requirements section required
-  const requirementsIdx = lines.findIndex((l) => /^##\s+Requirements\s*$/.test(l));
+  const requirementsIdx = lines.findIndex(l => /^##\s+Requirements\s*$/.test(l));
   if (requirementsIdx === -1) {
-    errors.push({ rule: 'requirements-required', message: 'Missing required `## Requirements` section.' });
+    errors.push({
+      rule: 'requirements-required',
+      message: 'Missing required `## Requirements` section.',
+    });
     return { valid: false, errors };
   }
 
@@ -58,7 +67,7 @@ export function validateSpec(markdown: string): ValidationResult {
   // Rule 5: heading hierarchy — no H4 (#### Scenario) outside a Requirement
   for (let i = requirementsIdx + 1; i < lines.length; i += 1) {
     if (/^####\s+/.test(lines[i])) {
-      const hasReqAbove = reqHeadingIndexes.some((idx) => idx < i);
+      const hasReqAbove = reqHeadingIndexes.some(idx => idx < i);
       if (!hasReqAbove) {
         errors.push({
           rule: 'heading-hierarchy',
@@ -91,7 +100,10 @@ export function validateSpec(markdown: string): ValidationResult {
 
     // Rule 3: Requirement body (between heading and first Scenario) non-empty
     const bodyEnd = scenarioIndexes[0] ?? reqEnd;
-    const reqBody = lines.slice(reqStart + 1, bodyEnd).join('\n').trim();
+    const reqBody = lines
+      .slice(reqStart + 1, bodyEnd)
+      .join('\n')
+      .trim();
     if (reqBody.length === 0) {
       errors.push({
         rule: 'requirement-body-required',

@@ -145,7 +145,10 @@ function changedRangeFromHunk(hunk: FileDiffHunk): { start: number; end: number 
   return { start, end };
 }
 
-export function changedRangesFromDiff(diff: FileDiffResult, updatedContent: string): RangeDescriptor[] {
+export function changedRangesFromDiff(
+  diff: FileDiffResult,
+  updatedContent: string
+): RangeDescriptor[] {
   const updatedLines = splitSnapshotLines(updatedContent);
   return diff.structuredPatch
     .map(changedRangeFromHunk)
@@ -168,12 +171,14 @@ export function buildMutationStateDescriptor(input: {
   rebased?: boolean;
 }): MutationStateDescriptor {
   const next = buildSnapshotDescriptor(input.relPath, input.updatedContent);
-  const previous = input.originalContent === null
-    ? undefined
-    : buildSnapshotDescriptor(input.relPath, input.originalContent);
-  const readSnapshot = input.readSnapshotContent === undefined
-    ? undefined
-    : buildSnapshotDescriptor(input.relPath, input.readSnapshotContent);
+  const previous =
+    input.originalContent === null
+      ? undefined
+      : buildSnapshotDescriptor(input.relPath, input.originalContent);
+  const readSnapshot =
+    input.readSnapshotContent === undefined
+      ? undefined
+      : buildSnapshotDescriptor(input.relPath, input.readSnapshotContent);
   return {
     previousSnapshotId: previous?.snapshotId ?? null,
     newSnapshotId: next.snapshotId,
@@ -181,7 +186,9 @@ export function buildMutationStateDescriptor(input: {
     newFileDigest: next.fileDigest,
     changedRanges: changedRangesFromDiff(input.diff, input.updatedContent),
     snapshotUpdated: input.snapshotUpdated,
-    ...(readSnapshot ? { readSnapshotId: readSnapshot.snapshotId, readFileDigest: readSnapshot.fileDigest } : {}),
+    ...(readSnapshot
+      ? { readSnapshotId: readSnapshot.snapshotId, readFileDigest: readSnapshot.fileDigest }
+      : {}),
     ...(input.rebased ? { rebased: true } : {}),
   };
 }
@@ -193,14 +200,18 @@ export function buildFileStateErrorDescriptor(input: {
   hasFullContent?: boolean;
   partialView?: boolean;
 }): FileStateErrorDescriptor {
-  const current = input.currentContent === undefined
-    ? undefined
-    : buildSnapshotDescriptor(input.relPath, input.currentContent);
-  const read = input.readContent === undefined
-    ? undefined
-    : buildSnapshotDescriptor(input.relPath, input.readContent);
+  const current =
+    input.currentContent === undefined
+      ? undefined
+      : buildSnapshotDescriptor(input.relPath, input.currentContent);
+  const read =
+    input.readContent === undefined
+      ? undefined
+      : buildSnapshotDescriptor(input.relPath, input.readContent);
   return {
-    ...(current ? { currentSnapshotId: current.snapshotId, currentFileDigest: current.fileDigest } : {}),
+    ...(current
+      ? { currentSnapshotId: current.snapshotId, currentFileDigest: current.fileDigest }
+      : {}),
     ...(read ? { readSnapshotId: read.snapshotId, readFileDigest: read.fileDigest } : {}),
     ...(input.hasFullContent !== undefined ? { hasFullContent: input.hasFullContent } : {}),
     ...(input.partialView !== undefined ? { partialView: input.partialView } : {}),

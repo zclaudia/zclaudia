@@ -66,7 +66,7 @@ export function ResizeDivider({ dir, containerSize, onDrag, groupId }: ResizeDiv
       document.addEventListener('pointerup', cleanup);
       document.addEventListener('pointercancel', cleanup);
     },
-    [isRow],
+    [isRow]
   );
 
   return (

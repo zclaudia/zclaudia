@@ -29,10 +29,13 @@ describe('ReusePoolPromotionService', () => {
 
   it('promotes a workflow-kind item: strips auto tags, flips sourceType, adds user tags', () => {
     const item = poolRepo.create({
-      kind: 'workflow', entityId: 'wf-1', phaseType: 'code-implement',
+      kind: 'workflow',
+      entityId: 'wf-1',
+      phaseType: 'code-implement',
       description: 'old desc',
       tags: ['auto-generated', 'run-abc', 'phase-1', 'keep-me'],
-      sourceType: 'auto', createdAt: 10,
+      sourceType: 'auto',
+      createdAt: 10,
     });
     const result = promote.promote(item.id, {
       newTags: ['keep-me', 'jpa-impl'],
@@ -52,11 +55,18 @@ describe('ReusePoolPromotionService', () => {
       allowedTools: ['Read'],
       maxTurns: 30,
       terminationCondition: { kind: 'output-file', target: 'r.md' },
-      sourceType: 'auto', createdAt: now, updatedAt: now,
+      sourceType: 'auto',
+      createdAt: now,
+      updatedAt: now,
     });
     const item = poolRepo.create({
-      kind: 'subagent', entityId: tmpl.id, phaseType: 'investigation',
-      description: 'invest', tags: ['auto-generated'], sourceType: 'auto', createdAt: now,
+      kind: 'subagent',
+      entityId: tmpl.id,
+      phaseType: 'investigation',
+      description: 'invest',
+      tags: ['auto-generated'],
+      sourceType: 'auto',
+      createdAt: now,
     });
     promote.promote(item.id, { newTags: ['my-investigation'] });
 
@@ -70,8 +80,12 @@ describe('ReusePoolPromotionService', () => {
 
   it('throws when subagent template is missing for a subagent-kind item', () => {
     const item = poolRepo.create({
-      kind: 'subagent', entityId: 'orphan-tmpl-id', phaseType: 'investigation',
-      tags: [], sourceType: 'auto', createdAt: Date.now(),
+      kind: 'subagent',
+      entityId: 'orphan-tmpl-id',
+      phaseType: 'investigation',
+      tags: [],
+      sourceType: 'auto',
+      createdAt: Date.now(),
     });
     expect(() => promote.promote(item.id, { newTags: [] })).toThrow(/subagent template/);
   });

@@ -118,7 +118,7 @@ describe('skill-tools (pi-backed)', () => {
     writeSkill(
       WORKSPACE_SKILLS_DIR,
       'win-only',
-      'name: win-only\ndescription: gated\nrequires:\n  os:\n    - win32',
+      'name: win-only\ndescription: gated\nrequires:\n  os:\n    - win32'
     );
     writeSkill(WORKSPACE_SKILLS_DIR, 'ok', 'name: ok\ndescription: no gate');
     const env = createExecutionEnv(tmpRoot);
@@ -134,7 +134,7 @@ describe('skill-tools (pi-backed)', () => {
     writeSkill(
       WORKSPACE_SKILLS_DIR,
       'win-only',
-      'name: win-only\ndescription: gated\nrequires:\n  os:\n    - win32',
+      'name: win-only\ndescription: gated\nrequires:\n  os:\n    - win32'
     );
     writeSkill(WORKSPACE_SKILLS_DIR, 'ok', 'name: ok\ndescription: no gate');
     const env = createExecutionEnv(tmpRoot);
@@ -142,9 +142,9 @@ describe('skill-tools (pi-backed)', () => {
 
     const eligible = getEligibleDiscoveredSkills();
 
-    expect(eligible.map((skill) => skill.id)).toContain('ok');
+    expect(eligible.map(skill => skill.id)).toContain('ok');
     if (process.platform !== 'win32') {
-      expect(eligible.map((skill) => skill.id)).not.toContain('win-only');
+      expect(eligible.map(skill => skill.id)).not.toContain('win-only');
     }
   });
 
@@ -152,42 +152,51 @@ describe('skill-tools (pi-backed)', () => {
     writeSkill(
       WORKSPACE_SKILLS_DIR,
       'frontend-review',
-      'name: frontend-review\ndescription: frontend checks\npaths:\n  - src/frontend/**',
+      'name: frontend-review\ndescription: frontend checks\npaths:\n  - src/frontend/**'
     );
     writeSkill(WORKSPACE_SKILLS_DIR, 'always-on', 'name: always-on\ndescription: always');
     const env = createExecutionEnv(tmpRoot);
     await loadAndCacheSkills(env);
 
-    expect(getDiscoveredSkills().map((skill) => skill.id).sort()).toEqual(['always-on', 'frontend-review']);
-    expect(getEligibleDiscoveredSkills().map((skill) => skill.id)).toEqual(['always-on']);
+    expect(
+      getDiscoveredSkills()
+        .map(skill => skill.id)
+        .sort()
+    ).toEqual(['always-on', 'frontend-review']);
+    expect(getEligibleDiscoveredSkills().map(skill => skill.id)).toEqual(['always-on']);
 
     const activated = activateConditionalSkillsForPaths(['/repo/src/frontend/App.tsx'], '/repo');
 
     expect(activated).toEqual(['frontend-review']);
-    expect(getEligibleDiscoveredSkills().map((skill) => skill.id).sort()).toEqual(['always-on', 'frontend-review']);
+    expect(
+      getEligibleDiscoveredSkills()
+        .map(skill => skill.id)
+        .sort()
+    ).toEqual(['always-on', 'frontend-review']);
   });
 
   it('keeps hook-triggered skills out of eligible catalog until a matching tool activates them', async () => {
     writeSkill(
       WORKSPACE_SKILLS_DIR,
       'bash-helper',
-      [
-        'name: bash-helper',
-        'description: bash guidance',
-        'hook_triggers:',
-        '  tools: [Bash]',
-      ].join('\n'),
+      ['name: bash-helper', 'description: bash guidance', 'hook_triggers:', '  tools: [Bash]'].join(
+        '\n'
+      )
     );
     writeSkill(WORKSPACE_SKILLS_DIR, 'always-on', 'name: always-on\ndescription: always');
     const env = createExecutionEnv(tmpRoot);
     await loadAndCacheSkills(env);
 
-    expect(getEligibleDiscoveredSkills().map((skill) => skill.id)).toEqual(['always-on']);
+    expect(getEligibleDiscoveredSkills().map(skill => skill.id)).toEqual(['always-on']);
 
     const activated = activateConditionalSkillsForToolNames(['Read', 'Bash']);
 
     expect(activated).toEqual(['bash-helper']);
-    expect(getEligibleDiscoveredSkills().map((skill) => skill.id).sort()).toEqual(['always-on', 'bash-helper']);
+    expect(
+      getEligibleDiscoveredSkills()
+        .map(skill => skill.id)
+        .sort()
+    ).toEqual(['always-on', 'bash-helper']);
   });
 
   it('tracks skill usage and ranks discovered skills by frequent recent use', async () => {
@@ -202,10 +211,10 @@ describe('skill-tools (pi-backed)', () => {
 
     const discovered = getDiscoveredSkills();
 
-    expect(discovered.map((skill) => skill.id)).toEqual(['beta', 'alpha']);
+    expect(discovered.map(skill => skill.id)).toEqual(['beta', 'alpha']);
     expect(discovered[0].usage).toEqual({ count: 2, lastUsedAt: 3000 });
     expect(discovered[1].usage).toEqual({ count: 1, lastUsedAt: 1000 });
-    expect(getEligibleDiscoveredSkills().map((skill) => skill.id)).toEqual(['beta', 'alpha']);
+    expect(getEligibleDiscoveredSkills().map(skill => skill.id)).toEqual(['beta', 'alpha']);
   });
 
   it('projects nested skill execution metadata from SKILL.md frontmatter', async () => {
@@ -221,7 +230,7 @@ describe('skill-tools (pi-backed)', () => {
         '    - fork',
         '  default_mode: fork',
         '  fork_tool_policy: web',
-      ].join('\n'),
+      ].join('\n')
     );
     const env = createExecutionEnv(tmpRoot);
     await loadAndCacheSkills(env);
@@ -253,27 +262,29 @@ describe('skill-tools (pi-backed)', () => {
         'requires:',
         '  os:',
         '    - win32',
-      ].join('\n'),
+      ].join('\n')
     );
     const env = createExecutionEnv(tmpRoot);
     await loadAndCacheSkills(env);
 
-    expect(getDiscoveredSkills()[0]).toEqual(expect.objectContaining({
-      requirements: { os: ['win32'] },
-      eligible: process.platform === 'win32',
-      metadata: {
-        whenToUse: 'Use for rich work',
-        allowedTools: ['Read', 'Grep'],
-        paths: ['src/**', 'docs/**'],
-        snippets: ['Review carefully', 'Prefer focused diffs'],
-        shellSnippets: ['pnpm test'],
-        hookTriggers: {
-          tools: ['Bash'],
-          paths: ['src/**'],
+    expect(getDiscoveredSkills()[0]).toEqual(
+      expect.objectContaining({
+        requirements: { os: ['win32'] },
+        eligible: process.platform === 'win32',
+        metadata: {
+          whenToUse: 'Use for rich work',
+          allowedTools: ['Read', 'Grep'],
+          paths: ['src/**', 'docs/**'],
+          snippets: ['Review carefully', 'Prefer focused diffs'],
+          shellSnippets: ['pnpm test'],
+          hookTriggers: {
+            tools: ['Bash'],
+            paths: ['src/**'],
+          },
+          userInvocable: false,
         },
-        userInvocable: false,
-      },
-    }));
+      })
+    );
   });
 
   it('projects flat skill execution metadata aliases and ignores invalid metadata', async () => {
@@ -286,7 +297,7 @@ describe('skill-tools (pi-backed)', () => {
         'allowed_modes: [fork, invalid, fork]',
         'default_mode: inline',
         'fork_tool_policy: dangerous',
-      ].join('\n'),
+      ].join('\n')
     );
     const env = createExecutionEnv(tmpRoot);
     await loadAndCacheSkills(env);
@@ -298,7 +309,12 @@ describe('skill-tools (pi-backed)', () => {
   });
 
   it('loads full SKILL.md content for cached workspace, external, and plugin skills', async () => {
-    writeSkill(WORKSPACE_SKILLS_DIR, 'workspace-one', 'name: workspace-one\ndescription: ws', '# Workspace\n');
+    writeSkill(
+      WORKSPACE_SKILLS_DIR,
+      'workspace-one',
+      'name: workspace-one\ndescription: ws',
+      '# Workspace\n'
+    );
     const extDir = path.join(process.env.HOME!, '.agents', 'skills');
     writeSkill(extDir, 'external-one', 'name: external-one\ndescription: ext', '# External\n');
     const pluginDir = path.join(tmpRoot, 'plugin-skills');
@@ -306,18 +322,22 @@ describe('skill-tools (pi-backed)', () => {
     const env = createExecutionEnv(tmpRoot);
     await loadAndCacheSkills(env);
     const pluginResult = await import('../skill-loader.js').then(({ loadAllSkills }) =>
-      loadAllSkills(env, [{ path: pluginDir, source: 'plugin' as const }]),
+      loadAllSkills(env, [{ path: pluginDir, source: 'plugin' as const }])
     );
     addPluginSkills(pluginResult.skills);
 
-    await expect(loadDiscoveredSkillContent({ source: 'workspace', id: 'workspace-one' }))
-      .resolves.toContain('# Workspace');
-    await expect(loadDiscoveredSkillContent({ source: 'external', id: 'external-one' }))
-      .resolves.toContain('# External');
-    await expect(loadDiscoveredSkillContent({ source: 'plugin', id: 'plugin-one' }))
-      .resolves.toContain('# Plugin');
-    await expect(loadDiscoveredSkillContent({ source: 'workspace', id: '../bad' }))
-      .resolves.toBeNull();
+    await expect(
+      loadDiscoveredSkillContent({ source: 'workspace', id: 'workspace-one' })
+    ).resolves.toContain('# Workspace');
+    await expect(
+      loadDiscoveredSkillContent({ source: 'external', id: 'external-one' })
+    ).resolves.toContain('# External');
+    await expect(
+      loadDiscoveredSkillContent({ source: 'plugin', id: 'plugin-one' })
+    ).resolves.toContain('# Plugin');
+    await expect(
+      loadDiscoveredSkillContent({ source: 'workspace', id: '../bad' })
+    ).resolves.toBeNull();
   });
 
   it('refreshSkillCache resets and reloads', async () => {
@@ -336,17 +356,27 @@ describe('skill-tools (pi-backed)', () => {
     await loadAndCacheSkills(env);
     addPluginSkills([
       {
-        skill: { name: 'shared', description: 'plugin attempt', content: '', filePath: '/plugin/shared/SKILL.md' },
+        skill: {
+          name: 'shared',
+          description: 'plugin attempt',
+          content: '',
+          filePath: '/plugin/shared/SKILL.md',
+        },
         source: 'plugin',
       },
       {
-        skill: { name: 'plugin-only', description: 'unique', content: '', filePath: '/plugin/plugin-only/SKILL.md' },
+        skill: {
+          name: 'plugin-only',
+          description: 'unique',
+          content: '',
+          filePath: '/plugin/plugin-only/SKILL.md',
+        },
         source: 'plugin',
       },
     ]);
     const discovered = getDiscoveredSkills();
     expect(discovered).toHaveLength(2);
-    expect(discovered.find((s) => s.source === 'workspace')?.name).toBe('ws-shared');
-    expect(discovered.find((s) => s.source === 'plugin')?.name).toBe('plugin-only');
+    expect(discovered.find(s => s.source === 'workspace')?.name).toBe('ws-shared');
+    expect(discovered.find(s => s.source === 'plugin')?.name).toBe('plugin-only');
   });
 });

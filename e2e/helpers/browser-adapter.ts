@@ -1,11 +1,11 @@
-import { Stagehand } from "@browserbasehq/stagehand";
-import { OpenAI } from "openai";
-import { chromium } from "playwright-core";
-import type { Page, Browser } from "playwright-core";
-import { z } from "zod";
-import { CleanJsonOpenAIClient } from "./clean-json-openai-client";
+import { Stagehand } from '@browserbasehq/stagehand';
+import { OpenAI } from 'openai';
+import { chromium } from 'playwright-core';
+import type { Page, Browser } from 'playwright-core';
+import type { z } from 'zod';
+import { CleanJsonOpenAIClient } from './clean-json-openai-client';
 
-const BASE_URL = process.env.E2E_BASE_URL || "http://localhost:1420";
+const BASE_URL = process.env.E2E_BASE_URL || 'http://localhost:1420';
 
 export interface BrowserAdapterOptions {
   headless?: boolean;
@@ -32,7 +32,9 @@ export class BrowserAdapter {
 
     this.modelConfigs = this.parseModelConfigs();
     if (this.modelConfigs.length === 0) {
-      throw new Error("No model config found. Please set OPENAI_API_KEY/OPENAI_BASE_URL/OPENAI_MODEL_NAME.");
+      throw new Error(
+        'No model config found. Please set OPENAI_API_KEY/OPENAI_BASE_URL/OPENAI_MODEL_NAME.'
+      );
     }
 
     await this.recreateStagehandAndConnect(options);
@@ -45,12 +47,12 @@ export class BrowserAdapter {
 
     if (!apiKey || !baseURL) return [];
 
-    const names = (process.env.OPENAI_MODEL_NAME || "gpt-4o")
-      .split(",")
-      .map((m) => m.trim())
+    const names = (process.env.OPENAI_MODEL_NAME || 'gpt-4o')
+      .split(',')
+      .map(m => m.trim())
       .filter(Boolean);
 
-    return names.map((modelName) => ({ modelName, apiKey, baseURL }));
+    return names.map(modelName => ({ modelName, apiKey, baseURL }));
   }
 
   private async recreateStagehandAndConnect(options: BrowserAdapterOptions) {
@@ -73,7 +75,7 @@ export class BrowserAdapter {
     });
 
     this.stagehand = new Stagehand({
-      env: "LOCAL",
+      env: 'LOCAL',
       verbose: 2,
       debugDom: true,
       llmClient,
@@ -107,14 +109,15 @@ export class BrowserAdapter {
       } catch (err: any) {
         lastError = err;
 
-        const status =
-          err?.status ??
-          err?.response?.status ??
-          err?.cause?.status;
+        const status = err?.status ?? err?.response?.status ?? err?.cause?.status;
 
-        const msg = String(err?.message || "").toLowerCase();
+        const msg = String(err?.message || '').toLowerCase();
 
-        const is429 = status === 429 || msg.includes("429") || msg.includes("rate limit") || msg.includes("quota");
+        const is429 =
+          status === 429 ||
+          msg.includes('429') ||
+          msg.includes('rate limit') ||
+          msg.includes('quota');
 
         if (is429 && this.currentModelIndex < this.modelConfigs.length - 1) {
           console.warn(
@@ -135,22 +138,24 @@ export class BrowserAdapter {
   }
 
   async act(instruction: string) {
-    if (!this.stagehand) throw new Error("Browser not launched");
-    return this.withFallback("act", () => this.stagehand!.act(instruction));
+    const stagehand = this.stagehand;
+    if (!stagehand) throw new Error('Browser not launched');
+    return this.withFallback('act', () => stagehand.act(instruction));
   }
 
   async extract<T extends z.AnyZodObject>(instruction: string, schema: T) {
-    if (!this.stagehand) throw new Error("Browser not launched");
-    return this.withFallback("extract", () => this.stagehand!.extract(instruction, { schema } as any));
+    const stagehand = this.stagehand;
+    if (!stagehand) throw new Error('Browser not launched');
+    return this.withFallback('extract', () => stagehand.extract(instruction, { schema } as any));
   }
 
   get page(): Page {
-    if (!this._page) throw new Error("Browser not launched");
+    if (!this._page) throw new Error('Browser not launched');
     return this._page;
   }
 
   async goto(url: string) {
-    const finalUrl = url.startsWith("/") ? `${BASE_URL}${url}` : url;
+    const finalUrl = url.startsWith('/') ? `${BASE_URL}${url}` : url;
     await this.page.goto(finalUrl);
   }
 
@@ -159,10 +164,7 @@ export class BrowserAdapter {
   }
 
   private async safeClose() {
-    await Promise.allSettled([
-      this.playwrightBrowser?.close(),
-      this.stagehand?.close(),
-    ]);
+    await Promise.allSettled([this.playwrightBrowser?.close(), this.stagehand?.close()]);
     this.playwrightBrowser = null;
     this.stagehand = null;
     this._page = null;
@@ -173,7 +175,7 @@ export class BrowserAdapter {
     return this.page.locator(selector);
   }
 
-  async waitForLoadState(state: "load" | "domcontentloaded" | "networkidle") {
+  async waitForLoadState(state: 'load' | 'domcontentloaded' | 'networkidle') {
     await this.page.waitForLoadState(state);
   }
 

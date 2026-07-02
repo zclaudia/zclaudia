@@ -61,7 +61,9 @@ export function CodexOAuthCard({
   if (status === 'needs_reauth') {
     return (
       <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4">
-        <div className="mb-2 text-sm text-destructive">Credentials expired. Please sign in again.</div>
+        <div className="mb-2 text-sm text-destructive">
+          Credentials expired. Please sign in again.
+        </div>
         <button
           type="button"
           onClick={onSignIn}

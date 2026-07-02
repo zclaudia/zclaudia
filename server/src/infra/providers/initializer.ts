@@ -9,20 +9,24 @@ export function autoDetectProviders(db: Database.Database): void {
   const cred = resolveEnvCredential();
   const now = Date.now();
 
-  const existing = db.prepare('SELECT id FROM llm_profiles LIMIT 1').get() as { id: string } | undefined;
+  const existing = db.prepare('SELECT id FROM llm_profiles LIMIT 1').get() as
+    | { id: string }
+    | undefined;
   if (!existing) {
     // Seed the default profile, materializing the env credential when present.
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO llm_profiles (id, name, provider_type, base_url, api_key, compat, is_default, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, NULL, 1, ?, ?)
-    `).run(
+    `
+    ).run(
       newId(),
       'ZClaudia Agent',
       cred?.providerType ?? 'anthropic',
       cred?.baseUrl ?? null,
       cred?.apiKey ?? null,
       now,
-      now,
+      now
     );
     console.log('   Registered default ZClaudia agent runtime');
     return;
@@ -31,20 +35,34 @@ export function autoDetectProviders(db: Database.Database): void {
   // Backfill: fill a keyless default profile from env (bootstrap convenience →
   // profile becomes the source of truth). Never overwrite an existing credential.
   if (!cred) return;
-  const def = db.prepare(`
+  const def = db
+    .prepare(
+      `
     SELECT id, provider_type, api_key, oauth_credentials FROM llm_profiles
     WHERE is_default = 1 ORDER BY updated_at DESC LIMIT 1
-  `).get() as { id: string; provider_type: string; api_key: string | null; oauth_credentials: string | null } | undefined;
+  `
+    )
+    .get() as
+    | {
+        id: string;
+        provider_type: string;
+        api_key: string | null;
+        oauth_credentials: string | null;
+      }
+    | undefined;
   if (!def) return;
   // Never touch a codex profile: it is legitimately keyless while the user is
   // completing OAuth; backfilling would convert it and break the OAuth flow.
   if (def.provider_type === 'openai-codex') return;
-  const keyless = (def.api_key == null || def.api_key.trim() === '') && def.oauth_credentials == null;
+  const keyless =
+    (def.api_key == null || def.api_key.trim() === '') && def.oauth_credentials == null;
   if (!keyless) return;
 
-  db.prepare(`
+  db.prepare(
+    `
     UPDATE llm_profiles SET provider_type = ?, base_url = ?, api_key = ?, updated_at = ? WHERE id = ?
-  `).run(cred.providerType, cred.baseUrl ?? null, cred.apiKey, now, def.id);
+  `
+  ).run(cred.providerType, cred.baseUrl ?? null, cred.apiKey, now, def.id);
   console.log('   Backfilled default ZClaudia agent credential from environment');
 }
 
@@ -56,10 +74,13 @@ export function startTempFileCleanup(): void {
     category: 'maintenance',
     intervalMs: 30 * 60 * 1000,
   });
-  tempFileCleanupTimer = setInterval(() => {
-    systemTaskRegistry.markRunStart('system:temp_file_cleanup');
-    systemTaskRegistry.markRunComplete('system:temp_file_cleanup', 0);
-  }, 30 * 60 * 1000);
+  tempFileCleanupTimer = setInterval(
+    () => {
+      systemTaskRegistry.markRunStart('system:temp_file_cleanup');
+      systemTaskRegistry.markRunComplete('system:temp_file_cleanup', 0);
+    },
+    30 * 60 * 1000
+  );
   tempFileCleanupTimer.unref();
 }
 

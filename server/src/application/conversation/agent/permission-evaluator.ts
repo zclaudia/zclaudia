@@ -7,9 +7,7 @@ import type {
   UnifiedPermissionPolicy,
 } from '@zclaudia/shared/interaction/permissions';
 import type { McpRiskAction, McpServerTrustPolicy } from '@zclaudia/shared/core/mcp';
-import {
-  DEFAULT_SENSITIVE_PATTERNS,
-} from '@zclaudia/shared/interaction/permissions';
+import { DEFAULT_SENSITIVE_PATTERNS } from '@zclaudia/shared/interaction/permissions';
 import * as path from 'path';
 import { minimatch } from 'minimatch';
 
@@ -118,18 +116,22 @@ export function extractBashCommand(toolInput: unknown, detail: string): string |
 
 export function isBashLikeTool(toolName: string): boolean {
   const lower = toolName.toLowerCase();
-  return lower === 'bash'
-    || lower === 'execute_command'
-    || lower === 'run_terminal_cmd'
-    || lower === 'terminal'
-    || lower === 'agent_shell';
+  return (
+    lower === 'bash' ||
+    lower === 'execute_command' ||
+    lower === 'run_terminal_cmd' ||
+    lower === 'terminal' ||
+    lower === 'agent_shell'
+  );
 }
 
 function hasToolNameSuffix(toolName: string, suffix: string): boolean {
-  return toolName === suffix
-    || toolName.endsWith(`_${suffix}`)
-    || toolName.endsWith(`-${suffix}`)
-    || toolName.endsWith(`:${suffix}`);
+  return (
+    toolName === suffix ||
+    toolName.endsWith(`_${suffix}`) ||
+    toolName.endsWith(`-${suffix}`) ||
+    toolName.endsWith(`:${suffix}`)
+  );
 }
 
 /**
@@ -162,16 +164,22 @@ const INTERACTION_TOOLS: ReadonlyArray<{ suffix: string; literal?: string; block
   { suffix: 'exit_plan_mode', literal: 'ExitPlanMode', blocking: true },
 ];
 
-function matchesInteractionTool(toolName: string, entry: { suffix: string; literal?: string }): boolean {
-  return hasToolNameSuffix(toolName, entry.suffix) || (entry.literal !== undefined && toolName === entry.literal);
+function matchesInteractionTool(
+  toolName: string,
+  entry: { suffix: string; literal?: string }
+): boolean {
+  return (
+    hasToolNameSuffix(toolName, entry.suffix) ||
+    (entry.literal !== undefined && toolName === entry.literal)
+  );
 }
 
 export function isInternalInteractionTool(toolName: string): boolean {
-  return INTERACTION_TOOLS.some((entry) => matchesInteractionTool(toolName, entry));
+  return INTERACTION_TOOLS.some(entry => matchesInteractionTool(toolName, entry));
 }
 
 function isBlockingInteractionTool(toolName: string): boolean {
-  return INTERACTION_TOOLS.some((entry) => entry.blocking && matchesInteractionTool(toolName, entry));
+  return INTERACTION_TOOLS.some(entry => entry.blocking && matchesInteractionTool(toolName, entry));
 }
 
 // ============================================
@@ -216,7 +224,7 @@ export function getOutsideWorkspaceRootsToRemember(
   rootPath: string
 ): string[] {
   return getOutsideWorkspacePaths(toolName, toolInput, detail, rootPath)
-    .map((filePath) => normalizeExternalRoot(filePath))
+    .map(filePath => normalizeExternalRoot(filePath))
     .filter((dir, index, arr) => arr.indexOf(dir) === index);
 }
 
@@ -229,10 +237,8 @@ export function isOutsideWorkspacePathAllowed(
 ): boolean {
   const outsidePaths = getOutsideWorkspacePaths(toolName, toolInput, detail, rootPath);
   if (outsidePaths.length === 0) return false;
-  const roots = [...allowedRoots].map((root) => path.resolve(root));
-  return outsidePaths.every((outsidePath) => (
-    roots.some((root) => isPathWithinRoot(outsidePath, root))
-  ));
+  const roots = [...allowedRoots].map(root => path.resolve(root));
+  return outsidePaths.every(outsidePath => roots.some(root => isPathWithinRoot(outsidePath, root)));
 }
 
 // ============================================
@@ -313,7 +319,12 @@ function targetsSensitiveFile(toolName: string, toolInput: unknown, detail: stri
   return false;
 }
 
-function targetsOutsideWorkspace(toolName: string, toolInput: unknown, detail: string, rootPath: string): boolean {
+function targetsOutsideWorkspace(
+  toolName: string,
+  toolInput: unknown,
+  detail: string,
+  rootPath: string
+): boolean {
   if (!rootPath) return false;
 
   const filePath = extractFilePath(toolInput);
@@ -354,11 +365,18 @@ export function classify(toolName: string, toolInput: unknown, detail: string): 
   if (toolName === 'AskUserQuestion') return 'userQuestions';
   if (isBlockingInteractionTool(toolName)) return 'userQuestions';
   if (toolName === 'Memory') {
-    const input = toolInput && typeof toolInput === 'object' ? toolInput as Record<string, unknown> : {};
+    const input =
+      toolInput && typeof toolInput === 'object' ? (toolInput as Record<string, unknown>) : {};
     const command = typeof input.command === 'string' ? input.command : '';
     if (command === 'view') return 'fileRead';
     if (command === 'delete') return 'destructiveOps';
-    if (command === 'create' || command === 'str_replace' || command === 'insert' || command === 'rename') return 'fileWrite';
+    if (
+      command === 'create' ||
+      command === 'str_replace' ||
+      command === 'insert' ||
+      command === 'rename'
+    )
+      return 'fileWrite';
     return 'fileWrite';
   }
   if (READONLY_TOOLS.includes(toolName)) return 'fileRead';
@@ -378,32 +396,38 @@ export function classify(toolName: string, toolInput: unknown, detail: string): 
 /** Map a CategoryAction to an EvaluationResult */
 function actionToResult(action: CategoryAction): EvaluationResult {
   switch (action) {
-    case 'auto-approve': return 'approve';
-    case 'ask': return 'escalate';
-    case 'block': return 'deny';
+    case 'auto-approve':
+      return 'approve';
+    case 'ask':
+      return 'escalate';
+    case 'block':
+      return 'deny';
   }
 }
 
 function mcpRiskActionToResult(action: McpRiskAction): EvaluationResult {
   switch (action) {
-    case 'auto-approve': return 'approve';
-    case 'ask': return 'escalate';
-    case 'deny': return 'deny';
+    case 'auto-approve':
+      return 'approve';
+    case 'ask':
+      return 'escalate';
+    case 'deny':
+      return 'deny';
   }
 }
 
 export function evaluateMcpToolTrustPolicy(
   risk: { riskLevel?: 'low' | 'medium' | 'high'; declaredReadOnly?: boolean },
-  policy?: McpServerTrustPolicy,
+  policy?: McpServerTrustPolicy
 ): EvaluationResult {
   const riskLevel = risk.riskLevel ?? 'high';
   const action = policy?.riskActions?.[riskLevel];
   if (action) return mcpRiskActionToResult(action);
 
   if (
-    risk.declaredReadOnly === true
-    && policy?.trustReadOnlyHint === true
-    && (policy.trustLevel === 'trusted-readonly' || policy.trustLevel === 'trusted')
+    risk.declaredReadOnly === true &&
+    policy?.trustReadOnlyHint === true &&
+    (policy.trustLevel === 'trusted-readonly' || policy.trustLevel === 'trusted')
   ) {
     return 'approve';
   }
@@ -470,21 +494,35 @@ export function getMatchedPermissionRule(
   }
 
   // Deny-action custom rules checked before guards (deny is strongest)
-  const denyResult = evaluateCustomRules(toolName, detail, customRules.filter(r => r.action === 'deny'));
+  const denyResult = evaluateCustomRules(
+    toolName,
+    detail,
+    customRules.filter(r => r.action === 'deny')
+  );
   if (denyResult === 'deny') {
     return 'Custom rule';
   }
 
-  if (policy.globalGuards.blockSensitiveFiles && targetsSensitiveFile(toolName, toolInput, detail)) {
+  if (
+    policy.globalGuards.blockSensitiveFiles &&
+    targetsSensitiveFile(toolName, toolInput, detail)
+  ) {
     return 'Sensitive file access';
   }
 
-  if (policy.globalGuards.blockOutsideWorkspace && targetsOutsideWorkspace(toolName, toolInput, detail, rootPath)) {
+  if (
+    policy.globalGuards.blockOutsideWorkspace &&
+    targetsOutsideWorkspace(toolName, toolInput, detail, rootPath)
+  ) {
     return 'Outside workspace access';
   }
 
   // Remaining custom rules (approve / escalate / continue)
-  const customResult = evaluateCustomRules(toolName, detail, customRules.filter(r => r.action !== 'deny'));
+  const customResult = evaluateCustomRules(
+    toolName,
+    detail,
+    customRules.filter(r => r.action !== 'deny')
+  );
   if (customResult === 'escalate') {
     return 'Custom rule';
   }
@@ -503,7 +541,11 @@ export function getMatchedPermissionRule(
 
 type CustomRuleResult = 'approve' | 'deny' | 'escalate' | 'continue';
 
-function evaluateCustomRules(toolName: string, detail: string, rules: AgentPermissionRule[]): CustomRuleResult {
+function evaluateCustomRules(
+  toolName: string,
+  detail: string,
+  rules: AgentPermissionRule[]
+): CustomRuleResult {
   for (const rule of rules) {
     if (rule.toolName === '*' || rule.toolName === toolName) {
       if (rule.pattern) {
@@ -557,21 +599,35 @@ export class PermissionEvaluator {
     }
 
     // 2. Deny-action custom rules — strongest signal, never weakened by a guard
-    const denyResult = evaluateCustomRules(toolName, detail, customRules.filter(r => r.action === 'deny'));
+    const denyResult = evaluateCustomRules(
+      toolName,
+      detail,
+      customRules.filter(r => r.action === 'deny')
+    );
     if (denyResult === 'deny') {
       return 'deny';
     }
 
     // 3. Global guards → escalate (stop allow rules from bypassing protection)
-    if (policy.globalGuards.blockSensitiveFiles && targetsSensitiveFile(toolName, toolInput, detail)) {
+    if (
+      policy.globalGuards.blockSensitiveFiles &&
+      targetsSensitiveFile(toolName, toolInput, detail)
+    ) {
       return 'escalate';
     }
-    if (policy.globalGuards.blockOutsideWorkspace && targetsOutsideWorkspace(toolName, toolInput, detail, rootPath)) {
+    if (
+      policy.globalGuards.blockOutsideWorkspace &&
+      targetsOutsideWorkspace(toolName, toolInput, detail, rootPath)
+    ) {
       return 'escalate';
     }
 
     // 4. Remaining custom rules — approve / escalate / continue (first match wins)
-    const customResult = evaluateCustomRules(toolName, detail, customRules.filter(r => r.action !== 'deny'));
+    const customResult = evaluateCustomRules(
+      toolName,
+      detail,
+      customRules.filter(r => r.action !== 'deny')
+    );
     if (customResult !== 'continue') {
       return customResult;
     }

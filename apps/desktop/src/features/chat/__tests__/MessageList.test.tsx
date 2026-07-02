@@ -13,6 +13,9 @@ const mockWaitForReady = vi.fn();
 const mockSetActiveTab = vi.fn();
 const mockOpenToolInWorkspace = vi.fn();
 const terminalIdsByBackend = new Map<string, string>();
+const mockSelectionState = {
+  selectedSessionId: null as string | null,
+};
 
 vi.mock('../../../contexts/ThemeContext', () => ({
   useTheme: () => ({ resolvedTheme: 'dark' }),
@@ -24,24 +27,26 @@ vi.mock('../../../contexts/ConnectionContext', () => ({
 }));
 
 vi.mock('../../../stores/filePushStore', () => ({
-  useFilePushStore: Object.assign(
-    (selector: any) => selector({ items: [] }),
-    { getState: () => ({ items: [] }) },
-  ),
+  useFilePushStore: Object.assign((selector: any) => selector({ items: [] }), {
+    getState: () => ({ items: [] }),
+  }),
 }));
 
 vi.mock('../../../stores/terminalStore', () => ({
+  getTerminalScopeKey: (projectId: string, backendId: string | null | undefined) =>
+    `${backendId ?? 'no-backend'}::${projectId}`,
   useTerminalStore: Object.assign(
-    (selector: any) => selector({
-      terminals: {},
-      getTerminalId: (projectId: string) => {
-        const backendId = (globalThis as any).__messageListTestActiveBackend ?? 'backend-1';
-        return terminalIdsByBackend.get(`${backendId}:${projectId}`);
-      },
-      openTerminal: mockOpenTerminal,
-      setDrawerOpen: mockSetDrawerOpen,
-      waitForReady: mockWaitForReady,
-    }),
+    (selector: any) =>
+      selector({
+        terminals: {},
+        getTerminalId: (projectId: string) => {
+          const backendId = (globalThis as any).__messageListTestActiveBackend ?? 'backend-1';
+          return terminalIdsByBackend.get(`${backendId}:${projectId}`);
+        },
+        openTerminal: mockOpenTerminal,
+        setDrawerOpen: mockSetDrawerOpen,
+        waitForReady: mockWaitForReady,
+      }),
     {
       getState: () => ({
         terminals: {},
@@ -53,22 +58,27 @@ vi.mock('../../../stores/terminalStore', () => ({
         setDrawerOpen: mockSetDrawerOpen,
         waitForReady: mockWaitForReady,
       }),
-    },
+    }
   ),
 }));
 
 vi.mock('../../../stores/projectStore', () => ({
   useProjectStore: Object.assign(
     (selector: any) => selector({ selectedSessionId: null, sessions: [] }),
-    { getState: () => ({ selectedSessionId: null, sessions: [] }) },
+    { getState: () => ({ selectedSessionId: null, sessions: [] }) }
   ),
 }));
 
+vi.mock('../../../stores/selectionStore', () => ({
+  useSelectionStore: Object.assign((selector: any) => selector(mockSelectionState), {
+    getState: () => mockSelectionState,
+  }),
+}));
+
 vi.mock('../../../stores/serverStore', () => ({
-  useServerStore: Object.assign(
-    (selector: any) => selector({}),
-    { getState: () => ({ activeServerSupports: (feature: string) => feature === 'remoteTerminal' }) },
-  ),
+  useServerStore: Object.assign((selector: any) => selector({}), {
+    getState: () => ({ activeServerSupports: (feature: string) => feature === 'remoteTerminal' }),
+  }),
 }));
 
 vi.mock('../../../stores/bottomPanelStore', () => ({
@@ -79,7 +89,11 @@ vi.mock('../../../stores/bottomPanelStore', () => ({
 
 vi.mock('../../../stores/rightSidebarStore', () => ({
   useRightSidebarStore: {
-    getState: () => ({ setCollapsed: vi.fn(), setActiveTab: mockSetActiveTab, markUnread: vi.fn() }),
+    getState: () => ({
+      setCollapsed: vi.fn(),
+      setActiveTab: mockSetActiveTab,
+      markUnread: vi.fn(),
+    }),
   },
 }));
 
@@ -139,7 +153,11 @@ vi.mock('../FilePushNotification', () => ({
 }));
 
 vi.mock('../FilePreviewModal', () => ({
-  FilePreviewModal: ({ onClose }: any) => <div data-testid="file-preview-modal"><button onClick={onClose}>close</button></div>,
+  FilePreviewModal: ({ onClose }: any) => (
+    <div data-testid="file-preview-modal">
+      <button onClick={onClose}>close</button>
+    </div>
+  ),
 }));
 
 vi.mock('../../../services/fileUpload', () => ({
@@ -166,7 +184,9 @@ function extractThinking(text: string): { thinking: string; content: string } {
 }
 
 // Helper to create a message
-function makeMessage(overrides: Partial<MessageWithToolCalls> & { id: string; role: 'user' | 'assistant' | 'system' }): MessageWithToolCalls {
+function makeMessage(
+  overrides: Partial<MessageWithToolCalls> & { id: string; role: 'user' | 'assistant' | 'system' }
+): MessageWithToolCalls {
   return {
     sessionId: 'session-1',
     content: '',
@@ -244,7 +264,7 @@ describe('extractThinking', () => {
 // ── MessageList component tests ────────────────────────────────────────────────
 
 let MessageList: typeof import('../MessageList').MessageList;
-let formatMessageTimestamp: typeof import('../MessageList').formatMessageTimestamp;
+let formatMessageTimestamp: typeof import('../messageTimestamp').formatMessageTimestamp;
 
 beforeEach(async () => {
   mockSendMessage.mockReset();
@@ -253,6 +273,7 @@ beforeEach(async () => {
   mockWaitForReady.mockReset();
   mockSetActiveTab.mockReset();
   mockOpenToolInWorkspace.mockReset();
+  mockSelectionState.selectedSessionId = null;
   terminalIdsByBackend.clear();
   (globalThis as any).__messageListTestActiveBackend = 'backend-1';
   mockOpenTerminal.mockImplementation((projectId: string) => {
@@ -263,8 +284,9 @@ beforeEach(async () => {
   });
   mockWaitForReady.mockResolvedValue(true);
   const mod = await import('../MessageList');
+  const timestampMod = await import('../messageTimestamp');
   MessageList = mod.MessageList;
-  formatMessageTimestamp = mod.formatMessageTimestamp;
+  formatMessageTimestamp = timestampMod.formatMessageTimestamp;
 });
 
 afterEach(() => {
@@ -281,9 +303,7 @@ describe('MessageList', () => {
   });
 
   it('renders a user message', () => {
-    const messages = [
-      makeMessage({ id: 'msg-1', role: 'user', content: 'Hello there' }),
-    ];
+    const messages = [makeMessage({ id: 'msg-1', role: 'user', content: 'Hello there' })];
     render(<MessageList messages={messages} />);
     expect(screen.getByText('Hello there')).toBeInTheDocument();
   });
@@ -355,9 +375,7 @@ describe('MessageList', () => {
 
   it('keeps user messages with JSON MessageInput that has text', () => {
     const content = JSON.stringify({ text: 'Structured message', attachments: [] });
-    const messages = [
-      makeMessage({ id: 'msg-1', role: 'user', content }),
-    ];
+    const messages = [makeMessage({ id: 'msg-1', role: 'user', content })];
     render(<MessageList messages={messages} />);
     expect(screen.getByText('Structured message')).toBeInTheDocument();
   });
@@ -378,9 +396,7 @@ describe('MessageList', () => {
       text: '',
       attachments: [{ fileId: 'f1', name: 'img.png', type: 'image' }],
     });
-    const messages = [
-      makeMessage({ id: 'msg-1', role: 'user', content }),
-    ];
+    const messages = [makeMessage({ id: 'msg-1', role: 'user', content })];
     render(<MessageList messages={messages} />);
     const messageList = screen.getByTestId('message-list');
     expect(messageList.children.length).toBe(1);
@@ -415,18 +431,14 @@ describe('MessageList', () => {
   });
 
   it('keeps system messages regardless of content', () => {
-    const messages = [
-      makeMessage({ id: 'msg-1', role: 'system', content: 'System notification' }),
-    ];
+    const messages = [makeMessage({ id: 'msg-1', role: 'system', content: 'System notification' })];
     render(<MessageList messages={messages} />);
     const messageList = screen.getByTestId('message-list');
     expect(messageList.children.length).toBe(1);
   });
 
   it('handles non-JSON user content as plain text', () => {
-    const messages = [
-      makeMessage({ id: 'msg-1', role: 'user', content: 'Not {valid} JSON' }),
-    ];
+    const messages = [makeMessage({ id: 'msg-1', role: 'user', content: 'Not {valid} JSON' })];
     render(<MessageList messages={messages} />);
     expect(screen.getByText('Not {valid} JSON')).toBeInTheDocument();
   });
@@ -434,27 +446,21 @@ describe('MessageList', () => {
   // ── data-role attribute ───────────────────────────────────────────────────
 
   it('assigns data-role attribute to user messages', () => {
-    const messages = [
-      makeMessage({ id: 'msg-1', role: 'user', content: 'User msg' }),
-    ];
+    const messages = [makeMessage({ id: 'msg-1', role: 'user', content: 'User msg' })];
     render(<MessageList messages={messages} />);
     const el = screen.getByText('User msg').closest('[data-role]');
     expect(el?.getAttribute('data-role')).toBe('user');
   });
 
   it('assigns data-role attribute to assistant messages', () => {
-    const messages = [
-      makeMessage({ id: 'msg-2', role: 'assistant', content: 'Assistant msg' }),
-    ];
+    const messages = [makeMessage({ id: 'msg-2', role: 'assistant', content: 'Assistant msg' })];
     render(<MessageList messages={messages} />);
     const el = screen.getByText('Assistant msg').closest('[data-role]');
     expect(el?.getAttribute('data-role')).toBe('assistant');
   });
 
   it('assigns data-role attribute to system messages', () => {
-    const messages = [
-      makeMessage({ id: 'msg-3', role: 'system', content: 'System msg' }),
-    ];
+    const messages = [makeMessage({ id: 'msg-3', role: 'system', content: 'System msg' })];
     render(<MessageList messages={messages} />);
     const el = screen.getByText('System msg').closest('[data-role]');
     expect(el?.getAttribute('data-role')).toBe('system');
@@ -515,38 +521,40 @@ describe('MessageList', () => {
     vi.setSystemTime(now);
 
     const messages = [
-      makeMessage({ id: 'msg-1', role: 'user', content: 'Yesterday', createdAt: messageTime.getTime() }),
+      makeMessage({
+        id: 'msg-1',
+        role: 'user',
+        content: 'Yesterday',
+        createdAt: messageTime.getTime(),
+      }),
     ];
     render(<MessageList messages={messages} />);
 
-    const timeEl = screen.getByText('Yesterday').closest('[data-role]')?.querySelector('.opacity-50');
+    const timeEl = screen
+      .getByText('Yesterday')
+      .closest('[data-role]')
+      ?.querySelector('.opacity-50');
     expect(timeEl?.textContent).toBe(formatMessageTimestamp(messageTime.getTime(), now.getTime()));
   });
 
   // ── User messages with styling ────────────────────────────────────────────
 
   it('user message bubble is right-aligned (items-end)', () => {
-    const messages = [
-      makeMessage({ id: 'msg-1', role: 'user', content: 'Hello' }),
-    ];
+    const messages = [makeMessage({ id: 'msg-1', role: 'user', content: 'Hello' })];
     render(<MessageList messages={messages} />);
     const roleDiv = screen.getByText('Hello').closest('[data-role="user"]');
     expect(roleDiv?.className).toContain('items-end');
   });
 
   it('assistant message bubble is left-aligned (items-start)', () => {
-    const messages = [
-      makeMessage({ id: 'msg-1', role: 'assistant', content: 'Hi' }),
-    ];
+    const messages = [makeMessage({ id: 'msg-1', role: 'assistant', content: 'Hi' })];
     render(<MessageList messages={messages} />);
     const roleDiv = screen.getByText('Hi').closest('[data-role="assistant"]');
     expect(roleDiv?.className).toContain('items-start');
   });
 
   it('system messages have reduced opacity', () => {
-    const messages = [
-      makeMessage({ id: 'msg-1', role: 'system', content: 'System notice' }),
-    ];
+    const messages = [makeMessage({ id: 'msg-1', role: 'system', content: 'System notice' })];
     render(<MessageList messages={messages} />);
     const roleDiv = screen.getByText('System notice').closest('[data-role="system"]');
     expect(roleDiv?.className).toContain('opacity-60');
@@ -570,9 +578,7 @@ describe('MessageList', () => {
   });
 
   it('does not render ToolCallList for user messages', () => {
-    const messages = [
-      makeMessage({ id: 'msg-1', role: 'user', content: 'Hello' }),
-    ];
+    const messages = [makeMessage({ id: 'msg-1', role: 'user', content: 'Hello' })];
     render(<MessageList messages={messages} />);
     expect(screen.queryByTestId('tool-call-list')).not.toBeInTheDocument();
   });
@@ -585,9 +591,7 @@ describe('MessageList', () => {
       { type: 'tool_use', toolUseId: 'tc-1', content: '' },
       { type: 'text', content: 'Final answer here.' },
     ];
-    const toolCalls: ToolCallState[] = [
-      makeToolCall({ id: 'tc-1', toolName: 'Read' }),
-    ];
+    const toolCalls: ToolCallState[] = [makeToolCall({ id: 'tc-1', toolName: 'Read' })];
     const messages = [
       makeMessage({
         id: 'msg-1',
@@ -612,9 +616,7 @@ describe('MessageList', () => {
       { type: 'tool_use', toolUseId: 'tc-1', content: '' },
       { type: 'text', content: 'Final answer here.' },
     ];
-    const toolCalls: ToolCallState[] = [
-      makeToolCall({ id: 'tc-1', toolName: 'Read' }),
-    ];
+    const toolCalls: ToolCallState[] = [makeToolCall({ id: 'tc-1', toolName: 'Read' })];
     const messages = [
       makeMessage({
         id: 'msg-1',
@@ -633,7 +635,7 @@ describe('MessageList', () => {
       expect(list).toHaveAttribute('data-default-collapsed', 'true');
     }
     expect(consoleErrorSpy).not.toHaveBeenCalledWith(
-      expect.stringContaining('Encountered two children with the same key'),
+      expect.stringContaining('Encountered two children with the same key')
     );
 
     consoleErrorSpy.mockRestore();
@@ -728,41 +730,27 @@ describe('MessageList', () => {
   // ── Resend button ─────────────────────────────────────────────────────────
 
   it('shows resend button when resendTargetMessageId matches a user message', () => {
-    const messages = [
-      makeMessage({ id: 'msg-1', role: 'user', content: 'Hello' }),
-    ];
+    const messages = [makeMessage({ id: 'msg-1', role: 'user', content: 'Hello' })];
     const onResend = vi.fn();
     render(
-      <MessageList
-        messages={messages}
-        resendTargetMessageId="msg-1"
-        onResendTarget={onResend}
-      />
+      <MessageList messages={messages} resendTargetMessageId="msg-1" onResendTarget={onResend} />
     );
     const resendBtn = screen.getByText('Resend');
     expect(resendBtn).toBeInTheDocument();
   });
 
   it('resend button calls onResendTarget when clicked', () => {
-    const messages = [
-      makeMessage({ id: 'msg-1', role: 'user', content: 'Hello' }),
-    ];
+    const messages = [makeMessage({ id: 'msg-1', role: 'user', content: 'Hello' })];
     const onResend = vi.fn();
     render(
-      <MessageList
-        messages={messages}
-        resendTargetMessageId="msg-1"
-        onResendTarget={onResend}
-      />
+      <MessageList messages={messages} resendTargetMessageId="msg-1" onResendTarget={onResend} />
     );
     fireEvent.click(screen.getByText('Resend'));
     expect(onResend).toHaveBeenCalled();
   });
 
   it('resend button is disabled when resendDisabled is true', () => {
-    const messages = [
-      makeMessage({ id: 'msg-1', role: 'user', content: 'Hello' }),
-    ];
+    const messages = [makeMessage({ id: 'msg-1', role: 'user', content: 'Hello' })];
     render(
       <MessageList
         messages={messages}
@@ -776,15 +764,9 @@ describe('MessageList', () => {
   });
 
   it('does not show resend button when resendTargetMessageId does not match', () => {
-    const messages = [
-      makeMessage({ id: 'msg-1', role: 'user', content: 'Hello' }),
-    ];
+    const messages = [makeMessage({ id: 'msg-1', role: 'user', content: 'Hello' })];
     render(
-      <MessageList
-        messages={messages}
-        resendTargetMessageId="msg-other"
-        onResendTarget={vi.fn()}
-      />
+      <MessageList messages={messages} resendTargetMessageId="msg-other" onResendTarget={vi.fn()} />
     );
     expect(screen.queryByText('Resend')).not.toBeInTheDocument();
   });
@@ -793,9 +775,7 @@ describe('MessageList', () => {
 
   it('renders structured user message with text from JSON', () => {
     const content = JSON.stringify({ text: 'Hello from JSON', attachments: [] });
-    const messages = [
-      makeMessage({ id: 'msg-1', role: 'user', content }),
-    ];
+    const messages = [makeMessage({ id: 'msg-1', role: 'user', content })];
     render(<MessageList messages={messages} />);
     expect(screen.getByText('Hello from JSON')).toBeInTheDocument();
   });
@@ -805,9 +785,7 @@ describe('MessageList', () => {
       text: 'Check this image',
       attachments: [{ fileId: 'f1', name: 'photo.png', type: 'image' }],
     });
-    const messages = [
-      makeMessage({ id: 'msg-1', role: 'user', content }),
-    ];
+    const messages = [makeMessage({ id: 'msg-1', role: 'user', content })];
     render(<MessageList messages={messages} />);
     expect(screen.getByText('Check this image')).toBeInTheDocument();
     // Attachment presence: image attachment renders a container with the name
@@ -824,7 +802,9 @@ describe('MessageList', () => {
         role: 'user',
         content: 'Here is my image',
         metadata: {
-          attachments: [{ fileId: 'f2', name: 'screenshot.png', mimeType: 'image/png', type: 'image' }],
+          attachments: [
+            { fileId: 'f2', name: 'screenshot.png', mimeType: 'image/png', type: 'image' },
+          ],
         },
       }),
     ];
@@ -841,7 +821,9 @@ describe('MessageList', () => {
         role: 'user',
         content: '',
         metadata: {
-          attachments: [{ fileId: 'f3', name: 'doc.pdf', mimeType: 'application/pdf', type: 'file' }],
+          attachments: [
+            { fileId: 'f3', name: 'doc.pdf', mimeType: 'application/pdf', type: 'file' },
+          ],
         },
       }),
     ];
@@ -857,9 +839,7 @@ describe('MessageList', () => {
       text: 'Legacy message',
       attachments: [{ fileId: 'f4', name: 'old-photo.jpg', mimeType: 'image/jpeg', type: 'image' }],
     });
-    const messages = [
-      makeMessage({ id: 'msg-1', role: 'user', content }),
-    ];
+    const messages = [makeMessage({ id: 'msg-1', role: 'user', content })];
     render(<MessageList messages={messages} />);
     expect(screen.getByText('Legacy message')).toBeInTheDocument();
     expect(screen.getByText('old-photo.jpg')).toBeInTheDocument();
@@ -868,9 +848,7 @@ describe('MessageList', () => {
   // ── Markdown rendering ────────────────────────────────────────────────────
 
   it('renders assistant messages via ReactMarkdown mock', () => {
-    const messages = [
-      makeMessage({ id: 'msg-1', role: 'assistant', content: 'Hello **bold**' }),
-    ];
+    const messages = [makeMessage({ id: 'msg-1', role: 'assistant', content: 'Hello **bold**' })];
     render(<MessageList messages={messages} />);
     // The markdown mock wraps content in a div with data-testid="markdown"
     expect(screen.getByTestId('markdown')).toBeInTheDocument();
@@ -886,6 +864,7 @@ describe('MessageList', () => {
       }),
     ];
     const { useProjectStore } = await import('../../../stores/projectStore');
+    mockSelectionState.selectedSessionId = 'session-1';
     (useProjectStore as any).getState = () => ({
       selectedSessionId: 'session-1',
       sessions: [{ id: 'session-1', projectId: 'proj-1' }],
@@ -911,7 +890,7 @@ describe('MessageList', () => {
     expect(mockOpenToolInWorkspace).toHaveBeenCalledWith(
       'session-1',
       'terminal',
-      expect.objectContaining({ projectId: 'proj-1', backendId: 'backend-2' }),
+      expect.objectContaining({ projectId: 'proj-1', backendId: 'backend-2' })
     );
     expect(mockWaitForReady).toHaveBeenCalledWith('term-backend-2-proj-1');
     await waitFor(() => {
@@ -926,9 +905,7 @@ describe('MessageList', () => {
   // ── Non-virtualised list structure ────────────────────────────────────────
 
   it('renders with data-testid="message-list" wrapper', () => {
-    const messages = [
-      makeMessage({ id: 'msg-1', role: 'user', content: 'Hi' }),
-    ];
+    const messages = [makeMessage({ id: 'msg-1', role: 'user', content: 'Hi' })];
     render(<MessageList messages={messages} />);
     expect(screen.getByTestId('message-list')).toBeInTheDocument();
   });
@@ -979,9 +956,7 @@ describe('MessageList', () => {
   });
 
   it('keeps existing assistant text visible while streaming tool calls without text blocks', () => {
-    const streamingBlocks: ContentBlock[] = [
-      { type: 'tool_use', toolUseId: 'stc-1', content: '' },
-    ];
+    const streamingBlocks: ContentBlock[] = [{ type: 'tool_use', toolUseId: 'stc-1', content: '' }];
     const streamingToolCalls: ToolCallState[] = [
       makeToolCall({ id: 'stc-1', toolName: 'Bash', status: 'running' }),
     ];
@@ -1012,9 +987,7 @@ describe('MessageList', () => {
   // ── Edge cases ────────────────────────────────────────────────────────────
 
   it('handles a single system message', () => {
-    const messages = [
-      makeMessage({ id: 'msg-1', role: 'system', content: 'Task started' }),
-    ];
+    const messages = [makeMessage({ id: 'msg-1', role: 'system', content: 'Task started' })];
     render(<MessageList messages={messages} />);
     const list = screen.getByTestId('message-list');
     expect(list.children.length).toBe(1);
@@ -1022,7 +995,11 @@ describe('MessageList', () => {
 
   it('handles many messages without virtualization (below threshold)', () => {
     const messages = Array.from({ length: 50 }, (_, i) =>
-      makeMessage({ id: `msg-${i}`, role: i % 2 === 0 ? 'user' : 'assistant', content: `Message ${i}` })
+      makeMessage({
+        id: `msg-${i}`,
+        role: i % 2 === 0 ? 'user' : 'assistant',
+        content: `Message ${i}`,
+      })
     );
     render(<MessageList messages={messages} />);
     const list = screen.getByTestId('message-list');
@@ -1043,9 +1020,7 @@ describe('MessageList', () => {
       text: 'here',
       attachments: [{ fileId: 'f1', name: 'data.csv', type: 'file' }],
     });
-    const messages = [
-      makeMessage({ id: 'msg-1', role: 'user', content }),
-    ];
+    const messages = [makeMessage({ id: 'msg-1', role: 'user', content })];
     render(<MessageList messages={messages} />);
     expect(screen.getByText('data.csv')).toBeInTheDocument();
   });

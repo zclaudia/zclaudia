@@ -112,20 +112,26 @@ describe('useSendMessage', () => {
     const wsSendMessage = vi.fn();
     const addMessage = vi.fn();
     const scrollToBottom = vi.fn();
-    const { result } = renderHook(() => useSendMessage(makeHookProps({
-      wsSendMessage,
-      addMessage,
-      scrollToBottom,
-    })));
+    const { result } = renderHook(() =>
+      useSendMessage(
+        makeHookProps({
+          wsSendMessage,
+          addMessage,
+          scrollToBottom,
+        })
+      )
+    );
 
     await act(async () => {
       await result.current.handleSendMessage('execute the plan');
     });
 
-    expect(wsSendMessage).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'run_start',
-      sessionId: 'session-1',
-    }));
+    expect(wsSendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'run_start',
+        sessionId: 'session-1',
+      })
+    );
     expect(useInteractionStore.getState().interactions).not.toHaveProperty('plan-1');
   });
 });
@@ -137,12 +143,16 @@ describe('handleSendMessage — mid-run queueing', () => {
 
   it('enqueues the message when isLoading (instead of sending run_steer)', async () => {
     const wsSendMessage = vi.fn();
-    const { result } = renderHook(() => useSendMessage(makeHookProps({
-      isLoading: true,
-      sessionRunId: 'r1',
-      isSessionRunning: true,
-      wsSendMessage,
-    })));
+    const { result } = renderHook(() =>
+      useSendMessage(
+        makeHookProps({
+          isLoading: true,
+          sessionRunId: 'r1',
+          isSessionRunning: true,
+          wsSendMessage,
+        })
+      )
+    );
 
     await act(async () => {
       await result.current.handleSendMessage('  also fix typo  ');
@@ -161,16 +171,26 @@ describe('handleSendMessage — mid-run queueing', () => {
 
   it('enqueues with attachments when isLoading + attachments present (allowed now)', async () => {
     const wsSendMessage = vi.fn();
-    const { result } = renderHook(() => useSendMessage(makeHookProps({
-      isLoading: true,
-      sessionRunId: 'r1',
-      isSessionRunning: true,
-      wsSendMessage,
-    })));
+    const { result } = renderHook(() =>
+      useSendMessage(
+        makeHookProps({
+          isLoading: true,
+          sessionRunId: 'r1',
+          isSessionRunning: true,
+          wsSendMessage,
+        })
+      )
+    );
 
     await act(async () => {
       await result.current.handleSendMessage('hi', [
-        { id: 'a', type: 'image', name: 'a.png', data: 'data:image/png;base64,', mimeType: 'image/png' },
+        {
+          id: 'a',
+          type: 'image',
+          name: 'a.png',
+          data: 'data:image/png;base64,',
+          mimeType: 'image/png',
+        },
       ]);
     });
 
@@ -182,12 +202,16 @@ describe('handleSendMessage — mid-run queueing', () => {
 
   it('steerNow sends run_steer immediately for a given content', async () => {
     const wsSendMessage = vi.fn();
-    const { result } = renderHook(() => useSendMessage(makeHookProps({
-      isLoading: true,
-      sessionRunId: 'r1',
-      isSessionRunning: true,
-      wsSendMessage,
-    })));
+    const { result } = renderHook(() =>
+      useSendMessage(
+        makeHookProps({
+          isLoading: true,
+          sessionRunId: 'r1',
+          isSessionRunning: true,
+          wsSendMessage,
+        })
+      )
+    );
 
     let returned: boolean | undefined;
     await act(async () => {
@@ -205,12 +229,16 @@ describe('handleSendMessage — mid-run queueing', () => {
 
   it('steerNow is a no-op and returns false without an active sessionRunId', async () => {
     const wsSendMessage = vi.fn();
-    const { result } = renderHook(() => useSendMessage(makeHookProps({
-      isLoading: true,
-      sessionRunId: null,
-      isSessionRunning: true,
-      wsSendMessage,
-    })));
+    const { result } = renderHook(() =>
+      useSendMessage(
+        makeHookProps({
+          isLoading: true,
+          sessionRunId: null,
+          isSessionRunning: true,
+          wsSendMessage,
+        })
+      )
+    );
 
     let returned: boolean | undefined;
     await act(async () => {
@@ -224,12 +252,16 @@ describe('handleSendMessage — mid-run queueing', () => {
 
   it('skips enqueue when isLoading but content is whitespace-only and no attachments', async () => {
     const wsSendMessage = vi.fn();
-    const { result } = renderHook(() => useSendMessage(makeHookProps({
-      isLoading: true,
-      sessionRunId: 'r1',
-      isSessionRunning: true,
-      wsSendMessage,
-    })));
+    const { result } = renderHook(() =>
+      useSendMessage(
+        makeHookProps({
+          isLoading: true,
+          sessionRunId: 'r1',
+          isSessionRunning: true,
+          wsSendMessage,
+        })
+      )
+    );
 
     await act(async () => {
       await result.current.handleSendMessage('   ');
@@ -248,36 +280,42 @@ describe('handleResendLastMessage', () => {
   it('re-runs the trailing user message without adding a duplicate optimistic copy', async () => {
     const wsSendMessage = vi.fn();
     const addMessage = vi.fn();
-    const { result } = renderHook(() => useSendMessage(makeHookProps({
-      isLoading: false,
-      isSessionRunning: false,
-      sessionRunId: null,
-      lastSessionMessage: {
-        id: 'm1',
-        sessionId: 'session-1',
-        role: 'user',
-        content: 'redo this',
-        createdAt: 1,
-      } as never,
-      wsSendMessage,
-      addMessage,
-    })));
+    const { result } = renderHook(() =>
+      useSendMessage(
+        makeHookProps({
+          isLoading: false,
+          isSessionRunning: false,
+          sessionRunId: null,
+          lastSessionMessage: {
+            id: 'm1',
+            sessionId: 'session-1',
+            role: 'user',
+            content: 'redo this',
+            createdAt: 1,
+          } as never,
+          wsSendMessage,
+          addMessage,
+        })
+      )
+    );
 
     await act(async () => {
       await result.current.handleResendLastMessage();
     });
 
     // Kicks off a resend run...
-    expect(wsSendMessage).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'run_start',
-      resend: true,
-      sessionId: 'session-1',
-    }));
+    expect(wsSendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'run_start',
+        resend: true,
+        sessionId: 'session-1',
+      })
+    );
     // ...but does NOT re-add the already-rendered user message (would duplicate
     // it in the view and then vanish on history sync since resend isn't persisted).
     expect(addMessage).not.toHaveBeenCalledWith(
       'session-1',
-      expect.objectContaining({ role: 'user' }),
+      expect.objectContaining({ role: 'user' })
     );
   });
 });

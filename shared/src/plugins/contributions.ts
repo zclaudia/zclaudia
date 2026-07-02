@@ -94,7 +94,7 @@ export type WorkflowStepHandler = (
     providerId?: string;
     stepRunId: string;
     runId: string;
-  },
+  }
 ) => Promise<{ status: 'completed' | 'failed'; output: Record<string, unknown>; error?: string }>;
 
 export interface NotchTabContribution {

@@ -2,7 +2,12 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSelectionCoordinator } from '../useSelectionCoordinator';
 
-const { mockConnectServer, mockGetProjectBackendId, mockGetSessionBackendId, mockResolveCanonicalBackendId } = vi.hoisted(() => ({
+const {
+  mockConnectServer,
+  mockGetProjectBackendId,
+  mockGetSessionBackendId,
+  mockResolveCanonicalBackendId,
+} = vi.hoisted(() => ({
   mockConnectServer: vi.fn(),
   mockGetProjectBackendId: vi.fn(() => 'backend-1'),
   mockGetSessionBackendId: vi.fn(() => 'backend-1'),
@@ -27,9 +32,7 @@ vi.mock('../../stores/ownershipStore', () => ({
 vi.mock('../../stores/sessionsStore', () => ({
   useSessionsStore: {
     getState: () => ({
-      remoteSessions: new Map([
-        ['b1', [{ id: 'remote-s1', projectId: 'p-remote' }]],
-      ]),
+      remoteSessions: new Map([['b1', [{ id: 'remote-s1', projectId: 'p-remote' }]]]),
     }),
   },
 }));
@@ -46,7 +49,7 @@ import { useRecoveryStore } from '../../stores/recoveryStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { isAndroid } from '../../utils/platform';
 
-vi.mock('../../utils/platform', async (importOriginal) => {
+vi.mock('../../utils/platform', async importOriginal => {
   const mod = await importOriginal<Record<string, any>>();
   return {
     ...mod,
@@ -59,7 +62,9 @@ describe('useSelectionCoordinator', () => {
     mockConnectServer.mockReset();
     mockGetProjectBackendId.mockReturnValue('backend-1');
     mockGetSessionBackendId.mockReturnValue('backend-1');
-    mockResolveCanonicalBackendId.mockImplementation((backendId: string | null | undefined) => backendId);
+    mockResolveCanonicalBackendId.mockImplementation(
+      (backendId: string | null | undefined) => backendId
+    );
     useServerStore.setState({
       activeServerId: 'backend-1',
       connections: {
@@ -113,14 +118,16 @@ describe('useSelectionCoordinator', () => {
 
   it('does not reconnect when selecting a session on the already active backend', () => {
     useProjectStore.setState({
-      sessions: [{
-        id: 'session-1',
-        projectId: 'project-1',
-        name: 'Session 1',
-        type: 'regular',
-        createdAt: 1,
-        updatedAt: 1,
-      }],
+      sessions: [
+        {
+          id: 'session-1',
+          projectId: 'project-1',
+          name: 'Session 1',
+          type: 'regular',
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
     });
 
     const { result } = renderHook(() => useSelectionCoordinator());
@@ -150,14 +157,16 @@ describe('useSelectionCoordinator', () => {
       backends: [{ backendId: 'local-backend-1', runtimeState: 'ready', name: 'Local' }],
     } as any);
     useProjectStore.setState({
-      sessions: [{
-        id: 'session-1',
-        projectId: 'project-1',
-        name: 'Session 1',
-        type: 'regular',
-        createdAt: 1,
-        updatedAt: 1,
-      }],
+      sessions: [
+        {
+          id: 'session-1',
+          projectId: 'project-1',
+          name: 'Session 1',
+          type: 'regular',
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
     });
 
     const { result } = renderHook(() => useSelectionCoordinator());
@@ -224,8 +233,26 @@ describe('useSelectionCoordinator', () => {
     });
     useRecoveryStore.setState({
       backends: {
-        'backend-1': { backendId: 'backend-1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() },
-        'backend-2': { backendId: 'backend-2', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() },
+        'backend-1': {
+          backendId: 'backend-1',
+          status: 'ready',
+          subscribed: true,
+          dataReady: true,
+          retryCount: 0,
+          lastError: null,
+          lastCloseReason: null,
+          statusEnteredAt: Date.now(),
+        },
+        'backend-2': {
+          backendId: 'backend-2',
+          status: 'ready',
+          subscribed: true,
+          dataReady: true,
+          retryCount: 0,
+          lastError: null,
+          lastCloseReason: null,
+          statusEnteredAt: Date.now(),
+        },
       },
     } as any);
 

@@ -16,8 +16,6 @@ describe('AiReviewSimulatorSection', () => {
     expect(screen.getByText('AI review simulator')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Run Review' })).toBeNull();
     fireEvent.click(screen.getByLabelText(/Expand AI review simulator/i));
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Run Review' })).toBeTruthy()
-    );
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Run Review' })).toBeTruthy());
   });
 });

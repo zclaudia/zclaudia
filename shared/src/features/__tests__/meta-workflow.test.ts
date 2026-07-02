@@ -1,17 +1,22 @@
 import { describe, it, expect } from 'vitest';
-import type {
-  PhaseDef, PhasesDoc, AcceptanceGate,
-} from '../meta-workflow.js';
+import type { PhaseDef, PhasesDoc, AcceptanceGate } from '../meta-workflow.js';
 import {
-  PHASE_TYPES, EXECUTE_ENTITIES, EXECUTE_PATTERNS,
-  META_WORKFLOW_RUN_STATUSES, META_WORKFLOW_PHASE_STATUSES,
+  PHASE_TYPES,
+  EXECUTE_ENTITIES,
+  EXECUTE_PATTERNS,
+  META_WORKFLOW_RUN_STATUSES,
+  META_WORKFLOW_PHASE_STATUSES,
 } from '../meta-workflow.js';
 
 describe('meta-workflow types', () => {
   it('PHASE_TYPES enum has exactly 6 values', () => {
     expect(PHASE_TYPES).toEqual([
-      'code-implement', 'code-refactor', 'code-test-write',
-      'design-doc', 'dep-update', 'investigation',
+      'code-implement',
+      'code-refactor',
+      'code-test-write',
+      'design-doc',
+      'dep-update',
+      'investigation',
     ]);
   });
 
@@ -32,12 +37,14 @@ describe('meta-workflow types', () => {
       dependsOn: [],
       inputs: [],
       outputs: [{ kind: 'commit', description: 'feature commit' }],
-      acceptanceGates: [{
-        id: 'compile',
-        description: 'project must compile',
-        command: 'mvn compile -q',
-        expect: { exitCode: 0 },
-      }],
+      acceptanceGates: [
+        {
+          id: 'compile',
+          description: 'project must compile',
+          command: 'mvn compile -q',
+          expect: { exitCode: 0 },
+        },
+      ],
     };
     expect(phase.phaseType).toBe('code-implement');
   });

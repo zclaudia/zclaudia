@@ -7,15 +7,17 @@ import { createExecutionEnv } from '../../../infra/execution-env.js';
 
 describe('loadAllSkills', () => {
   let tmpRoot: string;
-  beforeEach(() => { tmpRoot = mkdtempSync(path.join(tmpdir(), 'zc-sl-')); });
-  afterEach(() => { rmSync(tmpRoot, { recursive: true, force: true }); });
+  beforeEach(() => {
+    tmpRoot = mkdtempSync(path.join(tmpdir(), 'zc-sl-'));
+  });
+  afterEach(() => {
+    rmSync(tmpRoot, { recursive: true, force: true });
+  });
 
   function writeSkill(dir: string, name: string, frontmatter = '', body = `# ${name}\n`) {
     const skillDir = path.join(dir, name);
     mkdirSync(skillDir, { recursive: true });
-    const content = frontmatter
-      ? `---\n${frontmatter}\n---\n\n${body}`
-      : body;
+    const content = frontmatter ? `---\n${frontmatter}\n---\n\n${body}` : body;
     writeFileSync(path.join(skillDir, 'SKILL.md'), content);
     return skillDir;
   }
@@ -34,7 +36,8 @@ describe('loadAllSkills', () => {
   it('preserves source tags across multiple input dirs', async () => {
     const wsDir = path.join(tmpRoot, 'ws');
     const extDir = path.join(tmpRoot, 'ext');
-    mkdirSync(wsDir); mkdirSync(extDir);
+    mkdirSync(wsDir);
+    mkdirSync(extDir);
     writeSkill(wsDir, 'w-skill', 'name: w-skill\ndescription: workspace one');
     writeSkill(extDir, 'e-skill', 'name: e-skill\ndescription: external one');
     const env = createExecutionEnv(tmpRoot);
@@ -52,7 +55,7 @@ describe('loadAllSkills', () => {
     writeSkill(
       wsDir,
       'gated',
-      'name: gated\ndescription: needs git\nrequires:\n  binaries:\n    - git\n  os:\n    - linux',
+      'name: gated\ndescription: needs git\nrequires:\n  binaries:\n    - git\n  os:\n    - linux'
     );
     const env = createExecutionEnv(tmpRoot);
     const result = await loadAllSkills(env, [{ path: wsDir, source: 'workspace' }]);
@@ -85,7 +88,7 @@ describe('loadAllSkills', () => {
         '  paths:',
         '    - "src/**"',
         'user_invocable: false',
-      ].join('\n'),
+      ].join('\n')
     );
     const env = createExecutionEnv(tmpRoot);
     const result = await loadAllSkills(env, [{ path: wsDir, source: 'workspace' }]);

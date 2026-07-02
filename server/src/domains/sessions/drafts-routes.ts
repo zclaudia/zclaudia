@@ -1,30 +1,19 @@
-import { Router, Request, Response } from 'express';
+import { Router } from 'express';
+import type { Request, Response } from 'express';
 import type Database from 'better-sqlite3';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import type { SessionDraft } from '@zclaudia/shared/core/session';
 import { SessionDraftRepository } from './draft-repository.js';
+import { SessionRepository } from './repository.js';
 import { sendApiError } from '../../interfaces/http/response.js';
 
 export function createSessionDraftRoutes(db: Database.Database): Router {
   const router = Router();
   const repo = new SessionDraftRepository(db);
-
-  function sessionExists(sessionId: string): boolean {
-    const row = db.prepare('SELECT 1 FROM sessions WHERE id = ?').get(sessionId) as { 1: number } | undefined;
-    return !!row;
-  }
-
-  function isSessionArchived(sessionId: string): boolean {
-    try {
-      const row = db.prepare('SELECT archived_at FROM sessions WHERE id = ?').get(sessionId) as { archived_at: number | null } | undefined;
-      return !!row?.archived_at;
-    } catch {
-      return false;
-    }
-  }
+  const sessionRepo = new SessionRepository(db);
 
   function ensureSessionExists(req: Request, res: Response): boolean {
-    if (sessionExists(req.params.id)) {
+    if (sessionRepo.exists(req.params.id)) {
       return true;
     }
 
@@ -36,7 +25,7 @@ export function createSessionDraftRoutes(db: Database.Database): Router {
   }
 
   function ensureSessionNotArchived(req: Request, res: Response): boolean {
-    if (isSessionArchived(req.params.id)) {
+    if (sessionRepo.isArchived(req.params.id)) {
       res.status(409).json({
         success: false,
         error: { code: 'SESSION_ARCHIVED', message: 'Session is archived' },

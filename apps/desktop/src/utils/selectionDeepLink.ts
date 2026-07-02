@@ -33,7 +33,10 @@ export function parseSelectionDeepLinkUrl(rawUrl: string): SelectionDeepLinkTarg
     if (trimmed.startsWith('?')) {
       return parseSelectionDeepLink(trimmed);
     }
-    const parsed = new URL(trimmed, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
+    const parsed = new URL(
+      trimmed,
+      typeof window !== 'undefined' ? window.location.origin : 'http://localhost'
+    );
     return parseSelectionDeepLinkParams(parsed.searchParams);
   } catch {
     return parseSelectionDeepLink(trimmed);
@@ -56,7 +59,8 @@ export function consumeSelectionDeepLinkFromWindow(): SelectionDeepLinkTarget | 
     return hasSelectionDeepLinkTarget(parsed) ? parsed : null;
   }
 
-  const bridge = (window as Window & { AndroidNotifications?: AndroidNotificationBridge }).AndroidNotifications;
+  const bridge = (window as Window & { AndroidNotifications?: AndroidNotificationBridge })
+    .AndroidNotifications;
   if (bridge?.consumeSelectionTarget) {
     const bridgeTarget = bridge.consumeSelectionTarget();
     if (bridgeTarget?.trim()) {

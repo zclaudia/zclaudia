@@ -35,11 +35,26 @@ const STATUS_CONFIG: Record<LocalPRStatus, { label: string; color: string }> = {
   closed: { label: 'Closed', color: 'bg-gray-500/10 text-gray-400' },
 };
 
-const EXECUTION_STATE_CONFIG: Record<ExecutionState, { label: string; color: string; icon: React.ReactNode }> = {
+const EXECUTION_STATE_CONFIG: Record<
+  ExecutionState,
+  { label: string; color: string; icon: React.ReactNode }
+> = {
   idle: { label: 'Idle', color: '', icon: null },
-  queued: { label: 'Queued', color: 'bg-amber-500/10 text-amber-500', icon: <Clock className="w-3 h-3" /> },
-  running: { label: 'Running', color: 'bg-blue-500/10 text-blue-500', icon: <Loader2 className="w-3 h-3 animate-spin" /> },
-  failed: { label: 'Failed', color: 'bg-red-500/10 text-red-500', icon: <AlertCircle className="w-3 h-3" /> },
+  queued: {
+    label: 'Queued',
+    color: 'bg-amber-500/10 text-amber-500',
+    icon: <Clock className="w-3 h-3" />,
+  },
+  running: {
+    label: 'Running',
+    color: 'bg-blue-500/10 text-blue-500',
+    icon: <Loader2 className="w-3 h-3 animate-spin" />,
+  },
+  failed: {
+    label: 'Failed',
+    color: 'bg-red-500/10 text-red-500',
+    icon: <AlertCircle className="w-3 h-3" />,
+  },
 };
 
 interface LocalPRCardProps {
@@ -54,27 +69,23 @@ export function LocalPRCard({ pr, projectId }: LocalPRCardProps) {
   const [loading, setLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [reviewPickerOpen, setReviewPickerOpen] = useState(false);
-  const {
-    closePR,
-    reviewPR,
-    mergePR,
-    cancelMergePR,
-    resolveConflictPR,
-    reopenPR,
-    revertMergedPR,
-  } = useLocalPRStore();
-  const activeServerId = useServerStore((s) => s.activeServerId);
-  const legacyProviders = useProjectStore((s) => s.providers);
-  const scopedProviders = useLlmProfileMetaStore((s) => s.getProviders(activeServerId));
+  const { closePR, reviewPR, mergePR, cancelMergePR, resolveConflictPR, reopenPR, revertMergedPR } =
+    useLocalPRStore();
+  const activeServerId = useServerStore(s => s.activeServerId);
+  const legacyProviders = useProjectStore(s => s.providers);
+  const scopedProviders = useLlmProfileMetaStore(s => s.getProviders(activeServerId));
   const providers = scopedProviders.length > 0 ? scopedProviders : legacyProviders;
-  const projects = useProjectStore((s) => s.projects);
-  const sessions = useProjectStore((s) => s.sessions);
-  const selectSession = useProjectStore((s) => s.selectSession);
-  const status = STATUS_CONFIG[pr.status] ?? { label: pr.status, color: 'bg-gray-500/10 text-gray-400' };
+  const projects = useProjectStore(s => s.projects);
+  const sessions = useProjectStore(s => s.sessions);
+  const selectSession = useProjectStore(s => s.selectSession);
+  const status = STATUS_CONFIG[pr.status] ?? {
+    label: pr.status,
+    color: 'bg-gray-500/10 text-gray-400',
+  };
   const executionState = EXECUTION_STATE_CONFIG[pr.executionState] ?? EXECUTION_STATE_CONFIG.idle;
   const showExecutionState = pr.executionState !== 'idle';
 
-  const project = projects.find((p) => p.id === projectId);
+  const project = projects.find(p => p.id === projectId);
   // NOTE: prior to sub-project C this fell back to `project.llmProfileId`. That field
   // has been replaced by `project.defaultAgentProfileId`, which points at an
   // agent profile, not an LLM profile. The agent → llm resolution is now done
@@ -212,12 +223,12 @@ export function LocalPRCard({ pr, projectId }: LocalPRCardProps) {
   const openSession = async (sessionId: string) => {
     useProjectStore.getState().setDashboardView(projectId, 'local-prs');
     // If session isn't in store yet (broadcast missed), refresh from server
-    if (!sessions.find((s) => s.id === sessionId)) {
+    if (!sessions.find(s => s.id === sessionId)) {
       const fresh = await api.getSessions(projectId);
       useProjectStore.getState().mergeSessions(fresh);
     }
     // Session may have been permanently deleted
-    if (!useProjectStore.getState().sessions.find((s) => s.id === sessionId)) return;
+    if (!useProjectStore.getState().sessions.find(s => s.id === sessionId)) return;
     selectSession(sessionId);
   };
 
@@ -230,19 +241,27 @@ export function LocalPRCard({ pr, projectId }: LocalPRCardProps) {
               {status.label}
             </span>
             {showExecutionState && (
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full flex items-center gap-1 ${executionState.color}`}>
+              <span
+                className={`text-xs font-medium px-2 py-0.5 rounded-full flex items-center gap-1 ${executionState.color}`}
+              >
                 {executionState.icon}
                 {executionState.label}
               </span>
             )}
             {pr.autoTriggered && (
-              <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md">auto</span>
+              <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md">
+                auto
+              </span>
             )}
             {pr.autoReview && (
-              <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md">auto-review</span>
+              <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md">
+                auto-review
+              </span>
             )}
           </div>
-          <p className="text-sm font-medium mt-1 truncate" title={pr.title}>{pr.title}</p>
+          <p className="text-sm font-medium mt-1 truncate" title={pr.title}>
+            {pr.title}
+          </p>
           <p className="text-xs text-muted-foreground mt-0.5">
             <code className="bg-muted px-1 rounded-md">{branchShort}</code>
             {' → '}
@@ -279,7 +298,7 @@ export function LocalPRCard({ pr, projectId }: LocalPRCardProps) {
             {canReview && (
               <div className="relative">
                 <button
-                  onClick={() => setReviewPickerOpen((v) => !v)}
+                  onClick={() => setReviewPickerOpen(v => !v)}
                   disabled={loading}
                   title="AI Review"
                   className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-50"
@@ -288,24 +307,34 @@ export function LocalPRCard({ pr, projectId }: LocalPRCardProps) {
                 </button>
                 {reviewPickerOpen && (
                   <>
-                    <div className="fixed inset-0 z-40" onClick={() => setReviewPickerOpen(false)} />
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setReviewPickerOpen(false)}
+                    />
                     <div className="absolute right-0 top-full mt-1 z-50 bg-popover border border-border rounded-xl shadow-lg p-2 min-w-[200px]">
-                      <p className="text-xs font-medium text-muted-foreground mb-1.5 px-1">Review with:</p>
+                      <p className="text-xs font-medium text-muted-foreground mb-1.5 px-1">
+                        Review with:
+                      </p>
                       <button
                         onClick={() => handleReview(defaultLlmProfileId)}
                         className="w-full text-left text-xs px-2 py-1.5 rounded-md hover:bg-muted"
                       >
-                        Default{defaultLlmProfileId ? ` (${getProviderLabel(providers, defaultLlmProfileId)})` : ''}
+                        Default
+                        {defaultLlmProfileId
+                          ? ` (${getProviderLabel(providers, defaultLlmProfileId)})`
+                          : ''}
                       </button>
-                      {providers.filter((p) => p.id !== defaultLlmProfileId).map((p) => (
-                        <button
-                          key={p.id}
-                          onClick={() => handleReview(p.id)}
-                          className="w-full text-left text-xs px-2 py-1.5 rounded-md hover:bg-muted"
-                        >
-                          {p.name} ({p.providerType})
-                        </button>
-                      ))}
+                      {providers
+                        .filter(p => p.id !== defaultLlmProfileId)
+                        .map(p => (
+                          <button
+                            key={p.id}
+                            onClick={() => handleReview(p.id)}
+                            className="w-full text-left text-xs px-2 py-1.5 rounded-md hover:bg-muted"
+                          >
+                            {p.name} ({p.providerType})
+                          </button>
+                        ))}
                     </div>
                   </>
                 )}
@@ -507,7 +536,7 @@ export function LocalPRCard({ pr, projectId }: LocalPRCardProps) {
         )}
         {pr.reviewNotes && (
           <button
-            onClick={() => setNotesOpen((v) => !v)}
+            onClick={() => setNotesOpen(v => !v)}
             className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
           >
             {notesOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
@@ -530,18 +559,14 @@ export function LocalPRCard({ pr, projectId }: LocalPRCardProps) {
         </pre>
       )}
 
-      {pr.statusMessage && (
-        <p className="text-xs text-muted-foreground">{pr.statusMessage}</p>
-      )}
+      {pr.statusMessage && <p className="text-xs text-muted-foreground">{pr.statusMessage}</p>}
 
-      {actionError && (
-        <p className="text-xs text-red-500">{actionError}</p>
-      )}
+      {actionError && <p className="text-xs text-red-500">{actionError}</p>}
     </div>
   );
 }
 
 function getProviderLabel(providers: LlmProfileConfig[], id: string): string {
-  const p = providers.find((p) => p.id === id);
+  const p = providers.find(p => p.id === id);
   return p ? `${p.name}` : id.slice(0, 8);
 }

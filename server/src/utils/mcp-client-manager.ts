@@ -30,7 +30,9 @@ const IDLE_TIMEOUT_MS = 60_000; // 60 seconds
 
 function isAuthRequiredError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return /\b(401|403|unauthorized|forbidden|auth(?:entication|orization)? required|oauth|login required)\b/i.test(message);
+  return /\b(401|403|unauthorized|forbidden|auth(?:entication|orization)? required|oauth|login required)\b/i.test(
+    message
+  );
 }
 
 function authRequiredMessage(error: unknown): string {
@@ -40,16 +42,15 @@ function authRequiredMessage(error: unknown): string {
 
 function isMcpSessionExpiredError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  const code = typeof error === 'object' && error !== null && 'code' in error
-    ? (error as { code?: unknown }).code
-    : undefined;
+  const code =
+    typeof error === 'object' && error !== null && 'code' in error
+      ? (error as { code?: unknown }).code
+      : undefined;
   return (
-    (code === 404 || /\b404\b/.test(message))
-    && (
-      message.includes('"code":-32001')
-      || message.includes('"code": -32001')
-      || /session not found/i.test(message)
-    )
+    (code === 404 || /\b404\b/.test(message)) &&
+    (message.includes('"code":-32001') ||
+      message.includes('"code": -32001') ||
+      /session not found/i.test(message))
   );
 }
 
@@ -60,8 +61,12 @@ export class McpClientManager {
   private statuses = new Map<string, McpServerStatus>();
 
   private buildConfigKey(config: McpServerRuntimeConfig): string {
-    const sortedEnv = Object.entries('env' in config ? config.env || {} : {}).sort(([a], [b]) => a.localeCompare(b));
-    const sortedHeaders = Object.entries('headers' in config ? config.headers || {} : {}).sort(([a], [b]) => a.localeCompare(b));
+    const sortedEnv = Object.entries('env' in config ? config.env || {} : {}).sort(([a], [b]) =>
+      a.localeCompare(b)
+    );
+    const sortedHeaders = Object.entries('headers' in config ? config.headers || {} : {}).sort(
+      ([a], [b]) => a.localeCompare(b)
+    );
     return JSON.stringify({
       transport: config.transport || 'stdio',
       command: config.command,
@@ -81,7 +86,7 @@ export class McpClientManager {
    */
   async getClient(
     serverName: string,
-    config: McpServerRuntimeConfig,
+    config: McpServerRuntimeConfig
   ): Promise<McpClient | RemoteMcpClient> {
     const configKey = this.buildConfigKey(config);
     const cached = this.clients.get(serverName);
@@ -108,7 +113,7 @@ export class McpClientManager {
   private async createClient(
     serverName: string,
     configKey: string,
-    config: McpServerRuntimeConfig,
+    config: McpServerRuntimeConfig
   ): Promise<McpClient | RemoteMcpClient> {
     // Clean up stale entry, including config changes for the same server name.
     const cached = this.clients.get(serverName);
@@ -177,7 +182,7 @@ export class McpClientManager {
 
   async connect(
     serverName: string,
-    config: McpServerRuntimeConfig,
+    config: McpServerRuntimeConfig
   ): Promise<McpClient | RemoteMcpClient> {
     return this.getClient(serverName, config);
   }
@@ -193,7 +198,7 @@ export class McpClientManager {
 
   async refresh(
     serverName: string,
-    config: McpServerRuntimeConfig,
+    config: McpServerRuntimeConfig
   ): Promise<McpClient | RemoteMcpClient> {
     mcpInventoryCache.invalidate(serverName);
     await this.evict(serverName);
@@ -212,8 +217,12 @@ export class McpClientManager {
   }
 
   listStatuses(): McpServerStatus[] {
-    const names = new Set([...this.statuses.keys(), ...this.clients.keys(), ...this.connecting.keys()]);
-    return [...names].sort().map((name) => this.getStatus(name));
+    const names = new Set([
+      ...this.statuses.keys(),
+      ...this.clients.keys(),
+      ...this.connecting.keys(),
+    ]);
+    return [...names].sort().map(name => this.getStatus(name));
   }
 
   /**
@@ -223,9 +232,11 @@ export class McpClientManager {
     serverName: string,
     config: McpServerRuntimeConfig,
     toolName: string,
-    args: Record<string, unknown>,
+    args: Record<string, unknown>
   ): Promise<McpToolResult> {
-    return this.withSessionRetry(serverName, config, async (client) => client.callTool(toolName, args));
+    return this.withSessionRetry(serverName, config, async client =>
+      client.callTool(toolName, args)
+    );
   }
 
   /**
@@ -233,40 +244,40 @@ export class McpClientManager {
    */
   async listTools(
     serverName: string,
-    config: McpServerRuntimeConfig,
+    config: McpServerRuntimeConfig
   ): Promise<McpToolDefinition[]> {
-    return this.withSessionRetry(serverName, config, async (client) => client.listTools());
+    return this.withSessionRetry(serverName, config, async client => client.listTools());
   }
 
   async listResources(
     serverName: string,
-    config: McpServerRuntimeConfig,
+    config: McpServerRuntimeConfig
   ): Promise<McpResourceDefinition[]> {
-    return this.withSessionRetry(serverName, config, async (client) => client.listResources());
+    return this.withSessionRetry(serverName, config, async client => client.listResources());
   }
 
   async readResource(
     serverName: string,
     config: McpServerRuntimeConfig,
-    uri: string,
+    uri: string
   ): Promise<McpResourceResult> {
-    return this.withSessionRetry(serverName, config, async (client) => client.readResource(uri));
+    return this.withSessionRetry(serverName, config, async client => client.readResource(uri));
   }
 
   async listPrompts(
     serverName: string,
-    config: McpServerRuntimeConfig,
+    config: McpServerRuntimeConfig
   ): Promise<McpPromptDefinition[]> {
-    return this.withSessionRetry(serverName, config, async (client) => client.listPrompts());
+    return this.withSessionRetry(serverName, config, async client => client.listPrompts());
   }
 
   async getPrompt(
     serverName: string,
     config: McpServerRuntimeConfig,
     name: string,
-    args?: Record<string, unknown>,
+    args?: Record<string, unknown>
   ): Promise<McpPromptResult> {
-    return this.withSessionRetry(serverName, config, async (client) => client.getPrompt(name, args));
+    return this.withSessionRetry(serverName, config, async client => client.getPrompt(name, args));
   }
 
   /**
@@ -285,7 +296,7 @@ export class McpClientManager {
   private async withSessionRetry<T>(
     serverName: string,
     config: McpServerRuntimeConfig,
-    operation: (client: McpClient | RemoteMcpClient) => Promise<T>,
+    operation: (client: McpClient | RemoteMcpClient) => Promise<T>
   ): Promise<T> {
     const client = await this.getClient(serverName, config);
     try {

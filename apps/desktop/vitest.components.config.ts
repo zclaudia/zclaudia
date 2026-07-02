@@ -9,6 +9,7 @@ const pkg = JSON.parse(readFileSync(path.resolve(__dirname, '../../package.json'
 // 组件测试专用配置 - 使用 jsdom 环境
 export default defineConfig({
   plugins: [react()],
+  cacheDir: './node_modules/.vitest-cache-components',
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
@@ -23,13 +24,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup-components.ts'],
     include: ['src/components/**/*.{test,spec}.{ts,tsx}'],
-    exclude: [
-      '**/node_modules/**',
-      '**/src-tauri/**',
-    ],
-    cache: {
-      dir: './node_modules/.vitest-cache-components',
-    },
+    exclude: ['**/node_modules/**', '**/src-tauri/**'],
     pool: 'forks',
     testTimeout: 30000,
     hookTimeout: 30000,

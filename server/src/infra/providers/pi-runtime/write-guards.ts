@@ -39,10 +39,15 @@ export function isAgentSettingsPath(filePath: string): boolean {
 }
 
 export function hasUnsafeSettingsChange(filePath: string, content: string): boolean {
-  return isAgentSettingsPath(filePath) && UNSAFE_SETTINGS_PATTERNS.some(pattern => pattern.test(content));
+  return (
+    isAgentSettingsPath(filePath) && UNSAFE_SETTINGS_PATTERNS.some(pattern => pattern.test(content))
+  );
 }
 
-export function validateMutationContent(filePath: string, content: string): GuardFailure | undefined {
+export function validateMutationContent(
+  filePath: string,
+  content: string
+): GuardFailure | undefined {
   const size = Buffer.byteLength(content, 'utf8');
   if (size > MAX_WRITE_CONTENT_BYTES) {
     return {

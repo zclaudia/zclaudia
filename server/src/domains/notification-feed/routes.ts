@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, type Request, type Response } from 'express';
 import type { NotificationService } from './service.js';
 
 export function createNotificationRoutes(notificationService: NotificationService): Router {
@@ -15,7 +15,10 @@ export function createNotificationRoutes(notificationService: NotificationServic
       res.json({ success: true, data: result });
     } catch (error) {
       console.error('Error listing notifications:', error);
-      res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to list notifications' } });
+      res.status(500).json({
+        success: false,
+        error: { code: 'INTERNAL_ERROR', message: 'Failed to list notifications' },
+      });
     }
   });
 
@@ -24,14 +27,20 @@ export function createNotificationRoutes(notificationService: NotificationServic
     try {
       const { itemIds } = req.body;
       if (!Array.isArray(itemIds)) {
-        res.status(400).json({ success: false, error: { code: 'INVALID_INPUT', message: 'itemIds must be an array' } });
+        res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_INPUT', message: 'itemIds must be an array' },
+        });
         return;
       }
       notificationService.markRead(itemIds);
       res.json({ success: true });
     } catch (error) {
       console.error('Error marking notifications read:', error);
-      res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to mark read' } });
+      res.status(500).json({
+        success: false,
+        error: { code: 'INTERNAL_ERROR', message: 'Failed to mark read' },
+      });
     }
   });
 
@@ -42,7 +51,10 @@ export function createNotificationRoutes(notificationService: NotificationServic
       res.json({ success: true, data: { count } });
     } catch (error) {
       console.error('Error getting unread count:', error);
-      res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to get unread count' } });
+      res.status(500).json({
+        success: false,
+        error: { code: 'INTERNAL_ERROR', message: 'Failed to get unread count' },
+      });
     }
   });
 

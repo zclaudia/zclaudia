@@ -75,7 +75,7 @@ export const usePermissionStore = create<PermissionState>((set, get) => ({
   aiReviewResults: {},
   workflowProgress: {},
 
-  setPendingRequest: (request) => {
+  setPendingRequest: request => {
     if (!request) {
       // null clears the queue (backward compat)
       set({
@@ -87,7 +87,7 @@ export const usePermissionStore = create<PermissionState>((set, get) => ({
       });
       return;
     }
-    set((state) => {
+    set(state => {
       // Don't add duplicates
       if (state.pendingRequests.some(r => r.requestId === request.requestId)) {
         return state;
@@ -102,7 +102,7 @@ export const usePermissionStore = create<PermissionState>((set, get) => ({
 
   // Remove the first (current) request from queue, advance to next
   clearRequest: () =>
-    set((state) => {
+    set(state => {
       const removed = state.pendingRequests[0];
       const remaining = state.pendingRequests.slice(1);
       const feedbackDrafts = { ...state.feedbackDrafts };
@@ -123,8 +123,8 @@ export const usePermissionStore = create<PermissionState>((set, get) => ({
     }),
 
   // Remove a specific request by ID (e.g. resolved by another device)
-  clearRequestById: (requestId) =>
-    set((state) => {
+  clearRequestById: requestId =>
+    set(state => {
       const remaining = state.pendingRequests.filter(r => r.requestId !== requestId);
       const feedbackDrafts = { ...state.feedbackDrafts };
       const aiReviewResults = { ...state.aiReviewResults };
@@ -152,8 +152,8 @@ export const usePermissionStore = create<PermissionState>((set, get) => ({
     }),
 
   // Remove all requests belonging to a completed/failed session.
-  clearRequestsForSession: (sessionId) =>
-    set((state) => {
+  clearRequestsForSession: sessionId =>
+    set(state => {
       const removedIds = state.pendingRequests
         .filter(r => r.sessionId === sessionId)
         .map(r => r.requestId);
@@ -180,7 +180,7 @@ export const usePermissionStore = create<PermissionState>((set, get) => ({
 
   // Remove requests for a server that are not in the valid set (state heartbeat reconciliation)
   clearStaleRequests: (serverId, validIds) =>
-    set((state) => {
+    set(state => {
       const hasStale = state.pendingRequests.some(
         r => r.serverId === serverId && !validIds.has(r.requestId)
       );
@@ -221,19 +221,25 @@ export const usePermissionStore = create<PermissionState>((set, get) => ({
 
   // Get unique session IDs that have pending requests
   getSessionsWithPendingRequests: (): string[] => {
-    return [...new Set(get().pendingRequests.map(r => r.sessionId).filter((id): id is string => !!id))];
+    return [
+      ...new Set(
+        get()
+          .pendingRequests.map(r => r.sessionId)
+          .filter((id): id is string => !!id)
+      ),
+    ];
   },
 
   setFeedbackDraft: (requestId, feedback) =>
-    set((state) => ({
+    set(state => ({
       feedbackDrafts: {
         ...state.feedbackDrafts,
         [requestId]: feedback,
       },
     })),
 
-  clearFeedbackDraft: (requestId) =>
-    set((state) => {
+  clearFeedbackDraft: requestId =>
+    set(state => {
       if (!(requestId in state.feedbackDrafts)) return state;
       const feedbackDrafts = { ...state.feedbackDrafts };
       delete feedbackDrafts[requestId];
@@ -241,17 +247,17 @@ export const usePermissionStore = create<PermissionState>((set, get) => ({
     }),
 
   setAIReviewResult: (requestId, result) =>
-    set((state) => ({
+    set(state => ({
       aiReviewResults: { ...state.aiReviewResults, [requestId]: result },
     })),
 
   setWorkflowProgress: (requestId, progress) =>
-    set((state) => ({
+    set(state => ({
       workflowProgress: { ...state.workflowProgress, [requestId]: progress },
     })),
 
-  clearWorkflowProgress: (requestId) =>
-    set((state) => {
+  clearWorkflowProgress: requestId =>
+    set(state => {
       if (!(requestId in state.workflowProgress)) return state;
       const workflowProgress = { ...state.workflowProgress };
       delete workflowProgress[requestId];

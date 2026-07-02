@@ -188,7 +188,8 @@ function PopoverBody({
               data-testid="popover-cache-line"
               className="border-t border-border/40 px-3 py-2 text-[10px] text-muted-foreground"
             >
-              ↺ Prompt cache: {formatTokens(latestCacheRead ?? 0, { decimals: 0, upper: true })} read this turn
+              ↺ Prompt cache: {formatTokens(latestCacheRead ?? 0, { decimals: 0, upper: true })}{' '}
+              read this turn
             </div>
           )}
         </>
@@ -208,6 +209,6 @@ function PopoverBody({
         <div className="px-3 py-2.5 text-xs text-destructive">Failed to load context usage.</div>
       )}
     </div>,
-    document.body,
+    document.body
   );
 }

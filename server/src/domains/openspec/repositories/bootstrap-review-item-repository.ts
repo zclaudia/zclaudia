@@ -78,7 +78,15 @@ export class BootstrapReviewItemRepository extends BaseRepository<
     const id = newId();
     return {
       sql: `INSERT INTO bootstrap_review_items (id, scan_id, capability, operation, payload_json, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      params: [id, data.scanId, data.capability, data.operation, data.payloadJson, 'pending', Date.now()],
+      params: [
+        id,
+        data.scanId,
+        data.capability,
+        data.operation,
+        data.payloadJson,
+        'pending',
+        Date.now(),
+      ],
     };
   }
 
@@ -112,15 +120,15 @@ export class BootstrapReviewItemRepository extends BaseRepository<
     const rows = this.db
       .prepare(`SELECT * FROM bootstrap_review_items WHERE scan_id = ? ORDER BY created_at ASC`)
       .all(scanId);
-    return rows.map((r) => this.mapRow(r));
+    return rows.map(r => this.mapRow(r));
   }
 
   listPendingByScan(scanId: string): BootstrapReviewItem[] {
     const rows = this.db
       .prepare(
-        `SELECT * FROM bootstrap_review_items WHERE scan_id = ? AND status = 'pending' ORDER BY created_at ASC`,
+        `SELECT * FROM bootstrap_review_items WHERE scan_id = ? AND status = 'pending' ORDER BY created_at ASC`
       )
       .all(scanId);
-    return rows.map((r) => this.mapRow(r));
+    return rows.map(r => this.mapRow(r));
   }
 }

@@ -1,7 +1,12 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import type { DirectoryBrowseResponse, DirectoryListingResponse, FileContentResponse, FileEntry } from '@zclaudia/shared/files';
+import type {
+  DirectoryBrowseResponse,
+  DirectoryListingResponse,
+  FileContentResponse,
+  FileEntry,
+} from '@zclaudia/shared/files';
 
 const IGNORED_DIRS = new Set([
   'node_modules',
@@ -25,14 +30,67 @@ const IGNORED_DIRS = new Set([
 ]);
 
 const BINARY_EXTENSIONS = new Set([
-  '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.webp', '.svg', '.tiff', '.tif', '.avif',
-  '.mp3', '.mp4', '.wav', '.ogg', '.flac', '.avi', '.mov', '.mkv', '.webm',
-  '.zip', '.tar', '.gz', '.bz2', '.xz', '.7z', '.rar', '.zst',
-  '.exe', '.dll', '.so', '.dylib', '.a', '.o', '.obj', '.bin', '.apk', '.aab', '.ipa', '.deb', '.rpm',
-  '.woff', '.woff2', '.ttf', '.otf', '.eot',
-  '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
-  '.db', '.sqlite', '.sqlite3',
-  '.class', '.pyc', '.pyo', '.wasm', '.DS_Store',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.bmp',
+  '.ico',
+  '.webp',
+  '.svg',
+  '.tiff',
+  '.tif',
+  '.avif',
+  '.mp3',
+  '.mp4',
+  '.wav',
+  '.ogg',
+  '.flac',
+  '.avi',
+  '.mov',
+  '.mkv',
+  '.webm',
+  '.zip',
+  '.tar',
+  '.gz',
+  '.bz2',
+  '.xz',
+  '.7z',
+  '.rar',
+  '.zst',
+  '.exe',
+  '.dll',
+  '.so',
+  '.dylib',
+  '.a',
+  '.o',
+  '.obj',
+  '.bin',
+  '.apk',
+  '.aab',
+  '.ipa',
+  '.deb',
+  '.rpm',
+  '.woff',
+  '.woff2',
+  '.ttf',
+  '.otf',
+  '.eot',
+  '.pdf',
+  '.doc',
+  '.docx',
+  '.xls',
+  '.xlsx',
+  '.ppt',
+  '.pptx',
+  '.db',
+  '.sqlite',
+  '.sqlite3',
+  '.class',
+  '.pyc',
+  '.pyo',
+  '.wasm',
+  '.DS_Store',
 ]);
 
 function isBinaryExtension(fileName: string): boolean {
@@ -61,7 +119,7 @@ function recursiveFileSearch(
   rootDir: string,
   projectRoot: string,
   query: string,
-  maxResults: number,
+  maxResults: number
 ): { entries: FileEntry[]; hasMore: boolean } {
   const entries: FileEntry[] = [];
   let hasMore = false;
@@ -118,7 +176,7 @@ export class FileBrowseError extends Error {
   constructor(
     readonly status: number,
     readonly code: string,
-    message: string,
+    message: string
   ) {
     super(message);
   }
@@ -129,7 +187,7 @@ export class FileBrowseService {
     projectRoot: string | undefined,
     relativePath: string,
     query: string,
-    maxResults: string,
+    maxResults: string
   ): DirectoryListingResponse {
     if (!projectRoot) {
       throw new FileBrowseError(400, 'VALIDATION_ERROR', 'projectRoot is required');
@@ -226,11 +284,12 @@ export class FileBrowseService {
       throw new FileBrowseError(400, 'INVALID_PATH', 'Path is not a directory');
     }
 
-    const directories = fs.readdirSync(base, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .filter((entry) => !entry.name.startsWith('.'))
-      .filter((entry) => !IGNORED_DIRS.has(entry.name))
-      .map((entry) => ({ name: entry.name, path: path.join(base, entry.name) }))
+    const directories = fs
+      .readdirSync(base, { withFileTypes: true })
+      .filter(entry => entry.isDirectory())
+      .filter(entry => !entry.name.startsWith('.'))
+      .filter(entry => !IGNORED_DIRS.has(entry.name))
+      .map(entry => ({ name: entry.name, path: path.join(base, entry.name) }))
       .sort((a, b) => a.name.localeCompare(b.name));
 
     const parent = path.dirname(base);
@@ -243,10 +302,14 @@ export class FileBrowseService {
 
   readFileContent(
     projectRoot: string | undefined,
-    relativePath: string | undefined,
+    relativePath: string | undefined
   ): FileContentResponse {
     if (!projectRoot || !relativePath) {
-      throw new FileBrowseError(400, 'VALIDATION_ERROR', 'projectRoot and relativePath are required');
+      throw new FileBrowseError(
+        400,
+        'VALIDATION_ERROR',
+        'projectRoot and relativePath are required'
+      );
     }
 
     if (!isPathSafe(projectRoot, relativePath)) {

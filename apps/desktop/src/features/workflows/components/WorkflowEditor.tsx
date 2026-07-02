@@ -1,5 +1,15 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { ArrowLeft, Save, PanelLeftClose, PanelLeftOpen, X, ExternalLink, Check, Sparkles, Wrench } from 'lucide-react';
+import {
+  ArrowLeft,
+  Save,
+  PanelLeftClose,
+  PanelLeftOpen,
+  X,
+  ExternalLink,
+  Check,
+  Sparkles,
+  Wrench,
+} from 'lucide-react';
 import type {
   Workflow,
   WorkflowNodeDef,
@@ -46,7 +56,17 @@ function getInitialDefinition(workflow?: Workflow): WorkflowDefinition {
   return normalizeWorkflowDefinition(workflow.definition);
 }
 
-export function WorkflowEditor({ workflow, projectId, onBack, onSaved, standalone, serverUrl, authToken, initialMode, readOnly }: WorkflowEditorProps) {
+export function WorkflowEditor({
+  workflow,
+  projectId,
+  onBack,
+  onSaved,
+  standalone,
+  serverUrl,
+  authToken,
+  initialMode,
+  readOnly,
+}: WorkflowEditorProps) {
   const { createWorkflow, updateWorkflow, loadStepTypes } = useWorkflowStore();
   const projects = useProjectStore(s => s.projects);
   const project = projects.find(p => p.id === projectId);
@@ -58,7 +78,8 @@ export function WorkflowEditor({ workflow, projectId, onBack, onSaved, standalon
   // contract; T4 may wire this through useAgentForSession if needed.
   const llmProfileId = '';
   // Reference `project` and `projects` to preserve the prior signature.
-  void project; void projects;
+  void project;
+  void projects;
 
   useEffect(() => {
     loadStepTypes();
@@ -136,26 +157,28 @@ export function WorkflowEditor({ workflow, projectId, onBack, onSaved, standalon
     }
   }, [selectedNodeId]);
 
-  const updateSelectedEdge = useCallback((edgeId: string, data: Partial<Record<string, unknown>>) => {
-    const editorEl = document.querySelector('[data-graph-editor]');
-    if (editorEl && (editorEl as any).__updateEdgeData) {
-      (editorEl as any).__updateEdgeData(edgeId, data);
-    }
-  }, []);
+  const updateSelectedEdge = useCallback(
+    (edgeId: string, data: Partial<Record<string, unknown>>) => {
+      const editorEl = document.querySelector('[data-graph-editor]');
+      if (editorEl && (editorEl as any).__updateEdgeData) {
+        (editorEl as any).__updateEdgeData(edgeId, data);
+      }
+    },
+    []
+  );
 
-  const handleAIGenerated = useCallback((result: {
-    definition: WorkflowDefinition;
-    name: string;
-    description: string;
-  }) => {
-    setName(result.name);
-    setDescription(result.description);
-    // Replace the graph via the exposed imperative method
-    const editorEl = document.querySelector('[data-graph-editor]');
-    if (editorEl && (editorEl as any).__replaceGraph) {
-      (editorEl as any).__replaceGraph(result.definition.nodes, result.definition.edges);
-    }
-  }, []);
+  const handleAIGenerated = useCallback(
+    (result: { definition: WorkflowDefinition; name: string; description: string }) => {
+      setName(result.name);
+      setDescription(result.description);
+      // Replace the graph via the exposed imperative method
+      const editorEl = document.querySelector('[data-graph-editor]');
+      if (editorEl && (editorEl as any).__replaceGraph) {
+        (editorEl as any).__replaceGraph(result.definition.nodes, result.definition.edges);
+      }
+    },
+    []
+  );
 
   const handleSave = async () => {
     if (!name.trim()) return;
@@ -185,7 +208,12 @@ export function WorkflowEditor({ workflow, projectId, onBack, onSaved, standalon
           const resp = await fetch(`${serverUrl}/api/workflows/${workflowId}`, {
             method: 'PATCH',
             headers,
-            body: JSON.stringify({ name, description: description || undefined, definition, projectId }),
+            body: JSON.stringify({
+              name,
+              description: description || undefined,
+              definition,
+              projectId,
+            }),
           });
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         } else {
@@ -202,9 +230,17 @@ export function WorkflowEditor({ workflow, projectId, onBack, onSaved, standalon
         setTimeout(() => setSaveStatus('idle'), 2000);
       } else {
         if (workflow) {
-          await updateWorkflow(workflow.id, projectId, { name, description: description || undefined, definition });
+          await updateWorkflow(workflow.id, projectId, {
+            name,
+            description: description || undefined,
+            definition,
+          });
         } else {
-          await createWorkflow(projectId, { name, description: description || undefined, definition });
+          await createWorkflow(projectId, {
+            name,
+            description: description || undefined,
+            definition,
+          });
         }
         onSaved();
       }
@@ -260,10 +296,13 @@ export function WorkflowEditor({ workflow, projectId, onBack, onSaved, standalon
       id: selectedFlowEdge.id,
       source: selectedFlowEdge.source,
       target: selectedFlowEdge.target,
-      type: (selectedFlowEdge.data?.edgeType ?? selectedFlowEdge.sourceHandle ?? 'success') as WorkflowEdgeDef['type'],
-      maxIterations: typeof selectedFlowEdge.data?.maxIterations === 'number'
-        ? selectedFlowEdge.data.maxIterations
-        : undefined,
+      type: (selectedFlowEdge.data?.edgeType ??
+        selectedFlowEdge.sourceHandle ??
+        'success') as WorkflowEdgeDef['type'],
+      maxIterations:
+        typeof selectedFlowEdge.data?.maxIterations === 'number'
+          ? selectedFlowEdge.data.maxIterations
+          : undefined,
     };
   };
 
@@ -297,11 +336,14 @@ export function WorkflowEditor({ workflow, projectId, onBack, onSaved, standalon
           </div>
         )}
 
-        <div className={`flex items-center gap-2 px-3 ${standalone ? 'py-2' : 'pb-2'}`} data-tauri-drag-region={standalone}>
+        <div
+          className={`flex items-center gap-2 px-3 ${standalone ? 'py-2' : 'pb-2'}`}
+          data-tauri-drag-region={standalone}
+        >
           <input
             type="text"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={e => setName(e.target.value)}
             placeholder="Workflow name..."
             className="text-sm font-medium bg-transparent border-none outline-none placeholder:text-muted-foreground min-w-0 w-48"
             readOnly={readOnly}
@@ -310,7 +352,7 @@ export function WorkflowEditor({ workflow, projectId, onBack, onSaved, standalon
           <input
             type="text"
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={e => setDescription(e.target.value)}
             placeholder="Description (optional)"
             className="text-xs bg-transparent border-none outline-none text-muted-foreground placeholder:text-muted-foreground/40 flex-1 min-w-0"
             readOnly={readOnly}
@@ -400,7 +442,9 @@ export function WorkflowEditor({ workflow, projectId, onBack, onSaved, standalon
         ) : null}
 
         {/* Center: Graph editor canvas — takes all remaining space */}
-        <div className={`flex-1 min-w-0 flex flex-col ${readOnly ? '[&_.react-flow__node]:!cursor-default [&_.react-flow__handle]:!pointer-events-none' : ''}`}>
+        <div
+          className={`flex-1 min-w-0 flex flex-col ${readOnly ? '[&_.react-flow__node]:!cursor-default [&_.react-flow__handle]:!pointer-events-none' : ''}`}
+        >
           <WorkflowGraphEditor
             initialNodes={initial.nodes}
             initialEdges={initial.edges}
@@ -413,9 +457,13 @@ export function WorkflowEditor({ workflow, projectId, onBack, onSaved, standalon
 
         {/* Right: Config panel — visible for selected node or selected loop edge */}
         {(fullSelectedNode || fullSelectedEdge) && (
-          <div className={`w-72 border-l border-border overflow-y-auto p-3 bg-card/50 shrink-0 ${readOnly ? '[&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none [&_button:not([data-close])]:hidden' : ''}`}>
+          <div
+            className={`w-72 border-l border-border overflow-y-auto p-3 bg-card/50 shrink-0 ${readOnly ? '[&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none [&_button:not([data-close])]:hidden' : ''}`}
+          >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{readOnly ? 'Details' : 'Config'}</span>
+              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                {readOnly ? 'Details' : 'Config'}
+              </span>
               <button
                 data-close
                 onClick={() => {
@@ -444,22 +492,26 @@ export function WorkflowEditor({ workflow, projectId, onBack, onSaved, standalon
                 </div>
                 {fullSelectedEdge.type === 'loop' ? (
                   <div>
-                    <label className="text-xs font-medium text-muted-foreground block mb-1">Max Iterations</label>
+                    <label className="text-xs font-medium text-muted-foreground block mb-1">
+                      Max Iterations
+                    </label>
                     <input
                       type="number"
                       min={1}
                       max={99}
                       value={fullSelectedEdge.maxIterations ?? 3}
-                      onChange={(e) => {
+                      onChange={e => {
                         const nextValue = Number.parseInt(e.target.value, 10);
                         updateSelectedEdge(fullSelectedEdge.id, {
-                          maxIterations: Number.isFinite(nextValue) && nextValue > 0 ? nextValue : 1,
+                          maxIterations:
+                            Number.isFinite(nextValue) && nextValue > 0 ? nextValue : 1,
                         });
                       }}
                       className="w-full px-2.5 py-1.5 text-sm rounded-full border border-border bg-background focus:outline-none focus:border-primary"
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Number of times this loop edge may revisit its target before taking `loop_exhausted`.
+                      Number of times this loop edge may revisit its target before taking
+                      `loop_exhausted`.
                     </p>
                   </div>
                 ) : (

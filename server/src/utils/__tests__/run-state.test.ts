@@ -13,7 +13,9 @@ describe('run-state helpers', () => {
     expect(isForegroundActiveRun({ phase: 'completed', sessionType: 'regular' })).toBe(false);
     expect(isForegroundActiveRun({ phase: 'cancelled', sessionType: 'regular' })).toBe(false);
     expect(isForegroundActiveRun({ phase: 'failed', sessionType: 'regular' })).toBe(false);
-    expect(isForegroundActiveRun({ phase: 'awaiting_permission', sessionType: 'regular' })).toBe(true);
+    expect(isForegroundActiveRun({ phase: 'awaiting_permission', sessionType: 'regular' })).toBe(
+      true
+    );
     expect(isForegroundActiveRun({ phase: 'running', sessionType: 'background' })).toBe(false);
     expect(isForegroundActiveRun({ phase: 'running' })).toBe(true);
   });

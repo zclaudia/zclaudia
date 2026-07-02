@@ -1,4 +1,4 @@
-import { Page, Locator } from '@playwright/test';
+import type { Page, Locator } from '@playwright/test';
 
 /**
  * Page Object Model for Permission dialog
@@ -35,8 +35,12 @@ export class PermissionPage {
     this.permissionMessage = page.locator('[data-testid="permission-dialog"] p').first();
 
     // Form elements
-    this.credentialInput = page.locator('[data-testid="permission-dialog"] input[type="password"]').first();
-    this.rememberCheckbox = page.locator('[data-testid="permission-dialog"] input[type="checkbox"]').first();
+    this.credentialInput = page
+      .locator('[data-testid="permission-dialog"] input[type="password"]')
+      .first();
+    this.rememberCheckbox = page
+      .locator('[data-testid="permission-dialog"] input[type="checkbox"]')
+      .first();
   }
 
   /**
@@ -91,13 +95,13 @@ export class PermissionPage {
    * Get tool name from permission request
    */
   async getToolName(): Promise<string> {
-    return await this.toolName.textContent() || '';
+    return (await this.toolName.textContent()) || '';
   }
 
   /**
    * Get permission message text
    */
   async getPermissionMessage(): Promise<string> {
-    return await this.permissionMessage.textContent() || '';
+    return (await this.permissionMessage.textContent()) || '';
   }
 }
