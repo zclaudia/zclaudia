@@ -3,6 +3,8 @@ import type { LocalPR, LocalPRStatus } from '@zclaudia/shared/features/local-pr'
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import { LocalPRRepository } from './repository.js';
 import { buildConflictResolutionPrompt } from './conflict-resolution-prompt.js';
+import { resolveMergeCommitSha } from './merge-commit.js';
+import { resolveAvailableProviderId } from './provider-resolution.js';
 import { buildReviewPrompt } from './review-prompt.js';
 import { parseReviewVerdict } from './review-verdict.js';
 import { ProjectRepository } from '../projects/repository.js';
@@ -394,11 +396,11 @@ export class LocalPRService {
 
     // Precedence: explicit override > project.reviewLlmProfileId > project agent's LLM > default LLM.
     const agentLlmId = this.resolveAgentLlmIdForProject(pr.projectId);
-    const llmProfileId = this.resolveAvailableProviderId(
+    const llmProfileId = resolveAvailableProviderId(this.llmProfileRepo, [
       overrideProviderId,
       project.reviewLlmProfileId,
-      agentLlmId
-    );
+      agentLlmId,
+    ]);
     if (!llmProfileId) {
       throw new Error(`No provider available for review on project ${pr.projectId}`);
     }
@@ -713,7 +715,10 @@ export class LocalPRService {
     }
     // Precedence: project.reviewLlmProfileId > project agent's LLM > default LLM.
     const agentLlmId = this.resolveAgentLlmIdForProject(pr.projectId);
-    const llmProfileId = this.resolveAvailableProviderId(project.reviewLlmProfileId, agentLlmId);
+    const llmProfileId = resolveAvailableProviderId(this.llmProfileRepo, [
+      project.reviewLlmProfileId,
+      agentLlmId,
+    ]);
     if (!llmProfileId)
       throw new Error(`No provider available for conflict resolution on project ${pr.projectId}`);
     await this.startConflictResolution(prId, llmProfileId);
@@ -754,7 +759,7 @@ export class LocalPRService {
         );
       }
 
-      const mergeCommitSha = await this.resolveMergeCommitSha(pr, projectRoot, execFileAsync);
+      const mergeCommitSha = await resolveMergeCommitSha(pr, projectRoot, execFileAsync);
       if (!mergeCommitSha) {
         throw new Error(`Cannot determine merge commit for PR ${prId}`);
       }
@@ -799,11 +804,11 @@ export class LocalPRService {
 
     // Precedence: explicit override > project.reviewLlmProfileId > project agent's LLM > default LLM.
     const agentLlmId = this.resolveAgentLlmIdForProject(pr.projectId);
-    const llmProfileId = this.resolveAvailableProviderId(
+    const llmProfileId = resolveAvailableProviderId(this.llmProfileRepo, [
       overrideProviderId,
       project.reviewLlmProfileId,
-      agentLlmId
-    );
+      agentLlmId,
+    ]);
     if (!llmProfileId) {
       console.warn(`[LocalPRService] No provider for conflict resolution on PR ${prId}`);
       return;
@@ -1103,21 +1108,6 @@ export class LocalPRService {
     return this.prRepo;
   }
 
-  private resolveAvailableProviderId(...preferredIds: Array<string | undefined>): string | null {
-    const checked = new Set<string>();
-    for (const id of preferredIds) {
-      if (!id || checked.has(id)) continue;
-      checked.add(id);
-      if (this.llmProfileRepo.findById(id)) return id;
-    }
-
-    const defaultProvider = this.llmProfileRepo.findDefault();
-    if (defaultProvider?.id) return defaultProvider.id;
-
-    const providers = this.llmProfileRepo.findAll();
-    return providers[0]?.id ?? null;
-  }
-
   /**
    * Resolve the LLM profile id from the project's default agent. Returns undefined
    * if no agent is available (caller falls through to llm-profile default).
@@ -1145,31 +1135,5 @@ export class LocalPRService {
     } catch {
       return true;
     }
-  }
-
-  private async resolveMergeCommitSha(
-    pr: LocalPR,
-    repoPath: string,
-    execFileAsync: (
-      file: string,
-      args: string[],
-      options: { cwd: string }
-    ) => Promise<{ stdout: string | Buffer }>
-  ): Promise<string | null> {
-    if (pr.mergeCommitSha) return pr.mergeCommitSha;
-    const { stdout } = await execFileAsync(
-      'git',
-      ['log', '--merges', '--format=%H%x1f%s', '-n', '200'],
-      { cwd: repoPath }
-    );
-    const expectedSubject = `Merge Local PR: ${pr.title}`;
-    const output = String(stdout);
-    const row = output
-      .split('\n')
-      .map(line => line.trim())
-      .filter(Boolean)
-      .map(line => line.split('\x1f'))
-      .find(parts => parts[1] === expectedSubject);
-    return row?.[0] ?? null;
   }
 }

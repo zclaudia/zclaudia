@@ -466,7 +466,7 @@
       "evidence": "local-pr/service.ts is 1196 lines and owns creation, review, verdict parsing, merge, revert, conflict resolution, queue processing, stale reset, cleanup, provider resolution, and session cleanup.",
       "recommendation": "Split creation/refresh, review orchestration, merge/revert, conflict resolution, queue scheduler, and cleanup behind the existing API.",
       "status": "partial",
-      "verificationNote": "Review-prompt construction extracted to review-prompt.ts (mirrors conflict-resolution-prompt.ts) with dedicated tests; service.ts 1227->1175 lines. Queue-scheduler / merge / conflict orchestration split deferred (heavily coupled to private service state)."
+      "verificationNote": "Extracted review-prompt (review-prompt.ts), provider fallback (provider-resolution.ts) and merge-commit lookup (merge-commit.ts) into pure, independently-tested modules; service.ts 1227->1140 lines. Queue-scheduler / merge / conflict orchestration remain in the service (they are coupled to ~12 private methods; deferred)."
     },
     {
       "id": "QA-0035",

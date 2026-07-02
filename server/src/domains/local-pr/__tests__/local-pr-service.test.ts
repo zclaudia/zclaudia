@@ -53,6 +53,8 @@ const mockStartAISession = vi.fn((opts: any) => {
 import { LocalPRService } from '../service.js';
 import type { LocalPRAIDeps } from '../service.js';
 import { buildReviewPrompt } from '../review-prompt.js';
+import { resolveMergeCommitSha } from '../merge-commit.js';
+import { resolveAvailableProviderId } from '../provider-resolution.js';
 import { LocalPRRepository } from '../repository.js';
 import type { LocalPR } from '@zclaudia/shared/features/local-pr';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
@@ -899,21 +901,23 @@ describe('LocalPRService', () => {
 
   describe('resolveAvailableProviderId', () => {
     it('returns preferred provider when it exists', () => {
-      const result = (service as any).resolveAvailableProviderId('test-provider');
+      const result = resolveAvailableProviderId((service as any).llmProfileRepo, ['test-provider']);
       expect(result).toBe('test-provider');
     });
 
     it('falls back to default provider', () => {
-      const result = (service as any).resolveAvailableProviderId('nonexistent-provider');
+      const result = resolveAvailableProviderId((service as any).llmProfileRepo, [
+        'nonexistent-provider',
+      ]);
       expect(result).toBe('test-provider'); // default provider
     });
 
     it('skips undefined and duplicate ids', () => {
-      const result = (service as any).resolveAvailableProviderId(
+      const result = resolveAvailableProviderId((service as any).llmProfileRepo, [
         undefined,
         undefined,
-        'test-provider'
-      );
+        'test-provider',
+      ]);
       expect(result).toBe('test-provider');
     });
 
@@ -929,7 +933,9 @@ describe('LocalPRService', () => {
         CREATE TABLE worktree_configs (id TEXT PRIMARY KEY, project_id TEXT, worktree_path TEXT, auto_create_pr INTEGER DEFAULT 0, auto_review INTEGER DEFAULT 0, created_at INTEGER, updated_at INTEGER);
       `);
       const emptyService = new LocalPRService(emptyDb, mockBroadcast, createAIDeps());
-      const result = (emptyService as any).resolveAvailableProviderId('nonexistent');
+      const result = resolveAvailableProviderId((emptyService as any).llmProfileRepo, [
+        'nonexistent',
+      ]);
       expect(result).toBeNull();
       emptyDb.close();
     });
@@ -2190,7 +2196,7 @@ describe('LocalPRService', () => {
         title: 'Test PR',
       } as any;
 
-      const result = await (service as any).resolveMergeCommitSha(pr, '/test/repo', vi.fn());
+      const result = await resolveMergeCommitSha(pr, '/test/repo', vi.fn());
       expect(result).toBe('abc123def');
     });
 
@@ -2204,7 +2210,7 @@ describe('LocalPRService', () => {
         stdout: `aaa111\x1fSome other commit\nbbb222\x1fMerge Local PR: My Feature\nccc333\x1fAnother commit\n`,
       });
 
-      const result = await (service as any).resolveMergeCommitSha(pr, '/test/repo', mockExec);
+      const result = await resolveMergeCommitSha(pr, '/test/repo', mockExec);
       expect(result).toBe('bbb222');
       expect(mockExec).toHaveBeenCalledWith(
         'git',
@@ -2223,7 +2229,7 @@ describe('LocalPRService', () => {
         stdout: `aaa111\x1fSome other commit\n`,
       });
 
-      const result = await (service as any).resolveMergeCommitSha(pr, '/test/repo', mockExec);
+      const result = await resolveMergeCommitSha(pr, '/test/repo', mockExec);
       expect(result).toBeNull();
     });
   });
