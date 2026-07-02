@@ -69,3 +69,9 @@ zclaudia_set_updates_enabled() {
     export UPDATES_ENABLED="${UPDATES_ENABLED:-false}"
   fi
 }
+
+# Strip a leading `v` and any prerelease suffix, yielding the strict MAJOR.MINOR.PATCH
+# that Tauri's config requires. Usage: TAURI_VERSION="$(zclaudia_tauri_semver "$VERSION")"
+zclaudia_tauri_semver() {
+  echo "$1" | sed 's/^v//; s/-.*//'
+}

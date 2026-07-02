@@ -58,7 +58,7 @@ echo "Building Linux desktop app..."
 TAURI_CONFIG_FILE="apps/desktop/src-tauri/tauri.linux.release.generated.json"
 
 # Tauri requires strict semver (MAJOR.MINOR.PATCH) — strip v prefix and prerelease suffixes
-TAURI_VERSION="$(echo "$VERSION" | sed 's/^v//; s/-.*//')"
+TAURI_VERSION="$(zclaudia_tauri_semver "$VERSION")"
 
 cat > "$TAURI_CONFIG_FILE" <<EOF
 {
