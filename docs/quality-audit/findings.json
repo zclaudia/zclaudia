@@ -506,7 +506,8 @@
       "summary": "Selection state is mirrored between projectStore and selectionStore.",
       "evidence": "projectStore defines selectedProjectId, selectedSessionId, and dashboardViews, then synchronizes them with selectionStore through bidirectional subscriptions.",
       "recommendation": "Make selectionStore the single writer for selection state and keep projectStore compatibility reads only during migration.",
-      "status": "open"
+      "status": "open",
+      "verificationNote": "Deferred; executable refactor plan documented in docs/quality-audit/deferred-refactor-plans.md."
     },
     {
       "id": "QA-0038",
@@ -533,7 +534,8 @@
       "summary": "Sync services coordinate too many global stores.",
       "evidence": "sessionSync and facade sync modules coordinate sessions, messages, projects, ownership, run state, recovery, terminal state, and toasts using several global stores and module-level maps/sets.",
       "recommendation": "Introduce typed coordinator effects or reducers for reconciliation and add invariant tests for deletion, reconnect, snapshot replay, and content catch-up.",
-      "status": "open"
+      "status": "open",
+      "verificationNote": "Deferred; executable refactor plan documented in docs/quality-audit/deferred-refactor-plans.md."
     },
     {
       "id": "QA-0040",
@@ -587,7 +589,8 @@
       "summary": "Several UI modules are too large and mix data, validation, state, and rendering.",
       "evidence": "Large UI files include LlmProfileManager.tsx (1663 lines), AgentManager.tsx (1456), MessageInput.tsx (1306), McpServerSettings.tsx (1209), and MessageList.tsx (1165).",
       "recommendation": "Split form reducers, validation/serialization helpers, data loaders, subcomponents, and keyboard/attachment handlers behind tested boundaries.",
-      "status": "open"
+      "status": "open",
+      "verificationNote": "Deferred; executable refactor plan documented in docs/quality-audit/deferred-refactor-plans.md."
     },
     {
       "id": "QA-0044",

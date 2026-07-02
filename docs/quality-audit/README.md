@@ -42,6 +42,8 @@ If a hard gate fails, the batch cannot be considered healthy until the failure i
 
 Structured findings live in [findings.json](findings.json). Use it as the source of truth for the final optimization plan.
 
+Large, high-risk architectural refactors that were deferred rather than executed inline have executable plans in [deferred-refactor-plans.md](deferred-refactor-plans.md) (QA-0037, QA-0039, QA-0043).
+
 Recommended final prioritization:
 
 1. Fix blocker findings that prevent reliable gates.
