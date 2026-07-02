@@ -28,6 +28,7 @@ export const ICONS = [
 
 // Every visible fill/stroke hex in the chosen set → glyph slot.
 // transformSvg throws on any hex missing here (uppercase lookup).
+// Slot names must match the glyph-* keys in ../tokens/config.mjs.
 export const COLOR_MAP = {
   // grays (incl. dark secondary tones in two-tone icons: vue, dart, scala, svg)
   '#64748B': 'gray', '#71717A': 'gray', '#52525B': 'gray',
