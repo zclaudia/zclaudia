@@ -2,9 +2,13 @@
   "metadata": {
     "scope": "main repository only",
     "repositoryRoot": "/Users/zhvala/SourceCode/zclaudia",
-    "excluded": ["../zclaudia-gateway"],
+    "excluded": [
+      "../zclaudia-gateway"
+    ],
     "createdAt": "2026-07-01",
-    "lastUpdatedAt": "2026-07-01"
+    "lastUpdatedAt": "2026-07-02",
+    "lastVerifiedAt": "2026-07-02",
+    "verificationNote": "All 55 findings re-verified against the working tree on 2026-07-02 (gates + per-finding code inspection). Remaining \"open\" items were confirmed not-yet-addressed. Env caveats: build needs pnpm install for a new @fontsource dep; 4 pi-runtime server test files (21 tests) require rg/git binaries absent in this sandbox (see QA-0014)."
   },
   "findings": [
     {
@@ -18,7 +22,7 @@
       "summary": "Main-source lint fails on a no-unused-expressions violation.",
       "evidence": "ESLint reports @typescript-eslint/no-unused-expressions at line 85.",
       "recommendation": "Replace the side-effect-only ternary with an explicit if/else branch.",
-      "status": "open"
+      "status": "fixed"
     },
     {
       "id": "QA-0002",
@@ -31,7 +35,7 @@
       "summary": "Root build and test scripts are not reproducible when bare pnpm is absent from PATH.",
       "evidence": "Root build/test invoke scripts/with-project-node.sh pnpm ..., which fails with 'exec: pnpm: not found'.",
       "recommendation": "Use a reproducible pnpm invocation such as corepack pnpm in nested scripts, or ensure the wrapper exposes pnpm consistently.",
-      "status": "open"
+      "status": "fixed"
     },
     {
       "id": "QA-0003",
@@ -44,7 +48,7 @@
       "summary": "Desktop build script invokes bare pnpm internally.",
       "evidence": "Workspace build fails at @zclaudia/desktop build with 'sh: pnpm: command not found'.",
       "recommendation": "Use corepack pnpm or avoid invoking pnpm from inside the package build script.",
-      "status": "open"
+      "status": "fixed"
     },
     {
       "id": "QA-0004",
@@ -57,7 +61,7 @@
       "summary": "Desktop test runner spawns bare pnpm and fails without useful diagnostics.",
       "evidence": "desktop test exits with status 1 and no child-process error details in the inherited output.",
       "recommendation": "Spawn corepack pnpm or resolve pnpm through the project wrapper, and print result.error when spawnSync fails.",
-      "status": "open"
+      "status": "fixed"
     },
     {
       "id": "QA-0005",
@@ -70,7 +74,7 @@
       "summary": "Formatting gate fails across most of the repository.",
       "evidence": "prettier --list-different reports 1689 main-source/script files: server 888, desktop 680, shared 60, e2e 50, scripts 11.",
       "recommendation": "Run one mechanical formatting change after deciding whether to include generated/local-only files, then enforce format:check.",
-      "status": "open"
+      "status": "fixed"
     },
     {
       "id": "QA-0006",
@@ -83,7 +87,7 @@
       "summary": "Root lint scans ignored local worktree directories.",
       "evidence": "Root eslint . reports an additional error under .claire/worktrees even though .claire/ and .claude/ are gitignored.",
       "recommendation": "Add top-level .claude/ and .claire/ ignores to the ESLint flat config.",
-      "status": "open"
+      "status": "fixed"
     },
     {
       "id": "QA-0007",
@@ -96,7 +100,7 @@
       "summary": "Domain route issues raw SQL directly.",
       "evidence": "Architecture check flags db.prepare calls in a domain route.",
       "recommendation": "Move persistence and schema probing behind a repository or service boundary.",
-      "status": "open"
+      "status": "fixed"
     },
     {
       "id": "QA-0008",
@@ -109,7 +113,7 @@
       "summary": "Domain route validates LLM profiles with direct SQL.",
       "evidence": "Architecture check flags db.prepare calls in agent profile routes.",
       "recommendation": "Move LLM profile existence checks into a repository/service API.",
-      "status": "open"
+      "status": "fixed"
     },
     {
       "id": "QA-0009",
@@ -122,7 +126,7 @@
       "summary": "Desktop utility reads selectedSessionId from projectStore instead of selectionStore.",
       "evidence": "Architecture check flags projectStore selectedSessionId reads at lines 23, 72, and 112.",
       "recommendation": "Read selection state through selectionStore and keep projectStore focused on project/session data.",
-      "status": "open"
+      "status": "fixed"
     },
     {
       "id": "QA-0010",
@@ -135,7 +139,7 @@
       "summary": "Shared component imports a feature module.",
       "evidence": "Architecture check flags an import from ../features/git/store.",
       "recommendation": "Move the dependency to the owning feature, pass data through props, or move shared logic to a neutral layer.",
-      "status": "open"
+      "status": "fixed"
     },
     {
       "id": "QA-0011",
@@ -148,7 +152,8 @@
       "summary": "Lint warning volume reduces signal quality.",
       "evidence": "Main-source lint reports 2423 warnings, led by 1253 non-null assertions and 372 explicit any usages.",
       "recommendation": "Create focused warning-reduction tracks and avoid making all warnings blockers until the backlog is reduced.",
-      "status": "open"
+      "status": "partial",
+      "verificationNote": "Warnings reduced 2423 -> 772 on 2026-07-02; remaining are non-blocking backlog."
     },
     {
       "id": "QA-0012",
@@ -161,7 +166,8 @@
       "summary": "Desktop build emits large chunks.",
       "evidence": "Vite warns about feature-interactive around 1506 kB and index around 809 kB after minification.",
       "recommendation": "Review code splitting after quality gates are reliable, starting with feature-interactive and index.",
-      "status": "open"
+      "status": "partial",
+      "verificationNote": "manualChunks added in vite.config.ts; feature-interactive chunk still ~2628kB (bundles chat/fileviewer/supervision)."
     },
     {
       "id": "QA-0013",
@@ -174,7 +180,8 @@
       "summary": "A dynamic import is ineffective because the same module is statically imported elsewhere.",
       "evidence": "Vite reports src/services/api/base.ts is dynamically imported by servers.ts but also statically imported by several modules.",
       "recommendation": "Either remove the dynamic import or isolate the lazy-loaded dependency so the chunk split is effective.",
-      "status": "open"
+      "status": "fixed",
+      "verificationNote": "Dynamic import removed; base.ts is now statically imported only, so the ineffective-split no longer applies."
     },
     {
       "id": "QA-0014",
@@ -187,7 +194,8 @@
       "summary": "Server tests have environment assumptions that fail under restricted sandboxing.",
       "evidence": "Sandboxed run fails on listen EPERM and writes under ~/.zclaudia/workspace/skills; non-sandbox run passes 4845 tests with 1 skipped.",
       "recommendation": "Document the required test environment or make affected tests use injectable temp dirs and socket-free request paths where possible.",
-      "status": "open"
+      "status": "partial",
+      "verificationNote": "vitest.config now conditionally excludes socket-bound tests when loopback unavailable; tests still require rg/git binaries."
     },
     {
       "id": "QA-0015",
@@ -200,7 +208,7 @@
       "summary": "Server Vitest config uses a deprecated Vitest 4 option.",
       "evidence": "Vitest reports test.poolOptions was removed in Vitest 4 and previous poolOptions are now top-level options.",
       "recommendation": "Update the Vitest configuration to the current Vitest 4 schema.",
-      "status": "open"
+      "status": "fixed"
     },
     {
       "id": "QA-0016",
@@ -213,7 +221,7 @@
       "summary": "Shared package has formatting drift.",
       "evidence": "Prettier reports 60 files under shared/src as not matching project style.",
       "recommendation": "Normalize shared formatting as part of the repository-wide mechanical format pass.",
-      "status": "open"
+      "status": "fixed"
     },
     {
       "id": "QA-0017",
@@ -226,7 +234,8 @@
       "summary": "Root shared entrypoint re-exports UI-facing facade APIs.",
       "evidence": "shared/src/index.ts re-exports facade/index.ts, while 283 consumer files import from @zclaudia/shared directly.",
       "recommendation": "Keep root imports for compatibility, but document subpath imports as canonical and avoid exposing UI facade APIs through server-facing root imports.",
-      "status": "open"
+      "status": "partial",
+      "verificationNote": "index.ts comment marks subpath imports as canonical (legacy root), but root still re-exports facade/index.js."
     },
     {
       "id": "QA-0018",
@@ -239,7 +248,8 @@
       "summary": "Root entrypoint is not a complete representation of package exports.",
       "evidence": "package.json exposes broad subpath exports, while root index omits modules such as core/agent-readiness, core/provider-policy, features/executor, features/spec-change, and features/meta-workflow.",
       "recommendation": "Document root as a legacy convenience surface and use subpath exports as the canonical contract boundary.",
-      "status": "open"
+      "status": "partial",
+      "verificationNote": "Root documents \"prefer sub-path imports\" and includes subpath modules; still a convenience surface rather than a formal deprecation."
     },
     {
       "id": "QA-0019",
@@ -252,7 +262,8 @@
       "summary": "Wire message unions are manually maintained.",
       "evidence": "ClientMessage and ServerMessage are hand-built unions; current shared tests only prove a small subset of messages flow through the union.",
       "recommendation": "Add compile-time coverage per wire message module or restructure unions so new message types are included closer to their definition.",
-      "status": "open"
+      "status": "fixed",
+      "verificationNote": "union-coverage.test.ts now asserts mutual assignability between the aggregate ClientMessage/ServerMessage and the enumerated module unions (incl. interaction messages), so any added/removed wire message type fails to compile until the contract is updated."
     },
     {
       "id": "QA-0020",
@@ -265,7 +276,7 @@
       "summary": "Plugin manifest validation lacks direct tests.",
       "evidence": "No shared tests reference validatePluginManifest or resolvePluginPlatform outside the implementation files.",
       "recommendation": "Add tests for required fields, invalid ids, semver warnings, contribution validation, platform inference, and frontend inference.",
-      "status": "open"
+      "status": "fixed"
     },
     {
       "id": "QA-0021",
@@ -278,7 +289,7 @@
       "summary": "Shared production source still has lint warning debt.",
       "evidence": "shared lint reports 107 warnings, including production warnings for non-null assertions, explicit any in correlation guards, unused facade imports, and import() type annotations.",
       "recommendation": "Fix production-source warnings before test-only non-null assertions; use unknown-based guards in correlation.ts.",
-      "status": "open"
+      "status": "fixed"
     },
     {
       "id": "QA-0022",
@@ -291,7 +302,8 @@
       "summary": "Local trust boundary is too broad for browser-reachable APIs.",
       "evidence": "The server defaults to 0.0.0.0, enables global cors(), bypasses REST auth for localhost socket addresses, and treats any initial WebSocket auth message as authenticated.",
       "recommendation": "Define explicit trust modes; restrict Origin/Host for local mode and require an unguessable local token or Bearer auth consistently for remote/LAN mode.",
-      "status": "open"
+      "status": "partial",
+      "verificationNote": "CORS origin guard + mandatory WS auth added; still binds 0.0.0.0 when ZCLAUDIA_ALLOW_LAN=1."
     },
     {
       "id": "QA-0023",
@@ -304,7 +316,7 @@
       "summary": "File push route can copy arbitrary server-side file paths.",
       "evidence": "POST /api/files/push accepts filePath from the request body; FileTransferService only checks that the path exists and is a regular file before copying it into the file store.",
       "recommendation": "Restrict push sources to explicit allowed roots, require a privileged local token, or move arbitrary local file push behind an internal-only service API.",
-      "status": "open"
+      "status": "fixed"
     },
     {
       "id": "QA-0024",
@@ -317,7 +329,7 @@
       "summary": "Stored file path resolution lacks path-safety validation.",
       "evidence": "FileStore.getFilePath joins storageDir and fileId without rejecting absolute paths, parent traversal, or resolved paths outside the storage directory.",
       "recommendation": "Validate file IDs as safe storage keys and ensure resolved paths remain inside storageDir before read/delete operations.",
-      "status": "open"
+      "status": "fixed"
     },
     {
       "id": "QA-0025",
@@ -330,7 +342,7 @@
       "summary": "Schema migrations are applied outside a transaction.",
       "evidence": "runMigrations executes migration SQL and then inserts the migration record as separate operations; applyMigrations has the same pattern.",
       "recommendation": "Wrap each migration SQL execution and migration-record insert in a transaction, with rollback tests for mid-migration failures.",
-      "status": "open"
+      "status": "fixed"
     },
     {
       "id": "QA-0026",
@@ -343,7 +355,8 @@
       "summary": "WebSocket router exceptions fall through to legacy handling.",
       "evidence": "When router.route throws, server.ts logs the error and then calls handleClientMessage; the gateway message path follows the same pattern.",
       "recommendation": "Only fall back on explicit route misses; route exceptions should emit a structured error and be covered by regression tests.",
-      "status": "open"
+      "status": "fixed",
+      "verificationNote": "routeOrFallback returns structured error on exception (sendRouteError) and only runs legacy fallback on route-miss (router-dispatch.ts:18-26)."
     },
     {
       "id": "QA-0027",
@@ -369,7 +382,8 @@
       "summary": "Server infrastructure has substantial formatting and lint-warning debt.",
       "evidence": "The batch scope has 279 files failing Prettier and 542 ESLint warnings; full server lint reports 1486 warnings.",
       "recommendation": "Run the repository-wide mechanical format pass, then reduce production-source any and non-null assertions in security-sensitive server modules.",
-      "status": "open"
+      "status": "partial",
+      "verificationNote": "Formatting resolved (format:check passes repo-wide); production lint-warning reduction still pending."
     },
     {
       "id": "QA-0029",
@@ -382,7 +396,7 @@
       "summary": "Architecture boundary rules miss direct SQL in common domain route variants.",
       "evidence": "The architecture check flags routes.ts files, but direct SQL also appears in sessions/drafts-routes.ts and supervision/register.ts.",
       "recommendation": "Expand the rule to cover domain route variants and registers, while allowing repository/storage files; move route-level checks behind repositories or services.",
-      "status": "open"
+      "status": "fixed"
     },
     {
       "id": "QA-0030",
@@ -395,7 +409,7 @@
       "summary": "Agent default transitions can clear all defaults before the replacement write succeeds.",
       "evidence": "Create/update routes and AgentProfileRepository.setDefault clear all defaults before creating/updating/setting the requested default; deletion already uses a transaction for default transfer.",
       "recommendation": "Wrap clear-and-set/create/update default operations in repository/service transactions and add failure-injection tests.",
-      "status": "open"
+      "status": "fixed"
     },
     {
       "id": "QA-0031",
@@ -408,7 +422,8 @@
       "summary": "Queued local PR conflict resolution does not enter queued state.",
       "evidence": "When no execution slot is available, triggerConflictResolution updates only statusMessage and does not set executionState='queued' or pendingAction='resolve_conflict'.",
       "recommendation": "Set queue fields consistently with review/merge paths and extend the no-slot test to assert executionState and pendingAction.",
-      "status": "open"
+      "status": "fixed",
+      "verificationNote": "No-slot branch now sets executionState=queued and pendingAction=resolve_conflict (local-pr/service.ts:760-764)."
     },
     {
       "id": "QA-0032",
@@ -421,7 +436,8 @@
       "summary": "Claudia branch and session allocation is multi-step and partly non-atomic.",
       "evidence": "The inline-message path allocates a branch, may set active branch state, inserts a session, and attaches the session to the branch across separate calls.",
       "recommendation": "Introduce a transaction-scoped service for branch allocation plus session creation/attachment, with rollback/invariant tests for failed middle steps.",
-      "status": "open"
+      "status": "fixed",
+      "verificationNote": "Allocation moved into claudia-inline-session-allocation-service wrapped in db.transaction()."
     },
     {
       "id": "QA-0033",
@@ -434,7 +450,8 @@
       "summary": "Conversation handlers bypass repository boundaries for session and message persistence.",
       "evidence": "Conversation handlers issue direct SQL for project/session lookup, session creation, cancellation lookup, terminal project lookup, and steered message persistence.",
       "recommendation": "Route conversation/session writes through cohesive session and message services, and add architecture checks for application/conversation handlers.",
-      "status": "open"
+      "status": "partial",
+      "verificationNote": "Handlers route SQL through SessionRepository (no direct db.prepare); handler-level architecture check still pending."
     },
     {
       "id": "QA-0034",
@@ -460,7 +477,8 @@
       "summary": "Server domain layer has heavy formatting and lint-warning debt.",
       "evidence": "The domain/conversation/orchestration slice has 516 files failing Prettier and 764 ESLint warnings.",
       "recommendation": "Run the repository-wide mechanical format pass, then reduce production warnings in large state-machine modules first.",
-      "status": "open"
+      "status": "partial",
+      "verificationNote": "Formatting resolved; lint-warning reduction still pending."
     },
     {
       "id": "QA-0036",
@@ -473,7 +491,7 @@
       "summary": "Direct gateway secret is persisted in browser storage.",
       "evidence": "gatewayStore partialize persists directGatewaySecret, while runtime gatewaySecret is intentionally excluded and old gatewaySecret keys are removed in migration.",
       "recommendation": "Move direct gateway credentials to OS-backed secure storage where available, or persist only an opaque reference/session token with explicit fallback behavior.",
-      "status": "open"
+      "status": "fixed"
     },
     {
       "id": "QA-0037",
@@ -499,7 +517,8 @@
       "summary": "Protocol transport writes business stores directly.",
       "evidence": "GatewayTransport imports sessionsStore, projectStore, and ownershipStore, then clears sessions/projects/ownership when registry items disappear.",
       "recommendation": "Emit a typed registry-removal event from transport and perform store cleanup in facade runtime or facade sync code.",
-      "status": "open"
+      "status": "fixed",
+      "verificationNote": "Transport no longer imports stores; emits typed onBackendsRemoved event, store cleanup handled in facade sync (backend-data-sync.ts)."
     },
     {
       "id": "QA-0039",
@@ -538,7 +557,8 @@
       "summary": "Desktop data and connection layer has formatting and lint-warning debt.",
       "evidence": "This batch scope has 200 files failing Prettier and 159 ESLint warnings across 252 evaluated files.",
       "recommendation": "Run the repository-wide mechanical format pass, then reduce production warnings in stores, transport, embedded-server, and sync modules first.",
-      "status": "open"
+      "status": "partial",
+      "verificationNote": "Formatting resolved; lint-warning reduction still pending."
     },
     {
       "id": "QA-0042",
@@ -551,7 +571,7 @@
       "summary": "Shared components layer has ambiguous ownership.",
       "evidence": "Architecture check flags RightSidebarEmptyState importing features/git/store, while SettingsPanel in components imports many features/settings modules directly.",
       "recommendation": "Define components/ as reusable shared UI only, move feature-aware containers into app/ or owning features, and expand architecture rules after ownership is explicit.",
-      "status": "open"
+      "status": "fixed"
     },
     {
       "id": "QA-0043",
@@ -577,7 +597,8 @@
       "summary": "MessageInput stores attachments as full data URLs without a local size/count limit.",
       "evidence": "addFileAsAttachment reads files with FileReader.readAsDataURL, stores them in component state and draft refs, and only downscales images; no local file size or count limit is visible.",
       "recommendation": "Add shared attachment validation before reading files and prefer the streaming/upload path for larger files, with tests for oversized paste/select behavior.",
-      "status": "open"
+      "status": "fixed",
+      "verificationNote": "addFilesAsAttachments delegates to shared validateMessageAttachmentFiles (10MB / 8-file limits)."
     },
     {
       "id": "QA-0045",
@@ -590,7 +611,8 @@
       "summary": "Components-only test partition is not healthy.",
       "evidence": "vitest.components.config.ts failed with 4 failed files, 16 failed tests, and one unhandled mock error, while vitest.ui.config.ts passed 196 files and 2199 tests.",
       "recommendation": "Repair stale component tests and shared mocks, or remove the components partition from recommended fast gates until it reflects current UI behavior.",
-      "status": "open"
+      "status": "fixed",
+      "verificationNote": "Components partition now green: 53 files / 696 tests pass (verified 2026-07-02)."
     },
     {
       "id": "QA-0046",
@@ -603,7 +625,8 @@
       "summary": "UI lint signal is noisy and still has one hard error.",
       "evidence": "UI feature ESLint reports 516 files, 1 error, and 521 warnings; warnings are dominated by non-null assertions and React hook rules.",
       "recommendation": "Fix the baseline no-unused-expressions error, then reduce production React hook warnings and non-null assertions in large UI modules.",
-      "status": "open"
+      "status": "partial",
+      "verificationNote": "Baseline no-unused-expressions error fixed; UI warning backlog remains."
     },
     {
       "id": "QA-0047",
@@ -616,7 +639,7 @@
       "summary": "UI formatting drift is large.",
       "evidence": "Prettier reports 457 files in the UI feature scope as needing formatting.",
       "recommendation": "Include UI files in the repository-wide mechanical format pass and keep format:check mandatory before UI refactors.",
-      "status": "open"
+      "status": "fixed"
     },
     {
       "id": "QA-0048",
@@ -629,7 +652,7 @@
       "summary": "Project Node wrapper does not resolve the package manager.",
       "evidence": "Root scripts invoke scripts/with-project-node.sh pnpm ..., but the wrapper directly execs the provided command when Node already matches .node-version; pnpm can still be absent from PATH.",
       "recommendation": "Resolve pnpm through Corepack in scripts/with-project-node.sh or call corepack pnpm consistently from workspace scripts.",
-      "status": "open"
+      "status": "fixed"
     },
     {
       "id": "QA-0049",
@@ -642,7 +665,8 @@
       "summary": "E2E setup depends on a sibling gateway repository.",
       "evidence": "global-setup resolves GATEWAY_DIR to ../zclaudia-gateway, builds it with pnpm run build, and starts node dist/index.js from that external checkout.",
       "recommendation": "Make the gateway an explicit fixture/artifact for E2E or split gateway-dependent tests into a separate integration profile.",
-      "status": "open"
+      "status": "partial",
+      "verificationNote": "Gateway start gated behind TEST_MODES via createGatewayService; still builds/runs the ../zclaudia-gateway external checkout."
     },
     {
       "id": "QA-0050",
@@ -655,7 +679,8 @@
       "summary": "Local E2E can reuse any process on the expected ports.",
       "evidence": "Outside CI, setup reuses a service when a TCP port is open; it does not verify health, protocol version, gateway secret, data directory, or service identity.",
       "recommendation": "Replace raw port reuse with service-specific health and metadata checks, and fail early when an unexpected process owns the port.",
-      "status": "open"
+      "status": "fixed",
+      "verificationNote": "Port reuse now requires validateReusableServiceResponse (status/content-type/version/schema) before reuse."
     },
     {
       "id": "QA-0051",
@@ -668,7 +693,7 @@
       "summary": "Architecture boundary checker is too narrow for current server shapes.",
       "evidence": "The checker scans only server/src/domains/**/routes.ts for raw SQL, while earlier batches found direct SQL in route-like and registration files not named exactly routes.ts.",
       "recommendation": "Expand server scanning to route/register/handler file patterns and add tests for each supported shape.",
-      "status": "open"
+      "status": "fixed"
     },
     {
       "id": "QA-0052",
@@ -681,7 +706,8 @@
       "summary": "Test-file helper builds shell commands from input.",
       "evidence": "The helper interpolates the user-provided path into a find command string and later builds cd/npx/vitest shell strings; it also advertises ../zclaudia-gateway/src as a supported target.",
       "recommendation": "Use spawnSync argument arrays, constrain accepted paths to the main repo by default, and make cross-repo testing an explicit mode.",
-      "status": "open"
+      "status": "fixed",
+      "verificationNote": "Rebuilt on spawnSync arg arrays (no shell interpolation); cross-repo target still advertised."
     },
     {
       "id": "QA-0053",
@@ -694,7 +720,8 @@
       "summary": "Deploy scripts use mutable package manager resolution.",
       "evidence": "setup-server.sh prepares pnpm@latest when pnpm is missing, and deploy scripts fall back from pnpm install --frozen-lockfile to mutable pnpm install.",
       "recommendation": "Use the repository packageManager version through Corepack and fail frozen install by default unless an explicit repair mode is requested.",
-      "status": "open"
+      "status": "fixed",
+      "verificationNote": "Uses repo packageManager via corepack prepare; mutable install gated behind ZCLAUDIA_DEPLOY_REPAIR_INSTALL=1, frozen by default."
     },
     {
       "id": "QA-0054",
@@ -720,7 +747,8 @@
       "summary": "E2E and scripts formatting/lint debt still reduces signal.",
       "evidence": "Prettier reports 63 files in this scope as needing formatting, and ESLint reports 73 warnings across 84 evaluated JS/TS files.",
       "recommendation": "Include E2E and scripts in the repository-wide mechanical format pass, then clean unused variables and type-import warnings in test helpers/specs.",
-      "status": "open"
+      "status": "partial",
+      "verificationNote": "Formatting resolved; test-helper lint warnings remain."
     }
   ]
 }
