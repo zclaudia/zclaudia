@@ -23,8 +23,14 @@ status file rows) is sans.
 ## 3. One icon language
 
 lucide-react, `strokeWidth={1.75}`, monochrome in chrome (`text-muted-foreground`
-unless conveying status). No colored file-type icon libraries, no hand-rolled
-inline `<svg>` where a lucide equivalent exists, no emoji-as-icon.
+unless conveying status). No hand-rolled inline `<svg>` where a lucide
+equivalent exists, no emoji-as-icon.
+
+**The one sanctioned exception:** file-type glyphs rendered by
+`src/components/filesymbols/` (vendored Symbols artwork, regenerated via
+`gen:symbols`). Their colors must come exclusively from the `--glyph-*`
+tokens — never status tokens, never raw hex. Folders, chevrons, and every
+other chrome icon stay monochrome lucide.
 
 ## 4. One row language
 
