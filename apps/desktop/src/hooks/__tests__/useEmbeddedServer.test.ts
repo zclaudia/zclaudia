@@ -683,6 +683,20 @@ describe('hooks/useEmbeddedServer', () => {
       expect(mockSpawnFn).toHaveBeenCalled();
     });
 
+    it('registers the spawned PID to establish the single-server lease', async () => {
+      mockTauriInternals();
+      mockFetch.mockRejectedValue(new Error('Not running'));
+
+      renderHook(() => useEmbeddedServer());
+
+      await act(async () => {
+        await vi.runAllTimersAsync();
+        await Promise.resolve();
+      });
+
+      expect(mockInvoke).toHaveBeenCalledWith('register_dev_server_pid', { pid: 12345 });
+    });
+
     it('kills spawned process and reports error when PID registration fails', async () => {
       mockTauriInternals();
       mockFetch.mockRejectedValue(new Error('Not running'));

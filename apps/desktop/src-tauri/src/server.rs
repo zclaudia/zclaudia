@@ -623,6 +623,11 @@ pub async fn stop_server() -> Result<(), String> {
 /// doesn't have a Child handle — only the PID, which we kill via libc::kill.
 #[tauri::command]
 pub fn register_dev_server_pid(pid: u32) {
+    // Single-lease semantics: evict any previously-registered dev server that is still
+    // alive before taking the new PID. Repeated spawns (HMR reloads, StrictMode
+    // remounts) would otherwise overwrite the stored PID and orphan the old process
+    // until the machine reboots, since the exit hook only kills the last-registered PID.
+    kill_dev_server();
     eprintln!("[EmbeddedServer/Rust] Registered dev server pid={}", pid);
     if let Ok(mut guard) = DEV_SERVER_PID.lock() {
         *guard = Some(pid);

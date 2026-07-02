@@ -546,7 +546,8 @@
       "summary": "Dev embedded server lifecycle can leave orphan processes.",
       "evidence": "Dev cleanup intentionally does not kill the spawned server to avoid StrictMode races, while PID registration failure is only logged.",
       "recommendation": "Add a dev-process registry or lease with explicit cleanup on restart and tests for PID-registration failure and stale-process reuse.",
-      "status": "open"
+      "status": "fixed",
+      "verificationNote": "JS lease behaviour complete + tested (register on spawn, kill+throw on registration failure, health-check reuse, unmount cleanup). Added single-lease eviction in Rust register_dev_server_pid (kills a still-alive predecessor PID before storing the new one) so HMR/StrictMode respawns no longer orphan processes until reboot. NOTE: Rust change not compile-verified in this env (no cargo toolchain); verify in a Tauri build."
     },
     {
       "id": "QA-0041",
