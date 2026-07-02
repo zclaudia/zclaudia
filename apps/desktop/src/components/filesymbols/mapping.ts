@@ -105,8 +105,7 @@ const EXTENSIONS: Record<string, SymbolName> = {
 export function symbolNameForFile(name: string): SymbolName {
   const lower = name.toLowerCase();
 
-  const exact = BASENAMES[lower];
-  if (exact) return exact;
+  if (Object.hasOwn(BASENAMES, lower)) return BASENAMES[lower];
 
   for (const [prefix, symbol] of PREFIXES) {
     if (lower.startsWith(prefix)) return symbol;
@@ -117,7 +116,7 @@ export function symbolNameForFile(name: string): SymbolName {
 
   const dot = lower.lastIndexOf('.');
   const ext = dot > 0 ? lower.slice(dot + 1) : '';
-  return EXTENSIONS[ext] ?? 'document';
+  return Object.hasOwn(EXTENSIONS, ext) ? EXTENSIONS[ext] : 'document';
 }
 
 export function symbolMarkupForFile(name: string): string {

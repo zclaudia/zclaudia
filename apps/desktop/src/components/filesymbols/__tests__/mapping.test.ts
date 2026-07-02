@@ -38,6 +38,7 @@ describe('symbolNameForFile', () => {
     ['tauri.conf.json', 'tauri'],
     ['CLAUDE.md', 'claude'],
     ['Dockerfile', 'docker'],
+    ['Dockerfile.dev', 'docker'], // prefix looseness is intentional
     ['docker-compose.yml', 'docker'],
     ['Makefile', 'code-gray'],
     ['LICENSE', 'license'],
@@ -57,6 +58,7 @@ describe('symbolNameForFile', () => {
     ['.env.local', 'gear'],
     // generic dotfile / config fallback
     ['.syncignore', 'gear'],
+    ['.dockerignore', 'gear'], // does not start with "dockerfile"; falls to dotfile rule
     ['playwright.config.ts', 'gear'],
     // docs & assets
     ['notes.txt', 'text'],
@@ -73,6 +75,7 @@ describe('symbolNameForFile', () => {
     // fallback
     ['unknown.xyz', 'document'],
     ['no-extension', 'document'],
+    ['constructor', 'document'], // prototype-chain hardening
   ])('%s → %s', (name, expected) => {
     expect(symbolNameForFile(name)).toBe(expected);
   });
