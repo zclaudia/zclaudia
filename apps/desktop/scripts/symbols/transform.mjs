@@ -1,7 +1,8 @@
 // Rewrites vscode-symbols SVG paint colors into theme glyph tokens.
 // SVG presentation attributes don't support var(), so mapped colors move
 // into an inline style attribute. defs/mask/clipPath blocks pass through
-// untouched — white/black/#D9D9D9 there are mask-luminance infrastructure.
+// untouched — paints there (white/black/#D9D9D9, even stray strokes) are
+// mask-luminance infrastructure, so the leftover scan skips those blocks.
 const PASSTHROUGH = new Set(['none', 'currentColor']);
 
 const DEFS_BLOCK = /(<(?:defs|mask|clipPath)[\s\S]*?<\/(?:defs|mask|clipPath)>)/g;
@@ -13,7 +14,7 @@ function transformVisible(name, segment, colorMap) {
   if (/(?:fill|stroke)="(?:white|black)"/.test(segment)) {
     throw new Error(`${name}: visible white/black paint needs an explicit mapping decision`);
   }
-  return segment.replace(/<(\w+)((?:\s+[\w:-]+="[^"]*")*)\s*(\/?)>/g, (tag, el, attrs, selfClose) => {
+  const out = segment.replace(/<(\w+)((?:\s+[\w:-]+="[^"]*")*)\s*(\/?)>/g, (tag, el, attrs, selfClose) => {
     const decls = [];
     const rest = attrs.replace(/\s(fill|stroke)="(#[0-9A-Fa-f]{6})"/g, (_m, prop, hex) => {
       const slot = colorMap[hex.toUpperCase()];
@@ -22,23 +23,28 @@ function transformVisible(name, segment, colorMap) {
       return '';
     });
     if (decls.length === 0) return tag;
+    if (/\sstyle="/.test(rest)) {
+      throw new Error(`${name}: element already has a style attribute`);
+    }
     return `<${el}${rest} style="${decls.join(';')}"${selfClose ? '/' : ''}>`;
   });
-}
 
-export function transformSvg(name, svg, colorMap) {
-  const out = svg
-    .split(DEFS_BLOCK)
-    .map((part, i) => (i % 2 === 1 ? part : transformVisible(name, part, colorMap)))
-    .join('')
-    .replace(/<svg[^>]*>/, root => root.replace(/\s(?:width|height|xmlns)="[^"]*"/g, ''))
-    .replace(/\n\s*/g, '');
-
-  const leftover = [...out.matchAll(/(?:fill|stroke)="([^"]+)"/g)]
+  // Quote-agnostic so single-quoted paint can't slip past the tag regex above.
+  const leftover = [...out.matchAll(/(?:fill|stroke)=["']([^"']+)["']/g)]
     .map(m => m[1])
-    .filter(v => !PASSTHROUGH.has(v) && !/^(?:white|black|#D9D9D9|url\(#)/.test(v));
+    .filter(v => !PASSTHROUGH.has(v));
   if (leftover.length > 0) {
     throw new Error(`${name}: unhandled paint value(s): ${[...new Set(leftover)].join(', ')}`);
   }
   return out;
+}
+
+export function transformSvg(name, svg, colorMap) {
+  return svg
+    .split(DEFS_BLOCK)
+    .map((part, i) => (i % 2 === 1 ? part : transformVisible(name, part, colorMap)))
+    .join('')
+    .replace(/<svg[^>]*>/, root => root.replace(/\s(?:width|height|xmlns)="[^"]*"/g, ''))
+    // upstream SVGs are one element per line; collapsing newlines cannot fuse attributes
+    .replace(/\n\s*/g, '');
 }
