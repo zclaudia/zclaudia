@@ -57,7 +57,6 @@ export function ModeSelector({
         title={title}
         ariaHasPopup="listbox"
         ariaExpanded={open}
-        className="gap-1.5 px-2"
       >
         {locked ? <Lock size={14} strokeWidth={1.75} /> : null}
         <span>{current.label}</span>
