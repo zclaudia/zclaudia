@@ -3,6 +3,7 @@ import type { LocalPR, LocalPRStatus } from '@zclaudia/shared/features/local-pr'
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import { LocalPRRepository } from './repository.js';
 import { buildConflictResolutionPrompt } from './conflict-resolution-prompt.js';
+import { buildReviewPrompt } from './review-prompt.js';
 import { parseReviewVerdict } from './review-verdict.js';
 import { ProjectRepository } from '../projects/repository.js';
 import { LlmProfileRepository } from '../llm-profiles/repository.js';
@@ -12,7 +13,7 @@ import { resolveAgentForSession, NoAgentAvailableError } from '../agent-profiles
 import type { LocalPRAiSessionPort } from './ports.js';
 import { WorktreeConfigRepository } from '../../infra/repositories/worktree-config.js';
 import { Mutex } from 'async-mutex';
-import { mkdir, rm, writeFile } from 'fs/promises';
+import { rm } from 'fs/promises';
 import path from 'path';
 import {
   getGitStatus,
@@ -33,8 +34,6 @@ const STALE_TIMEOUT_MS = 30 * 60 * 1000;
 
 // Maximum number of merged/closed PRs to keep per project
 const MAX_FINISHED_PRS_PER_PROJECT = 10;
-const INLINE_DIFF_MAX_CHARS = 12000;
-const DIFF_PREVIEW_CHARS = 3000;
 const LOCAL_PR_SESSION_STREAM_MESSAGE_TYPES = new Set<ServerMessage['type']>([
   'run_started',
   'delta',
@@ -442,7 +441,7 @@ export class LocalPRService {
     this.broadcastToProject(pr.projectId, { type: 'sessions_created', session });
     this.broadcastPRUpdate(this.requirePR(prId));
 
-    const reviewPrompt = await this.buildReviewPrompt(pr);
+    const reviewPrompt = await buildReviewPrompt(pr);
     this.activeReviewIds.add(prId);
 
     this.requireAiDeps().startAISession({
@@ -463,57 +462,6 @@ export class LocalPRService {
     });
 
     console.log(`[LocalPRService] Started review session ${session.id} for PR ${prId}`);
-  }
-
-  private async buildReviewPrompt(pr: LocalPR): Promise<string> {
-    const diff = pr.diffSummary ?? '(no diff available)';
-    let diffSection: string;
-
-    if (diff.length <= INLINE_DIFF_MAX_CHARS) {
-      diffSection = `## Diff
-\`\`\`diff
-${diff}
-\`\`\``;
-    } else {
-      const relPath = path.join('.zclaudia', 'local-pr-review', `${pr.id}.diff.patch`);
-      const absPath = path.join(pr.worktreePath, relPath);
-      try {
-        await mkdir(path.dirname(absPath), { recursive: true });
-        await writeFile(absPath, diff, 'utf8');
-        diffSection = `## Diff
-Diff is too large to inline (${diff.length} chars). Read it from:
-\`${relPath}\`
-
-Preview:
-\`\`\`diff
-${diff.slice(0, DIFF_PREVIEW_CHARS)}
-\n... [truncated preview]
-\`\`\``;
-      } catch {
-        diffSection = `## Diff
-\`\`\`diff
-${diff.slice(0, INLINE_DIFF_MAX_CHARS)}
-\n... [truncated]
-\`\`\``;
-      }
-    }
-
-    return `You are a code reviewer. Your job is to review the following diff, fix any issues directly in the files, commit your fixes, and output a review verdict.
-
-## Branch
-\`${pr.branchName}\` → \`${pr.baseBranch}\`
-
-${diffSection}
-
-## Instructions
-1. Review the diff for bugs, security issues, code quality problems, or missing error handling.
-2. If you find issues, fix them directly in the files in the working directory.
-3. After fixing, commit your changes with: git add -A && git commit -m "fix: review fixes for ${pr.branchName}"
-4. At the end of your response, output ONE of:
-   - [REVIEW_PASSED] — if no issues found (or all issues were fixed)
-   - [REVIEW_FAILED] — only if you found critical issues you could NOT fix
-
-Be thorough but pragmatic. Minor style issues do not warrant REVIEW_FAILED.`;
   }
 
   private async onReviewSessionComplete(

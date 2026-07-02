@@ -465,7 +465,8 @@
       "summary": "LocalPRService is too broad for a git-mutating workflow service.",
       "evidence": "local-pr/service.ts is 1196 lines and owns creation, review, verdict parsing, merge, revert, conflict resolution, queue processing, stale reset, cleanup, provider resolution, and session cleanup.",
       "recommendation": "Split creation/refresh, review orchestration, merge/revert, conflict resolution, queue scheduler, and cleanup behind the existing API.",
-      "status": "open"
+      "status": "partial",
+      "verificationNote": "Review-prompt construction extracted to review-prompt.ts (mirrors conflict-resolution-prompt.ts) with dedicated tests; service.ts 1227->1175 lines. Queue-scheduler / merge / conflict orchestration split deferred (heavily coupled to private service state)."
     },
     {
       "id": "QA-0035",

@@ -52,6 +52,7 @@ const mockStartAISession = vi.fn((opts: any) => {
 
 import { LocalPRService } from '../service.js';
 import type { LocalPRAIDeps } from '../service.js';
+import { buildReviewPrompt } from '../review-prompt.js';
 import { LocalPRRepository } from '../repository.js';
 import type { LocalPR } from '@zclaudia/shared/features/local-pr';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
@@ -1380,7 +1381,7 @@ describe('LocalPRService', () => {
         baseBranch: 'main',
       });
 
-      const prompt = await (service as any).buildReviewPrompt(pr);
+      const prompt = await buildReviewPrompt(pr);
       expect(prompt).toContain('short diff content');
       expect(prompt).toContain('feat-x');
       expect(prompt).toContain('[REVIEW_PASSED]');
@@ -1397,7 +1398,7 @@ describe('LocalPRService', () => {
       db.prepare('UPDATE local_prs SET diff_summary = NULL WHERE id = ?').run(pr.id);
       const prUpdated = service.getRepo().findById(pr.id)!;
 
-      const prompt = await (service as any).buildReviewPrompt(prUpdated);
+      const prompt = await buildReviewPrompt(prUpdated);
       expect(prompt).toContain('(no diff available)');
     });
   });
