@@ -14,20 +14,23 @@ function transformVisible(name, segment, colorMap) {
   if (/(?:fill|stroke)="(?:white|black)"/.test(segment)) {
     throw new Error(`${name}: visible white/black paint needs an explicit mapping decision`);
   }
-  const out = segment.replace(/<(\w+)((?:\s+[\w:-]+="[^"]*")*)\s*(\/?)>/g, (tag, el, attrs, selfClose) => {
-    const decls = [];
-    const rest = attrs.replace(/\s(fill|stroke)="(#[0-9A-Fa-f]{6})"/g, (_m, prop, hex) => {
-      const slot = colorMap[hex.toUpperCase()];
-      if (!slot) throw new Error(`${name}: unmapped color ${hex}`);
-      decls.push(`${prop}:hsl(var(--glyph-${slot}))`);
-      return '';
-    });
-    if (decls.length === 0) return tag;
-    if (/\sstyle="/.test(rest)) {
-      throw new Error(`${name}: element already has a style attribute`);
+  const out = segment.replace(
+    /<(\w+)((?:\s+[\w:-]+="[^"]*")*)\s*(\/?)>/g,
+    (tag, el, attrs, selfClose) => {
+      const decls = [];
+      const rest = attrs.replace(/\s(fill|stroke)="(#[0-9A-Fa-f]{6})"/g, (_m, prop, hex) => {
+        const slot = colorMap[hex.toUpperCase()];
+        if (!slot) throw new Error(`${name}: unmapped color ${hex}`);
+        decls.push(`${prop}:hsl(var(--glyph-${slot}))`);
+        return '';
+      });
+      if (decls.length === 0) return tag;
+      if (/\sstyle="/.test(rest)) {
+        throw new Error(`${name}: element already has a style attribute`);
+      }
+      return `<${el}${rest} style="${decls.join(';')}"${selfClose ? '/' : ''}>`;
     }
-    return `<${el}${rest} style="${decls.join(';')}"${selfClose ? '/' : ''}>`;
-  });
+  );
 
   // Quote-agnostic so single-quoted paint can't slip past the tag regex above.
   const leftover = [...out.matchAll(/(?:fill|stroke)=["']([^"']+)["']/g)]
@@ -40,11 +43,13 @@ function transformVisible(name, segment, colorMap) {
 }
 
 export function transformSvg(name, svg, colorMap) {
-  return svg
-    .split(DEFS_BLOCK)
-    .map((part, i) => (i % 2 === 1 ? part : transformVisible(name, part, colorMap)))
-    .join('')
-    .replace(/<svg[^>]*>/, root => root.replace(/\s(?:width|height|xmlns)="[^"]*"/g, ''))
-    // upstream SVGs are one element per line; collapsing newlines cannot fuse attributes
-    .replace(/\r?\n\s*/g, '');
+  return (
+    svg
+      .split(DEFS_BLOCK)
+      .map((part, i) => (i % 2 === 1 ? part : transformVisible(name, part, colorMap)))
+      .join('')
+      .replace(/<svg[^>]*>/, root => root.replace(/\s(?:width|height|xmlns)="[^"]*"/g, ''))
+      // upstream SVGs are one element per line; collapsing newlines cannot fuse attributes
+      .replace(/\r?\n\s*/g, '')
+  );
 }
