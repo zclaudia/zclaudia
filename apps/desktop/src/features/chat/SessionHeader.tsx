@@ -186,7 +186,7 @@ export function SessionHeader({
       )}
       {currentSession.type !== 'background' && chipText && (
         <span
-          className="hidden min-w-0 shrink items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-[11px] leading-none text-primary sm:inline-flex"
+          className="hidden min-w-0 shrink items-center gap-1 rounded-md bg-muted/60 px-2 py-0.5 text-[11px] leading-none text-muted-foreground sm:inline-flex"
           title={firstUserText ?? undefined}
         >
           <MessageSquare size={11} className="shrink-0" />

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Lock } from 'lucide-react';
 import type { ProviderCapabilities } from '@zclaudia/shared/core/runtime-capabilities';
+import { SelectorTrigger } from './SelectorTrigger';
 
 interface ModeSelectorProps {
   capabilities: ProviderCapabilities;
@@ -48,25 +49,20 @@ export function ModeSelector({
 
   return (
     <div ref={ref} className="relative inline-block">
-      <button
-        type="button"
-        onClick={() => {
-          if (!isDisabled) setOpen(o => !o);
-        }}
-        disabled={isDisabled}
+      <SelectorTrigger
+        onClick={() => setOpen(o => !o)}
+        disabled={disabled}
+        locked={locked}
+        lockReason={lockReason}
         title={title}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        className={[
-          'inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium h-7 transition-colors',
-          'bg-accent text-accent-foreground hover:bg-accent/80',
-          isDisabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer',
-        ].join(' ')}
+        ariaHasPopup="listbox"
+        ariaExpanded={open}
+        className="gap-1.5 px-2"
       >
         {locked ? <Lock size={14} strokeWidth={1.75} /> : null}
         <span>{current.label}</span>
         <ChevronDown size={12} />
-      </button>
+      </SelectorTrigger>
       {open && !isDisabled && (
         <div
           role="listbox"

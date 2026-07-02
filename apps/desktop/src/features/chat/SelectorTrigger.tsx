@@ -7,6 +7,8 @@ interface SelectorTriggerProps {
   lockReason?: string;
   title?: string;
   ariaLabel?: string;
+  ariaHasPopup?: 'listbox' | 'menu';
+  ariaExpanded?: boolean;
   className?: string;
   children: ReactNode;
 }
@@ -18,6 +20,8 @@ export function SelectorTrigger({
   lockReason,
   title,
   ariaLabel,
+  ariaHasPopup,
+  ariaExpanded,
   className = '',
   children,
 }: SelectorTriggerProps) {
@@ -36,6 +40,8 @@ export function SelectorTrigger({
       disabled={effectiveDisabled}
       title={effectiveTitle}
       aria-label={ariaLabel}
+      aria-haspopup={ariaHasPopup}
+      aria-expanded={ariaExpanded}
       className={[
         'flex min-w-0 items-center gap-1 px-1.5 py-1 rounded-md text-[11px] font-medium transition-colors h-7',
         stateClass,
