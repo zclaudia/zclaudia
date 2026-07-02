@@ -1,7 +1,7 @@
 # UI Conventions — Chrome Disciplines
 
 Five rules for all persistent chrome (sidebar, headers, composer, right-panel tools).
-The Lineage panel (`src/features/lineage/`) is the in-repo reference implementation.
+The Lineage panel (`apps/desktop/src/features/lineage/`) is the in-repo reference implementation.
 
 ## 1. Color is semantics only
 
@@ -28,7 +28,7 @@ inline `<svg>` where a lucide equivalent exists, no emoji-as-icon.
 
 ## 4. One row language
 
-- List rows: `h-7 px-2 text-sm rounded-md`, hover `hover:bg-secondary hover:text-foreground`.
+- List rows: `h-7 px-2 text-sm rounded-md`, hover `hover:bg-secondary hover:text-foreground`. Applies to file-tree-style navigation lists; other chrome rows adopt the label/token rules without a mandatory row-height change.
 - Section labels: `text-[11px] font-medium text-muted-foreground`, sentence case —
   never `uppercase` + `tracking-*`.
 - Muted micro-text uses exactly two opacity steps: `text-muted-foreground` and
@@ -37,7 +37,7 @@ inline `<svg>` where a lucide equivalent exists, no emoji-as-icon.
 ## 5. One accent per control row
 
 In any toolbar or control row, at most one element may be solid/colored (the
-primary action). All siblings are ghost (see `src/features/chat/SelectorTrigger.tsx`).
+primary action). All siblings are ghost (see `apps/desktop/src/features/chat/SelectorTrigger.tsx`).
 Exceptions that keep their semantic color: elevated-permission warning state,
 destructive hover, locked (amber) state.
 
