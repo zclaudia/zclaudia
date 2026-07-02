@@ -737,7 +737,8 @@
       "summary": "Platform build scripts are large and duplicative.",
       "evidence": "android.sh is 573 lines and macos.sh is 557 lines, with repeated environment setup, Node manager handling, package install/build, signing, cleanup, and artifact verification logic.",
       "recommendation": "Extract shared bootstrap/version/signing/artifact helpers into smaller scripts or a typed build orchestrator, leaving thin platform wrappers.",
-      "status": "open"
+      "status": "partial",
+      "verificationNote": "Shared zclaudia_resolve_version + zclaudia_set_updates_enabled added to common.sh; adopted by linux.sh (now also sourcing common.sh for node/rustup setup) and macos.sh. Verified via bash -n + CI-mode and local-mode smoke tests. android.sh version block left intact (Gradle-specific VERSION_CODE formula + INSTALL_ONLY guards; not build-verifiable here). Signing/artifact-verification extraction still pending."
     },
     {
       "id": "QA-0055",

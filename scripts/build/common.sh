@@ -42,3 +42,30 @@ zclaudia_require_commands() {
     fi
   done
 }
+
+# Resolves the release VERSION and BUILD for a platform.
+# In CI (RELEASE_VERSION + RELEASE_BUILD set by the workflow) those are used as-is.
+# Locally it derives a dev version from the latest release tag via version-bump.sh,
+# eval'd into the current shell so it can export VERSION/BUILD/VERSION_CODE. Callers
+# remain responsible for any platform-specific derivation (e.g. VERSION_CODE, MAJOR).
+zclaudia_resolve_version() {
+  local platform="$1"
+  echo "=== Version check ==="
+  if [ -n "${RELEASE_VERSION:-}" ] && [ -n "${RELEASE_BUILD:-}" ]; then
+    VERSION="$RELEASE_VERSION"
+    BUILD="$RELEASE_BUILD"
+    echo "Using CI-provided version: $VERSION (build $BUILD)"
+  else
+    echo "Local build → deriving dev version from latest release tag"
+    eval "$(./scripts/release/version-bump.sh --platform "$platform" --dev-suffix)"
+  fi
+}
+
+# Enables updater artifacts only for real CI releases (RELEASE_VERSION + RELEASE_BUILD),
+# defaulting to false for local/dev builds unless explicitly overridden.
+zclaudia_set_updates_enabled() {
+  export UPDATES_ENABLED="${UPDATES_ENABLED:-${RELEASE_VERSION:+true}}"
+  if [ -z "${RELEASE_VERSION:-}" ] || [ -z "${RELEASE_BUILD:-}" ]; then
+    export UPDATES_ENABLED="${UPDATES_ENABLED:-false}"
+  fi
+}

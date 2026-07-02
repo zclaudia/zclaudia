@@ -4,12 +4,13 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-# --- Preflight checks ---
-export PATH="$HOME/.cargo/bin:$PATH"
+# shellcheck source=scripts/build/common.sh
+source "$(dirname "$0")/common.sh"
 
-# Ensure Node.js is available (fnm / nvm) and matches .node-version
-if command -v fnm >/dev/null 2>&1; then eval "$(fnm env --use-on-cd)"; fnm use --silent-if-unchanged 2>/dev/null || true; fi
-if command -v nvm >/dev/null 2>&1; then nvm use 2>/dev/null || true; fi
+# --- Preflight checks ---
+# Prefer rustup-managed toolchain, then ensure Node matches .node-version.
+zclaudia_prefer_rustup
+zclaudia_setup_node
 
 for cmd in rustup pnpm; do
   command -v "$cmd" >/dev/null || { echo "ERROR: $cmd not found"; exit 1; }
@@ -29,27 +30,13 @@ fi
 RELEASE_REMOTE="${RELEASE_REMOTE:-origin}"
 
 # --- Version selection ---
-# In CI (RELEASE_VERSION + RELEASE_BUILD set by workflow), use those directly.
-# Locally, always build a dev version from the latest release tag without
-# advancing the next release number.
-echo "=== Version check ==="
-
+zclaudia_resolve_version linux
 if [ -n "${RELEASE_VERSION:-}" ] && [ -n "${RELEASE_BUILD:-}" ]; then
-  # CI mode: use workflow-provided version
-  VERSION="$RELEASE_VERSION"
-  BUILD="$RELEASE_BUILD"
   VERSION_CODE="${RELEASE_VERSION_CODE:-0}"
   MAJOR=$(echo "$VERSION" | cut -d. -f1)
   MINOR=$(echo "$VERSION" | cut -d. -f2)
-  echo "Using CI-provided version: $VERSION (build $BUILD)"
-else
-  echo "Local build → deriving dev version from latest release tag"
-  eval "$(./scripts/release/version-bump.sh --platform linux --dev-suffix)"
 fi
-export UPDATES_ENABLED="${UPDATES_ENABLED:-${RELEASE_VERSION:+true}}"
-if [ -z "${RELEASE_VERSION:-}" ] || [ -z "${RELEASE_BUILD:-}" ]; then
-  export UPDATES_ENABLED="${UPDATES_ENABLED:-false}"
-fi
+zclaudia_set_updates_enabled
 echo ""
 
 # --- Install / update dependencies ---

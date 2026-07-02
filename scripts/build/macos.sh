@@ -250,20 +250,9 @@ fi
 echo "Release target: ${GITHUB_REPOSITORY:-$RELEASE_REMOTE} → $RELEASE_REPO"
 
 # --- Version selection ---
-# In CI (RELEASE_VERSION + RELEASE_BUILD set by workflow), use those directly.
-# Locally, always build a dev version from the latest release tag without
-# advancing the next release number.
-echo "=== Version check ==="
-
+zclaudia_resolve_version macos
 if [ -n "${RELEASE_VERSION:-}" ] && [ -n "${RELEASE_BUILD:-}" ]; then
-  # CI mode: use workflow-provided version
-  VERSION="$RELEASE_VERSION"
-  BUILD="$RELEASE_BUILD"
   VERSION_CODE="${RELEASE_VERSION_CODE:-0}"
-  echo "Using CI-provided version: $VERSION (build $BUILD)"
-else
-  echo "Local build → deriving dev version from latest release tag"
-  eval "$(./scripts/release/version-bump.sh --platform macos --dev-suffix)"
 fi
 
 # Derive major/minor from VERSION for both CI and local dev builds.
@@ -271,10 +260,7 @@ VERSION_CORE="$(echo "$VERSION" | sed 's/^v//; s/-.*//')"
 MAJOR="$(echo "$VERSION_CORE" | cut -d. -f1)"
 MINOR="$(echo "$VERSION_CORE" | cut -d. -f2)"
 
-export UPDATES_ENABLED="${UPDATES_ENABLED:-${RELEASE_VERSION:+true}}"
-if [ -z "${RELEASE_VERSION:-}" ] || [ -z "${RELEASE_BUILD:-}" ]; then
-  export UPDATES_ENABLED="${UPDATES_ENABLED:-false}"
-fi
+zclaudia_set_updates_enabled
 
 ARCH=$(uname -m)
 # Map uname -m to Tauri platform identifier
