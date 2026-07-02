@@ -1,6 +1,14 @@
 import { cleanup, render, screen } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 import { MarkdownChildrenWithInlineIcons } from '../InlineMarkdownIcons';
+
+function getCssRule(selector: string) {
+  const css = readFileSync('src/styles/index.css', 'utf8');
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = css.match(new RegExp(`${escapedSelector}\\s*\\{(?<body>[^}]+)\\}`));
+  return match?.groups?.body ?? '';
+}
 
 describe('MarkdownChildrenWithInlineIcons', () => {
   afterEach(() => {
@@ -52,6 +60,34 @@ describe('MarkdownChildrenWithInlineIcons', () => {
     render(<MarkdownChildrenWithInlineIcons>{'plain 😀'}</MarkdownChildrenWithInlineIcons>);
     expect(screen.queryByRole('img', { name: 'Grinning face' })).not.toBeInTheDocument();
     expect(screen.getByRole('img', { name: '😀' })).toBeInTheDocument();
+  });
+
+  it('centers fallback emoji on the surrounding text line', () => {
+    const rule = getCssRule('.inline-markdown-emoji');
+    expect(rule).toContain('vertical-align: middle;');
+    expect(rule).not.toContain('vertical-align: -0.125em;');
+  });
+
+  it('renders numeric keycap emoji as app-native centered chips', () => {
+    render(<MarkdownChildrenWithInlineIcons>{'1️⃣ `tool`'}</MarkdownChildrenWithInlineIcons>);
+
+    const keycap = screen.getByRole('img', { name: '1️⃣' });
+    expect(keycap).toHaveClass('inline-markdown-keycap');
+    expect(keycap).toHaveTextContent('1');
+    expect(keycap).not.toHaveTextContent('1️⃣');
+
+    const rule = getCssRule('.inline-markdown-keycap');
+    expect(rule).toContain('height: 1.375em;');
+    expect(rule).toContain('align-items: center;');
+    expect(rule).toContain('vertical-align: 0.04em;');
+  });
+
+  it('centers lucide-backed emoji icons on the surrounding text line', () => {
+    render(<MarkdownChildrenWithInlineIcons>{'2 ✅ done'}</MarkdownChildrenWithInlineIcons>);
+
+    const icon = screen.getByRole('img', { name: 'Completed' });
+    expect(icon).toHaveClass('align-middle');
+    expect(icon.getAttribute('class')).not.toContain('align-[-0.125em]');
   });
 
   it('wraps common service/tool emoji without adding them to the lucide map', () => {

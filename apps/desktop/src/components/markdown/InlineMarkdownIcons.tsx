@@ -198,12 +198,22 @@ const INLINE_MARKDOWN_EMOJI_PATTERN = INLINE_MARKDOWN_ICON_PATTERN
   : EMOJI_FALLBACK_PATTERN;
 const INLINE_MARKDOWN_ICON_REGEX = new RegExp(INLINE_MARKDOWN_EMOJI_PATTERN, 'gu');
 const INLINE_MARKDOWN_ICON_TEST_REGEX = new RegExp(INLINE_MARKDOWN_EMOJI_PATTERN, 'u');
+const KEYCAP_SYMBOL_REGEX = /^([0-9#*])\uFE0F?\u20E3$/u;
 
 export function hasInlineMarkdownIcon(text: string): boolean {
   return INLINE_MARKDOWN_ICON_TEST_REGEX.test(text);
 }
 
 function InlineMarkdownIcon({ symbol }: { symbol: string }) {
+  const keycapMatch = KEYCAP_SYMBOL_REGEX.exec(symbol);
+  if (keycapMatch) {
+    return (
+      <span aria-label={symbol} role="img" className="inline-markdown-keycap">
+        {keycapMatch[1]}
+      </span>
+    );
+  }
+
   const definition = INLINE_MARKDOWN_ICONS[symbol];
   if (!definition) {
     return (
@@ -218,7 +228,7 @@ function InlineMarkdownIcon({ symbol }: { symbol: string }) {
     <Icon
       aria-label={label}
       role="img"
-      className={`inline-block h-[1em] w-[1em] align-[-0.125em] ${className}`}
+      className={`inline-block h-[1em] w-[1em] align-middle ${className}`}
       fill={filled ? 'currentColor' : 'none'}
       strokeWidth={filled ? 1.75 : 2}
     />
