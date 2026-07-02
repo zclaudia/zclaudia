@@ -28,6 +28,7 @@ const VALID_THEMES: Theme[] = [
   'system',
 ];
 
+// Exact hslToRgb conversions of each theme's generated --background; dark-neutral and dark-warm round to the same hex at 8.5% lightness.
 const THEME_META_COLORS: Record<ResolvedTheme, string> = {
   light: '#f9f8f5',
   'light-cool': '#f6f7f8',
