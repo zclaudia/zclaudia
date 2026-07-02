@@ -191,7 +191,7 @@ export function ChangesPanel({ projectId, projectRoot }: ChangesPanelProps) {
                   )}
                   <span>Turns ({visibleTurns.length})</span>
                   {hiddenCount > 0 && (
-                    <span className="font-normal text-muted-foreground/70">
+                    <span className="font-normal text-muted-foreground/60">
                       · {hiddenCount} empty hidden
                     </span>
                   )}

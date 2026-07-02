@@ -180,7 +180,7 @@ function SectionShell({
       <div className="px-1 text-[11px] font-medium text-muted-foreground flex items-center gap-1">
         <span>Summary</span>
         {hasContent && summaryTimestamp && (
-          <span className="font-normal text-muted-foreground/70">
+          <span className="font-normal text-muted-foreground/60">
             · generated {timeAgo(summaryTimestamp)}
           </span>
         )}
