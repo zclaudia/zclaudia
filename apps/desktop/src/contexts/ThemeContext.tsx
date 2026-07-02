@@ -29,11 +29,11 @@ const VALID_THEMES: Theme[] = [
 ];
 
 const THEME_META_COLORS: Record<ResolvedTheme, string> = {
-  light: '#f9f7f2',
-  'light-cool': '#f6f7f9',
-  'dark-neutral': '#171514',
-  'dark-warm': '#161413',
-  'dark-cool': '#131519',
+  light: '#f9f8f5',
+  'light-cool': '#f6f7f8',
+  'dark-neutral': '#171614',
+  'dark-warm': '#171614',
+  'dark-cool': '#131418',
 };
 
 function getSystemTheme(): ResolvedTheme {
