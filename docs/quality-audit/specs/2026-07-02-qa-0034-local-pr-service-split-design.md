@@ -51,13 +51,19 @@ instance and passes it to every stage. It bundles the state and leaf helpers eve
 - **Shared mutable state:** `mergeLock` (Mutex), `activeReviewIds`, `activeConflictIds`.
 - **Leaf helpers** (moved verbatim): `requirePR`, `requireAiDeps`, `broadcastPRUpdate`,
   `hasAvailableSlot`, `deleteRelatedSessions`, `forwardSessionStream`,
-  `resolveAgentLlmIdForProject`.
+  `resolveAgentLlmIdForProject`, `archiveRelatedSessions`.
+- **Shared refresh ops** (moved verbatim): `maybeRefreshPR`, `refreshAfterBusyState`. Placed here
+  rather than in the creation stage because call-site analysis shows they are invoked by review,
+  merge, conflict, and the scheduler, yet only touch repos + git utils + `broadcastPRUpdate` (no
+  stage callbacks) — so they are genuinely shared, and hosting them here avoids four stages
+  depending on the creation module. `archiveRelatedSessions` is here for the same reason (called by
+  routes + the merge/close flow).
 
 ### ② Four stage collaborators (each holds the context)
 
 | New module | Class | Methods moved from `service.ts` |
 | --- | --- | --- |
-| `creation.ts` | `PRCreationService` | `checkCreatePreconditions`, `createPR`, `maybeAutoCreatePR`, `maybeAutoCreatePRForCompletedSession`, `maybeRefreshPR`, `refreshAfterBusyState`, `archiveRelatedSessions` |
+| `creation.ts` | `PRCreationService` | `checkCreatePreconditions`, `createPR`, `maybeAutoCreatePR`, `maybeAutoCreatePRForCompletedSession` |
 | `review.ts` | `PRReviewService` | `startReview`, `onReviewSessionComplete`, `cleanupReviewArtifacts` |
 | `merge.ts` | `PRMergeService` | `mergePR`, `cancelMerge`, `reopenPR`, `revertMergedPR` |
 | `conflict.ts` | `PRConflictService` | `triggerConflictResolution`, `startConflictResolution`, `onConflictSessionComplete` |
@@ -65,7 +71,8 @@ instance and passes it to every stage. It bundles the state and leaf helpers eve
 ### ③ `PRQueueScheduler` — the one cross-stage orchestrator
 
 New `scheduler.ts` exporting `class PRQueueScheduler` holding the context + references to the
-creation / review / merge stages. Methods moved: `tick`, `processQueue`, `processFailed`,
+creation / review / merge / conflict stages (`processQueue` dispatches into all four). Methods
+moved: `tick`, `processQueue`, `processFailed`,
 `processStale`, `processPendingReviews`, `processPendingMerges`, `cleanupFinishedPRs`.
 
 ### ④ `LocalPRService` becomes a facade
@@ -74,19 +81,26 @@ creation / review / merge stages. Methods moved: `tick`, `processQueue`, `proces
 references, and delegates each of its existing public methods to the owning collaborator. Public
 signatures unchanged. `getRepo()` stays on the facade.
 
-### Cross-stage edges (construction order resolves the cycle)
+### Cross-stage edges (call-site analysis)
+
+Once the shared refresh ops live on the context, only two real edges remain between stages:
 
 ```
-scheduler ──▶ creation, review, merge, conflict
-review    ──▶ merge      (auto-merge after an approved review)
-merge     ──▶ conflict   (merge conflict triggers resolution)
+scheduler ──▶ creation, review, merge, conflict   (processQueue / processPending* dispatch)
+merge     ──▶ conflict                            (a merge conflict triggers resolution)
 ```
 
-Construct in dependency order (conflict → merge → review → creation → scheduler). For any
-remaining cycle (e.g. review↔merge, or a stage calling back into another), use a
-post-construction wiring step (`stage.wire({ merge, conflict })`) rather than passing half-built
-objects into constructors. Cross-stage calls that today are direct `this.method(...)` become
-`this.merge.mergePR(...)` etc.
+There is **no** review→merge edge: `this.mergePR(...)` is only ever called from the scheduler
+(`processQueue`, `processPendingMerges`), never from review completion. Everything else that
+looked cross-stage (`refreshAfterBusyState`, `broadcastPRUpdate`, `requirePR`, …) is now a context
+call.
+
+Construct in dependency order: `conflict` first, then `merge` (takes `conflict`), then `creation`
+and `review` (no stage deps), then `scheduler` (takes creation/review/merge/conflict). No cycle
+remains, so plain constructor injection suffices — no post-construction wiring step needed.
+Cross-stage calls that today are direct `this.method(...)` become `this.conflict.startConflictResolution(...)`
+(inside merge) and `this.review.startReview(...)` / `this.merge.mergePR(...)` /
+`this.creation.*` / `this.conflict.*` (inside the scheduler).
 
 ## Execution plan (one stage per commit)
 
