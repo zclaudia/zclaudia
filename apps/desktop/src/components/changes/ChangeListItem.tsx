@@ -46,7 +46,7 @@ export function ChangeListItem({ entry, projectRoot, expanded, onToggle }: Chang
             <ChevronRight className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
           )}
           <FileText className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-          <span className="text-xs font-mono truncate flex-1 min-w-0">{entry.path}</span>
+          <span className="text-xs truncate flex-1 min-w-0">{entry.path}</span>
         </button>
         <div className="text-[10px] text-muted-foreground flex items-center gap-1 flex-shrink-0">
           {toolChips.map(chip => (

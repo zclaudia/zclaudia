@@ -15,7 +15,7 @@ export function FragmentDiffBlock({ fragment, index, filePath }: FragmentDiffBlo
   if (fragment.kind === 'edit') {
     return (
       <div className="space-y-1">
-        <div className="text-[10px] font-mono text-muted-foreground flex items-center gap-2">
+        <div className="text-[10px] text-muted-foreground flex items-center gap-2">
           <span>{index})</span>
           <span>{fragment.toolName}</span>
           {fragment.replaceAll && (
@@ -43,7 +43,7 @@ export function FragmentDiffBlock({ fragment, index, filePath }: FragmentDiffBlo
 
   return (
     <div className="space-y-1">
-      <div className="text-[10px] font-mono text-muted-foreground flex items-center gap-2">
+      <div className="text-[10px] text-muted-foreground flex items-center gap-2">
         <span>{index})</span>
         <span>NotebookEdit</span>
         <span className="px-1 rounded bg-muted text-muted-foreground/80">{fragment.editMode}</span>
@@ -69,7 +69,7 @@ function SummaryFragmentBlock({
 }) {
   return (
     <div className="space-y-1">
-      <div className="text-[10px] font-mono text-muted-foreground flex items-center gap-2">
+      <div className="text-[10px] text-muted-foreground flex items-center gap-2">
         <span>{index})</span>
         <span>{toolName}</span>
         <span className="text-muted-foreground/60">· Provider change summary</span>
@@ -100,7 +100,7 @@ function WriteFragmentBlock({
 
   return (
     <div className="space-y-1">
-      <div className="text-[10px] font-mono text-muted-foreground flex items-center gap-2">
+      <div className="text-[10px] text-muted-foreground flex items-center gap-2">
         <span>{index})</span>
         <span>{toolName}</span>
         <span className="text-muted-foreground/60">· New file content ({lines.length} lines)</span>

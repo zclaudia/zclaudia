@@ -182,7 +182,7 @@ export function ChangesPanel({ projectId, projectRoot }: ChangesPanelProps) {
                 <button
                   type="button"
                   onClick={() => setTurnsCollapsed(v => !v)}
-                  className="w-full flex items-center gap-1 px-1 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground hover:text-foreground"
+                  className="w-full flex items-center gap-1 px-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
                 >
                   {turnsCollapsed ? (
                     <ChevronRight className="w-3 h-3" />
@@ -191,7 +191,7 @@ export function ChangesPanel({ projectId, projectRoot }: ChangesPanelProps) {
                   )}
                   <span>Turns ({visibleTurns.length})</span>
                   {hiddenCount > 0 && (
-                    <span className="font-normal normal-case tracking-normal text-muted-foreground/70">
+                    <span className="font-normal text-muted-foreground/70">
                       · {hiddenCount} empty hidden
                     </span>
                   )}
@@ -208,7 +208,7 @@ export function ChangesPanel({ projectId, projectRoot }: ChangesPanelProps) {
 
             {modified.length > 0 && (
               <section className="space-y-1.5">
-                <div className="px-1 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+                <div className="px-1 text-[11px] font-medium text-muted-foreground">
                   Modified files ({modified.length})
                 </div>
                 <div className="space-y-1.5">
@@ -235,7 +235,7 @@ export function ChangesPanel({ projectId, projectRoot }: ChangesPanelProps) {
                 <button
                   type="button"
                   onClick={() => setBashCollapsed(v => !v)}
-                  className="w-full flex items-center gap-1 px-1 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground hover:text-foreground"
+                  className="w-full flex items-center gap-1 px-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
                 >
                   {bashCollapsed ? (
                     <ChevronRight className="w-3 h-3" />

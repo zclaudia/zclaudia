@@ -177,18 +177,14 @@ function SectionShell({
   const showRegenerate = hasContent && !isLoading;
   return (
     <section className="space-y-1.5">
-      <div className="px-1 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground flex items-center gap-1">
+      <div className="px-1 text-[11px] font-medium text-muted-foreground flex items-center gap-1">
         <span>Summary</span>
         {hasContent && summaryTimestamp && (
-          <span className="font-normal normal-case tracking-normal text-muted-foreground/70">
+          <span className="font-normal text-muted-foreground/70">
             · generated {timeAgo(summaryTimestamp)}
           </span>
         )}
-        {isStale && (
-          <span className="font-normal normal-case tracking-normal text-amber-600 dark:text-amber-400">
-            · stale
-          </span>
-        )}
+        {isStale && <span className="font-normal text-amber-600 dark:text-amber-400">· stale</span>}
         <div className="flex-1" />
         {showRegenerate && (
           <button
@@ -264,9 +260,7 @@ function SummaryRow({
 }) {
   return (
     <div className="flex items-start gap-2">
-      <span className="text-muted-foreground w-12 flex-shrink-0 uppercase tracking-wider text-[9px] pt-0.5">
-        {label}
-      </span>
+      <span className="text-muted-foreground w-12 flex-shrink-0 text-[10px] pt-0.5">{label}</span>
       <span className="flex-1 min-w-0 whitespace-pre-wrap leading-snug">{body}</span>
       {trailing && <span className="flex-shrink-0">{trailing}</span>}
     </div>
