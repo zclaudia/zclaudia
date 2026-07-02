@@ -370,7 +370,7 @@
       "evidence": "gateway-client.ts is 1105 lines and combines connection lifecycle, handshake, registry, subscriptions, data publishing, stream routing, HTTP proxying, push notifications, reconnects, and offline queueing.",
       "recommendation": "Split transport/handshake, registry, backend data, stream subscriptions, and HTTP proxy handling behind the existing command/query facade.",
       "status": "partial",
-      "verificationNote": "Extracted HTTP-proxy (gateway-http-proxy.ts), device identity (gateway-device-id.ts) and heartbeat timer (gateway-heartbeat.ts) into cohesive, independently-tested modules; gateway-client.ts 1225->~1055 lines. Remaining registry/subscription/reconnect state is still in the client (deep stateful decomposition deferred)."
+      "verificationNote": "Extracted HTTP-proxy (gateway-http-proxy.ts), device identity (gateway-device-id.ts), heartbeat timer (gateway-heartbeat.ts), and socket lifecycle + reconnect/backoff + offline send queue (gateway-transport.ts, GatewayTransport) into cohesive, independently-tested modules; GatewayClient now delegates connect/disconnect/send to GatewayTransport. gateway-client.ts 1225->937 lines. Remaining registry/subscription state is still in the client (deep stateful decomposition deferred)."
     },
     {
       "id": "QA-0028",

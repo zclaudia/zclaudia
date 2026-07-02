@@ -182,61 +182,11 @@ describe('GatewayClient', () => {
 
       expect(WebSocket).toHaveBeenCalled();
     });
-
-    it('clears pending reconnect timeout', () => {
-      const mockTimeout = setTimeout(() => {}, 10000);
-      (client as any).reconnectTimeout = mockTimeout;
-
-      client.connect();
-
-      expect((client as any).reconnectTimeout).toBeNull();
-    });
-
-    it('closes existing WebSocket before reconnecting', () => {
-      const mockWs = {
-        removeAllListeners: vi.fn(),
-        close: vi.fn(),
-      };
-      (client as any).ws = mockWs;
-
-      client.connect();
-
-      expect(mockWs.removeAllListeners).toHaveBeenCalled();
-      expect(mockWs.close).toHaveBeenCalled();
-    });
   });
 
   describe('disconnect', () => {
     beforeEach(() => {
       client = new GatewayClient(mockConfig);
-    });
-
-    it('sets intentional disconnect flag', () => {
-      client.disconnect();
-
-      expect((client as any).intentionalDisconnect).toBe(true);
-    });
-
-    it('clears reconnect timeout', () => {
-      const mockTimeout = setTimeout(() => {}, 10000);
-      (client as any).reconnectTimeout = mockTimeout;
-
-      client.disconnect();
-
-      expect((client as any).reconnectTimeout).toBeNull();
-    });
-
-    it('closes WebSocket connection', () => {
-      const mockWs = {
-        removeAllListeners: vi.fn(),
-        close: vi.fn(),
-      };
-      (client as any).ws = mockWs;
-
-      client.disconnect();
-
-      expect(mockWs.removeAllListeners).toHaveBeenCalled();
-      expect(mockWs.close).toHaveBeenCalled();
     });
 
     it('clears connection state', () => {
@@ -353,7 +303,7 @@ describe('GatewayClient', () => {
     });
 
     it('handles peer_ready success message', () => {
-      const mockWs = (client as any).ws;
+      const mockWs = (client as any).transport.ws;
       const message = {
         type: 'peer_ready',
         peerSessionId: 'session-abc',
@@ -388,12 +338,12 @@ describe('GatewayClient', () => {
       expect((client as any).peerSessionId).toBe('session-abc');
       expect((client as any).backendId).toBe('backend-123');
       expect((client as any).epoch).toBe(1);
-      expect((client as any).reconnectAttempts).toBe(0);
+      expect((client as any).transport.reconnectAttempts).toBe(0);
       expect(client.getDiscoveredBackends()).toHaveLength(1);
     });
 
     it('handles registry_snapshot message', () => {
-      const mockWs = (client as any).ws;
+      const mockWs = (client as any).transport.ws;
       (client as any).backendId = 'backend-1';
 
       const messageHandler = mockWs.on.mock.calls.find((call: any[]) => call[0] === 'message')?.[1];
@@ -430,7 +380,7 @@ describe('GatewayClient', () => {
     });
 
     it('clears connection state when websocket closes', () => {
-      const mockWs = (client as any).ws;
+      const mockWs = (client as any).transport.ws;
       (client as any).isConnected = true;
       (client as any).backendId = 'backend-123';
       (client as any).epoch = 1;
@@ -446,7 +396,7 @@ describe('GatewayClient', () => {
 
     it('handles invalid JSON message gracefully', () => {
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      const mockWs = (client as any).ws;
+      const mockWs = (client as any).transport.ws;
 
       const messageHandler = mockWs.on.mock.calls.find((call: any[]) => call[0] === 'message')?.[1];
       if (messageHandler) {
@@ -458,7 +408,7 @@ describe('GatewayClient', () => {
     });
 
     it('sends content_patch_error when catch-up query fails', async () => {
-      const sendWsSpy = vi.spyOn(client as any, 'sendWs').mockImplementation(() => {});
+      const sendWsSpy = vi.spyOn((client as any).transport, 'send').mockImplementation(() => {});
 
       client.commands.channel.onCatchUp(async () => {
         throw new Error('catch-up query failed');
@@ -531,91 +481,6 @@ describe('GatewayClient', () => {
     });
   });
 
-  describe('reconnection logic', () => {
-    beforeEach(() => {
-      vi.useFakeTimers();
-      client = new GatewayClient(mockConfig);
-    });
-
-    afterEach(() => {
-      vi.useRealTimers();
-    });
-
-    it('schedules reconnect with exponential backoff', () => {
-      client.connect();
-      const mockWs = (client as any).ws;
-
-      // Simulate close event (not code 4000)
-      const closeHandler = mockWs.on.mock.calls.find((call: any[]) => call[0] === 'close')?.[1];
-      if (closeHandler) {
-        closeHandler(1000);
-      }
-
-      expect((client as any).reconnectTimeout).not.toBeNull();
-      expect((client as any).reconnectAttempts).toBe(1);
-    });
-
-    it('schedules reconnect when the websocket errors without a close event', () => {
-      client.connect();
-      const mockWs = (client as any).ws;
-
-      const errorHandler = mockWs.on.mock.calls.find((call: any[]) => call[0] === 'error')?.[1];
-      errorHandler?.(new Error('proxy unavailable'));
-
-      expect((client as any).reconnectTimeout).not.toBeNull();
-      expect((client as any).reconnectAttempts).toBe(1);
-    });
-
-    it('schedules reconnect when the connection attempt never opens or closes', () => {
-      client.connect();
-
-      vi.advanceTimersByTime((client as any).connectTimeoutMs);
-
-      expect((client as any).reconnectTimeout).not.toBeNull();
-      expect((client as any).reconnectAttempts).toBe(1);
-    });
-
-    it('does not reconnect after code 4000 (replaced)', () => {
-      client.connect();
-      const mockWs = (client as any).ws;
-
-      const closeHandler = mockWs.on.mock.calls.find((call: any[]) => call[0] === 'close')?.[1];
-      if (closeHandler) {
-        closeHandler(4000);
-      }
-
-      expect((client as any).reconnectTimeout).toBeNull();
-    });
-
-    it('does not reconnect after intentional disconnect', () => {
-      client.connect();
-      const mockWs = (client as any).ws;
-
-      // Get the close handler before disconnect
-      const closeHandler = mockWs.on.mock.calls.find((call: any[]) => call[0] === 'close')?.[1];
-
-      // Now disconnect
-      client.disconnect();
-
-      // Even if close event fires after disconnect, should not schedule reconnect
-      if (closeHandler) {
-        closeHandler(1000);
-      }
-
-      expect((client as any).reconnectTimeout).toBeNull();
-    });
-
-    it('caps reconnect interval at max interval', () => {
-      (client as any).reconnectAttempts = 10;
-
-      (client as any).scheduleReconnect();
-
-      // Should be capped at 60000ms
-      const delay = (client as any).reconnectMaxInterval;
-      expect(delay).toBe(60000);
-    });
-  });
-
   describe('session broadcasting via catalog', () => {
     it('publishes catalog snapshot when connected with db', () => {
       // Setup mock db with prepare().all() chain
@@ -628,7 +493,7 @@ describe('GatewayClient', () => {
 
       client = new GatewayClient(mockConfig, mockDb, mockActiveRuns);
       client.connect();
-      const mockWs = (client as any).ws;
+      const mockWs = (client as any).transport.ws;
       mockWs.readyState = WebSocket.OPEN;
       (client as any).backendId = 'backend-123';
       (client as any).epoch = 1;
@@ -644,7 +509,7 @@ describe('GatewayClient', () => {
     it('broadcastSessionEvent publishes backend data event', () => {
       client = new GatewayClient(mockConfig);
       client.connect();
-      const mockWs = (client as any).ws;
+      const mockWs = (client as any).transport.ws;
       mockWs.readyState = WebSocket.OPEN;
       (client as any).backendId = 'backend-123';
       (client as any).epoch = 1;
@@ -661,7 +526,7 @@ describe('GatewayClient', () => {
     it('broadcastSessionEvent removes archived sessions', () => {
       client = new GatewayClient(mockConfig);
       client.connect();
-      const mockWs = (client as any).ws;
+      const mockWs = (client as any).transport.ws;
       mockWs.readyState = WebSocket.OPEN;
       (client as any).backendId = 'backend-123';
       (client as any).epoch = 1;
@@ -685,7 +550,7 @@ describe('GatewayClient', () => {
     it('broadcastProjectEvent publishes project upsert events', () => {
       client = new GatewayClient(mockConfig);
       client.connect();
-      const mockWs = (client as any).ws;
+      const mockWs = (client as any).transport.ws;
       mockWs.readyState = WebSocket.OPEN;
       (client as any).backendId = 'backend-123';
       (client as any).epoch = 1;
@@ -716,7 +581,7 @@ describe('GatewayClient', () => {
     it('broadcastProjectEvent publishes project remove events', () => {
       client = new GatewayClient(mockConfig);
       client.connect();
-      const mockWs = (client as any).ws;
+      const mockWs = (client as any).transport.ws;
       mockWs.readyState = WebSocket.OPEN;
       (client as any).backendId = 'backend-123';
       (client as any).epoch = 1;
@@ -735,7 +600,7 @@ describe('GatewayClient', () => {
 
     it('does not publish catalog event when disconnected', () => {
       client = new GatewayClient(mockConfig);
-      (client as any).ws = null;
+      (client as any).transport.ws = null;
       (client as any).isConnected = false;
 
       // Should not throw
@@ -776,7 +641,7 @@ describe('GatewayClient', () => {
   describe('edge cases', () => {
     it('handles close without existing WebSocket', () => {
       client = new GatewayClient(mockConfig);
-      (client as any).ws = null;
+      (client as any).transport.ws = null;
 
       // Should not throw
       client.disconnect();
@@ -784,7 +649,7 @@ describe('GatewayClient', () => {
 
     it('handles sendToChannel with null WebSocket', () => {
       client = new GatewayClient(mockConfig);
-      (client as any).ws = null;
+      (client as any).transport.ws = null;
 
       // Should not throw
       client.sendToChannel('channel-1', { type: 'test' } as any);
@@ -804,7 +669,7 @@ describe('GatewayClient', () => {
         removeAllListeners: vi.fn(),
         close: vi.fn(),
       };
-      (client as any).ws = ws;
+      (client as any).transport.ws = ws;
       (client as any).isConnected = true;
       (client as any).epoch = 1;
       (client as any).backendId = 'local-backend';

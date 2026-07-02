@@ -5,7 +5,6 @@
  * Implements handshake, heartbeat, catalog, stream demand, and stream event protocols.
  */
 
-import WebSocket from 'ws';
 import type { SocksProxyAgent } from 'socks-proxy-agent';
 import * as crypto from 'crypto';
 import type {
@@ -40,6 +39,7 @@ import { getOrCreateDeviceId } from './gateway-device-id.js';
 import { GatewayHeartbeat } from './gateway-heartbeat.js';
 import { handleHttpProxyRequest } from './gateway-http-proxy.js';
 import { createSocksProxyAgent } from './gateway-proxy-agent.js';
+import { GatewayTransport } from './gateway-transport.js';
 
 // ============================================================================
 // Types
@@ -219,7 +219,6 @@ export interface GatewayClientEventBus {
 // ============================================================================
 
 export class GatewayClient {
-  private ws: WebSocket | null = null;
   private config: GatewayClientConfig;
   private deviceId: string;
   private instanceId: string;
@@ -230,20 +229,24 @@ export class GatewayClient {
   private backendId: string | null = null;
   private epoch: number | null = null;
   private isConnected = false;
-  private intentionalDisconnect = false;
 
-  private reconnectAttempts = 0;
-  private reconnectBaseInterval = 5000;
-  private reconnectMaxInterval = 60000;
-  private reconnectTimeout: NodeJS.Timeout | null = null;
-  private connectTimeout: NodeJS.Timeout | null = null;
-  private connectTimeoutMs = 15000;
+  private readonly transport = new GatewayTransport({
+    resolveWsUrl: () => `${this.config.gatewayUrl.replace(/^http/, 'ws')}/ws`,
+    createAgent: () =>
+      createSocksProxyAgent(this.config, {
+        failureMessage: '[Gateway] Failed to configure proxy:',
+      }),
+    isConnected: () => this.isConnected,
+    onOpen: () => this.sendPeerHello(),
+    onMessage: msg => this.handleMessage(msg),
+    onDisconnect: () => this.cleanup(),
+  });
 
   private readonly heartbeat = new GatewayHeartbeat({
     intervalMs: 10_000,
-    canSend: () => !!this.ws && this.isConnected,
+    canSend: () => this.transport.hasSocket() && this.isConnected,
     currentEpoch: () => this.epoch,
-    send: msg => this.sendWs(msg),
+    send: msg => this.transport.send(msg),
   });
 
   private streamDemandActive = false;
@@ -263,10 +266,6 @@ export class GatewayClient {
   // Outgoing subscriptions (facade client role)
   private subscribedBackends = new Set<string>();
   private outgoingEvents: GatewayClientOutgoingEvents = {};
-
-  // Message queue for channel messages during disconnection
-  private static readonly MAX_PENDING_MESSAGES = 200;
-  private pendingMessages: string[] = [];
 
   // ==========================================================================
   // CQE Interface
@@ -288,7 +287,7 @@ export class GatewayClient {
     this.backendDataPublisher = new GatewayBackendDataPublisher({
       db,
       activeRuns: activeRuns ?? new Map(),
-      sendMessage: message => this.sendWs(message),
+      sendMessage: message => this.transport.send(message),
     });
     console.log(`[Gateway] Instance ID: ${this.instanceId} (channel=${this.channel})`);
 
@@ -354,81 +353,11 @@ export class GatewayClient {
   // ==========================================================================
 
   connect(): void {
-    this.intentionalDisconnect = false;
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout);
-      this.reconnectTimeout = null;
-    }
-    this.clearConnectTimeout();
-    if (this.ws) {
-      this.ws.removeAllListeners();
-      this.ws.close();
-      this.ws = null;
-    }
-
-    const wsUrl = this.config.gatewayUrl.replace(/^http/, 'ws');
-    console.log(`[Gateway] Connecting to ${wsUrl}...`);
-
-    const wsOptions: { agent?: SocksProxyAgent } = {};
-    const proxyAgent = createSocksProxyAgent(this.config, {
-      failureMessage: '[Gateway] Failed to configure proxy:',
-    });
-    if (proxyAgent) wsOptions.agent = proxyAgent;
-
-    this.ws = new WebSocket(`${wsUrl}/ws`, wsOptions);
-    const currentWs = this.ws;
-
-    this.connectTimeout = setTimeout(() => {
-      if (this.ws !== currentWs || this.isConnected) return;
-      console.warn(`[Gateway] Connection attempt timed out after ${this.connectTimeoutMs / 1000}s`);
-      currentWs.removeAllListeners();
-      currentWs.close();
-      if (this.ws === currentWs) this.ws = null;
-      this.cleanup();
-      this.scheduleReconnect();
-    }, this.connectTimeoutMs);
-
-    this.ws.on('open', () => {
-      if (this.ws !== currentWs) return;
-      this.sendPeerHello();
-    });
-    this.ws.on('message', (data: Buffer) => {
-      if (this.ws !== currentWs) return;
-      try {
-        this.handleMessage(JSON.parse(data.toString()));
-      } catch (error) {
-        console.error('[Gateway] Failed to parse message:', error);
-      }
-    });
-    this.ws.on('close', (code: number) => {
-      if (this.ws !== currentWs) return;
-      this.clearConnectTimeout();
-      console.log(`[Gateway] Disconnected (code: ${code})`);
-      this.cleanup();
-      if (code !== 4000) this.scheduleReconnect();
-    });
-    this.ws.on('error', error => {
-      if (this.ws !== currentWs) return;
-      this.clearConnectTimeout();
-      console.error('[Gateway] Connection error:', error);
-      this.cleanup();
-      this.scheduleReconnect();
-    });
+    this.transport.connect();
   }
 
   disconnect(): void {
-    this.intentionalDisconnect = true;
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout);
-      this.reconnectTimeout = null;
-    }
-    this.clearConnectTimeout();
-    this.cleanup();
-    if (this.ws) {
-      this.ws.removeAllListeners();
-      this.ws.close();
-      this.ws = null;
-    }
+    this.transport.disconnect();
   }
 
   getBackendId(): string | null {
@@ -492,7 +421,7 @@ export class GatewayClient {
   /** Send a message to a subscribing client via backend_server_message. */
   sendToChannel(targetPeerSessionId: string, message: ServerMessage): void {
     const backendId = this.backendId || targetPeerSessionId;
-    this.sendWs(
+    this.transport.send(
       {
         type: 'backend_server_message',
         backendId,
@@ -534,16 +463,16 @@ export class GatewayClient {
   }
 
   subscribeBackend(targetBackendId: string): void {
-    if (!this.ws || !this.isConnected) return;
-    this.sendWs({
+    if (!this.transport.hasSocket() || !this.isConnected) return;
+    this.transport.send({
       type: 'subscribe_backend',
       backendId: targetBackendId,
     } satisfies SubscribeBackendMessage);
   }
 
   unsubscribeBackend(targetBackendId: string): void {
-    if (!this.ws || !this.isConnected) return;
-    this.sendWs({
+    if (!this.transport.hasSocket() || !this.isConnected) return;
+    this.transport.send({
       type: 'unsubscribe_backend',
       backendId: targetBackendId,
     } satisfies UnsubscribeBackendMessage);
@@ -551,8 +480,8 @@ export class GatewayClient {
   }
 
   sendToBackend(targetBackendId: string, message: ClientMessage): void {
-    if (!this.ws || !this.isConnected) return;
-    this.sendWs({
+    if (!this.transport.hasSocket() || !this.isConnected) return;
+    this.transport.send({
       type: 'backend_client_message',
       backendId: targetBackendId,
       message,
@@ -564,8 +493,8 @@ export class GatewayClient {
   }
 
   catchUpOutgoingStream(backendId: string, sessionId: string, afterOffset: number): void {
-    if (!this.ws || !this.isConnected) return;
-    this.sendWs({
+    if (!this.transport.hasSocket() || !this.isConnected) return;
+    this.transport.send({
       type: 'catch_up_content',
       backendId,
       contentStreamId: sessionId,
@@ -578,7 +507,7 @@ export class GatewayClient {
   // ==========================================================================
 
   publishBackendDataSnapshot(targetPeerSessionId?: string): void {
-    if (!this.ws || !this.isConnected || !this.epoch) return;
+    if (!this.transport.hasSocket() || !this.isConnected || !this.epoch) return;
     const published = this.backendDataPublisher.publishSnapshot();
     if (published && targetPeerSessionId && this.config.getStateHeartbeat) {
       this.sendToChannel(targetPeerSessionId, this.config.getStateHeartbeat());
@@ -599,7 +528,7 @@ export class GatewayClient {
       archived_at?: number | null;
     }
   ): void {
-    if (!this.ws || !this.isConnected || !this.epoch) return;
+    if (!this.transport.hasSocket() || !this.isConnected || !this.epoch) return;
     this.backendDataPublisher.publishSessionEvent(eventType, session);
   }
 
@@ -636,7 +565,7 @@ export class GatewayClient {
       updated_at?: number;
     }
   ): void {
-    if (!this.ws || !this.isConnected || !this.epoch) return;
+    if (!this.transport.hasSocket() || !this.isConnected || !this.epoch) return;
     this.backendDataPublisher.broadcastProjectEvent(eventType, project);
   }
 
@@ -647,7 +576,7 @@ export class GatewayClient {
     seq: number,
     payload: unknown
   ): void {
-    if (!this.ws || !this.isConnected || !this.streamDemandActive) return;
+    if (!this.transport.hasSocket() || !this.isConnected || !this.streamDemandActive) return;
     const msg: BackendStreamEvent = {
       type: 'backend_stream_event',
       streamId: runId,
@@ -656,7 +585,7 @@ export class GatewayClient {
       seq,
       payload,
     };
-    this.sendWs(msg);
+    this.transport.send(msg);
   }
 
   sendPushNotificationRequest(event: {
@@ -668,8 +597,8 @@ export class GatewayClient {
     tags?: string[];
     clickUrl?: string;
   }): void {
-    if (!this.ws || !this.isConnected) return;
-    this.sendWs({
+    if (!this.transport.hasSocket() || !this.isConnected) return;
+    this.transport.send({
       type: 'push_notification_request',
       event: {
         name:
@@ -689,7 +618,6 @@ export class GatewayClient {
   // ==========================================================================
 
   private sendPeerHello(): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
     const msg: PeerHelloMessage = {
       type: 'peer_hello',
       protocolVersion: 3,
@@ -710,7 +638,7 @@ export class GatewayClient {
         minClientProtocolVersion: 1,
       },
     };
-    this.ws.send(JSON.stringify(msg));
+    this.transport.send(msg);
   }
 
   // ==========================================================================
@@ -745,7 +673,7 @@ export class GatewayClient {
       case 'http_proxy_request':
         void handleHttpProxyRequest(msg as unknown as GatewayHttpProxyRequest, {
           serverPort: this.config.serverPort || 3100,
-          sendWs: data => this.sendWs(data),
+          sendWs: data => this.transport.send(data),
         });
         break;
       // Backend subscription events (facade client role)
@@ -788,11 +716,10 @@ export class GatewayClient {
   }
 
   private handlePeerReady(msg: PeerReadyMessage): void {
-    this.clearConnectTimeout();
+    this.transport.notifyHandshakeComplete();
     this.isConnected = true;
     this.peerSessionId = msg.peerSessionId;
     this.recoveryToken = msg.recoveryToken;
-    this.reconnectAttempts = 0;
     if (msg.backend) {
       this.backendId = msg.backend.backendId;
       this.epoch = msg.backend.epoch;
@@ -806,7 +733,7 @@ export class GatewayClient {
     this.heartbeat.start();
     this.publishBackendDataSnapshot();
     this.startBackendDataPush();
-    this.flushPendingMessages();
+    this.transport.flushQueue();
     this.outgoingEvents.onConnectionStateChanged?.(true);
   }
 
@@ -876,10 +803,10 @@ export class GatewayClient {
         patches: messages,
         latestOffset: maxOffset,
       };
-      this.sendWs(patch);
+      this.transport.send(patch);
     } catch (error) {
       console.error('[Gateway] Catch-up error:', error);
-      this.sendWs({
+      this.transport.send({
         type: 'content_patch_error',
         backendId: msg.backendId,
         contentStreamId: sessionId,
@@ -990,28 +917,6 @@ export class GatewayClient {
   // Internal — Helpers
   // ==========================================================================
 
-  private sendWs(data: unknown, queueIfOffline = false): void {
-    const json = JSON.stringify(data);
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(json);
-    } else if (queueIfOffline) {
-      if (this.pendingMessages.length >= GatewayClient.MAX_PENDING_MESSAGES) {
-        this.pendingMessages.shift(); // drop oldest
-      }
-      this.pendingMessages.push(json);
-    }
-  }
-
-  private flushPendingMessages(): void {
-    if (this.pendingMessages.length === 0) return;
-    const msgs = this.pendingMessages.splice(0);
-    for (const json of msgs) {
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        this.ws.send(json);
-      }
-    }
-  }
-
   private cleanup(): void {
     const wasConnected = this.isConnected;
     this.isConnected = false;
@@ -1028,26 +933,5 @@ export class GatewayClient {
     this.heartbeat.stop();
     this.stopBackendDataPush();
     if (wasConnected) this.outgoingEvents.onConnectionStateChanged?.(false);
-  }
-
-  private clearConnectTimeout(): void {
-    if (this.connectTimeout) {
-      clearTimeout(this.connectTimeout);
-      this.connectTimeout = null;
-    }
-  }
-
-  private scheduleReconnect(): void {
-    if (this.intentionalDisconnect || this.reconnectTimeout) return;
-    this.reconnectAttempts++;
-    const delay = Math.min(
-      this.reconnectBaseInterval * Math.pow(2, this.reconnectAttempts - 1),
-      this.reconnectMaxInterval
-    );
-    console.log(`[Gateway] Reconnecting in ${delay / 1000}s (attempt ${this.reconnectAttempts})`);
-    this.reconnectTimeout = setTimeout(() => {
-      this.reconnectTimeout = null;
-      this.connect();
-    }, delay);
   }
 }
