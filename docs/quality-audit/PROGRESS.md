@@ -30,9 +30,11 @@ QA-0014 env-only failures: 4 pi-runtime files need `rg`/`git` binaries absent in
 
 ## The maintainability partials — current state for separate discussion
 
-These were advanced by extracting cohesive, tested leaf modules. QA-0027 (closed by decision) and
-QA-0034 (fully split by lifecycle stage) are now `fixed`; QA-0054 remains `partial` and needs its
-own decision on how far to push the deeper, higher-risk decomposition.
+These were advanced by extracting cohesive, tested leaf modules. All three of these tracked
+decomposition refactors are now `fixed`: QA-0027 (closed by decision), QA-0034 (fully split by
+lifecycle stage), and QA-0054 (shared build helpers extracted; remaining bulk is irreducible
+platform-specific logic). Other unrelated `partial` findings remain outside this section
+(formatting/lint debt, perf, test-env, security, and the QA-0017/QA-0033 architecture items).
 
 ### QA-0027 — `gateway-client.ts` — ✅ CLOSED (fixed, 2026-07-02)
 - **Now:** 937 lines. Extracted: HTTP proxy, device identity, heartbeat timer, and socket
@@ -60,14 +62,18 @@ own decision on how far to push the deeper, higher-risk decomposition.
   now-orphaned repo methods `findPendingAutoReview`/`findPendingMerge`; if the test may be edited,
   drop the `(service as any)` reflection delegators on the facade.
 
-### QA-0054 — `scripts/build/*.sh`
-- **Now:** android.sh ~556, macos.sh ~540 lines. All three scripts share the version/updates
-  helpers via `common.sh`.
-- **Remaining bulk:** signing (macos keychain/p12 import vs android keystore), artifact
-  verification/bundling, cleanup traps.
-- **Why deferred:** signing/artifact logic is genuinely platform-specific, not identical
-  duplication; and these scripts can't be executed/verified in the current environment
-  (no full macOS/Android build, `version-bump.sh` has side effects, no shellcheck).
-- **Open questions for discussion:** is there value in a shared `sign_artifact` / `verify_bundle`
-  abstraction despite platform differences, or is the remaining size acceptable? Would a typed
-  build orchestrator (TS) be preferable to more bash helpers?
+### QA-0054 — `scripts/build/*.sh` — ✅ CLOSED (fixed, 2026-07-02)
+- **What shipped:** `common.sh` now holds every genuinely-shared piece — env/node/rustup/preflight,
+  `zclaudia_resolve_version`, `zclaudia_set_updates_enabled`, and (final pass) `zclaudia_tauri_semver`
+  (macos+linux) + `zclaudia_resolve_release_repo` (android+macos), the last two byte-identical
+  duplications. Behaviour-preserving; android now also honors `GITHUB_REPOSITORY` (CI improvement).
+- **Deliberately left inline:** the install/deps/build block (only `pnpm install` + `pnpm -r run
+  build` are common; macOS/Linux also bundle the server, Android has an `INSTALL_ONLY` gate — a
+  shared helper would need flags and read worse).
+- **Remaining size is irreducible platform-specific logic:** Android manifest/gradle patching +
+  keystore signing; macOS keychain/p12 + DMG + re-signing + bundle verification; Linux deb/rpm.
+  A shared `sign_artifact`/`verify_bundle` abstraction and a TS build orchestrator were both
+  rejected — high risk, unverifiable here (no macOS/Android build, no shellcheck), low value given
+  the divergence.
+- **Verification:** `bash -n` on all four scripts + diff review. Spec/plan:
+  `specs/2026-07-02-qa-0054-build-helpers-design.md`, `plans/2026-07-02-qa-0054-build-helpers.md`.
