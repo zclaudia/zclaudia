@@ -367,7 +367,7 @@
       "file": "server/src/infra/gateway/gateway-client.ts",
       "line": 204,
       "summary": "GatewayClient centralizes too many networking responsibilities.",
-      "evidence": "gateway-client.ts is 1105 lines and combines connection lifecycle, handshake, registry, subscriptions, data publishing, stream routing, HTTP proxying, push notifications, reconnects, and offline queueing.",
+      "evidence": "gateway-client.ts is now ~937 lines (was 1105) after extracting HTTP proxy, device-id, heartbeat and transport into cohesive tested modules; remaining registry/subscription/router responsibilities still live in the client.",
       "recommendation": "Split transport/handshake, registry, backend data, stream subscriptions, and HTTP proxy handling behind the existing command/query facade.",
       "status": "partial",
       "verificationNote": "Extracted HTTP-proxy (gateway-http-proxy.ts), device identity (gateway-device-id.ts), heartbeat timer (gateway-heartbeat.ts), and socket lifecycle + reconnect/backoff + offline send queue (gateway-transport.ts, GatewayTransport) into cohesive, independently-tested modules; GatewayClient now delegates connect/disconnect/send to GatewayTransport. gateway-client.ts 1225->937 lines. Remaining registry/subscription state is still in the client (deep stateful decomposition deferred)."
