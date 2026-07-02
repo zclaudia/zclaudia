@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
+import { ChevronRight, Server, X } from 'lucide-react';
 import {
   useSessionsStore,
   type RemoteSession,
@@ -225,27 +226,24 @@ export function ActiveSessionsPanel({ onSessionSelect }: ActiveSessionsPanelProp
   if (!hasActiveSessions && !hasRecentlyCompleted) return null;
 
   return (
-    <div className="px-2 pb-2">
-      <div className="rounded-xl border border-border/50 bg-muted/30 p-1.5 transition-all duration-200">
+    <div className="border-t border-border px-2 pt-1 pb-2">
+      <div>
         {/* Header */}
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="w-full flex items-center gap-1.5 px-2 py-1 rounded-lg text-muted-foreground hover:text-foreground transition-colors"
+          className="w-full flex items-center gap-1.5 px-2 py-1 rounded-md text-muted-foreground hover:text-foreground transition-colors"
         >
-          <span className="text-[11px] font-semibold uppercase tracking-wide">Active Sessions</span>
+          <span className="text-[11px] font-medium">Active sessions</span>
           {hasActiveSessions && (
-            <span className="text-[10px] text-muted-foreground/50">{totalActive}</span>
+            <span className="text-[10px] text-muted-foreground/60">{totalActive}</span>
           )}
-          <svg
-            className={`ml-auto w-2.5 h-2.5 opacity-40 transition-transform duration-200 ${
+          <ChevronRight
+            className={`ml-auto h-3 w-3 text-muted-foreground/60 transition-transform duration-200 ${
               isCollapsed ? '' : 'rotate-90'
             }`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
+            strokeWidth={1.75}
+            aria-hidden="true"
+          />
         </button>
 
         {!isCollapsed && hasActiveSessions && (
@@ -256,23 +254,15 @@ export function ActiveSessionsPanel({ onSessionSelect }: ActiveSessionsPanelProp
                 <div key={backendId}>
                   {/* Backend label */}
                   <div className="flex items-center gap-1.5 px-2 py-0.5">
-                    <svg
-                      className="w-3 h-3 text-muted-foreground/50 shrink-0"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"
-                      />
-                    </svg>
-                    <span className="text-[10px] text-muted-foreground/70 truncate">
+                    <Server
+                      className="h-3 w-3 shrink-0 text-muted-foreground/60"
+                      strokeWidth={1.75}
+                      aria-hidden="true"
+                    />
+                    <span className="text-[10px] text-muted-foreground/60 truncate">
                       {getBackendName(backendId)}
                     </span>
-                    <span className="ml-auto text-[10px] text-muted-foreground/40 shrink-0">
+                    <span className="ml-auto text-[10px] text-muted-foreground/60 shrink-0">
                       {sessions.length}
                     </span>
                   </div>
@@ -297,17 +287,17 @@ export function ActiveSessionsPanel({ onSessionSelect }: ActiveSessionsPanelProp
                               onSessionSelect?.(backendId, session.id);
                             }
                           }}
-                          className="w-full text-left h-7 px-2 rounded-lg text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors flex items-center gap-1.5"
+                          className="w-full text-left h-7 px-2 rounded-md text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors flex items-center gap-1.5"
                         >
                           <span className="truncate flex-1">
                             {session.name || `Session ${session.id.slice(0, 8)}`}
                           </span>
                           {getProjectName(session.projectId) && (
-                            <span className="text-[9px] text-muted-foreground/40 shrink-0 truncate max-w-[60px]">
+                            <span className="text-[10px] text-muted-foreground/60 shrink-0 truncate max-w-[60px]">
                               {getProjectName(session.projectId)}
                             </span>
                           )}
-                          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shrink-0" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse shrink-0" />
                         </button>
                       </li>
                     ))}
@@ -320,14 +310,14 @@ export function ActiveSessionsPanel({ onSessionSelect }: ActiveSessionsPanelProp
 
         {/* Recently Completed */}
         {hasRecentlyCompleted && (
-          <div className="mt-1 border-t border-border/30 pt-1">
+          <div className="mt-1 border-t border-border pt-1">
             <div className="flex items-center gap-1.5 px-2 py-0.5">
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60">
-                Recently Completed
+              <span className="text-[11px] font-medium text-muted-foreground">
+                Recently completed
               </span>
               <button
                 onClick={clearAllRecentlyCompleted}
-                className="ml-auto text-[9px] text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+                className="ml-auto text-[10px] text-muted-foreground/60 hover:text-foreground transition-colors"
               >
                 Clear all
               </button>
@@ -352,39 +342,27 @@ export function ActiveSessionsPanel({ onSessionSelect }: ActiveSessionsPanelProp
                           onSessionSelect?.(resolvedOwnerBackendId, session.id);
                         }
                       }}
-                      className="flex-1 min-w-0 text-left h-7 px-2 rounded-lg text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors flex items-center gap-1.5"
+                      className="flex-1 min-w-0 text-left h-7 px-2 rounded-md text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors flex items-center gap-1.5"
                     >
-                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30 shrink-0" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 shrink-0" />
                       <span className="truncate flex-1">
                         {session.name || `Session ${session.id.slice(0, 8)}`}
                       </span>
-                      <span className="text-[9px] text-muted-foreground/40 shrink-0">
+                      <span className="text-[10px] text-muted-foreground/60 shrink-0">
                         {formatTimeAgo(completedAt)}
                       </span>
                       {getProjectName(session.projectId) && (
-                        <span className="text-[9px] text-muted-foreground/30 shrink-0 truncate max-w-[50px]">
+                        <span className="text-[10px] text-muted-foreground/60 shrink-0 truncate max-w-[50px]">
                           {getProjectName(session.projectId)}
                         </span>
                       )}
                     </button>
                     <button
                       onClick={() => dismissRecentlyCompleted(session.id)}
-                      className="w-5 h-5 flex items-center justify-center text-muted-foreground/30 hover:text-muted-foreground transition-colors shrink-0"
+                      className="w-5 h-5 flex items-center justify-center text-muted-foreground/60 hover:text-foreground transition-colors shrink-0"
                       aria-label="Dismiss"
                     >
-                      <svg
-                        className="w-2.5 h-2.5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
+                      <X className="h-2.5 w-2.5" strokeWidth={1.75} aria-hidden="true" />
                     </button>
                   </div>
                 )

@@ -435,13 +435,13 @@ describe('ActiveSessionsPanel', () => {
       expect(screen.getByText('My Session')).toBeDefined();
 
       // Click header to collapse
-      fireEvent.click(screen.getByText('Active Sessions'));
+      fireEvent.click(screen.getByText('Active sessions'));
 
       // Session should be hidden
       expect(screen.queryByText('My Session')).toBeNull();
 
       // Click again to expand
-      fireEvent.click(screen.getByText('Active Sessions'));
+      fireEvent.click(screen.getByText('Active sessions'));
       expect(screen.getByText('My Session')).toBeDefined();
     });
 
@@ -515,7 +515,7 @@ describe('ActiveSessionsPanel', () => {
       });
 
       render(<ActiveSessionsPanel />);
-      expect(screen.getByText('Recently Completed')).toBeDefined();
+      expect(screen.getByText('Recently completed')).toBeDefined();
       expect(screen.getByText('Done Session')).toBeDefined();
       expect(screen.getByText('Clear all')).toBeDefined();
     });
@@ -652,7 +652,7 @@ describe('ActiveSessionsPanel', () => {
 
       render(<ActiveSessionsPanel />);
 
-      expect(screen.getByText('Recently Completed')).toBeDefined();
+      expect(screen.getByText('Recently completed')).toBeDefined();
       expect(screen.getByText('Completed Local Hidden')).toBeDefined();
     });
   });
