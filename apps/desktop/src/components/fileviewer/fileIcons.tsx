@@ -38,6 +38,7 @@ const CODE_EXTENSIONS = new Set([
   'html',
   'vue',
   'svelte',
+  'ps1',
 ]);
 const TEXT_EXTENSIONS = new Set(['md', 'mdx', 'txt', 'rtf', 'log']);
 const DATA_EXTENSIONS = new Set(['json', 'jsonc', 'yaml', 'yml', 'toml', 'xml', 'lock', 'plist']);

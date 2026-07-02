@@ -10,6 +10,7 @@ describe('iconForFileName', () => {
     ['build.rs', FileCode],
     ['deploy.sh', FileCode],
     ['Dockerfile', FileCode],
+    ['windows.ps1', FileCode],
     ['README.md', FileText],
     ['LICENSE', FileText],
     ['notes.txt', FileText],
@@ -38,6 +39,7 @@ describe('FileTypeIcon', () => {
     expect(svg!.getAttribute('stroke')).toBe('currentColor');
     expect(svg!.getAttribute('stroke-width')).toBe('1.75');
     expect(container.querySelector('[fill]:not([fill="none"])')).toBeNull();
+    expect(svg!.getAttribute('class') ?? '').toContain('text-muted-foreground');
   });
 
   it('keeps the wrapper span + className contract', () => {
