@@ -38,6 +38,15 @@
     --thinking-foreground: 265 60% 97%;
     --terminal-cursor: 214 70% 45%;
     --terminal-selection: 214 70% 88%;
+    --glyph-red: 4 60% 48%;
+    --glyph-orange: 24 70% 46%;
+    --glyph-amber: 42 72% 44%;
+    --glyph-green: 150 45% 38%;
+    --glyph-teal: 180 45% 38%;
+    --glyph-blue: 214 65% 48%;
+    --glyph-purple: 265 45% 52%;
+    --glyph-pink: 330 55% 52%;
+    --glyph-gray: 45 5% 50%;
     /* @generated:tokens end */
 
     /* Radius */
@@ -85,6 +94,15 @@
     --thinking-foreground: 265 60% 97%;
     --terminal-cursor: 214 70% 45%;
     --terminal-selection: 214 70% 88%;
+    --glyph-red: 4 60% 48%;
+    --glyph-orange: 24 70% 46%;
+    --glyph-amber: 42 72% 44%;
+    --glyph-green: 150 45% 38%;
+    --glyph-teal: 180 45% 38%;
+    --glyph-blue: 214 65% 48%;
+    --glyph-purple: 265 45% 52%;
+    --glyph-pink: 330 55% 52%;
+    --glyph-gray: 45 5% 50%;
     /* @generated:tokens end */
   }
 
@@ -122,6 +140,15 @@
     --thinking: 265 42% 65%;
     --thinking-foreground: 265 60% 10%;
     --terminal-cursor: 214 70% 60%;
+    --glyph-red: 4 60% 64%;
+    --glyph-orange: 24 65% 62%;
+    --glyph-amber: 44 65% 60%;
+    --glyph-green: 150 40% 58%;
+    --glyph-teal: 180 40% 58%;
+    --glyph-blue: 214 60% 64%;
+    --glyph-purple: 265 45% 66%;
+    --glyph-pink: 330 50% 66%;
+    --glyph-gray: 45 6% 62%;
     --terminal-selection: 35 6% 20%;
     /* @generated:tokens end */
 
@@ -165,6 +192,15 @@
     --thinking: 265 42% 65%;
     --thinking-foreground: 265 60% 10%;
     --terminal-cursor: 214 70% 60%;
+    --glyph-red: 4 60% 64%;
+    --glyph-orange: 24 65% 62%;
+    --glyph-amber: 44 65% 60%;
+    --glyph-green: 150 40% 58%;
+    --glyph-teal: 180 40% 58%;
+    --glyph-blue: 214 60% 64%;
+    --glyph-purple: 265 45% 66%;
+    --glyph-pink: 330 50% 66%;
+    --glyph-gray: 45 6% 62%;
     --terminal-selection: 30 7% 20%;
     /* @generated:tokens end */
 
@@ -208,6 +244,15 @@
     --thinking: 265 42% 65%;
     --thinking-foreground: 265 60% 10%;
     --terminal-cursor: 214 70% 60%;
+    --glyph-red: 4 60% 64%;
+    --glyph-orange: 24 65% 62%;
+    --glyph-amber: 44 65% 60%;
+    --glyph-green: 150 40% 58%;
+    --glyph-teal: 180 40% 58%;
+    --glyph-blue: 214 60% 64%;
+    --glyph-purple: 265 45% 66%;
+    --glyph-pink: 330 50% 66%;
+    --glyph-gray: 45 6% 62%;
     --terminal-selection: 225 13% 20%;
     /* @generated:tokens end */
 

@@ -3,6 +3,34 @@
 // Regenerate CSS with: pnpm --filter @zclaudia/desktop run gen:tokens
 // Design rationale: docs/superpowers/specs/2026-07-02-warm-palette-retune-design.md
 
+// Symbols file-glyph palette — decorative file-type colors for
+// src/components/filesymbols/ only; deliberately separate from the status
+// accents so "JS yellow" never reads as warning. Starting values; tune
+// during the five-theme smoke pass.
+const lightGlyphs = {
+  'glyph-red': [4, 60, 48],
+  'glyph-orange': [24, 70, 46],
+  'glyph-amber': [42, 72, 44],
+  'glyph-green': [150, 45, 38],
+  'glyph-teal': [180, 45, 38],
+  'glyph-blue': [214, 65, 48],
+  'glyph-purple': [265, 45, 52],
+  'glyph-pink': [330, 55, 52],
+  'glyph-gray': [45, 5, 50],
+};
+
+const darkGlyphs = {
+  'glyph-red': [4, 60, 64],
+  'glyph-orange': [24, 65, 62],
+  'glyph-amber': [44, 65, 60],
+  'glyph-green': [150, 40, 58],
+  'glyph-teal': [180, 40, 58],
+  'glyph-blue': [214, 60, 64],
+  'glyph-purple': [265, 45, 66],
+  'glyph-pink': [330, 50, 66],
+  'glyph-gray': [45, 6, 62],
+};
+
 const lightAccents = {
   primary: [214, 70, 45],
   'primary-foreground': [0, 0, 100],
@@ -17,6 +45,7 @@ const lightAccents = {
   'thinking-foreground': [265, 60, 97],
   'terminal-cursor': [214, 70, 45],
   'terminal-selection': [214, 70, 88],
+  ...lightGlyphs,
 };
 
 const darkAccents = {
@@ -32,6 +61,7 @@ const darkAccents = {
   thinking: [265, 42, 65],
   'thinking-foreground': [265, 60, 10],
   'terminal-cursor': [214, 70, 60],
+  ...darkGlyphs,
 };
 
 function darkNeutrals(hue, sat, satText) {
