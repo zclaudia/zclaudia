@@ -96,24 +96,15 @@ echo "  [OK] Rust Android targets"
 echo ""
 
 # --- Version selection ---
-# In CI (RELEASE_VERSION + RELEASE_BUILD set by workflow), use those directly.
-# Locally, always build a dev version from the latest release tag without
-# advancing the next release number.
 if [ "$INSTALL_ONLY" = false ] && [ "$NO_BUMP" = false ]; then
-  echo "=== Version check ==="
-
+  zclaudia_resolve_version android
   if [ -n "${RELEASE_VERSION:-}" ] && [ -n "${RELEASE_BUILD:-}" ]; then
-    # CI mode: use workflow-provided version
-    VERSION="$RELEASE_VERSION"
-    BUILD="$RELEASE_BUILD"
+    # Android version code: CI provides it or we derive it from major/minor/build.
     VERSION_CODE="${RELEASE_VERSION_CODE:-$(($(echo "$VERSION" | cut -d. -f1) * 1000000 + $(echo "$VERSION" | cut -d. -f2) * 10000 + BUILD))}"
     MAJOR=$(echo "$VERSION" | cut -d. -f1)
     MINOR=$(echo "$VERSION" | cut -d. -f2)
-    echo "Using CI-provided version: $VERSION (build $BUILD)"
   else
     DEV=true
-    echo "Local build → deriving dev version from latest release tag"
-    eval "$(./scripts/release/version-bump.sh --platform android --dev-suffix)"
   fi
 
   # Export version for Gradle (build.gradle.kts reads env vars with priority over tauri.properties)

@@ -741,7 +741,7 @@
       "evidence": "android.sh is 573 lines and macos.sh is 557 lines, with repeated environment setup, Node manager handling, package install/build, signing, cleanup, and artifact verification logic.",
       "recommendation": "Extract shared bootstrap/version/signing/artifact helpers into smaller scripts or a typed build orchestrator, leaving thin platform wrappers.",
       "status": "partial",
-      "verificationNote": "Shared zclaudia_resolve_version + zclaudia_set_updates_enabled added to common.sh; adopted by linux.sh (now also sourcing common.sh for node/rustup setup) and macos.sh. Verified via bash -n + CI-mode and local-mode smoke tests. android.sh version block left intact (Gradle-specific VERSION_CODE formula + INSTALL_ONLY guards; not build-verifiable here). Signing/artifact-verification extraction still pending."
+      "verificationNote": "Shared zclaudia_resolve_version + zclaudia_set_updates_enabled in build/common.sh now adopted by all three build scripts (linux.sh, macos.sh, android.sh); linux.sh also uses common.sh for node/rustup setup. Verified via bash -n and CI/local smoke tests (incl. android VERSION_CODE formula). Signing/artifact-verification logic left inline — it is genuinely platform-specific (keystore vs keychain/p12), not identical duplication."
     },
     {
       "id": "QA-0055",
