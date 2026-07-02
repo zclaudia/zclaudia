@@ -1,7 +1,6 @@
 import type { LocalPRStatus } from '@zclaudia/shared/features/local-pr';
 import { removeWorktree } from '../../utils/git-operations.js';
 import type { LocalPRContext } from './context.js';
-import type { PRCreationService } from './creation.js';
 import type { PRReviewService } from './review.js';
 import type { PRMergeService } from './merge.js';
 import type { PRConflictService } from './conflict.js';
@@ -19,7 +18,6 @@ const MAX_FINISHED_PRS_PER_PROJECT = 10;
 export class PRQueueScheduler {
   constructor(
     private ctx: LocalPRContext,
-    private creation: PRCreationService,
     private review: PRReviewService,
     private merge: PRMergeService,
     private conflict: PRConflictService
@@ -112,31 +110,6 @@ export class PRQueueScheduler {
       this.ctx.broadcastPRUpdate(this.ctx.requirePR(pr.id));
       console.log(`[LocalPRService] Reset stale PR ${pr.id} (${pr.status} → ${resetStatus})`);
       await this.ctx.refreshAfterBusyState(pr.id);
-    }
-  }
-
-  private async processPendingReviews(): Promise<void> {
-    // Only auto-review PRs that have auto_review enabled
-    const pending = this.ctx.prRepo.findPendingAutoReview();
-
-    for (const pr of pending) {
-      if (this.ctx.activeReviewIds.has(pr.id)) continue; // already running
-
-      await this.review
-        .startReview(pr.id)
-        .catch(err =>
-          console.error(`[LocalPRService] Failed to start review for PR ${pr.id}:`, err)
-        );
-    }
-  }
-
-  private async processPendingMerges(): Promise<void> {
-    const pending = this.ctx.prRepo.findPendingMerge();
-
-    for (const pr of pending) {
-      await this.merge
-        .mergePR(pr.id)
-        .catch(err => console.error(`[LocalPRService] Failed to merge PR ${pr.id}:`, err));
     }
   }
 

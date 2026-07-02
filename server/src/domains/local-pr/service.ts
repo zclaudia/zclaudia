@@ -39,13 +39,7 @@ export class LocalPRService {
     this.review = new PRReviewService(this.ctx);
     this.conflict = new PRConflictService(this.ctx);
     this.merge = new PRMergeService(this.ctx, this.conflict);
-    this.scheduler = new PRQueueScheduler(
-      this.ctx,
-      this.creation,
-      this.review,
-      this.merge,
-      this.conflict
-    );
+    this.scheduler = new PRQueueScheduler(this.ctx, this.review, this.merge, this.conflict);
   }
 
   // ---------------------------------------------------------------------------
