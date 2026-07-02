@@ -28,3 +28,5 @@ docs/quality-audit/
 
 # 锁文件
 pnpm-lock.yaml
+
+apps/desktop/src/components/filesymbols/generated/
