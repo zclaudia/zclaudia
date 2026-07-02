@@ -1,5 +1,5 @@
 import type { NotificationItem as NotificationItemData } from '@zclaudia/shared';
-import { Bot, Clock, Dot, User, X, Zap, type LucideIcon } from 'lucide-react';
+import { Bot, Clock, HelpCircle, User, X, Zap, type LucideIcon } from 'lucide-react';
 import { useNotificationFeedStore } from '../../stores/notificationFeedStore';
 import { useConnection } from '../../contexts/ConnectionContext';
 import { useSelectionCoordinator } from '../../hooks/useSelectionCoordinator';
@@ -30,7 +30,7 @@ export function NotificationItem({ item, onDismiss, onAfterSelect }: Notificatio
   const { selectSession } = useSelectionCoordinator();
   const { sendMessage } = useConnection();
   const statusStyle = STATUS_STYLES[item.status] || STATUS_STYLES.running;
-  const SourceIcon = SOURCE_ICONS[item.source] ?? Dot;
+  const SourceIcon = SOURCE_ICONS[item.source] ?? HelpCircle;
   const isUnread = !item.readAt;
 
   const handleClick = () => {
