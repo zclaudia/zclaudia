@@ -28,6 +28,9 @@ function ThemeConsumer() {
       <button data-testid="set-cool" onClick={() => setTheme('dark-cool')}>
         Cool
       </button>
+      <button data-testid="set-light-cool" onClick={() => setTheme('light-cool')}>
+        Light Cool
+      </button>
     </div>
   );
 }
@@ -37,7 +40,13 @@ describe('ThemeContext', () => {
     vi.clearAllMocks();
     localStorage.clear();
     // Reset document classes
-    document.documentElement.classList.remove('dark', 'dark-neutral', 'dark-warm', 'dark-cool');
+    document.documentElement.classList.remove(
+      'dark',
+      'dark-neutral',
+      'dark-warm',
+      'dark-cool',
+      'light-cool'
+    );
     // Ensure matchMedia returns false (light mode) by default
     vi.mocked(window.matchMedia).mockImplementation(query => ({
       matches: false,
@@ -54,6 +63,10 @@ describe('ThemeContext', () => {
   describe('isDarkTheme', () => {
     it('returns false for light theme', () => {
       expect(isDarkTheme('light')).toBe(false);
+    });
+
+    it('returns false for light-cool theme', () => {
+      expect(isDarkTheme('light-cool')).toBe(false);
     });
 
     it('returns true for dark-neutral theme', () => {
@@ -150,6 +163,18 @@ describe('ThemeContext', () => {
       expect(screen.getByTestId('resolved')).toHaveTextContent('dark-cool');
     });
 
+    it('accepts a saved "light-cool" value from localStorage as valid on mount', () => {
+      localStorage.setItem('zclaudia-theme', 'light-cool');
+
+      render(
+        <ThemeProvider>
+          <ThemeConsumer />
+        </ThemeProvider>
+      );
+      expect(screen.getByTestId('theme')).toHaveTextContent('light-cool');
+      expect(screen.getByTestId('resolved')).toHaveTextContent('light-cool');
+    });
+
     it('migrates old "dark" value to "dark-neutral"', () => {
       localStorage.setItem('zclaudia-theme', 'dark');
 
@@ -237,6 +262,24 @@ describe('ThemeContext', () => {
       expect(screen.getByTestId('theme')).toHaveTextContent('dark-cool');
       expect(screen.getByTestId('resolved')).toHaveTextContent('dark-cool');
     });
+
+    it('updates to light-cool theme, applies the class, and persists to localStorage', () => {
+      render(
+        <ThemeProvider>
+          <ThemeConsumer />
+        </ThemeProvider>
+      );
+
+      act(() => {
+        screen.getByTestId('set-light-cool').click();
+      });
+
+      expect(screen.getByTestId('theme')).toHaveTextContent('light-cool');
+      expect(screen.getByTestId('resolved')).toHaveTextContent('light-cool');
+      expect(localStorage.getItem('zclaudia-theme')).toBe('light-cool');
+      expect(document.documentElement.classList.contains('light-cool')).toBe(true);
+      expect(document.documentElement.classList.contains('dark')).toBe(false);
+    });
   });
 
   describe('CSS class application', () => {
@@ -279,6 +322,24 @@ describe('ThemeContext', () => {
 
       expect(document.documentElement.classList.contains('dark-warm')).toBe(true);
       expect(document.documentElement.classList.contains('dark-neutral')).toBe(false);
+    });
+
+    it('switching from light-cool to dark-neutral removes light-cool and adds dark + dark-neutral', () => {
+      render(
+        <ThemeProvider defaultTheme="light-cool">
+          <ThemeConsumer />
+        </ThemeProvider>
+      );
+
+      expect(document.documentElement.classList.contains('light-cool')).toBe(true);
+
+      act(() => {
+        screen.getByTestId('set-dark').click();
+      });
+
+      expect(document.documentElement.classList.contains('light-cool')).toBe(false);
+      expect(document.documentElement.classList.contains('dark')).toBe(true);
+      expect(document.documentElement.classList.contains('dark-neutral')).toBe(true);
     });
   });
 

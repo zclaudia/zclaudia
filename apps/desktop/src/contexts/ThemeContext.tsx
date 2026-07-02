@@ -1,10 +1,10 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
-export type Theme = 'light' | 'dark-neutral' | 'dark-warm' | 'dark-cool' | 'system';
-export type ResolvedTheme = 'light' | 'dark-neutral' | 'dark-warm' | 'dark-cool';
+export type Theme = 'light' | 'light-cool' | 'dark-neutral' | 'dark-warm' | 'dark-cool' | 'system';
+export type ResolvedTheme = 'light' | 'light-cool' | 'dark-neutral' | 'dark-warm' | 'dark-cool';
 
 export function isDarkTheme(theme: ResolvedTheme): boolean {
-  return theme !== 'light';
+  return theme === 'dark-neutral' || theme === 'dark-warm' || theme === 'dark-cool';
 }
 
 interface ThemeContextType {
@@ -18,13 +18,22 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 const STORAGE_KEY = 'zclaudia-theme';
 const DEFAULT_DARK: ResolvedTheme = 'dark-neutral';
 const DARK_VARIANT_CLASSES = ['dark-neutral', 'dark-warm', 'dark-cool'];
-const VALID_THEMES: Theme[] = ['light', 'dark-neutral', 'dark-warm', 'dark-cool', 'system'];
+const LIGHT_VARIANT_CLASSES = ['light-cool'];
+const VALID_THEMES: Theme[] = [
+  'light',
+  'light-cool',
+  'dark-neutral',
+  'dark-warm',
+  'dark-cool',
+  'system',
+];
 
 const THEME_META_COLORS: Record<ResolvedTheme, string> = {
-  light: '#ffffff',
-  'dark-neutral': '#141517',
-  'dark-warm': '#141311',
-  'dark-cool': '#0f1218',
+  light: '#f9f7f2',
+  'light-cool': '#f6f7f9',
+  'dark-neutral': '#171514',
+  'dark-warm': '#161413',
+  'dark-cool': '#131519',
 };
 
 function getSystemTheme(): ResolvedTheme {
@@ -43,13 +52,14 @@ function resolveTheme(theme: Theme): ResolvedTheme {
 
 function applyThemeClasses(resolved: ResolvedTheme) {
   const root = document.documentElement;
+  root.classList.remove('dark');
+  DARK_VARIANT_CLASSES.forEach(cls => root.classList.remove(cls));
+  LIGHT_VARIANT_CLASSES.forEach(cls => root.classList.remove(cls));
   if (isDarkTheme(resolved)) {
     root.classList.add('dark');
-    DARK_VARIANT_CLASSES.forEach(cls => root.classList.remove(cls));
     root.classList.add(resolved); // e.g. 'dark-neutral'
-  } else {
-    root.classList.remove('dark');
-    DARK_VARIANT_CLASSES.forEach(cls => root.classList.remove(cls));
+  } else if (resolved !== 'light') {
+    root.classList.add(resolved); // e.g. 'light-cool'
   }
 
   const metaThemeColor = document.querySelector('meta[name="theme-color"]');

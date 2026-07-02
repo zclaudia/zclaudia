@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useTheme, isDarkTheme, type Theme } from '../../contexts/ThemeContext';
 import {
   Sun,
+  SunSnow,
   Moon,
   Flame,
   Snowflake,
@@ -13,6 +14,7 @@ import {
 
 const THEME_OPTIONS: { value: Theme; label: string; icon: LucideIcon }[] = [
   { value: 'light', label: 'Light', icon: Sun },
+  { value: 'light-cool', label: 'Light Cool', icon: SunSnow },
   { value: 'dark-neutral', label: 'Dark', icon: Moon },
   { value: 'dark-warm', label: 'Dark Warm', icon: Flame },
   { value: 'dark-cool', label: 'Dark Cool', icon: Snowflake },
@@ -21,6 +23,7 @@ const THEME_OPTIONS: { value: Theme; label: string; icon: LucideIcon }[] = [
 
 function getButtonIcon(theme: Theme, resolvedTheme: string): LucideIcon {
   if (theme === 'system') return Monitor;
+  if (theme === 'light-cool') return SunSnow;
   if (isDarkTheme(resolvedTheme as any)) return Moon;
   return Sun;
 }
@@ -30,7 +33,7 @@ export function ThemeToggle() {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const currentOption = THEME_OPTIONS.find(opt => opt.value === theme) || THEME_OPTIONS[4];
+  const currentOption = THEME_OPTIONS.find(opt => opt.value === theme) || THEME_OPTIONS[5];
   const ButtonIcon = getButtonIcon(theme, resolvedTheme);
 
   // Close dropdown when clicking outside

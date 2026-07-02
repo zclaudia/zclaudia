@@ -46,9 +46,20 @@ describe('ThemeToggle', () => {
 
     // All theme options should be visible
     expect(screen.getByText('Light')).toBeTruthy();
+    expect(screen.getByText('Light Cool')).toBeTruthy();
     expect(screen.getByText('Dark Warm')).toBeTruthy();
     expect(screen.getByText('Dark Cool')).toBeTruthy();
     expect(screen.getByText('System')).toBeTruthy();
+  });
+
+  it('renders all six theme options in the dropdown', () => {
+    render(<ThemeToggle />);
+    fireEvent.click(screen.getByTitle('Change theme'));
+
+    const dropdownOptions = screen
+      .getAllByRole('button')
+      .filter(b => b.className.includes('w-full'));
+    expect(dropdownOptions.length).toBe(6);
   });
 
   it('closes dropdown when toggle button is clicked again', () => {
@@ -93,6 +104,26 @@ describe('ThemeToggle', () => {
     fireEvent.click(screen.getByTitle('Change theme'));
     fireEvent.click(screen.getByText('Dark Cool'));
     expect(mockSetTheme).toHaveBeenCalledWith('dark-cool');
+  });
+
+  it('selects light-cool theme', () => {
+    render(<ThemeToggle />);
+    fireEvent.click(screen.getByTitle('Change theme'));
+    fireEvent.click(screen.getByText('Light Cool'));
+    expect(mockSetTheme).toHaveBeenCalledWith('light-cool');
+  });
+
+  it('shows check mark on light-cool option when it is the current theme', () => {
+    mockTheme = 'light-cool';
+    mockResolvedTheme = 'light-cool';
+    const { container } = render(<ThemeToggle />);
+    fireEvent.click(screen.getByTitle('Change theme'));
+
+    const allButtons = container.querySelectorAll('button');
+    const lightCoolButton = Array.from(allButtons).find(
+      b => b.textContent?.includes('Light Cool') && b.className.includes('w-full')
+    );
+    expect(lightCoolButton?.className).toContain('bg-muted/60');
   });
 
   it('closes dropdown after selecting a theme', () => {
