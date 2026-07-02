@@ -97,3 +97,7 @@ pnpm desktop:dev            # Desktop app only (Vite port 1420)
 pnpm test                   # Run all tests
 pnpm test:e2e               # End-to-end tests
 ```
+
+## UI Conventions
+
+Chrome styling rules (color/font/icon/row/accent disciplines): see `docs/ui-conventions.md`. New panels and sidebar/composer/header changes must follow it.

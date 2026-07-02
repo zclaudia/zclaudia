@@ -1,0 +1,45 @@
+# UI Conventions — Chrome Disciplines
+
+Five rules for all persistent chrome (sidebar, headers, composer, right-panel tools).
+The Lineage panel (`src/features/lineage/`) is the in-repo reference implementation.
+
+## 1. Color is semantics only
+
+Chrome carries zero decorative color. Allowed: status dots (`bg-success`,
+running/online), warnings (`warning` tokens, elevated permissions), destructive
+(`destructive` tokens), diff +/- colors, unread indicators. Everything else is
+grayscale (`foreground` / `muted-foreground` / `secondary`). Target: at most two
+semantic color groups visible per screen of chrome. Never hardcode raw palette
+classes (`text-blue-500`) or black/white opacities (`border-black/10`) in chrome —
+use semantic tokens (`border-border`, `bg-secondary`).
+
+## 2. One text font
+
+`font-mono` only for: code content, diffs, commit SHAs, terminal output, full
+filesystem paths in detail views, and keycap (kbd) chips like `⌘P` / `CTRL`.
+Any clickable navigation or list-row label (file tree rows, changes rows, git
+status file rows) is sans.
+
+## 3. One icon language
+
+lucide-react, `strokeWidth={1.75}`, monochrome in chrome (`text-muted-foreground`
+unless conveying status). No colored file-type icon libraries, no hand-rolled
+inline `<svg>` where a lucide equivalent exists, no emoji-as-icon.
+
+## 4. One row language
+
+- List rows: `h-7 px-2 text-sm rounded-md`, hover `hover:bg-secondary hover:text-foreground`.
+- Section labels: `text-[11px] font-medium text-muted-foreground`, sentence case —
+  never `uppercase` + `tracking-*`.
+- Muted micro-text uses exactly two opacity steps: `text-muted-foreground` and
+  `text-muted-foreground/60`.
+
+## 5. One accent per control row
+
+In any toolbar or control row, at most one element may be solid/colored (the
+primary action). All siblings are ghost (see `src/features/chat/SelectorTrigger.tsx`).
+Exceptions that keep their semantic color: elevated-permission warning state,
+destructive hover, locked (amber) state.
+
+Worked example: the Git panel Status tab keeps its solid commit button as the
+single accent; "Generate" and "stage all" are ghost muted.
