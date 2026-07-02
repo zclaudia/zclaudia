@@ -369,7 +369,8 @@
       "summary": "GatewayClient centralizes too many networking responsibilities.",
       "evidence": "gateway-client.ts is 1105 lines and combines connection lifecycle, handshake, registry, subscriptions, data publishing, stream routing, HTTP proxying, push notifications, reconnects, and offline queueing.",
       "recommendation": "Split transport/handshake, registry, backend data, stream subscriptions, and HTTP proxy handling behind the existing command/query facade.",
-      "status": "open"
+      "status": "partial",
+      "verificationNote": "HTTP-proxy handling (shouldStream/isUtf8Response/normalizeProxyRequestBody/handleHttpProxyRequest) extracted to gateway-http-proxy.ts with dedicated tests; gateway-client.ts 1225->1111 lines. Further CQE decomposition of registry/heartbeat/backend-data streaming deferred (high-risk stateful code)."
     },
     {
       "id": "QA-0028",

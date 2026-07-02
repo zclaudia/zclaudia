@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GatewayClient } from '../gateway-client.js';
+import { shouldStream } from '../gateway-http-proxy.js';
 import WebSocket from 'ws';
 import * as fs from 'fs';
 import * as uuidModule from '../../../utils/uuid.js';
@@ -320,10 +321,6 @@ describe('GatewayClient', () => {
 
   describe('HTTP proxy content handling', () => {
     it('does not stream known text-like content types', () => {
-      const shouldStream = (GatewayClient as any).shouldStream as (
-        headers: Record<string, string>
-      ) => boolean;
-
       expect(shouldStream({ 'content-type': 'application/json' })).toBe(false);
       expect(shouldStream({ 'content-type': 'text/plain; charset=utf-8' })).toBe(false);
       expect(shouldStream({ 'content-type': 'application/problem+json' })).toBe(false);
@@ -331,10 +328,6 @@ describe('GatewayClient', () => {
     });
 
     it('streams binary content types to avoid UTF-8 corruption', () => {
-      const shouldStream = (GatewayClient as any).shouldStream as (
-        headers: Record<string, string>
-      ) => boolean;
-
       expect(shouldStream({ 'content-type': 'image/png' })).toBe(true);
       expect(shouldStream({ 'content-type': 'application/pdf' })).toBe(true);
       expect(shouldStream({ 'content-type': 'application/octet-stream' })).toBe(true);
@@ -344,10 +337,6 @@ describe('GatewayClient', () => {
     });
 
     it('streams large payloads regardless of content type', () => {
-      const shouldStream = (GatewayClient as any).shouldStream as (
-        headers: Record<string, string>
-      ) => boolean;
-
       expect(
         shouldStream({
           'content-type': 'application/json',
@@ -756,53 +745,29 @@ describe('GatewayClient', () => {
 
   describe('additional content type handling', () => {
     it('handles empty content-type header', () => {
-      const shouldStream = (GatewayClient as any).shouldStream as (
-        headers: Record<string, string>
-      ) => boolean;
-
       expect(shouldStream({})).toBe(false);
       expect(shouldStream({ 'content-type': '' })).toBe(false);
     });
 
     it('handles content-type with charset and other params', () => {
-      const shouldStream = (GatewayClient as any).shouldStream as (
-        headers: Record<string, string>
-      ) => boolean;
-
       expect(shouldStream({ 'content-type': 'text/html; charset=utf-8' })).toBe(false);
       expect(shouldStream({ 'content-type': 'application/json; charset=utf-8' })).toBe(false);
     });
 
     it('handles javascript content types', () => {
-      const shouldStream = (GatewayClient as any).shouldStream as (
-        headers: Record<string, string>
-      ) => boolean;
-
       expect(shouldStream({ 'content-type': 'application/javascript' })).toBe(false);
       expect(shouldStream({ 'content-type': 'text/javascript' })).toBe(false);
     });
 
     it('handles form-urlencoded content type', () => {
-      const shouldStream = (GatewayClient as any).shouldStream as (
-        headers: Record<string, string>
-      ) => boolean;
-
       expect(shouldStream({ 'content-type': 'application/x-www-form-urlencoded' })).toBe(false);
     });
 
     it('handles graphql response content type', () => {
-      const shouldStream = (GatewayClient as any).shouldStream as (
-        headers: Record<string, string>
-      ) => boolean;
-
       expect(shouldStream({ 'content-type': 'application/graphql-response+json' })).toBe(false);
     });
 
     it('streams unknown content types', () => {
-      const shouldStream = (GatewayClient as any).shouldStream as (
-        headers: Record<string, string>
-      ) => boolean;
-
       expect(shouldStream({ 'content-type': 'application/unknown' })).toBe(true);
       expect(shouldStream({ 'content-type': 'video/mp4' })).toBe(true);
     });

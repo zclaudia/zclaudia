@@ -31,10 +31,6 @@ import type {
   BackendClientMessage,
   BackendServerMessage,
   GatewayHttpProxyRequest,
-  GatewayHttpProxyResponse,
-  GatewayHttpProxyResponseStart,
-  GatewayHttpProxyResponseChunk,
-  GatewayHttpProxyResponseEnd,
   SubscribeBackendMessage,
   BackendSubscribedMessage,
   UnsubscribeBackendMessage,
@@ -45,6 +41,7 @@ import type { ProjectItem, SessionItem, SessionMessage } from '@zclaudia/protoco
 import type { GatewayBackendInfo } from '@zclaudia/shared/core/server';
 import type { ClientMessage, ServerMessage } from '@zclaudia/shared/wire/messages';
 import { GatewayBackendDataPublisher } from './gateway-backend-data-publisher.js';
+import { handleHttpProxyRequest } from './gateway-http-proxy.js';
 import { createSocksProxyAgent } from './gateway-proxy-agent.js';
 
 // ============================================================================
@@ -780,7 +777,10 @@ export class GatewayClient {
         this.handleCatchUpRequest(msg as unknown as CatchUpContentMessage);
         break;
       case 'http_proxy_request':
-        this.handleHttpProxyRequest(msg as unknown as GatewayHttpProxyRequest);
+        void handleHttpProxyRequest(msg as unknown as GatewayHttpProxyRequest, {
+          serverPort: this.config.serverPort || 3100,
+          sendWs: data => this.sendWs(data),
+        });
         break;
       // Backend subscription events (facade client role)
       case 'backend_subscribed':
@@ -1042,120 +1042,6 @@ export class GatewayClient {
       msg.afterOffset,
       msg.message
     );
-  }
-
-  // ==========================================================================
-  // Internal — HTTP Proxy
-  // ==========================================================================
-
-  private static readonly STREAM_THRESHOLD = 1024 * 1024;
-
-  private static shouldStream(headers: Record<string, string>): boolean {
-    const contentLength = parseInt(headers['content-length'] || '0', 10);
-    if (contentLength > GatewayClient.STREAM_THRESHOLD) return true;
-    const rawCt = (headers['content-type'] || '').toLowerCase();
-    const ct = rawCt.split(';')[0].trim();
-    if (!ct) return false;
-    if (ct.startsWith('text/') || ct === 'application/json' || ct.endsWith('+json')) return false;
-    if (ct === 'application/xml' || ct === 'text/xml' || ct.endsWith('+xml')) return false;
-    if (ct === 'application/javascript' || ct === 'text/javascript') return false;
-    if (ct === 'application/x-www-form-urlencoded') return false;
-    return true;
-  }
-
-  private static isUtf8Response(headers: Record<string, string>): boolean {
-    const rawCt = (headers['content-type'] || '').toLowerCase();
-    const ct = rawCt.split(';')[0].trim();
-    if (!ct) return false;
-    if (ct.startsWith('text/')) return true;
-    if (ct === 'application/json' || ct.endsWith('+json')) return true;
-    if (ct === 'application/xml' || ct === 'text/xml' || ct.endsWith('+xml')) return true;
-    if (ct === 'application/javascript' || ct === 'text/javascript') return true;
-    if (ct === 'application/x-www-form-urlencoded') return true;
-    return false;
-  }
-
-  private static normalizeProxyRequestBody(body: unknown): string | Buffer | undefined {
-    if (body == null) return undefined;
-    if (typeof body === 'string' || Buffer.isBuffer(body)) return body;
-    if (body instanceof Uint8Array) return Buffer.from(body);
-    return JSON.stringify(body);
-  }
-
-  private async handleHttpProxyRequest(msg: GatewayHttpProxyRequest): Promise<void> {
-    const port = this.config.serverPort || 3100;
-    const url = `http://localhost:${port}${msg.path}`;
-    try {
-      const resp = await fetch(url, {
-        method: msg.method,
-        headers: msg.headers,
-        body: !['GET', 'HEAD'].includes(msg.method)
-          ? msg.bodyEncoding === 'base64' && typeof msg.body === 'string'
-            ? Buffer.from(msg.body, 'base64')
-            : GatewayClient.normalizeProxyRequestBody(msg.body)
-          : undefined,
-      });
-      const responseHeaders: Record<string, string> = {};
-      resp.headers.forEach((value, key) => {
-        responseHeaders[key] = value;
-      });
-
-      if (GatewayClient.shouldStream(responseHeaders) && resp.body) {
-        this.sendWs({
-          type: 'http_proxy_response_start',
-          requestId: msg.requestId,
-          statusCode: resp.status,
-          headers: responseHeaders,
-        } satisfies GatewayHttpProxyResponseStart);
-        const reader = resp.body.getReader();
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            this.sendWs({
-              type: 'http_proxy_response_chunk',
-              requestId: msg.requestId,
-              data: Buffer.from(value).toString('base64'),
-            } satisfies GatewayHttpProxyResponseChunk);
-          }
-        } finally {
-          reader.releaseLock();
-        }
-        this.sendWs({
-          type: 'http_proxy_response_end',
-          requestId: msg.requestId,
-        } satisfies GatewayHttpProxyResponseEnd);
-      } else {
-        const bodyEncoding = GatewayClient.isUtf8Response(responseHeaders)
-          ? ('utf8' as const)
-          : ('base64' as const);
-        const body =
-          bodyEncoding === 'utf8'
-            ? await resp.text()
-            : Buffer.from(await resp.arrayBuffer()).toString('base64');
-        this.sendWs({
-          type: 'http_proxy_response',
-          requestId: msg.requestId,
-          statusCode: resp.status,
-          headers: responseHeaders,
-          bodyEncoding,
-          body,
-        } satisfies GatewayHttpProxyResponse);
-      }
-    } catch (error) {
-      console.error('[Gateway] HTTP proxy error:', error);
-      this.sendWs({
-        type: 'http_proxy_response',
-        requestId: msg.requestId,
-        statusCode: 502,
-        headers: { 'content-type': 'application/json' },
-        bodyEncoding: 'utf8',
-        body: JSON.stringify({
-          success: false,
-          error: { code: 'PROXY_ERROR', message: 'Failed to reach local server' },
-        }),
-      } satisfies GatewayHttpProxyResponse);
-    }
   }
 
   // ==========================================================================
