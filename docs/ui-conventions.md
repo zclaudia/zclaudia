@@ -46,3 +46,15 @@ destructive hover, locked (amber) state.
 
 Worked example: the Git panel Status tab keeps its solid commit button as the
 single accent; "Generate" and "stage all" are ghost muted.
+
+## 6. Theme tokens are generated
+
+The color tokens in `apps/desktop/src/styles/index.css` (the four `@generated:tokens`
+blocks) are written by `pnpm --filter @zclaudia/desktop run gen:tokens` from
+`apps/desktop/scripts/tokens/config.mjs`. Never hand-edit those blocks — edit the
+config and regenerate. `gen:tokens:check` verifies the CSS matches the config.
+
+Rules the generator enforces per theme: every neutral sits on the theme's single
+hue axis (light 45°, dark 35°, dark-warm 30°, dark-cool 225°); the surface ladder
+is `sidebar < background < card (= popover)`; WCAG contrast floors (7:1 body text,
+4.5:1 muted text and all solid-fill foreground pairs).
