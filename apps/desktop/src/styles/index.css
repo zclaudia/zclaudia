@@ -3,203 +3,180 @@
 @tailwind utilities;
 
 @layer base {
-  /* Light theme (default) — Apple HIG aligned */
+  /* Light theme (default) — warm paper */
   :root {
-    /* Base colors */
-    --background: 215 22% 98%;
-    --foreground: 0 0% 0%;
-
-    /* Card colors */
-    --card: 215 22% 98%;
-    --sidebar: 215 18% 93%;
-    --card-foreground: 0 0% 0%;
-
-    /* Popover colors */
-    --popover: 215 22% 98%;
-    --popover-foreground: 0 0% 0%;
-
-    /* Primary colors — Apple System Blue #007AFF */
-    --primary: 211 100% 50%;
+    /* @generated:tokens light — edit apps/desktop/scripts/tokens/config.mjs, run pnpm gen:tokens */
+    --background: 45 25% 97%;
+    --foreground: 45 8% 10%;
+    --card: 45 30% 99%;
+    --sidebar: 45 15% 93%;
+    --card-foreground: 45 8% 10%;
+    --popover: 45 30% 99%;
+    --popover-foreground: 45 8% 10%;
+    --secondary: 45 12% 90%;
+    --secondary-foreground: 45 8% 20%;
+    --muted: 45 12% 91%;
+    --muted-foreground: 45 5% 43%;
+    --accent: 45 12% 87%;
+    --accent-foreground: 45 8% 20%;
+    --border: 45 10% 86%;
+    --input: 45 10% 86%;
+    --scrollbar-thumb: 45 8% 75%;
+    --scrollbar-thumb-hover: 45 8% 62%;
+    --terminal-bg: 45 15% 95%;
+    --terminal-fg: 45 8% 10%;
+    --primary: 214 70% 45%;
     --primary-foreground: 0 0% 100%;
-
-    /* Secondary colors — Apple systemGray6 (deepened for stronger button/surface contrast) */
-    --secondary: 215 15% 90%;
-    --secondary-foreground: 0 0% 20%;
-
-    /* Muted colors — Apple systemFill (deepened for stronger button/surface contrast) */
-    --muted: 215 15% 91%;
-    --muted-foreground: 240 3% 46%;
-
-    /* Accent colors (deepened — used as the prominent neutral fill for primary actions) */
-    --accent: 215 16% 87%;
-    --accent-foreground: 0 0% 20%;
-
-    /* Destructive colors — Apple System Red */
-    --destructive: 0 84.2% 60.2%;
+    --ring: 214 70% 45%;
+    --destructive: 4 66% 45%;
     --destructive-foreground: 0 0% 100%;
+    --success: 150 48% 33%;
+    --success-foreground: 150 40% 97%;
+    --warning: 38 80% 44%;
+    --warning-foreground: 35 80% 12%;
+    --thinking: 265 45% 50%;
+    --thinking-foreground: 265 60% 97%;
+    --terminal-cursor: 214 70% 45%;
+    --terminal-selection: 214 70% 88%;
+    /* @generated:tokens end */
 
-    /* Success colors — Apple System Green */
-    --success: 142.1 76.2% 36.3%;
-    --success-foreground: 355.7 100% 97.3%;
-
-    /* Warning colors — Apple System Orange */
-    --warning: 38 92% 50%;
-    --warning-foreground: 48 96% 89%;
-
-    /* Thinking colors */
-    --thinking: 265 60% 55%;
-    --thinking-foreground: 265 80% 98%;
-
-    /* Border and input — Apple subtle separator (deepened to match darker surfaces) */
-    --border: 215 14% 87%;
-    --input: 215 14% 87%;
-    --ring: 211 100% 50%;
-
-    /* Border radius — Apple-like larger corners */
+    /* Radius */
     --radius: 0.75rem;
 
-    /* Apple-style multi-layer shadows */
+    /* Shadows — Apple-style */
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04);
     --shadow-md: 0 2px 8px -1px rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04);
     --shadow-lg: 0 4px 16px -2px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.04);
     --shadow-xl: 0 8px 32px -4px rgb(0 0 0 / 0.12), 0 4px 8px -2px rgb(0 0 0 / 0.06);
-
-    /* Scrollbar colors */
-    --scrollbar-thumb: 240 4% 75%;
-    --scrollbar-thumb-hover: 240 4% 60%;
-
-    /* Terminal colors */
-    --terminal-bg: 240 5% 96%;
-    --terminal-fg: 0 0% 0%;
-    --terminal-cursor: 211 100% 50%;
-    --terminal-selection: 211 100% 90%;
   }
 
-  /* Dark theme — Neutral (default fallback) */
+  /* Dark theme — Neutral (default fallback), warm charcoal */
   .dark {
-    --background: 220 8% 8%;
-    --foreground: 210 15% 93%;
-    --card: 220 7% 10%;
-    --sidebar: 220 8% 6%;
-    --card-foreground: 210 15% 93%;
-    --popover: 220 7% 10%;
-    --popover-foreground: 210 15% 93%;
-    /* Apple System Blue (dark) #0A84FF */
-    --primary: 211 100% 52%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 220 6% 14%;
-    --secondary-foreground: 210 12% 88%;
-    --muted: 220 6% 14%;
-    --muted-foreground: 215 10% 58%;
-    --accent: 220 7% 17%;
-    --accent-foreground: 210 12% 88%;
-    --destructive: 0 62% 55%;
+    /* @generated:tokens dark — edit apps/desktop/scripts/tokens/config.mjs, run pnpm gen:tokens */
+    --background: 35 6% 8.5%;
+    --foreground: 35 10% 91%;
+    --card: 35 6% 11.5%;
+    --sidebar: 35 6% 6.5%;
+    --card-foreground: 35 10% 91%;
+    --popover: 35 6% 11.5%;
+    --popover-foreground: 35 10% 91%;
+    --secondary: 35 5% 14%;
+    --secondary-foreground: 35 8% 86%;
+    --muted: 35 5% 14%;
+    --muted-foreground: 35 6% 60%;
+    --accent: 35 6% 17%;
+    --accent-foreground: 35 8% 86%;
+    --border: 35 6% 17.5%;
+    --input: 35 6% 16%;
+    --scrollbar-thumb: 35 6% 27%;
+    --scrollbar-thumb-hover: 35 6% 35%;
+    --terminal-bg: 35 6% 6.5%;
+    --terminal-fg: 35 10% 91%;
+    --primary: 214 70% 60%;
+    --primary-foreground: 220 20% 10%;
+    --ring: 214 70% 60%;
+    --destructive: 4 62% 48%;
     --destructive-foreground: 0 0% 98%;
-    --success: 142 50% 42%;
-    --success-foreground: 142 60% 10%;
-    --warning: 40 80% 52%;
-    --warning-foreground: 30 70% 12%;
-    --thinking: 265 45% 58%;
-    --thinking-foreground: 265 60% 95%;
-    --border: 220 8% 18%;
-    --input: 220 7% 16%;
-    --ring: 211 100% 52%;
+    --success: 150 40% 52%;
+    --success-foreground: 150 45% 10%;
+    --warning: 40 70% 55%;
+    --warning-foreground: 35 65% 12%;
+    --thinking: 265 42% 65%;
+    --thinking-foreground: 265 60% 10%;
+    --terminal-cursor: 214 70% 60%;
+    --terminal-selection: 35 6% 20%;
+    /* @generated:tokens end */
 
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.2);
     --shadow-md: 0 2px 8px -1px rgb(0 0 0 / 0.3), 0 1px 2px -1px rgb(0 0 0 / 0.2);
     --shadow-lg: 0 4px 16px -2px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.2);
     --shadow-xl: 0 8px 32px -4px rgb(0 0 0 / 0.5), 0 4px 8px -2px rgb(0 0 0 / 0.3);
-
-    --scrollbar-thumb: 220 8% 28%;
-    --scrollbar-thumb-hover: 220 8% 36%;
-    --terminal-bg: 220 8% 6%;
-    --terminal-fg: 210 15% 93%;
-    --terminal-cursor: 211 100% 52%;
-    --terminal-selection: 220 7% 20%;
   }
 
   /* Dark theme — Warm (Notion-like) */
   .dark.dark-warm {
-    --background: 30 6% 7.5%;
-    --foreground: 40 12% 92%;
-    --card: 30 6% 10%;
-    --sidebar: 30 6% 5.5%;
-    --card-foreground: 40 12% 92%;
-    --popover: 30 6% 10%;
-    --popover-foreground: 40 12% 92%;
-    --primary: 211 100% 52%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 28 5% 14%;
-    --secondary-foreground: 35 10% 86%;
-    --muted: 28 5% 14%;
-    --muted-foreground: 30 8% 55%;
-    --accent: 28 6% 17%;
-    --accent-foreground: 35 10% 86%;
-    --destructive: 0 60% 53%;
+    /* @generated:tokens dark-warm — edit apps/desktop/scripts/tokens/config.mjs, run pnpm gen:tokens */
+    --background: 30 7% 8.5%;
+    --foreground: 30 12% 91%;
+    --card: 30 7% 11.5%;
+    --sidebar: 30 7% 6.5%;
+    --card-foreground: 30 12% 91%;
+    --popover: 30 7% 11.5%;
+    --popover-foreground: 30 12% 91%;
+    --secondary: 30 6% 14%;
+    --secondary-foreground: 30 10% 86%;
+    --muted: 30 6% 14%;
+    --muted-foreground: 30 8% 60%;
+    --accent: 30 7% 17%;
+    --accent-foreground: 30 10% 86%;
+    --border: 30 7% 17.5%;
+    --input: 30 7% 16%;
+    --scrollbar-thumb: 30 7% 27%;
+    --scrollbar-thumb-hover: 30 7% 35%;
+    --terminal-bg: 30 7% 6.5%;
+    --terminal-fg: 30 12% 91%;
+    --primary: 214 70% 60%;
+    --primary-foreground: 220 20% 10%;
+    --ring: 214 70% 60%;
+    --destructive: 4 62% 48%;
     --destructive-foreground: 0 0% 98%;
-    --success: 145 48% 40%;
-    --success-foreground: 145 55% 10%;
-    --warning: 42 78% 52%;
-    --warning-foreground: 32 65% 12%;
-    --thinking: 270 40% 55%;
-    --thinking-foreground: 270 50% 95%;
-    --border: 30 7% 18%;
-    --input: 30 6% 16%;
-    --ring: 211 100% 52%;
+    --success: 150 40% 52%;
+    --success-foreground: 150 45% 10%;
+    --warning: 40 70% 55%;
+    --warning-foreground: 35 65% 12%;
+    --thinking: 265 42% 65%;
+    --thinking-foreground: 265 60% 10%;
+    --terminal-cursor: 214 70% 60%;
+    --terminal-selection: 30 7% 20%;
+    /* @generated:tokens end */
 
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.2);
     --shadow-md: 0 2px 8px -1px rgb(0 0 0 / 0.3), 0 1px 2px -1px rgb(0 0 0 / 0.2);
     --shadow-lg: 0 4px 16px -2px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.2);
     --shadow-xl: 0 8px 32px -4px rgb(0 0 0 / 0.5), 0 4px 8px -2px rgb(0 0 0 / 0.3);
-
-    --scrollbar-thumb: 30 6% 26%;
-    --scrollbar-thumb-hover: 30 6% 34%;
-    --terminal-bg: 30 6% 6%;
-    --terminal-fg: 40 12% 92%;
-    --terminal-cursor: 211 100% 52%;
-    --terminal-selection: 28 6% 20%;
   }
 
   /* Dark theme — Cool Blue (VS Code-like) */
   .dark.dark-cool {
-    --background: 225 18% 7%;
-    --foreground: 215 20% 93%;
-    --card: 225 16% 9.5%;
-    --sidebar: 225 18% 5%;
-    --card-foreground: 215 20% 93%;
-    --popover: 225 16% 9.5%;
-    --popover-foreground: 215 20% 93%;
-    --primary: 211 100% 52%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 222 14% 13.5%;
-    --secondary-foreground: 215 15% 87%;
-    --muted: 222 14% 13.5%;
-    --muted-foreground: 218 12% 56%;
-    --accent: 222 15% 17%;
-    --accent-foreground: 215 15% 87%;
-    --destructive: 0 60% 55%;
+    /* @generated:tokens dark-cool — edit apps/desktop/scripts/tokens/config.mjs, run pnpm gen:tokens */
+    --background: 225 13% 8.5%;
+    --foreground: 225 18% 91%;
+    --card: 225 13% 11.5%;
+    --sidebar: 225 13% 6.5%;
+    --card-foreground: 225 18% 91%;
+    --popover: 225 13% 11.5%;
+    --popover-foreground: 225 18% 91%;
+    --secondary: 225 12% 14%;
+    --secondary-foreground: 225 16% 86%;
+    --muted: 225 12% 14%;
+    --muted-foreground: 225 14% 60%;
+    --accent: 225 13% 17%;
+    --accent-foreground: 225 16% 86%;
+    --border: 225 13% 17.5%;
+    --input: 225 13% 16%;
+    --scrollbar-thumb: 225 13% 27%;
+    --scrollbar-thumb-hover: 225 13% 35%;
+    --terminal-bg: 225 13% 6.5%;
+    --terminal-fg: 225 18% 91%;
+    --primary: 214 70% 60%;
+    --primary-foreground: 220 20% 10%;
+    --ring: 214 70% 60%;
+    --destructive: 4 62% 48%;
     --destructive-foreground: 0 0% 98%;
-    --success: 142 52% 43%;
-    --success-foreground: 142 60% 10%;
-    --warning: 42 82% 52%;
-    --warning-foreground: 30 70% 12%;
-    --thinking: 260 50% 60%;
-    --thinking-foreground: 260 60% 95%;
-    --border: 222 16% 19%;
-    --input: 222 14% 16%;
-    --ring: 211 100% 52%;
+    --success: 150 40% 52%;
+    --success-foreground: 150 45% 10%;
+    --warning: 40 70% 55%;
+    --warning-foreground: 35 65% 12%;
+    --thinking: 265 42% 65%;
+    --thinking-foreground: 265 60% 10%;
+    --terminal-cursor: 214 70% 60%;
+    --terminal-selection: 225 13% 20%;
+    /* @generated:tokens end */
 
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.2);
     --shadow-md: 0 2px 8px -1px rgb(0 0 0 / 0.3), 0 1px 2px -1px rgb(0 0 0 / 0.2);
     --shadow-lg: 0 4px 16px -2px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.2);
     --shadow-xl: 0 8px 32px -4px rgb(0 0 0 / 0.5), 0 4px 8px -2px rgb(0 0 0 / 0.3);
-
-    --scrollbar-thumb: 222 14% 28%;
-    --scrollbar-thumb-hover: 222 14% 36%;
-    --terminal-bg: 225 18% 5.5%;
-    --terminal-fg: 215 20% 93%;
-    --terminal-cursor: 211 100% 52%;
-    --terminal-selection: 222 15% 20%;
   }
 }
 
