@@ -33,6 +33,9 @@ inline `<svg>` where a lucide equivalent exists, no emoji-as-icon.
   never `uppercase` + `tracking-*`.
 - Muted micro-text uses exactly two opacity steps: `text-muted-foreground` and
   `text-muted-foreground/60`.
+- Nested sub-section labels (a group heading inside a panel that already has its own
+  header) keep the same size and sentence case but may use `text-foreground` to
+  preserve one level of hierarchy below the muted panel header.
 
 ## 5. One accent per control row
 

@@ -245,7 +245,7 @@ function FileSection({
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
-        <span className="text-[11px] font-medium text-muted-foreground">
+        <span className="text-[11px] font-medium text-foreground">
           {title} <span className="text-muted-foreground">({files.length})</span>
         </span>
         {onAll && (

@@ -192,7 +192,7 @@ function BranchSection({
   if (branches.length === 0) return null;
   return (
     <div>
-      <div className="text-[11px] font-medium text-muted-foreground mb-1">
+      <div className="text-[11px] font-medium text-foreground mb-1">
         {title} <span className="text-muted-foreground">({branches.length})</span>
       </div>
       <div className="bg-secondary/30 border border-border rounded-lg divide-y divide-border overflow-hidden">
