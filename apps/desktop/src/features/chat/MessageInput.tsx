@@ -10,9 +10,10 @@ import {
   Plus,
   ChevronUp,
   ChevronDown,
+  FolderClosed,
 } from 'lucide-react';
 import { Icon } from '../../components/ui/Icon';
-import { getFileIcon } from '../../config/icons';
+import { FileSymbol } from '../../components/filesymbols';
 import type { SlashCommand, FileEntry, SkillRef } from '@zclaudia/shared';
 import { skillRefKey, validateMessageAttachmentFiles } from '@zclaudia/shared';
 import * as api from '../../services/api';
@@ -1004,11 +1005,11 @@ export function MessageInput({
                   index === mentionState.selectedIndex ? 'bg-muted' : ''
                 }`}
               >
-                <Icon
-                  icon={getFileIcon(entry.name, entry.type === 'directory')}
-                  size={16}
-                  className="text-muted-foreground"
-                />
+                {entry.type === 'directory' ? (
+                  <Icon icon={FolderClosed} size={16} className="text-muted-foreground" />
+                ) : (
+                  <FileSymbol name={entry.name} size={16} />
+                )}
                 <span className="flex-1 truncate">{entry.name}</span>
                 {entry.type === 'directory' && (
                   <ChevronRight size={14} className="text-muted-foreground" />
