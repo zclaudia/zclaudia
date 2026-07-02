@@ -29,7 +29,7 @@ resolve_release_repo() {
     git remote -v >&2
     return 1
   fi
-  git remote get-url "$RELEASE_REMOTE" | sed 's/.*github\.com[:/]\(.*\)\.git/\1/'
+  zclaudia_resolve_release_repo "$RELEASE_REMOTE"
 }
 
 # --- Parse args ---

@@ -75,3 +75,15 @@ zclaudia_set_updates_enabled() {
 zclaudia_tauri_semver() {
   echo "$1" | sed 's/^v//; s/-.*//'
 }
+
+# Resolve the GitHub `owner/repo` slug for release uploads: prefer the CI-provided
+# GITHUB_REPOSITORY, else derive it from the named git remote (default: RELEASE_REMOTE or origin).
+# Prints the slug (empty if it cannot be derived). Usage: repo="$(zclaudia_resolve_release_repo)"
+zclaudia_resolve_release_repo() {
+  local remote="${1:-${RELEASE_REMOTE:-origin}}"
+  if [ -n "${GITHUB_REPOSITORY:-}" ]; then
+    echo "$GITHUB_REPOSITORY"
+    return 0
+  fi
+  git remote get-url "$remote" 2>/dev/null | sed 's/.*github\.com[:/]\(.*\)\.git/\1/'
+}
