@@ -1,4 +1,6 @@
-import { ExternalLink, Trash2, GitBranch } from 'lucide-react';
+import { useState } from 'react';
+import { createPortal } from 'react-dom';
+import { ExternalLink, Trash2, GitBranch, MoreHorizontal } from 'lucide-react';
 import type { Session } from '@zclaudia/shared';
 
 interface SessionItemProps {
@@ -58,9 +60,21 @@ export function SessionItem({
   const roleBadge = session.projectRole ? ROLE_BADGES[session.projectRole] : undefined;
   const statusLabel = getStatusLabel(session, isActive, hasPending);
 
-  // Right-side hover actions (desktop only): worktree-delete and/or pop-out.
-  const desktopActionCount = isMobile ? 0 : (onDeleteWorktree ? 1 : 0) + (onPopOut ? 1 : 0);
-  const actionPadding = desktopActionCount >= 2 ? 'pr-12' : desktopActionCount === 1 ? 'pr-6' : '';
+  // Right-side hover actions (desktop only) collapse into a "⋯" dropdown so the
+  // row stays clean — matching the project/session-header menu convention.
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
+  const hasRowMenu = !isMobile && Boolean(onDeleteWorktree || onPopOut);
+  const actionPadding = hasRowMenu ? 'pr-6' : '';
+
+  const openMenu = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (menuPos) {
+      setMenuPos(null);
+      return;
+    }
+    const r = e.currentTarget.getBoundingClientRect();
+    setMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+  };
 
   // Task items under Supervisor use lighter styling
   const selectedClass = isTask ? 'bg-muted/60 text-foreground' : 'bg-accent text-foreground';
@@ -147,36 +161,69 @@ export function SessionItem({
           </span>
         )}
       </button>
-      {!isMobile && (onDeleteWorktree || onPopOut) && (
-        <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          {onDeleteWorktree && (
-            <button
-              onClick={e => {
-                e.stopPropagation();
-                onDeleteWorktree();
-              }}
-              className="p-0.5 rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
-              title={deleteWorktreeTitle}
-              aria-label={deleteWorktreeTitle}
-            >
-              <Trash2 size={11} />
-            </button>
-          )}
-          {onPopOut && (
-            <button
-              onClick={e => {
-                e.stopPropagation();
-                onPopOut();
-              }}
-              className="p-0.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              title="Open in new window"
-              aria-label="Open in new window"
-            >
-              <ExternalLink size={11} />
-            </button>
-          )}
+      {hasRowMenu && (
+        <div
+          className={`absolute right-1 top-1/2 -translate-y-1/2 transition-opacity ${
+            menuPos ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+          }`}
+        >
+          <button
+            onClick={openMenu}
+            className={`p-0.5 rounded-md transition-colors ${
+              menuPos
+                ? 'bg-muted text-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+            }`}
+            title="Session actions"
+            aria-label="Session actions"
+            aria-haspopup="menu"
+            aria-expanded={menuPos != null}
+          >
+            <MoreHorizontal size={13} />
+          </button>
         </div>
       )}
+      {menuPos &&
+        createPortal(
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setMenuPos(null)} />
+            <div
+              role="menu"
+              className="fixed z-50 min-w-44 overflow-hidden rounded-md border border-border bg-popover py-1 shadow-md"
+              style={{ top: menuPos.top, right: menuPos.right }}
+            >
+              {onPopOut && (
+                <button
+                  role="menuitem"
+                  onClick={e => {
+                    e.stopPropagation();
+                    setMenuPos(null);
+                    onPopOut();
+                  }}
+                  className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-foreground hover:bg-secondary"
+                >
+                  <ExternalLink size={13} className="shrink-0 text-muted-foreground" />
+                  Open in new window
+                </button>
+              )}
+              {onDeleteWorktree && (
+                <button
+                  role="menuitem"
+                  onClick={e => {
+                    e.stopPropagation();
+                    setMenuPos(null);
+                    onDeleteWorktree();
+                  }}
+                  className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-destructive hover:bg-destructive/8"
+                >
+                  <Trash2 size={13} className="shrink-0" />
+                  {deleteWorktreeTitle}
+                </button>
+              )}
+            </div>
+          </>,
+          document.body
+        )}
     </div>
   );
 }

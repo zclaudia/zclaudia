@@ -102,7 +102,7 @@ describe('SessionItem', () => {
     expect(screen.queryByText('feat/my-test')).toBeNull();
   });
 
-  it('renders a remove-worktree button that fires onDeleteWorktree without selecting', () => {
+  it('fires onDeleteWorktree from the row menu without selecting', () => {
     const onDeleteWorktree = vi.fn();
     const onSelect = vi.fn();
     render(
@@ -114,8 +114,27 @@ describe('SessionItem', () => {
         onDeleteWorktree={onDeleteWorktree}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Remove worktree' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Session actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove worktree' }));
     expect(onDeleteWorktree).toHaveBeenCalledTimes(1);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('fires onPopOut from the row menu without selecting', () => {
+    const onPopOut = vi.fn();
+    const onSelect = vi.fn();
+    render(
+      <SessionItem
+        session={mockSession}
+        isSelected={false}
+        onSelect={onSelect}
+        hasPending={false}
+        onPopOut={onPopOut}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Session actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Open in new window' }));
+    expect(onPopOut).toHaveBeenCalledTimes(1);
     expect(onSelect).not.toHaveBeenCalled();
   });
 });

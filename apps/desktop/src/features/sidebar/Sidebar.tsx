@@ -390,21 +390,25 @@ export function Sidebar({
 
   const openContextMenu = (e: React.MouseEvent, _type: 'project', id: string) => {
     e.stopPropagation();
-    const clickX = e.clientX;
-    const clickY = e.clientY;
+    // Anchor to the trigger, not the click point — the menu should hang off the
+    // row like a standard dropdown. Vertically it drops below the button; the
+    // ⋯ button isn't the row's rightmost element (a "+" sits after it), so
+    // right-align to the row's edge instead so the menu is flush, not inset.
+    const btn = e.currentTarget.getBoundingClientRect();
+    const row = (e.currentTarget.parentElement ?? e.currentTarget).getBoundingClientRect();
     const menuWidth = isMobile ? 176 : 144;
-    const menuHeight = isMobile ? 190 : 140;
+    const menuHeight = isMobile ? 104 : 60;
     const viewportW = window.innerWidth;
     const viewportH = window.innerHeight;
     const margin = 8;
 
-    let top = clickY + 6;
+    let top = btn.bottom + 4;
     if (top + menuHeight > viewportH - margin) {
-      top = clickY - menuHeight - 6;
+      top = btn.top - menuHeight - 4;
     }
     top = Math.max(margin, Math.min(top, viewportH - menuHeight - margin));
 
-    let left = clickX - menuWidth + 12;
+    let left = row.right - menuWidth;
     left = Math.max(margin, Math.min(left, viewportW - menuWidth - margin));
 
     setContextMenuPos({ top, left });

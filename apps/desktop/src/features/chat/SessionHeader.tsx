@@ -302,7 +302,7 @@ export function SessionHeader({
                   <div className="fixed inset-0 z-[70]" onClick={onToggleSessionMenu} />
                   <div
                     role="menu"
-                    className="absolute right-0 top-full z-[80] mt-1 min-w-[190px] overflow-hidden rounded-xl border border-border/80 bg-card py-1 shadow-xl"
+                    className="absolute right-0 top-full z-[80] mt-1 min-w-44 overflow-hidden rounded-md border border-border bg-popover py-1 shadow-md"
                   >
                     <button
                       role="menuitem"
@@ -311,9 +311,9 @@ export function SessionHeader({
                         onToggleSessionMenu();
                       }}
                       disabled={isLoading}
-                      className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-foreground hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-foreground hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      <RotateCcw size={14} className="text-muted-foreground" />
+                      <RotateCcw size={13} className="shrink-0 text-muted-foreground" />
                       Reset session
                     </button>
                     <button
@@ -322,9 +322,9 @@ export function SessionHeader({
                         onExport();
                         onToggleSessionMenu();
                       }}
-                      className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-foreground hover:bg-secondary"
+                      className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-foreground hover:bg-secondary"
                     >
-                      <Download size={14} className="text-muted-foreground" />
+                      <Download size={13} className="shrink-0 text-muted-foreground" />
                       Export as Markdown
                     </button>
                     {isDesktopTauri && !isStandaloneSessionWindow && (
@@ -334,9 +334,9 @@ export function SessionHeader({
                           onPopOut();
                           onToggleSessionMenu();
                         }}
-                        className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-foreground hover:bg-secondary"
+                        className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-foreground hover:bg-secondary"
                       >
-                        <ExternalLink size={14} className="text-muted-foreground" />
+                        <ExternalLink size={13} className="shrink-0 text-muted-foreground" />
                         Open in new window
                       </button>
                     )}
@@ -349,9 +349,9 @@ export function SessionHeader({
                       }}
                       disabled={archiveDisabled}
                       title={archiveDisabled ? 'Stop the run before archiving' : undefined}
-                      className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-destructive hover:bg-destructive/8 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                      className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-destructive hover:bg-destructive/8 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
                     >
-                      <Archive size={14} />
+                      <Archive size={13} className="shrink-0" />
                       Archive session
                     </button>
                   </div>
@@ -372,7 +372,7 @@ export function SessionHeader({
               {showSessionMenu && (
                 <>
                   <div className="fixed inset-0 z-[70]" onClick={onToggleSessionMenu} />
-                  <div className="fixed right-3 top-[calc(env(safe-area-inset-top,0px)+42px)] z-[80] min-w-[180px] overflow-hidden rounded-xl border border-border/80 bg-card shadow-2xl">
+                  <div className="fixed right-3 top-[calc(env(safe-area-inset-top,0px)+42px)] z-[80] min-w-[180px] overflow-hidden rounded-lg border border-border bg-popover py-1 shadow-md">
                     <button
                       onClick={() => {
                         onResetProviderSession();
@@ -401,7 +401,7 @@ export function SessionHeader({
                       }}
                       disabled={archiveDisabled}
                       title={archiveDisabled ? 'Stop the run before archiving' : undefined}
-                      className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                      className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 text-destructive hover:bg-destructive/8 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                     >
                       <Archive size={14} />
                       Archive
