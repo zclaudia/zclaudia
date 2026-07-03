@@ -5,6 +5,7 @@
   "description": "A cross-platform shell for a zclaudia-owned coding agent",
   "type": "module",
   "scripts": {
+    "predev": "bash scripts/dev/ensure-deps.sh",
     "dev": "bash scripts/with-project-node.sh pnpm -r --parallel run dev",
     "start:clean": "bash scripts/dev/start-app-clean.sh",
     "build": "bash scripts/with-project-node.sh pnpm -r run build",
