@@ -3,9 +3,10 @@ import { act, renderHook } from '@testing-library/react';
 import { useActiveSessionStream } from '../useActiveSessionStream';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useSelectionStore } from '../../stores/selectionStore';
 import { useServerStore } from '../../stores/serverStore';
 import { useOwnershipStore } from '../../stores/ownershipStore';
-import { useRunStore } from '../../stores/runStore';
+import { useChatMessageStore } from '../../stores/chatMessageStore';
 
 describe('useActiveSessionStream', () => {
   const facade = {
@@ -37,7 +38,11 @@ describe('useActiveSessionStream', () => {
       currentInstanceId: null,
       currentDeviceId: null,
       snapshotVersion: 0,
+      reconnectGeneration: 0,
     });
+
+    // useActiveSessionStream sources the active session from the selection store.
+    useSelectionStore.setState({ selectedSessionId: 'session-1' } as any);
 
     useProjectStore.setState({
       projects: [],
@@ -62,18 +67,11 @@ describe('useActiveSessionStream', () => {
       taskOwners: {},
     });
 
-    useRunStore.setState(state => ({
-      ...state,
-      pagination: {
-        ...state.pagination,
-        'session-1': {
-          total: 0,
-          hasMore: false,
-          isLoadingMore: false,
-          maxOffset: 12,
-        },
-      },
-    }));
+    // The route hook reads catch-up offset from the chat message store pagination.
+    useChatMessageStore.setState({
+      messages: {},
+      pagination: { 'session-1': { maxOffset: 12 } },
+    } as any);
   });
 
   it('opens the selected session stream and closes it on unmount', () => {
@@ -126,10 +124,7 @@ describe('useActiveSessionStream', () => {
           'session-2': 'backend-2',
         },
       }));
-      useProjectStore.setState(state => ({
-        ...state,
-        selectedSessionId: 'session-2',
-      }));
+      useSelectionStore.setState({ selectedSessionId: 'session-2' } as any);
       useServerStore.setState(state => ({
         ...state,
         activeServerId: 'backend-2',
