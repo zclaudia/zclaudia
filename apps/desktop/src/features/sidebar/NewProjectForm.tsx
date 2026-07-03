@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { createPortal } from 'react-dom';
 import { FolderOpen } from 'lucide-react';
 import type { NewProjectFormProps } from './types';
 import { DirectoryPickerModal } from './DirectoryPickerModal';
@@ -93,17 +92,13 @@ export function NewProjectForm({
             <FolderOpen size={16} strokeWidth={1.75} />
           </button>
         </div>
-        {pickerOpen &&
-          createPortal(
-            <DirectoryPickerModal
-              open={pickerOpen}
-              backendId={selectedBackendId ?? backends[0]?.backendId ?? null}
-              initialPath={newProjectRootPath.trim() || undefined}
-              onClose={() => setPickerOpen(false)}
-              onSelect={path => onProjectRootPathChange(path)}
-            />,
-            document.body
-          )}
+        <DirectoryPickerModal
+          open={pickerOpen}
+          backendId={selectedBackendId ?? backends[0]?.backendId ?? null}
+          initialPath={newProjectRootPath.trim() || undefined}
+          onClose={() => setPickerOpen(false)}
+          onSelect={path => onProjectRootPathChange(path)}
+        />
         <div className={buttonRowClass}>
           <button
             onClick={onCreateProject}

@@ -179,7 +179,7 @@ export function SessionItem({
             aria-haspopup="menu"
             aria-expanded={menuPos != null}
           >
-            <MoreHorizontal size={13} />
+            <MoreHorizontal size={13} strokeWidth={1.75} />
           </button>
         </div>
       )}
