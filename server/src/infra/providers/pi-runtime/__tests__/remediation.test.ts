@@ -121,6 +121,35 @@ describe('remediationForResult', () => {
     expect(hint === undefined || /\/tmp\/x\.log|full output/.test(hint)).toBe(true);
   });
 
+  it('does not tell Bash to escalate on ambiguous sandbox failures', () => {
+    const hint = remediationForResult(
+      'Bash',
+      det({
+        ok: false,
+        exitCode: 7,
+        sandboxed: true,
+        failureClassification: 'ambiguous_failure',
+        recommendedNextStep: 'Gather more diagnostic output before requesting sandbox escalation.',
+      })
+    );
+    expect(hint).toMatch(/diagnostic/i);
+    expect(hint).toMatch(/before requesting sandbox escalation/i);
+  });
+
+  it('surfaces confirmed Eval sandbox capability guidance', () => {
+    const hint = remediationForResult(
+      'Eval',
+      det({
+        ok: false,
+        sandboxed: true,
+        failureClassification: 'confirmed_sandbox_denial',
+        recommendedNextStep: 'Request SandboxCapabilityAccess for http://127.0.0.1:8000.',
+      })
+    );
+    expect(hint).toMatch(/SandboxCapabilityAccess/);
+    expect(hint).toMatch(/127\.0\.0\.1:8000/);
+  });
+
   it('returns undefined for unknown error codes', () => {
     expect(
       remediationForResult('Grep', det({ ok: false, error: 'some_novel_error' }))

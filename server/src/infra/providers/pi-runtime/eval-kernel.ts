@@ -137,6 +137,8 @@ export interface EvalExecResult {
 export interface EvalKernelOptions {
   workspaceRoot: string;
   readOnly?: boolean;
+  extraAllowedDomains?: string[];
+  unsandboxed?: boolean;
 }
 
 function evalLogPath(): string {
@@ -202,10 +204,13 @@ export class EvalKernel {
       this.scriptPath = path.join(os.tmpdir(), `zclaudia-eval-kernel-${randomUUID()}.cjs`);
       writeFileSync(this.scriptPath, KERNEL_SOURCE, 'utf8');
     }
-    const wrap = await sandbox.wrapCommand(`node "${this.scriptPath}"`, {
-      workspaceRoot: this.options.workspaceRoot,
-      readOnly: this.options.readOnly === true,
-    });
+    const wrap = this.options.unsandboxed
+      ? { sandboxed: false }
+      : await sandbox.wrapCommand(`node "${this.scriptPath}"`, {
+          workspaceRoot: this.options.workspaceRoot,
+          readOnly: this.options.readOnly === true,
+          extraAllowedDomains: this.options.extraAllowedDomains,
+        });
     if (!wrap.sandboxed && this.options.readOnly === true) {
       return {
         ok: false,
@@ -328,6 +333,19 @@ export function getEvalKernel(key: string, options: EvalKernelOptions): EvalKern
     kernels.set(key, kernel);
   }
   return kernel;
+}
+
+export async function runOneShotEval(
+  options: EvalKernelOptions,
+  code: string,
+  opts?: { timeoutMs?: number }
+): Promise<EvalExecResult> {
+  const kernel = new EvalKernel(options);
+  try {
+    return await kernel.exec(code, opts);
+  } finally {
+    kernel.shutdown();
+  }
 }
 
 export async function __shutdownAllEvalKernelsForTests(): Promise<void> {

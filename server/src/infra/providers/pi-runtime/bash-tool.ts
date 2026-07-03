@@ -28,10 +28,12 @@ import { extractBashOutputInsights, formatBashResultText } from './bash-output.j
 import { registerInflightForegroundCommand } from './inflight-bash-registry.js';
 import * as sandbox from './sandbox.js';
 import {
-  detectSandboxDenial,
-  MAX_ESCALATION_ITERATIONS,
-  SANDBOX_NETWORK_ESCALATION_TOOL,
-} from './sandbox-denial.js';
+  networkGrantToAllowedDomain,
+  runSandboxedWithEscalation,
+  type SandboxGrant,
+  type SandboxOperationResult,
+  type SandboxPrivilegeMode,
+} from './sandbox-execution/index.js';
 import { errorResult, textResult, toolParams, truncateText } from './tool-common.js';
 import { resolveInsideWorkspace, toWorkspaceRelative } from './workspace-paths.js';
 
@@ -47,6 +49,10 @@ function sandboxInvocation(wrap: sandbox.WrapResult): SandboxInvocation | undefi
   if (!wrap.sandboxed) return undefined;
   if (!wrap.argv || !wrap.env) return undefined;
   return { argv: wrap.argv, env: wrap.env };
+}
+
+function parseSandboxMode(value: unknown): SandboxPrivilegeMode {
+  return value === 'sandbox' || value === 'unsandboxed' ? value : 'auto';
 }
 
 /**
@@ -98,13 +104,6 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
   const UPDATE_THROTTLE_MS = 100;
   const DEFAULT_AUTO_BACKGROUND_MS = 60_000;
   const grantedDomains = new Set<string>(options?.sandboxAllowedDomains ?? []);
-  const buildEscalationDetail = (hosts: string[]): string => {
-    const plural = hosts.length > 1;
-    return (
-      `This command tried to reach ${plural ? 'domains' : 'a domain'} not on the network allow-list: ${hosts.join(', ')}. ` +
-      `Approving allows ${plural ? 'them' : 'it'} for this session and re-runs the entire command - make sure the command is safe to repeat.`
-    );
-  };
   return {
     name: 'Bash',
     label: 'Bash',
@@ -125,6 +124,18 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
           description:
             'Run the command as a detached background task. Returns a taskId immediately; poll output with TaskOutput, stop with Monitor. timeout is ignored in background mode.',
         },
+        sandbox_mode: {
+          type: 'string',
+          enum: ['auto', 'sandbox', 'unsandboxed'],
+          default: 'auto',
+          description:
+            'Privilege mode for this call. auto runs sandboxed first and may request least-privilege access; sandbox forbids host execution; unsandboxed requests one-shot host execution and requires privilege_reason.',
+        },
+        privilege_reason: {
+          type: 'string',
+          description:
+            'Required when sandbox_mode is unsandboxed; explain why host execution is necessary.',
+        },
       },
       required: ['command'],
     }),
@@ -137,6 +148,9 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
       const args = toolParams(toolCallId, params);
       const command = typeof args.command === 'string' ? args.command : '';
       if (!command.trim()) return errorResult('missing_command', 'Bash requires a command');
+      const sandboxMode = parseSandboxMode(args.sandbox_mode);
+      const privilegeReason =
+        typeof args.privilege_reason === 'string' ? args.privilege_reason.trim() : undefined;
 
       const critical = findCriticalBashPattern(command);
       if (critical) {
@@ -241,6 +255,31 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
       const sandboxRequired = Boolean(critical);
 
       if (args.run_in_background === true) {
+        const privilegeGate =
+          sandboxMode === 'unsandboxed'
+            ? await runSandboxedWithEscalation({
+                toolCallId,
+                toolName: 'Bash',
+                sourceText: command,
+                allowedDomains: new Set([...sandbox.DEFAULT_ALLOWED_DOMAINS, ...grantedDomains]),
+                sandboxMode,
+                privilegeReason,
+                permissionCallback: options?.permissionCallback,
+                operation: async () => ({ ok: true, sandboxed: true, outputText: '' }),
+                unsandboxedOperation: async () => ({
+                  ok: true,
+                  sandboxed: false,
+                  outputText: '',
+                }),
+              })
+            : undefined;
+        if (privilegeGate && !privilegeGate.result.ok) {
+          return textResult(privilegeGate.result.outputText || '(no output)', {
+            ok: false,
+            ...privilegeGate.details,
+            sandboxed: privilegeGate.result.sandboxed,
+          });
+        }
         const db = options?.db;
         if (!db)
           return errorResult(
@@ -261,6 +300,10 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
             cwd: runCwd,
             workspaceRoot: cwd,
             sandboxAllowedDomains: [...grantedDomains],
+            privilegePlan: {
+              mode: sandboxMode === 'unsandboxed' ? 'unsandboxed' : 'sandbox',
+              grants: [],
+            },
             ...(sandboxRequired ? { sandboxRequired: true } : {}),
           },
         });
@@ -278,6 +321,7 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
               pid: started.executorRef?.pid,
               logPath: commandTaskLogPath(task.id),
               sandboxed,
+              ...(privilegeGate?.details ?? {}),
             }
           );
         } catch (err) {
@@ -334,60 +378,93 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
           }
         : undefined;
 
-      let wrap = await sandbox.wrapCommand(command, {
-        workspaceRoot: cwd,
-        readOnly: options?.sandboxReadOnly === true,
-        extraAllowedDomains: [...grantedDomains],
-        signal,
-      });
-      if (!wrap.sandboxed && options?.sandboxReadOnly === true) {
-        return errorResult(
-          'sandbox_unavailable_plan_mode',
-          'Read-only Bash requires the sandbox, which is not active for this command'
-        );
-      }
-      if (!wrap.sandboxed && sandboxRequired) {
-        return errorResult(
-          'sandbox_required_for_critical_command',
-          'Command requires sandbox isolation because it matched a critical-risk Bash pattern, but the sandbox is unavailable.',
-          { reason: critical?.reason }
-        );
-      }
-      const initialSandbox = sandboxInvocation(wrap);
-      if (wrap.sandboxed && !initialSandbox) {
-        return errorResult(
-          'sandbox_wrap_invalid',
-          'Sandbox command wrapper did not return argv/env'
-        );
-      }
-      let result = await runForegroundBash({
-        command,
-        cwd: runCwd,
-        timeoutSec,
-        signal,
-        onChunk,
-        autoBackgroundMs,
-        sandbox: initialSandbox,
-      });
-
-      const permissionCallback = options?.permissionCallback;
-      const canEscalate =
-        wrap.sandboxed && options?.sandboxReadOnly !== true && !!permissionCallback;
-      for (let iteration = 0; canEscalate && iteration < MAX_ESCALATION_ITERATIONS; iteration++) {
-        if (result.handoff || result.aborted || result.exitCode === 0) break;
-        const allowedNow = new Set<string>([...sandbox.DEFAULT_ALLOWED_DOMAINS, ...grantedDomains]);
-        const denial = detectSandboxDenial(command, result.fullOutput, allowedNow);
-        if (!denial) break;
-        const decision = await permissionCallback({
-          requestId: `${toolCallId}:sandbox-net:${iteration}`,
-          toolName: SANDBOX_NETWORK_ESCALATION_TOOL,
-          toolInput: { command, hosts: denial.hosts },
-          detail: buildEscalationDetail(denial.hosts),
-          timeoutSeconds: 0,
-          timeoutBehavior: 'deny',
+      type BashOperation = SandboxOperationResult & {
+        raw?: BashRunResult;
+        wrap?: sandbox.WrapResult;
+        errorCode?: string;
+        errorDetails?: Record<string, unknown>;
+      };
+      const runOnce = async (
+        grants: SandboxGrant[],
+        forceUnsandboxed = false
+      ): Promise<BashOperation> => {
+        const extraAllowedDomains = [
+          ...grantedDomains,
+          ...grants
+            .filter((grant): grant is Extract<SandboxGrant, { type: 'network' }> => grant.type === 'network')
+            .map(networkGrantToAllowedDomain),
+        ];
+        const wrap = forceUnsandboxed
+          ? ({ sandboxed: false } as sandbox.WrapResult)
+          : await sandbox.wrapCommand(command, {
+              workspaceRoot: cwd,
+              readOnly: options?.sandboxReadOnly === true,
+              extraAllowedDomains,
+              signal,
+            });
+        if (!wrap.sandboxed && options?.sandboxReadOnly === true && !forceUnsandboxed) {
+          return {
+            ok: false,
+            sandboxed: false,
+            outputText: 'Read-only Bash requires the sandbox, which is not active for this command',
+            exitCode: null,
+            errorCode: 'sandbox_unavailable_plan_mode',
+          };
+        }
+        if (!wrap.sandboxed && sandboxRequired && !forceUnsandboxed) {
+          return {
+            ok: false,
+            sandboxed: false,
+            outputText:
+              'Command requires sandbox isolation because it matched a critical-risk Bash pattern, but the sandbox is unavailable.',
+            exitCode: null,
+            errorCode: 'sandbox_required_for_critical_command',
+            errorDetails: { reason: critical?.reason },
+          };
+        }
+        const sandboxArgs = sandboxInvocation(wrap);
+        if (wrap.sandboxed && !sandboxArgs) {
+          return {
+            ok: false,
+            sandboxed: true,
+            outputText: 'Sandbox command wrapper did not return argv/env',
+            exitCode: null,
+            errorCode: 'sandbox_wrap_invalid',
+          };
+        }
+        const raw = await runForegroundBash({
+          command,
+          cwd: runCwd,
+          timeoutSec,
+          signal,
+          onChunk,
+          autoBackgroundMs,
+          sandbox: sandboxArgs,
         });
-        if (decision.behavior !== 'allow') break;
-        for (const host of denial.hosts) {
+        return {
+          ok: raw.exitCode === 0 && !raw.timedOut,
+          sandboxed: wrap.sandboxed,
+          outputText: raw.fullOutput,
+          exitCode: raw.exitCode,
+          timedOut: raw.timedOut,
+          raw,
+          wrap,
+        };
+      };
+
+      const escalated = await runSandboxedWithEscalation({
+        toolCallId,
+        toolName: 'Bash',
+        sourceText: command,
+        allowedDomains: new Set([...sandbox.DEFAULT_ALLOWED_DOMAINS, ...grantedDomains]),
+        sandboxMode,
+        privilegeReason,
+        permissionCallback: options?.permissionCallback,
+        operation: grants => runOnce(grants),
+        unsandboxedOperation: () => runOnce([], true),
+        persistGrant: grant => {
+          if (grant.type !== 'network') return;
+          const host = networkGrantToAllowedDomain(grant);
           grantedDomains.add(host);
           if (options?.db && options?.sessionId) {
             try {
@@ -396,29 +473,23 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
               console.warn('[sandbox] failed to persist session network grant; continuing:', err);
             }
           }
-        }
-        wrap = await sandbox.wrapCommand(command, {
-          workspaceRoot: cwd,
-          readOnly: options?.sandboxReadOnly === true,
-          extraAllowedDomains: [...grantedDomains],
-          signal,
-        });
-        if (!wrap.sandboxed) break;
-        const retrySandbox = sandboxInvocation(wrap);
-        if (!retrySandbox) {
-          return errorResult(
-            'sandbox_wrap_invalid',
-            'Sandbox command wrapper did not return argv/env'
-          );
-        }
-        result = await runForegroundBash({
-          command,
-          cwd: runCwd,
-          timeoutSec,
-          signal,
-          onChunk,
-          autoBackgroundMs,
-          sandbox: retrySandbox,
+        },
+      });
+      const operationResult = escalated.result as BashOperation;
+      if (operationResult.errorCode) {
+        return errorResult(
+          operationResult.errorCode,
+          operationResult.outputText,
+          operationResult.errorDetails
+        );
+      }
+      const result = operationResult.raw;
+      const wrap = operationResult.wrap ?? ({ sandboxed: operationResult.sandboxed } as sandbox.WrapResult);
+      if (!result) {
+        return textResult(operationResult.outputText || '(no output)', {
+          ok: operationResult.ok,
+          ...escalated.details,
+          sandboxed: operationResult.sandboxed,
         });
       }
 
@@ -448,6 +519,10 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
               autoBackgrounded: true,
               sandboxAllowedDomains: [...grantedDomains],
               sandboxed: wrap.sandboxed,
+              privilegePlan: {
+                mode: escalated.details.privilegeMode === 'unsandboxed' ? 'unsandboxed' : 'sandbox',
+                grants: escalated.details.grantsUsed ?? [],
+              },
               ...(sandboxRequired ? { sandboxRequired: true } : {}),
             },
           });
@@ -474,6 +549,7 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
               pid: handoff.child.pid,
               logPath: commandTaskLogPath(task.id),
               durationMs: result.durationMs,
+              ...escalated.details,
               sandboxed: wrap.sandboxed,
             }
           );
@@ -511,6 +587,7 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
           exitCode: null,
           truncated: result.truncated,
           durationMs: result.durationMs,
+          ...escalated.details,
           sandboxed: wrap.sandboxed,
           ...(fullOutputPath ? { fullOutputPath } : {}),
           ...(insights.diagnostics.length ? { diagnostics: insights.diagnostics } : {}),
@@ -552,6 +629,7 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
         timedOut: result.timedOut,
         ...(fullOutputPath ? { fullOutputPath } : {}),
         durationMs: result.durationMs,
+        ...escalated.details,
         sandboxed: wrap.sandboxed,
         ...(insights.diagnostics.length ? { diagnostics: insights.diagnostics } : {}),
         ...(insights.failedTests.length ? { failedTests: insights.failedTests } : {}),

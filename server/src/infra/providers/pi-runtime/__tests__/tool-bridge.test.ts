@@ -2754,6 +2754,59 @@ describe('Bash bridge tool', () => {
     expect(onDisk).toContain('1\n');
     expect(onDisk.trim().endsWith('5000')).toBe(true);
   });
+
+  it('exposes sandbox_mode and privilege_reason parameters', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-bash-priv-schema-'));
+    const bash = bashTool(dir);
+    rmSync(dir, { recursive: true, force: true });
+
+    expect(bash.parameters.properties.sandbox_mode.enum).toEqual([
+      'auto',
+      'sandbox',
+      'unsandboxed',
+    ]);
+    expect(bash.parameters.properties.privilege_reason.type).toBe('string');
+  });
+
+  it('requires privilege_reason for unsandboxed Bash', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-bash-priv-reason-'));
+    const permissionCallback = vi.fn();
+    const bash = buildTools(dir, { enabled: ['Bash'], permissionCallback }).find(
+      (t: any) => t.name === 'Bash'
+    ) as any;
+
+    const res = await bash.execute('bash-unsandboxed-no-reason', {
+      command: 'echo host',
+      sandbox_mode: 'unsandboxed',
+    });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(permissionCallback).not.toHaveBeenCalled();
+    expect(res.details.ok).toBe(false);
+    expect(res.content[0].text).toContain('privilege_reason');
+  });
+
+  it('requests unsandboxed permission before host Bash execution', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-bash-priv-host-'));
+    const permissionCallback = vi.fn(async () => ({ behavior: 'allow' }));
+    const bash = buildTools(dir, { enabled: ['Bash'], permissionCallback }).find(
+      (t: any) => t.name === 'Bash'
+    ) as any;
+
+    const res = await bash.execute('bash-unsandboxed-yes', {
+      command: 'echo HOST_OK',
+      sandbox_mode: 'unsandboxed',
+      privilege_reason: 'Need to verify host execution path.',
+    });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(permissionCallback).toHaveBeenCalledWith(
+      expect.objectContaining({ toolName: 'SandboxUnsandboxedAccess' })
+    );
+    expect(res.content[0].text).toContain('HOST_OK');
+    expect(res.details.privilegeMode).toBe('unsandboxed');
+    expect(res.details.unsandboxedApproved).toBe(true);
+  });
 });
 
 describe('Read image files', () => {

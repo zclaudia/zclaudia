@@ -9,6 +9,10 @@ import type { TaskExecutorUpdate } from '../../../domains/tasks/executors/types.
 import { killProcessTree } from './bash-runner.js';
 import { pidAlive, resolveDataDir } from '../../../domains/tasks/executors/command-executor.js';
 import * as sandbox from './sandbox.js';
+import {
+  networkGrantToAllowedDomain,
+  type SandboxGrant,
+} from './sandbox-execution/index.js';
 import { readTaskLogWindow } from './task-output-window.js';
 import { errorResult, textResult, truncateText } from './tool-common.js';
 import type { TaskRuntime } from './task-runtime.js';
@@ -118,6 +122,17 @@ export class EvalTaskRuntime implements TaskRuntime {
       typeof metadata.timeoutMs === 'number' && Number.isFinite(metadata.timeoutMs)
         ? metadata.timeoutMs
         : 30_000;
+    const privilegePlan =
+      metadata.privilegePlan && typeof metadata.privilegePlan === 'object'
+        ? (metadata.privilegePlan as { mode?: unknown; grants?: unknown })
+        : undefined;
+    const privilegeGrants = Array.isArray(privilegePlan?.grants)
+      ? (privilegePlan.grants.filter(
+          (grant): grant is SandboxGrant =>
+            !!grant && typeof grant === 'object' && (grant as { type?: unknown }).type === 'network'
+        ) as SandboxGrant[])
+      : [];
+    const extraAllowedDomains = privilegeGrants.map(networkGrantToAllowedDomain);
     const logPath = evalTaskLogPath(task.id);
     const resultPath = evalTaskResultPath(task.id);
     mkdirSync(path.dirname(logPath), { recursive: true });
@@ -128,13 +143,17 @@ export class EvalTaskRuntime implements TaskRuntime {
       mode: 0o600,
     });
 
-    const wrap = await sandbox.wrapCommand(
-      `${shellQuote(process.execPath)} ${shellQuote(scriptPath)} ${shellQuote(payloadPath)}`,
-      {
-        workspaceRoot,
-        readOnly,
-      }
-    );
+    const forceUnsandboxed = privilegePlan?.mode === 'unsandboxed';
+    const wrap = forceUnsandboxed
+      ? ({ sandboxed: false } as sandbox.WrapResult)
+      : await sandbox.wrapCommand(
+          `${shellQuote(process.execPath)} ${shellQuote(scriptPath)} ${shellQuote(payloadPath)}`,
+          {
+            workspaceRoot,
+            readOnly,
+            extraAllowedDomains,
+          }
+        );
     if (!wrap.sandboxed && readOnly) {
       throw new Error('Eval task in read-only mode requires the sandbox, which is not available.');
     }

@@ -1,11 +1,21 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type Database from 'better-sqlite3';
 
+import { persistSessionSandboxDomain } from '../../../application/conversation/agent/permission-memory.js';
 import { TaskRepository } from '../../../domains/tasks/repository.js';
 import { TaskService } from '../../../domains/tasks/task-service.js';
-import { getEvalKernel } from './eval-kernel.js';
+import type { PermissionCallback } from '../types.js';
+import { getEvalKernel, runOneShotEval, type EvalExecResult } from './eval-kernel.js';
 import { EvalTaskRuntime } from './eval-task-runtime.js';
 import { findBashSensitivePathAccess } from './bash-guards.js';
+import * as sandbox from './sandbox.js';
+import {
+  networkGrantToAllowedDomain,
+  runSandboxedWithEscalation,
+  type SandboxGrant,
+  type SandboxOperationResult,
+  type SandboxPrivilegeMode,
+} from './sandbox-execution/index.js';
 import { errorResult, textResult, toolParams } from './tool-common.js';
 
 export interface EvalBridgeToolOptions {
@@ -13,6 +23,8 @@ export interface EvalBridgeToolOptions {
   runId?: string;
   db?: Database.Database;
   sandboxReadOnly?: boolean;
+  sandboxAllowedDomains?: string[];
+  permissionCallback?: PermissionCallback;
 }
 
 function parseEvalTimeout(
@@ -36,6 +48,19 @@ function parseEvalTimeout(
     };
   }
   return { ok: true, timeoutMs: value * 1000 };
+}
+
+function parseSandboxMode(value: unknown): SandboxPrivilegeMode {
+  return value === 'sandbox' || value === 'unsandboxed' ? value : 'auto';
+}
+
+function formatEvalResultText(result: EvalExecResult): string {
+  let text = result.output || '';
+  if (result.error) text = text ? `${text}\n${result.error}` : result.error;
+  if (result.outputTruncated && result.fullOutputPath) {
+    text = `${text}\n... [eval output truncated; full output: ${result.fullOutputPath}]`;
+  }
+  return text || '(no output)';
 }
 
 export function createEvalBridgeTool(cwd: string, options?: EvalBridgeToolOptions): AgentTool<any> {
@@ -64,6 +89,18 @@ export function createEvalBridgeTool(cwd: string, options?: EvalBridgeToolOption
           description:
             'Run this code as an isolated one-shot background task. Does not use or mutate the persistent Eval kernel.',
         },
+        sandbox_mode: {
+          type: 'string',
+          enum: ['auto', 'sandbox', 'unsandboxed'],
+          default: 'auto',
+          description:
+            'Sandbox privilege mode. auto retries only confirmed sandbox capability denials with permission; sandbox never escalates; unsandboxed requires privilege_reason and explicit approval.',
+        },
+        privilege_reason: {
+          type: 'string',
+          description:
+            'Required when sandbox_mode is unsandboxed; explain why the sandbox cannot be used.',
+        },
       },
       required: ['code'],
     } as any,
@@ -72,11 +109,15 @@ export function createEvalBridgeTool(cwd: string, options?: EvalBridgeToolOption
       if (typeof args.code !== 'string' || !args.code.trim()) {
         return errorResult('missing_code', 'Eval requires code');
       }
+      const code = args.code;
       const timeout = parseEvalTimeout(args.timeout);
       if (!timeout.ok) {
         return errorResult('invalid_timeout', timeout.message, timeout.details);
       }
-      const sensitivePath = findBashSensitivePathAccess(args.code);
+      const sandboxMode = parseSandboxMode(args.sandbox_mode);
+      const privilegeReason =
+        typeof args.privilege_reason === 'string' ? args.privilege_reason : undefined;
+      const sensitivePath = findBashSensitivePathAccess(code);
       if (sensitivePath) {
         return errorResult(
           'eval_sensitive_path_blocked',
@@ -88,6 +129,34 @@ export function createEvalBridgeTool(cwd: string, options?: EvalBridgeToolOption
         );
       }
       if (args.run_in_background === true) {
+        const privilegeGate =
+          sandboxMode === 'unsandboxed'
+            ? await runSandboxedWithEscalation({
+                toolCallId,
+                toolName: 'Eval',
+                sourceText: code,
+                allowedDomains: new Set([
+                  ...sandbox.DEFAULT_ALLOWED_DOMAINS,
+                  ...(options?.sandboxAllowedDomains ?? []),
+                ]),
+                sandboxMode,
+                privilegeReason,
+                permissionCallback: options?.permissionCallback,
+                operation: async () => ({ ok: true, sandboxed: true, outputText: '' }),
+                unsandboxedOperation: async () => ({
+                  ok: true,
+                  sandboxed: false,
+                  outputText: '',
+                }),
+              })
+            : undefined;
+        if (privilegeGate && !privilegeGate.result.ok) {
+          return textResult(privilegeGate.result.outputText || '(no output)', {
+            ok: false,
+            ...privilegeGate.details,
+            sandboxed: privilegeGate.result.sandboxed,
+          });
+        }
         if (!options?.db)
           return errorResult(
             'missing_db_context',
@@ -104,10 +173,14 @@ export function createEvalBridgeTool(cwd: string, options?: EvalBridgeToolOption
           parentRunId: options.runId,
           parentToolUseId: typeof toolCallId === 'string' ? toolCallId : undefined,
           metadata: {
-            code: args.code,
+            code,
             workspaceRoot: cwd,
             readOnly: options.sandboxReadOnly === true,
             ...(timeout.timeoutMs !== undefined ? { timeoutMs: timeout.timeoutMs } : {}),
+            privilegePlan: {
+              mode: sandboxMode === 'unsandboxed' ? 'unsandboxed' : 'sandbox',
+              grants: [],
+            },
           },
         });
         try {
@@ -120,6 +193,7 @@ export function createEvalBridgeTool(cwd: string, options?: EvalBridgeToolOption
             taskId: running.id,
             status: running.status,
             type: 'eval',
+            ...(privilegeGate?.details ?? {}),
           });
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
@@ -128,25 +202,92 @@ export function createEvalBridgeTool(cwd: string, options?: EvalBridgeToolOption
         }
       }
       const readOnly = options?.sandboxReadOnly === true;
-      const kernelKey = `${options?.sessionId ?? `cwd:${cwd}`}:${readOnly ? 'ro' : 'rw'}`;
-      const kernel = getEvalKernel(kernelKey, { workspaceRoot: cwd, readOnly });
-      const result = await kernel.exec(args.code, {
-        ...(timeout.timeoutMs !== undefined ? { timeoutMs: timeout.timeoutMs } : {}),
-        reset: args.reset === true,
+      const grantedDomains = new Set(options?.sandboxAllowedDomains ?? []);
+      type EvalOperation = SandboxOperationResult & { evalResult?: EvalExecResult };
+      const runEval = async (
+        grants: SandboxGrant[],
+        forceUnsandboxed = false
+      ): Promise<EvalOperation> => {
+        const extraAllowedDomains = [
+          ...grantedDomains,
+          ...grants
+            .filter(
+              (grant): grant is Extract<SandboxGrant, { type: 'network' }> =>
+                grant.type === 'network'
+            )
+            .map(networkGrantToAllowedDomain),
+        ];
+        const privilegeKey = forceUnsandboxed
+          ? 'unsandboxed'
+          : extraAllowedDomains.length > 0
+            ? `sandbox:${extraAllowedDomains.sort().join(',')}`
+            : 'sandbox';
+        const kernelKey = `${options?.sessionId ?? `cwd:${cwd}`}:${
+          readOnly ? 'ro' : 'rw'
+        }:${privilegeKey}`;
+        const evalOptions = {
+          workspaceRoot: cwd,
+          readOnly,
+          extraAllowedDomains,
+          unsandboxed: forceUnsandboxed,
+        };
+        const result =
+          forceUnsandboxed && args.reset === true
+            ? await runOneShotEval(evalOptions, code, {
+                ...(timeout.timeoutMs !== undefined ? { timeoutMs: timeout.timeoutMs } : {}),
+              })
+            : await getEvalKernel(kernelKey, evalOptions).exec(code, {
+                ...(timeout.timeoutMs !== undefined ? { timeoutMs: timeout.timeoutMs } : {}),
+                reset: args.reset === true,
+              });
+        return {
+          ok: result.ok,
+          sandboxed: result.sandboxed !== false,
+          outputText: formatEvalResultText(result),
+          timedOut: result.timedOut,
+          evalResult: result,
+        };
+      };
+      const escalated = await runSandboxedWithEscalation({
+        toolCallId,
+        toolName: 'Eval',
+        sourceText: code,
+        allowedDomains: new Set([...sandbox.DEFAULT_ALLOWED_DOMAINS, ...grantedDomains]),
+        sandboxMode,
+        privilegeReason,
+        permissionCallback: options?.permissionCallback,
+        operation: grants => runEval(grants),
+        unsandboxedOperation: () => runEval([], true),
+        persistGrant: grant => {
+          if (grant.type !== 'network') return;
+          const host = networkGrantToAllowedDomain(grant);
+          grantedDomains.add(host);
+          if (options?.db && options?.sessionId) {
+            try {
+              persistSessionSandboxDomain(options.db, options.sessionId, host);
+            } catch (err) {
+              console.warn('[sandbox] failed to persist session network grant; continuing:', err);
+            }
+          }
+        },
       });
-      let text = result.output || '';
-      if (result.error) text = text ? `${text}\n${result.error}` : result.error;
-      if (result.outputTruncated && result.fullOutputPath) {
-        text = `${text}\n... [eval output truncated; full output: ${result.fullOutputPath}]`;
+      const operationResult = escalated.result as EvalOperation;
+      const result = operationResult.evalResult;
+      if (!result) {
+        return textResult(operationResult.outputText || '(no output)', {
+          ok: operationResult.ok,
+          ...escalated.details,
+          sandboxed: operationResult.sandboxed,
+        });
       }
-      if (!text) text = '(no output)';
-      return textResult(text, {
+      return textResult(operationResult.outputText, {
         ok: result.ok,
         ...(result.timedOut ? { timedOut: true } : {}),
         ...(result.kernelRestarted ? { kernelRestarted: true } : {}),
         ...(result.sandboxed !== undefined ? { sandboxed: result.sandboxed } : {}),
         ...(result.outputTruncated ? { outputTruncated: true } : {}),
         ...(result.fullOutputPath ? { fullOutputPath: result.fullOutputPath } : {}),
+        ...escalated.details,
       });
     },
   } as unknown as AgentTool<any>;

@@ -50,6 +50,24 @@ function bashHint(details: NonNullable<ToolDetails>): string | undefined {
   return undefined;
 }
 
+function sandboxExecutionHint(details: NonNullable<ToolDetails>): string | undefined {
+  const classification =
+    typeof details.failureClassification === 'string' ? details.failureClassification : undefined;
+  if (!classification) return undefined;
+  const nextStep =
+    typeof details.recommendedNextStep === 'string' ? details.recommendedNextStep : undefined;
+  switch (classification) {
+    case 'confirmed_sandbox_denial':
+      return nextStep ?? 'This is a confirmed sandbox denial. Request the specific sandbox capability rather than switching to unsandboxed execution.';
+    case 'probable_sandbox_denial':
+      return nextStep ?? 'This may be a sandbox denial, but evidence is incomplete. Collect one more diagnostic signal before requesting escalation.';
+    case 'ambiguous_failure':
+      return nextStep ?? 'Do not assume this failure is a permission issue. Inspect the command output and gather diagnostics before requesting sandbox escalation.';
+    default:
+      return undefined;
+  }
+}
+
 function pathArg(args: Record<string, unknown> | undefined): string | undefined {
   const value = args?.path ?? args?.file_path ?? args?.filePath;
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
@@ -248,6 +266,8 @@ export function remediationForResult(toolName: string, details: ToolDetails): st
   }
 
   if (toolName === 'Bash') {
+    const sandboxHint = sandboxExecutionHint(details);
+    if (sandboxHint) return sandboxHint;
     const hint = bashHint(details);
     if (hint) return hint;
     if (
@@ -257,6 +277,11 @@ export function remediationForResult(toolName: string, details: ToolDetails): st
     ) {
       return `The command failed; full output is at ${details.fullOutputPath} if the tail above is not enough.`;
     }
+  }
+
+  if (toolName === 'Eval') {
+    const sandboxHint = sandboxExecutionHint(details);
+    if (sandboxHint) return sandboxHint;
   }
   return undefined;
 }

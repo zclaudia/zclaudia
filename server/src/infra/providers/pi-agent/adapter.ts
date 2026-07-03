@@ -25,7 +25,11 @@ import {
 } from '../pi-runtime/index.js';
 import { resolveEnvModel } from '../pi-runtime/env-model.js';
 import { isSandboxAvailable } from '../pi-runtime/sandbox.js';
-import { SANDBOX_NETWORK_ESCALATION_TOOL } from '../pi-runtime/sandbox-denial.js';
+import {
+  SANDBOX_CAPABILITY_ACCESS_TOOL,
+  SANDBOX_NETWORK_ACCESS_COMPAT_TOOL,
+  SANDBOX_UNSANDBOXED_ACCESS_TOOL,
+} from '../pi-runtime/sandbox-execution/index.js';
 import { formatMcpInstructionsForPrompt } from '../pi-runtime/index.js';
 import { SqliteSessionStorage } from '../pi-runtime/session-tree/index.js';
 import {
@@ -72,7 +76,11 @@ const policy: ProviderPolicy = {
   modeSwitchSessionPolicy: 'preserve',
   sessionCwdPolicy: 'requested',
   emptyResultFallback: 'ZClaudia agent completed without additional output.',
-  escalateAlwaysTools: [SANDBOX_NETWORK_ESCALATION_TOOL],
+  escalateAlwaysTools: [
+    SANDBOX_NETWORK_ACCESS_COMPAT_TOOL,
+    SANDBOX_CAPABILITY_ACCESS_TOOL,
+    SANDBOX_UNSANDBOXED_ACCESS_TOOL,
+  ],
 };
 
 export { resolvePlanModeTools, translateEvent };

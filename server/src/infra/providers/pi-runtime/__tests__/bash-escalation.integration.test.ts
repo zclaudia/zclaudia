@@ -39,8 +39,10 @@ describe('Bash escalate-on-denial (integration, sandbox-gated)', () => {
     let asked = 0;
     const bash = getBash(db, async (req: any) => {
       asked++;
-      expect(req.toolName).toBe('SandboxNetworkAccess');
-      expect(req.toolInput.hosts).toContain('denied.example.com');
+      expect(req.toolName).toBe('SandboxCapabilityAccess');
+      expect(req.toolInput.grants).toEqual(
+        expect.arrayContaining([expect.objectContaining({ type: 'network', host: 'denied.example.com' })])
+      );
       return { behavior: 'allow' };
     });
     await bash.execute('call1', { command: 'curl -sS https://denied.example.com -o /dev/null' });
@@ -75,7 +77,7 @@ describe('Bash escalate-on-denial (integration, sandbox-gated)', () => {
     let promptedHosts: string[] = [];
     const bash = getBash(db, async (req: any) => {
       asked++;
-      promptedHosts = req.toolInput.hosts;
+      promptedHosts = req.toolInput.grants.map((grant: any) => grant.host);
       return { behavior: 'allow' };
     });
     await bash.execute('call1', {

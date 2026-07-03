@@ -5,6 +5,10 @@ import * as path from 'path';
 import type { TaskRecord, TaskStatus } from '@zclaudia/shared/core/task';
 import { resolveShell, killProcessTree } from '../../../infra/providers/pi-runtime/bash-runner.js';
 import * as sandbox from '../../../infra/providers/pi-runtime/sandbox.js';
+import {
+  networkGrantToAllowedDomain,
+  type SandboxGrant,
+} from '../../../infra/providers/pi-runtime/sandbox-execution/index.js';
 import { type TaskRepository } from '../repository.js';
 import { TaskService } from '../task-service.js';
 import type { TaskExecutor, TaskExecutorUpdate } from './types.js';
@@ -52,6 +56,7 @@ export class CommandTaskExecutor implements TaskExecutor {
       sandboxAllowedDomains?: unknown;
       sandboxReadOnly?: unknown;
       sandboxRequired?: unknown;
+      privilegePlan?: unknown;
     };
     const command = typeof meta.command === 'string' ? meta.command.trim() : '';
     if (!command) throw new Error('command task requires metadata.command');
@@ -63,12 +68,29 @@ export class CommandTaskExecutor implements TaskExecutor {
           (domain): domain is string => typeof domain === 'string' && domain.trim().length > 0
         )
       : [];
+    const privilegePlan =
+      meta.privilegePlan && typeof meta.privilegePlan === 'object'
+        ? (meta.privilegePlan as { mode?: unknown; grants?: unknown })
+        : undefined;
+    const privilegeGrants = Array.isArray(privilegePlan?.grants)
+      ? (privilegePlan.grants.filter(
+          (grant): grant is SandboxGrant =>
+            !!grant && typeof grant === 'object' && (grant as { type?: unknown }).type === 'network'
+        ) as SandboxGrant[])
+      : [];
+    const extraAllowedDomains = [
+      ...sandboxAllowedDomains,
+      ...privilegeGrants.map(networkGrantToAllowedDomain),
+    ];
 
-    const wrap = await sandbox.wrapCommand(command, {
-      workspaceRoot,
-      readOnly: meta.sandboxReadOnly === true,
-      extraAllowedDomains: sandboxAllowedDomains,
-    });
+    const forceUnsandboxed = privilegePlan?.mode === 'unsandboxed';
+    const wrap = forceUnsandboxed
+      ? ({ sandboxed: false } as sandbox.WrapResult)
+      : await sandbox.wrapCommand(command, {
+          workspaceRoot,
+          readOnly: meta.sandboxReadOnly === true,
+          extraAllowedDomains,
+        });
     if (!wrap.sandboxed && meta.sandboxRequired === true) {
       throw new Error('sandbox required for this command, but the sandbox is unavailable');
     }

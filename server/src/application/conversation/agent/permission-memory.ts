@@ -3,6 +3,10 @@
  * and project-level allowed outside-workspace roots.
  */
 import type { RememberedDecision } from './permission-evaluator.js';
+import {
+  formatNetworkGrantKey,
+  type SandboxGrant,
+} from '../../../infra/providers/pi-runtime/sandbox-execution/index.js';
 import { buildRememberKey } from './permission-evaluator.js';
 
 export interface PermissionMemoryRow {
@@ -119,4 +123,38 @@ export function persistSessionSandboxDomain(
     DO UPDATE SET decision = 'allow', updated_at = excluded.updated_at
   `
   ).run(sessionId, SANDBOX_NETWORK_KEY_PREFIX + host, now, now);
+}
+
+export function persistSessionSandboxGrant(
+  db: PermissionMemoryDb,
+  sessionId: string,
+  grant: SandboxGrant
+): void {
+  if (grant.type !== 'network') return;
+  const now = Date.now();
+  db.prepare(
+    `
+    INSERT INTO permission_memories (session_id, remember_key, decision, created_at, updated_at)
+    VALUES (?, ?, 'allow', ?, ?)
+    ON CONFLICT(session_id, remember_key)
+    DO UPDATE SET decision = 'allow', updated_at = excluded.updated_at
+  `
+  ).run(sessionId, `sandbox:${formatNetworkGrantKey(grant)}`, now, now);
+}
+
+export function loadSessionSandboxGrantKeys(
+  db: PermissionMemoryDb,
+  sessionId: string
+): string[] {
+  try {
+    const rows = db
+      .prepare(
+        "SELECT remember_key FROM permission_memories WHERE session_id = ? AND remember_key LIKE 'sandbox:network:%' AND decision = 'allow'"
+      )
+      .all(sessionId);
+    return rows.map(row => row.remember_key as string);
+  } catch (err) {
+    console.warn('[sandbox] failed to load session structured grants; treating as none:', err);
+    return [];
+  }
 }

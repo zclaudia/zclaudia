@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
@@ -101,6 +101,52 @@ describe('Eval tool', () => {
       ok: false,
       error: 'missing_db_context',
     });
+  });
+
+  it('exposes sandbox_mode and privilege_reason parameters', () => {
+    const { tool, dir } = makeEval();
+    rmSync(dir, { recursive: true, force: true });
+
+    expect(tool.parameters.properties.sandbox_mode.enum).toEqual([
+      'auto',
+      'sandbox',
+      'unsandboxed',
+    ]);
+    expect(tool.parameters.properties.privilege_reason.type).toBe('string');
+  });
+
+  it('requires privilege_reason for unsandboxed Eval', async () => {
+    const permissionCallback = vi.fn();
+    const { tool, dir } = makeEval({ permissionCallback });
+
+    const res = await tool.execute('eval-unsandboxed-no-reason', {
+      code: '1 + 1',
+      sandbox_mode: 'unsandboxed',
+    });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(permissionCallback).not.toHaveBeenCalled();
+    expect(res.details.ok).toBe(false);
+    expect(res.content[0].text).toContain('privilege_reason');
+  });
+
+  it('requests unsandboxed permission before host Eval execution', async () => {
+    const permissionCallback = vi.fn(async () => ({ behavior: 'allow' }));
+    const { tool, dir } = makeEval({ permissionCallback });
+
+    const res = await tool.execute('eval-unsandboxed-yes', {
+      code: '"HOST_EVAL_OK"',
+      sandbox_mode: 'unsandboxed',
+      privilege_reason: 'Need to verify host Eval execution path.',
+    });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(permissionCallback).toHaveBeenCalledWith(
+      expect.objectContaining({ toolName: 'SandboxUnsandboxedAccess' })
+    );
+    expect(res.content[0].text).toContain('HOST_EVAL_OK');
+    expect(res.details.privilegeMode).toBe('unsandboxed');
+    expect(res.details.unsandboxedApproved).toBe(true);
   });
 
   it('rejects non-integer timeout values', async () => {

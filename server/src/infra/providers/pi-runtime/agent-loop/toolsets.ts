@@ -6,6 +6,13 @@ import type {
 } from '../../../../domains/agent-loop/index.js';
 import { buildTools } from '../tool-bridge.js';
 
+const SANDBOX_PERMISSION_TOOLS = [
+  'CriticalBashCommand',
+  'SandboxNetworkAccess',
+  'SandboxCapabilityAccess',
+  'SandboxUnsandboxedAccess',
+] as const;
+
 export interface ToolsetContext {
   cwd: string;
   db?: import('better-sqlite3').Database;
@@ -40,21 +47,21 @@ const BUILTIN_AGENT_LOOP_TOOLSET_DEFINITIONS: Record<string, MutableAgentLoopToo
   'code-review-readonly': {
     id: 'code-review-readonly',
     tools: ['Read', 'Glob', 'Grep', 'LS', 'Bash'],
-    permissionTools: ['CriticalBashCommand', 'SandboxNetworkAccess'],
+    permissionTools: SANDBOX_PERMISSION_TOOLS,
     permissionMode: 'allow-declared-tools',
     sandboxReadOnly: true,
   },
   'workflow-prompt-readonly': {
     id: 'workflow-prompt-readonly',
     tools: ['Read', 'Glob', 'Grep', 'LS', 'Bash'],
-    permissionTools: ['CriticalBashCommand', 'SandboxNetworkAccess'],
+    permissionTools: SANDBOX_PERMISSION_TOOLS,
     permissionMode: 'allow-declared-tools',
     sandboxReadOnly: true,
   },
   'workflow-prompt': {
     id: 'workflow-prompt',
     tools: ['Read', 'Glob', 'Grep', 'LS', 'Bash', 'Edit', 'MultiEdit', 'Write'],
-    permissionTools: ['CriticalBashCommand', 'SandboxNetworkAccess'],
+    permissionTools: SANDBOX_PERMISSION_TOOLS,
     permissionMode: 'allow-declared-tools',
     sandboxReadOnly: false,
   },

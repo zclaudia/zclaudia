@@ -2,6 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ToolName } from '@zclaudia/shared/core/tools';
 import { buildAgentLoopTools, getAgentLoopToolsetDescriptor } from '../toolsets.js';
 
+const EXPECTED_PERMISSION_TOOLS = [
+  'CriticalBashCommand',
+  'SandboxNetworkAccess',
+  'SandboxCapabilityAccess',
+  'SandboxUnsandboxedAccess',
+];
+
 describe('agent-loop builtin toolsets', () => {
   it('declares the first-pass builtin toolsets', () => {
     expect(getAgentLoopToolsetDescriptor('none')).toMatchObject({
@@ -19,21 +26,21 @@ describe('agent-loop builtin toolsets', () => {
 
     expect(getAgentLoopToolsetDescriptor('code-review-readonly')).toMatchObject({
       tools: ['Read', 'Glob', 'Grep', 'LS', 'Bash'],
-      permissionTools: ['CriticalBashCommand', 'SandboxNetworkAccess'],
+      permissionTools: EXPECTED_PERMISSION_TOOLS,
       permissionMode: 'allow-declared-tools',
       sandboxReadOnly: true,
     });
 
     expect(getAgentLoopToolsetDescriptor('workflow-prompt-readonly')).toMatchObject({
       tools: ['Read', 'Glob', 'Grep', 'LS', 'Bash'],
-      permissionTools: ['CriticalBashCommand', 'SandboxNetworkAccess'],
+      permissionTools: EXPECTED_PERMISSION_TOOLS,
       permissionMode: 'allow-declared-tools',
       sandboxReadOnly: true,
     });
 
     expect(getAgentLoopToolsetDescriptor('workflow-prompt')).toMatchObject({
       tools: ['Read', 'Glob', 'Grep', 'LS', 'Bash', 'Edit', 'MultiEdit', 'Write'],
-      permissionTools: ['CriticalBashCommand', 'SandboxNetworkAccess'],
+      permissionTools: EXPECTED_PERMISSION_TOOLS,
       permissionMode: 'allow-declared-tools',
       sandboxReadOnly: false,
     });
@@ -70,15 +77,14 @@ describe('agent-loop builtin toolsets', () => {
 
   it('isolates returned internal permission tool descriptors from mutation', () => {
     const descriptor = getAgentLoopToolsetDescriptor('workflow-prompt');
-    expect(descriptor?.permissionTools).toEqual(['CriticalBashCommand', 'SandboxNetworkAccess']);
+    expect(descriptor?.permissionTools).toEqual(EXPECTED_PERMISSION_TOOLS);
 
     const mutablePermissionTools = descriptor!.permissionTools as string[];
     expect(() => mutablePermissionTools.push('AskUserQuestion')).toThrow();
 
-    expect(getAgentLoopToolsetDescriptor('workflow-prompt')?.permissionTools).toEqual([
-      'CriticalBashCommand',
-      'SandboxNetworkAccess',
-    ]);
+    expect(getAgentLoopToolsetDescriptor('workflow-prompt')?.permissionTools).toEqual(
+      EXPECTED_PERMISSION_TOOLS
+    );
   });
 
   it('builds writable tools for workflow prompts', () => {
