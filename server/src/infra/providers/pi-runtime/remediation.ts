@@ -51,6 +51,13 @@ function bashHint(details: NonNullable<ToolDetails>): string | undefined {
 }
 
 function sandboxExecutionHint(details: NonNullable<ToolDetails>): string | undefined {
+  if (details.sandboxInternalProxyDetected === true) {
+    const urls = Array.isArray(details.sandboxInternalProxyUrls)
+      ? details.sandboxInternalProxyUrls.filter((url): url is string => typeof url === 'string')
+      : [];
+    const urlText = urls.length ? ` (${urls.join(', ')})` : '';
+    return `The localhost proxy${urlText} is the sandbox-runtime internal network proxy, not the user's proxy configuration. If the task needs host localhost access, local port binding, browser auth, or host credential agents, retry with sandbox_mode:"unsandboxed" and a concrete privilege_reason; otherwise request the specific sandbox capability for confirmed network denials.`;
+  }
   const classification =
     typeof details.failureClassification === 'string' ? details.failureClassification : undefined;
   if (!classification) return undefined;

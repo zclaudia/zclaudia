@@ -15,7 +15,11 @@ import {
 } from './file-change-notifier.js';
 import { createLspDiagnosticsAdapter, type LspTransport } from './lsp-diagnostics-adapter.js';
 import { NoopEditGuard } from './noop-edit-guard.js';
-import { createReadFileStateStore, type ReadFileStateStore } from './read-file-state.js';
+import {
+  createReadFileStateStore,
+  getSessionReadFileStateStore,
+  type ReadFileStateStore,
+} from './read-file-state.js';
 import type { TaskRuntimeRegistryFactory } from './task-tools.js';
 import type { ToolExecutionObserver } from './tool-execution-observer.js';
 import type {
@@ -41,7 +45,8 @@ export interface ToolBridgeOptions {
   permissionCallback?: PermissionCallback;
   /** Whether the active model accepts image content blocks (model.input includes 'image'). */
   supportsVision?: boolean;
-  /** Shared per-run read state used to require full reads before file mutations. */
+  /** Session-scoped read state used to require full reads before file mutations.
+   * Resolved from `sessionId` when absent; falls back to a per-call store. */
   readFileState?: ReadFileStateStore;
   /** Optional write lifecycle hooks for diagnostics, IDE notifications, or file-history integrations. */
   writeLifecycle?: WriteLifecycleHooks;
@@ -88,7 +93,11 @@ export function buildEffectiveToolOptions(
   );
   return {
     ...options,
-    readFileState: options?.readFileState ?? createReadFileStateStore(),
+    readFileState:
+      options?.readFileState ??
+      (options?.sessionId
+        ? getSessionReadFileStateStore(options.sessionId)
+        : createReadFileStateStore()),
     noopGuard: options?.noopGuard ?? new NoopEditGuard(),
     writeLifecycle: composeWriteLifecycleHooks(options?.writeLifecycle, fileChangeLifecycle),
     diagnosticsProvider:

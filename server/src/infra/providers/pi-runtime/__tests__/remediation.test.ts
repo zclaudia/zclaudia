@@ -112,6 +112,25 @@ describe('remediationForResult', () => {
     expect(hint).toMatch(/ExitPlanMode|Plan mode/);
   });
 
+  it('explains sandbox internal proxy details before generic network escalation advice', () => {
+    const hint = remediationForResult(
+      'Bash',
+      det({
+        ok: false,
+        exitCode: 7,
+        sandboxed: true,
+        failureClassification: 'confirmed_sandbox_denial',
+        sandboxInternalProxyDetected: true,
+        sandboxInternalProxyUrls: ['http://localhost:64700'],
+        recommendedNextStep: 'Request SandboxCapabilityAccess for http://127.0.0.1:8000.',
+      })
+    );
+
+    expect(hint).toMatch(/sandbox-runtime internal network proxy/i);
+    expect(hint).toMatch(/not .*user.*proxy/i);
+    expect(hint).toMatch(/sandbox_mode:"unsandboxed"/);
+  });
+
   it('points at the full output file when a Bash result was persisted', () => {
     const hint = remediationForResult(
       'Bash',

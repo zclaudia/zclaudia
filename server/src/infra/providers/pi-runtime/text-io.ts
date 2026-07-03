@@ -2,8 +2,6 @@ import { chmod, readFile, rename, rm, stat, writeFile } from 'fs/promises';
 import path from 'path';
 import { randomUUID } from 'crypto';
 
-export const TOOL_RESULT_CONTENT_LIMIT = 80_000;
-
 export type LineEndingStyle = 'CRLF' | 'LF';
 export type TextEncoding = 'utf8' | 'utf16le';
 
@@ -12,15 +10,6 @@ export interface TextFileMetadata {
   encoding: TextEncoding;
   hasBom: boolean;
   mode?: number;
-}
-
-export interface ContentDetailFields {
-  originalContent: string | null;
-  updatedContent: string;
-  contentTruncated?: {
-    originalContent?: boolean;
-    updatedContent?: boolean;
-  };
 }
 
 export function lineEndingFor(content: string): LineEndingStyle {
@@ -123,35 +112,4 @@ export async function maybeMarkExecutableForShebang(
   } catch {
     return false;
   }
-}
-
-export function truncateToolResultContent(
-  content: string,
-  limit = TOOL_RESULT_CONTENT_LIMIT
-): { content: string; truncated: boolean } {
-  if (content.length <= limit) return { content, truncated: false };
-  return {
-    content: `${content.slice(0, limit)}\n... [truncated ${content.length - limit} chars]`,
-    truncated: true,
-  };
-}
-
-export function buildContentDetailFields(
-  originalContent: string | null,
-  updatedContent: string
-): ContentDetailFields {
-  const updated = truncateToolResultContent(updatedContent);
-  const original =
-    originalContent === null
-      ? { content: null, truncated: false }
-      : truncateToolResultContent(originalContent);
-  const contentTruncated = {
-    ...(original.truncated ? { originalContent: true } : {}),
-    ...(updated.truncated ? { updatedContent: true } : {}),
-  };
-  return {
-    originalContent: original.content,
-    updatedContent: updated.content,
-    ...(Object.keys(contentTruncated).length > 0 ? { contentTruncated } : {}),
-  };
 }

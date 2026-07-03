@@ -8,7 +8,11 @@ import type { TaskExecutor } from '../../../domains/tasks/executors/types.js';
 import { errorResult, jsonResult, textResult, toolParams, truncateText } from './tool-common.js';
 import { CommandTaskRuntime } from './command-task-runtime.js';
 import { EvalTaskRuntime } from './eval-task-runtime.js';
-import { createTaskRuntimeRegistry, type TaskRuntimeRegistry } from './task-runtime.js';
+import {
+  createTaskRuntimeRegistry,
+  type TaskRuntimeRegistry,
+  type TaskToolResult,
+} from './task-runtime.js';
 export { parseTaskOutputWindowParams } from './task-output-window.js';
 
 type AgentToolParameters = AgentTool['parameters'];
@@ -122,7 +126,8 @@ export function createTaskOutputTool(
   return {
     name: 'TaskOutput',
     label: 'TaskOutput',
-    description: 'Read task state, result, and lifecycle events by task id.',
+    description:
+      'Read task state, result, and lifecycle events by task id. Pass wait_ms to block until new output arrives or the task finishes instead of polling with sleep.',
     parameters: agentToolParameters({
       type: 'object',
       properties: {
@@ -139,6 +144,11 @@ export function createTaskOutputTool(
           description:
             'For command tasks: return only the last N lines (takes precedence over output_offset)',
         },
+        wait_ms: {
+          type: 'number',
+          description:
+            'Block up to this many ms (max 60000) until new output appears past output_offset or the task reaches a terminal state. Prefer this over sleep-and-poll loops.',
+        },
       },
       required: ['task_id'],
     }),
@@ -151,20 +161,47 @@ export function createTaskOutputTool(
       }
 
       const repo = new TaskRepository(db);
-      const task = repo.findById(taskId.trim());
-      if (!task) return errorResult('task_not_found', `Task not found: ${taskId}`, { taskId });
+      const registry = runtimeRegistryFactory(repo);
+      const isTerminal = (status: string): boolean => status !== 'running' && status !== 'pending';
 
-      const runtime = runtimeRegistryFactory(repo).get(task.type);
-      if (runtime?.readOutput) return runtime.readOutput(task, args);
+      const readOnce = async (): Promise<TaskToolResult | undefined> => {
+        const task = repo.findById(taskId.trim());
+        if (!task) return undefined;
+        const runtime = registry.get(task.type);
+        if (runtime?.readOutput) return runtime.readOutput(task, args);
+        const includeEvents = args.include_events !== false;
+        const events = includeEvents ? repo.listEvents(task.id) : [];
+        return textResult(JSON.stringify({ task, events }, null, 2), {
+          ok: true,
+          taskId: task.id,
+          status: task.status,
+          eventCount: events.length,
+        });
+      };
 
-      const includeEvents = args.include_events !== false;
-      const events = includeEvents ? repo.listEvents(task.id) : [];
-      return textResult(JSON.stringify({ task, events }, null, 2), {
-        ok: true,
-        taskId: task.id,
-        status: task.status,
-        eventCount: events.length,
-      });
+      let result = await readOnce();
+      if (!result) return errorResult('task_not_found', `Task not found: ${taskId}`, { taskId });
+
+      const waitMsArg = typeof args.wait_ms === 'number' ? args.wait_ms : 0;
+      const waitMs = Math.min(Math.max(waitMsArg, 0), 60_000);
+      if (waitMs > 0) {
+        const deadline = Date.now() + waitMs;
+        const hasNewOutput = (details: Record<string, unknown>): boolean =>
+          typeof details.rawOutput === 'string' && details.rawOutput.length > 0;
+        const status = (details: Record<string, unknown>): string =>
+          typeof details.status === 'string' ? details.status : 'running';
+        while (
+          !hasNewOutput(result.details) &&
+          !isTerminal(status(result.details)) &&
+          Date.now() < deadline
+        ) {
+          await new Promise(resolve => setTimeout(resolve, Math.min(250, deadline - Date.now())));
+          const next = await readOnce();
+          if (!next) break;
+          result = next;
+        }
+      }
+      return result;
     },
   };
 }

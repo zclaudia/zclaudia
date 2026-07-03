@@ -1066,8 +1066,6 @@ describe('Write bridge tool', () => {
       ok: true,
       type: 'update',
       firstChangedLine: 2,
-      originalContent: 'const a = 1;\nconst b = 2;\n',
-      updatedContent: 'const a = 1;\nconst b = 3;\n',
     });
     expect(res.details.diff).toContain('--- f.ts');
     expect(res.details.diff).toContain('+++ f.ts');
@@ -1089,7 +1087,7 @@ describe('Write bridge tool', () => {
     expect(res.details.lineChanges).toEqual({ additions: 1, deletions: 1, changes: 2 });
   });
 
-  it('truncates large original and updated content in write results', async () => {
+  it('does not embed full before/after file bodies in write result details', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
     const original = `${'a'.repeat(90_000)}\n`;
     const updated = `${'b'.repeat(90_000)}\n`;
@@ -1103,14 +1101,10 @@ describe('Write bridge tool', () => {
 
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.ok).toBe(true);
-    expect(res.details.originalContent).not.toBe(original);
-    expect(res.details.updatedContent).not.toBe(updated);
-    expect(String(res.details.originalContent).length).toBeLessThan(81_000);
-    expect(String(res.details.updatedContent).length).toBeLessThan(81_000);
-    expect(res.details.contentTruncated).toEqual({
-      originalContent: true,
-      updatedContent: true,
-    });
+    expect(res.details.originalContent).toBeUndefined();
+    expect(res.details.updatedContent).toBeUndefined();
+    // The diff itself stays budgeted so a giant rewrite cannot bloat the record.
+    expect(String(res.details.diff).length).toBeLessThan(81_000);
   });
 
   it('runs the write lifecycle after updating an existing file', async () => {
@@ -1886,8 +1880,6 @@ describe('Edit bridge tool', () => {
     expect(res.details).toMatchObject({
       ok: true,
       firstChangedLine: 2,
-      originalContent: 'const a = 1;\nconst b = 2;\n',
-      updatedContent: 'const a = 1;\nconst b = 3;\n',
       state: {
         previousSnapshotId: expect.stringMatching(/^f\.ts#[a-f0-9]{12}$/),
         newSnapshotId: expect.stringMatching(/^f\.ts#[a-f0-9]{12}$/),
@@ -2114,7 +2106,6 @@ describe('Edit bridge tool', () => {
       ok: true,
       preview: true,
       path: 'f.ts',
-      updatedContent: 'const a = 2;\n',
     });
     expect(res.details.diff).toContain('-const a = 1;');
     expect(res.details.diff).toContain('+const a = 2;');
@@ -3071,6 +3062,52 @@ describe('TaskOutput for command tasks', () => {
 
     await new CommandTaskExecutor(new TaskRepository(db)).stop(taskId); // no leaked sleep
     rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('wait_ms blocks until new output arrives instead of returning empty', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-tobg-'));
+    const tools = buildTools(dir, { enabled: ['Bash', 'TaskOutput'], db });
+    const bash = tools.find((t: any) => t.name === 'Bash') as any;
+    const taskOutput = tools.find((t: any) => t.name === 'TaskOutput') as any;
+    const started = await bash.execute('tw1', {
+      command: 'sleep 1; echo late-line; sleep 30',
+      run_in_background: true,
+    });
+    const taskId = started.details.taskId as string;
+    await new Promise(r => setTimeout(r, 200));
+
+    const t0 = Date.now();
+    const res = await taskOutput.execute('tw2', { task_id: taskId, wait_ms: 8000 });
+    const waited = Date.now() - t0;
+
+    await new CommandTaskExecutor(new TaskRepository(db)).stop(taskId);
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+    expect(res.details.rawOutput).toContain('late-line');
+    expect(waited).toBeGreaterThan(300);
+    expect(waited).toBeLessThan(8000);
+  });
+
+  it('wait_ms returns when the task completes without new output', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-tobg-'));
+    const tools = buildTools(dir, { enabled: ['Bash', 'TaskOutput'], db });
+    const bash = tools.find((t: any) => t.name === 'Bash') as any;
+    const taskOutput = tools.find((t: any) => t.name === 'TaskOutput') as any;
+    const started = await bash.execute('tw3', {
+      command: 'sleep 1',
+      run_in_background: true,
+    });
+    const taskId = started.details.taskId as string;
+    await new Promise(r => setTimeout(r, 200));
+
+    const t0 = Date.now();
+    const res = await taskOutput.execute('tw4', { task_id: taskId, wait_ms: 10_000 });
+    const waited = Date.now() - t0;
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+    expect(res.details.status).not.toBe('running');
+    expect(waited).toBeLessThan(9000);
   });
 
   it('tail_lines returns the last N lines', async () => {

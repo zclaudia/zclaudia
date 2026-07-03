@@ -7,6 +7,8 @@ interface MessageMetadata {
     output?: unknown;
     isError?: boolean;
     effect?: unknown;
+    startedAt?: number;
+    completedAt?: number;
   }>;
   attachments?: Array<{
     path: string;
@@ -47,7 +49,9 @@ export function extractAndIndexMetadata(
         toolInput,
         toolResult,
         toolCall.isError ? 1 : 0,
-        createdAt
+        // Prefer the call's own execution timestamps; the message row's
+        // created_at collapses every call in the message onto one instant.
+        toolCall.completedAt ?? toolCall.startedAt ?? createdAt
       );
 
       // Extract file paths from tool call inputs

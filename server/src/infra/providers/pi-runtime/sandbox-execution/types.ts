@@ -20,6 +20,7 @@ export interface SandboxEvidence {
   candidateTargets: string[];
   missingSignals: string[];
   inference?: string;
+  internalProxyUrls?: string[];
 }
 
 export interface SandboxExecutionDetails {
@@ -27,6 +28,9 @@ export interface SandboxExecutionDetails {
   privilegeMode: 'sandbox' | 'capability-granted' | 'unsandboxed';
   failureClassification?: SandboxFailureClassification;
   sandboxEvidence?: SandboxEvidence;
+  recommendedPrivilegeMode?: SandboxPrivilegeMode;
+  sandboxInternalProxyDetected?: boolean;
+  sandboxInternalProxyUrls?: string[];
   grantsUsed?: SandboxGrant[];
   escalationRequested?: boolean;
   unsandboxedApproved?: boolean;

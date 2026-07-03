@@ -13,6 +13,16 @@ export const EDIT_TOOL_SELECTION_GUIDANCE = [
   '- After a successful Write, Edit, MultiEdit, or EditSymbol result, rely on its diff and updated snapshot; do not call Read again only to verify the change.',
 ].join('\n');
 
+export const SANDBOX_PRIVILEGE_SELECTION_GUIDANCE = [
+  '# Sandbox Privilege Selection',
+  'Bash and Eval normally run in a sandbox. Prefer sandbox_mode:"auto" for ordinary commands: the runtime will request least-privilege SandboxCapabilityAccess only after confirmed sandbox denials.',
+  'Use sandbox_mode:"unsandboxed" with a concrete privilege_reason when the task is known before execution to require host integration that the sandbox cannot provide.',
+  'Host-only examples include: bind a localhost port for a dev server or proxy (for example uvicorn --host 127.0.0.1 --port ...), open or complete browser-based login flows such as AWS SSO, run aws sso / credential commands, interact with host credential agents/keychains, or reach services/devices only available from the user host.',
+  'If Bash or Eval output shows http_proxy=http://localhost:<port>, HTTP_PROXY=http://localhost:<port>, or similar localhost proxy variables while sandboxed, treat that as the sandbox-runtime internal network proxy, not as the user\'s proxy configuration.',
+  'Do not ask the user to run commands in their terminal merely because host integration is needed. Call Bash or Eval with sandbox_mode:"unsandboxed" and privilege_reason so the user can approve or deny the one-shot host execution.',
+  'Do not use unsandboxed for vague failures. If a sandboxed command fails ambiguously, inspect output or gather diagnostics first; use capability grants for confirmed sandbox denials.',
+].join('\n');
+
 export interface PiRunPromptBundle {
   effectiveSystemPrompt: string;
   snapshotSystemPromptText: string;
@@ -68,6 +78,7 @@ export function buildPiRunPrompt(input: {
     ? `${externalProviderCatalog}\nUse SearchExternalTools and InspectExternalTool before loading external tools. LoadExternalTool only makes a tool available in this session; execution may still require permission.`
     : '';
   let baseSystemPrompt = appendPromptBlock(systemPrompt ?? '', EDIT_TOOL_SELECTION_GUIDANCE);
+  baseSystemPrompt = appendPromptBlock(baseSystemPrompt, SANDBOX_PRIVILEGE_SELECTION_GUIDANCE);
   baseSystemPrompt = appendPromptBlock(baseSystemPrompt, externalToolsPrompt);
   baseSystemPrompt = appendPromptBlock(baseSystemPrompt, skillCatalog);
   baseSystemPrompt = appendPromptBlock(baseSystemPrompt, activeSkillContext);
@@ -79,6 +90,10 @@ export function buildPiRunPrompt(input: {
   let snapshotSystemPromptText = appendPromptBlock(
     systemPrompt ?? '',
     EDIT_TOOL_SELECTION_GUIDANCE
+  );
+  snapshotSystemPromptText = appendPromptBlock(
+    snapshotSystemPromptText,
+    SANDBOX_PRIVILEGE_SELECTION_GUIDANCE
   );
   snapshotSystemPromptText = appendPromptBlock(snapshotSystemPromptText, externalProviderCatalog);
   snapshotSystemPromptText = appendPromptBlock(snapshotSystemPromptText, mcpInstructions);

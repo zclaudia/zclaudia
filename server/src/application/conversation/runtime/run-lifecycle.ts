@@ -262,13 +262,15 @@ export function upsertAssistantMessage(
   }
   if (run.collectedToolCalls.length > 0) {
     metadata.toolCalls = run.collectedToolCalls.map(
-      ({ toolUseId, name, input, output, isError, effect }) => ({
+      ({ toolUseId, name, input, output, isError, effect, startedAt, completedAt }) => ({
         toolUseId,
         name,
         input,
         output,
         isError,
         effect,
+        startedAt,
+        completedAt,
       })
     );
   }

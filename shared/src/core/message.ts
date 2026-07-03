@@ -164,6 +164,10 @@ export interface ToolCall {
   output?: unknown;
   isError?: boolean;
   effect?: ToolEffect;
+  /** Epoch ms when the tool call started executing. */
+  startedAt?: number;
+  /** Epoch ms when the tool result arrived. */
+  completedAt?: number;
 }
 
 export interface UsageCost {

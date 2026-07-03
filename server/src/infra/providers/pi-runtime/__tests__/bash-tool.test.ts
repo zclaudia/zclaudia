@@ -193,6 +193,19 @@ describe('Bash bridge tool module', () => {
     expect(result.content[0].text).not.toContain('hidden');
   });
 
+  it('lets shell probes of nonexistent files run instead of pointing at Read', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'zclaudia-bash-module-'));
+    const bash = createBashBridgeTool(dir) as any;
+
+    const result = await bash.execute('bash-read-missing', {
+      command: 'cat missing_output.md 2>/dev/null || echo "NOT FOUND"',
+    });
+
+    await rm(dir, { recursive: true, force: true });
+    expect(result.details.error).not.toBe('bash_file_read_blocked');
+    expect(result.content[0].text).toContain('NOT FOUND');
+  });
+
   it('blocks direct source file mutations through shell commands', async () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'zclaudia-bash-module-'));
     await mkdir(path.join(dir, 'src'));

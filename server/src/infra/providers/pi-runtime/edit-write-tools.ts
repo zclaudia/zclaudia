@@ -21,7 +21,6 @@ import {
 } from './write-lifecycle.js';
 import {
   applyLineEndingStyle,
-  buildContentDetailFields,
   lineEndingFor,
   maybeMarkExecutableForShebang,
   readTextFileWithMetadata,
@@ -243,11 +242,12 @@ function buildMutationDetailsBase(input: {
   ok?: true;
   path: string;
   diff: FileDiffResult;
-  originalContent: string | null;
-  updatedContent: string;
   extra?: Record<string, unknown>;
 }): Record<string, unknown> {
   const diffDetails = buildBudgetedDiffDetails(input.diff);
+  // Deliberately no full before/after content here: the diff + snapshot state
+  // carry everything consumers use, and two file bodies per edit bloat every
+  // persisted tool_call_record (~50KB each on a mid-sized file).
   return {
     ok: input.ok ?? true,
     path: input.path,
@@ -258,7 +258,6 @@ function buildMutationDetailsBase(input: {
     lineChanges: input.diff.lineChanges,
     ...(diffDetails.diffTruncated ? { diffTruncated: true } : {}),
     ...(diffDetails.structuredPatchTruncated ? { structuredPatchTruncated: true } : {}),
-    ...buildContentDetailFields(input.originalContent, input.updatedContent),
   };
 }
 
@@ -666,7 +665,6 @@ export function createWriteBridgeTool(cwd: string, options?: FileMutationToolOpt
             state,
             ...(diffDetails.diffTruncated ? { diffTruncated: true } : {}),
             ...(diffDetails.structuredPatchTruncated ? { structuredPatchTruncated: true } : {}),
-            ...buildContentDetailFields(originalContent, content),
             ...(backup ? { backup } : {}),
             ...(madeExecutable ? { madeExecutable: true } : {}),
             ...(lifecycle ? { lifecycle } : {}),
@@ -885,8 +883,6 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
                   ...buildMutationDetailsBase({
                     path: relPath,
                     diff,
-                    originalContent,
-                    updatedContent: operation.content,
                     extra: {
                       preview: true,
                       type: existed ? 'update' : 'create',
@@ -957,8 +953,6 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
                 ...buildMutationDetailsBase({
                   path: operation.path,
                   diff,
-                  originalContent: original,
-                  updatedContent: '',
                   extra: {
                     ...(previewOnly ? { preview: true } : {}),
                     type: 'delete',
@@ -1375,8 +1369,6 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
             const detailsBase = buildMutationDetailsBase({
               path: relPath,
               diff,
-              originalContent: original,
-              updatedContent: updated,
               extra: {
                 replaced: totalReplaced,
                 editCount: batchEdits.length,
@@ -1504,8 +1496,6 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
             const hashlineDetailsBase = buildMutationDetailsBase({
               path: relPath,
               diff,
-              originalContent: original,
-              updatedContent: updated,
               extra: {
                 replaced: 1,
                 state,
@@ -1644,8 +1634,6 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
           const detailsBase = buildMutationDetailsBase({
             path: relPath,
             diff,
-            originalContent: original,
-            updatedContent: updated,
             extra: {
               replaced,
               state,

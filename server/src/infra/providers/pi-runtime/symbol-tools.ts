@@ -157,6 +157,45 @@ function buildMatch(input: Omit<SymbolMatch, 'text' | 'bodyDigest'>, content: st
   };
 }
 
+/** Net ()/[]/{} depth change of one Python line, ignoring brackets inside
+ * string literals and after a `#` comment. Good enough for signature spans;
+ * multi-line strings inside a signature are not handled. */
+function pythonBracketDelta(text: string): number {
+  let delta = 0;
+  let quote: string | undefined;
+  for (let index = 0; index < text.length; index += 1) {
+    const ch = text[index];
+    if (quote) {
+      if (ch === '\\') {
+        index += 1;
+        continue;
+      }
+      if (ch === quote) quote = undefined;
+      continue;
+    }
+    if (ch === '#') break;
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      continue;
+    }
+    if (ch === '(' || ch === '[' || ch === '{') delta += 1;
+    else if (ch === ')' || ch === ']' || ch === '}') delta -= 1;
+  }
+  return delta;
+}
+
+/** Index of the line where a `def`/`class` header closes (brackets balanced).
+ * A multi-line signature's closing `) -> str:` dedents back to the def
+ * column, so the dedent-based body scan must only start after this line. */
+function pythonHeaderEnd(lines: LineInfo[], defIndex: number): number {
+  let depth = 0;
+  for (let cursor = defIndex; cursor < lines.length; cursor += 1) {
+    depth += pythonBracketDelta(lines[cursor].text);
+    if (depth <= 0) return cursor;
+  }
+  return defIndex;
+}
+
 function pythonSymbols(content: string): SymbolMatch[] {
   const lines = splitLines(content);
   const matches: SymbolMatch[] = [];
@@ -166,8 +205,9 @@ function pythonSymbols(content: string): SymbolMatch[] {
     if (!match) continue;
     const indent = indentation(match[1]);
     const startIndex = includeDecorators(lines, index, indent);
+    const headerEnd = pythonHeaderEnd(lines, index);
     let endIndex = lines.length - 1;
-    for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
+    for (let cursor = headerEnd + 1; cursor < lines.length; cursor += 1) {
       const candidate = lines[cursor];
       if (!candidate.text.trim()) continue;
       if (indentation(candidate.text) <= indent) {
@@ -175,7 +215,7 @@ function pythonSymbols(content: string): SymbolMatch[] {
         break;
       }
     }
-    while (endIndex > index && !lines[endIndex].text.trim()) endIndex -= 1;
+    while (endIndex > headerEnd && !lines[endIndex].text.trim()) endIndex -= 1;
     const kind: SymbolKind = match[3] === 'class' ? 'class' : 'function';
     matches.push(
       buildMatch(

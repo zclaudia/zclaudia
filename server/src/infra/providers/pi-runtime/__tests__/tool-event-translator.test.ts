@@ -144,6 +144,46 @@ describe('translateToolEvent', () => {
     });
   });
 
+  it('marks tool_result as error when the result details carry ok:false (returned error, not thrown)', () => {
+    const out = translateToolEvent(
+      {
+        type: 'tool_execution_end',
+        toolCallId: 't1',
+        toolName: 'Edit',
+        result: {
+          content: [{ type: 'text', text: 'File has not been read yet.' }],
+          details: { ok: false, error: 'file_not_read' },
+        },
+        isError: false,
+      } as any,
+      ctx
+    );
+    expect(out).toMatchObject({
+      type: 'tool_result',
+      isToolError: true,
+    });
+  });
+
+  it('keeps isToolError false when details.ok is true', () => {
+    const out = translateToolEvent(
+      {
+        type: 'tool_execution_end',
+        toolCallId: 't1',
+        toolName: 'Edit',
+        result: {
+          content: [{ type: 'text', text: 'Edited file' }],
+          details: { ok: true },
+        },
+        isError: false,
+      } as any,
+      ctx
+    );
+    expect(out).toMatchObject({
+      type: 'tool_result',
+      isToolError: false,
+    });
+  });
+
   it('emits a mode_transition (enter) alongside the tool_result for a successful EnterPlanMode', () => {
     const out = translateToolEvent(
       {
@@ -209,6 +249,7 @@ describe('translateToolEvent', () => {
       ctx
     );
     // Just the tool_result, no transition (rejection must not flip the UI mode).
+    // details.ok=false uniformly maps to isToolError so the failure is recorded.
     expect(out).toEqual({
       type: 'tool_result',
       toolUseId: 'pm3',
@@ -217,7 +258,7 @@ describe('translateToolEvent', () => {
         content: [{ type: 'text', text: 'Plan rejected by the user.' }],
         details: { ok: false },
       },
-      isToolError: false,
+      isToolError: true,
     });
   });
 

@@ -128,13 +128,17 @@ export function translateToolEvent(
         const toolName = (event as any).toolName;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const result = (event as any).result;
+        // pi-core only sets isError when a tool throws; zclaudia tools report
+        // failures as normal returns with details.ok=false, which must count
+        // as tool errors too (DB is_error, UI badges, loop guards).
+        const resultDetails = (result as { details?: { ok?: unknown } } | undefined)?.details;
         const toolResultEvent: ProviderRuntimeEvent = {
           type: 'tool_result',
           toolUseId,
           toolName,
           toolResult: result,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          isToolError: Boolean((event as any).isError),
+          isToolError: Boolean((event as any).isError) || resultDetails?.ok === false,
         };
         const transition = planModeTransitionEvent(toolName, toolUseId, result);
         return transition ? [toolResultEvent, transition] : toolResultEvent;

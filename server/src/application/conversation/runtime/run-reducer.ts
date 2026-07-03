@@ -83,6 +83,7 @@ function applyToolStarted(
     name: payload.toolName,
     input: payload.input,
     effect: payload.effect,
+    startedAt: Date.now(),
   });
   activeRun.contentBlocks.push({ type: 'tool_use', toolUseId: payload.toolUseId });
 }
@@ -95,5 +96,6 @@ function applyToolFinished(
   if (!collected) return;
   collected.output = payload.output;
   collected.isError = payload.isError || false;
+  collected.completedAt = Date.now();
   if (payload.effect) collected.effect = payload.effect;
 }

@@ -1,6 +1,8 @@
 import type { AgentTool, AgentToolUpdateCallback } from '@earendil-works/pi-agent-core';
 import type Database from 'better-sqlite3';
 import { existsSync, statSync } from 'fs';
+import os from 'os';
+import path from 'path';
 
 import { persistSessionSandboxDomain } from '../../../application/conversation/agent/permission-memory.js';
 import { TaskRepository } from '../../../domains/tasks/repository.js';
@@ -220,7 +222,19 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
         );
       }
 
-      const fileBypass = findBashFileBypass(command);
+      let fileBypass = findBashFileBypass(command);
+      // A read block only makes sense when the file exists: there is no file
+      // state to keep visible for a missing file, and pointing the model at
+      // Read would just fail with ENOENT (Bash and Read then bounce the model
+      // back and forth). Probe commands like `cat f 2>/dev/null || echo ...`
+      // must run and report absence naturally.
+      if (fileBypass?.kind === 'file_read' && fileBypass.target) {
+        const rawTarget = fileBypass.target.replace(/^~(?=\/|$)/, os.homedir());
+        const resolvedTarget = path.isAbsolute(rawTarget)
+          ? rawTarget
+          : path.resolve(runCwd, rawTarget);
+        if (!existsSync(resolvedTarget)) fileBypass = undefined;
+      }
       if (fileBypass) {
         const toolName = fileBypass.suggestedTool;
         const message =

@@ -92,3 +92,21 @@ describe('buildPiRunPrompt — edit tool guidance', () => {
     }
   });
 });
+
+describe('buildPiRunPrompt — sandbox privilege guidance', () => {
+  it('teaches the model to request unsandboxed Bash for host-only workflows', () => {
+    const bundle = buildPiRunPrompt({ ...base, systemPrompt: 'Base.' });
+
+    expect(bundle.effectiveSystemPrompt).toContain('# Sandbox Privilege Selection');
+    expect(bundle.effectiveSystemPrompt).toContain('sandbox_mode:"unsandboxed"');
+    expect(bundle.effectiveSystemPrompt).toContain('privilege_reason');
+    expect(bundle.effectiveSystemPrompt).toContain('bind a localhost port');
+    expect(bundle.effectiveSystemPrompt).toContain('uvicorn --host 127.0.0.1 --port');
+    expect(bundle.effectiveSystemPrompt).toContain('AWS SSO');
+    expect(bundle.effectiveSystemPrompt).toContain('aws sso');
+    expect(bundle.effectiveSystemPrompt).toContain('http_proxy=http://localhost:<port>');
+    expect(bundle.effectiveSystemPrompt).toContain('sandbox-runtime internal network proxy');
+    expect(bundle.effectiveSystemPrompt).toContain('Do not ask the user to run commands in their terminal');
+    expect(bundle.snapshotSystemPromptText).toContain('# Sandbox Privilege Selection');
+  });
+});

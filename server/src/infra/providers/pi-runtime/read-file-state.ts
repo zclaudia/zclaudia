@@ -63,6 +63,33 @@ function normalizeContent(content: string): string {
   return content.replace(/\r\n/g, '\n');
 }
 
+/**
+ * Session-scoped store registry. Read state must survive run boundaries: a run
+ * is one user prompt, and requiring a fresh full Read before every cross-run
+ * Edit forces the model to re-read unchanged files each turn. Staleness is
+ * still guarded per-edit by content comparison (`file_modified_since_read`),
+ * so carrying state across runs cannot let a stale edit through.
+ */
+const sessionStores = new Map<string, ReadFileStateStore>();
+const MAX_SESSION_STORES = 200;
+
+export function getSessionReadFileStateStore(sessionId: string): ReadFileStateStore {
+  const existing = sessionStores.get(sessionId);
+  if (existing) {
+    // Refresh LRU position.
+    sessionStores.delete(sessionId);
+    sessionStores.set(sessionId, existing);
+    return existing;
+  }
+  const store = createReadFileStateStore();
+  sessionStores.set(sessionId, store);
+  if (sessionStores.size > MAX_SESSION_STORES) {
+    const oldest = sessionStores.keys().next().value;
+    if (oldest !== undefined) sessionStores.delete(oldest);
+  }
+  return store;
+}
+
 export function createReadFileStateStore(): ReadFileStateStore {
   const entries = new Map<string, ReadFileStateEntry>();
 

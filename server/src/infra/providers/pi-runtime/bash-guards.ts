@@ -20,6 +20,8 @@ export interface BashFileBypassMatch {
   kind: BashFileBypassKind;
   reason: string;
   suggestedTool: 'Read' | 'Edit' | 'Write';
+  /** The workspace path the command touches, when it could be extracted. */
+  target?: string;
 }
 
 export interface BashToolRoutingSuggestion {
@@ -472,6 +474,7 @@ export function findBashFileBypass(command: string): BashFileBypassMatch | undef
         kind: 'file_read',
         reason: `shell file reader reads ${target}`,
         suggestedTool: 'Read',
+        target,
       };
     }
   }
@@ -487,6 +490,7 @@ export function findBashFileBypass(command: string): BashFileBypassMatch | undef
         kind: 'file_read',
         reason: `script reads ${target}`,
         suggestedTool: 'Read',
+        target,
       };
     }
   }

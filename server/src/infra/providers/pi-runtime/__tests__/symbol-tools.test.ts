@@ -63,6 +63,79 @@ describe('ReadSymbol/EditSymbol', () => {
     expect(res.content[0].text).toContain('3|        return 1');
   });
 
+  it('reads a Python function with a multi-line signature including its full body', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-symbol-'));
+    writeFileSync(
+      path.join(dir, 'token.py'),
+      [
+        'def _build_and_generate_jwt(',
+        '    audience: str,',
+        '    csms_prefix: str,',
+        '    ttl_seconds: int,',
+        '    refresh_secrets: bool = False,',
+        ') -> str:',
+        '    payload = {"aud": audience}  # comment with ) paren',
+        '    return sign(payload)',
+        '',
+        'def other():',
+        '    return None',
+        '',
+      ].join('\n')
+    );
+    const tools = getTools(dir);
+
+    const res = await tools.ReadSymbol.execute('rs-multiline', {
+      file_path: 'token.py',
+      symbol: '_build_and_generate_jwt',
+    });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({
+      ok: true,
+      kind: 'function',
+      startLine: 1,
+      endLine: 8,
+    });
+    expect(res.content[0].text).toContain('6|) -> str:');
+    expect(res.content[0].text).toContain('8|    return sign(payload)');
+    expect(res.content[0].text).not.toContain('10|def other():');
+  });
+
+  it('reads a Python method with a multi-line signature inside a class', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-symbol-'));
+    writeFileSync(
+      path.join(dir, 'svc.py'),
+      [
+        'class Service:',
+        '    def handle(',
+        '        self,',
+        '        request: dict,',
+        '    ) -> dict:',
+        '        return request',
+        '',
+        '    def next_method(self):',
+        '        return 1',
+        '',
+      ].join('\n')
+    );
+    const tools = getTools(dir);
+
+    const res = await tools.ReadSymbol.execute('rs-multiline-method', {
+      file_path: 'svc.py',
+      symbol: 'Service.handle',
+    });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({
+      ok: true,
+      kind: 'method',
+      startLine: 2,
+      endLine: 6,
+    });
+    expect(res.content[0].text).toContain('6|        return request');
+    expect(res.content[0].text).not.toContain('next_method');
+  });
+
   it('edits a TypeScript class method after ReadSymbol without a separate full Read', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-symbol-'));
     writeFileSync(

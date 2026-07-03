@@ -72,6 +72,7 @@ describe('run reducer', () => {
         name: 'Read',
         input: { file_path: '/repo/src/app.ts' },
         effect: undefined,
+        startedAt: expect.any(Number),
       },
     ]);
     expect(run.contentBlocks).toEqual([{ type: 'tool_use', toolUseId: 'tool-1' }]);
@@ -103,6 +104,7 @@ describe('run reducer', () => {
       output: 'patched',
       isError: false,
       effect,
+      completedAt: expect.any(Number),
     });
   });
 
