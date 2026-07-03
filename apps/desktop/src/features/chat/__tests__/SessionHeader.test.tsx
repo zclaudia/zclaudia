@@ -196,4 +196,23 @@ describe('SessionHeader', () => {
     expect(screen.getByText(/Fix my bug/)).toBeTruthy();
     expect(screen.queryByText(/Hello!/)).toBeNull(); // The assistant greeting should not be in chip
   });
+
+  describe('context usage in the pill', () => {
+    it('hides the percentage while usage is low (below the warn threshold)', () => {
+      render(<SessionHeader {...baseProps} contextPercent={1} />);
+      expect(screen.queryByText(/1%/)).toBeNull();
+    });
+
+    it('surfaces the percentage in warning color once usage reaches the threshold', () => {
+      render(<SessionHeader {...baseProps} contextPercent={82} />);
+      const pct = screen.getByText(/82%/);
+      expect(pct.className).toContain('text-warning');
+    });
+
+    it('escalates to the destructive color when usage is critical', () => {
+      render(<SessionHeader {...baseProps} contextPercent={97} />);
+      const pct = screen.getByText(/97%/);
+      expect(pct.className).toContain('text-destructive');
+    });
+  });
 });

@@ -33,6 +33,12 @@ import { resolveTopicChip } from './sessionTopicChip';
 
 const DEFAULT_AGENT_LABEL = 'Default Coding Agent';
 
+// Context usage is only worth surfacing in the header when it's approaching the
+// window limit; below this it just adds noise, so the pill hides it. The exact
+// number is always available in the details popover.
+const CONTEXT_WARN_PERCENT = 80;
+const CONTEXT_DANGER_PERCENT = 95;
+
 const isDesktopTauri =
   typeof window !== 'undefined' &&
   '__TAURI_INTERNALS__' in window &&
@@ -95,11 +101,10 @@ export function SessionHeader({
   );
   const { agent } = useAgentForSession(currentSession?.id);
   const modelValue = systemInfo?.model || agent?.model || null;
-  // Show "Agent Name (model)" once the agent resolves; fall back to a generic
+  // The pill shows only the agent name to stay compact; the model is redundant
+  // here since it's spelled out in the details popover. Fall back to a generic
   // placeholder during the brief first-render window before the store hydrates.
-  const agentLabel = agent
-    ? `${agent.name}${modelValue ? ` (${modelValue})` : ''}`
-    : DEFAULT_AGENT_LABEL;
+  const agentLabel = agent?.name ?? DEFAULT_AGENT_LABEL;
   const pathValue = systemInfo?.cwd || currentSession?.workingDirectory || null;
 
   // Topic anchor chip: first user message in the session
@@ -205,9 +210,15 @@ export function SessionHeader({
             aria-expanded={showInfo}
           >
             <Cpu size={12} className="shrink-0" />
-            <span className="truncate">{agentLabel}</span>
-            {contextPercent != null && (
-              <span className="shrink-0 text-muted-foreground/80">· {contextPercent}%</span>
+            {/* leading-tight (not the pill's leading-none) so truncate's
+                overflow:hidden doesn't clip descenders like the "g" in "Coding" */}
+            <span className="truncate leading-tight">{agentLabel}</span>
+            {contextPercent != null && contextPercent >= CONTEXT_WARN_PERCENT && (
+              <span
+                className={`shrink-0 font-medium ${contextPercent >= CONTEXT_DANGER_PERCENT ? 'text-destructive' : 'text-warning'}`}
+              >
+                · {contextPercent}%
+              </span>
             )}
             <ChevronDown size={11} className="shrink-0 opacity-70" />
           </button>
