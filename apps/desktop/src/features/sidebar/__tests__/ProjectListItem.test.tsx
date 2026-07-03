@@ -115,8 +115,9 @@ describe('ProjectListItem', () => {
       expect(screen.getByText('Worktree A Session')).toBeDefined();
       // ...with its git branch label (not the dir basename "feat-a")...
       expect(screen.getByText('feat/a')).toBeDefined();
-      // ...and a remove-worktree affordance is reachable on the flat row.
-      expect(screen.getByRole('button', { name: 'Remove worktree' })).toBeDefined();
+      // ...and a remove-worktree affordance is reachable via the row's "…" menu.
+      fireEvent.click(screen.getByRole('button', { name: 'Session actions' }));
+      expect(screen.getByRole('menuitem', { name: 'Remove worktree' })).toBeDefined();
     });
 
     it('keeps a collapsible group (with count) for worktrees with 2+ sessions', () => {
