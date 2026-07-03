@@ -69,7 +69,9 @@ const FALLBACK_MONO_FONT =
  * plain string, so we read the computed value rather than passing the var directly.
  */
 function resolveMonoFontFamily(): string {
-  if (typeof document === 'undefined') return FALLBACK_MONO_FONT;
+  if (typeof document === 'undefined' || typeof getComputedStyle === 'undefined') {
+    return FALLBACK_MONO_FONT;
+  }
   const value = getComputedStyle(document.documentElement)
     .getPropertyValue('--font-mono')
     .replace(/\s+/g, ' ')
