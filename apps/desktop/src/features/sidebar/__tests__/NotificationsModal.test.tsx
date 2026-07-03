@@ -35,7 +35,7 @@ describe('NotificationsModal', () => {
   it('calls onClose on backdrop click', () => {
     const onClose = vi.fn();
     render(<NotificationsModal open onClose={onClose} />);
-    fireEvent.click(screen.getByTestId('notifications-backdrop'));
+    fireEvent.click(screen.getByTestId('modal-backdrop'));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
