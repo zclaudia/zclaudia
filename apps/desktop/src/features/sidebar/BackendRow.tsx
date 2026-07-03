@@ -32,19 +32,24 @@ export function BackendRow({
           type="button"
           onClick={onToggle}
           aria-expanded={expanded}
-          className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left"
+          // pr-1 (not px-2) matches ProjectListItem's px-1 right padding so the
+          // trailing chevron lines up vertically with the project row's chevron;
+          // pl-2 keeps this parent row one indent level shallower than projects.
+          className="flex min-w-0 flex-1 items-center gap-2 py-1.5 pl-2 pr-1 text-left"
         >
-          <ChevronRight
-            size={14}
-            strokeWidth={2}
-            className={`flex-shrink-0 text-muted-foreground transition-transform ${expanded ? 'rotate-90' : ''}`}
-          />
+          {/* Status dot leads (like the project row's folder icon); the expand
+              chevron trails at the right end, matching ProjectListItem. */}
           <span
             className={`h-2 w-2 flex-shrink-0 rounded-full ${online ? 'bg-success' : 'bg-muted-foreground'}`}
           />
           <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
             {name}
           </span>
+          <ChevronRight
+            size={14}
+            strokeWidth={2}
+            className={`flex-shrink-0 text-muted-foreground/70 transition-transform ${expanded ? 'rotate-90' : ''}`}
+          />
         </button>
         {onNewProject && (
           <button
