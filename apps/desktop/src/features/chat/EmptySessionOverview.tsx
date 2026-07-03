@@ -62,7 +62,7 @@ export function EmptySessionSnapshot({
   if (!status || !projectName) return null;
 
   return (
-    <div className="mb-6 px-1.5 animate-in fade-in duration-300">
+    <div className="mb-6 px-1.5 animate-fade-in">
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-sm font-medium text-foreground truncate">{projectName}</span>
         <span className="flex items-center gap-1.5 text-sm text-muted-foreground flex-shrink-0">
@@ -73,7 +73,9 @@ export function EmptySessionSnapshot({
         </span>
       </div>
       <div className="mt-0.5 text-xs text-muted-foreground/60 truncate">
-        {status.clean ? 'Working tree clean' : `${changeCount} uncommitted changes`}
+        {status.clean
+          ? 'Working tree clean'
+          : `${changeCount} uncommitted ${changeCount === 1 ? 'change' : 'changes'}`}
         {latestCommit && (
           <>
             {' · '}
@@ -92,15 +94,9 @@ interface EmptySessionChipsProps {
   onSuggestion: (text: string) => void;
 }
 
-/** True when a command list contains the `/goal` slash command.
- * Checks the real `SlashCommand.command` field (e.g. `/goal`) as well as a
- * bare `name` field, since callers in tests construct lightweight command
- * stand-ins that only set `name`. */
+/** True when a command list contains the `/goal` slash command. */
 function hasGoalCommand(commands: SlashCommand[]): boolean {
-  return commands.some(c => {
-    const withName = c as { name?: string };
-    return c.command === '/goal' || c.command === 'goal' || withName.name === 'goal';
-  });
+  return commands.some(c => c.command === '/goal');
 }
 
 /** Suggestion chips shown below the selector row on the empty-session screen. */

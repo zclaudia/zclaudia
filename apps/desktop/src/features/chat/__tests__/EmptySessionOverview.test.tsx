@@ -87,7 +87,7 @@ describe('EmptySessionSnapshot', () => {
 });
 
 describe('EmptySessionChips', () => {
-  const goalCommand: SlashCommand = { name: 'goal', description: 'Set a goal' } as SlashCommand;
+  const goalCommand: SlashCommand = { command: '/goal', description: 'Set a goal', source: 'local' };
 
   it('shows the review chip when dirty, and no explain fallback', () => {
     seedGit(dirtyStatus);
