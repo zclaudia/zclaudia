@@ -31,6 +31,50 @@ const darkGlyphs = {
   'glyph-gray': [45, 6, 62],
 };
 
+// Terminal ANSI 16-color palette — hue-anchored to the accent/glyph system
+// (red 4 = destructive, green 150 = success, yellow 38-44 = warning,
+// blue 214 = primary, magenta 285 ≈ glyph-purple, cyan 185-190 ≈ glyph-teal).
+// white/bright-white stay deliberately light: their semantic role is background
+// blocks and reverse video; foreground use is rescued by xterm's
+// minimumContrastRatio (see TerminalController).
+const lightAnsi = {
+  'terminal-ansi-black': [45, 8, 16],
+  'terminal-ansi-red': [4, 66, 45],
+  'terminal-ansi-green': [150, 48, 33],
+  'terminal-ansi-yellow': [38, 80, 38],
+  'terminal-ansi-blue': [214, 70, 45],
+  'terminal-ansi-magenta': [285, 45, 48],
+  'terminal-ansi-cyan': [190, 65, 32],
+  'terminal-ansi-white': [45, 6, 78],
+  'terminal-ansi-bright-black': [45, 5, 43],
+  'terminal-ansi-bright-red': [4, 70, 52],
+  'terminal-ansi-bright-green': [150, 45, 40],
+  'terminal-ansi-bright-yellow': [40, 78, 45],
+  'terminal-ansi-bright-blue': [214, 70, 56],
+  'terminal-ansi-bright-magenta': [285, 50, 58],
+  'terminal-ansi-bright-cyan': [190, 60, 40],
+  'terminal-ansi-bright-white': [45, 10, 88],
+};
+
+const darkAnsi = {
+  'terminal-ansi-black': [35, 6, 22],
+  'terminal-ansi-red': [4, 60, 62],
+  'terminal-ansi-green': [150, 40, 56],
+  'terminal-ansi-yellow': [42, 65, 60],
+  'terminal-ansi-blue': [214, 62, 64],
+  'terminal-ansi-magenta': [285, 45, 68],
+  'terminal-ansi-cyan': [185, 45, 56],
+  'terminal-ansi-white': [35, 10, 80],
+  'terminal-ansi-bright-black': [35, 6, 45],
+  'terminal-ansi-bright-red': [4, 65, 68],
+  'terminal-ansi-bright-green': [150, 42, 63],
+  'terminal-ansi-bright-yellow': [44, 70, 66],
+  'terminal-ansi-bright-blue': [214, 65, 70],
+  'terminal-ansi-bright-magenta': [285, 50, 74],
+  'terminal-ansi-bright-cyan': [185, 50, 63],
+  'terminal-ansi-bright-white': [35, 12, 93],
+};
+
 const lightAccents = {
   primary: [214, 70, 45],
   'primary-foreground': [0, 0, 100],
@@ -46,6 +90,7 @@ const lightAccents = {
   'terminal-cursor': [214, 70, 45],
   'terminal-selection': [214, 70, 88],
   ...lightGlyphs,
+  ...lightAnsi,
 };
 
 const darkAccents = {
@@ -62,6 +107,7 @@ const darkAccents = {
   'thinking-foreground': [265, 60, 10],
   'terminal-cursor': [214, 70, 60],
   ...darkGlyphs,
+  ...darkAnsi,
 };
 
 function darkNeutrals(hue, sat, satText) {
