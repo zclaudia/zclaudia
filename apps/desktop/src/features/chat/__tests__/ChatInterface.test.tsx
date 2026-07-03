@@ -1601,9 +1601,9 @@ describe('ChatInterface', () => {
 
   // ─── Provider Badge ───────────────────────────────────────────────────
 
-  it('shows agent badge with "Agent Name (model)" format', () => {
-    // Sub-project C T4: SessionHeader now displays `${agent.name} (${agent.model})`
-    // via useAgentForSession instead of resolving an LLM provider name.
+  it('shows agent badge with the agent name, not the provider or model', () => {
+    // SessionHeader resolves the agent via useAgentForSession and shows only its
+    // name in the pill; the model lives in the details popover, not the badge.
     useAgentProfileMetaStore.setState({
       profiles: {
         'agent-1': {
@@ -1637,8 +1637,10 @@ describe('ChatInterface', () => {
       },
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
-    // Badge shows "Coder (claude-sonnet-4-6)" — agent name + model, not the LLM provider name.
-    expect(container.textContent).toContain('Coder (claude-sonnet-4-6)');
+    // Badge shows the agent name; neither the LLM provider name nor the model appears.
+    expect(container.textContent).toContain('Coder');
+    expect(container.textContent).not.toContain('TestProvider');
+    expect(container.textContent).not.toContain('claude-sonnet-4-6');
     mockProviderMetaStore.getState().getProviders.mockReturnValue([]);
   });
 
@@ -1680,6 +1682,8 @@ describe('ChatInterface', () => {
   });
 
   it('uses real context occupancy for the header and compact usage display', () => {
+    // 85% is above the header pill's warn threshold (80%), so the percentage is
+    // visible; below the threshold the pill hides it (covered in SessionHeader.test).
     setDefaultStores({
       sessionConfigStore: {
         sessionUsage: {
@@ -1688,7 +1692,7 @@ describe('ChatInterface', () => {
             outputTokens: 200,
             latestInputTokens: 0,
             latestOutputTokens: 75,
-            contextUsedTokens: 32_900,
+            contextUsedTokens: 850_000,
             contextWindow: 1_000_000,
           },
         },
@@ -1696,8 +1700,8 @@ describe('ChatInterface', () => {
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
     const tokenDisplay = container.querySelector('[data-testid="token-usage"]');
-    expect(tokenDisplay?.getAttribute('data-context-used')).toBe('32900');
-    expect(container.textContent).toContain('· 3%');
+    expect(tokenDisplay?.getAttribute('data-context-used')).toBe('850000');
+    expect(container.textContent).toContain('· 85%');
   });
 
   it('passes zero usage when no usage data exists', () => {
