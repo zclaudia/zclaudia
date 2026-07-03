@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { Children, cloneElement, isValidElement } from 'react';
+import { Children, cloneElement, isValidElement, useState } from 'react';
+import twemoji from '@twemoji/api';
 import {
   AlertTriangle,
   BarChart3,
@@ -192,16 +193,55 @@ const INLINE_MARKDOWN_ICON_TOKENS = Object.keys(INLINE_MARKDOWN_ICONS).sort(
   (a, b) => b.length - a.length
 );
 const INLINE_MARKDOWN_ICON_PATTERN = INLINE_MARKDOWN_ICON_TOKENS.map(escapeRegex).join('|');
-const EMOJI_FALLBACK_PATTERN = String.raw`(?:\p{Regional_Indicator}{2}|[0-9#*]\uFE0F?\u20E3|\p{Extended_Pictographic}(?:\uFE0F|\uFE0E|\p{Emoji_Modifier})*(?:\u200D\p{Extended_Pictographic}(?:\uFE0F|\uFE0E|\p{Emoji_Modifier})*)*)`;
-const INLINE_MARKDOWN_EMOJI_PATTERN = INLINE_MARKDOWN_ICON_PATTERN
-  ? `(?:${INLINE_MARKDOWN_ICON_PATTERN})|(?:${EMOJI_FALLBACK_PATTERN})`
-  : EMOJI_FALLBACK_PATTERN;
+// The trailing `(?:[\u{E0020}-\u{E007E}]+\u{E007F})?` consumes an optional
+// Unicode Tag Sequence (used by England/Scotland/Wales subdivision flags like
+// 🏴󠁧󠁢󠁥󠁮󠁧󠁿) so the tag characters don't leak as stray text.
+const EMOJI_FALLBACK_PATTERN = String.raw`(?:\p{Regional_Indicator}{2}|[0-9#*]\uFE0F?\u20E3|\p{Extended_Pictographic}(?:\uFE0F|\uFE0E|\p{Emoji_Modifier})*(?:\u200D\p{Extended_Pictographic}(?:\uFE0F|\uFE0E|\p{Emoji_Modifier})*)*(?:[\u{E0020}-\u{E007E}]+\u{E007F})?)`;
+const INLINE_MARKDOWN_EMOJI_PATTERN = `(?:${INLINE_MARKDOWN_ICON_PATTERN})|(?:${EMOJI_FALLBACK_PATTERN})`;
 const INLINE_MARKDOWN_ICON_REGEX = new RegExp(INLINE_MARKDOWN_EMOJI_PATTERN, 'gu');
 const INLINE_MARKDOWN_ICON_TEST_REGEX = new RegExp(INLINE_MARKDOWN_EMOJI_PATTERN, 'u');
 const KEYCAP_SYMBOL_REGEX = /^([0-9#*])\uFE0F?\u20E3$/u;
 
+// CDN base for the maintained Twemoji asset set (jdecked fork). Swap this for a
+// self-hosted `/twemoji/` path under `public/` to render fully offline.
+const TWEMOJI_ASSET_BASE = 'https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.3/assets/svg/';
+
+function getTwemojiUrl(symbol: string): string {
+  return `${TWEMOJI_ASSET_BASE}${twemoji.convert.toCodePoint(symbol)}.svg`;
+}
+
 export function hasInlineMarkdownIcon(text: string): boolean {
   return INLINE_MARKDOWN_ICON_TEST_REGEX.test(text);
+}
+
+/**
+ * Renders an emoji that has no lucide mapping as a cross-platform Twemoji SVG.
+ * Falls back to the system emoji font (`.inline-markdown-emoji`) if the image
+ * fails to load, so content stays readable offline.
+ */
+function EmojiImage({ symbol }: { symbol: string }) {
+  const [failed, setFailed] = useState(false);
+
+  if (failed) {
+    return (
+      <span aria-label={symbol} role="img" className="inline-markdown-emoji">
+        {symbol}
+      </span>
+    );
+  }
+
+  return (
+    <img
+      src={getTwemojiUrl(symbol)}
+      alt={symbol}
+      aria-label={symbol}
+      role="img"
+      className="inline-markdown-emoji-img"
+      draggable={false}
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
+  );
 }
 
 function InlineMarkdownIcon({ symbol }: { symbol: string }) {
@@ -216,11 +256,7 @@ function InlineMarkdownIcon({ symbol }: { symbol: string }) {
 
   const definition = INLINE_MARKDOWN_ICONS[symbol];
   if (!definition) {
-    return (
-      <span aria-label={symbol} role="img" className="inline-markdown-emoji">
-        {symbol}
-      </span>
-    );
+    return <EmojiImage symbol={symbol} />;
   }
 
   const { Icon, label, className, filled } = definition;
@@ -230,7 +266,7 @@ function InlineMarkdownIcon({ symbol }: { symbol: string }) {
       role="img"
       className={`inline-block h-[1em] w-[1em] align-middle ${className}`}
       fill={filled ? 'currentColor' : 'none'}
-      strokeWidth={filled ? 1.75 : 2}
+      strokeWidth={1.75}
     />
   );
 }

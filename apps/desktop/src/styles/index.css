@@ -522,6 +522,15 @@ body.notch-window {
   font-variant-emoji: emoji;
 }
 
+.inline-markdown-emoji-img {
+  display: inline-block;
+  width: 1.1em;
+  height: 1.1em;
+  vertical-align: middle;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
 .inline-markdown-keycap {
   display: inline-flex;
   width: 1.375em;

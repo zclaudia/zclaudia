@@ -98,4 +98,19 @@ describe('MarkdownChildrenWithInlineIcons', () => {
       expect(screen.getByRole('img', { name: emoji })).toBeInTheDocument();
     }
   });
+
+  it('keeps Unicode tag-sequence flag subdivisions intact (no stray tag chars)', () => {
+    // England flag = U+1F3F4 + tag letters gbeng + cancel tag, built from
+    // codepoints to avoid editors/shell stripping the invisible tag chars.
+    const england = `${String.fromCodePoint(0x1f3f4)}${String.fromCodePoint(
+      0xe0067, 0xe0062, 0xe0065, 0xe006e, 0xe0067, 0xe007f
+    )}`;
+    render(<MarkdownChildrenWithInlineIcons>{`flag ${england}`}</MarkdownChildrenWithInlineIcons>);
+
+    // The entire subdivision flag is wrapped as one img role with the full
+    // sequence as its accessible name — the tag characters must not leak out.
+    expect(screen.getByRole('img', { name: england })).toBeInTheDocument();
+    // No stray tag/control characters rendered as visible text.
+    expect(document.body.textContent).not.toMatch(new RegExp(String.fromCodePoint(0xe0067)));
+  });
 });
