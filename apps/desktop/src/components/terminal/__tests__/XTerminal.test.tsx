@@ -72,7 +72,7 @@ vi.mock('../../../utils/platform', async importOriginal => {
   };
 });
 
-import { XTerminal } from '../XTerminal';
+import { XTerminal, getTerminalTheme } from '../XTerminal';
 
 describe('XTerminal', () => {
   async function flushTerminalMount() {
@@ -140,6 +140,61 @@ describe('XTerminal', () => {
 
     const { container } = render(<XTerminal terminalId="term-1" projectId="proj-1" />);
     expect(container.firstElementChild).toBeTruthy();
+  });
+
+  it('maps all 16 ANSI palette slots from CSS variables', () => {
+    // Each slot gets a distinct primary color so a crossed wire fails loudly.
+    const values: Record<string, string> = {
+      '--terminal-bg': '0 0% 0%',
+      '--terminal-fg': '0 0% 100%',
+      '--terminal-cursor': '0 0% 100%',
+      '--terminal-selection': '0 0% 50%',
+      '--terminal-ansi-black': '0 0% 0%',
+      '--terminal-ansi-red': '0 100% 50%',
+      '--terminal-ansi-green': '120 100% 50%',
+      '--terminal-ansi-yellow': '60 100% 50%',
+      '--terminal-ansi-blue': '240 100% 50%',
+      '--terminal-ansi-magenta': '300 100% 50%',
+      '--terminal-ansi-cyan': '180 100% 50%',
+      '--terminal-ansi-white': '0 0% 100%',
+      '--terminal-ansi-bright-black': '0 0% 50%',
+      '--terminal-ansi-bright-red': '0 100% 25%',
+      '--terminal-ansi-bright-green': '120 100% 25%',
+      '--terminal-ansi-bright-yellow': '60 100% 25%',
+      '--terminal-ansi-bright-blue': '240 100% 25%',
+      '--terminal-ansi-bright-magenta': '300 100% 25%',
+      '--terminal-ansi-bright-cyan': '180 100% 25%',
+      '--terminal-ansi-bright-white': '0 0% 75%',
+    };
+    vi.spyOn(window, 'getComputedStyle').mockReturnValue({
+      getPropertyValue: (prop: string) => values[prop] || '',
+    } as any);
+
+    const theme = getTerminalTheme();
+
+    expect(theme).toMatchObject({
+      background: '#000000',
+      foreground: '#ffffff',
+      cursor: '#ffffff',
+      selectionBackground: '#808080',
+      black: '#000000',
+      red: '#ff0000',
+      green: '#00ff00',
+      yellow: '#ffff00',
+      blue: '#0000ff',
+      magenta: '#ff00ff',
+      cyan: '#00ffff',
+      white: '#ffffff',
+      brightBlack: '#808080',
+      brightRed: '#800000',
+      brightGreen: '#008000',
+      // hslToHex's float math lands these 127.5-boundary channels on 0x7f — expected values match actual output
+      brightYellow: '#7f8000',
+      brightBlue: '#000080',
+      brightMagenta: '#80007f',
+      brightCyan: '#007f80',
+      brightWhite: '#bfbfbf',
+    });
   });
 
   it('applies inline style for background color', () => {
