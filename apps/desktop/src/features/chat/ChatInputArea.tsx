@@ -20,6 +20,7 @@ import { WorktreeSelector } from './WorktreeSelector';
 import { TokenUsageDisplay } from './TokenUsageDisplay';
 import { ContextUsagePopover } from './ContextUsagePopover';
 import { ComposerFooter } from './ComposerFooter';
+import { EmptySessionSnapshot, EmptySessionChips } from './EmptySessionOverview';
 import { MessageInput, type Attachment } from './MessageInput';
 import { SendQueueBar } from './SendQueueBar';
 import type { QueueItem } from '../../stores/sendQueueStore';
@@ -156,6 +157,8 @@ export function ChatInputArea({
 
   const closeMobileTools = useCallback(() => setMobileToolsOpen(false), []);
 
+  const emptySessionWorktree = currentSession?.workingDirectory || currentProject?.rootPath;
+
   // One-shot prefill (e.g. from the plan "Execute plan" button). Takes
   // precedence over restoreMessage/initialDraft on its tick, then clears
   // itself so subsequent user edits aren't clobbered. `prefillConsumed`
@@ -164,6 +167,7 @@ export function ChatInputArea({
   // overwrite them on the next MessageInput effect).
   const pendingPrefill = useComposerStore(s => s.pendingPrefills[sessionId]);
   const clearPendingPrefill = useComposerStore(s => s.clearPendingPrefill);
+  const setPendingPrefill = useComposerStore(s => s.setPendingPrefill);
   const [prefillConsumed, setPrefillConsumed] = useState(false);
 
   useEffect(() => {
@@ -344,6 +348,13 @@ export function ChatInputArea({
       {/* Centered column matching the message reading column (ChatMessagePane) so
           the composer aligns with the chat content instead of stretching edge-to-edge. */}
       <div className="mx-auto w-full max-w-3xl">
+        {centered && (
+          <EmptySessionSnapshot
+            projectId={currentProject?.id}
+            projectName={currentProject?.name}
+            worktreePath={emptySessionWorktree}
+          />
+        )}
         {/* Pinned goal bar — only present when a goal exists */}
         {goal && (
           <div className="mb-1.5">
@@ -574,6 +585,14 @@ export function ChatInputArea({
                 />
               </ContextUsagePopover>
             }
+          />
+        )}
+        {centered && (
+          <EmptySessionChips
+            projectId={currentProject?.id}
+            worktreePath={emptySessionWorktree}
+            commands={commands}
+            onSuggestion={text => setPendingPrefill(sessionId, text)}
           />
         )}
       </div>

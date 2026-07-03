@@ -84,6 +84,21 @@ describe('EmptySessionSnapshot', () => {
     expect(screen.getByText(/3 uncommitted changes/)).toBeInTheDocument();
     expect(screen.queryByText('be5cc81d')).not.toBeInTheDocument();
   });
+
+  it('uses singular "change" wording when exactly one file changed', () => {
+    const oneFileStatus: GitWorktreeStatus = {
+      clean: false,
+      staged: ['a.ts'],
+      unstaged: [],
+      untracked: [],
+      currentBranch: 'main',
+      ahead: 0,
+      behind: 0,
+    };
+    seedGit(oneFileStatus, []);
+    render(<EmptySessionSnapshot projectId={PROJECT_ID} projectName="zclaudia" worktreePath={WT} />);
+    expect(screen.getByText(/1 uncommitted change(?!s)/)).toBeInTheDocument();
+  });
 });
 
 describe('EmptySessionChips', () => {

@@ -140,6 +140,7 @@ export function EmptySessionChips({
       {chips.map(chip => (
         <button
           key={chip.key}
+          type="button"
           onClick={() => onSuggestion(chip.template)}
           className="h-7 px-2.5 inline-flex items-center gap-1.5 text-sm rounded-md border border-border text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
         >
