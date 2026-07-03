@@ -51,16 +51,8 @@ function makeProps(overrides: Partial<ProjectListItemProps> = {}): ProjectListIt
     onCloseContextMenu: vi.fn(),
     onSettingsProject: vi.fn(),
     onDeleteProject: vi.fn(),
-    isCreatingSession: false,
-    newSessionName: '',
-    onNewSessionNameChange: vi.fn(),
-    newSessionAgentProfileId: '',
-    onNewSessionAgentProfileIdChange: vi.fn(),
     onStartCreatingSession: vi.fn(),
-    onCreateSession: vi.fn(),
-    onCancelCreateSession: vi.fn(),
     isConnected: true,
-    agents: [],
     ...overrides,
   };
 }

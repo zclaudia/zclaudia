@@ -17,7 +17,10 @@ import { MobileSidebarHeader } from './MobileSidebarHeader';
 import { SidebarSearch } from './SidebarSearch';
 import { SearchModal } from './SearchModal';
 import { ProjectListItem } from './ProjectListItem';
+import { NewSessionModal } from './NewSessionModal';
 import { BackendRow } from './BackendRow';
+import { useProjectStore } from '../../stores/projectStore';
+import { useOwnershipStore } from '../../stores/ownershipStore';
 import { useOnlineBackends } from './onlineBackends';
 import { useBackendConnectionLifecycle } from './useBackendConnectionLifecycle';
 import { useSidebarExpansionStore } from '../../stores/sidebarExpansionStore';
@@ -157,6 +160,7 @@ export function Sidebar({
   const [creatingSessionForProject, setCreatingSessionForProject] = useState<string | null>(null);
   const [newSessionName, setNewSessionName] = useState('');
   const [newSessionAgentProfileId, setNewSessionAgentProfileId] = useState<string>('');
+  const [newSessionWorkingDirectory, setNewSessionWorkingDirectory] = useState<string | null>(null);
   const [contextMenuProject, setContextMenuProject] = useState<string | null>(null);
   const [contextMenuPos, setContextMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [settingsProjectId, setSettingsProjectId] = useState<string | null>(null);
@@ -260,6 +264,17 @@ export function Sidebar({
     }
   }, [agentLoaded, agentLoading, loadAllAgents]);
   const agents = Object.values(agentProfiles);
+  const allProjects = useProjectStore(s => s.projects);
+  const newSessionProject = creatingSessionForProject
+    ? (allProjects.find(p => p.id === creatingSessionForProject) ?? null)
+    : null;
+  // Subscribed selector (not a one-shot getState snapshot): the long-lived
+  // modal's DirectoryPicker makes live backend calls, so backendId must react
+  // to ownership changes. Safe to call unconditionally — returns null when no
+  // session is being created.
+  const newSessionBackendId = useOwnershipStore(s =>
+    s.getProjectBackendId(creatingSessionForProject)
+  );
 
   // --- Automation mode wiring ---
   // Hook must run unconditionally; only consumed when automationMode is present.
@@ -286,6 +301,8 @@ export function Sidebar({
     setShowNewProjectForm,
     setNewSessionName,
     setNewSessionAgentProfileId,
+    newSessionWorkingDirectory,
+    setNewSessionWorkingDirectory,
     setCreatingSessionForProject,
     setCreatingProject,
     setContextMenuProject,
@@ -495,26 +512,10 @@ export function Sidebar({
             onCloseContextMenu={() => setContextMenuProject(null)}
             onSettingsProject={setSettingsProjectId}
             onDeleteProject={actions.handleDeleteProject}
-            isCreatingSession={creatingSessionForProject === project.id}
-            newSessionName={newSessionName}
-            onNewSessionNameChange={setNewSessionName}
-            newSessionAgentProfileId={newSessionAgentProfileId}
-            onNewSessionAgentProfileIdChange={setNewSessionAgentProfileId}
             onStartCreatingSession={() => {
               runAfterAgentGate(() => setCreatingSessionForProject(project.id));
             }}
-            onCreateSession={() => {
-              runAfterAgentGate(() => actions.handleCreateSession(project.id), {
-                forceRefresh: true,
-              });
-            }}
-            onCancelCreateSession={() => {
-              setCreatingSessionForProject(null);
-              setNewSessionName('');
-              setNewSessionAgentProfileId('');
-            }}
             isConnected={isConnected}
-            agents={agents}
             onPopOutSession={actions.handlePopOutSession}
           />
         </SortableItem>
@@ -609,6 +610,33 @@ export function Sidebar({
           document.body
         )}
       {createPortal(<PluginPermissionDialog />, document.body)}
+      {newSessionProject && (
+        <NewSessionModal
+          open
+          onClose={() => {
+            setCreatingSessionForProject(null);
+            setNewSessionName('');
+            setNewSessionAgentProfileId('');
+            setNewSessionWorkingDirectory(null);
+          }}
+          project={newSessionProject}
+          backendId={newSessionBackendId}
+          agents={agents}
+          name={newSessionName}
+          onNameChange={setNewSessionName}
+          agentProfileId={newSessionAgentProfileId}
+          onAgentProfileIdChange={setNewSessionAgentProfileId}
+          workingDirectory={newSessionWorkingDirectory}
+          onWorkingDirectoryChange={setNewSessionWorkingDirectory}
+          onCreate={() => {
+            runAfterAgentGate(() => actions.handleCreateSession(newSessionProject.id), {
+              forceRefresh: true,
+            });
+          }}
+          isConnected={isConnected}
+          isMobile={isMobile}
+        />
+      )}
     </>
   );
 

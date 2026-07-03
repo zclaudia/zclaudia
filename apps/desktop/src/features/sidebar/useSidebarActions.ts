@@ -28,6 +28,8 @@ interface UseSidebarActionsOptions {
   setShowNewProjectForm: (v: boolean) => void;
   setNewSessionName: (v: string) => void;
   setNewSessionAgentProfileId: (v: string) => void;
+  newSessionWorkingDirectory: string | null;
+  setNewSessionWorkingDirectory: (v: string | null) => void;
   setCreatingSessionForProject: (v: string | null) => void;
   setCreatingProject: (v: boolean) => void;
   setContextMenuProject: (v: string | null) => void;
@@ -57,6 +59,8 @@ export function useSidebarActions({
   setShowNewProjectForm,
   setNewSessionName,
   setNewSessionAgentProfileId,
+  newSessionWorkingDirectory,
+  setNewSessionWorkingDirectory,
   setCreatingSessionForProject,
   setCreatingProject,
   setContextMenuProject,
@@ -134,10 +138,12 @@ export function useSidebarActions({
           projectId,
           name: newSessionName.trim() || undefined,
           agentProfileId: newSessionAgentProfileId || undefined,
+          workingDirectory: newSessionWorkingDirectory || undefined,
         });
         addSession(session);
         setNewSessionName('');
         setNewSessionAgentProfileId('');
+        setNewSessionWorkingDirectory(null);
         setCreatingSessionForProject(null);
         selectSession(session.id);
       } catch (error) {
@@ -152,10 +158,12 @@ export function useSidebarActions({
       isConnected,
       newSessionName,
       newSessionAgentProfileId,
+      newSessionWorkingDirectory,
       addSession,
       selectSession,
       setNewSessionName,
       setNewSessionAgentProfileId,
+      setNewSessionWorkingDirectory,
       setCreatingSessionForProject,
       onAgentNotReady,
     ]

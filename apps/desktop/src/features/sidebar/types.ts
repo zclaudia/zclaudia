@@ -75,16 +75,8 @@ export interface ProjectListItemProps {
   onSettingsProject: (id: string) => void;
   onDeleteProject: (id: string, name?: string) => void;
   // New session
-  isCreatingSession: boolean;
-  newSessionName: string;
-  onNewSessionNameChange: (name: string) => void;
-  newSessionAgentProfileId: string;
-  onNewSessionAgentProfileIdChange: (id: string) => void;
   onStartCreatingSession: () => void;
-  onCreateSession: () => void;
-  onCancelCreateSession: () => void;
   isConnected: boolean;
-  agents: SidebarAgent[];
   // Pop-out (desktop only)
   onPopOutSession?: (sessionId: string, projectId: string) => void;
 }

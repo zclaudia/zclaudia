@@ -1020,39 +1020,29 @@ describe('Sidebar', () => {
     const projBtn = buttons.find(b => b.textContent?.includes('Project One'))!;
     fireEvent.click(projBtn);
 
-    // Open context menu and click New Session
-    const dotsButtons = Array.from(container.querySelectorAll('button')).filter(b => {
-      return b.className.includes('flex-shrink-0') && b.textContent?.trim() === '';
+    // Open the New session modal via the "+" quick action
+    const newSessionBtn = projBtn
+      .closest('div')!
+      .querySelector('button[aria-label="New session"]') as HTMLButtonElement;
+    fireEvent.click(newSessionBtn);
+
+    // Fill session name (modal portals to document.body)
+    const sessionInput = document.querySelector('input[placeholder="Session name (optional)"]')!;
+    fireEvent.change(sessionInput, { target: { value: 'My Session' } });
+
+    // Click Create
+    const createBtn = Array.from(document.querySelectorAll('button')).find(
+      b => b.textContent === 'Create'
+    )!;
+    await act(async () => {
+      fireEvent.click(createBtn);
     });
 
-    if (dotsButtons.length > 0) {
-      fireEvent.click(dotsButtons[0], { clientX: 100, clientY: 100 });
-      const newSessionBtn = Array.from(document.querySelectorAll('button')).find(
-        b => b.textContent?.trim() === 'New Session'
-      );
-      if (newSessionBtn) {
-        fireEvent.click(newSessionBtn);
-        // Fill session name
-        const sessionInput = container.querySelector(
-          'input[placeholder="Session name (optional)"]'
-        )!;
-        fireEvent.change(sessionInput, { target: { value: 'My Session' } });
-
-        // Click Create
-        const createBtn = Array.from(container.querySelectorAll('button')).find(
-          b => b.textContent === 'Create'
-        )!;
-        await act(async () => {
-          fireEvent.click(createBtn);
-        });
-
-        expect(api.createSession).toHaveBeenCalledWith({
-          projectId: 'proj-1',
-          name: 'My Session',
-          agentProfileId: undefined,
-        });
-      }
-    }
+    expect(api.createSession).toHaveBeenCalledWith({
+      projectId: 'proj-1',
+      name: 'My Session',
+      agentProfileId: undefined,
+    });
   });
 
   it('cancels session creation on Escape', () => {
@@ -1061,24 +1051,15 @@ describe('Sidebar', () => {
     const projBtn = buttons.find(b => b.textContent?.includes('Project One'))!;
     fireEvent.click(projBtn);
 
-    const dotsButtons = Array.from(container.querySelectorAll('button')).filter(b => {
-      return b.className.includes('flex-shrink-0') && b.textContent?.trim() === '';
-    });
+    const newSessionBtn = projBtn
+      .closest('div')!
+      .querySelector('button[aria-label="New session"]') as HTMLButtonElement;
+    fireEvent.click(newSessionBtn);
 
-    if (dotsButtons.length > 0) {
-      fireEvent.click(dotsButtons[0], { clientX: 100, clientY: 100 });
-      const newSessionBtn = Array.from(document.querySelectorAll('button')).find(
-        b => b.textContent?.trim() === 'New Session'
-      );
-      if (newSessionBtn) {
-        fireEvent.click(newSessionBtn);
-        const sessionInput = container.querySelector(
-          'input[placeholder="Session name (optional)"]'
-        )!;
-        fireEvent.keyDown(sessionInput, { key: 'Escape' });
-        expect(container.querySelector('input[placeholder="Session name (optional)"]')).toBeFalsy();
-      }
-    }
+    const sessionInput = document.querySelector('input[placeholder="Session name (optional)"]')!;
+    fireEvent.keyDown(sessionInput, { key: 'Escape' });
+    // Escape closes the Modal → resets creatingSessionForProject → modal unmounts.
+    expect(document.querySelector('input[placeholder="Session name (optional)"]')).toBeFalsy();
   });
 
   it('creates session via Enter key', async () => {
@@ -1088,27 +1069,17 @@ describe('Sidebar', () => {
     const projBtn = buttons.find(b => b.textContent?.includes('Project One'))!;
     fireEvent.click(projBtn);
 
-    const dotsButtons = Array.from(container.querySelectorAll('button')).filter(b => {
-      return b.className.includes('flex-shrink-0') && b.textContent?.trim() === '';
-    });
+    const newSessionBtn = projBtn
+      .closest('div')!
+      .querySelector('button[aria-label="New session"]') as HTMLButtonElement;
+    fireEvent.click(newSessionBtn);
 
-    if (dotsButtons.length > 0) {
-      fireEvent.click(dotsButtons[0], { clientX: 100, clientY: 100 });
-      const newSessionBtn = Array.from(document.querySelectorAll('button')).find(
-        b => b.textContent?.trim() === 'New Session'
-      );
-      if (newSessionBtn) {
-        fireEvent.click(newSessionBtn);
-        const sessionInput = container.querySelector(
-          'input[placeholder="Session name (optional)"]'
-        )!;
-        fireEvent.change(sessionInput, { target: { value: 'Enter Session' } });
-        await act(async () => {
-          fireEvent.keyDown(sessionInput, { key: 'Enter' });
-        });
-        expect(api.createSession).toHaveBeenCalled();
-      }
-    }
+    const sessionInput = document.querySelector('input[placeholder="Session name (optional)"]')!;
+    fireEvent.change(sessionInput, { target: { value: 'Enter Session' } });
+    await act(async () => {
+      fireEvent.keyDown(sessionInput, { key: 'Enter' });
+    });
+    expect(api.createSession).toHaveBeenCalled();
   });
 
   it('blocks session submit when readiness becomes unusable while the form is open', async () => {
@@ -1137,12 +1108,12 @@ describe('Sidebar', () => {
       .querySelector('button[aria-label="New session"]') as HTMLButtonElement;
     fireEvent.click(newSessionBtn);
 
-    const sessionInput = container.querySelector('input[placeholder="Session name (optional)"]')!;
+    const sessionInput = document.querySelector('input[placeholder="Session name (optional)"]')!;
     fireEvent.change(sessionInput, { target: { value: 'Blocked Session' } });
     shouldFailReadiness = true;
     useAgentReadinessStore.setState({ readiness: null, refresh } as any);
 
-    const createBtn = Array.from(container.querySelectorAll('button')).find(
+    const createBtn = Array.from(document.querySelectorAll('button')).find(
       b => b.textContent === 'Create'
     )!;
     await act(async () => {
@@ -1178,7 +1149,7 @@ describe('Sidebar', () => {
       .querySelector('button[aria-label="New session"]') as HTMLButtonElement;
     fireEvent.click(newSessionBtn);
 
-    const createBtn = Array.from(container.querySelectorAll('button')).find(
+    const createBtn = Array.from(document.querySelectorAll('button')).find(
       b => b.textContent === 'Create'
     )!;
     await act(async () => {
@@ -1920,56 +1891,43 @@ describe('Sidebar', () => {
     )!;
     fireEvent.click(projBtn);
 
-    // Open context menu (dots button next to project)
-    const dotsButtons = Array.from(container.querySelectorAll('button')).filter(
-      b => b.className.includes('flex-shrink-0') && b.textContent?.trim() === ''
-    );
+    // Open the New session modal via the "+" quick action
+    const newSessionBtn = projBtn
+      .closest('div')!
+      .querySelector('button[aria-label="New session"]') as HTMLButtonElement;
+    fireEvent.click(newSessionBtn);
 
-    // Mirrors the guard used by the existing context-menu tests; the supervisor
-    // / multi-button layout means the dots button isn't always present in jsdom.
-    if (dotsButtons.length > 0) {
-      fireEvent.click(dotsButtons[0], { clientX: 100, clientY: 100 });
-      const newSessionBtn = Array.from(document.querySelectorAll('button')).find(
-        b => b.textContent?.trim() === 'New Session'
-      );
+    // Agent Select trigger shows "Default (from project)" before any agent picked.
+    // The modal portals to document.body, so query there.
+    const agentTrigger = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('button[aria-haspopup="listbox"]')
+    ).find(b => b.textContent?.includes('Default (from project)'));
+    expect(agentTrigger).toBeTruthy();
+    fireEvent.click(agentTrigger!);
 
-      if (newSessionBtn) {
-        fireEvent.click(newSessionBtn);
+    // Both agents listed in dropdown, with the default-marker suffix.
+    const options = Array.from(document.querySelectorAll('[role="option"]'));
+    const defaultOpt = options.find(o => o.textContent?.includes('Default Coding Agent'));
+    const docOpt = options.find(o => o.textContent?.includes('Doc Writer'));
+    expect(defaultOpt?.textContent).toContain('*'); // default-marker
+    expect(docOpt).toBeTruthy();
 
-        // Agent Select trigger shows "Default (from project)" before any agent picked.
-        const agentTrigger = Array.from(
-          container.querySelectorAll<HTMLButtonElement>('button[aria-haspopup="listbox"]')
-        ).find(b => b.textContent?.includes('Default (from project)'));
-        expect(agentTrigger).toBeTruthy();
-        fireEvent.click(agentTrigger!);
+    // Pick Doc Writer, then submit.
+    fireEvent.click(docOpt as Element);
+    const sessionInput = document.querySelector('input[placeholder="Session name (optional)"]')!;
+    fireEvent.change(sessionInput, { target: { value: 'My Session' } });
+    const createBtn = Array.from(document.querySelectorAll('button')).find(
+      b => b.textContent === 'Create'
+    )!;
+    await act(async () => {
+      fireEvent.click(createBtn);
+    });
 
-        // Both agents listed in dropdown, with the default-marker suffix.
-        const options = Array.from(document.querySelectorAll('[role="option"]'));
-        const defaultOpt = options.find(o => o.textContent?.includes('Default Coding Agent'));
-        const docOpt = options.find(o => o.textContent?.includes('Doc Writer'));
-        expect(defaultOpt?.textContent).toContain('*'); // default-marker
-        expect(docOpt).toBeTruthy();
-
-        // Pick Doc Writer, then submit.
-        fireEvent.click(docOpt as Element);
-        const sessionInput = container.querySelector(
-          'input[placeholder="Session name (optional)"]'
-        )!;
-        fireEvent.change(sessionInput, { target: { value: 'My Session' } });
-        const createBtn = Array.from(container.querySelectorAll('button')).find(
-          b => b.textContent === 'Create'
-        )!;
-        await act(async () => {
-          fireEvent.click(createBtn);
-        });
-
-        expect(api.createSession).toHaveBeenCalledWith({
-          projectId: 'proj-1',
-          name: 'My Session',
-          agentProfileId: 'a2',
-        });
-      }
-    }
+    expect(api.createSession).toHaveBeenCalledWith({
+      projectId: 'proj-1',
+      name: 'My Session',
+      agentProfileId: 'a2',
+    });
   });
 
   // ---- normalizeSearchPreview ----

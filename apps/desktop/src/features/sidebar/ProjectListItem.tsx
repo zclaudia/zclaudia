@@ -14,7 +14,6 @@ import { WorktreeGroupItem } from './WorktreeGroupItem';
 import { ProjectWorkspaceItem } from './ProjectWorkspaceItem';
 import { groupSessionsByWorktree } from './worktreeGrouping';
 import { SortableList, SortableItem } from '../../components/SortableList';
-import { Select } from '../../components/ui/Select';
 import type { Session } from '@zclaudia/shared';
 import type { ProjectListItemProps } from './types';
 
@@ -92,16 +91,8 @@ export function ProjectListItem({
   onCloseContextMenu,
   onSettingsProject,
   onDeleteProject,
-  isCreatingSession,
-  newSessionName,
-  onNewSessionNameChange,
-  newSessionAgentProfileId,
-  onNewSessionAgentProfileIdChange,
   onStartCreatingSession,
-  onCreateSession,
-  onCancelCreateSession,
   isConnected,
-  agents,
   onPopOutSession,
 }: ProjectListItemProps) {
   const menuWidthClass = isMobile ? 'w-44' : 'w-36';
@@ -117,17 +108,6 @@ export function ProjectListItem({
   const menuItemClass = `${menuItemBaseClass} hover:bg-secondary active:bg-secondary`;
   const menuDeleteClass = `${menuItemBaseClass} text-destructive hover:bg-destructive/8 active:bg-destructive/8`;
   const menuContainerClass = `fixed ${menuWidthClass} overflow-hidden bg-popover border border-border rounded-md py-1 shadow-md z-50`;
-  const inputClass = isMobile
-    ? 'w-full px-3 py-2.5 bg-muted/60 border-0 rounded-lg text-sm shadow-apple-sm focus:outline-none focus:ring-1 focus:ring-primary/50'
-    : 'w-full px-2 py-1.5 bg-muted/60 border-0 rounded-lg text-sm shadow-apple-sm focus:outline-none focus:ring-1 focus:ring-primary/50';
-  const buttonRowClass = isMobile ? 'flex gap-2 mt-2' : 'flex gap-1 mt-1.5';
-  const createBtnClass = isMobile
-    ? 'flex-1 px-3 py-2.5 bg-accent text-foreground font-medium shadow-apple-sm hover:bg-accent/80 active:bg-accent/70 rounded-lg text-sm'
-    : 'flex-1 px-2 py-1 bg-accent text-foreground font-medium shadow-apple-sm hover:bg-accent/80 rounded-lg text-xs';
-  const cancelBtnClass = isMobile
-    ? 'flex-1 px-3 py-2.5 bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground active:bg-muted/80 rounded-lg text-sm'
-    : 'flex-1 px-2 py-1 bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground rounded-lg text-xs';
-  const sessionFormWrapperClass = isMobile ? '' : 'mt-1';
 
   interface RenderSessionOptions {
     /** Override the branch tag (e.g. flattened worktree rows use the git branch). */
@@ -407,48 +387,6 @@ export function ProjectListItem({
             </div>
           )}
           {!hasSupervisor && renderRegularSessions()}
-
-          {/* New session form */}
-          {isCreatingSession && (
-            <div className={sessionFormWrapperClass}>
-              <input
-                type="text"
-                value={newSessionName}
-                onChange={e => onNewSessionNameChange(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') onCreateSession();
-                  if (e.key === 'Escape') onCancelCreateSession();
-                }}
-                placeholder="Session name (optional)"
-                className={inputClass}
-                autoFocus
-              />
-              {agents.length > 0 && (
-                <Select
-                  value={newSessionAgentProfileId}
-                  onChange={onNewSessionAgentProfileIdChange}
-                  block
-                  size={isMobile ? 'lg' : 'md'}
-                  className={isMobile ? 'mt-2' : 'mt-1'}
-                  options={[
-                    { value: '', label: 'Default (from project)' },
-                    ...agents.map(a => ({
-                      value: a.id,
-                      label: `${a.name}${a.isDefault ? ' *' : ''}`,
-                    })),
-                  ]}
-                />
-              )}
-              <div className={buttonRowClass}>
-                <button onClick={onCreateSession} className={createBtnClass}>
-                  Create
-                </button>
-                <button onClick={onCancelCreateSession} className={cancelBtnClass}>
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       )}
     </>
