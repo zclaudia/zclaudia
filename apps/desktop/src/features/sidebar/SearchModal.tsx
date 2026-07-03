@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import {
   Search as SearchIcon,
   X,
@@ -10,6 +9,7 @@ import {
   SlidersHorizontal,
   Clock,
 } from 'lucide-react';
+import { Modal } from '../../components/ui/Modal';
 import { SearchFilters } from '../../components/SearchFilters';
 import { timeAgo } from '../../utils/timeAgo';
 import type { SearchModalProps } from './types';
@@ -93,11 +93,6 @@ export function SearchModal({ open, onClose, search, sessions, onResultSelect }:
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
-        return;
-      }
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setActiveIndex(i => Math.min(i + 1, Math.max(navCount - 1, 0)));
@@ -127,31 +122,14 @@ export function SearchModal({ open, onClose, search, sessions, onResultSelect }:
       searchHistory,
       selectResult,
       handleSelectHistoryItem,
-      onClose,
     ]
   );
 
   if (!open) return null;
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[100] flex items-start justify-center px-4 pt-[12vh]"
-      onKeyDown={handleKeyDown}
-    >
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-[apple-fade-in_120ms_ease-out]"
-        onClick={onClose}
-        aria-hidden
-      />
-
-      {/* Dialog */}
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Search"
-        className="relative w-full max-w-2xl overflow-hidden rounded-2xl border border-border bg-card shadow-apple-xl animate-[apple-fade-in_150ms_ease-out]"
-      >
+  return (
+    <Modal open={open} onClose={onClose} ariaLabel="Search" size="2xl">
+      <div onKeyDown={handleKeyDown}>
         {/* Header / input row */}
         <div className="flex items-center gap-2.5 px-4 py-3">
           <SearchIcon
@@ -304,7 +282,6 @@ export function SearchModal({ open, onClose, search, sessions, onResultSelect }:
           )}
         </div>
       </div>
-    </div>,
-    document.body
+    </Modal>
   );
 }
