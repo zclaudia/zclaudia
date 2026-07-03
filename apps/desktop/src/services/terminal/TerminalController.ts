@@ -307,6 +307,9 @@ export class TerminalController {
           fontFamily: resolveMonoFontFamily(),
           theme,
           allowProposedApi: true,
+          // Safety net for colors the theme palette can't control (256-color /
+          // truecolor output, and white/bright-white used as foreground).
+          minimumContrastRatio: 4.5,
         });
     this.fitAddon = this.deps.factories?.createFitAddon
       ? this.deps.factories.createFitAddon()
