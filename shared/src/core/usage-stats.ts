@@ -30,3 +30,30 @@ export interface UsageStatsPayload {
   activeDays: UsageActiveDay[];
   capturedAt: number;
 }
+
+export interface ModelUsageDay {
+  /** Local date, 'YYYY-MM-DD' (server timezone). */
+  date: string;
+  /** Per-model totalTokens for the day. */
+  models: Record<string, number>;
+}
+
+export interface ModelUsageTotal {
+  model: string;
+  /** totalTokens − output within the window (prompt side incl. cache). */
+  inTokens: number;
+  outTokens: number;
+  totalTokens: number;
+  /** Fraction of the window's grand total, in [0, 1]. */
+  share: number;
+}
+
+export interface ModelUsagePayload {
+  /** Ascending; only days that have model-tagged usage. */
+  days: ModelUsageDay[];
+  /** Descending by share. */
+  models: ModelUsageTotal[];
+  /** MIN(created_at) of model-tagged assistant messages (all-time); null when none. */
+  trackedSince: number | null;
+  capturedAt: number;
+}

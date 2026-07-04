@@ -2,7 +2,12 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import Database from 'better-sqlite3';
-import { computeUsageStats, computeStreak, createUsageStatsRoutes } from '../usage-stats.js';
+import {
+  computeUsageStats,
+  computeStreak,
+  computeModelStats,
+  createUsageStatsRoutes,
+} from '../usage-stats.js';
 
 const DAY = 86_400_000;
 
@@ -47,9 +52,21 @@ function seedSession(id: string, createdAt = 1) {
   db.prepare('INSERT INTO sessions VALUES (?, ?, ?, ?)').run(id, 'p1', createdAt, createdAt);
 }
 
-function seedMessage(role: string, createdAt: number, usageTokens?: number) {
+function seedMessage(
+  role: string,
+  createdAt: number,
+  usageTokens?: number,
+  opts: { model?: string; output?: number } = {}
+) {
   const metadata =
-    usageTokens === undefined ? null : JSON.stringify({ usage: { totalTokens: usageTokens } });
+    usageTokens === undefined && !opts.model
+      ? null
+      : JSON.stringify({
+          ...(usageTokens !== undefined
+            ? { usage: { totalTokens: usageTokens, output: opts.output ?? 0 } }
+            : {}),
+          ...(opts.model ? { model: opts.model } : {}),
+        });
   db.prepare('INSERT INTO messages VALUES (?, ?, ?, ?, ?, ?)').run(
     `m${seq++}`,
     's1',
@@ -157,6 +174,65 @@ describe('computeUsageStats', () => {
   });
 });
 
+describe('computeModelStats', () => {
+  beforeEach(() => {
+    db = createTestDb();
+    seq = 0;
+  });
+
+  it('aggregates per-day per-model totals with in/out split and shares', () => {
+    seedMessage('assistant', noonDaysAgo(2), 600, { model: 'claude-fable-5', output: 200 });
+    seedMessage('assistant', noonDaysAgo(2), 400, { model: 'deepseek-v4-flash', output: 100 });
+    seedMessage('assistant', noonDaysAgo(1), 1000, { model: 'claude-fable-5', output: 700 });
+    seedMessage('assistant', noonDaysAgo(1), 500); // no model -> excluded
+    seedMessage('user', noonDaysAgo(1)); // excluded
+
+    const stats = computeModelStats(db, 'all');
+    expect(stats.days).toEqual([
+      {
+        date: localDateString(noonDaysAgo(2)),
+        models: { 'claude-fable-5': 600, 'deepseek-v4-flash': 400 },
+      },
+      { date: localDateString(noonDaysAgo(1)), models: { 'claude-fable-5': 1000 } },
+    ]);
+    expect(stats.models).toEqual([
+      {
+        model: 'claude-fable-5',
+        inTokens: 700,
+        outTokens: 900,
+        totalTokens: 1600,
+        share: 0.8,
+      },
+      {
+        model: 'deepseek-v4-flash',
+        inTokens: 300,
+        outTokens: 100,
+        totalTokens: 400,
+        share: 0.2,
+      },
+    ]);
+    expect(stats.trackedSince).toBe(noonDaysAgo(2));
+    expect(typeof stats.capturedAt).toBe('number');
+  });
+
+  it('windows by range but keeps trackedSince all-time', () => {
+    seedMessage('assistant', noonDaysAgo(40), 100, { model: 'claude-fable-5', output: 50 });
+    seedMessage('assistant', noonDaysAgo(2), 300, { model: 'claude-fable-5', output: 100 });
+    const week = computeModelStats(db, '7d');
+    expect(week.days).toHaveLength(1);
+    expect(week.models[0].totalTokens).toBe(300);
+    expect(week.trackedSince).toBe(noonDaysAgo(40));
+  });
+
+  it('returns empty structures when nothing is tagged', () => {
+    seedMessage('assistant', noonDaysAgo(1), 500); // usage but no model
+    const stats = computeModelStats(db, 'all');
+    expect(stats.days).toEqual([]);
+    expect(stats.models).toEqual([]);
+    expect(stats.trackedSince).toBeNull();
+  });
+});
+
 describe('computeStreak', () => {
   const today = localDateString(noonDaysAgo(0));
 
@@ -236,5 +312,18 @@ describe('GET /usage', () => {
     seedSession('s1', noonDaysAgo(40));
     const res = await request(makeApp()).get('/api/stats/usage?range=99d');
     expect(res.body.data.sessions).toBe(1);
+  });
+
+  it('serves model stats with a per-range cache', async () => {
+    seedMessage('assistant', noonDaysAgo(1), 500, { model: 'claude-fable-5', output: 100 });
+    const app = makeApp(60_000);
+    const res = await request(app).get('/api/stats/models');
+    expect(res.status).toBe(200);
+    expect(res.body.data.models[0].model).toBe('claude-fable-5');
+    seedMessage('assistant', noonDaysAgo(1), 999, { model: 'x', output: 1 });
+    const res2 = await request(app).get('/api/stats/models');
+    expect(res2.body.data.models).toHaveLength(1); // cached
+    const week = await request(app).get('/api/stats/models?range=7d');
+    expect(week.body.data.models).toHaveLength(2); // separate cache key
   });
 });

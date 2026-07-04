@@ -10,6 +10,9 @@ import type {
   UsageStatsPayload,
   UsageActiveDay,
   UsageStatsRange,
+  ModelUsagePayload,
+  ModelUsageDay,
+  ModelUsageTotal,
 } from '@zclaudia/shared/core/usage-stats';
 
 const DAY_MS = 86_400_000;
@@ -132,6 +135,63 @@ export function computeUsageStats(
   };
 }
 
+/** Per-day per-model aggregation. Expressions must stay textually identical
+ *  to idx_messages_model_usage (migration 034). */
+export const MODEL_USAGE_SQL = `SELECT date(created_at / 1000, 'unixepoch', 'localtime') AS date,
+       json_extract(metadata, '$.model') AS model,
+       COALESCE(SUM(CAST(json_extract(metadata, '$.usage.totalTokens') AS INTEGER)), 0) AS total,
+       COALESCE(SUM(CAST(json_extract(metadata, '$.usage.output') AS INTEGER)), 0) AS output
+FROM messages
+WHERE role = 'assistant' AND json_extract(metadata, '$.model') IS NOT NULL AND created_at >= ?
+GROUP BY date, model ORDER BY date`;
+
+export const MODEL_TRACKED_SINCE_SQL = `SELECT MIN(created_at) AS t FROM messages
+WHERE role = 'assistant' AND json_extract(metadata, '$.model') IS NOT NULL`;
+
+export function computeModelStats(db: Database, range: UsageStatsRange = 'all'): ModelUsagePayload {
+  const now = Date.now();
+  const windowStartMs =
+    range === 'all' ? now - ACTIVE_DAYS_WINDOW_MS : now - RANGE_MS[range];
+
+  const rows = db.prepare(MODEL_USAGE_SQL).all(windowStartMs) as Array<{
+    date: string;
+    model: string;
+    total: number;
+    output: number;
+  }>;
+
+  const dayMap = new Map<string, Record<string, number>>();
+  const totals = new Map<string, { total: number; output: number }>();
+  for (const row of rows) {
+    const day = dayMap.get(row.date) ?? {};
+    day[row.model] = (day[row.model] ?? 0) + row.total;
+    dayMap.set(row.date, day);
+    const t = totals.get(row.model) ?? { total: 0, output: 0 };
+    t.total += row.total;
+    t.output += row.output;
+    totals.set(row.model, t);
+  }
+
+  const grandTotal = [...totals.values()].reduce((sum, t) => sum + t.total, 0);
+  const days: ModelUsageDay[] = [...dayMap.entries()].map(([date, models]) => ({
+    date,
+    models,
+  }));
+  const models: ModelUsageTotal[] = [...totals.entries()]
+    .map(([model, t]) => ({
+      model,
+      inTokens: t.total - t.output,
+      outTokens: t.output,
+      totalTokens: t.total,
+      share: grandTotal > 0 ? t.total / grandTotal : 0,
+    }))
+    .sort((a, b) => b.totalTokens - a.totalTokens);
+
+  const tracked = db.prepare(MODEL_TRACKED_SINCE_SQL).get() as { t: number | null };
+
+  return { days, models, trackedSince: tracked.t ?? null, capturedAt: now };
+}
+
 export function createUsageStatsRoutes(
   db: Database,
   opts: { ttlMs?: number } = {}
@@ -139,6 +199,7 @@ export function createUsageStatsRoutes(
   const ttlMs = opts.ttlMs ?? 60_000;
   const router = Router();
   const cache = new Map<UsageStatsRange, { data: UsageStatsPayload; at: number }>();
+  const modelCache = new Map<UsageStatsRange, { data: ModelUsagePayload; at: number }>();
 
   // GET /api/stats/usage?range=all|30d|7d — aggregate usage stats for the Home page
   router.get('/usage', (req: Request, res: Response) => {
@@ -150,6 +211,24 @@ export function createUsageStatsRoutes(
         cache.set(range, { data: computeUsageStats(db, range), at: Date.now() });
       }
       res.json({ success: true, data: cache.get(range)!.data });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: { code: 'STATS_ERROR', message: (error as Error).message },
+      });
+    }
+  });
+
+  // GET /api/stats/models?range=all|30d|7d — per-model usage for the Models tab
+  router.get('/models', (req: Request, res: Response) => {
+    try {
+      const raw = req.query.range;
+      const range: UsageStatsRange = raw === '30d' || raw === '7d' ? raw : 'all';
+      const hit = modelCache.get(range);
+      if (!hit || Date.now() - hit.at > ttlMs) {
+        modelCache.set(range, { data: computeModelStats(db, range), at: Date.now() });
+      }
+      res.json({ success: true, data: modelCache.get(range)!.data });
     } catch (error) {
       res.status(500).json({
         success: false,
