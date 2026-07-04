@@ -16,6 +16,7 @@ import { createSystemTaskRoutes } from '../../interfaces/http/system-tasks.js';
 import { createWorkspaceRoutes } from '../../interfaces/http/workspace.js';
 import { createGatewayRouter } from '../../interfaces/http/gateway.js';
 import { createWebSearchConfigRoutes } from '../../interfaces/http/web-search.js';
+import { createUsageStatsRoutes } from '../../interfaces/http/usage-stats.js';
 import type { ProcessSupervisor } from '../../infra/services/process-supervisor.js';
 import type { GatewayState } from '../../infra/gateway/gateway-state.js';
 import { getGatewayClient } from '../../infra/gateway/gateway-instance.js';
@@ -69,6 +70,7 @@ export function registerPlatformRoutes(deps: RegisterPlatformRoutesDeps): void {
   });
 
   app.use('/api/system', localOnlyMiddleware, createSystemStatsRoutes());
+  app.use('/api/stats', authMiddleware, createUsageStatsRoutes(db));
   app.use(
     '/api/debug',
     localOnlyMiddleware,

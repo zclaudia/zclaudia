@@ -40,6 +40,7 @@ export * from './core/api.js';
 export * from './core/mcp.js';
 export * from './core/pcp.js';
 export * from './core/provider-policy.js';
+export * from './core/usage-stats.js';
 export type {
   BuiltinTaskType,
   TaskType,
