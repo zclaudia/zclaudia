@@ -4,7 +4,13 @@ import { getUsageStats } from '../../services/api';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { LOCAL_BACKEND_KEY, resolveSessionBucketBackendId } from '../../stores/sessionsStore';
 import { formatTokens } from '../../utils/formatTokens';
-import { buildHeatmapWeeks, flattenRowMajor, formatHour, funLine } from './usageStats';
+import {
+  buildHeatmapWeeks,
+  cardValueClass,
+  flattenRowMajor,
+  formatHour,
+  funLine,
+} from './usageStats';
 import { prettyModelName } from './modelStats';
 import { ModelsChart } from './ModelsChart';
 
@@ -62,7 +68,7 @@ export function UsageStatsStrip() {
   // build or a remote backend behind on updates) omits the newer fields, and
   // those cards hide instead of rendering "undefined" / "NaN PM".
   const line = funLine(stats.allTimeTokens ?? stats.totalTokens, localToday());
-  const cards: Array<{ label: string; value: string; compact?: boolean; title?: string }> = [
+  const cards: Array<{ label: string; value: string; title?: string }> = [
     { label: 'Sessions', value: stats.sessions.toLocaleString('en-US') },
     { label: 'Messages', value: stats.messages.toLocaleString('en-US') },
     { label: 'Total tokens', value: formatTokens(stats.totalTokens) },
@@ -81,9 +87,6 @@ export function UsageStatsStrip() {
           {
             label: 'Favorite model',
             value: prettyModelName(stats.favoriteModel),
-            // Model names are the only text value — a size down (with a
-            // matched line height so the tiles stay equal) fits them.
-            compact: true,
             title: stats.favoriteModel,
           },
         ]
@@ -132,9 +135,7 @@ export function UsageStatsStrip() {
                 <span className="block text-[11px] text-muted-foreground">{c.label}</span>
                 <span
                   title={c.title}
-                  className={`block mt-0.5 font-medium text-foreground truncate ${
-                    c.compact ? 'text-sm leading-7' : 'text-lg'
-                  }`}
+                  className={`block mt-0.5 font-medium text-foreground truncate ${cardValueClass(c.value)}`}
                 >
                   {c.value}
                 </span>

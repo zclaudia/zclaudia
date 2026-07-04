@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildHeatmapWeeks,
+  cardValueClass,
   flattenRowMajor,
   formatHour,
   funLine,
@@ -60,6 +61,16 @@ describe('flattenRowMajor', () => {
     expect(flat[1]?.date).toBe('2026-06-28');
     // Friday row (index 5): week1's cell is 2026-07-03 with the count.
     expect(flat[5 * 2 + 1]).toEqual({ date: '2026-07-03', count: 5, level: 4 });
+  });
+});
+
+describe('cardValueClass', () => {
+  it('steps the font size down as the value gets longer', () => {
+    expect(cardValueClass('39.9M')).toBe('text-lg');
+    expect(cardValueClass('Opus 4 8')).toBe('text-lg'); // 8 chars — numbers and short names stay large
+    expect(cardValueClass('Haiku 4 5')).toBe('text-sm leading-7');
+    expect(cardValueClass('Deepseek V4 Flash')).toBe('text-xs leading-7');
+    expect(cardValueClass('Some Extremely Long Model Name')).toBe('text-[11px] leading-7');
   });
 });
 

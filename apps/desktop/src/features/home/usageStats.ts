@@ -74,6 +74,16 @@ export function flattenRowMajor(
   return cells;
 }
 
+/** Length-stepped font-size class for a metric-card value: numbers and short
+ *  model names render large, longer names step down instead of truncating.
+ *  Line height is pinned to the text-lg line box so the tiles stay equal. */
+export function cardValueClass(value: string): string {
+  if (value.length <= 8) return 'text-lg';
+  if (value.length <= 13) return 'text-sm leading-7';
+  if (value.length <= 18) return 'text-xs leading-7';
+  return 'text-[11px] leading-7';
+}
+
 /** Reference corpora for the fun comparison line, ascending by size. */
 const REFERENCES: Array<{ name: string; tokens: number }> = [
   { name: 'The Little Prince', tokens: 20_000 },
