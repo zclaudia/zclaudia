@@ -146,6 +146,7 @@ import { useRunStore } from '../../stores/runStore';
 import { useSessionRunStateStore } from '../../stores/sessionRunStateStore';
 import { useUIStore } from '../../stores/uiStore';
 import { useAgentReadinessStore } from '../../stores/agentReadinessStore';
+import { useHomeQuickActionsStore } from '../../stores/homeQuickActionsStore';
 import { useSidebarExpansionStore } from '../../stores/sidebarExpansionStore';
 import * as api from '../../services/api';
 import { groupSessionsByWorktree } from '../../features/sidebar/worktreeGrouping';
@@ -1160,6 +1161,20 @@ describe('Sidebar', () => {
       expect(document.body.textContent).toContain('The model provider is missing an API key');
     });
     expect(selectionMocks.selectSession).not.toHaveBeenCalledWith('new-sess');
+  });
+
+  // ---- Home quick actions ----
+
+  it('opens the new-session modal with a project picker on a home quick action', async () => {
+    render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
+    act(() => {
+      useHomeQuickActionsStore.getState().request('new-session');
+    });
+    await waitFor(() => {
+      expect(screen.getByText('New session')).toBeTruthy();
+    });
+    expect(screen.getByText('Project')).toBeTruthy();
+    expect(useHomeQuickActionsStore.getState().pending).toBeNull();
   });
 
   // ---- Search ----

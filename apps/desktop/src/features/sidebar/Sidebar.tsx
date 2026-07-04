@@ -31,6 +31,7 @@ import { useSidebarActions } from './useSidebarActions';
 import { useAgentProfileMetaStore } from '../../stores/agentProfileMetaStore';
 import { useSidebarWidthStore, SIDEBAR_WIDTH_LIMITS } from '../../stores/sidebarWidthStore';
 import { useAgentReadinessStore } from '../../stores/agentReadinessStore';
+import { useHomeQuickActionsStore } from '../../stores/homeQuickActionsStore';
 import { AgentRequiredDialog } from '../agent/AgentRequiredDialog';
 import type { AgentReadinessReason } from '@zclaudia/shared/core/agent-readiness';
 import type { SettingsTab } from '../settings/settingsTabDefs';
@@ -157,7 +158,10 @@ export function Sidebar({
   const [newProjectRootPath, setNewProjectRootPath] = useState('');
   const [newProjectBackendId, setNewProjectBackendId] = useState<string | null>(null);
   const [creatingProject, setCreatingProject] = useState(false);
-  const [creatingSessionForProject, setCreatingSessionForProject] = useState<string | null>(null);
+  const [newSessionRequest, setNewSessionRequest] = useState<{
+    projectId: string | null;
+    pickerEnabled: boolean;
+  } | null>(null);
   const [newSessionName, setNewSessionName] = useState('');
   const [newSessionAgentProfileId, setNewSessionAgentProfileId] = useState<string>('');
   const [newSessionWorkingDirectory, setNewSessionWorkingDirectory] = useState<string | null>(null);
@@ -265,15 +269,15 @@ export function Sidebar({
   }, [agentLoaded, agentLoading, loadAllAgents]);
   const agents = Object.values(agentProfiles);
   const allProjects = useProjectStore(s => s.projects);
-  const newSessionProject = creatingSessionForProject
-    ? (allProjects.find(p => p.id === creatingSessionForProject) ?? null)
+  const newSessionProject = newSessionRequest?.projectId
+    ? (allProjects.find(p => p.id === newSessionRequest.projectId) ?? null)
     : null;
   // Subscribed selector (not a one-shot getState snapshot): the long-lived
   // modal's DirectoryPicker makes live backend calls, so backendId must react
   // to ownership changes. Safe to call unconditionally — returns null when no
   // session is being created.
   const newSessionBackendId = useOwnershipStore(s =>
-    s.getProjectBackendId(creatingSessionForProject)
+    s.getProjectBackendId(newSessionRequest?.projectId ?? null)
   );
 
   // --- Automation mode wiring ---
@@ -303,7 +307,8 @@ export function Sidebar({
     setNewSessionAgentProfileId,
     newSessionWorkingDirectory,
     setNewSessionWorkingDirectory,
-    setCreatingSessionForProject,
+    setCreatingSessionForProject: (projectId: string | null) =>
+      setNewSessionRequest(projectId ? { projectId, pickerEnabled: false } : null),
     setCreatingProject,
     setContextMenuProject,
     newProjectName,
@@ -464,6 +469,19 @@ export function Sidebar({
     [ensureAgentGate]
   );
 
+  // Home-page quick actions: the Sidebar owns the new-session modal and the
+  // inline new-project form, so Home requests them through the bridge store.
+  const pendingQuickAction = useHomeQuickActionsStore(s => s.pending);
+  useEffect(() => {
+    if (!pendingQuickAction) return;
+    const action = useHomeQuickActionsStore.getState().consume();
+    if (action === 'new-session') {
+      runAfterAgentGate(() => setNewSessionRequest({ projectId: null, pickerEnabled: true }));
+    } else if (action === 'new-project') {
+      setShowNewProjectForm(true);
+    }
+  }, [pendingQuickAction, runAfterAgentGate]);
+
   // --- Shared renderers ---
   const renderProjectItems = (backendProjects: typeof filteredProjects) => (
     <SortableList
@@ -513,7 +531,9 @@ export function Sidebar({
             onSettingsProject={setSettingsProjectId}
             onDeleteProject={actions.handleDeleteProject}
             onStartCreatingSession={() => {
-              runAfterAgentGate(() => setCreatingSessionForProject(project.id));
+              runAfterAgentGate(() =>
+                setNewSessionRequest({ projectId: project.id, pickerEnabled: false })
+              );
             }}
             isConnected={isConnected}
             onPopOutSession={actions.handlePopOutSession}
@@ -610,16 +630,22 @@ export function Sidebar({
           document.body
         )}
       {createPortal(<PluginPermissionDialog />, document.body)}
-      {newSessionProject && (
+      {newSessionRequest && (
         <NewSessionModal
           open
           onClose={() => {
-            setCreatingSessionForProject(null);
+            setNewSessionRequest(null);
             setNewSessionName('');
             setNewSessionAgentProfileId('');
             setNewSessionWorkingDirectory(null);
           }}
           project={newSessionProject}
+          projects={allProjects}
+          showProjectPicker={newSessionRequest.pickerEnabled}
+          onProjectChange={projectId => {
+            setNewSessionRequest(r => (r ? { ...r, projectId } : r));
+            setNewSessionWorkingDirectory(null);
+          }}
           backendId={newSessionBackendId}
           agents={agents}
           name={newSessionName}
@@ -629,6 +655,7 @@ export function Sidebar({
           workingDirectory={newSessionWorkingDirectory}
           onWorkingDirectoryChange={setNewSessionWorkingDirectory}
           onCreate={() => {
+            if (!newSessionProject) return;
             runAfterAgentGate(() => actions.handleCreateSession(newSessionProject.id), {
               forceRefresh: true,
             });
