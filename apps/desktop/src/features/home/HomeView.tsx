@@ -154,27 +154,30 @@ export function HomeView({ onNewSession, onAddProject }: HomeViewProps) {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-2xl px-6 pt-16 pb-10">
-        <h2 className="text-xl font-semibold mb-3">Welcome to ZClaudia</h2>
+        <h2 className="text-xl font-semibold mb-4">Welcome to ZClaudia</h2>
         {quickActions}
 
-        {running.length > 0 && (
-          <SessionGroup
-            label="Running"
-            rows={running}
-            multiBackend={multiBackend}
-            backendName={backendName}
-            onOpen={openSession}
-          />
-        )}
-        {recent.length > 0 && (
-          <SessionGroup
-            label="Recent"
-            rows={recent}
-            multiBackend={multiBackend}
-            backendName={backendName}
-            onOpen={openSession}
-          />
-        )}
+        {/* First group opens with more air after the buttons; siblings tighten. */}
+        <div className="[&>*:first-child]:mt-10 [&>*+*]:mt-8">
+          {running.length > 0 && (
+            <SessionGroup
+              label="Running"
+              rows={running}
+              multiBackend={multiBackend}
+              backendName={backendName}
+              onOpen={openSession}
+            />
+          )}
+          {recent.length > 0 && (
+            <SessionGroup
+              label="Recent"
+              rows={recent}
+              multiBackend={multiBackend}
+              backendName={backendName}
+              onOpen={openSession}
+            />
+          )}
+        </div>
 
         <UsageStatsStrip />
       </div>
@@ -196,7 +199,7 @@ function SessionGroup({
   onOpen: (row: HomeSessionRow) => void;
 }) {
   return (
-    <div className="mt-6">
+    <div>
       <div className="px-2 text-[11px] font-medium text-muted-foreground">{label}</div>
       <ul className="mt-1">
         {rows.map(row => (
@@ -208,8 +211,9 @@ function SessionGroup({
               {row.isRunning && (
                 <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse shrink-0" />
               )}
-              <span className="truncate flex-1">{row.title}</span>
-              <span className="text-[11px] text-muted-foreground/60 shrink-0 truncate max-w-[120px]">
+              {/* Left group: title + tags stay together; only the time floats right. */}
+              <span className="truncate">{row.title}</span>
+              <span className="text-[11px] text-muted-foreground/60 bg-secondary/60 rounded px-1.5 py-px shrink-0 truncate max-w-[120px]">
                 {row.projectName}
               </span>
               {multiBackend && (
@@ -217,7 +221,7 @@ function SessionGroup({
                   {backendName(row.backendKey)}
                 </span>
               )}
-              <span className="text-[11px] text-muted-foreground/60 shrink-0 min-w-[56px] text-right">
+              <span className="ml-auto text-[11px] text-muted-foreground/60 shrink-0 pl-4">
                 {timeAgo(row.updatedAt)}
               </span>
             </button>

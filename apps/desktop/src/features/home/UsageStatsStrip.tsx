@@ -11,7 +11,7 @@ const HEATMAP_WEEKS = 26;
 /** Tailwind classes per heatmap intensity level (0..4). The heatmap is the
  *  strip's only color — data-viz exemption from the grayscale chrome rule. */
 const LEVEL_CLASS = [
-  'bg-secondary',
+  'bg-border/60',
   'bg-primary/25',
   'bg-primary/45',
   'bg-primary/70',
@@ -48,7 +48,9 @@ export function UsageStatsStrip() {
     [stats]
   );
 
-  if (!stats || (stats.sessions === 0 && stats.messages === 0)) return null;
+  // A sessions-only database has nothing worth charting — hide until the
+  // first message exists.
+  if (!stats || stats.messages === 0) return null;
 
   const line = funLine(stats.totalTokens);
   const numbers: Array<{ value: string; label: string }> = [
@@ -59,7 +61,7 @@ export function UsageStatsStrip() {
   ];
 
   return (
-    <div className="mt-8 px-2">
+    <div className="mt-12 border-t border-border pt-6 px-2">
       <div className="flex flex-wrap items-start gap-x-7 gap-y-2">
         {numbers.map(n => (
           <div key={n.label} className="flex flex-col gap-0.5">

@@ -44,10 +44,12 @@ describe('UsageStatsStrip', () => {
     expect(container.innerHTML).toBe('');
   });
 
-  it('renders nothing when there is no activity at all', async () => {
+  it('renders nothing when there are no messages yet', async () => {
+    // A sessions-only database has nothing worth charting — the strip would
+    // be a row of zeros over an all-gray heatmap.
     getUsageStats.mockResolvedValue({
       ...payload,
-      sessions: 0,
+      sessions: 2,
       messages: 0,
       totalTokens: 0,
       currentStreakDays: 0,
