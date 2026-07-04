@@ -90,4 +90,30 @@ describe('NewSessionModal', () => {
     fireEvent.click(screen.getByTestId('pick-dir'));
     expect(p.onWorkingDirectoryChange).toHaveBeenCalledWith('/picked/dir');
   });
+
+  const projects = [project, { id: 'p2', name: 'gateway', rootPath: '/repo/gateway' }] as any[];
+
+  it('hides the project picker by default', () => {
+    setup();
+    expect(screen.queryByText('Project')).toBeNull();
+  });
+
+  it('renders a project picker and disables Create until a project is chosen', () => {
+    setup({ project: null, projects, showProjectPicker: true, onProjectChange: vi.fn() });
+    expect(screen.getByText('Project')).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Create' }) as HTMLButtonElement).disabled).toBe(
+      true
+    );
+    expect((screen.getByRole('button', { name: 'Change' }) as HTMLButtonElement).disabled).toBe(
+      true
+    );
+  });
+
+  it('keeps Create enabled when the picker has a chosen project', () => {
+    setup({ project: projects[1], projects, showProjectPicker: true, onProjectChange: vi.fn() });
+    expect((screen.getByRole('button', { name: 'Create' }) as HTMLButtonElement).disabled).toBe(
+      false
+    );
+    expect(screen.getByText('/repo/gateway')).toBeTruthy();
+  });
 });

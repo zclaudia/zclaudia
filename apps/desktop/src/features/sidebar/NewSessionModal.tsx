@@ -9,7 +9,8 @@ import type { SidebarAgent } from './types';
 interface NewSessionModalProps {
   open: boolean;
   onClose: () => void;
-  project: Project;
+  /** null = no project chosen yet (picker flow). */
+  project: Project | null;
   /** Backend that owns the project (for the directory picker). */
   backendId: string | null;
   agents: SidebarAgent[];
@@ -23,6 +24,11 @@ interface NewSessionModalProps {
   onCreate: () => void;
   isConnected: boolean;
   isMobile?: boolean;
+  /** Options for the project picker (picker flow only). */
+  projects?: Project[];
+  /** Render the project picker row; set once at open time. */
+  showProjectPicker?: boolean;
+  onProjectChange?: (projectId: string) => void;
 }
 
 export function NewSessionModal({
@@ -40,11 +46,14 @@ export function NewSessionModal({
   onCreate,
   isConnected,
   isMobile = false,
+  projects = [],
+  showProjectPicker = false,
+  onProjectChange,
 }: NewSessionModalProps) {
   const [showPicker, setShowPicker] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
 
-  const projectRoot = project.rootPath ?? '';
+  const projectRoot = project?.rootPath ?? '';
   const displayDir = workingDirectory ?? projectRoot;
   const isCustomDir = workingDirectory != null && workingDirectory !== projectRoot;
   const selectedModel = agents.find(a => a.id === agentProfileId)?.model ?? null;
@@ -57,7 +66,7 @@ export function NewSessionModal({
     <div className="flex gap-2">
       <button
         onClick={onCreate}
-        disabled={!isConnected}
+        disabled={!isConnected || !project}
         className="flex-1 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-foreground shadow-apple-sm hover:bg-accent/80 disabled:cursor-not-allowed disabled:opacity-50"
       >
         Create
@@ -83,6 +92,24 @@ export function NewSessionModal({
         isMobile={isMobile}
       >
         <div className="flex flex-col gap-4 px-4 py-4">
+          {showProjectPicker && (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-medium text-muted-foreground">Project</span>
+              <Select
+                value={project?.id ?? ''}
+                onChange={id => {
+                  if (id) onProjectChange?.(id);
+                }}
+                block
+                size="md"
+                options={[
+                  { value: '', label: 'Choose a project…' },
+                  ...projects.map(p => ({ value: p.id, label: p.name })),
+                ]}
+              />
+            </div>
+          )}
+
           <label className="flex flex-col gap-1.5">
             <span className="text-[11px] font-medium text-muted-foreground">Name</span>
             <input
@@ -91,7 +118,7 @@ export function NewSessionModal({
               value={name}
               onChange={e => onNameChange(e.target.value)}
               onKeyDown={e => {
-                if (e.key === 'Enter') onCreate();
+                if (e.key === 'Enter' && project) onCreate();
               }}
               placeholder="Session name (optional)"
               className="w-full rounded-lg border-0 bg-muted/60 px-3 py-2 text-sm text-foreground shadow-apple-sm focus:outline-none focus:ring-1 focus:ring-primary/50"
@@ -129,7 +156,8 @@ export function NewSessionModal({
               </span>
               <button
                 onClick={() => setShowPicker(true)}
-                className="flex items-center gap-1.5 rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+                disabled={!project}
+                className="flex items-center gap-1.5 rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <FolderOpen size={13} strokeWidth={1.75} />
                 Change
