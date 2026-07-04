@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { HomeView } from '../HomeView';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useSessionsStore, LOCAL_BACKEND_KEY } from '../../../stores/sessionsStore';
+import { useOwnershipStore } from '../../../stores/ownershipStore';
 
 const selectSessionOnBackend = vi.fn();
 vi.mock('../../../hooks/useSelectionCoordinator', () => ({
@@ -30,6 +31,12 @@ describe('HomeView', () => {
       remoteSessions: new Map(),
       activeSessionIdsByBackend: new Map(),
     } as any);
+    useOwnershipStore.setState({
+      sessionBackendIds: {},
+      sessionOwnershipVersions: {},
+      projectBackendIds: {},
+      taskOwners: {},
+    });
   });
 
   it('renders the empty state with quick actions when there are no sessions', () => {
@@ -110,5 +117,41 @@ describe('HomeView', () => {
     } as any);
     render(<HomeView onNewSession={vi.fn()} onAddProject={vi.fn()} />);
     expect(screen.getByText('Local')).toBeTruthy();
+  });
+
+  it('drops remote-owned sessions from the local list instead of mislabeling them', () => {
+    seedProject('p1', 'zclaudia');
+    // Genuinely local session: no ownership record.
+    seedLocalSession('sl', { name: 'Local one', updatedAt: 2 });
+    // Remote-owned session that also leaked into projectStore.sessions because
+    // the active backend switched to remote-1 (useDataLoader reload).
+    seedLocalSession('sr', { name: 'Remote one', updatedAt: 1 });
+    useOwnershipStore.getState().setSessionOwners(['sr'], 'remote-1');
+    useSessionsStore.setState({
+      remoteSessions: new Map([
+        [
+          'remote-1',
+          [
+            {
+              id: 'sr',
+              projectId: 'p1',
+              type: 'regular',
+              name: 'Remote one',
+              createdAt: 1,
+              updatedAt: 1,
+              isActive: false,
+            } as any,
+          ],
+        ],
+      ]),
+    } as any);
+
+    render(<HomeView onNewSession={vi.fn()} onAddProject={vi.fn()} />);
+
+    // The remote session must appear exactly once, from its remote bucket.
+    expect(screen.getAllByText('Remote one')).toHaveLength(1);
+    // Rows span two backends → badges visible with the right labels.
+    expect(screen.getByText('Local')).toBeTruthy();
+    expect(screen.getByText('Backend remote-1')).toBeTruthy();
   });
 });

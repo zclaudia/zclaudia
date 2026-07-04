@@ -667,9 +667,11 @@ export function Sidebar({
     </>
   );
 
-  // Mobile: render as overlay drawer
+  // Mobile: render as overlay drawer. When the drawer is closed, still render
+  // the portaled modals (body portals) so quick actions from the Home page can
+  // open them — same pattern as the desktop-collapsed branch below.
   if (isMobile) {
-    if (!isOpen) return null;
+    if (!isOpen) return renderPortaledModals();
 
     return (
       <>

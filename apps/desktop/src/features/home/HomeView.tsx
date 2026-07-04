@@ -6,12 +6,13 @@ import {
   resolveSessionBucketBackendId,
 } from '../../stores/sessionsStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useOwnershipStore } from '../../stores/ownershipStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useGatewayStore, shouldShowNonCurrentInstanceBackend } from '../../stores/gatewayStore';
 import { useUIStore } from '../../stores/uiStore';
 import { useSelectionCoordinator } from '../../hooks/useSelectionCoordinator';
 import { isMobileBackendUsable } from '../../services/mobileConnectionState';
-import { LEGACY_LOCAL_SERVER_ID } from '../../utils/controlPlane';
+import { LEGACY_LOCAL_SERVER_ID, resolveCanonicalBackendId } from '../../utils/controlPlane';
 import { timeAgo } from '../../utils/timeAgo';
 import { selectHomeSessions, type HomeSessionRow } from './homeSessions';
 
@@ -22,8 +23,10 @@ interface HomeViewProps {
 
 /** Top-level home view (no project/session selected): cross-backend resume hub. */
 export function HomeView({ onNewSession, onAddProject }: HomeViewProps) {
-  const localSessions = useProjectStore(s => s.sessions);
+  const activeBackendSessions = useProjectStore(s => s.sessions);
   const projects = useProjectStore(s => s.projects);
+  const sessionOwnerIds = useOwnershipStore(s => s.sessionBackendIds);
+  const projectOwnerIds = useOwnershipStore(s => s.projectBackendIds);
   const remoteSessions = useSessionsStore(s => s.remoteSessions);
   const activeSessionIdsByBackend = useSessionsStore(s => s.activeSessionIdsByBackend);
   const facadeBackends = useFacadeStore(s => s.backends);
@@ -44,6 +47,24 @@ export function HomeView({ onNewSession, onAddProject }: HomeViewProps) {
     if (hasDirectLocalConnection) aliases.add(LEGACY_LOCAL_SERVER_ID);
     return aliases;
   }, [localBackendId, facadeConnectionState, facadeBackends]);
+
+  // projectStore.sessions holds the ACTIVE backend's sessions, which may be a
+  // remote backend (useDataLoader reloads it on active-backend switches). Keep
+  // only sessions owned by the local backend (or with no recorded owner);
+  // remote-owned ones surface from their own remoteSessions bucket instead,
+  // correctly labeled. Owner resolution mirrors resolveSessionOwnerBackendId:
+  // project owner wins over session owner, ids are canonicalized.
+  const localSessions = useMemo(
+    () =>
+      activeBackendSessions.filter(session => {
+        const rawOwner = projectOwnerIds[session.projectId] ?? sessionOwnerIds[session.id];
+        if (!rawOwner) return true;
+        const owner = resolveCanonicalBackendId(rawOwner, localBackendId ?? rawOwner);
+        if (!owner) return true;
+        return owner === localBackendId || localAliasBackendIds.has(owner);
+      }),
+    [activeBackendSessions, projectOwnerIds, sessionOwnerIds, localBackendId, localAliasBackendIds]
+  );
 
   const { running, recent, multiBackend } = useMemo(
     () =>

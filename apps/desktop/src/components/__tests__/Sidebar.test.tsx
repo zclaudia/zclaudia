@@ -1177,6 +1177,26 @@ describe('Sidebar', () => {
     expect(useHomeQuickActionsStore.getState().pending).toBeNull();
   });
 
+  it('opens the new-session modal on a home quick action when the mobile drawer is closed', async () => {
+    render(
+      <Sidebar
+        collapsed={false}
+        onToggle={vi.fn()}
+        isMobile={true}
+        isOpen={false}
+        onClose={vi.fn()}
+      />
+    );
+    act(() => {
+      useHomeQuickActionsStore.getState().request('new-session');
+    });
+    await waitFor(() => {
+      expect(screen.getByText('New session')).toBeTruthy();
+    });
+    expect(screen.getByText('Project')).toBeTruthy();
+    expect(useHomeQuickActionsStore.getState().pending).toBeNull();
+  });
+
   // ---- Search ----
 
   it('renders search input', () => {
