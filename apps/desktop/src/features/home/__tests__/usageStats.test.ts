@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildHeatmapWeeks, funLine, heatmapLevel } from '../usageStats';
+import { buildHeatmapWeeks, formatHour, funLine, heatmapLevel } from '../usageStats';
 
 describe('heatmapLevel', () => {
   it('is 0 for zero and scales 1..4 relative to the max', () => {
@@ -41,6 +41,15 @@ describe('buildHeatmapWeeks', () => {
     // Window is the current week only: Sun .. Wed real, Thu-Sat future -> null
     expect(weeks[0][3]?.date).toBe('2026-07-01');
     expect(weeks[0][4]).toBeNull();
+  });
+});
+
+describe('formatHour', () => {
+  it('formats 12-hour labels', () => {
+    expect(formatHour(0)).toBe('12 AM');
+    expect(formatHour(9)).toBe('9 AM');
+    expect(formatHour(12)).toBe('12 PM');
+    expect(formatHour(23)).toBe('11 PM');
   });
 });
 

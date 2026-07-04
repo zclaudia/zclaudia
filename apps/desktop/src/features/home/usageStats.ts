@@ -55,6 +55,13 @@ export function buildHeatmapWeeks(
   return grid;
 }
 
+/** 0-23 -> '9 AM' / '12 PM' style label. */
+export function formatHour(hour: number): string {
+  const suffix = hour < 12 ? 'AM' : 'PM';
+  const h = hour % 12 === 0 ? 12 : hour % 12;
+  return `${h} ${suffix}`;
+}
+
 /** Reference corpora for the fun comparison line, ascending by size. */
 const REFERENCES: Array<{ name: string; tokens: number }> = [
   { name: 'The Little Prince', tokens: 20_000 },

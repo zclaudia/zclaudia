@@ -1,7 +1,11 @@
 import { apiCallForBackend } from './unwrap';
-import type { UsageStatsPayload } from '@zclaudia/shared';
+import type { UsageStatsPayload, UsageStatsRange } from '@zclaudia/shared';
 
-/** Local-backend usage stats for the Home page strip. */
-export async function getUsageStats(backendId: string | null): Promise<UsageStatsPayload> {
-  return apiCallForBackend<UsageStatsPayload>(backendId, '/api/stats/usage');
+/** Local-backend usage stats for the Home page panel. */
+export async function getUsageStats(
+  backendId: string | null,
+  range: UsageStatsRange = 'all'
+): Promise<UsageStatsPayload> {
+  const suffix = range === 'all' ? '' : `?range=${range}`;
+  return apiCallForBackend<UsageStatsPayload>(backendId, `/api/stats/usage${suffix}`);
 }
