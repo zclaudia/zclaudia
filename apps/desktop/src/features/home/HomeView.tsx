@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Plus, FolderPlus } from 'lucide-react';
 import {
   useSessionsStore,
@@ -14,6 +14,7 @@ import { useSelectionCoordinator } from '../../hooks/useSelectionCoordinator';
 import { isMobileBackendUsable } from '../../services/mobileConnectionState';
 import { LEGACY_LOCAL_SERVER_ID, resolveCanonicalBackendId } from '../../utils/controlPlane';
 import { timeAgo } from '../../utils/timeAgo';
+import { generateSessionTitle } from '../../services/api';
 import { selectHomeSessions, type HomeSessionRow } from './homeSessions';
 import { greeting } from './greeting';
 import { UsageStatsStrip } from './UsageStatsStrip';
@@ -112,6 +113,25 @@ export function HomeView({ onNewSession, onAddProject }: HomeViewProps) {
     useUIStore.getState().requestForceScrollToBottom(row.id);
     coordinator.selectSessionOnBackend(backendId, row.id);
   };
+
+  // Nudge the backend to auto-title sessions that never got one (older or
+  // interrupted sessions show as "Untitled"). Fire at most once per session per
+  // app run; the server re-checks eligibility and no-ops empty/already-titled
+  // ones, and the generated title lands via a sessions_updated broadcast.
+  const titleRequestedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const requested = titleRequestedRef.current;
+    for (const row of [...running, ...recent]) {
+      if (row.title !== 'Untitled' || requested.has(row.id)) continue;
+      const backendId =
+        row.backendKey === LOCAL_BACKEND_KEY
+          ? resolveSessionBucketBackendId(LOCAL_BACKEND_KEY, localBackendId)
+          : row.backendKey;
+      if (!backendId) continue;
+      requested.add(row.id);
+      void generateSessionTitle(backendId, row.id).catch(() => {});
+    }
+  }, [running, recent, localBackendId]);
 
   const isEmpty = running.length === 0 && recent.length === 0;
 

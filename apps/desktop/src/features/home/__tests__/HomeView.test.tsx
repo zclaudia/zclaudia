@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { HomeView } from '../HomeView';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useSessionsStore, LOCAL_BACKEND_KEY } from '../../../stores/sessionsStore';
 import { useOwnershipStore } from '../../../stores/ownershipStore';
+import { useFacadeStore } from '../../../stores/facadeStore';
 
 const selectSessionOnBackend = vi.fn();
 vi.mock('../../../hooks/useSelectionCoordinator', () => ({
@@ -12,6 +13,11 @@ vi.mock('../../../hooks/useSelectionCoordinator', () => ({
 
 vi.mock('../UsageStatsStrip', () => ({
   UsageStatsStrip: () => <div data-testid="usage-strip" />,
+}));
+
+const generateSessionTitle = vi.fn(() => Promise.resolve());
+vi.mock('../../../services/api', () => ({
+  generateSessionTitle: (...args: unknown[]) => generateSessionTitle(...args),
 }));
 
 function seedProject(id: string, name: string) {
@@ -46,6 +52,7 @@ describe('HomeView', () => {
       projectBackendIds: {},
       taskOwners: {},
     });
+    useFacadeStore.setState({ localBackendId: null } as any);
   });
 
   it('renders nothing before the initial data load completes', () => {
@@ -187,6 +194,23 @@ describe('HomeView', () => {
     // Rows span two backends → badges visible with the right labels.
     expect(screen.getByText(/· Local$/)).toBeTruthy();
     expect(screen.getByText(/· Backend remote-1$/)).toBeTruthy();
+  });
+
+  it('requests an auto-title for untitled sessions once a backend is resolvable', async () => {
+    useFacadeStore.setState({ localBackendId: 'local' } as any);
+    seedProject('p1', 'zclaudia');
+    seedLocalSession('s1', { updatedAt: 100 }); // no name, no autoTitle -> "Untitled"
+    render(<HomeView onNewSession={vi.fn()} onAddProject={vi.fn()} />);
+    await waitFor(() => expect(generateSessionTitle).toHaveBeenCalled());
+    expect(generateSessionTitle.mock.calls[0][1]).toBe('s1');
+  });
+
+  it('does not request a title for sessions that already have a name', () => {
+    useFacadeStore.setState({ localBackendId: 'local' } as any);
+    seedProject('p1', 'zclaudia');
+    seedLocalSession('s1', { name: 'Fix the thing' });
+    render(<HomeView onNewSession={vi.fn()} onAddProject={vi.fn()} />);
+    expect(generateSessionTitle).not.toHaveBeenCalled();
   });
 
   it('renders the usage strip only in the populated state', () => {

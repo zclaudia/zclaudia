@@ -51,7 +51,9 @@ function toRow(
 ): HomeSessionRow {
   return {
     id: session.id,
-    title: session.autoTitle || session.name || 'Untitled',
+    // Explicit user name wins over the AI auto-title so a rename is never
+    // overridden; auto-title only fills in for unnamed sessions.
+    title: session.name || session.autoTitle || 'Untitled',
     projectId: session.projectId,
     projectName: projectNames.get(session.projectId) ?? '',
     backendKey,

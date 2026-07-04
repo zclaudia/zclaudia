@@ -82,10 +82,12 @@ export function SessionItem({
     ? `text-muted-foreground/70 hover:bg-muted/40 ${isMobile ? 'active:bg-muted/40' : ''} hover:text-foreground`
     : `text-muted-foreground hover:bg-secondary ${isMobile ? 'active:bg-secondary' : ''} hover:text-foreground`;
 
-  // Strip "Task: " prefix for task items (redundant under Tasks section)
+  // Strip "Task: " prefix for task items (redundant under Tasks section).
+  // Regular sessions fall back to the auto-generated title so an unnamed session
+  // reads the same here as in the home view instead of a bare "Untitled Session".
   const displayName = isTask
     ? (session.name || 'Untitled Task').replace(/^Task:\s*/i, '')
-    : session.name || 'Untitled Session';
+    : session.name || session.autoTitle || 'Untitled Session';
 
   return (
     <div className="relative group" data-testid="session-item">

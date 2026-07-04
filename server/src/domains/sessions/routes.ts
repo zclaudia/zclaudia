@@ -22,6 +22,7 @@ import { forkSession, ForkError } from './fork-service.js';
 import { buildContextGraph } from './context-graph-read.js';
 import { sendApiError } from '../../interfaces/http/response.js';
 import { NoAgentAvailableError } from '../agent-profiles/agent-resolver.js';
+import { requestSessionTitleGeneration } from '../../application/conversation/title/request-session-title.js';
 import { resolveAgentReadinessForSession } from '../agent-readiness/check.js';
 import type { ActiveRun } from '../../application/conversation/transport/types.js';
 
@@ -361,6 +362,21 @@ export function createSessionRoutes(
       console.error('Error dismissing interrupted status:', error);
       sendApiError(res, 500, 'DB_ERROR', 'Failed to dismiss interrupted status');
     }
+  });
+
+  // Request auto-title generation for a session (e.g. the home view asking an
+  // untitled-but-non-empty session to be summarized). Fire-and-forget: the title
+  // service re-checks eligibility and lands the result via a sessions_updated
+  // broadcast, so this returns 202 immediately regardless of the outcome.
+  router.post('/:id/generate-title', (req: Request, res: Response) => {
+    requestSessionTitleGeneration({
+      db,
+      sessionId: req.params.id,
+      broadcast: msg => {
+        if (msg.type === 'sessions_updated') sessionEvents?.publishSessionEvent('updated', msg.session);
+      },
+    });
+    res.status(202).json({ success: true });
   });
 
   // Delete session

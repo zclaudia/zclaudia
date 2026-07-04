@@ -100,6 +100,21 @@ export async function updateSessionWorkingDirectory(
   );
 }
 
+/**
+ * Ask the backend to auto-generate a title for a session (used by the home view
+ * for untitled-but-non-empty sessions). Fire-and-forget: the server re-checks
+ * eligibility and broadcasts the result via sessions_updated. Takes an explicit
+ * backendId because the home view aggregates sessions across backends.
+ */
+export async function generateSessionTitle(
+  backendId: string | null,
+  sessionId: string
+): Promise<void> {
+  await apiCallVoidForBackend(backendId, `/api/sessions/${sessionId}/generate-title`, {
+    method: 'POST',
+  });
+}
+
 export async function resetSessionSdkSession(sessionId: string): Promise<void> {
   return apiCallVoidForBackend(
     getBackendIdForSession(sessionId),

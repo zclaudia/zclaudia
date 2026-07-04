@@ -128,17 +128,20 @@ describe('selectHomeSessions', () => {
     expect(result.recent[0].id).toBe('s14');
   });
 
-  it('falls back title through autoTitle, name, then Untitled', () => {
+  it('resolves title as name, then autoTitle, then Untitled', () => {
     const result = selectHomeSessions(
       input({
         localSessions: [
-          session('a', { autoTitle: 'Auto', name: 'Named', updatedAt: 3 }),
-          session('b', { name: 'Named', updatedAt: 2 }),
-          session('c', { updatedAt: 1 }),
+          // Explicit name wins over the auto-title so a rename is never hidden.
+          session('a', { autoTitle: 'Auto', name: 'Named', updatedAt: 4 }),
+          // No name → fall back to the auto-title.
+          session('b', { autoTitle: 'Auto', updatedAt: 3 }),
+          session('c', { name: 'Named', updatedAt: 2 }),
+          session('d', { updatedAt: 1 }),
         ],
       })
     );
-    expect(result.recent.map(r => r.title)).toEqual(['Auto', 'Named', 'Untitled']);
+    expect(result.recent.map(r => r.title)).toEqual(['Named', 'Auto', 'Named', 'Untitled']);
   });
 
   it('carries lastMessageOffset through as messageCount when present', () => {

@@ -21,6 +21,31 @@ describe('SessionItem', () => {
     expect(screen.getByText('Test Session')).toBeDefined();
   });
 
+  it('falls back to the auto-title, then Untitled, when unnamed', () => {
+    const autoTitled = { ...mockSession, name: undefined, autoTitle: 'Refactor the parser' };
+    const { rerender } = render(
+      <SessionItem session={autoTitled} isSelected={false} onSelect={vi.fn()} hasPending={false} />
+    );
+    expect(screen.getByText('Refactor the parser')).toBeDefined();
+
+    rerender(
+      <SessionItem
+        session={{ ...mockSession, name: undefined, autoTitle: undefined }}
+        isSelected={false}
+        onSelect={vi.fn()}
+        hasPending={false}
+      />
+    );
+    expect(screen.getByText('Untitled Session')).toBeDefined();
+  });
+
+  it('prefers an explicit name over the auto-title', () => {
+    const both = { ...mockSession, name: 'My name', autoTitle: 'Auto title' };
+    render(<SessionItem session={both} isSelected={false} onSelect={vi.fn()} hasPending={false} />);
+    expect(screen.getByText('My name')).toBeDefined();
+    expect(screen.queryByText('Auto title')).toBeNull();
+  });
+
   it('calls onSelect when clicked', () => {
     const onSelect = vi.fn();
     render(
