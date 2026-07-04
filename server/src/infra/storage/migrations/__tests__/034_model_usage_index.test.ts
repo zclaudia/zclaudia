@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import Database from 'better-sqlite3';
 import { applyMigrations } from '../index.js';
-import { MODEL_USAGE_SQL } from '../../../../interfaces/http/usage-stats.js';
+import {
+  MODEL_TRACKED_SINCE_SQL,
+  MODEL_USAGE_SQL,
+} from '../../../../interfaces/http/usage-stats.js';
 
 function migratedDb(): Database.Database {
   const db = new Database(':memory:');
@@ -33,6 +36,16 @@ describe('034_model_usage_index', () => {
     const plan = planFor(db, MODEL_USAGE_SQL, 0);
     // eslint-disable-next-line no-console
     console.log('034 query plan:', plan);
+    expect(plan).toContain('idx_messages_model_usage');
+    expect(plan).not.toContain('SCAN messages');
+    db.close();
+  });
+
+  it('tracked-since lookup also rides the partial index', () => {
+    // MIN(created_at) over the same partial predicate must stay index-only;
+    // expression drift would silently degrade it to a full scan.
+    const db = migratedDb();
+    const plan = planFor(db, MODEL_TRACKED_SINCE_SQL);
     expect(plan).toContain('idx_messages_model_usage');
     expect(plan).not.toContain('SCAN messages');
     db.close();

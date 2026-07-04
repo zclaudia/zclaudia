@@ -71,5 +71,8 @@ export function buildModelChart(days: ModelUsageDay[], modelOrder: string[]): Mo
 
   const maxTotal = Math.max(...bars.map(b => b.total));
   const scaleMax = niceCeil(maxTotal);
-  return { bars, ticks: [0, scaleMax / 2, scaleMax], scaleMax };
+  // All-zero windows collapse to a single tick — [0, 0, 0] would collide as
+  // React keys and stack three gridlines on the baseline.
+  const ticks = scaleMax > 0 ? [0, scaleMax / 2, scaleMax] : [0];
+  return { bars, ticks, scaleMax };
 }

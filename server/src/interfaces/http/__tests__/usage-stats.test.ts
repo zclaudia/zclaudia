@@ -231,6 +231,15 @@ describe('computeModelStats', () => {
     expect(stats.models).toEqual([]);
     expect(stats.trackedSince).toBeNull();
   });
+
+  it('clamps inTokens to zero on malformed usage rows', () => {
+    // A row where output exceeds totalTokens must not yield a negative
+    // prompt-side count.
+    seedMessage('assistant', noonDaysAgo(1), 100, { model: 'claude-fable-5', output: 250 });
+    const stats = computeModelStats(db, 'all');
+    expect(stats.models[0].inTokens).toBe(0);
+    expect(stats.models[0].outTokens).toBe(250);
+  });
 });
 
 describe('computeStreak', () => {

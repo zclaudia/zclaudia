@@ -150,6 +150,10 @@ WHERE role = 'assistant' AND json_extract(metadata, '$.model') IS NOT NULL`;
 
 export function computeModelStats(db: Database, range: UsageStatsRange = 'all'): ModelUsagePayload {
   const now = Date.now();
+  // Deliberate: 'all' is capped at the 182-day heatmap horizon for BOTH the
+  // day series and the legend totals/shares — matching the Overview panel's
+  // Active days / Longest streak semantics rather than the all-time token
+  // cards. Revisit once model data older than 182 days exists (2027-01+).
   const windowStartMs =
     range === 'all' ? now - ACTIVE_DAYS_WINDOW_MS : now - RANGE_MS[range];
 
@@ -180,7 +184,9 @@ export function computeModelStats(db: Database, range: UsageStatsRange = 'all'):
   const models: ModelUsageTotal[] = [...totals.entries()]
     .map(([model, t]) => ({
       model,
-      inTokens: t.total - t.output,
+      // Clamped: malformed usage rows (output > totalTokens) must not
+      // produce a negative prompt-side count.
+      inTokens: Math.max(0, t.total - t.output),
       outTokens: t.output,
       totalTokens: t.total,
       share: grandTotal > 0 ? t.total / grandTotal : 0,

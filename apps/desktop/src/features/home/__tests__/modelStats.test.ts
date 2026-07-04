@@ -45,4 +45,12 @@ describe('buildModelChart', () => {
     expect(chart.bars).toEqual([]);
     expect(chart.scaleMax).toBe(0);
   });
+
+  it('collapses ticks to a single zero when every day is zero-total', () => {
+    // Zero-usage tagged rows yield all-zero days; duplicate tick values
+    // would collide as React keys downstream.
+    const chart = buildModelChart([{ date: '2026-07-01', models: { a: 0 } }], ['a']);
+    expect(chart.ticks).toEqual([0]);
+    expect(chart.scaleMax).toBe(0);
+  });
 });
