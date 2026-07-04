@@ -48,9 +48,10 @@ export function UsageStatsStrip() {
     [stats]
   );
 
-  // A sessions-only database has nothing worth charting — hide until the
-  // first message exists.
-  if (!stats || stats.messages === 0) return null;
+  // Once loaded the strip always renders — an all-zero footer with an empty
+  // heatmap anchors the page instead of leaving it bare. Only a failed fetch
+  // (stats never set) keeps it hidden.
+  if (!stats) return null;
 
   const line = funLine(stats.totalTokens);
   const numbers: Array<{ value: string; label: string }> = [

@@ -44,9 +44,9 @@ describe('UsageStatsStrip', () => {
     expect(container.innerHTML).toBe('');
   });
 
-  it('renders nothing when there are no messages yet', async () => {
-    // A sessions-only database has nothing worth charting — the strip would
-    // be a row of zeros over an all-gray heatmap.
+  it('renders zeros and an empty heatmap before the first message', async () => {
+    // The strip anchors the page visually even without activity — an empty
+    // (all level-0) heatmap, GitHub-fresh-profile style.
     getUsageStats.mockResolvedValue({
       ...payload,
       sessions: 2,
@@ -55,11 +55,13 @@ describe('UsageStatsStrip', () => {
       currentStreakDays: 0,
       activeDays: [],
     });
-    const { container } = render(<UsageStatsStrip />);
+    render(<UsageStatsStrip />);
     await waitFor(() => {
-      expect(getUsageStats).toHaveBeenCalled();
+      expect(screen.getByText('Sessions')).toBeTruthy();
     });
-    expect(container.innerHTML).toBe('');
+    expect(screen.getByText('0d')).toBeTruthy();
+    expect(document.querySelector('[data-testid="usage-heatmap"]')).toBeTruthy();
+    expect(screen.queryByText(/more tokens than/)).toBeNull();
   });
 
   it('hides the fun line below the multiplier floor', async () => {
