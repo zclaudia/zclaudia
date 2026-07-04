@@ -14,9 +14,9 @@ const RANGE_LABEL: Record<UsageStatsRange, string> = { all: 'All', '30d': '30d',
  *  panel's only color — data-viz exemption from the grayscale chrome rule. */
 const LEVEL_CLASS = [
   'bg-border/60',
-  'bg-primary/25',
-  'bg-primary/45',
-  'bg-primary/70',
+  'bg-primary/30',
+  'bg-primary/55',
+  'bg-primary/80',
   'bg-primary',
 ];
 
@@ -55,15 +55,22 @@ export function UsageStatsStrip() {
   // showing the previous payload until the new one lands.
   if (!stats) return null;
 
-  const line = funLine(stats.allTimeTokens);
+  // Guards double as version-skew protection: an older server (stale local
+  // build or a remote backend behind on updates) omits the newer fields, and
+  // those cards hide instead of rendering "undefined" / "NaN PM".
+  const line = funLine(stats.allTimeTokens ?? stats.totalTokens, localToday());
   const cards: Array<{ label: string; value: string }> = [
     { label: 'Sessions', value: stats.sessions.toLocaleString('en-US') },
     { label: 'Messages', value: stats.messages.toLocaleString('en-US') },
     { label: 'Total tokens', value: formatTokens(stats.totalTokens) },
-    { label: 'Active days', value: String(stats.activeDaysCount) },
+    ...(typeof stats.activeDaysCount === 'number'
+      ? [{ label: 'Active days', value: String(stats.activeDaysCount) }]
+      : []),
     { label: 'Current streak', value: `${stats.currentStreakDays}d` },
-    { label: 'Longest streak', value: `${stats.longestStreakDays}d` },
-    ...(stats.peakHour !== null
+    ...(typeof stats.longestStreakDays === 'number'
+      ? [{ label: 'Longest streak', value: `${stats.longestStreakDays}d` }]
+      : []),
+    ...(typeof stats.peakHour === 'number'
       ? [{ label: 'Peak hour', value: formatHour(stats.peakHour) }]
       : []),
   ];
@@ -88,9 +95,9 @@ export function UsageStatsStrip() {
           ))}
         </div>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {cards.map(c => (
-          <div key={c.label} className="bg-secondary/50 rounded-lg px-3.5 py-2.5 min-w-[104px]">
+          <div key={c.label} className="bg-secondary/50 rounded-lg px-3.5 py-2.5">
             <span className="block text-[11px] text-muted-foreground">{c.label}</span>
             <span className="block mt-0.5 text-lg font-medium text-foreground">{c.value}</span>
           </div>
@@ -98,17 +105,17 @@ export function UsageStatsStrip() {
       </div>
       <div
         data-testid="usage-heatmap"
-        className="mt-4 grid [grid-template-rows:repeat(7,minmax(0,1fr))] grid-flow-col gap-[3px] w-fit"
+        className="mt-4 grid [grid-template-rows:repeat(7,minmax(0,1fr))] grid-flow-col gap-1 w-fit"
       >
         {weeks.flat().map((cell, i) =>
           cell ? (
             <span
               key={cell.date}
               title={`${cell.date}: ${cell.count} ${cell.count === 1 ? 'message' : 'messages'}`}
-              className={`h-[11px] w-[11px] rounded-[3px] ${LEVEL_CLASS[cell.level]}`}
+              className={`h-[13px] w-[13px] rounded-[3px] ${LEVEL_CLASS[cell.level]}`}
             />
           ) : (
-            <span key={`pad-${i}`} className="h-[11px] w-[11px]" />
+            <span key={`pad-${i}`} className="h-[13px] w-[13px]" />
           )
         )}
       </div>

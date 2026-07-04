@@ -66,18 +66,24 @@ export function formatHour(hour: number): string {
 const REFERENCES: Array<{ name: string; tokens: number }> = [
   { name: 'The Little Prince', tokens: 20_000 },
   { name: 'The Great Gatsby', tokens: 65_000 },
+  { name: '1984', tokens: 120_000 },
   { name: 'Moby-Dick', tokens: 280_000 },
+  { name: 'The Lord of the Rings', tokens: 600_000 },
   { name: 'War and Peace', tokens: 750_000 },
 ];
 
-/** "You've used ~N× more tokens than <book>." — null when the total is too
- *  small for a multiplier of at least 2 against the smallest reference. */
-export function funLine(totalTokens: number): string | null {
-  let pick: { name: string; tokens: number } | null = null;
-  for (const ref of REFERENCES) {
-    if (totalTokens / ref.tokens >= 2) pick = ref;
-  }
-  if (!pick) return null;
+/** "You've used ~N× more tokens than <book>." — rotates daily among the
+ *  references whose multiplier lands in [2, 9999]; null when none qualify.
+ *  `dayKey` ('YYYY-MM-DD') keeps the pick deterministic and testable. */
+export function funLine(totalTokens: number, dayKey: string): string | null {
+  const eligible = REFERENCES.filter(ref => {
+    const multiplier = totalTokens / ref.tokens;
+    return multiplier >= 2 && multiplier <= 9999;
+  });
+  if (eligible.length === 0) return null;
+  let hash = 0;
+  for (const ch of dayKey) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  const pick = eligible[hash % eligible.length];
   const multiplier = Math.round(totalTokens / pick.tokens);
   return `You've used ~${multiplier}× more tokens than ${pick.name}.`;
 }

@@ -58,6 +58,28 @@ describe('UsageStatsStrip', () => {
     expect(screen.getByText('34')).toBeTruthy();
   });
 
+  it('degrades gracefully against an old-server payload missing the new fields', async () => {
+    // A stale local server (or a remote backend on an older version) returns
+    // the pre-range payload shape. The four legacy cards render; the three
+    // new ones are hidden instead of showing undefined/NaN.
+    getUsageStats.mockResolvedValue({
+      sessions: 3,
+      messages: 4,
+      totalTokens: 56_500,
+      currentStreakDays: 1,
+      activeDays: [{ date: '2026-07-04', count: 4 }],
+      capturedAt: 1,
+    });
+    const { container } = render(<UsageStatsStrip />);
+    await waitFor(() => expect(screen.getByText('Sessions')).toBeTruthy());
+    expect(screen.getByText('56.5k')).toBeTruthy();
+    expect(screen.queryByText('Active days')).toBeNull();
+    expect(screen.queryByText('Longest streak')).toBeNull();
+    expect(screen.queryByText('Peak hour')).toBeNull();
+    expect(container.textContent).not.toContain('undefined');
+    expect(container.textContent).not.toContain('NaN');
+  });
+
   it('hides the peak hour card when null', async () => {
     getUsageStats.mockResolvedValue({ ...payload, peakHour: null });
     render(<UsageStatsStrip />);

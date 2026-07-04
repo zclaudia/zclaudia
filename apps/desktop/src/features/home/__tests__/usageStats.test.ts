@@ -54,18 +54,36 @@ describe('formatHour', () => {
 });
 
 describe('funLine', () => {
-  it('picks the largest reference at least 2x below the total', () => {
-    expect(funLine(40_000_000)).toContain('War and Peace');
-    expect(funLine(200_000)).toContain('The Great Gatsby'); // 200k/65k ≈ 3.1×, largest ref clearing 2×
-    expect(funLine(50_000)).toContain('The Little Prince'); // only the smallest ref clears 2×
+  it('rotates deterministically among eligible references by day key', () => {
+    // 40M tokens: every book in the pool clears 2x and stays under 9999x,
+    // so all six are eligible and the pick depends only on the day key.
+    const a = funLine(40_000_000, '2026-07-04');
+    const b = funLine(40_000_000, '2026-07-04');
+    expect(a).toBe(b); // deterministic for the same day
+    const week = Array.from({ length: 7 }, (_, i) =>
+      funLine(40_000_000, `2026-07-0${i + 1}`)
+    );
+    expect(new Set(week).size).toBeGreaterThan(1); // varies across days
   });
 
-  it('includes a rounded multiplier', () => {
-    expect(funLine(40_000_000)).toContain('~53×');
+  it('includes a rounded multiplier for the picked reference', () => {
+    const line = funLine(40_000_000, '2026-07-04');
+    expect(line).toMatch(/~\d+× more tokens than/);
+  });
+
+  it('excludes references outside the 2x..9999x multiplier band', () => {
+    // 50k tokens: only The Little Prince (20k) clears 2x.
+    for (let day = 1; day <= 9; day++) {
+      expect(funLine(50_000, `2026-07-0${day}`)).toContain('The Little Prince');
+    }
+    // 300M tokens: Little Prince would be 15000x (over cap) — never picked.
+    for (let day = 1; day <= 9; day++) {
+      expect(funLine(300_000_000, `2026-07-0${day}`)).not.toContain('The Little Prince');
+    }
   });
 
   it('returns null below the 2x floor', () => {
-    expect(funLine(30_000)).toBeNull();
-    expect(funLine(0)).toBeNull();
+    expect(funLine(30_000, '2026-07-04')).toBeNull();
+    expect(funLine(0, '2026-07-04')).toBeNull();
   });
 });
