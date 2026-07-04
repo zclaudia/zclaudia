@@ -64,7 +64,7 @@ export function SessionItem({
   // row stays clean — matching the project/session-header menu convention.
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const hasRowMenu = !isMobile && Boolean(onDeleteWorktree || onPopOut);
-  const actionPadding = hasRowMenu ? 'pr-6' : '';
+  const actionPadding = hasRowMenu ? 'pr-6' : 'pr-2';
 
   const openMenu = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -76,7 +76,7 @@ export function SessionItem({
     setMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
   };
 
-  // Task items under Supervisor use lighter styling
+  // Task items under Supervisor use lighter styling.
   const selectedClass = isTask ? 'bg-muted/60 text-foreground' : 'bg-accent text-foreground';
   const unselectedClass = isTask
     ? `text-muted-foreground/70 hover:bg-muted/40 ${isMobile ? 'active:bg-muted/40' : ''} hover:text-foreground`
@@ -91,7 +91,7 @@ export function SessionItem({
     <div className="relative group" data-testid="session-item">
       <button
         onClick={() => onSelect(session.id)}
-        className={`w-full text-left px-2 rounded-lg truncate flex items-center gap-1 ${
+        className={`-ml-5 w-[calc(100%+1.25rem)] text-left pl-7 rounded-lg truncate flex items-center gap-1 transition-colors ${
           isTask ? 'text-xs' : 'text-sm'
         } ${
           isMobile ? 'min-h-[44px]' : 'h-7'

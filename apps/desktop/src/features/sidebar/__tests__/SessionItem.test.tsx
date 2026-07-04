@@ -43,10 +43,14 @@ describe('SessionItem', () => {
   });
 
   it('applies selected styles', () => {
-    const { container } = render(
+    render(
       <SessionItem session={mockSession} isSelected={true} onSelect={vi.fn()} hasPending={false} />
     );
-    expect(container.firstChild).toBeDefined();
+    const button = screen.getByRole('button', { name: /Test Session/ });
+    expect(button.className).toContain('-ml-5');
+    expect(button.className).toContain('w-[calc(100%+1.25rem)]');
+    expect(button.className).toContain('pl-7');
+    expect(button.className).toContain('bg-accent');
   });
 
   it('shows active running state', () => {

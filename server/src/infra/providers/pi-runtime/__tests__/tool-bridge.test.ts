@@ -537,6 +537,69 @@ describe('buildTools', () => {
     }
   });
 
+  it('Agent fills projectId from the current session context instead of model input', async () => {
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    applyMigrations(db);
+    const now = Date.now();
+    db.prepare(
+      `INSERT INTO llm_profiles (id, name, provider_type, is_default, created_at, updated_at)
+       VALUES ('llm-1', 'Default LLM', 'zclaudia', 1, ?, ?)`
+    ).run(now, now);
+    db.prepare(
+      `INSERT INTO agent_profiles (id, name, llm_profile_id, is_default, created_at, updated_at)
+       VALUES ('agent-1', 'Default Agent', 'llm-1', 1, ?, ?)`
+    ).run(now, now);
+    db.prepare(
+      `INSERT INTO projects (id, name, type, root_path, created_at, updated_at)
+       VALUES ('project-parent', 'Parent Project', 'code', '/tmp/project-parent', ?, ?)`
+    ).run(now, now);
+    db.prepare(
+      `INSERT INTO sessions (id, project_id, name, agent_profile_id, type, created_at, updated_at)
+       VALUES ('session-parent', 'project-parent', 'Parent Session', 'agent-1', 'regular', ?, ?)`
+    ).run(now, now);
+
+    const agentTaskExecutor = {
+      start: vi.fn(async (task: any) => ({
+        status: 'running',
+        executorRef: { providerType: 'zclaudia-agent-runner', taskId: task.id },
+      })),
+      wait: vi.fn(async () => ({
+        status: 'completed',
+        result: { text: 'direct child agent result' },
+      })),
+      stop: vi.fn(),
+    };
+    try {
+      const agent = buildTools('/tmp/project-parent', {
+        enabled: ['Agent'],
+        sessionId: 'session-parent',
+        runId: 'run-parent',
+        db,
+        agentTaskExecutor: agentTaskExecutor as any,
+      })[0] as any;
+
+      const result = await agent.execute('tool-agent-context', {
+        prompt: 'Explore this repo',
+        wait: true,
+      });
+      const parsed = JSON.parse(result.content[0].text);
+
+      expect(parsed).toMatchObject({ ok: true, status: 'completed' });
+      expect(agentTaskExecutor.start).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            projectId: 'project-parent',
+            prompt: 'Explore this repo',
+            cwd: '/tmp/project-parent',
+          }),
+        })
+      );
+    } finally {
+      db.close();
+    }
+  });
+
   it('TaskOutput returns task state, result, and events by task id', async () => {
     const db = new Database(':memory:');
     db.pragma('foreign_keys = ON');

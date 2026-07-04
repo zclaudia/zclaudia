@@ -29,6 +29,23 @@ function taskTitleFromArgs(args: Record<string, unknown>): string | undefined {
   return undefined;
 }
 
+function resolveProjectIdForSession(
+  db: Database.Database | undefined,
+  sessionId: string | undefined
+): string | undefined {
+  if (!db || !sessionId) return undefined;
+  try {
+    const row = db
+      .prepare('SELECT project_id AS projectId FROM sessions WHERE id = ?')
+      .get(sessionId) as { projectId?: string } | undefined;
+    return typeof row?.projectId === 'string' && row.projectId.trim()
+      ? row.projectId.trim()
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export type TaskRuntimeRegistryFactory = (repo: TaskRepository) => TaskRuntimeRegistry;
 
 export function createDefaultTaskRuntimeRegistry(repo: TaskRepository): TaskRuntimeRegistry {
@@ -70,6 +87,7 @@ export function createAgentTool(
         return errorResult('missing_prompt', 'Agent requires a prompt');
       }
 
+      const projectId = resolveProjectIdForSession(db, sessionId);
       const taskService = new TaskService(new TaskRepository(db));
       const task = taskService.createTask({
         type: 'agent',
@@ -83,6 +101,7 @@ export function createAgentTool(
           permissionOverride:
             args.permission_override ?? args.permissionOverride ?? permissionOverride,
           cwd,
+          projectId,
           ...(args.isolation === 'worktree' ? { isolation: 'worktree' } : {}),
         },
       });
