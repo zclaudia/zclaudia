@@ -86,6 +86,7 @@ vi.mock('../../plugins/builtinPanels', () => ({ initBuiltinPanels: vi.fn() }));
 vi.mock('../../utils/directGatewaySetup', () => ({ shouldShowDirectGatewaySetup: () => false }));
 vi.mock('../../services/mobileConnectionState', () => ({
   getMobileControlPlaneState: () => 'ready',
+  isMobileBackendUsable: () => true,
 }));
 
 import App from '../../App';

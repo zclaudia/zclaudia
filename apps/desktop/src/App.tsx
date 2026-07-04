@@ -3,6 +3,7 @@ import { Sidebar } from './features/sidebar/Sidebar';
 import { NotificationsModal } from './features/sidebar/NotificationsModal';
 import { SidebarCollapsedBar } from './features/sidebar/SidebarCollapsedBar';
 import { SessionChatLayout } from './features/chat/SessionChatLayout';
+import { HomeView } from './features/home/HomeView';
 import { MobileSetup } from './components/setup/MobileSetup';
 import { WindowsSetup } from './components/setup/WindowsSetup';
 import { SettingsPanel } from './features/settings/SettingsPanel';
@@ -40,6 +41,7 @@ import { useNotificationFeedStore } from './stores/notificationFeedStore';
 import { useNotificationsModalStore } from './stores/notificationsModalStore';
 import { useGatewayStore } from './stores/gatewayStore';
 import { useShortcutStore } from './stores/shortcutStore';
+import { useHomeQuickActionsStore } from './stores/homeQuickActionsStore';
 import { isDesktopTauri } from './utils/platform';
 import { initBuiltinPanels } from './plugins/builtinPanels';
 import { shouldShowDirectGatewaySetup } from './utils/directGatewaySetup';
@@ -507,12 +509,17 @@ function AppContent() {
                 }}
               />
             ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
-                <div className="text-center">
-                  <h2 className="text-xl font-semibold mb-2">Welcome to ZClaudia</h2>
-                  <p>Select a project and session to start chatting</p>
-                </div>
-              </div>
+              <HomeView
+                onNewSession={() => {
+                  useHomeQuickActionsStore.getState().request('new-session');
+                }}
+                onAddProject={() => {
+                  // The inline new-project form lives in the sidebar — make sure it is visible.
+                  if (isMobile) setSidebarOpen(true);
+                  else setSidebarCollapsed(false);
+                  useHomeQuickActionsStore.getState().request('new-project');
+                }}
+              />
             )}
           </div>
         </main>
