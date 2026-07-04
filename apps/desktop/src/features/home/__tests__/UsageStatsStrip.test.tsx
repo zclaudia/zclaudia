@@ -19,6 +19,7 @@ const payload = {
   currentStreakDays: 17,
   longestStreakDays: 17,
   peakHour: 23,
+  favoriteModel: 'claude-opus-4-8',
   allTimeTokens: 39_900_000,
   activeDays: [{ date: '2026-07-03', count: 5 }],
   capturedAt: 1,
@@ -43,7 +44,7 @@ describe('UsageStatsStrip', () => {
     expect(document.querySelector('[data-testid="usage-heatmap"]')).toBeTruthy();
   });
 
-  it('renders all seven metric cards with labels', async () => {
+  it('renders all eight metric cards with labels', async () => {
     getUsageStats.mockResolvedValue(payload);
     render(<UsageStatsStrip />);
     await waitFor(() => expect(screen.getByText('Sessions')).toBeTruthy());
@@ -55,6 +56,7 @@ describe('UsageStatsStrip', () => {
       'Current streak',
       'Longest streak',
       'Peak hour',
+      'Favorite model',
     ]) {
       expect(screen.getByText(label)).toBeTruthy();
     }
@@ -89,6 +91,20 @@ describe('UsageStatsStrip', () => {
     render(<UsageStatsStrip />);
     await waitFor(() => expect(screen.getByText('Sessions')).toBeTruthy());
     expect(screen.queryByText('Peak hour')).toBeNull();
+  });
+
+  it('shows the favorite model card with a pretty name, hidden when null', async () => {
+    getUsageStats.mockResolvedValue(payload);
+    render(<UsageStatsStrip />);
+    await waitFor(() => expect(screen.getByText('Favorite model')).toBeTruthy());
+    expect(screen.getByText('Opus 4 8')).toBeTruthy();
+  });
+
+  it('hides the favorite model card when null', async () => {
+    getUsageStats.mockResolvedValue({ ...payload, favoriteModel: null });
+    render(<UsageStatsStrip />);
+    await waitFor(() => expect(screen.getByText('Sessions')).toBeTruthy());
+    expect(screen.queryByText('Favorite model')).toBeNull();
   });
 
   it('refetches with the chosen range and keeps previous numbers while pending', async () => {

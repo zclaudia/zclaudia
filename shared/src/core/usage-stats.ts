@@ -24,6 +24,9 @@ export interface UsageStatsPayload {
   longestStreakDays: number;
   /** 0-23 mode of user-message local hour within the range; null when no user messages. */
   peakHour: number | null;
+  /** Model id with the highest token total within the range (models recorded
+   *  from 2026-07 on); null when no model-tagged messages exist in the window. */
+  favoriteModel: string | null;
   /** All-time assistant tokens (for the fun line) — range-independent. */
   allTimeTokens: number;
   /** Days with >=1 user message, ALWAYS the full 182-day window (heatmap), ascending. */

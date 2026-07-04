@@ -232,6 +232,20 @@ describe('computeModelStats', () => {
     expect(stats.trackedSince).toBeNull();
   });
 
+  it('reports the top model by window tokens as favoriteModel on the usage payload', () => {
+    seedMessage('assistant', noonDaysAgo(40), 5000, { model: 'claude-opus-4-8', output: 100 });
+    seedMessage('assistant', noonDaysAgo(2), 600, { model: 'claude-fable-5', output: 200 });
+    seedMessage('assistant', noonDaysAgo(1), 400, { model: 'deepseek-v4-flash', output: 100 });
+    // All-time (182d window): opus dominates; last 7 days: fable wins.
+    expect(computeUsageStats(db, 'all').favoriteModel).toBe('claude-opus-4-8');
+    expect(computeUsageStats(db, '7d').favoriteModel).toBe('claude-fable-5');
+  });
+
+  it('leaves favoriteModel null when nothing is model-tagged', () => {
+    seedMessage('assistant', noonDaysAgo(1), 500); // usage but no model
+    expect(computeUsageStats(db, 'all').favoriteModel).toBeNull();
+  });
+
   it('clamps inTokens to zero on malformed usage rows', () => {
     // A row where output exceeds totalTokens must not yield a negative
     // prompt-side count.

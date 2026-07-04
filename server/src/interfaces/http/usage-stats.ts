@@ -117,6 +117,9 @@ export function computeUsageStats(
   const peakRow = db.prepare(PEAK_HOUR_SQL).get(windowStartMs) as
     | { hour: number; c: number }
     | undefined;
+  const favoriteRow = db.prepare(FAVORITE_MODEL_SQL).get(windowStartMs) as
+    | { model: string; total: number }
+    | undefined;
 
   return {
     sessions,
@@ -129,6 +132,7 @@ export function computeUsageStats(
     ),
     longestStreakDays: computeLongestStreak(windowedDays.map(d => d.date)),
     peakHour: peakRow?.hour ?? null,
+    favoriteModel: favoriteRow?.model ?? null,
     allTimeTokens,
     activeDays,
     capturedAt: now,
@@ -147,6 +151,14 @@ GROUP BY date, model ORDER BY date`;
 
 export const MODEL_TRACKED_SINCE_SQL = `SELECT MIN(created_at) AS t FROM messages
 WHERE role = 'assistant' AND json_extract(metadata, '$.model') IS NOT NULL`;
+
+/** Top model by window tokens (ties break to the lexicographically first id).
+ *  Expressions must stay textually identical to idx_messages_model_usage. */
+export const FAVORITE_MODEL_SQL = `SELECT json_extract(metadata, '$.model') AS model,
+       COALESCE(SUM(CAST(json_extract(metadata, '$.usage.totalTokens') AS INTEGER)), 0) AS total
+FROM messages
+WHERE role = 'assistant' AND json_extract(metadata, '$.model') IS NOT NULL AND created_at >= ?
+GROUP BY model ORDER BY total DESC, model ASC LIMIT 1`;
 
 export function computeModelStats(db: Database, range: UsageStatsRange = 'all'): ModelUsagePayload {
   const now = Date.now();

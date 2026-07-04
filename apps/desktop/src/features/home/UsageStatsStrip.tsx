@@ -5,6 +5,7 @@ import { useFacadeStore } from '../../stores/facadeStore';
 import { LOCAL_BACKEND_KEY, resolveSessionBucketBackendId } from '../../stores/sessionsStore';
 import { formatTokens } from '../../utils/formatTokens';
 import { buildHeatmapWeeks, flattenRowMajor, formatHour, funLine } from './usageStats';
+import { prettyModelName } from './modelStats';
 import { ModelsChart } from './ModelsChart';
 
 const HEATMAP_WEEKS = 26;
@@ -75,6 +76,9 @@ export function UsageStatsStrip() {
     ...(typeof stats.peakHour === 'number'
       ? [{ label: 'Peak hour', value: formatHour(stats.peakHour) }]
       : []),
+    ...(typeof stats.favoriteModel === 'string'
+      ? [{ label: 'Favorite model', value: prettyModelName(stats.favoriteModel) }]
+      : []),
   ];
 
   return (
@@ -117,7 +121,9 @@ export function UsageStatsStrip() {
             {cards.map(c => (
               <div key={c.label} className="bg-secondary/50 rounded-lg px-3.5 py-2.5">
                 <span className="block text-[11px] text-muted-foreground">{c.label}</span>
-                <span className="block mt-0.5 text-lg font-medium text-foreground">{c.value}</span>
+                <span className="block mt-0.5 text-lg font-medium text-foreground truncate">
+                  {c.value}
+                </span>
               </div>
             ))}
           </div>
