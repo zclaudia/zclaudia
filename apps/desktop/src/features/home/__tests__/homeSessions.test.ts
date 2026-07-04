@@ -83,6 +83,16 @@ describe('selectHomeSessions', () => {
     expect(result.recent.map(r => r.id)).toEqual(['ok']);
   });
 
+  it('excludes sessions of internal projects', () => {
+    const result = selectHomeSessions(
+      input({
+        projects: [...projects, { id: 'pi', name: '__claudia', isInternal: true }] as any[],
+        localSessions: [session('a'), session('i', { projectId: 'pi' })],
+      })
+    );
+    expect(result.recent.map(r => r.id)).toEqual(['a']);
+  });
+
   it('treats a missing type as regular', () => {
     const result = selectHomeSessions(
       input({ localSessions: [session('a', { type: undefined })] })

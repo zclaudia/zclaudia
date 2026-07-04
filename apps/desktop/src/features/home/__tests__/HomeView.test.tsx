@@ -18,6 +18,11 @@ function seedProject(id: string, name: string) {
   useProjectStore.setState(s => ({ projects: [...s.projects, { id, name } as any] }));
 }
 
+/** Simulate the initial REST data load having completed (useDataLoader sets this). */
+function markDataLoaded() {
+  useProjectStore.setState({ dataServerId: 'local' } as any);
+}
+
 function seedLocalSession(id: string, over: Record<string, unknown> = {}) {
   useProjectStore.setState(s => ({
     sessions: [
@@ -30,7 +35,7 @@ function seedLocalSession(id: string, over: Record<string, unknown> = {}) {
 describe('HomeView', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useProjectStore.setState({ projects: [], sessions: [] } as any);
+    useProjectStore.setState({ projects: [], sessions: [], dataServerId: null } as any);
     useSessionsStore.setState({
       remoteSessions: new Map(),
       activeSessionIdsByBackend: new Map(),
@@ -43,7 +48,13 @@ describe('HomeView', () => {
     });
   });
 
+  it('renders nothing before the initial data load completes', () => {
+    const { container } = render(<HomeView onNewSession={vi.fn()} onAddProject={vi.fn()} />);
+    expect(container.innerHTML).toBe('');
+  });
+
   it('renders the empty state with quick actions when there are no sessions', () => {
+    markDataLoaded();
     render(<HomeView onNewSession={vi.fn()} onAddProject={vi.fn()} />);
     expect(screen.getByText('Welcome to ZClaudia')).toBeTruthy();
     expect(screen.getByText('Start a session or add a project to get going.')).toBeTruthy();
@@ -83,6 +94,7 @@ describe('HomeView', () => {
   });
 
   it('fires the quick-action callbacks', () => {
+    markDataLoaded();
     const onNewSession = vi.fn();
     const onAddProject = vi.fn();
     render(<HomeView onNewSession={onNewSession} onAddProject={onAddProject} />);
@@ -160,6 +172,7 @@ describe('HomeView', () => {
   });
 
   it('renders the usage strip only in the populated state', () => {
+    markDataLoaded();
     const empty = render(<HomeView onNewSession={vi.fn()} onAddProject={vi.fn()} />);
     expect(empty.container.querySelector('[data-testid="usage-strip"]')).toBeNull();
     empty.unmount();

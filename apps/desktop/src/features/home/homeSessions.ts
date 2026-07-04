@@ -69,7 +69,9 @@ export function selectHomeSessions(input: HomeSessionsInput): HomeSessions {
     isVisibleGatewayBackend,
   } = input;
 
-  const projectNames = new Map(projects.map(p => [p.id, p.name]));
+  // Internal projects (e.g. __claudia) are hidden from user-facing lists, so
+  // their sessions drop out the same way orphaned-project sessions do.
+  const projectNames = new Map(projects.filter(p => !p.isInternal).map(p => [p.id, p.name]));
 
   // Union of active ids across the local bucket and its gateway aliases.
   const localActiveIds = new Set<string>();

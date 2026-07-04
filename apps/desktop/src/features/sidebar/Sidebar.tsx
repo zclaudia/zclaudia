@@ -640,7 +640,7 @@ export function Sidebar({
             setNewSessionWorkingDirectory(null);
           }}
           project={newSessionProject}
-          projects={allProjects}
+          projects={allProjects.filter(p => !p.isInternal)}
           showProjectPicker={newSessionRequest.pickerEnabled}
           onProjectChange={projectId => {
             setNewSessionRequest(r => (r ? { ...r, projectId } : r));

@@ -121,6 +121,9 @@ function resetStores(refresh = vi.fn().mockResolvedValue(undefined)) {
   useProjectStore.setState({
     sessions: [],
     projects: [],
+    // Initial-load stamp: HomeView renders nothing (not even the welcome
+    // state) until useDataLoader sets this.
+    dataServerId: 'local',
     selectSession: vi.fn(),
   } as any);
   useClaudiaStore.setState({

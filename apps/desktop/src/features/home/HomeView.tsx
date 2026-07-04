@@ -26,6 +26,9 @@ interface HomeViewProps {
 export function HomeView({ onNewSession, onAddProject }: HomeViewProps) {
   const activeBackendSessions = useProjectStore(s => s.sessions);
   const projects = useProjectStore(s => s.projects);
+  // Set by useDataLoader once the initial REST load for the active backend
+  // completes; null while loading (and re-nulled on backend switch/reconnect).
+  const dataLoaded = useProjectStore(s => s.dataServerId !== null);
   const sessionOwnerIds = useOwnershipStore(s => s.sessionBackendIds);
   const projectOwnerIds = useOwnershipStore(s => s.projectBackendIds);
   const remoteSessions = useSessionsStore(s => s.remoteSessions);
@@ -131,6 +134,10 @@ export function HomeView({ onNewSession, onAddProject }: HomeViewProps) {
   );
 
   if (isEmpty) {
+    // Before the initial REST load finishes the stores are empty regardless of
+    // real data — showing the welcome state then would flash it on every cold
+    // start. Stay blank until useDataLoader has stamped the load as complete.
+    if (!dataLoaded) return null;
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
