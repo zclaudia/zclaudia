@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { buildHeatmapWeeks, formatHour, funLine, heatmapLevel } from '../usageStats';
+import {
+  buildHeatmapWeeks,
+  flattenRowMajor,
+  formatHour,
+  funLine,
+  heatmapLevel,
+} from '../usageStats';
 
 describe('heatmapLevel', () => {
   it('is 0 for zero and scales 1..4 relative to the max', () => {
@@ -41,6 +47,19 @@ describe('buildHeatmapWeeks', () => {
     // Window is the current week only: Sun .. Wed real, Thu-Sat future -> null
     expect(weeks[0][3]?.date).toBe('2026-07-01');
     expect(weeks[0][4]).toBeNull();
+  });
+});
+
+describe('flattenRowMajor', () => {
+  it('transposes column-major weeks into row-major cells', () => {
+    const weeks = buildHeatmapWeeks([{ date: '2026-07-03', count: 5 }], '2026-07-04', 2);
+    const flat = flattenRowMajor(weeks);
+    expect(flat).toHaveLength(14);
+    // Row-major: first two cells are the Sunday of week 0 then week 1.
+    expect(flat[0]?.date).toBe('2026-06-21');
+    expect(flat[1]?.date).toBe('2026-06-28');
+    // Friday row (index 5): week1's cell is 2026-07-03 with the count.
+    expect(flat[5 * 2 + 1]).toEqual({ date: '2026-07-03', count: 5, level: 4 });
   });
 });
 

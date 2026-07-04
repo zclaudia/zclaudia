@@ -62,6 +62,18 @@ export function formatHour(hour: number): string {
   return `${h} ${suffix}`;
 }
 
+/** Transpose the column-major weeks grid into row-major cells for a CSS grid
+ *  that fills the container width with one fr column per week. */
+export function flattenRowMajor(
+  weeks: Array<Array<HeatmapCell | null>>
+): Array<HeatmapCell | null> {
+  const cells: Array<HeatmapCell | null> = [];
+  for (let day = 0; day < 7; day++) {
+    for (const week of weeks) cells.push(week[day] ?? null);
+  }
+  return cells;
+}
+
 /** Reference corpora for the fun comparison line, ascending by size. */
 const REFERENCES: Array<{ name: string; tokens: number }> = [
   { name: 'The Little Prince', tokens: 20_000 },

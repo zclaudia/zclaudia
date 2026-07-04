@@ -4,7 +4,7 @@ import { getUsageStats } from '../../services/api';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { LOCAL_BACKEND_KEY, resolveSessionBucketBackendId } from '../../stores/sessionsStore';
 import { formatTokens } from '../../utils/formatTokens';
-import { buildHeatmapWeeks, formatHour, funLine } from './usageStats';
+import { buildHeatmapWeeks, flattenRowMajor, formatHour, funLine } from './usageStats';
 
 const HEATMAP_WEEKS = 26;
 const RANGES: UsageStatsRange[] = ['all', '30d', '7d'];
@@ -103,19 +103,21 @@ export function UsageStatsStrip() {
           </div>
         ))}
       </div>
+      {/* Row-major grid with one fr column per week so the heatmap spans the
+          exact same width as the cards above (26 = HEATMAP_WEEKS). */}
       <div
         data-testid="usage-heatmap"
-        className="mt-4 grid [grid-template-rows:repeat(7,minmax(0,1fr))] grid-flow-col gap-1 w-fit"
+        className="mt-4 grid grid-cols-[repeat(26,minmax(0,1fr))] gap-1"
       >
-        {weeks.flat().map((cell, i) =>
+        {flattenRowMajor(weeks).map((cell, i) =>
           cell ? (
             <span
               key={cell.date}
               title={`${cell.date}: ${cell.count} ${cell.count === 1 ? 'message' : 'messages'}`}
-              className={`h-[13px] w-[13px] rounded-[3px] ${LEVEL_CLASS[cell.level]}`}
+              className={`aspect-square w-full rounded-[4px] ${LEVEL_CLASS[cell.level]}`}
             />
           ) : (
-            <span key={`pad-${i}`} className="h-[13px] w-[13px]" />
+            <span key={`pad-${i}`} className="aspect-square w-full" />
           )
         )}
       </div>
