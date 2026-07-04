@@ -15,6 +15,7 @@ import { isMobileBackendUsable } from '../../services/mobileConnectionState';
 import { LEGACY_LOCAL_SERVER_ID, resolveCanonicalBackendId } from '../../utils/controlPlane';
 import { timeAgo } from '../../utils/timeAgo';
 import { selectHomeSessions, type HomeSessionRow } from './homeSessions';
+import { greeting } from './greeting';
 import { UsageStatsStrip } from './UsageStatsStrip';
 
 interface HomeViewProps {
@@ -153,12 +154,16 @@ export function HomeView({ onNewSession, onAddProject }: HomeViewProps) {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto max-w-2xl px-6 pt-16 pb-10">
-        <h2 className="text-xl font-semibold mb-4">Welcome to ZClaudia</h2>
-        {quickActions}
+      <div className="mx-auto max-w-2xl px-6 pt-12 pb-10">
+        {/* Greeting + actions share one row so the header reads as a home, not a
+            welcome mat, and the top half isn't sparse next to the dense stats. */}
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-xl font-semibold">{greeting(new Date().getHours())}</h2>
+          {quickActions}
+        </div>
 
-        {/* First group opens with more air after the buttons; siblings tighten. */}
-        <div className="[&>*:first-child]:mt-10 [&>*+*]:mt-8">
+        {/* First group opens with more air after the header; siblings tighten. */}
+        <div className="[&>*:first-child]:mt-9 [&>*+*]:mt-8">
           {running.length > 0 && (
             <SessionGroup
               label="Running"

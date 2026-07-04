@@ -94,7 +94,7 @@ export function UsageStatsStrip() {
   ];
 
   return (
-    <div className="mt-12 border-t border-border pt-5 px-2">
+    <div className="mt-10 border-t border-border pt-5 px-2">
       <div className="flex items-center mb-3">
         <div className="flex gap-0.5">
           {(['overview', 'models'] as const).map(t => (

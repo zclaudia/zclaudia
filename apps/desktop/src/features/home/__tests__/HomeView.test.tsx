@@ -63,6 +63,14 @@ describe('HomeView', () => {
     expect(screen.queryByText('Recent')).toBeNull();
   });
 
+  it('greets instead of welcoming once there is activity', () => {
+    seedProject('p1', 'zclaudia');
+    seedLocalSession('s1', { name: 'Fix the thing', updatedAt: 100 });
+    render(<HomeView onNewSession={vi.fn()} onAddProject={vi.fn()} />);
+    expect(screen.getByText(/Good (morning|afternoon|evening)/)).toBeTruthy();
+    expect(screen.queryByText('Welcome to ZClaudia')).toBeNull();
+  });
+
   it('renders recent rows with project names and hides the Running group when idle', () => {
     seedProject('p1', 'zclaudia');
     seedLocalSession('s1', { name: 'Fix the thing', updatedAt: 100 });
