@@ -59,6 +59,8 @@ export interface MessageMetadata {
   toolCalls?: ToolCall[];
   contentBlocks?: ContentBlock[];
   usage?: UsageInfo;
+  /** Model id used for the run that produced this assistant message (recorded from 2026-07 on; absent on older rows). */
+  model?: string;
   filePush?: FilePushMetadata;
   thinkingBlocks?: ThinkingBlock[];
   /** True when this user message was injected mid-run via steering (vs. normal user send). */

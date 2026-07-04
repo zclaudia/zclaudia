@@ -260,6 +260,9 @@ export function upsertAssistantMessage(
   if (options?.usage) {
     metadata.usage = options.usage;
   }
+  if (run.agentProfile?.model) {
+    metadata.model = run.agentProfile.model;
+  }
   if (run.collectedToolCalls.length > 0) {
     metadata.toolCalls = run.collectedToolCalls.map(
       ({ toolUseId, name, input, output, isError, effect, startedAt, completedAt }) => ({

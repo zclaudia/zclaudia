@@ -70,3 +70,28 @@ describe('Route C tree write wiring (assistant final save)', () => {
     expect(entries).toHaveLength(0);
   });
 });
+
+describe('upsertAssistantMessage — model in metadata', () => {
+  function persistedMetadata(db: Database.Database): Record<string, unknown> {
+    const row = db.prepare('SELECT metadata FROM messages WHERE id = ?').get('a1') as {
+      metadata: string | null;
+    };
+    expect(row.metadata).toBeTruthy();
+    return JSON.parse(row.metadata!);
+  }
+
+  it('records run.agentProfile.model on the persisted metadata', () => {
+    const db = makeDb();
+    const run = fakeRun(db);
+    run.agentProfile = { model: 'claude-sonnet-4-5' };
+    upsertAssistantMessage(run, { usage: { inputTokens: 1, outputTokens: 2 } as never });
+    expect(persistedMetadata(db).model).toBe('claude-sonnet-4-5');
+  });
+
+  it('omits model when agentProfile is undefined', () => {
+    const db = makeDb();
+    const run = fakeRun(db); // no agentProfile
+    upsertAssistantMessage(run, { usage: { inputTokens: 1, outputTokens: 2 } as never });
+    expect('model' in persistedMetadata(db)).toBe(false);
+  });
+});
