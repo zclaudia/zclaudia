@@ -43,8 +43,8 @@ function localDateString(ms: number): string {
 let db: Database.Database;
 let seq = 0;
 
-function seedSession(id: string) {
-  db.prepare('INSERT INTO sessions VALUES (?, ?, ?, ?)').run(id, 'p1', 1, 1);
+function seedSession(id: string, createdAt = 1) {
+  db.prepare('INSERT INTO sessions VALUES (?, ?, ?, ?)').run(id, 'p1', createdAt, createdAt);
 }
 
 function seedMessage(role: string, createdAt: number, usageTokens?: number) {
@@ -73,7 +73,7 @@ describe('computeUsageStats', () => {
     seedMessage('assistant', noonDaysAgo(0), 1200);
     seedMessage('assistant', noonDaysAgo(1), 800);
     seedMessage('assistant', noonDaysAgo(1)); // no usage metadata — ignored in sum
-    const stats = computeUsageStats(db);
+    const stats = computeUsageStats(db, 'all');
     expect(stats.sessions).toBe(2);
     expect(stats.messages).toBe(4);
     expect(stats.totalTokens).toBe(2000);
@@ -85,7 +85,7 @@ describe('computeUsageStats', () => {
     seedMessage('user', noonDaysAgo(2));
     seedMessage('user', noonDaysAgo(0));
     seedMessage('assistant', noonDaysAgo(1), 10); // assistant does not create an active day
-    const stats = computeUsageStats(db);
+    const stats = computeUsageStats(db, 'all');
     expect(stats.activeDays).toEqual([
       { date: localDateString(noonDaysAgo(2)), count: 2 },
       { date: localDateString(noonDaysAgo(0)), count: 1 },
@@ -96,8 +96,64 @@ describe('computeUsageStats', () => {
     seedSession('s1');
     seedMessage('user', noonDaysAgo(200));
     seedMessage('user', noonDaysAgo(0));
-    const stats = computeUsageStats(db);
+    const stats = computeUsageStats(db, 'all');
     expect(stats.activeDays).toHaveLength(1);
+  });
+
+  it('windows sessions, messages, and tokens by range', () => {
+    seedSession('old', noonDaysAgo(40));
+    seedSession('recent', noonDaysAgo(2));
+    seedMessage('user', noonDaysAgo(40));
+    seedMessage('assistant', noonDaysAgo(40), 1000);
+    seedMessage('user', noonDaysAgo(10));
+    seedMessage('assistant', noonDaysAgo(10), 300);
+    seedMessage('user', noonDaysAgo(2));
+    seedMessage('assistant', noonDaysAgo(2), 50);
+
+    const week = computeUsageStats(db, '7d');
+    expect(week.sessions).toBe(1);
+    expect(week.messages).toBe(2);
+    expect(week.totalTokens).toBe(50);
+    expect(week.allTimeTokens).toBe(1350);
+
+    const month = computeUsageStats(db, '30d');
+    expect(month.messages).toBe(4);
+    expect(month.totalTokens).toBe(350);
+  });
+
+  it('keeps activeDays full-window under a range but windows activeDaysCount', () => {
+    seedSession('s1');
+    seedMessage('user', noonDaysAgo(20));
+    seedMessage('user', noonDaysAgo(2));
+    const week = computeUsageStats(db, '7d');
+    expect(week.activeDays).toHaveLength(2); // heatmap data unaffected
+    expect(week.activeDaysCount).toBe(1);
+  });
+
+  it('computes the longest streak within the range', () => {
+    seedSession('s1');
+    for (const n of [9, 8, 7, 3, 2]) seedMessage('user', noonDaysAgo(n));
+    const all = computeUsageStats(db, 'all');
+    expect(all.longestStreakDays).toBe(3); // 9,8,7
+    const week = computeUsageStats(db, '7d');
+    expect(week.longestStreakDays).toBe(2); // 3,2 (8,9 outside window)
+  });
+
+  it('computes peak hour as the mode with earliest-hour ties, null when empty', () => {
+    seedSession('s1');
+    const at = (daysAgo: number, hour: number) => {
+      const d = new Date();
+      d.setHours(hour, 0, 0, 0);
+      return d.getTime() - daysAgo * DAY;
+    };
+    seedMessage('user', at(1, 9));
+    seedMessage('user', at(2, 9));
+    seedMessage('user', at(1, 15));
+    seedMessage('user', at(2, 15));
+    seedMessage('user', at(3, 20));
+    // 9 and 15 tie with 2 each -> earliest hour wins
+    expect(computeUsageStats(db, 'all').peakHour).toBe(9);
+    expect(computeUsageStats(createTestDb(), 'all').peakHour).toBeNull();
   });
 });
 
@@ -144,6 +200,10 @@ describe('GET /usage', () => {
     expect(res.body.data.messages).toBe(2);
     expect(res.body.data.totalTokens).toBe(500);
     expect(res.body.data.currentStreakDays).toBe(1);
+    expect(res.body.data.activeDaysCount).toBe(1);
+    expect(res.body.data.longestStreakDays).toBe(1);
+    expect(res.body.data.allTimeTokens).toBe(500);
+    expect(typeof res.body.data.peakHour).toBe('number');
     expect(typeof res.body.data.capturedAt).toBe('number');
   });
 
@@ -155,5 +215,26 @@ describe('GET /usage', () => {
     const second = await request(app).get('/api/stats/usage');
     expect(first.body.data.sessions).toBe(1);
     expect(second.body.data.sessions).toBe(1);
+  });
+
+  it('parses the range param and caches per range', async () => {
+    seedSession('old', noonDaysAgo(40));
+    seedSession('recent', noonDaysAgo(2));
+    const app = makeApp(60_000);
+    const all = await request(app).get('/api/stats/usage');
+    const week = await request(app).get('/api/stats/usage?range=7d');
+    expect(all.body.data.sessions).toBe(2);
+    expect(week.body.data.sessions).toBe(1);
+    seedSession('another', noonDaysAgo(1)); // cached: neither changes
+    const all2 = await request(app).get('/api/stats/usage');
+    const week2 = await request(app).get('/api/stats/usage?range=7d');
+    expect(all2.body.data.sessions).toBe(2);
+    expect(week2.body.data.sessions).toBe(1);
+  });
+
+  it('falls back to all for an invalid range param', async () => {
+    seedSession('s1', noonDaysAgo(40));
+    const res = await request(makeApp()).get('/api/stats/usage?range=99d');
+    expect(res.body.data.sessions).toBe(1);
   });
 });

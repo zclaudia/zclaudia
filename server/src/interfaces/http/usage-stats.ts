@@ -6,7 +6,11 @@
 
 import { Router, type Request, type Response } from 'express';
 import type { Database } from 'better-sqlite3';
-import type { UsageStatsPayload, UsageActiveDay } from '@zclaudia/shared/core/usage-stats';
+import type {
+  UsageStatsPayload,
+  UsageActiveDay,
+  UsageStatsRange,
+} from '@zclaudia/shared/core/usage-stats';
 
 const DAY_MS = 86_400_000;
 /** Heatmap horizon: 26 weeks. */
@@ -28,10 +32,20 @@ function localDateString(ms: number): string {
 export const ASSISTANT_TOKENS_SUM_SQL = `SELECT COALESCE(SUM(CAST(json_extract(metadata, '$.usage.totalTokens') AS INTEGER)), 0) AS n
          FROM messages WHERE role = 'assistant' AND metadata IS NOT NULL`;
 
+/** Windowed twin of ASSISTANT_TOKENS_SUM_SQL — expression must stay textually
+ *  identical to the second column of idx_messages_assistant_tokens_by_time
+ *  (migration 032) or the planner reverts to a table scan. */
+export const ASSISTANT_TOKENS_SUM_WINDOWED_SQL = `SELECT COALESCE(SUM(CAST(json_extract(metadata, '$.usage.totalTokens') AS INTEGER)), 0) AS n
+         FROM messages WHERE role = 'assistant' AND metadata IS NOT NULL AND created_at >= ?`;
+
 /** Served by the partial index `idx_messages_user_created_at` (migration 031). */
 export const ACTIVE_DAYS_SQL = `SELECT date(created_at / 1000, 'unixepoch', 'localtime') AS date, COUNT(*) AS count
        FROM messages WHERE role = 'user' AND created_at >= ?
        GROUP BY date ORDER BY date`;
+
+export const PEAK_HOUR_SQL = `SELECT CAST(strftime('%H', created_at / 1000, 'unixepoch', 'localtime') AS INTEGER) AS hour, COUNT(*) AS c
+       FROM messages WHERE role = 'user' AND created_at >= ?
+       GROUP BY hour ORDER BY c DESC, hour ASC LIMIT 1`;
 
 /** Consecutive active days ending today; an idle today doesn't break the
  *  streak until the day ends, so counting falls back to yesterday. */
@@ -47,23 +61,72 @@ export function computeStreak(activeDayDates: string[], today: string): number {
   return streak;
 }
 
-export function computeUsageStats(db: Database): UsageStatsPayload {
+/** Longest consecutive run in an ascending list of 'YYYY-MM-DD' dates. */
+export function computeLongestStreak(activeDayDates: string[]): number {
+  let longest = 0;
+  let run = 0;
+  let prevMs: number | null = null;
+  for (const date of activeDayDates) {
+    const ms = new Date(`${date}T12:00:00`).getTime();
+    run = prevMs !== null && Math.round((ms - prevMs) / DAY_MS) === 1 ? run + 1 : 1;
+    longest = Math.max(longest, run);
+    prevMs = ms;
+  }
+  return longest;
+}
+
+const RANGE_MS: Record<Exclude<UsageStatsRange, 'all'>, number> = {
+  '30d': 30 * DAY_MS,
+  '7d': 7 * DAY_MS,
+};
+
+export function computeUsageStats(
+  db: Database,
+  range: UsageStatsRange = 'all'
+): UsageStatsPayload {
   const now = Date.now();
-  const sessions = (db.prepare('SELECT COUNT(*) AS n FROM sessions').get() as { n: number }).n;
-  const messages = (db.prepare('SELECT COUNT(*) AS n FROM messages').get() as { n: number }).n;
-  const totalTokens = (db.prepare(ASSISTANT_TOKENS_SUM_SQL).get() as { n: number }).n;
+  const windowStartMs = range === 'all' ? 0 : now - RANGE_MS[range];
+
+  const count = (sql: string, ...params: unknown[]) =>
+    (db.prepare(sql).get(...params) as { n: number }).n;
+
+  const sessions =
+    range === 'all'
+      ? count('SELECT COUNT(*) AS n FROM sessions')
+      : count('SELECT COUNT(*) AS n FROM sessions WHERE created_at >= ?', windowStartMs);
+  const messages =
+    range === 'all'
+      ? count('SELECT COUNT(*) AS n FROM messages')
+      : count('SELECT COUNT(*) AS n FROM messages WHERE created_at >= ?', windowStartMs);
+  const allTimeTokens = count(ASSISTANT_TOKENS_SUM_SQL);
+  const totalTokens =
+    range === 'all' ? allTimeTokens : count(ASSISTANT_TOKENS_SUM_WINDOWED_SQL, windowStartMs);
+
+  // Heatmap data is range-independent: always the full 182-day window.
   const activeDays = db
     .prepare(ACTIVE_DAYS_SQL)
     .all(now - ACTIVE_DAYS_WINDOW_MS) as UsageActiveDay[];
+  const windowedDays =
+    range === 'all'
+      ? activeDays
+      : activeDays.filter(d => d.date >= localDateString(windowStartMs));
+
+  const peakRow = db.prepare(PEAK_HOUR_SQL).get(windowStartMs) as
+    | { hour: number; c: number }
+    | undefined;
 
   return {
     sessions,
     messages,
     totalTokens,
+    activeDaysCount: windowedDays.length,
     currentStreakDays: computeStreak(
       activeDays.map(d => d.date),
       localDateString(now)
     ),
+    longestStreakDays: computeLongestStreak(windowedDays.map(d => d.date)),
+    peakHour: peakRow?.hour ?? null,
+    allTimeTokens,
     activeDays,
     capturedAt: now,
   };
@@ -75,15 +138,18 @@ export function createUsageStatsRoutes(
 ): Router {
   const ttlMs = opts.ttlMs ?? 60_000;
   const router = Router();
-  let cache: { data: UsageStatsPayload; at: number } | null = null;
+  const cache = new Map<UsageStatsRange, { data: UsageStatsPayload; at: number }>();
 
-  // GET /api/stats/usage — aggregate usage stats for the Home page
-  router.get('/usage', (_req: Request, res: Response) => {
+  // GET /api/stats/usage?range=all|30d|7d — aggregate usage stats for the Home page
+  router.get('/usage', (req: Request, res: Response) => {
     try {
-      if (!cache || Date.now() - cache.at > ttlMs) {
-        cache = { data: computeUsageStats(db), at: Date.now() };
+      const raw = req.query.range;
+      const range: UsageStatsRange = raw === '30d' || raw === '7d' ? raw : 'all';
+      const hit = cache.get(range);
+      if (!hit || Date.now() - hit.at > ttlMs) {
+        cache.set(range, { data: computeUsageStats(db, range), at: Date.now() });
       }
-      res.json({ success: true, data: cache.data });
+      res.json({ success: true, data: cache.get(range)!.data });
     } catch (error) {
       res.status(500).json({
         success: false,

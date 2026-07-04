@@ -7,16 +7,26 @@ export interface UsageActiveDay {
   count: number;
 }
 
+export type UsageStatsRange = 'all' | '30d' | '7d';
+
 export interface UsageStatsPayload {
-  /** All sessions ever created (archived included). */
+  /** Sessions created within the range (archived included). */
   sessions: number;
-  /** All messages, any role. */
+  /** Messages created within the range, any role. */
   messages: number;
-  /** Sum of assistant-message metadata.usage.totalTokens. */
+  /** Assistant usage tokens within the range. */
   totalTokens: number;
-  /** Consecutive active days ending today (or yesterday when today is idle so far). */
+  /** Distinct active days within the range. */
+  activeDaysCount: number;
+  /** Consecutive active days ending today — range-independent. */
   currentStreakDays: number;
-  /** Days with >=1 user message, last 182 days (26 weeks) only, ascending. */
+  /** Longest consecutive run within the range ('all' bounded by the 182d data window). */
+  longestStreakDays: number;
+  /** 0-23 mode of user-message local hour within the range; null when no user messages. */
+  peakHour: number | null;
+  /** All-time assistant tokens (for the fun line) — range-independent. */
+  allTimeTokens: number;
+  /** Days with >=1 user message, ALWAYS the full 182-day window (heatmap), ascending. */
   activeDays: UsageActiveDay[];
   capturedAt: number;
 }
