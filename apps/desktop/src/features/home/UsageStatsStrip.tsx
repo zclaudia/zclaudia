@@ -5,6 +5,7 @@ import { useFacadeStore } from '../../stores/facadeStore';
 import { LOCAL_BACKEND_KEY, resolveSessionBucketBackendId } from '../../stores/sessionsStore';
 import { formatTokens } from '../../utils/formatTokens';
 import { buildHeatmapWeeks, flattenRowMajor, formatHour, funLine } from './usageStats';
+import { ModelsChart } from './ModelsChart';
 
 const HEATMAP_WEEKS = 26;
 const RANGES: UsageStatsRange[] = ['all', '30d', '7d'];
@@ -31,6 +32,7 @@ function localToday(): string {
 export function UsageStatsStrip() {
   const localBackendId = useFacadeStore(s => s.localBackendId);
   const [range, setRange] = useState<UsageStatsRange>('all');
+  const [tab, setTab] = useState<'overview' | 'models'>('overview');
   const [stats, setStats] = useState<UsageStatsPayload | null>(null);
 
   useEffect(() => {
@@ -78,7 +80,21 @@ export function UsageStatsStrip() {
   return (
     <div className="mt-12 border-t border-border pt-5 px-2">
       <div className="flex items-center mb-3">
-        <span className="text-[11px] font-medium text-muted-foreground">Usage</span>
+        <div className="flex gap-0.5">
+          {(['overview', 'models'] as const).map(t => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`text-xs px-2.5 py-1 rounded-md transition-colors ${
+                t === tab
+                  ? 'bg-secondary text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {t === 'overview' ? 'Overview' : 'Models'}
+            </button>
+          ))}
+        </div>
         <div className="ml-auto flex gap-0.5">
           {RANGES.map(r => (
             <button
@@ -95,33 +111,39 @@ export function UsageStatsStrip() {
           ))}
         </div>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {cards.map(c => (
-          <div key={c.label} className="bg-secondary/50 rounded-lg px-3.5 py-2.5">
-            <span className="block text-[11px] text-muted-foreground">{c.label}</span>
-            <span className="block mt-0.5 text-lg font-medium text-foreground">{c.value}</span>
+      {tab === 'overview' ? (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {cards.map(c => (
+              <div key={c.label} className="bg-secondary/50 rounded-lg px-3.5 py-2.5">
+                <span className="block text-[11px] text-muted-foreground">{c.label}</span>
+                <span className="block mt-0.5 text-lg font-medium text-foreground">{c.value}</span>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      {/* Row-major grid with one fr column per week so the heatmap spans the
-          exact same width as the cards above (26 = HEATMAP_WEEKS). */}
-      <div
-        data-testid="usage-heatmap"
-        className="mt-4 grid grid-cols-[repeat(26,minmax(0,1fr))] gap-1"
-      >
-        {flattenRowMajor(weeks).map((cell, i) =>
-          cell ? (
-            <span
-              key={cell.date}
-              title={`${cell.date}: ${cell.count} ${cell.count === 1 ? 'message' : 'messages'}`}
-              className={`aspect-square w-full rounded-[4px] ${LEVEL_CLASS[cell.level]}`}
-            />
-          ) : (
-            <span key={`pad-${i}`} className="aspect-square w-full" />
-          )
-        )}
-      </div>
-      {line && <div className="mt-3 text-xs text-muted-foreground/60">{line}</div>}
+          {/* Row-major grid with one fr column per week so the heatmap spans the
+              exact same width as the cards above (26 = HEATMAP_WEEKS). */}
+          <div
+            data-testid="usage-heatmap"
+            className="mt-4 grid grid-cols-[repeat(26,minmax(0,1fr))] gap-1"
+          >
+            {flattenRowMajor(weeks).map((cell, i) =>
+              cell ? (
+                <span
+                  key={cell.date}
+                  title={`${cell.date}: ${cell.count} ${cell.count === 1 ? 'message' : 'messages'}`}
+                  className={`aspect-square w-full rounded-[4px] ${LEVEL_CLASS[cell.level]}`}
+                />
+              ) : (
+                <span key={`pad-${i}`} className="aspect-square w-full" />
+              )
+            )}
+          </div>
+          {line && <div className="mt-3 text-xs text-muted-foreground/60">{line}</div>}
+        </>
+      ) : (
+        <ModelsChart range={range} />
+      )}
     </div>
   );
 }

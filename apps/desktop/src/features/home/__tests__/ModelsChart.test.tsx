@@ -1,0 +1,71 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { ModelsChart } from '../ModelsChart';
+
+const getModelStats = vi.fn();
+vi.mock('../../../services/api', () => ({
+  getModelStats: (...args: unknown[]) => getModelStats(...args),
+}));
+
+const payload = {
+  days: [
+    { date: '2026-07-03', models: { 'claude-fable-5': 600, 'deepseek-v4-flash': 400 } },
+    { date: '2026-07-04', models: { 'claude-fable-5': 2000 } },
+  ],
+  models: [
+    { model: 'claude-fable-5', inTokens: 1700, outTokens: 900, totalTokens: 2600, share: 0.867 },
+    { model: 'deepseek-v4-flash', inTokens: 300, outTokens: 100, totalTokens: 400, share: 0.133 },
+  ],
+  trackedSince: new Date('2026-07-04T10:00:00').getTime(),
+  capturedAt: 1,
+};
+
+describe('ModelsChart', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders the chart, legend rows with pretty names and shares, and the footnote', async () => {
+    getModelStats.mockResolvedValue(payload);
+    render(<ModelsChart range="all" />);
+    await waitFor(() => expect(screen.getByText('Fable 5')).toBeTruthy());
+    expect(screen.getByText('Deepseek V4 Flash')).toBeTruthy();
+    expect(screen.getByText('86.7%')).toBeTruthy();
+    expect(screen.getByText(/1\.7k in · 900 out/)).toBeTruthy();
+    expect(document.querySelector('[data-testid="models-chart-svg"]')).toBeTruthy();
+    expect(screen.getByText(/Model tracking started/)).toBeTruthy();
+  });
+
+  it('collapses the legend past five entries', async () => {
+    const many = Array.from({ length: 7 }, (_, i) => ({
+      model: `model-${i}`,
+      inTokens: 10,
+      outTokens: 10,
+      totalTokens: 20,
+      share: 1 / 7,
+    }));
+    getModelStats.mockResolvedValue({ ...payload, models: many });
+    render(<ModelsChart range="all" />);
+    await waitFor(() => expect(screen.getByText('Model 0')).toBeTruthy());
+    expect(screen.queryByText('Model 5')).toBeNull();
+    fireEvent.click(screen.getByText('Show 2 more'));
+    expect(screen.getByText('Model 5')).toBeTruthy();
+    expect(screen.getByText('Model 6')).toBeTruthy();
+  });
+
+  it('shows the empty state when nothing is tagged yet', async () => {
+    getModelStats.mockResolvedValue({ days: [], models: [], trackedSince: null, capturedAt: 1 });
+    render(<ModelsChart range="all" />);
+    await waitFor(() => expect(getModelStats).toHaveBeenCalled());
+    expect(screen.getByText(/No model data yet/)).toBeTruthy();
+  });
+
+  it('refetches when the range changes', async () => {
+    getModelStats.mockResolvedValue(payload);
+    const { rerender } = render(<ModelsChart range="all" />);
+    await waitFor(() => expect(getModelStats).toHaveBeenCalledTimes(1));
+    rerender(<ModelsChart range="7d" />);
+    await waitFor(() => expect(getModelStats).toHaveBeenCalledTimes(2));
+    expect(getModelStats).toHaveBeenLastCalledWith(expect.anything(), '7d');
+  });
+});

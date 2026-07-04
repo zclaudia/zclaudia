@@ -3,8 +3,12 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { UsageStatsStrip } from '../UsageStatsStrip';
 
 const getUsageStats = vi.fn();
+const getModelStats = vi.fn(() =>
+  Promise.resolve({ days: [], models: [], trackedSince: null, capturedAt: 1 })
+);
 vi.mock('../../../services/api', () => ({
   getUsageStats: (...args: unknown[]) => getUsageStats(...args),
+  getModelStats: (...args: unknown[]) => getModelStats(...args),
 }));
 
 const payload = {
@@ -141,6 +145,17 @@ describe('UsageStatsStrip', () => {
     expect(screen.getAllByText('0d').length).toBeGreaterThan(0);
     expect(document.querySelector('[data-testid="usage-heatmap"]')).toBeTruthy();
     expect(screen.queryByText(/more tokens than/)).toBeNull();
+  });
+
+  it('switches to the Models tab and back', async () => {
+    getUsageStats.mockResolvedValue(payload);
+    render(<UsageStatsStrip />);
+    await waitFor(() => expect(screen.getByText('Sessions')).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: 'Models' }));
+    await waitFor(() => expect(screen.getByText(/No model data yet/)).toBeTruthy());
+    expect(screen.queryByText('Sessions')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Overview' }));
+    expect(screen.getByText('Sessions')).toBeTruthy();
   });
 
   it('hides the fun line below the multiplier floor', async () => {
