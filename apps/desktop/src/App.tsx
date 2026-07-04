@@ -445,6 +445,23 @@ function AppContent() {
         )}
 
         <main ref={swipeOpenClaudiaRef} className="flex-1 flex flex-col overflow-hidden relative">
+          {/* Desktop: the main column owns its own top drag strip. The full-width
+              AppHeader (which used to provide this) only renders on mobile now, and
+              only SessionHeader re-adds a strip — so welcome/dashboard views would
+              otherwise leave the top of the window un-draggable. When the view has
+              its own top control bar (session/dashboard/automations) we keep the
+              strip a hairline so it doesn't cover their buttons; the empty welcome
+              view has nothing underneath, so we widen it to an easy grab target. */}
+          {!isMobile && (
+            <div
+              className={`absolute inset-x-0 top-0 z-10 hidden sm:block ${
+                topLevelView.kind !== 'automations' && !dashboardProject && !selectedSessionId
+                  ? 'h-10'
+                  : 'h-2'
+              }`}
+              data-tauri-drag-region
+            />
+          )}
           <div className="flex-1 overflow-hidden relative">
             {isMobile && (
               <MobileOverlays
