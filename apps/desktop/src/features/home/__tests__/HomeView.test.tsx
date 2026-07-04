@@ -10,6 +10,10 @@ vi.mock('../../../hooks/useSelectionCoordinator', () => ({
   useSelectionCoordinator: () => ({ selectSessionOnBackend }),
 }));
 
+vi.mock('../UsageStatsStrip', () => ({
+  UsageStatsStrip: () => <div data-testid="usage-strip" />,
+}));
+
 function seedProject(id: string, name: string) {
   useProjectStore.setState(s => ({ projects: [...s.projects, { id, name } as any] }));
 }
@@ -153,5 +157,16 @@ describe('HomeView', () => {
     // Rows span two backends → badges visible with the right labels.
     expect(screen.getByText('Local')).toBeTruthy();
     expect(screen.getByText('Backend remote-1')).toBeTruthy();
+  });
+
+  it('renders the usage strip only in the populated state', () => {
+    const empty = render(<HomeView onNewSession={vi.fn()} onAddProject={vi.fn()} />);
+    expect(empty.container.querySelector('[data-testid="usage-strip"]')).toBeNull();
+    empty.unmount();
+
+    seedProject('p1', 'zclaudia');
+    seedLocalSession('s1', { name: 'Fix the thing' });
+    render(<HomeView onNewSession={vi.fn()} onAddProject={vi.fn()} />);
+    expect(screen.getByTestId('usage-strip')).toBeTruthy();
   });
 });

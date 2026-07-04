@@ -15,6 +15,7 @@ import { isMobileBackendUsable } from '../../services/mobileConnectionState';
 import { LEGACY_LOCAL_SERVER_ID, resolveCanonicalBackendId } from '../../utils/controlPlane';
 import { timeAgo } from '../../utils/timeAgo';
 import { selectHomeSessions, type HomeSessionRow } from './homeSessions';
+import { UsageStatsStrip } from './UsageStatsStrip';
 
 interface HomeViewProps {
   onNewSession: () => void;
@@ -167,6 +168,8 @@ export function HomeView({ onNewSession, onAddProject }: HomeViewProps) {
             onOpen={openSession}
           />
         )}
+
+        <UsageStatsStrip />
       </div>
     </div>
   );
