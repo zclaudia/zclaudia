@@ -62,7 +62,7 @@ export function UsageStatsStrip() {
   // build or a remote backend behind on updates) omits the newer fields, and
   // those cards hide instead of rendering "undefined" / "NaN PM".
   const line = funLine(stats.allTimeTokens ?? stats.totalTokens, localToday());
-  const cards: Array<{ label: string; value: string }> = [
+  const cards: Array<{ label: string; value: string; compact?: boolean; title?: string }> = [
     { label: 'Sessions', value: stats.sessions.toLocaleString('en-US') },
     { label: 'Messages', value: stats.messages.toLocaleString('en-US') },
     { label: 'Total tokens', value: formatTokens(stats.totalTokens) },
@@ -77,7 +77,16 @@ export function UsageStatsStrip() {
       ? [{ label: 'Peak hour', value: formatHour(stats.peakHour) }]
       : []),
     ...(typeof stats.favoriteModel === 'string'
-      ? [{ label: 'Favorite model', value: prettyModelName(stats.favoriteModel) }]
+      ? [
+          {
+            label: 'Favorite model',
+            value: prettyModelName(stats.favoriteModel),
+            // Model names are the only text value — a size down (with a
+            // matched line height so the tiles stay equal) fits them.
+            compact: true,
+            title: stats.favoriteModel,
+          },
+        ]
       : []),
   ];
 
@@ -121,7 +130,12 @@ export function UsageStatsStrip() {
             {cards.map(c => (
               <div key={c.label} className="bg-secondary/50 rounded-lg px-3.5 py-2.5">
                 <span className="block text-[11px] text-muted-foreground">{c.label}</span>
-                <span className="block mt-0.5 text-lg font-medium text-foreground truncate">
+                <span
+                  title={c.title}
+                  className={`block mt-0.5 font-medium text-foreground truncate ${
+                    c.compact ? 'text-sm leading-7' : 'text-lg'
+                  }`}
+                >
                   {c.value}
                 </span>
               </div>
