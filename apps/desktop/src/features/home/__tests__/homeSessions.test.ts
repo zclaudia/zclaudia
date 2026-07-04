@@ -141,6 +141,19 @@ describe('selectHomeSessions', () => {
     expect(result.recent.map(r => r.title)).toEqual(['Auto', 'Named', 'Untitled']);
   });
 
+  it('carries lastMessageOffset through as messageCount when present', () => {
+    const result = selectHomeSessions(
+      input({
+        localSessions: [
+          session('a', { lastMessageOffset: 12 }),
+          session('b', { updatedAt: 500 }),
+        ],
+      })
+    );
+    expect(result.recent.find(r => r.id === 'a')?.messageCount).toBe(12);
+    expect(result.recent.find(r => r.id === 'b')?.messageCount).toBeUndefined();
+  });
+
   it('resolves project names and flags multiBackend only with >1 distinct backend', () => {
     const single = selectHomeSessions(input({ localSessions: [session('a')] }));
     expect(single.multiBackend).toBe(false);

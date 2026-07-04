@@ -10,6 +10,8 @@ export interface HomeSessionRow {
   backendKey: string;
   updatedAt: number;
   isRunning: boolean;
+  /** Message count when known (RemoteSession.lastMessageOffset). */
+  messageCount?: number;
 }
 
 export interface HomeSessionsInput {
@@ -55,6 +57,7 @@ function toRow(
     backendKey,
     updatedAt: session.updatedAt,
     isRunning,
+    messageCount: (session as { lastMessageOffset?: number }).lastMessageOffset,
   };
 }
 

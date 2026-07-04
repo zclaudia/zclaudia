@@ -206,23 +206,31 @@ function SessionGroup({
           <li key={row.id}>
             <button
               onClick={() => onOpen(row)}
-              className="w-full h-7 px-2 rounded-md text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors flex items-center gap-2 text-left"
+              className="w-full px-2 py-1.5 rounded-md text-left hover:bg-secondary transition-colors group"
             >
-              {row.isRunning && (
-                <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse shrink-0" />
-              )}
-              {/* Left group: title + tags stay together; only the time floats right. */}
-              <span className="truncate">{row.title}</span>
-              <span className="text-[11px] text-muted-foreground/60 bg-secondary/60 rounded px-1.5 py-px shrink-0 truncate max-w-[120px]">
-                {row.projectName}
-              </span>
-              {multiBackend && (
-                <span className="text-[11px] text-muted-foreground/60 shrink-0 truncate max-w-[100px]">
-                  {backendName(row.backendKey)}
+              <span className="flex items-center gap-2">
+                {row.isRunning && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse shrink-0" />
+                )}
+                <span className="truncate text-sm text-foreground">{row.title}</span>
+                <span className="ml-auto shrink-0 pl-4 text-[11px] text-muted-foreground/60">
+                  {timeAgo(row.updatedAt)}
                 </span>
-              )}
-              <span className="ml-auto text-[11px] text-muted-foreground/60 shrink-0 pl-4">
-                {timeAgo(row.updatedAt)}
+              </span>
+              <span
+                className={`block mt-px truncate text-xs text-muted-foreground/60 ${
+                  row.isRunning ? 'pl-[14px]' : ''
+                }`}
+              >
+                {[
+                  row.messageCount
+                    ? `${row.messageCount} ${row.messageCount === 1 ? 'message' : 'messages'}`
+                    : null,
+                  row.projectName,
+                  multiBackend ? backendName(row.backendKey) : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
               </span>
             </button>
           </li>

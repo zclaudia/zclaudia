@@ -73,6 +73,16 @@ describe('HomeView', () => {
     expect(screen.getByText('zclaudia')).toBeTruthy();
   });
 
+  it('shows a meta line with message count and project', () => {
+    seedProject('p1', 'zclaudia');
+    seedLocalSession('s1', { name: 'Fix the thing', lastMessageOffset: 12 });
+    seedLocalSession('s2', { name: 'Sparse one', updatedAt: 0 });
+    render(<HomeView onNewSession={vi.fn()} onAddProject={vi.fn()} />);
+    expect(screen.getByText('12 messages · zclaudia')).toBeTruthy();
+    // No count recorded -> the segment is omitted, project only.
+    expect(screen.getByText('zclaudia')).toBeTruthy();
+  });
+
   it('pins running sessions in a Running group', () => {
     seedProject('p1', 'zclaudia');
     seedLocalSession('s1', { name: 'Busy one' });
@@ -110,7 +120,7 @@ describe('HomeView', () => {
     // Unmount before mutating the store: the mounted view is store-subscribed
     // and would re-render alongside the second copy.
     const { unmount } = render(<HomeView onNewSession={vi.fn()} onAddProject={vi.fn()} />);
-    expect(screen.queryByText('Local')).toBeNull();
+    expect(screen.queryByText(/· Local/)).toBeNull();
     unmount();
 
     useSessionsStore.setState({
@@ -132,7 +142,7 @@ describe('HomeView', () => {
       ]),
     } as any);
     render(<HomeView onNewSession={vi.fn()} onAddProject={vi.fn()} />);
-    expect(screen.getByText('Local')).toBeTruthy();
+    expect(screen.getByText(/· Local$/)).toBeTruthy();
   });
 
   it('drops remote-owned sessions from the local list instead of mislabeling them', () => {
@@ -167,8 +177,8 @@ describe('HomeView', () => {
     // The remote session must appear exactly once, from its remote bucket.
     expect(screen.getAllByText('Remote one')).toHaveLength(1);
     // Rows span two backends → badges visible with the right labels.
-    expect(screen.getByText('Local')).toBeTruthy();
-    expect(screen.getByText('Backend remote-1')).toBeTruthy();
+    expect(screen.getByText(/· Local$/)).toBeTruthy();
+    expect(screen.getByText(/· Backend remote-1$/)).toBeTruthy();
   });
 
   it('renders the usage strip only in the populated state', () => {
