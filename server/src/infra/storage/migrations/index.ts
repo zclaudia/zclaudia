@@ -31,6 +31,7 @@ import { migration as m_027_agent_multimodal_fallback } from './027_agent_multim
 import { migration as m_028_agent_loop_contexts } from './028_agent_loop_contexts.js';
 import { migration as m_029_automations } from './029_automations.js';
 import { migration as m_030_generalize_workflow_runs } from './030_generalize_workflow_runs.js';
+import { migration as m_031_usage_stats_indexes } from './031_usage_stats_indexes.js';
 
 export type { Migration };
 
@@ -65,6 +66,7 @@ export const migrations: Migration[] = [
   m_028_agent_loop_contexts,
   m_029_automations,
   m_030_generalize_workflow_runs,
+  m_031_usage_stats_indexes,
 ];
 
 /**
