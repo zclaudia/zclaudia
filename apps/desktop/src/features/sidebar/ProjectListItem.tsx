@@ -1,5 +1,13 @@
 import { createPortal } from 'react-dom';
-import { Folder, FolderOpen, ChevronRight, Plus, Settings, Trash2 } from 'lucide-react';
+import {
+  Folder,
+  FolderOpen,
+  ChevronDown,
+  ChevronRight,
+  Plus,
+  Settings,
+  Trash2,
+} from 'lucide-react';
 import { isDesktopTauri } from '../../utils/platform';
 import { SessionItem } from './SessionItem';
 import { WorktreeGroupItem } from './WorktreeGroupItem';
@@ -232,27 +240,31 @@ export function ProjectListItem({
           ) : (
             <Folder className="w-4 h-4 flex-shrink-0 text-muted-foreground" strokeWidth={1.75} />
           )}
-          <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+          <span className="min-w-0 truncate text-sm font-medium text-foreground">
             {project.name}
           </span>
-          {/* Supervisor phase — shown at rest, yields to the hover actions */}
-          {phaseDot && (
-            <span
-              className="flex group-hover:hidden items-center gap-1 shrink-0"
-              aria-label={`Workspace ${phaseDot.label}`}
-            >
-              <span className={`w-1.5 h-1.5 rounded-full ${phaseDot.dot}`} />
-              <span className="text-[10px] text-muted-foreground/60">{phaseDot.label}</span>
-            </span>
+          {isExpanded ? (
+            <ChevronDown
+              className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground/70"
+              strokeWidth={2}
+            />
+          ) : (
+            <ChevronRight
+              className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground/70"
+              strokeWidth={2}
+            />
           )}
-          {/* Trailing chevron, aligned with BackendRow's */}
-          <ChevronRight
-            className={`w-3.5 h-3.5 flex-shrink-0 text-muted-foreground/60 transition-transform ${
-              isExpanded ? 'rotate-90' : ''
-            }`}
-            strokeWidth={2}
-          />
         </button>
+        {/* Supervisor phase — shown at rest, yields to the hover actions */}
+        {phaseDot && (
+          <span
+            className="flex group-hover:hidden items-center gap-1 pr-1 shrink-0"
+            aria-label={`Workspace ${phaseDot.label}`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${phaseDot.dot}`} />
+            <span className="text-[10px] text-muted-foreground/60">{phaseDot.label}</span>
+          </span>
+        )}
         {/* Project menu button */}
         <button
           onClick={e => onOpenContextMenu(e, 'project', project.id)}
