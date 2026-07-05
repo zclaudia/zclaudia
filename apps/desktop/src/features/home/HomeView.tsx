@@ -175,12 +175,11 @@ export function HomeView({ onNewSession, onAddProject }: HomeViewProps) {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-2xl px-6 pt-12 pb-10">
-        {/* Greeting + actions share one row so the header reads as a home, not a
-            welcome mat, and the top half isn't sparse next to the dense stats. */}
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-xl font-semibold">{greeting(new Date().getHours())}</h2>
-          {quickActions}
-        </div>
+        {/* Populated home leads with just the greeting — creating sessions and
+            projects is already covered by the sidebar (per-project "New session",
+            per-backend "New project"), so the header buttons would be redundant.
+            The empty state still shows them as the only onboarding entry point. */}
+        <h2 className="text-xl font-semibold">{greeting(new Date().getHours())}</h2>
 
         {/* First group opens with more air after the header; siblings tighten. */}
         <div className="[&>*:first-child]:mt-9 [&>*+*]:mt-8">
