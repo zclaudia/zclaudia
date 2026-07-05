@@ -12,8 +12,7 @@ interface AgentsTreeProps {
 }
 
 /**
- * Backend-grouped master list for Agents shell mode. Mirrors BackendRow's group-header
- * language; offline backends are dimmed, non-expandable, and never reveal children.
+ * Backend-grouped master list for the Profiles tab of Agents shell mode.
  * Presentational only — data comes from useProfilesByBackend via the parent.
  */
 export function AgentsTree({
