@@ -36,10 +36,6 @@ export async function deleteAgentProfile(id: string): Promise<void> {
   return apiCallVoid(`${BASE}/${id}`, { method: 'DELETE' });
 }
 
-export async function setDefaultAgentProfile(id: string): Promise<AgentProfileConfig> {
-  return apiCall<AgentProfileConfig>(`${BASE}/${id}/set-default`, { method: 'POST' });
-}
-
 export async function listAgentProfilesForBackend(
   backendId: string | null
 ): Promise<AgentProfileConfig[]> {
@@ -72,13 +68,4 @@ export async function deleteAgentProfileForBackend(
   id: string
 ): Promise<void> {
   return apiCallVoidForBackend(backendId, `${BASE}/${id}`, { method: 'DELETE' });
-}
-
-export async function setDefaultAgentProfileForBackend(
-  backendId: string | null,
-  id: string
-): Promise<AgentProfileConfig> {
-  return apiCallForBackend<AgentProfileConfig>(backendId, `${BASE}/${id}/set-default`, {
-    method: 'POST',
-  });
 }
