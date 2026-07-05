@@ -118,7 +118,15 @@ describe('topLevelViewStore automation selection', () => {
 });
 
 describe('agents view', () => {
-  beforeEach(() => useTopLevelViewStore.getState().returnToApp());
+  beforeEach(() => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'app' },
+      selectedAutomationItemId: null,
+      automationListRefreshNonce: 0,
+      agentsSelection: null,
+      agentsRefreshNonce: 0,
+    });
+  });
 
   it('openAgents enters agents mode on the profiles tab with no selection', () => {
     useTopLevelViewStore.getState().openAgents();
@@ -135,6 +143,35 @@ describe('agents view', () => {
       kind: 'profile',
       id: 'p1',
     });
+  });
+
+  it('openAgents clears an existing selection', () => {
+    useTopLevelViewStore.getState().openAgents();
+    useTopLevelViewStore.getState().selectAgentsItem({ backendId: 'b1', kind: 'profile', id: 'p1' });
+    useTopLevelViewStore.getState().openAgents();
+    expect(useTopLevelViewStore.getState().agentsSelection).toBeNull();
+  });
+
+  it('selectAgentsItem(null) clears the selection', () => {
+    useTopLevelViewStore.getState().openAgents();
+    useTopLevelViewStore.getState().selectAgentsItem({ backendId: 'b1', kind: 'new' });
+    useTopLevelViewStore.getState().selectAgentsItem(null);
+    expect(useTopLevelViewStore.getState().agentsSelection).toBeNull();
+  });
+
+  it('setAgentsTab clears the selection while in agents view', () => {
+    useTopLevelViewStore.getState().openAgents();
+    useTopLevelViewStore.getState().selectAgentsItem({ backendId: 'b1', kind: 'profile', id: 'p1' });
+    useTopLevelViewStore.getState().setAgentsTab('profiles');
+    const s = useTopLevelViewStore.getState();
+    expect(s.view).toEqual({ kind: 'agents', tab: 'profiles' });
+    expect(s.agentsSelection).toBeNull();
+  });
+
+  it('ignores setAgentsTab when not in agents view', () => {
+    useTopLevelViewStore.getState().openSettings();
+    useTopLevelViewStore.getState().setAgentsTab('profiles');
+    expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'settings' });
   });
 
   it('returnToApp clears agents selection', () => {

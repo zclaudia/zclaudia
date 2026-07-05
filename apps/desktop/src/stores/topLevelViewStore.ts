@@ -70,7 +70,9 @@ export const useTopLevelViewStore = create<TopLevelViewState>(set => ({
     set(s => ({ automationListRefreshNonce: s.automationListRefreshNonce + 1 })),
   openAgents: () => set({ view: { kind: 'agents', tab: 'profiles' }, agentsSelection: null }),
   setAgentsTab: tab =>
-    set(state => (state.view.kind === 'agents' ? { view: { ...state.view, tab } } : state)),
+    set(state =>
+      state.view.kind === 'agents' ? { view: { ...state.view, tab }, agentsSelection: null } : state
+    ),
   selectAgentsItem: sel => set({ agentsSelection: sel }),
   bumpAgentsRefresh: () => set(s => ({ agentsRefreshNonce: s.agentsRefreshNonce + 1 })),
 }));
