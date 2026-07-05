@@ -7,8 +7,14 @@ import type {
   ContextWindowSource,
   CacheRetentionSetting,
 } from '@zclaudia/shared';
-import { fetchApi, fetchLocalApi, activeServerSupports } from './base';
-import { apiCall, apiCallVoid, apiCallForBackend } from './unwrap';
+import {
+  fetchApi,
+  fetchApiForBackend,
+  fetchLocalApi,
+  activeServerSupports,
+  backendSupports,
+} from './base';
+import { apiCall, apiCallVoid, apiCallForBackend, apiCallVoidForBackend } from './unwrap';
 
 /**
  * Structured result for {@link deleteLlmProfile}. The DELETE route returns 409
@@ -74,6 +80,27 @@ export async function createLlmProfile(data: {
   });
 }
 
+export async function createLlmProfileForBackend(
+  backendId: string | null,
+  data: {
+    name: string;
+    providerType?: string;
+    baseUrl?: string | null;
+    apiKey?: string | null;
+    compat?: LlmProfileCompat | null;
+    env?: Record<string, string>;
+    requestHeaders?: Record<string, string> | null;
+    models?: LlmProfileModelEntry[] | null;
+    cacheRetention?: CacheRetentionSetting | null;
+    isDefault?: boolean;
+  }
+): Promise<LlmProfileConfig> {
+  return apiCallForBackend<LlmProfileConfig>(backendId, '/api/llm-profiles', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
 export async function updateLlmProfile(
   id: string,
   // `cacheRetention: null` is meaningful on PUT: it clears the stored value.
@@ -90,6 +117,28 @@ export async function updateLlmProfile(
   }
 ): Promise<LlmProfileConfig> {
   return apiCall<LlmProfileConfig>(`/api/llm-profiles/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateLlmProfileForBackend(
+  backendId: string | null,
+  id: string,
+  // `cacheRetention: null` is meaningful on PUT: it clears the stored value.
+  data: Omit<
+    Partial<LlmProfileConfig>,
+    'baseUrl' | 'apiKey' | 'compat' | 'requestHeaders' | 'models' | 'cacheRetention'
+  > & {
+    baseUrl?: string | null;
+    apiKey?: string | null;
+    compat?: LlmProfileCompat | null;
+    requestHeaders?: Record<string, string> | null;
+    models?: LlmProfileModelEntry[] | null;
+    cacheRetention?: CacheRetentionSetting | null;
+  }
+): Promise<LlmProfileConfig> {
+  return apiCallForBackend<LlmProfileConfig>(backendId, `/api/llm-profiles/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
@@ -117,12 +166,57 @@ export async function deleteLlmProfile(id: string): Promise<DeleteLlmProfileResu
   }
 }
 
+/**
+ * Backend-scoped variant of {@link deleteLlmProfile}. Same rationale for
+ * bypassing the `*Void` helper: goes straight to `fetchApiForBackend` so the
+ * 409 `{code: 'IN_USE', message, agentCount}` fields survive the round trip.
+ */
+export async function deleteLlmProfileForBackend(
+  backendId: string | null,
+  id: string
+): Promise<DeleteLlmProfileResult> {
+  try {
+    const response = await fetchApiForBackend<unknown>(`/api/llm-profiles/${id}`, backendId, {
+      method: 'DELETE',
+    });
+    if (response.success) return { ok: true };
+    const err = response.error as
+      | { code?: string; message?: string; agentCount?: number }
+      | undefined;
+    return {
+      ok: false,
+      code: err?.code ?? 'UNKNOWN',
+      message: err?.message ?? 'Failed to delete LLM profile',
+      agentCount: err?.agentCount,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      code: 'NETWORK_ERROR',
+      message: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
 export async function setDefaultLlmProfile(id: string): Promise<void> {
   if (!activeServerSupports('setDefaultProvider')) {
     console.warn('[API] setDefaultLlmProfile not supported by active server, skipping');
     return;
   }
   return apiCallVoid(`/api/llm-profiles/${id}/set-default`, { method: 'POST' });
+}
+
+export async function setDefaultLlmProfileForBackend(
+  backendId: string | null,
+  id: string
+): Promise<void> {
+  if (!backendSupports(backendId, 'setDefaultProvider')) {
+    console.warn('[API] setDefaultLlmProfileForBackend not supported by backend, skipping');
+    return;
+  }
+  return apiCallVoidForBackend(backendId, `/api/llm-profiles/${id}/set-default`, {
+    method: 'POST',
+  });
 }
 
 /**
@@ -159,6 +253,28 @@ export async function fetchModelsForLlmProfilePreview(
 }
 
 /**
+ * Backend-scoped variant of {@link fetchModelsForLlmProfilePreview}.
+ */
+export async function fetchModelsForLlmProfilePreviewForBackend(
+  backendId: string | null,
+  profile: LlmProfilePreviewInput
+): Promise<FetchLlmProfileModelsResult> {
+  try {
+    const data = await apiCallForBackend<{ models: string[] }>(
+      backendId,
+      `/api/llm-profiles/models/fetch-preview`,
+      {
+        method: 'POST',
+        body: JSON.stringify(profile),
+      }
+    );
+    return { ok: true, models: Array.isArray(data?.models) ? data.models : [] };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
  * Probe a (formDraft, modelId) pair against an upstream provider. Returns the
  * same `{ ok, latencyMs }` / `{ ok: false, error }` envelope on both transport
  * failure and server-reported probe failure.
@@ -169,6 +285,29 @@ export async function probeLlmProfileModelPreview(
 ): Promise<ProbeLlmProfileModelResult> {
   try {
     const data = await apiCall<ProbeLlmProfileModelResult>(
+      `/api/llm-profiles/models/probe-preview`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ ...profile, modelId }),
+      }
+    );
+    return data;
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Backend-scoped variant of {@link probeLlmProfileModelPreview}.
+ */
+export async function probeLlmProfileModelPreviewForBackend(
+  backendId: string | null,
+  profile: LlmProfilePreviewInput,
+  modelId: string
+): Promise<ProbeLlmProfileModelResult> {
+  try {
+    const data = await apiCallForBackend<ProbeLlmProfileModelResult>(
+      backendId,
       `/api/llm-profiles/models/probe-preview`,
       {
         method: 'POST',
@@ -206,6 +345,30 @@ export async function resolveContextWindowPreview(input: {
     method: 'POST',
     body: JSON.stringify(input),
   });
+}
+
+/**
+ * Backend-scoped variant of {@link resolveContextWindowPreview}.
+ */
+export async function resolveContextWindowPreviewForBackend(
+  backendId: string | null,
+  input: {
+    providerType: string;
+    baseUrl?: string;
+    apiKey?: string;
+    requestHeaders?: Record<string, string>;
+    models?: LlmProfileModelEntry[];
+    modelId: string;
+  }
+): Promise<ResolveContextWindowPreviewResult> {
+  return apiCallForBackend<ResolveContextWindowPreviewResult>(
+    backendId,
+    '/api/llm-profiles/models/resolve-preview',
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }
+  );
 }
 
 // ── Codex OAuth ────────────────────────────────────────────────────────────────
@@ -249,6 +412,21 @@ export async function startCodexOAuth(
   });
 }
 
+export async function startCodexOAuthForBackend(
+  backendId: string | null,
+  profileId: string,
+  method: 'browser' | 'device_code'
+): Promise<CodexOAuthStartResult> {
+  return apiCallForBackend<CodexOAuthStartResult>(
+    backendId,
+    `/api/llm-profiles/${profileId}/oauth/start`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ method }),
+    }
+  );
+}
+
 export async function pollCodexOAuthStatus(
   profileId: string,
   sessionId: string
@@ -256,10 +434,33 @@ export async function pollCodexOAuthStatus(
   return apiCall<CodexOAuthStatus>(`/api/llm-profiles/${profileId}/oauth/status/${sessionId}`);
 }
 
+export async function pollCodexOAuthStatusForBackend(
+  backendId: string | null,
+  profileId: string,
+  sessionId: string
+): Promise<CodexOAuthStatus> {
+  return apiCallForBackend<CodexOAuthStatus>(
+    backendId,
+    `/api/llm-profiles/${profileId}/oauth/status/${sessionId}`
+  );
+}
+
 export async function cancelCodexOAuth(profileId: string, sessionId: string): Promise<void> {
   return apiCallVoid(`/api/llm-profiles/${profileId}/oauth/cancel/${sessionId}`, {
     method: 'POST',
   });
+}
+
+export async function cancelCodexOAuthForBackend(
+  backendId: string | null,
+  profileId: string,
+  sessionId: string
+): Promise<void> {
+  return apiCallVoidForBackend(
+    backendId,
+    `/api/llm-profiles/${profileId}/oauth/cancel/${sessionId}`,
+    { method: 'POST' }
+  );
 }
 
 export async function fetchCodexModels(
@@ -270,8 +471,29 @@ export async function fetchCodexModels(
   return apiCall<CodexModelsResponse>(`/api/llm-profiles/${profileId}/codex-models${query}`);
 }
 
+export async function fetchCodexModelsForBackend(
+  backendId: string | null,
+  profileId: string,
+  opts?: { refresh?: boolean }
+): Promise<CodexModelsResponse> {
+  const query = opts?.refresh ? '?refresh=true' : '';
+  return apiCallForBackend<CodexModelsResponse>(
+    backendId,
+    `/api/llm-profiles/${profileId}/codex-models${query}`
+  );
+}
+
 export async function signOutCodexOAuth(profileId: string): Promise<void> {
   return apiCallVoid(`/api/llm-profiles/${profileId}/oauth/signout`, { method: 'POST' });
+}
+
+export async function signOutCodexOAuthForBackend(
+  backendId: string | null,
+  profileId: string
+): Promise<void> {
+  return apiCallVoidForBackend(backendId, `/api/llm-profiles/${profileId}/oauth/signout`, {
+    method: 'POST',
+  });
 }
 
 // Runtime adapter capability/command routes stay under `/api/providers` —
