@@ -29,6 +29,7 @@ import { useMobileInit } from './hooks/useMobileInit';
 import { useTauriWindowEvents } from './hooks/useTauriWindowEvents';
 import { useAgentsBackends } from './features/agents/selectAgentsBackends';
 import { useProfilesByBackend, type AgentsBackend } from './features/agents/useProfilesByBackend';
+import { useSkillsByBackend } from './features/agents/useSkillsByBackend';
 import { useServerStore } from './stores/serverStore';
 import { useFacadeStore } from './stores/facadeStore';
 import { useProjectStore } from './stores/projectStore';
@@ -62,8 +63,8 @@ const AgentsContent = lazy(() =>
   import('./features/agents/AgentsContent').then(m => ({ default: m.AgentsContent }))
 );
 
-// Stable empty list handed to useProfilesByBackend while agents mode is closed
-// (empty array = no fetches; loading settles false).
+// Stable empty list handed to the agents-mode catalog hooks while their tab is
+// not showing (empty array = no fetches; loading settles false).
 const NO_AGENTS_BACKENDS: AgentsBackend[] = [];
 const MOBILE_TOAST_CONTAINER_CLASS =
   'fixed top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2';
@@ -211,11 +212,20 @@ function AppContent() {
         }
       : undefined;
 
-  // Agents shell mode: hooks run unconditionally, but profile fetching only
-  // happens while the mode is open (idle = empty backends list, no fetches).
+  // Agents shell mode: hooks run unconditionally, but each tab's catalog is only
+  // fetched while that tab is showing (idle = empty backends list, no fetches).
+  // Switching tabs still refetches: the hooks' effect keys change as their
+  // backends list goes empty -> populated.
   const agentsBackends = useAgentsBackends();
   const agentsData = useProfilesByBackend(
-    topLevelView.kind === 'agents' ? agentsBackends : NO_AGENTS_BACKENDS
+    topLevelView.kind === 'agents' && topLevelView.tab === 'profiles'
+      ? agentsBackends
+      : NO_AGENTS_BACKENDS
+  );
+  const skillsData = useSkillsByBackend(
+    topLevelView.kind === 'agents' && topLevelView.tab === 'skills'
+      ? agentsBackends
+      : NO_AGENTS_BACKENDS
   );
 
   const agentsMode =
@@ -226,6 +236,7 @@ function AppContent() {
           onBack: closeTopLevelView,
           backends: agentsBackends,
           data: agentsData,
+          skillsData,
           selection: agentsSelection,
           onSelectItem: selectAgentsItem,
         }
@@ -523,7 +534,11 @@ function AppContent() {
               </Suspense>
             ) : topLevelView.kind === 'agents' ? (
               <Suspense fallback={<LazyFallback />}>
-                <AgentsContent backends={agentsBackends} data={agentsData} />
+                <AgentsContent
+                  backends={agentsBackends}
+                  data={agentsData}
+                  skillsData={skillsData}
+                />
               </Suspense>
             ) : dashboardProject ? (
               <Suspense fallback={<LazyFallback />}>

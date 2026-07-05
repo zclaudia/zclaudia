@@ -13,8 +13,10 @@ import { AutomationTree } from '../automation/AutomationTree';
 import { useAutomationApi } from '../automation/useAutomationApi';
 import type { AutomationTab } from '../automation/automation-types';
 import { AgentsTree } from '../agents/AgentsTree';
+import { SkillsTree } from '../agents/SkillsTree';
 import type { AgentsTab, AgentsSelection } from '../agents/agents-types';
 import type { AgentsBackend, ProfilesByBackend } from '../agents/useProfilesByBackend';
+import type { SkillsByBackend } from '../agents/useSkillsByBackend';
 import { MobileSidebarHeader } from './MobileSidebarHeader';
 import { SidebarSearch } from './SidebarSearch';
 import { SearchModal } from './SearchModal';
@@ -75,13 +77,14 @@ interface SidebarProps {
     onSelectScope: (backendId: string, projectId?: string) => void;
   };
   onOpenAgents?: () => void;
-  /** When present, the sidebar renders in agents mode (tab nav + profiles tree). */
+  /** When present, the sidebar renders in agents mode (tab nav + the active tab's tree). */
   agentsMode?: {
     tab: AgentsTab;
     onSelectTab: (tab: AgentsTab) => void;
     onBack: () => void;
     backends: AgentsBackend[];
     data: ProfilesByBackend;
+    skillsData: SkillsByBackend;
     selection: AgentsSelection | null;
     onSelectItem: (sel: AgentsSelection) => void;
   };
@@ -760,14 +763,25 @@ export function Sidebar({
                 onSelectScope={automationMode.onSelectScope}
               />
             ) : agentsMode ? (
-              <AgentsTree
-                backends={agentsMode.backends}
-                data={agentsMode.data}
-                selection={agentsMode.selection}
-                expandedBackendIds={expandedBackendIds}
-                onToggleBackend={toggleBackend}
-                onSelectItem={agentsMode.onSelectItem}
-              />
+              agentsMode.tab === 'skills' ? (
+                <SkillsTree
+                  backends={agentsMode.backends}
+                  data={agentsMode.skillsData}
+                  selection={agentsMode.selection}
+                  expandedBackendIds={expandedBackendIds}
+                  onToggleBackend={toggleBackend}
+                  onSelectItem={agentsMode.onSelectItem}
+                />
+              ) : (
+                <AgentsTree
+                  backends={agentsMode.backends}
+                  data={agentsMode.data}
+                  selection={agentsMode.selection}
+                  expandedBackendIds={expandedBackendIds}
+                  onToggleBackend={toggleBackend}
+                  onSelectItem={agentsMode.onSelectItem}
+                />
+              )
             ) : (
               renderProjectList()
             )}
@@ -871,14 +885,25 @@ export function Sidebar({
               onSelectScope={automationMode.onSelectScope}
             />
           ) : agentsMode ? (
-            <AgentsTree
-              backends={agentsMode.backends}
-              data={agentsMode.data}
-              selection={agentsMode.selection}
-              expandedBackendIds={expandedBackendIds}
-              onToggleBackend={toggleBackend}
-              onSelectItem={agentsMode.onSelectItem}
-            />
+            agentsMode.tab === 'skills' ? (
+              <SkillsTree
+                backends={agentsMode.backends}
+                data={agentsMode.skillsData}
+                selection={agentsMode.selection}
+                expandedBackendIds={expandedBackendIds}
+                onToggleBackend={toggleBackend}
+                onSelectItem={agentsMode.onSelectItem}
+              />
+            ) : (
+              <AgentsTree
+                backends={agentsMode.backends}
+                data={agentsMode.data}
+                selection={agentsMode.selection}
+                expandedBackendIds={expandedBackendIds}
+                onToggleBackend={toggleBackend}
+                onSelectItem={agentsMode.onSelectItem}
+              />
+            )
           ) : (
             renderProjectList()
           )}

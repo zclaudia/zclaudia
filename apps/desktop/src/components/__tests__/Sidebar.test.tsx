@@ -79,6 +79,12 @@ vi.mock('../../hooks/useSwipeBack', () => ({
 vi.mock('../../features/automation/AutomationTree', () => ({
   AutomationTree: ({ tab }: any) => <div data-testid="automation-tree" data-tab={tab} />,
 }));
+vi.mock('../../features/agents/AgentsTree', () => ({
+  AgentsTree: () => <div data-testid="agents-tree" />,
+}));
+vi.mock('../../features/agents/SkillsTree', () => ({
+  SkillsTree: () => <div data-testid="skills-tree" />,
+}));
 vi.mock('../../hooks/useSelectionCoordinator', () => ({
   useSelectionCoordinator: () => ({
     selectProject: selectionMocks.selectProject,
@@ -2068,6 +2074,43 @@ describe('Sidebar', () => {
 
     expect(screen.getByTestId('automation-tree')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Workflows' })).toBeTruthy();
+  });
+
+  // ---- Agents mode ----
+
+  const makeAgentsMode = (tab: 'profiles' | 'skills') => ({
+    tab,
+    onSelectTab: vi.fn(),
+    onBack: vi.fn(),
+    backends: [],
+    data: { profiles: new Map(), errors: new Map(), loading: false },
+    skillsData: {
+      skills: new Map(),
+      diagnostics: new Map(),
+      dirs: new Map(),
+      errors: new Map(),
+      loading: false,
+    },
+    selection: null,
+    onSelectItem: vi.fn(),
+  });
+
+  it('renders AgentsTree when agentsMode is on the profiles tab', () => {
+    render(
+      <Sidebar collapsed={false} onToggle={vi.fn()} agentsMode={makeAgentsMode('profiles')} />
+    );
+
+    expect(screen.getByTestId('agents-tree')).toBeTruthy();
+    expect(screen.queryByTestId('skills-tree')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Profiles' })).toBeTruthy();
+  });
+
+  it('renders SkillsTree when agentsMode is on the skills tab', () => {
+    render(<Sidebar collapsed={false} onToggle={vi.fn()} agentsMode={makeAgentsMode('skills')} />);
+
+    expect(screen.getByTestId('skills-tree')).toBeTruthy();
+    expect(screen.queryByTestId('agents-tree')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Skills' })).toBeTruthy();
   });
 
   // ---- PluginPermissionDialog ----

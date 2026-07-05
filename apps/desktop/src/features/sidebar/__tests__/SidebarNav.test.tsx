@@ -141,6 +141,33 @@ describe('SidebarNav', () => {
     );
     expect(screen.getByRole('button', { name: 'Profiles' }).className).toContain('bg-secondary');
   });
+
+  it('fires onSelectTab with "skills" when the Skills tab is clicked', () => {
+    const onSelectTab = vi.fn();
+    render(
+      <SidebarNav
+        onHome={vi.fn()}
+        isHomeActive={false}
+        agentsMode={{ tab: 'profiles', onSelectTab, onBack: vi.fn() }}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Skills' }));
+    expect(onSelectTab).toHaveBeenCalledWith('skills');
+  });
+
+  it('marks the Skills tab active and Profiles inactive when on the skills tab', () => {
+    render(
+      <SidebarNav
+        onHome={vi.fn()}
+        isHomeActive={false}
+        agentsMode={{ tab: 'skills', onSelectTab: vi.fn(), onBack: vi.fn() }}
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Skills' }).className).toContain('bg-secondary');
+    expect(screen.getByRole('button', { name: 'Profiles' }).className).toContain(
+      'text-muted-foreground'
+    );
+  });
 });
 
 const base = { onHome: () => {}, isHomeActive: false };
