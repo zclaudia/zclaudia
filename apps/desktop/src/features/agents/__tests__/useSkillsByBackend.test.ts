@@ -153,7 +153,7 @@ describe('useSkillsByBackend', () => {
     });
     vi.mocked(api.getExternalSkillDirsForBackend).mockResolvedValue(['/dir']);
 
-    renderHook(() => useSkillsByBackend(backends));
+    const { result } = renderHook(() => useSkillsByBackend(backends));
 
     await waitFor(() => {
       expect(api.getWorkspaceSkillsResultForBackend).toHaveBeenCalledTimes(1);
@@ -169,7 +169,6 @@ describe('useSkillsByBackend', () => {
       expect(api.getExternalSkillDirsForBackend).toHaveBeenCalledTimes(2);
     });
 
-    const { result } = renderHook(() => useSkillsByBackend(backends));
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
     });
@@ -218,10 +217,13 @@ describe('useSkillsByBackend', () => {
     });
 
     // b1's slow fetch resolves late; the cancelled guard must discard it.
-    act(() => {
+    // Drain the full microtask chain (allSettled pair -> Promise.all -> .then)
+    // so the stale setState would have landed by now if the guard were missing.
+    await act(async () => {
       resolveB1Skills({ skills: [makeSkill('s1')], diagnostics: [] });
     });
-    await Promise.resolve();
+    await act(async () => {});
+    await act(async () => {});
 
     expect(result.current.skills.has('b1')).toBe(false);
     expect(result.current.skills.get('b2')).toEqual([makeSkill('s2')]);

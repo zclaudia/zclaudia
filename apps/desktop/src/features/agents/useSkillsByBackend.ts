@@ -45,7 +45,7 @@ export function useSkillsByBackend(backends: AgentsBackend[]): SkillsByBackend {
 
     setState(prev => ({ ...prev, loading: true }));
 
-    void Promise.allSettled(
+    void Promise.all(
       onlineBackends.map(b =>
         Promise.allSettled([
           getWorkspaceSkillsResultForBackend(b.backendId),
@@ -60,12 +60,8 @@ export function useSkillsByBackend(backends: AgentsBackend[]): SkillsByBackend {
       const dirs = new Map<string, string[]>();
       const errors = new Map<string, string>();
 
-      results.forEach((result, index) => {
+      results.forEach(([skillsResult, dirsResult], index) => {
         const backendId = onlineBackends[index].backendId;
-        // The outer Promise.allSettled over Promise.allSettled([...]) pairs always
-        // fulfills (the inner allSettled never rejects), so this is always fulfilled.
-        if (result.status !== 'fulfilled') return;
-        const [skillsResult, dirsResult] = result.value;
 
         if (skillsResult.status === 'fulfilled') {
           skills.set(backendId, skillsResult.value.skills);
