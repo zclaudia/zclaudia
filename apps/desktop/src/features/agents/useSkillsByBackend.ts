@@ -1,10 +1,14 @@
-import { useEffect, useState } from 'react';
-import type { WorkspaceSkillInfo, SkillLoadDiagnostic } from '../../services/api';
+import { useMemo } from 'react';
+import type {
+  WorkspaceSkillInfo,
+  SkillLoadDiagnostic,
+  WorkspaceSkillsResult,
+} from '../../services/api';
 import {
   getWorkspaceSkillsResultForBackend,
   getExternalSkillDirsForBackend,
 } from '../../services/api';
-import { useTopLevelViewStore } from '../../stores/topLevelViewStore';
+import { useCatalogByBackend } from './useCatalogByBackend';
 import type { AgentsBackend } from './agents-types';
 
 export interface SkillsByBackend {
@@ -26,75 +30,34 @@ export interface SkillsByBackend {
  * Fetch each online backend's workspace skills (+ diagnostics) and external skill dirs;
  * refetches when agentsRefreshNonce bumps.
  *
- * Skills and dirs are fetched independently per backend: a dirs failure never pollutes
- * the errors map (dirs are secondary to the skills list) — it is recorded in dirsFailed
- * instead, with no dirs entry.
+ * Skills and dirs are fetched independently per backend — via two useCatalogByBackend
+ * instances rather than one composite fetcher, because the failure domains must stay
+ * separate: a skills failure records an error but must NOT drop a successfully fetched
+ * dirs list, and a dirs failure never pollutes the errors map (dirs are secondary to
+ * the skills list) — it is recorded in dirsFailed instead, with no dirs entry.
  */
 export function useSkillsByBackend(backends: AgentsBackend[]): SkillsByBackend {
-  const nonce = useTopLevelViewStore(s => s.agentsRefreshNonce);
-  const [state, setState] = useState<SkillsByBackend>({
-    skills: new Map(),
-    diagnostics: new Map(),
-    dirs: new Map(),
-    dirsFailed: new Set(),
-    errors: new Map(),
-    loading: true,
-  });
+  const skillsCatalog = useCatalogByBackend<WorkspaceSkillsResult>(
+    backends,
+    getWorkspaceSkillsResultForBackend
+  );
+  const dirsCatalog = useCatalogByBackend<string[]>(backends, getExternalSkillDirsForBackend);
 
-  const onlineKey = backends
-    .filter(b => b.online)
-    .map(b => b.backendId)
-    .sort()
-    .join(',');
+  return useMemo(() => {
+    const skills = new Map<string, WorkspaceSkillInfo[]>();
+    const diagnostics = new Map<string, SkillLoadDiagnostic[]>();
+    for (const [backendId, result] of skillsCatalog.data) {
+      skills.set(backendId, result.skills);
+      diagnostics.set(backendId, result.diagnostics);
+    }
 
-  useEffect(() => {
-    let cancelled = false;
-    const onlineBackends = backends.filter(b => b.online);
-
-    setState(prev => ({ ...prev, loading: true }));
-
-    void Promise.all(
-      onlineBackends.map(b =>
-        Promise.allSettled([
-          getWorkspaceSkillsResultForBackend(b.backendId),
-          getExternalSkillDirsForBackend(b.backendId),
-        ])
-      )
-    ).then(results => {
-      if (cancelled) return;
-
-      const skills = new Map<string, WorkspaceSkillInfo[]>();
-      const diagnostics = new Map<string, SkillLoadDiagnostic[]>();
-      const dirs = new Map<string, string[]>();
-      const dirsFailed = new Set<string>();
-      const errors = new Map<string, string>();
-
-      results.forEach(([skillsResult, dirsResult], index) => {
-        const backendId = onlineBackends[index].backendId;
-
-        if (skillsResult.status === 'fulfilled') {
-          skills.set(backendId, skillsResult.value.skills);
-          diagnostics.set(backendId, skillsResult.value.diagnostics);
-        } else {
-          const error = skillsResult.reason;
-          errors.set(backendId, error instanceof Error ? error.message : String(error));
-        }
-
-        if (dirsResult.status === 'fulfilled') {
-          dirs.set(backendId, dirsResult.value);
-        } else {
-          dirsFailed.add(backendId);
-        }
-      });
-
-      setState({ skills, diagnostics, dirs, dirsFailed, errors, loading: false });
-    });
-
-    return () => {
-      cancelled = true;
+    return {
+      skills,
+      diagnostics,
+      dirs: dirsCatalog.data,
+      dirsFailed: new Set(dirsCatalog.errors.keys()),
+      errors: skillsCatalog.errors,
+      loading: skillsCatalog.loading || dirsCatalog.loading,
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onlineKey, nonce]);
-
-  return state;
+  }, [skillsCatalog, dirsCatalog]);
 }
