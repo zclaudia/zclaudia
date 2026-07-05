@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import type { LlmProfileConfig } from '@zclaudia/shared';
 
 import { LlmProfileEditor } from '../LlmProfileEditor';
@@ -16,11 +16,27 @@ vi.mock('../../../services/api', () => ({
   resolveContextWindowPreviewForBackend: vi.fn(),
 }));
 
-vi.mock('../CodexOAuthSection', () => ({
-  CodexOAuthSection: ({ backendId }: { backendId: string }) => (
-    <div data-testid="codex-oauth-section">{backendId}</div>
-  ),
+interface CapturedCodexSectionProps {
+  backendId: string;
+  onBeforeSignIn?: () => Promise<LlmProfileConfig | null>;
+  onCredentialsChanged: () => void;
+}
+
+const captured = vi.hoisted(() => ({
+  codexSection: null as unknown,
 }));
+
+vi.mock('../CodexOAuthSection', () => ({
+  CodexOAuthSection: (props: { backendId: string }) => {
+    captured.codexSection = props;
+    return <div data-testid="codex-oauth-section">{props.backendId}</div>;
+  },
+}));
+
+function capturedCodexSectionProps(): CapturedCodexSectionProps {
+  expect(captured.codexSection).not.toBeNull();
+  return captured.codexSection as CapturedCodexSectionProps;
+}
 
 function makeProfile(overrides: Partial<LlmProfileConfig> = {}): LlmProfileConfig {
   return {
@@ -47,6 +63,7 @@ function renderEditor(profile: LlmProfileConfig | null) {
 describe('LlmProfileEditor', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    captured.codexSection = null;
     vi.mocked(api.createLlmProfileForBackend).mockResolvedValue(makeProfile({ id: 'created-1' }));
     vi.mocked(api.updateLlmProfileForBackend).mockResolvedValue(makeProfile());
     vi.mocked(api.deleteLlmProfileForBackend).mockResolvedValue({ ok: true });
@@ -219,6 +236,51 @@ describe('LlmProfileEditor', () => {
     expect(screen.queryByPlaceholderText('http://api.example.com/v1')).toBeNull();
     expect(screen.queryByPlaceholderText('sk-...')).toBeNull();
     expect(screen.getByTestId('codex-oauth-section')).toHaveTextContent('b1');
+  });
+
+  it('codex create: onBeforeSignIn persists silently and promotes later saves to update (no double create)', async () => {
+    vi.mocked(api.updateLlmProfileForBackend).mockResolvedValue(
+      makeProfile({ id: 'created-1', providerType: 'openai-codex' })
+    );
+    const { onSaved } = renderEditor(null);
+
+    fireEvent.change(screen.getByPlaceholderText('e.g., Local ZClaudia Agent'), {
+      target: { value: 'My Codex' },
+    });
+    // Switch the provider type dropdown to openai-codex.
+    fireEvent.click(screen.getByRole('button', { name: 'Anthropic' }));
+    fireEvent.click(screen.getByRole('button', { name: 'OpenAI Codex (ChatGPT Plus/Pro)' }));
+
+    // Sign-in pre-save: persists via create, resolves with the saved profile,
+    // but does NOT notify the parent (a keyed remount would tear down the
+    // in-flight OAuth modal).
+    let saved: LlmProfileConfig | null = null;
+    await act(async () => {
+      saved = await capturedCodexSectionProps().onBeforeSignIn!();
+    });
+    expect(saved).toMatchObject({ id: 'created-1' });
+    expect(api.createLlmProfileForBackend).toHaveBeenCalledTimes(1);
+    expect(onSaved).not.toHaveBeenCalled();
+
+    // The silent create promoted savedIdRef: the next Save updates the
+    // persisted profile instead of creating a duplicate.
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    await waitFor(() => {
+      expect(api.updateLlmProfileForBackend).toHaveBeenCalledWith(
+        'b1',
+        'created-1',
+        expect.objectContaining({ name: 'My Codex', providerType: 'openai-codex' })
+      );
+    });
+    expect(api.createLlmProfileForBackend).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledWith('created-1');
+    });
+
+    // Credential changes surface the promoted id to the parent.
+    onSaved.mockClear();
+    act(() => capturedCodexSectionProps().onCredentialsChanged());
+    expect(onSaved).toHaveBeenCalledWith('created-1');
   });
 
   it('fetch models calls the ForBackend preview api with the form draft and opens the picker', async () => {
