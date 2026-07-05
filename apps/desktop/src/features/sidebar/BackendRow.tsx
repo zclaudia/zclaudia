@@ -42,7 +42,7 @@ export function BackendRow({
           <span
             className={`h-2 w-2 flex-shrink-0 rounded-full ${online ? 'bg-success' : 'bg-muted-foreground'}`}
           />
-          <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+          <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">
             {name}
           </span>
           <ChevronRight

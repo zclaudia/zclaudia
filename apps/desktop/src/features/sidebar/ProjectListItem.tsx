@@ -100,8 +100,8 @@ export function ProjectListItem({
     ? 'w-8 h-8 rounded-md hover:bg-secondary active:bg-secondary flex-shrink-0 flex items-center justify-center opacity-0 group-hover:opacity-100'
     : 'w-6 h-6 rounded-md hidden group-hover:flex hover:bg-secondary flex-shrink-0 items-center justify-center';
   const projectButtonClass = isMobile
-    ? 'flex-1 min-w-0 min-h-[36px] text-left px-1 text-sm flex items-center gap-1.5 text-foreground'
-    : 'flex-1 min-w-0 h-7 text-left px-1 text-sm flex items-center gap-1.5';
+    ? 'flex-1 min-w-0 min-h-[36px] text-left px-1 text-xs flex items-center gap-1.5 text-foreground'
+    : 'flex-1 min-w-0 h-7 text-left px-1 text-xs flex items-center gap-1.5';
   const menuItemBaseClass = isMobile
     ? 'w-full text-left px-3 py-3 text-sm flex items-center gap-2'
     : 'w-full text-left px-3 py-1.5 text-xs flex items-center gap-2';
@@ -234,13 +234,16 @@ export function ProjectListItem({
         <button onClick={onToggle} className={projectButtonClass}>
           {isExpanded ? (
             <FolderOpen
-              className="w-4 h-4 flex-shrink-0 text-muted-foreground"
+              className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground"
               strokeWidth={1.75}
             />
           ) : (
-            <Folder className="w-4 h-4 flex-shrink-0 text-muted-foreground" strokeWidth={1.75} />
+            <Folder
+              className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground"
+              strokeWidth={1.75}
+            />
           )}
-          <span className="min-w-0 truncate text-sm font-medium text-foreground">
+          <span className="min-w-0 truncate text-xs font-medium text-foreground">
             {project.name}
           </span>
           {isExpanded ? (

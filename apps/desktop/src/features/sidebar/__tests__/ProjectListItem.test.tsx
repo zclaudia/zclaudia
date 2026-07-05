@@ -75,6 +75,16 @@ describe('ProjectListItem', () => {
     expect(screen.queryByText('新建 session')).toBeNull();
   });
 
+  it('uses compact project folder icons', () => {
+    const { container, rerender } = render(
+      <ProjectListItem {...makeProps({ isExpanded: true })} />
+    );
+    expect(container.querySelector('svg')?.getAttribute('class')).toContain('w-3.5 h-3.5');
+
+    rerender(<ProjectListItem {...makeProps({ isExpanded: false })} />);
+    expect(container.querySelector('svg')?.getAttribute('class')).toContain('w-3.5 h-3.5');
+  });
+
   describe('worktree flattening', () => {
     const rootSession = {
       ...mockSession,

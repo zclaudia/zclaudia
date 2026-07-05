@@ -30,7 +30,7 @@ export interface AutomationTreeProps {
 }
 
 const rowBase =
-  'w-full text-left px-2 py-1.5 rounded-md text-sm flex items-center gap-2 hover:bg-secondary hover:text-foreground transition-colors';
+  'w-full text-left px-2 py-1.5 rounded-md text-xs flex items-center gap-2 hover:bg-secondary hover:text-foreground transition-colors';
 
 /** Only the workflows/automations tabs let project nodes expand to item leaves; the rest don't. */
 function tabIsExpandable(tab: AutomationTab): boolean {

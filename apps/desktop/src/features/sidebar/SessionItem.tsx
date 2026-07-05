@@ -93,9 +93,7 @@ export function SessionItem({
     <div className="relative group" data-testid="session-item">
       <button
         onClick={() => onSelect(session.id)}
-        className={`-ml-5 w-[calc(100%+1.25rem)] text-left pl-7 rounded-lg truncate flex items-center gap-1 transition-colors ${
-          isTask ? 'text-xs' : 'text-sm'
-        } ${
+        className={`-ml-5 w-[calc(100%+1.25rem)] text-left pl-7 rounded-lg truncate flex items-center gap-1 transition-colors text-xs ${
           isMobile ? 'min-h-[44px]' : 'h-7'
         } ${actionPadding} ${isSelected ? selectedClass : unselectedClass}`}
       >
