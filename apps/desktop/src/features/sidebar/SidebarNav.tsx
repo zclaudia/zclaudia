@@ -46,56 +46,63 @@ export function SidebarNav({
 
   if (automationMode) {
     return (
-      <div className="p-2 space-y-0.5 border-b border-border">
-        <button
-          onClick={automationMode.onBack}
-          aria-label="Back to app"
-          className={`${rowBase} text-muted-foreground`}
-        >
-          <ArrowLeft className={iconSize} strokeWidth={1.75} />
-          Back to app
-        </button>
+      <>
+        <div className="p-2 space-y-0.5">
+          <button
+            onClick={automationMode.onBack}
+            aria-label="Back to app"
+            className={`${rowBase} text-muted-foreground`}
+          >
+            <ArrowLeft className={iconSize} strokeWidth={1.75} />
+            Back to app
+          </button>
 
-        {AUTOMATION_TABS.map(({ key, label, Icon }) => {
-          const active = automationMode.tab === key;
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => automationMode.onSelectTab(key)}
-              aria-label={label}
-              className={`${rowBase} ${active ? 'bg-secondary text-foreground' : 'text-muted-foreground'}`}
-            >
-              <Icon className={iconSize} strokeWidth={1.75} />
-              {label}
-            </button>
-          );
-        })}
-      </div>
+          {AUTOMATION_TABS.map(({ key, label, Icon }) => {
+            const active = automationMode.tab === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => automationMode.onSelectTab(key)}
+                aria-label={label}
+                className={`${rowBase} ${active ? 'bg-secondary text-foreground' : 'text-muted-foreground'}`}
+              >
+                <Icon className={iconSize} strokeWidth={1.75} />
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="mx-3 border-t border-border" aria-hidden />
+      </>
     );
   }
 
   return (
-    <div className="p-2 space-y-0.5 border-b border-border">
-      <button
-        onClick={onHome}
-        aria-label="Home"
-        className={`${rowBase} ${isHomeActive ? 'bg-secondary text-foreground' : 'text-muted-foreground'}`}
-      >
-        <Home className={iconSize} strokeWidth={1.75} />
-        Home
-      </button>
-
-      {onOpenAutomations && (
+    <>
+      <div className="p-2 space-y-0.5">
         <button
-          onClick={onOpenAutomations}
-          aria-label="Automations"
-          className={`${rowBase} text-muted-foreground`}
+          onClick={onHome}
+          aria-label="Home"
+          className={`${rowBase} ${isHomeActive ? 'bg-secondary text-foreground' : 'text-muted-foreground'}`}
         >
-          <Zap className={iconSize} strokeWidth={1.75} />
-          Automations
+          <Home className={iconSize} strokeWidth={1.75} />
+          Home
         </button>
-      )}
-    </div>
+
+        {onOpenAutomations && (
+          <button
+            onClick={onOpenAutomations}
+            aria-label="Automations"
+            className={`${rowBase} text-muted-foreground`}
+          >
+            <Zap className={iconSize} strokeWidth={1.75} />
+            Automations
+          </button>
+        )}
+      </div>
+      {/* Inset section divider — see SidebarFooter's twin above Settings */}
+      <div className="mx-3 border-t border-border" aria-hidden />
+    </>
   );
 }
