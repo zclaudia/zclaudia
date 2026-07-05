@@ -13,7 +13,6 @@ import { useConnection } from '../../contexts/ConnectionContext';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { useSidebarWidthStore, SIDEBAR_WIDTH_LIMITS } from '../../stores/sidebarWidthStore';
-import { LlmProfileManager } from './LlmProfileManager';
 import { ServerGatewayConfig } from './ServerGatewayConfig';
 import { PluginSettings } from './PluginSettings';
 import { usePluginStore, selectPluginSettingsTabs } from '../../stores/pluginStore';
@@ -405,26 +404,6 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
                 {activeTab === 'agent' && <AgentSettings />}
                 {activeTab === 'permissions' && <PermissionSettings />}
 
-                {activeTab === 'providers' && (
-                  <div className="space-y-4">
-                    {!isActiveLocalBackend && activeServer && (
-                      <RemoteServerBanner
-                        serverName={activeServer.name}
-                        label="Viewing providers"
-                      />
-                    )}
-                    <p className="text-sm text-muted-foreground">
-                      {isActiveLocalBackend
-                        ? 'Manage AI providers for your projects on this server. Each provider can have different CLI paths and environment variables.'
-                        : 'AI providers configured on this server.'}
-                    </p>
-                    <LlmProfileManagerInline
-                      key={activeServerId || 'none'}
-                      readOnly={!isActiveLocalBackend}
-                    />
-                  </div>
-                )}
-
                 {activeTab === 'notifications' && <NotificationSettingsInline />}
 
                 {activeTab === 'gateway' && (
@@ -516,10 +495,6 @@ function RemoteServerBanner({ serverName, label }: { serverName: string; label: 
       </span>
     </div>
   );
-}
-
-function LlmProfileManagerInline({ readOnly }: { readOnly?: boolean }) {
-  return <LlmProfileManager isOpen={true} onClose={() => {}} inline={true} readOnly={readOnly} />;
 }
 
 function ServerPickerDropdown({

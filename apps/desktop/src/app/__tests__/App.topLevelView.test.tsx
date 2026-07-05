@@ -11,9 +11,9 @@ vi.mock('../WindowRouter', () => ({
 }));
 
 vi.mock('../../features/sidebar/Sidebar', () => ({
-  Sidebar: ({ onOpenSettings }: { onOpenSettings?: (tab?: 'providers') => void }) => (
+  Sidebar: ({ onOpenSettings }: { onOpenSettings?: (tab?: 'permissions') => void }) => (
     <aside data-testid="app-sidebar">
-      <button onClick={() => onOpenSettings?.('providers')}>Open Settings</button>
+      <button onClick={() => onOpenSettings?.('permissions')}>Open Settings</button>
     </aside>
   ),
 }));
@@ -163,7 +163,7 @@ describe('App top-level view routing', () => {
     await waitFor(() => {
       expect(getByTestId('settings-panel')).toBeTruthy();
     });
-    expect(getByTestId('settings-panel').getAttribute('data-initial-tab')).toBe('providers');
+    expect(getByTestId('settings-panel').getAttribute('data-initial-tab')).toBe('permissions');
     expect(queryByTestId('app-sidebar')).toBeNull();
     expect(queryByText('Welcome to ZClaudia')).toBeNull();
 

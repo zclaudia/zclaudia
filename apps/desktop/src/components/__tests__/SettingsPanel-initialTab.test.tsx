@@ -24,15 +24,6 @@ vi.mock('../../stores/llmProfileMetaStore', () => {
   return { useLlmProfileMetaStore: store };
 });
 
-vi.mock('../../features/settings/LlmProfileManager', () => ({
-  LlmProfileManager: ({ isOpen, inline }: any) =>
-    isOpen ? (
-      <div data-testid="provider-manager" data-inline={inline}>
-        ProviderManager
-      </div>
-    ) : null,
-}));
-
 vi.mock('../../features/settings/GeneralSettings', () => ({
   GeneralSettings: () => <div data-testid="general-settings">GeneralSettings</div>,
 }));
@@ -205,16 +196,16 @@ function setupStores() {
 }
 
 describe('SettingsPanel initialTab', () => {
-  it('opens on the providers tab when initialTab="providers" is provided', async () => {
+  it('opens on the permissions tab when initialTab="permissions" is provided', async () => {
     setupStores();
     let container!: HTMLElement;
     await act(async () => {
-      const view = render(<SettingsPanel isOpen initialTab="providers" onClose={() => {}} />);
+      const view = render(<SettingsPanel isOpen initialTab="permissions" onClose={() => {}} />);
       container = view.container;
       await Promise.resolve();
     });
-    // The providers tab content (ProviderManager) should be visible immediately
-    expect(container.querySelector('[data-testid="provider-manager"]')).toBeTruthy();
+    // The permissions tab content should be visible immediately
+    expect(container.querySelector('[data-testid="permission-settings"]')).toBeTruthy();
     // The general-settings panel should NOT be visible
     expect(container.querySelector('[data-testid="general-settings"]')).toBeNull();
   });
@@ -228,6 +219,6 @@ describe('SettingsPanel initialTab', () => {
       await Promise.resolve();
     });
     expect(container.querySelector('[data-testid="general-settings"]')).toBeTruthy();
-    expect(container.querySelector('[data-testid="provider-manager"]')).toBeNull();
+    expect(container.querySelector('[data-testid="permission-settings"]')).toBeNull();
   });
 });

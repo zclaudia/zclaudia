@@ -30,14 +30,6 @@ vi.mock('../../stores/llmProfileMetaStore', () => ({
 }));
 
 // Mock child components
-vi.mock('../../features/settings/LlmProfileManager', () => ({
-  LlmProfileManager: ({ isOpen, inline }: any) =>
-    isOpen ? (
-      <div data-testid="provider-manager" data-inline={inline}>
-        ProviderManager
-      </div>
-    ) : null,
-}));
 vi.mock('../../features/settings/GeneralSettings', async () => {
   const React = await import('react');
   const uiStoreModule = await import('../../stores/uiStore');
@@ -414,7 +406,7 @@ describe('SettingsPanel', () => {
 
   it('shows server tabs', async () => {
     const { container } = await renderSettingsPanel();
-    expect(container.textContent).toContain('Providers');
+    expect(container.textContent).toContain('Web Search');
     expect(container.textContent).not.toContain('Notifications');
   });
 
@@ -452,14 +444,6 @@ describe('SettingsPanel', () => {
   });
 
   // ---- Tab switching ----
-
-  it('switches to Providers tab', async () => {
-    const { container } = await renderSettingsPanel();
-    const providersTab = container.querySelector('[data-testid="providers-tab"]');
-    expect(providersTab).toBeTruthy();
-    await clickAsync(providersTab!);
-    expect(container.querySelector('[data-testid="provider-manager"]')).toBeTruthy();
-  });
 
   it('switches to Plugins tab', async () => {
     const { container } = await renderSettingsPanel();
@@ -732,17 +716,7 @@ describe('SettingsPanel', () => {
     });
   });
 
-  // ---- Providers tab ----
-
-  it('shows ProviderManager inline when Providers tab is selected', async () => {
-    const { container } = await renderSettingsPanel();
-    const providersTab = container.querySelector('[data-testid="providers-tab"]');
-    await clickAsync(providersTab!);
-
-    const pm = container.querySelector('[data-testid="provider-manager"]');
-    expect(pm).toBeTruthy();
-    expect(pm?.getAttribute('data-inline')).toBe('true');
-  });
+  // ---- Remote server banner ----
 
   it('shows remote server notice when not local server', async () => {
     setupStores({
@@ -772,10 +746,10 @@ describe('SettingsPanel', () => {
     });
 
     const { container } = await renderSettingsPanel();
-    const providersTab = container.querySelector('[data-testid="providers-tab"]');
-    await clickAsync(providersTab!);
+    const webSearchTab = container.querySelector('[data-testid="web-search-tab"]');
+    await clickAsync(webSearchTab!);
 
-    expect(container.textContent).toContain('Viewing providers on');
+    expect(container.textContent).toContain('Viewing Web Search settings on');
     expect(container.textContent).toContain('Remote Server');
     expect(container.textContent).toContain('(read-only)');
   });

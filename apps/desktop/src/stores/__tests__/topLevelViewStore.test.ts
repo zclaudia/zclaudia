@@ -20,15 +20,15 @@ describe('topLevelViewStore', () => {
   });
 
   it('opens Settings with an initial tab payload', () => {
-    useTopLevelViewStore.getState().openSettings('providers');
+    useTopLevelViewStore.getState().openSettings('permissions');
     expect(useTopLevelViewStore.getState().view).toEqual({
       kind: 'settings',
-      initialTab: 'providers',
+      initialTab: 'permissions',
     });
   });
 
   it('returns to the normal app shell', () => {
-    useTopLevelViewStore.getState().openSettings('providers');
+    useTopLevelViewStore.getState().openSettings('permissions');
     useTopLevelViewStore.getState().returnToApp();
     expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'app' });
   });
