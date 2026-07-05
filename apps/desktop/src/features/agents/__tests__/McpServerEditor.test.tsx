@@ -145,6 +145,23 @@ describe('McpServerEditor', () => {
     });
   });
 
+  it('edit mode: empty args/env/headers fall back to [] / {} / {} in the update payload', async () => {
+    const { onSaved } = renderEditor(makeServer({ args: undefined }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(api.updateMcpServerForBackend).toHaveBeenCalledWith(
+        'b1',
+        's1',
+        expect.objectContaining({ args: [], env: {}, headers: {} })
+      );
+    });
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledWith('s1');
+    });
+  });
+
   it('delete: first click arms confirmation, second click deletes and fires onDeleted', async () => {
     const { onDeleted } = renderEditor(makeServer());
 

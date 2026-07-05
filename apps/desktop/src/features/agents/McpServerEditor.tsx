@@ -128,6 +128,7 @@ export function McpServerEditor({
   const [saving, setSaving] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [oauthLogin, setOauthLogin] = useState<{ session: McpOAuthStartResult } | null>(null);
+  const [startingOAuth, setStartingOAuth] = useState(false);
 
   const [pendingDelete, setPendingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -280,7 +281,8 @@ export function McpServerEditor({
 
   const handleOAuthLogin = useCallback(
     async (method: 'browser' | 'device_code') => {
-      if (!server) return;
+      if (!server || startingOAuth) return;
+      setStartingOAuth(true);
       setActionError(null);
       try {
         const session = await startMcpOAuthForBackend(backendId, server.name, method);
@@ -290,10 +292,18 @@ export function McpServerEditor({
         setOauthLogin({ session });
       } catch (err) {
         setActionError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setStartingOAuth(false);
       }
     },
-    [backendId, server]
+    [backendId, server, startingOAuth]
   );
+
+  const handleOAuthSuccess = useCallback(() => {
+    if (!server) return;
+    setOauthLogin(null);
+    void runAction(() => refreshMcpServerForBackend(backendId, server.name));
+  }, [backendId, server, runAction]);
 
   const handleDelete = async () => {
     if (!server || deleting) return;
@@ -398,7 +408,8 @@ export function McpServerEditor({
                 <button
                   type="button"
                   onClick={() => void handleOAuthLogin('browser')}
-                  className="px-2 py-1 text-[10px] rounded-md bg-orange-500/20 text-orange-200 hover:bg-orange-500/30 transition-colors"
+                  disabled={startingOAuth}
+                  className="px-2 py-1 text-[10px] rounded-md bg-orange-500/20 text-orange-200 hover:bg-orange-500/30 disabled:opacity-50 transition-colors"
                   title="Start MCP OAuth login"
                 >
                   OAuth Login
@@ -407,7 +418,8 @@ export function McpServerEditor({
                   <button
                     type="button"
                     onClick={() => void handleOAuthLogin('device_code')}
-                    className="px-2 py-1 text-[10px] rounded-md bg-orange-500/10 text-orange-200 hover:bg-orange-500/20 transition-colors"
+                    disabled={startingOAuth}
+                    className="px-2 py-1 text-[10px] rounded-md bg-orange-500/10 text-orange-200 hover:bg-orange-500/20 disabled:opacity-50 transition-colors"
                     title="Start MCP OAuth device-code login"
                   >
                     Device Login
@@ -895,10 +907,7 @@ export function McpServerEditor({
           serverName={server.name}
           session={oauthLogin.session}
           onClose={() => setOauthLogin(null)}
-          onSuccess={() => {
-            setOauthLogin(null);
-            void runAction(() => refreshMcpServerForBackend(backendId, server.name));
-          }}
+          onSuccess={handleOAuthSuccess}
         />
       )}
     </div>
