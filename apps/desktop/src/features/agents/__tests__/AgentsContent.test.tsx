@@ -509,6 +509,41 @@ describe('AgentsContent', () => {
     expect(screen.queryByText('Loading…')).toBeNull();
   });
 
+  it('shows the error hint when the post-save skills refetch settles without the id', () => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'skills' },
+      agentsSelection: { backendId: 'b1', kind: 'new-skill' },
+    });
+
+    const { rerender } = render(
+      <AgentsContent backends={backends} data={makeData({})} skillsData={emptySkills} />
+    );
+    fireEvent.click(screen.getByText('skill-stub-save'));
+    expect(screen.getByText('Loading…')).toBeTruthy();
+
+    // Refetch starts…
+    rerender(
+      <AgentsContent
+        backends={backends}
+        data={makeData({})}
+        skillsData={makeSkillsData({}, { loading: true })}
+      />
+    );
+    // …and settles with a failure — the just-saved marker must let go instead
+    // of masking the error behind eternal Loading chrome.
+    rerender(
+      <AgentsContent
+        backends={backends}
+        data={makeData({})}
+        skillsData={makeSkillsData({}, { errors: { b1: 'boom' } })}
+      />
+    );
+
+    expect(screen.getByText('Select a skill')).toBeTruthy();
+    expect(screen.getByText("Couldn't load skills for this backend.")).toBeTruthy();
+    expect(screen.queryByText('Loading…')).toBeNull();
+  });
+
   it('skill mutations never refresh the global profile stores', () => {
     // b1 is the active backend — a profile mutation here would refresh the
     // stores, but skills must not.

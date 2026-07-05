@@ -8,7 +8,7 @@
  * backend (skills mutations never touch those stores).
  */
 
-import { useEffect, useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import { useTopLevelViewStore } from '../../stores/topLevelViewStore';
 import { useServerStore } from '../../stores/serverStore';
@@ -19,6 +19,7 @@ import { resolveCanonicalBackendId } from '../../utils/controlPlane';
 import { ProfileEditor } from './ProfileEditor';
 import { SkillEditor } from './SkillEditor';
 import { SkillDirsEditor } from './SkillDirsEditor';
+import { useSavedBridge } from './useSavedBridge';
 import type { AgentsBackend } from './agents-types';
 import type { ProfilesByBackend } from './useProfilesByBackend';
 import type { SkillsByBackend } from './useSkillsByBackend';
@@ -72,52 +73,22 @@ export function AgentsContent({ backends, data, skillsData }: AgentsContentProps
   const activeServerId = useServerStore(s => s.activeServerId);
   const localBackendId = useFacadeStore(s => s.localBackendId);
 
-  // Optimistic overlay: handleProfileSaved re-selects the saved id before the
-  // nonce refetch lands, so the fetched map is briefly stale. Holding the
-  // just-saved profile keeps the editor visible (no empty-state flash) until
-  // the refetch becomes authoritative.
-  const [savedOverlay, setSavedOverlay] = useState<{
-    backendId: string;
-    profile: AgentProfileConfig;
-  } | null>(null);
-
-  // Drop the overlay once the fetched map contains its id (the fetch is now
-  // authoritative) or when the selection moves to a different identity.
-  useEffect(() => {
-    if (!savedOverlay) return;
-    const matchesSelection =
-      selection?.kind === 'profile' &&
-      selection.backendId === savedOverlay.backendId &&
-      selection.id === savedOverlay.profile.id;
-    const fetched = (data.profiles.get(savedOverlay.backendId) ?? []).some(
-      p => p.id === savedOverlay.profile.id
-    );
-    if (!matchesSelection || fetched) setSavedOverlay(null);
-  }, [savedOverlay, selection, data]);
-
-  // Skill counterpart to the profile overlay. SkillEditor's onSaved only
-  // reports the id (not the full object), so this marker can't carry a record
-  // for the editor to render from — it just remembers "this id was just saved"
-  // so the detail pane keeps its chrome (muted loading body) instead of
-  // flashing the empty state while the nonce refetch is in flight.
-  const [savedSkillMarker, setSavedSkillMarker] = useState<{
-    backendId: string;
-    id: string;
-  } | null>(null);
-
-  // Drop the marker once the fetched map contains its id or the selection moves
-  // to a different identity — mirrors the profile overlay's lifecycle.
-  useEffect(() => {
-    if (!savedSkillMarker) return;
-    const matchesSelection =
-      selection?.kind === 'skill' &&
-      selection.backendId === savedSkillMarker.backendId &&
-      selection.id === savedSkillMarker.id;
-    const fetched = (skillsData.skills.get(savedSkillMarker.backendId) ?? []).some(
-      s => s.id === savedSkillMarker.id
-    );
-    if (!matchesSelection || fetched) setSavedSkillMarker(null);
-  }, [savedSkillMarker, selection, skillsData]);
+  // Just-saved bridges: save handlers re-select the saved id before the nonce
+  // refetch lands, so the fetched maps are briefly stale. Each bridge remembers
+  // what was just saved until the refetch delivers it — or SETTLES without it
+  // (then the normal stale/error branches take over; see useSavedBridge).
+  //
+  // Profiles carry the full saved object (the editor keeps rendering from it,
+  // no empty-state flash); skills' onSaved only reports the id, so that bridge
+  // is an id-only marker that just keeps the Loading chrome up.
+  const profileBridge = useSavedBridge<AgentProfileConfig>({
+    loading: data.loading,
+    contains: (backendId, id) => (data.profiles.get(backendId) ?? []).some(p => p.id === id),
+  });
+  const skillBridge = useSavedBridge<never>({
+    loading: skillsData.loading,
+    contains: (backendId, id) => (skillsData.skills.get(backendId) ?? []).some(s => s.id === id),
+  });
 
   if (!selection) {
     const activeTab = view.kind === 'agents' ? view.tab : 'profiles';
@@ -142,7 +113,7 @@ export function AgentsContent({ backends, data, skillsData }: AgentsContentProps
   };
 
   const handleSkillSaved = (id: string) => {
-    setSavedSkillMarker({ backendId: editedBackendId, id });
+    skillBridge.record(editedBackendId, id);
     bumpAgentsRefresh();
     // Create mode lands on the newly created skill's id; the marker bridges the
     // gap until the refetch delivers the record.
@@ -162,15 +133,13 @@ export function AgentsContent({ backends, data, skillsData }: AgentsContentProps
           ? ((data.profiles.get(selection.backendId) ?? []).find(p => p.id === selection.id) ??
             null)
           : null;
-      const overlayProfile =
-        selection.kind === 'profile' &&
-        savedOverlay &&
-        savedOverlay.backendId === selection.backendId &&
-        savedOverlay.profile.id === selection.id
-          ? savedOverlay.profile
-          : null;
-      // The fetched object wins once it exists; the overlay only bridges the gap.
-      const profile = fetchedProfile ?? overlayProfile;
+      const bridged =
+        selection.kind === 'profile'
+          ? profileBridge.lookup(selection.backendId, selection.id)
+          : undefined;
+      const bridgedProfile = bridged !== undefined && bridged !== true ? bridged : null;
+      // The fetched object wins once it exists; the bridge only spans the gap.
+      const profile = fetchedProfile ?? bridgedProfile;
 
       // Stale selection (e.g. the profile was deleted elsewhere) falls back to the
       // quiet empty state rather than an editor for a phantom record. When the
@@ -190,10 +159,10 @@ export function AgentsContent({ backends, data, skillsData }: AgentsContentProps
       }
 
       const handleSaved = (saved: AgentProfileConfig) => {
-        setSavedOverlay({ backendId: editedBackendId, profile: saved });
+        profileBridge.record(editedBackendId, saved.id, saved);
         bumpAgentsRefresh();
         // Create mode lands on the newly created profile's id; the editor remounts
-        // (its key flips from ':new' to the id) populated from the overlay.
+        // (its key flips from ':new' to the id) populated from the bridge.
         selectAgentsItem({ backendId: editedBackendId, kind: 'profile', id: saved.id });
         refreshGlobalStoresIfActive();
       };
@@ -226,10 +195,7 @@ export function AgentsContent({ backends, data, skillsData }: AgentsContentProps
         (skillsData.skills.get(editedBackendId) ?? []).find(s => s.id === selection.id) ?? null;
 
       if (!skill) {
-        const justSaved =
-          savedSkillMarker !== null &&
-          savedSkillMarker.backendId === editedBackendId &&
-          savedSkillMarker.id === selection.id;
+        const justSaved = skillBridge.lookup(editedBackendId, selection.id) === true;
         if (skillsData.loading || justSaved) {
           // A refetch is in flight (or a save's nonce bump hasn't landed yet):
           // keep the detail chrome instead of flashing the empty state.
