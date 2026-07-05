@@ -1,5 +1,6 @@
 import { FolderCog } from 'lucide-react';
 import { BackendGroup } from './BackendGroup';
+import { TreeInfoRow, treeRowClass } from './treeRows';
 import type { AgentsBackend, AgentsSelection } from './agents-types';
 import type { SkillsByBackend } from './useSkillsByBackend';
 
@@ -45,7 +46,7 @@ export function SkillsTree({
               const error = data.errors.get(backendId);
 
               if (!skills && data.loading) {
-                return <div className="px-2 text-xs text-muted-foreground/60">Loading…</div>;
+                return <TreeInfoRow>Loading…</TreeInfoRow>;
               }
 
               const isDirsSelected =
@@ -55,11 +56,7 @@ export function SkillsTree({
                   key="__skill-dirs__"
                   type="button"
                   onClick={() => onSelectItem({ backendId, kind: 'skill-dirs' })}
-                  className={`w-full text-left h-7 px-2 rounded-md text-sm flex items-center gap-1.5 transition-colors ${
-                    isDirsSelected
-                      ? 'bg-secondary text-foreground'
-                      : 'hover:bg-secondary hover:text-foreground text-muted-foreground'
-                  }`}
+                  className={treeRowClass(isDirsSelected)}
                 >
                   <FolderCog size={14} strokeWidth={2} className="text-muted-foreground shrink-0" />
                   <span className="truncate flex-1">External directories</span>
@@ -71,9 +68,7 @@ export function SkillsTree({
               if (error) {
                 return (
                   <>
-                    <div className="px-2 text-xs text-muted-foreground/60">
-                      Couldn't load skills
-                    </div>
+                    <TreeInfoRow>Couldn't load skills</TreeInfoRow>
                     {footer}
                   </>
                 );
@@ -82,7 +77,7 @@ export function SkillsTree({
               if (!skills || skills.length === 0) {
                 return (
                   <>
-                    <div className="px-2 text-xs text-muted-foreground/60">No skills</div>
+                    <TreeInfoRow>No skills</TreeInfoRow>
                     {footer}
                   </>
                 );
@@ -103,11 +98,7 @@ export function SkillsTree({
                         key={`${skill.source ?? 'workspace'}:${skill.id}`}
                         type="button"
                         onClick={() => onSelectItem({ backendId, kind: 'skill', id: skill.id })}
-                        className={`w-full text-left h-7 px-2 rounded-md text-sm flex items-center gap-1.5 transition-colors ${
-                          isSelected
-                            ? 'bg-secondary text-foreground'
-                            : 'hover:bg-secondary hover:text-foreground text-muted-foreground'
-                        }`}
+                        className={treeRowClass(isSelected)}
                       >
                         <span className="truncate flex-1">{skill.name || skill.id}</span>
                         {showSourceTag && (

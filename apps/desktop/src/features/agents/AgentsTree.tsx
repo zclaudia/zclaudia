@@ -1,4 +1,5 @@
 import { BackendGroup } from './BackendGroup';
+import { TreeInfoRow, treeRowClass } from './treeRows';
 import type { AgentsSelection } from './agents-types';
 import type { AgentsBackend, ProfilesByBackend } from './useProfilesByBackend';
 
@@ -42,17 +43,13 @@ export function AgentsTree({
               const error = data.errors.get(backendId);
 
               if (!profiles && data.loading) {
-                return <div className="px-2 text-xs text-muted-foreground/60">Loading…</div>;
+                return <TreeInfoRow>Loading…</TreeInfoRow>;
               }
               if (error) {
-                return (
-                  <div className="px-2 text-xs text-muted-foreground/60">
-                    Couldn't load profiles
-                  </div>
-                );
+                return <TreeInfoRow>Couldn't load profiles</TreeInfoRow>;
               }
               if (!profiles || profiles.length === 0) {
-                return <div className="px-2 text-xs text-muted-foreground/60">No profiles</div>;
+                return <TreeInfoRow>No profiles</TreeInfoRow>;
               }
 
               return profiles.map(profile => {
@@ -66,11 +63,7 @@ export function AgentsTree({
                     key={profile.id}
                     type="button"
                     onClick={() => onSelectItem({ backendId, kind: 'profile', id: profile.id })}
-                    className={`w-full text-left h-7 px-2 rounded-md text-sm flex items-center gap-1.5 transition-colors ${
-                      isSelected
-                        ? 'bg-secondary text-foreground'
-                        : 'hover:bg-secondary hover:text-foreground text-muted-foreground'
-                    }`}
+                    className={treeRowClass(isSelected)}
                   >
                     <span className="truncate flex-1">{profile.name}</span>
                     {profile.isDefault && (
