@@ -111,7 +111,9 @@ describe('useProfilesByBackend', () => {
       expect(api.listAgentProfilesForBackend).toHaveBeenCalledTimes(2);
     });
 
-    expect(result.current.loading).toBe(false);
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
   });
 
   it('sets loading true during fetch and false after settle', async () => {
