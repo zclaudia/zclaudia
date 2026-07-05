@@ -158,6 +158,26 @@ describe('ProfileEditor', () => {
     expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
   });
 
+  it('clears an armed delete confirmation when the profile prop switches', async () => {
+    const { rerender, onSaved, onDeleted } = await renderEditor(makeProfile('p1', 'Coder'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await screen.findByRole('button', { name: 'Confirm delete' });
+
+    rerender(
+      <ProfileEditor
+        backendId="b1"
+        profile={makeProfile('p2', 'Reviewer')}
+        onSaved={onSaved}
+        onDeleted={onDeleted}
+      />
+    );
+
+    expect(await screen.findByRole('button', { name: 'Delete' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Confirm delete' })).toBeNull();
+    expect(api.deleteAgentProfileForBackend).not.toHaveBeenCalled();
+  });
+
   it('repopulates the form when the profile prop switches', async () => {
     const { rerender, onSaved, onDeleted } = await renderEditor(makeProfile('p1', 'Coder'));
     await screen.findByDisplayValue('Coder');

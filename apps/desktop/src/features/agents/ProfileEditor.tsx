@@ -27,6 +27,12 @@ import {
 } from '@zclaudia/shared';
 import * as api from '../../services/api';
 
+/**
+ * Parent must remount this component per identity — key it by
+ * `${backendId}:${profile?.id ?? 'new'}`. The populate effect deliberately
+ * depends on profile id only; prop-driven switching of backendId or same-id
+ * content updates without a key change is not supported.
+ */
 export interface ProfileEditorProps {
   backendId: string;
   /** null = create mode */
