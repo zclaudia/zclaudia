@@ -23,9 +23,9 @@ function normalizePath(p: string): string {
 
 // Supervisor phase shown as a small status dot on the project header row.
 const PHASE_DOT: Record<string, { label: string; dot: string }> = {
-  active: { label: 'active', dot: 'bg-green-500' },
-  paused: { label: 'paused', dot: 'bg-yellow-500' },
-  setup: { label: 'setup', dot: 'bg-blue-500' },
+  active: { label: 'active', dot: 'bg-success' },
+  paused: { label: 'paused', dot: 'bg-warning' },
+  setup: { label: 'setup', dot: 'bg-primary' },
   idle: { label: 'idle', dot: 'bg-muted-foreground/40' },
 };
 
