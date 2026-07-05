@@ -72,12 +72,7 @@ export async function getWorkspaceSkillsResult(): Promise<WorkspaceSkillsResult>
 export async function getWorkspaceSkillsForBackend(
   backendId: string | null
 ): Promise<WorkspaceSkillInfo[]> {
-  const result = (await fetchApiForBackend<WorkspaceSkillInfo[]>(
-    '/api/workspace/skills',
-    backendId
-  )) as ApiResponse<WorkspaceSkillInfo[]> & {
-    diagnostics?: SkillLoadDiagnostic[];
-  };
+  const result = await fetchApiForBackend<WorkspaceSkillInfo[]>('/api/workspace/skills', backendId);
   if (!result.success || !result.data)
     throw new Error(result.error?.message || 'Failed to load workspace skills');
   return result.data;

@@ -31,7 +31,9 @@ export async function getMcpServers(): Promise<McpServerConfig[]> {
   return result.data;
 }
 
-export async function getMcpServersForBackend(backendId: string | null): Promise<McpServerConfig[]> {
+export async function getMcpServersForBackend(
+  backendId: string | null
+): Promise<McpServerConfig[]> {
   const result = await fetchApiForBackend<McpServerConfig[]>('/api/mcp-servers', backendId);
   if (!result.success || !result.data) {
     throw new Error(result.error?.message || 'Failed to fetch MCP servers');
