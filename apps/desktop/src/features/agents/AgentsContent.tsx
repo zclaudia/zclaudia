@@ -310,6 +310,20 @@ export function AgentsContent({ backends, data, skillsData, mcpData }: AgentsCon
       );
     }
 
+    case 'llm-profile':
+    case 'new-llm-profile': {
+      // Phase 4 Task 6 wires these — placeholder renders the same empty-state
+      // markup used for no-selection until the Providers editor lands.
+      return (
+        <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
+          <p className="text-sm">Select a provider</p>
+          <p className="mt-1 text-xs opacity-60">
+            Choose a provider from the sidebar, or create one with +.
+          </p>
+        </div>
+      );
+    }
+
     case 'mcp-server':
     case 'new-mcp-server': {
       const server =

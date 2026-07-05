@@ -195,6 +195,17 @@ describe('agents view', () => {
     expect(s.agentsSelection).toBeNull();
   });
 
+  it('setAgentsTab switches to providers and clears the selection', () => {
+    useTopLevelViewStore.getState().openAgents();
+    useTopLevelViewStore
+      .getState()
+      .selectAgentsItem({ backendId: 'b1', kind: 'llm-profile', id: 'lp1' });
+    useTopLevelViewStore.getState().setAgentsTab('providers');
+    const s = useTopLevelViewStore.getState();
+    expect(s.view).toEqual({ kind: 'agents', tab: 'providers' });
+    expect(s.agentsSelection).toBeNull();
+  });
+
   it('ignores setAgentsTab when not in agents view', () => {
     useTopLevelViewStore.getState().openSettings();
     useTopLevelViewStore.getState().setAgentsTab('profiles');
