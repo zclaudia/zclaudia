@@ -2,7 +2,7 @@
  * Backend-scoped MCP server editor
  *
  * Standalone create/edit form + connection actions for one MCP server on one
- * backend, extracted from the settings McpServerSettings monolith. Talks to
+ * backend, extracted from the old settings MCP Servers tab's monolith. Talks to
  * the ForBackend API variants directly — no global store.
  *
  * Parent must remount this component per identity — key it by
@@ -10,9 +10,9 @@
  * `server` prop on mount only; prop-driven switching of backendId or server
  * without a key change is not supported.
  *
- * Deliberately not carried over from the settings component: readOnly mode,
- * the search bar, stats cards, list rows, the mcpServerStore, and the
- * expandable inventory browser (tools/resources/prompts details — deferred).
+ * Deliberately not carried over from the old settings tab's component: readOnly
+ * mode, the search bar, stats cards, list rows, the (now-deleted) mcpServerStore,
+ * and the expandable inventory browser (tools/resources/prompts details — deferred).
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';

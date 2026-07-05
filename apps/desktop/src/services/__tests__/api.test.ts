@@ -48,11 +48,6 @@ import {
   updateAgentConfig,
   getNotificationConfig,
   sendTestNotification,
-  getMcpServers,
-  createMcpServer,
-  updateMcpServer,
-  deleteMcpServer,
-  toggleMcpServer,
   fetchLocalApi,
   setProjectReviewProvider,
   getWorktreeConfigs,
@@ -866,41 +861,6 @@ describe('api', () => {
     });
   });
 
-  describe('MCP Servers API', () => {
-    it('getMcpServers', async () => {
-      mockResponse([{ id: 'mcp1' }]);
-      const result = await getMcpServers();
-      expect(result).toHaveLength(1);
-    });
-
-    it('createMcpServer', async () => {
-      mockResponse({ id: 'mcp1' });
-      const result = await createMcpServer({ name: 'Test', command: 'node', args: [] } as any);
-      expect(result.id).toBe('mcp1');
-    });
-
-    it('updateMcpServer', async () => {
-      mockResponse({ id: 'mcp1' });
-      const result = await updateMcpServer('mcp1', { name: 'Updated' });
-      expect(result.id).toBe('mcp1');
-    });
-
-    it('deleteMcpServer', async () => {
-      mockResponse(undefined);
-      await deleteMcpServer('mcp1');
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/mcp-servers/mcp1'),
-        expect.objectContaining({ method: 'DELETE' })
-      );
-    });
-
-    it('toggleMcpServer', async () => {
-      mockResponse({ id: 'mcp1', enabled: true });
-      const result = await toggleMcpServer('mcp1');
-      expect(result.enabled).toBe(true);
-    });
-  });
-
   describe('Local PRs API', () => {
     it('listLocalPRs', async () => {
       mockResponse([{ id: 'pr1' }]);
@@ -1369,13 +1329,6 @@ describe('api', () => {
         expect.stringContaining('/api/notifications/test'),
         expect.objectContaining({ method: 'POST' })
       );
-    });
-
-    it('toggleMcpServer toggles server', async () => {
-      const server = { id: 'mcp1', enabled: true };
-      mockResponse(server);
-      const result = await toggleMcpServer('mcp1');
-      expect(result).toEqual(server);
     });
 
     it('searchMessages searches with filters', async () => {

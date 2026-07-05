@@ -16,7 +16,6 @@ import { useSidebarWidthStore, SIDEBAR_WIDTH_LIMITS } from '../../stores/sidebar
 import { LlmProfileManager } from './LlmProfileManager';
 import { ServerGatewayConfig } from './ServerGatewayConfig';
 import { PluginSettings } from './PluginSettings';
-import { McpServerSettings } from './McpServerSettings';
 import { usePluginStore, selectPluginSettingsTabs } from '../../stores/pluginStore';
 import type { BackendConnectionState, BackendSnapshot, GatewayBackendInfo } from '@zclaudia/shared';
 import { AgentSettings } from './AgentSettings';
@@ -442,24 +441,6 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
                       of Claudia.
                     </p>
                     <PluginSettings />
-                  </div>
-                )}
-
-                {activeTab === 'mcp-servers' && (
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">MCP Servers</h3>
-                    {!isActiveLocalBackend && activeServer && (
-                      <RemoteServerBanner
-                        serverName={activeServer.name}
-                        label="Viewing MCP servers"
-                      />
-                    )}
-                    <p className="text-sm text-muted-foreground">
-                      {isActiveLocalBackend
-                        ? 'Manage MCP (Model Context Protocol) servers. These servers provide additional tools to AI providers.'
-                        : 'MCP servers configured on this server.'}
-                    </p>
-                    <McpServerSettings readOnly={!isActiveLocalBackend} />
                   </div>
                 )}
 

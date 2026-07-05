@@ -113,9 +113,6 @@ vi.mock('../../features/settings/ServerGatewayConfig', () => ({
 vi.mock('../../features/settings/PluginSettings', () => ({
   PluginSettings: () => <div data-testid="plugin-settings">PluginSettings</div>,
 }));
-vi.mock('../../features/settings/McpServerSettings', () => ({
-  McpServerSettings: () => <div data-testid="mcp-settings">McpServerSettings</div>,
-}));
 vi.mock('../../features/workflows/api', () => ({
   listAllWorkflows: vi.fn().mockResolvedValue([]),
 }));
@@ -418,7 +415,6 @@ describe('SettingsPanel', () => {
   it('shows server tabs', async () => {
     const { container } = await renderSettingsPanel();
     expect(container.textContent).toContain('Providers');
-    expect(container.textContent).toContain('MCP Servers');
     expect(container.textContent).not.toContain('Notifications');
   });
 
@@ -472,15 +468,6 @@ describe('SettingsPanel', () => {
     await clickAsync(pluginsTab!);
     expect(container.querySelector('[data-testid="plugin-settings"]')).toBeTruthy();
     expect(container.textContent).toContain('Plugins');
-  });
-
-  it('switches to MCP Servers tab', async () => {
-    const { container } = await renderSettingsPanel();
-    const mcpTab = container.querySelector('[data-testid="mcp-servers-tab"]');
-    expect(mcpTab).toBeTruthy();
-    await clickAsync(mcpTab!);
-    expect(container.querySelector('[data-testid="mcp-settings"]')).toBeTruthy();
-    expect(container.textContent).toContain('MCP Servers');
   });
 
   it('switches to Notifications tab on Android', async () => {
@@ -1122,17 +1109,6 @@ describe('SettingsPanel', () => {
     const { container } = await renderSettingsPanel();
     // Plugins tab should always be there
     expect(container.textContent).toContain('Plugins');
-  });
-
-  // ---- MCP Servers tab ----
-
-  it('shows MCP Servers description and component', async () => {
-    const { container } = await renderSettingsPanel();
-    const mcpTab = container.querySelector('[data-testid="mcp-servers-tab"]');
-    await clickAsync(mcpTab!);
-
-    expect(container.textContent).toContain('Model Context Protocol');
-    expect(container.querySelector('[data-testid="mcp-settings"]')).toBeTruthy();
   });
 
   // ---- Connection status colors ----

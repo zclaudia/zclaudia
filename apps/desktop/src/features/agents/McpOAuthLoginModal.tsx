@@ -1,7 +1,7 @@
 /**
  * MCP OAuth Login Modal (backend-scoped)
  *
- * Moved from the settings McpServerSettings component. The caller starts the
+ * Moved from the old settings MCP Servers tab's component. The caller starts the
  * OAuth session (startMcpOAuthForBackend) and passes it in; this modal polls
  * for completion and cancels the session on close.
  */

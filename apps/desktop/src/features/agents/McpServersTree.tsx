@@ -14,7 +14,7 @@ interface McpServersTreeProps {
 }
 
 /**
- * Status dot color for a server row. Mirrors McpServerSettings' badge semantics with
+ * Status dot color for a server row. Mirrors the old settings MCP Servers tab's badge semantics with
  * tree-dot vocabulary: connected → success, connecting → pulsing success, failed →
  * destructive, needs-auth → warning; everything inert (config disabled, runtime
  * disabled, configured-but-not-connected, idle, or no status reported) → muted.
