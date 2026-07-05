@@ -31,6 +31,7 @@ import { useAgentsBackends } from './features/agents/selectAgentsBackends';
 import { useProfilesByBackend, type AgentsBackend } from './features/agents/useProfilesByBackend';
 import { useSkillsByBackend } from './features/agents/useSkillsByBackend';
 import { useMcpServersByBackend } from './features/agents/useMcpServersByBackend';
+import { useLlmProfilesByBackend } from './features/agents/useLlmProfilesByBackend';
 import { useServerStore } from './stores/serverStore';
 import { useFacadeStore } from './stores/facadeStore';
 import { useProjectStore } from './stores/projectStore';
@@ -233,6 +234,11 @@ function AppContent() {
       ? agentsBackends
       : NO_AGENTS_BACKENDS
   );
+  const providersData = useLlmProfilesByBackend(
+    topLevelView.kind === 'agents' && topLevelView.tab === 'providers'
+      ? agentsBackends
+      : NO_AGENTS_BACKENDS
+  );
 
   const agentsMode =
     topLevelView.kind === 'agents'
@@ -244,6 +250,7 @@ function AppContent() {
           data: agentsData,
           skillsData,
           mcpData,
+          providersData,
           selection: agentsSelection,
           onSelectItem: selectAgentsItem,
         }
@@ -546,6 +553,7 @@ function AppContent() {
                   data={agentsData}
                   skillsData={skillsData}
                   mcpData={mcpData}
+                  providersData={providersData}
                 />
               </Suspense>
             ) : dashboardProject ? (

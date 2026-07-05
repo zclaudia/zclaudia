@@ -7,10 +7,19 @@ import { useTopLevelViewStore } from '../../../stores/topLevelViewStore';
 import { useServerStore } from '../../../stores/serverStore';
 import { useFacadeStore } from '../../../stores/facadeStore';
 
-const { mockLoadAll, mockRefresh } = vi.hoisted(() => ({
+const { mockLoadAll, mockRefresh, mockListLlmProfilesForBackend } = vi.hoisted(() => ({
   mockLoadAll: vi.fn().mockResolvedValue(undefined),
   mockRefresh: vi.fn().mockResolvedValue(undefined),
+  mockListLlmProfilesForBackend: vi.fn(),
 }));
+
+// AgentsContent's provider store sync refetches the edited backend's LLM
+// profile list; stub only that call and keep the rest of the api surface real
+// (the test only imports types from it).
+vi.mock('../../../services/api', async importOriginal => {
+  const mod = await importOriginal<Record<string, unknown>>();
+  return { ...mod, listLlmProfilesForBackend: mockListLlmProfilesForBackend };
+});
 
 // The stub exposes buttons wired to onSaved/onDeleted so tests can drive the
 // parent's handlers without the real (network-heavy) editor.
@@ -101,6 +110,24 @@ vi.mock('../McpServerEditor', () => ({
   ),
 }));
 
+// LLM profile (provider) editor stub: like MCP, onSaved reports only the id.
+vi.mock('../LlmProfileEditor', () => ({
+  LlmProfileEditor: ({
+    profile,
+    onSaved,
+    onDeleted,
+  }: {
+    profile: { id: string } | null;
+    onSaved: (id: string) => void;
+    onDeleted: () => void;
+  }) => (
+    <div data-testid="llm-profile-editor" data-profile-id={profile?.id ?? 'null'}>
+      <button onClick={() => onSaved('llm-saved-1')}>llm-stub-save</button>
+      <button onClick={() => onDeleted()}>llm-stub-delete</button>
+    </div>
+  ),
+}));
+
 vi.mock('../../../stores/agentProfileMetaStore', () => ({
   useAgentProfileMetaStore: { getState: () => ({ loadAll: mockLoadAll }) },
 }));
@@ -110,11 +137,13 @@ vi.mock('../../../stores/agentReadinessStore', () => ({
 }));
 
 import { AgentsContent } from '../AgentsContent';
+import { useLlmProfileMetaStore } from '../../../stores/llmProfileMetaStore';
 import type { AgentsBackend, ProfilesByBackend } from '../useProfilesByBackend';
 import type { SkillsByBackend } from '../useSkillsByBackend';
 import type { McpServersByBackend } from '../useMcpServersByBackend';
+import type { LlmProfilesByBackend } from '../useLlmProfilesByBackend';
 import type { WorkspaceSkillInfo, SkillLoadDiagnostic } from '../../../services/api';
-import type { McpServerConfig, McpServerStatus } from '@zclaudia/shared';
+import type { LlmProfileConfig, McpServerConfig, McpServerStatus } from '@zclaudia/shared';
 
 function makeProfile(id: string, name = id): AgentProfileConfig {
   return {
@@ -194,9 +223,34 @@ function makeMcpData(
 
 const emptyMcp = makeMcpData({});
 
+function makeLlmProfile(id: string, name = id): LlmProfileConfig {
+  return {
+    id,
+    name,
+    providerType: 'anthropic',
+    isDefault: false,
+    createdAt: 0,
+    updatedAt: 0,
+  };
+}
+
+function makeProvidersData(
+  profilesByBackend: Record<string, LlmProfileConfig[]>,
+  opts: { errors?: Record<string, string>; loading?: boolean } = {}
+): LlmProfilesByBackend {
+  return {
+    profiles: new Map(Object.entries(profilesByBackend)),
+    errors: new Map(Object.entries(opts.errors ?? {})),
+    loading: opts.loading ?? false,
+  };
+}
+
+const emptyProviders = makeProvidersData({});
+
 describe('AgentsContent', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockListLlmProfilesForBackend.mockResolvedValue([]);
     useTopLevelViewStore.setState({
       view: { kind: 'agents', tab: 'profiles' },
       agentsSelection: null,
@@ -204,11 +258,13 @@ describe('AgentsContent', () => {
     });
     useServerStore.setState({ activeServerId: null } as never);
     useFacadeStore.setState({ localBackendId: 'b1' } as never);
+    useLlmProfileMetaStore.setState({ providersByBackend: {} });
   });
 
   it('renders the empty state when nothing is selected', () => {
     render(
       <AgentsContent
+        providersData={emptyProviders}
         backends={backends}
         mcpData={emptyMcp}
         data={makeData({})}
@@ -230,6 +286,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={emptyMcp}
         backends={backends}
         data={makeData({ b1: [makeProfile('ap1', 'Coding Agent')] })}
@@ -249,6 +306,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={emptyMcp}
         backends={backends}
         data={makeData({ b1: [makeProfile('ap1')] })}
@@ -267,6 +325,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={emptyMcp}
         backends={backends}
         data={makeData({}, { b1: 'boom' })}
@@ -284,6 +343,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         backends={backends}
         mcpData={emptyMcp}
         data={makeData({})}
@@ -301,6 +361,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         backends={backends}
         mcpData={emptyMcp}
         data={makeData({})}
@@ -320,6 +381,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         backends={backends}
         mcpData={emptyMcp}
         data={makeData({})}
@@ -341,6 +403,7 @@ describe('AgentsContent', () => {
 
     const { rerender } = render(
       <AgentsContent
+        providersData={emptyProviders}
         backends={backends}
         mcpData={emptyMcp}
         data={makeData({})}
@@ -353,6 +416,7 @@ describe('AgentsContent', () => {
     // Refetch lands with the authoritative record — it wins over the overlay.
     rerender(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={emptyMcp}
         backends={backends}
         data={makeData({ b1: [makeProfile('saved-1', 'Fetched One')] })}
@@ -369,6 +433,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         backends={backends}
         mcpData={emptyMcp}
         data={makeData({})}
@@ -396,6 +461,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={emptyMcp}
         backends={backends}
         data={makeData({ b1: [makeProfile('ap1')] })}
@@ -415,6 +481,7 @@ describe('AgentsContent', () => {
     useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new-profile' } });
     const { unmount } = render(
       <AgentsContent
+        providersData={emptyProviders}
         backends={backends}
         mcpData={emptyMcp}
         data={makeData({})}
@@ -432,6 +499,7 @@ describe('AgentsContent', () => {
     useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b2', kind: 'new-profile' } });
     render(
       <AgentsContent
+        providersData={emptyProviders}
         backends={backends}
         mcpData={emptyMcp}
         data={makeData({})}
@@ -450,6 +518,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         backends={backends}
         mcpData={emptyMcp}
         data={makeData({})}
@@ -471,6 +540,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         backends={backends}
         mcpData={emptyMcp}
         data={makeData({})}
@@ -493,6 +563,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         backends={backends}
         mcpData={emptyMcp}
         data={makeData({})}
@@ -513,6 +584,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
@@ -533,6 +605,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
@@ -552,6 +625,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
@@ -572,6 +646,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
@@ -592,6 +667,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         backends={backends}
         mcpData={emptyMcp}
         data={makeData({})}
@@ -612,6 +688,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         backends={backends}
         mcpData={emptyMcp}
         data={makeData({})}
@@ -640,6 +717,7 @@ describe('AgentsContent', () => {
 
     const { rerender } = render(
       <AgentsContent
+        providersData={emptyProviders}
         backends={backends}
         mcpData={emptyMcp}
         data={makeData({})}
@@ -651,6 +729,7 @@ describe('AgentsContent', () => {
 
     rerender(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
@@ -671,6 +750,7 @@ describe('AgentsContent', () => {
 
     const { rerender } = render(
       <AgentsContent
+        providersData={emptyProviders}
         backends={backends}
         mcpData={emptyMcp}
         data={makeData({})}
@@ -683,6 +763,7 @@ describe('AgentsContent', () => {
     // Refetch starts…
     rerender(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
@@ -693,6 +774,7 @@ describe('AgentsContent', () => {
     // of masking the error behind eternal Loading chrome.
     rerender(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
@@ -715,6 +797,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         backends={backends}
         mcpData={emptyMcp}
         data={makeData({})}
@@ -735,6 +818,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
@@ -759,6 +843,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
@@ -798,6 +883,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         backends={backends}
         mcpData={emptyMcp}
         data={makeData({})}
@@ -817,6 +903,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
@@ -840,6 +927,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
@@ -862,6 +950,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
@@ -884,6 +973,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={makeMcpData(
           { b1: [makeMcpServer('m1', 'context7')] },
           { statuses: { b1: { context7: { name: 'context7', state: 'connected' } } } }
@@ -909,6 +999,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={makeMcpData({ b1: [makeMcpServer('m1', 'context7')] })}
         backends={backends}
         data={makeData({})}
@@ -927,6 +1018,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
@@ -947,6 +1039,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
@@ -979,6 +1072,7 @@ describe('AgentsContent', () => {
 
     const { rerender } = render(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
@@ -990,6 +1084,7 @@ describe('AgentsContent', () => {
 
     rerender(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={makeMcpData({ b1: [makeMcpServer('mcp-saved-1', 'Saved Server')] })}
         backends={backends}
         data={makeData({})}
@@ -1010,6 +1105,7 @@ describe('AgentsContent', () => {
 
     const { rerender } = render(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
@@ -1022,6 +1118,7 @@ describe('AgentsContent', () => {
     // Refetch starts…
     rerender(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={makeMcpData({}, { loading: true })}
         backends={backends}
         data={makeData({})}
@@ -1031,6 +1128,7 @@ describe('AgentsContent', () => {
     // …and settles with a failure — the marker lets go and the error shows.
     rerender(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={makeMcpData({}, { errors: { b1: 'boom' } })}
         backends={backends}
         data={makeData({})}
@@ -1051,6 +1149,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={makeMcpData({}, { errors: { b1: 'boom' } })}
         backends={backends}
         data={makeData({})}
@@ -1071,6 +1170,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={makeMcpData({ b1: [makeMcpServer('m1')] })}
         backends={backends}
         data={makeData({})}
@@ -1093,6 +1193,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={makeMcpData({ b1: [makeMcpServer('m1')] })}
         backends={backends}
         data={makeData({})}
@@ -1120,6 +1221,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        providersData={emptyProviders}
         mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
@@ -1130,5 +1232,416 @@ describe('AgentsContent', () => {
     fireEvent.click(screen.getByText('mcp-stub-save'));
     expect(mockLoadAll).not.toHaveBeenCalled();
     expect(mockRefresh).not.toHaveBeenCalled();
+  });
+
+  // ---- Providers tab ----
+
+  it('renders the providers empty state copy when the providers tab has no selection', () => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'providers' },
+      agentsSelection: null,
+    });
+
+    render(
+      <AgentsContent
+        providersData={emptyProviders}
+        mcpData={emptyMcp}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    expect(screen.getByText('Select a provider')).toBeTruthy();
+    expect(
+      screen.getByText('Choose a provider from the sidebar, or create one with +.')
+    ).toBeTruthy();
+    expect(screen.queryByTestId('llm-profile-editor')).toBeNull();
+  });
+
+  it('renders the provider editor and header for a selected LLM profile', () => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'providers' },
+      agentsSelection: { backendId: 'b1', kind: 'llm-profile', id: 'lp1' },
+    });
+
+    render(
+      <AgentsContent
+        providersData={makeProvidersData({ b1: [makeLlmProfile('lp1', 'Anthropic Direct')] })}
+        mcpData={emptyMcp}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    expect(screen.getByTestId('llm-profile-editor').getAttribute('data-profile-id')).toBe('lp1');
+    expect(screen.getByText('Anthropic Direct')).toBeTruthy();
+    expect(screen.getByText('Backend 1')).toBeTruthy();
+  });
+
+  it('renders provider create mode with a null profile and "New provider" header', () => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'providers' },
+      agentsSelection: { backendId: 'b2', kind: 'new-llm-profile' },
+    });
+
+    render(
+      <AgentsContent
+        providersData={emptyProviders}
+        mcpData={emptyMcp}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    expect(screen.getByTestId('llm-profile-editor').getAttribute('data-profile-id')).toBe('null');
+    expect(screen.getByText('New provider')).toBeTruthy();
+    expect(screen.getByText('Backend 2')).toBeTruthy();
+  });
+
+  it('falls back to the providers empty state for a stale provider selection', () => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'providers' },
+      agentsSelection: { backendId: 'b1', kind: 'llm-profile', id: 'gone' },
+    });
+
+    render(
+      <AgentsContent
+        providersData={makeProvidersData({ b1: [makeLlmProfile('lp1')] })}
+        mcpData={emptyMcp}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    expect(screen.getByText('Select a provider')).toBeTruthy();
+    expect(screen.queryByTestId('llm-profile-editor')).toBeNull();
+  });
+
+  it('shows a fetch-error hint for a stale provider selection on a failed backend', () => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'providers' },
+      agentsSelection: { backendId: 'b1', kind: 'llm-profile', id: 'lp1' },
+    });
+
+    render(
+      <AgentsContent
+        providersData={makeProvidersData({}, { errors: { b1: 'boom' } })}
+        mcpData={emptyMcp}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    expect(screen.getByText('Select a provider')).toBeTruthy();
+    expect(screen.getByText("Couldn't load providers for this backend.")).toBeTruthy();
+    expect(screen.queryByTestId('llm-profile-editor')).toBeNull();
+  });
+
+  it('keeps the detail chrome while providers are still loading for a missing id', () => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'providers' },
+      agentsSelection: { backendId: 'b1', kind: 'llm-profile', id: 'lp1' },
+    });
+
+    render(
+      <AgentsContent
+        providersData={makeProvidersData({}, { loading: true })}
+        mcpData={emptyMcp}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    expect(screen.queryByText('Select a provider')).toBeNull();
+    expect(screen.getByText('lp1')).toBeTruthy();
+    expect(screen.getByText('Loading…')).toBeTruthy();
+  });
+
+  it('provider save bumps the nonce, re-selects the id, and avoids the empty-state flash', () => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'providers' },
+      agentsSelection: { backendId: 'b2', kind: 'new-llm-profile' },
+    });
+
+    render(
+      <AgentsContent
+        providersData={emptyProviders}
+        mcpData={emptyMcp}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    // providersData does not contain llm-saved-1 (and is not even loading yet) —
+    // the just-saved marker must keep the detail chrome up instead of flashing
+    // the empty state.
+    fireEvent.click(screen.getByText('llm-stub-save'));
+
+    const state = useTopLevelViewStore.getState();
+    expect(state.agentsRefreshNonce).toBe(1);
+    expect(state.agentsSelection).toEqual({
+      backendId: 'b2',
+      kind: 'llm-profile',
+      id: 'llm-saved-1',
+    });
+    expect(screen.queryByText('Select a provider')).toBeNull();
+    expect(screen.getByText('llm-saved-1')).toBeTruthy();
+    expect(screen.getByText('Loading…')).toBeTruthy();
+  });
+
+  it('renders the fetched provider once the refetch lands after a save', () => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'providers' },
+      agentsSelection: { backendId: 'b2', kind: 'new-llm-profile' },
+    });
+
+    const { rerender } = render(
+      <AgentsContent
+        providersData={emptyProviders}
+        mcpData={emptyMcp}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+    fireEvent.click(screen.getByText('llm-stub-save'));
+    expect(screen.getByText('Loading…')).toBeTruthy();
+
+    rerender(
+      <AgentsContent
+        providersData={makeProvidersData({ b2: [makeLlmProfile('llm-saved-1', 'Saved Provider')] })}
+        mcpData={emptyMcp}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    expect(screen.getByTestId('llm-profile-editor').getAttribute('data-profile-id')).toBe(
+      'llm-saved-1'
+    );
+    expect(screen.getByText('Saved Provider')).toBeTruthy();
+    expect(screen.queryByText('Loading…')).toBeNull();
+  });
+
+  it('shows the error hint when the post-save providers refetch settles without the id', () => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'providers' },
+      agentsSelection: { backendId: 'b2', kind: 'new-llm-profile' },
+    });
+
+    const { rerender } = render(
+      <AgentsContent
+        providersData={emptyProviders}
+        mcpData={emptyMcp}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+    fireEvent.click(screen.getByText('llm-stub-save'));
+    expect(screen.getByText('Loading…')).toBeTruthy();
+
+    // Refetch starts…
+    rerender(
+      <AgentsContent
+        providersData={makeProvidersData({}, { loading: true })}
+        mcpData={emptyMcp}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+    // …and settles with a failure — the marker lets go and the error shows.
+    rerender(
+      <AgentsContent
+        providersData={makeProvidersData({}, { errors: { b2: 'boom' } })}
+        mcpData={emptyMcp}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    expect(screen.getByText('Select a provider')).toBeTruthy();
+    expect(screen.getByText("Couldn't load providers for this backend.")).toBeTruthy();
+    expect(screen.queryByText('Loading…')).toBeNull();
+  });
+
+  it('provider delete clears the selection and bumps the refresh nonce', () => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'providers' },
+      agentsSelection: { backendId: 'b1', kind: 'llm-profile', id: 'lp1' },
+    });
+
+    render(
+      <AgentsContent
+        providersData={makeProvidersData({ b1: [makeLlmProfile('lp1')] })}
+        mcpData={emptyMcp}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    fireEvent.click(screen.getByText('llm-stub-delete'));
+
+    const state = useTopLevelViewStore.getState();
+    expect(state.agentsSelection).toBeNull();
+    expect(state.agentsRefreshNonce).toBe(1);
+  });
+
+  it('provider save on the active backend refreshes readiness and the global provider cache', async () => {
+    // b1 is the active backend (activeServerId null → localBackendId 'b1').
+    const list = [makeLlmProfile('llm-saved-1', 'Fresh')];
+    mockListLlmProfilesForBackend.mockResolvedValue(list);
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'providers' },
+      agentsSelection: { backendId: 'b1', kind: 'new-llm-profile' },
+    });
+
+    render(
+      <AgentsContent
+        providersData={emptyProviders}
+        mcpData={emptyMcp}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('llm-stub-save'));
+    });
+
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+    // Provider mutations must NOT reload agent profiles — that's the agent
+    // profile path's concern.
+    expect(mockLoadAll).not.toHaveBeenCalled();
+    expect(mockListLlmProfilesForBackend).toHaveBeenCalledWith('b1');
+    expect(useLlmProfileMetaStore.getState().providersByBackend['b1']).toEqual(list);
+  });
+
+  it('mirrors the provider cache under the legacy raw active id when it differs', async () => {
+    // activeServerId still holds the legacy 'local' string while the edited
+    // backend uses the canonical id — readers key by the raw id, so the fresh
+    // list must land under both.
+    useServerStore.setState({ activeServerId: 'local' } as never);
+    useFacadeStore.setState({ localBackendId: 'b1' } as never);
+    const list = [makeLlmProfile('llm-saved-1')];
+    mockListLlmProfilesForBackend.mockResolvedValue(list);
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'providers' },
+      agentsSelection: { backendId: 'b1', kind: 'new-llm-profile' },
+    });
+
+    render(
+      <AgentsContent
+        providersData={emptyProviders}
+        mcpData={emptyMcp}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('llm-stub-save'));
+    });
+
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+    const { providersByBackend } = useLlmProfileMetaStore.getState();
+    expect(providersByBackend['b1']).toEqual(list);
+    expect(providersByBackend['local']).toEqual(list);
+  });
+
+  it('provider mutations on a non-active backend update its cache without readiness refresh', async () => {
+    // b2 is not the active backend — no readiness refresh, no raw-key mirror,
+    // but the canonical cache entry still updates.
+    const list = [makeLlmProfile('llm-saved-1')];
+    mockListLlmProfilesForBackend.mockResolvedValue(list);
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'providers' },
+      agentsSelection: { backendId: 'b2', kind: 'new-llm-profile' },
+    });
+
+    render(
+      <AgentsContent
+        providersData={emptyProviders}
+        mcpData={emptyMcp}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('llm-stub-save'));
+    });
+
+    expect(mockRefresh).not.toHaveBeenCalled();
+    expect(mockLoadAll).not.toHaveBeenCalled();
+    expect(mockListLlmProfilesForBackend).toHaveBeenCalledWith('b2');
+    const { providersByBackend } = useLlmProfileMetaStore.getState();
+    expect(providersByBackend['b2']).toEqual(list);
+    expect(providersByBackend['b1']).toBeUndefined();
+  });
+
+  it('provider delete also syncs the global provider cache', async () => {
+    mockListLlmProfilesForBackend.mockResolvedValue([]);
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'providers' },
+      agentsSelection: { backendId: 'b1', kind: 'llm-profile', id: 'lp1' },
+    });
+
+    render(
+      <AgentsContent
+        providersData={makeProvidersData({ b1: [makeLlmProfile('lp1')] })}
+        mcpData={emptyMcp}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('llm-stub-delete'));
+    });
+
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+    expect(mockListLlmProfilesForBackend).toHaveBeenCalledWith('b1');
+    expect(useLlmProfileMetaStore.getState().providersByBackend['b1']).toEqual([]);
+  });
+
+  it('survives a failed provider cache refetch (readiness still refreshes)', async () => {
+    mockListLlmProfilesForBackend.mockRejectedValue(new Error('offline'));
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'providers' },
+      agentsSelection: { backendId: 'b1', kind: 'new-llm-profile' },
+    });
+
+    render(
+      <AgentsContent
+        providersData={emptyProviders}
+        mcpData={emptyMcp}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('llm-stub-save'));
+    });
+
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+    expect(useLlmProfileMetaStore.getState().providersByBackend['b1']).toBeUndefined();
   });
 });

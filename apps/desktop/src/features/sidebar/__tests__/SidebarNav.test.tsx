@@ -168,6 +168,33 @@ describe('SidebarNav', () => {
     expect(onSelectTab).toHaveBeenCalledWith('mcp-servers');
   });
 
+  it('fires onSelectTab with "providers" when the Providers tab is clicked', () => {
+    const onSelectTab = vi.fn();
+    render(
+      <SidebarNav
+        onHome={vi.fn()}
+        isHomeActive={false}
+        agentsMode={{ tab: 'profiles', onSelectTab, onBack: vi.fn() }}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Providers' }));
+    expect(onSelectTab).toHaveBeenCalledWith('providers');
+  });
+
+  it('marks the Providers tab active when on the providers tab', () => {
+    render(
+      <SidebarNav
+        onHome={vi.fn()}
+        isHomeActive={false}
+        agentsMode={{ tab: 'providers', onSelectTab: vi.fn(), onBack: vi.fn() }}
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Providers' }).className).toContain('bg-secondary');
+    expect(screen.getByRole('button', { name: 'Profiles' }).className).toContain(
+      'text-muted-foreground'
+    );
+  });
+
   it('marks the MCP Servers tab active when on the mcp-servers tab', () => {
     render(
       <SidebarNav

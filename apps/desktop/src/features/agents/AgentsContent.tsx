@@ -1,11 +1,12 @@
 /**
  * Agents management content rendered inline in the main pane.
  *
- * Selection comes from the sidebar's AgentsTree/SkillsTree/McpServersTree (via
- * topLevelViewStore); this component owns only the detail header + editor body.
- * Saves and deletes bump the shared refresh nonce so the trees refetch; profile
- * mutations additionally refresh the global agent stores when the edited backend
- * is the app's active backend (skills and MCP mutations never touch those stores).
+ * Selection comes from the sidebar's AgentsTree/SkillsTree/McpServersTree/
+ * ProvidersTree (via topLevelViewStore); this component owns only the detail
+ * header + editor body. Saves and deletes bump the shared refresh nonce so the
+ * trees refetch; profile and provider mutations additionally refresh the global
+ * stores when the edited backend is the app's active backend (skills and MCP
+ * mutations never touch those stores).
  */
 
 import type { ReactNode } from 'react';
@@ -15,31 +16,37 @@ import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useAgentProfileMetaStore } from '../../stores/agentProfileMetaStore';
 import { useAgentReadinessStore } from '../../stores/agentReadinessStore';
+import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
 import { resolveCanonicalBackendId } from '../../utils/controlPlane';
+import { listLlmProfilesForBackend } from '../../services/api';
 import { ProfileEditor } from './ProfileEditor';
 import { SkillEditor } from './SkillEditor';
 import { SkillDirsEditor } from './SkillDirsEditor';
 import { McpServerEditor } from './McpServerEditor';
+import { LlmProfileEditor } from './LlmProfileEditor';
 import { useSavedBridge } from './useSavedBridge';
 import type { AgentsBackend } from './agents-types';
 import type { ProfilesByBackend } from './useProfilesByBackend';
 import type { SkillsByBackend } from './useSkillsByBackend';
 import type { McpServersByBackend } from './useMcpServersByBackend';
+import type { LlmProfilesByBackend } from './useLlmProfilesByBackend';
 
 interface AgentsContentProps {
   backends: AgentsBackend[];
   data: ProfilesByBackend;
   skillsData: SkillsByBackend;
   mcpData: McpServersByBackend;
+  providersData: LlmProfilesByBackend;
 }
 
-type EmptyStateNoun = 'profile' | 'skill' | 'MCP server';
+type EmptyStateNoun = 'profile' | 'skill' | 'MCP server' | 'provider';
 
 // Pre-articled labels: `a ${noun}` would produce "a MCP server".
 const NOUN_WITH_ARTICLE: Record<EmptyStateNoun, string> = {
   profile: 'a profile',
   skill: 'a skill',
   'MCP server': 'an MCP server',
+  provider: 'a provider',
 };
 
 function EmptyState({ noun, hint }: { noun: EmptyStateNoun; hint?: string }) {
@@ -77,7 +84,13 @@ function DetailShell({
   );
 }
 
-export function AgentsContent({ backends, data, skillsData, mcpData }: AgentsContentProps) {
+export function AgentsContent({
+  backends,
+  data,
+  skillsData,
+  mcpData,
+  providersData,
+}: AgentsContentProps) {
   const view = useTopLevelViewStore(s => s.view);
   const selection = useTopLevelViewStore(s => s.agentsSelection);
   const selectAgentsItem = useTopLevelViewStore(s => s.selectAgentsItem);
@@ -106,13 +119,25 @@ export function AgentsContent({ backends, data, skillsData, mcpData }: AgentsCon
     loading: mcpData.loading,
     contains: (backendId, id) => (mcpData.servers.get(backendId) ?? []).some(s => s.id === id),
   });
+  // Providers mirror MCP: LlmProfileEditor's onSaved reports only the id.
+  const llmProfileBridge = useSavedBridge<never>({
+    loading: providersData.loading,
+    contains: (backendId, id) =>
+      (providersData.profiles.get(backendId) ?? []).some(p => p.id === id),
+  });
 
   if (!selection) {
     const activeTab = view.kind === 'agents' ? view.tab : 'profiles';
     return (
       <EmptyState
         noun={
-          activeTab === 'skills' ? 'skill' : activeTab === 'mcp-servers' ? 'MCP server' : 'profile'
+          activeTab === 'skills'
+            ? 'skill'
+            : activeTab === 'mcp-servers'
+              ? 'MCP server'
+              : activeTab === 'providers'
+                ? 'provider'
+                : 'profile'
         }
       />
     );
@@ -132,6 +157,42 @@ export function AgentsContent({ backends, data, skillsData, mcpData }: AgentsCon
     if (editedBackendId === activeBackendId) {
       void useAgentProfileMetaStore.getState().loadAll();
       void useAgentReadinessStore.getState().refresh();
+    }
+  };
+
+  // Provider (LLM profile) counterpart of refreshGlobalStoresIfActive.
+  //
+  // Key audit of useLlmProfileMetaStore.providersByBackend: every writer keys
+  // by the RAW activeServerId — useDataLoader/SessionChatWindow/
+  // WorkflowEditorWindow call projectStore.setProviders(), which forwards
+  // `useServerStore.getState().activeServerId` verbatim, and the settings
+  // components (LlmProfileManager/ProjectSettings/PermissionSettings) pass
+  // `activeServerId` explicitly. Every reader (useSidebarData, useChatSession,
+  // useAgentForSession, LocalPRCard, projectStore.getProviders) also passes the
+  // raw `activeServerId`. So the map is uniformly keyed on the raw active id,
+  // which may still be the legacy 'local' string rather than the canonical
+  // backend id. We therefore always cache under the canonical edited backend id
+  // (future-proof, harmless) AND, when the edited backend is the active one but
+  // the raw key differs (the legacy-'local' case), mirror under the raw key so
+  // today's readers actually see the fresh list.
+  const syncLlmProfileGlobalStoresIfActive = async () => {
+    const activeBackendId = resolveCanonicalBackendId(activeServerId, localBackendId);
+    const editedIsActive = editedBackendId === activeBackendId;
+    if (editedIsActive) {
+      // Provider mutations can flip agent readiness (e.g. adding the first
+      // credentialed profile) — refresh the gate like the profiles path does.
+      void useAgentReadinessStore.getState().refresh();
+    }
+    try {
+      const list = await listLlmProfilesForBackend(editedBackendId);
+      const { setProviders } = useLlmProfileMetaStore.getState();
+      setProviders(list, editedBackendId);
+      if (editedIsActive && activeServerId && activeServerId !== editedBackendId) {
+        setProviders(list, activeServerId);
+      }
+    } catch {
+      // Best-effort cache refresh: the Providers tree still refetches via the
+      // nonce bump, and stale global data self-heals on the next data load.
     }
   };
 
@@ -312,15 +373,67 @@ export function AgentsContent({ backends, data, skillsData, mcpData }: AgentsCon
 
     case 'llm-profile':
     case 'new-llm-profile': {
-      // Phase 4 Task 6 wires these — placeholder renders the same empty-state
-      // markup used for no-selection until the Providers editor lands.
+      const llmProfile =
+        selection.kind === 'llm-profile'
+          ? ((providersData.profiles.get(editedBackendId) ?? []).find(p => p.id === selection.id) ??
+            null)
+          : null;
+
+      if (selection.kind === 'llm-profile' && !llmProfile) {
+        const justSaved = llmProfileBridge.lookup(editedBackendId, selection.id) === true;
+        if (providersData.loading || justSaved) {
+          // A refetch is in flight (or a save's nonce bump hasn't landed yet):
+          // keep the detail chrome instead of flashing the empty state.
+          return (
+            <DetailShell title={selection.id} backendName={backendName}>
+              <p className="text-sm text-muted-foreground">Loading…</p>
+            </DetailShell>
+          );
+        }
+        // Stale selection after the fetch settled — same fallback semantics as
+        // the other tabs: quiet empty state, with an error hint when the fetch
+        // failed.
+        return (
+          <EmptyState
+            noun="provider"
+            hint={
+              providersData.errors.has(editedBackendId)
+                ? "Couldn't load providers for this backend."
+                : undefined
+            }
+          />
+        );
+      }
+
+      // Unlike skills/MCP — and like agent profiles — provider mutations feed
+      // the app-wide caches (LLM profile list + readiness gate).
+      const handleSaved = (id: string) => {
+        llmProfileBridge.record(editedBackendId, id);
+        bumpAgentsRefresh();
+        // Create mode lands on the newly created provider's id; the marker
+        // bridges the gap until the refetch delivers the record.
+        selectAgentsItem({ backendId: editedBackendId, kind: 'llm-profile', id });
+        void syncLlmProfileGlobalStoresIfActive();
+      };
+
+      const handleDeleted = () => {
+        selectAgentsItem(null);
+        bumpAgentsRefresh();
+        void syncLlmProfileGlobalStoresIfActive();
+      };
+
+      const title = selection.kind === 'llm-profile' ? (llmProfile?.name ?? '') : 'New provider';
+
       return (
-        <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
-          <p className="text-sm">Select a provider</p>
-          <p className="mt-1 text-xs opacity-60">
-            Choose a provider from the sidebar, or create one with +.
-          </p>
-        </div>
+        <DetailShell title={title} backendName={backendName}>
+          <LlmProfileEditor
+            key={`${editedBackendId}:${selection.kind === 'llm-profile' ? selection.id : 'new'}`}
+            backendId={editedBackendId}
+            profile={llmProfile}
+            onSaved={handleSaved}
+            onDeleted={handleDeleted}
+          />
+        </DetailShell>
       );
     }
 
