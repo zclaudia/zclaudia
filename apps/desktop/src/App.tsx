@@ -30,6 +30,7 @@ import { useTauriWindowEvents } from './hooks/useTauriWindowEvents';
 import { useAgentsBackends } from './features/agents/selectAgentsBackends';
 import { useProfilesByBackend, type AgentsBackend } from './features/agents/useProfilesByBackend';
 import { useSkillsByBackend } from './features/agents/useSkillsByBackend';
+import { useMcpServersByBackend } from './features/agents/useMcpServersByBackend';
 import { useServerStore } from './stores/serverStore';
 import { useFacadeStore } from './stores/facadeStore';
 import { useProjectStore } from './stores/projectStore';
@@ -227,6 +228,11 @@ function AppContent() {
       ? agentsBackends
       : NO_AGENTS_BACKENDS
   );
+  const mcpData = useMcpServersByBackend(
+    topLevelView.kind === 'agents' && topLevelView.tab === 'mcp-servers'
+      ? agentsBackends
+      : NO_AGENTS_BACKENDS
+  );
 
   const agentsMode =
     topLevelView.kind === 'agents'
@@ -237,6 +243,7 @@ function AppContent() {
           backends: agentsBackends,
           data: agentsData,
           skillsData,
+          mcpData,
           selection: agentsSelection,
           onSelectItem: selectAgentsItem,
         }
@@ -538,6 +545,7 @@ function AppContent() {
                   backends={agentsBackends}
                   data={agentsData}
                   skillsData={skillsData}
+                  mcpData={mcpData}
                 />
               </Suspense>
             ) : dashboardProject ? (

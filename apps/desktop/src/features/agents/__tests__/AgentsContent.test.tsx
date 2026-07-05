@@ -73,6 +73,34 @@ vi.mock('../SkillDirsEditor', () => ({
   ),
 }));
 
+// MCP editor stub: like the skill editor, onSaved reports only the saved id.
+// onStatusChanged mirrors the real editor's connection-action callback.
+vi.mock('../McpServerEditor', () => ({
+  McpServerEditor: ({
+    server,
+    status,
+    onSaved,
+    onDeleted,
+    onStatusChanged,
+  }: {
+    server: { id: string } | null;
+    status: { state: string } | undefined;
+    onSaved: (id: string) => void;
+    onDeleted: () => void;
+    onStatusChanged: () => void;
+  }) => (
+    <div
+      data-testid="mcp-editor"
+      data-server-id={server?.id ?? 'null'}
+      data-status={status?.state ?? 'none'}
+    >
+      <button onClick={() => onSaved('mcp-saved-1')}>mcp-stub-save</button>
+      <button onClick={() => onDeleted()}>mcp-stub-delete</button>
+      <button onClick={() => onStatusChanged()}>mcp-stub-status</button>
+    </div>
+  ),
+}));
+
 vi.mock('../../../stores/agentProfileMetaStore', () => ({
   useAgentProfileMetaStore: { getState: () => ({ loadAll: mockLoadAll }) },
 }));
@@ -84,7 +112,9 @@ vi.mock('../../../stores/agentReadinessStore', () => ({
 import { AgentsContent } from '../AgentsContent';
 import type { AgentsBackend, ProfilesByBackend } from '../useProfilesByBackend';
 import type { SkillsByBackend } from '../useSkillsByBackend';
+import type { McpServersByBackend } from '../useMcpServersByBackend';
 import type { WorkspaceSkillInfo, SkillLoadDiagnostic } from '../../../services/api';
+import type { McpServerConfig, McpServerStatus } from '@zclaudia/shared';
 
 function makeProfile(id: string, name = id): AgentProfileConfig {
   return {
@@ -142,6 +172,28 @@ function makeSkillsData(
 
 const emptySkills = makeSkillsData({});
 
+function makeMcpServer(id: string, name = id): McpServerConfig {
+  return { id, name, enabled: true } as McpServerConfig;
+}
+
+function makeMcpData(
+  serversByBackend: Record<string, McpServerConfig[]>,
+  opts: {
+    statuses?: Record<string, Record<string, McpServerStatus>>;
+    errors?: Record<string, string>;
+    loading?: boolean;
+  } = {}
+): McpServersByBackend {
+  return {
+    servers: new Map(Object.entries(serversByBackend)),
+    statuses: new Map(Object.entries(opts.statuses ?? {})),
+    errors: new Map(Object.entries(opts.errors ?? {})),
+    loading: opts.loading ?? false,
+  };
+}
+
+const emptyMcp = makeMcpData({});
+
 describe('AgentsContent', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -155,7 +207,14 @@ describe('AgentsContent', () => {
   });
 
   it('renders the empty state when nothing is selected', () => {
-    render(<AgentsContent backends={backends} data={makeData({})} skillsData={emptySkills} />);
+    render(
+      <AgentsContent
+        backends={backends}
+        mcpData={emptyMcp}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
 
     expect(screen.getByText('Select a profile')).toBeTruthy();
     expect(
@@ -171,6 +230,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        mcpData={emptyMcp}
         backends={backends}
         data={makeData({ b1: [makeProfile('ap1', 'Coding Agent')] })}
         skillsData={emptySkills}
@@ -189,6 +249,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        mcpData={emptyMcp}
         backends={backends}
         data={makeData({ b1: [makeProfile('ap1')] })}
         skillsData={emptySkills}
@@ -206,6 +267,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        mcpData={emptyMcp}
         backends={backends}
         data={makeData({}, { b1: 'boom' })}
         skillsData={emptySkills}
@@ -220,7 +282,14 @@ describe('AgentsContent', () => {
   it('renders create mode with a null profile and "New profile" header', () => {
     useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b2', kind: 'new-profile' } });
 
-    render(<AgentsContent backends={backends} data={makeData({})} skillsData={emptySkills} />);
+    render(
+      <AgentsContent
+        backends={backends}
+        mcpData={emptyMcp}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
 
     expect(screen.getByTestId('profile-editor').getAttribute('data-profile-id')).toBe('null');
     expect(screen.getByText('New profile')).toBeTruthy();
@@ -230,7 +299,14 @@ describe('AgentsContent', () => {
   it('onSaved bumps the refresh nonce and selects the saved profile id', () => {
     useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new-profile' } });
 
-    render(<AgentsContent backends={backends} data={makeData({})} skillsData={emptySkills} />);
+    render(
+      <AgentsContent
+        backends={backends}
+        mcpData={emptyMcp}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
 
     fireEvent.click(screen.getByText('stub-save'));
 
@@ -242,7 +318,14 @@ describe('AgentsContent', () => {
   it('keeps the saved profile visible while the refetch is still stale', () => {
     useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new-profile' } });
 
-    render(<AgentsContent backends={backends} data={makeData({})} skillsData={emptySkills} />);
+    render(
+      <AgentsContent
+        backends={backends}
+        mcpData={emptyMcp}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
 
     // data does not contain saved-1 yet — the overlay must bridge the gap
     // instead of flashing the empty state.
@@ -257,7 +340,12 @@ describe('AgentsContent', () => {
     useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new-profile' } });
 
     const { rerender } = render(
-      <AgentsContent backends={backends} data={makeData({})} skillsData={emptySkills} />
+      <AgentsContent
+        backends={backends}
+        mcpData={emptyMcp}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
     );
     fireEvent.click(screen.getByText('stub-save'));
     expect(screen.getByText('Saved One')).toBeTruthy();
@@ -265,6 +353,7 @@ describe('AgentsContent', () => {
     // Refetch lands with the authoritative record — it wins over the overlay.
     rerender(
       <AgentsContent
+        mcpData={emptyMcp}
         backends={backends}
         data={makeData({ b1: [makeProfile('saved-1', 'Fetched One')] })}
         skillsData={emptySkills}
@@ -278,7 +367,14 @@ describe('AgentsContent', () => {
   it('does not leak the overlay into a different selection', () => {
     useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new-profile' } });
 
-    render(<AgentsContent backends={backends} data={makeData({})} skillsData={emptySkills} />);
+    render(
+      <AgentsContent
+        backends={backends}
+        mcpData={emptyMcp}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
     fireEvent.click(screen.getByText('stub-save'));
     expect(screen.getByTestId('profile-editor')).toBeTruthy();
 
@@ -300,6 +396,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        mcpData={emptyMcp}
         backends={backends}
         data={makeData({ b1: [makeProfile('ap1')] })}
         skillsData={emptySkills}
@@ -317,7 +414,12 @@ describe('AgentsContent', () => {
     // b1 is the active backend (activeServerId null → localBackendId 'b1').
     useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new-profile' } });
     const { unmount } = render(
-      <AgentsContent backends={backends} data={makeData({})} skillsData={emptySkills} />
+      <AgentsContent
+        backends={backends}
+        mcpData={emptyMcp}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
     );
 
     fireEvent.click(screen.getByText('stub-save'));
@@ -328,7 +430,14 @@ describe('AgentsContent', () => {
     // b2 is not the active backend — no global refresh.
     vi.clearAllMocks();
     useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b2', kind: 'new-profile' } });
-    render(<AgentsContent backends={backends} data={makeData({})} skillsData={emptySkills} />);
+    render(
+      <AgentsContent
+        backends={backends}
+        mcpData={emptyMcp}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
 
     fireEvent.click(screen.getByText('stub-save'));
     expect(mockLoadAll).not.toHaveBeenCalled();
@@ -339,7 +448,14 @@ describe('AgentsContent', () => {
     useServerStore.setState({ activeServerId: 'b2' } as never);
     useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b2', kind: 'new-profile' } });
 
-    render(<AgentsContent backends={backends} data={makeData({})} skillsData={emptySkills} />);
+    render(
+      <AgentsContent
+        backends={backends}
+        mcpData={emptyMcp}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
 
     fireEvent.click(screen.getByText('stub-save'));
     expect(mockLoadAll).toHaveBeenCalledTimes(1);
@@ -353,7 +469,14 @@ describe('AgentsContent', () => {
     useFacadeStore.setState({ localBackendId: 'b1' } as never);
     useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new-profile' } });
 
-    render(<AgentsContent backends={backends} data={makeData({})} skillsData={emptySkills} />);
+    render(
+      <AgentsContent
+        backends={backends}
+        mcpData={emptyMcp}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
 
     fireEvent.click(screen.getByText('stub-save'));
     expect(mockLoadAll).toHaveBeenCalledTimes(1);
@@ -368,7 +491,14 @@ describe('AgentsContent', () => {
       agentsSelection: null,
     });
 
-    render(<AgentsContent backends={backends} data={makeData({})} skillsData={emptySkills} />);
+    render(
+      <AgentsContent
+        backends={backends}
+        mcpData={emptyMcp}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
 
     expect(screen.getByText('Select a skill')).toBeTruthy();
     expect(screen.getByText('Choose a skill from the sidebar, or create one with +.')).toBeTruthy();
@@ -383,6 +513,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
         skillsData={makeSkillsData({ b1: [makeSkill('sk1', 'Git Helper')] })}
@@ -402,6 +533,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
         skillsData={makeSkillsData({ b1: [makeSkill('sk1')] })}
@@ -420,6 +552,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
         skillsData={makeSkillsData({}, { errors: { b1: 'boom' } })}
@@ -439,6 +572,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
         skillsData={makeSkillsData({}, { loading: true })}
@@ -456,7 +590,14 @@ describe('AgentsContent', () => {
       agentsSelection: { backendId: 'b2', kind: 'new-skill' },
     });
 
-    render(<AgentsContent backends={backends} data={makeData({})} skillsData={emptySkills} />);
+    render(
+      <AgentsContent
+        backends={backends}
+        mcpData={emptyMcp}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
 
     expect(screen.getByTestId('skill-editor').getAttribute('data-skill-id')).toBe('null');
     expect(screen.getByText('New skill')).toBeTruthy();
@@ -469,7 +610,14 @@ describe('AgentsContent', () => {
       agentsSelection: { backendId: 'b1', kind: 'new-skill' },
     });
 
-    render(<AgentsContent backends={backends} data={makeData({})} skillsData={emptySkills} />);
+    render(
+      <AgentsContent
+        backends={backends}
+        mcpData={emptyMcp}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
 
     // skillsData does not contain skill-saved-1 (and is not even loading yet) —
     // the just-saved marker must keep the detail chrome up instead of flashing
@@ -491,13 +639,19 @@ describe('AgentsContent', () => {
     });
 
     const { rerender } = render(
-      <AgentsContent backends={backends} data={makeData({})} skillsData={emptySkills} />
+      <AgentsContent
+        backends={backends}
+        mcpData={emptyMcp}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
     );
     fireEvent.click(screen.getByText('skill-stub-save'));
     expect(screen.getByText('Loading…')).toBeTruthy();
 
     rerender(
       <AgentsContent
+        mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
         skillsData={makeSkillsData({ b1: [makeSkill('skill-saved-1', 'Saved Skill')] })}
@@ -516,7 +670,12 @@ describe('AgentsContent', () => {
     });
 
     const { rerender } = render(
-      <AgentsContent backends={backends} data={makeData({})} skillsData={emptySkills} />
+      <AgentsContent
+        backends={backends}
+        mcpData={emptyMcp}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
     );
     fireEvent.click(screen.getByText('skill-stub-save'));
     expect(screen.getByText('Loading…')).toBeTruthy();
@@ -524,6 +683,7 @@ describe('AgentsContent', () => {
     // Refetch starts…
     rerender(
       <AgentsContent
+        mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
         skillsData={makeSkillsData({}, { loading: true })}
@@ -533,6 +693,7 @@ describe('AgentsContent', () => {
     // of masking the error behind eternal Loading chrome.
     rerender(
       <AgentsContent
+        mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
         skillsData={makeSkillsData({}, { errors: { b1: 'boom' } })}
@@ -552,7 +713,14 @@ describe('AgentsContent', () => {
       agentsSelection: { backendId: 'b1', kind: 'new-skill' },
     });
 
-    render(<AgentsContent backends={backends} data={makeData({})} skillsData={emptySkills} />);
+    render(
+      <AgentsContent
+        backends={backends}
+        mcpData={emptyMcp}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
 
     fireEvent.click(screen.getByText('skill-stub-save'));
     expect(mockLoadAll).not.toHaveBeenCalled();
@@ -567,6 +735,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
         skillsData={makeSkillsData({ b1: [makeSkill('sk1')] })}
@@ -590,6 +759,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
         skillsData={makeSkillsData(
@@ -626,7 +796,14 @@ describe('AgentsContent', () => {
       agentsSelection: { backendId: 'b1', kind: 'skill-dirs' },
     });
 
-    render(<AgentsContent backends={backends} data={makeData({})} skillsData={emptySkills} />);
+    render(
+      <AgentsContent
+        backends={backends}
+        mcpData={emptyMcp}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
 
     fireEvent.click(screen.getByText('dirs-stub-save'));
     expect(useTopLevelViewStore.getState().agentsRefreshNonce).toBe(1);
@@ -640,6 +817,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
         skillsData={makeSkillsData({}, { dirsFailed: ['b1'] })}
@@ -662,6 +840,7 @@ describe('AgentsContent', () => {
 
     render(
       <AgentsContent
+        mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
         skillsData={makeSkillsData({}, { loading: true })}
@@ -671,5 +850,285 @@ describe('AgentsContent', () => {
     expect(screen.queryByTestId('skill-dirs-editor')).toBeNull();
     expect(screen.getByText('Loading…')).toBeTruthy();
     expect(screen.getByText('External directories')).toBeTruthy();
+  });
+
+  // ---- MCP Servers tab ----
+
+  it('renders the MCP empty state copy (grammatical article) on the mcp tab', () => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'mcp-servers' },
+      agentsSelection: null,
+    });
+
+    render(
+      <AgentsContent
+        mcpData={emptyMcp}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    expect(screen.getByText('Select an MCP server')).toBeTruthy();
+    expect(
+      screen.getByText('Choose an MCP server from the sidebar, or create one with +.')
+    ).toBeTruthy();
+    expect(screen.queryByTestId('mcp-editor')).toBeNull();
+  });
+
+  it('renders the MCP editor with header and status for a selected server', () => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'mcp-servers' },
+      agentsSelection: { backendId: 'b1', kind: 'mcp-server', id: 'm1' },
+    });
+
+    render(
+      <AgentsContent
+        mcpData={makeMcpData(
+          { b1: [makeMcpServer('m1', 'context7')] },
+          { statuses: { b1: { context7: { name: 'context7', state: 'connected' } } } }
+        )}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    const editor = screen.getByTestId('mcp-editor');
+    expect(editor.getAttribute('data-server-id')).toBe('m1');
+    expect(editor.getAttribute('data-status')).toBe('connected');
+    expect(screen.getByText('context7')).toBeTruthy();
+    expect(screen.getByText('Backend 1')).toBeTruthy();
+  });
+
+  it('passes an undefined status when the backend reported no statuses', () => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'mcp-servers' },
+      agentsSelection: { backendId: 'b1', kind: 'mcp-server', id: 'm1' },
+    });
+
+    render(
+      <AgentsContent
+        mcpData={makeMcpData({ b1: [makeMcpServer('m1', 'context7')] })}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    expect(screen.getByTestId('mcp-editor').getAttribute('data-status')).toBe('none');
+  });
+
+  it('renders MCP create mode with a null server and "New MCP server" header', () => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'mcp-servers' },
+      agentsSelection: { backendId: 'b2', kind: 'new-mcp-server' },
+    });
+
+    render(
+      <AgentsContent
+        mcpData={emptyMcp}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    expect(screen.getByTestId('mcp-editor').getAttribute('data-server-id')).toBe('null');
+    expect(screen.getByText('New MCP server')).toBeTruthy();
+    expect(screen.getByText('Backend 2')).toBeTruthy();
+  });
+
+  it('MCP save bumps the nonce, re-selects the id, and avoids the empty-state flash', () => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'mcp-servers' },
+      agentsSelection: { backendId: 'b1', kind: 'new-mcp-server' },
+    });
+
+    render(
+      <AgentsContent
+        mcpData={emptyMcp}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    // mcpData does not contain mcp-saved-1 (and is not even loading yet) — the
+    // just-saved marker must keep the detail chrome up instead of flashing the
+    // empty state.
+    fireEvent.click(screen.getByText('mcp-stub-save'));
+
+    const state = useTopLevelViewStore.getState();
+    expect(state.agentsRefreshNonce).toBe(1);
+    expect(state.agentsSelection).toEqual({
+      backendId: 'b1',
+      kind: 'mcp-server',
+      id: 'mcp-saved-1',
+    });
+    expect(screen.queryByText('Select an MCP server')).toBeNull();
+    expect(screen.getByText('mcp-saved-1')).toBeTruthy();
+    expect(screen.getByText('Loading…')).toBeTruthy();
+  });
+
+  it('renders the fetched server once the refetch lands after a save', () => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'mcp-servers' },
+      agentsSelection: { backendId: 'b1', kind: 'new-mcp-server' },
+    });
+
+    const { rerender } = render(
+      <AgentsContent
+        mcpData={emptyMcp}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+    fireEvent.click(screen.getByText('mcp-stub-save'));
+    expect(screen.getByText('Loading…')).toBeTruthy();
+
+    rerender(
+      <AgentsContent
+        mcpData={makeMcpData({ b1: [makeMcpServer('mcp-saved-1', 'Saved Server')] })}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    expect(screen.getByTestId('mcp-editor').getAttribute('data-server-id')).toBe('mcp-saved-1');
+    expect(screen.getByText('Saved Server')).toBeTruthy();
+    expect(screen.queryByText('Loading…')).toBeNull();
+  });
+
+  it('shows the error hint when the post-save MCP refetch settles without the id', () => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'mcp-servers' },
+      agentsSelection: { backendId: 'b1', kind: 'new-mcp-server' },
+    });
+
+    const { rerender } = render(
+      <AgentsContent
+        mcpData={emptyMcp}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+    fireEvent.click(screen.getByText('mcp-stub-save'));
+    expect(screen.getByText('Loading…')).toBeTruthy();
+
+    // Refetch starts…
+    rerender(
+      <AgentsContent
+        mcpData={makeMcpData({}, { loading: true })}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+    // …and settles with a failure — the marker lets go and the error shows.
+    rerender(
+      <AgentsContent
+        mcpData={makeMcpData({}, { errors: { b1: 'boom' } })}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    expect(screen.getByText('Select an MCP server')).toBeTruthy();
+    expect(screen.getByText("Couldn't load MCP servers for this backend.")).toBeTruthy();
+    expect(screen.queryByText('Loading…')).toBeNull();
+  });
+
+  it('shows a fetch-error hint for a stale MCP selection on a failed backend', () => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'mcp-servers' },
+      agentsSelection: { backendId: 'b1', kind: 'mcp-server', id: 'm1' },
+    });
+
+    render(
+      <AgentsContent
+        mcpData={makeMcpData({}, { errors: { b1: 'boom' } })}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    expect(screen.getByText('Select an MCP server')).toBeTruthy();
+    expect(screen.getByText("Couldn't load MCP servers for this backend.")).toBeTruthy();
+    expect(screen.queryByTestId('mcp-editor')).toBeNull();
+  });
+
+  it('MCP delete clears the selection and bumps the refresh nonce', () => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'mcp-servers' },
+      agentsSelection: { backendId: 'b1', kind: 'mcp-server', id: 'm1' },
+    });
+
+    render(
+      <AgentsContent
+        mcpData={makeMcpData({ b1: [makeMcpServer('m1')] })}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    fireEvent.click(screen.getByText('mcp-stub-delete'));
+
+    const state = useTopLevelViewStore.getState();
+    expect(state.agentsSelection).toBeNull();
+    expect(state.agentsRefreshNonce).toBe(1);
+  });
+
+  it('MCP status changes bump the refresh nonce so statuses refetch', () => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'mcp-servers' },
+      agentsSelection: { backendId: 'b1', kind: 'mcp-server', id: 'm1' },
+    });
+
+    render(
+      <AgentsContent
+        mcpData={makeMcpData({ b1: [makeMcpServer('m1')] })}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    fireEvent.click(screen.getByText('mcp-stub-status'));
+    expect(useTopLevelViewStore.getState().agentsRefreshNonce).toBe(1);
+    // The selection stays put — only the catalog refetches.
+    expect(useTopLevelViewStore.getState().agentsSelection).toEqual({
+      backendId: 'b1',
+      kind: 'mcp-server',
+      id: 'm1',
+    });
+  });
+
+  it('MCP mutations never refresh the global profile stores', () => {
+    // b1 is the active backend — a profile mutation here would refresh the
+    // stores, but MCP must not.
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'mcp-servers' },
+      agentsSelection: { backendId: 'b1', kind: 'new-mcp-server' },
+    });
+
+    render(
+      <AgentsContent
+        mcpData={emptyMcp}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    fireEvent.click(screen.getByText('mcp-stub-save'));
+    expect(mockLoadAll).not.toHaveBeenCalled();
+    expect(mockRefresh).not.toHaveBeenCalled();
   });
 });

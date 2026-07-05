@@ -14,9 +14,11 @@ import { useAutomationApi } from '../automation/useAutomationApi';
 import type { AutomationTab } from '../automation/automation-types';
 import { AgentsTree } from '../agents/AgentsTree';
 import { SkillsTree } from '../agents/SkillsTree';
+import { McpServersTree } from '../agents/McpServersTree';
 import type { AgentsTab, AgentsSelection } from '../agents/agents-types';
 import type { AgentsBackend, ProfilesByBackend } from '../agents/useProfilesByBackend';
 import type { SkillsByBackend } from '../agents/useSkillsByBackend';
+import type { McpServersByBackend } from '../agents/useMcpServersByBackend';
 import { MobileSidebarHeader } from './MobileSidebarHeader';
 import { SidebarSearch } from './SidebarSearch';
 import { SearchModal } from './SearchModal';
@@ -85,6 +87,7 @@ interface SidebarProps {
     backends: AgentsBackend[];
     data: ProfilesByBackend;
     skillsData: SkillsByBackend;
+    mcpData: McpServersByBackend;
     selection: AgentsSelection | null;
     onSelectItem: (sel: AgentsSelection) => void;
   };
@@ -763,7 +766,16 @@ export function Sidebar({
                 onSelectScope={automationMode.onSelectScope}
               />
             ) : agentsMode ? (
-              agentsMode.tab === 'skills' ? (
+              agentsMode.tab === 'mcp-servers' ? (
+                <McpServersTree
+                  backends={agentsMode.backends}
+                  data={agentsMode.mcpData}
+                  selection={agentsMode.selection}
+                  expandedBackendIds={expandedBackendIds}
+                  onToggleBackend={toggleBackend}
+                  onSelectItem={agentsMode.onSelectItem}
+                />
+              ) : agentsMode.tab === 'skills' ? (
                 <SkillsTree
                   backends={agentsMode.backends}
                   data={agentsMode.skillsData}
@@ -885,7 +897,16 @@ export function Sidebar({
               onSelectScope={automationMode.onSelectScope}
             />
           ) : agentsMode ? (
-            agentsMode.tab === 'skills' ? (
+            agentsMode.tab === 'mcp-servers' ? (
+              <McpServersTree
+                backends={agentsMode.backends}
+                data={agentsMode.mcpData}
+                selection={agentsMode.selection}
+                expandedBackendIds={expandedBackendIds}
+                onToggleBackend={toggleBackend}
+                onSelectItem={agentsMode.onSelectItem}
+              />
+            ) : agentsMode.tab === 'skills' ? (
               <SkillsTree
                 backends={agentsMode.backends}
                 data={agentsMode.skillsData}

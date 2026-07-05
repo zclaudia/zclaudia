@@ -85,6 +85,9 @@ vi.mock('../../features/agents/AgentsTree', () => ({
 vi.mock('../../features/agents/SkillsTree', () => ({
   SkillsTree: () => <div data-testid="skills-tree" />,
 }));
+vi.mock('../../features/agents/McpServersTree', () => ({
+  McpServersTree: () => <div data-testid="mcp-servers-tree" />,
+}));
 vi.mock('../../hooks/useSelectionCoordinator', () => ({
   useSelectionCoordinator: () => ({
     selectProject: selectionMocks.selectProject,
@@ -2078,7 +2081,7 @@ describe('Sidebar', () => {
 
   // ---- Agents mode ----
 
-  const makeAgentsMode = (tab: 'profiles' | 'skills') => ({
+  const makeAgentsMode = (tab: 'profiles' | 'skills' | 'mcp-servers') => ({
     tab,
     onSelectTab: vi.fn(),
     onBack: vi.fn(),
@@ -2089,6 +2092,12 @@ describe('Sidebar', () => {
       diagnostics: new Map(),
       dirs: new Map(),
       dirsFailed: new Set<string>(),
+      errors: new Map(),
+      loading: false,
+    },
+    mcpData: {
+      servers: new Map(),
+      statuses: new Map(),
       errors: new Map(),
       loading: false,
     },
@@ -2112,6 +2121,17 @@ describe('Sidebar', () => {
     expect(screen.getByTestId('skills-tree')).toBeTruthy();
     expect(screen.queryByTestId('agents-tree')).toBeNull();
     expect(screen.getByRole('button', { name: 'Skills' })).toBeTruthy();
+  });
+
+  it('renders McpServersTree when agentsMode is on the mcp-servers tab', () => {
+    render(
+      <Sidebar collapsed={false} onToggle={vi.fn()} agentsMode={makeAgentsMode('mcp-servers')} />
+    );
+
+    expect(screen.getByTestId('mcp-servers-tree')).toBeTruthy();
+    expect(screen.queryByTestId('agents-tree')).toBeNull();
+    expect(screen.queryByTestId('skills-tree')).toBeNull();
+    expect(screen.getByRole('button', { name: 'MCP Servers' })).toBeTruthy();
   });
 
   // ---- PluginPermissionDialog ----

@@ -1,11 +1,11 @@
 /**
  * Agents management content rendered inline in the main pane.
  *
- * Selection comes from the sidebar's AgentsTree/SkillsTree (via topLevelViewStore);
- * this component owns only the detail header + editor body. Saves and deletes bump
- * the shared refresh nonce so the trees refetch; profile mutations additionally
- * refresh the global agent stores when the edited backend is the app's active
- * backend (skills mutations never touch those stores).
+ * Selection comes from the sidebar's AgentsTree/SkillsTree/McpServersTree (via
+ * topLevelViewStore); this component owns only the detail header + editor body.
+ * Saves and deletes bump the shared refresh nonce so the trees refetch; profile
+ * mutations additionally refresh the global agent stores when the edited backend
+ * is the app's active backend (skills and MCP mutations never touch those stores).
  */
 
 import type { ReactNode } from 'react';
@@ -19,23 +19,35 @@ import { resolveCanonicalBackendId } from '../../utils/controlPlane';
 import { ProfileEditor } from './ProfileEditor';
 import { SkillEditor } from './SkillEditor';
 import { SkillDirsEditor } from './SkillDirsEditor';
+import { McpServerEditor } from './McpServerEditor';
 import { useSavedBridge } from './useSavedBridge';
 import type { AgentsBackend } from './agents-types';
 import type { ProfilesByBackend } from './useProfilesByBackend';
 import type { SkillsByBackend } from './useSkillsByBackend';
+import type { McpServersByBackend } from './useMcpServersByBackend';
 
 interface AgentsContentProps {
   backends: AgentsBackend[];
   data: ProfilesByBackend;
   skillsData: SkillsByBackend;
+  mcpData: McpServersByBackend;
 }
 
-function EmptyState({ noun, hint }: { noun: 'profile' | 'skill' | 'MCP server'; hint?: string }) {
+type EmptyStateNoun = 'profile' | 'skill' | 'MCP server';
+
+// Pre-articled labels: `a ${noun}` would produce "a MCP server".
+const NOUN_WITH_ARTICLE: Record<EmptyStateNoun, string> = {
+  profile: 'a profile',
+  skill: 'a skill',
+  'MCP server': 'an MCP server',
+};
+
+function EmptyState({ noun, hint }: { noun: EmptyStateNoun; hint?: string }) {
   return (
     <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
-      <p className="text-sm">Select a {noun}</p>
+      <p className="text-sm">Select {NOUN_WITH_ARTICLE[noun]}</p>
       <p className="mt-1 text-xs opacity-60">
-        {hint ?? `Choose a ${noun} from the sidebar, or create one with +.`}
+        {hint ?? `Choose ${NOUN_WITH_ARTICLE[noun]} from the sidebar, or create one with +.`}
       </p>
     </div>
   );
@@ -65,7 +77,7 @@ function DetailShell({
   );
 }
 
-export function AgentsContent({ backends, data, skillsData }: AgentsContentProps) {
+export function AgentsContent({ backends, data, skillsData, mcpData }: AgentsContentProps) {
   const view = useTopLevelViewStore(s => s.view);
   const selection = useTopLevelViewStore(s => s.agentsSelection);
   const selectAgentsItem = useTopLevelViewStore(s => s.selectAgentsItem);
@@ -89,10 +101,21 @@ export function AgentsContent({ backends, data, skillsData }: AgentsContentProps
     loading: skillsData.loading,
     contains: (backendId, id) => (skillsData.skills.get(backendId) ?? []).some(s => s.id === id),
   });
+  // MCP mirrors skills: McpServerEditor's onSaved reports only the id.
+  const mcpBridge = useSavedBridge<never>({
+    loading: mcpData.loading,
+    contains: (backendId, id) => (mcpData.servers.get(backendId) ?? []).some(s => s.id === id),
+  });
 
   if (!selection) {
     const activeTab = view.kind === 'agents' ? view.tab : 'profiles';
-    return <EmptyState noun={activeTab === 'skills' ? 'skill' : 'profile'} />;
+    return (
+      <EmptyState
+        noun={
+          activeTab === 'skills' ? 'skill' : activeTab === 'mcp-servers' ? 'MCP server' : 'profile'
+        }
+      />
+    );
   }
 
   const editedBackendId = selection.backendId;
@@ -289,8 +312,73 @@ export function AgentsContent({ backends, data, skillsData }: AgentsContentProps
 
     case 'mcp-server':
     case 'new-mcp-server': {
-      // Phase 3 Task 7 replaces this placeholder.
-      return <EmptyState noun="MCP server" />;
+      const server =
+        selection.kind === 'mcp-server'
+          ? ((mcpData.servers.get(editedBackendId) ?? []).find(s => s.id === selection.id) ?? null)
+          : null;
+
+      if (selection.kind === 'mcp-server' && !server) {
+        const justSaved = mcpBridge.lookup(editedBackendId, selection.id) === true;
+        if (mcpData.loading || justSaved) {
+          // A refetch is in flight (or a save's nonce bump hasn't landed yet):
+          // keep the detail chrome instead of flashing the empty state.
+          return (
+            <DetailShell title={selection.id} backendName={backendName}>
+              <p className="text-sm text-muted-foreground">Loading…</p>
+            </DetailShell>
+          );
+        }
+        // Stale selection after the fetch settled — same fallback semantics as
+        // profiles/skills: quiet empty state, with an error hint when the fetch failed.
+        return (
+          <EmptyState
+            noun="MCP server"
+            hint={
+              mcpData.errors.has(editedBackendId)
+                ? "Couldn't load MCP servers for this backend."
+                : undefined
+            }
+          />
+        );
+      }
+
+      // Statuses are keyed by server NAME (not id) — see useMcpServersByBackend.
+      // A missing statuses entry means "statuses unavailable" and renders as
+      // undefined status (the editor treats it as not connected).
+      const status = server ? mcpData.statuses.get(editedBackendId)?.[server.name] : undefined;
+
+      // Like skills — and unlike profiles — MCP mutations never touch the
+      // global profile stores.
+      const handleSaved = (id: string) => {
+        mcpBridge.record(editedBackendId, id);
+        bumpAgentsRefresh();
+        // Create mode lands on the newly created server's id; the marker bridges
+        // the gap until the refetch delivers the record.
+        selectAgentsItem({ backendId: editedBackendId, kind: 'mcp-server', id });
+      };
+
+      const handleDeleted = () => {
+        selectAgentsItem(null);
+        bumpAgentsRefresh();
+      };
+
+      const title = selection.kind === 'mcp-server' ? (server?.name ?? '') : 'New MCP server';
+
+      return (
+        <DetailShell title={title} backendName={backendName}>
+          <McpServerEditor
+            key={`${editedBackendId}:${selection.kind === 'mcp-server' ? selection.id : 'new'}`}
+            backendId={editedBackendId}
+            server={server}
+            status={status}
+            onSaved={handleSaved}
+            onDeleted={handleDeleted}
+            // Connect/disconnect/refresh/toggle/oauth changed connection state —
+            // bump so the statuses refetch.
+            onStatusChanged={bumpAgentsRefresh}
+          />
+        </DetailShell>
+      );
     }
 
     default: {

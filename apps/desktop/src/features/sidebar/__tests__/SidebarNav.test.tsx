@@ -155,6 +155,33 @@ describe('SidebarNav', () => {
     expect(onSelectTab).toHaveBeenCalledWith('skills');
   });
 
+  it('fires onSelectTab with "mcp-servers" when the MCP Servers tab is clicked', () => {
+    const onSelectTab = vi.fn();
+    render(
+      <SidebarNav
+        onHome={vi.fn()}
+        isHomeActive={false}
+        agentsMode={{ tab: 'profiles', onSelectTab, onBack: vi.fn() }}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'MCP Servers' }));
+    expect(onSelectTab).toHaveBeenCalledWith('mcp-servers');
+  });
+
+  it('marks the MCP Servers tab active when on the mcp-servers tab', () => {
+    render(
+      <SidebarNav
+        onHome={vi.fn()}
+        isHomeActive={false}
+        agentsMode={{ tab: 'mcp-servers', onSelectTab: vi.fn(), onBack: vi.fn() }}
+      />
+    );
+    expect(screen.getByRole('button', { name: 'MCP Servers' }).className).toContain('bg-secondary');
+    expect(screen.getByRole('button', { name: 'Profiles' }).className).toContain(
+      'text-muted-foreground'
+    );
+  });
+
   it('marks the Skills tab active and Profiles inactive when on the skills tab', () => {
     render(
       <SidebarNav

@@ -9,6 +9,7 @@ import {
   Bot,
   SlidersHorizontal,
   Lightbulb,
+  Database,
 } from 'lucide-react';
 import type { AutomationTab } from '../automation/automation-types';
 import type { AgentsTab } from '../agents/agents-types';
@@ -52,6 +53,7 @@ const AUTOMATION_TABS: { key: AutomationTab; label: string; Icon: typeof Zap }[]
 const AGENTS_TABS: { key: AgentsTab; label: string; Icon: typeof Bot }[] = [
   { key: 'profiles', label: 'Profiles', Icon: SlidersHorizontal },
   { key: 'skills', label: 'Skills', Icon: Lightbulb },
+  { key: 'mcp-servers', label: 'MCP Servers', Icon: Database },
 ];
 
 /**
