@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 
 import { useTopLevelViewStore } from '../../../stores/topLevelViewStore';
@@ -154,6 +154,57 @@ describe('AgentsContent', () => {
     const state = useTopLevelViewStore.getState();
     expect(state.agentsRefreshNonce).toBe(1);
     expect(state.agentsSelection).toEqual({ backendId: 'b1', kind: 'profile', id: 'saved-1' });
+  });
+
+  it('keeps the saved profile visible while the refetch is still stale', () => {
+    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new' } });
+
+    render(<AgentsContent backends={backends} data={makeData({})} />);
+
+    // data does not contain saved-1 yet — the overlay must bridge the gap
+    // instead of flashing the empty state.
+    fireEvent.click(screen.getByText('stub-save'));
+
+    expect(screen.queryByText('Select a profile')).toBeNull();
+    expect(screen.getByTestId('profile-editor').getAttribute('data-profile-id')).toBe('saved-1');
+    expect(screen.getByText('Saved One')).toBeTruthy();
+  });
+
+  it('prefers the fetched profile over the overlay once the refetch lands', () => {
+    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new' } });
+
+    const { rerender } = render(<AgentsContent backends={backends} data={makeData({})} />);
+    fireEvent.click(screen.getByText('stub-save'));
+    expect(screen.getByText('Saved One')).toBeTruthy();
+
+    // Refetch lands with the authoritative record — it wins over the overlay.
+    rerender(
+      <AgentsContent
+        backends={backends}
+        data={makeData({ b1: [makeProfile('saved-1', 'Fetched One')] })}
+      />
+    );
+
+    expect(screen.getByText('Fetched One')).toBeTruthy();
+    expect(screen.queryByText('Saved One')).toBeNull();
+  });
+
+  it('does not leak the overlay into a different selection', () => {
+    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new' } });
+
+    render(<AgentsContent backends={backends} data={makeData({})} />);
+    fireEvent.click(screen.getByText('stub-save'));
+    expect(screen.getByTestId('profile-editor')).toBeTruthy();
+
+    // Select a different (absent) profile — the overlay must not stand in.
+    act(() => {
+      useTopLevelViewStore.setState({
+        agentsSelection: { backendId: 'b1', kind: 'profile', id: 'other' },
+      });
+    });
+
+    expect(screen.getByText('Select a profile')).toBeTruthy();
+    expect(screen.queryByTestId('profile-editor')).toBeNull();
   });
 
   it('onDeleted clears the selection and bumps the refresh nonce', () => {

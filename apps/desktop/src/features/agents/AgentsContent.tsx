@@ -7,6 +7,7 @@
  * agent stores when the edited backend is the app's active backend.
  */
 
+import { useEffect, useState } from 'react';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import { useTopLevelViewStore } from '../../stores/topLevelViewStore';
 import { useServerStore } from '../../stores/serverStore';
@@ -41,14 +42,46 @@ export function AgentsContent({ backends, data }: AgentsContentProps) {
   const activeServerId = useServerStore(s => s.activeServerId);
   const localBackendId = useFacadeStore(s => s.localBackendId);
 
+  // Optimistic overlay: handleSaved re-selects the saved id before the nonce
+  // refetch lands, so the fetched map is briefly stale. Holding the just-saved
+  // profile keeps the editor visible (no empty-state flash) until the refetch
+  // becomes authoritative.
+  const [savedOverlay, setSavedOverlay] = useState<{
+    backendId: string;
+    profile: AgentProfileConfig;
+  } | null>(null);
+
+  // Drop the overlay once the fetched map contains its id (the fetch is now
+  // authoritative) or when the selection moves to a different identity.
+  useEffect(() => {
+    if (!savedOverlay) return;
+    const matchesSelection =
+      selection?.kind === 'profile' &&
+      selection.backendId === savedOverlay.backendId &&
+      selection.id === savedOverlay.profile.id;
+    const fetched = (data.profiles.get(savedOverlay.backendId) ?? []).some(
+      p => p.id === savedOverlay.profile.id
+    );
+    if (!matchesSelection || fetched) setSavedOverlay(null);
+  }, [savedOverlay, selection, data]);
+
   if (!selection) {
     return <EmptyState />;
   }
 
-  const profile =
+  const fetchedProfile =
     selection.kind === 'profile'
       ? ((data.profiles.get(selection.backendId) ?? []).find(p => p.id === selection.id) ?? null)
       : null;
+  const overlayProfile =
+    selection.kind === 'profile' &&
+    savedOverlay &&
+    savedOverlay.backendId === selection.backendId &&
+    savedOverlay.profile.id === selection.id
+      ? savedOverlay.profile
+      : null;
+  // The fetched object wins once it exists; the overlay only bridges the gap.
+  const profile = fetchedProfile ?? overlayProfile;
 
   // Stale selection (e.g. the profile was deleted elsewhere) falls back to the
   // quiet empty state rather than an editor for a phantom record. When the
@@ -83,8 +116,10 @@ export function AgentsContent({ backends, data }: AgentsContentProps) {
   };
 
   const handleSaved = (saved: AgentProfileConfig) => {
+    setSavedOverlay({ backendId: editedBackendId, profile: saved });
     bumpAgentsRefresh();
-    // Create mode lands on the newly created profile's id.
+    // Create mode lands on the newly created profile's id; the editor remounts
+    // (its key flips from ':new' to the id) populated from the overlay.
     selectAgentsItem({ backendId: editedBackendId, kind: 'profile', id: saved.id });
     refreshGlobalStoresIfActive();
   };
