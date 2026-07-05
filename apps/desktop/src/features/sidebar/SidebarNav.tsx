@@ -1,9 +1,26 @@
-import { Home, Workflow, Zap, Blocks, History, Server, ArrowLeft } from 'lucide-react';
+import {
+  Home,
+  Workflow,
+  Zap,
+  Blocks,
+  History,
+  Server,
+  ArrowLeft,
+  Bot,
+  SlidersHorizontal,
+} from 'lucide-react';
 import type { AutomationTab } from '../automation/automation-types';
+import type { AgentsTab } from '../agents/agents-types';
 
 export interface SidebarAutomationNavMode {
   tab: AutomationTab;
   onSelectTab: (tab: AutomationTab) => void;
+  onBack: () => void;
+}
+
+export interface SidebarAgentsNavMode {
+  tab: AgentsTab;
+  onSelectTab: (tab: AgentsTab) => void;
   onBack: () => void;
 }
 
@@ -16,6 +33,10 @@ interface SidebarNavProps {
   onOpenAutomations?: () => void;
   /** When present, the nav renders the automation tabs instead of app destinations. */
   automationMode?: SidebarAutomationNavMode;
+  /** Open agents mode. Omitted (e.g. on mobile) hides the entry. */
+  onOpenAgents?: () => void;
+  /** When present, the nav renders the agents tabs instead of app destinations. */
+  agentsMode?: SidebarAgentsNavMode;
   isMobile?: boolean;
 }
 
@@ -25,6 +46,10 @@ const AUTOMATION_TABS: { key: AutomationTab; label: string; Icon: typeof Zap }[]
   { key: 'workflows', label: 'Workflows', Icon: Workflow },
   { key: 'runs', label: 'Runs', Icon: History },
   { key: 'system', label: 'System', Icon: Server },
+];
+
+const AGENTS_TABS: { key: AgentsTab; label: string; Icon: typeof Bot }[] = [
+  { key: 'profiles', label: 'Profiles', Icon: SlidersHorizontal },
 ];
 
 /**
@@ -37,6 +62,8 @@ export function SidebarNav({
   isHomeActive,
   onOpenAutomations,
   automationMode,
+  onOpenAgents,
+  agentsMode,
   isMobile,
 }: SidebarNavProps) {
   const rowBase = isMobile
@@ -78,6 +105,40 @@ export function SidebarNav({
     );
   }
 
+  if (agentsMode) {
+    return (
+      <>
+        <div className="p-2 space-y-0.5">
+          <button
+            onClick={agentsMode.onBack}
+            aria-label="Back to app"
+            className={`${rowBase} text-muted-foreground`}
+          >
+            <ArrowLeft className={iconSize} strokeWidth={1.75} />
+            Back to app
+          </button>
+
+          {AGENTS_TABS.map(({ key, label, Icon }) => {
+            const active = agentsMode.tab === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => agentsMode.onSelectTab(key)}
+                aria-label={label}
+                className={`${rowBase} ${active ? 'bg-secondary text-foreground' : 'text-muted-foreground'}`}
+              >
+                <Icon className={iconSize} strokeWidth={1.75} />
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="mx-3 border-t border-border" aria-hidden />
+      </>
+    );
+  }
+
   return (
     <>
       <div className="p-2 space-y-0.5">
@@ -98,6 +159,17 @@ export function SidebarNav({
           >
             <Zap className={iconSize} strokeWidth={1.75} />
             Automations
+          </button>
+        )}
+
+        {onOpenAgents && (
+          <button
+            onClick={onOpenAgents}
+            aria-label="Agents"
+            className={`${rowBase} text-muted-foreground`}
+          >
+            <Bot className={iconSize} strokeWidth={1.75} />
+            Agents
           </button>
         )}
       </div>

@@ -91,6 +91,43 @@ describe('SidebarNav', () => {
       'text-muted-foreground'
     );
   });
+
+  it('renders Agents entry and calls onOpenAgents', () => {
+    const onOpenAgents = vi.fn();
+    render(<SidebarNav onHome={vi.fn()} isHomeActive={false} onOpenAgents={onOpenAgents} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Agents' }));
+    expect(onOpenAgents).toHaveBeenCalled();
+  });
+
+  it('does not render Agents entry when onOpenAgents is omitted', () => {
+    render(<SidebarNav onHome={vi.fn()} isHomeActive={false} />);
+    expect(screen.queryByRole('button', { name: 'Agents' })).toBeNull();
+  });
+
+  it('renders agents-mode tabs with back button', () => {
+    const onBack = vi.fn();
+    render(
+      <SidebarNav
+        onHome={vi.fn()}
+        isHomeActive={false}
+        agentsMode={{ tab: 'profiles', onSelectTab: vi.fn(), onBack }}
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Profiles' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Back to app' }));
+    expect(onBack).toHaveBeenCalled();
+  });
+
+  it('marks the active agents tab', () => {
+    render(
+      <SidebarNav
+        onHome={vi.fn()}
+        isHomeActive={false}
+        agentsMode={{ tab: 'profiles', onSelectTab: vi.fn(), onBack: vi.fn() }}
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Profiles' }).className).toContain('bg-secondary');
+  });
 });
 
 const base = { onHome: () => {}, isHomeActive: false };
