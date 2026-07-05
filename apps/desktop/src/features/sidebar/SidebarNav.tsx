@@ -53,9 +53,62 @@ const AGENTS_TABS: { key: AgentsTab; label: string; Icon: typeof Bot }[] = [
 ];
 
 /**
+ * Shared shell for the automation/agents mode navs: a Back-to-app row followed
+ * by the mode's tab rows, with the inset section divider underneath. In-file
+ * only — both mode branches of SidebarNav render through this.
+ */
+function ModeTabsNav<K extends string>({
+  tabs,
+  activeKey,
+  onSelect,
+  onBack,
+  rowBase,
+  iconSize,
+}: {
+  tabs: { key: K; label: string; Icon: typeof Zap }[];
+  activeKey: K;
+  onSelect: (key: K) => void;
+  onBack: () => void;
+  rowBase: string;
+  iconSize: string;
+}) {
+  return (
+    <>
+      <div className="p-2 space-y-0.5">
+        <button
+          onClick={onBack}
+          aria-label="Back to app"
+          className={`${rowBase} text-muted-foreground`}
+        >
+          <ArrowLeft className={iconSize} strokeWidth={1.75} />
+          Back to app
+        </button>
+
+        {tabs.map(({ key, label, Icon }) => {
+          const active = activeKey === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => onSelect(key)}
+              aria-label={label}
+              className={`${rowBase} ${active ? 'bg-secondary text-foreground' : 'text-muted-foreground'}`}
+            >
+              <Icon className={iconSize} strokeWidth={1.75} />
+              {label}
+            </button>
+          );
+        })}
+      </div>
+      <div className="mx-3 border-t border-border" aria-hidden />
+    </>
+  );
+}
+
+/**
  * Top-of-sidebar navigation cluster. In normal mode it lists app-level
- * destinations (Home, Automations). In automation mode it lists a Back row plus
- * the automation tabs. Pinned above the scrollable project list.
+ * destinations (Home, Automations, Agents). In automation or agents mode it
+ * lists a Back row plus that mode's tabs. Pinned above the scrollable list.
  */
 export function SidebarNav({
   onHome,
@@ -73,69 +126,27 @@ export function SidebarNav({
 
   if (automationMode) {
     return (
-      <>
-        <div className="p-2 space-y-0.5">
-          <button
-            onClick={automationMode.onBack}
-            aria-label="Back to app"
-            className={`${rowBase} text-muted-foreground`}
-          >
-            <ArrowLeft className={iconSize} strokeWidth={1.75} />
-            Back to app
-          </button>
-
-          {AUTOMATION_TABS.map(({ key, label, Icon }) => {
-            const active = automationMode.tab === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => automationMode.onSelectTab(key)}
-                aria-label={label}
-                className={`${rowBase} ${active ? 'bg-secondary text-foreground' : 'text-muted-foreground'}`}
-              >
-                <Icon className={iconSize} strokeWidth={1.75} />
-                {label}
-              </button>
-            );
-          })}
-        </div>
-        <div className="mx-3 border-t border-border" aria-hidden />
-      </>
+      <ModeTabsNav
+        tabs={AUTOMATION_TABS}
+        activeKey={automationMode.tab}
+        onSelect={automationMode.onSelectTab}
+        onBack={automationMode.onBack}
+        rowBase={rowBase}
+        iconSize={iconSize}
+      />
     );
   }
 
   if (agentsMode) {
     return (
-      <>
-        <div className="p-2 space-y-0.5">
-          <button
-            onClick={agentsMode.onBack}
-            aria-label="Back to app"
-            className={`${rowBase} text-muted-foreground`}
-          >
-            <ArrowLeft className={iconSize} strokeWidth={1.75} />
-            Back to app
-          </button>
-
-          {AGENTS_TABS.map(({ key, label, Icon }) => {
-            const active = agentsMode.tab === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => agentsMode.onSelectTab(key)}
-                aria-label={label}
-                className={`${rowBase} ${active ? 'bg-secondary text-foreground' : 'text-muted-foreground'}`}
-              >
-                <Icon className={iconSize} strokeWidth={1.75} />
-                {label}
-              </button>
-            );
-          })}
-        </div>
-        <div className="mx-3 border-t border-border" aria-hidden />
-      </>
+      <ModeTabsNav
+        tabs={AGENTS_TABS}
+        activeKey={agentsMode.tab}
+        onSelect={agentsMode.onSelectTab}
+        onBack={agentsMode.onBack}
+        rowBase={rowBase}
+        iconSize={iconSize}
+      />
     );
   }
 

@@ -118,6 +118,19 @@ describe('SidebarNav', () => {
     expect(onBack).toHaveBeenCalled();
   });
 
+  it('fires onSelectTab with "profiles" when the Profiles tab is clicked', () => {
+    const onSelectTab = vi.fn();
+    render(
+      <SidebarNav
+        onHome={vi.fn()}
+        isHomeActive={false}
+        agentsMode={{ tab: 'profiles', onSelectTab, onBack: vi.fn() }}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Profiles' }));
+    expect(onSelectTab).toHaveBeenCalledWith('profiles');
+  });
+
   it('marks the active agents tab', () => {
     render(
       <SidebarNav
