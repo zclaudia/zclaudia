@@ -18,12 +18,16 @@ export function SkillDirsEditor({ backendId, dirs, diagnostics, onSaved }: Skill
   const [draftDirs, setDraftDirs] = useState<string[]>(dirs);
   const [newDirPath, setNewDirPath] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   // Mirrors the settings interaction: every add/remove immediately PUTs the
-  // whole array — there is no separate explicit save step.
+  // whole array — there is no separate explicit save step. `saving` guards
+  // against overlapping PUTs from rapid clicks.
   const handleAddDir = async () => {
     const trimmed = newDirPath.trim();
-    if (!trimmed || draftDirs.includes(trimmed)) return;
+    if (saving || !trimmed || draftDirs.includes(trimmed)) return;
+    setSaving(true);
+    setError(null);
     try {
       const updated = [...draftDirs, trimmed];
       await api.saveExternalSkillDirsForBackend(backendId, updated);
@@ -32,10 +36,15 @@ export function SkillDirsEditor({ backendId, dirs, diagnostics, onSaved }: Skill
       onSaved();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add directory');
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleRemoveDir = async (dir: string) => {
+    if (saving) return;
+    setSaving(true);
+    setError(null);
     try {
       const updated = draftDirs.filter(d => d !== dir);
       await api.saveExternalSkillDirsForBackend(backendId, updated);
@@ -43,6 +52,8 @@ export function SkillDirsEditor({ backendId, dirs, diagnostics, onSaved }: Skill
       onSaved();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to remove directory');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -92,7 +103,8 @@ export function SkillDirsEditor({ backendId, dirs, diagnostics, onSaved }: Skill
               <button
                 type="button"
                 onClick={() => handleRemoveDir(dir)}
-                className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-red-400 transition-colors shrink-0"
+                disabled={saving}
+                className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-red-400 disabled:opacity-50 transition-colors shrink-0"
                 title="Remove"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -120,7 +132,7 @@ export function SkillDirsEditor({ backendId, dirs, diagnostics, onSaved }: Skill
         />
         <button
           onClick={handleAddDir}
-          disabled={!newDirPath.trim()}
+          disabled={saving || !newDirPath.trim()}
           className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground disabled:opacity-50 whitespace-nowrap transition-colors"
         >
           + Add
