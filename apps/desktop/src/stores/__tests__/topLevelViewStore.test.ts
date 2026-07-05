@@ -135,6 +135,22 @@ describe('agents view', () => {
     expect(s.agentsSelection).toBeNull();
   });
 
+  it('openAgents accepts a tab for readiness deep-links', () => {
+    useTopLevelViewStore.getState().openAgents('providers');
+    const s = useTopLevelViewStore.getState();
+    expect(s.view).toEqual({ kind: 'agents', tab: 'providers' });
+    expect(s.agentsSelection).toBeNull();
+  });
+
+  it('openAgents with a tab clears an existing selection', () => {
+    useTopLevelViewStore.getState().openAgents();
+    useTopLevelViewStore
+      .getState()
+      .selectAgentsItem({ backendId: 'b1', kind: 'llm-profile', id: 'lp1' });
+    useTopLevelViewStore.getState().openAgents('providers');
+    expect(useTopLevelViewStore.getState().agentsSelection).toBeNull();
+  });
+
   it('selectAgentsItem stores backend-scoped selection', () => {
     useTopLevelViewStore.getState().openAgents();
     useTopLevelViewStore

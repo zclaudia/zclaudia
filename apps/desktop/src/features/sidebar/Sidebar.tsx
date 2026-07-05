@@ -649,11 +649,9 @@ export function Sidebar({
             onClose={() => setAgentDialogOpen(false)}
             onConfigure={destination => {
               setAgentDialogOpen(false);
-              if (destination.kind === 'agents') {
-                useTopLevelViewStore.getState().openAgents();
-              } else {
-                onOpenSettings?.(destination.tab);
-              }
+              // Every readiness destination lives in the Agents shell mode now
+              // (providers deep-link included) — no settings fallback.
+              useTopLevelViewStore.getState().openAgents(destination.tab);
             }}
           />,
           document.body

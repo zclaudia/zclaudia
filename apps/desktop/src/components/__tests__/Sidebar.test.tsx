@@ -772,6 +772,41 @@ describe('Sidebar', () => {
     expect(document.body.textContent).not.toContain('No agent available yet');
   });
 
+  it('deep-links provider-shaped readiness reasons to the agents providers tab', async () => {
+    const onOpenSettings = vi.fn();
+    const refresh = vi.fn(async () => {
+      useAgentReadinessStore.setState({
+        readiness: { usable: false, reason: 'no_credential' },
+        loading: false,
+      });
+    });
+    setupStores({
+      agentReadinessStore: {
+        readiness: null,
+        refresh,
+      },
+    });
+    useTopLevelViewStore.setState({ view: { kind: 'app' }, agentsSelection: null });
+
+    const { container } = render(
+      <Sidebar collapsed={false} onToggle={vi.fn()} onOpenSettings={onOpenSettings} />
+    );
+    const newProjectBtn = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="New project"]'
+    )!;
+    fireEvent.click(newProjectBtn);
+
+    await waitFor(() => {
+      expect(document.body.textContent).toContain('No agent available yet');
+    });
+
+    fireEvent.click(screen.getByText('Configure →'));
+
+    expect(onOpenSettings).not.toHaveBeenCalled();
+    expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'agents', tab: 'providers' });
+    expect(document.body.textContent).not.toContain('No agent available yet');
+  });
+
   it('creates project when form is submitted', async () => {
     const addProject = vi.fn();
     const selectProject = vi.fn();

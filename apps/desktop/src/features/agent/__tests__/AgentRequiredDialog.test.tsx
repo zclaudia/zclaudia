@@ -31,6 +31,20 @@ describe('AgentRequiredDialog', () => {
     expect(onConfigure).toHaveBeenCalledWith({ kind: 'agents' });
   });
 
+  it('provider-shaped reasons map to the agents providers tab', () => {
+    const onConfigure = vi.fn();
+    render(
+      <AgentRequiredDialog
+        open
+        reason="no_credential"
+        onClose={() => {}}
+        onConfigure={onConfigure}
+      />
+    );
+    fireEvent.click(screen.getByText('Configure →'));
+    expect(onConfigure).toHaveBeenCalledWith({ kind: 'agents', tab: 'providers' });
+  });
+
   it('secondary button calls onClose', () => {
     const onClose = vi.fn();
     render(<AgentRequiredDialog open reason="no_agent" onClose={onClose} onConfigure={() => {}} />);

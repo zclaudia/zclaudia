@@ -1,10 +1,14 @@
 import type { AgentReadinessReason } from '@zclaudia/shared/core/agent-readiness';
-import type { SettingsTab } from '../settings/settingsTabDefs';
+import type { AgentsTab } from '../agents/agents-types';
 
-/** Where "Configure →" should navigate to: the Agents shell mode, or a settings tab. */
-export type ReadinessDestination =
-  | { kind: 'agents' }
-  | { kind: 'settings'; tab: Extract<SettingsTab, 'providers'> };
+/**
+ * Where "Configure →" should navigate: the Agents shell mode, optionally on a
+ * specific tab (omitted = the default Profiles tab).
+ */
+export interface ReadinessDestination {
+  kind: 'agents';
+  tab?: AgentsTab;
+}
 
 export interface ReadinessGuidance {
   title: string;
@@ -25,7 +29,7 @@ export function readinessGuidance(reason: AgentReadinessReason | undefined): Rea
       return {
         title: 'No agent available yet',
         body: 'This agent has no model provider linked. Configure one to continue.',
-        destination: { kind: 'settings', tab: 'providers' },
+        destination: { kind: 'agents', tab: 'providers' },
       };
     case 'no_model':
       return {
@@ -38,7 +42,7 @@ export function readinessGuidance(reason: AgentReadinessReason | undefined): Rea
       return {
         title: 'No agent available yet',
         body: 'The model provider is missing an API key (or login credentials). Add one to continue.',
-        destination: { kind: 'settings', tab: 'providers' },
+        destination: { kind: 'agents', tab: 'providers' },
       };
   }
 }

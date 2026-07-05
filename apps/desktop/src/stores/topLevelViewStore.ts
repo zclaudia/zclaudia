@@ -25,7 +25,7 @@ interface TopLevelViewState {
   returnToApp: () => void;
   selectAutomationItem: (id: string | null) => void;
   bumpAutomationListRefresh: () => void;
-  openAgents: () => void;
+  openAgents: (tab?: AgentsTab) => void;
   setAgentsTab: (tab: AgentsTab) => void;
   selectAgentsItem: (sel: AgentsSelection | null) => void;
   bumpAgentsRefresh: () => void;
@@ -68,7 +68,7 @@ export const useTopLevelViewStore = create<TopLevelViewState>(set => ({
   selectAutomationItem: id => set({ selectedAutomationItemId: id }),
   bumpAutomationListRefresh: () =>
     set(s => ({ automationListRefreshNonce: s.automationListRefreshNonce + 1 })),
-  openAgents: () => set({ view: { kind: 'agents', tab: 'profiles' }, agentsSelection: null }),
+  openAgents: (tab = 'profiles') => set({ view: { kind: 'agents', tab }, agentsSelection: null }),
   setAgentsTab: tab =>
     set(state =>
       state.view.kind === 'agents' ? { view: { ...state.view, tab }, agentsSelection: null } : state
