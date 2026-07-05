@@ -67,6 +67,14 @@ describe('AgentsTree', () => {
     expect(onToggleBackend).not.toHaveBeenCalled();
   });
 
+  it('offline group header toggle is disabled (not keyboard-focusable)', () => {
+    render(<AgentsTree {...baseProps} />);
+    const toggle = screen.getByText('Remote Server').closest('button')!;
+    expect(toggle).toBeDisabled();
+    const onlineToggle = screen.getByText('Local Server').closest('button')!;
+    expect(onlineToggle).not.toBeDisabled();
+  });
+
   it('online group header has a chevron', () => {
     render(<AgentsTree {...baseProps} />);
     const header = screen.getByText('Local Server').closest('div.group')!;
@@ -107,6 +115,19 @@ describe('AgentsTree', () => {
       <AgentsTree {...baseProps} data={emptyData({ loading: true })} expandedBackendIds={['b1']} />
     );
     expect(screen.getByText('Loading…')).toBeInTheDocument();
+  });
+
+  it('keeps showing existing profiles during a background refetch (stale-while-refetch)', () => {
+    const profiles = [{ id: 'p1', name: 'Coder', isDefault: false } as any];
+    render(
+      <AgentsTree
+        {...baseProps}
+        data={emptyData({ loading: true, profiles: new Map([['b1', profiles]]) })}
+        expandedBackendIds={['b1']}
+      />
+    );
+    expect(screen.getByText('Coder')).toBeInTheDocument();
+    expect(screen.queryByText('Loading…')).toBeNull();
   });
 
   it('expanded online group with an error shows error text', () => {

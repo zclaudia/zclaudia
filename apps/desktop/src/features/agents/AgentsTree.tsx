@@ -37,6 +37,7 @@ export function AgentsTree({
             >
               <button
                 type="button"
+                disabled={!online}
                 onClick={() => {
                   if (online) onToggleBackend(backendId);
                 }}
