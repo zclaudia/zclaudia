@@ -1,5 +1,5 @@
 import type { ApiResponse } from '@zclaudia/shared';
-import { fetchLocalApi } from './base';
+import { fetchLocalApi, fetchApiForBackend } from './base';
 export interface WorkspaceSkillInfo {
   id: string;
   name: string;
@@ -67,6 +67,20 @@ export async function getWorkspaceSkillsResult(): Promise<WorkspaceSkillsResult>
     skills: result.data,
     diagnostics: result.diagnostics ?? [],
   };
+}
+
+export async function getWorkspaceSkillsForBackend(
+  backendId: string | null
+): Promise<WorkspaceSkillInfo[]> {
+  const result = (await fetchApiForBackend<WorkspaceSkillInfo[]>(
+    '/api/workspace/skills',
+    backendId
+  )) as ApiResponse<WorkspaceSkillInfo[]> & {
+    diagnostics?: SkillLoadDiagnostic[];
+  };
+  if (!result.success || !result.data)
+    throw new Error(result.error?.message || 'Failed to load workspace skills');
+  return result.data;
 }
 
 export async function getWorkspaceSkill(skillId: string): Promise<{ id: string; content: string }> {

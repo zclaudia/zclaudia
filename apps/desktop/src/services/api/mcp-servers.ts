@@ -5,7 +5,7 @@ import type {
   McpServerTransport,
   McpServerTrustPolicy,
 } from '@zclaudia/shared/core/mcp';
-import { fetchLocalApi } from './base';
+import { fetchLocalApi, fetchApiForBackend } from './base';
 
 export type McpOAuthStartResult =
   | { sessionId: string; method: 'browser'; authUrl: string; expiresAt: number }
@@ -25,6 +25,14 @@ export type McpOAuthStatus =
 
 export async function getMcpServers(): Promise<McpServerConfig[]> {
   const result = await fetchLocalApi<McpServerConfig[]>('/api/mcp-servers');
+  if (!result.success || !result.data) {
+    throw new Error(result.error?.message || 'Failed to fetch MCP servers');
+  }
+  return result.data;
+}
+
+export async function getMcpServersForBackend(backendId: string | null): Promise<McpServerConfig[]> {
+  const result = await fetchApiForBackend<McpServerConfig[]>('/api/mcp-servers', backendId);
   if (!result.success || !result.data) {
     throw new Error(result.error?.message || 'Failed to fetch MCP servers');
   }
@@ -107,6 +115,16 @@ export async function toggleMcpServer(id: string): Promise<McpServerConfig> {
 
 export async function getMcpServerStatuses(): Promise<McpServerStatus[]> {
   const result = await fetchLocalApi<McpServerStatus[]>('/api/mcp-servers/status');
+  if (!result.success || !result.data) {
+    throw new Error(result.error?.message || 'Failed to fetch MCP server status');
+  }
+  return result.data;
+}
+
+export async function getMcpServerStatusesForBackend(
+  backendId: string | null
+): Promise<McpServerStatus[]> {
+  const result = await fetchApiForBackend<McpServerStatus[]>('/api/mcp-servers/status', backendId);
   if (!result.success || !result.data) {
     throw new Error(result.error?.message || 'Failed to fetch MCP server status');
   }

@@ -8,7 +8,7 @@ import type {
   CacheRetentionSetting,
 } from '@zclaudia/shared';
 import { fetchApi, fetchLocalApi, activeServerSupports } from './base';
-import { apiCall, apiCallVoid } from './unwrap';
+import { apiCall, apiCallVoid, apiCallForBackend } from './unwrap';
 
 /**
  * Structured result for {@link deleteLlmProfile}. The DELETE route returns 409
@@ -48,6 +48,12 @@ export interface ResolveContextWindowPreviewResult {
 
 export async function listLlmProfiles(options?: RequestInit): Promise<LlmProfileConfig[]> {
   return apiCall<LlmProfileConfig[]>('/api/llm-profiles', options);
+}
+
+export async function listLlmProfilesForBackend(
+  backendId: string | null
+): Promise<LlmProfileConfig[]> {
+  return apiCallForBackend<LlmProfileConfig[]>(backendId, '/api/llm-profiles');
 }
 
 export async function createLlmProfile(data: {
