@@ -185,6 +185,16 @@ describe('agents view', () => {
     expect(s.agentsSelection).toBeNull();
   });
 
+  it('setAgentsTab switches from skills to mcp-servers and clears the selection', () => {
+    useTopLevelViewStore.getState().openAgents();
+    useTopLevelViewStore.getState().setAgentsTab('skills');
+    useTopLevelViewStore.getState().selectAgentsItem({ backendId: 'b1', kind: 'skill', id: 's1' });
+    useTopLevelViewStore.getState().setAgentsTab('mcp-servers');
+    const s = useTopLevelViewStore.getState();
+    expect(s.view).toEqual({ kind: 'agents', tab: 'mcp-servers' });
+    expect(s.agentsSelection).toBeNull();
+  });
+
   it('ignores setAgentsTab when not in agents view', () => {
     useTopLevelViewStore.getState().openSettings();
     useTopLevelViewStore.getState().setAgentsTab('profiles');

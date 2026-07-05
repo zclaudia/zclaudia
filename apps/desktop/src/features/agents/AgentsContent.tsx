@@ -29,7 +29,7 @@ interface AgentsContentProps {
   skillsData: SkillsByBackend;
 }
 
-function EmptyState({ noun, hint }: { noun: 'profile' | 'skill'; hint?: string }) {
+function EmptyState({ noun, hint }: { noun: 'profile' | 'skill' | 'MCP server'; hint?: string }) {
   return (
     <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
       <p className="text-sm">Select a {noun}</p>
@@ -321,9 +321,15 @@ export function AgentsContent({ backends, data, skillsData }: AgentsContentProps
       );
     }
 
+    case 'mcp-server':
+    case 'new-mcp-server': {
+      // Phase 3 Task 7 replaces this placeholder.
+      return <EmptyState noun="MCP server" />;
+    }
+
     default: {
-      // Exhaustiveness gate: adding a selection kind (e.g. Phase 3's MCP
-      // servers) must fail compilation here until it gets a case above.
+      // Exhaustiveness gate: adding a selection kind must fail compilation
+      // here until it gets a case above.
       const unhandled: never = selection;
       return unhandled;
     }
