@@ -85,17 +85,17 @@ describe('HomeView', () => {
     expect(screen.getByText('Recent')).toBeTruthy();
     expect(screen.queryByText('Running')).toBeNull();
     expect(screen.getByText('Fix the thing')).toBeTruthy();
-    expect(screen.getByText('zclaudia')).toBeTruthy();
+    expect(screen.getByText('zclaudia · Local')).toBeTruthy();
   });
 
-  it('shows a meta line with message count and project', () => {
+  it('shows a meta line with message count, project, and backend', () => {
     seedProject('p1', 'zclaudia');
     seedLocalSession('s1', { name: 'Fix the thing', lastMessageOffset: 12 });
     seedLocalSession('s2', { name: 'Sparse one', updatedAt: 0 });
     render(<HomeView onNewSession={vi.fn()} onAddProject={vi.fn()} />);
-    expect(screen.getByText('12 messages · zclaudia')).toBeTruthy();
-    // No count recorded -> the segment is omitted, project only.
-    expect(screen.getByText('zclaudia')).toBeTruthy();
+    expect(screen.getByText('12 messages · zclaudia · Local')).toBeTruthy();
+    // No count recorded -> the count segment is omitted, project + backend only.
+    expect(screen.getByText('zclaudia · Local')).toBeTruthy();
   });
 
   it('pins running sessions in a Running group', () => {
@@ -129,35 +129,12 @@ describe('HomeView', () => {
     expect(onAddProject).toHaveBeenCalledTimes(1);
   });
 
-  it('shows backend badges only when sessions span multiple backends', () => {
+  it('always shows the backend name in the session meta line', () => {
     seedProject('p1', 'zclaudia');
     seedLocalSession('s1', { name: 'Local one', updatedAt: 2 });
-    // Unmount before mutating the store: the mounted view is store-subscribed
-    // and would re-render alongside the second copy.
-    const { unmount } = render(<HomeView onNewSession={vi.fn()} onAddProject={vi.fn()} />);
-    expect(screen.queryByText(/· Local/)).toBeNull();
-    unmount();
-
-    useSessionsStore.setState({
-      remoteSessions: new Map([
-        [
-          'remote-1',
-          [
-            {
-              id: 's2',
-              projectId: 'p1',
-              type: 'regular',
-              name: 'Remote one',
-              createdAt: 1,
-              updatedAt: 1,
-              isActive: false,
-            } as any,
-          ],
-        ],
-      ]),
-    } as any);
     render(<HomeView onNewSession={vi.fn()} onAddProject={vi.fn()} />);
-    expect(screen.getByText(/· Local$/)).toBeTruthy();
+    // Backend is shown even when every session is on the same (local) backend.
+    expect(screen.getByText(/zclaudia · Local$/)).toBeTruthy();
   });
 
   it('drops remote-owned sessions from the local list instead of mislabeling them', () => {

@@ -72,7 +72,7 @@ export function HomeView({ onNewSession, onAddProject }: HomeViewProps) {
     [activeBackendSessions, projectOwnerIds, sessionOwnerIds, localBackendId, localAliasBackendIds]
   );
 
-  const { running, recent, multiBackend } = useMemo(
+  const { running, recent } = useMemo(
     () =>
       selectHomeSessions({
         localSessions,
@@ -187,7 +187,6 @@ export function HomeView({ onNewSession, onAddProject }: HomeViewProps) {
             <SessionGroup
               label="Running"
               rows={running}
-              multiBackend={multiBackend}
               backendName={backendName}
               onOpen={openSession}
             />
@@ -196,7 +195,6 @@ export function HomeView({ onNewSession, onAddProject }: HomeViewProps) {
             <SessionGroup
               label="Recent"
               rows={recent}
-              multiBackend={multiBackend}
               backendName={backendName}
               onOpen={openSession}
             />
@@ -212,13 +210,11 @@ export function HomeView({ onNewSession, onAddProject }: HomeViewProps) {
 function SessionGroup({
   label,
   rows,
-  multiBackend,
   backendName,
   onOpen,
 }: {
   label: string;
   rows: HomeSessionRow[];
-  multiBackend: boolean;
   backendName: (backendKey: string) => string;
   onOpen: (row: HomeSessionRow) => void;
 }) {
@@ -251,7 +247,7 @@ function SessionGroup({
                     ? `${row.messageCount} ${row.messageCount === 1 ? 'message' : 'messages'}`
                     : null,
                   row.projectName,
-                  multiBackend ? backendName(row.backendKey) : null,
+                  backendName(row.backendKey),
                 ]
                   .filter(Boolean)
                   .join(' · ')}
