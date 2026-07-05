@@ -124,6 +124,7 @@ function makeSkillsData(
   skillsByBackend: Record<string, WorkspaceSkillInfo[]>,
   opts: {
     dirs?: Record<string, string[]>;
+    dirsFailed?: string[];
     diagnostics?: Record<string, SkillLoadDiagnostic[]>;
     errors?: Record<string, string>;
     loading?: boolean;
@@ -133,6 +134,7 @@ function makeSkillsData(
     skills: new Map(Object.entries(skillsByBackend)),
     diagnostics: new Map(Object.entries(opts.diagnostics ?? {})),
     dirs: new Map(Object.entries(opts.dirs ?? {})),
+    dirsFailed: new Set(opts.dirsFailed ?? []),
     errors: new Map(Object.entries(opts.errors ?? {})),
     loading: opts.loading ?? false,
   };
@@ -593,5 +595,46 @@ describe('AgentsContent', () => {
 
     fireEvent.click(screen.getByText('dirs-stub-save'));
     expect(useTopLevelViewStore.getState().agentsRefreshNonce).toBe(1);
+  });
+
+  it('never renders the dirs editor when the dirs fetch failed', () => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'skills' },
+      agentsSelection: { backendId: 'b1', kind: 'skill-dirs' },
+    });
+
+    render(
+      <AgentsContent
+        backends={backends}
+        data={makeData({})}
+        skillsData={makeSkillsData({}, { dirsFailed: ['b1'] })}
+      />
+    );
+
+    // An editable empty list here would wipe the backend's configured dirs on
+    // the first add/remove (the editor PUTs the whole array).
+    expect(screen.queryByTestId('skill-dirs-editor')).toBeNull();
+    expect(screen.getByText("Couldn't load directories for this backend.")).toBeTruthy();
+    expect(screen.getByText('Editing is disabled until the list can be loaded.')).toBeTruthy();
+    expect(screen.getByText('External directories')).toBeTruthy();
+  });
+
+  it('treats a missing dirs entry while loading as loading, not an editable empty list', () => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'skills' },
+      agentsSelection: { backendId: 'b1', kind: 'skill-dirs' },
+    });
+
+    render(
+      <AgentsContent
+        backends={backends}
+        data={makeData({})}
+        skillsData={makeSkillsData({}, { loading: true })}
+      />
+    );
+
+    expect(screen.queryByTestId('skill-dirs-editor')).toBeNull();
+    expect(screen.getByText('Loading…')).toBeTruthy();
+    expect(screen.getByText('External directories')).toBeTruthy();
   });
 });

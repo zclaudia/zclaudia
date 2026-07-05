@@ -281,12 +281,39 @@ export function AgentsContent({ backends, data, skillsData }: AgentsContentProps
     }
 
     case 'skill-dirs': {
+      // A failed dirs fetch must never present an editable empty list: the
+      // editor PUTs the whole array on every add/remove, so seeding it with []
+      // would silently wipe the backend's configured dirs on the first edit.
+      if (skillsData.dirsFailed.has(editedBackendId)) {
+        return (
+          <DetailShell title="External directories" backendName={backendName}>
+            <p className="text-sm text-muted-foreground">
+              Couldn't load directories for this backend.
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground/60">
+              Editing is disabled until the list can be loaded.
+            </p>
+          </DetailShell>
+        );
+      }
+
+      const dirs = skillsData.dirs.get(editedBackendId);
+      // A missing entry while the fetch is in flight means "not loaded yet",
+      // not "empty" — same wipe hazard as a failed fetch.
+      if (!dirs && skillsData.loading) {
+        return (
+          <DetailShell title="External directories" backendName={backendName}>
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          </DetailShell>
+        );
+      }
+
       return (
         <DetailShell title="External directories" backendName={backendName}>
           <SkillDirsEditor
             key={editedBackendId}
             backendId={editedBackendId}
-            dirs={skillsData.dirs.get(editedBackendId) ?? []}
+            dirs={dirs ?? []}
             diagnostics={skillsData.diagnostics.get(editedBackendId) ?? []}
             onSaved={bumpAgentsRefresh}
           />

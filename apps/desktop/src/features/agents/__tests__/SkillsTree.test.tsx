@@ -15,6 +15,7 @@ function emptyData(overrides?: Partial<SkillsByBackend>): SkillsByBackend {
     skills: new Map(),
     diagnostics: new Map(),
     dirs: new Map(),
+    dirsFailed: new Set(),
     errors: new Map(),
     loading: false,
     ...overrides,
@@ -129,7 +130,7 @@ describe('SkillsTree', () => {
     expect(screen.getByText("Couldn't load skills")).toBeInTheDocument();
   });
 
-  it('error state does not render the footer row', () => {
+  it('error state still renders the footer row (dirs are fetched independently)', () => {
     render(
       <SkillsTree
         {...baseProps}
@@ -137,7 +138,8 @@ describe('SkillsTree', () => {
         expandedBackendIds={['b1']}
       />
     );
-    expect(screen.queryByText('External directories')).toBeNull();
+    expect(screen.getByText("Couldn't load skills")).toBeInTheDocument();
+    expect(screen.getByText('External directories')).toBeInTheDocument();
   });
 
   it('expanded online group with empty skill array shows No skills, then the footer row', () => {

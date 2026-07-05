@@ -2088,6 +2088,7 @@ describe('Sidebar', () => {
       skills: new Map(),
       diagnostics: new Map(),
       dirs: new Map(),
+      dirsFailed: new Set<string>(),
       errors: new Map(),
       loading: false,
     },

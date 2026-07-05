@@ -68,6 +68,7 @@ describe('useSkillsByBackend', () => {
     expect(result.current.skills.get('b2')).toEqual([makeSkill('s2')]);
     expect(result.current.diagnostics.get('b2')).toEqual([]);
     expect(result.current.dirs.get('b2')).toEqual(['/dir/b2']);
+    expect(result.current.dirsFailed.size).toBe(0);
 
     expect(api.getWorkspaceSkillsResultForBackend).toHaveBeenCalledTimes(2);
     expect(api.getExternalSkillDirsForBackend).toHaveBeenCalledTimes(2);
@@ -126,7 +127,7 @@ describe('useSkillsByBackend', () => {
     expect(result.current.skills.get('b2')).toEqual([makeSkill('s2')]);
   });
 
-  it('soft-fails a dirs fetch: dirs falls back to [], no error recorded, skills stay intact', async () => {
+  it('records a failed dirs fetch in dirsFailed: no dirs entry, no error, skills stay intact', async () => {
     const backends: AgentsBackend[] = [{ backendId: 'b1', name: 'Backend 1', online: true }];
     vi.mocked(api.getWorkspaceSkillsResultForBackend).mockResolvedValue({
       skills: [makeSkill('s1')],
@@ -140,7 +141,10 @@ describe('useSkillsByBackend', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.dirs.get('b1')).toEqual([]);
+    // No dirs entry — a fallback [] would let the editor's whole-array PUT
+    // silently wipe the backend's configured dirs.
+    expect(result.current.dirs.has('b1')).toBe(false);
+    expect(result.current.dirsFailed.has('b1')).toBe(true);
     expect(result.current.errors.has('b1')).toBe(false);
     expect(result.current.skills.get('b1')).toEqual([makeSkill('s1')]);
   });
@@ -184,6 +188,7 @@ describe('useSkillsByBackend', () => {
     expect(result.current.skills.size).toBe(0);
     expect(result.current.diagnostics.size).toBe(0);
     expect(result.current.dirs.size).toBe(0);
+    expect(result.current.dirsFailed.size).toBe(0);
     expect(result.current.errors.size).toBe(0);
     expect(api.getWorkspaceSkillsResultForBackend).not.toHaveBeenCalled();
     expect(api.getExternalSkillDirsForBackend).not.toHaveBeenCalled();

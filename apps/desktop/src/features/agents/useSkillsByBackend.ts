@@ -11,6 +11,13 @@ export interface SkillsByBackend {
   skills: Map<string, WorkspaceSkillInfo[]>;
   diagnostics: Map<string, SkillLoadDiagnostic[]>;
   dirs: Map<string, string[]>;
+  /**
+   * Backends whose external-dirs fetch failed. No dirs entry is recorded for them —
+   * consumers must not treat the missing entry as an empty list (SkillDirsEditor PUTs
+   * the whole array on every mutation, so an editable [] would silently wipe the
+   * backend's configured dirs).
+   */
+  dirsFailed: Set<string>;
   errors: Map<string, string>;
   loading: boolean;
 }
@@ -19,9 +26,9 @@ export interface SkillsByBackend {
  * Fetch each online backend's workspace skills (+ diagnostics) and external skill dirs;
  * refetches when agentsRefreshNonce bumps.
  *
- * Skills and dirs are fetched independently per backend: a dirs failure is soft (dirs
- * entry falls back to []) and never pollutes the errors map, since dirs are secondary
- * to the skills list.
+ * Skills and dirs are fetched independently per backend: a dirs failure never pollutes
+ * the errors map (dirs are secondary to the skills list) — it is recorded in dirsFailed
+ * instead, with no dirs entry.
  */
 export function useSkillsByBackend(backends: AgentsBackend[]): SkillsByBackend {
   const nonce = useTopLevelViewStore(s => s.agentsRefreshNonce);
@@ -29,6 +36,7 @@ export function useSkillsByBackend(backends: AgentsBackend[]): SkillsByBackend {
     skills: new Map(),
     diagnostics: new Map(),
     dirs: new Map(),
+    dirsFailed: new Set(),
     errors: new Map(),
     loading: true,
   });
@@ -58,6 +66,7 @@ export function useSkillsByBackend(backends: AgentsBackend[]): SkillsByBackend {
       const skills = new Map<string, WorkspaceSkillInfo[]>();
       const diagnostics = new Map<string, SkillLoadDiagnostic[]>();
       const dirs = new Map<string, string[]>();
+      const dirsFailed = new Set<string>();
       const errors = new Map<string, string>();
 
       results.forEach(([skillsResult, dirsResult], index) => {
@@ -74,11 +83,11 @@ export function useSkillsByBackend(backends: AgentsBackend[]): SkillsByBackend {
         if (dirsResult.status === 'fulfilled') {
           dirs.set(backendId, dirsResult.value);
         } else {
-          dirs.set(backendId, []);
+          dirsFailed.add(backendId);
         }
       });
 
-      setState({ skills, diagnostics, dirs, errors, loading: false });
+      setState({ skills, diagnostics, dirs, dirsFailed, errors, loading: false });
     });
 
     return () => {

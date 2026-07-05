@@ -47,11 +47,6 @@ export function SkillsTree({
               if (!skills && data.loading) {
                 return <div className="px-2 text-xs text-muted-foreground/60">Loading…</div>;
               }
-              if (error) {
-                return (
-                  <div className="px-2 text-xs text-muted-foreground/60">Couldn't load skills</div>
-                );
-              }
 
               const isDirsSelected =
                 selection?.kind === 'skill-dirs' && selection.backendId === backendId;
@@ -70,6 +65,19 @@ export function SkillsTree({
                   <span className="truncate flex-1">External directories</span>
                 </button>
               );
+
+              // The dirs footer stays reachable even when the skills fetch
+              // failed — dirs are fetched independently and may be fine.
+              if (error) {
+                return (
+                  <>
+                    <div className="px-2 text-xs text-muted-foreground/60">
+                      Couldn't load skills
+                    </div>
+                    {footer}
+                  </>
+                );
+              }
 
               if (!skills || skills.length === 0) {
                 return (
