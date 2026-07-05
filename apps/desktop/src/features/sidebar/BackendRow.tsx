@@ -48,7 +48,7 @@ export function BackendRow({
           <ChevronRight
             size={14}
             strokeWidth={2}
-            className={`flex-shrink-0 text-muted-foreground/70 transition-transform ${expanded ? 'rotate-90' : ''}`}
+            className={`flex-shrink-0 text-muted-foreground/60 transition-transform ${expanded ? 'rotate-90' : ''}`}
           />
         </button>
         {onNewProject && (
