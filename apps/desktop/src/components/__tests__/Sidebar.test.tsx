@@ -27,14 +27,6 @@ vi.mock('../SearchFilters', () => ({
     </div>
   ),
 }));
-vi.mock('../ActiveSessionsPanel', () => ({
-  ActiveSessionsPanel: ({ onSessionSelect }: any) => (
-    <div data-testid="active-sessions">
-      <button onClick={() => onSessionSelect('local', 'sess-1')}>select-active</button>
-      <button onClick={() => onSessionSelect('backend-1', 'sess-2')}>select-gw</button>
-    </div>
-  ),
-}));
 vi.mock('../PluginPermissionDialog', () => ({ PluginPermissionDialog: () => null }));
 vi.mock('../../features/sidebar/SessionItem', () => ({
   SessionItem: ({
@@ -151,7 +143,6 @@ import { useSidebarExpansionStore } from '../../stores/sidebarExpansionStore';
 import * as api from '../../services/api';
 import { groupSessionsByWorktree } from '../../features/sidebar/worktreeGrouping';
 import { isAndroid } from '../../utils/platform';
-import { resolveCanonicalBackendId } from '../../utils/controlPlane';
 
 vi.mock('../../utils/platform', async importOriginal => {
   const mod = await importOriginal<Record<string, any>>();
@@ -1549,38 +1540,6 @@ describe('Sidebar', () => {
     if (sessBtn) {
       fireEvent.click(sessBtn);
       expect(onClose).toHaveBeenCalled();
-    }
-  });
-
-  // ---- Active Sessions Panel ----
-
-  it('renders ActiveSessionsPanel', () => {
-    const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    expect(container.querySelector('[data-testid="active-sessions"]')).toBeTruthy();
-  });
-
-  it('handles active session selection for local backend', () => {
-    const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const localBtn = Array.from(container.querySelectorAll('button')).find(
-      b => b.textContent === 'select-active'
-    );
-    if (localBtn) {
-      fireEvent.click(localBtn);
-      expect(selectionMocks.selectSessionOnBackend).toHaveBeenCalledWith(
-        resolveCanonicalBackendId('local', 'local'),
-        'sess-1'
-      );
-    }
-  });
-
-  it('handles active session selection for remote backend', () => {
-    const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const remoteBtn = Array.from(container.querySelectorAll('button')).find(
-      b => b.textContent === 'select-gw'
-    );
-    if (remoteBtn) {
-      fireEvent.click(remoteBtn);
-      expect(selectionMocks.selectSessionOnBackend).toHaveBeenCalledWith('backend-1', 'sess-2');
     }
   });
 

@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useSwipeBack } from '../../hooks/useSwipeBack';
 import { ProjectSettings } from '../settings/ProjectSettings';
-import { ActiveSessionsPanel } from '../../components/ActiveSessionsPanel';
 import { PluginPermissionDialog } from '../../components/permission/PluginPermissionDialog';
 import { SortableList, SortableItem } from '../../components/SortableList';
 
@@ -735,15 +734,6 @@ export function Sidebar({
             )}
           </div>
 
-          <div className="flex-shrink-0">
-            <ActiveSessionsPanel
-              onSessionSelect={(backendId, sessionId) => {
-                actions.handleActiveSessionSelect(backendId, sessionId);
-                if (onClose) onClose();
-              }}
-            />
-          </div>
-
           <SidebarFooter onShowSettings={() => onOpenSettings?.()} isMobile />
         </div>
 
@@ -834,10 +824,6 @@ export function Sidebar({
           ) : (
             renderProjectList()
           )}
-        </div>
-
-        <div className="flex-shrink-0">
-          <ActiveSessionsPanel onSessionSelect={actions.handleActiveSessionSelect} />
         </div>
 
         <SidebarFooter onShowSettings={() => onOpenSettings?.()} />

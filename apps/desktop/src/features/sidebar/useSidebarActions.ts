@@ -3,7 +3,6 @@ import { isDesktopTauri } from '../../utils/platform';
 import { openPopoutWindow } from '../../utils/popoutWindow';
 import { useOwnershipStore } from '../../stores/ownershipStore';
 import { useUIStore } from '../../stores/uiStore';
-import { isLegacyLocalBackendId, resolveCanonicalBackendId } from '../../utils/controlPlane';
 import { useSelectionCoordinator } from '../../hooks/useSelectionCoordinator';
 import type { Project, Session } from '@zclaudia/shared';
 import * as api from '../../services/api';
@@ -71,20 +70,7 @@ export function useSidebarActions({
   onAgentNotReady,
 }: UseSidebarActionsOptions) {
   const requestMessageJump = useUIStore(s => s.requestMessageJump);
-  const { selectProject, selectSession, selectSessionOnBackend } = useSelectionCoordinator();
-
-  const handleActiveSessionSelect = useCallback(
-    (backendId: string, sessionId: string) => {
-      useUIStore.getState().requestForceScrollToBottom(sessionId);
-      if (isLegacyLocalBackendId(backendId)) {
-        const resolvedBackendId = resolveCanonicalBackendId(backendId, backendId);
-        if (resolvedBackendId) selectSessionOnBackend(resolvedBackendId, sessionId);
-        return;
-      }
-      selectSessionOnBackend(backendId, sessionId);
-    },
-    [selectSessionOnBackend]
-  );
+  const { selectProject, selectSession } = useSelectionCoordinator();
 
   const handleCreateProject = useCallback(
     async (backendId?: string | null) => {
@@ -245,7 +231,6 @@ export function useSidebarActions({
   return {
     selectProject,
     selectSession,
-    handleActiveSessionSelect,
     handleCreateProject,
     handleCreateSession,
     handleDeleteProject,
