@@ -5,8 +5,8 @@ import { useFacadeStore } from '../../stores/facadeStore';
 import { resolveGatewayBackendUrl, getGatewayAuthHeaders } from '../gatewayProxy';
 import {
   getControlPlaneMode,
-  isLegacyLocalBackendId,
   isLocalBackendId,
+  resolveCanonicalBackendId,
   resolveLocalBackendId,
 } from '../../utils/controlPlane';
 
@@ -19,24 +19,17 @@ export function activeServerSupports(feature: ServerFeature): boolean {
  * Check if an explicit backend advertises a specific feature.
  *
  * `serverStore.connections` is keyed by real backend ids (as delivered by
- * facade sync), never by the legacy `'local'` sentinel — so a lookup must
- * resolve the same way `getBaseUrlForBackend`/`getAuthHeadersForBackend` do:
- * a `null`/`undefined` id falls back to the active server, and the legacy
- * `'local'` id is resolved to the real local backend id before indexing
- * `connections`. Keeping this resolution identical to those two functions is
- * what guarantees the guard and the actual request never disagree about
- * which backend they mean.
+ * facade sync), never by the legacy `'local'` sentinel — so the id is
+ * canonicalized first (null → active server, legacy `'local'` → real local
+ * backend id), mirroring how the `*ForBackend` request helpers resolve their
+ * target. That shared resolution is what guarantees the guard and the actual
+ * request never disagree about which backend they mean.
  */
 export function backendSupports(backendId: string | null, feature: ServerFeature): boolean {
   const state = useServerStore.getState();
-  let id = backendId ?? state.activeServerId;
-  if (isLegacyLocalBackendId(id)) {
-    id = resolveLocalBackendId(id);
-  }
+  const id = resolveCanonicalBackendId(backendId ?? state.activeServerId);
   if (!id) return false;
-  const conn = state.connections[id];
-  if (!conn || conn.features.length === 0) return false;
-  return conn.features.includes(feature);
+  return state.serverSupports(id, feature);
 }
 
 // Custom error class for authentication errors

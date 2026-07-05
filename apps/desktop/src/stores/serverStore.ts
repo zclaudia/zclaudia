@@ -52,6 +52,7 @@ interface ServerState {
   // Getters
   getServerConnection: (serverId: string) => ServerConnection | undefined;
   getActiveServerConnection: () => ServerConnection | undefined;
+  serverSupports: (serverId: string, feature: ServerFeature) => boolean;
   activeServerSupports: (feature: ServerFeature) => boolean;
 }
 
@@ -173,11 +174,15 @@ export const useServerStore = create<ServerState>()((set, get) => ({
     return state.connections[state.activeServerId];
   },
 
+  serverSupports: (serverId, feature) => {
+    const conn = get().connections[serverId];
+    if (!conn || conn.features.length === 0) return false;
+    return conn.features.includes(feature);
+  },
+
   activeServerSupports: feature => {
     const state = get();
     if (!state.activeServerId) return false;
-    const conn = state.connections[state.activeServerId];
-    if (!conn || conn.features.length === 0) return false;
-    return conn.features.includes(feature);
+    return state.serverSupports(state.activeServerId, feature);
   },
 }));
