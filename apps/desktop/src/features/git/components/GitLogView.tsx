@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { useCallback, useEffect } from 'react';
 import * as api from '../../../services/api';
 import { useGitStore, selectLog } from '../store';
+import { useExternalRefresh } from '../useExternalRefresh';
 
 interface GitLogViewProps {
   projectId: string;
   worktreePath: string;
+  refreshNonce?: number;
 }
 
 function relativeDate(ts: number): string {
@@ -19,39 +20,23 @@ function relativeDate(ts: number): string {
   return new Date(ts).toLocaleDateString();
 }
 
-export function GitLogView({ projectId, worktreePath }: GitLogViewProps) {
+export function GitLogView({ projectId, worktreePath, refreshNonce }: GitLogViewProps) {
   const log = useGitStore(selectLog(projectId, worktreePath));
   const setLog = useGitStore(s => s.setLog);
-  const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
-    try {
-      const next = await api.getGitLog(projectId, worktreePath, 50);
-      setLog(projectId, worktreePath, next);
-    } finally {
-      setLoading(false);
-    }
+    const next = await api.getGitLog(projectId, worktreePath, 50);
+    setLog(projectId, worktreePath, next);
   }, [projectId, worktreePath, setLog]);
 
   useEffect(() => {
     refresh().catch(() => {});
   }, [refresh]);
 
+  useExternalRefresh(refresh, refreshNonce);
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-        <span className="text-[11px] font-medium text-muted-foreground">Recent commits</span>
-        <button
-          type="button"
-          onClick={() => refresh()}
-          disabled={loading}
-          className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-        </button>
-      </div>
-
       <div className="flex-1 overflow-y-auto">
         {!log ? (
           <div className="px-3 py-3 text-xs text-muted-foreground">Loading…</div>

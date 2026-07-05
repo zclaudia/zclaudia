@@ -105,6 +105,64 @@ describe('SessionMessageRepository', () => {
     expect(repo.findRowIdById('m1')).not.toBeNull();
   });
 
+  it('assigns offset 1 to the first message in a session', () => {
+    const message = repo.create({
+      id: 'm1',
+      sessionId: 's1',
+      role: 'user',
+      content: 'First',
+      createdAt: Date.now(),
+    });
+
+    expect(message.offset).toBe(1);
+  });
+
+  it('assigns the next contiguous offset after existing messages', () => {
+    const now = Date.now();
+    db.prepare(
+      `
+      INSERT INTO messages (id, session_id, role, content, metadata, created_at, offset)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `
+    ).run('existing-1', 's1', 'user', 'Existing', null, now, 7);
+
+    const message = repo.create({
+      id: 'm1',
+      sessionId: 's1',
+      role: 'assistant',
+      content: 'Reply',
+      createdAt: now + 1,
+    });
+
+    expect(message.offset).toBe(8);
+  });
+
+  it('scopes offset numbering per session', () => {
+    const now = Date.now();
+    db.prepare(
+      `
+      INSERT INTO sessions (id, project_id, name, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+    `
+    ).run('s2', 'project-1', 'Session 2', now, now);
+    db.prepare(
+      `
+      INSERT INTO messages (id, session_id, role, content, metadata, created_at, offset)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `
+    ).run('other-session', 's2', 'user', 'Other', null, now, 5);
+
+    const message = repo.create({
+      id: 'm1',
+      sessionId: 's1',
+      role: 'user',
+      content: 'First in s1',
+      createdAt: now + 1,
+    });
+
+    expect(message.offset).toBe(1);
+  });
+
   it('lists recent assistant message contents newest first', () => {
     const now = Date.now();
     db.prepare(

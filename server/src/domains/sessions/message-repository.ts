@@ -151,8 +151,9 @@ export class SessionMessageRepository {
     this.db
       .prepare(
         `
-      INSERT INTO messages (id, session_id, role, content, metadata, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO messages (id, session_id, role, content, metadata, created_at, offset)
+      VALUES (?, ?, ?, ?, ?, ?,
+        (SELECT COALESCE(MAX(offset), 0) + 1 FROM messages WHERE session_id = ?))
     `
       )
       .run(
@@ -161,7 +162,8 @@ export class SessionMessageRepository {
         input.role,
         input.content,
         input.metadata ? JSON.stringify(input.metadata) : null,
-        input.createdAt
+        input.createdAt,
+        input.sessionId
       );
 
     const row = this.db

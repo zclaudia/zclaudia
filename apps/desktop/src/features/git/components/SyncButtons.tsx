@@ -6,10 +6,26 @@ import { runWithToast } from '../runWithToast';
 interface SyncButtonsProps {
   projectId: string;
   worktreePath: string;
+  ahead?: number;
+  behind?: number;
   onAfter?: () => void | Promise<void>;
 }
 
-export function SyncButtons({ projectId, worktreePath, onAfter }: SyncButtonsProps) {
+function Count({ n }: { n: number }) {
+  return (
+    <span className="ml-0.5 rounded bg-muted/70 px-1 text-[10px] leading-none text-foreground tabular-nums">
+      {n}
+    </span>
+  );
+}
+
+export function SyncButtons({
+  projectId,
+  worktreePath,
+  ahead = 0,
+  behind = 0,
+  onAfter,
+}: SyncButtonsProps) {
   const [busy, setBusy] = useState<null | 'fetch' | 'pull' | 'push'>(null);
 
   const run = async (kind: 'fetch' | 'pull' | 'push') => {
@@ -47,20 +63,22 @@ export function SyncButtons({ projectId, worktreePath, onAfter }: SyncButtonsPro
         onClick={() => run('pull')}
         disabled={!!busy}
         className={baseBtn}
-        title="git pull --ff-only"
+        title={behind > 0 ? `git pull --ff-only (${behind} behind)` : 'git pull --ff-only'}
       >
         <ArrowDownToLine className="w-3 h-3 opacity-70" />
         {busy === 'pull' ? 'Pulling…' : 'Pull'}
+        {behind > 0 && busy !== 'pull' && <Count n={behind} />}
       </button>
       <button
         type="button"
         onClick={() => run('push')}
         disabled={!!busy}
         className={baseBtn}
-        title="git push"
+        title={ahead > 0 ? `git push (${ahead} ahead)` : 'git push'}
       >
         <ArrowUpFromLine className="w-3 h-3 opacity-70" />
         {busy === 'push' ? 'Pushing…' : 'Push'}
+        {ahead > 0 && busy !== 'push' && <Count n={ahead} />}
       </button>
     </div>
   );

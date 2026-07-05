@@ -1,40 +1,39 @@
 import { useCallback, useEffect, useState } from 'react';
-import { GitBranch as BranchIcon, RefreshCw, Plus, Trash2 } from 'lucide-react';
+import { GitBranch as BranchIcon, Plus, Trash2 } from 'lucide-react';
 import * as api from '../../../services/api';
 import { useGitStore, selectBranches } from '../store';
 import { runWithToast } from '../runWithToast';
 import { useToastStore } from '../../../stores/toastStore';
+import { useExternalRefresh } from '../useExternalRefresh';
 
 interface GitBranchesViewProps {
   projectId: string;
   worktreePath: string;
+  refreshNonce?: number;
   onAfterMutation?: () => void | Promise<void>;
 }
 
 export function GitBranchesView({
   projectId,
   worktreePath,
+  refreshNonce,
   onAfterMutation,
 }: GitBranchesViewProps) {
   const branches = useGitStore(selectBranches(projectId, worktreePath));
   const setBranches = useGitStore(s => s.setBranches);
-  const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [newName, setNewName] = useState('');
 
   const refresh = useCallback(async () => {
-    setLoading(true);
-    try {
-      const next = await api.getGitBranches(projectId, worktreePath);
-      setBranches(projectId, worktreePath, next);
-    } finally {
-      setLoading(false);
-    }
+    const next = await api.getGitBranches(projectId, worktreePath);
+    setBranches(projectId, worktreePath, next);
   }, [projectId, worktreePath, setBranches]);
 
   useEffect(() => {
     refresh().catch(() => {});
   }, [refresh]);
+
+  useExternalRefresh(refresh, refreshNonce);
 
   const afterChange = useCallback(async () => {
     await refresh();
@@ -123,18 +122,6 @@ export function GitBranchesView({
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-        <span className="text-[11px] font-medium text-muted-foreground">Branches</span>
-        <button
-          type="button"
-          onClick={() => refresh()}
-          disabled={loading}
-          className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-        </button>
-      </div>
-
       {/* New branch */}
       <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border">
         <input

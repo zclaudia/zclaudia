@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Archive, RefreshCw, Trash2 } from 'lucide-react';
+import { Archive, Trash2 } from 'lucide-react';
 import * as api from '../../../services/api';
 import { useGitStore, selectStash } from '../store';
 import { runWithToast } from '../runWithToast';
 import { confirm } from '../../../stores/confirmDialogStore';
+import { useExternalRefresh } from '../useExternalRefresh';
 
 interface GitStashViewProps {
   projectId: string;
   worktreePath: string;
+  refreshNonce?: number;
   onAfterMutation?: () => void | Promise<void>;
 }
 
@@ -22,26 +24,27 @@ function relativeDate(ts: number): string {
   return new Date(ts).toLocaleDateString();
 }
 
-export function GitStashView({ projectId, worktreePath, onAfterMutation }: GitStashViewProps) {
+export function GitStashView({
+  projectId,
+  worktreePath,
+  refreshNonce,
+  onAfterMutation,
+}: GitStashViewProps) {
   const stash = useGitStore(selectStash(projectId, worktreePath));
   const setStash = useGitStore(s => s.setStash);
-  const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [stashMessage, setStashMessage] = useState('');
 
   const refresh = useCallback(async () => {
-    setLoading(true);
-    try {
-      const next = await api.getGitStash(projectId, worktreePath);
-      setStash(projectId, worktreePath, next);
-    } finally {
-      setLoading(false);
-    }
+    const next = await api.getGitStash(projectId, worktreePath);
+    setStash(projectId, worktreePath, next);
   }, [projectId, worktreePath, setStash]);
 
   useEffect(() => {
     refresh().catch(() => {});
   }, [refresh]);
+
+  useExternalRefresh(refresh, refreshNonce);
 
   const handleCreate = async () => {
     if (creating) return;
@@ -83,20 +86,6 @@ export function GitStashView({ projectId, worktreePath, onAfterMutation }: GitSt
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-        <span className="text-[11px] font-medium text-muted-foreground">
-          Stashes ({stash?.length ?? 0})
-        </span>
-        <button
-          type="button"
-          onClick={() => refresh()}
-          disabled={loading}
-          className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-        </button>
-      </div>
-
       <div className="px-3 py-2 border-b border-border space-y-2">
         <input
           type="text"
@@ -148,7 +137,7 @@ export function GitStashView({ projectId, worktreePath, onAfterMutation }: GitSt
                   <button
                     type="button"
                     onClick={() => handleDrop(s.index)}
-                    className="p-1 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-500"
+                    className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
                     title="Drop stash"
                   >
                     <Trash2 className="w-3 h-3" />

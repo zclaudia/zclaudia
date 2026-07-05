@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { GitBranch as BranchIcon, ChevronDown } from 'lucide-react';
+import { GitBranch as BranchIcon, ChevronDown, RefreshCw } from 'lucide-react';
 import * as api from '../../../services/api';
-import { useGitStore } from '../store';
+import { useGitStore, selectStatus } from '../store';
 import { resolveEffectiveWorktree } from '../resolveWorktree';
 import { SyncButtons } from './SyncButtons';
 import { GitStatusView } from './GitStatusView';
@@ -25,6 +25,8 @@ export function GitSidebarPanel({
 }: GitSidebarPanelProps) {
   const [override, setOverride] = useState<string | null>(null);
   const [tab, setTab] = useState<SubTab>('status');
+  const [refreshNonce, setRefreshNonce] = useState(0);
+  const [spinning, setSpinning] = useState(false);
 
   const worktrees = useGitStore(s => (projectId ? (s.worktrees[projectId] ?? []) : []));
   const setWorktrees = useGitStore(s => s.setWorktrees);
@@ -52,6 +54,7 @@ export function GitSidebarPanel({
   }, [projectId, setWorktrees]);
 
   const effectivePath = resolveEffectiveWorktree(override, workingDirectory, projectRoot);
+  const status = useGitStore(selectStatus(projectId ?? '', effectivePath ?? ''));
 
   const refreshStatus = useCallback(async () => {
     if (!projectId || !effectivePath) return;
@@ -62,6 +65,18 @@ export function GitSidebarPanel({
       // ignore
     }
   }, [projectId, effectivePath, setStatus]);
+
+  // Keep the header's ahead/behind counts fresh regardless of the active tab.
+  useEffect(() => {
+    void refreshStatus();
+  }, [refreshStatus]);
+
+  const handleRefresh = useCallback(() => {
+    setSpinning(true);
+    setRefreshNonce(n => n + 1);
+    void refreshStatus();
+    window.setTimeout(() => setSpinning(false), 600);
+  }, [refreshStatus]);
 
   const currentBranch = useMemo(
     () => worktrees.find(w => w.path === effectivePath)?.branch,
@@ -81,35 +96,41 @@ export function GitSidebarPanel({
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Header: worktree switcher + sync */}
-      <div className="border-b border-border px-3 py-2 space-y-2">
-        <div className="flex items-center gap-2">
-          <BranchIcon className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-          {worktrees.length > 1 ? (
-            <div className="relative min-w-0 flex-1">
-              <select
-                value={effectivePath}
-                onChange={e => setOverride(e.target.value)}
-                className="w-full appearance-none bg-background border border-border rounded-lg pl-2 pr-7 py-1 text-xs cursor-pointer outline-none transition-colors hover:bg-secondary focus:border-primary"
-              >
-                {worktrees.map(w => (
-                  <option key={w.path} value={w.path}>
-                    {w.branch}
-                    {w.isMain ? ' (main)' : ''}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            </div>
-          ) : (
-            <span className="text-sm font-semibold truncate">{currentBranch ?? 'git'}</span>
-          )}
-        </div>
-        <SyncButtons projectId={projectId} worktreePath={effectivePath} onAfter={refreshStatus} />
+      {/* Header: worktree switcher + sync, on a single row */}
+      <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+        <BranchIcon className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+        {worktrees.length > 1 ? (
+          <div className="relative min-w-0 flex-1">
+            <select
+              value={effectivePath}
+              onChange={e => setOverride(e.target.value)}
+              className="w-full appearance-none bg-background border border-border rounded-lg pl-2 pr-7 py-1 text-xs cursor-pointer outline-none transition-colors hover:bg-secondary focus:border-primary"
+            >
+              {worktrees.map(w => (
+                <option key={w.path} value={w.path}>
+                  {w.branch}
+                  {w.isMain ? ' (main)' : ''}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          </div>
+        ) : (
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+            {currentBranch ?? 'git'}
+          </span>
+        )}
+        <SyncButtons
+          projectId={projectId}
+          worktreePath={effectivePath}
+          ahead={status?.ahead ?? 0}
+          behind={status?.behind ?? 0}
+          onAfter={refreshStatus}
+        />
       </div>
 
-      {/* Tabs */}
-      <div className="border-b border-border px-3 py-2">
+      {/* Tabs + shared refresh */}
+      <div className="flex items-center justify-between border-b border-border px-3 py-2">
         <div className="inline-flex items-center gap-0.5 rounded-lg bg-secondary/60 p-1">
           {(['status', 'commits', 'branches', 'stash'] as const).map(t => (
             <button
@@ -126,16 +147,37 @@ export function GitSidebarPanel({
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          onClick={handleRefresh}
+          className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+          title="Refresh"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${spinning ? 'animate-spin' : ''}`} strokeWidth={1.75} />
+        </button>
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-hidden">
-        {tab === 'status' && <GitStatusView projectId={projectId} worktreePath={effectivePath} />}
-        {tab === 'commits' && <GitLogView projectId={projectId} worktreePath={effectivePath} />}
+        {tab === 'status' && (
+          <GitStatusView
+            projectId={projectId}
+            worktreePath={effectivePath}
+            refreshNonce={refreshNonce}
+          />
+        )}
+        {tab === 'commits' && (
+          <GitLogView
+            projectId={projectId}
+            worktreePath={effectivePath}
+            refreshNonce={refreshNonce}
+          />
+        )}
         {tab === 'branches' && (
           <GitBranchesView
             projectId={projectId}
             worktreePath={effectivePath}
+            refreshNonce={refreshNonce}
             onAfterMutation={refreshStatus}
           />
         )}
@@ -143,6 +185,7 @@ export function GitSidebarPanel({
           <GitStashView
             projectId={projectId}
             worktreePath={effectivePath}
+            refreshNonce={refreshNonce}
             onAfterMutation={refreshStatus}
           />
         )}

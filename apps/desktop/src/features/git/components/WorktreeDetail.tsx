@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react';
-import { Copy } from 'lucide-react';
+import { Copy, RefreshCw } from 'lucide-react';
 import type { GitWorktree } from '@zclaudia/shared';
 import * as api from '../../../services/api';
-import { useGitStore } from '../store';
+import { useGitStore, selectStatus } from '../store';
 import { SyncButtons } from './SyncButtons';
 import { GitStatusView } from './GitStatusView';
 import { GitLogView } from './GitLogView';
@@ -19,7 +19,10 @@ interface WorktreeDetailProps {
 
 export function WorktreeDetail({ projectId, worktree, onRefreshList }: WorktreeDetailProps) {
   const [tab, setTab] = useState<SubTab>('status');
+  const [refreshNonce, setRefreshNonce] = useState(0);
+  const [spinning, setSpinning] = useState(false);
   const setStatus = useGitStore(s => s.setStatus);
+  const status = useGitStore(selectStatus(projectId, worktree.path));
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -34,6 +37,13 @@ export function WorktreeDetail({ projectId, worktree, onRefreshList }: WorktreeD
     await refreshStatus();
     if (onRefreshList) await onRefreshList();
   }, [refreshStatus, onRefreshList]);
+
+  const handleRefresh = useCallback(() => {
+    setSpinning(true);
+    setRefreshNonce(n => n + 1);
+    void refreshStatus();
+    window.setTimeout(() => setSpinning(false), 600);
+  }, [refreshStatus]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -71,12 +81,18 @@ export function WorktreeDetail({ projectId, worktree, onRefreshList }: WorktreeD
               </button>
             </div>
           </div>
-          <SyncButtons projectId={projectId} worktreePath={worktree.path} onAfter={onAfterSync} />
+          <SyncButtons
+            projectId={projectId}
+            worktreePath={worktree.path}
+            ahead={status?.ahead ?? 0}
+            behind={status?.behind ?? 0}
+            onAfter={onAfterSync}
+          />
         </div>
       </div>
 
-      {/* Sub-tabs */}
-      <div className="border-b border-border px-3 py-2">
+      {/* Sub-tabs + shared refresh */}
+      <div className="flex items-center justify-between border-b border-border px-3 py-2">
         <div className="inline-flex items-center gap-0.5 rounded-lg bg-secondary/60 p-1">
           {(['status', 'commits', 'branches', 'stash'] as const).map(t => (
             <button
@@ -93,16 +109,37 @@ export function WorktreeDetail({ projectId, worktree, onRefreshList }: WorktreeD
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          onClick={handleRefresh}
+          className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+          title="Refresh"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${spinning ? 'animate-spin' : ''}`} strokeWidth={1.75} />
+        </button>
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-hidden">
-        {tab === 'status' && <GitStatusView projectId={projectId} worktreePath={worktree.path} />}
-        {tab === 'commits' && <GitLogView projectId={projectId} worktreePath={worktree.path} />}
+        {tab === 'status' && (
+          <GitStatusView
+            projectId={projectId}
+            worktreePath={worktree.path}
+            refreshNonce={refreshNonce}
+          />
+        )}
+        {tab === 'commits' && (
+          <GitLogView
+            projectId={projectId}
+            worktreePath={worktree.path}
+            refreshNonce={refreshNonce}
+          />
+        )}
         {tab === 'branches' && (
           <GitBranchesView
             projectId={projectId}
             worktreePath={worktree.path}
+            refreshNonce={refreshNonce}
             onAfterMutation={onAfterSync}
           />
         )}
@@ -110,6 +147,7 @@ export function WorktreeDetail({ projectId, worktree, onRefreshList }: WorktreeD
           <GitStashView
             projectId={projectId}
             worktreePath={worktree.path}
+            refreshNonce={refreshNonce}
             onAfterMutation={refreshStatus}
           />
         )}

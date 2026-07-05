@@ -1,20 +1,21 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Check, ChevronRight, Loader2, Minus, Plus, RefreshCw, Sparkles } from 'lucide-react';
+import { Check, ChevronRight, GitCommit, Loader2, Minus, Plus, Sparkles } from 'lucide-react';
 import * as api from '../../../services/api';
 import type { GitFileDiffKind } from '../../../services/api/git';
 import { CodeViewer } from '../../../components/renderers/CodeViewer';
 import { useGitStore, selectStatus } from '../store';
 import { runWithToast } from '../runWithToast';
+import { useExternalRefresh } from '../useExternalRefresh';
 
 interface GitStatusViewProps {
   projectId: string;
   worktreePath: string;
+  refreshNonce?: number;
 }
 
-export function GitStatusView({ projectId, worktreePath }: GitStatusViewProps) {
+export function GitStatusView({ projectId, worktreePath, refreshNonce }: GitStatusViewProps) {
   const status = useGitStore(selectStatus(projectId, worktreePath));
   const setStatus = useGitStore(s => s.setStatus);
-  const [loading, setLoading] = useState(false);
   const [committing, setCommitting] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [message, setMessage] = useState('');
@@ -32,18 +33,15 @@ export function GitStatusView({ projectId, worktreePath }: GitStatusViewProps) {
   };
 
   const refresh = useCallback(async () => {
-    setLoading(true);
-    try {
-      const next = await api.getWorktreeStatus(projectId, worktreePath);
-      setStatus(projectId, worktreePath, next);
-    } finally {
-      setLoading(false);
-    }
+    const next = await api.getWorktreeStatus(projectId, worktreePath);
+    setStatus(projectId, worktreePath, next);
   }, [projectId, worktreePath, setStatus]);
 
   useEffect(() => {
     refresh().catch(() => {});
   }, [refresh]);
+
+  useExternalRefresh(refresh, refreshNonce);
 
   const stage = async (files: string[]) => {
     const ok = await runWithToast(`Stage ${files.length} file(s)`, projectId, () =>
@@ -112,26 +110,19 @@ export function GitStatusView({ projectId, worktreePath }: GitStatusViewProps) {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-        <span className="text-[11px] font-medium text-muted-foreground">Working tree</span>
-        <button
-          type="button"
-          onClick={() => refresh()}
-          disabled={loading}
-          className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-          title="Refresh status"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-3 space-y-4">
+      <div className="flex-1 overflow-y-auto">
         {!status ? (
-          <div className="text-xs text-muted-foreground">Loading…</div>
+          <div className="p-3 text-xs text-muted-foreground">Loading…</div>
         ) : status.clean ? (
-          <div className="text-sm text-muted-foreground italic">Working tree clean.</div>
+          <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary/60">
+              <GitCommit className="h-5 w-5 text-muted-foreground" strokeWidth={1.75} />
+            </div>
+            <p className="text-sm font-medium text-foreground">Working tree clean</p>
+            <p className="text-xs text-muted-foreground">No changes to commit.</p>
+          </div>
         ) : (
-          <>
+          <div className="p-3 space-y-4">
             <FileSection
               title="Staged"
               files={status.staged}
@@ -165,7 +156,7 @@ export function GitStatusView({ projectId, worktreePath }: GitStatusViewProps) {
               diffs={diffs}
               onToggleDiff={toggleDiff}
             />
-          </>
+          </div>
         )}
       </div>
 
