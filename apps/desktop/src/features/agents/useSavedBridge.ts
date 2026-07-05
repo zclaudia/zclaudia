@@ -13,7 +13,10 @@
  *  - a fetch cycle at nonce >= nonceAtSave SETTLES without it: `loading` was
  *    observed true after the record was created (nonce bumps BEFORE loading
  *    flips true, so any post-record loading phase is at nonce >= nonceAtSave)
- *    and then flipped back to false.
+ *    and then flipped back to false. The guarantee that `loading` only settles
+ *    for the latest cycle comes from useCatalogByBackend's own per-effect
+ *    `cancelled` flag, which drops a superseded cycle's setState entirely; the
+ *    nonce >= nonceAtSave check here is belt-and-braces on top of that.
  *
  * The settle clause fixes two edges the old selection-scoped overlay/marker had:
  * a refetch that settles WITHOUT the id no longer leaves an eternal Loading
