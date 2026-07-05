@@ -240,10 +240,10 @@ describe('AgentsTree', () => {
     expect(screen.getByRole('button', { name: 'New profile' })).toBeInTheDocument();
   });
 
-  it('clicking + fires onSelectItem with kind new', () => {
+  it('clicking + fires onSelectItem with kind new-profile', () => {
     const onSelectItem = vi.fn();
     render(<AgentsTree {...baseProps} onSelectItem={onSelectItem} />);
     fireEvent.click(screen.getByRole('button', { name: 'New profile' }));
-    expect(onSelectItem).toHaveBeenCalledWith({ backendId: 'b1', kind: 'new' });
+    expect(onSelectItem).toHaveBeenCalledWith({ backendId: 'b1', kind: 'new-profile' });
   });
 });

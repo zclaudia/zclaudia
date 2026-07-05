@@ -135,7 +135,7 @@ describe('AgentsContent', () => {
   });
 
   it('renders create mode with a null profile and "New profile" header', () => {
-    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b2', kind: 'new' } });
+    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b2', kind: 'new-profile' } });
 
     render(<AgentsContent backends={backends} data={makeData({})} />);
 
@@ -145,7 +145,7 @@ describe('AgentsContent', () => {
   });
 
   it('onSaved bumps the refresh nonce and selects the saved profile id', () => {
-    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new' } });
+    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new-profile' } });
 
     render(<AgentsContent backends={backends} data={makeData({})} />);
 
@@ -157,7 +157,7 @@ describe('AgentsContent', () => {
   });
 
   it('keeps the saved profile visible while the refetch is still stale', () => {
-    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new' } });
+    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new-profile' } });
 
     render(<AgentsContent backends={backends} data={makeData({})} />);
 
@@ -171,7 +171,7 @@ describe('AgentsContent', () => {
   });
 
   it('prefers the fetched profile over the overlay once the refetch lands', () => {
-    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new' } });
+    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new-profile' } });
 
     const { rerender } = render(<AgentsContent backends={backends} data={makeData({})} />);
     fireEvent.click(screen.getByText('stub-save'));
@@ -190,7 +190,7 @@ describe('AgentsContent', () => {
   });
 
   it('does not leak the overlay into a different selection', () => {
-    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new' } });
+    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new-profile' } });
 
     render(<AgentsContent backends={backends} data={makeData({})} />);
     fireEvent.click(screen.getByText('stub-save'));
@@ -223,7 +223,7 @@ describe('AgentsContent', () => {
 
   it('refreshes the global stores only when the edited backend is active', () => {
     // b1 is the active backend (activeServerId null → localBackendId 'b1').
-    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new' } });
+    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new-profile' } });
     const { unmount } = render(<AgentsContent backends={backends} data={makeData({})} />);
 
     fireEvent.click(screen.getByText('stub-save'));
@@ -233,7 +233,7 @@ describe('AgentsContent', () => {
 
     // b2 is not the active backend — no global refresh.
     vi.clearAllMocks();
-    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b2', kind: 'new' } });
+    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b2', kind: 'new-profile' } });
     render(<AgentsContent backends={backends} data={makeData({})} />);
 
     fireEvent.click(screen.getByText('stub-save'));
@@ -243,7 +243,7 @@ describe('AgentsContent', () => {
 
   it('refreshes the global stores when activeServerId directly matches the edited backend', () => {
     useServerStore.setState({ activeServerId: 'b2' } as never);
-    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b2', kind: 'new' } });
+    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b2', kind: 'new-profile' } });
 
     render(<AgentsContent backends={backends} data={makeData({})} />);
 
@@ -257,7 +257,7 @@ describe('AgentsContent', () => {
     // the canonical local backend id — the refresh must still fire.
     useServerStore.setState({ activeServerId: 'local' } as never);
     useFacadeStore.setState({ localBackendId: 'b1' } as never);
-    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new' } });
+    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new-profile' } });
 
     render(<AgentsContent backends={backends} data={makeData({})} />);
 

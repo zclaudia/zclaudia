@@ -61,7 +61,7 @@ export function AgentsTree({
               {online && (
                 <button
                   type="button"
-                  onClick={() => onSelectItem({ backendId, kind: 'new' })}
+                  onClick={() => onSelectItem({ backendId, kind: 'new-profile' })}
                   className="mr-1 hidden h-6 w-6 flex-shrink-0 items-center justify-center rounded-md hover:bg-accent group-hover:flex"
                   title="New profile"
                   aria-label="New profile"

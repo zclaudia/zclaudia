@@ -137,7 +137,9 @@ describe('agents view', () => {
 
   it('selectAgentsItem stores backend-scoped selection', () => {
     useTopLevelViewStore.getState().openAgents();
-    useTopLevelViewStore.getState().selectAgentsItem({ backendId: 'b1', kind: 'profile', id: 'p1' });
+    useTopLevelViewStore
+      .getState()
+      .selectAgentsItem({ backendId: 'b1', kind: 'profile', id: 'p1' });
     expect(useTopLevelViewStore.getState().agentsSelection).toEqual({
       backendId: 'b1',
       kind: 'profile',
@@ -147,24 +149,39 @@ describe('agents view', () => {
 
   it('openAgents clears an existing selection', () => {
     useTopLevelViewStore.getState().openAgents();
-    useTopLevelViewStore.getState().selectAgentsItem({ backendId: 'b1', kind: 'profile', id: 'p1' });
+    useTopLevelViewStore
+      .getState()
+      .selectAgentsItem({ backendId: 'b1', kind: 'profile', id: 'p1' });
     useTopLevelViewStore.getState().openAgents();
     expect(useTopLevelViewStore.getState().agentsSelection).toBeNull();
   });
 
   it('selectAgentsItem(null) clears the selection', () => {
     useTopLevelViewStore.getState().openAgents();
-    useTopLevelViewStore.getState().selectAgentsItem({ backendId: 'b1', kind: 'new' });
+    useTopLevelViewStore.getState().selectAgentsItem({ backendId: 'b1', kind: 'new-profile' });
     useTopLevelViewStore.getState().selectAgentsItem(null);
     expect(useTopLevelViewStore.getState().agentsSelection).toBeNull();
   });
 
   it('setAgentsTab clears the selection while in agents view', () => {
     useTopLevelViewStore.getState().openAgents();
-    useTopLevelViewStore.getState().selectAgentsItem({ backendId: 'b1', kind: 'profile', id: 'p1' });
+    useTopLevelViewStore
+      .getState()
+      .selectAgentsItem({ backendId: 'b1', kind: 'profile', id: 'p1' });
     useTopLevelViewStore.getState().setAgentsTab('profiles');
     const s = useTopLevelViewStore.getState();
     expect(s.view).toEqual({ kind: 'agents', tab: 'profiles' });
+    expect(s.agentsSelection).toBeNull();
+  });
+
+  it('setAgentsTab switches to skills and clears the selection', () => {
+    useTopLevelViewStore.getState().openAgents();
+    useTopLevelViewStore
+      .getState()
+      .selectAgentsItem({ backendId: 'b1', kind: 'profile', id: 'p1' });
+    useTopLevelViewStore.getState().setAgentsTab('skills');
+    const s = useTopLevelViewStore.getState();
+    expect(s.view).toEqual({ kind: 'agents', tab: 'skills' });
     expect(s.agentsSelection).toBeNull();
   });
 
@@ -176,7 +193,7 @@ describe('agents view', () => {
 
   it('returnToApp clears agents selection', () => {
     useTopLevelViewStore.getState().openAgents();
-    useTopLevelViewStore.getState().selectAgentsItem({ backendId: 'b1', kind: 'new' });
+    useTopLevelViewStore.getState().selectAgentsItem({ backendId: 'b1', kind: 'new-profile' });
     useTopLevelViewStore.getState().returnToApp();
     expect(useTopLevelViewStore.getState().agentsSelection).toBeNull();
   });
