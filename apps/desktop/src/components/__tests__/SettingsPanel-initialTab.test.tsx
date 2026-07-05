@@ -49,12 +49,6 @@ vi.mock('../../features/settings/McpServerSettings', () => ({
   McpServerSettings: () => <div data-testid="mcp-settings">McpServerSettings</div>,
 }));
 
-vi.mock('../../features/settings/WorkspaceSkillsSettings', () => ({
-  WorkspaceSkillsSettings: () => (
-    <div data-testid="workspace-settings">WorkspaceSkillsSettings</div>
-  ),
-}));
-
 vi.mock('../../features/settings/AgentSettings', () => ({
   AgentSettings: () => <div data-testid="agent-settings">AgentSettings</div>,
 }));

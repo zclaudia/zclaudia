@@ -17,7 +17,6 @@ import { LlmProfileManager } from './LlmProfileManager';
 import { ServerGatewayConfig } from './ServerGatewayConfig';
 import { PluginSettings } from './PluginSettings';
 import { McpServerSettings } from './McpServerSettings';
-import { WorkspaceSkillsSettings } from './WorkspaceSkillsSettings';
 import { usePluginStore, selectPluginSettingsTabs } from '../../stores/pluginStore';
 import type { BackendConnectionState, BackendSnapshot, GatewayBackendInfo } from '@zclaudia/shared';
 import { AgentSettings } from './AgentSettings';
@@ -461,21 +460,6 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
                         : 'MCP servers configured on this server.'}
                     </p>
                     <McpServerSettings readOnly={!isActiveLocalBackend} />
-                  </div>
-                )}
-
-                {activeTab === 'workspace' && (
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">Skills</h3>
-                    {!isActiveLocalBackend && activeServer && (
-                      <RemoteServerBanner serverName={activeServer.name} label="Viewing skills" />
-                    )}
-                    <p className="text-sm text-muted-foreground">
-                      {isActiveLocalBackend
-                        ? 'Manage workspace skills and external skill directories. Skills are lazy-loaded tools available to all AI providers.'
-                        : 'Workspace skills configured on this server.'}
-                    </p>
-                    <WorkspaceSkillsSettings readOnly={!isActiveLocalBackend} />
                   </div>
                 )}
 
