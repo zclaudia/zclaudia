@@ -35,25 +35,6 @@ export function resolveSessionBucketBackendId(
   return backendId ?? null;
 }
 
-export interface RecentlyCompletedSession {
-  session: RemoteSession;
-  backendId: string;
-  ownerBackendId: string;
-  completedAt: number;
-}
-
-function addToRecentlyCompleted(
-  existing: RecentlyCompletedSession[],
-  session: RemoteSession,
-  backendId: string
-): RecentlyCompletedSession[] {
-  if (existing.some(r => r.session.id === session.id)) return existing;
-  return [
-    { session, backendId, ownerBackendId: backendId, completedAt: Date.now() },
-    ...existing,
-  ].slice(0, 20);
-}
-
 interface SessionsState {
   // Remote sessions organized by backendId
   remoteSessions: Map<string, RemoteSession[]>;
@@ -61,8 +42,6 @@ interface SessionsState {
   // - local direct server: "__local__"
   // - gateway backend: raw backendId
   activeSessionIdsByBackend: Map<string, Set<string>>;
-  // Sessions that recently transitioned from active to inactive (in-memory only)
-  recentlyCompletedSessions: RecentlyCompletedSession[];
 
   // Actions
   setRemoteSessions: (backendId: string, sessions: RemoteSession[]) => void;
@@ -77,14 +56,11 @@ interface SessionsState {
   setSessionActiveById: (backendId: string, sessionId: string, isActive: boolean) => void;
   clearBackendSessions: (backendId: string) => void;
   clearAllSessions: () => void;
-  dismissRecentlyCompleted: (sessionId: string) => void;
-  clearAllRecentlyCompleted: () => void;
 }
 
 export const useSessionsStore = create<SessionsState>(set => ({
   remoteSessions: new Map(),
   activeSessionIdsByBackend: new Map(),
-  recentlyCompletedSessions: [],
 
   setRemoteSessions: (backendId: string, sessions: RemoteSession[]) => {
     // Note: caller (backend_data_snapshot handler) already checks sessionsChanged
@@ -134,27 +110,12 @@ export const useSessionsStore = create<SessionsState>(set => ({
         if (session.isActive) backendActive.add(session.id);
       } else if (eventType === 'updated') {
         // Update existing session
-        const prev = backendSessions.find(s => s.id === session.id);
         newMap.set(
           backendId,
           backendSessions.map(s => (s.id === session.id ? session : s))
         );
-        const wasActive = prev?.isActive === true;
         if (session.isActive) backendActive.add(session.id);
         else backendActive.delete(session.id);
-        newActiveMap.set(backendId, backendActive);
-        // Track completion: only if session was previously active
-        if (wasActive && !session.isActive) {
-          return {
-            remoteSessions: newMap,
-            activeSessionIdsByBackend: newActiveMap,
-            recentlyCompletedSessions: addToRecentlyCompleted(
-              state.recentlyCompletedSessions,
-              session,
-              backendId
-            ),
-          };
-        }
       } else if (eventType === 'deleted') {
         // Remove session
         newMap.set(
@@ -226,20 +187,11 @@ export const useSessionsStore = create<SessionsState>(set => ({
       const newActiveMap = new Map(state.activeSessionIdsByBackend);
       newActiveMap.set(backendId, new Set(activeSessionIds));
 
-      // Track sessions that just completed (were active, now aren't)
-      let recentlyCompleted = state.recentlyCompletedSessions;
-      sessions.forEach((s, i) => {
-        if (s.isActive && !updated[i].isActive) {
-          recentlyCompleted = addToRecentlyCompleted(recentlyCompleted, updated[i], backendId);
-        }
-      });
-
       const newMap = new Map(state.remoteSessions);
       newMap.set(backendId, updated);
       return {
         remoteSessions: newMap,
         activeSessionIdsByBackend: newActiveMap,
-        recentlyCompletedSessions: recentlyCompleted,
       };
     });
   },
@@ -261,24 +213,10 @@ export const useSessionsStore = create<SessionsState>(set => ({
         return { activeSessionIdsByBackend: newActiveMap };
       }
 
-      const wasActive = sessions[idx].isActive;
       const newMap = new Map(state.remoteSessions);
       const updated = [...sessions];
       updated[idx] = { ...updated[idx], isActive };
       newMap.set(backendId, updated);
-
-      // Track completion when transitioning active → inactive
-      if (wasActive && !isActive) {
-        return {
-          remoteSessions: newMap,
-          activeSessionIdsByBackend: newActiveMap,
-          recentlyCompletedSessions: addToRecentlyCompleted(
-            state.recentlyCompletedSessions,
-            updated[idx],
-            backendId
-          ),
-        };
-      }
 
       return {
         remoteSessions: newMap,
@@ -307,17 +245,5 @@ export const useSessionsStore = create<SessionsState>(set => ({
       remoteSessions: new Map(),
       activeSessionIdsByBackend: new Map(),
     });
-  },
-
-  dismissRecentlyCompleted: (sessionId: string) => {
-    set(state => ({
-      recentlyCompletedSessions: state.recentlyCompletedSessions.filter(
-        r => r.session.id !== sessionId
-      ),
-    }));
-  },
-
-  clearAllRecentlyCompleted: () => {
-    set({ recentlyCompletedSessions: [] });
   },
 }));

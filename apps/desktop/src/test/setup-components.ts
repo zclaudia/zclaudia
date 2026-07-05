@@ -494,10 +494,6 @@ const mockSessionsStore = createMockStore({
   deleteSession: vi.fn(),
   activeSessionId: null,
   setActiveSessionId: vi.fn(),
-  recentlyCompleted: [],
-  recentlyCompletedSessions: [],
-  clearAllRecentlyCompleted: vi.fn(),
-  dismissRecentlyCompleted: vi.fn(),
   activeSessionIdsByBackend: new Map(),
   activeSessionsByBackend: new Map(),
   setActiveSessionsForBackend: vi.fn((backendId: string, sessionIds: Set<string>) => {

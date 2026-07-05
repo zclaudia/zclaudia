@@ -53,7 +53,6 @@ function resetStores() {
   useSessionsStore.setState({
     remoteSessions: new Map([['b1', [baseRemoteSession]]]),
     activeSessionIdsByBackend: new Map([['b1', new Set()]]),
-    recentlyCompletedSessions: [],
   } as any);
   useOwnershipStore.setState({
     sessionBackendIds: { s1: 'b1' },

@@ -107,7 +107,6 @@ describe('useBackendFacade run_event forwarding', () => {
         ],
       ]),
       activeSessionIdsByBackend: new Map([['remote-1', new Set(['session-1'])]]),
-      recentlyCompletedSessions: [],
     } as any);
     useOwnershipStore.setState({
       sessionBackendIds: { 'session-1': 'remote-1' },

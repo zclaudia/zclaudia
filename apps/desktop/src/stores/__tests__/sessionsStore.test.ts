@@ -6,7 +6,6 @@ describe('sessionsStore', () => {
     useSessionsStore.setState({
       remoteSessions: new Map(),
       activeSessionIdsByBackend: new Map(),
-      recentlyCompletedSessions: [],
     });
   });
 
@@ -285,17 +284,6 @@ describe('sessionsStore', () => {
       expect(backend2![0].isActive).toBe(true); // unchanged
     });
 
-    it('tracks recently completed sessions', () => {
-      const s1 = createRemoteSession({ id: 's1', isActive: true });
-      useSessionsStore.getState().setRemoteSessions('backend-1', [s1]);
-
-      useSessionsStore.getState().reconcileActiveStatus('backend-1', new Set());
-
-      const completed = useSessionsStore.getState().recentlyCompletedSessions;
-      expect(completed).toHaveLength(1);
-      expect(completed[0].session.id).toBe('s1');
-      expect(completed[0].backendId).toBe('backend-1');
-    });
   });
 
   describe('setActiveSessionsForBackend', () => {
@@ -348,17 +336,6 @@ describe('sessionsStore', () => {
       expect(stored![0].isActive).toBe(true);
     });
 
-    it('tracks recently completed on deactivation', () => {
-      const s1 = createRemoteSession({ id: 's1', isActive: true });
-      useSessionsStore.getState().setRemoteSessions('b1', [s1]);
-
-      useSessionsStore.getState().setSessionActiveById('b1', 's1', false);
-
-      const completed = useSessionsStore.getState().recentlyCompletedSessions;
-      expect(completed).toHaveLength(1);
-      expect(completed[0].session.id).toBe('s1');
-    });
-
     it('handles missing backend gracefully', () => {
       useSessionsStore.getState().setSessionActiveById('missing', 's1', true);
       // Should not throw
@@ -398,17 +375,6 @@ describe('sessionsStore', () => {
       expect(before).toBe(after); // no change
     });
 
-    it('tracks recently completed on update from active to inactive', () => {
-      const s1 = createRemoteSession({ id: 's1', isActive: true });
-      useSessionsStore.getState().setRemoteSessions('b1', [s1]);
-
-      const updated = createRemoteSession({ id: 's1', isActive: false });
-      useSessionsStore.getState().handleSessionEvent('b1', 'updated', updated);
-
-      const completed = useSessionsStore.getState().recentlyCompletedSessions;
-      expect(completed).toHaveLength(1);
-    });
-
     it('removes from active set on delete', () => {
       const s1 = createRemoteSession({ id: 's1', isActive: true });
       useSessionsStore.getState().setRemoteSessions('b1', [s1]);
@@ -420,30 +386,4 @@ describe('sessionsStore', () => {
     });
   });
 
-  describe('dismissRecentlyCompleted', () => {
-    it('removes session from recently completed', () => {
-      const s1 = createRemoteSession({ id: 's1', isActive: true });
-      useSessionsStore.getState().setRemoteSessions('b1', [s1]);
-      useSessionsStore.getState().setSessionActiveById('b1', 's1', false);
-
-      expect(useSessionsStore.getState().recentlyCompletedSessions).toHaveLength(1);
-
-      useSessionsStore.getState().dismissRecentlyCompleted('s1');
-      expect(useSessionsStore.getState().recentlyCompletedSessions).toHaveLength(0);
-    });
-  });
-
-  describe('clearAllRecentlyCompleted', () => {
-    it('clears all recently completed sessions', () => {
-      const s1 = createRemoteSession({ id: 's1', isActive: true });
-      const s2 = createRemoteSession({ id: 's2', isActive: true });
-      useSessionsStore.getState().setRemoteSessions('b1', [s1, s2]);
-      useSessionsStore.getState().reconcileActiveStatus('b1', new Set());
-
-      expect(useSessionsStore.getState().recentlyCompletedSessions.length).toBeGreaterThan(0);
-
-      useSessionsStore.getState().clearAllRecentlyCompleted();
-      expect(useSessionsStore.getState().recentlyCompletedSessions).toHaveLength(0);
-    });
-  });
 });
