@@ -2,12 +2,9 @@ import { useEffect, useState } from 'react';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import { listAgentProfilesForBackend } from '../../services/api';
 import { useTopLevelViewStore } from '../../stores/topLevelViewStore';
+import type { AgentsBackend } from './agents-types';
 
-export interface AgentsBackend {
-  backendId: string;
-  name: string;
-  online: boolean;
-}
+export type { AgentsBackend } from './agents-types';
 
 export interface ProfilesByBackend {
   profiles: Map<string, AgentProfileConfig[]>;

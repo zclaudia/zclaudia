@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { BackendSnapshot } from '@zclaudia/shared';
 import { useFacadeStore } from '../../stores/facadeStore';
-import type { AgentsBackend } from './useProfilesByBackend';
+import type { AgentsBackend } from './agents-types';
 
 /** Is this the local backend (by id, or by the isThisInstance fallback)? */
 function isLocal(backend: BackendSnapshot, localBackendId: string | null): boolean {

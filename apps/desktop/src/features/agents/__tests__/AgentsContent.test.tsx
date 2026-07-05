@@ -61,10 +61,13 @@ const backends: AgentsBackend[] = [
   { backendId: 'b2', name: 'Backend 2', online: true },
 ];
 
-function makeData(profilesByBackend: Record<string, AgentProfileConfig[]>): ProfilesByBackend {
+function makeData(
+  profilesByBackend: Record<string, AgentProfileConfig[]>,
+  errors: Record<string, string> = {}
+): ProfilesByBackend {
   return {
     profiles: new Map(Object.entries(profilesByBackend)),
-    errors: new Map(),
+    errors: new Map(Object.entries(errors)),
     loading: false,
   };
 }
@@ -116,6 +119,18 @@ describe('AgentsContent', () => {
     render(<AgentsContent backends={backends} data={makeData({ b1: [makeProfile('ap1')] })} />);
 
     expect(screen.getByText('Select a profile')).toBeTruthy();
+    expect(screen.queryByTestId('profile-editor')).toBeNull();
+  });
+
+  it('shows a fetch-error hint when the selected backend failed to load', () => {
+    useTopLevelViewStore.setState({
+      agentsSelection: { backendId: 'b1', kind: 'profile', id: 'ap1' },
+    });
+
+    render(<AgentsContent backends={backends} data={makeData({}, { b1: 'boom' })} />);
+
+    expect(screen.getByText('Select a profile')).toBeTruthy();
+    expect(screen.getByText("Couldn't load profiles for this backend.")).toBeTruthy();
     expect(screen.queryByTestId('profile-editor')).toBeNull();
   });
 
@@ -173,5 +188,30 @@ describe('AgentsContent', () => {
     fireEvent.click(screen.getByText('stub-save'));
     expect(mockLoadAll).not.toHaveBeenCalled();
     expect(mockRefresh).not.toHaveBeenCalled();
+  });
+
+  it('refreshes the global stores when activeServerId directly matches the edited backend', () => {
+    useServerStore.setState({ activeServerId: 'b2' } as never);
+    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b2', kind: 'new' } });
+
+    render(<AgentsContent backends={backends} data={makeData({})} />);
+
+    fireEvent.click(screen.getByText('stub-save'));
+    expect(mockLoadAll).toHaveBeenCalledTimes(1);
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('canonicalizes the legacy "local" activeServerId before comparing', () => {
+    // activeServerId still holds the legacy id while the edited backend uses
+    // the canonical local backend id — the refresh must still fire.
+    useServerStore.setState({ activeServerId: 'local' } as never);
+    useFacadeStore.setState({ localBackendId: 'b1' } as never);
+    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new' } });
+
+    render(<AgentsContent backends={backends} data={makeData({})} />);
+
+    fireEvent.click(screen.getByText('stub-save'));
+    expect(mockLoadAll).toHaveBeenCalledTimes(1);
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
   });
 });

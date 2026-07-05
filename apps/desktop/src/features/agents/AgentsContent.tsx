@@ -13,20 +13,22 @@ import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useAgentProfileMetaStore } from '../../stores/agentProfileMetaStore';
 import { useAgentReadinessStore } from '../../stores/agentReadinessStore';
+import { resolveCanonicalBackendId } from '../../utils/controlPlane';
 import { ProfileEditor } from './ProfileEditor';
-import type { AgentsBackend, ProfilesByBackend } from './useProfilesByBackend';
+import type { AgentsBackend } from './agents-types';
+import type { ProfilesByBackend } from './useProfilesByBackend';
 
 interface AgentsContentProps {
   backends: AgentsBackend[];
   data: ProfilesByBackend;
 }
 
-function EmptyState() {
+function EmptyState({ hint }: { hint?: string }) {
   return (
     <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
       <p className="text-sm">Select a profile</p>
       <p className="mt-1 text-xs opacity-60">
-        Choose a profile from the sidebar, or create one with +.
+        {hint ?? 'Choose a profile from the sidebar, or create one with +.'}
       </p>
     </div>
   );
@@ -49,9 +51,19 @@ export function AgentsContent({ backends, data }: AgentsContentProps) {
       : null;
 
   // Stale selection (e.g. the profile was deleted elsewhere) falls back to the
-  // quiet empty state rather than an editor for a phantom record.
+  // quiet empty state rather than an editor for a phantom record. When the
+  // backend's fetch failed we say so — a missing profile then means "couldn't
+  // load", not "deleted".
   if (selection.kind === 'profile' && !profile) {
-    return <EmptyState />;
+    return (
+      <EmptyState
+        hint={
+          data.errors.has(selection.backendId)
+            ? "Couldn't load profiles for this backend."
+            : undefined
+        }
+      />
+    );
   }
 
   const editedBackendId = selection.backendId;
@@ -59,9 +71,11 @@ export function AgentsContent({ backends, data }: AgentsContentProps) {
 
   // Mirrors what AgentManager used to do after mutations: keep the app-wide
   // agent profile cache and readiness gate fresh — but only when the edited
-  // backend is the one the rest of the app is talking to.
+  // backend is the one the rest of the app is talking to. activeServerId may
+  // still hold the legacy 'local' id while editedBackendId is canonical, so
+  // canonicalize before comparing.
   const refreshGlobalStoresIfActive = () => {
-    const activeBackendId = activeServerId ?? localBackendId;
+    const activeBackendId = resolveCanonicalBackendId(activeServerId, localBackendId);
     if (editedBackendId === activeBackendId) {
       void useAgentProfileMetaStore.getState().loadAll();
       void useAgentReadinessStore.getState().refresh();
