@@ -12,6 +12,9 @@ import { SidebarNav } from './SidebarNav';
 import { AutomationTree } from '../automation/AutomationTree';
 import { useAutomationApi } from '../automation/useAutomationApi';
 import type { AutomationTab } from '../automation/automation-types';
+import { AgentsTree } from '../agents/AgentsTree';
+import type { AgentsTab, AgentsSelection } from '../agents/agents-types';
+import type { AgentsBackend, ProfilesByBackend } from '../agents/useProfilesByBackend';
 import { MobileSidebarHeader } from './MobileSidebarHeader';
 import { SidebarSearch } from './SidebarSearch';
 import { SearchModal } from './SearchModal';
@@ -70,6 +73,17 @@ interface SidebarProps {
     /** projectId omitted = scope to the whole backend (global). */
     onSelectScope: (backendId: string, projectId?: string) => void;
   };
+  onOpenAgents?: () => void;
+  /** When present, the sidebar renders in agents mode (tab nav + profiles tree). */
+  agentsMode?: {
+    tab: AgentsTab;
+    onSelectTab: (tab: AgentsTab) => void;
+    onBack: () => void;
+    backends: AgentsBackend[];
+    data: ProfilesByBackend;
+    selection: AgentsSelection | null;
+    onSelectItem: (sel: AgentsSelection) => void;
+  };
   onOpenSettings?: (initialTab?: SettingsTab) => void;
   /** Navigate to the welcome screen (deselect session + exit any dashboard). */
   onHome: () => void;
@@ -93,6 +107,8 @@ export function Sidebar({
   onOpenDashboard,
   onOpenAutomations,
   automationMode,
+  onOpenAgents,
+  agentsMode,
   onOpenSettings,
   onHome,
   isHomeActive,
@@ -714,6 +730,15 @@ export function Sidebar({
                   }
                 : undefined
             }
+            agentsMode={
+              agentsMode
+                ? {
+                    tab: agentsMode.tab,
+                    onSelectTab: agentsMode.onSelectTab,
+                    onBack: agentsMode.onBack,
+                  }
+                : undefined
+            }
           />
 
           <div className="flex-1 overflow-y-auto scrollbar-hidden p-2">
@@ -728,6 +753,15 @@ export function Sidebar({
                 expandedBackendIds={expandedBackendIds}
                 onToggleBackend={toggleBackend}
                 onSelectScope={automationMode.onSelectScope}
+              />
+            ) : agentsMode ? (
+              <AgentsTree
+                backends={agentsMode.backends}
+                data={agentsMode.data}
+                selection={agentsMode.selection}
+                expandedBackendIds={expandedBackendIds}
+                onToggleBackend={toggleBackend}
+                onSelectItem={agentsMode.onSelectItem}
               />
             ) : (
               renderProjectList()
@@ -806,6 +840,16 @@ export function Sidebar({
                 }
               : undefined
           }
+          onOpenAgents={onOpenAgents}
+          agentsMode={
+            agentsMode
+              ? {
+                  tab: agentsMode.tab,
+                  onSelectTab: agentsMode.onSelectTab,
+                  onBack: agentsMode.onBack,
+                }
+              : undefined
+          }
         />
 
         <div className="flex-1 overflow-y-auto scrollbar-hidden p-2">
@@ -820,6 +864,15 @@ export function Sidebar({
               expandedBackendIds={expandedBackendIds}
               onToggleBackend={toggleBackend}
               onSelectScope={automationMode.onSelectScope}
+            />
+          ) : agentsMode ? (
+            <AgentsTree
+              backends={agentsMode.backends}
+              data={agentsMode.data}
+              selection={agentsMode.selection}
+              expandedBackendIds={expandedBackendIds}
+              onToggleBackend={toggleBackend}
+              onSelectItem={agentsMode.onSelectItem}
             />
           ) : (
             renderProjectList()

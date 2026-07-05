@@ -27,6 +27,8 @@ import { useClaudiaDesktop } from './hooks/useClaudiaDesktop';
 import { useDeepLinkNavigation } from './hooks/useDeepLinkNavigation';
 import { useMobileInit } from './hooks/useMobileInit';
 import { useTauriWindowEvents } from './hooks/useTauriWindowEvents';
+import { useAgentsBackends } from './features/agents/selectAgentsBackends';
+import { useProfilesByBackend, type AgentsBackend } from './features/agents/useProfilesByBackend';
 import { useServerStore } from './stores/serverStore';
 import { useFacadeStore } from './stores/facadeStore';
 import { useProjectStore } from './stores/projectStore';
@@ -56,6 +58,13 @@ const ProjectDashboard = lazy(() =>
 const AutomationContent = lazy(() =>
   import('./features/automation/AutomationContent').then(m => ({ default: m.AutomationContent }))
 );
+const AgentsContent = lazy(() =>
+  import('./features/agents/AgentsContent').then(m => ({ default: m.AgentsContent }))
+);
+
+// Stable empty list handed to useProfilesByBackend while agents mode is closed
+// (empty array = no fetches; loading settles false).
+const NO_AGENTS_BACKENDS: AgentsBackend[] = [];
 const MOBILE_TOAST_CONTAINER_CLASS =
   'fixed top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2';
 
@@ -99,6 +108,10 @@ function AppContent() {
   const openAutomations = useTopLevelViewStore(s => s.openAutomations);
   const setAutomationTab = useTopLevelViewStore(s => s.setAutomationTab);
   const setAutomationProjectFilter = useTopLevelViewStore(s => s.setAutomationProjectFilter);
+  const openAgents = useTopLevelViewStore(s => s.openAgents);
+  const setAgentsTab = useTopLevelViewStore(s => s.setAgentsTab);
+  const selectAgentsItem = useTopLevelViewStore(s => s.selectAgentsItem);
+  const agentsSelection = useTopLevelViewStore(s => s.agentsSelection);
   const refreshReadiness = useAgentReadinessStore(s => s.refresh);
 
   const {
@@ -195,6 +208,26 @@ function AppContent() {
             setActiveServer(backendId);
             setAutomationProjectFilter(projectId);
           },
+        }
+      : undefined;
+
+  // Agents shell mode: hooks run unconditionally, but profile fetching only
+  // happens while the mode is open (idle = empty backends list, no fetches).
+  const agentsBackends = useAgentsBackends();
+  const agentsData = useProfilesByBackend(
+    topLevelView.kind === 'agents' ? agentsBackends : NO_AGENTS_BACKENDS
+  );
+
+  const agentsMode =
+    topLevelView.kind === 'agents'
+      ? {
+          tab: topLevelView.tab,
+          onSelectTab: setAgentsTab,
+          onBack: closeTopLevelView,
+          backends: agentsBackends,
+          data: agentsData,
+          selection: agentsSelection,
+          onSelectItem: selectAgentsItem,
         }
       : undefined;
 
@@ -437,6 +470,8 @@ function AppContent() {
           isHomeActive={!selectedSessionId && !dashboardProjectId}
           onOpenAutomations={() => openAutomations()}
           automationMode={automationMode}
+          onOpenAgents={() => openAgents()}
+          agentsMode={agentsMode}
         />
 
         {!isMobile && (
@@ -451,13 +486,13 @@ function AppContent() {
               AppHeader (which used to provide this) only renders on mobile now, and
               only SessionHeader re-adds a strip — so welcome/dashboard views would
               otherwise leave the top of the window un-draggable. When the view has
-              its own top control bar (session/dashboard/automations) we keep the
+              its own top control bar (session/dashboard/automations/agents) we keep the
               strip a hairline so it doesn't cover their buttons; the empty welcome
               view has nothing underneath, so we widen it to an easy grab target. */}
           {!isMobile && (
             <div
               className={`absolute inset-x-0 top-0 z-10 hidden sm:block ${
-                topLevelView.kind !== 'automations' && !dashboardProject && !selectedSessionId
+                topLevelView.kind === 'app' && !dashboardProject && !selectedSessionId
                   ? 'h-10'
                   : 'h-2'
               }`}
@@ -485,6 +520,10 @@ function AppContent() {
                   projectId={topLevelView.projectId}
                   backendId={activeServerId ?? localBackendId}
                 />
+              </Suspense>
+            ) : topLevelView.kind === 'agents' ? (
+              <Suspense fallback={<LazyFallback />}>
+                <AgentsContent backends={agentsBackends} data={agentsData} />
               </Suspense>
             ) : dashboardProject ? (
               <Suspense fallback={<LazyFallback />}>
