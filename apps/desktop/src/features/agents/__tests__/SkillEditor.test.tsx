@@ -136,6 +136,23 @@ describe('SkillEditor', () => {
     expect(await screen.findByText('load boom')).toBeInTheDocument();
   });
 
+  it('eligible badge uses the green pair', async () => {
+    await renderEditor(makeSkill({ eligible: true }));
+
+    const badge = screen.getByText('Eligible');
+    expect(badge.className).toContain('bg-green-500/20');
+    expect(badge.className).toContain('text-green-400');
+  });
+
+  it('blocked badge uses destructive tokens, not green', async () => {
+    await renderEditor(makeSkill({ eligible: false }));
+
+    const badge = screen.getByText('Blocked');
+    expect(badge.className).toContain('bg-destructive/20');
+    expect(badge.className).toContain('text-destructive');
+    expect(badge.className).not.toContain('green');
+  });
+
   it('shows an inline error when save fails', async () => {
     vi.mocked(api.saveWorkspaceSkillForBackend).mockRejectedValue(new Error('save boom'));
 

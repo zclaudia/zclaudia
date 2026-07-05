@@ -246,7 +246,11 @@ function SkillInfoCard({ skill }: { skill: WorkspaceSkillInfo }) {
     <div className="p-3 bg-secondary/50 rounded-lg border border-border/50">
       <div className="flex items-center gap-2">
         <span className="font-medium text-sm truncate">{displayName}</span>
-        <span className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-green-500/20 text-green-400">
+        <span
+          className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium ${
+            isEligible ? 'bg-green-500/20 text-green-400' : 'bg-destructive/20 text-destructive'
+          }`}
+        >
           {isEligible ? 'Eligible' : 'Blocked'}
         </span>
         <span
