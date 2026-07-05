@@ -1043,28 +1043,24 @@ function ModelRow({
   // F3: when contextWindow is left blank, ask the server what the runtime would
   // resolve for this modelId so users see "if you save this row blank, X via
   // Y" inline. Debounced so a fast typer doesn't fan out a request per
-  // keystroke; an abort + version counter ensures stale responses don't
-  // overwrite the freshest result.
+  // keystroke; a version counter ensures stale responses don't overwrite the
+  // freshest result.
   const [resolved, setResolved] = useState<ResolvedPreviewState>({ status: 'idle' });
   const requestIdRef = useRef(0);
   const debounceTimerRef = useRef<number | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
 
   const modelIdInput = row.modelId.trim();
   const contextOverrideEmpty = !row.contextWindowStr.trim();
   const helperEligible = !!providerType && !!modelIdInput && contextOverrideEmpty && !errs.modelId;
 
   useEffect(() => {
-    // Clear any pending debounce + abort the in-flight request on every input
-    // change. If we're no longer eligible (override filled, modelId cleared,
-    // etc.) just reset to idle — the UI hides the helper text in those cases.
+    // Clear any pending debounce on every input change (in-flight responses
+    // are neutralized by the request-id staleness guard below). If we're no
+    // longer eligible (override filled, modelId cleared, etc.) just reset to
+    // idle — the UI hides the helper text in those cases.
     if (debounceTimerRef.current !== null) {
       window.clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = null;
-    }
-    if (abortRef.current) {
-      abortRef.current.abort();
-      abortRef.current = null;
     }
     if (!helperEligible) {
       // Don't surface stale results when the helper isn't applicable.
@@ -1091,7 +1087,6 @@ function ModelRow({
         return rest;
       });
 
-      abortRef.current = new AbortController();
       resolveContextWindowPreviewForBackend(backendId, {
         ...previewInput,
         models: sanitizedModels,
@@ -1128,7 +1123,6 @@ function ModelRow({
   useEffect(() => {
     return () => {
       if (debounceTimerRef.current !== null) window.clearTimeout(debounceTimerRef.current);
-      if (abortRef.current) abortRef.current.abort();
     };
   }, []);
 

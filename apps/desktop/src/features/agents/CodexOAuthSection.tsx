@@ -165,7 +165,6 @@ export function CodexOAuthSection({
       <CodexOAuthCard
         profile={profile}
         isCurrentLocalServer={isCurrentLocalServer}
-        isTauri={isTauri}
         onSignIn={() => void handleSignIn()}
         onSignOut={handleSignOut}
         inFlight={showLogin || signInPending}

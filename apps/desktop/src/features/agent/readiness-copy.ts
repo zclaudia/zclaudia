@@ -34,7 +34,7 @@ export function readinessGuidance(reason: AgentReadinessReason | undefined): Rea
     case 'no_model':
       return {
         title: 'No agent available yet',
-        body: "The agent's selected model isn't configured, or isn't in the list of models offered by its provider. Pick an available model in the agent settings.",
+        body: "The agent's selected model isn't configured, or isn't in the list of models offered by its provider. Pick an available model in the agent's profile.",
         destination: { kind: 'agents' },
       };
     case 'no_credential':

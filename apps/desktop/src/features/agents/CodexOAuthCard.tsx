@@ -4,7 +4,6 @@ import type { LlmProfileConfig } from '@zclaudia/shared';
 interface Props {
   profile: LlmProfileConfig;
   isCurrentLocalServer: boolean;
-  isTauri: boolean;
   onSignIn: () => void;
   onSignOut: () => void;
   inFlight: boolean;

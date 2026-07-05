@@ -7,7 +7,7 @@
  * constants, Tauri browser-open behavior and portal rendering are unchanged.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   startCodexOAuthForBackend,
@@ -39,6 +39,13 @@ export function CodexOAuthLoginModal({
   const [session, setSession] = useState<CodexOAuthStartResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [polling, setPolling] = useState(false);
+  // Held in a ref (mirroring InlinePermissionRequest's onDecisionRef) so an
+  // unstable parent callback doesn't restart the polling effect — a restart
+  // would reset `count` and defeat the MAX_POLLS timeout.
+  const onSuccessRef = useRef(onSuccess);
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+  }, [onSuccess]);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,6 +71,7 @@ export function CodexOAuthLoginModal({
 
   useEffect(() => {
     if (!polling || !session) return;
+    let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let count = 0;
     const tick = async () => {
@@ -74,9 +82,13 @@ export function CodexOAuthLoginModal({
           profileId,
           session.sessionId
         );
+        // A poll may resolve after unmount (clearTimeout only stops the next
+        // tick, not the in-flight request) — never touch state or parent
+        // callbacks once the effect is torn down.
+        if (cancelled) return;
         if (status.state === 'success') {
           setPolling(false);
-          onSuccess(status.accountId);
+          onSuccessRef.current(status.accountId);
           return;
         }
         if (status.state === 'error') {
@@ -96,15 +108,17 @@ export function CodexOAuthLoginModal({
         }
         timer = setTimeout(tick, POLL_INTERVAL_MS);
       } catch (err) {
+        if (cancelled) return;
         setPolling(false);
         setError(err instanceof Error ? err.message : 'Poll failed');
       }
     };
     timer = setTimeout(tick, POLL_INTERVAL_MS);
     return () => {
+      cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [polling, session, backendId, profileId, onSuccess]);
+  }, [polling, session, backendId, profileId]);
 
   const handleCancel = async () => {
     if (session) {

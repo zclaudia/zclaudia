@@ -166,8 +166,8 @@ export function AgentsContent({
   // by the RAW activeServerId — useDataLoader/SessionChatWindow/
   // WorkflowEditorWindow call projectStore.setProviders(), which forwards
   // `useServerStore.getState().activeServerId` verbatim, and the settings
-  // components (LlmProfileManager/ProjectSettings/PermissionSettings) pass
-  // `activeServerId` explicitly. Every reader (useSidebarData, useChatSession,
+  // components (ProjectSettings/PermissionSettings) pass `activeServerId`
+  // explicitly. Every reader (useSidebarData, useChatSession,
   // useAgentForSession, LocalPRCard, projectStore.getProviders) also passes the
   // raw `activeServerId`. So the map is uniformly keyed on the raw active id,
   // which may still be the legacy 'local' string rather than the canonical
@@ -190,9 +190,10 @@ export function AgentsContent({
       if (editedIsActive && activeServerId && activeServerId !== editedBackendId) {
         setProviders(list, activeServerId);
       }
-    } catch {
+    } catch (err) {
       // Best-effort cache refresh: the Providers tree still refetches via the
       // nonce bump, and stale global data self-heals on the next data load.
+      console.warn('[AgentsContent] provider cache refresh failed:', err);
     }
   };
 
