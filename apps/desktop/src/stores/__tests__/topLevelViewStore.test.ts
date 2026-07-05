@@ -116,3 +116,37 @@ describe('topLevelViewStore automation selection', () => {
     expect(useTopLevelViewStore.getState().automationListRefreshNonce).toBe(before + 1);
   });
 });
+
+describe('agents view', () => {
+  beforeEach(() => useTopLevelViewStore.getState().returnToApp());
+
+  it('openAgents enters agents mode on the profiles tab with no selection', () => {
+    useTopLevelViewStore.getState().openAgents();
+    const s = useTopLevelViewStore.getState();
+    expect(s.view).toEqual({ kind: 'agents', tab: 'profiles' });
+    expect(s.agentsSelection).toBeNull();
+  });
+
+  it('selectAgentsItem stores backend-scoped selection', () => {
+    useTopLevelViewStore.getState().openAgents();
+    useTopLevelViewStore.getState().selectAgentsItem({ backendId: 'b1', kind: 'profile', id: 'p1' });
+    expect(useTopLevelViewStore.getState().agentsSelection).toEqual({
+      backendId: 'b1',
+      kind: 'profile',
+      id: 'p1',
+    });
+  });
+
+  it('returnToApp clears agents selection', () => {
+    useTopLevelViewStore.getState().openAgents();
+    useTopLevelViewStore.getState().selectAgentsItem({ backendId: 'b1', kind: 'new' });
+    useTopLevelViewStore.getState().returnToApp();
+    expect(useTopLevelViewStore.getState().agentsSelection).toBeNull();
+  });
+
+  it('bumpAgentsRefresh increments the nonce', () => {
+    const before = useTopLevelViewStore.getState().agentsRefreshNonce;
+    useTopLevelViewStore.getState().bumpAgentsRefresh();
+    expect(useTopLevelViewStore.getState().agentsRefreshNonce).toBe(before + 1);
+  });
+});
