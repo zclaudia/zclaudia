@@ -22,13 +22,13 @@ describe('AgentRequiredDialog', () => {
     expect(container.textContent).toBe('');
   });
 
-  it('primary button calls onConfigure with the mapped settings tab', () => {
+  it('primary button calls onConfigure with the mapped destination', () => {
     const onConfigure = vi.fn();
     render(
       <AgentRequiredDialog open reason="no_agent" onClose={() => {}} onConfigure={onConfigure} />
     );
     fireEvent.click(screen.getByText('Configure →'));
-    expect(onConfigure).toHaveBeenCalledWith('agents');
+    expect(onConfigure).toHaveBeenCalledWith({ kind: 'agents' });
   });
 
   it('secondary button calls onClose', () => {

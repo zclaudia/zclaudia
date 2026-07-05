@@ -4,7 +4,6 @@ import { isAndroid } from '../../utils/platform';
 export type SettingsTab =
   | 'general'
   | 'agent'
-  | 'agents'
   | 'permissions'
   | 'providers'
   | 'notifications'
@@ -133,28 +132,6 @@ export function getServerTabs({
             strokeWidth={2}
             d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
           />
-        </svg>
-      ),
-    },
-    {
-      id: 'agents',
-      label: 'Agents',
-      icon: (
-        <svg
-          className="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          viewBox="0 0 24 24"
-        >
-          <path d="M12 8V4H8" />
-          <rect width={16} height={12} x={4} y={8} rx={2} />
-          <path d="M2 14h2" />
-          <path d="M20 14h2" />
-          <path d="M15 13v2" />
-          <path d="M9 13v2" />
         </svg>
       ),
     },

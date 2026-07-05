@@ -33,15 +33,6 @@ vi.mock('../../features/settings/LlmProfileManager', () => ({
     ) : null,
 }));
 
-vi.mock('../../features/settings/AgentManager', () => ({
-  AgentManager: ({ isOpen, inline }: any) =>
-    isOpen ? (
-      <div data-testid="agent-manager" data-inline={inline}>
-        AgentManager
-      </div>
-    ) : null,
-}));
-
 vi.mock('../../features/settings/GeneralSettings', () => ({
   GeneralSettings: () => <div data-testid="general-settings">GeneralSettings</div>,
 }));

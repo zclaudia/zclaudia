@@ -69,8 +69,8 @@ export function AgentsContent({ backends, data }: AgentsContentProps) {
   const editedBackendId = selection.backendId;
   const backendName = backends.find(b => b.backendId === editedBackendId)?.name;
 
-  // Mirrors what AgentManager used to do after mutations: keep the app-wide
-  // agent profile cache and readiness gate fresh — but only when the edited
+  // Mirrors what the old settings Agents tab used to do after mutations: keep
+  // the app-wide agent profile cache and readiness gate fresh — but only when the edited
   // backend is the one the rest of the app is talking to. activeServerId may
   // still hold the legacy 'local' id while editedBackendId is canonical, so
   // canonicalize before comparing.

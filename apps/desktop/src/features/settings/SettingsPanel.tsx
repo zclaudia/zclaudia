@@ -14,7 +14,6 @@ import { useIsMobile } from '../../hooks/useMediaQuery';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { useSidebarWidthStore, SIDEBAR_WIDTH_LIMITS } from '../../stores/sidebarWidthStore';
 import { LlmProfileManager } from './LlmProfileManager';
-import { AgentManager } from './AgentManager';
 import { ServerGatewayConfig } from './ServerGatewayConfig';
 import { PluginSettings } from './PluginSettings';
 import { McpServerSettings } from './McpServerSettings';
@@ -428,23 +427,6 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
                   </div>
                 )}
 
-                {activeTab === 'agents' && (
-                  <div className="space-y-4">
-                    {!isActiveLocalBackend && activeServer && (
-                      <RemoteServerBanner serverName={activeServer.name} label="Viewing agents" />
-                    )}
-                    <p className="text-sm text-muted-foreground">
-                      {isActiveLocalBackend
-                        ? 'Manage agent profiles — each binds a system prompt, enabled tools, and thinking level to an LLM profile.'
-                        : 'Agent profiles configured on this server.'}
-                    </p>
-                    <AgentManagerInline
-                      key={activeServerId || 'none'}
-                      readOnly={!isActiveLocalBackend}
-                    />
-                  </div>
-                )}
-
                 {activeTab === 'notifications' && <NotificationSettingsInline />}
 
                 {activeTab === 'gateway' && (
@@ -573,10 +555,6 @@ function RemoteServerBanner({ serverName, label }: { serverName: string; label: 
 
 function LlmProfileManagerInline({ readOnly }: { readOnly?: boolean }) {
   return <LlmProfileManager isOpen={true} onClose={() => {}} inline={true} readOnly={readOnly} />;
-}
-
-function AgentManagerInline({ readOnly }: { readOnly?: boolean }) {
-  return <AgentManager isOpen={true} onClose={() => {}} inline={true} readOnly={readOnly} />;
 }
 
 function ServerPickerDropdown({

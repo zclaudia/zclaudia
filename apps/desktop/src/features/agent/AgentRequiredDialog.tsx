@@ -1,6 +1,5 @@
 import type { AgentReadinessReason } from '@zclaudia/shared/core/agent-readiness';
-import type { SettingsTab } from '../settings/settingsTabDefs';
-import { readinessGuidance } from './readiness-copy';
+import { readinessGuidance, type ReadinessDestination } from './readiness-copy';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 
@@ -8,7 +7,7 @@ interface AgentRequiredDialogProps {
   open: boolean;
   reason: AgentReadinessReason | undefined;
   onClose: () => void;
-  onConfigure: (tab: Extract<SettingsTab, 'providers' | 'agents'>) => void;
+  onConfigure: (destination: ReadinessDestination) => void;
 }
 
 export function AgentRequiredDialog({
@@ -41,7 +40,7 @@ export function AgentRequiredDialog({
         <div className="px-5 pb-4 text-sm text-muted-foreground leading-relaxed">{g.body}</div>
         <div className="flex gap-2 px-5 pb-5 mt-auto">
           <button
-            onClick={() => onConfigure(g.settingsTab)}
+            onClick={() => onConfigure(g.destination)}
             className="flex-1 px-3 py-2 bg-accent text-foreground font-medium shadow-apple-sm hover:bg-accent/80 rounded-lg text-sm"
           >
             Configure →

@@ -28,7 +28,7 @@ describe('topLevelViewStore', () => {
   });
 
   it('returns to the normal app shell', () => {
-    useTopLevelViewStore.getState().openSettings('agents');
+    useTopLevelViewStore.getState().openSettings('providers');
     useTopLevelViewStore.getState().returnToApp();
     expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'app' });
   });

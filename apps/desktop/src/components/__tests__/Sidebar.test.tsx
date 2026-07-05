@@ -140,6 +140,7 @@ import { useUIStore } from '../../stores/uiStore';
 import { useAgentReadinessStore } from '../../stores/agentReadinessStore';
 import { useHomeQuickActionsStore } from '../../stores/homeQuickActionsStore';
 import { useSidebarExpansionStore } from '../../stores/sidebarExpansionStore';
+import { useTopLevelViewStore } from '../../stores/topLevelViewStore';
 import * as api from '../../services/api';
 import { groupSessionsByWorktree } from '../../features/sidebar/worktreeGrouping';
 import { isAndroid } from '../../utils/platform';
@@ -724,7 +725,7 @@ describe('Sidebar', () => {
     expect(container.querySelector('input[placeholder="Project name"]')).toBeFalsy();
   });
 
-  it('opens top-level Settings from the agent setup dialog configure action', async () => {
+  it('opens the Agents shell mode from the agent setup dialog configure action', async () => {
     const onOpenSettings = vi.fn();
     const refresh = vi.fn(async () => {
       useAgentReadinessStore.setState({
@@ -738,6 +739,7 @@ describe('Sidebar', () => {
         refresh,
       },
     });
+    useTopLevelViewStore.setState({ view: { kind: 'app' }, agentsSelection: null });
 
     const { container } = render(
       <Sidebar collapsed={false} onToggle={vi.fn()} onOpenSettings={onOpenSettings} />
@@ -753,8 +755,8 @@ describe('Sidebar', () => {
 
     fireEvent.click(screen.getByText('Configure →'));
 
-    expect(onOpenSettings).toHaveBeenCalledTimes(1);
-    expect(onOpenSettings).toHaveBeenCalledWith('agents');
+    expect(onOpenSettings).not.toHaveBeenCalled();
+    expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'agents', tab: 'profiles' });
     expect(document.body.textContent).not.toContain('No agent available yet');
   });
 

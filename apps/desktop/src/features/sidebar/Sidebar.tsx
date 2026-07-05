@@ -37,6 +37,7 @@ import { useHomeQuickActionsStore } from '../../stores/homeQuickActionsStore';
 import { AgentRequiredDialog } from '../agent/AgentRequiredDialog';
 import type { AgentReadinessReason } from '@zclaudia/shared/core/agent-readiness';
 import type { SettingsTab } from '../settings/settingsTabDefs';
+import { useTopLevelViewStore } from '../../stores/topLevelViewStore';
 
 import * as api from '../../services/api';
 import type { GitWorktree } from '@zclaudia/shared';
@@ -637,9 +638,13 @@ export function Sidebar({
             open={agentDialogOpen}
             reason={agentDialogReason}
             onClose={() => setAgentDialogOpen(false)}
-            onConfigure={tab => {
+            onConfigure={destination => {
               setAgentDialogOpen(false);
-              onOpenSettings?.(tab);
+              if (destination.kind === 'agents') {
+                useTopLevelViewStore.getState().openAgents();
+              } else {
+                onOpenSettings?.(destination.tab);
+              }
             }}
           />,
           document.body

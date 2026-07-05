@@ -287,7 +287,7 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
   }, [profile?.id]);
 
   // Create mode: pre-select the default LLM profile once the catalog arrives
-  // (mirrors AgentManager's Add Agent pre-selection).
+  // (mirrors the old settings Agents tab's Add Agent pre-selection).
   useEffect(() => {
     if (profile) return;
     if (llmProfiles.length === 0) return;
