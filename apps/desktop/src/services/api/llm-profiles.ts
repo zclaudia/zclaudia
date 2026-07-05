@@ -14,14 +14,14 @@ import {
   activeServerSupports,
   backendSupports,
 } from './base';
-import { apiCall, apiCallVoid, apiCallForBackend, apiCallVoidForBackend } from './unwrap';
+import { apiCall, apiCallForBackend, apiCallVoidForBackend } from './unwrap';
 
 /**
- * Structured result for {@link deleteLlmProfile}. The DELETE route returns 409
- * with `{code: 'IN_USE', message, agentCount}` when the profile is bound by an
- * agent profile, and the caller (LlmProfileManager) renders that count inline.
- * `apiCallVoid` drops the `code`/`agentCount` fields, so this helper goes
- * straight to `fetchApi` to preserve them.
+ * Structured result for {@link deleteLlmProfileForBackend}. The DELETE route
+ * returns 409 with `{code: 'IN_USE', message, agentCount}` when the profile is
+ * bound by an agent profile, and the caller (LlmProfileEditor) renders that
+ * count inline. `apiCallVoidForBackend` drops the `code`/`agentCount` fields,
+ * so this helper goes straight to `fetchApiForBackend` to preserve them.
  */
 export type DeleteLlmProfileResult =
   | { ok: true }
@@ -62,24 +62,6 @@ export async function listLlmProfilesForBackend(
   return apiCallForBackend<LlmProfileConfig[]>(backendId, '/api/llm-profiles');
 }
 
-export async function createLlmProfile(data: {
-  name: string;
-  providerType?: string;
-  baseUrl?: string | null;
-  apiKey?: string | null;
-  compat?: LlmProfileCompat | null;
-  env?: Record<string, string>;
-  requestHeaders?: Record<string, string> | null;
-  models?: LlmProfileModelEntry[] | null;
-  cacheRetention?: CacheRetentionSetting | null;
-  isDefault?: boolean;
-}): Promise<LlmProfileConfig> {
-  return apiCall<LlmProfileConfig>('/api/llm-profiles', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
-}
-
 export async function createLlmProfileForBackend(
   backendId: string | null,
   data: {
@@ -97,27 +79,6 @@ export async function createLlmProfileForBackend(
 ): Promise<LlmProfileConfig> {
   return apiCallForBackend<LlmProfileConfig>(backendId, '/api/llm-profiles', {
     method: 'POST',
-    body: JSON.stringify(data),
-  });
-}
-
-export async function updateLlmProfile(
-  id: string,
-  // `cacheRetention: null` is meaningful on PUT: it clears the stored value.
-  data: Omit<
-    Partial<LlmProfileConfig>,
-    'baseUrl' | 'apiKey' | 'compat' | 'requestHeaders' | 'models' | 'cacheRetention'
-  > & {
-    baseUrl?: string | null;
-    apiKey?: string | null;
-    compat?: LlmProfileCompat | null;
-    requestHeaders?: Record<string, string> | null;
-    models?: LlmProfileModelEntry[] | null;
-    cacheRetention?: CacheRetentionSetting | null;
-  }
-): Promise<LlmProfileConfig> {
-  return apiCall<LlmProfileConfig>(`/api/llm-profiles/${id}`, {
-    method: 'PUT',
     body: JSON.stringify(data),
   });
 }
@@ -144,33 +105,6 @@ export async function updateLlmProfileForBackend(
   });
 }
 
-export async function deleteLlmProfile(id: string): Promise<DeleteLlmProfileResult> {
-  try {
-    const response = await fetchApi<unknown>(`/api/llm-profiles/${id}`, { method: 'DELETE' });
-    if (response.success) return { ok: true };
-    const err = response.error as
-      | { code?: string; message?: string; agentCount?: number }
-      | undefined;
-    return {
-      ok: false,
-      code: err?.code ?? 'UNKNOWN',
-      message: err?.message ?? 'Failed to delete LLM profile',
-      agentCount: err?.agentCount,
-    };
-  } catch (err) {
-    return {
-      ok: false,
-      code: 'NETWORK_ERROR',
-      message: err instanceof Error ? err.message : String(err),
-    };
-  }
-}
-
-/**
- * Backend-scoped variant of {@link deleteLlmProfile}. Same rationale for
- * bypassing the `*Void` helper: goes straight to `fetchApiForBackend` so the
- * 409 `{code: 'IN_USE', message, agentCount}` fields survive the round trip.
- */
 export async function deleteLlmProfileForBackend(
   backendId: string | null,
   id: string
@@ -196,14 +130,6 @@ export async function deleteLlmProfileForBackend(
       message: err instanceof Error ? err.message : String(err),
     };
   }
-}
-
-export async function setDefaultLlmProfile(id: string): Promise<void> {
-  if (!activeServerSupports('setDefaultProvider')) {
-    console.warn('[API] setDefaultLlmProfile not supported by active server, skipping');
-    return;
-  }
-  return apiCallVoid(`/api/llm-profiles/${id}/set-default`, { method: 'POST' });
 }
 
 export async function setDefaultLlmProfileForBackend(
@@ -238,23 +164,6 @@ export interface LlmProfilePreviewInput {
  * than a persisted profile id. Used by the LLM profile editor so Fetch works
  * for brand-new profiles and reflects baseUrl/apiKey edits without saving.
  */
-export async function fetchModelsForLlmProfilePreview(
-  profile: LlmProfilePreviewInput
-): Promise<FetchLlmProfileModelsResult> {
-  try {
-    const data = await apiCall<{ models: string[] }>(`/api/llm-profiles/models/fetch-preview`, {
-      method: 'POST',
-      body: JSON.stringify(profile),
-    });
-    return { ok: true, models: Array.isArray(data?.models) ? data.models : [] };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
-  }
-}
-
-/**
- * Backend-scoped variant of {@link fetchModelsForLlmProfilePreview}.
- */
 export async function fetchModelsForLlmProfilePreviewForBackend(
   backendId: string | null,
   profile: LlmProfilePreviewInput
@@ -278,27 +187,6 @@ export async function fetchModelsForLlmProfilePreviewForBackend(
  * Probe a (formDraft, modelId) pair against an upstream provider. Returns the
  * same `{ ok, latencyMs }` / `{ ok: false, error }` envelope on both transport
  * failure and server-reported probe failure.
- */
-export async function probeLlmProfileModelPreview(
-  profile: LlmProfilePreviewInput,
-  modelId: string
-): Promise<ProbeLlmProfileModelResult> {
-  try {
-    const data = await apiCall<ProbeLlmProfileModelResult>(
-      `/api/llm-profiles/models/probe-preview`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ ...profile, modelId }),
-      }
-    );
-    return data;
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
-  }
-}
-
-/**
- * Backend-scoped variant of {@link probeLlmProfileModelPreview}.
  */
 export async function probeLlmProfileModelPreviewForBackend(
   backendId: string | null,
@@ -332,23 +220,6 @@ export async function probeLlmProfileModelPreviewForBackend(
  * value of the *next* resolution layer (what would happen if the row were
  * left blank), the caller must strip the current row's `contextWindow` from
  * its entry before invoking — this matches what the ModelRow does.
- */
-export async function resolveContextWindowPreview(input: {
-  providerType: string;
-  baseUrl?: string;
-  apiKey?: string;
-  requestHeaders?: Record<string, string>;
-  models?: LlmProfileModelEntry[];
-  modelId: string;
-}): Promise<ResolveContextWindowPreviewResult> {
-  return apiCall<ResolveContextWindowPreviewResult>('/api/llm-profiles/models/resolve-preview', {
-    method: 'POST',
-    body: JSON.stringify(input),
-  });
-}
-
-/**
- * Backend-scoped variant of {@link resolveContextWindowPreview}.
  */
 export async function resolveContextWindowPreviewForBackend(
   backendId: string | null,
@@ -402,16 +273,6 @@ export interface CodexModelsResponse {
   source: 'live' | 'cache' | 'fallback';
 }
 
-export async function startCodexOAuth(
-  profileId: string,
-  method: 'browser' | 'device_code'
-): Promise<CodexOAuthStartResult> {
-  return apiCall<CodexOAuthStartResult>(`/api/llm-profiles/${profileId}/oauth/start`, {
-    method: 'POST',
-    body: JSON.stringify({ method }),
-  });
-}
-
 export async function startCodexOAuthForBackend(
   backendId: string | null,
   profileId: string,
@@ -427,13 +288,6 @@ export async function startCodexOAuthForBackend(
   );
 }
 
-export async function pollCodexOAuthStatus(
-  profileId: string,
-  sessionId: string
-): Promise<CodexOAuthStatus> {
-  return apiCall<CodexOAuthStatus>(`/api/llm-profiles/${profileId}/oauth/status/${sessionId}`);
-}
-
 export async function pollCodexOAuthStatusForBackend(
   backendId: string | null,
   profileId: string,
@@ -443,12 +297,6 @@ export async function pollCodexOAuthStatusForBackend(
     backendId,
     `/api/llm-profiles/${profileId}/oauth/status/${sessionId}`
   );
-}
-
-export async function cancelCodexOAuth(profileId: string, sessionId: string): Promise<void> {
-  return apiCallVoid(`/api/llm-profiles/${profileId}/oauth/cancel/${sessionId}`, {
-    method: 'POST',
-  });
 }
 
 export async function cancelCodexOAuthForBackend(
@@ -463,14 +311,6 @@ export async function cancelCodexOAuthForBackend(
   );
 }
 
-export async function fetchCodexModels(
-  profileId: string,
-  opts?: { refresh?: boolean }
-): Promise<CodexModelsResponse> {
-  const query = opts?.refresh ? '?refresh=true' : '';
-  return apiCall<CodexModelsResponse>(`/api/llm-profiles/${profileId}/codex-models${query}`);
-}
-
 export async function fetchCodexModelsForBackend(
   backendId: string | null,
   profileId: string,
@@ -481,10 +321,6 @@ export async function fetchCodexModelsForBackend(
     backendId,
     `/api/llm-profiles/${profileId}/codex-models${query}`
   );
-}
-
-export async function signOutCodexOAuth(profileId: string): Promise<void> {
-  return apiCallVoid(`/api/llm-profiles/${profileId}/oauth/signout`, { method: 'POST' });
 }
 
 export async function signOutCodexOAuthForBackend(

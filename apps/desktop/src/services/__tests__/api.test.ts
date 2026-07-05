@@ -11,10 +11,6 @@ import {
   getSessionMessages,
   deleteSessionDraft,
   listLlmProfiles,
-  createLlmProfile,
-  updateLlmProfile,
-  deleteLlmProfile,
-  setDefaultLlmProfile,
   getProviderCommands,
   getProviderTypeCommands,
   listDirectory,
@@ -467,48 +463,6 @@ describe('api', () => {
       const result = await listLlmProfiles();
 
       expect(result).toEqual(profiles);
-    });
-
-    it('createLlmProfile creates profile', async () => {
-      const profile = { id: 'prov1', name: 'New Provider' };
-      mockResponse(profile);
-
-      const result = await createLlmProfile({ name: 'New Provider' });
-
-      expect(result).toEqual(profile);
-    });
-
-    it('updateLlmProfile updates profile', async () => {
-      mockResponse(undefined);
-
-      await updateLlmProfile('prov1', { name: 'Updated' });
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:3100/api/llm-profiles/prov1',
-        expect.objectContaining({ method: 'PUT' })
-      );
-    });
-
-    it('deleteLlmProfile deletes profile', async () => {
-      mockResponse(undefined);
-
-      await deleteLlmProfile('prov1');
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:3100/api/llm-profiles/prov1',
-        expect.objectContaining({ method: 'DELETE' })
-      );
-    });
-
-    it('setDefaultLlmProfile sets default', async () => {
-      mockResponse(undefined);
-
-      await setDefaultLlmProfile('prov1');
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:3100/api/llm-profiles/prov1/set-default',
-        expect.objectContaining({ method: 'POST' })
-      );
     });
 
     it('getProviderCommands returns commands', async () => {
