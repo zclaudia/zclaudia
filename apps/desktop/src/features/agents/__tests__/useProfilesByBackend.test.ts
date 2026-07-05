@@ -28,7 +28,7 @@ function makeProfile(id: string): AgentProfileConfig {
 describe('useProfilesByBackend', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useTopLevelViewStore.setState({ agentsRefreshNonce: 0 } as any);
+    useTopLevelViewStore.setState({ agentsRefreshNonce: 0 });
   });
 
   it('fetches each ONLINE backend profiles into the map keyed by backendId', async () => {
@@ -137,5 +137,65 @@ describe('useProfilesByBackend', () => {
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
     });
+  });
+
+  it('ignores a stale fetch that resolves after the backend set changed', async () => {
+    let resolveB1: (value: AgentProfileConfig[]) => void = () => {};
+    vi.mocked(api.listAgentProfilesForBackend).mockImplementation(backendId => {
+      if (backendId === 'b1') {
+        return new Promise(resolve => {
+          resolveB1 = resolve;
+        });
+      }
+      return Promise.resolve([makeProfile('ap2')]);
+    });
+
+    const { result, rerender } = renderHook(
+      ({ backends }: { backends: AgentsBackend[] }) => useProfilesByBackend(backends),
+      { initialProps: { backends: [{ backendId: 'b1', name: 'Backend 1', online: true }] } }
+    );
+
+    // b1 removed while its fetch is still in flight.
+    rerender({ backends: [{ backendId: 'b2', name: 'Backend 2', online: true }] });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    // b1's slow fetch resolves late; the cancelled guard must discard it.
+    act(() => {
+      resolveB1([makeProfile('ap1')]);
+    });
+    await Promise.resolve();
+
+    expect(result.current.profiles.has('b1')).toBe(false);
+    expect(result.current.profiles.get('b2')).toEqual([makeProfile('ap2')]);
+    expect(result.current.loading).toBe(false);
+  });
+
+  it('stringifies non-Error rejections into errors', async () => {
+    const backends: AgentsBackend[] = [{ backendId: 'b1', name: 'Backend 1', online: true }];
+    vi.mocked(api.listAgentProfilesForBackend).mockRejectedValue('plain failure');
+
+    const { result } = renderHook(() => useProfilesByBackend(backends));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.errors.get('b1')).toBe('plain failure');
+    expect(result.current.profiles.has('b1')).toBe(false);
+  });
+
+  it('settles loading to false for an empty backends array', async () => {
+    const { result } = renderHook(() => useProfilesByBackend([]));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.profiles.size).toBe(0);
+    expect(result.current.errors.size).toBe(0);
+    expect(api.listAgentProfilesForBackend).not.toHaveBeenCalled();
   });
 });

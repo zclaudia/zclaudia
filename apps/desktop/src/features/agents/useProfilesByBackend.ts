@@ -24,7 +24,11 @@ export function useProfilesByBackend(backends: AgentsBackend[]): ProfilesByBacke
     loading: true,
   });
 
-  const onlineKey = backends.map(b => `${b.backendId}:${b.online}`).join(',');
+  const onlineKey = backends
+    .filter(b => b.online)
+    .map(b => b.backendId)
+    .sort()
+    .join(',');
 
   useEffect(() => {
     let cancelled = false;
