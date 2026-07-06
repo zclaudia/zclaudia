@@ -10,6 +10,7 @@ can copy the same shape with smaller decisions.
 - Runtime selection: conversation runs choose the provider adapter from `agentProfile.runtimeType ?? 'zclaudia'`; LLM profile `providerType` remains endpoint metadata.
 - Safety boundaries: missing runtime adapters fail instead of falling back to zclaudia, zclaudia-only compaction stays gated to zclaudia, and multimodal fallback no longer changes runtime adapter identity.
 - Claude adapter: `server/src/infra/providers/claude-agent` contains the manifest, runner, adapter, SDK dependency, registry wiring, abort propagation, native mode mapping, and minimal SDK event transforms.
+- Claude hardening: permission bridge, event mapping coverage, live smoke harness, and UI limitations hint are implemented.
 - HTTP metadata: `/api/providers/type/claude/capabilities` and `/api/providers/type/claude/commands` work.
 - UI: Agent Profile editor can select `ZClaudia` or `Claude` and saves `runtimeType`.
 
@@ -63,6 +64,10 @@ can copy the same shape with smaller decisions.
    - HTTP provider metadata tests.
    - ProfileEditor tests.
    - `@zclaudia/shared`, `@zclaudia/server`, and `@zclaudia/desktop` builds.
+
+10. Add a runtime-local permission bridge before declaring `interaction.approval` supported.
+
+11. Add an opt-in live smoke harness for the runtime before starting UI polish.
 
 ## Runtime-Specific Notes
 

@@ -671,7 +671,7 @@ git commit -m "feat(agents): explain claude runtime limitations"
 **Files:**
 - Modify: `docs/plans/agent-runtime-codex-cursor-replication.md`
 
-- [ ] **Step 1: Update the checklist**
+- [x] **Step 1: Update the checklist**
 
 In `docs/plans/agent-runtime-codex-cursor-replication.md`, add under "Completed Claude Path":
 
@@ -686,7 +686,7 @@ Add under "Replication Steps Per Runtime":
 11. Add an opt-in live smoke harness for the runtime before starting UI polish.
 ```
 
-- [ ] **Step 2: Run final verification**
+- [x] **Step 2: Run final verification**
 
 Run:
 
@@ -708,10 +708,10 @@ Expected:
 - `git diff --check` has no output.
 - `git status --short` only shows the checklist document before commit.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
-git add docs/plans/agent-runtime-codex-cursor-replication.md
+git add docs/plans/agent-runtime-codex-cursor-replication.md docs/plans/claude-runtime-hardening-implementation.md
 git commit -m "docs(runtime): update runtime replication checklist"
 ```
 
