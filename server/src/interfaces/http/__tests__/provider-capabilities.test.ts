@@ -30,4 +30,32 @@ describe('provider capability routes', () => {
     expect(byProfile.status).toBe(200);
     expect(byProfile.body.data.supportsAIReview).toBe(true);
   });
+
+  it('returns claude runtime capabilities by type', async () => {
+    const app = makeApp();
+
+    const res = await request(app).get('/api/providers/type/claude/capabilities');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.modeLabel).toBe('Mode');
+    expect(res.body.data.defaultModeId).toBe('default');
+    expect(res.body.data.supportsAIReview).toBe(false);
+    expect(res.body.data.modes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'default' }),
+        expect.objectContaining({ id: 'plan' }),
+      ])
+    );
+  });
+
+  it('returns commands for the claude runtime type', async () => {
+    const app = makeApp();
+
+    const res = await request(app).get('/api/providers/type/claude/commands');
+    const missing = await request(app).get('/api/providers/type/codex/commands');
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(missing.status).toBe(404);
+  });
 });

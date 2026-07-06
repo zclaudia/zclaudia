@@ -15,9 +15,27 @@ const ZCLAUDIA_CAPABILITIES: ProviderCapabilities = {
   supportsAIReview: true,
 };
 
+const CLAUDE_CAPABILITIES: ProviderCapabilities = {
+  modeLabel: 'Mode',
+  defaultModeId: 'default',
+  modes: [
+    { id: 'default', label: 'Default', description: 'Normal Claude Code turns' },
+    { id: 'plan', label: 'Plan', description: 'Claude plan mode' },
+  ],
+  modelLabel: 'Model',
+  models: [],
+  supportsAIReview: false,
+};
+
+const RUNTIME_CAPABILITIES: Record<string, ProviderCapabilities> = {
+  zclaudia: ZCLAUDIA_CAPABILITIES,
+  claude: CLAUDE_CAPABILITIES,
+};
+
 export function mountCapabilityRoutes(router: Router, db: Database.Database): void {
   router.get('/type/:type/capabilities', (req: Request, res: Response) => {
-    if (req.params.type !== 'zclaudia') {
+    const capabilities = RUNTIME_CAPABILITIES[req.params.type];
+    if (!capabilities) {
       res.status(404).json({
         success: false,
         error: { code: 'NOT_FOUND', message: 'Runtime type not found' },
@@ -25,7 +43,7 @@ export function mountCapabilityRoutes(router: Router, db: Database.Database): vo
       return;
     }
 
-    res.json({ success: true, data: ZCLAUDIA_CAPABILITIES } as ApiResponse<ProviderCapabilities>);
+    res.json({ success: true, data: capabilities } as ApiResponse<ProviderCapabilities>);
   });
 
   router.get('/:id/capabilities', (req: Request, res: Response) => {
@@ -41,8 +59,9 @@ export function mountCapabilityRoutes(router: Router, db: Database.Database): vo
       return;
     }
 
-    // The runtime is currently always the zclaudia stub regardless of llm
-    // provider type; T3/T4 will branch on provider_type when needed.
+    // LLM-profile capabilities remain zclaudia capabilities until callers ask
+    // by agent profile/runtime type. This route receives an LLM profile id, not
+    // an Agent profile id.
     res.json({ success: true, data: ZCLAUDIA_CAPABILITIES } as ApiResponse<ProviderCapabilities>);
   });
 }
