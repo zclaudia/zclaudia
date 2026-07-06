@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useTheme, isDarkTheme } from '../../contexts/ThemeContext';
@@ -55,6 +55,9 @@ function detectLanguage(filePath: string): string {
   return EXT_TO_LANG[ext] || 'text';
 }
 
+/** Poll interval for detecting external file changes in the standalone window. */
+const FILE_POLL_INTERVAL_MS = 5000;
+
 interface FileViewerWindowProps {
   filePath: string;
   projectRoot: string;
@@ -79,43 +82,111 @@ export function FileViewerWindow({
   const [error, setError] = useState<string | null>(null);
   const { resolvedTheme } = useTheme();
 
+  // Mirror `content` into a ref so the polling closure can read the latest
+  // value without re-subscribing on every content change.
+  const contentRef = useRef<string | null>(null);
+  useEffect(() => {
+    contentRef.current = content;
+  }, [content]);
+  // mtime of the currently displayed content; null until the first successful load.
+  const knownMtimeRef = useRef<number | null>(null);
+  // Prevents overlapping poll ticks from issuing duplicate requests.
+  const pollInFlightRef = useRef(false);
+
+  // Build request headers/query helpers for the active transport (direct
+  // serverUrl fetch vs. the api layer backed by ConnectionProvider).
+  const authHeaders = (): Record<string, string> => {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (authToken) headers['Authorization'] = authToken;
+    return headers;
+  };
+  const fileQuery = () => new URLSearchParams({ projectRoot, relativePath: filePath });
+
+  const fetchStat = async (): Promise<number> => {
+    if (serverUrl) {
+      const resp = await fetch(`${serverUrl}/api/files/stat?${fileQuery()}`, {
+        headers: authHeaders(),
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const json = await resp.json();
+      if (!json.success) throw new Error(json.error?.message || 'Failed to stat file');
+      return json.data.mtimeMs as number;
+    }
+    const stat = await api.getFileStat({ projectRoot, relativePath: filePath });
+    return stat.mtimeMs;
+  };
+
+  const fetchContent = async (): Promise<string> => {
+    if (serverUrl) {
+      const resp = await fetch(`${serverUrl}/api/files/content?${fileQuery()}`, {
+        headers: authHeaders(),
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const json = await resp.json();
+      if (!json.success) throw new Error(json.error?.message || 'Failed to load file');
+      return json.data.content as string;
+    }
+    const result = await api.getFileContent({ projectRoot, relativePath: filePath });
+    return result.content;
+  };
+
+  // Initial load + freshness poll. Stat first; only re-fetch content when the
+  // mtime advanced. Picks up external edits (editor, git, agent) while the
+  // window is open.
   useEffect(() => {
     let cancelled = false;
+
+    const checkOnce = async () => {
+      if (cancelled || pollInFlightRef.current) return;
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      pollInFlightRef.current = true;
+      try {
+        const hasContent = contentRef.current != null;
+
+        let mtime: number;
+        try {
+          mtime = await fetchStat();
+        } catch (e) {
+          if (!hasContent && !cancelled) {
+            setError(e instanceof Error ? e.message : 'Failed to load file');
+            setLoading(false);
+          }
+          return;
+        }
+        if (cancelled) return;
+        if (hasContent && knownMtimeRef.current != null && mtime <= knownMtimeRef.current) return;
+
+        const fileContent = await fetchContent();
+        if (cancelled) return;
+        knownMtimeRef.current = mtime;
+        setContent(fileContent);
+        setLoading(false);
+        setError(null);
+      } catch (e) {
+        if (!cancelled && contentRef.current == null) {
+          setError(e instanceof Error ? e.message : 'Failed to load file');
+          setLoading(false);
+        }
+      } finally {
+        pollInFlightRef.current = false;
+      }
+    };
+
+    // Reset transient state for a new target file, then load + poll. The
+    // synchronous resets are intentional: when filePath/projectRoot change we
+    // must flip back to "loading" before the (async) first fetch resolves.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setError(null);
-
-    (async () => {
-      try {
-        let fileContent: string;
-        if (serverUrl) {
-          // Direct fetch for standalone windows (no ConnectionProvider available)
-          const qp = new URLSearchParams({ projectRoot, relativePath: filePath });
-          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-          if (authToken) headers['Authorization'] = authToken;
-          const resp = await fetch(`${serverUrl}/api/files/content?${qp}`, { headers });
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          const json = await resp.json();
-          if (!json.success) throw new Error(json.error?.message || 'Failed to load');
-          fileContent = json.data.content;
-        } else {
-          const result = await api.getFileContent({ projectRoot, relativePath: filePath });
-          fileContent = result.content;
-        }
-        if (!cancelled) {
-          setContent(fileContent);
-          setLoading(false);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load file');
-          setLoading(false);
-        }
-      }
-    })();
+    knownMtimeRef.current = null;
+    void checkOnce();
+    const intervalId = window.setInterval(() => void checkOnce(), FILE_POLL_INTERVAL_MS);
 
     return () => {
       cancelled = true;
+      window.clearInterval(intervalId);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filePath, projectRoot, serverUrl, authToken]);
 
   const lang = detectLanguage(filePath);

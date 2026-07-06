@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import * as api from '../../../services/api';
 import { FileViewerPanel, FileViewerActions } from '../FileViewerPanel';
 
 vi.mock('../../../contexts/ThemeContext', () => ({
@@ -13,6 +14,7 @@ vi.mock('../../../hooks/useMediaQuery', () => ({
 
 vi.mock('../../../services/api', () => ({
   getFileContent: vi.fn().mockResolvedValue({ content: 'file content' }),
+  getFileStat: vi.fn().mockResolvedValue({ mtimeMs: 1000, size: 11, path: 'src/app.tsx' }),
   getBaseUrl: vi.fn(() => 'http://localhost:3100'),
   getAuthHeaders: vi.fn(() => ({})),
 }));
@@ -83,6 +85,8 @@ const mockFileViewerState = {
   treeWidthPx: 256,
   setTreeWidthPx: vi.fn(),
   isOpen: false,
+  knownMtimeMs: null as number | null,
+  invalidate: vi.fn(),
   targetLine: null as number | null,
   targetEndLine: null as number | null,
   targetNonce: 0,
@@ -156,6 +160,47 @@ describe('FileViewerPanel', () => {
     render(<FileViewerPanel projectRoot="/project" />);
     expect(screen.getByTestId('code-viewer')).toBeInTheDocument();
     expect(screen.getByText('const x = 1;')).toBeInTheDocument();
+  });
+
+  it('stats the file and loads content (with mtime) on first open', async () => {
+    mockFileViewerState.filePath = 'src/app.tsx';
+    mockFileViewerState.content = null;
+    mockFileViewerState.knownMtimeMs = null;
+    render(<FileViewerPanel projectRoot="/project" />);
+
+    await waitFor(() => {
+      expect(api.getFileStat).toHaveBeenCalledWith({
+        projectRoot: '/project',
+        relativePath: 'src/app.tsx',
+        backendId: null,
+      });
+      expect(api.getFileContent).toHaveBeenCalledWith({
+        projectRoot: '/project',
+        relativePath: 'src/app.tsx',
+        backendId: null,
+      });
+      expect(mockFileViewerState.setContent).toHaveBeenCalledWith('file content', 1000);
+    });
+  });
+
+  it('refetches content when the polled mtime advances past the known mtime', async () => {
+    mockFileViewerState.filePath = 'src/app.tsx';
+    mockFileViewerState.content = 'const x = 1;';
+    mockFileViewerState.knownMtimeMs = 1000;
+    // Simulate the file having changed on disk.
+    (api.getFileStat as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      mtimeMs: 5000,
+      size: 20,
+      path: 'src/app.tsx',
+    });
+
+    render(<FileViewerPanel projectRoot="/project" />);
+
+    await waitFor(() => {
+      expect(api.getFileStat).toHaveBeenCalled();
+      expect(api.getFileContent).toHaveBeenCalled();
+      expect(mockFileViewerState.setContent).toHaveBeenCalledWith('file content', 5000);
+    });
   });
 
   it('renders markdown viewer for markdown files', () => {

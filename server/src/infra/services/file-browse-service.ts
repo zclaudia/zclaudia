@@ -5,6 +5,7 @@ import type {
   DirectoryBrowseResponse,
   DirectoryListingResponse,
   FileContentResponse,
+  FileStatResponse,
   FileEntry,
 } from '@zclaudia/shared/files';
 
@@ -345,6 +346,42 @@ export class FileBrowseService {
     return {
       path: relativePath,
       content: fs.readFileSync(fullPath, 'utf-8'),
+      size: stat.size,
+    };
+  }
+
+  /**
+   * Returns lightweight file metadata (mtime + size) without reading contents.
+   * Used by clients to poll for external file changes. Does NOT reject binary
+   * files or enforce the 1MB size cap — those checks only matter when reading
+   * content.
+   */
+  statFile(projectRoot: string | undefined, relativePath: string | undefined): FileStatResponse {
+    if (!projectRoot || !relativePath) {
+      throw new FileBrowseError(
+        400,
+        'VALIDATION_ERROR',
+        'projectRoot and relativePath are required'
+      );
+    }
+
+    if (!isPathSafe(projectRoot, relativePath)) {
+      throw new FileBrowseError(403, 'FORBIDDEN', 'Path traversal not allowed');
+    }
+
+    const fullPath = path.join(projectRoot, relativePath);
+    if (!fs.existsSync(fullPath)) {
+      throw new FileBrowseError(404, 'NOT_FOUND', 'File not found');
+    }
+
+    const stat = fs.statSync(fullPath);
+    if (stat.isDirectory()) {
+      throw new FileBrowseError(400, 'INVALID_PATH', 'Path is a directory, not a file');
+    }
+
+    return {
+      path: relativePath,
+      mtimeMs: stat.mtimeMs,
       size: stat.size,
     };
   }

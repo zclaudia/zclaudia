@@ -461,6 +461,76 @@ describe('files routes', () => {
     });
   });
 
+  describe('GET /api/files/stat', () => {
+    it('returns 400 when projectRoot or relativePath missing', async () => {
+      const res1 = await request(app).get('/api/files/stat?projectRoot=/project');
+      expect(res1.status).toBe(400);
+
+      const res2 = await request(app).get('/api/files/stat?relativePath=file.ts');
+      expect(res2.status).toBe(400);
+    });
+
+    it('returns 403 for path traversal attempts', async () => {
+      const res = await request(app).get(
+        '/api/files/stat?projectRoot=/project&relativePath=../../../etc/passwd'
+      );
+
+      expect(res.status).toBe(403);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe('FORBIDDEN');
+    });
+
+    it('returns 404 for non-existent file', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+
+      const res = await request(app).get(
+        '/api/files/stat?projectRoot=/project&relativePath=missing.ts'
+      );
+
+      expect(res.status).toBe(404);
+      expect(res.body.error.code).toBe('NOT_FOUND');
+    });
+
+    it('returns 400 when path is a directory', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.statSync).mockReturnValue({
+        isDirectory: () => true,
+        size: 0,
+      } as fs.Stats);
+
+      const res = await request(app).get(
+        '/api/files/stat?projectRoot=/project&relativePath=src'
+      );
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('INVALID_PATH');
+    });
+
+    it('returns mtime and size without reading content', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      const mtime = 1700000000000;
+      vi.mocked(fs.statSync).mockReturnValue({
+        isDirectory: () => false,
+        size: 42,
+        mtimeMs: mtime,
+      } as fs.Stats);
+
+      const res = await request(app).get(
+        '/api/files/stat?projectRoot=/project&relativePath=index.ts'
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toMatchObject({
+        path: 'index.ts',
+        mtimeMs: mtime,
+        size: 42,
+      });
+      // stat must NOT read file contents
+      expect(fs.readFileSync).not.toHaveBeenCalled();
+    });
+  });
+
   describe('POST /api/files/upload', () => {
     it('should upload file and return fileId', async () => {
       const response = await request(app)

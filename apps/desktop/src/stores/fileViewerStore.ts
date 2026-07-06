@@ -16,6 +16,12 @@ interface FileViewerState {
   content: string | null;
   loading: boolean;
   error: string | null;
+  /**
+   * mtime (ms since epoch) of the file content currently displayed. Used by the
+   * panel's staleness poll to decide whether a re-fetch is needed. `null` when
+   * no content has been loaded yet (forces an initial fetch).
+   */
+  knownMtimeMs: number | null;
   // Optional line target — when set, FileViewerPanel scrolls to targetLine
   // and highlights the [targetLine, targetEndLine ?? targetLine] range.
   targetLine: number | null;
@@ -32,7 +38,7 @@ interface FileViewerState {
   // Full-screen overlay (mobile)
   fullscreen: boolean;
   // LRU content cache  (key = "projectRoot\0relativePath")
-  contentCache: Map<string, string>;
+  contentCache: Map<string, CacheEntry>;
 
   openFile: (
     projectRoot: string,
@@ -40,7 +46,7 @@ interface FileViewerState {
     targetLine?: number,
     targetEndLine?: number
   ) => void;
-  setContent: (content: string) => void;
+  setContent: (content: string, mtimeMs?: number) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   close: () => void;
@@ -51,11 +57,20 @@ interface FileViewerState {
   setSearchOpen: (open: boolean) => void;
   setFullscreen: (open: boolean) => void;
   getCached: (projectRoot: string, relativePath: string) => string | undefined;
+  /** Remove a cached entry so the next open forces a fresh fetch. */
+  invalidate: (projectRoot: string, relativePath: string) => void;
 }
 
 function cacheKey(root: string, path: string) {
   return `${root}\0${path}`;
 }
+
+/** Cached file payload: the text plus the mtime it was read at. */
+interface CacheEntry {
+  content: string;
+  mtimeMs: number;
+}
+
 function clampTreeWidth(widthPx: number) {
   return Math.max(TREE_WIDTH_MIN, Math.min(TREE_WIDTH_MAX, Math.round(widthPx)));
 }
@@ -67,6 +82,7 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
   content: null,
   loading: false,
   error: null,
+  knownMtimeMs: null,
   targetLine: null,
   targetEndLine: null,
   targetNonce: 0,
@@ -82,12 +98,16 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
     targetLine?: number,
     targetEndLine?: number
   ) => {
-    const cached = get().contentCache.get(cacheKey(projectRoot, relativePath));
+    const key = cacheKey(projectRoot, relativePath);
+    const cached = get().contentCache.get(key);
     set(state => ({
       isOpen: true,
       filePath: relativePath,
       projectRoot,
-      content: cached ?? null,
+      content: cached?.content ?? null,
+      knownMtimeMs: cached?.mtimeMs ?? null,
+      // Display cached content instantly when available; the panel still runs a
+      // freshness check in the background so external edits are picked up.
       loading: !cached,
       error: null,
       targetLine: targetLine ?? null,
@@ -99,19 +119,22 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
     usePluginStore.getState().updatePanelVisibility('file-viewer', true);
   },
 
-  setContent: (content: string) => {
+  setContent: (content: string, mtimeMs?: number) => {
     const { filePath, projectRoot, contentCache } = get();
+    // Default to "now" when no mtime is supplied so callers that don't track
+    // mtime still produce a fresh-ish cache entry.
+    const stamp = mtimeMs ?? Date.now();
     if (filePath && projectRoot) {
       const key = cacheKey(projectRoot, filePath);
       // LRU eviction: delete then re-insert to move to end
       contentCache.delete(key);
-      contentCache.set(key, content);
+      contentCache.set(key, { content, mtimeMs: stamp });
       if (contentCache.size > CACHE_MAX) {
         const oldest = contentCache.keys().next().value;
         if (oldest !== undefined) contentCache.delete(oldest);
       }
     }
-    set({ content, loading: false });
+    set({ content, knownMtimeMs: stamp, loading: false });
   },
 
   setLoading: (loading: boolean) => set({ loading }),
@@ -147,5 +170,15 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
   setFullscreen: (open: boolean) => set({ fullscreen: open }),
 
   getCached: (projectRoot: string, relativePath: string) =>
-    get().contentCache.get(cacheKey(projectRoot, relativePath)),
+    get().contentCache.get(cacheKey(projectRoot, relativePath))?.content,
+
+  invalidate: (projectRoot: string, relativePath: string) => {
+    const { contentCache, filePath, projectRoot: curRoot } = get();
+    contentCache.delete(cacheKey(projectRoot, relativePath));
+    // If the invalidated file is the one currently displayed, drop its mtime so
+    // the next staleness check treats it as unknown and forces a fresh fetch.
+    const isCurrent =
+      filePath === relativePath && curRoot === projectRoot && !!filePath && !!curRoot;
+    set({ contentCache: new Map(contentCache), ...(isCurrent ? { knownMtimeMs: null } : {}) });
+  },
 }));

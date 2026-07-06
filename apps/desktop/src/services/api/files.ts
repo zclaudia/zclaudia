@@ -2,6 +2,7 @@ import type {
   DirectoryBrowseResponse,
   DirectoryListingResponse,
   FileContentResponse,
+  FileStatResponse,
 } from '@zclaudia/shared';
 import { apiCall, apiCallForBackend } from './unwrap';
 
@@ -57,4 +58,24 @@ export async function getFileContent(params: {
   return params.backendId
     ? apiCallForBackend<FileContentResponse>(params.backendId, `/api/files/content?${queryParams}`)
     : apiCall<FileContentResponse>(`/api/files/content?${queryParams}`);
+}
+
+/**
+ * Lightweight metadata (mtime + size) for a file — used to poll for external
+ * file changes without re-reading full content. Returns the file's
+ * last-modified time in ms since epoch.
+ */
+export async function getFileStat(params: {
+  projectRoot: string;
+  relativePath: string;
+  backendId?: string | null;
+}): Promise<FileStatResponse> {
+  const queryParams = new URLSearchParams({
+    projectRoot: params.projectRoot,
+    relativePath: params.relativePath,
+  });
+
+  return params.backendId
+    ? apiCallForBackend<FileStatResponse>(params.backendId, `/api/files/stat?${queryParams}`)
+    : apiCall<FileStatResponse>(`/api/files/stat?${queryParams}`);
 }

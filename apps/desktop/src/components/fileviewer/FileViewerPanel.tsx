@@ -87,6 +87,14 @@ function detectLanguage(filePath: string): string {
   return EXT_TO_LANG[ext] || 'text';
 }
 
+/**
+ * How often to poll the server for external file changes while a file is open.
+ * The panel runs a single setInterval; on each tick it stats the file and only
+ * re-fetches full content when the mtime advanced. The first check also fires
+ * immediately on open/switch so a stale cached view is corrected right away.
+ */
+const FILE_POLL_INTERVAL_MS = 5000;
+
 /** Splits a relative path into directory segments + filename for breadcrumb display. */
 function breadcrumbSegments(relativePath: string): { dirs: string[]; file: string } {
   const parts = relativePath.split('/').filter(Boolean);
@@ -373,6 +381,9 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
     setTreeWidthPx,
   } = store;
   const treeResizeCleanupRef = useRef<(() => void) | null>(null);
+  // Guards an in-flight stat/content poll so overlapping setInterval ticks do
+  // not issue duplicate network requests (e.g. when a fetch outlasts the tick).
+  const pollInFlightRef = useRef(false);
   // Guard: when the store still holds state pointing at a different project
   // (e.g. user just switched session/project), treat the viewer as if no file
   // is selected. SessionChatLayout's effect will close()/reset the store
@@ -388,29 +399,81 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
 
   const { resolvedTheme } = useTheme();
 
-  // Fetch file content when filePath changes (skip if already cached)
+  // Freshness poll: on open/switch and every FILE_POLL_INTERVAL_MS, stat the
+  // current file and re-fetch content only when the mtime advanced past what we
+  // already show. This picks up edits made by the agent *or* by any external
+  // process (editor, git pull, …) while the viewer is open. Cached content is
+  // shown instantly and updated seamlessly in the background once the new
+  // version arrives — no "Loading…" flicker for refreshes.
+  //
+  // Lifecycle / session switching: this panel is mounted inside SessionChatLayout
+  // which is keyed by sessionId, so switching sessions unmounts it and the
+  // cleanup below clears the interval. When the panel tab is hidden or the
+  // top-level view changes (e.g. to Settings) the component also unmounts,
+  // stopping the poll. Mount ≡ "file is open and visible".
   useEffect(() => {
     if (!filePath || !projectRoot) return;
-    // openFile() already populated content from cache — skip fetch
-    if (useFileViewerStore.getState().content) return;
 
     let cancelled = false;
 
-    (async () => {
+    const checkOnce = async () => {
+      if (cancelled || pollInFlightRef.current) return;
+      // Skip work while the whole window is hidden (background tab).
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      pollInFlightRef.current = true;
       try {
+        const st = useFileViewerStore.getState();
+        // Bail if the user has since switched to a different file. (A project
+        // switch re-runs this effect via its props with a fresh closure + cleanup,
+        // so only the file path needs guarding here.)
+        if (st.filePath !== filePath) return;
+        const hasContent = st.content != null;
+        const knownMtime = st.knownMtimeMs;
+
+        // Stat first (cheap). If we already have content and the mtime hasn't
+        // advanced, there is nothing to do.
+        let stat;
+        try {
+          stat = await api.getFileStat({
+            projectRoot,
+            relativePath: filePath,
+            backendId: fileBackendId,
+          });
+        } catch (e) {
+          // Stat failed (deleted / network). Only surface an error when there is
+          // no cached content to keep showing.
+          if (!hasContent && !cancelled) {
+            setError(e instanceof Error ? e.message : 'Failed to load file');
+          }
+          return;
+        }
+        if (cancelled) return;
+        if (hasContent && knownMtime != null && stat.mtimeMs <= knownMtime) return;
+
+        // Stale or first load: fetch the full content.
         const result = await api.getFileContent({
           projectRoot,
           relativePath: filePath,
           backendId: fileBackendId,
         });
-        if (!cancelled) setContent(result.content);
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load file');
+        if (cancelled) return;
+        setContent(result.content, stat.mtimeMs);
+      } catch (e) {
+        if (!cancelled && useFileViewerStore.getState().content == null) {
+          setError(e instanceof Error ? e.message : 'Failed to load file');
+        }
+      } finally {
+        pollInFlightRef.current = false;
       }
-    })();
+    };
+
+    // Fire once immediately (covers the "open/switch" trigger) then poll.
+    void checkOnce();
+    const intervalId = window.setInterval(() => void checkOnce(), FILE_POLL_INTERVAL_MS);
 
     return () => {
       cancelled = true;
+      window.clearInterval(intervalId);
     };
   }, [fileBackendId, filePath, projectRoot, setContent, setError]);
 

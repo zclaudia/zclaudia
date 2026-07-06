@@ -8,6 +8,7 @@ import type {
   DirectoryBrowseResponse,
   DirectoryListingResponse,
   FileContentResponse,
+  FileStatResponse,
 } from '@zclaudia/shared/files';
 import { fileStore } from '../../infra/storage/fileStore.js';
 import { FileBrowseError, FileBrowseService } from '../../infra/services/file-browse-service.js';
@@ -163,6 +164,32 @@ export function createFilesRoutes(broadcastCtx?: FilesRouteBroadcastContext): Ro
       res.status(500).json({
         success: false,
         error: { code: 'SERVER_ERROR', message: 'Failed to browse directories' },
+      });
+    }
+  });
+
+  // GET /api/files/stat
+  // Query params: projectRoot, relativePath
+  // Returns lightweight file metadata (mtime + size) for staleness polling.
+  // Does not read file contents — cheaper than /content for periodic checks.
+  router.get('/stat', (req: Request, res: Response) => {
+    try {
+      const { projectRoot, relativePath } = req.query as Record<string, string>;
+      const response = fileBrowseService.statFile(projectRoot, relativePath);
+
+      res.json({ success: true, data: response } as ApiResponse<FileStatResponse>);
+    } catch (error) {
+      if (error instanceof FileBrowseError) {
+        res.status(error.status).json({
+          success: false,
+          error: { code: error.code, message: error.message },
+        });
+        return;
+      }
+      console.error('Error stating file:', error);
+      res.status(500).json({
+        success: false,
+        error: { code: 'SERVER_ERROR', message: 'Failed to stat file' },
       });
     }
   });

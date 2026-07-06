@@ -22,6 +22,17 @@ export interface FileContentResponse {
   size: number; // file size in bytes
 }
 
+/**
+ * Lightweight file metadata used for staleness checks (e.g. polling the file
+ * viewer to detect external edits). Cheaper than FileContentResponse since it
+ * never reads file contents — only `stat()`.
+ */
+export interface FileStatResponse {
+  path: string; // relative path from project root
+  mtimeMs: number; // last-modified time in milliseconds since epoch
+  size: number; // file size in bytes
+}
+
 // Directory browser types (project root picker)
 
 export interface DirectoryBrowseEntry {

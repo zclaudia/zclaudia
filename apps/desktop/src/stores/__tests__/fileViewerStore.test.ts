@@ -11,6 +11,7 @@ describe('fileViewerStore', () => {
       content: null,
       loading: false,
       error: null,
+      knownMtimeMs: null,
       targetLine: null,
       targetEndLine: null,
       targetNonce: 0,
@@ -302,6 +303,61 @@ describe('fileViewerStore', () => {
       expect(useFileViewerStore.getState().getCached('/projectB', 'src/index.ts')).toBe(
         'content B'
       );
+    });
+  });
+
+  describe('mtime tracking', () => {
+    it('records the supplied mtime when setting content', () => {
+      useFileViewerStore.getState().openFile('/project', 'src/index.ts');
+      useFileViewerStore.getState().setContent('hello', 12345);
+
+      expect(useFileViewerStore.getState().knownMtimeMs).toBe(12345);
+    });
+
+    it('restores knownMtimeMs from cache when reopening a file', () => {
+      useFileViewerStore.getState().openFile('/project', 'src/index.ts');
+      useFileViewerStore.getState().setContent('cached', 999);
+
+      useFileViewerStore.getState().openFile('/project', 'src/other.ts');
+      // knownMtimeMs for other.ts is null (uncached)
+      expect(useFileViewerStore.getState().knownMtimeMs).toBeNull();
+
+      useFileViewerStore.getState().openFile('/project', 'src/index.ts');
+      expect(useFileViewerStore.getState().knownMtimeMs).toBe(999);
+      expect(useFileViewerStore.getState().content).toBe('cached');
+    });
+  });
+
+  describe('invalidate', () => {
+    it('removes a cached entry so getCached returns undefined', () => {
+      useFileViewerStore.getState().openFile('/project', 'src/index.ts');
+      useFileViewerStore.getState().setContent('cached', 100);
+
+      useFileViewerStore.getState().invalidate('/project', 'src/index.ts');
+
+      expect(useFileViewerStore.getState().getCached('/project', 'src/index.ts')).toBeUndefined();
+    });
+
+    it('clears knownMtimeMs when invalidating the currently displayed file', () => {
+      useFileViewerStore.getState().openFile('/project', 'src/index.ts');
+      useFileViewerStore.getState().setContent('cached', 100);
+
+      useFileViewerStore.getState().invalidate('/project', 'src/index.ts');
+
+      // mtime dropped so the next poll treats the content as unknown/stale
+      expect(useFileViewerStore.getState().knownMtimeMs).toBeNull();
+    });
+
+    it('leaves other cached files untouched', () => {
+      useFileViewerStore.getState().openFile('/project', 'src/a.ts');
+      useFileViewerStore.getState().setContent('A', 1);
+      useFileViewerStore.getState().openFile('/project', 'src/b.ts');
+      useFileViewerStore.getState().setContent('B', 2);
+
+      useFileViewerStore.getState().invalidate('/project', 'src/a.ts');
+
+      expect(useFileViewerStore.getState().getCached('/project', 'src/a.ts')).toBeUndefined();
+      expect(useFileViewerStore.getState().getCached('/project', 'src/b.ts')).toBe('B');
     });
   });
 });
