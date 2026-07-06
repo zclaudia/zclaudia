@@ -4,6 +4,7 @@ import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useGatewayStore } from '../../stores/gatewayStore';
 import { useConnection } from '../../contexts/ConnectionContext';
+import { useIsActiveLocalBackend } from '../../hooks/useIsActiveLocalBackend';
 import {
   getMobileBackendViewState,
   getVisibleMobileBackends,
@@ -27,7 +28,7 @@ export function BackendPicker() {
   const facadeConnectionState = useFacadeStore(s => s.connectionState);
   const localBackendId = useFacadeStore(s => s.localBackendId);
   const currentInstanceId = useFacadeStore(s => s.currentInstanceId);
-  const activeServer = facadeBackends.find(b => b.backendId === activeServerId) ?? null;
+  const { activeServer } = useIsActiveLocalBackend();
 
   const isActiveRemote = !!activeServerId && !!localBackendId && activeServerId !== localBackendId;
   const effectiveShowLocal = showLocalBackend || isActiveRemote;

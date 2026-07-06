@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTopLevelViewStore } from '../../stores/topLevelViewStore';
 import { useServerStore } from '../../stores/serverStore';
-import { useFacadeStore } from '../../stores/facadeStore';
+import { useIsActiveLocalBackend } from '../../hooks/useIsActiveLocalBackend';
 import { PluginSettings } from '../settings/PluginSettings';
 import { WebSearchSettings } from '../settings/WebSearchSettings';
 import { BuiltinPanelsSection } from './BuiltinPanelsSection';
@@ -43,17 +43,10 @@ function Shell({
 export function PluginsContent() {
   const view = useTopLevelViewStore(s => s.view);
   const activeServerId = useServerStore(s => s.activeServerId);
-  const facadeBackends = useFacadeStore(s => s.backends);
-  const localBackendId = useFacadeStore(s => s.localBackendId);
+  const { isRemoteBackend } = useIsActiveLocalBackend();
 
   if (view.kind !== 'plugins') return null;
   const tab = view.tab;
-
-  const activeServer = facadeBackends.find(b => b.backendId === activeServerId) ?? null;
-  const isActiveLocalBackend =
-    !!activeServerId &&
-    (activeServerId === localBackendId || activeServer?.isThisInstance === true);
-  const isRemoteBackend = !isActiveLocalBackend;
 
   if (tab === 'builtin') {
     return (

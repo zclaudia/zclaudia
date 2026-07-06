@@ -11,6 +11,7 @@ import { useFacadeStore } from '../../stores/facadeStore';
 import { useGatewayStore } from '../../stores/gatewayStore';
 import { useConnection } from '../../contexts/ConnectionContext';
 import { useIsMobile } from '../../hooks/useMediaQuery';
+import { useIsActiveLocalBackend } from '../../hooks/useIsActiveLocalBackend';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { useSidebarWidthStore, SIDEBAR_WIDTH_LIMITS } from '../../stores/sidebarWidthStore';
 import { ServerGatewayConfig } from './ServerGatewayConfig';
@@ -59,15 +60,12 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
   const facadeConnectionState = useFacadeStore(s => s.connectionState);
   const localBackendId = useFacadeStore(s => s.localBackendId);
   const currentInstanceId = useFacadeStore(s => s.currentInstanceId);
-  const activeServer = facadeBackends.find(b => b.backendId === activeServerId) ?? null;
+  const { activeServer, isActiveLocalBackend } = useIsActiveLocalBackend();
   const isConnected = isMobileBackendUsable({
     backendId: activeServerId,
     connectionState: facadeConnectionState,
     backends: facadeBackends,
   });
-  const isActiveLocalBackend =
-    !!activeServerId &&
-    (activeServerId === localBackendId || activeServer?.isThisInstance === true);
 
   const isActiveRemote = !!activeServerId && !!localBackendId && activeServerId !== localBackendId;
   const effectiveShowLocal = showLocalBackend || isActiveRemote;
