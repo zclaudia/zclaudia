@@ -17,9 +17,12 @@
 
 /// Points to move the lights DOWN from their default vertical center.
 ///
-/// This is the single tunable knob — fine-tune it by eye after building until
-/// the traffic lights vertically center with the custom sidebar-header icons.
+/// Fine-tune by eye after building until the traffic lights vertically center
+/// with the custom sidebar-header icons.
 pub const TRAFFIC_LIGHT_DROP: f64 = 7.0;
+
+/// Points to move the lights RIGHT from their default horizontal inset.
+pub const TRAFFIC_LIGHT_RIGHT_SHIFT: f64 = 8.0;
 
 /// Reposition the main window's traffic-light buttons so they sit `TRAFFIC_LIGHT_DROP`
 /// points below their default vertical center.
@@ -34,11 +37,27 @@ pub fn center_traffic_lights(window: &tauri::WebviewWindow) {
         use objc2::msg_send;
         use objc2::runtime::AnyObject;
         use objc2_foundation::{NSPoint, NSRect};
+        use std::sync::OnceLock;
+
+        static TRAFFIC_LIGHT_BASE_X: OnceLock<[f64; 3]> = OnceLock::new();
 
         let win: *mut AnyObject = webview.ns_window() as _;
         if win.is_null() {
             return;
         }
+
+        let base_x = TRAFFIC_LIGHT_BASE_X.get_or_init(|| {
+            let mut positions = [0.0f64; 3];
+            for i in 0usize..3 {
+                let button: *mut AnyObject = msg_send![win, standardWindowButton: i];
+                if button.is_null() {
+                    continue;
+                }
+                let frame: NSRect = msg_send![button, frame];
+                positions[i] = frame.origin.x;
+            }
+            positions
+        });
 
         // NSWindowButton indices: 0 = close, 1 = miniaturize, 2 = zoom.
         // Passed as NSUInteger (usize-sized).
@@ -62,13 +81,14 @@ pub fn center_traffic_lights(window: &tauri::WebviewWindow) {
 
             // Cocoa/NSView uses a bottom-left origin (y increases UPWARD). Start from
             // the vertically-centered y within the title bar, then SUBTRACT the drop
-            // to move the button DOWN. Keep the button's existing origin.x so the
-            // native left inset / spacing is preserved.
+            // to move the button DOWN. Shift x right from the OS default captured once
+            // on first call so repeated relayouts do not compound.
             let target_y = (superview_frame.size.height - button_frame.size.height) / 2.0
                 - TRAFFIC_LIGHT_DROP;
+            let target_x = base_x[index] + TRAFFIC_LIGHT_RIGHT_SHIFT;
 
             let origin = NSPoint {
-                x: button_frame.origin.x,
+                x: target_x,
                 y: target_y,
             };
             let _: () = msg_send![button, setFrameOrigin: origin];

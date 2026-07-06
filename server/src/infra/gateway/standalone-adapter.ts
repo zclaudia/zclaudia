@@ -55,7 +55,7 @@ export class StandaloneFacadeAdapter implements FacadeRuntimeGatewayAdapter {
       backendId: this.backendId,
       instanceId: this.instanceId,
       deviceId: this.deviceId,
-      name: 'Local Server',
+      name: 'This Device',
       channel: 'local',
       visible: true,
       capabilities: this.localHandler?.getCapabilities() ?? [],

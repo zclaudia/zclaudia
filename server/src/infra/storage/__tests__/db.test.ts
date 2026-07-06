@@ -305,6 +305,7 @@ describe('storage/db', () => {
         call => call[0].includes('INSERT OR IGNORE INTO servers') && call[0].includes("'local'")
       );
       expect(localServerCall).toBeDefined();
+      expect(localServerCall?.[0]).toContain("'This Device'");
     });
 
     it('inserts default gateway config', async () => {

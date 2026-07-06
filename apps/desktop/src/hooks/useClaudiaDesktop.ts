@@ -109,7 +109,7 @@ export function useClaudiaDesktop({
         const serverId =
           resolveCanonicalBackendId(localBackendId ?? LEGACY_LOCAL_SERVER_ID, localBackendId) ||
           LEGACY_LOCAL_SERVER_ID;
-        const serverName = localBackendName || 'Local Server';
+        const serverName = localBackendName || 'This Device';
         const hostWindow = getCurrentWindow();
         const scale =
           typeof window.devicePixelRatio === 'number' && window.devicePixelRatio > 0

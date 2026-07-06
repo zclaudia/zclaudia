@@ -191,7 +191,7 @@ export class EmbeddedGatewayAdapter implements FacadeRuntimeGatewayAdapter {
       backendId: this.localBackendId!,
       instanceId: this.gatewayClient.queries.identity.getInstanceId(),
       deviceId: this.gatewayClient.queries.identity.getDeviceId(),
-      name: 'Local Server',
+      name: 'This Device',
       channel: 'local',
       visible: true,
       capabilities: this.localHandler?.getCapabilities() ?? [],

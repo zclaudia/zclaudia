@@ -1085,7 +1085,7 @@ INSERT OR IGNORE INTO gateway_config (id, enabled, created_at, updated_at)
 VALUES (1, 0, strftime('%s','now')*1000, strftime('%s','now')*1000);
 
 INSERT OR IGNORE INTO servers (id, name, address, connection_mode, is_default, requires_auth, created_at, updated_at)
-VALUES ('local', 'Local Server', 'localhost:3100', 'direct', 1, 0, strftime('%s','now')*1000, strftime('%s','now')*1000);
+VALUES ('local', 'This Device', 'localhost:3100', 'direct', 1, 0, strftime('%s','now')*1000, strftime('%s','now')*1000);
 
 INSERT OR IGNORE INTO agent_config (id, enabled, created_at, updated_at)
 VALUES (1, 1, strftime('%s','now')*1000, strftime('%s','now')*1000);

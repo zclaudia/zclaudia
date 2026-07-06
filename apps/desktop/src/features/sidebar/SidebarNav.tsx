@@ -44,11 +44,11 @@ interface SidebarNavProps {
 }
 
 const AUTOMATION_TABS: { key: AutomationTab; label: string; Icon: typeof Zap }[] = [
-  { key: 'automations', label: 'Automations', Icon: Zap },
   { key: 'activity', label: 'Activity', Icon: Blocks },
   { key: 'workflows', label: 'Workflows', Icon: Workflow },
-  { key: 'runs', label: 'Runs', Icon: History },
+  { key: 'automations', label: 'Automations', Icon: Zap },
   { key: 'system', label: 'System', Icon: Server },
+  { key: 'runs', label: 'Runs', Icon: History },
 ];
 
 const AGENTS_TABS: { key: AgentsTab; label: string; Icon: typeof Bot }[] = [
@@ -113,7 +113,7 @@ function ModeTabsNav<K extends string>({
 
 /**
  * Top-of-sidebar navigation cluster. In normal mode it lists app-level
- * destinations (Home, Automations, Agents). In automation or agents mode it
+ * destinations (Home, Agents, Automations). In automation or agents mode it
  * lists a Back row plus that mode's tabs. Pinned above the scrollable list.
  */
 export function SidebarNav({
@@ -168,17 +168,6 @@ export function SidebarNav({
           Home
         </button>
 
-        {onOpenAutomations && (
-          <button
-            onClick={onOpenAutomations}
-            aria-label="Automations"
-            className={`${rowBase} text-muted-foreground`}
-          >
-            <Zap className={iconSize} strokeWidth={1.75} />
-            Automations
-          </button>
-        )}
-
         {onOpenAgents && (
           <button
             onClick={onOpenAgents}
@@ -187,6 +176,17 @@ export function SidebarNav({
           >
             <Bot className={iconSize} strokeWidth={1.75} />
             Agents
+          </button>
+        )}
+
+        {onOpenAutomations && (
+          <button
+            onClick={onOpenAutomations}
+            aria-label="Automations"
+            className={`${rowBase} text-muted-foreground`}
+          >
+            <Zap className={iconSize} strokeWidth={1.75} />
+            Automations
           </button>
         )}
       </div>

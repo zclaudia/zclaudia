@@ -32,7 +32,7 @@ export function SidebarCollapsedBar({
       // the expanded sidebar's header (which sits below the card's top gutter),
       // so it lines up with the macOS traffic lights after they're nudged down
       // natively (see src-tauri/src/traffic_lights.rs TRAFFIC_LIGHT_DROP).
-      className="flex h-11 flex-shrink-0 items-center gap-1 bg-background pl-[76px] pr-2 pt-1.5"
+      className="flex h-11 flex-shrink-0 items-center gap-1 bg-background pl-[84px] pr-2 pt-1.5"
       data-tauri-drag-region
     >
       <button
