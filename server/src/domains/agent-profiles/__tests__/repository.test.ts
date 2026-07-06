@@ -78,6 +78,24 @@ describe('AgentProfileRepository', () => {
     expect(fetched!.runtimeType).toBe('claude');
   });
 
+  it('updates runtime type', () => {
+    const created = repo.create({
+      name: 'runtime-update',
+      llmProfileId,
+      model: 'm',
+      systemPrompt: '',
+      enabledTools: ['read'],
+    });
+
+    const updated = repo.update(created.id, { runtimeType: 'claude' });
+    const raw = db
+      .prepare('SELECT runtime_type FROM agent_profiles WHERE id = ?')
+      .get(created.id) as { runtime_type: string };
+
+    expect(updated.runtimeType).toBe('claude');
+    expect(raw.runtime_type).toBe('claude');
+  });
+
   it('persists plugin ownership metadata for plugin-provided profiles', () => {
     const created = repo.create({
       name: 'ZCharlie',

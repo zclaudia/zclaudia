@@ -6,7 +6,6 @@ import type {
   MultimodalFallbackConfig,
   ThinkingLevel,
 } from '@zclaudia/shared/core/agent-profile';
-import { AGENT_RUNTIME_TYPES } from '@zclaudia/shared/core/agent-profile';
 import {
   normalizeSkillExecutionSelection,
   normalizeSkillSelection,
@@ -36,15 +35,13 @@ const VALID_THINKING_LEVELS = new Set<ThinkingLevel>([
   'high',
   'xhigh',
 ]);
-const DEFAULT_RUNTIME_TYPES: readonly AgentRuntimeType[] = [
+const AGENT_RUNTIME_TYPES: readonly AgentRuntimeType[] = [
   'zclaudia',
   'claude',
   'codex',
   'cursor',
 ];
-const VALID_RUNTIME_TYPES = new Set<string>(
-  (AGENT_RUNTIME_TYPES as readonly AgentRuntimeType[] | undefined) ?? DEFAULT_RUNTIME_TYPES
-);
+const VALID_RUNTIME_TYPES = new Set<string>(AGENT_RUNTIME_TYPES);
 
 type AgentProfileCreate = Omit<AgentProfileConfig, 'id' | 'createdAt' | 'updatedAt'>;
 type AgentProfileUpdate = Partial<Omit<AgentProfileConfig, 'id' | 'createdAt' | 'updatedAt'>> & {
