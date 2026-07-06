@@ -117,6 +117,11 @@ Done when:
 
 ### Phase C: Slash Commands End-To-End
 
+Phase C status: implemented. Claude command metadata is backed by the shared
+custom command scanner, including user, project, and plugin command sources.
+The desktop command handler forwards provider slash commands and unknown slash
+inputs to the active runtime, while plugin commands still use the command API.
+
 Make slash command parity explicit:
 
 - Keep provider command metadata backed by `scanCustomCommands`.
