@@ -2170,7 +2170,7 @@ describe('Sidebar', () => {
 
     expect(screen.getByTestId('agents-tree')).toBeTruthy();
     expect(screen.queryByTestId('skills-tree')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Profiles' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Agent Profiles' })).toBeTruthy();
   });
 
   it('renders SkillsTree when agentsMode is on the skills tab', () => {
@@ -2201,7 +2201,7 @@ describe('Sidebar', () => {
     expect(screen.queryByTestId('agents-tree')).toBeNull();
     expect(screen.queryByTestId('skills-tree')).toBeNull();
     expect(screen.queryByTestId('mcp-servers-tree')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Providers' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'LLM Providers' })).toBeTruthy();
   });
 
   // ---- PluginPermissionDialog ----

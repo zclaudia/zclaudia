@@ -7,7 +7,7 @@ import {
   Server,
   ArrowLeft,
   Bot,
-  SlidersHorizontal,
+  BotMessageSquare,
   Lightbulb,
   Database,
   Plug,
@@ -52,10 +52,10 @@ const AUTOMATION_TABS: { key: AutomationTab; label: string; Icon: typeof Zap }[]
 ];
 
 const AGENTS_TABS: { key: AgentsTab; label: string; Icon: typeof Bot }[] = [
-  { key: 'profiles', label: 'Profiles', Icon: SlidersHorizontal },
+  { key: 'profiles', label: 'Agent Profiles', Icon: BotMessageSquare },
+  { key: 'providers', label: 'LLM Providers', Icon: Plug },
   { key: 'skills', label: 'Skills', Icon: Lightbulb },
   { key: 'mcp-servers', label: 'MCP Servers', Icon: Database },
-  { key: 'providers', label: 'Providers', Icon: Plug },
 ];
 
 /**

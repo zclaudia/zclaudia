@@ -113,12 +113,12 @@ describe('SidebarNav', () => {
         agentsMode={{ tab: 'profiles', onSelectTab: vi.fn(), onBack }}
       />
     );
-    expect(screen.getByRole('button', { name: 'Profiles' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Agent Profiles' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Back to app' }));
     expect(onBack).toHaveBeenCalled();
   });
 
-  it('fires onSelectTab with "profiles" when the Profiles tab is clicked', () => {
+  it('fires onSelectTab with "profiles" when the Agent Profiles tab is clicked', () => {
     const onSelectTab = vi.fn();
     render(
       <SidebarNav
@@ -127,7 +127,7 @@ describe('SidebarNav', () => {
         agentsMode={{ tab: 'profiles', onSelectTab, onBack: vi.fn() }}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Profiles' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Agent Profiles' }));
     expect(onSelectTab).toHaveBeenCalledWith('profiles');
   });
 
@@ -139,7 +139,7 @@ describe('SidebarNav', () => {
         agentsMode={{ tab: 'profiles', onSelectTab: vi.fn(), onBack: vi.fn() }}
       />
     );
-    expect(screen.getByRole('button', { name: 'Profiles' }).className).toContain('bg-secondary');
+    expect(screen.getByRole('button', { name: 'Agent Profiles' }).className).toContain('bg-secondary');
   });
 
   it('fires onSelectTab with "skills" when the Skills tab is clicked', () => {
@@ -168,7 +168,7 @@ describe('SidebarNav', () => {
     expect(onSelectTab).toHaveBeenCalledWith('mcp-servers');
   });
 
-  it('fires onSelectTab with "providers" when the Providers tab is clicked', () => {
+  it('fires onSelectTab with "providers" when the LLM Providers tab is clicked', () => {
     const onSelectTab = vi.fn();
     render(
       <SidebarNav
@@ -177,11 +177,11 @@ describe('SidebarNav', () => {
         agentsMode={{ tab: 'profiles', onSelectTab, onBack: vi.fn() }}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Providers' }));
+    fireEvent.click(screen.getByRole('button', { name: 'LLM Providers' }));
     expect(onSelectTab).toHaveBeenCalledWith('providers');
   });
 
-  it('marks the Providers tab active when on the providers tab', () => {
+  it('marks the LLM Providers tab active when on the providers tab', () => {
     render(
       <SidebarNav
         onHome={vi.fn()}
@@ -189,8 +189,8 @@ describe('SidebarNav', () => {
         agentsMode={{ tab: 'providers', onSelectTab: vi.fn(), onBack: vi.fn() }}
       />
     );
-    expect(screen.getByRole('button', { name: 'Providers' }).className).toContain('bg-secondary');
-    expect(screen.getByRole('button', { name: 'Profiles' }).className).toContain(
+    expect(screen.getByRole('button', { name: 'LLM Providers' }).className).toContain('bg-secondary');
+    expect(screen.getByRole('button', { name: 'Agent Profiles' }).className).toContain(
       'text-muted-foreground'
     );
   });
@@ -204,12 +204,12 @@ describe('SidebarNav', () => {
       />
     );
     expect(screen.getByRole('button', { name: 'MCP Servers' }).className).toContain('bg-secondary');
-    expect(screen.getByRole('button', { name: 'Profiles' }).className).toContain(
+    expect(screen.getByRole('button', { name: 'Agent Profiles' }).className).toContain(
       'text-muted-foreground'
     );
   });
 
-  it('marks the Skills tab active and Profiles inactive when on the skills tab', () => {
+  it('marks the Skills tab active and Agent Profiles inactive when on the skills tab', () => {
     render(
       <SidebarNav
         onHome={vi.fn()}
@@ -218,7 +218,7 @@ describe('SidebarNav', () => {
       />
     );
     expect(screen.getByRole('button', { name: 'Skills' }).className).toContain('bg-secondary');
-    expect(screen.getByRole('button', { name: 'Profiles' }).className).toContain(
+    expect(screen.getByRole('button', { name: 'Agent Profiles' }).className).toContain(
       'text-muted-foreground'
     );
   });
