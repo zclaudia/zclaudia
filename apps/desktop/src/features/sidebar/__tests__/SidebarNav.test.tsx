@@ -168,6 +168,57 @@ describe('SidebarNav', () => {
     expect(onSelectTab).toHaveBeenCalledWith('mcp-servers');
   });
 
+  it('renders Plugins entry and calls onOpenPlugins', () => {
+    const onOpenPlugins = vi.fn();
+    render(<SidebarNav onHome={vi.fn()} isHomeActive={false} onOpenPlugins={onOpenPlugins} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Plugins' }));
+    expect(onOpenPlugins).toHaveBeenCalled();
+  });
+
+  it('does not render Plugins entry when onOpenPlugins is omitted', () => {
+    render(<SidebarNav onHome={vi.fn()} isHomeActive={false} />);
+    expect(screen.queryByRole('button', { name: 'Plugins' })).toBeNull();
+  });
+
+  it('renders plugins-mode tabs with back button', () => {
+    const onBack = vi.fn();
+    render(
+      <SidebarNav
+        onHome={vi.fn()}
+        isHomeActive={false}
+        pluginsMode={{ tab: 'installed', onSelectTab: vi.fn(), onBack }}
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Built-in' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Web Search' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Back to app' }));
+    expect(onBack).toHaveBeenCalled();
+  });
+
+  it('fires onSelectTab with "web-search" when the Web Search tab is clicked', () => {
+    const onSelectTab = vi.fn();
+    render(
+      <SidebarNav
+        onHome={vi.fn()}
+        isHomeActive={false}
+        pluginsMode={{ tab: 'installed', onSelectTab, onBack: vi.fn() }}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Web Search' }));
+    expect(onSelectTab).toHaveBeenCalledWith('web-search');
+  });
+
+  it('marks the active plugins tab', () => {
+    render(
+      <SidebarNav
+        onHome={vi.fn()}
+        isHomeActive={false}
+        pluginsMode={{ tab: 'builtin', onSelectTab: vi.fn(), onBack: vi.fn() }}
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Built-in' }).className).toContain('bg-secondary');
+  });
+
   it('fires onSelectTab with "providers" when the LLM Providers tab is clicked', () => {
     const onSelectTab = vi.fn();
     render(

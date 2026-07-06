@@ -11,9 +11,13 @@ import {
   Lightbulb,
   Database,
   Plug,
+  Puzzle,
+  LayoutPanelTop,
+  Search,
 } from 'lucide-react';
 import type { AutomationTab } from '../automation/automation-types';
 import type { AgentsTab } from '../agents/agents-types';
+import type { PluginsTab } from '../plugins/plugins-types';
 
 export interface SidebarAutomationNavMode {
   tab: AutomationTab;
@@ -24,6 +28,12 @@ export interface SidebarAutomationNavMode {
 export interface SidebarAgentsNavMode {
   tab: AgentsTab;
   onSelectTab: (tab: AgentsTab) => void;
+  onBack: () => void;
+}
+
+export interface SidebarPluginsNavMode {
+  tab: PluginsTab;
+  onSelectTab: (tab: PluginsTab) => void;
   onBack: () => void;
 }
 
@@ -40,6 +50,10 @@ interface SidebarNavProps {
   onOpenAgents?: () => void;
   /** When present, the nav renders the agents tabs instead of app destinations. */
   agentsMode?: SidebarAgentsNavMode;
+  /** Open plugins mode. Omitted (e.g. on mobile) hides the entry. */
+  onOpenPlugins?: () => void;
+  /** When present, the nav renders the plugins tabs instead of app destinations. */
+  pluginsMode?: SidebarPluginsNavMode;
   isMobile?: boolean;
 }
 
@@ -56,6 +70,12 @@ const AGENTS_TABS: { key: AgentsTab; label: string; Icon: typeof Bot }[] = [
   { key: 'providers', label: 'LLM Providers', Icon: Plug },
   { key: 'skills', label: 'Skills', Icon: Lightbulb },
   { key: 'mcp-servers', label: 'MCP Servers', Icon: Database },
+];
+
+const PLUGINS_TABS: { key: PluginsTab; label: string; Icon: typeof Zap }[] = [
+  { key: 'installed', label: 'Plugins', Icon: Puzzle },
+  { key: 'builtin', label: 'Built-in', Icon: LayoutPanelTop },
+  { key: 'web-search', label: 'Web Search', Icon: Search },
 ];
 
 /**
@@ -123,6 +143,8 @@ export function SidebarNav({
   automationMode,
   onOpenAgents,
   agentsMode,
+  onOpenPlugins,
+  pluginsMode,
   isMobile,
 }: SidebarNavProps) {
   const rowBase = isMobile
@@ -156,6 +178,19 @@ export function SidebarNav({
     );
   }
 
+  if (pluginsMode) {
+    return (
+      <ModeTabsNav
+        tabs={PLUGINS_TABS}
+        activeKey={pluginsMode.tab}
+        onSelect={pluginsMode.onSelectTab}
+        onBack={pluginsMode.onBack}
+        rowBase={rowBase}
+        iconSize={iconSize}
+      />
+    );
+  }
+
   return (
     <>
       <div className="p-2 space-y-0.5">
@@ -176,6 +211,17 @@ export function SidebarNav({
           >
             <Bot className={iconSize} strokeWidth={1.75} />
             Agents
+          </button>
+        )}
+
+        {onOpenPlugins && (
+          <button
+            onClick={onOpenPlugins}
+            aria-label="Plugins"
+            className={`${rowBase} text-muted-foreground`}
+          >
+            <Puzzle className={iconSize} strokeWidth={1.75} />
+            Plugins
           </button>
         )}
 
