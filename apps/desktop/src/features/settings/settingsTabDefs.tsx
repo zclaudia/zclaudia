@@ -7,8 +7,6 @@ export type SettingsTab =
   | 'permissions'
   | 'notifications'
   | 'gateway'
-  | 'plugins'
-  | 'web-search'
   | 'debug'
   | `plugin:${string}`;
 

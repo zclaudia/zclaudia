@@ -724,8 +724,6 @@ describe('SettingsPanel', () => {
     });
   });
 
-  // ---- Remote server banner ----
-
   // ---- Notifications tab ----
 
   it('renders notification settings when tab is selected', async () => {
