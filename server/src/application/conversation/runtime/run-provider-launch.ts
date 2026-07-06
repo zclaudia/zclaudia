@@ -102,16 +102,26 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     userHooks,
   } = input;
 
-  const multimodalFallback = resolveMultimodalFallbackForRun({
-    db: db as Database.Database,
+  const baseMultimodalFallback = {
+    applied: false,
     agentProfile,
     llmProfile: providerConfig,
-    images,
-  });
+    llmProfileId: input.llmProfileId ?? providerConfig?.id ?? agentProfile.llmProfileId,
+    providerType,
+  };
+  const multimodalFallback =
+    providerType === 'zclaudia'
+      ? resolveMultimodalFallbackForRun({
+          db: db as Database.Database,
+          agentProfile,
+          llmProfile: providerConfig,
+          images,
+        })
+      : baseMultimodalFallback;
   const effectiveAgentProfile = multimodalFallback.agentProfile;
   const effectiveProviderConfig = multimodalFallback.llmProfile;
   const effectiveLlmProfileId = multimodalFallback.llmProfileId;
-  const effectiveProviderType = effectiveProviderConfig?.providerType ?? providerType;
+  const effectiveProviderType = providerType;
   if (multimodalFallback.applied) {
     activeRun.agentProfile = effectiveAgentProfile;
     activeRun.llmProfile = effectiveProviderConfig;
@@ -154,7 +164,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     input: message.input,
     listeners,
     llmProfileId: effectiveLlmProfileId,
-    providerType: effectiveProviderConfig?.providerType ?? effectiveProviderType,
+    providerType: effectiveProviderType,
     runId,
     sendRunEvent,
     sessionId: message.sessionId,
@@ -290,7 +300,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
   // preempt an overflow that the very first request would trigger. Non-fatal: on
   // any failure the request still goes out and handleRunException's
   // overflow-recovery retry remains the net.
-  if (effectiveProviderConfig) {
+  if (effectiveProviderType === 'zclaudia' && effectiveProviderConfig) {
     try {
       const preflight = await maybeCompact({
         db: db as Database.Database,

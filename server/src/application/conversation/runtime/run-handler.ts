@@ -100,6 +100,7 @@ export async function handleRunStart(
     markPendingResolutionResumed,
     persistSessionWorkingDirectory,
     providerConfig,
+    providerType,
     providerEventState,
     llmProfileId,
     requestedCwd,
@@ -114,7 +115,6 @@ export async function handleRunStart(
   let handedOffToRetry = false;
 
   try {
-    const providerType = providerConfig?.providerType || 'zclaudia';
     const adapter = context.providerRegistry.getOrDefault(providerType);
 
     // Kimi stores session state under the work_dir scope. Resuming the same

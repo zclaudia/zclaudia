@@ -97,6 +97,7 @@ export interface RunBootstrapResult {
   persistSessionWorkingDirectory: (nextWorkingDirectory: string | null | undefined) => void;
   projectId: string;
   providerConfig?: LlmProfileConfig;
+  providerType: string;
   providerEventState: RunProviderEventState;
   llmProfileId: string | null;
   requestedCwd: string;
@@ -212,14 +213,11 @@ export function initializeRunBootstrap(
   const llmProfileId = providerConfig?.id ?? null;
   const enabledTools = agentProfile.enabledTools as ToolName[];
 
-  if (providerConfig) {
-    trace.setMeta({ provider: providerConfig.providerType });
-  }
-
   const sessionType = (session.session_type || 'regular') as 'regular' | 'background' | 'agent';
   const projectId = session.project_id || message.sessionId;
-  const providerTypeForSession = providerConfig?.providerType || 'zclaudia';
+  const providerTypeForSession = agentProfile.runtimeType ?? 'zclaudia';
   const providerPolicy = providerRegistry.getPolicy(providerTypeForSession);
+  trace.setMeta({ provider: providerTypeForSession });
 
   // Some providers ignore a new non-default mode when resuming an existing
   // provider session. Keep the previous behavior by default, and let providers
@@ -288,6 +286,7 @@ export function initializeRunBootstrap(
     // compaction simply won't trigger in that degraded mode.
     agentProfile,
     llmProfile: providerConfig ?? undefined,
+    providerType: providerTypeForSession,
     externalToolState: buildExternalToolRuntimeState(agentProfile),
     skillState: buildSkillRuntimeState(agentProfile),
   };
@@ -369,7 +368,7 @@ export function initializeRunBootstrap(
     session.root_path
   );
   trace.setMeta({
-    provider: providerConfig?.providerType,
+    provider: providerTypeForSession,
     cwd: message.workingDirectory || persistedWorkingDirectory || session.root_path || undefined,
   });
 
@@ -425,6 +424,7 @@ export function initializeRunBootstrap(
     persistSessionWorkingDirectory,
     projectId,
     providerConfig,
+    providerType: providerTypeForSession,
     providerEventState,
     llmProfileId,
     requestedCwd,

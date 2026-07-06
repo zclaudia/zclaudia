@@ -198,6 +198,12 @@ function createDb(): Database.Database {
     );
   `);
   createAgentProfilesTable(db);
+  const agentProfileColumns = db
+    .prepare(`PRAGMA table_info(agent_profiles)`)
+    .all() as Array<{ name: string }>;
+  if (!agentProfileColumns.some(column => column.name === 'runtime_type')) {
+    db.exec(`ALTER TABLE agent_profiles ADD COLUMN runtime_type TEXT DEFAULT 'zclaudia'`);
+  }
 
   const now = Date.now();
   db.prepare(
@@ -302,6 +308,53 @@ describe('ws/run-handler', () => {
     assembleSystemPromptMock.mockResolvedValue('workspace prompt');
     buildSkillDirectoryHintMock.mockReturnValue('skill directory');
     toolRegistryGetAllMock.mockReturnValue([]);
+  });
+
+  it('selects the runtime adapter from the resolved agent profile runtime type', async () => {
+    const { handleRunStart } = await import('../run-handler.js');
+
+    const runWithRuntimeType = async (
+      sessionId: string,
+      runtimeType: 'claude' | 'zclaudia' | null
+    ) => {
+      const db = createDb();
+      db.prepare(`UPDATE agent_profiles SET runtime_type = ? WHERE id = 'agent-1'`).run(
+        runtimeType
+      );
+      insertSession(db, { id: sessionId, type: 'regular' });
+
+      mockProviderRegistry.getOrDefault.mockClear();
+
+      await handleRunStart(
+        {
+          id: 'client-1',
+          ws: {} as any,
+          isAlive: true,
+          isLocal: true,
+          authenticated: true,
+        },
+        {
+          type: 'run_start',
+          clientRequestId: `req-${sessionId}`,
+          sessionId,
+          input: 'hello',
+        },
+        db as any,
+        {},
+        undefined,
+        createRunHandlerContext()
+      );
+    };
+
+    await runWithRuntimeType('session-claude-runtime', 'claude');
+    expect(mockProviderRegistry.getOrDefault).toHaveBeenCalledWith('claude');
+    expect(mockProviderRegistry.getOrDefault).not.toHaveBeenCalledWith('anthropic');
+
+    await runWithRuntimeType('session-default-runtime', null);
+    expect(mockProviderRegistry.getOrDefault).toHaveBeenCalledWith('zclaudia');
+
+    await runWithRuntimeType('session-zclaudia-runtime', 'zclaudia');
+    expect(mockProviderRegistry.getOrDefault).toHaveBeenCalledWith('zclaudia');
   });
 
   it('exposes skill directory hint and resolved agent profile to agent sessions', async () => {
