@@ -5,10 +5,11 @@
 Finish the Claude runtime migration before copying the runtime abstraction to
 Codex or Cursor.
 
-The previous phase made Claude usable as a first-class runtime: adapter
-selection, registry wiring, permission approval, event mapping, smoke checks,
-and the Profile Editor runtime selector are in place. This document tracks the
-remaining parity work needed to call the Claude migration complete.
+Claude is usable as a first-class runtime: adapter selection, registry wiring,
+permission approval, event mapping, smoke checks, custom command metadata, MCP
+bridge wiring, and the Profile Editor runtime selector are in place. This
+document records the completed migration path and the explicit advanced
+capabilities that remain out of scope for Claude.
 
 ## Current Baseline
 
@@ -28,12 +29,13 @@ Completed in `zclaudia`:
 - Claude SDK receives the zclaudia MCP bridge as `claudia-plugins` when bridge
   tools and a server port are available.
 
-Remaining gaps:
+Completion status:
 
-- Slash command behavior is exposed in metadata but not validated end to end
-  against Claude SDK plugin/custom command loading.
-- AI review and multimodal fallback are still marked as zclaudia-only.
-- Background task/process-tree semantics are still unsupported for Claude.
+- Claude runtime migration is complete for the supported capability set.
+- AI review, multimodal attachments/fallback, and background task controls are
+  explicitly unsupported for Claude until each has a dedicated implementation.
+- Live Claude Agent SDK smoke remains opt-in because it requires Claude Code
+  authentication and may spend tokens.
 
 ## Source Mapping From `my-claudia`
 
@@ -170,6 +172,10 @@ Done when:
 
 ### Phase E: Completion Gate
 
+Phase E status: implemented. The deterministic test/build/smoke gate passes,
+the live Claude Agent SDK smoke remains opt-in, and Codex/Cursor replication
+notes are updated with the finalized Claude path.
+
 Finish Claude migration:
 
 - Extend `smoke:claude-runtime` with optional checks for user MCP, bridge MCP,
@@ -187,5 +193,6 @@ Finish Claude migration:
 4. Phase D: Review, Multimodal, And Background Capability Decisions.
 5. Phase E: Completion Gate.
 
-Do not begin Codex or Cursor runtime implementation until Phase E is complete
-or the remaining Claude gaps are explicitly accepted as out of scope.
+Claude runtime migration is complete for supported capabilities. Codex/Cursor
+implementation can copy this external-agent path, keeping deferred advanced
+capabilities unsupported until each runtime implements them directly.
