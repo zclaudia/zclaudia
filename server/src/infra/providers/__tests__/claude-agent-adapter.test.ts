@@ -3,9 +3,10 @@ import { ClaudeAgentAdapter } from '../claude-agent/adapter.js';
 import { buildClaudeCanUseTool } from '../claude-agent/permissions.js';
 import { transformClaudeSdkMessage } from '../claude-agent/runner.js';
 
-const { queryMock, loadClaudeAgentConfigMock } = vi.hoisted(() => ({
+const { queryMock, loadClaudeAgentConfigMock, createToolBridgeEntryMock } = vi.hoisted(() => ({
   queryMock: vi.fn(),
   loadClaudeAgentConfigMock: vi.fn(() => ({ mcpServers: {}, plugins: [] })),
+  createToolBridgeEntryMock: vi.fn(() => null),
 }));
 
 vi.mock('@anthropic-ai/claude-agent-sdk', () => ({
@@ -14,6 +15,11 @@ vi.mock('@anthropic-ai/claude-agent-sdk', () => ({
 
 vi.mock('../claude-agent/config.js', () => ({
   loadClaudeAgentConfig: loadClaudeAgentConfigMock,
+}));
+
+vi.mock('../agent-plugin/tool-bridge.js', () => ({
+  DEFAULT_AGENT_PLUGIN_BRIDGE_MCP_SERVER_NAME: 'claudia-plugins',
+  createAgentPluginToolBridgeMcpEntry: createToolBridgeEntryMock,
 }));
 
 async function* claudeStream(messages: unknown[]) {
@@ -109,6 +115,93 @@ describe('ClaudeAgentAdapter', () => {
             docs: { command: 'node', args: ['docs-server.js'] },
           },
           plugins: [{ type: 'local', path: '/tmp/claude-plugin' }],
+        }),
+      })
+    );
+  });
+
+  it('merges the standard tool bridge MCP server into Claude SDK options', async () => {
+    const adapter = new ClaudeAgentAdapter();
+    loadClaudeAgentConfigMock.mockReturnValueOnce({
+      mcpServers: {
+        docs: { command: 'node', args: ['docs-server.js'] },
+      },
+      plugins: [],
+    });
+    createToolBridgeEntryMock.mockReturnValueOnce({
+      command: 'node',
+      args: ['mcp-bridge.js'],
+      env: {
+        CLAUDIA_BRIDGE_URL: 'http://127.0.0.1:3100',
+        CLAUDIA_SESSION_ID: 'session-1',
+      },
+    });
+    queryMock.mockReturnValueOnce(claudeStream([]));
+
+    for await (const _event of adapter.run(
+      'hello',
+      {
+        cwd: '/tmp/project',
+        claudiaSessionId: 'session-1',
+        serverPort: 3100,
+      } as any,
+      vi.fn()
+    )) {
+      // drain stream
+    }
+
+    expect(createToolBridgeEntryMock).toHaveBeenCalledWith({
+      serverPort: 3100,
+      zclaudiaSessionId: 'session-1',
+    });
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          mcpServers: {
+            docs: { command: 'node', args: ['docs-server.js'] },
+            'claudia-plugins': {
+              command: 'node',
+              args: ['mcp-bridge.js'],
+              env: {
+                CLAUDIA_BRIDGE_URL: 'http://127.0.0.1:3100',
+                CLAUDIA_SESSION_ID: 'session-1',
+              },
+            },
+          },
+        }),
+      })
+    );
+  });
+
+  it('preserves user-defined claudia-plugins MCP server over the generated bridge', async () => {
+    const adapter = new ClaudeAgentAdapter();
+    loadClaudeAgentConfigMock.mockReturnValueOnce({
+      mcpServers: {
+        'claudia-plugins': { command: 'custom-bridge', args: ['user.js'] },
+      },
+      plugins: [],
+    });
+    createToolBridgeEntryMock.mockReturnValueOnce({
+      command: 'node',
+      args: ['mcp-bridge.js'],
+      env: { CLAUDIA_BRIDGE_URL: 'http://127.0.0.1:3100' },
+    });
+    queryMock.mockReturnValueOnce(claudeStream([]));
+
+    for await (const _event of adapter.run(
+      'hello',
+      { cwd: '/tmp/project', claudiaSessionId: 'session-1', serverPort: 3100 } as any,
+      vi.fn()
+    )) {
+      // drain stream
+    }
+
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          mcpServers: {
+            'claudia-plugins': { command: 'custom-bridge', args: ['user.js'] },
+          },
         }),
       })
     );

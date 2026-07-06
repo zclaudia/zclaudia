@@ -4,11 +4,17 @@ import type {
   ProviderRuntimeEvent,
   RunOptions,
 } from '../types.js';
+import {
+  createAgentPluginToolBridgeMcpEntry,
+  DEFAULT_AGENT_PLUGIN_BRIDGE_MCP_SERVER_NAME,
+} from '../agent-plugin/tool-bridge.js';
 import { loadClaudeAgentConfig } from './config.js';
 import { CLAUDE_AGENT_MANIFEST, CLAUDE_AGENT_POLICY } from './manifest.js';
 import { buildClaudeCanUseTool } from './permissions.js';
 import type { ClaudeAgentRunOptions } from './runner.js';
 import { runClaudeAgent } from './runner.js';
+
+type ClaudeMcpServers = NonNullable<ClaudeAgentRunOptions['mcpServers']>;
 
 const CLAUDE_PERMISSION_MODES = new Set([
   'default',
@@ -23,6 +29,18 @@ function toClaudePermissionMode(mode?: string): ClaudeAgentRunOptions['permissio
   return mode && CLAUDE_PERMISSION_MODES.has(mode)
     ? (mode as ClaudeAgentRunOptions['permissionMode'])
     : undefined;
+}
+
+function mergeClaudeMcpServers(
+  base: ClaudeMcpServers,
+  bridgeEntry: ClaudeMcpServers[string] | null
+): ClaudeMcpServers {
+  if (!bridgeEntry) return base;
+  if (base[DEFAULT_AGENT_PLUGIN_BRIDGE_MCP_SERVER_NAME]) return base;
+  return {
+    ...base,
+    [DEFAULT_AGENT_PLUGIN_BRIDGE_MCP_SERVER_NAME]: bridgeEntry,
+  };
 }
 
 export class ClaudeAgentAdapter implements ProviderAdapter {
@@ -48,6 +66,11 @@ export class ClaudeAgentAdapter implements ProviderAdapter {
 
     try {
       const claudeConfig = loadClaudeAgentConfig();
+      const bridgeEntry = createAgentPluginToolBridgeMcpEntry({
+        serverPort: options.serverPort,
+        zclaudiaSessionId: options.claudiaSessionId,
+      });
+      const mcpServers = mergeClaudeMcpServers(claudeConfig.mcpServers, bridgeEntry);
       yield* runClaudeAgent(input, {
         cwd: options.cwd,
         sessionId: options.sessionId,
@@ -58,7 +81,7 @@ export class ClaudeAgentAdapter implements ProviderAdapter {
         systemPrompt: options.systemPrompt,
         abortController,
         canUseTool: buildClaudeCanUseTool(onPermission),
-        mcpServers: claudeConfig.mcpServers,
+        mcpServers,
         plugins: claudeConfig.plugins,
         onSessionId: sessionId => {
           if (sessionId && sessionId !== currentKey) {
