@@ -380,7 +380,7 @@ git commit -m "test(runtime): harden claude sdk event mapping"
 - Modify: `server/package.json`
 - Create: `docs/plans/claude-runtime-smoke-check.md`
 
-- [ ] **Step 1: Add the smoke script**
+- [x] **Step 1: Add the smoke script**
 
 Create `server/scripts/smoke-claude-runtime.ts`:
 
@@ -397,6 +397,11 @@ function hasFlag(name: string): boolean {
   return process.argv.includes(`--${name}`);
 }
 
+function isAbortLikeError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return /abort|cancel/i.test(`${error.name} ${error.message}`);
+}
+
 async function collect(
   adapter: ClaudeAgentAdapter,
   input: string,
@@ -405,7 +410,14 @@ async function collect(
     sessionId?: string;
     abortAfterMs?: number;
   }
-): Promise<{ events: ProviderRuntimeEvent[]; sessionId?: string }> {
+): Promise<{
+  events: ProviderRuntimeEvent[];
+  sessionId?: string;
+  aborted: boolean;
+  abortObserved: boolean;
+  elapsedMs: number;
+}> {
+  const startedAt = Date.now();
   const abortController = new AbortController();
   const timer =
     options.abortAfterMs !== undefined
@@ -438,6 +450,18 @@ async function collect(
         console.error(`[smoke] provider error: ${event.error}`);
       }
     }
+  } catch (error) {
+    if (!abortController.signal.aborted || !isAbortLikeError(error)) {
+      throw error;
+    }
+    console.log('[smoke] abort observed');
+    return {
+      events,
+      sessionId: events.find(event => event.type === 'init' && event.sessionId)?.sessionId,
+      aborted: true,
+      abortObserved: true,
+      elapsedMs: Date.now() - startedAt,
+    };
   } finally {
     if (timer) clearTimeout(timer);
   }
@@ -445,7 +469,22 @@ async function collect(
   return {
     events,
     sessionId: events.find(event => event.type === 'init' && event.sessionId)?.sessionId,
+    aborted: abortController.signal.aborted,
+    abortObserved: false,
+    elapsedMs: Date.now() - startedAt,
   };
+}
+
+function stoppedPromptlyAfterAbort(
+  result: Awaited<ReturnType<typeof collect>>,
+  abortAfterMs: number
+): boolean {
+  return (
+    result.aborted &&
+    (result.abortObserved ||
+      (result.elapsedMs <= abortAfterMs + 5_000 &&
+        !result.events.some(event => event.type === 'result')))
+  );
 }
 
 async function main(): Promise<void> {
@@ -470,15 +509,24 @@ async function main(): Promise<void> {
     cwd,
     sessionId: first.sessionId,
   });
+  if (second.sessionId !== first.sessionId) {
+    throw new Error(
+      `Claude resume smoke started a different session: ${second.sessionId ?? 'missing init'}`
+    );
+  }
   if (!second.events.some(event => event.type === 'result' || event.type === 'assistant')) {
     throw new Error('Claude resume smoke did not receive assistant content or a result event.');
   }
 
-  await collect(adapter, 'Wait for 30 seconds before replying.', {
+  const abortAfterMs = 250;
+  const cancelled = await collect(adapter, 'Wait for 30 seconds before replying.', {
     cwd,
     sessionId: first.sessionId,
-    abortAfterMs: 250,
+    abortAfterMs,
   });
+  if (!stoppedPromptlyAfterAbort(cancelled, abortAfterMs)) {
+    throw new Error('Claude cancel smoke did not stop promptly after AbortController fired.');
+  }
   console.log('[smoke] cancel path invoked through AbortController');
 }
 
@@ -488,7 +536,7 @@ main().catch(error => {
 });
 ```
 
-- [ ] **Step 2: Add package script**
+- [x] **Step 2: Add package script**
 
 In `server/package.json`, add:
 
@@ -496,7 +544,7 @@ In `server/package.json`, add:
 "smoke:claude-runtime": "tsx scripts/smoke-claude-runtime.ts"
 ```
 
-- [ ] **Step 3: Add smoke documentation**
+- [x] **Step 3: Add smoke documentation**
 
 Create `docs/plans/claude-runtime-smoke-check.md`:
 
@@ -521,7 +569,7 @@ If the Claude Agent SDK or Claude Code authentication is unavailable, the script
 fails with the SDK error. This script is not part of normal CI.
 ````
 
-- [ ] **Step 4: Run non-live script**
+- [x] **Step 4: Run non-live script**
 
 Run:
 
@@ -531,7 +579,7 @@ corepack pnpm --filter @zclaudia/server smoke:claude-runtime
 
 Expected: PASS with "Skipping live Claude smoke".
 
-- [ ] **Step 5: Run build**
+- [x] **Step 5: Run build**
 
 Run:
 
@@ -541,7 +589,7 @@ corepack pnpm --filter @zclaudia/server build
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/scripts/smoke-claude-runtime.ts server/package.json docs/plans/claude-runtime-smoke-check.md

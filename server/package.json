@@ -12,6 +12,7 @@
     "start": "node dist/index.js",
     "clean": "rm -rf dist bundle",
     "bundle": "node scripts/bundle.mjs",
+    "smoke:claude-runtime": "tsx scripts/smoke-claude-runtime.ts",
     "trace:llm-profile": "tsx scripts/trace-llm-profile-session.ts",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
