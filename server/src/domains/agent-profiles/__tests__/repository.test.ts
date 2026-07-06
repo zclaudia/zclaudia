@@ -37,6 +37,7 @@ describe('AgentProfileRepository', () => {
     expect(fetched!.description).toBe('Coding agent');
     expect(fetched!.llmProfileId).toBe(llmProfileId);
     expect(fetched!.model).toBe('claude-sonnet-4-6');
+    expect(fetched!.runtimeType).toBe('zclaudia');
     expect(fetched!.systemPrompt).toBe('You are a coder.');
     expect(fetched!.enabledTools).toEqual(['Read', 'Write', 'Bash']);
     expect(fetched!.toolSelection).toEqual({
@@ -56,6 +57,25 @@ describe('AgentProfileRepository', () => {
     ]);
     expect(fetched!.thinkingLevel).toBe('medium');
     expect(fetched!.isDefault).toBe(true);
+  });
+
+  it('persists claude runtime type', () => {
+    const created = repo.create({
+      name: 'claude-agent',
+      runtimeType: 'claude',
+      llmProfileId,
+      model: 'claude-sonnet-4-6',
+      systemPrompt: '',
+      enabledTools: ['read'],
+    });
+
+    const raw = db
+      .prepare('SELECT runtime_type FROM agent_profiles WHERE id = ?')
+      .get(created.id) as { runtime_type: string };
+    const fetched = repo.findById(created.id);
+
+    expect(raw.runtime_type).toBe('claude');
+    expect(fetched!.runtimeType).toBe('claude');
   });
 
   it('persists plugin ownership metadata for plugin-provided profiles', () => {

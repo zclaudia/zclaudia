@@ -35,6 +35,7 @@ import { migration as m_031_usage_stats_indexes } from './031_usage_stats_indexe
 import { migration as m_032_windowed_usage_stats_index } from './032_windowed_usage_stats_index.js';
 import { migration as m_033_backfill_rest_message_offset } from './033_backfill_rest_message_offset.js';
 import { migration as m_034_model_usage_index } from './034_model_usage_index.js';
+import { migration as m_035_agent_profile_runtime_type } from './035_agent_profile_runtime_type.js';
 
 export type { Migration };
 
@@ -73,6 +74,7 @@ export const migrations: Migration[] = [
   m_032_windowed_usage_stats_index,
   m_033_backfill_rest_message_offset,
   m_034_model_usage_index,
+  m_035_agent_profile_runtime_type,
 ];
 
 /**

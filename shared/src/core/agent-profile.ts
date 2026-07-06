@@ -3,6 +3,9 @@ import type { SkillExecutionSelection, SkillSelection } from './skills.js';
 
 export type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 
+export const AGENT_RUNTIME_TYPES = ['zclaudia', 'claude', 'codex', 'cursor'] as const;
+export type AgentRuntimeType = (typeof AGENT_RUNTIME_TYPES)[number];
+
 export interface MultimodalFallbackConfig {
   llmProfileId: string;
   model: string;
@@ -12,6 +15,7 @@ export interface AgentProfileConfig {
   id: string;
   name: string;
   description?: string;
+  runtimeType?: AgentRuntimeType;
   llmProfileId: string;
   model: string;
   systemPrompt: string;

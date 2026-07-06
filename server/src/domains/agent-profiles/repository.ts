@@ -2,9 +2,11 @@ import { BaseRepository } from '../../infra/repositories/base.js';
 import type { Database } from 'better-sqlite3';
 import type {
   AgentProfileConfig,
+  AgentRuntimeType,
   MultimodalFallbackConfig,
   ThinkingLevel,
 } from '@zclaudia/shared/core/agent-profile';
+import { AGENT_RUNTIME_TYPES } from '@zclaudia/shared/core/agent-profile';
 import {
   normalizeSkillExecutionSelection,
   normalizeSkillSelection,
@@ -34,11 +36,26 @@ const VALID_THINKING_LEVELS = new Set<ThinkingLevel>([
   'high',
   'xhigh',
 ]);
+const DEFAULT_RUNTIME_TYPES: readonly AgentRuntimeType[] = [
+  'zclaudia',
+  'claude',
+  'codex',
+  'cursor',
+];
+const VALID_RUNTIME_TYPES = new Set<string>(
+  (AGENT_RUNTIME_TYPES as readonly AgentRuntimeType[] | undefined) ?? DEFAULT_RUNTIME_TYPES
+);
 
 type AgentProfileCreate = Omit<AgentProfileConfig, 'id' | 'createdAt' | 'updatedAt'>;
 type AgentProfileUpdate = Partial<Omit<AgentProfileConfig, 'id' | 'createdAt' | 'updatedAt'>> & {
   multimodalFallback?: MultimodalFallbackConfig | null;
 };
+
+function normalizeRuntimeType(raw: unknown): AgentRuntimeType {
+  return typeof raw === 'string' && VALID_RUNTIME_TYPES.has(raw)
+    ? (raw as AgentRuntimeType)
+    : 'zclaudia';
+}
 
 function normalizeEnabledTools(tools: string[]): string[] {
   const normalized = tools.flatMap(tool => {
@@ -174,6 +191,7 @@ export class AgentProfileRepository extends BaseRepository<
       id: row.id,
       name: row.name,
       description: row.description ?? undefined,
+      runtimeType: normalizeRuntimeType(row.runtime_type),
       llmProfileId: row.llm_profile_id,
       model: row.model,
       systemPrompt: row.system_prompt,
@@ -302,13 +320,14 @@ export class AgentProfileRepository extends BaseRepository<
     const enabledTools = resolveToolSelection(toolSelection).builtinTools;
     return {
       sql: `
-        INSERT INTO agent_profiles (id, name, description, llm_profile_id, model, system_prompt, enabled_tools, tool_selection, skill_selection, skill_execution, multimodal_fallback, thinking_level, is_default, source, plugin_id, plugin_profile_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO agent_profiles (id, name, description, runtime_type, llm_profile_id, model, system_prompt, enabled_tools, tool_selection, skill_selection, skill_execution, multimodal_fallback, thinking_level, is_default, source, plugin_id, plugin_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       params: [
         id,
         data.name,
         data.description ?? null,
+        normalizeRuntimeType(data.runtimeType),
         data.llmProfileId,
         data.model,
         data.systemPrompt,
@@ -339,6 +358,10 @@ export class AgentProfileRepository extends BaseRepository<
     if (data.description !== undefined) {
       updates.push('description = ?');
       params.push(data.description || null);
+    }
+    if (data.runtimeType !== undefined) {
+      updates.push('runtime_type = ?');
+      params.push(normalizeRuntimeType(data.runtimeType));
     }
     if (data.llmProfileId !== undefined) {
       updates.push('llm_profile_id = ?');
