@@ -68,6 +68,9 @@ Existing new-project foundations:
 
 ### Phase A: Claude Config And SDK Loading
 
+Phase A status: implemented. Claude SDK receives user MCP servers and enabled
+local plugins from Claude Code configuration.
+
 Load Claude Code user configuration into the Claude Agent SDK:
 
 - Create an adapter-local Claude config loader under

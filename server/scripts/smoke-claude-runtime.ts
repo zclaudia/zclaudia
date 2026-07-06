@@ -1,4 +1,5 @@
 import { ClaudeAgentAdapter } from '../src/infra/providers/claude-agent/adapter.js';
+import { loadClaudeAgentConfig } from '../src/infra/providers/claude-agent/config.js';
 import type { ProviderRuntimeEvent } from '../src/infra/providers/types.js';
 
 function arg(name: string): string | undefined {
@@ -110,6 +111,10 @@ async function main(): Promise<void> {
   const cwd = arg('cwd') ?? process.cwd();
   const prompt = arg('prompt') ?? 'Reply with exactly: zclaudia claude runtime smoke ok';
   const adapter = new ClaudeAgentAdapter();
+  const claudeConfig = loadClaudeAgentConfig();
+  console.log(
+    `[smoke] claude config mcpServers=${Object.keys(claudeConfig.mcpServers).length} plugins=${claudeConfig.plugins.length}`
+  );
 
   const first = await collect(adapter, prompt, { cwd });
   if (!first.sessionId) {
