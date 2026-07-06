@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
 import type {
   AgentProfileConfig,
+  AgentRuntimeType,
   ThinkingLevel,
   LlmProfileConfig,
   McpServerConfig,
@@ -42,6 +43,7 @@ export interface ProfileEditorProps {
 }
 
 type ThinkingLevelOption = '' | ThinkingLevel;
+type RuntimeOption = Extract<AgentRuntimeType, 'zclaudia' | 'claude'>;
 type SkillDefaultModeOption = 'default' | SkillExecutionMode;
 type SkillForkToolPolicyOption = 'default' | SkillForkToolPolicy;
 const THINKING_LEVEL_OPTIONS: { value: ThinkingLevelOption; label: string }[] = [
@@ -151,6 +153,7 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
   // Form state — mirror LlmProfileManager `form*` naming convention
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
+  const [formRuntimeType, setFormRuntimeType] = useState<RuntimeOption>('zclaudia');
   const [formLlmProfileId, setFormLlmProfileId] = useState('');
   const [formModel, setFormModel] = useState('');
   const [formFallbackLlmProfileId, setFormFallbackLlmProfileId] = useState('');
@@ -241,6 +244,7 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
     clearDeleteConfirmation();
     setFormName('');
     setFormDescription('');
+    setFormRuntimeType('zclaudia');
     setFormLlmProfileId('');
     setFormModel('');
     setFormFallbackLlmProfileId('');
@@ -260,6 +264,7 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
     clearDeleteConfirmation();
     setFormName(agent.name);
     setFormDescription(agent.description ?? '');
+    setFormRuntimeType(agent.runtimeType === 'claude' ? 'claude' : 'zclaudia');
     setFormLlmProfileId(agent.llmProfileId);
     setFormModel(agent.model);
     setFormFallbackLlmProfileId(agent.multimodalFallback?.llmProfileId ?? '');
@@ -557,6 +562,7 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
       const payload = {
         name: formName.trim(),
         description: formDescription.trim() || undefined,
+        runtimeType: formRuntimeType,
         llmProfileId: formLlmProfileId,
         model: formModel.trim(),
         multimodalFallback,
@@ -658,6 +664,24 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
           rows={2}
           className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary"
         />
+      </div>
+
+      <div>
+        <label
+          htmlFor="agent-profile-runtime"
+          className="block text-sm font-medium text-muted-foreground mb-1"
+        >
+          Runtime
+        </label>
+        <select
+          id="agent-profile-runtime"
+          value={formRuntimeType}
+          onChange={e => setFormRuntimeType(e.target.value as RuntimeOption)}
+          className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary"
+        >
+          <option value="zclaudia">ZClaudia</option>
+          <option value="claude">Claude</option>
+        </select>
       </div>
 
       <LlmProfileSelector

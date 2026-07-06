@@ -105,6 +105,34 @@ describe('ProfileEditor', () => {
     expect(api.updateAgentProfileForBackend).not.toHaveBeenCalled();
   });
 
+  it('create mode: includes the selected runtime type in the save payload', async () => {
+    const saved = { ...makeProfile('new1', 'Claude Agent'), runtimeType: 'claude' as const };
+    vi.mocked(api.createAgentProfileForBackend).mockResolvedValue(saved);
+
+    await renderEditor(null);
+
+    fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), {
+      target: { value: 'Claude Agent' },
+    });
+    fireEvent.change(screen.getByLabelText('Runtime'), {
+      target: { value: 'claude' },
+    });
+    fireEvent.click(screen.getByText('Select a model'));
+    fireEvent.click(screen.getByText('Sonnet'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() => {
+      expect(api.createAgentProfileForBackend).toHaveBeenCalledWith(
+        'b1',
+        expect.objectContaining({
+          name: 'Claude Agent',
+          runtimeType: 'claude',
+        })
+      );
+    });
+  });
+
   it('edit mode: populates the form from the profile prop and updates via updateAgentProfileForBackend', async () => {
     const profile = makeProfile('p1', 'Coder');
     const saved = { ...profile, name: 'Coder 2' };
