@@ -30,6 +30,7 @@ export function ensureDefaultAgentProfile(db: Database.Database): void {
     systemPrompt: DEFAULT_AGENT_SYSTEM_PROMPT,
     enabledTools: resolveToolSelection(defaultToolSelection).builtinTools,
     toolSelection: defaultToolSelection,
+    runtimeType: 'zclaudia',
     isDefault: true,
   });
 

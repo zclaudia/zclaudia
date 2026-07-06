@@ -45,6 +45,7 @@ export class PluginAgentProfileService {
       skillSelection: contribution.skillSelection,
       skillExecution: contribution.skillExecution,
       thinkingLevel: contribution.thinkingLevel,
+      runtimeType: 'zclaudia',
       source: 'plugin',
       pluginId,
       pluginProfileId: contribution.id,

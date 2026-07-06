@@ -1,7 +1,12 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type Database from 'better-sqlite3';
-import type { AgentProfileConfig, ThinkingLevel } from '@zclaudia/shared/core/agent-profile';
+import type {
+  AgentProfileConfig,
+  AgentRuntimeType,
+  ThinkingLevel,
+} from '@zclaudia/shared/core/agent-profile';
+import { AGENT_RUNTIME_TYPES } from '@zclaudia/shared/core/agent-profile';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import { AgentProfileRepository } from './repository.js';
 import { LlmProfileRepository } from '../llm-profiles/repository.js';
@@ -20,6 +25,16 @@ const VALID_THINKING_LEVELS: readonly ThinkingLevel[] = [
   'high',
   'xhigh',
 ];
+
+const VALID_RUNTIME_TYPES: readonly AgentRuntimeType[] = AGENT_RUNTIME_TYPES;
+
+function validateRuntimeType(input: unknown): AgentRuntimeType | undefined | null {
+  if (input === undefined) return undefined;
+  if (typeof input !== 'string' || !VALID_RUNTIME_TYPES.includes(input as AgentRuntimeType)) {
+    return null;
+  }
+  return input as AgentRuntimeType;
+}
 
 type MultimodalFallbackValidation =
   | { ok: true; value: AgentProfileConfig['multimodalFallback'] | null | undefined }
@@ -139,6 +154,7 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         skillExecution,
         multimodalFallback,
         thinkingLevel,
+        runtimeType,
         isDefault,
       } = req.body ?? {};
 
@@ -187,6 +203,17 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         });
         return;
       }
+      const validatedRuntimeType = validateRuntimeType(runtimeType);
+      if (validatedRuntimeType === null) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: `Invalid runtimeType. Must be one of: ${VALID_RUNTIME_TYPES.join(', ')}`,
+          },
+        });
+        return;
+      }
 
       if (!llmRepo.findById(llmProfileId)) {
         res.status(400).json({
@@ -219,6 +246,7 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         skillExecution,
         multimodalFallback: validatedFallback.value ?? undefined,
         thinkingLevel: thinkingLevel ?? undefined,
+        runtimeType: validatedRuntimeType ?? 'zclaudia',
         isDefault: Boolean(isDefault),
       });
 
@@ -246,6 +274,18 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
           error: {
             code: 'VALIDATION_ERROR',
             message: `Invalid thinkingLevel. Must be one of: ${VALID_THINKING_LEVELS.join(', ')}`,
+          },
+        });
+        return;
+      }
+
+      const validatedRuntimeType = validateRuntimeType(body.runtimeType);
+      if (validatedRuntimeType === null) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: `Invalid runtimeType. Must be one of: ${VALID_RUNTIME_TYPES.join(', ')}`,
           },
         });
         return;
@@ -307,6 +347,8 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         patch.multimodalFallback = validatedFallback.value as never;
       if (Object.prototype.hasOwnProperty.call(body, 'thinkingLevel'))
         patch.thinkingLevel = body.thinkingLevel ?? undefined;
+      if (Object.prototype.hasOwnProperty.call(body, 'runtimeType'))
+        patch.runtimeType = validatedRuntimeType === undefined ? undefined : validatedRuntimeType;
       if (Object.prototype.hasOwnProperty.call(body, 'isDefault'))
         patch.isDefault = Boolean(body.isDefault);
 

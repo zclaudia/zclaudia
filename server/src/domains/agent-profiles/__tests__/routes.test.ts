@@ -71,6 +71,39 @@ describe('agent-profiles routes', () => {
     expect(res.body.data.multimodalFallback).toEqual({ llmProfileId: vision.id, model: 'gpt-4o' });
   });
 
+  it('POST accepts claude runtime type', async () => {
+    const res = await request(app)
+      .post('/api/agent-profiles')
+      .send({
+        name: 'claude',
+        runtimeType: 'claude',
+        llmProfileId,
+        model: 'claude-sonnet-4-6',
+        systemPrompt: '',
+        enabledTools: ['read'],
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.runtimeType).toBe('claude');
+  });
+
+  it('POST rejects invalid runtime type', async () => {
+    const res = await request(app)
+      .post('/api/agent-profiles')
+      .send({
+        name: 'bad',
+        runtimeType: 'bad-runtime',
+        llmProfileId,
+        model: 'm',
+        systemPrompt: '',
+        enabledTools: ['read'],
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(res.body.error.message).toMatch(/runtimeType/);
+  });
+
   it('POST rejects fallback models declared without image support', async () => {
     const textOnly = new LlmProfileRepository(db).create({
       name: 'text-only',
@@ -132,6 +165,25 @@ describe('agent-profiles routes', () => {
       .send({ name: 'updated' });
     expect(res.status).toBe(200);
     expect(res.body.data.name).toBe('updated');
+  });
+
+  it('PATCH updates runtime type', async () => {
+    const create = await request(app)
+      .post('/api/agent-profiles')
+      .send({
+        name: 'a',
+        llmProfileId,
+        model: 'm',
+        systemPrompt: '',
+        enabledTools: ['read'],
+      });
+
+    const res = await request(app)
+      .patch(`/api/agent-profiles/${create.body.data.id}`)
+      .send({ runtimeType: 'claude' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.runtimeType).toBe('claude');
   });
 
   it('PATCH clears a multimodal fallback with null', async () => {
