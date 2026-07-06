@@ -682,6 +682,12 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
           <option value="zclaudia">ZClaudia</option>
           <option value="claude">Claude</option>
         </select>
+        {formRuntimeType === 'claude' && (
+          <p className="mt-2 rounded-md border border-border bg-secondary/50 px-3 py-2 text-xs text-muted-foreground">
+            Claude uses the Claude Agent SDK runtime. AI review and multimodal fallback are
+            zclaudia-only in this phase.
+          </p>
+        )}
       </div>
 
       <LlmProfileSelector

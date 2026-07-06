@@ -604,7 +604,7 @@ git commit -m "chore(runtime): add claude live smoke harness"
 - Modify: `apps/desktop/src/features/agents/ProfileEditor.tsx`
 - Test: `apps/desktop/src/features/agents/__tests__/ProfileEditor.test.tsx`
 
-- [ ] **Step 1: Add failing UI test**
+- [x] **Step 1: Add failing UI test**
 
 Add this test:
 
@@ -623,7 +623,7 @@ it('shows Claude runtime limitations when Claude is selected', async () => {
 });
 ```
 
-- [ ] **Step 2: Run test and verify it fails**
+- [x] **Step 2: Run test and verify it fails**
 
 Run:
 
@@ -633,7 +633,7 @@ corepack pnpm --filter @zclaudia/desktop test -- src/features/agents/__tests__/P
 
 Expected: FAIL because the hint is not rendered.
 
-- [ ] **Step 3: Add the hint**
+- [x] **Step 3: Add the hint**
 
 In `apps/desktop/src/features/agents/ProfileEditor.tsx`, directly below the runtime `<select>`, add:
 
@@ -646,7 +646,7 @@ In `apps/desktop/src/features/agents/ProfileEditor.tsx`, directly below the runt
 )}
 ```
 
-- [ ] **Step 4: Run test and build**
+- [x] **Step 4: Run test and build**
 
 Run:
 
@@ -657,10 +657,10 @@ corepack pnpm --filter @zclaudia/desktop build
 
 Expected: PASS. Existing Vite chunk warnings are acceptable.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
-git add apps/desktop/src/features/agents/ProfileEditor.tsx apps/desktop/src/features/agents/__tests__/ProfileEditor.test.tsx
+git add apps/desktop/src/features/agents/ProfileEditor.tsx apps/desktop/src/features/agents/__tests__/ProfileEditor.test.tsx docs/plans/claude-runtime-hardening-implementation.md
 git commit -m "feat(agents): explain claude runtime limitations"
 ```
 

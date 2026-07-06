@@ -133,6 +133,21 @@ describe('ProfileEditor', () => {
     });
   });
 
+  it('shows Claude runtime limitations when Claude is selected', async () => {
+    await renderEditor(null);
+
+    expect(screen.queryByText(/Claude Agent SDK/)).toBeNull();
+
+    fireEvent.change(screen.getByLabelText('Runtime'), {
+      target: { value: 'claude' },
+    });
+
+    expect(screen.getByText(/Claude Agent SDK/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/AI review and multimodal fallback are zclaudia-only/)
+    ).toBeInTheDocument();
+  });
+
   it('edit mode: populates the form from the profile prop and updates via updateAgentProfileForBackend', async () => {
     const profile = makeProfile('p1', 'Coder');
     const saved = { ...profile, name: 'Coder 2' };
