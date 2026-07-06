@@ -19,6 +19,12 @@ describe('ProviderRegistry', () => {
       expect(adapter).toBeDefined();
       expect(adapter!.type).toBe('zclaudia');
     });
+
+    it('has a claude runtime adapter registered by default', () => {
+      const adapter = providerRegistry.get('claude');
+      expect(adapter).toBeDefined();
+      expect(adapter!.type).toBe('claude');
+    });
   });
 
   describe('register', () => {
@@ -86,8 +92,8 @@ describe('ProviderRegistry', () => {
       expect(definition?.policy).toBe(policy);
     });
 
-    it('does not register third-party coding agent adapters by default', () => {
-      expect(providerRegistry.get('claude')).toBeUndefined();
+    it('only registers migrated coding agent adapters by default', () => {
+      expect(providerRegistry.get('claude')).toBeDefined();
       expect(providerRegistry.get('opencode')).toBeUndefined();
       expect(providerRegistry.get('codex')).toBeUndefined();
       expect(providerRegistry.get('cursor')).toBeUndefined();

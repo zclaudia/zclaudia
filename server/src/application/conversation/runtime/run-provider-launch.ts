@@ -260,6 +260,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
   });
   runOptions.externalToolState = activeRun.externalToolState;
   runOptions.skillState = activeRun.skillState;
+  runOptions.abortController = activeRun.abortController;
   runOptions.images = images.length > 0 ? images : undefined;
   runOptions.userHooks = userHooks && userHooks.length > 0 ? userHooks : undefined;
   runOptions.toolExecutionObserver = createSkillActivationObserver();

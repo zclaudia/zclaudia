@@ -63,6 +63,8 @@ export interface RunOptions {
   onAgentReady?: (handle: SteerHandle) => void;
   /** Called when pi emits `turn_start` (after the steering queue is drained with steeringMode:'all'). Application clears pendingSteers. */
   onSteerConsumed?: () => void;
+  /** Shared run abort controller owned by the application runtime. */
+  abortController?: AbortController;
   /** Resolved image attachments for this prompt (base64, ≤5MB each). */
   images?: Array<{ name: string; mimeType: string; data: string }>;
   /** Resolved user hooks for PreToolUse / PostToolUse lifecycle. */

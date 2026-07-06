@@ -115,4 +115,29 @@ describe('buildRunContext — workspace prompt merge', () => {
 
     expect(first.runOptions.systemPrompt).toBe(second.runOptions.systemPrompt);
   });
+
+  it('passes the provider-native permission mode into run options', async () => {
+    const { buildRunContext } = await import('../run-context.js');
+
+    const { nativeMode, runOptions } = await buildRunContext(
+      createInput({
+        adapter: {
+          manifest: {
+            permissionModeMap: {
+              plan_only: 'plan',
+            },
+          },
+        },
+        modeValue: 'plan_only',
+        message: {
+          input: 'hello',
+          sessionId: 'session-1',
+          mode: 'plan_only',
+        },
+      })
+    );
+
+    expect(nativeMode).toBe('plan');
+    expect(runOptions.mode).toBe('plan');
+  });
 });

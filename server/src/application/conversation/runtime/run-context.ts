@@ -159,7 +159,7 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
       cwd,
       sessionId: sdkSessionId,
       env: filePushEnv,
-      mode: message.mode || 'default',
+      mode: nativeMode,
       systemPrompt,
       sessionTitle: session.name || undefined,
       serverPort: serverPort || undefined,
