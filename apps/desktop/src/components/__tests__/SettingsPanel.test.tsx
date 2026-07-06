@@ -395,6 +395,21 @@ describe('SettingsPanel', () => {
     fireEvent.mouseUp(document);
   });
 
+  it('floats the settings tab rail as a card on the content surface', () => {
+    const { container } = render(<SettingsPanel isOpen={true} onClose={vi.fn()} />);
+    const card = container.querySelector('[data-testid="settings-sidebar-card"]');
+    expect(card).toBeTruthy();
+    expect(card?.className).toContain('rounded-lg');
+    expect(card?.className).toContain('bg-[hsl(var(--sidebar))]');
+    expect(card?.className).toContain('overflow-hidden');
+
+    const outer = card?.parentElement;
+    expect(outer?.getAttribute('data-testid')).toBe('settings-sidebar');
+    expect(outer?.className).toContain('bg-card');
+    expect(outer?.className).toContain('p-1.5');
+    expect(outer?.className).not.toContain('border-r');
+  });
+
   // ---- Tab navigation ----
 
   it('shows all app tabs', async () => {

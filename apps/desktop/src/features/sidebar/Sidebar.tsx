@@ -835,7 +835,7 @@ export function Sidebar({
   return (
     <>
       <div
-        className="relative flex flex-shrink-0 flex-col border-r border-border/50 bg-[hsl(var(--sidebar))]"
+        className="relative flex flex-shrink-0 flex-col bg-background p-1.5"
         style={{ width: clampedSidebarWidth }}
       >
         {/* Resize handle on the right edge */}
@@ -845,17 +845,6 @@ export function Sidebar({
           onTouchStart={onResizeStart}
           aria-hidden
         />
-        <div className="relative z-50 flex-shrink-0">
-          <SidebarTopBar
-            onToggle={onToggle}
-            onOpenSearch={() => setSearchOpen(!searchOpen)}
-            isSearchOpen={searchOpen}
-            onOpenNotifications={onOpenNotifications}
-            isNotificationsOpen={isNotificationsOpen}
-            notificationUnreadCount={notificationUnreadCount}
-            disableNotifications={disableNotifications}
-          />
-        </div>
 
         <SearchModal
           open={searchOpen}
@@ -868,88 +857,105 @@ export function Sidebar({
           }}
         />
 
-        <SidebarNav
-          onHome={onHome}
-          isHomeActive={isHomeActive}
-          onOpenAutomations={onOpenAutomations}
-          automationMode={
-            automationMode
-              ? {
-                  tab: automationMode.tab,
-                  onSelectTab: automationMode.onSelectTab,
-                  onBack: automationMode.onBack,
-                }
-              : undefined
-          }
-          onOpenAgents={onOpenAgents}
-          agentsMode={
-            agentsMode
-              ? {
-                  tab: agentsMode.tab,
-                  onSelectTab: agentsMode.onSelectTab,
-                  onBack: agentsMode.onBack,
-                }
-              : undefined
-          }
-        />
-
-        <div className="flex-1 overflow-y-auto scrollbar-hidden p-2">
-          {automationMode ? (
-            <AutomationTree
-              tab={automationMode.tab}
-              api={automationApi}
-              activeBackendId={automationMode.activeBackendId}
-              selectedProjectId={automationMode.projectId}
-              backends={onlineBackends}
-              getProjectsForBackend={getProjectsForBackend}
-              expandedBackendIds={expandedBackendIds}
-              onToggleBackend={toggleBackend}
-              onSelectScope={automationMode.onSelectScope}
+        <div
+          data-testid="sidebar-card"
+          className="flex flex-1 flex-col min-w-0 min-h-0 overflow-hidden rounded-lg border border-border/50 bg-[hsl(var(--sidebar))] shadow-sm"
+        >
+          <div className="relative z-50 flex-shrink-0">
+            <SidebarTopBar
+              onToggle={onToggle}
+              onOpenSearch={() => setSearchOpen(!searchOpen)}
+              isSearchOpen={searchOpen}
+              onOpenNotifications={onOpenNotifications}
+              isNotificationsOpen={isNotificationsOpen}
+              notificationUnreadCount={notificationUnreadCount}
+              disableNotifications={disableNotifications}
             />
-          ) : agentsMode ? (
-            agentsMode.tab === 'providers' ? (
-              <ProvidersTree
-                backends={agentsMode.backends}
-                data={agentsMode.providersData}
-                selection={agentsMode.selection}
-                expandedBackendIds={expandedBackendIds}
-                onToggleBackend={toggleBackend}
-                onSelectItem={agentsMode.onSelectItem}
-              />
-            ) : agentsMode.tab === 'mcp-servers' ? (
-              <McpServersTree
-                backends={agentsMode.backends}
-                data={agentsMode.mcpData}
-                selection={agentsMode.selection}
-                expandedBackendIds={expandedBackendIds}
-                onToggleBackend={toggleBackend}
-                onSelectItem={agentsMode.onSelectItem}
-              />
-            ) : agentsMode.tab === 'skills' ? (
-              <SkillsTree
-                backends={agentsMode.backends}
-                data={agentsMode.skillsData}
-                selection={agentsMode.selection}
-                expandedBackendIds={expandedBackendIds}
-                onToggleBackend={toggleBackend}
-                onSelectItem={agentsMode.onSelectItem}
-              />
-            ) : (
-              <AgentsTree
-                backends={agentsMode.backends}
-                data={agentsMode.data}
-                selection={agentsMode.selection}
-                expandedBackendIds={expandedBackendIds}
-                onToggleBackend={toggleBackend}
-                onSelectItem={agentsMode.onSelectItem}
-              />
-            )
-          ) : (
-            renderProjectList()
-          )}
-        </div>
+          </div>
 
-        <SidebarFooter onShowSettings={() => onOpenSettings?.()} />
+          <SidebarNav
+            onHome={onHome}
+            isHomeActive={isHomeActive}
+            onOpenAutomations={onOpenAutomations}
+            automationMode={
+              automationMode
+                ? {
+                    tab: automationMode.tab,
+                    onSelectTab: automationMode.onSelectTab,
+                    onBack: automationMode.onBack,
+                  }
+                : undefined
+            }
+            onOpenAgents={onOpenAgents}
+            agentsMode={
+              agentsMode
+                ? {
+                    tab: agentsMode.tab,
+                    onSelectTab: agentsMode.onSelectTab,
+                    onBack: agentsMode.onBack,
+                  }
+                : undefined
+            }
+          />
+
+          <div className="flex-1 overflow-y-auto scrollbar-hidden p-2">
+            {automationMode ? (
+              <AutomationTree
+                tab={automationMode.tab}
+                api={automationApi}
+                activeBackendId={automationMode.activeBackendId}
+                selectedProjectId={automationMode.projectId}
+                backends={onlineBackends}
+                getProjectsForBackend={getProjectsForBackend}
+                expandedBackendIds={expandedBackendIds}
+                onToggleBackend={toggleBackend}
+                onSelectScope={automationMode.onSelectScope}
+              />
+            ) : agentsMode ? (
+              agentsMode.tab === 'providers' ? (
+                <ProvidersTree
+                  backends={agentsMode.backends}
+                  data={agentsMode.providersData}
+                  selection={agentsMode.selection}
+                  expandedBackendIds={expandedBackendIds}
+                  onToggleBackend={toggleBackend}
+                  onSelectItem={agentsMode.onSelectItem}
+                />
+              ) : agentsMode.tab === 'mcp-servers' ? (
+                <McpServersTree
+                  backends={agentsMode.backends}
+                  data={agentsMode.mcpData}
+                  selection={agentsMode.selection}
+                  expandedBackendIds={expandedBackendIds}
+                  onToggleBackend={toggleBackend}
+                  onSelectItem={agentsMode.onSelectItem}
+                />
+              ) : agentsMode.tab === 'skills' ? (
+                <SkillsTree
+                  backends={agentsMode.backends}
+                  data={agentsMode.skillsData}
+                  selection={agentsMode.selection}
+                  expandedBackendIds={expandedBackendIds}
+                  onToggleBackend={toggleBackend}
+                  onSelectItem={agentsMode.onSelectItem}
+                />
+              ) : (
+                <AgentsTree
+                  backends={agentsMode.backends}
+                  data={agentsMode.data}
+                  selection={agentsMode.selection}
+                  expandedBackendIds={expandedBackendIds}
+                  onToggleBackend={toggleBackend}
+                  onSelectItem={agentsMode.onSelectItem}
+                />
+              )
+            ) : (
+              renderProjectList()
+            )}
+          </div>
+
+          <SidebarFooter onShowSettings={() => onOpenSettings?.()} />
+        </div>
       </div>
       {renderPortaledModals()}
     </>

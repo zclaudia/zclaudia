@@ -346,6 +346,25 @@ describe('Sidebar', () => {
     expect(container.textContent).toContain('Project One');
   });
 
+  it('wraps the expanded sidebar contents in a floating card', () => {
+    const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
+    const card = container.querySelector('[data-testid="sidebar-card"]');
+    expect(card).toBeTruthy();
+    expect(card?.className).toContain('rounded-lg');
+    expect(card?.className).toContain('bg-[hsl(var(--sidebar))]');
+    expect(card?.className).toContain('overflow-hidden');
+  });
+
+  it('drops the hard border and floats the card on the background tone', () => {
+    const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
+    const outer = container
+      .querySelector('[data-testid="sidebar-card"]')
+      ?.parentElement;
+    expect(outer?.className).toContain('bg-background');
+    expect(outer?.className).toContain('p-1.5');
+    expect(outer?.className).not.toContain('border-r');
+  });
+
   it('only shows projects owned by the active backend', () => {
     setupStores({
       projectStore: {

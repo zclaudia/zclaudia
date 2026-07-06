@@ -37,6 +37,9 @@ mod notch;
 mod shortcuts;
 
 #[cfg(not(target_os = "android"))]
+mod traffic_lights;
+
+#[cfg(not(target_os = "android"))]
 use shortcuts::{ShortcutConfigState, ShortcutStateHandle, DEFAULT_CLAUDIA_SHORTCUT};
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -259,6 +262,14 @@ pub fn run() {
             })
             .build(app)?;
 
+        // macOS: drop the native traffic lights so they vertically center with the
+        // custom sidebar-header icons. No-op on other platforms. The buttons may not
+        // be fully laid out yet at setup time — the Resized / Focused re-apply in the
+        // run() handler covers that case.
+        if let Some(window) = app.get_webview_window("main") {
+            traffic_lights::center_traffic_lights(&window);
+        }
+
         Ok(())
     });
 
@@ -279,6 +290,19 @@ pub fn run() {
                     }
                     // Close button on main window: hide to tray instead of quitting
                     if label == "main" {
+                        // Re-drop the traffic lights on relayout (resize / fullscreen
+                        // toggle / refocus), since AppKit restores their default
+                        // vertical center on those transitions. Idempotent, so calling
+                        // it repeatedly is safe. Done before the CloseRequested `if let`
+                        // below, which moves `event`.
+                        if matches!(
+                            event,
+                            tauri::WindowEvent::Resized(_) | tauri::WindowEvent::Focused(true)
+                        ) {
+                            if let Some(window) = app.get_webview_window("main") {
+                                traffic_lights::center_traffic_lights(&window);
+                            }
+                        }
                         if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                             api.prevent_close();
                             if let Some(window) = app.get_webview_window("main") {

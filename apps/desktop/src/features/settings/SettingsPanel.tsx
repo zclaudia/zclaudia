@@ -285,7 +285,7 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
         {!isMobile && (
           <div
             data-testid="settings-sidebar"
-            className="relative flex flex-col border-r border-border bg-[hsl(var(--sidebar))] shrink-0"
+            className="relative flex flex-col bg-card p-1.5 shrink-0"
             style={{ width: clampedSettingsSidebarWidth }}
           >
             <div
@@ -295,94 +295,99 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
               onTouchStart={onResizeStart}
               aria-hidden
             />
-            <div className="flex h-full flex-col px-3 pb-3 gap-0.5 overflow-y-auto">
-              <div className="h-9 -mx-3 flex-shrink-0" data-tauri-drag-region />
-              <button
-                onClick={onClose}
-                className="flex items-center gap-1.5 mt-1 mb-2 px-3 py-2 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 19l-7-7 7-7"
-                  />
-                </svg>
-                <span className="text-sm">Back to app</span>
-              </button>
-              <div className="relative mb-2">
-                <svg
-                  className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+            <div
+              data-testid="settings-sidebar-card"
+              className="flex flex-1 flex-col min-h-0 overflow-hidden rounded-lg border border-border/50 bg-[hsl(var(--sidebar))] shadow-sm"
+            >
+              <div className="flex h-full flex-col px-3 pb-3 gap-0.5 overflow-y-auto">
+                <div className="h-9 -mx-3 flex-shrink-0" data-tauri-drag-region />
+                <button
+                  onClick={onClose}
+                  className="flex items-center gap-1.5 mt-1 mb-2 px-3 py-2 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"
-                  />
-                </svg>
-                <input
-                  type="text"
-                  value={navQuery}
-                  onChange={e => setNavQuery(e.target.value)}
-                  placeholder="Search settings…"
-                  className="w-full pl-8 pr-2 py-1.5 text-sm bg-secondary/50 rounded-md placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-border"
-                />
-              </div>
-
-              {visibleAppTabs.length > 0 && (
-                <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  App
-                </div>
-              )}
-              {visibleAppTabs.map(renderTabButton)}
-
-              {visibleServerTabs.length > 0 && (
-                <div className="relative border-t border-border mt-2">
-                  <button
-                    onClick={() => setServerPickerOpen(!serverPickerOpen)}
-                    className="w-full px-3 pt-3 pb-1.5 flex items-center justify-between group"
-                  >
-                    <span
-                      className="text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate"
-                      title={activeServer?.name || 'Server'}
-                    >
-                      {activeServer?.name || 'Server'}
-                    </span>
-                    <svg
-                      className={`w-3 h-3 text-muted-foreground group-hover:text-foreground transition-transform ${serverPickerOpen ? 'rotate-180' : ''}`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
-                  </button>
-
-                  {serverPickerOpen && (
-                    <ServerPickerDropdown
-                      isGatewayConnected={isGatewayConnected}
-                      visibleGatewayBackends={visibleGatewayBackends}
-                      activeServerId={activeServerId}
-                      facadeConnectionState={facadeConnectionState}
-                      facadeBackends={facadeBackends}
-                      onClose={() => setServerPickerOpen(false)}
-                      onSwitch={handleBackendSwitch}
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 19l-7-7 7-7"
                     />
-                  )}
+                  </svg>
+                  <span className="text-sm">Back to app</span>
+                </button>
+                <div className="relative mb-2">
+                  <svg
+                    className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"
+                    />
+                  </svg>
+                  <input
+                    type="text"
+                    value={navQuery}
+                    onChange={e => setNavQuery(e.target.value)}
+                    placeholder="Search settings…"
+                    className="w-full pl-8 pr-2 py-1.5 text-sm bg-secondary/50 rounded-md placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-border"
+                  />
                 </div>
-              )}
 
-              {visibleServerTabs.map(renderTabButton)}
+                {visibleAppTabs.length > 0 && (
+                  <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    App
+                  </div>
+                )}
+                {visibleAppTabs.map(renderTabButton)}
+
+                {visibleServerTabs.length > 0 && (
+                  <div className="relative border-t border-border mt-2">
+                    <button
+                      onClick={() => setServerPickerOpen(!serverPickerOpen)}
+                      className="w-full px-3 pt-3 pb-1.5 flex items-center justify-between group"
+                    >
+                      <span
+                        className="text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate"
+                        title={activeServer?.name || 'Server'}
+                      >
+                        {activeServer?.name || 'Server'}
+                      </span>
+                      <svg
+                        className={`w-3 h-3 text-muted-foreground group-hover:text-foreground transition-transform ${serverPickerOpen ? 'rotate-180' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </button>
+
+                    {serverPickerOpen && (
+                      <ServerPickerDropdown
+                        isGatewayConnected={isGatewayConnected}
+                        visibleGatewayBackends={visibleGatewayBackends}
+                        activeServerId={activeServerId}
+                        facadeConnectionState={facadeConnectionState}
+                        facadeBackends={facadeBackends}
+                        onClose={() => setServerPickerOpen(false)}
+                        onSwitch={handleBackendSwitch}
+                      />
+                    )}
+                  </div>
+                )}
+
+                {visibleServerTabs.map(renderTabButton)}
+              </div>
             </div>
           </div>
         )}
