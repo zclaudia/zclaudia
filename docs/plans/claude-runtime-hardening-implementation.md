@@ -4,7 +4,7 @@
 
 **Goal:** Harden the existing Claude runtime so chat, resume, cancel, permission approval, and SDK event mapping are reliable enough to use before copying the pattern to Codex/Cursor.
 
-**Architecture:** Keep all Claude SDK-specific code in `server/src/infra/providers/claude-agent`. The common runtime continues to consume `ProviderRuntimeEvent`, `RunOptions`, and `PermissionCallback`; it should not import Claude SDK types. Live SDK verification is opt-in via a script and is not part of normal CI.
+**Architecture:** Keep all Claude SDK-specific code in `server/src/infra/providers/external-agents/claude`. The common runtime continues to consume `ProviderRuntimeEvent`, `RunOptions`, and `PermissionCallback`; it should not import Claude SDK types. Live SDK verification is opt-in via a script and is not part of normal CI.
 
 **Tech Stack:** TypeScript, Vitest, `@anthropic-ai/claude-agent-sdk`, existing zclaudia provider runtime contracts, React ProfileEditor tests.
 
@@ -12,10 +12,10 @@
 
 ## File Structure
 
-- Create `server/src/infra/providers/claude-agent/permissions.ts`: convert Claude SDK `canUseTool` calls into zclaudia `PermissionCallback` calls.
-- Modify `server/src/infra/providers/claude-agent/runner.ts`: pass `canUseTool`, type the SDK options more narrowly, and expand SDK message transforms.
-- Modify `server/src/infra/providers/claude-agent/adapter.ts`: pass the zclaudia permission callback through to `runClaudeAgent`.
-- Modify `server/src/infra/providers/claude-agent/manifest.ts`: mark `interaction.approval` supported only after permission bridge tests pass.
+- Create `server/src/infra/providers/external-agents/claude/permissions.ts`: convert Claude SDK `canUseTool` calls into zclaudia `PermissionCallback` calls.
+- Modify `server/src/infra/providers/external-agents/claude/runner.ts`: pass `canUseTool`, type the SDK options more narrowly, and expand SDK message transforms.
+- Modify `server/src/infra/providers/external-agents/claude/adapter.ts`: pass the zclaudia permission callback through to `runClaudeAgent`.
+- Modify `server/src/infra/providers/external-agents/claude/manifest.ts`: mark `interaction.approval` supported only after permission bridge tests pass.
 - Modify `server/src/infra/providers/__tests__/claude-agent-adapter.test.ts`: cover permission bridge wiring and event transform shapes.
 - Create `server/scripts/smoke-claude-runtime.ts`: opt-in live Claude SDK smoke harness.
 - Modify `server/package.json`: add a script for the live smoke harness.
@@ -28,10 +28,10 @@
 ### Task 1: Claude Permission Bridge
 
 **Files:**
-- Create: `server/src/infra/providers/claude-agent/permissions.ts`
-- Modify: `server/src/infra/providers/claude-agent/runner.ts`
-- Modify: `server/src/infra/providers/claude-agent/adapter.ts`
-- Modify: `server/src/infra/providers/claude-agent/manifest.ts`
+- Create: `server/src/infra/providers/external-agents/claude/permissions.ts`
+- Modify: `server/src/infra/providers/external-agents/claude/runner.ts`
+- Modify: `server/src/infra/providers/external-agents/claude/adapter.ts`
+- Modify: `server/src/infra/providers/external-agents/claude/manifest.ts`
 - Test: `server/src/infra/providers/__tests__/claude-agent-adapter.test.ts`
 
 - [x] **Step 1: Add failing permission bridge tests**
@@ -39,7 +39,7 @@
 Add these imports to `server/src/infra/providers/__tests__/claude-agent-adapter.test.ts`:
 
 ```ts
-import { buildClaudeCanUseTool } from '../claude-agent/permissions.js';
+import { buildClaudeCanUseTool } from '../external-agents/claude/permissions.js';
 ```
 
 Add tests:
@@ -125,7 +125,7 @@ Expected: FAIL because `buildClaudeCanUseTool` does not exist and `runner.ts` do
 
 - [x] **Step 3: Implement the permission bridge**
 
-Create `server/src/infra/providers/claude-agent/permissions.ts`:
+Create `server/src/infra/providers/external-agents/claude/permissions.ts`:
 
 ```ts
 import type { CanUseTool, PermissionResult } from '@anthropic-ai/claude-agent-sdk';
@@ -179,7 +179,7 @@ export function buildClaudeCanUseTool(onPermission?: PermissionCallback): CanUse
 
 - [x] **Step 4: Wire the bridge through runner and adapter**
 
-In `server/src/infra/providers/claude-agent/runner.ts`, change imports:
+In `server/src/infra/providers/external-agents/claude/runner.ts`, change imports:
 
 ```ts
 import { query } from '@anthropic-ai/claude-agent-sdk';
@@ -207,7 +207,7 @@ Add:
 if (options.canUseTool) sdkOptions.canUseTool = options.canUseTool;
 ```
 
-In `server/src/infra/providers/claude-agent/adapter.ts`, import:
+In `server/src/infra/providers/external-agents/claude/adapter.ts`, import:
 
 ```ts
 import { buildClaudeCanUseTool } from './permissions.js';
@@ -227,7 +227,7 @@ canUseTool: buildClaudeCanUseTool(onPermission),
 
 - [x] **Step 5: Update the manifest once tests pass**
 
-In `server/src/infra/providers/claude-agent/manifest.ts`, replace the approval capability:
+In `server/src/infra/providers/external-agents/claude/manifest.ts`, replace the approval capability:
 
 ```ts
 { id: 'interaction.approval', supported: true, mode: 'bridged', reliability: 'best_effort' },
@@ -247,7 +247,7 @@ Expected: PASS.
 - [x] **Step 7: Commit**
 
 ```bash
-git add server/src/infra/providers/claude-agent/permissions.ts server/src/infra/providers/claude-agent/runner.ts server/src/infra/providers/claude-agent/adapter.ts server/src/infra/providers/claude-agent/manifest.ts server/src/infra/providers/__tests__/claude-agent-adapter.test.ts
+git add server/src/infra/providers/external-agents/claude/permissions.ts server/src/infra/providers/external-agents/claude/runner.ts server/src/infra/providers/external-agents/claude/adapter.ts server/src/infra/providers/external-agents/claude/manifest.ts server/src/infra/providers/__tests__/claude-agent-adapter.test.ts
 git commit -m "feat(runtime): bridge claude tool permissions"
 ```
 
@@ -256,7 +256,7 @@ git commit -m "feat(runtime): bridge claude tool permissions"
 ### Task 2: Claude SDK Event Mapping Hardening
 
 **Files:**
-- Modify: `server/src/infra/providers/claude-agent/runner.ts`
+- Modify: `server/src/infra/providers/external-agents/claude/runner.ts`
 - Test: `server/src/infra/providers/__tests__/claude-agent-adapter.test.ts`
 
 - [x] **Step 1: Add event transform tests**
@@ -341,7 +341,7 @@ Expected: FAIL on malformed assistant/user messages because the current mapper e
 
 - [x] **Step 3: Update malformed assistant/user handling**
 
-In `server/src/infra/providers/claude-agent/runner.ts`, replace malformed assistant handling:
+In `server/src/infra/providers/external-agents/claude/runner.ts`, replace malformed assistant handling:
 
 ```ts
 if (!Array.isArray(blocks)) return [];
@@ -367,7 +367,7 @@ Expected: PASS.
 - [x] **Step 5: Commit**
 
 ```bash
-git add server/src/infra/providers/claude-agent/runner.ts server/src/infra/providers/__tests__/claude-agent-adapter.test.ts
+git add server/src/infra/providers/external-agents/claude/runner.ts server/src/infra/providers/__tests__/claude-agent-adapter.test.ts
 git commit -m "test(runtime): harden claude sdk event mapping"
 ```
 
@@ -385,7 +385,7 @@ git commit -m "test(runtime): harden claude sdk event mapping"
 Create `server/scripts/smoke-claude-runtime.ts`:
 
 ```ts
-import { ClaudeAgentAdapter } from '../src/infra/providers/claude-agent/adapter.js';
+import { ClaudeAgentAdapter } from '../src/infra/providers/external-agents/claude/adapter.js';
 import type { ProviderRuntimeEvent } from '../src/infra/providers/types.js';
 
 function arg(name: string): string | undefined {

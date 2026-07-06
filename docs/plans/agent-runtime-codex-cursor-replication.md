@@ -9,7 +9,7 @@ can copy the same shape with smaller decisions.
 - Storage/API: `agent_profiles.runtime_type` is migrated, mapped, defaulted to `zclaudia`, and validated on create/update.
 - Runtime selection: conversation runs choose the provider adapter from `agentProfile.runtimeType ?? 'zclaudia'`; LLM profile `providerType` remains endpoint metadata.
 - Safety boundaries: missing runtime adapters fail instead of falling back to zclaudia, zclaudia-only compaction stays gated to zclaudia, and multimodal fallback no longer changes runtime adapter identity.
-- Claude adapter: `server/src/infra/providers/claude-agent` contains the manifest, runner, adapter, SDK dependency, registry wiring, abort propagation, native mode mapping, and minimal SDK event transforms.
+- Claude adapter: `server/src/infra/providers/external-agents/claude` contains the manifest, runner, adapter, SDK dependency, registry wiring, abort propagation, native mode mapping, and minimal SDK event transforms.
 - Claude hardening: permission bridge, event mapping coverage, live smoke harness, and UI limitations hint are implemented.
 - HTTP metadata: `/api/providers/type/claude/capabilities` and `/api/providers/type/claude/commands` work.
 - UI: Agent Profile editor can select `ZClaudia` or `Claude` and saves `runtimeType`.
@@ -17,9 +17,9 @@ can copy the same shape with smaller decisions.
 ## Replication Steps Per Runtime
 
 1. Add a provider directory:
-   - `server/src/infra/providers/<runtime>-agent/manifest.ts`
-   - `server/src/infra/providers/<runtime>-agent/runner.ts`
-   - `server/src/infra/providers/<runtime>-agent/adapter.ts`
+   - `server/src/infra/providers/external-agents/<runtime>/manifest.ts`
+   - `server/src/infra/providers/external-agents/<runtime>/runner.ts`
+   - `server/src/infra/providers/external-agents/<runtime>/adapter.ts`
    - `server/src/infra/providers/__tests__/<runtime>-agent-adapter.test.ts`
 
 2. Register the adapter in `server/src/infra/providers/registry.ts`.

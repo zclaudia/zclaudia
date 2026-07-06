@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ClaudeAgentAdapter } from '../claude-agent/adapter.js';
-import { buildClaudeCanUseTool } from '../claude-agent/permissions.js';
-import { transformClaudeSdkMessage } from '../claude-agent/runner.js';
+import { ClaudeAgentAdapter } from '../external-agents/claude/adapter.js';
+import { buildClaudeCanUseTool } from '../external-agents/claude/permissions.js';
+import { transformClaudeSdkMessage } from '../external-agents/claude/runner.js';
 
 const { queryMock, loadClaudeAgentConfigMock, createToolBridgeEntryMock } = vi.hoisted(() => ({
   queryMock: vi.fn(),
@@ -13,11 +13,11 @@ vi.mock('@anthropic-ai/claude-agent-sdk', () => ({
   query: queryMock,
 }));
 
-vi.mock('../claude-agent/config.js', () => ({
+vi.mock('../external-agents/claude/config.js', () => ({
   loadClaudeAgentConfig: loadClaudeAgentConfigMock,
 }));
 
-vi.mock('../agent-plugin/tool-bridge.js', () => ({
+vi.mock('../external-agents/agent-plugin/tool-bridge.js', () => ({
   DEFAULT_AGENT_PLUGIN_BRIDGE_MCP_SERVER_NAME: 'claudia-plugins',
   createAgentPluginToolBridgeMcpEntry: createToolBridgeEntryMock,
 }));

@@ -4,7 +4,7 @@
 
 **Goal:** Load Claude Code MCP servers and enabled plugins into the Claude Agent SDK for `runtimeType: 'claude'` runs.
 
-**Architecture:** Keep Claude Code config parsing inside `server/src/infra/providers/claude-agent` so common runtime code remains provider-agnostic. The adapter asks the loader for SDK-compatible config, then the runner passes `mcpServers` and `plugins` to `query({ prompt, options })`. Invalid or absent config fails closed to empty config.
+**Architecture:** Keep Claude Code config parsing inside `server/src/infra/providers/external-agents/claude` so common runtime code remains provider-agnostic. The adapter asks the loader for SDK-compatible config, then the runner passes `mcpServers` and `plugins` to `query({ prompt, options })`. Invalid or absent config fails closed to empty config.
 
 **Tech Stack:** TypeScript, Vitest, `@anthropic-ai/claude-agent-sdk`, Node `fs/path/os`, existing Claude agent adapter tests.
 
@@ -12,10 +12,10 @@
 
 ## File Structure
 
-- Create `server/src/infra/providers/claude-agent/config.ts`: adapter-local loader for `~/.claude/mcp.json`, `~/.claude/settings.json`, and `~/.claude/plugins/installed_plugins.json`.
-- Create `server/src/infra/providers/claude-agent/__tests__/config.test.ts`: focused tests for absent config, valid MCP config, valid plugin config, invalid JSON, and cache clearing.
-- Modify `server/src/infra/providers/claude-agent/runner.ts`: add `mcpServers` and `plugins` to `ClaudeAgentRunOptions` and SDK options.
-- Modify `server/src/infra/providers/claude-agent/adapter.ts`: load Claude config and pass it to `runClaudeAgent`.
+- Create `server/src/infra/providers/external-agents/claude/config.ts`: adapter-local loader for `~/.claude/mcp.json`, `~/.claude/settings.json`, and `~/.claude/plugins/installed_plugins.json`.
+- Create `server/src/infra/providers/external-agents/claude/__tests__/config.test.ts`: focused tests for absent config, valid MCP config, valid plugin config, invalid JSON, and cache clearing.
+- Modify `server/src/infra/providers/external-agents/claude/runner.ts`: add `mcpServers` and `plugins` to `ClaudeAgentRunOptions` and SDK options.
+- Modify `server/src/infra/providers/external-agents/claude/adapter.ts`: load Claude config and pass it to `runClaudeAgent`.
 - Modify `server/src/infra/providers/__tests__/claude-agent-adapter.test.ts`: assert SDK query receives loaded config through the adapter.
 - Modify `docs/plans/claude-runtime-completion.md`: mark Phase A complete after implementation and verification.
 
@@ -24,12 +24,12 @@
 ### Task 1: Claude Config Loader
 
 **Files:**
-- Create: `server/src/infra/providers/claude-agent/config.ts`
-- Create: `server/src/infra/providers/claude-agent/__tests__/config.test.ts`
+- Create: `server/src/infra/providers/external-agents/claude/config.ts`
+- Create: `server/src/infra/providers/external-agents/claude/__tests__/config.test.ts`
 
 - [ ] **Step 1: Add failing loader tests**
 
-Create `server/src/infra/providers/claude-agent/__tests__/config.test.ts`:
+Create `server/src/infra/providers/external-agents/claude/__tests__/config.test.ts`:
 
 ```ts
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
@@ -172,14 +172,14 @@ describe('loadClaudeAgentConfig', () => {
 Run:
 
 ```bash
-NODE_ENV=test corepack pnpm --filter @zclaudia/server test -- src/infra/providers/claude-agent/__tests__/config.test.ts
+NODE_ENV=test corepack pnpm --filter @zclaudia/server test -- src/infra/providers/external-agents/claude/__tests__/config.test.ts
 ```
 
-Expected: FAIL because `server/src/infra/providers/claude-agent/config.ts` does not exist.
+Expected: FAIL because `server/src/infra/providers/external-agents/claude/config.ts` does not exist.
 
 - [ ] **Step 3: Implement the loader**
 
-Create `server/src/infra/providers/claude-agent/config.ts`:
+Create `server/src/infra/providers/external-agents/claude/config.ts`:
 
 ```ts
 import { existsSync, readFileSync } from 'fs';
@@ -288,7 +288,7 @@ export function loadClaudeAgentConfig(): ClaudeAgentConfig {
 Run:
 
 ```bash
-NODE_ENV=test corepack pnpm --filter @zclaudia/server test -- src/infra/providers/claude-agent/__tests__/config.test.ts
+NODE_ENV=test corepack pnpm --filter @zclaudia/server test -- src/infra/providers/external-agents/claude/__tests__/config.test.ts
 ```
 
 Expected: PASS.
@@ -298,7 +298,7 @@ Expected: PASS.
 Run:
 
 ```bash
-git add server/src/infra/providers/claude-agent/config.ts server/src/infra/providers/claude-agent/__tests__/config.test.ts
+git add server/src/infra/providers/external-agents/claude/config.ts server/src/infra/providers/external-agents/claude/__tests__/config.test.ts
 git commit -m "feat(runtime): load claude agent config"
 ```
 
@@ -307,8 +307,8 @@ git commit -m "feat(runtime): load claude agent config"
 ### Task 2: Pass Config Through Claude Adapter And Runner
 
 **Files:**
-- Modify: `server/src/infra/providers/claude-agent/runner.ts`
-- Modify: `server/src/infra/providers/claude-agent/adapter.ts`
+- Modify: `server/src/infra/providers/external-agents/claude/runner.ts`
+- Modify: `server/src/infra/providers/external-agents/claude/adapter.ts`
 - Modify: `server/src/infra/providers/__tests__/claude-agent-adapter.test.ts`
 
 - [ ] **Step 1: Add failing adapter wiring test**
@@ -325,7 +325,7 @@ vi.mock('@anthropic-ai/claude-agent-sdk', () => ({
   query: queryMock,
 }));
 
-vi.mock('../claude-agent/config.js', () => ({
+vi.mock('../external-agents/claude/config.js', () => ({
   loadClaudeAgentConfig: loadClaudeAgentConfigMock,
 }));
 ```
@@ -376,7 +376,7 @@ Expected: FAIL because `adapter.ts` does not load config and `runner.ts` does no
 
 - [ ] **Step 3: Add config fields to the runner**
 
-In `server/src/infra/providers/claude-agent/runner.ts`, extend imports:
+In `server/src/infra/providers/external-agents/claude/runner.ts`, extend imports:
 
 ```ts
 import type {
@@ -408,7 +408,7 @@ if (options.plugins && options.plugins.length > 0) {
 
 - [ ] **Step 4: Load config in the adapter**
 
-In `server/src/infra/providers/claude-agent/adapter.ts`, add:
+In `server/src/infra/providers/external-agents/claude/adapter.ts`, add:
 
 ```ts
 import { loadClaudeAgentConfig } from './config.js';
@@ -432,7 +432,7 @@ plugins: claudeConfig.plugins,
 Run:
 
 ```bash
-NODE_ENV=test corepack pnpm --filter @zclaudia/server test -- src/infra/providers/__tests__/claude-agent-adapter.test.ts src/infra/providers/claude-agent/__tests__/config.test.ts
+NODE_ENV=test corepack pnpm --filter @zclaudia/server test -- src/infra/providers/__tests__/claude-agent-adapter.test.ts src/infra/providers/external-agents/claude/__tests__/config.test.ts
 corepack pnpm --filter @zclaudia/server build
 ```
 
@@ -443,7 +443,7 @@ Expected: PASS.
 Run:
 
 ```bash
-git add server/src/infra/providers/claude-agent/runner.ts server/src/infra/providers/claude-agent/adapter.ts server/src/infra/providers/__tests__/claude-agent-adapter.test.ts
+git add server/src/infra/providers/external-agents/claude/runner.ts server/src/infra/providers/external-agents/claude/adapter.ts server/src/infra/providers/__tests__/claude-agent-adapter.test.ts
 git commit -m "feat(runtime): pass claude config to agent sdk"
 ```
 
@@ -461,7 +461,7 @@ git commit -m "feat(runtime): pass claude config to agent sdk"
 In `server/scripts/smoke-claude-runtime.ts`, import:
 
 ```ts
-import { loadClaudeAgentConfig } from '../src/infra/providers/claude-agent/config.js';
+import { loadClaudeAgentConfig } from '../src/infra/providers/external-agents/claude/config.js';
 ```
 
 Inside `main`, after `const adapter = new ClaudeAgentAdapter();`, add:
@@ -522,7 +522,7 @@ git commit -m "docs(runtime): document claude config loading"
 Run:
 
 ```bash
-NODE_ENV=test corepack pnpm --filter @zclaudia/server test -- src/infra/providers/__tests__/claude-agent-adapter.test.ts src/infra/providers/claude-agent/__tests__/config.test.ts src/infra/providers/__tests__/registry.test.ts
+NODE_ENV=test corepack pnpm --filter @zclaudia/server test -- src/infra/providers/__tests__/claude-agent-adapter.test.ts src/infra/providers/external-agents/claude/__tests__/config.test.ts src/infra/providers/__tests__/registry.test.ts
 corepack pnpm --filter @zclaudia/server test -- src/application/conversation/runtime/__tests__/run-handler.test.ts src/application/conversation/runtime/__tests__/run-provider-launch.test.ts src/application/conversation/runtime/__tests__/run-context.test.ts
 corepack pnpm --filter @zclaudia/server smoke:claude-runtime
 corepack pnpm --filter @zclaudia/server build
@@ -546,5 +546,5 @@ Expected:
   - `server/src/domains/sessions/lifecycle-service.ts`
   - `server/src/domains/sessions/__tests__/session-lifecycle-service.test.ts`
 - Do not add or commit files under `docs/superpowers`.
-- Keep SDK-specific types inside `server/src/infra/providers/claude-agent`.
+- Keep SDK-specific types inside `server/src/infra/providers/external-agents/claude`.
 - Do not implement MCP bridge injection in this phase; that is Phase B.

@@ -15,19 +15,21 @@ remaining parity work needed to call the Claude migration complete.
 Completed in `zclaudia`:
 
 - `AgentProfileConfig.runtimeType` selects `zclaudia` or `claude`.
-- `server/src/infra/providers/claude-agent` owns Claude SDK integration.
+- `server/src/infra/providers/external-agents/claude` owns Claude SDK integration.
 - Claude chat, resume, cancel, SDK event mapping, and approval bridging are
   covered by focused tests.
 - `/api/providers/type/claude/capabilities` and
   `/api/providers/type/claude/commands` expose runtime metadata.
 - `server/scripts/smoke-claude-runtime.ts` provides an opt-in live SDK check.
 - Profile Editor can select Claude and explains current limitations.
+- Claude external-agent code is staged for later extraction under
+  `server/src/infra/providers/external-agents`.
+- Claude SDK receives user MCP servers and enabled local plugins.
+- Claude SDK receives the zclaudia MCP bridge as `claudia-plugins` when bridge
+  tools and a server port are available.
 
 Remaining gaps:
 
-- Claude SDK does not yet receive the user's `~/.claude/mcp.json` MCP servers.
-- Claude SDK does not yet receive enabled Claude Code plugins.
-- zclaudia MCP bridge tools are not injected into Claude SDK runs.
 - Slash command behavior is exposed in metadata but not validated end to end
   against Claude SDK plugin/custom command loading.
 - AI review and multimodal fallback are still marked as zclaudia-only.
@@ -74,7 +76,7 @@ local plugins from Claude Code configuration.
 Load Claude Code user configuration into the Claude Agent SDK:
 
 - Create an adapter-local Claude config loader under
-  `server/src/infra/providers/claude-agent`.
+  `server/src/infra/providers/external-agents/claude`.
 - Read `~/.claude/mcp.json` into SDK-compatible `mcpServers`.
 - Read enabled Claude plugins from `~/.claude/settings.json` and
   `~/.claude/plugins/installed_plugins.json` into SDK `plugins`.

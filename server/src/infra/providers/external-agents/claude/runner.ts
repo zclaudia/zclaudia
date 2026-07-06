@@ -6,7 +6,7 @@ import type {
   PermissionMode,
   SdkPluginConfig,
 } from '@anthropic-ai/claude-agent-sdk';
-import type { ProviderRuntimeEvent, SystemInfo } from '../message-types.js';
+import type { ProviderRuntimeEvent, SystemInfo } from '../../message-types.js';
 
 export interface ClaudeAgentRunOptions {
   cwd: string;

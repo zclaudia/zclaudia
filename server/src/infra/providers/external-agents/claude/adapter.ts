@@ -3,7 +3,7 @@ import type {
   ProviderAdapter,
   ProviderRuntimeEvent,
   RunOptions,
-} from '../types.js';
+} from '../../types.js';
 import {
   createAgentPluginToolBridgeMcpEntry,
   DEFAULT_AGENT_PLUGIN_BRIDGE_MCP_SERVER_NAME,

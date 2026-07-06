@@ -4,7 +4,7 @@
 
 **Goal:** Inject zclaudia interaction tools into Claude through a provider-plugin boundary that can later be reused by Codex and Cursor providers.
 
-**Architecture:** Add a provider-agnostic agent plugin tool bridge helper under `server/src/infra/providers/agent-plugin`. The helper exposes a standard zclaudia bridge context and can create the existing MCP stdio bridge entry without importing Claude SDK types. Claude then translates that bridge entry into Claude SDK `mcpServers`, merging it with user Claude config while preserving user-defined `claudia-plugins` servers.
+**Architecture:** Add a provider-agnostic agent plugin tool bridge helper under `server/src/infra/providers/external-agents/agent-plugin`. The helper exposes a standard zclaudia bridge context and can create the existing MCP stdio bridge entry without importing Claude SDK types. Claude then translates that bridge entry into Claude SDK `mcpServers`, merging it with user Claude config while preserving user-defined `claudia-plugins` servers.
 
 **Tech Stack:** TypeScript, Vitest, Claude Agent SDK option types, existing `buildMcpBridgeEntry` helper.
 
@@ -12,14 +12,14 @@
 
 ## File Structure
 
-- Create `server/src/infra/providers/agent-plugin/tool-bridge.ts`
+- Create `server/src/infra/providers/external-agents/agent-plugin/tool-bridge.ts`
   - Owns provider-agnostic tool bridge context types.
   - Calls existing `buildMcpBridgeEntry(serverPort, sessionId)` helper.
   - Does not import Claude SDK types.
-- Create `server/src/infra/providers/agent-plugin/__tests__/tool-bridge.test.ts`
+- Create `server/src/infra/providers/external-agents/agent-plugin/__tests__/tool-bridge.test.ts`
   - Verifies bridge entry creation from standard context.
   - Verifies missing port and missing registered tools produce no entry.
-- Modify `server/src/infra/providers/claude-agent/adapter.ts`
+- Modify `server/src/infra/providers/external-agents/claude/adapter.ts`
   - Builds standard tool bridge context from `RunOptions`.
   - Merges bridge MCP entry into loaded Claude config before calling `runClaudeAgent`.
   - Keeps user-defined `claudia-plugins` config when present.
@@ -33,12 +33,12 @@
 ## Task 1: Standard Agent Plugin Tool Bridge Helper
 
 **Files:**
-- Create: `server/src/infra/providers/agent-plugin/tool-bridge.ts`
-- Create: `server/src/infra/providers/agent-plugin/__tests__/tool-bridge.test.ts`
+- Create: `server/src/infra/providers/external-agents/agent-plugin/tool-bridge.ts`
+- Create: `server/src/infra/providers/external-agents/agent-plugin/__tests__/tool-bridge.test.ts`
 
 - [ ] **Step 1: Write the failing tests**
 
-Create `server/src/infra/providers/agent-plugin/__tests__/tool-bridge.test.ts`:
+Create `server/src/infra/providers/external-agents/agent-plugin/__tests__/tool-bridge.test.ts`:
 
 ```ts
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -113,14 +113,14 @@ describe('agent plugin tool bridge', () => {
 Run:
 
 ```bash
-NODE_ENV=test corepack pnpm --filter @zclaudia/server test -- src/infra/providers/agent-plugin/__tests__/tool-bridge.test.ts
+NODE_ENV=test corepack pnpm --filter @zclaudia/server test -- src/infra/providers/external-agents/agent-plugin/__tests__/tool-bridge.test.ts
 ```
 
-Expected: FAIL because `server/src/infra/providers/agent-plugin/tool-bridge.ts` does not exist.
+Expected: FAIL because `server/src/infra/providers/external-agents/agent-plugin/tool-bridge.ts` does not exist.
 
 - [ ] **Step 3: Implement the helper**
 
-Create `server/src/infra/providers/agent-plugin/tool-bridge.ts`:
+Create `server/src/infra/providers/external-agents/agent-plugin/tool-bridge.ts`:
 
 ```ts
 import {
@@ -150,7 +150,7 @@ export function createAgentPluginToolBridgeMcpEntry(
 Run:
 
 ```bash
-NODE_ENV=test corepack pnpm --filter @zclaudia/server test -- src/infra/providers/agent-plugin/__tests__/tool-bridge.test.ts
+NODE_ENV=test corepack pnpm --filter @zclaudia/server test -- src/infra/providers/external-agents/agent-plugin/__tests__/tool-bridge.test.ts
 ```
 
 Expected: PASS.
@@ -158,14 +158,14 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add server/src/infra/providers/agent-plugin/tool-bridge.ts server/src/infra/providers/agent-plugin/__tests__/tool-bridge.test.ts
+git add server/src/infra/providers/external-agents/agent-plugin/tool-bridge.ts server/src/infra/providers/external-agents/agent-plugin/__tests__/tool-bridge.test.ts
 git commit -m "feat(runtime): add agent plugin tool bridge context"
 ```
 
 ## Task 2: Claude Translation And MCP Merge
 
 **Files:**
-- Modify: `server/src/infra/providers/claude-agent/adapter.ts`
+- Modify: `server/src/infra/providers/external-agents/claude/adapter.ts`
 - Modify: `server/src/infra/providers/__tests__/claude-agent-adapter.test.ts`
 
 - [ ] **Step 1: Write failing Claude adapter tests**
@@ -183,7 +183,7 @@ const { queryMock, loadClaudeAgentConfigMock, createToolBridgeEntryMock } = vi.h
 Add:
 
 ```ts
-vi.mock('../agent-plugin/tool-bridge.js', () => ({
+vi.mock('../external-agents/agent-plugin/tool-bridge.js', () => ({
   DEFAULT_AGENT_PLUGIN_BRIDGE_MCP_SERVER_NAME: 'claudia-plugins',
   createAgentPluginToolBridgeMcpEntry: createToolBridgeEntryMock,
 }));
@@ -292,7 +292,7 @@ Expected: FAIL because the Claude adapter does not call the tool bridge helper o
 
 - [ ] **Step 3: Implement Claude MCP merge**
 
-In `server/src/infra/providers/claude-agent/adapter.ts`, import:
+In `server/src/infra/providers/external-agents/claude/adapter.ts`, import:
 
 ```ts
 import {
@@ -334,7 +334,7 @@ Pass `mcpServers` instead of `claudeConfig.mcpServers`.
 Run:
 
 ```bash
-NODE_ENV=test corepack pnpm --filter @zclaudia/server test -- src/infra/providers/__tests__/claude-agent-adapter.test.ts src/infra/providers/agent-plugin/__tests__/tool-bridge.test.ts
+NODE_ENV=test corepack pnpm --filter @zclaudia/server test -- src/infra/providers/__tests__/claude-agent-adapter.test.ts src/infra/providers/external-agents/agent-plugin/__tests__/tool-bridge.test.ts
 ```
 
 Expected: PASS.
@@ -342,7 +342,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add server/src/infra/providers/claude-agent/adapter.ts server/src/infra/providers/__tests__/claude-agent-adapter.test.ts
+git add server/src/infra/providers/external-agents/claude/adapter.ts server/src/infra/providers/__tests__/claude-agent-adapter.test.ts
 git commit -m "feat(runtime): inject agent plugin bridge into claude"
 ```
 
@@ -367,8 +367,8 @@ MCP server when bridge tools and a server port are available. User-defined
 Run:
 
 ```bash
-NODE_ENV=test corepack pnpm --filter @zclaudia/server test -- src/infra/providers/__tests__/claude-agent-adapter.test.ts src/infra/providers/agent-plugin/__tests__/tool-bridge.test.ts src/utils/__tests__/mcp-bridge-launch.test.ts
-NODE_ENV=test corepack pnpm --filter @zclaudia/server test -- src/infra/providers/claude-agent/__tests__/config.test.ts src/infra/providers/__tests__/registry.test.ts
+NODE_ENV=test corepack pnpm --filter @zclaudia/server test -- src/infra/providers/__tests__/claude-agent-adapter.test.ts src/infra/providers/external-agents/agent-plugin/__tests__/tool-bridge.test.ts src/utils/__tests__/mcp-bridge-launch.test.ts
+NODE_ENV=test corepack pnpm --filter @zclaudia/server test -- src/infra/providers/external-agents/claude/__tests__/config.test.ts src/infra/providers/__tests__/registry.test.ts
 corepack pnpm --filter @zclaudia/server test -- src/application/conversation/runtime/__tests__/run-handler.test.ts src/application/conversation/runtime/__tests__/run-provider-launch.test.ts src/application/conversation/runtime/__tests__/run-context.test.ts
 corepack pnpm --filter @zclaudia/server smoke:claude-runtime
 corepack pnpm --filter @zclaudia/server build

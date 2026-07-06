@@ -1,5 +1,5 @@
 import type { CanUseTool, PermissionResult } from '@anthropic-ai/claude-agent-sdk';
-import type { PermissionCallback } from '../types.js';
+import type { PermissionCallback } from '../../types.js';
 
 function detailFromClaudeRequest(input: {
   title?: string;

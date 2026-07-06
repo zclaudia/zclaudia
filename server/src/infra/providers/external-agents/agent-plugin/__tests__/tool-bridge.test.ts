@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const buildMcpBridgeEntryMock = vi.fn();
 
-vi.mock('../../../../utils/mcp-bridge-launch.js', () => ({
+vi.mock('../../../../../utils/mcp-bridge-launch.js', () => ({
   buildMcpBridgeEntry: buildMcpBridgeEntryMock,
 }));
 

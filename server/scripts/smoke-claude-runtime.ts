@@ -1,5 +1,5 @@
-import { ClaudeAgentAdapter } from '../src/infra/providers/claude-agent/adapter.js';
-import { loadClaudeAgentConfig } from '../src/infra/providers/claude-agent/config.js';
+import { ClaudeAgentAdapter } from '../src/infra/providers/external-agents/claude/adapter.js';
+import { loadClaudeAgentConfig } from '../src/infra/providers/external-agents/claude/config.js';
 import type { ProviderRuntimeEvent } from '../src/infra/providers/types.js';
 
 function arg(name: string): string | undefined {

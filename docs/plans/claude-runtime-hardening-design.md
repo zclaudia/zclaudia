@@ -13,7 +13,7 @@ previous phase:
 
 - `AgentProfileConfig.runtimeType` selects the runtime adapter.
 - LLM profile `providerType` remains endpoint metadata for zclaudia/pi-agent.
-- Claude runtime behavior lives under `server/src/infra/providers/claude-agent`.
+- Claude runtime behavior lives under `server/src/infra/providers/external-agents/claude`.
 
 ## Workstreams
 
