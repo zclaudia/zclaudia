@@ -332,6 +332,11 @@ export class SessionLifecycleService {
     this.repo.update(sessionId, { sdkSessionId: null } as unknown as Partial<
       Omit<Session, 'id' | 'createdAt' | 'updatedAt'>
     >);
+    // CLI providers resume via sdk_session_id, but the internal pi-runtime
+    // rebuilds its context from the session tree leaf pointer. Clearing the
+    // leaf makes the next run start with an empty context; the entries (and
+    // therefore the visible transcript) are left intact.
+    this.db.prepare('UPDATE session_leaf SET leaf_id = NULL WHERE session_id = ?').run(sessionId);
     const updatedSession = this.repo.findById(sessionId);
     if (updatedSession) {
       this.publishUpdatedSession(updatedSession);

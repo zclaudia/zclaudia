@@ -309,6 +309,35 @@ describe('SessionLifecycleService', () => {
     );
   });
 
+  it('resetSdkSession also clears the pi-runtime session tree leaf but keeps entries', () => {
+    const service = new SessionLifecycleService(db, {});
+    const now = Date.now();
+    db.prepare(
+      `INSERT INTO sessions (id, project_id, name, sdk_session_id, sort_order, created_at, updated_at) VALUES (?,?,?,?,?,?,?)`
+    ).run('s1', 'project-1', 'S1', 'sdk-123', 0, now, now);
+    // The internal pi-runtime rebuilds its context from the session tree leaf
+    // pointer, not from sdk_session_id — reset must clear the leaf too.
+    db.prepare(
+      `INSERT INTO session_entries (id, session_id, parent_id, type, payload, timestamp) VALUES (?,?,?,?,?,?)`
+    ).run('e1', 's1', null, 'message', '{}', '2026-06-21T00:00:00.000Z');
+    db.prepare(`INSERT INTO session_leaf (session_id, leaf_id) VALUES (?, ?)`).run('s1', 'e1');
+
+    service.resetSdkSession('s1');
+
+    const leaf = db
+      .prepare('SELECT leaf_id AS leafId FROM session_leaf WHERE session_id = ?')
+      .get('s1') as { leafId: string | null } | undefined;
+    expect(leaf?.leafId ?? null).toBeNull();
+    // Entries stay (option A: visible chat / transcript history is preserved).
+    expect(
+      (
+        db.prepare(`SELECT count(*) AS c FROM session_entries WHERE session_id='s1'`).get() as {
+          c: number;
+        }
+      ).c
+    ).toBe(1);
+  });
+
   it('dismisses interrupted status and emits updated side effects', () => {
     const broadcastSessionEvent = vi.fn();
     const emitPluginEvent = vi.fn().mockResolvedValue(undefined);
