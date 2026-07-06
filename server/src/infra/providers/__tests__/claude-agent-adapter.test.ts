@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ClaudeAgentAdapter } from '../claude-agent/adapter.js';
+import { buildClaudeCanUseTool } from '../claude-agent/permissions.js';
 import { transformClaudeSdkMessage } from '../claude-agent/runner.js';
 
 const { queryMock } = vi.hoisted(() => ({
@@ -14,6 +15,14 @@ async function* claudeStream(messages: unknown[]) {
   for (const message of messages) {
     yield message;
   }
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(res => {
+    resolve = res;
+  });
+  return { promise, resolve };
 }
 
 describe('ClaudeAgentAdapter', () => {
@@ -101,5 +110,169 @@ describe('ClaudeAgentAdapter', () => {
     });
 
     expect(transformClaudeSdkMessage({ type: 'system', subtype: 'unknown' })).toEqual([]);
+  });
+
+  it('bridges Claude canUseTool allow decisions to the SDK permission result', async () => {
+    const onPermission = vi.fn(async () => ({ behavior: 'allow' as const }));
+    const canUseTool = buildClaudeCanUseTool(onPermission);
+
+    const result = await canUseTool?.(
+      'Bash',
+      { command: 'npm test' },
+      {
+        signal: new AbortController().signal,
+        toolUseID: 'tool-1',
+        title: 'Claude wants to run Bash',
+        displayName: 'Run command',
+        description: 'npm test',
+      }
+    );
+
+    expect(onPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestId: 'tool-1',
+        toolName: 'Bash',
+        toolInput: { command: 'npm test' },
+        detail: 'Claude wants to run Bash\n\nnpm test',
+        timeoutSeconds: 60,
+        timeoutBehavior: 'deny',
+      })
+    );
+    expect(result).toEqual({ behavior: 'allow' });
+  });
+
+  it('bridges Claude canUseTool deny decisions to the SDK permission result', async () => {
+    const onPermission = vi.fn(async () => ({ behavior: 'deny' as const, message: 'Nope' }));
+    const canUseTool = buildClaudeCanUseTool(onPermission);
+
+    const result = await canUseTool?.(
+      'Write',
+      { file_path: 'src/app.ts' },
+      {
+        signal: new AbortController().signal,
+        toolUseID: 'tool-2',
+        title: 'Claude wants to write a file',
+      }
+    );
+
+    expect(result).toEqual({ behavior: 'deny', message: 'Nope' });
+  });
+
+  it('denies Claude tool use when the permission callback rejects', async () => {
+    const onPermission = vi.fn(async () => {
+      throw new Error('approval service unavailable');
+    });
+    const canUseTool = buildClaudeCanUseTool(onPermission);
+
+    const result = await canUseTool?.(
+      'Bash',
+      { command: 'npm test' },
+      {
+        signal: new AbortController().signal,
+        toolUseID: 'tool-3',
+        title: 'Claude wants to run Bash',
+      }
+    );
+
+    expect(result).toEqual({
+      behavior: 'deny',
+      message: 'Permission request failed.',
+    });
+  });
+
+  it('denies Claude tool use when the SDK aborts while permission is pending', async () => {
+    const pending = deferred<{ behavior: 'allow' }>();
+    const onPermission = vi.fn(() => pending.promise);
+    const controller = new AbortController();
+    const canUseTool = buildClaudeCanUseTool(onPermission);
+
+    const resultPromise = canUseTool?.(
+      'Bash',
+      { command: 'npm test' },
+      {
+        signal: controller.signal,
+        toolUseID: 'tool-4',
+        title: 'Claude wants to run Bash',
+      }
+    );
+    controller.abort();
+    pending.resolve({ behavior: 'allow' });
+
+    await expect(resultPromise).resolves.toEqual({
+      behavior: 'deny',
+      interrupt: true,
+      message: 'Permission request was aborted.',
+    });
+  });
+
+  it('passes canUseTool to the Claude SDK query options', async () => {
+    const adapter = new ClaudeAgentAdapter();
+    queryMock.mockReturnValueOnce(claudeStream([]));
+
+    for await (const _event of adapter.run(
+      'hello',
+      { cwd: '/tmp/project', claudiaSessionId: 'session-1' } as any,
+      vi.fn(async () => ({ behavior: 'allow' }))
+    )) {
+      // drain
+    }
+
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          canUseTool: expect.any(Function),
+        }),
+      })
+    );
+  });
+
+  it('does not pass invalid permission modes to the Claude SDK', async () => {
+    const adapter = new ClaudeAgentAdapter();
+    queryMock.mockReturnValueOnce(claudeStream([]));
+
+    for await (const _event of adapter.run(
+      'hello',
+      { cwd: '/tmp/project', claudiaSessionId: 'session-1', mode: 'unexpected-mode' } as any,
+      vi.fn()
+    )) {
+      // drain
+    }
+
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.not.objectContaining({
+          permissionMode: expect.anything(),
+        }),
+      })
+    );
+  });
+
+  it('appends the ZClaudia system prompt to the Claude Code preset', async () => {
+    const adapter = new ClaudeAgentAdapter();
+    queryMock.mockReturnValueOnce(claudeStream([]));
+
+    for await (const _event of adapter.run(
+      'hello',
+      {
+        cwd: '/tmp/project',
+        claudiaSessionId: 'session-1',
+        systemPrompt: 'Use project instructions.',
+      } as any,
+      vi.fn()
+    )) {
+      // drain
+    }
+
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          systemPrompt: {
+            type: 'preset',
+            preset: 'claude_code',
+            append: 'Use project instructions.',
+          },
+        }),
+      })
+    );
   });
 });

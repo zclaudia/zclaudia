@@ -34,7 +34,7 @@
 - Modify: `server/src/infra/providers/claude-agent/manifest.ts`
 - Test: `server/src/infra/providers/__tests__/claude-agent-adapter.test.ts`
 
-- [ ] **Step 1: Add failing permission bridge tests**
+- [x] **Step 1: Add failing permission bridge tests**
 
 Add these imports to `server/src/infra/providers/__tests__/claude-agent-adapter.test.ts`:
 
@@ -113,7 +113,7 @@ it('passes canUseTool to the Claude SDK query options', async () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused test and verify it fails**
+- [x] **Step 2: Run the focused test and verify it fails**
 
 Run:
 
@@ -123,7 +123,7 @@ NODE_ENV=test corepack pnpm --filter @zclaudia/server test -- src/infra/provider
 
 Expected: FAIL because `buildClaudeCanUseTool` does not exist and `runner.ts` does not pass `canUseTool`.
 
-- [ ] **Step 3: Implement the permission bridge**
+- [x] **Step 3: Implement the permission bridge**
 
 Create `server/src/infra/providers/claude-agent/permissions.ts`:
 
@@ -177,7 +177,7 @@ export function buildClaudeCanUseTool(onPermission?: PermissionCallback): CanUse
 }
 ```
 
-- [ ] **Step 4: Wire the bridge through runner and adapter**
+- [x] **Step 4: Wire the bridge through runner and adapter**
 
 In `server/src/infra/providers/claude-agent/runner.ts`, change imports:
 
@@ -225,7 +225,7 @@ Pass into `runClaudeAgent`:
 canUseTool: buildClaudeCanUseTool(onPermission),
 ```
 
-- [ ] **Step 5: Update the manifest once tests pass**
+- [x] **Step 5: Update the manifest once tests pass**
 
 In `server/src/infra/providers/claude-agent/manifest.ts`, replace the approval capability:
 
@@ -233,7 +233,7 @@ In `server/src/infra/providers/claude-agent/manifest.ts`, replace the approval c
 { id: 'interaction.approval', supported: true, mode: 'bridged', reliability: 'best_effort' },
 ```
 
-- [ ] **Step 6: Run focused tests**
+- [x] **Step 6: Run focused tests**
 
 Run:
 
@@ -244,7 +244,7 @@ corepack pnpm --filter @zclaudia/server build
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/infra/providers/claude-agent/permissions.ts server/src/infra/providers/claude-agent/runner.ts server/src/infra/providers/claude-agent/adapter.ts server/src/infra/providers/claude-agent/manifest.ts server/src/infra/providers/__tests__/claude-agent-adapter.test.ts

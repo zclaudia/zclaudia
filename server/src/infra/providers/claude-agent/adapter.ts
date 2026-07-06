@@ -5,7 +5,24 @@ import type {
   RunOptions,
 } from '../types.js';
 import { CLAUDE_AGENT_MANIFEST, CLAUDE_AGENT_POLICY } from './manifest.js';
+import { buildClaudeCanUseTool } from './permissions.js';
+import type { ClaudeAgentRunOptions } from './runner.js';
 import { runClaudeAgent } from './runner.js';
+
+const CLAUDE_PERMISSION_MODES = new Set([
+  'default',
+  'acceptEdits',
+  'bypassPermissions',
+  'plan',
+  'dontAsk',
+  'auto',
+]);
+
+function toClaudePermissionMode(mode?: string): ClaudeAgentRunOptions['permissionMode'] {
+  return mode && CLAUDE_PERMISSION_MODES.has(mode)
+    ? (mode as ClaudeAgentRunOptions['permissionMode'])
+    : undefined;
+}
 
 export class ClaudeAgentAdapter implements ProviderAdapter {
   readonly type = 'claude';
@@ -17,7 +34,7 @@ export class ClaudeAgentAdapter implements ProviderAdapter {
   async *run(
     input: string,
     options: RunOptions,
-    _onPermission?: PermissionCallback
+    onPermission?: PermissionCallback
   ): AsyncGenerator<ProviderRuntimeEvent, void, void> {
     const key = options.sessionId || options.claudiaSessionId || `pending:${Date.now()}`;
     const abortController = options.abortController ?? new AbortController();
@@ -34,10 +51,11 @@ export class ClaudeAgentAdapter implements ProviderAdapter {
         sessionId: options.sessionId,
         env: options.env,
         cliPath: options.cliPath,
-        permissionMode: options.mode,
+        permissionMode: toClaudePermissionMode(options.mode),
         model: options.agentProfile?.model,
         systemPrompt: options.systemPrompt,
         abortController,
+        canUseTool: buildClaudeCanUseTool(onPermission),
         onSessionId: sessionId => {
           if (sessionId && sessionId !== currentKey) {
             this.abortControllers.delete(currentKey);

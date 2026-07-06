@@ -13,7 +13,7 @@ export const CLAUDE_AGENT_MANIFEST: PCPProviderManifest = {
     { id: 'tool.call', supported: true, mode: 'native', reliability: 'strict' },
     { id: 'tool.inject', supported: false, degradation: 'fallback_to_text' },
     { id: 'interaction.form', supported: false, degradation: 'fallback_to_text' },
-    { id: 'interaction.approval', supported: false, degradation: 'fallback_to_notice' },
+    { id: 'interaction.approval', supported: true, mode: 'bridged', reliability: 'best_effort' },
     { id: 'interaction.todo', supported: false, degradation: 'fallback_to_text' },
     { id: 'input.image', supported: false, degradation: 'fallback_to_notice' },
     { id: 'input.text_file', supported: false, degradation: 'fallback_to_notice' },

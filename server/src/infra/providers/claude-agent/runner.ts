@@ -1,4 +1,5 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
+import type { CanUseTool, Options, PermissionMode } from '@anthropic-ai/claude-agent-sdk';
 import type { ProviderRuntimeEvent, SystemInfo } from '../message-types.js';
 
 export interface ClaudeAgentRunOptions {
@@ -6,10 +7,11 @@ export interface ClaudeAgentRunOptions {
   sessionId?: string;
   env?: Record<string, string>;
   cliPath?: string;
-  permissionMode?: string;
+  permissionMode?: PermissionMode;
   model?: string;
   systemPrompt?: string;
   abortController?: AbortController;
+  canUseTool?: CanUseTool;
   onSessionId?: (sessionId: string) => void;
 }
 
@@ -18,7 +20,7 @@ export async function* runClaudeAgent(
   options: ClaudeAgentRunOptions
 ): AsyncGenerator<ProviderRuntimeEvent, void, void> {
   const abortController = options.abortController ?? new AbortController();
-  const sdkOptions: Record<string, unknown> = {
+  const sdkOptions: Partial<Options> = {
     cwd: options.cwd,
     abortController,
   };
@@ -26,9 +28,16 @@ export async function* runClaudeAgent(
   if (options.sessionId) sdkOptions.resume = options.sessionId;
   if (options.permissionMode) sdkOptions.permissionMode = options.permissionMode;
   if (options.model) sdkOptions.model = options.model;
-  if (options.systemPrompt) sdkOptions.appendSystemPrompt = options.systemPrompt;
+  if (options.systemPrompt) {
+    sdkOptions.systemPrompt = {
+      type: 'preset',
+      preset: 'claude_code',
+      append: options.systemPrompt,
+    };
+  }
   if (options.cliPath) sdkOptions.pathToClaudeCodeExecutable = options.cliPath;
   if (options.env) sdkOptions.env = { ...process.env, ...options.env };
+  if (options.canUseTool) sdkOptions.canUseTool = options.canUseTool;
 
   const stream = query({ prompt: input, options: sdkOptions });
   for await (const message of stream) {
