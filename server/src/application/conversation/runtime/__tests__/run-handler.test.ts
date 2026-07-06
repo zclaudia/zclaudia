@@ -45,7 +45,11 @@ const mockProviderRegistry = {
     manifest: undefined,
     getRunState: vi.fn(() => ({})),
   })),
-  get: vi.fn(),
+  get: vi.fn(() => ({
+    run: providerRunMock,
+    manifest: undefined,
+    getRunState: vi.fn(() => ({})),
+  })),
   getPolicy: vi.fn(),
 };
 
@@ -323,7 +327,7 @@ describe('ws/run-handler', () => {
       );
       insertSession(db, { id: sessionId, type: 'regular' });
 
-      mockProviderRegistry.getOrDefault.mockClear();
+      mockProviderRegistry.get.mockClear();
 
       await handleRunStart(
         {
@@ -347,14 +351,46 @@ describe('ws/run-handler', () => {
     };
 
     await runWithRuntimeType('session-claude-runtime', 'claude');
-    expect(mockProviderRegistry.getOrDefault).toHaveBeenCalledWith('claude');
-    expect(mockProviderRegistry.getOrDefault).not.toHaveBeenCalledWith('anthropic');
+    expect(mockProviderRegistry.get).toHaveBeenCalledWith('claude');
+    expect(mockProviderRegistry.get).not.toHaveBeenCalledWith('anthropic');
 
     await runWithRuntimeType('session-default-runtime', null);
-    expect(mockProviderRegistry.getOrDefault).toHaveBeenCalledWith('zclaudia');
+    expect(mockProviderRegistry.get).toHaveBeenCalledWith('zclaudia');
 
     await runWithRuntimeType('session-zclaudia-runtime', 'zclaudia');
-    expect(mockProviderRegistry.getOrDefault).toHaveBeenCalledWith('zclaudia');
+    expect(mockProviderRegistry.get).toHaveBeenCalledWith('zclaudia');
+  });
+
+  it('fails instead of falling back when a runtime adapter is not registered', async () => {
+    const { handleRunStart } = await import('../run-handler.js');
+    const db = createDb();
+    db.prepare(`UPDATE agent_profiles SET runtime_type = ? WHERE id = 'agent-1'`).run('claude');
+    insertSession(db, { id: 'session-missing-runtime', type: 'regular' });
+    mockProviderRegistry.get.mockReturnValueOnce(undefined);
+
+    await handleRunStart(
+      {
+        id: 'client-1',
+        ws: {} as any,
+        isAlive: true,
+        isLocal: true,
+        authenticated: true,
+      },
+      {
+        type: 'run_start',
+        clientRequestId: 'req-missing-runtime',
+        sessionId: 'session-missing-runtime',
+        input: 'hello',
+      },
+      db as any,
+      {},
+      undefined,
+      createRunHandlerContext()
+    );
+
+    expect(mockProviderRegistry.get).toHaveBeenCalledWith('claude');
+    expect(providerRunMock).not.toHaveBeenCalled();
+    expect(sendMessageMock).toHaveBeenCalled();
   });
 
   it('exposes skill directory hint and resolved agent profile to agent sessions', async () => {

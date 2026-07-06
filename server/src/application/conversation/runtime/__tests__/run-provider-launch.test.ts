@@ -141,7 +141,7 @@ describe('ws/run-provider-launch', () => {
         baseUrl: '/usr/bin/claude',
       } as any,
       llmProfileId: 'provider-1',
-      providerType: 'claude',
+      providerType: 'zclaudia',
       runId: 'run-1',
       sdkSessionId: 'sdk-prev',
       sendRunEvent: sendRunEventMock,
@@ -191,7 +191,7 @@ describe('ws/run-provider-launch', () => {
         runId: 'run-1',
         sessionId: 'session-1',
         llmProfileId: 'provider-1',
-        providerType: 'claude',
+        providerType: 'zclaudia',
       })
     );
     expect(runStartedListener).toHaveBeenCalledWith(
@@ -206,7 +206,7 @@ describe('ws/run-provider-launch', () => {
           sessionType: 'background',
           input: 'hello',
           llmProfileId: 'provider-1',
-          providerType: 'claude',
+          providerType: 'zclaudia',
         }),
       })
     );
@@ -218,7 +218,7 @@ describe('ws/run-provider-launch', () => {
     expect(buildRunContextMock).toHaveBeenCalledWith(
       expect.objectContaining({
         cwd: '/tmp/project',
-        providerType: 'claude',
+        providerType: 'zclaudia',
         sdkSessionId: 'sdk-prev',
         sessionType: 'background',
         providerConfig: expect.objectContaining({
@@ -237,10 +237,10 @@ describe('ws/run-provider-launch', () => {
       }),
       permissionCallback
     );
-    expect(activeRun.providerType).toBe('claude');
+    expect(activeRun.providerType).toBe('zclaudia');
     expect(activeRun.providerSessionId).toBe('sdk-1');
     expect(activeRun.providerCwd).toBe('/tmp/project');
-    expect(trace.setMeta).toHaveBeenCalledWith({ provider: 'claude', cwd: '/tmp/project' });
+    expect(trace.setMeta).toHaveBeenCalledWith({ provider: 'zclaudia', cwd: '/tmp/project' });
     expect(result.providerRunner).toBeTruthy();
     unregisterPluginDomainEventListener();
 
@@ -329,7 +329,7 @@ describe('ws/run-provider-launch', () => {
         baseUrl: '/usr/bin/claude',
       } as any,
       llmProfileId: 'provider-1',
-      providerType: 'claude',
+      providerType: 'zclaudia',
       runId: 'run-1',
       sendRunEvent: sendRunEventMock,
       serverPort: 3100,
@@ -439,7 +439,7 @@ describe('ws/run-provider-launch', () => {
       processedInput: 'look',
       providerConfig: primary,
       llmProfileId: primary.id,
-      providerType: primary.providerType,
+      providerType: 'zclaudia',
       runId: 'run-1',
       sendRunEvent: sendRunEventMock,
       serverPort: 3100,
@@ -470,7 +470,7 @@ describe('ws/run-provider-launch', () => {
           id: fallback.id,
           baseUrl: 'http://vision/v1',
         }),
-        providerType: fallback.providerType,
+        providerType: 'zclaudia',
       })
     );
     expect(runStartedListener).toHaveBeenCalledWith(
@@ -478,7 +478,7 @@ describe('ws/run-provider-launch', () => {
         type: 'run.started',
         payload: expect.objectContaining({
           llmProfileId: fallback.id,
-          providerType: fallback.providerType,
+          providerType: 'zclaudia',
         }),
       })
     );

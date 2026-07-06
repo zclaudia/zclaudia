@@ -86,6 +86,7 @@ export async function handleRunException(
   const overflowRetryCount = recoveryState.overflowRetryCount || 0;
   if (
     error instanceof ContextOverflowError &&
+    activeRun.providerType === 'zclaudia' &&
     activeRun.agentProfile &&
     activeRun.llmProfile &&
     overflowRetryCount < MAX_OVERFLOW_RETRIES

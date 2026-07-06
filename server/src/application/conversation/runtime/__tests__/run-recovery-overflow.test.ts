@@ -87,4 +87,26 @@ describe('handleRunException — overflow recovery', () => {
     expect(handleRetry).not.toHaveBeenCalled();
     expect(result.handedOffToRetry).toBe(false);
   });
+
+  it('does not run zclaudia overflow compaction for non-zclaudia runtimes', async () => {
+    compactForOverflow.mockResolvedValue({ outcome: 'compacted', compacted: true });
+    const { input, handleRetry } = baseInput({
+      activeRun: {
+        sessionId: 's1',
+        providerType: 'claude',
+        agentProfile: { model: 'm' },
+        llmProfile: { apiKey: 'k' },
+        saveInterval: undefined,
+        pendingPermissions: new Map(),
+        phase: 'running',
+        phaseEmitter: { emit: vi.fn(), onChange: vi.fn() },
+        fullContent: '',
+        collectedToolCalls: [],
+      },
+    });
+    const result = await handleRunException(input as any);
+    expect(compactForOverflow).not.toHaveBeenCalled();
+    expect(handleRetry).not.toHaveBeenCalled();
+    expect(result.handedOffToRetry).toBe(false);
+  });
 });

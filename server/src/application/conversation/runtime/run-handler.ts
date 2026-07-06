@@ -115,7 +115,10 @@ export async function handleRunStart(
   let handedOffToRetry = false;
 
   try {
-    const adapter = context.providerRegistry.getOrDefault(providerType);
+    const adapter = context.providerRegistry.get(providerType);
+    if (!adapter) {
+      throw new Error(`Provider adapter not registered: ${providerType}`);
+    }
 
     // Kimi stores session state under the work_dir scope. Resuming the same
     // session ID under a different directory creates a fresh empty context,
