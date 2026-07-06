@@ -99,5 +99,20 @@ describe('ProviderRegistry', () => {
       expect(providerRegistry.get('cursor')).toBeUndefined();
       expect(providerRegistry.get('kimi')).toBeUndefined();
     });
+
+    it('declares Claude advanced capabilities as unsupported until implemented', () => {
+      const definition = providerRegistry.getDefinition('claude');
+      const capabilities = Object.fromEntries(
+        definition!.capabilityManifest.capabilities.map(capability => [
+          capability.id,
+          capability.supported,
+        ])
+      );
+
+      expect(capabilities['input.image']).toBe(false);
+      expect(capabilities['input.text_file']).toBe(false);
+      expect(capabilities['input.binary_file']).toBe(false);
+      expect(capabilities['session.background_task']).toBe(false);
+    });
   });
 });

@@ -40,6 +40,7 @@ describe('provider capability routes', () => {
     expect(res.body.data.modeLabel).toBe('Mode');
     expect(res.body.data.defaultModeId).toBe('default');
     expect(res.body.data.supportsAIReview).toBe(false);
+    expect(res.body.data.supportsImages).toBeFalsy();
     expect(res.body.data.modes).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: 'default' }),

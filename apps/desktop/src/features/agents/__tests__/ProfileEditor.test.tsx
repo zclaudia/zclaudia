@@ -137,6 +137,7 @@ describe('ProfileEditor', () => {
     await renderEditor(null);
 
     expect(screen.queryByText(/Claude Agent SDK/)).toBeNull();
+    expect(screen.getByText('Multimodal fallback')).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Runtime'), {
       target: { value: 'claude' },
@@ -144,8 +145,58 @@ describe('ProfileEditor', () => {
 
     expect(screen.getByText(/Claude Agent SDK/)).toBeInTheDocument();
     expect(
-      screen.getByText(/AI review and multimodal fallback are zclaudia-only/)
+      screen.getByText(/AI review, multimodal attachments and fallback, and background task controls are zclaudia-only/)
     ).toBeInTheDocument();
+    expect(screen.queryByText('Multimodal fallback')).toBeNull();
+  });
+
+  it('does not save multimodal fallback config for Claude runtime', async () => {
+    const visionProfile: LlmProfileConfig = {
+      ...llmProfile,
+      id: 'vision-lp',
+      name: 'Vision',
+      models: [
+        {
+          modelId: 'vision-model',
+          displayName: 'Vision Model',
+          capabilities: { vision: true },
+        },
+      ],
+    };
+    vi.mocked(api.listLlmProfilesForBackend).mockResolvedValue([llmProfile, visionProfile]);
+    vi.mocked(api.createAgentProfileForBackend).mockResolvedValue({
+      ...makeProfile('new1', 'Claude Agent'),
+      runtimeType: 'claude',
+    });
+
+    await renderEditor(null);
+
+    fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), {
+      target: { value: 'Claude Agent' },
+    });
+    fireEvent.change(screen.getByLabelText('Fallback LLM Profile'), {
+      target: { value: 'vision-lp' },
+    });
+    fireEvent.change(screen.getByLabelText('Fallback Model'), {
+      target: { value: 'vision-model' },
+    });
+    fireEvent.change(screen.getByLabelText('Runtime'), {
+      target: { value: 'claude' },
+    });
+    fireEvent.click(screen.getByText('Select a model'));
+    fireEvent.click(screen.getByText('Sonnet'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() => {
+      expect(api.createAgentProfileForBackend).toHaveBeenCalledWith(
+        'b1',
+        expect.objectContaining({
+          runtimeType: 'claude',
+          multimodalFallback: undefined,
+        })
+      );
+    });
   });
 
   it('edit mode: populates the form from the profile prop and updates via updateAgentProfileForBackend', async () => {

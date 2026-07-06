@@ -541,7 +541,9 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
     }
     const fallbackProfile = llmProfiles.find(p => p.id === formFallbackLlmProfileId);
     const trimmedFallbackModel = formFallbackModel.trim();
+    const isClaudeRuntime = formRuntimeType === 'claude';
     if (
+      !isClaudeRuntime &&
       formFallbackLlmProfileId &&
       !fallbackModelValidForProfile(trimmedFallbackModel, fallbackProfile)
     ) {
@@ -553,8 +555,11 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
     setFormError(null);
     try {
       const resolvedTools = resolveToolSelection(formToolSelection).builtinTools;
-      const multimodalFallback =
-        formFallbackLlmProfileId && trimmedFallbackModel
+      const multimodalFallback = isClaudeRuntime
+        ? profile?.multimodalFallback
+          ? null
+          : undefined
+        : formFallbackLlmProfileId && trimmedFallbackModel
           ? { llmProfileId: formFallbackLlmProfileId, model: trimmedFallbackModel }
           : profile?.multimodalFallback
             ? null
@@ -684,8 +689,8 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
         </select>
         {formRuntimeType === 'claude' && (
           <p className="mt-2 rounded-md border border-border bg-secondary/50 px-3 py-2 text-xs text-muted-foreground">
-            Claude uses the Claude Agent SDK runtime. AI review and multimodal fallback are
-            zclaudia-only in this phase.
+            Claude uses the Claude Agent SDK runtime. AI review, multimodal attachments and
+            fallback, and background task controls are zclaudia-only in this phase.
           </p>
         )}
       </div>
@@ -719,23 +724,28 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
         llmProfile={llmProfiles.find(p => p.id === formLlmProfileId)}
       />
 
-      <MultimodalFallbackSelector
-        profiles={llmProfiles}
-        profileId={formFallbackLlmProfileId}
-        model={formFallbackModel}
-        onProfileChange={id => {
-          setFormFallbackLlmProfileId(id);
-          if (!id) {
-            setFormFallbackModel('');
-            return;
-          }
-          const nextProfile = llmProfiles.find(p => p.id === id);
-          if (formFallbackModel && !fallbackModelValidForProfile(formFallbackModel, nextProfile)) {
-            setFormFallbackModel('');
-          }
-        }}
-        onModelChange={setFormFallbackModel}
-      />
+      {formRuntimeType !== 'claude' && (
+        <MultimodalFallbackSelector
+          profiles={llmProfiles}
+          profileId={formFallbackLlmProfileId}
+          model={formFallbackModel}
+          onProfileChange={id => {
+            setFormFallbackLlmProfileId(id);
+            if (!id) {
+              setFormFallbackModel('');
+              return;
+            }
+            const nextProfile = llmProfiles.find(p => p.id === id);
+            if (
+              formFallbackModel &&
+              !fallbackModelValidForProfile(formFallbackModel, nextProfile)
+            ) {
+              setFormFallbackModel('');
+            }
+          }}
+          onModelChange={setFormFallbackModel}
+        />
+      )}
 
       <div>
         <label className="block text-sm font-medium text-muted-foreground mb-1">

@@ -140,6 +140,12 @@ Done when:
 
 ### Phase D: Review, Multimodal, And Background Capability Decisions
 
+Phase D status: implemented for capability truthfulness. Claude keeps AI review,
+multimodal attachments/fallback, and background task controls unsupported until
+each has a dedicated implementation. The Profile Editor hides zclaudia-only
+multimodal fallback controls for Claude profiles and explains the remaining
+advanced limitations.
+
 Resolve the remaining zclaudia-only limitations:
 
 - AI review:
