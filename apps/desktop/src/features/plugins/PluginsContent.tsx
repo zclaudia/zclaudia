@@ -63,17 +63,22 @@ export function PluginsContent() {
     );
   }
 
+  // Key the active-backend content on activeServerId so switching backends via
+  // the header picker remounts it, forcing a refetch of that backend's config
+  // (both components load once on mount).
+  const backendKey = activeServerId ?? 'none';
+
   if (tab === 'web-search') {
     return (
       <Shell tab={tab} showPicker>
-        <WebSearchSettings readOnly={isRemoteBackend} />
+        <WebSearchSettings key={backendKey} readOnly={isRemoteBackend} />
       </Shell>
     );
   }
 
   return (
     <Shell tab={tab} showPicker>
-      <PluginSettings showBuiltin={false} />
+      <PluginSettings key={backendKey} showBuiltin={false} />
     </Shell>
   );
 }
