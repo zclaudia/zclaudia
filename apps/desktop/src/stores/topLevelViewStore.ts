@@ -5,12 +5,14 @@ import type {
   OpenAutomationsOptions,
 } from '../features/automation/automation-types';
 import type { AgentsTab, AgentsSelection } from '../features/agents/agents-types';
+import type { PluginsTab } from '../features/plugins/plugins-types';
 
 export type TopLevelView =
   | { kind: 'app' }
   | { kind: 'settings'; initialTab?: SettingsTab }
   | { kind: 'automations'; tab: AutomationTab; projectId?: string }
-  | { kind: 'agents'; tab: AgentsTab };
+  | { kind: 'agents'; tab: AgentsTab }
+  | { kind: 'plugins'; tab: PluginsTab };
 
 interface TopLevelViewState {
   view: TopLevelView;
@@ -29,6 +31,8 @@ interface TopLevelViewState {
   setAgentsTab: (tab: AgentsTab) => void;
   selectAgentsItem: (sel: AgentsSelection | null) => void;
   bumpAgentsRefresh: () => void;
+  openPlugins: (tab?: PluginsTab) => void;
+  setPluginsTab: (tab: PluginsTab) => void;
 }
 
 export const useTopLevelViewStore = create<TopLevelViewState>(set => ({
@@ -75,4 +79,7 @@ export const useTopLevelViewStore = create<TopLevelViewState>(set => ({
     ),
   selectAgentsItem: sel => set({ agentsSelection: sel }),
   bumpAgentsRefresh: () => set(s => ({ agentsRefreshNonce: s.agentsRefreshNonce + 1 })),
+  openPlugins: (tab = 'installed') => set({ view: { kind: 'plugins', tab } }),
+  setPluginsTab: tab =>
+    set(state => (state.view.kind === 'plugins' ? { view: { ...state.view, tab } } : state)),
 }));

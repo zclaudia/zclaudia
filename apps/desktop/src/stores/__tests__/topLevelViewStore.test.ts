@@ -241,3 +241,37 @@ describe('agents view', () => {
     expect(useTopLevelViewStore.getState().agentsRefreshNonce).toBe(before + 1);
   });
 });
+
+describe('plugins view', () => {
+  beforeEach(() => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'app' },
+      selectedAutomationItemId: null,
+      automationListRefreshNonce: 0,
+      agentsSelection: null,
+      agentsRefreshNonce: 0,
+    });
+  });
+
+  it('openPlugins enters plugins mode on the installed tab', () => {
+    useTopLevelViewStore.getState().openPlugins();
+    expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'plugins', tab: 'installed' });
+  });
+
+  it('openPlugins accepts an explicit tab', () => {
+    useTopLevelViewStore.getState().openPlugins('web-search');
+    expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'plugins', tab: 'web-search' });
+  });
+
+  it('setPluginsTab switches the tab while in plugins view', () => {
+    useTopLevelViewStore.getState().openPlugins();
+    useTopLevelViewStore.getState().setPluginsTab('builtin');
+    expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'plugins', tab: 'builtin' });
+  });
+
+  it('ignores setPluginsTab when not in plugins view', () => {
+    useTopLevelViewStore.getState().openSettings();
+    useTopLevelViewStore.getState().setPluginsTab('builtin');
+    expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'settings' });
+  });
+});
