@@ -3,12 +3,17 @@ import { ClaudeAgentAdapter } from '../claude-agent/adapter.js';
 import { buildClaudeCanUseTool } from '../claude-agent/permissions.js';
 import { transformClaudeSdkMessage } from '../claude-agent/runner.js';
 
-const { queryMock } = vi.hoisted(() => ({
+const { queryMock, loadClaudeAgentConfigMock } = vi.hoisted(() => ({
   queryMock: vi.fn(),
+  loadClaudeAgentConfigMock: vi.fn(() => ({ mcpServers: {}, plugins: [] })),
 }));
 
 vi.mock('@anthropic-ai/claude-agent-sdk', () => ({
   query: queryMock,
+}));
+
+vi.mock('../claude-agent/config.js', () => ({
+  loadClaudeAgentConfig: loadClaudeAgentConfigMock,
 }));
 
 async function* claudeStream(messages: unknown[]) {
@@ -77,6 +82,36 @@ describe('ClaudeAgentAdapter', () => {
     adapter.trackAbortControllerForTest('sdk-1', abortController);
     await adapter.abort('sdk-1', '/tmp/project');
     expect(abortController.signal.aborted).toBe(true);
+  });
+
+  it('passes Claude config MCP servers and plugins to the SDK query options', async () => {
+    const adapter = new ClaudeAgentAdapter();
+    loadClaudeAgentConfigMock.mockReturnValueOnce({
+      mcpServers: {
+        docs: { command: 'node', args: ['docs-server.js'] },
+      },
+      plugins: [{ type: 'local', path: '/tmp/claude-plugin' }],
+    });
+    queryMock.mockReturnValueOnce(claudeStream([]));
+
+    for await (const _event of adapter.run(
+      'hello',
+      { cwd: '/tmp/project', claudiaSessionId: 'session-1' } as any,
+      vi.fn()
+    )) {
+      // drain stream
+    }
+
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          mcpServers: {
+            docs: { command: 'node', args: ['docs-server.js'] },
+          },
+          plugins: [{ type: 'local', path: '/tmp/claude-plugin' }],
+        }),
+      })
+    );
   });
 
   it('transforms Claude SDK task and progress events without empty assistant text', () => {

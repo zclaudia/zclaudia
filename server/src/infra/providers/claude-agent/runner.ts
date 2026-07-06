@@ -1,5 +1,11 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
-import type { CanUseTool, Options, PermissionMode } from '@anthropic-ai/claude-agent-sdk';
+import type {
+  CanUseTool,
+  McpServerConfig,
+  Options,
+  PermissionMode,
+  SdkPluginConfig,
+} from '@anthropic-ai/claude-agent-sdk';
 import type { ProviderRuntimeEvent, SystemInfo } from '../message-types.js';
 
 export interface ClaudeAgentRunOptions {
@@ -12,6 +18,8 @@ export interface ClaudeAgentRunOptions {
   systemPrompt?: string;
   abortController?: AbortController;
   canUseTool?: CanUseTool;
+  mcpServers?: Record<string, McpServerConfig>;
+  plugins?: SdkPluginConfig[];
   onSessionId?: (sessionId: string) => void;
 }
 
@@ -38,6 +46,12 @@ export async function* runClaudeAgent(
   if (options.cliPath) sdkOptions.pathToClaudeCodeExecutable = options.cliPath;
   if (options.env) sdkOptions.env = { ...process.env, ...options.env };
   if (options.canUseTool) sdkOptions.canUseTool = options.canUseTool;
+  if (options.mcpServers && Object.keys(options.mcpServers).length > 0) {
+    sdkOptions.mcpServers = options.mcpServers;
+  }
+  if (options.plugins && options.plugins.length > 0) {
+    sdkOptions.plugins = options.plugins;
+  }
 
   const stream = query({ prompt: input, options: sdkOptions });
   for await (const message of stream) {

@@ -4,6 +4,7 @@ import type {
   ProviderRuntimeEvent,
   RunOptions,
 } from '../types.js';
+import { loadClaudeAgentConfig } from './config.js';
 import { CLAUDE_AGENT_MANIFEST, CLAUDE_AGENT_POLICY } from './manifest.js';
 import { buildClaudeCanUseTool } from './permissions.js';
 import type { ClaudeAgentRunOptions } from './runner.js';
@@ -46,6 +47,7 @@ export class ClaudeAgentAdapter implements ProviderAdapter {
     let currentKey = key;
 
     try {
+      const claudeConfig = loadClaudeAgentConfig();
       yield* runClaudeAgent(input, {
         cwd: options.cwd,
         sessionId: options.sessionId,
@@ -56,6 +58,8 @@ export class ClaudeAgentAdapter implements ProviderAdapter {
         systemPrompt: options.systemPrompt,
         abortController,
         canUseTool: buildClaudeCanUseTool(onPermission),
+        mcpServers: claudeConfig.mcpServers,
+        plugins: claudeConfig.plugins,
         onSessionId: sessionId => {
           if (sessionId && sessionId !== currentKey) {
             this.abortControllers.delete(currentKey);
