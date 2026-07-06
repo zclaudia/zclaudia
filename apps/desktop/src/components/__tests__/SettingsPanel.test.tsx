@@ -102,9 +102,6 @@ vi.mock('../../features/settings/GeneralSettings', async () => {
 vi.mock('../../features/settings/ServerGatewayConfig', () => ({
   ServerGatewayConfig: () => <div data-testid="server-gateway-config">ServerGatewayConfig</div>,
 }));
-vi.mock('../../features/settings/PluginSettings', () => ({
-  PluginSettings: () => <div data-testid="plugin-settings">PluginSettings</div>,
-}));
 vi.mock('../../features/workflows/api', () => ({
   listAllWorkflows: vi.fn().mockResolvedValue([]),
 }));
@@ -416,13 +413,18 @@ describe('SettingsPanel', () => {
     const { container } = await renderSettingsPanel();
     expect(container.textContent).toContain('General');
     expect(container.textContent).toContain('Claudia');
-    expect(container.textContent).toContain('Plugins');
   });
 
   it('shows server tabs', async () => {
     const { container } = await renderSettingsPanel();
-    expect(container.textContent).toContain('Web Search');
+    expect(container.textContent).toContain('Permissions');
     expect(container.textContent).not.toContain('Notifications');
+  });
+
+  it('does not show Plugins or Web Search tabs (moved to Plugins mode)', async () => {
+    const { container } = await renderSettingsPanel();
+    expect(container.querySelector('[data-testid="plugins-tab"]')).toBeNull();
+    expect(container.querySelector('[data-testid="web-search-tab"]')).toBeNull();
   });
 
   it('hides Notifications tab on desktop', async () => {
@@ -459,15 +461,6 @@ describe('SettingsPanel', () => {
   });
 
   // ---- Tab switching ----
-
-  it('switches to Plugins tab', async () => {
-    const { container } = await renderSettingsPanel();
-    const pluginsTab = container.querySelector('[data-testid="plugins-tab"]');
-    expect(pluginsTab).toBeTruthy();
-    await clickAsync(pluginsTab!);
-    expect(container.querySelector('[data-testid="plugin-settings"]')).toBeTruthy();
-    expect(container.textContent).toContain('Plugins');
-  });
 
   it('switches to Notifications tab on Android', async () => {
     vi.mocked(isAndroid).mockReturnValue(true);
@@ -732,42 +725,6 @@ describe('SettingsPanel', () => {
   });
 
   // ---- Remote server banner ----
-
-  it('shows remote server notice when not local server', async () => {
-    setupStores({
-      serverStore: {
-        activeServerId: 'remote-1',
-      },
-      facadeStore: {
-        backends: [
-          {
-            backendId: 'local-standalone',
-            name: 'Local',
-            online: true,
-            runtimeState: 'ready',
-            isThisInstance: true,
-            instanceId: 'instance-local',
-          },
-          {
-            backendId: 'remote-1',
-            name: 'Remote Server',
-            online: true,
-            runtimeState: 'ready',
-            isThisInstance: false,
-            instanceId: 'instance-remote',
-          },
-        ],
-      },
-    });
-
-    const { container } = await renderSettingsPanel();
-    const webSearchTab = container.querySelector('[data-testid="web-search-tab"]');
-    await clickAsync(webSearchTab!);
-
-    expect(container.textContent).toContain('Viewing Web Search settings on');
-    expect(container.textContent).toContain('Remote Server');
-    expect(container.textContent).toContain('(read-only)');
-  });
 
   // ---- Notifications tab ----
 
@@ -1090,14 +1047,18 @@ describe('SettingsPanel', () => {
 
   it('renders plugin settings tabs when plugins define them', async () => {
     usePluginStore.setState({
-      plugins: [],
+      settingsTabs: [
+        {
+          id: 'my-plugin-tab',
+          pluginId: 'my-plugin',
+          type: 'settings-tab',
+          label: 'My Plugin',
+        },
+      ],
     } as any);
 
-    // The pluginSettingsTabs are derived from store — mock the selector
-    // For this test, we just verify the plugin tab area renders
     const { container } = await renderSettingsPanel();
-    // Plugins tab should always be there
-    expect(container.textContent).toContain('Plugins');
+    expect(container.textContent).toContain('My Plugin');
   });
 
   // ---- Connection status colors ----

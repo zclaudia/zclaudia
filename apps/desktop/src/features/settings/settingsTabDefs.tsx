@@ -132,20 +132,6 @@ export function getServerTabs({
         </svg>
       ),
     },
-    {
-      id: 'plugins',
-      label: 'Plugins',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-          />
-        </svg>
-      ),
-    },
     ...pluginSettingsTabs.map(tab => ({
       id: `plugin:${tab.id}` as SettingsTab,
       label: tab.label,
@@ -160,26 +146,6 @@ export function getServerTabs({
         </svg>
       ),
     })),
-    {
-      id: 'web-search',
-      label: 'Web Search',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 110-15 7.5 7.5 0 010 15z"
-          />
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M7.5 10.5h6M10.5 7.5v6"
-          />
-        </svg>
-      ),
-    },
     ...(isActiveLocalBackend
       ? [
           {

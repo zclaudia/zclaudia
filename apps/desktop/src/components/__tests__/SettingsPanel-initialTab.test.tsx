@@ -32,10 +32,6 @@ vi.mock('../../features/settings/ServerGatewayConfig', () => ({
   ServerGatewayConfig: () => <div data-testid="server-gateway-config">ServerGatewayConfig</div>,
 }));
 
-vi.mock('../../features/settings/PluginSettings', () => ({
-  PluginSettings: () => <div data-testid="plugin-settings">PluginSettings</div>,
-}));
-
 vi.mock('../../features/settings/AgentSettings', () => ({
   AgentSettings: () => <div data-testid="agent-settings">AgentSettings</div>,
 }));

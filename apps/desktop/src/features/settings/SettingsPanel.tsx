@@ -14,7 +14,6 @@ import { useIsMobile } from '../../hooks/useMediaQuery';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { useSidebarWidthStore, SIDEBAR_WIDTH_LIMITS } from '../../stores/sidebarWidthStore';
 import { ServerGatewayConfig } from './ServerGatewayConfig';
-import { PluginSettings } from './PluginSettings';
 import { usePluginStore, selectPluginSettingsTabs } from '../../stores/pluginStore';
 import type { GatewayBackendInfo } from '@zclaudia/shared';
 import { AgentSettings } from './AgentSettings';
@@ -23,7 +22,6 @@ import { NotificationSettingsInline } from './NotificationSettings';
 import { MobileGatewayConfig } from './MobileGatewayConfig';
 import { DebugSettings } from './DebugSettings';
 import { GeneralSettings } from './GeneralSettings';
-import { WebSearchSettings } from './WebSearchSettings';
 import {
   type SettingsTab,
   type SettingsTabDef,
@@ -400,29 +398,6 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
                   </div>
                 )}
 
-                {activeTab === 'plugins' && (
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">Plugins</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Manage installed plugins and their settings. Plugins extend the functionality
-                      of Claudia.
-                    </p>
-                    <PluginSettings />
-                  </div>
-                )}
-
-                {activeTab === 'web-search' && (
-                  <div className="space-y-4">
-                    {!isActiveLocalBackend && activeServer && (
-                      <RemoteServerBanner
-                        serverName={activeServer.name}
-                        label="Viewing Web Search settings"
-                      />
-                    )}
-                    <WebSearchSettings readOnly={!isActiveLocalBackend} />
-                  </div>
-                )}
-
                 {activeTab === 'debug' && (
                   <DebugSettings
                     isConnected={isConnected}
@@ -456,31 +431,6 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
           </div>
         )}
       </div>
-    </div>
-  );
-}
-
-// --- Small inline helpers ---
-
-function RemoteServerBanner({ serverName, label }: { serverName: string; label: string }) {
-  return (
-    <div className="flex items-center gap-2 px-3 py-2 bg-muted/60 border border-primary/20 rounded-lg text-sm">
-      <svg
-        className="w-4 h-4 text-primary shrink-0"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-        />
-      </svg>
-      <span>
-        {label} on <strong>{serverName}</strong> (read-only)
-      </span>
     </div>
   );
 }
