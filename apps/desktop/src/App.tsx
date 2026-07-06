@@ -64,6 +64,9 @@ const AutomationContent = lazy(() =>
 const AgentsContent = lazy(() =>
   import('./features/agents/AgentsContent').then(m => ({ default: m.AgentsContent }))
 );
+const PluginsContent = lazy(() =>
+  import('./features/plugins/PluginsContent').then(m => ({ default: m.PluginsContent }))
+);
 
 // Stable empty list handed to the agents-mode catalog hooks while their tab is
 // not showing (empty array = no fetches; loading settles false).
@@ -115,6 +118,8 @@ function AppContent() {
   const setAgentsTab = useTopLevelViewStore(s => s.setAgentsTab);
   const selectAgentsItem = useTopLevelViewStore(s => s.selectAgentsItem);
   const agentsSelection = useTopLevelViewStore(s => s.agentsSelection);
+  const openPlugins = useTopLevelViewStore(s => s.openPlugins);
+  const setPluginsTab = useTopLevelViewStore(s => s.setPluginsTab);
   const refreshReadiness = useAgentReadinessStore(s => s.refresh);
 
   const {
@@ -253,6 +258,15 @@ function AppContent() {
           providersData,
           selection: agentsSelection,
           onSelectItem: selectAgentsItem,
+        }
+      : undefined;
+
+  const pluginsMode =
+    topLevelView.kind === 'plugins'
+      ? {
+          tab: topLevelView.tab,
+          onSelectTab: setPluginsTab,
+          onBack: closeTopLevelView,
         }
       : undefined;
 
@@ -497,6 +511,8 @@ function AppContent() {
           automationMode={automationMode}
           onOpenAgents={() => openAgents()}
           agentsMode={agentsMode}
+          onOpenPlugins={() => openPlugins()}
+          pluginsMode={pluginsMode}
         />
 
         {!isMobile && (
@@ -555,6 +571,10 @@ function AppContent() {
                   mcpData={mcpData}
                   providersData={providersData}
                 />
+              </Suspense>
+            ) : topLevelView.kind === 'plugins' ? (
+              <Suspense fallback={<LazyFallback />}>
+                <PluginsContent />
               </Suspense>
             ) : dashboardProject ? (
               <Suspense fallback={<LazyFallback />}>

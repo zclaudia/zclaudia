@@ -17,6 +17,7 @@ import { SkillsTree } from '../agents/SkillsTree';
 import { McpServersTree } from '../agents/McpServersTree';
 import { ProvidersTree } from '../agents/ProvidersTree';
 import type { AgentsTab, AgentsSelection } from '../agents/agents-types';
+import type { PluginsTab } from '../plugins/plugins-types';
 import type { AgentsBackend, ProfilesByBackend } from '../agents/useProfilesByBackend';
 import type { SkillsByBackend } from '../agents/useSkillsByBackend';
 import type { McpServersByBackend } from '../agents/useMcpServersByBackend';
@@ -94,6 +95,13 @@ interface SidebarProps {
     selection: AgentsSelection | null;
     onSelectItem: (sel: AgentsSelection) => void;
   };
+  onOpenPlugins?: () => void;
+  /** When present, the sidebar renders in plugins mode (tab nav only). */
+  pluginsMode?: {
+    tab: PluginsTab;
+    onSelectTab: (tab: PluginsTab) => void;
+    onBack: () => void;
+  };
   onOpenSettings?: (initialTab?: SettingsTab) => void;
   /** Navigate to the welcome screen (deselect session + exit any dashboard). */
   onHome: () => void;
@@ -119,6 +127,8 @@ export function Sidebar({
   automationMode,
   onOpenAgents,
   agentsMode,
+  onOpenPlugins,
+  pluginsMode,
   onOpenSettings,
   onHome,
   isHomeActive,
@@ -751,6 +761,7 @@ export function Sidebar({
                   }
                 : undefined
             }
+            pluginsMode={pluginsMode}
           />
 
           <div className="flex-1 overflow-y-auto scrollbar-hidden p-2">
@@ -896,6 +907,8 @@ export function Sidebar({
                   }
                 : undefined
             }
+            onOpenPlugins={onOpenPlugins}
+            pluginsMode={pluginsMode}
           />
 
           <div className="flex-1 overflow-y-auto scrollbar-hidden p-2">
