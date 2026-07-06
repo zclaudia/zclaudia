@@ -90,6 +90,11 @@ Done when:
 
 ### Phase B: ZClaudia MCP Bridge For Claude
 
+Phase B status: implemented. zclaudia exposes a provider-agnostic agent plugin
+tool bridge context, and Claude translates that bridge into a `claudia-plugins`
+MCP server when bridge tools and a server port are available. User-defined
+`claudia-plugins` MCP servers are preserved.
+
 Expose zclaudia bridge tools to Claude SDK:
 
 - Build the `claudia-plugins` MCP server entry with

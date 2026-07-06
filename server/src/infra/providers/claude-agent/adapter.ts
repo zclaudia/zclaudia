@@ -66,7 +66,7 @@ export class ClaudeAgentAdapter implements ProviderAdapter {
 
     try {
       const claudeConfig = loadClaudeAgentConfig();
-      const bridgeEntry = createAgentPluginToolBridgeMcpEntry({
+      const bridgeEntry = await createAgentPluginToolBridgeMcpEntry({
         serverPort: options.serverPort,
         zclaudiaSessionId: options.claudiaSessionId,
       });

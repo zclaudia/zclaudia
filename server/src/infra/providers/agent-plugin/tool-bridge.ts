@@ -1,7 +1,4 @@
-import {
-  buildMcpBridgeEntry,
-  type McpBridgeServerEntry,
-} from '../../../utils/mcp-bridge-launch.js';
+import type { McpBridgeServerEntry } from '../../../utils/mcp-bridge-launch.js';
 
 export const DEFAULT_AGENT_PLUGIN_BRIDGE_MCP_SERVER_NAME = 'claudia-plugins';
 
@@ -12,9 +9,10 @@ export interface AgentPluginToolBridgeContext {
 
 export type AgentPluginMcpBridgeEntry = McpBridgeServerEntry;
 
-export function createAgentPluginToolBridgeMcpEntry(
+export async function createAgentPluginToolBridgeMcpEntry(
   context: AgentPluginToolBridgeContext
-): AgentPluginMcpBridgeEntry | null {
+): Promise<AgentPluginMcpBridgeEntry | null> {
   if (!context.serverPort) return null;
+  const { buildMcpBridgeEntry } = await import('../../../utils/mcp-bridge-launch.js');
   return buildMcpBridgeEntry(context.serverPort, context.zclaudiaSessionId);
 }

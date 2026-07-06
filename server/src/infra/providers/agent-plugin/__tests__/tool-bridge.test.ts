@@ -22,7 +22,7 @@ describe('agent plugin tool bridge', () => {
     });
 
     const { createAgentPluginToolBridgeMcpEntry } = await import('../tool-bridge.js');
-    const entry = createAgentPluginToolBridgeMcpEntry({
+    const entry = await createAgentPluginToolBridgeMcpEntry({
       serverPort: 3100,
       zclaudiaSessionId: 'session-1',
     });
@@ -42,7 +42,7 @@ describe('agent plugin tool bridge', () => {
     const { createAgentPluginToolBridgeMcpEntry } = await import('../tool-bridge.js');
 
     expect(
-      createAgentPluginToolBridgeMcpEntry({
+      await createAgentPluginToolBridgeMcpEntry({
         serverPort: undefined,
         zclaudiaSessionId: 'session-1',
       })
@@ -56,7 +56,7 @@ describe('agent plugin tool bridge', () => {
     const { createAgentPluginToolBridgeMcpEntry } = await import('../tool-bridge.js');
 
     expect(
-      createAgentPluginToolBridgeMcpEntry({
+      await createAgentPluginToolBridgeMcpEntry({
         serverPort: 3100,
         zclaudiaSessionId: 'session-1',
       })
