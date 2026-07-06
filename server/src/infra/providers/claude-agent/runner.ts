@@ -122,7 +122,7 @@ export function transformClaudeSdkMessage(
   if (msg.type === 'assistant') {
     const blocks = (msg.message as { content?: Array<Record<string, unknown>> } | undefined)
       ?.content;
-    if (!Array.isArray(blocks)) return { type: 'assistant', content: '' };
+    if (!Array.isArray(blocks)) return [];
 
     const events: ProviderRuntimeEvent[] = [];
     for (const block of blocks) {
@@ -143,7 +143,7 @@ export function transformClaudeSdkMessage(
   if (msg.type === 'user') {
     const blocks = (msg.message as { content?: Array<Record<string, unknown>> } | undefined)
       ?.content;
-    if (!Array.isArray(blocks)) return { type: 'assistant', content: '' };
+    if (!Array.isArray(blocks)) return [];
 
     const events = blocks
       .filter(block => block.type === 'tool_result')

@@ -259,7 +259,7 @@ git commit -m "feat(runtime): bridge claude tool permissions"
 - Modify: `server/src/infra/providers/claude-agent/runner.ts`
 - Test: `server/src/infra/providers/__tests__/claude-agent-adapter.test.ts`
 
-- [ ] **Step 1: Add event transform tests**
+- [x] **Step 1: Add event transform tests**
 
 Add tests to `server/src/infra/providers/__tests__/claude-agent-adapter.test.ts`:
 
@@ -329,7 +329,7 @@ it('ignores malformed assistant and user messages without emitting empty content
 });
 ```
 
-- [ ] **Step 2: Run the focused test and verify it fails**
+- [x] **Step 2: Run the focused test and verify it fails**
 
 Run:
 
@@ -339,7 +339,7 @@ NODE_ENV=test corepack pnpm --filter @zclaudia/server test -- src/infra/provider
 
 Expected: FAIL on malformed assistant/user messages because the current mapper emits `{ type: 'assistant', content: '' }`.
 
-- [ ] **Step 3: Update malformed assistant/user handling**
+- [x] **Step 3: Update malformed assistant/user handling**
 
 In `server/src/infra/providers/claude-agent/runner.ts`, replace malformed assistant handling:
 
@@ -353,7 +353,7 @@ Replace malformed user handling:
 if (!Array.isArray(blocks)) return [];
 ```
 
-- [ ] **Step 4: Run focused tests and build**
+- [x] **Step 4: Run focused tests and build**
 
 Run:
 
@@ -364,7 +364,7 @@ corepack pnpm --filter @zclaudia/server build
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/infra/providers/claude-agent/runner.ts server/src/infra/providers/__tests__/claude-agent-adapter.test.ts

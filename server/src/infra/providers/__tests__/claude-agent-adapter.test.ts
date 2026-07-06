@@ -112,6 +112,75 @@ describe('ClaudeAgentAdapter', () => {
     expect(transformClaudeSdkMessage({ type: 'system', subtype: 'unknown' })).toEqual([]);
   });
 
+  it('transforms assistant text and tool use blocks', () => {
+    expect(
+      transformClaudeSdkMessage({
+        type: 'assistant',
+        message: {
+          content: [
+            { type: 'text', text: 'hello' },
+            { type: 'tool_use', id: 'tool-1', name: 'Read', input: { file_path: 'README.md' } },
+          ],
+        },
+      })
+    ).toEqual([
+      { type: 'assistant', content: 'hello' },
+      {
+        type: 'tool_use',
+        toolUseId: 'tool-1',
+        toolName: 'Read',
+        toolInput: { file_path: 'README.md' },
+      },
+    ]);
+  });
+
+  it('transforms user tool result blocks', () => {
+    expect(
+      transformClaudeSdkMessage({
+        type: 'user',
+        message: {
+          content: [
+            {
+              type: 'tool_result',
+              tool_use_id: 'tool-1',
+              content: 'file contents',
+              is_error: false,
+            },
+          ],
+        },
+      })
+    ).toEqual({
+      type: 'tool_result',
+      toolUseId: 'tool-1',
+      toolResult: 'file contents',
+      isToolError: false,
+    });
+  });
+
+  it('transforms result success and execution errors', () => {
+    expect(transformClaudeSdkMessage({ type: 'result', result: 'done' })).toEqual({
+      type: 'result',
+      content: 'done',
+      isComplete: true,
+    });
+
+    expect(
+      transformClaudeSdkMessage({
+        type: 'result',
+        subtype: 'error_during_execution',
+        error: 'boom',
+      })
+    ).toEqual({
+      type: 'error',
+      error: 'boom',
+    });
+  });
+
+  it('ignores malformed assistant and user messages without emitting empty content', () => {
+    expect(transformClaudeSdkMessage({ type: 'assistant', message: {} })).toEqual([]);
+    expect(transformClaudeSdkMessage({ type: 'user', message: {} })).toEqual([]);
+  });
+
   it('bridges Claude canUseTool allow decisions to the SDK permission result', async () => {
     const onPermission = vi.fn(async () => ({ behavior: 'allow' as const }));
     const canUseTool = buildClaudeCanUseTool(onPermission);
