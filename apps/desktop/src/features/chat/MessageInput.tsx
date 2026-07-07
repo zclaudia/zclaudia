@@ -1109,6 +1109,7 @@ export function MessageInput({
             className="relative w-full resize-none min-h-[1.5rem] overflow-y-auto border-0 bg-transparent p-0 whitespace-pre-wrap break-words placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               fontSize: 'var(--chat-font-input, 0.875rem)',
+              width: '100%',
               maxHeight: `${Math.max(120, availableViewportHeight * 0.3)}px`,
               color: 'hsl(var(--foreground))',
               caretColor: 'hsl(var(--foreground))',
@@ -1195,6 +1196,7 @@ export function MessageInput({
             className="relative w-full resize-none overflow-auto border-0 bg-transparent px-0 py-1 pr-2 leading-6 whitespace-pre-wrap break-words placeholder:text-muted-foreground/60 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               fontSize: 'var(--chat-font-input, 0.875rem)',
+              width: '100%',
               minHeight: `${expandedInputHeight}px`,
               maxHeight: `${expandedInputMaxHeight}px`,
               color: 'hsl(var(--foreground))',
@@ -1312,6 +1314,7 @@ export function MessageInput({
               className="relative block h-6 w-full resize-none overflow-hidden border-0 bg-transparent p-0 leading-6 whitespace-pre-wrap break-words placeholder:text-muted-foreground/60 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
               style={{
                 fontSize: 'var(--chat-font-input, 0.875rem)',
+                width: '100%',
                 color: 'hsl(var(--foreground))',
                 caretColor: 'hsl(var(--foreground))',
               }}
