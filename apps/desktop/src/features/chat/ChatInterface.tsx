@@ -59,7 +59,6 @@ export function ChatInterface({
   const isMobile = useIsMobile();
   const activeServerId = useServerStore(s => s.activeServerId);
   const setDrawerOpen = useTerminalStore(s => s.setDrawerOpen);
-  const advancedInput = useUIStore(s => s.advancedInput);
   const poppedOutSessions = useUIStore(s => s.poppedOutSessions);
   const route = useSessionRoute(sessionId);
   const routedBackendId = route.backendId;
@@ -539,7 +538,6 @@ export function ChatInterface({
                 fileReferenceBackendId={fileReferenceBackendId}
                 sessionRunId={sessionRunId}
                 currentUsage={currentUsage}
-                advancedInput={advancedInput}
                 restoreMessage={restoreMessage}
                 initialDraft={initialDraft}
                 draftExists={draftExists}

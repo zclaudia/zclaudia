@@ -519,8 +519,6 @@ const useSessionsStoreMock = vi.fn((selector?: (state: any) => any) => {
 const mockUIStore = createMockStore({
   fontSize: 'medium',
   setFontSize: vi.fn(),
-  advancedInput: false,
-  setAdvancedInput: vi.fn(),
   forceScrollToBottomSessionId: null,
   requestForceScrollToBottom: vi.fn(),
   consumeForceScrollToBottom: vi.fn(),

@@ -31,7 +31,6 @@ import { usePluginStore } from '../../stores/pluginStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useDraftEditorStore } from '../../stores/draftEditorStore';
 import { useComposerStore } from '../../stores/composerStore';
-import { useUIStore } from '../../stores/uiStore';
 import { activatePanel, usePanelIsActive } from '../../utils/openPanel';
 import * as api from '../../services/api';
 import type { UnifiedPermissionPolicy, SlashCommand, Session, Project } from '@zclaudia/shared';
@@ -67,7 +66,6 @@ interface ChatInputAreaProps {
     latestCacheWriteTokens?: number;
     contextUsedTokens?: number;
   };
-  advancedInput: boolean;
   restoreMessage: { content: string; attachments?: Attachment[] } | null;
   initialDraft: SessionDraft | undefined;
   draftExists: boolean;
@@ -102,7 +100,6 @@ export function ChatInputArea({
   fileReferenceBackendId,
   sessionRunId,
   currentUsage,
-  advancedInput,
   restoreMessage,
   initialDraft,
   draftExists,
@@ -119,7 +116,6 @@ export function ChatInputArea({
   const isDrawerOpen = useTerminalStore(s => s.isDrawerOpen);
   const disabledBuiltinPanels = usePluginStore(s => s.disabledBuiltinPanels);
   const fileViewerOpen = useFileViewerStore(s => s.isOpen);
-  const setAdvancedInput = useUIStore(s => s.setAdvancedInput);
   const openDraftEditor = useDraftEditorStore(s => s.openEditor);
   const setSendCallback = useDraftEditorStore(s => s.setSendCallback);
   // Reactive active-tab checks (work for both bottom and right placement)
@@ -397,10 +393,6 @@ export function ChatInputArea({
           isLoading={isLoading}
           initialValue={messageInputInitialValue}
           initialAttachments={restoreMessage?.attachments ?? initialDraft?.attachments}
-          advancedMode={advancedInput}
-          onRequestAdvancedMode={
-            !isMobile && !advancedInput ? () => setAdvancedInput(true) : undefined
-          }
           mobileToolbarSlot={
             isMobile
               ? (() => {
@@ -556,7 +548,6 @@ export function ChatInputArea({
                 })()
               : undefined
           }
-          onToggleAdvanced={!isMobile ? () => setAdvancedInput(!advancedInput) : undefined}
           placeholder={
             !isConnected
               ? 'Connecting...'
@@ -564,9 +555,7 @@ export function ChatInputArea({
                 ? 'Type to queue a message — sends after this run (or Steer)...'
                 : isForcedPlanSession || mode === 'plan'
                   ? 'Plan Mode: Analyze and plan (no code changes)...'
-                  : advancedInput
-                    ? 'Type a message  ·  / commands  ·  @ files  ·  Cmd+Enter to send'
-                    : 'Type a message  ·  / commands  ·  @ files'
+                  : 'Type a message  ·  / commands  ·  @ files'
           }
         />
         {!isMobile && (

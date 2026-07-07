@@ -8,8 +8,6 @@ import {
   File as FileIcon,
   ChevronRight,
   Plus,
-  ChevronUp,
-  ChevronDown,
   FolderClosed,
 } from 'lucide-react';
 import { Icon } from '../../components/ui/Icon';
@@ -49,10 +47,7 @@ interface MessageInputProps {
   placeholder?: string;
   initialValue?: string; // Initial value to set (e.g., for restoring after cancel)
   initialAttachments?: Attachment[]; // Initial attachments to restore
-  advancedMode?: boolean; // Advanced input: larger textarea, Enter=newline on desktop
-  onToggleAdvanced?: () => void; // Toggle between normal and advanced mode
   mobileToolbarSlot?: React.ReactNode; // Extra buttons rendered in mobile action row
-  onRequestAdvancedMode?: () => void;
 }
 
 // State for @ mention feature
@@ -116,10 +111,7 @@ export function MessageInput({
   placeholder = 'Type a message...',
   initialValue,
   initialAttachments,
-  advancedMode = false,
-  onToggleAdvanced,
   mobileToolbarSlot,
-  onRequestAdvancedMode,
 }: MessageInputProps) {
   const getAvailableViewportHeight = useCallback(() => {
     if (typeof window === 'undefined') return 800;
@@ -129,7 +121,6 @@ export function MessageInput({
   const setDraft = useComposerStore(s => s.setDraft);
   const clearDraft = useComposerStore(s => s.clearDraft);
   const { agent } = useAgentForSession(sessionId);
-  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform);
   const [value, setValue] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
@@ -415,51 +406,33 @@ export function MessageInput({
   // Debounced fetch
   const debouncedFetchEntries = useMemo(() => debounce(fetchEntries, 150), [fetchEntries]);
 
-  // Auto-resize textarea height based on content and fall back to internal scrolling past a max height.
+  // Auto-resize: grow from one line up to a cap, then scroll. Bidirectional —
+  // resetting height to 'auto' before measuring lets it shrink as content is
+  // deleted. rich-textarea's backdrop tracks the textarea size via ResizeObserver.
   useEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
 
-    if (!advancedMode) {
-      if (!isMobile) {
-        // Desktop collapsed mode is intentionally fixed-height. As soon as content
-        // needs more than a single line, switch to advanced mode instead of
-        // stretching the baseline row and risking visual misalignment.
-        textarea.style.height = '24px';
-        textarea.style.maxHeight = '24px';
-        textarea.style.overflowY = 'hidden';
-        if (textarea.scrollHeight > textarea.clientHeight + 1) {
-          onRequestAdvancedMode?.();
-        }
-        return;
-      }
-
-      // Mobile collapsed composer can grow within the available viewport.
-      const maxHeight = expandedInputHeight;
+    if (isMobile) {
+      const max = expandedInputHeight;
       textarea.style.height = 'auto';
       textarea.style.height = `${Math.max(
         COLLAPSED_CONTROL_SIZE_PX,
-        Math.min(textarea.scrollHeight, maxHeight)
+        Math.min(textarea.scrollHeight, max)
       )}px`;
-      textarea.style.maxHeight = `${maxHeight}px`;
-      textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
-
-      if (isMobile) {
-        textarea.scrollTop = textarea.scrollHeight;
-      }
-    } else {
-      // Advanced mode: clear inline styles so CSS min/max + overflow takes effect
-      textarea.style.height = '';
-      textarea.style.overflowY = 'auto';
+      textarea.style.maxHeight = `${max}px`;
+      textarea.style.overflowY = textarea.scrollHeight > max ? 'auto' : 'hidden';
+      textarea.scrollTop = textarea.scrollHeight;
+      return;
     }
-  }, [
-    value,
-    advancedMode,
-    expandedInputHeight,
-    isMobile,
-    availableViewportHeight,
-    onRequestAdvancedMode,
-  ]);
+
+    // Desktop: grow to ~40% of the viewport (capped 320px), then scroll.
+    const max = Math.min(Math.floor(availableViewportHeight * 0.4), 320);
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.min(textarea.scrollHeight, max)}px`;
+    textarea.style.maxHeight = `${max}px`;
+    textarea.style.overflowY = textarea.scrollHeight > max ? 'auto' : 'hidden';
+  }, [value, isMobile, expandedInputHeight, availableViewportHeight]);
 
   useEffect(() => {
     if (!isMobile) return;
@@ -702,47 +675,15 @@ export function MessageInput({
       }
     }
 
-    // Enter key behavior (guarded by IME composition state)
+    // Enter key behavior (guarded by IME composition state).
+    // Desktop: Enter sends, Shift+Enter inserts a newline.
+    // Mobile: Enter is always a newline; sending is limited to the send button.
     if (e.key === 'Enter' && !isComposing && !e.nativeEvent.isComposing) {
-      if (isMobile) {
-        // Mobile composer should always treat Enter as a newline. Sending is
-        // intentionally limited to the explicit send button.
+      if (!isMobile && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
         return;
       }
-
-      if (advancedMode) {
-        // Advanced + desktop: Cmd/Ctrl+Enter sends, plain Enter is newline
-        if (e.metaKey || e.ctrlKey) {
-          e.preventDefault();
-          handleSend();
-          return;
-        }
-        // Plain Enter: don't preventDefault — let textarea insert newline
-      } else {
-        // Normal mode: Enter sends, Shift+Enter is newline
-        if (!e.shiftKey) {
-          e.preventDefault();
-          handleSend();
-          return;
-        }
-      }
-    }
-
-    // Tab to insert spaces (advanced mode only, when no dropdown is open)
-    if (e.key === 'Tab' && advancedMode && !showCommands && !mentionState.isActive) {
-      e.preventDefault();
-      const target = e.currentTarget;
-      const start = target.selectionStart;
-      const end = target.selectionEnd;
-      const newValue = value.substring(0, start) + '  ' + value.substring(end);
-      updateValue(newValue);
-      setTimeout(() => {
-        if (textareaRef.current) {
-          textareaRef.current.selectionStart = start + 2;
-          textareaRef.current.selectionEnd = start + 2;
-        }
-      }, 0);
-      return;
     }
 
     // Escape to cancel loading
@@ -1160,108 +1101,13 @@ export function MessageInput({
             )}
           </div>
         </div>
-      ) : advancedMode ? (
-        /* Desktop advanced: textarea owns the top area; actions live in a separate bottom bar. */
-        <div
-          data-testid="composer-box"
-          className="flex flex-col rounded-2xl border border-border bg-input px-4 pt-3 pb-2 transition-colors duration-200 focus-within:border-primary/60 focus-within:shadow-apple-md"
-        >
-          <RichTextarea
-            data-testid="message-input"
-            ref={textareaRef}
-            value={value}
-            onChange={handleChange}
-            onKeyDown={handleKeyDown}
-            onPaste={handlePaste}
-            onCompositionStart={() => {
-              if (compositionTimeoutRef.current) {
-                clearTimeout(compositionTimeoutRef.current);
-                compositionTimeoutRef.current = null;
-              }
-              setIsComposing(true);
-            }}
-            onCompositionEnd={() => {
-              compositionTimeoutRef.current = setTimeout(() => {
-                setIsComposing(false);
-                compositionTimeoutRef.current = null;
-              }, 50);
-            }}
-            disabled={disabled}
-            placeholder={placeholder}
-            spellCheck={false}
-            autoCorrect="off"
-            autoCapitalize="off"
-            autoComplete="off"
-            rows={1}
-            className="relative w-full resize-none overflow-auto border-0 bg-transparent px-0 py-1 pr-2 leading-6 whitespace-pre-wrap break-words placeholder:text-muted-foreground/60 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{
-              fontSize: 'var(--chat-font-input, 0.875rem)',
-              width: '100%',
-              minHeight: `${expandedInputHeight}px`,
-              maxHeight: `${expandedInputMaxHeight}px`,
-              color: 'hsl(var(--foreground))',
-              caretColor: 'hsl(var(--foreground))',
-            }}
-          >
-            {(v: string) => renderSkillTokens(v, skillIds, commandSet)}
-          </RichTextarea>
-
-          <div className="mt-2 flex items-center gap-2">
-            <button
-              data-testid="attach-button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={disabled}
-              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Add attachment (images, files)"
-            >
-              <Plus size={18} strokeWidth={1.75} />
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept="image/*,.pdf,.txt,.md,.json,.csv"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-            <div className="flex-1" />
-            {onToggleAdvanced && (
-              <button
-                data-testid="advanced-toggle"
-                onClick={onToggleAdvanced}
-                className="flex h-6 w-6 flex-shrink-0 items-center justify-center text-primary transition-colors"
-                title="Normal input"
-              >
-                <ChevronDown size={14} strokeWidth={2} />
-              </button>
-            )}
-            {isLoading && onCancel ? (
-              <button
-                data-testid="cancel-button"
-                onClick={onCancel}
-                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-foreground text-background hover:bg-foreground/90"
-                title="Cancel (Esc)"
-              >
-                <Square size={12} fill="currentColor" strokeWidth={0} />
-              </button>
-            ) : (
-              <button
-                data-testid="send-button"
-                onClick={handleSend}
-                disabled={disabled || (!value.trim() && attachments.length === 0)}
-                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
-                title={`Send message (${isMac ? 'Cmd' : 'Ctrl'}+Enter)`}
-              >
-                <ArrowUp size={18} strokeWidth={2.25} />
-              </button>
-            )}
-          </div>
-        </div>
       ) : (
-        /* Desktop collapsed: single-row layout — all controls inside the bordered box */
+        /* Desktop: one auto-growing composer. Single row at rest; grows
+           line-by-line up to a viewport cap then scrolls; +/send stay anchored
+           to the bottom (items-end) as it grows. */
         <div
           data-testid="composer-box"
-          className="flex min-h-12 items-center gap-2 rounded-2xl border border-border bg-input px-2.5 transition-colors duration-200 focus-within:border-primary/60 focus-within:shadow-apple-md"
+          className="flex items-end gap-2 rounded-2xl border border-border bg-input px-2.5 py-2 transition-colors duration-200 focus-within:border-primary/60 focus-within:shadow-apple-md"
         >
           {/* Attachment button */}
           <button
@@ -1282,11 +1128,10 @@ export function MessageInput({
             className="hidden"
           />
 
-          {/* Text input */}
-          {/* flex + items-center centers rich-textarea's inline-block root and
-              removes the inline-block baseline gap that otherwise pushes the
-              single-line text above the row's vertical center. */}
-          <div className="flex-1 relative flex items-center">
+          {/* flex + items-end keeps rich-textarea's inline-block root
+              bottom-aligned (kills the inline-block baseline gap) so the single
+              line sits correctly and +/send stay pinned to the bottom as it grows. */}
+          <div className="flex-1 relative flex items-end">
             <RichTextarea
               data-testid="message-input"
               ref={textareaRef}
@@ -1314,10 +1159,11 @@ export function MessageInput({
               autoCapitalize="off"
               autoComplete="off"
               rows={1}
-              className="relative block h-6 w-full resize-none overflow-hidden border-0 bg-transparent p-0 leading-6 whitespace-pre-wrap break-words placeholder:text-muted-foreground/60 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+              className="relative block w-full resize-none border-0 bg-transparent p-0 leading-6 whitespace-pre-wrap break-words placeholder:text-muted-foreground/60 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
               style={{
                 fontSize: 'var(--chat-font-input, 0.875rem)',
                 width: '100%',
+                minHeight: '1.5rem',
                 color: 'hsl(var(--foreground))',
                 caretColor: 'hsl(var(--foreground))',
               }}
@@ -1325,19 +1171,6 @@ export function MessageInput({
               {(v: string) => renderSkillTokens(v, skillIds, commandSet)}
             </RichTextarea>
           </div>
-
-          {/* Multiline toggle (only when onToggleAdvanced is provided) — kept
-                visually light: small bare icon, no hover box, sits close to Send. */}
-          {onToggleAdvanced && (
-            <button
-              data-testid="advanced-toggle"
-              onClick={onToggleAdvanced}
-              className="flex h-6 w-6 flex-shrink-0 items-center justify-center -mr-1 text-muted-foreground/50 transition-colors hover:text-foreground"
-              title="Advanced input (Enter to newline)"
-            >
-              <ChevronUp size={14} strokeWidth={2} />
-            </button>
-          )}
 
           {/* Send/Cancel button */}
           {isLoading && onCancel ? (

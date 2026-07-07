@@ -86,21 +86,6 @@ describe('uiStore', () => {
     });
   });
 
-  describe('advancedInput', () => {
-    it('setAdvancedInput enables advanced input', () => {
-      useUIStore.getState().setAdvancedInput(true);
-      expect(useUIStore.getState().advancedInput).toBe(true);
-      expect(localStorage.getItem('zclaudia-advanced-input')).toBe('true');
-    });
-
-    it('setAdvancedInput disables advanced input', () => {
-      useUIStore.getState().setAdvancedInput(true);
-      useUIStore.getState().setAdvancedInput(false);
-      expect(useUIStore.getState().advancedInput).toBe(false);
-      expect(localStorage.getItem('zclaudia-advanced-input')).toBe('false');
-    });
-  });
-
   describe('forceScrollToBottom', () => {
     it('requestForceScrollToBottom sets sessionId', () => {
       useUIStore.getState().requestForceScrollToBottom('s1');

@@ -90,23 +90,9 @@ describe('MessageInput', () => {
     expect(box.querySelector('[data-testid="send-button"]')).not.toBeNull();
   });
 
-  it('shows the multiline toggle when onToggleAdvanced is provided', () => {
-    const { getByTestId } = render(<MessageInput {...defaultProps} onToggleAdvanced={() => {}} />);
-    expect(getByTestId('advanced-toggle')).toBeInTheDocument();
-  });
-
-  it('hides the multiline toggle when onToggleAdvanced is not provided', () => {
+  it('does not render an advanced-mode toggle', () => {
     const { queryByTestId } = render(<MessageInput {...defaultProps} />);
     expect(queryByTestId('advanced-toggle')).toBeNull();
-  });
-
-  it('calls onToggleAdvanced when the multiline toggle is clicked', () => {
-    const onToggleAdvanced = vi.fn();
-    const { getByTestId } = render(
-      <MessageInput {...defaultProps} onToggleAdvanced={onToggleAdvanced} />
-    );
-    fireEvent.click(getByTestId('advanced-toggle'));
-    expect(onToggleAdvanced).toHaveBeenCalledTimes(1);
   });
 
   it('drops the old helper-text lines', () => {
@@ -528,108 +514,49 @@ describe('MessageInput', () => {
     });
   });
 
-  // ── Advanced mode ─────────────────────────────────────────────────────────
+  // ── Auto-grow ──────────────────────────────────────────────────────────────
 
-  describe('advanced mode', () => {
-    it('renders larger textarea in advanced mode', () => {
-      render(<MessageInput {...defaultProps} advancedMode />);
-      const textarea = screen.getByPlaceholderText(/Type a message/) as HTMLTextAreaElement;
-      expect(textarea.style.minHeight).toBe('160px');
-      expect(textarea.className).toContain('resize-none');
-    });
-
-    it('renders normal textarea with smaller min-height when not in advanced mode', () => {
+  describe('auto-grow', () => {
+    it('renders a single-row composer that keeps controls inside the bordered box', () => {
       render(<MessageInput {...defaultProps} />);
       const textarea = screen.getByPlaceholderText(/Type a message/);
-      expect(textarea.className).toContain('h-6');
       expect(textarea.className).toContain('leading-6');
       expect(textarea.className).toContain('resize-none');
       const box = screen.getByTestId('composer-box');
-      expect(box.className).toContain('items-center');
-      expect(box.className).toContain('min-h-12');
-      expect(box.className).not.toContain('items-end');
-    });
-
-    it('pins single-line collapsed composer height to the shared control size', () => {
-      render(<MessageInput {...defaultProps} />);
-      const textarea = screen.getByPlaceholderText(/Type a message/) as HTMLTextAreaElement;
-      Object.defineProperty(textarea, 'scrollHeight', { configurable: true, value: 40 });
-      fireEvent.change(textarea, { target: { value: 'short' } });
-      expect(textarea.style.height).toBe('24px');
-    });
-
-    it('uses a stacked desktop advanced composer so controls do not indent the text area', () => {
-      render(<MessageInput {...defaultProps} advancedMode />);
-      const box = screen.getByTestId('composer-box');
-      expect(box.className).toContain('flex-col');
-      expect(box.className).not.toContain('items-center');
+      expect(box.className).toContain('items-end');
       expect(box.querySelector('[data-testid="message-input"]')).not.toBeNull();
       expect(box.querySelector('[data-testid="attach-button"]')).not.toBeNull();
       expect(box.querySelector('[data-testid="send-button"]')).not.toBeNull();
     });
 
-    it('keeps collapsed desktop composer center-aligned even once content exceeds a single line', () => {
+    it('grows the textarea height to fit content up to the cap', () => {
       render(<MessageInput {...defaultProps} />);
-      const textarea = screen.getByPlaceholderText(/Type a message/) as HTMLTextAreaElement;
-      Object.defineProperty(textarea, 'scrollHeight', { configurable: true, value: 72 });
-      fireEvent.change(textarea, { target: { value: 'line 1\nline 2' } });
-      const box = screen.getByTestId('composer-box');
-      expect(box.className).toContain('items-center');
-      expect(box.className).not.toContain('items-end');
+      const textarea = screen.getByTestId('message-input') as HTMLTextAreaElement;
+      Object.defineProperty(textarea, 'scrollHeight', { configurable: true, value: 80 });
+      fireEvent.change(textarea, { target: { value: 'line1\nline2\nline3' } });
+      expect(textarea.style.height).toBe('80px');
+      expect(textarea.style.overflowY).toBe('hidden');
     });
 
-    it('does not send on plain Enter in advanced mode (desktop)', () => {
-      const onSend = vi.fn();
-      render(<MessageInput {...defaultProps} onSend={onSend} advancedMode />);
-      const textarea = screen.getByPlaceholderText(/Type a message/);
-      fireEvent.change(textarea, { target: { value: 'Test' } });
-      fireEvent.keyDown(textarea, { key: 'Enter' });
-      expect(onSend).not.toHaveBeenCalled();
+    it('caps height and enables internal scroll past the max', () => {
+      render(<MessageInput {...defaultProps} />);
+      const textarea = screen.getByTestId('message-input') as HTMLTextAreaElement;
+      Object.defineProperty(textarea, 'scrollHeight', { configurable: true, value: 9999 });
+      fireEvent.change(textarea, { target: { value: 'many\nlines\nhere' } });
+      expect(textarea.style.overflowY).toBe('auto');
+      expect(parseInt(textarea.style.maxHeight, 10)).toBeLessThanOrEqual(320);
+      expect(textarea.style.height).toBe(textarea.style.maxHeight);
     });
 
-    it('sends on Cmd+Enter in advanced mode', () => {
-      const onSend = vi.fn();
-      render(<MessageInput {...defaultProps} onSend={onSend} advancedMode />);
-      const textarea = screen.getByPlaceholderText(/Type a message/);
-      fireEvent.change(textarea, { target: { value: 'Test' } });
-      fireEvent.keyDown(textarea, { key: 'Enter', metaKey: true });
-      expect(onSend).toHaveBeenCalledWith('Test', undefined);
-    });
-
-    it('sends on Ctrl+Enter in advanced mode', () => {
-      const onSend = vi.fn();
-      render(<MessageInput {...defaultProps} onSend={onSend} advancedMode />);
-      const textarea = screen.getByPlaceholderText(/Type a message/);
-      fireEvent.change(textarea, { target: { value: 'Test' } });
-      fireEvent.keyDown(textarea, { key: 'Enter', ctrlKey: true });
-      expect(onSend).toHaveBeenCalledWith('Test', undefined);
-    });
-
-    it('inserts spaces on Tab in advanced mode', () => {
-      render(<MessageInput {...defaultProps} advancedMode />);
-      const textarea = screen.getByPlaceholderText(/Type a message/) as HTMLTextAreaElement;
-      fireEvent.change(textarea, { target: { value: 'hello' } });
-      textarea.selectionStart = 5;
-      textarea.selectionEnd = 5;
-      fireEvent.keyDown(textarea, { key: 'Tab' });
-      expect(textarea.value).toContain('  ');
-    });
-
-    it('shows send button with Cmd+Enter title in advanced mode', () => {
-      render(<MessageInput {...defaultProps} advancedMode />);
-      expect(screen.getByTitle(/Send message \((Cmd|Ctrl)\+Enter\)/)).toBeInTheDocument();
-    });
-
-    it('restores vertical scrolling when switching to advanced mode', () => {
-      const { rerender } = render(<MessageInput {...defaultProps} />);
-      const collapsedTextarea = screen.getByPlaceholderText(
-        /Type a message/
-      ) as HTMLTextAreaElement;
-      fireEvent.change(collapsedTextarea, { target: { value: 'short' } });
-      expect(collapsedTextarea.style.overflowY).toBe('hidden');
-      rerender(<MessageInput {...defaultProps} advancedMode />);
-      const advancedTextarea = screen.getByPlaceholderText(/Type a message/) as HTMLTextAreaElement;
-      expect(advancedTextarea.style.overflowY).toBe('auto');
+    it('shrinks height back down as content is deleted', () => {
+      render(<MessageInput {...defaultProps} />);
+      const textarea = screen.getByTestId('message-input') as HTMLTextAreaElement;
+      Object.defineProperty(textarea, 'scrollHeight', { configurable: true, value: 200 });
+      fireEvent.change(textarea, { target: { value: 'a\nb\nc\nd\ne' } });
+      expect(textarea.style.height).toBe('200px');
+      Object.defineProperty(textarea, 'scrollHeight', { configurable: true, value: 24 });
+      fireEvent.change(textarea, { target: { value: 'a' } });
+      expect(textarea.style.height).toBe('24px');
     });
   });
 

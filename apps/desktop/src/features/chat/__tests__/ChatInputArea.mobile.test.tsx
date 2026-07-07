@@ -238,7 +238,6 @@ const baseProps = {
     inputTokens: 0,
     outputTokens: 0,
   },
-  advancedInput: false,
   restoreMessage: null,
   initialDraft: { content: '', attachments: [] },
   draftExists: false,

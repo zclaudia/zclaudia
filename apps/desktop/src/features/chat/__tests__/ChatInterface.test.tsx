@@ -91,10 +91,8 @@ vi.mock('../MessageInput', () => ({
       data-disabled={props.disabled}
       data-loading={props.isLoading}
       data-placeholder={props.placeholder}
-      data-advanced={props.advancedMode}
       data-initial-value={props.initialValue || ''}
       data-initial-attachments={JSON.stringify(props.initialAttachments || [])}
-      data-has-toggle-advanced={props.onToggleAdvanced != null ? 'true' : 'false'}
     >
       <button data-testid="send-btn" onClick={() => props.onSend?.('hello')}>
         Send
@@ -108,15 +106,6 @@ vi.mock('../MessageInput', () => ({
       <button data-testid="command-btn" onClick={() => props.onCommand?.('/help', '')}>
         Command
       </button>
-      {props.onToggleAdvanced && (
-        <button
-          data-testid="toggle-advanced-btn"
-          title={props.advancedMode ? 'Normal input' : 'Advanced input (Enter to newline)'}
-          onClick={() => props.onToggleAdvanced?.()}
-        >
-          toggle advanced
-        </button>
-      )}
     </div>
   ),
 }));
@@ -459,10 +448,8 @@ function setDefaultStores(overrides?: {
     setActiveTab: vi.fn(),
   });
   useUIStore.setState({
-    advancedInput: false,
     forceScrollToBottomSessionId: null,
     poppedOutSessions: new Map(),
-    setAdvancedInput: vi.fn(),
     consumeForceScrollToBottom: vi.fn(),
     addPoppedOutSession: vi.fn(),
     removePoppedOutSession: vi.fn(),
@@ -1434,33 +1421,6 @@ describe('ChatInterface', () => {
     expect(container.querySelector('[data-testid="worktree-selector"]')).toBeNull();
   });
 
-  // ─── Advanced Input Toggle ────────────────────────────────────────────
-
-  it('renders advanced input toggle button (wired into MessageInput via onToggleAdvanced)', () => {
-    const { container } = render(<ChatInterface sessionId="sess-1" />);
-    // The toggle is now an inline control inside MessageInput, not a separate toolbar button.
-    const btn = container.querySelector('button[title="Advanced input (Enter to newline)"]');
-    expect(btn).toBeTruthy();
-  });
-
-  it('passes advancedMode=false by default to MessageInput', () => {
-    const { container } = render(<ChatInterface sessionId="sess-1" />);
-    const input = container.querySelector('[data-testid="message-input"]');
-    expect(input?.getAttribute('data-advanced')).toBe('false');
-  });
-
-  it('passes advancedMode=true when advancedInput is enabled', () => {
-    setDefaultStores({
-      uiStore: {
-        advancedInput: true,
-        poppedOutSessions: new Map(),
-      },
-    });
-    const { container } = render(<ChatInterface sessionId="sess-1" />);
-    const input = container.querySelector('[data-testid="message-input"]');
-    expect(input?.getAttribute('data-advanced')).toBe('true');
-  });
-
   // ─── MessageInput Placeholder Texts ───────────────────────────────────
 
   it('shows default placeholder when connected and not loading', () => {
@@ -1837,24 +1797,6 @@ describe('ChatInterface', () => {
     const { container } = render(<ChatInterface sessionId="sess-1" />);
     const wt = container.querySelector('[data-testid="worktree-selector"]');
     expect(wt?.getAttribute('data-locked')).toBe('true');
-  });
-
-  // ─── Advanced input toggle text ───────────────────────────────────────
-
-  it('shows correct placeholder for advanced input mode', () => {
-    setDefaultStores({
-      uiStore: {
-        advancedInput: true,
-        poppedOutSessions: new Map(),
-      },
-      chatMessageStore: {
-        messages: {},
-        pagination: { 'sess-1': { total: 0, hasMore: false } },
-      },
-    });
-    const { container } = render(<ChatInterface sessionId="sess-1" />);
-    const input = container.querySelector('[data-testid="message-input"]');
-    expect(input?.getAttribute('data-placeholder')).toContain('Cmd+Enter to send');
   });
 
   // ─── Permission override passed in run_start ──────────────────────────

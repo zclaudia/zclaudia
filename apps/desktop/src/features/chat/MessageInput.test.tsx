@@ -330,118 +330,43 @@ describe('MessageInput', () => {
     });
   });
 
-  // ── Advanced mode ─────────────────────────────────────────────────────────
+  // ── Auto-grow ──────────────────────────────────────────────────────────────
 
-  describe('advanced mode', () => {
-    it('renders larger textarea with resize in advanced mode', () => {
-      render(<MessageInput {...defaultProps} advancedMode />);
-      const textarea = screen.getByPlaceholderText(/Type a message/) as HTMLTextAreaElement;
-      expect(textarea.className).toContain('resize-none');
-      expect(textarea.style.minHeight).toBe('160px');
-    });
-
-    it('renders normal textarea when not in advanced mode', () => {
+  describe('auto-grow', () => {
+    it('grows the textarea height to fit content up to the cap', () => {
       render(<MessageInput {...defaultProps} />);
-      const textarea = screen.getByPlaceholderText(/Type a message/);
-      expect(textarea.className).toContain('h-6');
-      expect(textarea.className).toContain('leading-6');
-      const box = screen.getByTestId('composer-box');
-      expect(box.className).toContain('min-h-12');
-      expect(box.className).toContain('items-center');
+      const textarea = screen.getByTestId('message-input') as HTMLTextAreaElement;
+      Object.defineProperty(textarea, 'scrollHeight', { configurable: true, value: 80 });
+      fireEvent.change(textarea, { target: { value: 'line1\nline2\nline3' } });
+      expect(textarea.style.height).toBe('80px');
+      expect(textarea.style.overflowY).toBe('hidden');
     });
 
-    it('does not send on plain Enter in advanced mode', () => {
-      const onSend = vi.fn();
-      render(<MessageInput {...defaultProps} onSend={onSend} advancedMode />);
-      const textarea = screen.getByPlaceholderText(/Type a message/);
-      fireEvent.change(textarea, { target: { value: 'Test' } });
-      fireEvent.keyDown(textarea, { key: 'Enter' });
-      expect(onSend).not.toHaveBeenCalled();
-    });
-
-    it('sends on Cmd+Enter in advanced mode', () => {
-      const onSend = vi.fn();
-      render(<MessageInput {...defaultProps} onSend={onSend} advancedMode />);
-      const textarea = screen.getByPlaceholderText(/Type a message/);
-      fireEvent.change(textarea, { target: { value: 'Test' } });
-      fireEvent.keyDown(textarea, { key: 'Enter', metaKey: true });
-      expect(onSend).toHaveBeenCalledWith('Test', undefined);
-    });
-
-    it('inserts spaces on Tab in advanced mode', () => {
-      render(<MessageInput {...defaultProps} advancedMode />);
-      const textarea = screen.getByPlaceholderText(/Type a message/) as HTMLTextAreaElement;
-      fireEvent.change(textarea, { target: { value: 'hello' } });
-      textarea.selectionStart = 5;
-      textarea.selectionEnd = 5;
-      fireEvent.keyDown(textarea, { key: 'Tab' });
-      expect(textarea.value).toContain('  ');
-    });
-
-    it('shows send button with Cmd+Enter title', () => {
-      render(<MessageInput {...defaultProps} advancedMode />);
-      expect(screen.getByTitle(/Send message \((Cmd|Ctrl)\+Enter\)/)).toBeInTheDocument();
-    });
-
-    it('restores scrolling when switching to advanced mode', () => {
-      const { rerender } = render(<MessageInput {...defaultProps} />);
-      const collapsedTextarea = screen.getByPlaceholderText(
-        /Type a message/
-      ) as HTMLTextAreaElement;
-      fireEvent.change(collapsedTextarea, { target: { value: 'short' } });
-      expect(collapsedTextarea.style.overflowY).toBe('hidden');
-      rerender(<MessageInput {...defaultProps} advancedMode />);
-      const advancedTextarea = screen.getByPlaceholderText(/Type a message/) as HTMLTextAreaElement;
-      expect(advancedTextarea.style.overflowY).toBe('auto');
-    });
-
-    it('keeps collapsed desktop textarea capped to a single-line height', () => {
+    it('caps height and enables internal scroll past the max', () => {
       render(<MessageInput {...defaultProps} />);
-      const textarea = screen.getByPlaceholderText(/Type a message/) as HTMLTextAreaElement;
-      fireEvent.change(textarea, {
-        target: { value: 'long content that should still cap the collapsed composer height' },
-      });
-      expect(textarea.style.maxHeight).toBe('24px');
+      const textarea = screen.getByTestId('message-input') as HTMLTextAreaElement;
+      Object.defineProperty(textarea, 'scrollHeight', { configurable: true, value: 9999 });
+      fireEvent.change(textarea, { target: { value: 'many\nlines\nhere' } });
+      expect(textarea.style.overflowY).toBe('auto');
+      // capped at min(40% viewport, 320)
+      expect(parseInt(textarea.style.maxHeight, 10)).toBeLessThanOrEqual(320);
+      expect(textarea.style.height).toBe(textarea.style.maxHeight);
     });
 
-    it('pins single-line collapsed composer height to the shared control size', () => {
+    it('shrinks height back down as content is deleted', () => {
       render(<MessageInput {...defaultProps} />);
-      const textarea = screen.getByPlaceholderText(/Type a message/) as HTMLTextAreaElement;
-      Object.defineProperty(textarea, 'scrollHeight', {
-        configurable: true,
-        value: 40,
-      });
-      fireEvent.change(textarea, { target: { value: 'short' } });
+      const textarea = screen.getByTestId('message-input') as HTMLTextAreaElement;
+      Object.defineProperty(textarea, 'scrollHeight', { configurable: true, value: 200 });
+      fireEvent.change(textarea, { target: { value: 'a\nb\nc\nd\ne' } });
+      expect(textarea.style.height).toBe('200px');
+      Object.defineProperty(textarea, 'scrollHeight', { configurable: true, value: 24 });
+      fireEvent.change(textarea, { target: { value: 'a' } });
       expect(textarea.style.height).toBe('24px');
     });
 
-    it('requests advanced mode when collapsed desktop input exceeds the max height', () => {
-      const onRequestAdvancedMode = vi.fn();
-      render(<MessageInput {...defaultProps} onRequestAdvancedMode={onRequestAdvancedMode} />);
-      const textarea = screen.getByPlaceholderText(/Type a message/) as HTMLTextAreaElement;
-      Object.defineProperty(textarea, 'scrollHeight', {
-        configurable: true,
-        value: 220,
-      });
-      fireEvent.change(textarea, { target: { value: 'content that exceeds collapsed height' } });
-      expect(onRequestAdvancedMode).toHaveBeenCalledTimes(1);
-    });
-
-    it('keeps collapsed desktop controls center-aligned even when the textarea grows taller', () => {
+    it('does not render an advanced-mode toggle', () => {
       render(<MessageInput {...defaultProps} />);
-      const textarea = screen.getByPlaceholderText(/Type a message/) as HTMLTextAreaElement;
-      Object.defineProperty(textarea, 'scrollHeight', {
-        configurable: true,
-        value: 72,
-      });
-      fireEvent.change(textarea, { target: { value: 'line 1\nline 2' } });
-      const row = screen.getByTestId('composer-box');
-      expect(row.className).toContain('items-center');
-      expect(row.className).not.toContain('items-end');
-      expect(screen.getByTitle('Add attachment (images, files)').className).not.toContain(
-        'self-end'
-      );
-      expect(screen.getByTestId('send-button').className).not.toContain('self-end');
+      expect(screen.queryByTestId('advanced-toggle')).toBeNull();
     });
   });
 

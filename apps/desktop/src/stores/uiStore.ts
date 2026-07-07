@@ -39,7 +39,6 @@ const FONT_CONFIGS: Record<FontSizePreset, FontSizeConfig> = {
 };
 
 const STORAGE_KEY = 'zclaudia-font-size';
-const ADV_INPUT_KEY = 'zclaudia-advanced-input';
 const NOTCH_PANEL_KEY = 'zclaudia-show-notch-panel';
 const NOTCH_MONITOR_KEY = 'zclaudia-notch-monitor';
 
@@ -72,8 +71,6 @@ function applyFontVars(preset: FontSizePreset) {
 interface UIState {
   fontSize: FontSizePreset;
   setFontSize: (size: FontSizePreset) => void;
-  advancedInput: boolean;
-  setAdvancedInput: (enabled: boolean) => void;
   forceScrollToBottomSessionId: string | null;
   requestForceScrollToBottom: (sessionId: string) => void;
   consumeForceScrollToBottom: (sessionId: string) => void;
@@ -95,13 +92,6 @@ export const useUIStore = create<UIState>(set => {
   const initial = loadFontSize();
   // Apply on store creation
   applyFontVars(initial);
-
-  let advInitial = false;
-  try {
-    advInitial = localStorage.getItem(ADV_INPUT_KEY) === 'true';
-  } catch {
-    /* ignore */
-  }
 
   let notchInitial = true;
   try {
@@ -140,11 +130,6 @@ export const useUIStore = create<UIState>(set => {
         localStorage.setItem(NOTCH_MONITOR_KEY, String(index));
       }
       set({ notchMonitor: index });
-    },
-    advancedInput: advInitial,
-    setAdvancedInput: enabled => {
-      localStorage.setItem(ADV_INPUT_KEY, String(enabled));
-      set({ advancedInput: enabled });
     },
     forceScrollToBottomSessionId: null,
     requestForceScrollToBottom: sessionId => {
