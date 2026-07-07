@@ -28,6 +28,7 @@ import {
 } from '@zclaudia/shared';
 import * as api from '../../services/api';
 import { EditorSection, FieldLabel } from './ui/EditorSection';
+import { Chip } from './ui/Chip';
 
 /**
  * Parent must remount this component per identity — key it by
@@ -217,6 +218,7 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
   const [expandedCapabilitySectionIds, setExpandedCapabilitySectionIds] = useState<
     CapabilitySectionId[]
   >([]);
+  const [systemPromptExpanded, setSystemPromptExpanded] = useState(false);
 
   const [pendingDelete, setPendingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -699,77 +701,33 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
   const pinnedSkillCount = formSkillSelection.pinned?.length ?? 0;
   const skillPolicyOverrideCount = formSkillExecution.overrides?.length ?? 0;
 
+  // Chip summary of the currently-attached capabilities. Display-only preview
+  // above the accordions; removal reuses the existing disable handlers.
+  const enabledToolSetChips = builtinToolSetEntries.filter(set =>
+    formToolSelection.sets.some(selected => selected.source === 'builtin' && selected.id === set.id)
+  );
+  const mcpProviderChips = externalProviders.filter(provider => provider.source === 'mcp');
+  const pinnedSkillChips = (formSkillSelection.pinned ?? []).map(ref => {
+    const key = skillRefKey(ref);
+    const skill = skillCatalog.find(candidate => skillRefKey(skillRefFor(candidate)) === key);
+    return {
+      key,
+      label: skill?.name || skill?.id || ref.id,
+      skill,
+    };
+  });
+  const hasAttachedCapabilities =
+    enabledToolSetChips.length > 0 || mcpProviderChips.length > 0 || pinnedSkillChips.length > 0;
+
+  const systemPromptPreview = formSystemPrompt.trim().split('\n')[0] || '';
+
   return (
     <div
       data-testid="agent-profile-editor"
       className="mx-auto flex w-full max-w-[760px] flex-col gap-4 pb-4"
     >
-      <EditorSection title="Profile details">
-        <div>
-          <FieldLabel>Name *</FieldLabel>
-          <input
-            type="text"
-            value={formName}
-            onChange={e => setFormName(e.target.value)}
-            placeholder="e.g., Default Coding Agent"
-            className={FIELD_CLASS}
-          />
-        </div>
-
-        <div>
-          <FieldLabel>Description (optional)</FieldLabel>
-          <textarea
-            value={formDescription}
-            onChange={e => setFormDescription(e.target.value)}
-            placeholder="What this agent is for"
-            rows={2}
-            className={TEXTAREA_CLASS}
-          />
-        </div>
-
-        <label className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/55 px-3 py-2.5">
-          <span className="min-w-0">
-            <span className="block text-sm text-foreground">Set as default agent</span>
-            <span className="block text-xs text-muted-foreground">
-              Use this profile when a project has no explicit agent selection.
-            </span>
-          </span>
-          <input
-            type="checkbox"
-            id="agentIsDefault"
-            checked={formIsDefault}
-            onChange={e => setFormIsDefault(e.target.checked)}
-            className="shrink-0 rounded-md border-border bg-background"
-          />
-        </label>
-      </EditorSection>
-
-      <EditorSection title="Runtime">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <FieldLabel htmlFor="agent-profile-runtime">Agent Type</FieldLabel>
-            <select
-              id="agent-profile-runtime"
-              value={formRuntimeType}
-              onChange={e => setFormRuntimeType(e.target.value as RuntimeOption)}
-              className={FIELD_CLASS}
-            >
-              <option value="zclaudia">ZClaudia</option>
-              <option value="claude">Claude</option>
-            </select>
-          </div>
-
-          <ThinkingLevelSelector value={formThinkingLevel} onChange={setFormThinkingLevel} />
-        </div>
-
-        {formRuntimeType === 'claude' && (
-          <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-muted-foreground">
-            Claude uses the Claude Agent SDK runtime. AI review, multimodal attachments and
-            fallback, and background task controls are zclaudia-only in this phase.
-          </p>
-        )}
-
-        <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <EditorSection title="Model">
           <LlmProfileSelector
             value={formLlmProfileId}
             onChange={id => {
@@ -793,51 +751,75 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
             onChange={setFormModel}
             llmProfile={llmProfiles.find(p => p.id === formLlmProfileId)}
           />
-        </div>
 
-        <ModelDeclarationWarning
-          formModel={formModel}
-          llmProfile={llmProfiles.find(p => p.id === formLlmProfileId)}
-        />
+          <ModelDeclarationWarning
+            formModel={formModel}
+            llmProfile={llmProfiles.find(p => p.id === formLlmProfileId)}
+          />
+
+          <ThinkingLevelSelector value={formThinkingLevel} onChange={setFormThinkingLevel} />
+        </EditorSection>
 
         {formRuntimeType !== 'claude' && (
-          <MultimodalFallbackSelector
-            profiles={llmProfiles}
-            profileId={formFallbackLlmProfileId}
-            model={formFallbackModel}
-            onProfileChange={id => {
-              setFormFallbackLlmProfileId(id);
-              if (!id) {
-                setFormFallbackModel('');
-                return;
-              }
-              const nextProfile = llmProfiles.find(p => p.id === id);
-              if (
-                formFallbackModel &&
-                !fallbackModelValidForProfile(formFallbackModel, nextProfile)
-              ) {
-                setFormFallbackModel('');
-              }
-            }}
-            onModelChange={setFormFallbackModel}
-          />
+          <EditorSection title="Multimodal fallback">
+            <MultimodalFallbackSelector
+              profiles={llmProfiles}
+              profileId={formFallbackLlmProfileId}
+              model={formFallbackModel}
+              onProfileChange={id => {
+                setFormFallbackLlmProfileId(id);
+                if (!id) {
+                  setFormFallbackModel('');
+                  return;
+                }
+                const nextProfile = llmProfiles.find(p => p.id === id);
+                if (
+                  formFallbackModel &&
+                  !fallbackModelValidForProfile(formFallbackModel, nextProfile)
+                ) {
+                  setFormFallbackModel('');
+                }
+              }}
+              onModelChange={setFormFallbackModel}
+            />
+          </EditorSection>
         )}
-      </EditorSection>
-
-      <EditorSection title="System Prompt">
-        <textarea
-          value={formSystemPrompt}
-          onChange={e => setFormSystemPrompt(e.target.value)}
-          placeholder="You are a helpful coding agent..."
-          rows={9}
-          className={`${MONO_FIELD_CLASS} min-h-[180px] resize-y`}
-        />
-      </EditorSection>
+      </div>
 
       <EditorSection
         title="Capabilities"
         description="Configure built-in tools, external providers, and skill execution for this profile."
       >
+        <div>
+          <div className="mb-2 text-xs font-medium text-muted-foreground">Attached capabilities</div>
+          {hasAttachedCapabilities ? (
+            <div className="flex flex-wrap gap-2">
+              {enabledToolSetChips.map(set => (
+                <Chip
+                  key={`toolset:${set.id}`}
+                  label={set.label}
+                  onRemove={() => toggleToolSet(set.id)}
+                />
+              ))}
+              {mcpProviderChips.map(provider => (
+                <Chip
+                  key={`mcp:${provider.serverId}`}
+                  label={`mcp/${provider.serverId}`}
+                  onRemove={() => toggleMcpProvider(provider.serverId)}
+                />
+              ))}
+              {pinnedSkillChips.map(chip => (
+                <Chip
+                  key={`skill:${chip.key}`}
+                  label={chip.label}
+                  onRemove={chip.skill ? () => togglePinnedSkill(chip.skill!) : undefined}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">No capabilities attached yet.</p>
+          )}
+        </div>
         <CapabilityDisclosure
           title="Tool Sets"
           summary={`${resolvedBuiltinTools.length} built-in tools resolved`}
@@ -1215,6 +1197,102 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
         </CapabilityDisclosure>
       </EditorSection>
 
+      <EditorSection title="System Prompt">
+        {systemPromptExpanded ? (
+          <div className="space-y-2">
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSystemPromptExpanded(false)}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Collapse
+              </button>
+            </div>
+            <textarea
+              value={formSystemPrompt}
+              onChange={e => setFormSystemPrompt(e.target.value)}
+              placeholder="You are a helpful coding agent..."
+              rows={9}
+              className={`${MONO_FIELD_CLASS} min-h-[180px] resize-y`}
+            />
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setSystemPromptExpanded(true)}
+            className="flex w-full items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/55 px-3 py-2.5 text-left transition-colors hover:bg-secondary/50"
+          >
+            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+              {systemPromptPreview || 'No system prompt set — click to edit.'}
+            </span>
+            <span className="shrink-0 text-xs text-muted-foreground">Edit</span>
+          </button>
+        )}
+      </EditorSection>
+
+      <EditorSection title="Profile details">
+        <div>
+          <FieldLabel>Name *</FieldLabel>
+          <input
+            type="text"
+            value={formName}
+            onChange={e => setFormName(e.target.value)}
+            placeholder="e.g., Default Coding Agent"
+            className={FIELD_CLASS}
+          />
+        </div>
+
+        <div>
+          <FieldLabel>Description (optional)</FieldLabel>
+          <textarea
+            value={formDescription}
+            onChange={e => setFormDescription(e.target.value)}
+            placeholder="What this agent is for"
+            rows={2}
+            className={TEXTAREA_CLASS}
+          />
+        </div>
+
+        <label className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/55 px-3 py-2.5">
+          <span className="min-w-0">
+            <span className="block text-sm text-foreground">Set as default agent</span>
+            <span className="block text-xs text-muted-foreground">
+              Use this profile when a project has no explicit agent selection.
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            id="agentIsDefault"
+            checked={formIsDefault}
+            onChange={e => setFormIsDefault(e.target.checked)}
+            className="shrink-0 rounded-md border-border bg-background"
+          />
+        </label>
+      </EditorSection>
+
+      <EditorSection title="Runtime">
+        <div>
+          <FieldLabel htmlFor="agent-profile-runtime">Agent Type</FieldLabel>
+          <select
+            id="agent-profile-runtime"
+            value={formRuntimeType}
+            onChange={e => setFormRuntimeType(e.target.value as RuntimeOption)}
+            className={FIELD_CLASS}
+          >
+            <option value="zclaudia">ZClaudia</option>
+            <option value="claude">Claude</option>
+          </select>
+        </div>
+
+        {formRuntimeType === 'claude' && (
+          <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-muted-foreground">
+            Claude uses the Claude Agent SDK runtime. AI review, multimodal attachments and
+            fallback, and background task controls are zclaudia-only in this phase.
+          </p>
+        )}
+      </EditorSection>
+
       <div className="sticky bottom-0 z-10 -mx-1 bg-background/90 px-1 py-3 backdrop-blur">
         {formError && <p className="mb-2 text-xs text-destructive">{formError}</p>}
         <div className="flex gap-2 rounded-lg border border-border/60 bg-card/95 p-2 shadow-apple-sm">
@@ -1384,8 +1462,7 @@ function MultimodalFallbackSelector({
     hasDeclaredModels && !visionModels.some(entry => entry.modelId === model) ? '' : model;
 
   return (
-    <div className="space-y-3 rounded-lg border border-border/60 bg-background/55 p-3">
-      <div className="text-sm font-medium text-foreground">Multimodal fallback</div>
+    <div className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="min-w-0 text-xs text-muted-foreground">
           <span className="mb-1 block">Fallback LLM Profile</span>
