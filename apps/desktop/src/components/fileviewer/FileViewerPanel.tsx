@@ -648,6 +648,15 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
   const matchesByLineMap = useMemo(() => matchesByLine(matches), [matches]);
   const activeMatchLine = activeMatch?.line ?? null;
   const activeMatchColumn = activeMatch?.start ?? 0;
+  // Index of the active match within the full match list, used by the markdown
+  // renderer's DOM-based highlighter to pick the active match.
+  const activeMatchIndex = useMemo(() => {
+    if (!activeMatch) return 0;
+    const idx = matches.findIndex(
+      m => m.line === activeMatch.line && m.start === activeMatch.start && m.end === activeMatch.end
+    );
+    return idx < 0 ? 0 : idx;
+  }, [activeMatch, matches]);
 
   // Scroll the virtualized list to the active match line whenever it changes.
   useEffect(() => {
@@ -871,7 +880,12 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
                 !loading &&
                 (isMarkdown ? (
                   <div className="h-full overflow-auto">
-                    <MarkdownFileContent content={content} />
+                    <MarkdownFileContent
+                      content={content}
+                      highlightQuery={inFileSearchOpen ? inFileSearchQuery : undefined}
+                      highlightCaseSensitive={inFileSearchCaseSensitive}
+                      highlightActiveIndex={activeMatchIndex}
+                    />
                   </div>
                 ) : (
                   <VirtualizedCodeView

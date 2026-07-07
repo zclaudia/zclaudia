@@ -274,6 +274,25 @@ describe('FileViewerPanel', () => {
     expect(screen.queryByTestId('code-viewer')).not.toBeInTheDocument();
   });
 
+  it('highlights in-file search matches inside the rendered markdown', () => {
+    // jsdom does not implement scrollIntoView; the hook swallows errors, but
+    // stub it so the call is a clean no-op.
+    const spy = vi
+      .spyOn(Element.prototype, 'scrollIntoView')
+      .mockImplementation(() => undefined);
+    mockFileViewerState.filePath = 'docs/readme.md';
+    mockFileViewerState.content = '# Title\n\nfind this text here and find again';
+    mockFileViewerState.inFileSearchOpen = true;
+    mockFileViewerState.inFileSearchQuery = 'find';
+    render(<FileViewerPanel projectRoot="/project" />);
+
+    const marks = document.querySelectorAll('mark.search-mark');
+    expect(marks.length).toBe(2);
+    // Indices are assigned in document order.
+    expect(Array.from(marks).map(m => m.getAttribute('data-match-index'))).toEqual(['0', '1']);
+    spy.mockRestore();
+  });
+
   it('does not render the old @file empty-state pane', () => {
     const { container } = render(<FileViewerPanel projectRoot="/project" />);
     expect(container.textContent).not.toContain('Select a file to preview');
