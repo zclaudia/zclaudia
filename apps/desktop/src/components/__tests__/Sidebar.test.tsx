@@ -79,18 +79,6 @@ vi.mock('../../hooks/useSwipeBack', () => ({
 vi.mock('../../features/automation/AutomationTree', () => ({
   AutomationTree: ({ tab }: any) => <div data-testid="automation-tree" data-tab={tab} />,
 }));
-vi.mock('../../features/agents/AgentsTree', () => ({
-  AgentsTree: () => <div data-testid="agents-tree" />,
-}));
-vi.mock('../../features/agents/SkillsTree', () => ({
-  SkillsTree: () => <div data-testid="skills-tree" />,
-}));
-vi.mock('../../features/agents/McpServersTree', () => ({
-  McpServersTree: () => <div data-testid="mcp-servers-tree" />,
-}));
-vi.mock('../../features/agents/ProvidersTree', () => ({
-  ProvidersTree: () => <div data-testid="providers-tree" />,
-}));
 vi.mock('../../hooks/useSelectionCoordinator', () => ({
   useSelectionCoordinator: () => ({
     selectProject: selectionMocks.selectProject,

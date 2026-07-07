@@ -1,12 +1,12 @@
 /**
  * Agents management content rendered inline in the main pane.
  *
- * Selection comes from the sidebar's AgentsTree/SkillsTree/McpServersTree/
- * ProvidersTree (via topLevelViewStore); this component owns only the detail
+ * Selection comes from the library BrowseView's item cards (via
+ * topLevelViewStore); this component owns the browse grid plus the detail
  * header + editor body. Saves and deletes bump the shared refresh nonce so the
- * trees refetch; profile and provider mutations additionally refresh the global
- * stores when the edited backend is the app's active backend (skills and MCP
- * mutations never touch those stores).
+ * library refetches; profile and provider mutations additionally refresh the
+ * global stores when the edited backend is the app's active backend (skills and
+ * MCP mutations never touch those stores).
  */
 
 import { useState } from 'react';
