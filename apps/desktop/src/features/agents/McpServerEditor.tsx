@@ -830,7 +830,9 @@ export function McpServerEditor({
           <div className="grid grid-cols-3 gap-2">
             {(['low', 'medium', 'high'] as const).map(level => (
               <div key={level}>
-                <FieldLabel htmlFor={`mcp-${level}-risk-action`}>{level} risk action</FieldLabel>
+                <FieldLabel htmlFor={`mcp-${level}-risk-action`}>
+                  {`${level[0].toUpperCase()}${level.slice(1)}`} risk action
+                </FieldLabel>
                 <select
                   id={`mcp-${level}-risk-action`}
                   aria-label={`${level[0].toUpperCase()}${level.slice(1)} risk action`}
