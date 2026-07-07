@@ -3,17 +3,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { MessageInput } from './MessageInput';
 import type { SlashCommand } from '@zclaudia/shared';
 
-// rich-textarea observes the textarea's size via ResizeObserver, which jsdom
-// (this suite's environment, via src/test/setup.ts) does not implement. Stub
-// it so RichTextarea can mount; observe/unobserve/disconnect are all no-ops
-// since layout math isn't exercised by these tests.
-class MockResizeObserver {
-  observe = vi.fn();
-  unobserve = vi.fn();
-  disconnect = vi.fn();
-}
-vi.stubGlobal('ResizeObserver', MockResizeObserver);
-
 // Mock hooks
 let mockIsMobile = false;
 vi.mock('../../hooks/useMediaQuery', () => ({

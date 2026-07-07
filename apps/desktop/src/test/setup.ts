@@ -184,6 +184,16 @@ if (typeof Element !== 'undefined') {
   Element.prototype.scrollIntoView = vi.fn();
 }
 
+// Mock ResizeObserver (needed by rich-textarea, which observes textarea size)
+vi.stubGlobal(
+  'ResizeObserver',
+  class ResizeObserver {
+    observe = vi.fn();
+    unobserve = vi.fn();
+    disconnect = vi.fn();
+  }
+);
+
 // Mock ThemeContext — needed by components that use useTheme (e.g. BrandMark → LoadingIndicator)
 vi.mock('@/contexts/ThemeContext', () => ({
   useTheme: vi.fn(() => ({
