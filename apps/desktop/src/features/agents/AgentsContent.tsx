@@ -60,7 +60,7 @@ function EmptyState({ noun, hint }: { noun: EmptyStateNoun; hint?: string }) {
     <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
       <p className="text-sm">Select {NOUN_WITH_ARTICLE[noun]}</p>
       <p className="mt-1 text-xs opacity-60">
-        {hint ?? `Choose ${NOUN_WITH_ARTICLE[noun]} from the sidebar, or create one with +.`}
+        {hint ?? `Pick ${NOUN_WITH_ARTICLE[noun]} from the library, or create one with New.`}
       </p>
     </div>
   );

@@ -74,7 +74,7 @@ export function BrowseView({
             </button>
           </div>
         </div>
-        {backends.length > 1 && (
+        {(backends.length > 1 || backendFilter !== 'all') && (
           <div className="flex items-center gap-2">
             <span className="text-[11px] text-muted-foreground">Backend</span>
             <FilterChips chips={chips} activeKey={backendFilter} onSelect={onSelectBackendFilter} />

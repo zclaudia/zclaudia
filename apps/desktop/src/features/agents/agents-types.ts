@@ -25,11 +25,11 @@ export interface LibraryItem {
   id: string;
   title: string;
   subtitle?: string;
-  /** e.g. 'Default' (profile), 'connected' (mcp) — rendered as a status badge. */
+  /** e.g. 'Default' for the default profile — rendered as a status badge. */
   status?: string;
 }
 
-/** A backend row in the Agents shell mode (tree + editor header). */
+/** A backend in the Agents shell mode (library cards + editor header). */
 export interface AgentsBackend {
   backendId: string;
   name: string;

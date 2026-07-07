@@ -1,6 +1,14 @@
-import type { AgentsTab, AgentsSelection } from './agents-types';
+import type { AgentsTab } from './agents-types';
 
-export type NewTarget = AgentsSelection['kind'] | 'menu';
+/**
+ * The creatable selection kinds. Deliberately narrower than
+ * `AgentsSelection['kind']` (excludes item and `skill-dirs` kinds) so callers
+ * that build a `new-*` selection from a `NewTarget` are provably constructing a
+ * fieldless `{ backendId, kind }` selection — no accidental id-bearing kind.
+ */
+export type NewSelectionKind = 'new-profile' | 'new-skill' | 'new-mcp-server' | 'new-llm-profile';
+
+export type NewTarget = NewSelectionKind | 'menu';
 
 export function resolveNewTarget(tab: AgentsTab): NewTarget {
   switch (tab) {
@@ -17,7 +25,7 @@ export function resolveNewTarget(tab: AgentsTab): NewTarget {
   }
 }
 
-const MENU_ITEMS: { kind: AgentsSelection['kind']; label: string }[] = [
+const MENU_ITEMS: { kind: NewSelectionKind; label: string }[] = [
   { kind: 'new-profile', label: 'New profile' },
   { kind: 'new-skill', label: 'New skill' },
   { kind: 'new-mcp-server', label: 'New MCP server' },
@@ -28,7 +36,7 @@ export function NewItemMenu({
   onPick,
   onClose,
 }: {
-  onPick: (kind: AgentsSelection['kind']) => void;
+  onPick: (kind: NewSelectionKind) => void;
   onClose: () => void;
 }) {
   return (
