@@ -9,6 +9,7 @@
  * mutations never touch those stores).
  */
 
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import { useTopLevelViewStore } from '../../stores/topLevelViewStore';
@@ -25,7 +26,10 @@ import { SkillDirsEditor } from './SkillDirsEditor';
 import { McpServerEditor } from './McpServerEditor';
 import { LlmProfileEditor } from './LlmProfileEditor';
 import { useSavedBridge } from './useSavedBridge';
-import type { AgentsBackend } from './agents-types';
+import { BrowseView } from './BrowseView';
+import { NewItemMenu, resolveNewTarget } from './NewItemMenu';
+import { useAgentsLibrary } from './useAgentsLibrary';
+import type { AgentsBackend, AgentsSelection, LibraryItem } from './agents-types';
 import type { ProfilesByBackend } from './useProfilesByBackend';
 import type { SkillsByBackend } from './useSkillsByBackend';
 import type { McpServersByBackend } from './useMcpServersByBackend';
@@ -98,6 +102,45 @@ export function AgentsContent({
   const activeServerId = useServerStore(s => s.activeServerId);
   const localBackendId = useFacadeStore(s => s.localBackendId);
 
+  const activeTab = view.kind === 'agents' ? view.tab : 'all';
+  const backendFilter = useTopLevelViewStore(s => s.agentsBackendFilter);
+  const setBackendFilter = useTopLevelViewStore(s => s.setAgentsBackendFilter);
+  const [newMenuOpen, setNewMenuOpen] = useState(false);
+
+  const libraryItems = useAgentsLibrary(
+    {
+      profiles: data.profiles,
+      skills: skillsData.skills,
+      servers: mcpData.servers,
+      llmProfiles: providersData.profiles,
+    },
+    backends,
+    { tab: activeTab, backendFilter }
+  );
+
+  const openItem = (item: LibraryItem) =>
+    selectAgentsItem(
+      item.kind === 'profile'
+        ? { backendId: item.backendId, kind: 'profile', id: item.id }
+        : item.kind === 'skill'
+          ? { backendId: item.backendId, kind: 'skill', id: item.id }
+          : item.kind === 'mcp-server'
+            ? { backendId: item.backendId, kind: 'mcp-server', id: item.id }
+            : { backendId: item.backendId, kind: 'llm-profile', id: item.id }
+    );
+
+  const backendForNew = () =>
+    backendFilter !== 'all' ? backendFilter : (backends[0]?.backendId ?? localBackendId ?? '');
+
+  const startNew = () => {
+    const target = resolveNewTarget(activeTab);
+    if (target === 'menu') {
+      setNewMenuOpen(true);
+      return;
+    }
+    selectAgentsItem({ backendId: backendForNew(), kind: target } as AgentsSelection);
+  };
+
   // Just-saved bridges: save handlers re-select the saved id before the nonce
   // refetch lands, so the fetched maps are briefly stale. Each bridge remembers
   // what was just saved until the refetch delivers it — or SETTLES without it
@@ -127,19 +170,29 @@ export function AgentsContent({
   });
 
   if (!selection) {
-    const activeTab = view.kind === 'agents' ? view.tab : 'profiles';
     return (
-      <EmptyState
-        noun={
-          activeTab === 'skills'
-            ? 'skill'
-            : activeTab === 'mcp-servers'
-              ? 'MCP server'
-              : activeTab === 'providers'
-                ? 'provider'
-                : 'profile'
-        }
-      />
+      <div className="relative h-full">
+        <BrowseView
+          tab={activeTab}
+          backendFilter={backendFilter}
+          backends={backends}
+          items={libraryItems}
+          onOpen={openItem}
+          onSelectBackendFilter={setBackendFilter}
+          onNew={startNew}
+        />
+        {newMenuOpen && (
+          <div className="absolute right-4 top-14">
+            <NewItemMenu
+              onPick={kind => {
+                setNewMenuOpen(false);
+                selectAgentsItem({ backendId: backendForNew(), kind } as AgentsSelection);
+              }}
+              onClose={() => setNewMenuOpen(false)}
+            />
+          </div>
+        )}
+      </div>
     );
   }
 

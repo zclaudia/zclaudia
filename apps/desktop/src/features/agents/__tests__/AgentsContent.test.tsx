@@ -261,7 +261,7 @@ describe('AgentsContent', () => {
     useLlmProfileMetaStore.setState({ providersByBackend: {} });
   });
 
-  it('renders the empty state when nothing is selected', () => {
+  it('renders the library browse view when nothing is selected', () => {
     render(
       <AgentsContent
         providersData={emptyProviders}
@@ -272,10 +272,9 @@ describe('AgentsContent', () => {
       />
     );
 
-    expect(screen.getByText('Select a profile')).toBeTruthy();
-    expect(
-      screen.getByText('Choose a profile from the sidebar, or create one with +.')
-    ).toBeTruthy();
+    // No selection now shows the library BrowseView (headed by the active
+    // tab's title) instead of a "Select a …" empty state.
+    expect(screen.getByText('Agent Profiles')).toBeTruthy();
     expect(screen.queryByTestId('profile-editor')).toBeNull();
   });
 
@@ -555,7 +554,7 @@ describe('AgentsContent', () => {
 
   // ---- Skills tab ----
 
-  it('renders the skills empty state copy when the skills tab has no selection', () => {
+  it('renders the library browse view on the skills tab with no selection', () => {
     useTopLevelViewStore.setState({
       view: { kind: 'agents', tab: 'skills' },
       agentsSelection: null,
@@ -571,8 +570,7 @@ describe('AgentsContent', () => {
       />
     );
 
-    expect(screen.getByText('Select a skill')).toBeTruthy();
-    expect(screen.getByText('Choose a skill from the sidebar, or create one with +.')).toBeTruthy();
+    expect(screen.getByText('Skills')).toBeTruthy();
     expect(screen.queryByTestId('skill-editor')).toBeNull();
   });
 
@@ -942,7 +940,7 @@ describe('AgentsContent', () => {
 
   // ---- MCP Servers tab ----
 
-  it('renders the MCP empty state copy (grammatical article) on the mcp tab', () => {
+  it('renders the library browse view on the mcp tab with no selection', () => {
     useTopLevelViewStore.setState({
       view: { kind: 'agents', tab: 'mcp-servers' },
       agentsSelection: null,
@@ -958,10 +956,7 @@ describe('AgentsContent', () => {
       />
     );
 
-    expect(screen.getByText('Select an MCP server')).toBeTruthy();
-    expect(
-      screen.getByText('Choose an MCP server from the sidebar, or create one with +.')
-    ).toBeTruthy();
+    expect(screen.getByText('MCP Servers')).toBeTruthy();
     expect(screen.queryByTestId('mcp-editor')).toBeNull();
   });
 
@@ -1236,7 +1231,7 @@ describe('AgentsContent', () => {
 
   // ---- Providers tab ----
 
-  it('renders the providers empty state copy when the providers tab has no selection', () => {
+  it('renders the library browse view on the providers tab with no selection', () => {
     useTopLevelViewStore.setState({
       view: { kind: 'agents', tab: 'providers' },
       agentsSelection: null,
@@ -1252,10 +1247,7 @@ describe('AgentsContent', () => {
       />
     );
 
-    expect(screen.getByText('Select a provider')).toBeTruthy();
-    expect(
-      screen.getByText('Choose a provider from the sidebar, or create one with +.')
-    ).toBeTruthy();
+    expect(screen.getByText('LLM Providers')).toBeTruthy();
     expect(screen.queryByTestId('llm-profile-editor')).toBeNull();
   });
 
