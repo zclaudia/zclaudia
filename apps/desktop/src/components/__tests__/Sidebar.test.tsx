@@ -787,7 +787,7 @@ describe('Sidebar', () => {
     fireEvent.click(screen.getByText('Configure →'));
 
     expect(onOpenSettings).not.toHaveBeenCalled();
-    expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'agents', tab: 'profiles' });
+    expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'agents', tab: 'all' });
     expect(document.body.textContent).not.toContain('No agent available yet');
   });
 
@@ -2142,62 +2142,45 @@ describe('Sidebar', () => {
     tab,
     onSelectTab: vi.fn(),
     onBack: vi.fn(),
-    backends: [],
-    data: { profiles: new Map(), errors: new Map(), loading: false },
-    skillsData: {
-      skills: new Map(),
-      diagnostics: new Map(),
-      dirs: new Map(),
-      dirsFailed: new Set<string>(),
-      errors: new Map(),
-      loading: false,
-    },
-    mcpData: {
-      servers: new Map(),
-      statuses: new Map(),
-      errors: new Map(),
-      loading: false,
-    },
-    providersData: { profiles: new Map(), errors: new Map(), loading: false },
-    selection: null,
-    onSelectItem: vi.fn(),
   });
 
-  it('renders AgentsTree when agentsMode is on the profiles tab', () => {
+  // The master list moved to a card grid in the main panel; the sidebar now shows
+  // only the type nav in agents mode and renders no resource tree.
+  it('shows the profiles nav and no tree when agentsMode is on the profiles tab', () => {
     render(
       <Sidebar collapsed={false} onToggle={vi.fn()} agentsMode={makeAgentsMode('profiles')} />
     );
 
-    expect(screen.getByTestId('agents-tree')).toBeTruthy();
+    expect(screen.queryByTestId('agents-tree')).toBeNull();
     expect(screen.queryByTestId('skills-tree')).toBeNull();
     expect(screen.getByRole('button', { name: 'Agent Profiles' })).toBeTruthy();
   });
 
-  it('renders SkillsTree when agentsMode is on the skills tab', () => {
+  it('shows the skills nav and no tree when agentsMode is on the skills tab', () => {
     render(<Sidebar collapsed={false} onToggle={vi.fn()} agentsMode={makeAgentsMode('skills')} />);
 
-    expect(screen.getByTestId('skills-tree')).toBeTruthy();
+    expect(screen.queryByTestId('skills-tree')).toBeNull();
     expect(screen.queryByTestId('agents-tree')).toBeNull();
     expect(screen.getByRole('button', { name: 'Skills' })).toBeTruthy();
   });
 
-  it('renders McpServersTree when agentsMode is on the mcp-servers tab', () => {
+  it('shows the mcp-servers nav and no tree when agentsMode is on the mcp-servers tab', () => {
     render(
       <Sidebar collapsed={false} onToggle={vi.fn()} agentsMode={makeAgentsMode('mcp-servers')} />
     );
 
-    expect(screen.getByTestId('mcp-servers-tree')).toBeTruthy();
+    expect(screen.queryByTestId('mcp-servers-tree')).toBeNull();
     expect(screen.queryByTestId('agents-tree')).toBeNull();
     expect(screen.queryByTestId('skills-tree')).toBeNull();
     expect(screen.getByRole('button', { name: 'MCP Servers' })).toBeTruthy();
   });
 
-  it('renders ProvidersTree when agentsMode is on the providers tab', () => {
+  it('shows the providers nav and no tree when agentsMode is on the providers tab', () => {
     render(
       <Sidebar collapsed={false} onToggle={vi.fn()} agentsMode={makeAgentsMode('providers')} />
     );
 
-    expect(screen.getByTestId('providers-tree')).toBeTruthy();
+    expect(screen.queryByTestId('providers-tree')).toBeNull();
     expect(screen.queryByTestId('agents-tree')).toBeNull();
     expect(screen.queryByTestId('skills-tree')).toBeNull();
     expect(screen.queryByTestId('mcp-servers-tree')).toBeNull();
