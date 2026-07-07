@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { ChevronDown, Check } from 'lucide-react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
+import { ChevronDown, ChevronRight, Check } from 'lucide-react';
 import type {
   AgentProfileConfig,
   AgentRuntimeType,
@@ -46,6 +46,13 @@ type ThinkingLevelOption = '' | ThinkingLevel;
 type RuntimeOption = Extract<AgentRuntimeType, 'zclaudia' | 'claude'>;
 type SkillDefaultModeOption = 'default' | SkillExecutionMode;
 type SkillForkToolPolicyOption = 'default' | SkillForkToolPolicy;
+type CapabilitySectionId = 'tool-sets' | 'external-tools' | 'skills';
+
+const FIELD_CLASS =
+  'w-full rounded-lg border border-border/70 bg-background/70 px-3 py-2 text-sm text-foreground shadow-apple-sm focus:outline-none focus:ring-1 focus:ring-primary/50';
+const TEXTAREA_CLASS = `${FIELD_CLASS} resize-y`;
+const MONO_FIELD_CLASS = `${FIELD_CLASS} font-mono`;
+
 const THINKING_LEVEL_OPTIONS: { value: ThinkingLevelOption; label: string }[] = [
   { value: '', label: 'Auto' },
   { value: 'off', label: 'off' },
@@ -128,6 +135,69 @@ function formatPinnedExternalToolCount(count: number): string {
   return `${count} pinned external ${count === 1 ? 'tool' : 'tools'}`;
 }
 
+function EditorSection({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="overflow-hidden rounded-lg border border-border/60 bg-secondary/25 shadow-apple-sm">
+      <div className="border-b border-border/60 px-4 py-3">
+        <h2 className="text-sm font-medium text-foreground">{title}</h2>
+        {description && <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>}
+      </div>
+      <div className="space-y-3 p-4">{children}</div>
+    </section>
+  );
+}
+
+function FieldLabel({ children, htmlFor }: { children: ReactNode; htmlFor?: string }) {
+  return (
+    <label htmlFor={htmlFor} className="mb-1 block text-xs font-medium text-muted-foreground">
+      {children}
+    </label>
+  );
+}
+
+function CapabilityDisclosure({
+  title,
+  summary,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  summary: ReactNode;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="overflow-hidden rounded-lg border border-border/60 bg-background/55">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left transition-colors hover:bg-secondary/50"
+      >
+        <span className="min-w-0">
+          <span className="block text-sm font-medium text-foreground">{title}</span>
+          <span className="mt-0.5 block truncate text-xs text-muted-foreground">{summary}</span>
+        </span>
+        <ChevronRight
+          size={15}
+          className={`shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`}
+        />
+      </button>
+      {open && <div className="border-t border-border/60 p-3">{children}</div>}
+    </div>
+  );
+}
+
 function mcpTrustSummaryLabels(server: McpServerConfig): string[] {
   const policy = server.trustPolicy;
   const labels = [
@@ -171,6 +241,9 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
   const [saving, setSaving] = useState(false);
   const [customizedToolSetIds, setCustomizedToolSetIds] = useState<BuiltinToolSetId[]>([]);
   const [expandedToolSetIds, setExpandedToolSetIds] = useState<BuiltinToolSetId[]>([]);
+  const [expandedCapabilitySectionIds, setExpandedCapabilitySectionIds] = useState<
+    CapabilitySectionId[]
+  >([]);
 
   const [pendingDelete, setPendingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -258,6 +331,7 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
     setFormError(null);
     setCustomizedToolSetIds([]);
     setExpandedToolSetIds([]);
+    setExpandedCapabilitySectionIds([]);
   };
 
   const populateForm = (agent: AgentProfileConfig) => {
@@ -280,6 +354,7 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
     setFormThinkingLevel((agent.thinkingLevel ?? '') as ThinkingLevelOption);
     setFormIsDefault(agent.isDefault ?? false);
     setFormError(null);
+    setExpandedCapabilitySectionIds([]);
   };
 
   useEffect(() => {
@@ -307,6 +382,12 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
   const toggleToolSetExpanded = (setId: BuiltinToolSetId) => {
     setExpandedToolSetIds(current =>
       current.includes(setId) ? current.filter(id => id !== setId) : [...current, setId]
+    );
+  };
+
+  const toggleCapabilitySection = (sectionId: CapabilitySectionId) => {
+    setExpandedCapabilitySectionIds(current =>
+      current.includes(sectionId) ? current.filter(id => id !== sectionId) : [...current, sectionId]
     );
   };
 
@@ -646,123 +727,150 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
   const skillPolicyOverrideCount = formSkillExecution.overrides?.length ?? 0;
 
   return (
-    <div className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-muted-foreground mb-1">Name *</label>
-        <input
-          type="text"
-          value={formName}
-          onChange={e => setFormName(e.target.value)}
-          placeholder="e.g., Default Coding Agent"
-          className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary"
-        />
-      </div>
+    <div
+      data-testid="agent-profile-editor"
+      className="mx-auto flex w-full max-w-[760px] flex-col gap-4 pb-4"
+    >
+      <EditorSection title="Profile details">
+        <div>
+          <FieldLabel>Name *</FieldLabel>
+          <input
+            type="text"
+            value={formName}
+            onChange={e => setFormName(e.target.value)}
+            placeholder="e.g., Default Coding Agent"
+            className={FIELD_CLASS}
+          />
+        </div>
 
-      <div>
-        <label className="block text-sm font-medium text-muted-foreground mb-1">
-          Description (optional)
-        </label>
-        <textarea
-          value={formDescription}
-          onChange={e => setFormDescription(e.target.value)}
-          placeholder="What this agent is for"
-          rows={2}
-          className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary"
-        />
-      </div>
+        <div>
+          <FieldLabel>Description (optional)</FieldLabel>
+          <textarea
+            value={formDescription}
+            onChange={e => setFormDescription(e.target.value)}
+            placeholder="What this agent is for"
+            rows={2}
+            className={TEXTAREA_CLASS}
+          />
+        </div>
 
-      <div>
-        <label
-          htmlFor="agent-profile-runtime"
-          className="block text-sm font-medium text-muted-foreground mb-1"
-        >
-          Runtime
+        <label className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/55 px-3 py-2.5">
+          <span className="min-w-0">
+            <span className="block text-sm text-foreground">Set as default agent</span>
+            <span className="block text-xs text-muted-foreground">
+              Use this profile when a project has no explicit agent selection.
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            id="agentIsDefault"
+            checked={formIsDefault}
+            onChange={e => setFormIsDefault(e.target.checked)}
+            className="shrink-0 rounded-md border-border bg-background"
+          />
         </label>
-        <select
-          id="agent-profile-runtime"
-          value={formRuntimeType}
-          onChange={e => setFormRuntimeType(e.target.value as RuntimeOption)}
-          className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary"
-        >
-          <option value="zclaudia">ZClaudia</option>
-          <option value="claude">Claude</option>
-        </select>
+      </EditorSection>
+
+      <EditorSection title="Runtime">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <FieldLabel htmlFor="agent-profile-runtime">Agent Type</FieldLabel>
+            <select
+              id="agent-profile-runtime"
+              value={formRuntimeType}
+              onChange={e => setFormRuntimeType(e.target.value as RuntimeOption)}
+              className={FIELD_CLASS}
+            >
+              <option value="zclaudia">ZClaudia</option>
+              <option value="claude">Claude</option>
+            </select>
+          </div>
+
+          <ThinkingLevelSelector value={formThinkingLevel} onChange={setFormThinkingLevel} />
+        </div>
+
         {formRuntimeType === 'claude' && (
-          <p className="mt-2 rounded-md border border-border bg-secondary/50 px-3 py-2 text-xs text-muted-foreground">
+          <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-muted-foreground">
             Claude uses the Claude Agent SDK runtime. AI review, multimodal attachments and
             fallback, and background task controls are zclaudia-only in this phase.
           </p>
         )}
-      </div>
 
-      <LlmProfileSelector
-        value={formLlmProfileId}
-        onChange={id => {
-          setFormLlmProfileId(id);
-          // Clearing the model when the LLM profile changes avoids referencing
-          // a model id that doesn't exist in the new profile's models list.
-          const newProfile = llmProfiles.find(p => p.id === id);
-          const newProfileModels = newProfile?.models;
-          if (
-            formModel &&
-            (!newProfileModels || !newProfileModels.some(m => m.modelId === formModel))
-          ) {
-            setFormModel('');
-          }
-        }}
-        profiles={llmProfiles}
-      />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <LlmProfileSelector
+            value={formLlmProfileId}
+            onChange={id => {
+              setFormLlmProfileId(id);
+              // Clearing the model when the LLM profile changes avoids referencing
+              // a model id that doesn't exist in the new profile's models list.
+              const newProfile = llmProfiles.find(p => p.id === id);
+              const newProfileModels = newProfile?.models;
+              if (
+                formModel &&
+                (!newProfileModels || !newProfileModels.some(m => m.modelId === formModel))
+              ) {
+                setFormModel('');
+              }
+            }}
+            profiles={llmProfiles}
+          />
 
-      <ModelSelector
-        value={formModel}
-        onChange={setFormModel}
-        llmProfile={llmProfiles.find(p => p.id === formLlmProfileId)}
-      />
+          <ModelSelector
+            value={formModel}
+            onChange={setFormModel}
+            llmProfile={llmProfiles.find(p => p.id === formLlmProfileId)}
+          />
+        </div>
 
-      <ModelDeclarationWarning
-        formModel={formModel}
-        llmProfile={llmProfiles.find(p => p.id === formLlmProfileId)}
-      />
-
-      {formRuntimeType !== 'claude' && (
-        <MultimodalFallbackSelector
-          profiles={llmProfiles}
-          profileId={formFallbackLlmProfileId}
-          model={formFallbackModel}
-          onProfileChange={id => {
-            setFormFallbackLlmProfileId(id);
-            if (!id) {
-              setFormFallbackModel('');
-              return;
-            }
-            const nextProfile = llmProfiles.find(p => p.id === id);
-            if (
-              formFallbackModel &&
-              !fallbackModelValidForProfile(formFallbackModel, nextProfile)
-            ) {
-              setFormFallbackModel('');
-            }
-          }}
-          onModelChange={setFormFallbackModel}
+        <ModelDeclarationWarning
+          formModel={formModel}
+          llmProfile={llmProfiles.find(p => p.id === formLlmProfileId)}
         />
-      )}
 
-      <div>
-        <label className="block text-sm font-medium text-muted-foreground mb-1">
-          System Prompt
-        </label>
+        {formRuntimeType !== 'claude' && (
+          <MultimodalFallbackSelector
+            profiles={llmProfiles}
+            profileId={formFallbackLlmProfileId}
+            model={formFallbackModel}
+            onProfileChange={id => {
+              setFormFallbackLlmProfileId(id);
+              if (!id) {
+                setFormFallbackModel('');
+                return;
+              }
+              const nextProfile = llmProfiles.find(p => p.id === id);
+              if (
+                formFallbackModel &&
+                !fallbackModelValidForProfile(formFallbackModel, nextProfile)
+              ) {
+                setFormFallbackModel('');
+              }
+            }}
+            onModelChange={setFormFallbackModel}
+          />
+        )}
+      </EditorSection>
+
+      <EditorSection title="System Prompt">
         <textarea
           value={formSystemPrompt}
           onChange={e => setFormSystemPrompt(e.target.value)}
           placeholder="You are a helpful coding agent..."
-          rows={10}
-          className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary font-mono"
+          rows={9}
+          className={`${MONO_FIELD_CLASS} min-h-[180px] resize-y`}
         />
-      </div>
+      </EditorSection>
 
-      <div className="space-y-3">
-        <div>
-          <label className="block text-sm font-medium text-muted-foreground mb-1">Tool Sets</label>
+      <EditorSection
+        title="Capabilities"
+        description="Configure built-in tools, external providers, and skill execution for this profile."
+      >
+        <CapabilityDisclosure
+          title="Tool Sets"
+          summary={`${resolvedBuiltinTools.length} built-in tools resolved`}
+          open={expandedCapabilitySectionIds.includes('tool-sets')}
+          onToggle={() => toggleCapabilitySection('tool-sets')}
+        >
           <div className="space-y-2">
             {builtinToolSetEntries.map(set => {
               const checked = formToolSelection.sets.some(
@@ -871,11 +979,13 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
           <p className="mt-2 text-[10px] text-muted-foreground">
             Resolved built-in tools: {resolvedBuiltinTools.join(', ') || 'none'}
           </p>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-muted-foreground mb-1">
-            External Tool Providers
-          </label>
+        </CapabilityDisclosure>
+        <CapabilityDisclosure
+          title="External Tool Providers"
+          summary={`${externalProviders.length} providers, ${formatPinnedExternalToolCount(pinnedExternalToolLabels.length)}`}
+          open={expandedCapabilitySectionIds.includes('external-tools')}
+          onToggle={() => toggleCapabilitySection('external-tools')}
+        >
           <div className="rounded-lg border border-border bg-secondary/50 p-3 text-sm">
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
@@ -983,9 +1093,13 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
               )}
             </div>
           </div>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-muted-foreground mb-1">Skills</label>
+        </CapabilityDisclosure>
+        <CapabilityDisclosure
+          title="Skills"
+          summary={`${skillProviderCount} sources, ${skillIncludeCount} included, ${pinnedSkillCount} pinned, ${skillPolicyOverrideCount} policy overrides`}
+          open={expandedCapabilitySectionIds.includes('skills')}
+          onToggle={() => toggleCapabilitySection('skills')}
+        >
           <div className="rounded-lg border border-border bg-secondary/50 p-3 text-sm">
             <div className="mb-3 flex flex-wrap gap-2 text-[10px] text-muted-foreground">
               <span>{skillProviderCount} sources</span>
@@ -1125,48 +1239,34 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
               )}
             </div>
           </div>
-        </div>
-      </div>
+        </CapabilityDisclosure>
+      </EditorSection>
 
-      <ThinkingLevelSelector value={formThinkingLevel} onChange={setFormThinkingLevel} />
-
-      <div className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          id="agentIsDefault"
-          checked={formIsDefault}
-          onChange={e => setFormIsDefault(e.target.checked)}
-          className="rounded-md border-border bg-secondary"
-        />
-        <label htmlFor="agentIsDefault" className="text-sm">
-          Set as default agent
-        </label>
-      </div>
-
-      {formError && <p className="text-xs text-destructive">{formError}</p>}
-
-      <div className="flex gap-2 pt-2">
-        <button
-          onClick={handleSubmit}
-          disabled={!formName.trim() || saving}
-          className="flex-1 px-4 py-2 bg-muted/60 text-foreground hover:bg-muted rounded-lg text-sm font-medium disabled:opacity-50"
-        >
-          {saving ? 'Saving...' : profile ? 'Update' : 'Create'}
-        </button>
-        {profile && (
+      <div className="sticky bottom-0 z-10 -mx-1 bg-background/90 px-1 py-3 backdrop-blur">
+        {formError && <p className="mb-2 text-xs text-destructive">{formError}</p>}
+        <div className="flex gap-2 rounded-lg border border-border/60 bg-card/95 p-2 shadow-apple-sm">
           <button
-            onClick={handleDelete}
-            disabled={deleting}
-            className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${
-              pendingDelete
-                ? 'bg-destructive/15 text-destructive hover:bg-destructive/25'
-                : 'bg-secondary text-destructive hover:bg-secondary/80'
-            }`}
-            title={pendingDelete ? 'Click again to confirm delete' : 'Delete'}
+            onClick={handleSubmit}
+            disabled={!formName.trim() || saving}
+            className="flex-1 rounded-lg bg-muted/70 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50"
           >
-            {deleting ? 'Deleting...' : pendingDelete ? 'Confirm delete' : 'Delete'}
+            {saving ? 'Saving...' : profile ? 'Update' : 'Create'}
           </button>
-        )}
+          {profile && (
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${
+                pendingDelete
+                  ? 'bg-destructive/15 text-destructive hover:bg-destructive/25'
+                  : 'bg-secondary text-destructive hover:bg-secondary/80'
+              }`}
+              title={pendingDelete ? 'Click again to confirm delete' : 'Delete'}
+            >
+              {deleting ? 'Deleting...' : pendingDelete ? 'Confirm delete' : 'Delete'}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -1241,12 +1341,12 @@ function ModelSelector({
 
   return (
     <div ref={ref} className="relative">
-      <label className="block text-sm font-medium text-muted-foreground mb-1">Model *</label>
+      <FieldLabel>Model *</FieldLabel>
       <button
         type="button"
         onClick={() => hasModels && setOpen(!open)}
         disabled={!hasModels}
-        className="w-full flex items-center justify-between px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary text-left disabled:opacity-50 disabled:cursor-not-allowed font-mono"
+        className={`${FIELD_CLASS} flex items-center justify-between text-left font-mono disabled:cursor-not-allowed disabled:opacity-50`}
       >
         <span className="truncate">{displayLabel}</span>
         <ChevronDown
@@ -1311,8 +1411,8 @@ function MultimodalFallbackSelector({
     hasDeclaredModels && !visionModels.some(entry => entry.modelId === model) ? '' : model;
 
   return (
-    <div className="rounded-lg border border-border bg-secondary/40 p-3 space-y-3">
-      <label className="block text-sm font-medium text-muted-foreground">Multimodal fallback</label>
+    <div className="space-y-3 rounded-lg border border-border/60 bg-background/55 p-3">
+      <div className="text-sm font-medium text-foreground">Multimodal fallback</div>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="min-w-0 text-xs text-muted-foreground">
           <span className="mb-1 block">Fallback LLM Profile</span>
@@ -1320,7 +1420,7 @@ function MultimodalFallbackSelector({
             aria-label="Fallback LLM Profile"
             value={profileId}
             onChange={event => onProfileChange(event.target.value)}
-            className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+            className={FIELD_CLASS}
           >
             <option value="">None</option>
             {profiles.map(profile => (
@@ -1339,7 +1439,7 @@ function MultimodalFallbackSelector({
               value={modelValue}
               onChange={event => onModelChange(event.target.value)}
               disabled={visionModels.length === 0}
-              className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary disabled:opacity-50"
+              className={`${FIELD_CLASS} disabled:opacity-50`}
             >
               <option value="">Select a Vision-capable model</option>
               {visionModels.map(entry => {
@@ -1363,7 +1463,7 @@ function MultimodalFallbackSelector({
               value={model}
               onChange={event => onModelChange(event.target.value)}
               placeholder="model id"
-              className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary font-mono"
+              className={MONO_FIELD_CLASS}
             />
           </label>
         )}
@@ -1402,11 +1502,11 @@ function LlmProfileSelector({
 
   return (
     <div ref={ref} className="relative">
-      <label className="block text-sm font-medium text-muted-foreground mb-1">LLM Profile *</label>
+      <FieldLabel>LLM Profile *</FieldLabel>
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary text-left"
+        className={`${FIELD_CLASS} flex items-center justify-between text-left`}
       >
         <span>
           {selected
@@ -1476,11 +1576,11 @@ function ThinkingLevelSelector({
 
   return (
     <div ref={ref} className="relative">
-      <label className="block text-sm font-medium text-muted-foreground mb-1">Thinking Level</label>
+      <FieldLabel>Thinking Level</FieldLabel>
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary text-left"
+        className={`${FIELD_CLASS} flex items-center justify-between text-left`}
       >
         <span>{selected?.label ?? 'Auto'}</span>
         <ChevronDown

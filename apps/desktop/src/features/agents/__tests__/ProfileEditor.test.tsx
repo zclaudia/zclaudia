@@ -73,6 +73,20 @@ describe('ProfileEditor', () => {
     });
   });
 
+  it('renders as a compact centered editor', async () => {
+    await renderEditor(null);
+
+    const editor = screen.getByTestId('agent-profile-editor');
+    expect(editor.className).toContain('mx-auto');
+    expect(editor.className).toContain('max-w-[760px]');
+  });
+
+  it('uses an Agent Type dropdown for runtime selection', async () => {
+    await renderEditor(null);
+
+    expect(screen.getByLabelText('Agent Type')).toHaveValue('zclaudia');
+  });
+
   it('create mode: saves via createAgentProfileForBackend and fires onSaved', async () => {
     const saved = makeProfile('new1', 'My Agent');
     vi.mocked(api.createAgentProfileForBackend).mockResolvedValue(saved);
@@ -114,7 +128,7 @@ describe('ProfileEditor', () => {
     fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), {
       target: { value: 'Claude Agent' },
     });
-    fireEvent.change(screen.getByLabelText('Runtime'), {
+    fireEvent.change(screen.getByLabelText('Agent Type'), {
       target: { value: 'claude' },
     });
     fireEvent.click(screen.getByText('Select a model'));
@@ -139,13 +153,15 @@ describe('ProfileEditor', () => {
     expect(screen.queryByText(/Claude Agent SDK/)).toBeNull();
     expect(screen.getByText('Multimodal fallback')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Runtime'), {
+    fireEvent.change(screen.getByLabelText('Agent Type'), {
       target: { value: 'claude' },
     });
 
     expect(screen.getByText(/Claude Agent SDK/)).toBeInTheDocument();
     expect(
-      screen.getByText(/AI review, multimodal attachments and fallback, and background task controls are zclaudia-only/)
+      screen.getByText(
+        /AI review, multimodal attachments and fallback, and background task controls are zclaudia-only/
+      )
     ).toBeInTheDocument();
     expect(screen.queryByText('Multimodal fallback')).toBeNull();
   });
@@ -180,7 +196,7 @@ describe('ProfileEditor', () => {
     fireEvent.change(screen.getByLabelText('Fallback Model'), {
       target: { value: 'vision-model' },
     });
-    fireEvent.change(screen.getByLabelText('Runtime'), {
+    fireEvent.change(screen.getByLabelText('Agent Type'), {
       target: { value: 'claude' },
     });
     fireEvent.click(screen.getByText('Select a model'));
@@ -226,6 +242,16 @@ describe('ProfileEditor', () => {
       expect(onSaved).toHaveBeenCalledWith(saved);
     });
     expect(api.createAgentProfileForBackend).not.toHaveBeenCalled();
+  });
+
+  it('keeps capability details collapsed until a summary row is expanded', async () => {
+    const { queryAllByLabelText } = await renderEditor(null);
+
+    expect(queryAllByLabelText(/enable full tool set/)).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole('button', { name: /Tool Sets/ }));
+
+    expect(queryAllByLabelText(/enable full tool set/).length).toBeGreaterThan(0);
   });
 
   it('delete: first click arms confirmation, second click deletes and fires onDeleted', async () => {
