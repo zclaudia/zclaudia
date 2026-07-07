@@ -3,6 +3,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import * as api from '../../../services/api';
 import { FileViewerPanel, FileViewerActions } from '../FileViewerPanel';
 
+const scrollToRowMock = vi.hoisted(() => vi.fn());
+
 vi.mock('../../../contexts/ThemeContext', () => ({
   useTheme: () => ({ resolvedTheme: 'dark' }),
   isDarkTheme: (theme: string) => theme === 'dark',
@@ -20,7 +22,7 @@ vi.mock('../../../services/api', () => ({
 }));
 
 vi.mock('../FileSearchInput', () => ({
-  FileSearchInput: (props: any) => <div data-testid="file-search">FileSearchInput</div>,
+  FileSearchInput: (_props: any) => <div data-testid="file-search">FileSearchInput</div>,
 }));
 
 vi.mock('../FileTree', () => ({
@@ -63,7 +65,7 @@ vi.mock('react-window', () => ({
       ))}
     </div>
   ),
-  useListRef: () => ({ current: null }),
+  useListRef: () => ({ current: { scrollToRow: scrollToRowMock } }),
 }));
 
 const mockFileViewerState = {
@@ -72,6 +74,9 @@ const mockFileViewerState = {
   loading: false,
   error: null as string | null,
   searchOpen: false,
+  inFileSearchOpen: false,
+  inFileSearchQuery: '',
+  inFileSearchCaseSensitive: false,
   showTree: true,
   fullscreen: false,
   projectRoot: null as string | null,
@@ -79,6 +84,10 @@ const mockFileViewerState = {
   setContent: vi.fn(),
   setError: vi.fn(),
   setSearchOpen: vi.fn(),
+  setInFileSearchOpen: vi.fn(),
+  setInFileSearchQuery: vi.fn(),
+  toggleInFileSearchCaseSensitive: vi.fn(),
+  resetInFileSearch: vi.fn(),
   setFullscreen: vi.fn(),
   toggleTree: vi.fn(),
   setShowTree: vi.fn(),
@@ -100,13 +109,29 @@ vi.mock('../../../stores/fileViewerStore', () => {
   return { useFileViewerStore: store };
 });
 
+vi.mock('../FileContentSearchInput', () => ({
+  FileContentSearchInput: (props: any) => (
+    <button
+      type="button"
+      data-testid="file-content-search"
+      onClick={() => props.onSelectMatch({ line: 3, start: 10, end: 13 })}
+    >
+      FileContentSearchInput
+    </button>
+  ),
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
+  scrollToRowMock.mockClear();
   mockFileViewerState.filePath = null;
   mockFileViewerState.content = null;
   mockFileViewerState.loading = false;
   mockFileViewerState.error = null;
   mockFileViewerState.searchOpen = false;
+  mockFileViewerState.inFileSearchOpen = false;
+  mockFileViewerState.inFileSearchQuery = '';
+  mockFileViewerState.inFileSearchCaseSensitive = false;
   mockFileViewerState.showTree = true;
   mockFileViewerState.treeWidthPx = 256;
   mockFileViewerState.projectRoot = null;
@@ -203,6 +228,44 @@ describe('FileViewerPanel', () => {
     });
   });
 
+  it('renders FileContentSearchInput when inFileSearchOpen is true with a file open', () => {
+    mockFileViewerState.filePath = 'src/index.ts';
+    mockFileViewerState.content = 'const x = 1;';
+    mockFileViewerState.inFileSearchOpen = true;
+    render(<FileViewerPanel projectRoot="/project" />);
+    expect(screen.getByTestId('file-content-search')).toBeInTheDocument();
+  });
+
+  it('lets the user open in-file search via the toolbar button', () => {
+    mockFileViewerState.filePath = 'src/index.ts';
+    mockFileViewerState.content = 'const x = 1;';
+    mockFileViewerState.inFileSearchOpen = false;
+    const { container } = render(<FileViewerActions />);
+    const findBtn = container.querySelector('button[aria-label="Find in file"]') as HTMLButtonElement;
+    expect(findBtn).toBeInTheDocument();
+    findBtn.click();
+    expect(mockFileViewerState.setInFileSearchOpen).toHaveBeenCalledWith(true);
+  });
+
+  it('renders FileContentSearchInput when inFileSearchOpen is true with a file open', () => {
+    mockFileViewerState.filePath = 'src/index.ts';
+    mockFileViewerState.content = 'const x = 1;';
+    mockFileViewerState.inFileSearchOpen = true;
+    render(<FileViewerPanel projectRoot="/project" />);
+    expect(screen.getByTestId('file-content-search')).toBeInTheDocument();
+  });
+
+  it('lets the user open in-file search via the toolbar button', () => {
+    mockFileViewerState.filePath = 'src/index.ts';
+    mockFileViewerState.content = 'const x = 1;';
+    mockFileViewerState.inFileSearchOpen = false;
+    const { container } = render(<FileViewerActions />);
+    const findBtn = container.querySelector('button[aria-label="Find in file"]') as HTMLButtonElement;
+    expect(findBtn).toBeInTheDocument();
+    findBtn.click();
+    expect(mockFileViewerState.setInFileSearchOpen).toHaveBeenCalledWith(true);
+  });
+
   it('renders markdown viewer for markdown files', () => {
     mockFileViewerState.filePath = 'docs/readme.md';
     mockFileViewerState.content = '| A |\n| - |\n| B |';
@@ -261,6 +324,29 @@ describe('FileViewerPanel', () => {
 
     expect(screen.queryByTestId('file-tree')).not.toBeInTheDocument();
     expect(screen.getByTestId('code-viewer')).toBeInTheDocument();
+  });
+
+  it('scrolls to the selected in-file search match and highlights matches', async () => {
+    mockFileViewerState.filePath = 'src/current.ts';
+    mockFileViewerState.content = 'import foo\nfoo bar baz\nline with foo';
+    mockFileViewerState.inFileSearchOpen = true;
+    mockFileViewerState.inFileSearchQuery = 'foo';
+    mockFileViewerState.showTree = false;
+
+    render(<FileViewerPanel projectRoot="/project" />);
+
+    expect(screen.getAllByText('foo')).toHaveLength(3);
+    fireEvent.click(screen.getByTestId('file-content-search'));
+
+    await waitFor(() =>
+      expect(scrollToRowMock).toHaveBeenCalledWith({
+        index: 2,
+        align: 'center',
+        behavior: 'auto',
+      })
+    );
+
+    expect(document.querySelectorAll('mark')).toHaveLength(3);
   });
 });
 

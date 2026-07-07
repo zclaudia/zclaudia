@@ -25,14 +25,17 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Search,
+  TextSearch,
 } from 'lucide-react';
 import { useTheme, isDarkTheme } from '../../contexts/ThemeContext';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import * as api from '../../services/api';
 import { FileSearchInput } from './FileSearchInput';
+import { FileContentSearchInput } from './FileContentSearchInput';
 import { FileTree } from './FileTree';
 import { MarkdownFileContent } from './MarkdownFileContent';
 import { FileSymbol } from '../filesymbols';
+import { matchesByLine, findContentMatches, type ContentMatch } from './contentSearch';
 import { isDesktopTauri } from '../../utils/platform';
 import { openPopoutWindow, buildWindowTitle, getConnectionParams } from '../../utils/popoutWindow';
 import { useProjectStore } from '../../stores/projectStore';
@@ -122,6 +125,9 @@ type CodeRowExtraProps = {
   highlightStart: number | null;
   highlightEnd: number | null;
   lineNumberWidth: string;
+  activeMatchLine: number | null;
+  activeMatchColumn: number;
+  matchesByLine: Map<number, { start: number; end: number }[]>;
 };
 
 function CodeRow({
@@ -133,6 +139,9 @@ function CodeRow({
   highlightStart,
   highlightEnd,
   lineNumberWidth,
+  activeMatchLine,
+  activeMatchColumn,
+  matchesByLine,
 }: RowComponentProps<CodeRowExtraProps>) {
   const line = tokens[index];
   if (!line) return null;
@@ -142,15 +151,21 @@ function CodeRow({
     highlightEnd != null &&
     lineNumber >= highlightStart &&
     lineNumber <= highlightEnd;
+  const isActiveMatchLine = activeMatchLine != null && activeMatchLine === lineNumber;
   const lineProps = getLineProps({ line });
   const themeBg = (lineProps.style?.backgroundColor as string | undefined) ?? undefined;
+  const matchRanges = matchesByLine.get(lineNumber) ?? [];
   return (
     <div
       style={{
         ...style,
         display: 'flex',
         whiteSpace: 'pre',
-        backgroundColor: inRange ? 'hsl(var(--primary) / 0.12)' : themeBg,
+        backgroundColor: isActiveMatchLine
+          ? 'hsl(var(--primary) / 0.16)'
+          : inRange
+            ? 'hsl(var(--primary) / 0.12)'
+            : themeBg,
       }}
     >
       <span
@@ -168,17 +183,123 @@ function CodeRow({
         {lineNumber}
       </span>
       <span style={{ flex: 1, minWidth: 0 }}>
-        {line.map((token, key) => {
-          const tokenProps = getTokenProps({ token });
-          return (
-            <span key={key} style={tokenProps.style} className={tokenProps.className}>
-              {token.content}
-            </span>
-          );
-        })}
+        {line.reduce<{
+          nodes: React.ReactNode[];
+          column: number;
+        }>(
+          (acc, token, key) => {
+            const tokenProps = getTokenProps({ token });
+            const text = String(tokenProps.children ?? '');
+            acc.nodes.push(
+              renderTokenWithMatches(
+                tokenProps,
+                matchRanges,
+                key,
+                activeMatchColumn,
+                acc.column
+              )
+            );
+            acc.column += text.length;
+            return acc;
+          },
+          { nodes: [], column: 0 }
+        ).nodes}
       </span>
     </div>
   );
+}
+
+/** Split a token's text into spans, highlighting matched ranges.
+ *  The token starts at `tokenColumn` on the current line. */
+function renderTokenWithMatches(
+  tokenProps: { style?: CSSProperties; className?: string; children?: React.ReactNode },
+  matchRanges: { start: number; end: number }[],
+  tokenKey: number,
+  activeMatchColumn: number,
+  tokenColumn: number
+) {
+  if (matchRanges.length === 0) {
+    return (
+      <span key={tokenKey} style={tokenProps.style} className={tokenProps.className}>
+        {tokenProps.children}
+      </span>
+    );
+  }
+
+  const text = String(tokenProps.children ?? '');
+  const tokenEnd = tokenColumn + text.length;
+  const tokenRanges = matchRanges.filter(r => r.end > tokenColumn && r.start < tokenEnd);
+
+  if (tokenRanges.length === 0) {
+    return (
+      <span key={tokenKey} style={tokenProps.style} className={tokenProps.className}>
+        {tokenProps.children}
+      </span>
+    );
+  }
+
+  const spans: React.ReactNode[] = [];
+  let cursor = 0;
+  let rangeIndex = 0;
+  let spanKey = 0;
+
+  while (cursor < text.length && rangeIndex < tokenRanges.length) {
+    const range = tokenRanges[rangeIndex];
+    const localStart = Math.max(0, range.start - tokenColumn);
+    const localEnd = Math.min(text.length, range.end - tokenColumn);
+
+    if (localEnd <= cursor) {
+      rangeIndex++;
+      continue;
+    }
+    if (localStart > cursor) {
+      spans.push(
+        <span
+          key={`${tokenKey}-${spanKey}`}
+          style={tokenProps.style}
+          className={tokenProps.className}
+        >
+          {text.slice(cursor, localStart)}
+        </span>
+      );
+      spanKey++;
+      cursor = localStart;
+    }
+
+    const start = Math.max(cursor, localStart);
+    const end = Math.min(text.length, localEnd);
+    const isActive = activeMatchColumn >= range.start && activeMatchColumn < range.end;
+    spans.push(
+      <mark
+        key={`${tokenKey}-${spanKey}`}
+        style={{
+          ...tokenProps.style,
+          backgroundColor: isActive ? 'hsl(var(--primary) / 0.45)' : 'hsl(var(--primary) / 0.25)',
+          color: 'inherit',
+        }}
+        className={tokenProps.className}
+      >
+        {text.slice(start, end)}
+      </mark>
+    );
+    spanKey++;
+    cursor = end;
+    if (cursor >= localEnd) rangeIndex++;
+  }
+
+  if (cursor < text.length) {
+    spans.push(
+      <span
+        key={`${tokenKey}-${spanKey}`}
+        style={tokenProps.style}
+        className={tokenProps.className}
+      >
+        {text.slice(cursor)}
+      </span>
+    );
+  }
+
+  return spans;
 }
 
 interface VirtualizedCodeViewProps {
@@ -188,6 +309,9 @@ interface VirtualizedCodeViewProps {
   highlightStart: number | null;
   highlightEnd: number | null;
   listRef: React.RefObject<ListImperativeAPI | null>;
+  matchesByLine: Map<number, { start: number; end: number }[]>;
+  activeMatchLine: number | null;
+  activeMatchColumn: number;
 }
 
 /**
@@ -202,6 +326,9 @@ function VirtualizedCodeView({
   highlightStart,
   highlightEnd,
   listRef,
+  matchesByLine,
+  activeMatchLine,
+  activeMatchColumn,
 }: VirtualizedCodeViewProps) {
   const lineCount = useMemo(() => content.split(/\r?\n/).length, [content]);
   const lineNumberWidth = `${Math.max(2, String(lineCount).length) + 2}ch`;
@@ -220,6 +347,9 @@ function VirtualizedCodeView({
             highlightStart,
             highlightEnd,
             lineNumberWidth,
+            activeMatchLine,
+            activeMatchColumn,
+            matchesByLine,
           }}
           listRef={listRef}
           style={{
@@ -267,6 +397,8 @@ export function FileViewerActions() {
   const {
     searchOpen,
     setSearchOpen,
+    inFileSearchOpen,
+    setInFileSearchOpen,
     content,
     filePath,
     projectRoot,
@@ -328,6 +460,20 @@ export function FileViewerActions() {
       </button>
       {content && (
         <button
+          onClick={() => setInFileSearchOpen(!inFileSearchOpen)}
+          className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors flex-shrink-0 ${
+            inFileSearchOpen
+              ? 'bg-secondary text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          } hover:bg-secondary`}
+          title="Find in file (Cmd+F)"
+          aria-label="Find in file"
+        >
+          <TextSearch className="w-3.5 h-3.5" aria-hidden="true" />
+        </button>
+      )}
+      {content && (
+        <button
           onClick={handleCopy}
           className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors flex-shrink-0 ${
             copied
@@ -369,6 +515,9 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
   const {
     loading,
     searchOpen,
+    inFileSearchOpen,
+    inFileSearchQuery,
+    inFileSearchCaseSensitive,
     targetLine,
     targetEndLine,
     targetNonce,
@@ -376,6 +525,9 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
     setContent,
     setError,
     setSearchOpen,
+    setInFileSearchOpen,
+    setInFileSearchQuery,
+    toggleInFileSearchCaseSensitive,
     showTree,
     treeWidthPx,
     setTreeWidthPx,
@@ -397,10 +549,12 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
   const fileBackendId = resolveProjectBackendId(projectRoot);
   const listRef = useListRef(null);
 
+  const [activeMatch, setActiveMatch] = useState<ContentMatch | null>(null);
+
   const { resolvedTheme } = useTheme();
 
   // Freshness poll: on open/switch and every FILE_POLL_INTERVAL_MS, stat the
-  // current file and re-fetch content only when the mtime advanced past what we
+  // current file and re-fetch full content only when the mtime advanced past what we
   // already show. This picks up edits made by the agent *or* by any external
   // process (editor, git pull, …) while the viewer is open. Cached content is
   // shown instantly and updated seamlessly in the background once the new
@@ -484,6 +638,51 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
   const lang = filePath ? detectLanguage(filePath) : 'text';
   const codeTheme = isDarkTheme(resolvedTheme) ? prismThemes.oneDark : prismThemes.oneLight;
   const isMarkdown = lang === 'markdown';
+
+  // In-file search state derived from the store. We keep the active match in a
+  // local state so the panel can scroll the virtualized list to it.
+  const matches = useMemo(() => {
+    if (!content || !inFileSearchOpen) return [];
+    return findContentMatches(content, inFileSearchQuery, inFileSearchCaseSensitive);
+  }, [content, inFileSearchOpen, inFileSearchQuery, inFileSearchCaseSensitive]);
+  const matchesByLineMap = useMemo(() => matchesByLine(matches), [matches]);
+  const activeMatchLine = activeMatch?.line ?? null;
+  const activeMatchColumn = activeMatch?.start ?? 0;
+
+  // Scroll the virtualized list to the active match line whenever it changes.
+  useEffect(() => {
+    if (!activeMatch || isMarkdown) return;
+    if (loading || !content) return;
+    const id = window.setTimeout(() => {
+      try {
+        listRef.current?.scrollToRow({
+          index: Math.max(0, activeMatch.line - 1),
+          align: 'center',
+          behavior: 'auto',
+        });
+      } catch {
+        // Ignore out-of-range transitions.
+      }
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [activeMatch, content, loading, isMarkdown, listRef]);
+
+  // Keyboard shortcut: Cmd/Ctrl+F opens in-file search, Escape closes it.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        if (content) setInFileSearchOpen(true);
+      }
+      if (e.key === 'Escape' && inFileSearchOpen) {
+        e.preventDefault();
+        setInFileSearchOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [content, inFileSearchOpen, setInFileSearchOpen]);
+
   const headerIcon = filePath ? (
     <FileSymbol
       name={filePath.split('/').pop() ?? filePath}
@@ -611,6 +810,18 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
             />
           )}
 
+          {inFileSearchOpen && content && (
+            <FileContentSearchInput
+              content={content}
+              query={inFileSearchQuery}
+              caseSensitive={inFileSearchCaseSensitive}
+              onQueryChange={setInFileSearchQuery}
+              onToggleCaseSensitive={toggleInFileSearchCaseSensitive}
+              onSelectMatch={setActiveMatch}
+              onClose={() => setInFileSearchOpen(false)}
+            />
+          )}
+
           <div className={`flex-1 min-h-0 overflow-hidden ${contentLayoutClass}`}>
             {showFileTree && (
               <>
@@ -670,6 +881,9 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
                     highlightStart={highlightStart}
                     highlightEnd={highlightEnd}
                     listRef={listRef}
+                    matchesByLine={matchesByLineMap}
+                    activeMatchLine={activeMatchLine}
+                    activeMatchColumn={activeMatchColumn}
                   />
                 ))}
             </div>

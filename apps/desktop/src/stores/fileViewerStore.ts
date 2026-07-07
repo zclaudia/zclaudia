@@ -37,6 +37,10 @@ interface FileViewerState {
   treeWidthPx: number;
   // Full-screen overlay (mobile)
   fullscreen: boolean;
+  // In-file content search UI state
+  inFileSearchOpen: boolean;
+  inFileSearchQuery: string;
+  inFileSearchCaseSensitive: boolean;
   // LRU content cache  (key = "projectRoot\0relativePath")
   contentCache: Map<string, CacheEntry>;
 
@@ -56,6 +60,10 @@ interface FileViewerState {
   setTreeWidthPx: (widthPx: number) => void;
   setSearchOpen: (open: boolean) => void;
   setFullscreen: (open: boolean) => void;
+  setInFileSearchOpen: (open: boolean) => void;
+  setInFileSearchQuery: (query: string) => void;
+  toggleInFileSearchCaseSensitive: () => void;
+  resetInFileSearch: () => void;
   getCached: (projectRoot: string, relativePath: string) => string | undefined;
   /** Remove a cached entry so the next open forces a fresh fetch. */
   invalidate: (projectRoot: string, relativePath: string) => void;
@@ -90,6 +98,9 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
   showTree: true,
   treeWidthPx: TREE_WIDTH_DEFAULT,
   fullscreen: false,
+  inFileSearchOpen: false,
+  inFileSearchQuery: '',
+  inFileSearchCaseSensitive: false,
   contentCache: new Map(),
 
   openFile: (
@@ -114,6 +125,8 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
       targetEndLine: targetEndLine ?? null,
       targetNonce: state.targetNonce + 1,
       searchOpen: false,
+      inFileSearchOpen: false,
+      inFileSearchQuery: '',
     }));
     // Show file viewer panel in bottom panel
     usePluginStore.getState().updatePanelVisibility('file-viewer', true);
@@ -148,6 +161,8 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
       fullscreen: false,
       targetLine: null,
       targetEndLine: null,
+      inFileSearchOpen: false,
+      inFileSearchQuery: '',
     });
     // Hide file viewer panel in bottom panel
     usePluginStore.getState().updatePanelVisibility('file-viewer', false);
@@ -168,6 +183,16 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
   setSearchOpen: (open: boolean) => set({ searchOpen: open, isOpen: open ? true : undefined }),
 
   setFullscreen: (open: boolean) => set({ fullscreen: open }),
+
+  setInFileSearchOpen: (open: boolean) => set({ inFileSearchOpen: open }),
+
+  setInFileSearchQuery: (query: string) => set({ inFileSearchQuery: query }),
+
+  toggleInFileSearchCaseSensitive: () =>
+    set(state => ({ inFileSearchCaseSensitive: !state.inFileSearchCaseSensitive })),
+
+  resetInFileSearch: () =>
+    set({ inFileSearchOpen: false, inFileSearchQuery: '', inFileSearchCaseSensitive: false }),
 
   getCached: (projectRoot: string, relativePath: string) =>
     get().contentCache.get(cacheKey(projectRoot, relativePath))?.content,
