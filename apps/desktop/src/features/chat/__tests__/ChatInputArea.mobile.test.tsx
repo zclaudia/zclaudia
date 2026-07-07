@@ -163,9 +163,7 @@ vi.mock('../../../stores/draftEditorStore', () => ({
 }));
 
 vi.mock('../../../stores/uiStore', () => ({
-  useUIStore: vi.fn(() => ({
-    setAdvancedInput: vi.fn(),
-  })),
+  useUIStore: vi.fn(() => ({})),
 }));
 
 const projectStoreState = {
