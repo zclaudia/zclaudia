@@ -523,7 +523,10 @@ describe('MessageInput', () => {
       expect(textarea.className).toContain('leading-6');
       expect(textarea.className).toContain('resize-none');
       const box = screen.getByTestId('composer-box');
-      expect(box.className).toContain('items-end');
+      // Row centers its content (single line is vertically centered); +/send use
+      // self-end to anchor to the bottom as the box grows.
+      expect(box.className).toContain('items-center');
+      expect(box.querySelector('[data-testid="send-button"]')?.className).toContain('self-end');
       expect(box.querySelector('[data-testid="message-input"]')).not.toBeNull();
       expect(box.querySelector('[data-testid="attach-button"]')).not.toBeNull();
       expect(box.querySelector('[data-testid="send-button"]')).not.toBeNull();

@@ -427,7 +427,7 @@ export function MessageInput({
     }
 
     // Desktop: grow to ~40% of the viewport (capped 320px), then scroll.
-    const max = Math.min(Math.floor(availableViewportHeight * 0.4), 320);
+    const max = Math.min(Math.floor(availableViewportHeight * 0.3), 200);
     textarea.style.height = 'auto';
     textarea.style.height = `${Math.min(textarea.scrollHeight, max)}px`;
     textarea.style.maxHeight = `${max}px`;
@@ -1103,18 +1103,19 @@ export function MessageInput({
         </div>
       ) : (
         /* Desktop: one auto-growing composer. Single row at rest; grows
-           line-by-line up to a viewport cap then scrolls; +/send stay anchored
-           to the bottom (items-end) as it grows. */
+           line-by-line up to a viewport cap then scrolls. The row centers its
+           content (items-center) so the single line is vertically centered,
+           while +/send use self-end to stay pinned to the bottom as it grows. */
         <div
           data-testid="composer-box"
-          className="flex items-end gap-2 rounded-2xl border border-border bg-input px-2.5 py-2 transition-colors duration-200 focus-within:border-primary/60 focus-within:shadow-apple-md"
+          className="flex items-center gap-2 rounded-2xl border border-border bg-input px-2.5 py-2 transition-colors duration-200 focus-within:border-primary/60 focus-within:shadow-apple-md"
         >
           {/* Attachment button */}
           <button
             data-testid="attach-button"
             onClick={() => fileInputRef.current?.click()}
             disabled={disabled}
-            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex h-8 w-8 flex-shrink-0 self-end items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
             title="Add attachment (images, files)"
           >
             <Plus size={18} strokeWidth={1.75} />
@@ -1128,10 +1129,11 @@ export function MessageInput({
             className="hidden"
           />
 
-          {/* flex + items-end keeps rich-textarea's inline-block root
-              bottom-aligned (kills the inline-block baseline gap) so the single
-              line sits correctly and +/send stay pinned to the bottom as it grows. */}
-          <div className="flex-1 relative flex items-end">
+          {/* flex + items-center centers rich-textarea's inline-block root
+              (kills the inline-block baseline gap) so the single line is
+              vertically centered; the +/send buttons use self-end to anchor
+              to the bottom as the box grows. */}
+          <div className="flex-1 relative flex items-center">
             <RichTextarea
               data-testid="message-input"
               ref={textareaRef}
@@ -1177,7 +1179,7 @@ export function MessageInput({
             <button
               data-testid="cancel-button"
               onClick={onCancel}
-              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-foreground text-background hover:bg-foreground/90"
+              className="flex h-8 w-8 flex-shrink-0 self-end items-center justify-center rounded-full bg-foreground text-background hover:bg-foreground/90"
               title="Cancel (Esc)"
             >
               <Square size={12} fill="currentColor" strokeWidth={0} />
@@ -1187,7 +1189,7 @@ export function MessageInput({
               data-testid="send-button"
               onClick={handleSend}
               disabled={disabled || (!value.trim() && attachments.length === 0)}
-              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
+              className="flex h-8 w-8 flex-shrink-0 self-end items-center justify-center rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
               title="Send message (Enter)"
             >
               <ArrowUp size={18} strokeWidth={2.25} />
