@@ -1283,7 +1283,10 @@ export function MessageInput({
           />
 
           {/* Text input */}
-          <div className="flex-1 relative">
+          {/* flex + items-center centers rich-textarea's inline-block root and
+              removes the inline-block baseline gap that otherwise pushes the
+              single-line text above the row's vertical center. */}
+          <div className="flex-1 relative flex items-center">
             <RichTextarea
               data-testid="message-input"
               ref={textareaRef}
