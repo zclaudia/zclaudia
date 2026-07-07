@@ -12,6 +12,7 @@ import {
   Database,
   Plug,
   LayoutPanelTop,
+  LayoutGrid,
   Search,
 } from 'lucide-react';
 import type { AutomationTab } from '../automation/automation-types';
@@ -65,6 +66,7 @@ const AUTOMATION_TABS: { key: AutomationTab; label: string; Icon: typeof Zap }[]
 ];
 
 const AGENTS_TABS: { key: AgentsTab; label: string; Icon: typeof Bot }[] = [
+  { key: 'all', label: 'All items', Icon: LayoutGrid },
   { key: 'profiles', label: 'Agent Profiles', Icon: BotMessageSquare },
   { key: 'providers', label: 'LLM Providers', Icon: Plug },
   { key: 'skills', label: 'Skills', Icon: Lightbulb },
