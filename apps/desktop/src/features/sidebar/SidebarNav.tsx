@@ -11,7 +11,6 @@ import {
   Lightbulb,
   Database,
   Plug,
-  Puzzle,
   LayoutPanelTop,
   Search,
 } from 'lucide-react';
@@ -73,7 +72,7 @@ const AGENTS_TABS: { key: AgentsTab; label: string; Icon: typeof Bot }[] = [
 ];
 
 const PLUGINS_TABS: { key: PluginsTab; label: string; Icon: typeof Zap }[] = [
-  { key: 'installed', label: 'Plugins', Icon: Puzzle },
+  { key: 'installed', label: 'Plugins', Icon: Blocks },
   { key: 'builtin', label: 'Built-in', Icon: LayoutPanelTop },
   { key: 'web-search', label: 'Web Search', Icon: Search },
 ];
@@ -220,7 +219,7 @@ export function SidebarNav({
             aria-label="Plugins"
             className={`${rowBase} text-muted-foreground`}
           >
-            <Puzzle className={iconSize} strokeWidth={1.75} />
+            <Blocks className={iconSize} strokeWidth={1.75} />
             Plugins
           </button>
         )}
