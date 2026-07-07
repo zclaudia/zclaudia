@@ -25,7 +25,8 @@ import type { WorkspaceSkillInfo } from '../../services/api/workspace-skills';
 import { downscaleImageFile } from '../attachments/downscale-image';
 import { SlashMenu, type SlashSuggestion } from './SlashMenu';
 import { PinnedSkillChips } from './PinnedSkillChips';
-import { SkillTokenHighlighter } from './SkillTokenHighlighter';
+import { RichTextarea, type RichTextareaHandle } from 'rich-textarea';
+import { renderSkillTokens } from './SkillTokenRenderer';
 
 export interface Attachment {
   id: string;
@@ -146,7 +147,7 @@ export function MessageInput({
   );
   const expandedInputHeight = Math.min(EXPANDED_INPUT_DEFAULT_HEIGHT_PX, expandedInputMaxHeight);
 
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const textareaRef = useRef<RichTextareaHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commandListRef = useRef<HTMLDivElement>(null);
   const mentionListRef = useRef<HTMLDivElement>(null);
@@ -1078,52 +1079,43 @@ export function MessageInput({
       {isMobile ? (
         /* Mobile: card-style two-row layout — textarea on top, buttons below */
         <div className="bg-input border border-border rounded-2xl px-3 pt-3 pb-2 mb-1">
-          <div className="relative">
-            {/* Highlight overlay (transparent glyphs, marks line up under the textarea). */}
-            <SkillTokenHighlighter
-              value={value}
-              skillIds={skillIds}
-              commandSet={commandSet}
-              className="pointer-events-none absolute inset-0 w-full resize-none min-h-[1.5rem] overflow-y-auto border-0 p-0 whitespace-pre-wrap break-words"
-              style={{
-                fontSize: 'var(--chat-font-input, 0.875rem)',
-                maxHeight: `${Math.max(120, availableViewportHeight * 0.3)}px`,
-              }}
-            />
-            <textarea
-              data-testid="message-input"
-              ref={textareaRef}
-              value={value}
-              onChange={handleChange}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-              onCompositionStart={() => {
-                if (compositionTimeoutRef.current) {
-                  clearTimeout(compositionTimeoutRef.current);
-                  compositionTimeoutRef.current = null;
-                }
-                setIsComposing(true);
-              }}
-              onCompositionEnd={() => {
-                compositionTimeoutRef.current = setTimeout(() => {
-                  setIsComposing(false);
-                  compositionTimeoutRef.current = null;
-                }, 50);
-              }}
-              disabled={disabled}
-              placeholder={placeholder}
-              spellCheck={false}
-              autoCorrect="off"
-              autoCapitalize="off"
-              autoComplete="off"
-              rows={1}
-              className="relative w-full bg-transparent text-transparent caret-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed resize-none min-h-[1.5rem] overflow-y-auto border-0 p-0"
-              style={{
-                fontSize: 'var(--chat-font-input, 0.875rem)',
-                maxHeight: `${Math.max(120, availableViewportHeight * 0.3)}px`,
-              }}
-            />
-          </div>
+          <RichTextarea
+            data-testid="message-input"
+            ref={textareaRef}
+            value={value}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            onCompositionStart={() => {
+              if (compositionTimeoutRef.current) {
+                clearTimeout(compositionTimeoutRef.current);
+                compositionTimeoutRef.current = null;
+              }
+              setIsComposing(true);
+            }}
+            onCompositionEnd={() => {
+              compositionTimeoutRef.current = setTimeout(() => {
+                setIsComposing(false);
+                compositionTimeoutRef.current = null;
+              }, 50);
+            }}
+            disabled={disabled}
+            placeholder={placeholder}
+            spellCheck={false}
+            autoCorrect="off"
+            autoCapitalize="off"
+            autoComplete="off"
+            rows={1}
+            className="relative w-full resize-none min-h-[1.5rem] overflow-y-auto border-0 bg-transparent p-0 whitespace-pre-wrap break-words placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              fontSize: 'var(--chat-font-input, 0.875rem)',
+              maxHeight: `${Math.max(120, availableViewportHeight * 0.3)}px`,
+              color: 'hsl(var(--foreground))',
+              caretColor: 'hsl(var(--foreground))',
+            }}
+          >
+            {(v: string) => renderSkillTokens(v, skillIds, commandSet)}
+          </RichTextarea>
           <div className="flex items-center gap-2 mt-2">
             {/* Attachment button */}
             <button
@@ -1173,53 +1165,44 @@ export function MessageInput({
           data-testid="composer-box"
           className="flex flex-col rounded-2xl border border-border bg-input px-4 pt-3 pb-2 transition-colors duration-200 focus-within:border-primary/60 focus-within:shadow-apple-md"
         >
-          <div className="relative">
-            <SkillTokenHighlighter
-              value={value}
-              skillIds={skillIds}
-              commandSet={commandSet}
-              className="pointer-events-none absolute inset-0 w-full resize-none overflow-auto border-0 px-0 py-1 pr-2 leading-6 whitespace-pre-wrap break-words"
-              style={{
-                fontSize: 'var(--chat-font-input, 0.875rem)',
-                minHeight: `${expandedInputHeight}px`,
-                maxHeight: `${expandedInputMaxHeight}px`,
-              }}
-            />
-            <textarea
-              data-testid="message-input"
-              ref={textareaRef}
-              value={value}
-              onChange={handleChange}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-              onCompositionStart={() => {
-                if (compositionTimeoutRef.current) {
-                  clearTimeout(compositionTimeoutRef.current);
-                  compositionTimeoutRef.current = null;
-                }
-                setIsComposing(true);
-              }}
-              onCompositionEnd={() => {
-                compositionTimeoutRef.current = setTimeout(() => {
-                  setIsComposing(false);
-                  compositionTimeoutRef.current = null;
-                }, 50);
-              }}
-              disabled={disabled}
-              placeholder={placeholder}
-              spellCheck={false}
-              autoCorrect="off"
-              autoCapitalize="off"
-              autoComplete="off"
-              rows={1}
-              className="relative w-full resize-none overflow-auto border-0 bg-transparent px-0 py-1 pr-2 text-transparent caret-foreground leading-6 placeholder:text-muted-foreground/60 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{
-                fontSize: 'var(--chat-font-input, 0.875rem)',
-                minHeight: `${expandedInputHeight}px`,
-                maxHeight: `${expandedInputMaxHeight}px`,
-              }}
-            />
-          </div>
+          <RichTextarea
+            data-testid="message-input"
+            ref={textareaRef}
+            value={value}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            onCompositionStart={() => {
+              if (compositionTimeoutRef.current) {
+                clearTimeout(compositionTimeoutRef.current);
+                compositionTimeoutRef.current = null;
+              }
+              setIsComposing(true);
+            }}
+            onCompositionEnd={() => {
+              compositionTimeoutRef.current = setTimeout(() => {
+                setIsComposing(false);
+                compositionTimeoutRef.current = null;
+              }, 50);
+            }}
+            disabled={disabled}
+            placeholder={placeholder}
+            spellCheck={false}
+            autoCorrect="off"
+            autoCapitalize="off"
+            autoComplete="off"
+            rows={1}
+            className="relative w-full resize-none overflow-auto border-0 bg-transparent px-0 py-1 pr-2 leading-6 whitespace-pre-wrap break-words placeholder:text-muted-foreground/60 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              fontSize: 'var(--chat-font-input, 0.875rem)',
+              minHeight: `${expandedInputHeight}px`,
+              maxHeight: `${expandedInputMaxHeight}px`,
+              color: 'hsl(var(--foreground))',
+              caretColor: 'hsl(var(--foreground))',
+            }}
+          >
+            {(v: string) => renderSkillTokens(v, skillIds, commandSet)}
+          </RichTextarea>
 
           <div className="mt-2 flex items-center gap-2">
             <button
@@ -1299,14 +1282,7 @@ export function MessageInput({
 
           {/* Text input */}
           <div className="flex-1 relative">
-            <SkillTokenHighlighter
-              value={value}
-              skillIds={skillIds}
-              commandSet={commandSet}
-              className="pointer-events-none absolute inset-0 block h-6 w-full resize-none overflow-hidden border-0 p-0 leading-6 whitespace-pre-wrap break-words"
-              style={{ fontSize: 'var(--chat-font-input, 0.875rem)' }}
-            />
-            <textarea
+            <RichTextarea
               data-testid="message-input"
               ref={textareaRef}
               value={value}
@@ -1333,9 +1309,15 @@ export function MessageInput({
               autoCapitalize="off"
               autoComplete="off"
               rows={1}
-              className="relative block h-6 w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-transparent caret-foreground leading-6 placeholder:text-muted-foreground/60 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-              style={{ fontSize: 'var(--chat-font-input, 0.875rem)' }}
-            />
+              className="relative block h-6 w-full resize-none overflow-hidden border-0 bg-transparent p-0 leading-6 whitespace-pre-wrap break-words placeholder:text-muted-foreground/60 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+              style={{
+                fontSize: 'var(--chat-font-input, 0.875rem)',
+                color: 'hsl(var(--foreground))',
+                caretColor: 'hsl(var(--foreground))',
+              }}
+            >
+              {(v: string) => renderSkillTokens(v, skillIds, commandSet)}
+            </RichTextarea>
           </div>
 
           {/* Multiline toggle (only when onToggleAdvanced is provided) — kept
