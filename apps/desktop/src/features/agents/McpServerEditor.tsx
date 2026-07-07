@@ -29,6 +29,7 @@ import {
 } from '../../services/api';
 import type { McpOAuthStartResult } from '../../services/api';
 import { McpOAuthLoginModal } from './McpOAuthLoginModal';
+import { EditorSection, FieldLabel } from './ui/EditorSection';
 import type { McpServerConfig, McpServerStatus } from '@zclaudia/shared';
 import type {
   McpRiskAction,
@@ -495,10 +496,10 @@ export function McpServerEditor({
         </div>
       )}
 
-      <div className="bg-secondary/50 border border-border/50 rounded-lg p-4 space-y-3">
+      <EditorSection title="Configuration">
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs text-muted-foreground mb-1">Name *</label>
+            <FieldLabel>Name *</FieldLabel>
             <input
               type="text"
               value={formName}
@@ -508,9 +509,7 @@ export function McpServerEditor({
             />
           </div>
           <div>
-            <label htmlFor="mcp-transport" className="block text-xs text-muted-foreground mb-1">
-              Transport
-            </label>
+            <FieldLabel htmlFor="mcp-transport">Transport</FieldLabel>
             <select
               id="mcp-transport"
               aria-label="Transport"
@@ -528,7 +527,7 @@ export function McpServerEditor({
         {formTransport === 'stdio' ? (
           <>
             <div>
-              <label className="block text-xs text-muted-foreground mb-1">Command *</label>
+              <FieldLabel>Command *</FieldLabel>
               <input
                 type="text"
                 value={formCommand}
@@ -539,9 +538,7 @@ export function McpServerEditor({
             </div>
 
             <div>
-              <label className="block text-xs text-muted-foreground mb-1">
-                Arguments (space-separated)
-              </label>
+              <FieldLabel>Arguments (space-separated)</FieldLabel>
               <input
                 type="text"
                 value={formArgs}
@@ -553,7 +550,7 @@ export function McpServerEditor({
           </>
         ) : (
           <div>
-            <label className="block text-xs text-muted-foreground mb-1">Remote MCP URL *</label>
+            <FieldLabel>Remote MCP URL *</FieldLabel>
             <input
               type="text"
               value={formUrl}
@@ -565,7 +562,7 @@ export function McpServerEditor({
         )}
 
         <div>
-          <label className="block text-xs text-muted-foreground mb-1">Description</label>
+          <FieldLabel>Description</FieldLabel>
           <input
             type="text"
             value={formDescription}
@@ -698,7 +695,7 @@ export function McpServerEditor({
 
         {formTransport !== 'stdio' && (
           <div>
-            <label className="block text-xs text-muted-foreground mb-1">Headers Helper</label>
+            <FieldLabel>Headers Helper</FieldLabel>
             <input
               type="text"
               value={formHeadersHelper}
@@ -791,9 +788,7 @@ export function McpServerEditor({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="mcp-trust-level" className="block text-xs text-muted-foreground mb-1">
-                Trust Level
-              </label>
+              <FieldLabel htmlFor="mcp-trust-level">Trust Level</FieldLabel>
               <select
                 id="mcp-trust-level"
                 aria-label="Trust Level"
@@ -807,12 +802,7 @@ export function McpServerEditor({
               </select>
             </div>
             <div>
-              <label
-                htmlFor="mcp-default-risk-action"
-                className="block text-xs text-muted-foreground mb-1"
-              >
-                Default risk action
-              </label>
+              <FieldLabel htmlFor="mcp-default-risk-action">Default risk action</FieldLabel>
               <select
                 id="mcp-default-risk-action"
                 aria-label="Default risk action"
@@ -840,12 +830,7 @@ export function McpServerEditor({
           <div className="grid grid-cols-3 gap-2">
             {(['low', 'medium', 'high'] as const).map(level => (
               <div key={level}>
-                <label
-                  htmlFor={`mcp-${level}-risk-action`}
-                  className="block text-xs capitalize text-muted-foreground mb-1"
-                >
-                  {level} risk action
-                </label>
+                <FieldLabel htmlFor={`mcp-${level}-risk-action`}>{level} risk action</FieldLabel>
                 <select
                   id={`mcp-${level}-risk-action`}
                   aria-label={`${level[0].toUpperCase()}${level.slice(1)} risk action`}
@@ -866,9 +851,7 @@ export function McpServerEditor({
 
         {/* Provider scope */}
         <div>
-          <label className="block text-xs text-muted-foreground mb-1">
-            Provider Scope (empty = all providers)
-          </label>
+          <FieldLabel>Provider Scope (empty = all providers)</FieldLabel>
           <div className="flex flex-wrap gap-2">
             {PROVIDER_OPTIONS.map(opt => (
               <button
@@ -899,7 +882,7 @@ export function McpServerEditor({
             {saving ? 'Saving...' : server ? 'Save' : 'Add'}
           </button>
         </div>
-      </div>
+      </EditorSection>
 
       {oauthLogin && server && (
         <McpOAuthLoginModal
