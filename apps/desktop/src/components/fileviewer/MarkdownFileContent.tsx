@@ -1,12 +1,13 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { useTheme, isDarkTheme } from '../../contexts/ThemeContext';
 import {
   hasInlineMarkdownIcon,
   MarkdownChildrenWithInlineIcons,
   TextWithInlineMarkdownIcons,
 } from '../markdown/InlineMarkdownIcons';
+import { useTextHighlight } from './useTextHighlight';
 
 function normalizeMarkdownForRender(content: string): string {
   const normalized = content.replace(/\r\n/g, '\n');
@@ -19,15 +20,37 @@ function normalizeMarkdownForRender(content: string): string {
 
 interface MarkdownFileContentProps {
   content: string;
+  /** When provided, in-file search highlights & scrolls to matches in the rendered DOM. */
+  highlightQuery?: string;
+  highlightCaseSensitive?: boolean;
+  /** 0-based index of the active match (for highlighting + scroll). */
+  highlightActiveIndex?: number;
 }
 
-export function MarkdownFileContent({ content }: MarkdownFileContentProps) {
+export function MarkdownFileContent({
+  content,
+  highlightQuery,
+  highlightCaseSensitive,
+  highlightActiveIndex,
+}: MarkdownFileContentProps) {
   const { resolvedTheme } = useTheme();
   const dark = isDarkTheme(resolvedTheme);
   const normalizedContent = useMemo(() => normalizeMarkdownForRender(content), [content]);
+  const containerRef = useRef<HTMLDivElement>(null);
+  // Highlight & scroll within the rendered markdown. Markdown can't reuse the
+  // code view's line/column approach (raw offsets don't map to rendered HTML),
+  // so we match the literal query string in the DOM instead. contentSignature
+  // forces a re-run after React paints new content.
+  useTextHighlight(
+    containerRef,
+    highlightQuery ?? '',
+    highlightCaseSensitive ?? false,
+    highlightActiveIndex ?? 0,
+    normalizedContent
+  );
 
   return (
-    <div className="w-full h-full overflow-auto p-4 md:p-6">
+    <div ref={containerRef} className="w-full h-full overflow-auto p-4 md:p-6">
       <div className={`prose prose-sm max-w-none min-w-0 ${dark ? 'dark:prose-invert' : ''}`}>
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
