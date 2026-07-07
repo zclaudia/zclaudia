@@ -95,7 +95,11 @@ export function renderSkillTokens(
 ): ReactNode {
   return splitSegments(value, commandSet, skillIds).map((seg, i) => {
     if (seg.kind === 'plain') {
-      return <span key={i}>{seg.text}</span>;
+      return (
+        <span key={i} style={{ color: 'hsl(var(--foreground))' }}>
+          {seg.text}
+        </span>
+      );
     }
     if (seg.kind === 'hidden') {
       return (
