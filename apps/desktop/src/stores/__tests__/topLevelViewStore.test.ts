@@ -253,9 +253,9 @@ describe('plugins view', () => {
     });
   });
 
-  it('openPlugins enters plugins mode on the installed tab', () => {
+  it('openPlugins enters plugins mode on the plugins tab', () => {
     useTopLevelViewStore.getState().openPlugins();
-    expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'plugins', tab: 'installed' });
+    expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'plugins', tab: 'plugins' });
   });
 
   it('openPlugins accepts an explicit tab', () => {
@@ -265,13 +265,13 @@ describe('plugins view', () => {
 
   it('setPluginsTab switches the tab while in plugins view', () => {
     useTopLevelViewStore.getState().openPlugins();
-    useTopLevelViewStore.getState().setPluginsTab('builtin');
-    expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'plugins', tab: 'builtin' });
+    useTopLevelViewStore.getState().setPluginsTab('web-search');
+    expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'plugins', tab: 'web-search' });
   });
 
   it('ignores setPluginsTab when not in plugins view', () => {
     useTopLevelViewStore.getState().openSettings();
-    useTopLevelViewStore.getState().setPluginsTab('builtin');
+    useTopLevelViewStore.getState().setPluginsTab('web-search');
     expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'settings' });
   });
 });
