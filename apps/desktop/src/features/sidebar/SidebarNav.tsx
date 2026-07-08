@@ -11,7 +11,6 @@ import {
   Lightbulb,
   Database,
   Plug,
-  LayoutPanelTop,
   LayoutGrid,
   Search,
 } from 'lucide-react';
@@ -74,8 +73,7 @@ const AGENTS_TABS: { key: AgentsTab; label: string; Icon: typeof Bot }[] = [
 ];
 
 const PLUGINS_TABS: { key: PluginsTab; label: string; Icon: typeof Zap }[] = [
-  { key: 'installed', label: 'Plugins', Icon: Blocks },
-  { key: 'builtin', label: 'Built-in', Icon: LayoutPanelTop },
+  { key: 'plugins', label: 'Plugins', Icon: Plug },
   { key: 'web-search', label: 'Web Search', Icon: Search },
 ];
 
