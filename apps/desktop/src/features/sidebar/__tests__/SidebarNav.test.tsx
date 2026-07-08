@@ -186,9 +186,10 @@ describe('SidebarNav', () => {
       <SidebarNav
         onHome={vi.fn()}
         isHomeActive={false}
-        pluginsMode={{ tab: 'plugins', onSelectTab: vi.fn(), onBack }}
+        pluginsMode={{ tab: 'built-in', onSelectTab: vi.fn(), onBack }}
       />
     );
+    expect(screen.getByRole('button', { name: 'Built-in' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Plugins' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Web Search' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Back to app' }));

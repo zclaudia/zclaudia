@@ -119,13 +119,29 @@ export function PluginsContent() {
     );
   }
 
+  if (view.tab === 'built-in') {
+    return (
+      <PluginsBrowseView
+        title="Built-in"
+        models={builtinModels}
+        kind="Built-in"
+        onToggle={toggleBuiltinPanel}
+        emptyText="No built-in panels."
+        searchPlaceholder="Search built-in…"
+      />
+    );
+  }
+
+  // Installed plugins tab.
   return (
     <>
       <PluginsBrowseView
-        builtin={builtinModels}
-        installed={installedModels}
-        onToggleBuiltin={toggleBuiltinPanel}
-        onToggleInstalled={toggleInstalled}
+        title="Plugins"
+        models={installedModels}
+        kind="Installed"
+        onToggle={toggleInstalled}
+        emptyText="No plugins installed. Add a plugin directory to get started."
+        searchPlaceholder="Search plugins…"
         onAddDirectory={() => setDirsOpen(true)}
       />
       <Modal

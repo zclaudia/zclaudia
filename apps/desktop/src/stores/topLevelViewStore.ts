@@ -84,7 +84,7 @@ export const useTopLevelViewStore = create<TopLevelViewState>(set => ({
   selectAgentsItem: sel => set({ agentsSelection: sel }),
   bumpAgentsRefresh: () => set(s => ({ agentsRefreshNonce: s.agentsRefreshNonce + 1 })),
   setAgentsBackendFilter: backendFilter => set({ agentsBackendFilter: backendFilter }),
-  openPlugins: (tab = 'plugins') =>
+  openPlugins: (tab = 'built-in') =>
     set({ view: { kind: 'plugins', tab: normalizePluginsTab(tab) } }),
   setPluginsTab: tab =>
     set(state =>

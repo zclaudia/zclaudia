@@ -14,6 +14,7 @@ import {
   LayoutGrid,
   Search,
   ToyBrick,
+  LayoutPanelTop,
 } from 'lucide-react';
 import type { AutomationTab } from '../automation/automation-types';
 import type { AgentsTab } from '../agents/agents-types';
@@ -74,6 +75,7 @@ const AGENTS_TABS: { key: AgentsTab; label: string; Icon: typeof Bot }[] = [
 ];
 
 const PLUGINS_TABS: { key: PluginsTab; label: string; Icon: typeof Zap }[] = [
+  { key: 'built-in', label: 'Built-in', Icon: LayoutPanelTop },
   { key: 'plugins', label: 'Plugins', Icon: ToyBrick },
   { key: 'web-search', label: 'Web Search', Icon: Search },
 ];

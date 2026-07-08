@@ -4,18 +4,19 @@ import { Blocks } from 'lucide-react';
 import { PluginsBrowseView } from './PluginsBrowseView';
 import type { PluginCardModel } from './plugins-types';
 
-const builtin: PluginCardModel[] = [
+const models: PluginCardModel[] = [
   { id: 'a', title: 'Terminal', pluginId: 'com.claudia.terminal', icon: Blocks, enabled: true },
   { id: 'b', title: 'Memory', pluginId: 'com.claudia.memory', icon: Blocks, enabled: true },
 ];
 
-function setup(over = {}) {
+function setup(over: Partial<React.ComponentProps<typeof PluginsBrowseView>> = {}) {
   const props = {
-    builtin,
-    installed: [] as PluginCardModel[],
-    onToggleBuiltin: vi.fn(),
-    onToggleInstalled: vi.fn(),
-    onAddDirectory: vi.fn(),
+    title: 'Built-in',
+    models,
+    kind: 'Built-in' as const,
+    onToggle: vi.fn(),
+    emptyText: 'No built-in panels.',
+    searchPlaceholder: 'Search built-in…',
     ...over,
   };
   render(<PluginsBrowseView {...props} />);
@@ -23,26 +24,37 @@ function setup(over = {}) {
 }
 
 describe('PluginsBrowseView', () => {
-  it('renders both sections with counts and the built-in empty installed state', () => {
+  it('renders the title, count, and cards', () => {
     setup();
-    expect(screen.getByText('Built-in · 2')).toBeInTheDocument();
-    expect(screen.getByText('Installed · 0')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Built-in' })).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
     expect(screen.getByText('Terminal')).toBeInTheDocument();
+    expect(screen.getByText('Memory')).toBeInTheDocument();
   });
 
-  it('filters cards across sections by query', () => {
+  it('filters cards by query', () => {
     setup();
-    fireEvent.change(screen.getByPlaceholderText('Search plugins…'), {
+    fireEvent.change(screen.getByPlaceholderText('Search built-in…'), {
       target: { value: 'memory' },
     });
     expect(screen.getByText('Memory')).toBeInTheDocument();
     expect(screen.queryByText('Terminal')).toBeNull();
-    expect(screen.getByText('Built-in · 1')).toBeInTheDocument();
   });
 
-  it('calls onAddDirectory when the button is clicked', () => {
-    const props = setup();
+  it('shows the empty state when there are no models', () => {
+    setup({ models: [], emptyText: 'No plugins installed.' });
+    expect(screen.getByText('No plugins installed.')).toBeInTheDocument();
+  });
+
+  it('omits Add directory when onAddDirectory is not provided', () => {
+    setup();
+    expect(screen.queryByRole('button', { name: /add directory/i })).toBeNull();
+  });
+
+  it('renders Add directory when provided and calls it', () => {
+    const onAddDirectory = vi.fn();
+    setup({ onAddDirectory });
     fireEvent.click(screen.getByRole('button', { name: /add directory/i }));
-    expect(props.onAddDirectory).toHaveBeenCalledTimes(1);
+    expect(onAddDirectory).toHaveBeenCalledTimes(1);
   });
 });

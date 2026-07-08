@@ -6,9 +6,9 @@ describe('plugins tab defaults and normalization', () => {
     useTopLevelViewStore.setState({ view: { kind: 'home' } as never });
   });
 
-  it('openPlugins defaults to the plugins tab', () => {
+  it('openPlugins defaults to the built-in tab', () => {
     useTopLevelViewStore.getState().openPlugins();
-    expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'plugins', tab: 'plugins' });
+    expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'plugins', tab: 'built-in' });
   });
 
   it('maps a legacy "installed" tab to "plugins"', () => {
@@ -16,9 +16,14 @@ describe('plugins tab defaults and normalization', () => {
     expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'plugins', tab: 'plugins' });
   });
 
-  it('maps a legacy "builtin" tab to "plugins"', () => {
+  it('maps a legacy "builtin" tab to "built-in"', () => {
     useTopLevelViewStore.getState().openPlugins('builtin' as never);
-    expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'plugins', tab: 'plugins' });
+    expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'plugins', tab: 'built-in' });
+  });
+
+  it('keeps built-in', () => {
+    useTopLevelViewStore.getState().openPlugins('built-in');
+    expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'plugins', tab: 'built-in' });
   });
 
   it('keeps web-search', () => {

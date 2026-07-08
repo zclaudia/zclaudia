@@ -253,9 +253,9 @@ describe('plugins view', () => {
     });
   });
 
-  it('openPlugins enters plugins mode on the plugins tab', () => {
+  it('openPlugins enters plugins mode on the built-in tab', () => {
     useTopLevelViewStore.getState().openPlugins();
-    expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'plugins', tab: 'plugins' });
+    expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'plugins', tab: 'built-in' });
   });
 
   it('openPlugins accepts an explicit tab', () => {
