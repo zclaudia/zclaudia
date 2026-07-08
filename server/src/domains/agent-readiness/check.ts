@@ -5,6 +5,7 @@ import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import { AgentProfileRepository } from '../agent-profiles/repository.js';
 import { LlmProfileRepository } from '../llm-profiles/repository.js';
 import { hasLlmCredential } from './credential.js';
+import { runtimeRequiresLlmProfile } from '@zclaudia/shared/core/profile-config-descriptor';
 import {
   findInRegistryCrossProvider,
   tryGetRegistryModel,
@@ -39,6 +40,12 @@ function readinessForResolvedAgent(
   llm: LlmProfileConfig | null | undefined
 ): AgentReadiness {
   if (!agent) return { usable: false, reason: 'no_agent' };
+  // Native runtimes (e.g. claude) don't bind an LLM profile — they authenticate
+  // via their own SDK/subscription and use a native model id. Structural readiness
+  // for them is just a non-blank model.
+  if (!runtimeRequiresLlmProfile(agent.runtimeType)) {
+    return agent.model?.trim() ? { usable: true } : { usable: false, reason: 'no_model' };
+  }
   if (!llm) return { usable: false, reason: 'no_llm_profile' };
   if (!hasLlmCredential(llm)) return { usable: false, reason: 'no_credential' };
   if (!hasUsableModel(agent.model, llm)) return { usable: false, reason: 'no_model' };

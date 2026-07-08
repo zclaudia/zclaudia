@@ -98,4 +98,32 @@ describe('resolveAgentReadiness', () => {
     seedAgent(seedLlm('sk-x'), 'totally-unregistered-model-id');
     expect(resolveAgentReadiness(db)).toEqual({ usable: false, reason: 'no_model' });
   });
+
+  it('usable for a native (claude) runtime with a model and no llm profile', () => {
+    const agentRepo = new AgentProfileRepository(db);
+    agentRepo.create({
+      name: 'claude-agent',
+      llmProfileId: '',
+      model: 'claude-opus-4-8',
+      systemPrompt: '',
+      enabledTools: [],
+      runtimeType: 'claude',
+      isDefault: true,
+    });
+    expect(resolveAgentReadiness(db)).toEqual({ usable: true });
+  });
+
+  it('no_model for a native runtime missing a model', () => {
+    const agentRepo = new AgentProfileRepository(db);
+    agentRepo.create({
+      name: 'claude-agent',
+      llmProfileId: '',
+      model: '',
+      systemPrompt: '',
+      enabledTools: [],
+      runtimeType: 'claude',
+      isDefault: true,
+    });
+    expect(resolveAgentReadiness(db)).toEqual({ usable: false, reason: 'no_model' });
+  });
 });
