@@ -168,16 +168,16 @@ describe('SidebarNav', () => {
     expect(onSelectTab).toHaveBeenCalledWith('mcp-servers');
   });
 
-  it('renders Plugins entry and calls onOpenPlugins', () => {
+  it('renders Extensions entry and calls onOpenPlugins', () => {
     const onOpenPlugins = vi.fn();
     render(<SidebarNav onHome={vi.fn()} isHomeActive={false} onOpenPlugins={onOpenPlugins} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Plugins' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Extensions' }));
     expect(onOpenPlugins).toHaveBeenCalled();
   });
 
-  it('does not render Plugins entry when onOpenPlugins is omitted', () => {
+  it('does not render Extensions entry when onOpenPlugins is omitted', () => {
     render(<SidebarNav onHome={vi.fn()} isHomeActive={false} />);
-    expect(screen.queryByRole('button', { name: 'Plugins' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Extensions' })).toBeNull();
   });
 
   it('renders plugins-mode tabs with back button', () => {

@@ -217,11 +217,11 @@ export function SidebarNav({
         {onOpenPlugins && (
           <button
             onClick={onOpenPlugins}
-            aria-label="Plugins"
+            aria-label="Extensions"
             className={`${rowBase} text-muted-foreground`}
           >
             <Blocks className={iconSize} strokeWidth={1.75} />
-            Plugins
+            Extensions
           </button>
         )}
 
