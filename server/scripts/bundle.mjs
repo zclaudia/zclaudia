@@ -268,7 +268,7 @@ await esbuild.build({
   target: 'node20',
   format: 'esm',
   outfile: path.join(outDir, 'server.mjs'),
-  external: ['better-sqlite3', 'node-pty', 'bufferutil', 'utf-8-validate'],
+  external: ['better-sqlite3', 'node-pty', '@ast-grep/napi', 'bufferutil', 'utf-8-validate'],
   banner: {
     js: [
       `import { createRequire as __bundled_createRequire } from 'module';`,
@@ -474,6 +474,53 @@ console.log('  [3/4] Clean-room native module install');
       );
     }
   }
+
+  // -- @ast-grep/napi (prebuilt NAPI binding, loaded via dynamic import) --
+  {
+    const mainSrc = resolvePackage('@ast-grep/napi');
+    const dest = path.join(outDir, 'node_modules', '@ast-grep', 'napi');
+
+    copyFile(path.join(mainSrc, 'package.json'), path.join(dest, 'package.json'));
+    copyFile(path.join(mainSrc, 'index.js'), path.join(dest, 'index.js'));
+    if (fs.existsSync(path.join(mainSrc, 'lang'))) {
+      copyDir(path.join(mainSrc, 'lang'), path.join(dest, 'lang'));
+    }
+    if (fs.existsSync(path.join(mainSrc, 'types'))) {
+      copyDir(path.join(mainSrc, 'types'), path.join(dest, 'types'));
+    }
+
+    const mainPkgJson = JSON.parse(fs.readFileSync(path.join(mainSrc, 'package.json'), 'utf8'));
+    const optionalDeps = mainPkgJson.optionalDependencies || {};
+    let platformPkgName;
+    let platformSrc;
+    for (const candidate of Object.keys(optionalDeps)) {
+      try {
+        platformSrc = resolvePackage(candidate);
+        platformPkgName = candidate;
+        break;
+      } catch {
+        // optional binding not installed for this platform
+      }
+    }
+    if (!platformSrc || !platformPkgName) {
+      throw new Error('@ast-grep/napi platform binding not found for this platform');
+    }
+
+    const platformDest = path.join(
+      outDir,
+      'node_modules',
+      '@ast-grep',
+      platformPkgName.slice('@ast-grep/'.length)
+    );
+    copyFile(path.join(platformSrc, 'package.json'), path.join(platformDest, 'package.json'));
+    for (const file of fs.readdirSync(platformSrc)) {
+      if (file.endsWith('.node')) {
+        copyFile(path.join(platformSrc, file), path.join(platformDest, file));
+      }
+    }
+
+    console.log(`    @ast-grep/napi@${mainPkgJson.version} (${platformPkgName}): OK`);
+  }
 }
 
 // ============================================================================
@@ -492,6 +539,19 @@ if (fs.existsSync(cacheBin)) {
   } catch (e) {
     console.error(
       `    better-sqlite3: FAILED - ${e.stderr?.toString().trim().split('\n')[0] || e.message}`
+    );
+    process.exit(1);
+  }
+
+  try {
+    execSync(
+      `"${cacheBin}" -e "const napi = require('@ast-grep/napi'); napi.parse(napi.Lang.JavaScript, '1');"`,
+      { cwd: outDir, stdio: 'pipe' }
+    );
+    console.log('    @ast-grep/napi: OK');
+  } catch (e) {
+    console.error(
+      `    @ast-grep/napi: FAILED - ${e.stderr?.toString().trim().split('\n')[0] || e.message}`
     );
     process.exit(1);
   }
