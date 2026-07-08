@@ -186,10 +186,10 @@ describe('SidebarNav', () => {
       <SidebarNav
         onHome={vi.fn()}
         isHomeActive={false}
-        pluginsMode={{ tab: 'installed', onSelectTab: vi.fn(), onBack }}
+        pluginsMode={{ tab: 'plugins', onSelectTab: vi.fn(), onBack }}
       />
     );
-    expect(screen.getByRole('button', { name: 'Built-in' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Plugins' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Web Search' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Back to app' }));
     expect(onBack).toHaveBeenCalled();
@@ -201,7 +201,7 @@ describe('SidebarNav', () => {
       <SidebarNav
         onHome={vi.fn()}
         isHomeActive={false}
-        pluginsMode={{ tab: 'installed', onSelectTab, onBack: vi.fn() }}
+        pluginsMode={{ tab: 'plugins', onSelectTab, onBack: vi.fn() }}
       />
     );
     fireEvent.click(screen.getByRole('button', { name: 'Web Search' }));
@@ -213,10 +213,10 @@ describe('SidebarNav', () => {
       <SidebarNav
         onHome={vi.fn()}
         isHomeActive={false}
-        pluginsMode={{ tab: 'builtin', onSelectTab: vi.fn(), onBack: vi.fn() }}
+        pluginsMode={{ tab: 'plugins', onSelectTab: vi.fn(), onBack: vi.fn() }}
       />
     );
-    expect(screen.getByRole('button', { name: 'Built-in' }).className).toContain('bg-secondary');
+    expect(screen.getByRole('button', { name: 'Plugins' }).className).toContain('bg-secondary');
   });
 
   it('fires onSelectTab with "providers" when the LLM Providers tab is clicked', () => {
