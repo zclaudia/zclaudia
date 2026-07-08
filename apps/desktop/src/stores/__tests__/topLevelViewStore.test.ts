@@ -128,10 +128,10 @@ describe('agents view', () => {
     });
   });
 
-  it('openAgents enters agents mode on the profiles tab with no selection', () => {
+  it('openAgents enters agents mode on the all-items tab with no selection', () => {
     useTopLevelViewStore.getState().openAgents();
     const s = useTopLevelViewStore.getState();
-    expect(s.view).toEqual({ kind: 'agents', tab: 'profiles' });
+    expect(s.view).toEqual({ kind: 'agents', tab: 'all' });
     expect(s.agentsSelection).toBeNull();
   });
 
