@@ -7,6 +7,7 @@
 
 import { usePluginStore, selectPluginPanels } from '../../stores/pluginStore';
 import type { UIExtension } from '../../stores/pluginStore';
+import { Toggle } from '../../components/ui/Toggle';
 
 // Built-in panel toggle card. Moved verbatim from PluginSettings.
 interface BuiltinPanelCardProps {
@@ -34,19 +35,11 @@ function BuiltinPanelCard({ panel, disabled, onToggle }: BuiltinPanelCardProps) 
           </div>
           <p className="text-xs text-muted-foreground/70 font-mono mt-0.5">{panel.pluginId}</p>
         </div>
-        <button
-          onClick={() => onToggle(panel.id)}
-          className={`relative w-10 h-5 rounded-full transition-colors ${
-            !disabled ? 'bg-primary' : 'bg-secondary'
-          }`}
-          title={disabled ? 'Enable panel' : 'Disable panel'}
-        >
-          <span
-            className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
-              !disabled ? 'left-5' : 'left-0.5'
-            }`}
-          />
-        </button>
+        <Toggle
+          checked={!disabled}
+          onChange={() => onToggle(panel.id)}
+          aria-label={disabled ? 'Enable panel' : 'Disable panel'}
+        />
       </div>
     </div>
   );

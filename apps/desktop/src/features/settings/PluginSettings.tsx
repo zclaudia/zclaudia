@@ -11,6 +11,7 @@ import type { InstalledPlugin, PluginStatus } from '../../stores/pluginStore';
 import { getBaseUrl, fetchAndSyncPlugins } from '../../services/api';
 import { BuiltinPanelsSection } from '../plugins/BuiltinPanelsSection';
 import { PluginDirsManager } from '../plugins/PluginDirsManager';
+import { Toggle } from '../../components/ui/Toggle';
 
 // Status badge colors — using semantic theme tokens
 const statusColors: Record<PluginStatus, string> = {
@@ -302,19 +303,11 @@ function PluginCard({ plugin, onToggle, onRemove, onReload, onOpenSettings }: Pl
 
         <div className="flex items-center gap-1">
           {/* Enable/Disable Toggle */}
-          <button
-            onClick={() => onToggle(plugin.manifest.id)}
-            className={`relative w-10 h-5 rounded-full transition-colors ${
-              plugin.enabled ? 'bg-primary' : 'bg-secondary'
-            }`}
-            title={plugin.enabled ? 'Disable plugin' : 'Enable plugin'}
-          >
-            <span
-              className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
-                plugin.enabled ? 'left-5' : 'left-0.5'
-              }`}
-            />
-          </button>
+          <Toggle
+            checked={plugin.enabled}
+            onChange={() => onToggle(plugin.manifest.id)}
+            aria-label={plugin.enabled ? 'Disable plugin' : 'Enable plugin'}
+          />
 
           {/* Settings Button */}
           {plugin.manifest.contributes?.settings && (
