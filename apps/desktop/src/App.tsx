@@ -116,8 +116,6 @@ function AppContent() {
   const setAutomationProjectFilter = useTopLevelViewStore(s => s.setAutomationProjectFilter);
   const openAgents = useTopLevelViewStore(s => s.openAgents);
   const setAgentsTab = useTopLevelViewStore(s => s.setAgentsTab);
-  const selectAgentsItem = useTopLevelViewStore(s => s.selectAgentsItem);
-  const agentsSelection = useTopLevelViewStore(s => s.agentsSelection);
   const openPlugins = useTopLevelViewStore(s => s.openPlugins);
   const setPluginsTab = useTopLevelViewStore(s => s.setPluginsTab);
   const refreshReadiness = useAgentReadinessStore(s => s.refresh);
@@ -225,22 +223,26 @@ function AppContent() {
   // backends list goes empty -> populated.
   const agentsBackends = useAgentsBackends();
   const agentsData = useProfilesByBackend(
-    topLevelView.kind === 'agents' && topLevelView.tab === 'profiles'
+    topLevelView.kind === 'agents' &&
+      (topLevelView.tab === 'profiles' || topLevelView.tab === 'all')
       ? agentsBackends
       : NO_AGENTS_BACKENDS
   );
   const skillsData = useSkillsByBackend(
-    topLevelView.kind === 'agents' && topLevelView.tab === 'skills'
+    topLevelView.kind === 'agents' &&
+      (topLevelView.tab === 'skills' || topLevelView.tab === 'all')
       ? agentsBackends
       : NO_AGENTS_BACKENDS
   );
   const mcpData = useMcpServersByBackend(
-    topLevelView.kind === 'agents' && topLevelView.tab === 'mcp-servers'
+    topLevelView.kind === 'agents' &&
+      (topLevelView.tab === 'mcp-servers' || topLevelView.tab === 'all')
       ? agentsBackends
       : NO_AGENTS_BACKENDS
   );
   const providersData = useLlmProfilesByBackend(
-    topLevelView.kind === 'agents' && topLevelView.tab === 'providers'
+    topLevelView.kind === 'agents' &&
+      (topLevelView.tab === 'providers' || topLevelView.tab === 'all')
       ? agentsBackends
       : NO_AGENTS_BACKENDS
   );
@@ -251,13 +253,6 @@ function AppContent() {
           tab: topLevelView.tab,
           onSelectTab: setAgentsTab,
           onBack: closeTopLevelView,
-          backends: agentsBackends,
-          data: agentsData,
-          skillsData,
-          mcpData,
-          providersData,
-          selection: agentsSelection,
-          onSelectItem: selectAgentsItem,
         }
       : undefined;
 

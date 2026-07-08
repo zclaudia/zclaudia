@@ -20,6 +20,7 @@ interface TopLevelViewState {
   automationListRefreshNonce: number;
   agentsSelection: AgentsSelection | null;
   agentsRefreshNonce: number;
+  agentsBackendFilter: 'all' | string;
   openSettings: (initialTab?: SettingsTab) => void;
   openAutomations: (opts?: OpenAutomationsOptions) => void;
   setAutomationTab: (tab: AutomationTab) => void;
@@ -31,6 +32,7 @@ interface TopLevelViewState {
   setAgentsTab: (tab: AgentsTab) => void;
   selectAgentsItem: (sel: AgentsSelection | null) => void;
   bumpAgentsRefresh: () => void;
+  setAgentsBackendFilter: (backendFilter: 'all' | string) => void;
   openPlugins: (tab?: PluginsTab) => void;
   setPluginsTab: (tab: PluginsTab) => void;
 }
@@ -41,6 +43,7 @@ export const useTopLevelViewStore = create<TopLevelViewState>(set => ({
   automationListRefreshNonce: 0,
   agentsSelection: null,
   agentsRefreshNonce: 0,
+  agentsBackendFilter: 'all',
   openSettings: initialTab =>
     set({
       view: initialTab ? { kind: 'settings', initialTab } : { kind: 'settings' },
@@ -72,13 +75,14 @@ export const useTopLevelViewStore = create<TopLevelViewState>(set => ({
   selectAutomationItem: id => set({ selectedAutomationItemId: id }),
   bumpAutomationListRefresh: () =>
     set(s => ({ automationListRefreshNonce: s.automationListRefreshNonce + 1 })),
-  openAgents: (tab = 'profiles') => set({ view: { kind: 'agents', tab }, agentsSelection: null }),
+  openAgents: (tab = 'all') => set({ view: { kind: 'agents', tab }, agentsSelection: null }),
   setAgentsTab: tab =>
     set(state =>
       state.view.kind === 'agents' ? { view: { ...state.view, tab }, agentsSelection: null } : state
     ),
   selectAgentsItem: sel => set({ agentsSelection: sel }),
   bumpAgentsRefresh: () => set(s => ({ agentsRefreshNonce: s.agentsRefreshNonce + 1 })),
+  setAgentsBackendFilter: backendFilter => set({ agentsBackendFilter: backendFilter }),
   openPlugins: (tab = 'installed') => set({ view: { kind: 'plugins', tab } }),
   setPluginsTab: tab =>
     set(state => (state.view.kind === 'plugins' ? { view: { ...state.view, tab } } : state)),

@@ -1,14 +1,15 @@
 /**
  * Agents management content rendered inline in the main pane.
  *
- * Selection comes from the sidebar's AgentsTree/SkillsTree/McpServersTree/
- * ProvidersTree (via topLevelViewStore); this component owns only the detail
+ * Selection comes from the library BrowseView's item cards (via
+ * topLevelViewStore); this component owns the browse grid plus the detail
  * header + editor body. Saves and deletes bump the shared refresh nonce so the
- * trees refetch; profile and provider mutations additionally refresh the global
- * stores when the edited backend is the app's active backend (skills and MCP
- * mutations never touch those stores).
+ * library refetches; profile and provider mutations additionally refresh the
+ * global stores when the edited backend is the app's active backend (skills and
+ * MCP mutations never touch those stores).
  */
 
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import { useTopLevelViewStore } from '../../stores/topLevelViewStore';
@@ -25,7 +26,12 @@ import { SkillDirsEditor } from './SkillDirsEditor';
 import { McpServerEditor } from './McpServerEditor';
 import { LlmProfileEditor } from './LlmProfileEditor';
 import { useSavedBridge } from './useSavedBridge';
-import type { AgentsBackend } from './agents-types';
+import { DetailHeader } from './ui/DetailHeader';
+import type { DetailBadge } from './ui/DetailHeader';
+import { BrowseView } from './BrowseView';
+import { NewItemMenu, resolveNewTarget } from './NewItemMenu';
+import { useAgentsLibrary } from './useAgentsLibrary';
+import type { AgentsBackend, AgentsSelection, LibraryItem } from './agents-types';
 import type { ProfilesByBackend } from './useProfilesByBackend';
 import type { SkillsByBackend } from './useSkillsByBackend';
 import type { McpServersByBackend } from './useMcpServersByBackend';
@@ -54,28 +60,54 @@ function EmptyState({ noun, hint }: { noun: EmptyStateNoun; hint?: string }) {
     <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
       <p className="text-sm">Select {NOUN_WITH_ARTICLE[noun]}</p>
       <p className="mt-1 text-xs opacity-60">
-        {hint ?? `Choose ${NOUN_WITH_ARTICLE[noun]} from the sidebar, or create one with +.`}
+        {hint ?? `Pick ${NOUN_WITH_ARTICLE[noun]} from the library, or create one with New.`}
       </p>
     </div>
   );
 }
 
-/** Detail header (title + backend name) over a scrollable, width-capped body. */
+/** Maps a selection kind to the breadcrumb label of its owning section. */
+function crumbForSelectionKind(kind: AgentsSelection['kind']): string {
+  switch (kind) {
+    case 'profile':
+    case 'new-profile':
+      return 'Profiles';
+    case 'skill':
+    case 'new-skill':
+    case 'skill-dirs':
+      return 'Skills';
+    case 'mcp-server':
+    case 'new-mcp-server':
+      return 'MCP Servers';
+    case 'llm-profile':
+    case 'new-llm-profile':
+      return 'LLM Providers';
+  }
+}
+
+/** Breadcrumb header (via DetailHeader) over a scrollable, width-capped body. */
 function DetailShell({
   title,
+  crumb,
+  onBack,
+  badges,
   backendName,
   children,
 }: {
   title: string;
+  crumb: string;
+  onBack: () => void;
+  badges?: DetailBadge[];
   backendName?: string;
   children: ReactNode;
 }) {
+  const headerBadges: DetailBadge[] = [
+    ...(backendName ? [{ label: backendName }] : []),
+    ...(badges ?? []),
+  ];
   return (
     <div className="flex h-full flex-col bg-background text-foreground">
-      <div className="flex items-baseline gap-2 border-b border-border px-4 py-3">
-        <h1 className="truncate text-sm font-medium text-foreground">{title}</h1>
-        {backendName && <span className="text-xs text-muted-foreground/60">{backendName}</span>}
-      </div>
+      <DetailHeader crumb={crumb} title={title} badges={headerBadges} onBack={onBack} />
 
       <div className="flex-1 overflow-y-auto p-4">
         <div className="mx-auto max-w-2xl">{children}</div>
@@ -97,6 +129,45 @@ export function AgentsContent({
   const bumpAgentsRefresh = useTopLevelViewStore(s => s.bumpAgentsRefresh);
   const activeServerId = useServerStore(s => s.activeServerId);
   const localBackendId = useFacadeStore(s => s.localBackendId);
+
+  const activeTab = view.kind === 'agents' ? view.tab : 'all';
+  const backendFilter = useTopLevelViewStore(s => s.agentsBackendFilter);
+  const setBackendFilter = useTopLevelViewStore(s => s.setAgentsBackendFilter);
+  const [newMenuOpen, setNewMenuOpen] = useState(false);
+
+  const libraryItems = useAgentsLibrary(
+    {
+      profiles: data.profiles,
+      skills: skillsData.skills,
+      servers: mcpData.servers,
+      llmProfiles: providersData.profiles,
+    },
+    backends,
+    { tab: activeTab, backendFilter }
+  );
+
+  const openItem = (item: LibraryItem) =>
+    selectAgentsItem(
+      item.kind === 'profile'
+        ? { backendId: item.backendId, kind: 'profile', id: item.id }
+        : item.kind === 'skill'
+          ? { backendId: item.backendId, kind: 'skill', id: item.id }
+          : item.kind === 'mcp-server'
+            ? { backendId: item.backendId, kind: 'mcp-server', id: item.id }
+            : { backendId: item.backendId, kind: 'llm-profile', id: item.id }
+    );
+
+  const backendForNew = () =>
+    backendFilter !== 'all' ? backendFilter : (backends[0]?.backendId ?? localBackendId ?? '');
+
+  const startNew = () => {
+    const target = resolveNewTarget(activeTab);
+    if (target === 'menu') {
+      setNewMenuOpen(true);
+      return;
+    }
+    selectAgentsItem({ backendId: backendForNew(), kind: target } as AgentsSelection);
+  };
 
   // Just-saved bridges: save handlers re-select the saved id before the nonce
   // refetch lands, so the fetched maps are briefly stale. Each bridge remembers
@@ -127,19 +198,29 @@ export function AgentsContent({
   });
 
   if (!selection) {
-    const activeTab = view.kind === 'agents' ? view.tab : 'profiles';
     return (
-      <EmptyState
-        noun={
-          activeTab === 'skills'
-            ? 'skill'
-            : activeTab === 'mcp-servers'
-              ? 'MCP server'
-              : activeTab === 'providers'
-                ? 'provider'
-                : 'profile'
-        }
-      />
+      <div className="relative h-full">
+        <BrowseView
+          tab={activeTab}
+          backendFilter={backendFilter}
+          backends={backends}
+          items={libraryItems}
+          onOpen={openItem}
+          onSelectBackendFilter={setBackendFilter}
+          onNew={startNew}
+        />
+        {newMenuOpen && (
+          <div className="absolute right-4 top-14">
+            <NewItemMenu
+              onPick={kind => {
+                setNewMenuOpen(false);
+                selectAgentsItem({ backendId: backendForNew(), kind } as AgentsSelection);
+              }}
+              onClose={() => setNewMenuOpen(false)}
+            />
+          </div>
+        )}
+      </div>
     );
   }
 
@@ -261,7 +342,11 @@ export function AgentsContent({
       const title = selection.kind === 'profile' ? (profile?.name ?? '') : 'New profile';
 
       return (
-        <DetailShell title={title} backendName={backendName}>
+        <DetailShell title={title} backendName={backendName}
+            crumb={crumbForSelectionKind(selection.kind)}
+            onBack={() => selectAgentsItem(null)}
+            badges={profile?.isDefault ? [{ label: 'Default', tone: 'accent' }] : undefined}
+          >
           <ProfileEditor
             key={`${editedBackendId}:${selection.kind === 'profile' ? selection.id : 'new'}`}
             backendId={editedBackendId}
@@ -285,7 +370,10 @@ export function AgentsContent({
           // A refetch is in flight (or a save's nonce bump hasn't landed yet):
           // keep the detail chrome instead of flashing the empty state.
           return (
-            <DetailShell title={selection.id} backendName={backendName}>
+            <DetailShell title={selection.id} backendName={backendName}
+            crumb={crumbForSelectionKind(selection.kind)}
+            onBack={() => selectAgentsItem(null)}
+          >
               <p className="text-sm text-muted-foreground">Loading…</p>
             </DetailShell>
           );
@@ -305,7 +393,10 @@ export function AgentsContent({
       }
 
       return (
-        <DetailShell title={skill.name || skill.id} backendName={backendName}>
+        <DetailShell title={skill.name || skill.id} backendName={backendName}
+            crumb={crumbForSelectionKind(selection.kind)}
+            onBack={() => selectAgentsItem(null)}
+          >
           <SkillEditor
             key={`${editedBackendId}:${selection.id}`}
             backendId={editedBackendId}
@@ -319,7 +410,10 @@ export function AgentsContent({
 
     case 'new-skill': {
       return (
-        <DetailShell title="New skill" backendName={backendName}>
+        <DetailShell title="New skill" backendName={backendName}
+            crumb={crumbForSelectionKind(selection.kind)}
+            onBack={() => selectAgentsItem(null)}
+          >
           <SkillEditor
             key={`${editedBackendId}:new`}
             backendId={editedBackendId}
@@ -337,7 +431,10 @@ export function AgentsContent({
       // would silently wipe the backend's configured dirs on the first edit.
       if (skillsData.dirsFailed.has(editedBackendId)) {
         return (
-          <DetailShell title="External directories" backendName={backendName}>
+          <DetailShell title="External directories" backendName={backendName}
+            crumb={crumbForSelectionKind(selection.kind)}
+            onBack={() => selectAgentsItem(null)}
+          >
             <p className="text-sm text-muted-foreground">
               Couldn't load directories for this backend.
             </p>
@@ -353,14 +450,20 @@ export function AgentsContent({
       // not "empty" — same wipe hazard as a failed fetch.
       if (!dirs && skillsData.loading) {
         return (
-          <DetailShell title="External directories" backendName={backendName}>
+          <DetailShell title="External directories" backendName={backendName}
+            crumb={crumbForSelectionKind(selection.kind)}
+            onBack={() => selectAgentsItem(null)}
+          >
             <p className="text-sm text-muted-foreground">Loading…</p>
           </DetailShell>
         );
       }
 
       return (
-        <DetailShell title="External directories" backendName={backendName}>
+        <DetailShell title="External directories" backendName={backendName}
+            crumb={crumbForSelectionKind(selection.kind)}
+            onBack={() => selectAgentsItem(null)}
+          >
           <SkillDirsEditor
             key={editedBackendId}
             backendId={editedBackendId}
@@ -386,7 +489,10 @@ export function AgentsContent({
           // A refetch is in flight (or a save's nonce bump hasn't landed yet):
           // keep the detail chrome instead of flashing the empty state.
           return (
-            <DetailShell title={selection.id} backendName={backendName}>
+            <DetailShell title={selection.id} backendName={backendName}
+            crumb={crumbForSelectionKind(selection.kind)}
+            onBack={() => selectAgentsItem(null)}
+          >
               <p className="text-sm text-muted-foreground">Loading…</p>
             </DetailShell>
           );
@@ -426,7 +532,10 @@ export function AgentsContent({
       const title = selection.kind === 'llm-profile' ? (llmProfile?.name ?? '') : 'New provider';
 
       return (
-        <DetailShell title={title} backendName={backendName}>
+        <DetailShell title={title} backendName={backendName}
+            crumb={crumbForSelectionKind(selection.kind)}
+            onBack={() => selectAgentsItem(null)}
+          >
           <LlmProfileEditor
             key={`${editedBackendId}:${selection.kind === 'llm-profile' ? selection.id : 'new'}`}
             backendId={editedBackendId}
@@ -451,7 +560,10 @@ export function AgentsContent({
           // A refetch is in flight (or a save's nonce bump hasn't landed yet):
           // keep the detail chrome instead of flashing the empty state.
           return (
-            <DetailShell title={selection.id} backendName={backendName}>
+            <DetailShell title={selection.id} backendName={backendName}
+            crumb={crumbForSelectionKind(selection.kind)}
+            onBack={() => selectAgentsItem(null)}
+          >
               <p className="text-sm text-muted-foreground">Loading…</p>
             </DetailShell>
           );
@@ -493,7 +605,10 @@ export function AgentsContent({
       const title = selection.kind === 'mcp-server' ? (server?.name ?? '') : 'New MCP server';
 
       return (
-        <DetailShell title={title} backendName={backendName}>
+        <DetailShell title={title} backendName={backendName}
+            crumb={crumbForSelectionKind(selection.kind)}
+            onBack={() => selectAgentsItem(null)}
+          >
           <McpServerEditor
             key={`${editedBackendId}:${selection.kind === 'mcp-server' ? selection.id : 'new'}`}
             backendId={editedBackendId}

@@ -1,5 +1,5 @@
-/** Tabs inside the Agents shell mode. */
-export type AgentsTab = 'profiles' | 'skills' | 'mcp-servers' | 'providers';
+/** Tabs inside the Agents shell mode. 'all' is the unified library view. */
+export type AgentsTab = 'all' | 'profiles' | 'skills' | 'mcp-servers' | 'providers';
 
 // Deliberately named `llm-profile` (not `provider`) to avoid colliding with
 // the agent `profile` kind above — these selections address LLM profiles
@@ -15,7 +15,21 @@ export type AgentsSelection =
   | { backendId: string; kind: 'llm-profile'; id: string }
   | { backendId: string; kind: 'new-llm-profile' };
 
-/** A backend row in the Agents shell mode (tree + editor header). */
+/** The concrete resource kinds that appear as cards in the library. */
+export type LibraryItemKind = 'profile' | 'skill' | 'mcp-server' | 'llm-profile';
+
+/** A single card in the Agent library browse grid. */
+export interface LibraryItem {
+  kind: LibraryItemKind;
+  backendId: string;
+  id: string;
+  title: string;
+  subtitle?: string;
+  /** e.g. 'Default' for the default profile — rendered as a status badge. */
+  status?: string;
+}
+
+/** A backend in the Agents shell mode (library cards + editor header). */
 export interface AgentsBackend {
   backendId: string;
   name: string;

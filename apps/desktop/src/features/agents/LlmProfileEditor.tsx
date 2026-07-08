@@ -32,6 +32,7 @@ import {
 } from '../../services/api';
 import type { LlmProfilePreviewInput } from '../../services/api';
 import { CodexOAuthSection } from './CodexOAuthSection';
+import { EditorSection, FieldLabel } from './ui/EditorSection';
 import {
   draftsToEntries,
   entryToDraft,
@@ -640,9 +641,9 @@ export function LlmProfileEditor({
         </div>
       )}
 
-      <div className="bg-secondary/50 border border-border/50 rounded-lg p-4 space-y-4">
+      <EditorSection title="Configuration">
         <div>
-          <label className="block text-sm font-medium text-muted-foreground mb-1">Name *</label>
+          <FieldLabel>Name *</FieldLabel>
           <input
             type="text"
             value={formName}
@@ -657,9 +658,7 @@ export function LlmProfileEditor({
         {formProviderType !== 'openai-codex' && (
           <>
             <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-1">
-                Base URL (optional)
-              </label>
+              <FieldLabel>Base URL (optional)</FieldLabel>
               <input
                 type="text"
                 value={formBaseUrl}
@@ -674,9 +673,7 @@ export function LlmProfileEditor({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-1">
-                API Key (optional)
-              </label>
+              <FieldLabel>API Key (optional)</FieldLabel>
               <input
                 type="password"
                 value={formApiKey}
@@ -691,9 +688,7 @@ export function LlmProfileEditor({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-1">
-                Prompt cache retention
-              </label>
+              <FieldLabel>Prompt cache retention</FieldLabel>
               <select
                 value={formCacheRetention}
                 onChange={e =>
@@ -730,9 +725,7 @@ export function LlmProfileEditor({
 
         {!isCodexProvider && (
           <div>
-            <label className="block text-sm font-medium text-muted-foreground mb-1">
-              Request Headers (JSON)
-            </label>
+            <FieldLabel>Request Headers (JSON)</FieldLabel>
             <textarea
               value={formRequestHeaders}
               onChange={e => {
@@ -865,7 +858,7 @@ export function LlmProfileEditor({
             {saving ? 'Saving...' : profile ? 'Save' : 'Create'}
           </button>
         </div>
-      </div>
+      </EditorSection>
 
       {fetchPicker && (
         <FetchModelsPickerDialog
@@ -1441,7 +1434,7 @@ function ProviderTypeSelector({
 
   return (
     <div ref={ref} className="relative">
-      <label className="block text-sm font-medium text-muted-foreground mb-1">Provider Type</label>
+      <FieldLabel>Provider Type</FieldLabel>
       <button
         type="button"
         onClick={() => setOpen(!open)}

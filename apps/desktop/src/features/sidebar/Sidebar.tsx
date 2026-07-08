@@ -12,16 +12,8 @@ import { SidebarNav } from './SidebarNav';
 import { AutomationTree } from '../automation/AutomationTree';
 import { useAutomationApi } from '../automation/useAutomationApi';
 import type { AutomationTab } from '../automation/automation-types';
-import { AgentsTree } from '../agents/AgentsTree';
-import { SkillsTree } from '../agents/SkillsTree';
-import { McpServersTree } from '../agents/McpServersTree';
-import { ProvidersTree } from '../agents/ProvidersTree';
-import type { AgentsTab, AgentsSelection } from '../agents/agents-types';
+import type { AgentsTab } from '../agents/agents-types';
 import type { PluginsTab } from '../plugins/plugins-types';
-import type { AgentsBackend, ProfilesByBackend } from '../agents/useProfilesByBackend';
-import type { SkillsByBackend } from '../agents/useSkillsByBackend';
-import type { McpServersByBackend } from '../agents/useMcpServersByBackend';
-import type { LlmProfilesByBackend } from '../agents/useLlmProfilesByBackend';
 import { MobileSidebarHeader } from './MobileSidebarHeader';
 import { SidebarSearch } from './SidebarSearch';
 import { SearchModal } from './SearchModal';
@@ -82,18 +74,11 @@ interface SidebarProps {
     onSelectScope: (backendId: string, projectId?: string) => void;
   };
   onOpenAgents?: () => void;
-  /** When present, the sidebar renders in agents mode (tab nav + the active tab's tree). */
+  /** When present, the sidebar renders in agents mode (tab nav only). */
   agentsMode?: {
     tab: AgentsTab;
     onSelectTab: (tab: AgentsTab) => void;
     onBack: () => void;
-    backends: AgentsBackend[];
-    data: ProfilesByBackend;
-    skillsData: SkillsByBackend;
-    mcpData: McpServersByBackend;
-    providersData: LlmProfilesByBackend;
-    selection: AgentsSelection | null;
-    onSelectItem: (sel: AgentsSelection) => void;
   };
   onOpenPlugins?: () => void;
   /** When present, the sidebar renders in plugins mode (tab nav only). */
@@ -777,45 +762,7 @@ export function Sidebar({
                 onToggleBackend={toggleBackend}
                 onSelectScope={automationMode.onSelectScope}
               />
-            ) : agentsMode ? (
-              agentsMode.tab === 'providers' ? (
-                <ProvidersTree
-                  backends={agentsMode.backends}
-                  data={agentsMode.providersData}
-                  selection={agentsMode.selection}
-                  expandedBackendIds={expandedBackendIds}
-                  onToggleBackend={toggleBackend}
-                  onSelectItem={agentsMode.onSelectItem}
-                />
-              ) : agentsMode.tab === 'mcp-servers' ? (
-                <McpServersTree
-                  backends={agentsMode.backends}
-                  data={agentsMode.mcpData}
-                  selection={agentsMode.selection}
-                  expandedBackendIds={expandedBackendIds}
-                  onToggleBackend={toggleBackend}
-                  onSelectItem={agentsMode.onSelectItem}
-                />
-              ) : agentsMode.tab === 'skills' ? (
-                <SkillsTree
-                  backends={agentsMode.backends}
-                  data={agentsMode.skillsData}
-                  selection={agentsMode.selection}
-                  expandedBackendIds={expandedBackendIds}
-                  onToggleBackend={toggleBackend}
-                  onSelectItem={agentsMode.onSelectItem}
-                />
-              ) : (
-                <AgentsTree
-                  backends={agentsMode.backends}
-                  data={agentsMode.data}
-                  selection={agentsMode.selection}
-                  expandedBackendIds={expandedBackendIds}
-                  onToggleBackend={toggleBackend}
-                  onSelectItem={agentsMode.onSelectItem}
-                />
-              )
-            ) : (
+            ) : agentsMode ? null : (
               renderProjectList()
             )}
           </div>
@@ -924,45 +871,7 @@ export function Sidebar({
                 onToggleBackend={toggleBackend}
                 onSelectScope={automationMode.onSelectScope}
               />
-            ) : agentsMode ? (
-              agentsMode.tab === 'providers' ? (
-                <ProvidersTree
-                  backends={agentsMode.backends}
-                  data={agentsMode.providersData}
-                  selection={agentsMode.selection}
-                  expandedBackendIds={expandedBackendIds}
-                  onToggleBackend={toggleBackend}
-                  onSelectItem={agentsMode.onSelectItem}
-                />
-              ) : agentsMode.tab === 'mcp-servers' ? (
-                <McpServersTree
-                  backends={agentsMode.backends}
-                  data={agentsMode.mcpData}
-                  selection={agentsMode.selection}
-                  expandedBackendIds={expandedBackendIds}
-                  onToggleBackend={toggleBackend}
-                  onSelectItem={agentsMode.onSelectItem}
-                />
-              ) : agentsMode.tab === 'skills' ? (
-                <SkillsTree
-                  backends={agentsMode.backends}
-                  data={agentsMode.skillsData}
-                  selection={agentsMode.selection}
-                  expandedBackendIds={expandedBackendIds}
-                  onToggleBackend={toggleBackend}
-                  onSelectItem={agentsMode.onSelectItem}
-                />
-              ) : (
-                <AgentsTree
-                  backends={agentsMode.backends}
-                  data={agentsMode.data}
-                  selection={agentsMode.selection}
-                  expandedBackendIds={expandedBackendIds}
-                  onToggleBackend={toggleBackend}
-                  onSelectItem={agentsMode.onSelectItem}
-                />
-              )
-            ) : (
+            ) : agentsMode ? null : (
               renderProjectList()
             )}
           </div>

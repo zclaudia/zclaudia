@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import * as api from '../../services/api';
 import type { WorkspaceSkillInfo } from '../../services/api';
+import { EditorSection, FieldLabel } from './ui/EditorSection';
 
 /**
  * Parent must remount this component per identity — key it by
@@ -136,9 +137,9 @@ export function SkillEditor({ backendId, skill, onSaved, onDeleted }: SkillEdito
       {!isWorkspace ? (
         <p className="text-xs text-muted-foreground">Managed by its source — read-only.</p>
       ) : isCreate ? (
-        <div className="bg-secondary/50 border border-border/50 rounded-lg p-4 space-y-3">
+        <EditorSection title="New skill">
           <div>
-            <label className="block text-xs text-muted-foreground mb-1">Skill ID *</label>
+            <FieldLabel>Skill ID *</FieldLabel>
             <input
               type="text"
               placeholder="e.g. my-skill"
@@ -148,7 +149,7 @@ export function SkillEditor({ backendId, skill, onSaved, onDeleted }: SkillEdito
             />
           </div>
           <div>
-            <label className="block text-xs text-muted-foreground mb-1">SKILL.md Content *</label>
+            <FieldLabel>SKILL.md Content *</FieldLabel>
             <textarea
               placeholder={
                 '---\nname: My Skill\ndescription: What this skill does\n---\n\n# My Skill\n\nInstructions here...'
@@ -168,7 +169,7 @@ export function SkillEditor({ backendId, skill, onSaved, onDeleted }: SkillEdito
               {saving ? 'Creating...' : 'Create'}
             </button>
           </div>
-        </div>
+        </EditorSection>
       ) : loading ? (
         <p className="text-muted-foreground text-center py-8">Loading...</p>
       ) : (
