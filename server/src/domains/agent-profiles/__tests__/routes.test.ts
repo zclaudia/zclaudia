@@ -287,4 +287,33 @@ describe('agent-profiles routes', () => {
     const fetchA = await request(app).get(`/api/agent-profiles/${a.body.data.id}`);
     expect(fetchA.body.data.isDefault).toBe(false);
   });
+
+  it('POST allows a claude profile without llmProfileId and stores NULL', async () => {
+    const res = await request(app)
+      .post('/api/agent-profiles')
+      .send({ name: 'claude-agent', model: 'claude-opus-4-8', runtimeType: 'claude', enabledTools: [] });
+    expect(res.status).toBe(201);
+    expect(res.body.data.runtimeType).toBe('claude');
+    expect(res.body.data.llmProfileId).toBe(''); // API surfaces '' for "no profile"
+
+    const row = db.prepare('SELECT llm_profile_id FROM agent_profiles WHERE id = ?').get(res.body.data.id) as { llm_profile_id: string | null };
+    expect(row.llm_profile_id).toBeNull(); // persisted as NULL, not ''
+  });
+
+  it('POST still requires llmProfileId for zclaudia runtime', async () => {
+    const res = await request(app)
+      .post('/api/agent-profiles')
+      .send({ name: 'z', model: 'gpt', runtimeType: 'zclaudia', enabledTools: [] });
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toMatch(/llmProfileId is required/);
+  });
+
+  it('keeps the llm_profile_id foreign key (RESTRICT) for zclaudia profiles', async () => {
+    const created = await request(app)
+      .post('/api/agent-profiles')
+      .send({ name: 'z', llmProfileId, model: 'm', runtimeType: 'zclaudia', enabledTools: [] });
+    expect(created.status).toBe(201);
+    // Deleting the referenced LLM profile must fail — the FK is still enforced.
+    expect(() => db.prepare('DELETE FROM llm_profiles WHERE id = ?').run(llmProfileId)).toThrow();
+  });
 });

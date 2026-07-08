@@ -7,6 +7,7 @@ import type {
   ThinkingLevel,
 } from '@zclaudia/shared/core/agent-profile';
 import { AGENT_RUNTIME_TYPES } from '@zclaudia/shared/core/agent-profile';
+import { runtimeRequiresLlmProfile } from '@zclaudia/shared/core/profile-config-descriptor';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import { AgentProfileRepository } from './repository.js';
 import { LlmProfileRepository } from '../llm-profiles/repository.js';
@@ -165,13 +166,6 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         });
         return;
       }
-      if (!llmProfileId || typeof llmProfileId !== 'string') {
-        res.status(400).json({
-          success: false,
-          error: { code: 'VALIDATION_ERROR', message: 'llmProfileId is required' },
-        });
-        return;
-      }
       if (!model || typeof model !== 'string') {
         res.status(400).json({
           success: false,
@@ -215,7 +209,16 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         return;
       }
 
-      if (!llmRepo.findById(llmProfileId)) {
+      const requiresLlmProfile = runtimeRequiresLlmProfile(validatedRuntimeType ?? 'zclaudia');
+      if (requiresLlmProfile && (!llmProfileId || typeof llmProfileId !== 'string')) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'llmProfileId is required' },
+        });
+        return;
+      }
+
+      if (llmProfileId && !llmRepo.findById(llmProfileId)) {
         res.status(400).json({
           success: false,
           error: { code: 'VALIDATION_ERROR', message: `llmProfileId not found: ${llmProfileId}` },
@@ -237,7 +240,7 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
       const profile = repo.createWithDefaultHandling({
         name,
         description,
-        llmProfileId,
+        llmProfileId: typeof llmProfileId === 'string' ? llmProfileId : '',
         model,
         systemPrompt: typeof systemPrompt === 'string' ? systemPrompt : '',
         enabledTools: Array.isArray(enabledTools) ? enabledTools : [],

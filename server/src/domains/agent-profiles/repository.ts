@@ -189,7 +189,7 @@ export class AgentProfileRepository extends BaseRepository<
       name: row.name,
       description: row.description ?? undefined,
       runtimeType: normalizeRuntimeType(row.runtime_type),
-      llmProfileId: row.llm_profile_id,
+      llmProfileId: row.llm_profile_id ?? '',
       model: row.model,
       systemPrompt: row.system_prompt,
       enabledTools: resolved.builtinTools,
@@ -325,7 +325,7 @@ export class AgentProfileRepository extends BaseRepository<
         data.name,
         data.description ?? null,
         normalizeRuntimeType(data.runtimeType),
-        data.llmProfileId,
+        data.llmProfileId ? data.llmProfileId : null,
         data.model,
         data.systemPrompt,
         JSON.stringify(enabledTools),
@@ -362,7 +362,7 @@ export class AgentProfileRepository extends BaseRepository<
     }
     if (data.llmProfileId !== undefined) {
       updates.push('llm_profile_id = ?');
-      params.push(data.llmProfileId);
+      params.push(data.llmProfileId ? data.llmProfileId : null);
     }
     if (data.model !== undefined) {
       updates.push('model = ?');
