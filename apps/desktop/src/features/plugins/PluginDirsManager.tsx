@@ -2,13 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { getBaseUrl, fetchAndSyncPlugins } from '../../services/api';
 
 // Plugin directory manager
-export function PluginDirsManager() {
+export function PluginDirsManager({ embedded = false }: { embedded?: boolean } = {}) {
   const [extraDirs, setExtraDirs] = useState<string[]>([]);
   const [allDirs, setAllDirs] = useState<string[]>([]);
   const [newDir, setNewDir] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsed, setCollapsed] = useState(!embedded);
 
   const fetchDirs = useCallback(async () => {
     try {
@@ -71,20 +71,22 @@ export function PluginDirsManager() {
 
   return (
     <div>
-      <button
-        onClick={() => setCollapsed(!collapsed)}
-        className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground tracking-wider mb-2 hover:text-foreground transition-colors"
-      >
-        <svg
-          className={`w-3 h-3 transition-transform ${collapsed ? '' : 'rotate-90'}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
+      {!embedded && (
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground tracking-wider mb-2 hover:text-foreground transition-colors"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-        Plugin directories ({allDirs.length})
-      </button>
+          <svg
+            className={`w-3 h-3 transition-transform ${collapsed ? '' : 'rotate-90'}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+          Plugin directories ({allDirs.length})
+        </button>
+      )}
 
       {!collapsed && (
         <div className="space-y-2">
@@ -153,7 +155,7 @@ export function PluginDirsManager() {
           {error && <p className="text-xs text-destructive">{error}</p>}
 
           <p className="text-xs text-muted-foreground">
-            After adding a directory, use Discover to scan for new plugins.
+            Plugins in added directories are scanned automatically.
           </p>
         </div>
       )}

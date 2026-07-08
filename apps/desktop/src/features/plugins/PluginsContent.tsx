@@ -136,7 +136,7 @@ export function PluginsContent() {
         size="lg"
       >
         <div className="p-4">
-          <PluginDirsManager />
+          <PluginDirsManager embedded />
         </div>
       </Modal>
     </>
