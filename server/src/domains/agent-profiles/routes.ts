@@ -294,7 +294,7 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         return;
       }
 
-      if (body.llmProfileId !== undefined) {
+      if (body.llmProfileId !== undefined && body.llmProfileId !== '') {
         if (!llmRepo.findById(body.llmProfileId)) {
           res.status(400).json({
             success: false,

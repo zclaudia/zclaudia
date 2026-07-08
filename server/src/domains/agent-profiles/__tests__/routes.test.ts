@@ -186,6 +186,21 @@ describe('agent-profiles routes', () => {
     expect(res.body.data.runtimeType).toBe('claude');
   });
 
+  it('PATCH accepts clearing llmProfileId when switching to claude', async () => {
+    const created = await request(app)
+      .post('/api/agent-profiles')
+      .send({ name: 'p', llmProfileId, model: 'm', runtimeType: 'zclaudia', enabledTools: [] });
+    const id = created.body.data.id;
+
+    const res = await request(app)
+      .patch(`/api/agent-profiles/${id}`)
+      .send({ runtimeType: 'claude', llmProfileId: '', model: 'claude-opus-4-8' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.runtimeType).toBe('claude');
+    expect(res.body.data.llmProfileId).toBe('');
+  });
+
   it('PATCH clears a multimodal fallback with null', async () => {
     const vision = new LlmProfileRepository(db).create({
       name: 'vision',
