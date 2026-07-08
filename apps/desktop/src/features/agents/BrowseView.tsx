@@ -5,7 +5,6 @@ import { ItemCard } from './ui/ItemCard';
 import { FilterChips } from './ui/FilterChips';
 
 const TAB_TITLE: Record<AgentsTab, string> = {
-  all: 'All items',
   profiles: 'Agent Profiles',
   skills: 'Skills',
   'mcp-servers': 'MCP Servers',

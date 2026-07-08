@@ -31,7 +31,7 @@ export function highlightTextNodes(
   root: HTMLElement,
   query: string,
   caseSensitive = false
-): HTMLMarkElement[] {
+): HTMLElement[] {
   if (!query) return [];
 
   const flags = caseSensitive ? 'g' : 'gi';
@@ -61,7 +61,7 @@ export function highlightTextNodes(
     current = walker.nextNode();
   }
 
-  const marks: HTMLMarkElement[] = [];
+  const marks: HTMLElement[] = [];
   for (const textNode of targets) {
     const text = textNode.nodeValue ?? '';
     re.lastIndex = 0;

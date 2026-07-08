@@ -9,7 +9,6 @@
  * MCP mutations never touch those stores).
  */
 
-import { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import { useTopLevelViewStore } from '../../stores/topLevelViewStore';
@@ -29,7 +28,7 @@ import { useSavedBridge } from './useSavedBridge';
 import { DetailHeader } from './ui/DetailHeader';
 import type { DetailBadge } from './ui/DetailHeader';
 import { BrowseView } from './BrowseView';
-import { NewItemMenu, resolveNewTarget } from './NewItemMenu';
+import { resolveNewTarget } from './NewItemMenu';
 import { useAgentsLibrary } from './useAgentsLibrary';
 import type { AgentsBackend, AgentsSelection, LibraryItem } from './agents-types';
 import type { ProfilesByBackend } from './useProfilesByBackend';
@@ -130,10 +129,9 @@ export function AgentsContent({
   const activeServerId = useServerStore(s => s.activeServerId);
   const localBackendId = useFacadeStore(s => s.localBackendId);
 
-  const activeTab = view.kind === 'agents' ? view.tab : 'all';
+  const activeTab = view.kind === 'agents' ? view.tab : 'profiles';
   const backendFilter = useTopLevelViewStore(s => s.agentsBackendFilter);
   const setBackendFilter = useTopLevelViewStore(s => s.setAgentsBackendFilter);
-  const [newMenuOpen, setNewMenuOpen] = useState(false);
 
   const libraryItems = useAgentsLibrary(
     {
@@ -162,10 +160,6 @@ export function AgentsContent({
 
   const startNew = () => {
     const target = resolveNewTarget(activeTab);
-    if (target === 'menu') {
-      setNewMenuOpen(true);
-      return;
-    }
     selectAgentsItem({ backendId: backendForNew(), kind: target } as AgentsSelection);
   };
 
@@ -209,17 +203,6 @@ export function AgentsContent({
           onSelectBackendFilter={setBackendFilter}
           onNew={startNew}
         />
-        {newMenuOpen && (
-          <div className="absolute right-4 top-14">
-            <NewItemMenu
-              onPick={kind => {
-                setNewMenuOpen(false);
-                selectAgentsItem({ backendId: backendForNew(), kind } as AgentsSelection);
-              }}
-              onClose={() => setNewMenuOpen(false)}
-            />
-          </div>
-        )}
       </div>
     );
   }

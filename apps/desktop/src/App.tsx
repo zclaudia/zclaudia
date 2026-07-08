@@ -223,26 +223,22 @@ function AppContent() {
   // backends list goes empty -> populated.
   const agentsBackends = useAgentsBackends();
   const agentsData = useProfilesByBackend(
-    topLevelView.kind === 'agents' &&
-      (topLevelView.tab === 'profiles' || topLevelView.tab === 'all')
+    topLevelView.kind === 'agents' && topLevelView.tab === 'profiles'
       ? agentsBackends
       : NO_AGENTS_BACKENDS
   );
   const skillsData = useSkillsByBackend(
-    topLevelView.kind === 'agents' &&
-      (topLevelView.tab === 'skills' || topLevelView.tab === 'all')
+    topLevelView.kind === 'agents' && topLevelView.tab === 'skills'
       ? agentsBackends
       : NO_AGENTS_BACKENDS
   );
   const mcpData = useMcpServersByBackend(
-    topLevelView.kind === 'agents' &&
-      (topLevelView.tab === 'mcp-servers' || topLevelView.tab === 'all')
+    topLevelView.kind === 'agents' && topLevelView.tab === 'mcp-servers'
       ? agentsBackends
       : NO_AGENTS_BACKENDS
   );
   const providersData = useLlmProfilesByBackend(
-    topLevelView.kind === 'agents' &&
-      (topLevelView.tab === 'providers' || topLevelView.tab === 'all')
+    topLevelView.kind === 'agents' && topLevelView.tab === 'providers'
       ? agentsBackends
       : NO_AGENTS_BACKENDS
   );

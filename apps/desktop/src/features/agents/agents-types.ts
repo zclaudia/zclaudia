@@ -1,5 +1,5 @@
-/** Tabs inside the Agents shell mode. 'all' is the unified library view. */
-export type AgentsTab = 'all' | 'profiles' | 'skills' | 'mcp-servers' | 'providers';
+/** Tabs inside the Agents shell mode. */
+export type AgentsTab = 'profiles' | 'skills' | 'mcp-servers' | 'providers';
 
 // Deliberately named `llm-profile` (not `provider`) to avoid colliding with
 // the agent `profile` kind above — these selections address LLM profiles

@@ -11,7 +11,7 @@ const items: LibraryItem[] = [
 
 function setup(overrides = {}) {
   const props = {
-    tab: 'all' as const,
+    tab: 'profiles' as const,
     backendFilter: 'all',
     backends,
     items,

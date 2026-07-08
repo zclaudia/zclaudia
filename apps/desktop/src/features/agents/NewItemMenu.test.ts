@@ -8,8 +8,4 @@ describe('resolveNewTarget', () => {
     expect(resolveNewTarget('mcp-servers')).toBe('new-mcp-server');
     expect(resolveNewTarget('providers')).toBe('new-llm-profile');
   });
-
-  it('returns "menu" for the all-items view', () => {
-    expect(resolveNewTarget('all')).toBe('menu');
-  });
 });

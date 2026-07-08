@@ -114,6 +114,7 @@ describe('SidebarNav', () => {
       />
     );
     expect(screen.getByRole('button', { name: 'Agent Profiles' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'All items' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Back to app' }));
     expect(onBack).toHaveBeenCalled();
   });

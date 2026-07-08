@@ -30,7 +30,6 @@ export function buildLibraryItems(
 ): LibraryItem[] {
   const out: LibraryItem[] = [];
   const wantKind = (k: LibraryItem['kind']) =>
-    filter.tab === 'all' ||
     (filter.tab === 'profiles' && k === 'profile') ||
     (filter.tab === 'skills' && k === 'skill') ||
     (filter.tab === 'mcp-servers' && k === 'mcp-server') ||

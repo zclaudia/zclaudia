@@ -14,10 +14,11 @@ const sources = {
 };
 
 describe('buildLibraryItems', () => {
-  it('merges all four kinds into a flat list with backendId carried through', () => {
-    const items = buildLibraryItems(sources, backends, { tab: 'all', backendFilter: 'all' });
-    expect(items.map(i => i.kind).sort()).toEqual(['llm-profile', 'mcp-server', 'profile', 'skill']);
-    expect(items.find(i => i.kind === 'profile')).toMatchObject({
+  it('builds profile items with backendId carried through', () => {
+    const items = buildLibraryItems(sources, backends, { tab: 'profiles', backendFilter: 'all' });
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      kind: 'profile',
       backendId: 'b1', id: 'p1', title: 'Coding', status: 'Default',
     });
   });
@@ -29,7 +30,7 @@ describe('buildLibraryItems', () => {
   });
 
   it('filters by backend', () => {
-    const items = buildLibraryItems(sources, backends, { tab: 'all', backendFilter: 'b2' });
+    const items = buildLibraryItems(sources, backends, { tab: 'mcp-servers', backendFilter: 'b2' });
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({ kind: 'mcp-server', backendId: 'b2' });
   });

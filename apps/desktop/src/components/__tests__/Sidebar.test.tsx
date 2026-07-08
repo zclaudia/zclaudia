@@ -775,7 +775,7 @@ describe('Sidebar', () => {
     fireEvent.click(screen.getByText('Configure →'));
 
     expect(onOpenSettings).not.toHaveBeenCalled();
-    expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'agents', tab: 'all' });
+    expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'agents', tab: 'profiles' });
     expect(document.body.textContent).not.toContain('No agent available yet');
   });
 
