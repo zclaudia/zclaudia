@@ -591,4 +591,12 @@ describe('ProfileEditor', () => {
       );
     });
   });
+
+  it('default-agent Toggle flips isDefault', async () => {
+    await renderEditor(null);
+    const toggle = screen.getByRole('switch', { name: 'Set as default agent' });
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+  });
 });

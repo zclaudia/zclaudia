@@ -32,6 +32,7 @@ import {
   runtimeRequiresLlmProfile,
 } from '@zclaudia/shared/core/profile-config-descriptor';
 import * as api from '../../services/api';
+import { Toggle } from '../../components/ui/Toggle';
 import { EditorSection, EditorRow, FieldLabel } from './ui/EditorSection';
 import { EditorTabs } from './ui/EditorTabs';
 import type { EditorTab } from './ui/EditorTabs';
@@ -1032,22 +1033,20 @@ export function ProfileEditor({
                 </EditorSection>
               )}
 
-              <EditorSection title="Profile details">
-                <label className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/55 px-3 py-2.5">
-                  <span className="min-w-0">
-                    <span className="block text-sm text-foreground">Set as default agent</span>
-                    <span className="block text-xs text-muted-foreground">
-                      Use this profile when a project has no explicit agent selection.
-                    </span>
-                  </span>
-                  <input
-                    type="checkbox"
-                    id="agentIsDefault"
-                    checked={formIsDefault}
-                    onChange={e => setFormIsDefault(e.target.checked)}
-                    className="shrink-0 rounded-md border-border bg-background"
+              <EditorSection title="Profile details" flush>
+                <div className="divide-y divide-border/60">
+                  <EditorRow
+                    title="Set as default agent"
+                    description="Use this profile when a project has no explicit agent selection."
+                    control={
+                      <Toggle
+                        aria-label="Set as default agent"
+                        checked={formIsDefault}
+                        onChange={setFormIsDefault}
+                      />
+                    }
                   />
-                </label>
+                </div>
               </EditorSection>
             </div>
           )}
