@@ -232,6 +232,7 @@ describe('ProfileEditor', () => {
     fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), {
       target: { value: 'Claude Agent' },
     });
+    fireEvent.click(screen.getByRole('button', { name: 'Add fallback model' }));
     fireEvent.change(screen.getByLabelText('Fallback LLM Profile'), {
       target: { value: 'vision-lp' },
     });
@@ -254,6 +255,37 @@ describe('ProfileEditor', () => {
         })
       );
     });
+  });
+
+  it('multimodal fallback: opens via Add, sets fields, removes to clear', async () => {
+    const visionProfile: LlmProfileConfig = {
+      ...llmProfile,
+      id: 'vision-lp',
+      name: 'Vision',
+      models: [
+        { modelId: 'vision-model', displayName: 'Vision Model', capabilities: { vision: true } },
+      ],
+    };
+    vi.mocked(api.listLlmProfilesForBackend).mockResolvedValue([llmProfile, visionProfile]);
+    await renderEditor(null);
+
+    // Collapsed by default in create mode: the fallback selects are not mounted.
+    expect(screen.queryByLabelText('Fallback LLM Profile')).toBeNull();
+
+    // Open it.
+    fireEvent.click(screen.getByRole('button', { name: 'Add fallback model' }));
+    expect(screen.getByLabelText('Fallback LLM Profile')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Fallback LLM Profile'), {
+      target: { value: 'vision-lp' },
+    });
+    fireEvent.change(screen.getByLabelText('Fallback Model'), {
+      target: { value: 'vision-model' },
+    });
+
+    // Remove collapses and clears the selects.
+    fireEvent.click(screen.getByRole('button', { name: 'Remove fallback' }));
+    expect(screen.queryByLabelText('Fallback LLM Profile')).toBeNull();
   });
 
   it('edit mode: autosaves an edit via updateAgentProfileForBackend (no Update button)', async () => {
