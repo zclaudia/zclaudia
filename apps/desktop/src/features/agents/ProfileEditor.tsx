@@ -104,6 +104,22 @@ function fallbackModelValidForProfile(
   return models.some(entry => entry.modelId === trimmed && modelSupportsVision(entry));
 }
 
+function ReadonlyField({ id, label, value }: { id: string; label: string; value: string }) {
+  return (
+    <div>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <input
+        id={id}
+        type="text"
+        readOnly
+        aria-readonly="true"
+        value={value}
+        className={`${FIELD_CLASS} cursor-default text-muted-foreground`}
+      />
+    </div>
+  );
+}
+
 function isBuiltinRefForTools(
   ref: ToolSelection['include'][number],
   tools: readonly ToolName[]
@@ -193,6 +209,7 @@ export function ProfileEditor({
   const [formRuntimeType, setFormRuntimeType] = useState<RuntimeOption>('zclaudia');
   const [formLlmProfileId, setFormLlmProfileId] = useState('');
   const [formModel, setFormModel] = useState('');
+  const [formCliPath, setFormCliPath] = useState('');
   const [formFallbackLlmProfileId, setFormFallbackLlmProfileId] = useState('');
   const [formFallbackModel, setFormFallbackModel] = useState('');
   const [formSystemPrompt, setFormSystemPrompt] = useState('');
@@ -219,18 +236,19 @@ export function ProfileEditor({
   const [deleting, setDeleting] = useState(false);
 
   const mountedRef = useRef(true);
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
       mountedRef.current = false;
-    },
-    []
-  );
+    };
+  }, []);
 
   // Captured once per mount (the editor is keyed by profile id, so this is stable
   // per identity). Used to decide null (clear existing) vs undefined (omit) for the
   // multimodal fallback — reading the live `profile` prop instead would re-fire a
   // no-op save after the saved profile round-trips back.
   const hadFallbackAtMount = useRef(Boolean(profile?.multimodalFallback));
+  const hadCliPathAtMount = useRef(Boolean(profile?.cliPath));
 
   // Supporting catalogs for the target backend. Skills / MCP failures degrade
   // gracefully to empty catalogs — only the LLM profile list is a hard error.
@@ -286,6 +304,7 @@ export function ProfileEditor({
     setFormRuntimeType('zclaudia');
     setFormLlmProfileId('');
     setFormModel('');
+    setFormCliPath('');
     setFormFallbackLlmProfileId('');
     setFormFallbackModel('');
     setFormSystemPrompt('');
@@ -305,6 +324,7 @@ export function ProfileEditor({
     setFormRuntimeType(agent.runtimeType === 'claude' ? 'claude' : 'zclaudia');
     setFormLlmProfileId(agent.llmProfileId);
     setFormModel(agent.model);
+    setFormCliPath(agent.cliPath ?? '');
     setFormFallbackLlmProfileId(agent.multimodalFallback?.llmProfileId ?? '');
     setFormFallbackModel(agent.multimodalFallback?.model ?? '');
     setFormSystemPrompt(agent.systemPrompt);
@@ -571,7 +591,9 @@ export function ProfileEditor({
   const buildPayload = useCallback(() => {
     const resolvedTools = resolveToolSelection(formToolSelection).builtinTools;
     const descriptor = getProfileConfigDescriptor(formRuntimeType);
+    const isClaudeRuntime = formRuntimeType === 'claude';
     const trimmedFallbackModel = formFallbackModel.trim();
+    const trimmedCliPath = formCliPath.trim();
     const multimodalFallback = !descriptor.model.multimodalFallback
       ? hadFallbackAtMount.current
         ? null
@@ -581,19 +603,26 @@ export function ProfileEditor({
         : hadFallbackAtMount.current
           ? null
           : undefined;
+    const cliPath =
+      formRuntimeType === 'claude'
+        ? trimmedCliPath || (hadCliPathAtMount.current ? null : undefined)
+        : hadCliPathAtMount.current
+          ? null
+          : undefined;
     return {
       name: formName.trim(),
       description: formDescription.trim() || undefined,
       runtimeType: formRuntimeType,
       llmProfileId: formLlmProfileId,
-      model: formModel.trim(),
+      model: isClaudeRuntime ? '' : formModel.trim(),
+      cliPath,
       multimodalFallback,
       systemPrompt: formSystemPrompt,
       enabledTools: resolvedTools,
       toolSelection: formToolSelection,
       skillSelection: formSkillSelection,
       skillExecution: formSkillExecution,
-      thinkingLevel: formThinkingLevel === '' ? undefined : formThinkingLevel,
+      thinkingLevel: isClaudeRuntime || formThinkingLevel === '' ? undefined : formThinkingLevel,
       isDefault: formIsDefault,
     };
   }, [
@@ -602,6 +631,7 @@ export function ProfileEditor({
     formRuntimeType,
     formLlmProfileId,
     formModel,
+    formCliPath,
     formFallbackLlmProfileId,
     formFallbackModel,
     formSystemPrompt,
@@ -625,7 +655,7 @@ export function ProfileEditor({
   const formValid = Boolean(
     formName.trim() &&
     (runtimeRequiresLlmProfile(formRuntimeType) ? formLlmProfileId : true) &&
-    formModel.trim() &&
+    (formRuntimeType === 'claude' || formModel.trim()) &&
     fallbackVisionValid
   );
 
@@ -650,6 +680,9 @@ export function ProfileEditor({
     // Model ids are not interchangeable across runtimes → clear and let the form
     // sit in `pending` until a model is chosen for the new runtime.
     setFormModel('');
+    if (next === 'claude') {
+      setFormThinkingLevel('');
+    }
     if (!runtimeRequiresLlmProfile(next)) {
       // Native runtimes don't bind an LLM profile or a multimodal fallback.
       setFormLlmProfileId('');
@@ -664,7 +697,7 @@ export function ProfileEditor({
       setFormError('LLM Profile is required');
       return;
     }
-    if (!formModel.trim()) {
+    if (formRuntimeType !== 'claude' && !formModel.trim()) {
       setFormError('Model is required');
       return;
     }
@@ -817,96 +850,139 @@ export function ProfileEditor({
                     ))}
                   </select>
                 </div>
+                {formRuntimeType === 'claude' && (
+                  <div>
+                    <FieldLabel htmlFor="agent-profile-cli-path">CLI Path (optional)</FieldLabel>
+                    <input
+                      id="agent-profile-cli-path"
+                      type="text"
+                      value={formCliPath}
+                      onChange={e => setFormCliPath(e.target.value)}
+                      onBlur={autosave.flush}
+                      placeholder="/opt/homebrew/bin/claude"
+                      className={MONO_FIELD_CLASS}
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Custom path to Claude CLI binary
+                    </p>
+                  </div>
+                )}
+                {formRuntimeType === 'claude' && (
+                  <>
+                    <ReadonlyField
+                      id="agent-profile-native-model"
+                      label="Claude Model"
+                      value="Auto (Claude CLI default)"
+                    />
+                    {activeDescriptor.model.thinkingLevel && (
+                      <ReadonlyField
+                        id="agent-profile-thinking-level"
+                        label="Thinking Level"
+                        value="Auto"
+                      />
+                    )}
+                    {activeDescriptor.authNote && (
+                      <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-muted-foreground">
+                        {activeDescriptor.authNote}
+                      </p>
+                    )}
+                  </>
+                )}
               </EditorSection>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <EditorSection title="Model">
-                  {activeDescriptor.model.kind === 'llm-profile' ? (
-                    <>
-                      <LlmProfileSelector
-                        value={formLlmProfileId}
-                        onChange={id => {
-                          setFormLlmProfileId(id);
-                          // Clearing the model when the LLM profile changes avoids referencing
-                          // a model id that doesn't exist in the new profile's models list.
-                          const newProfile = llmProfiles.find(p => p.id === id);
-                          const newProfileModels = newProfile?.models;
+              {formRuntimeType !== 'claude' && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <EditorSection title="Model">
+                    {activeDescriptor.model.kind === 'llm-profile' ? (
+                      <>
+                        <LlmProfileSelector
+                          value={formLlmProfileId}
+                          onChange={id => {
+                            setFormLlmProfileId(id);
+                            // Clearing the model when the LLM profile changes avoids referencing
+                            // a model id that doesn't exist in the new profile's models list.
+                            const newProfile = llmProfiles.find(p => p.id === id);
+                            const newProfileModels = newProfile?.models;
+                            if (
+                              formModel &&
+                              (!newProfileModels ||
+                                !newProfileModels.some(m => m.modelId === formModel))
+                            ) {
+                              setFormModel('');
+                            }
+                          }}
+                          profiles={llmProfiles}
+                        />
+
+                        <ModelSelector
+                          value={formModel}
+                          onChange={setFormModel}
+                          llmProfile={llmProfiles.find(p => p.id === formLlmProfileId)}
+                        />
+
+                        <ModelDeclarationWarning
+                          formModel={formModel}
+                          llmProfile={llmProfiles.find(p => p.id === formLlmProfileId)}
+                        />
+                      </>
+                    ) : (
+                      <div>
+                        <FieldLabel htmlFor="agent-profile-native-model">Claude Model</FieldLabel>
+                        <input
+                          id="agent-profile-native-model"
+                          type="text"
+                          value={formModel}
+                          onChange={e => setFormModel(e.target.value)}
+                          onBlur={autosave.flush}
+                          placeholder="Auto (Claude CLI default)"
+                          className={FIELD_CLASS}
+                        />
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Leave blank to use Claude Code's configured default model.
+                        </p>
+                      </div>
+                    )}
+
+                    {activeDescriptor.model.thinkingLevel && (
+                      <ThinkingLevelSelector
+                        value={formThinkingLevel}
+                        onChange={setFormThinkingLevel}
+                      />
+                    )}
+
+                    {activeDescriptor.authNote && (
+                      <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-muted-foreground">
+                        {activeDescriptor.authNote}
+                      </p>
+                    )}
+                  </EditorSection>
+
+                  {activeDescriptor.model.multimodalFallback && (
+                    <EditorSection title="Multimodal fallback">
+                      <MultimodalFallbackSelector
+                        profiles={llmProfiles}
+                        profileId={formFallbackLlmProfileId}
+                        model={formFallbackModel}
+                        onProfileChange={id => {
+                          setFormFallbackLlmProfileId(id);
+                          if (!id) {
+                            setFormFallbackModel('');
+                            return;
+                          }
+                          const nextProfile = llmProfiles.find(p => p.id === id);
                           if (
-                            formModel &&
-                            (!newProfileModels ||
-                              !newProfileModels.some(m => m.modelId === formModel))
+                            formFallbackModel &&
+                            !fallbackModelValidForProfile(formFallbackModel, nextProfile)
                           ) {
-                            setFormModel('');
+                            setFormFallbackModel('');
                           }
                         }}
-                        profiles={llmProfiles}
+                        onModelChange={setFormFallbackModel}
                       />
-
-                      <ModelSelector
-                        value={formModel}
-                        onChange={setFormModel}
-                        llmProfile={llmProfiles.find(p => p.id === formLlmProfileId)}
-                      />
-
-                      <ModelDeclarationWarning
-                        formModel={formModel}
-                        llmProfile={llmProfiles.find(p => p.id === formLlmProfileId)}
-                      />
-                    </>
-                  ) : (
-                    <div>
-                      <FieldLabel htmlFor="agent-profile-native-model">Claude Model</FieldLabel>
-                      <input
-                        id="agent-profile-native-model"
-                        type="text"
-                        value={formModel}
-                        onChange={e => setFormModel(e.target.value)}
-                        onBlur={autosave.flush}
-                        placeholder="e.g., claude-sonnet-4-6"
-                        className={FIELD_CLASS}
-                      />
-                    </div>
+                    </EditorSection>
                   )}
-
-                  {activeDescriptor.model.thinkingLevel && (
-                    <ThinkingLevelSelector
-                      value={formThinkingLevel}
-                      onChange={setFormThinkingLevel}
-                    />
-                  )}
-
-                  {activeDescriptor.authNote && (
-                    <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-muted-foreground">
-                      {activeDescriptor.authNote}
-                    </p>
-                  )}
-                </EditorSection>
-
-                {activeDescriptor.model.multimodalFallback && (
-                  <EditorSection title="Multimodal fallback">
-                    <MultimodalFallbackSelector
-                      profiles={llmProfiles}
-                      profileId={formFallbackLlmProfileId}
-                      model={formFallbackModel}
-                      onProfileChange={id => {
-                        setFormFallbackLlmProfileId(id);
-                        if (!id) {
-                          setFormFallbackModel('');
-                          return;
-                        }
-                        const nextProfile = llmProfiles.find(p => p.id === id);
-                        if (
-                          formFallbackModel &&
-                          !fallbackModelValidForProfile(formFallbackModel, nextProfile)
-                        ) {
-                          setFormFallbackModel('');
-                        }
-                      }}
-                      onModelChange={setFormFallbackModel}
-                    />
-                  </EditorSection>
-                )}
-              </div>
+                </div>
+              )}
 
               <EditorSection title="Profile details">
                 <label className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/55 px-3 py-2.5">

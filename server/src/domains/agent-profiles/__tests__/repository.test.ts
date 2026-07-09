@@ -26,6 +26,7 @@ describe('AgentProfileRepository', () => {
       description: 'Coding agent',
       llmProfileId,
       model: 'claude-sonnet-4-6',
+      cliPath: '/opt/homebrew/bin/claude',
       systemPrompt: 'You are a coder.',
       enabledTools: ['read', 'write', 'bash'],
       thinkingLevel: 'medium',
@@ -37,6 +38,7 @@ describe('AgentProfileRepository', () => {
     expect(fetched!.description).toBe('Coding agent');
     expect(fetched!.llmProfileId).toBe(llmProfileId);
     expect(fetched!.model).toBe('claude-sonnet-4-6');
+    expect(fetched!.cliPath).toBe('/opt/homebrew/bin/claude');
     expect(fetched!.runtimeType).toBe('zclaudia');
     expect(fetched!.systemPrompt).toBe('You are a coder.');
     expect(fetched!.enabledTools).toEqual(['Read', 'Write', 'Bash']);

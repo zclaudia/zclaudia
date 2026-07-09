@@ -15,6 +15,7 @@ import type { ClaudeAgentRunOptions } from './runner.js';
 import { runClaudeAgent } from './runner.js';
 
 type ClaudeMcpServers = NonNullable<ClaudeAgentRunOptions['mcpServers']>;
+type ClaudeThinkingOptions = Pick<ClaudeAgentRunOptions, 'thinking' | 'effort'>;
 
 const CLAUDE_PERMISSION_MODES = new Set([
   'default',
@@ -43,12 +44,25 @@ function mergeClaudeMcpServers(
   };
 }
 
+function toClaudeThinkingOptions(level: RunOptions['thinkingLevel']): ClaudeThinkingOptions {
+  if (!level) return {};
+  if (level === 'off') return { thinking: { type: 'disabled' } };
+  const effort = level === 'minimal' ? 'low' : level;
+  return {
+    thinking: { type: 'adaptive' },
+    effort,
+  };
+}
+
 export class ClaudeAgentAdapter implements ProviderAdapter {
   readonly type = 'claude';
   readonly manifest = CLAUDE_AGENT_MANIFEST;
   readonly policy = CLAUDE_AGENT_POLICY;
   private readonly abortControllers = new Map<string, AbortController>();
-  private readonly runStates = new WeakMap<RunOptions, { providerSessionId?: string; providerCwd: string }>();
+  private readonly runStates = new WeakMap<
+    RunOptions,
+    { providerSessionId?: string; providerCwd: string }
+  >();
 
   async *run(
     input: string,
@@ -71,13 +85,17 @@ export class ClaudeAgentAdapter implements ProviderAdapter {
         zclaudiaSessionId: options.claudiaSessionId,
       });
       const mcpServers = mergeClaudeMcpServers(claudeConfig.mcpServers, bridgeEntry);
+      const model = options.agentProfile?.model?.trim() || undefined;
+      const cliPath = options.agentProfile?.cliPath?.trim() || options.cliPath;
+      const thinkingOptions = toClaudeThinkingOptions(options.thinkingLevel);
       yield* runClaudeAgent(input, {
         cwd: options.cwd,
         sessionId: options.sessionId,
         env: options.env,
-        cliPath: options.cliPath,
+        cliPath,
         permissionMode: toClaudePermissionMode(options.mode),
-        model: options.agentProfile?.model,
+        model,
+        ...thinkingOptions,
         systemPrompt: options.systemPrompt,
         abortController,
         canUseTool: buildClaudeCanUseTool(onPermission),

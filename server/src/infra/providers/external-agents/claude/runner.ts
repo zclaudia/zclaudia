@@ -15,6 +15,8 @@ export interface ClaudeAgentRunOptions {
   cliPath?: string;
   permissionMode?: PermissionMode;
   model?: string;
+  thinking?: Options['thinking'];
+  effort?: Options['effort'];
   systemPrompt?: string;
   abortController?: AbortController;
   canUseTool?: CanUseTool;
@@ -36,6 +38,8 @@ export async function* runClaudeAgent(
   if (options.sessionId) sdkOptions.resume = options.sessionId;
   if (options.permissionMode) sdkOptions.permissionMode = options.permissionMode;
   if (options.model) sdkOptions.model = options.model;
+  if (options.thinking) sdkOptions.thinking = options.thinking;
+  if (options.effort) sdkOptions.effort = options.effort;
   if (options.systemPrompt) {
     sdkOptions.systemPrompt = {
       type: 'preset',

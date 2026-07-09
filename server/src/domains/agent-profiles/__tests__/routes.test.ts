@@ -87,6 +87,40 @@ describe('agent-profiles routes', () => {
     expect(res.body.data.runtimeType).toBe('claude');
   });
 
+  it('POST accepts a Claude profile with CLI path and auto model', async () => {
+    const res = await request(app)
+      .post('/api/agent-profiles')
+      .send({
+        name: 'claude-auto',
+        runtimeType: 'claude',
+        cliPath: '/opt/homebrew/bin/claude',
+        systemPrompt: '',
+        enabledTools: ['read'],
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.runtimeType).toBe('claude');
+    expect(res.body.data.llmProfileId).toBe('');
+    expect(res.body.data.model).toBe('');
+    expect(res.body.data.cliPath).toBe('/opt/homebrew/bin/claude');
+  });
+
+  it('POST accepts a Claude profile with an explicit blank model from the desktop form', async () => {
+    const res = await request(app).post('/api/agent-profiles').send({
+      name: 'claude-auto',
+      runtimeType: 'claude',
+      llmProfileId: '',
+      model: '',
+      systemPrompt: '',
+      enabledTools: [],
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.runtimeType).toBe('claude');
+    expect(res.body.data.llmProfileId).toBe('');
+    expect(res.body.data.model).toBe('');
+  });
+
   it('POST rejects invalid runtime type', async () => {
     const res = await request(app)
       .post('/api/agent-profiles')
@@ -278,6 +312,24 @@ describe('agent-profiles routes', () => {
     expect(list.body.data[0].isDefault).toBe(true);
   });
 
+  it('DELETE removes a Claude profile created with auto model and no LLM profile', async () => {
+    const create = await request(app).post('/api/agent-profiles').send({
+      name: 'claude-auto',
+      runtimeType: 'claude',
+      llmProfileId: '',
+      model: '',
+      systemPrompt: '',
+      enabledTools: [],
+    });
+    expect(create.status).toBe(201);
+
+    const del = await request(app).delete(`/api/agent-profiles/${create.body.data.id}`);
+
+    expect(del.status).toBe(200);
+    const fetch = await request(app).get(`/api/agent-profiles/${create.body.data.id}`);
+    expect(fetch.status).toBe(404);
+  });
+
   it('POST /:id/set-default makes another agent default', async () => {
     const a = await request(app)
       .post('/api/agent-profiles')
@@ -304,14 +356,19 @@ describe('agent-profiles routes', () => {
   });
 
   it('POST allows a claude profile without llmProfileId and stores NULL', async () => {
-    const res = await request(app)
-      .post('/api/agent-profiles')
-      .send({ name: 'claude-agent', model: 'claude-opus-4-8', runtimeType: 'claude', enabledTools: [] });
+    const res = await request(app).post('/api/agent-profiles').send({
+      name: 'claude-agent',
+      model: 'claude-opus-4-8',
+      runtimeType: 'claude',
+      enabledTools: [],
+    });
     expect(res.status).toBe(201);
     expect(res.body.data.runtimeType).toBe('claude');
     expect(res.body.data.llmProfileId).toBe(''); // API surfaces '' for "no profile"
 
-    const row = db.prepare('SELECT llm_profile_id FROM agent_profiles WHERE id = ?').get(res.body.data.id) as { llm_profile_id: string | null };
+    const row = db
+      .prepare('SELECT llm_profile_id FROM agent_profiles WHERE id = ?')
+      .get(res.body.data.id) as { llm_profile_id: string | null };
     expect(row.llm_profile_id).toBeNull(); // persisted as NULL, not ''
   });
 

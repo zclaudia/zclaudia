@@ -120,6 +120,74 @@ describe('ClaudeAgentAdapter', () => {
     );
   });
 
+  it('uses profile CLI path and omits model/thinking overrides when Claude profile is auto', async () => {
+    const adapter = new ClaudeAgentAdapter();
+    queryMock.mockReturnValueOnce(claudeStream([]));
+
+    for await (const _event of adapter.run(
+      'hello',
+      {
+        cwd: '/tmp/project',
+        claudiaSessionId: 'session-1',
+        agentProfile: {
+          runtimeType: 'claude',
+          model: '',
+          cliPath: '/opt/homebrew/bin/claude',
+        },
+      } as any,
+      vi.fn()
+    )) {
+      // drain stream
+    }
+
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          pathToClaudeCodeExecutable: '/opt/homebrew/bin/claude',
+        }),
+      })
+    );
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.not.objectContaining({
+          model: expect.anything(),
+          thinking: expect.anything(),
+          effort: expect.anything(),
+        }),
+      })
+    );
+  });
+
+  it('maps explicit Claude thinking levels to SDK effort overrides', async () => {
+    const adapter = new ClaudeAgentAdapter();
+    queryMock.mockReturnValueOnce(claudeStream([]));
+
+    for await (const _event of adapter.run(
+      'hello',
+      {
+        cwd: '/tmp/project',
+        claudiaSessionId: 'session-1',
+        agentProfile: {
+          runtimeType: 'claude',
+          model: '',
+        },
+        thinkingLevel: 'xhigh',
+      } as any,
+      vi.fn()
+    )) {
+      // drain stream
+    }
+
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          thinking: { type: 'adaptive' },
+          effort: 'xhigh',
+        }),
+      })
+    );
+  });
+
   it('merges the standard tool bridge MCP server into Claude SDK options', async () => {
     const adapter = new ClaudeAgentAdapter();
     loadClaudeAgentConfigMock.mockReturnValueOnce({

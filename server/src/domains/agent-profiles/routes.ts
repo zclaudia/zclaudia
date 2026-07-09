@@ -156,6 +156,7 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         multimodalFallback,
         thinkingLevel,
         runtimeType,
+        cliPath,
         isDefault,
       } = req.body ?? {};
 
@@ -163,13 +164,6 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         res.status(400).json({
           success: false,
           error: { code: 'VALIDATION_ERROR', message: 'name is required' },
-        });
-        return;
-      }
-      if (!model || typeof model !== 'string') {
-        res.status(400).json({
-          success: false,
-          error: { code: 'VALIDATION_ERROR', message: 'model is required' },
         });
         return;
       }
@@ -208,8 +202,32 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         });
         return;
       }
+      const resolvedRuntimeType = validatedRuntimeType ?? 'zclaudia';
+      if (model !== undefined && model !== null && typeof model !== 'string') {
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'model must be a string' },
+        });
+        return;
+      }
+      const normalizedModel = typeof model === 'string' ? model.trim() : '';
+      if (runtimeRequiresLlmProfile(resolvedRuntimeType) && !normalizedModel) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'model is required' },
+        });
+        return;
+      }
+      if (cliPath !== undefined && cliPath !== null && typeof cliPath !== 'string') {
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'cliPath must be a string' },
+        });
+        return;
+      }
+      const normalizedCliPath = typeof cliPath === 'string' ? cliPath.trim() : undefined;
 
-      const requiresLlmProfile = runtimeRequiresLlmProfile(validatedRuntimeType ?? 'zclaudia');
+      const requiresLlmProfile = runtimeRequiresLlmProfile(resolvedRuntimeType);
       if (requiresLlmProfile && (!llmProfileId || typeof llmProfileId !== 'string')) {
         res.status(400).json({
           success: false,
@@ -241,7 +259,8 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         name,
         description,
         llmProfileId: typeof llmProfileId === 'string' ? llmProfileId : '',
-        model,
+        model: normalizedModel,
+        cliPath: normalizedCliPath,
         systemPrompt: typeof systemPrompt === 'string' ? systemPrompt : '',
         enabledTools: Array.isArray(enabledTools) ? enabledTools : [],
         toolSelection,
@@ -249,7 +268,7 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         skillExecution,
         multimodalFallback: validatedFallback.value ?? undefined,
         thinkingLevel: thinkingLevel ?? undefined,
-        runtimeType: validatedRuntimeType ?? 'zclaudia',
+        runtimeType: resolvedRuntimeType,
         isDefault: Boolean(isDefault),
       });
 
@@ -293,6 +312,30 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         });
         return;
       }
+      if (
+        Object.prototype.hasOwnProperty.call(body, 'model') &&
+        body.model !== undefined &&
+        body.model !== null &&
+        typeof body.model !== 'string'
+      ) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'model must be a string' },
+        });
+        return;
+      }
+      if (
+        Object.prototype.hasOwnProperty.call(body, 'cliPath') &&
+        body.cliPath !== undefined &&
+        body.cliPath !== null &&
+        typeof body.cliPath !== 'string'
+      ) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'cliPath must be a string' },
+        });
+        return;
+      }
 
       if (body.llmProfileId !== undefined && body.llmProfileId !== '') {
         if (!llmRepo.findById(body.llmProfileId)) {
@@ -329,13 +372,18 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         return;
       }
 
-      const patch: Partial<Omit<AgentProfileConfig, 'id' | 'createdAt' | 'updatedAt'>> = {};
+      const patch: Partial<Omit<AgentProfileConfig, 'id' | 'createdAt' | 'updatedAt'>> & {
+        cliPath?: string | null;
+      } = {};
       if (Object.prototype.hasOwnProperty.call(body, 'name')) patch.name = body.name;
       if (Object.prototype.hasOwnProperty.call(body, 'description'))
         patch.description = body.description ?? undefined;
       if (Object.prototype.hasOwnProperty.call(body, 'llmProfileId'))
         patch.llmProfileId = body.llmProfileId;
-      if (Object.prototype.hasOwnProperty.call(body, 'model')) patch.model = body.model;
+      if (Object.prototype.hasOwnProperty.call(body, 'model'))
+        patch.model = typeof body.model === 'string' ? body.model.trim() : '';
+      if (Object.prototype.hasOwnProperty.call(body, 'cliPath'))
+        patch.cliPath = typeof body.cliPath === 'string' ? body.cliPath.trim() : null;
       if (Object.prototype.hasOwnProperty.call(body, 'systemPrompt'))
         patch.systemPrompt = body.systemPrompt;
       if (Object.prototype.hasOwnProperty.call(body, 'enabledTools'))

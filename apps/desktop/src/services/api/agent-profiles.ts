@@ -4,9 +4,10 @@ import { apiCall, apiCallVoid, apiCallForBackend, apiCallVoidForBackend } from '
 const BASE = '/api/agent-profiles';
 type AgentProfileWriteInput = Omit<
   AgentProfileConfig,
-  'id' | 'createdAt' | 'updatedAt' | 'multimodalFallback'
+  'id' | 'createdAt' | 'updatedAt' | 'multimodalFallback' | 'cliPath'
 > & {
   multimodalFallback?: AgentProfileConfig['multimodalFallback'] | null;
+  cliPath?: string | null;
 };
 
 export async function listAgentProfiles(options?: RequestInit): Promise<AgentProfileConfig[]> {

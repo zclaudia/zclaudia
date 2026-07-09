@@ -113,7 +113,7 @@ describe('resolveAgentReadiness', () => {
     expect(resolveAgentReadiness(db)).toEqual({ usable: true });
   });
 
-  it('no_model for a native runtime missing a model', () => {
+  it('usable for a native runtime using the CLI default model', () => {
     const agentRepo = new AgentProfileRepository(db);
     agentRepo.create({
       name: 'claude-agent',
@@ -124,6 +124,6 @@ describe('resolveAgentReadiness', () => {
       runtimeType: 'claude',
       isDefault: true,
     });
-    expect(resolveAgentReadiness(db)).toEqual({ usable: false, reason: 'no_model' });
+    expect(resolveAgentReadiness(db)).toEqual({ usable: true });
   });
 });

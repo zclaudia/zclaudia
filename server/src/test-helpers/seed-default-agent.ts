@@ -68,6 +68,7 @@ export function createAgentProfilesTable(db: Database.Database): void {
       description TEXT,
       llm_profile_id TEXT,
       model TEXT NOT NULL DEFAULT 'claude-sonnet-4-6',
+      cli_path TEXT,
       system_prompt TEXT NOT NULL DEFAULT '',
       enabled_tools TEXT NOT NULL DEFAULT '["Read","Write","Edit","Bash","Grep","Glob","LS"]',
       tool_selection TEXT,

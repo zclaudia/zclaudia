@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { StrictMode } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import type { AgentProfileConfig, LlmProfileConfig } from '@zclaudia/shared';
@@ -141,9 +142,6 @@ describe('ProfileEditor', () => {
     fireEvent.change(screen.getByLabelText('Agent Type'), {
       target: { value: 'claude' },
     });
-    fireEvent.change(screen.getByLabelText('Claude Model'), {
-      target: { value: 'claude-opus-4-8' },
-    });
 
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
 
@@ -153,9 +151,42 @@ describe('ProfileEditor', () => {
         expect.objectContaining({
           name: 'Claude Agent',
           runtimeType: 'claude',
+          model: '',
         })
       );
     });
+  });
+
+  it('create mode completes under React StrictMode', async () => {
+    const saved = { ...makeProfile('new1', 'Claude Agent'), runtimeType: 'claude' as const };
+    vi.mocked(api.createAgentProfileForBackend).mockResolvedValue(saved);
+    const onSaved = vi.fn();
+
+    render(
+      <StrictMode>
+        <ProfileEditor
+          backendId="b1"
+          profile={null}
+          onBack={vi.fn()}
+          onSaved={onSaved}
+          onDeleted={vi.fn()}
+        />
+      </StrictMode>
+    );
+    await screen.findByPlaceholderText(NAME_PLACEHOLDER);
+
+    fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), {
+      target: { value: 'Claude Agent' },
+    });
+    fireEvent.change(screen.getByLabelText('Agent Type'), {
+      target: { value: 'claude' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledWith(saved);
+    });
+    expect(screen.getByRole('button', { name: 'Create' })).toBeInTheDocument();
   });
 
   it('shows Claude runtime limitations when Claude is selected', async () => {
@@ -210,9 +241,6 @@ describe('ProfileEditor', () => {
     fireEvent.change(screen.getByLabelText('Agent Type'), {
       target: { value: 'claude' },
     });
-    fireEvent.change(screen.getByLabelText('Claude Model'), {
-      target: { value: 'claude-opus-4-8' },
-    });
 
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
 
@@ -221,6 +249,7 @@ describe('ProfileEditor', () => {
         'b1',
         expect.objectContaining({
           runtimeType: 'claude',
+          model: '',
           multimodalFallback: undefined,
         })
       );
@@ -419,7 +448,7 @@ describe('ProfileEditor', () => {
     expect(screen.queryByDisplayValue('Coder')).toBeNull();
   });
 
-  it('Claude runtime reshapes the Model tab: native model input, no LLM model dropdown, no fallback, authNote', async () => {
+  it('Claude runtime merges model settings into Runtime as read-only Auto fields', async () => {
     // model: '' so the zclaudia model dropdown trigger renders its placeholder
     // ("Select a model") rather than the already-matched "Sonnet" label.
     await renderEditor({ ...makeProfile('p1', 'Coding'), model: '' }); // zclaudia by default
@@ -429,17 +458,22 @@ describe('ProfileEditor', () => {
 
     fireEvent.change(screen.getByLabelText('Agent Type'), { target: { value: 'claude' } });
 
-    // native: free-text Claude model input replaces the dropdown; fallback section gone; authNote shown.
+    // Claude keeps native model settings in Runtime and removes the separate Model card.
     expect(screen.queryByText('Select a model')).toBeNull();
-    expect(screen.getByLabelText('Claude Model')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Model' })).toBeNull();
+    expect(screen.getByLabelText('Claude Model')).toHaveValue('Auto (Claude CLI default)');
+    expect(screen.getByLabelText('Claude Model')).toHaveAttribute('readonly');
+    expect(screen.getByLabelText('Thinking Level')).toHaveValue('Auto');
+    expect(screen.getByLabelText('Thinking Level')).toHaveAttribute('readonly');
     expect(screen.queryByText('Multimodal fallback')).toBeNull();
     expect(screen.getByText(/Claude Agent SDK runtime/)).toBeInTheDocument();
   });
 
-  it('switching runtime clears the model (pending re-selection)', async () => {
+  it('switching runtime shows read-only Claude auto defaults', async () => {
     await renderEditor(makeProfile('p1', 'Coding'));
     fireEvent.change(screen.getByLabelText('Agent Type'), { target: { value: 'claude' } });
-    expect(screen.getByLabelText('Claude Model')).toHaveValue('');
+    expect(screen.getByLabelText('Claude Model')).toHaveValue('Auto (Claude CLI default)');
+    expect(screen.getByLabelText('Thinking Level')).toHaveValue('Auto');
   });
 
   it('create: a Claude profile is valid without an LLM profile and saves llmProfileId ""', async () => {
@@ -452,8 +486,40 @@ describe('ProfileEditor', () => {
       target: { value: 'Claude Agent' },
     });
     fireEvent.change(screen.getByLabelText('Agent Type'), { target: { value: 'claude' } });
-    fireEvent.change(screen.getByLabelText('Claude Model'), {
-      target: { value: 'claude-opus-4-8' },
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() => {
+      expect(api.createAgentProfileForBackend).toHaveBeenCalledWith(
+        'b1',
+        expect.objectContaining({
+          runtimeType: 'claude',
+          llmProfileId: '',
+          model: '',
+          thinkingLevel: undefined,
+        })
+      );
+    });
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalled();
+    });
+  });
+
+  it('create: a Claude profile can use CLI path and auto model', async () => {
+    vi.mocked(api.createAgentProfileForBackend).mockResolvedValue({
+      ...makeProfile('n1', 'Claude Auto'),
+      runtimeType: 'claude',
+      model: '',
+      cliPath: '/opt/homebrew/bin/claude',
+    });
+    await renderEditor(null);
+
+    fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), {
+      target: { value: 'Claude Auto' },
+    });
+    fireEvent.change(screen.getByLabelText('Agent Type'), { target: { value: 'claude' } });
+    fireEvent.change(screen.getByLabelText('CLI Path (optional)'), {
+      target: { value: '/opt/homebrew/bin/claude' },
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
@@ -464,12 +530,10 @@ describe('ProfileEditor', () => {
         expect.objectContaining({
           runtimeType: 'claude',
           llmProfileId: '',
-          model: 'claude-opus-4-8',
+          model: '',
+          cliPath: '/opt/homebrew/bin/claude',
         })
       );
-    });
-    await waitFor(() => {
-      expect(onSaved).toHaveBeenCalled();
     });
   });
 });

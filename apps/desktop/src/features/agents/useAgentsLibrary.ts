@@ -2,10 +2,27 @@ import { useMemo } from 'react';
 import type { AgentsBackend, AgentsTab, LibraryItem } from './agents-types';
 
 // Minimal shapes we read — kept loose so upstream record types can widen.
-interface ProfileLike { id: string; name?: string; isDefault?: boolean; model?: string }
-interface SkillLike { id: string; name?: string; description?: string }
-interface ServerLike { id: string; name?: string }
-interface LlmProfileLike { id: string; name?: string; models?: unknown[] }
+interface ProfileLike {
+  id: string;
+  name?: string;
+  isDefault?: boolean;
+  model?: string;
+  runtimeType?: string;
+}
+interface SkillLike {
+  id: string;
+  name?: string;
+  description?: string;
+}
+interface ServerLike {
+  id: string;
+  name?: string;
+}
+interface LlmProfileLike {
+  id: string;
+  name?: string;
+  models?: unknown[];
+}
 
 export interface LibrarySources {
   profiles: Map<string, ProfileLike[]>;
@@ -38,13 +55,23 @@ export function buildLibraryItems(
   if (wantKind('profile'))
     eachBackend(sources.profiles, (backendId, p) =>
       out.push({
-        kind: 'profile', backendId, id: p.id, title: p.name ?? p.id,
-        subtitle: p.model, status: p.isDefault ? 'Default' : undefined,
+        kind: 'profile',
+        backendId,
+        id: p.id,
+        title: p.name ?? p.id,
+        subtitle: p.model || (p.runtimeType === 'claude' ? 'Auto' : undefined),
+        status: p.isDefault ? 'Default' : undefined,
       })
     );
   if (wantKind('skill'))
     eachBackend(sources.skills, (backendId, s) =>
-      out.push({ kind: 'skill', backendId, id: s.id, title: s.name ?? s.id, subtitle: s.description })
+      out.push({
+        kind: 'skill',
+        backendId,
+        id: s.id,
+        title: s.name ?? s.id,
+        subtitle: s.description,
+      })
     );
   if (wantKind('mcp-server'))
     eachBackend(sources.servers, (backendId, m) =>
@@ -53,7 +80,10 @@ export function buildLibraryItems(
   if (wantKind('llm-profile'))
     eachBackend(sources.llmProfiles, (backendId, l) =>
       out.push({
-        kind: 'llm-profile', backendId, id: l.id, title: l.name ?? l.id,
+        kind: 'llm-profile',
+        backendId,
+        id: l.id,
+        title: l.name ?? l.id,
         subtitle: l.models ? `${l.models.length} models` : undefined,
       })
     );

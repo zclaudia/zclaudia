@@ -35,17 +35,13 @@ const VALID_THINKING_LEVELS = new Set<ThinkingLevel>([
   'high',
   'xhigh',
 ]);
-const AGENT_RUNTIME_TYPES: readonly AgentRuntimeType[] = [
-  'zclaudia',
-  'claude',
-  'codex',
-  'cursor',
-];
+const AGENT_RUNTIME_TYPES: readonly AgentRuntimeType[] = ['zclaudia', 'claude', 'codex', 'cursor'];
 const VALID_RUNTIME_TYPES = new Set<string>(AGENT_RUNTIME_TYPES);
 
 type AgentProfileCreate = Omit<AgentProfileConfig, 'id' | 'createdAt' | 'updatedAt'>;
 type AgentProfileUpdate = Partial<Omit<AgentProfileConfig, 'id' | 'createdAt' | 'updatedAt'>> & {
   multimodalFallback?: MultimodalFallbackConfig | null;
+  cliPath?: string | null;
 };
 
 function normalizeRuntimeType(raw: unknown): AgentRuntimeType {
@@ -191,6 +187,7 @@ export class AgentProfileRepository extends BaseRepository<
       runtimeType: normalizeRuntimeType(row.runtime_type),
       llmProfileId: row.llm_profile_id ?? '',
       model: row.model,
+      cliPath: row.cli_path ?? undefined,
       systemPrompt: row.system_prompt,
       enabledTools: resolved.builtinTools,
       toolSelection,
@@ -317,8 +314,8 @@ export class AgentProfileRepository extends BaseRepository<
     const enabledTools = resolveToolSelection(toolSelection).builtinTools;
     return {
       sql: `
-        INSERT INTO agent_profiles (id, name, description, runtime_type, llm_profile_id, model, system_prompt, enabled_tools, tool_selection, skill_selection, skill_execution, multimodal_fallback, thinking_level, is_default, source, plugin_id, plugin_profile_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO agent_profiles (id, name, description, runtime_type, llm_profile_id, model, cli_path, system_prompt, enabled_tools, tool_selection, skill_selection, skill_execution, multimodal_fallback, thinking_level, is_default, source, plugin_id, plugin_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       params: [
         id,
@@ -327,6 +324,7 @@ export class AgentProfileRepository extends BaseRepository<
         normalizeRuntimeType(data.runtimeType),
         data.llmProfileId ? data.llmProfileId : null,
         data.model,
+        data.cliPath || null,
         data.systemPrompt,
         JSON.stringify(enabledTools),
         stringifySelection(toolSelection),
@@ -367,6 +365,10 @@ export class AgentProfileRepository extends BaseRepository<
     if (data.model !== undefined) {
       updates.push('model = ?');
       params.push(data.model);
+    }
+    if (Object.prototype.hasOwnProperty.call(data, 'cliPath')) {
+      updates.push('cli_path = ?');
+      params.push(data.cliPath || null);
     }
     if (data.systemPrompt !== undefined) {
       updates.push('system_prompt = ?');

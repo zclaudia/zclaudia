@@ -40,11 +40,10 @@ function readinessForResolvedAgent(
   llm: LlmProfileConfig | null | undefined
 ): AgentReadiness {
   if (!agent) return { usable: false, reason: 'no_agent' };
-  // Native runtimes (e.g. claude) don't bind an LLM profile — they authenticate
-  // via their own SDK/subscription and use a native model id. Structural readiness
-  // for them is just a non-blank model.
+  // Native runtimes (e.g. Claude) don't bind an LLM profile. A blank model means
+  // the native CLI/SDK resolves its configured default model.
   if (!runtimeRequiresLlmProfile(agent.runtimeType)) {
-    return agent.model?.trim() ? { usable: true } : { usable: false, reason: 'no_model' };
+    return { usable: true };
   }
   if (!llm) return { usable: false, reason: 'no_llm_profile' };
   if (!hasLlmCredential(llm)) return { usable: false, reason: 'no_credential' };
