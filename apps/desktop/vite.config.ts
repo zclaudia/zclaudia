@@ -21,7 +21,10 @@ export default defineConfig({
   resolve: {
     alias: [
       { find: '@', replacement: path.resolve(__dirname, './src') },
-      { find: '@zclaudia/shared', replacement: path.resolve(sharedSrc, 'index.ts') },
+      // Exact-match the bare import so it does NOT shadow the deep-import regex
+      // below (a string alias matches `@zclaudia/shared/...` too, which rewrote
+      // deep imports to `index.ts/core/...` and broke runtime value-imports).
+      { find: /^@zclaudia\/shared$/, replacement: path.resolve(sharedSrc, 'index.ts') },
       { find: /^@zclaudia\/shared\/(.+)$/, replacement: `${sharedSrc}/$1.ts` },
     ],
   },
