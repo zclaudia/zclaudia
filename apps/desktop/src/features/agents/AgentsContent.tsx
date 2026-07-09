@@ -68,9 +68,6 @@ function EmptyState({ noun, hint }: { noun: EmptyStateNoun; hint?: string }) {
 /** Maps a selection kind to the breadcrumb label of its owning section. */
 function crumbForSelectionKind(kind: AgentsSelection['kind']): string {
   switch (kind) {
-    case 'profile':
-    case 'new-profile':
-      return 'Profiles';
     case 'skill':
     case 'new-skill':
     case 'skill-dirs':
@@ -81,6 +78,8 @@ function crumbForSelectionKind(kind: AgentsSelection['kind']): string {
     case 'llm-profile':
     case 'new-llm-profile':
       return 'LLM Providers';
+    default:
+      return '';
   }
 }
 
@@ -347,10 +346,12 @@ export function AgentsContent({
           // A refetch is in flight (or a save's nonce bump hasn't landed yet):
           // keep the detail chrome instead of flashing the empty state.
           return (
-            <DetailShell title={selection.id} backendName={backendName}
-            crumb={crumbForSelectionKind(selection.kind)}
-            onBack={() => selectAgentsItem(null)}
-          >
+            <DetailShell
+              title={selection.id}
+              backendName={backendName}
+              crumb={crumbForSelectionKind(selection.kind)}
+              onBack={() => selectAgentsItem(null)}
+            >
               <p className="text-sm text-muted-foreground">Loading…</p>
             </DetailShell>
           );
@@ -370,10 +371,12 @@ export function AgentsContent({
       }
 
       return (
-        <DetailShell title={skill.name || skill.id} backendName={backendName}
-            crumb={crumbForSelectionKind(selection.kind)}
-            onBack={() => selectAgentsItem(null)}
-          >
+        <DetailShell
+          title={skill.name || skill.id}
+          backendName={backendName}
+          crumb={crumbForSelectionKind(selection.kind)}
+          onBack={() => selectAgentsItem(null)}
+        >
           <SkillEditor
             key={`${editedBackendId}:${selection.id}`}
             backendId={editedBackendId}
@@ -387,10 +390,12 @@ export function AgentsContent({
 
     case 'new-skill': {
       return (
-        <DetailShell title="New skill" backendName={backendName}
-            crumb={crumbForSelectionKind(selection.kind)}
-            onBack={() => selectAgentsItem(null)}
-          >
+        <DetailShell
+          title="New skill"
+          backendName={backendName}
+          crumb={crumbForSelectionKind(selection.kind)}
+          onBack={() => selectAgentsItem(null)}
+        >
           <SkillEditor
             key={`${editedBackendId}:new`}
             backendId={editedBackendId}
@@ -408,7 +413,9 @@ export function AgentsContent({
       // would silently wipe the backend's configured dirs on the first edit.
       if (skillsData.dirsFailed.has(editedBackendId)) {
         return (
-          <DetailShell title="External directories" backendName={backendName}
+          <DetailShell
+            title="External directories"
+            backendName={backendName}
             crumb={crumbForSelectionKind(selection.kind)}
             onBack={() => selectAgentsItem(null)}
           >
@@ -427,7 +434,9 @@ export function AgentsContent({
       // not "empty" — same wipe hazard as a failed fetch.
       if (!dirs && skillsData.loading) {
         return (
-          <DetailShell title="External directories" backendName={backendName}
+          <DetailShell
+            title="External directories"
+            backendName={backendName}
             crumb={crumbForSelectionKind(selection.kind)}
             onBack={() => selectAgentsItem(null)}
           >
@@ -437,10 +446,12 @@ export function AgentsContent({
       }
 
       return (
-        <DetailShell title="External directories" backendName={backendName}
-            crumb={crumbForSelectionKind(selection.kind)}
-            onBack={() => selectAgentsItem(null)}
-          >
+        <DetailShell
+          title="External directories"
+          backendName={backendName}
+          crumb={crumbForSelectionKind(selection.kind)}
+          onBack={() => selectAgentsItem(null)}
+        >
           <SkillDirsEditor
             key={editedBackendId}
             backendId={editedBackendId}
@@ -466,10 +477,12 @@ export function AgentsContent({
           // A refetch is in flight (or a save's nonce bump hasn't landed yet):
           // keep the detail chrome instead of flashing the empty state.
           return (
-            <DetailShell title={selection.id} backendName={backendName}
-            crumb={crumbForSelectionKind(selection.kind)}
-            onBack={() => selectAgentsItem(null)}
-          >
+            <DetailShell
+              title={selection.id}
+              backendName={backendName}
+              crumb={crumbForSelectionKind(selection.kind)}
+              onBack={() => selectAgentsItem(null)}
+            >
               <p className="text-sm text-muted-foreground">Loading…</p>
             </DetailShell>
           );
@@ -509,10 +522,12 @@ export function AgentsContent({
       const title = selection.kind === 'llm-profile' ? (llmProfile?.name ?? '') : 'New provider';
 
       return (
-        <DetailShell title={title} backendName={backendName}
-            crumb={crumbForSelectionKind(selection.kind)}
-            onBack={() => selectAgentsItem(null)}
-          >
+        <DetailShell
+          title={title}
+          backendName={backendName}
+          crumb={crumbForSelectionKind(selection.kind)}
+          onBack={() => selectAgentsItem(null)}
+        >
           <LlmProfileEditor
             key={`${editedBackendId}:${selection.kind === 'llm-profile' ? selection.id : 'new'}`}
             backendId={editedBackendId}
@@ -537,10 +552,12 @@ export function AgentsContent({
           // A refetch is in flight (or a save's nonce bump hasn't landed yet):
           // keep the detail chrome instead of flashing the empty state.
           return (
-            <DetailShell title={selection.id} backendName={backendName}
-            crumb={crumbForSelectionKind(selection.kind)}
-            onBack={() => selectAgentsItem(null)}
-          >
+            <DetailShell
+              title={selection.id}
+              backendName={backendName}
+              crumb={crumbForSelectionKind(selection.kind)}
+              onBack={() => selectAgentsItem(null)}
+            >
               <p className="text-sm text-muted-foreground">Loading…</p>
             </DetailShell>
           );
@@ -582,10 +599,12 @@ export function AgentsContent({
       const title = selection.kind === 'mcp-server' ? (server?.name ?? '') : 'New MCP server';
 
       return (
-        <DetailShell title={title} backendName={backendName}
-            crumb={crumbForSelectionKind(selection.kind)}
-            onBack={() => selectAgentsItem(null)}
-          >
+        <DetailShell
+          title={title}
+          backendName={backendName}
+          crumb={crumbForSelectionKind(selection.kind)}
+          onBack={() => selectAgentsItem(null)}
+        >
           <McpServerEditor
             key={`${editedBackendId}:${selection.kind === 'mcp-server' ? selection.id : 'new'}`}
             backendId={editedBackendId}

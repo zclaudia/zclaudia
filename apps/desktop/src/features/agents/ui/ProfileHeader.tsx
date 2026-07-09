@@ -18,6 +18,7 @@ export interface ProfileHeaderProps {
   saveStatus?: SaveStatus;
   onRetry?: () => void;
   onRequestDelete?: () => void;
+  deleting?: boolean;
 }
 
 export function ProfileHeader({
@@ -33,6 +34,7 @@ export function ProfileHeader({
   saveStatus,
   onRetry,
   onRequestDelete,
+  deleting,
 }: ProfileHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -84,11 +86,12 @@ export function ProfileHeader({
                       <button
                         role="menuitem"
                         type="button"
+                        disabled={deleting}
                         onClick={() => {
                           setMenuOpen(false);
                           onRequestDelete();
                         }}
-                        className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-destructive hover:bg-destructive/10"
+                        className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50 disabled:pointer-events-none"
                       >
                         <Trash2 size={14} strokeWidth={1.75} />
                         Delete profile
