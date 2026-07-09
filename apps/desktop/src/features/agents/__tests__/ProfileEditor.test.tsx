@@ -267,6 +267,8 @@ describe('ProfileEditor', () => {
   it('keeps capability details collapsed until a summary row is expanded', async () => {
     const { queryAllByLabelText } = await renderEditor(null);
 
+    fireEvent.click(screen.getByRole('tab', { name: /Capabilities/ }));
+
     expect(queryAllByLabelText(/enable full tool set/)).toHaveLength(0);
 
     fireEvent.click(screen.getByRole('button', { name: /Tool Sets/ }));
@@ -298,6 +300,23 @@ describe('ProfileEditor', () => {
   it('create mode shows no delete entry point', async () => {
     await renderEditor(null);
     expect(screen.queryByRole('button', { name: 'More actions' })).toBeNull();
+  });
+
+  it('shows Model tab by default and switches to the Prompt tab', async () => {
+    await renderEditor(makeProfile('p1', 'Coding'));
+
+    // Model tab content is visible by default (Agent Type select lives in Model).
+    expect(screen.getByLabelText('Agent Type')).toBeInTheDocument();
+    // System Prompt lives in the Prompt tab — not mounted yet.
+    expect(screen.queryByPlaceholderText('You are a helpful coding agent...')).toBeNull();
+
+    fireEvent.click(screen.getByRole('tab', { name: /Prompt/ }));
+
+    // Now the prompt editor is reachable and the Agent Type select is gone.
+    // (System Prompt starts collapsed; expand it, then the textarea appears.)
+    fireEvent.click(screen.getByText('No system prompt set — click to edit.'));
+    expect(screen.getByPlaceholderText('You are a helpful coding agent...')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Agent Type')).toBeNull();
   });
 
   it('repopulates the form when the profile prop switches', async () => {

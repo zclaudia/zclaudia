@@ -28,6 +28,8 @@ import {
 } from '@zclaudia/shared';
 import * as api from '../../services/api';
 import { EditorSection, FieldLabel } from './ui/EditorSection';
+import { EditorTabs } from './ui/EditorTabs';
+import type { EditorTab } from './ui/EditorTabs';
 import { Chip } from './ui/Chip';
 import { useProfileAutosave } from './useProfileAutosave';
 import { ProfileHeader } from './ui/ProfileHeader';
@@ -233,6 +235,7 @@ export function ProfileEditor({
     CapabilitySectionId[]
   >([]);
   const [systemPromptExpanded, setSystemPromptExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState<'model' | 'capabilities' | 'prompt'>('model');
 
   const [deleting, setDeleting] = useState(false);
 
@@ -768,6 +771,14 @@ export function ProfileEditor({
     ...(profile?.isDefault ? [{ label: 'Default', tone: 'accent' as const }] : []),
   ];
 
+  const capabilityCount =
+    enabledToolSetChips.length + mcpProviderChips.length + pinnedSkillChips.length;
+  const editorTabs: EditorTab[] = [
+    { id: 'model', label: 'Model' },
+    { id: 'capabilities', label: 'Capabilities', count: capabilityCount || undefined },
+    { id: 'prompt', label: 'Prompt' },
+  ];
+
   return (
     <div className="flex h-full flex-col bg-background text-foreground">
       <ProfileHeader
@@ -791,7 +802,37 @@ export function ProfileEditor({
           data-testid="agent-profile-editor"
           className="mx-auto flex w-full max-w-[760px] flex-col gap-4 pb-4"
         >
-          <div className="grid gap-3 sm:grid-cols-2">
+          <EditorTabs
+            tabs={editorTabs}
+            active={activeTab}
+            onChange={id => setActiveTab(id as typeof activeTab)}
+          />
+
+          {activeTab === 'model' && (
+            <div className="flex flex-col gap-4">
+              <EditorSection title="Runtime">
+                <div>
+                  <FieldLabel htmlFor="agent-profile-runtime">Agent Type</FieldLabel>
+                  <select
+                    id="agent-profile-runtime"
+                    value={formRuntimeType}
+                    onChange={e => setFormRuntimeType(e.target.value as RuntimeOption)}
+                    className={FIELD_CLASS}
+                  >
+                    <option value="zclaudia">ZClaudia</option>
+                    <option value="claude">Claude</option>
+                  </select>
+                </div>
+
+                {formRuntimeType === 'claude' && (
+                  <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-muted-foreground">
+                    Claude uses the Claude Agent SDK runtime. AI review, multimodal attachments and
+                    fallback, and background task controls are zclaudia-only in this phase.
+                  </p>
+                )}
+              </EditorSection>
+
+              <div className="grid gap-3 sm:grid-cols-2">
             <EditorSection title="Model">
               <LlmProfileSelector
                 value={formLlmProfileId}
@@ -851,6 +892,28 @@ export function ProfileEditor({
             )}
           </div>
 
+              <EditorSection title="Profile details">
+                <label className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/55 px-3 py-2.5">
+                  <span className="min-w-0">
+                    <span className="block text-sm text-foreground">Set as default agent</span>
+                    <span className="block text-xs text-muted-foreground">
+                      Use this profile when a project has no explicit agent selection.
+                    </span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    id="agentIsDefault"
+                    checked={formIsDefault}
+                    onChange={e => setFormIsDefault(e.target.checked)}
+                    className="shrink-0 rounded-md border-border bg-background"
+                  />
+                </label>
+              </EditorSection>
+            </div>
+          )}
+
+          {activeTab === 'capabilities' && (
+            <div className="flex flex-col gap-4">
           <EditorSection
             title="Capabilities"
             description="Configure built-in tools, external providers, and skill execution for this profile."
@@ -1269,7 +1332,11 @@ export function ProfileEditor({
               </div>
             </CapabilityDisclosure>
           </EditorSection>
+            </div>
+          )}
 
+          {activeTab === 'prompt' && (
+            <div className="flex flex-col gap-4">
           <EditorSection title="System Prompt">
             {systemPromptExpanded ? (
               <div className="space-y-2">
@@ -1304,46 +1371,8 @@ export function ProfileEditor({
               </button>
             )}
           </EditorSection>
-
-          <EditorSection title="Profile details">
-            <label className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/55 px-3 py-2.5">
-              <span className="min-w-0">
-                <span className="block text-sm text-foreground">Set as default agent</span>
-                <span className="block text-xs text-muted-foreground">
-                  Use this profile when a project has no explicit agent selection.
-                </span>
-              </span>
-              <input
-                type="checkbox"
-                id="agentIsDefault"
-                checked={formIsDefault}
-                onChange={e => setFormIsDefault(e.target.checked)}
-                className="shrink-0 rounded-md border-border bg-background"
-              />
-            </label>
-          </EditorSection>
-
-          <EditorSection title="Runtime">
-            <div>
-              <FieldLabel htmlFor="agent-profile-runtime">Agent Type</FieldLabel>
-              <select
-                id="agent-profile-runtime"
-                value={formRuntimeType}
-                onChange={e => setFormRuntimeType(e.target.value as RuntimeOption)}
-                className={FIELD_CLASS}
-              >
-                <option value="zclaudia">ZClaudia</option>
-                <option value="claude">Claude</option>
-              </select>
             </div>
-
-            {formRuntimeType === 'claude' && (
-              <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-muted-foreground">
-                Claude uses the Claude Agent SDK runtime. AI review, multimodal attachments and
-                fallback, and background task controls are zclaudia-only in this phase.
-              </p>
-            )}
-          </EditorSection>
+          )}
 
           {!profile && (
             <div className="sticky bottom-0 z-10 -mx-1 bg-background/90 px-1 py-3 backdrop-blur">
