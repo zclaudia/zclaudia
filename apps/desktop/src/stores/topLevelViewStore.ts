@@ -6,6 +6,7 @@ import type {
 } from '../features/automation/automation-types';
 import type { AgentsTab, AgentsSelection } from '../features/agents/agents-types';
 import type { PluginsTab } from '../features/plugins/plugins-types';
+import { normalizePluginsTab } from '../features/plugins/plugins-types';
 
 export type TopLevelView =
   | { kind: 'app' }
@@ -83,7 +84,12 @@ export const useTopLevelViewStore = create<TopLevelViewState>(set => ({
   selectAgentsItem: sel => set({ agentsSelection: sel }),
   bumpAgentsRefresh: () => set(s => ({ agentsRefreshNonce: s.agentsRefreshNonce + 1 })),
   setAgentsBackendFilter: backendFilter => set({ agentsBackendFilter: backendFilter }),
-  openPlugins: (tab = 'installed') => set({ view: { kind: 'plugins', tab } }),
+  openPlugins: (tab = 'built-in') =>
+    set({ view: { kind: 'plugins', tab: normalizePluginsTab(tab) } }),
   setPluginsTab: tab =>
-    set(state => (state.view.kind === 'plugins' ? { view: { ...state.view, tab } } : state)),
+    set(state =>
+      state.view.kind === 'plugins'
+        ? { view: { ...state.view, tab: normalizePluginsTab(tab) } }
+        : state
+    ),
 }));

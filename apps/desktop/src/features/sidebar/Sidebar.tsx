@@ -762,7 +762,7 @@ export function Sidebar({
                 onToggleBackend={toggleBackend}
                 onSelectScope={automationMode.onSelectScope}
               />
-            ) : agentsMode ? null : (
+            ) : agentsMode || pluginsMode ? null : (
               renderProjectList()
             )}
           </div>
@@ -871,7 +871,7 @@ export function Sidebar({
                 onToggleBackend={toggleBackend}
                 onSelectScope={automationMode.onSelectScope}
               />
-            ) : agentsMode ? null : (
+            ) : agentsMode || pluginsMode ? null : (
               renderProjectList()
             )}
           </div>

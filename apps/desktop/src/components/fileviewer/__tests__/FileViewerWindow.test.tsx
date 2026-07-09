@@ -9,6 +9,7 @@ vi.mock('../../../contexts/ThemeContext', () => ({
 
 vi.mock('../../../services/api', () => ({
   getFileContent: vi.fn().mockResolvedValue({ content: 'mock file content' }),
+  getFileStat: vi.fn().mockResolvedValue({ mtimeMs: 1000, size: 11, path: 'src/app.tsx' }),
 }));
 
 vi.mock('react-markdown', () => ({

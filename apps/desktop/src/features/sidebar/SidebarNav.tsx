@@ -11,8 +11,9 @@ import {
   Lightbulb,
   Database,
   Plug,
-  LayoutPanelTop,
   Search,
+  ToyBrick,
+  LayoutPanelTop,
 } from 'lucide-react';
 import type { AutomationTab } from '../automation/automation-types';
 import type { AgentsTab } from '../agents/agents-types';
@@ -72,8 +73,8 @@ const AGENTS_TABS: { key: AgentsTab; label: string; Icon: typeof Bot }[] = [
 ];
 
 const PLUGINS_TABS: { key: PluginsTab; label: string; Icon: typeof Zap }[] = [
-  { key: 'installed', label: 'Plugins', Icon: Blocks },
-  { key: 'builtin', label: 'Built-in', Icon: LayoutPanelTop },
+  { key: 'built-in', label: 'Built-in', Icon: LayoutPanelTop },
+  { key: 'plugins', label: 'Plugins', Icon: ToyBrick },
   { key: 'web-search', label: 'Web Search', Icon: Search },
 ];
 
@@ -216,11 +217,11 @@ export function SidebarNav({
         {onOpenPlugins && (
           <button
             onClick={onOpenPlugins}
-            aria-label="Plugins"
+            aria-label="Extensions"
             className={`${rowBase} text-muted-foreground`}
           >
             <Blocks className={iconSize} strokeWidth={1.75} />
-            Plugins
+            Extensions
           </button>
         )}
 
