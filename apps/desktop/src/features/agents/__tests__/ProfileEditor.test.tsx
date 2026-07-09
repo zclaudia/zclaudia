@@ -272,6 +272,34 @@ describe('ProfileEditor', () => {
     }
   });
 
+  it('opening an existing profile does not trigger a phantom autosave', async () => {
+    vi.useFakeTimers();
+    try {
+      const existing = makeProfile('p1', 'Coding');
+      vi.mocked(api.updateAgentProfileForBackend).mockResolvedValue(existing);
+
+      render(
+        <ProfileEditor
+          backendId="b1"
+          profile={existing}
+          onBack={vi.fn()}
+          onSaved={vi.fn()}
+          onDeleted={vi.fn()}
+        />
+      );
+
+      // Catalog load + form hydration settle, then well past the debounce window.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+
+      // No user edit happened, so the form is not dirty — nothing should persist.
+      expect(api.updateAgentProfileForBackend).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('Capabilities tab defaults to the Tools sub-panel with tool sets visible', async () => {
     const { queryAllByLabelText } = await renderEditor(null);
 

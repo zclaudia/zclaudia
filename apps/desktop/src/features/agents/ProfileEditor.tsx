@@ -211,6 +211,10 @@ export function ProfileEditor({
   const [systemPromptExpanded, setSystemPromptExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState<'model' | 'capabilities' | 'prompt'>('model');
   const [capabilityTab, setCapabilityTab] = useState<'tools' | 'providers' | 'skills'>('tools');
+  // False until the form has been populated from `profile` (populate runs in an
+  // effect, a render after mount). Autosave is gated on this so the empty
+  // pre-hydration form is never seen as a dirty edit.
+  const [hydrated, setHydrated] = useState(false);
 
   const [deleting, setDeleting] = useState(false);
 
@@ -322,6 +326,7 @@ export function ProfileEditor({
     } else {
       resetForm();
     }
+    setHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id]);
 
@@ -634,7 +639,7 @@ export function ProfileEditor({
   }, [profile, backendId, buildPayload, onSaved]);
 
   const autosave = useProfileAutosave({
-    enabled: profile !== null,
+    enabled: profile !== null && hydrated,
     valid: formValid,
     signature,
     save: performAutosave,

@@ -36,6 +36,7 @@ export function useProfileAutosave({
   const enabledRef = useRef(enabled);
   const validRef = useRef(valid);
   const savingRef = useRef(false);
+  const prevEnabledRef = useRef(enabled);
   const mountedRef = useRef(true);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   sigRef.current = signature;
@@ -86,7 +87,19 @@ export function useProfileAutosave({
   }, []);
 
   useEffect(() => {
+    const justEnabled = enabled && !prevEnabledRef.current;
+    prevEnabledRef.current = enabled;
     if (!enabled) return;
+    if (justEnabled) {
+      // Autosave just turned on because the editor finished hydrating its form
+      // from the loaded record (form populated + enabled in the same commit).
+      // Adopt the hydrated signature as the saved baseline so opening a record
+      // is never mistaken for a user edit and never schedules a phantom save.
+      lastSaved.current = signature;
+      clearTimer();
+      setStatus('saved');
+      return;
+    }
     if (signature === lastSaved.current) {
       setStatus(s => (s === 'failed' ? s : 'saved'));
       return;
