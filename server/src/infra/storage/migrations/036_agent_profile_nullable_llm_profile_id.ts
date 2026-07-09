@@ -5,18 +5,30 @@ import type { Migration } from './types.js';
  * llm_profiles(id) ON DELETE RESTRICT, so `claude`/native runtimes can persist
  * NULL (no LLM profile) while `zclaudia` keeps referential integrity. SQLite
  * cannot drop a NOT NULL constraint in place, so we use the standard
- * rebuild-copy-drop-rename pattern, mirroring 018. PRAGMA statements stay inside
- * the transaction (no-ops there) so the connection's foreign_keys setting is
- * left unchanged — production runs migrations with enforcement off, so the drop
- * never trips the sessions.agent_profile_id RESTRICT FK. All three indexes are
- * recreated after the rename.
+ * rebuild-copy-drop-rename pattern.
+ *
+ * CRITICAL: `PRAGMA foreign_keys` is a NO-OP inside a transaction, so it must be
+ * toggled OUTSIDE the BEGIN/COMMIT (before/after). With enforcement genuinely
+ * off, `DROP TABLE agent_profiles` does not fire the implicit FK-action delete
+ * that would otherwise trip the `sessions.agent_profile_id ... ON DELETE
+ * RESTRICT` constraint on a populated database (the failure mode that only shows
+ * up when real rows exist — an empty test DB never hits it). The child FKs
+ * (sessions, projects) resolve back to `agent_profiles` after the rename; all
+ * three indexes are recreated; enforcement is restored after COMMIT.
+ *
+ * The migration runner runs this via `db.exec` (NOT wrapped in its own
+ * transaction) because the SQL contains an explicit `BEGIN` — so the leading
+ * `PRAGMA foreign_keys = OFF` executes in autocommit mode and actually takes
+ * effect.
  */
 export const migration: Migration = {
   name: '036_agent_profile_nullable_llm_profile_id',
   sql: `
+PRAGMA foreign_keys = OFF;
+
 BEGIN;
 
-PRAGMA foreign_keys = OFF;
+DROP TABLE IF EXISTS agent_profiles_new;
 
 CREATE TABLE agent_profiles_new (
   id TEXT PRIMARY KEY,
@@ -54,8 +66,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_profiles_plugin_profile
   ON agent_profiles(plugin_id, plugin_profile_id)
   WHERE plugin_id IS NOT NULL AND plugin_profile_id IS NOT NULL;
 
-PRAGMA foreign_keys = ON;
-
 COMMIT;
+
+PRAGMA foreign_keys = ON;
   `,
 };
