@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import type { AgentProfileConfig, LlmProfileConfig } from '@zclaudia/shared';
 
 import { ProfileEditor } from '../ProfileEditor';
@@ -215,33 +215,37 @@ describe('ProfileEditor', () => {
     });
   });
 
-  it('edit mode: populates the form from the profile prop and updates via updateAgentProfileForBackend', async () => {
-    const profile = makeProfile('p1', 'Coder');
-    const saved = { ...profile, name: 'Coder 2' };
-    vi.mocked(api.updateAgentProfileForBackend).mockResolvedValue(saved);
+  it('edit mode: autosaves an edit via updateAgentProfileForBackend (no Update button)', async () => {
+    vi.useFakeTimers();
+    try {
+      const existing = makeProfile('p1', 'Coding');
+      const saved = { ...existing, name: 'Coding 2' };
+      vi.mocked(api.updateAgentProfileForBackend).mockResolvedValue(saved);
 
-    const { onSaved } = await renderEditor(profile);
+      const onSaved = vi.fn();
+      render(
+        <ProfileEditor backendId="b1" profile={existing} onSaved={onSaved} onDeleted={vi.fn()} />
+      );
+      // catalog load resolves on fake timers
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
 
-    const nameInput = await screen.findByDisplayValue('Coder');
-    fireEvent.change(nameInput, { target: { value: 'Coder 2' } });
+      // No Update button in edit mode.
+      expect(screen.queryByRole('button', { name: 'Update' })).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Update' }));
+      fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), { target: { value: 'Coding 2' } });
 
-    await waitFor(() => {
+      // Debounce window elapses → one autosave.
+      await act(async () => { await vi.advanceTimersByTimeAsync(600); });
+
       expect(api.updateAgentProfileForBackend).toHaveBeenCalledWith(
         'b1',
         'p1',
-        expect.objectContaining({
-          name: 'Coder 2',
-          llmProfileId: 'lp1',
-          model: 'claude-sonnet-4-6',
-        })
+        expect.objectContaining({ name: 'Coding 2' })
       );
-    });
-    await waitFor(() => {
       expect(onSaved).toHaveBeenCalledWith(saved);
-    });
-    expect(api.createAgentProfileForBackend).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('keeps capability details collapsed until a summary row is expanded', async () => {

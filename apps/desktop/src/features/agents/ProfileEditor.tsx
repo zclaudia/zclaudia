@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type ReactNode } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight, Check } from 'lucide-react';
 import type {
   AgentProfileConfig,
@@ -29,6 +29,8 @@ import {
 import * as api from '../../services/api';
 import { EditorSection, FieldLabel } from './ui/EditorSection';
 import { Chip } from './ui/Chip';
+import { useProfileAutosave } from './useProfileAutosave';
+import { SaveStateIndicator } from './ui/SaveStateIndicator';
 
 /**
  * Parent must remount this component per identity — key it by
@@ -585,6 +587,68 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
     });
   };
 
+  const buildPayload = useCallback(() => {
+    const resolvedTools = resolveToolSelection(formToolSelection).builtinTools;
+    const isClaudeRuntime = formRuntimeType === 'claude';
+    const trimmedFallbackModel = formFallbackModel.trim();
+    const multimodalFallback = isClaudeRuntime
+      ? profile?.multimodalFallback
+        ? null
+        : undefined
+      : formFallbackLlmProfileId && trimmedFallbackModel
+        ? { llmProfileId: formFallbackLlmProfileId, model: trimmedFallbackModel }
+        : profile?.multimodalFallback
+          ? null
+          : undefined;
+    return {
+      name: formName.trim(),
+      description: formDescription.trim() || undefined,
+      runtimeType: formRuntimeType,
+      llmProfileId: formLlmProfileId,
+      model: formModel.trim(),
+      multimodalFallback,
+      systemPrompt: formSystemPrompt,
+      enabledTools: resolvedTools,
+      toolSelection: formToolSelection,
+      skillSelection: formSkillSelection,
+      skillExecution: formSkillExecution,
+      thinkingLevel: formThinkingLevel === '' ? undefined : formThinkingLevel,
+      isDefault: formIsDefault,
+    };
+  }, [
+    formName, formDescription, formRuntimeType, formLlmProfileId, formModel,
+    formFallbackLlmProfileId, formFallbackModel, formSystemPrompt, formToolSelection,
+    formSkillSelection, formSkillExecution, formThinkingLevel, formIsDefault,
+    llmProfiles, profile,
+  ]);
+
+  const fallbackVisionValid =
+    formRuntimeType === 'claude' ||
+    !formFallbackLlmProfileId ||
+    fallbackModelValidForProfile(
+      formFallbackModel.trim(),
+      llmProfiles.find(p => p.id === formFallbackLlmProfileId)
+    );
+
+  const formValid = Boolean(
+    formName.trim() && formLlmProfileId && formModel.trim() && fallbackVisionValid
+  );
+
+  const signature = useMemo(() => JSON.stringify(buildPayload()), [buildPayload]);
+
+  const performAutosave = useCallback(async () => {
+    if (!profile) return;
+    const saved = await api.updateAgentProfileForBackend(backendId, profile.id, buildPayload());
+    onSaved(saved);
+  }, [profile, backendId, buildPayload, onSaved]);
+
+  const autosave = useProfileAutosave({
+    enabled: profile !== null,
+    valid: formValid,
+    signature,
+    save: performAutosave,
+  });
+
   const handleSubmit = async () => {
     if (!formName.trim()) return;
     if (!formLlmProfileId) {
@@ -610,41 +674,12 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
     setSaving(true);
     setFormError(null);
     try {
-      const resolvedTools = resolveToolSelection(formToolSelection).builtinTools;
-      const multimodalFallback = isClaudeRuntime
-        ? profile?.multimodalFallback
-          ? null
-          : undefined
-        : formFallbackLlmProfileId && trimmedFallbackModel
-          ? { llmProfileId: formFallbackLlmProfileId, model: trimmedFallbackModel }
-          : profile?.multimodalFallback
-            ? null
-            : undefined;
-      const payload = {
-        name: formName.trim(),
-        description: formDescription.trim() || undefined,
-        runtimeType: formRuntimeType,
-        llmProfileId: formLlmProfileId,
-        model: formModel.trim(),
-        multimodalFallback,
-        systemPrompt: formSystemPrompt,
-        enabledTools: resolvedTools,
-        toolSelection: formToolSelection,
-        skillSelection: formSkillSelection,
-        skillExecution: formSkillExecution,
-        thinkingLevel: formThinkingLevel === '' ? undefined : formThinkingLevel,
-        isDefault: formIsDefault,
-      };
-
-      const saved = profile
-        ? await api.updateAgentProfileForBackend(backendId, profile.id, payload)
-        : await api.createAgentProfileForBackend(backendId, payload);
-
+      const saved = await api.createAgentProfileForBackend(backendId, buildPayload());
       onSaved(saved);
     } catch (error) {
       console.error('Failed to save agent profile:', error);
       const message = error instanceof Error ? error.message : String(error);
-      setFormError(`Failed to ${profile ? 'update' : 'create'} agent: ${message}`);
+      setFormError(`Failed to create agent: ${message}`);
     } finally {
       setSaving(false);
     }
@@ -1212,6 +1247,7 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
             <textarea
               value={formSystemPrompt}
               onChange={e => setFormSystemPrompt(e.target.value)}
+              onBlur={autosave.flush}
               placeholder="You are a helpful coding agent..."
               rows={9}
               className={`${MONO_FIELD_CLASS} min-h-[180px] resize-y`}
@@ -1238,6 +1274,7 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
             type="text"
             value={formName}
             onChange={e => setFormName(e.target.value)}
+            onBlur={autosave.flush}
             placeholder="e.g., Default Coding Agent"
             className={FIELD_CLASS}
           />
@@ -1248,6 +1285,7 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
           <textarea
             value={formDescription}
             onChange={e => setFormDescription(e.target.value)}
+            onBlur={autosave.flush}
             placeholder="What this agent is for"
             rows={2}
             className={TEXTAREA_CLASS}
@@ -1295,26 +1333,32 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
 
       <div className="sticky bottom-0 z-10 -mx-1 bg-background/90 px-1 py-3 backdrop-blur">
         {formError && <p className="mb-2 text-xs text-destructive">{formError}</p>}
-        <div className="flex gap-2 rounded-lg border border-border/60 bg-card/95 p-2 shadow-apple-sm">
-          <button
-            onClick={handleSubmit}
-            disabled={!formName.trim() || saving}
-            className="flex-1 rounded-lg bg-muted/70 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : profile ? 'Update' : 'Create'}
-          </button>
-          {profile && (
+        <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-card/95 p-2 shadow-apple-sm">
+          {profile ? (
+            <>
+              <div className="flex-1">
+                <SaveStateIndicator status={autosave.status} onRetry={autosave.retry} />
+              </div>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${
+                  pendingDelete
+                    ? 'bg-destructive/15 text-destructive hover:bg-destructive/25'
+                    : 'bg-secondary text-destructive hover:bg-secondary/80'
+                }`}
+                title={pendingDelete ? 'Click again to confirm delete' : 'Delete'}
+              >
+                {deleting ? 'Deleting...' : pendingDelete ? 'Confirm delete' : 'Delete'}
+              </button>
+            </>
+          ) : (
             <button
-              onClick={handleDelete}
-              disabled={deleting}
-              className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${
-                pendingDelete
-                  ? 'bg-destructive/15 text-destructive hover:bg-destructive/25'
-                  : 'bg-secondary text-destructive hover:bg-secondary/80'
-              }`}
-              title={pendingDelete ? 'Click again to confirm delete' : 'Delete'}
+              onClick={handleSubmit}
+              disabled={!formName.trim() || saving}
+              className="flex-1 rounded-lg bg-muted/70 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50"
             >
-              {deleting ? 'Deleting...' : pendingDelete ? 'Confirm delete' : 'Delete'}
+              {saving ? 'Saving...' : 'Create'}
             </button>
           )}
         </div>
