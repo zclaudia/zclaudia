@@ -272,16 +272,54 @@ describe('ProfileEditor', () => {
     }
   });
 
-  it('keeps capability details collapsed until a summary row is expanded', async () => {
+  it('Capabilities tab defaults to the Tools sub-panel with tool sets visible', async () => {
     const { queryAllByLabelText } = await renderEditor(null);
 
     fireEvent.click(screen.getByRole('tab', { name: /Capabilities/ }));
 
+    // Tools is the default sub-panel — the built-in tool set checkboxes render immediately.
+    expect(queryAllByLabelText(/enable full tool set/).length).toBeGreaterThan(0);
+  });
+
+  it('Capabilities sub-tabs switch between Tools, Providers, and Skills', async () => {
+    const { queryAllByLabelText } = await renderEditor(null);
+
+    fireEvent.click(screen.getByRole('tab', { name: /Capabilities/ }));
+
+    // Tools panel: tool set checkboxes present; providers heading absent.
+    expect(queryAllByLabelText(/enable full tool set/).length).toBeGreaterThan(0);
+    expect(screen.queryByText('Configured MCP servers')).toBeNull();
+
+    // Switch to Providers.
+    fireEvent.click(screen.getByRole('tab', { name: /Providers/ }));
+    expect(screen.getByText('Configured MCP servers')).toBeInTheDocument();
     expect(queryAllByLabelText(/enable full tool set/)).toHaveLength(0);
 
-    fireEvent.click(screen.getByRole('button', { name: /Tool Sets/ }));
+    // Switch to Skills.
+    fireEvent.click(screen.getByRole('tab', { name: /Skills/ }));
+    expect(screen.getByLabelText('enable workspace skills')).toBeInTheDocument();
+    expect(screen.queryByText('Configured MCP servers')).toBeNull();
+  });
 
-    expect(queryAllByLabelText(/enable full tool set/).length).toBeGreaterThan(0);
+  it('Claude runtime shows read-only capability notes instead of editable panels', async () => {
+    const { queryAllByLabelText } = await renderEditor(null);
+
+    fireEvent.change(screen.getByLabelText('Agent Type'), { target: { value: 'claude' } });
+    fireEvent.click(screen.getByRole('tab', { name: /Capabilities/ }));
+
+    // Tools: native read-only note, no editable checkboxes.
+    expect(queryAllByLabelText(/enable full tool set/)).toHaveLength(0);
+    expect(screen.getByText(/built-in tool sets are not injected/i)).toBeInTheDocument();
+
+    // Providers: external note.
+    fireEvent.click(screen.getByRole('tab', { name: /Providers/ }));
+    expect(screen.queryByText('Configured MCP servers')).toBeNull();
+    expect(screen.getAllByText(/managed by ~\/\.claude/i).length).toBeGreaterThan(0);
+
+    // Skills: external note.
+    fireEvent.click(screen.getByRole('tab', { name: /Skills/ }));
+    expect(screen.queryByLabelText('enable workspace skills')).toBeNull();
+    expect(screen.getAllByText(/managed by ~\/\.claude/i).length).toBeGreaterThan(0);
   });
 
   it('edit mode: ⋯ menu Delete confirms then calls deleteAgentProfileForBackend + onDeleted', async () => {

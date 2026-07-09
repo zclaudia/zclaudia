@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback, useMemo, type ReactNode } from 'react';
-import { ChevronDown, ChevronRight, Check } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { ChevronDown, Check } from 'lucide-react';
 import type {
   AgentProfileConfig,
   AgentRuntimeType,
@@ -35,7 +35,6 @@ import * as api from '../../services/api';
 import { EditorSection, FieldLabel } from './ui/EditorSection';
 import { EditorTabs } from './ui/EditorTabs';
 import type { EditorTab } from './ui/EditorTabs';
-import { Chip } from './ui/Chip';
 import { useProfileAutosave } from './useProfileAutosave';
 import { ProfileHeader } from './ui/ProfileHeader';
 import type { DetailBadge } from './ui/DetailHeader';
@@ -61,7 +60,6 @@ type ThinkingLevelOption = '' | ThinkingLevel;
 type RuntimeOption = Extract<AgentRuntimeType, 'zclaudia' | 'claude'>;
 type SkillDefaultModeOption = 'default' | SkillExecutionMode;
 type SkillForkToolPolicyOption = 'default' | SkillForkToolPolicy;
-type CapabilitySectionId = 'tool-sets' | 'external-tools' | 'skills';
 
 const FIELD_CLASS =
   'w-full rounded-lg border border-border/70 bg-background/70 px-3 py-2 text-sm text-foreground shadow-apple-sm focus:outline-none focus:ring-1 focus:ring-primary/50';
@@ -151,37 +149,11 @@ function formatPinnedExternalToolCount(count: number): string {
   return `${count} pinned external ${count === 1 ? 'tool' : 'tools'}`;
 }
 
-function CapabilityDisclosure({
-  title,
-  summary,
-  open,
-  onToggle,
-  children,
-}: {
-  title: string;
-  summary: ReactNode;
-  open: boolean;
-  onToggle: () => void;
-  children: ReactNode;
-}) {
+function CapabilityNote({ title, body }: { title: string; body: string }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-border/60 bg-background/55">
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left transition-colors hover:bg-secondary/50"
-      >
-        <span className="min-w-0">
-          <span className="block text-sm font-medium text-foreground">{title}</span>
-          <span className="mt-0.5 block truncate text-xs text-muted-foreground">{summary}</span>
-        </span>
-        <ChevronRight
-          size={15}
-          className={`shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`}
-        />
-      </button>
-      {open && <div className="border-t border-border/60 p-3">{children}</div>}
+    <div className="rounded-lg border border-border/60 bg-background/55 p-3">
+      <p className="text-sm font-medium text-foreground">{title}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{body}</p>
     </div>
   );
 }
@@ -236,11 +208,9 @@ export function ProfileEditor({
   const [saving, setSaving] = useState(false);
   const [customizedToolSetIds, setCustomizedToolSetIds] = useState<BuiltinToolSetId[]>([]);
   const [expandedToolSetIds, setExpandedToolSetIds] = useState<BuiltinToolSetId[]>([]);
-  const [expandedCapabilitySectionIds, setExpandedCapabilitySectionIds] = useState<
-    CapabilitySectionId[]
-  >([]);
   const [systemPromptExpanded, setSystemPromptExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState<'model' | 'capabilities' | 'prompt'>('model');
+  const [capabilityTab, setCapabilityTab] = useState<'tools' | 'providers' | 'skills'>('tools');
 
   const [deleting, setDeleting] = useState(false);
 
@@ -323,7 +293,6 @@ export function ProfileEditor({
     setFormError(null);
     setCustomizedToolSetIds([]);
     setExpandedToolSetIds([]);
-    setExpandedCapabilitySectionIds([]);
   };
 
   const populateForm = (agent: AgentProfileConfig) => {
@@ -345,7 +314,6 @@ export function ProfileEditor({
     setFormThinkingLevel((agent.thinkingLevel ?? '') as ThinkingLevelOption);
     setFormIsDefault(agent.isDefault ?? false);
     setFormError(null);
-    setExpandedCapabilitySectionIds([]);
   };
 
   useEffect(() => {
@@ -373,12 +341,6 @@ export function ProfileEditor({
   const toggleToolSetExpanded = (setId: BuiltinToolSetId) => {
     setExpandedToolSetIds(current =>
       current.includes(setId) ? current.filter(id => id !== setId) : [...current, setId]
-    );
-  };
-
-  const toggleCapabilitySection = (sectionId: CapabilitySectionId) => {
-    setExpandedCapabilitySectionIds(current =>
-      current.includes(sectionId) ? current.filter(id => id !== sectionId) : [...current, sectionId]
     );
   };
 
@@ -788,9 +750,6 @@ export function ProfileEditor({
       skill,
     };
   });
-  const hasAttachedCapabilities =
-    enabledToolSetChips.length > 0 || mcpProviderChips.length > 0 || pinnedSkillChips.length > 0;
-
   const systemPromptPreview = formSystemPrompt.trim().split('\n')[0] || '';
 
   const headerBadges: DetailBadge[] = [
@@ -970,425 +929,435 @@ export function ProfileEditor({
                 title="Capabilities"
                 description="Configure built-in tools, external providers, and skill execution for this profile."
               >
-                <div>
-                  <div className="mb-2 text-xs font-medium text-muted-foreground">
-                    Attached capabilities
-                  </div>
-                  {hasAttachedCapabilities ? (
-                    <div className="flex flex-wrap gap-2">
-                      {enabledToolSetChips.map(set => (
-                        <Chip
-                          key={`toolset:${set.id}`}
-                          label={set.label}
-                          onRemove={() => toggleToolSet(set.id)}
-                        />
-                      ))}
-                      {mcpProviderChips.map(provider => (
-                        <Chip
-                          key={`mcp:${provider.serverId}`}
-                          label={`mcp/${provider.serverId}`}
-                          onRemove={() => toggleMcpProvider(provider.serverId)}
-                        />
-                      ))}
-                      {pinnedSkillChips.map(chip => (
-                        <Chip
-                          key={`skill:${chip.key}`}
-                          label={chip.label}
-                          onRemove={chip.skill ? () => togglePinnedSkill(chip.skill!) : undefined}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">No capabilities attached yet.</p>
-                  )}
-                </div>
-                <CapabilityDisclosure
-                  title="Tool Sets"
-                  summary={`${resolvedBuiltinTools.length} built-in tools resolved`}
-                  open={expandedCapabilitySectionIds.includes('tool-sets')}
-                  onToggle={() => toggleCapabilitySection('tool-sets')}
-                >
-                  <div className="space-y-2">
-                    {builtinToolSetEntries.map(set => {
-                      const checked = formToolSelection.sets.some(
-                        selected => selected.source === 'builtin' && selected.id === set.id
-                      );
-                      const customized = customizedToolSetIds.includes(set.id);
-                      const expanded = expandedToolSetIds.includes(set.id);
-                      return (
-                        <div
-                          key={set.id}
-                          className={`min-w-0 rounded-lg border p-3 text-sm transition-colors ${
-                            checked
-                              ? 'bg-muted/60 border-primary/45 text-primary shadow-sm'
-                              : customized
-                                ? 'bg-secondary/80 border-primary/25 text-foreground'
-                                : 'bg-secondary/60 border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground/40'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={() => toggleToolSet(set.id)}
-                              aria-label={`enable full tool set ${set.id}`}
-                              className="rounded-md border-border shrink-0"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => toggleToolSetExpanded(set.id)}
-                              aria-label={`expand tool set ${set.id}`}
-                              className="min-w-0 flex-1 text-left"
-                            >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <div className="font-medium truncate">{set.label}</div>
-                                <span className="shrink-0 rounded-full bg-background/70 border border-border/70 px-2 py-0.5 text-[10px] text-muted-foreground">
-                                  {set.tools.length} tools
-                                </span>
-                                <span className="min-w-0 truncate text-xs text-muted-foreground">
-                                  {set.tools.slice(0, 4).join(', ')}
-                                  {set.tools.length > 4 ? '...' : ''}
-                                </span>
-                              </div>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => toggleToolSetCustomize(set.id)}
-                              aria-label={`customize tool set ${set.id}`}
-                              className={`shrink-0 rounded-md border px-2 py-1 text-[11px] transition-colors ${
-                                customized
-                                  ? 'border-primary/40 bg-muted/60 text-primary'
-                                  : 'border-border bg-background/70 text-muted-foreground hover:text-foreground'
-                              }`}
-                            >
-                              {customized ? 'Custom' : 'Customize'}
-                            </button>
-                          </div>
-                          {expanded && (
-                            <div className="mt-3 space-y-1 border-t border-border/70 pt-2">
-                              {set.tools.map(tool => {
-                                const selected = customized
-                                  ? formToolSelection.include.some(
-                                      ref => ref.source === 'builtin' && ref.name === tool
-                                    )
-                                  : checked;
-                                const metadata = BUILTIN_TOOL_METADATA[tool];
-                                return (
-                                  <label
-                                    key={tool}
-                                    className={`flex items-start gap-3 rounded-md bg-background/60 px-2 py-2 ${
-                                      customized ? 'cursor-pointer hover:bg-background/80' : ''
-                                    }`}
-                                  >
-                                    {customized ? (
-                                      <input
-                                        type="checkbox"
-                                        checked={selected}
-                                        onChange={() => toggleCustomTool(set.id, tool)}
-                                        aria-label={`select tool ${tool}`}
-                                        className="mt-0.5 shrink-0"
-                                      />
-                                    ) : (
-                                      <span
-                                        className={`mt-1 h-2 w-2 shrink-0 rounded-full ${selected ? 'bg-primary' : 'bg-muted-foreground/40'}`}
-                                      />
-                                    )}
-                                    <span className="min-w-0 flex-1">
-                                      <span
-                                        className="block truncate font-mono text-xs"
-                                        title={tool}
-                                      >
-                                        {tool}
-                                      </span>
-                                      <span
-                                        className="mt-0.5 block truncate text-[11px] text-muted-foreground"
-                                        title={metadata.description || metadata.label}
-                                      >
-                                        {metadata.description || metadata.label}
-                                      </span>
-                                    </span>
-                                  </label>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <p className="mt-2 text-[10px] text-muted-foreground">
-                    Resolved built-in tools: {resolvedBuiltinTools.join(', ') || 'none'}
-                  </p>
-                </CapabilityDisclosure>
-                <CapabilityDisclosure
-                  title="External Tool Providers"
-                  summary={`${externalProviders.length} providers, ${formatPinnedExternalToolCount(pinnedExternalToolLabels.length)}`}
-                  open={expandedCapabilitySectionIds.includes('external-tools')}
-                  onToggle={() => toggleCapabilitySection('external-tools')}
-                >
-                  <div className="rounded-lg border border-border bg-secondary/50 p-3 text-sm">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs text-muted-foreground">Configured MCP servers</p>
-                        <span className="text-[10px] text-muted-foreground">
-                          {externalProviders.filter(provider => provider.source === 'mcp').length}{' '}
-                          selected
-                        </span>
-                      </div>
-                      {mcpServers.length === 0 ? (
-                        <p className="rounded-md bg-background/60 px-2 py-2 text-xs text-muted-foreground">
-                          No MCP servers configured.
-                        </p>
-                      ) : (
-                        mcpServers.map(server => {
-                          const status = mcpStatuses[server.name];
-                          const selected = mcpProviderSelected(server.name);
-                          const state =
-                            status?.state ?? (server.enabled ? 'configured' : 'disabled');
+                <EditorTabs
+                  variant="sub"
+                  active={capabilityTab}
+                  onChange={id => setCapabilityTab(id as typeof capabilityTab)}
+                  tabs={[
+                    {
+                      id: 'tools',
+                      label: 'Tools',
+                      count:
+                        activeDescriptor.capabilities.tools === 'profile'
+                          ? enabledToolSetChips.length || undefined
+                          : undefined,
+                    },
+                    {
+                      id: 'providers',
+                      label: 'Providers',
+                      count:
+                        activeDescriptor.capabilities.providers === 'profile'
+                          ? mcpProviderChips.length || undefined
+                          : undefined,
+                    },
+                    {
+                      id: 'skills',
+                      label: 'Skills',
+                      count:
+                        activeDescriptor.capabilities.skills === 'profile'
+                          ? pinnedSkillChips.length || undefined
+                          : undefined,
+                    },
+                  ]}
+                />
+
+                {capabilityTab === 'tools' &&
+                  (activeDescriptor.capabilities.tools === 'profile' ? (
+                    <>
+                      <div className="space-y-2">
+                        {builtinToolSetEntries.map(set => {
+                          const checked = formToolSelection.sets.some(
+                            selected => selected.source === 'builtin' && selected.id === set.id
+                          );
+                          const customized = customizedToolSetIds.includes(set.id);
+                          const expanded = expandedToolSetIds.includes(set.id);
                           return (
                             <div
-                              key={server.id}
-                              className="flex min-w-0 items-center justify-between gap-3 rounded-md bg-background/60 px-2 py-2"
+                              key={set.id}
+                              className={`min-w-0 rounded-lg border p-3 text-sm transition-colors ${
+                                checked
+                                  ? 'bg-muted/60 border-primary/45 text-primary shadow-sm'
+                                  : customized
+                                    ? 'bg-secondary/80 border-primary/25 text-foreground'
+                                    : 'bg-secondary/60 border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground/40'
+                              }`}
                             >
-                              <div className="min-w-0 flex-1">
-                                <div className="flex min-w-0 items-center gap-2">
-                                  <span
-                                    className="truncate font-mono text-xs"
-                                    title={`mcp/${server.name}`}
-                                  >
-                                    mcp/{server.name}
-                                  </span>
-                                  <span
-                                    className={`shrink-0 rounded-full border border-border px-2 py-0.5 text-[10px] ${
-                                      state === 'connected'
-                                        ? 'text-green-400'
-                                        : state === 'failed'
-                                          ? 'text-red-400'
-                                          : state === 'needs-auth'
-                                            ? 'text-orange-300'
-                                            : 'text-muted-foreground'
-                                    }`}
-                                  >
-                                    {state}
-                                  </span>
+                              <div className="flex items-center gap-3 min-w-0">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => toggleToolSet(set.id)}
+                                  aria-label={`enable full tool set ${set.id}`}
+                                  className="rounded-md border-border shrink-0"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => toggleToolSetExpanded(set.id)}
+                                  aria-label={`expand tool set ${set.id}`}
+                                  className="min-w-0 flex-1 text-left"
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className="font-medium truncate">{set.label}</div>
+                                    <span className="shrink-0 rounded-full bg-background/70 border border-border/70 px-2 py-0.5 text-[10px] text-muted-foreground">
+                                      {set.tools.length} tools
+                                    </span>
+                                    <span className="min-w-0 truncate text-xs text-muted-foreground">
+                                      {set.tools.slice(0, 4).join(', ')}
+                                      {set.tools.length > 4 ? '...' : ''}
+                                    </span>
+                                  </div>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleToolSetCustomize(set.id)}
+                                  aria-label={`customize tool set ${set.id}`}
+                                  className={`shrink-0 rounded-md border px-2 py-1 text-[11px] transition-colors ${
+                                    customized
+                                      ? 'border-primary/40 bg-muted/60 text-primary'
+                                      : 'border-border bg-background/70 text-muted-foreground hover:text-foreground'
+                                  }`}
+                                >
+                                  {customized ? 'Custom' : 'Customize'}
+                                </button>
+                              </div>
+                              {expanded && (
+                                <div className="mt-3 space-y-1 border-t border-border/70 pt-2">
+                                  {set.tools.map(tool => {
+                                    const selected = customized
+                                      ? formToolSelection.include.some(
+                                          ref => ref.source === 'builtin' && ref.name === tool
+                                        )
+                                      : checked;
+                                    const metadata = BUILTIN_TOOL_METADATA[tool];
+                                    return (
+                                      <label
+                                        key={tool}
+                                        className={`flex items-start gap-3 rounded-md bg-background/60 px-2 py-2 ${
+                                          customized ? 'cursor-pointer hover:bg-background/80' : ''
+                                        }`}
+                                      >
+                                        {customized ? (
+                                          <input
+                                            type="checkbox"
+                                            checked={selected}
+                                            onChange={() => toggleCustomTool(set.id, tool)}
+                                            aria-label={`select tool ${tool}`}
+                                            className="mt-0.5 shrink-0"
+                                          />
+                                        ) : (
+                                          <span
+                                            className={`mt-1 h-2 w-2 shrink-0 rounded-full ${selected ? 'bg-primary' : 'bg-muted-foreground/40'}`}
+                                          />
+                                        )}
+                                        <span className="min-w-0 flex-1">
+                                          <span
+                                            className="block truncate font-mono text-xs"
+                                            title={tool}
+                                          >
+                                            {tool}
+                                          </span>
+                                          <span
+                                            className="mt-0.5 block truncate text-[11px] text-muted-foreground"
+                                            title={metadata.description || metadata.label}
+                                          >
+                                            {metadata.description || metadata.label}
+                                          </span>
+                                        </span>
+                                      </label>
+                                    );
+                                  })}
                                 </div>
-                                <p className="mt-1 truncate text-[10px] text-muted-foreground">
-                                  tools {status?.inventory?.tools ?? 'unknown'} | resources{' '}
-                                  {status?.inventory?.resources ?? 'unknown'} | prompts{' '}
-                                  {status?.inventory?.prompts ?? 'unknown'}
-                                </p>
-                                <div className="mt-1 flex flex-wrap gap-1">
-                                  {mcpTrustSummaryLabels(server).map(label => (
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <p className="mt-2 text-[10px] text-muted-foreground">
+                        Resolved built-in tools: {resolvedBuiltinTools.join(', ') || 'none'}
+                      </p>
+                    </>
+                  ) : (
+                    <CapabilityNote
+                      title="Claude provides its own tools"
+                      body="Built-in tool sets are not injected into the Claude runtime. Only plugin, skill, and interaction tools bridge through the claudia-plugins MCP server."
+                    />
+                  ))}
+
+                {capabilityTab === 'providers' &&
+                  (activeDescriptor.capabilities.providers === 'profile' ? (
+                    <div className="rounded-lg border border-border bg-secondary/50 p-3 text-sm">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs text-muted-foreground">Configured MCP servers</p>
+                          <span className="text-[10px] text-muted-foreground">
+                            {externalProviders.filter(provider => provider.source === 'mcp').length}{' '}
+                            selected
+                          </span>
+                        </div>
+                        {mcpServers.length === 0 ? (
+                          <p className="rounded-md bg-background/60 px-2 py-2 text-xs text-muted-foreground">
+                            No MCP servers configured.
+                          </p>
+                        ) : (
+                          mcpServers.map(server => {
+                            const status = mcpStatuses[server.name];
+                            const selected = mcpProviderSelected(server.name);
+                            const state =
+                              status?.state ?? (server.enabled ? 'configured' : 'disabled');
+                            return (
+                              <div
+                                key={server.id}
+                                className="flex min-w-0 items-center justify-between gap-3 rounded-md bg-background/60 px-2 py-2"
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex min-w-0 items-center gap-2">
                                     <span
-                                      key={label}
-                                      className="rounded-full bg-secondary/80 px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                                      className="truncate font-mono text-xs"
+                                      title={`mcp/${server.name}`}
                                     >
+                                      mcp/{server.name}
+                                    </span>
+                                    <span
+                                      className={`shrink-0 rounded-full border border-border px-2 py-0.5 text-[10px] ${
+                                        state === 'connected'
+                                          ? 'text-green-400'
+                                          : state === 'failed'
+                                            ? 'text-red-400'
+                                            : state === 'needs-auth'
+                                              ? 'text-orange-300'
+                                              : 'text-muted-foreground'
+                                      }`}
+                                    >
+                                      {state}
+                                    </span>
+                                  </div>
+                                  <p className="mt-1 truncate text-[10px] text-muted-foreground">
+                                    tools {status?.inventory?.tools ?? 'unknown'} | resources{' '}
+                                    {status?.inventory?.resources ?? 'unknown'} | prompts{' '}
+                                    {status?.inventory?.prompts ?? 'unknown'}
+                                  </p>
+                                  <div className="mt-1 flex flex-wrap gap-1">
+                                    {mcpTrustSummaryLabels(server).map(label => (
+                                      <span
+                                        key={label}
+                                        className="rounded-full bg-secondary/80 px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                                      >
+                                        {label}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleMcpProvider(server.name)}
+                                  className={`shrink-0 rounded-md px-2 py-1 text-[10px] transition-colors ${
+                                    selected
+                                      ? 'bg-muted text-primary hover:bg-muted'
+                                      : 'bg-secondary text-muted-foreground hover:text-foreground'
+                                  } disabled:opacity-50`}
+                                >
+                                  {selected ? 'Remove' : 'Add'}
+                                </button>
+                              </div>
+                            );
+                          })
+                        )}
+                        {externalProviders.some(provider => provider.source === 'plugin') && (
+                          <div className="border-t border-border/70 pt-2">
+                            <p className="mb-1 text-xs text-muted-foreground">Plugin providers</p>
+                            {externalProviders
+                              .filter(provider => provider.source === 'plugin')
+                              .map(provider => {
+                                const label = externalProviderLabel(provider);
+                                return (
+                                  <div
+                                    key={label}
+                                    className="rounded-md bg-background/60 px-2 py-2"
+                                  >
+                                    <span className="font-mono text-xs" title={label}>
                                       {label}
                                     </span>
-                                  ))}
-                                </div>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => toggleMcpProvider(server.name)}
-                                className={`shrink-0 rounded-md px-2 py-1 text-[10px] transition-colors ${
-                                  selected
-                                    ? 'bg-muted text-primary hover:bg-muted'
-                                    : 'bg-secondary text-muted-foreground hover:text-foreground'
-                                } disabled:opacity-50`}
-                              >
-                                {selected ? 'Remove' : 'Add'}
-                              </button>
-                            </div>
-                          );
-                        })
-                      )}
-                      {externalProviders.some(provider => provider.source === 'plugin') && (
-                        <div className="border-t border-border/70 pt-2">
-                          <p className="mb-1 text-xs text-muted-foreground">Plugin providers</p>
-                          {externalProviders
-                            .filter(provider => provider.source === 'plugin')
-                            .map(provider => {
-                              const label = externalProviderLabel(provider);
-                              return (
-                                <div key={label} className="rounded-md bg-background/60 px-2 py-2">
-                                  <span className="font-mono text-xs" title={label}>
-                                    {label}
-                                  </span>
-                                  <span className="ml-2 text-[10px] text-muted-foreground">
-                                    not yet connected
-                                  </span>
-                                </div>
-                              );
-                            })}
-                        </div>
-                      )}
-                    </div>
-                    <div className="mt-2 border-t border-border/70 pt-2">
-                      <p className="text-[10px] text-muted-foreground">
-                        {formatPinnedExternalToolCount(pinnedExternalToolLabels.length)}
-                      </p>
-                      {pinnedExternalToolLabels.length > 0 && (
-                        <p
-                          className="mt-1 truncate font-mono text-[10px] text-muted-foreground"
-                          title={pinnedExternalToolLabels.join(', ')}
-                        >
-                          {pinnedExternalToolLabels.join(', ')}
+                                    <span className="ml-2 text-[10px] text-muted-foreground">
+                                      not yet connected
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-2 border-t border-border/70 pt-2">
+                        <p className="text-[10px] text-muted-foreground">
+                          {formatPinnedExternalToolCount(pinnedExternalToolLabels.length)}
                         </p>
-                      )}
+                        {pinnedExternalToolLabels.length > 0 && (
+                          <p
+                            className="mt-1 truncate font-mono text-[10px] text-muted-foreground"
+                            title={pinnedExternalToolLabels.join(', ')}
+                          >
+                            {pinnedExternalToolLabels.join(', ')}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </CapabilityDisclosure>
-                <CapabilityDisclosure
-                  title="Skills"
-                  summary={`${skillProviderCount} sources, ${skillIncludeCount} included, ${pinnedSkillCount} pinned, ${skillPolicyOverrideCount} policy overrides`}
-                  open={expandedCapabilitySectionIds.includes('skills')}
-                  onToggle={() => toggleCapabilitySection('skills')}
-                >
-                  <div className="rounded-lg border border-border bg-secondary/50 p-3 text-sm">
-                    <div className="mb-3 flex flex-wrap gap-2 text-[10px] text-muted-foreground">
-                      <span>{skillProviderCount} sources</span>
-                      <span>{skillIncludeCount} included</span>
-                      <span>{pinnedSkillCount} pinned inline</span>
-                      <span>{skillPolicyOverrideCount} policy overrides</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      {(['workspace', 'external', 'plugin'] as SkillSource[]).map(source => (
-                        <label
-                          key={source}
-                          className="flex items-center gap-2 rounded-md bg-background/60 px-2 py-1.5 text-xs capitalize"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={skillSourceEnabled(source)}
-                            onChange={() => toggleSkillSource(source)}
-                            aria-label={`enable ${source} skills`}
-                          />
-                          {source}
-                        </label>
-                      ))}
-                    </div>
-                    <div className="mt-3 space-y-2 border-t border-border/70 pt-2">
-                      {skillCatalog.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">No skills discovered.</p>
-                      ) : (
-                        skillCatalog.map(skill => {
-                          const ref = skillRefFor(skill);
-                          const key = skillRefKey(ref);
-                          const pinned = (formSkillSelection.pinned ?? []).some(
-                            item => skillRefKey(item) === key
-                          );
-                          const executionOverride = skillExecutionOverrideFor(skill);
-                          return (
-                            <div key={key} className="rounded-md bg-background/60 px-2 py-2">
-                              <div className="flex min-w-0 items-center gap-2">
-                                <span
-                                  className="min-w-0 flex-1 truncate font-medium text-xs"
-                                  title={`${ref.source}/${skill.id}`}
-                                >
-                                  {skill.name || skill.id}
-                                </span>
-                                <select
-                                  aria-label={`skill visibility ${key}`}
-                                  value={skillVisibility(skill)}
-                                  onChange={event =>
-                                    setSkillVisibility(
-                                      skill,
-                                      event.target.value as 'default' | 'include' | 'exclude'
-                                    )
-                                  }
-                                  className="rounded border border-border bg-secondary px-1 py-0.5 text-[10px]"
-                                >
-                                  <option value="default">Default</option>
-                                  <option value="include">Include</option>
-                                  <option value="exclude">Exclude</option>
-                                </select>
-                                <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                                  <input
-                                    type="checkbox"
-                                    checked={pinned}
-                                    disabled={skillVisibility(skill) === 'exclude'}
-                                    onChange={() => togglePinnedSkill(skill)}
-                                    aria-label={`pin skill ${key}`}
-                                  />
-                                  Pin
-                                </label>
-                              </div>
-                              <p
-                                className="mt-1 truncate font-mono text-[10px] text-muted-foreground"
-                                title={skill.description || `${ref.source}/${skill.id}`}
-                              >
-                                {ref.source}/{skill.id} · {skill.description || 'No description'}
-                              </p>
-                              <div className="mt-2 grid gap-2 border-t border-border/60 pt-2 sm:grid-cols-2">
-                                <label className="min-w-0 text-[10px] text-muted-foreground">
-                                  <span className="mb-1 block">Default mode</span>
+                  ) : (
+                    <CapabilityNote
+                      title="Managed by ~/.claude"
+                      body="MCP providers for the Claude runtime come from your ~/.claude configuration and aren't set per profile here."
+                    />
+                  ))}
+
+                {capabilityTab === 'skills' &&
+                  (activeDescriptor.capabilities.skills === 'profile' ? (
+                    <div className="rounded-lg border border-border bg-secondary/50 p-3 text-sm">
+                      <div className="mb-3 flex flex-wrap gap-2 text-[10px] text-muted-foreground">
+                        <span>{skillProviderCount} sources</span>
+                        <span>{skillIncludeCount} included</span>
+                        <span>{pinnedSkillCount} pinned inline</span>
+                        <span>{skillPolicyOverrideCount} policy overrides</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {(['workspace', 'external', 'plugin'] as SkillSource[]).map(source => (
+                          <label
+                            key={source}
+                            className="flex items-center gap-2 rounded-md bg-background/60 px-2 py-1.5 text-xs capitalize"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={skillSourceEnabled(source)}
+                              onChange={() => toggleSkillSource(source)}
+                              aria-label={`enable ${source} skills`}
+                            />
+                            {source}
+                          </label>
+                        ))}
+                      </div>
+                      <div className="mt-3 space-y-2 border-t border-border/70 pt-2">
+                        {skillCatalog.length === 0 ? (
+                          <p className="text-xs text-muted-foreground">No skills discovered.</p>
+                        ) : (
+                          skillCatalog.map(skill => {
+                            const ref = skillRefFor(skill);
+                            const key = skillRefKey(ref);
+                            const pinned = (formSkillSelection.pinned ?? []).some(
+                              item => skillRefKey(item) === key
+                            );
+                            const executionOverride = skillExecutionOverrideFor(skill);
+                            return (
+                              <div key={key} className="rounded-md bg-background/60 px-2 py-2">
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <span
+                                    className="min-w-0 flex-1 truncate font-medium text-xs"
+                                    title={`${ref.source}/${skill.id}`}
+                                  >
+                                    {skill.name || skill.id}
+                                  </span>
                                   <select
-                                    aria-label={`skill default mode ${key}`}
-                                    value={executionOverride?.defaultMode ?? 'default'}
+                                    aria-label={`skill visibility ${key}`}
+                                    value={skillVisibility(skill)}
                                     onChange={event =>
-                                      setSkillDefaultMode(
+                                      setSkillVisibility(
                                         skill,
-                                        event.target.value as SkillDefaultModeOption
+                                        event.target.value as 'default' | 'include' | 'exclude'
                                       )
                                     }
-                                    className="w-full rounded border border-border bg-secondary px-1 py-0.5 text-[10px]"
+                                    className="rounded border border-border bg-secondary px-1 py-0.5 text-[10px]"
                                   >
                                     <option value="default">Default</option>
-                                    <option value="inline">Inline</option>
-                                    <option value="fork">Fork</option>
+                                    <option value="include">Include</option>
+                                    <option value="exclude">Exclude</option>
                                   </select>
-                                </label>
-                                <label className="min-w-0 text-[10px] text-muted-foreground">
-                                  <span className="mb-1 block">Fork tools</span>
-                                  <select
-                                    aria-label={`skill fork tool policy ${key}`}
-                                    value={executionOverride?.forkToolPolicy ?? 'default'}
-                                    onChange={event =>
-                                      setSkillForkToolPolicy(
-                                        skill,
-                                        event.target.value as SkillForkToolPolicyOption
-                                      )
-                                    }
-                                    className="w-full rounded border border-border bg-secondary px-1 py-0.5 text-[10px]"
-                                  >
-                                    <option value="default">Default</option>
-                                    <option value="read-only">Read-only</option>
-                                    <option value="web">Web</option>
-                                    <option value="workspace-edit">Workspace edit</option>
-                                    <option value="agent-default">Agent default</option>
-                                  </select>
-                                </label>
-                                <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                                  <input
-                                    type="checkbox"
-                                    checked={
-                                      executionOverride?.allowedModes?.includes('inline') ?? false
-                                    }
-                                    onChange={() => toggleSkillAllowedMode(skill, 'inline')}
-                                    aria-label={`allow inline skill ${key}`}
-                                  />
-                                  Allow inline
-                                </label>
-                                <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                                  <input
-                                    type="checkbox"
-                                    checked={
-                                      executionOverride?.allowedModes?.includes('fork') ?? false
-                                    }
-                                    onChange={() => toggleSkillAllowedMode(skill, 'fork')}
-                                    aria-label={`allow fork skill ${key}`}
-                                  />
-                                  Allow fork
-                                </label>
+                                  <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                    <input
+                                      type="checkbox"
+                                      checked={pinned}
+                                      disabled={skillVisibility(skill) === 'exclude'}
+                                      onChange={() => togglePinnedSkill(skill)}
+                                      aria-label={`pin skill ${key}`}
+                                    />
+                                    Pin
+                                  </label>
+                                </div>
+                                <p
+                                  className="mt-1 truncate font-mono text-[10px] text-muted-foreground"
+                                  title={skill.description || `${ref.source}/${skill.id}`}
+                                >
+                                  {ref.source}/{skill.id} · {skill.description || 'No description'}
+                                </p>
+                                <div className="mt-2 grid gap-2 border-t border-border/60 pt-2 sm:grid-cols-2">
+                                  <label className="min-w-0 text-[10px] text-muted-foreground">
+                                    <span className="mb-1 block">Default mode</span>
+                                    <select
+                                      aria-label={`skill default mode ${key}`}
+                                      value={executionOverride?.defaultMode ?? 'default'}
+                                      onChange={event =>
+                                        setSkillDefaultMode(
+                                          skill,
+                                          event.target.value as SkillDefaultModeOption
+                                        )
+                                      }
+                                      className="w-full rounded border border-border bg-secondary px-1 py-0.5 text-[10px]"
+                                    >
+                                      <option value="default">Default</option>
+                                      <option value="inline">Inline</option>
+                                      <option value="fork">Fork</option>
+                                    </select>
+                                  </label>
+                                  <label className="min-w-0 text-[10px] text-muted-foreground">
+                                    <span className="mb-1 block">Fork tools</span>
+                                    <select
+                                      aria-label={`skill fork tool policy ${key}`}
+                                      value={executionOverride?.forkToolPolicy ?? 'default'}
+                                      onChange={event =>
+                                        setSkillForkToolPolicy(
+                                          skill,
+                                          event.target.value as SkillForkToolPolicyOption
+                                        )
+                                      }
+                                      className="w-full rounded border border-border bg-secondary px-1 py-0.5 text-[10px]"
+                                    >
+                                      <option value="default">Default</option>
+                                      <option value="read-only">Read-only</option>
+                                      <option value="web">Web</option>
+                                      <option value="workspace-edit">Workspace edit</option>
+                                      <option value="agent-default">Agent default</option>
+                                    </select>
+                                  </label>
+                                  <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                    <input
+                                      type="checkbox"
+                                      checked={
+                                        executionOverride?.allowedModes?.includes('inline') ?? false
+                                      }
+                                      onChange={() => toggleSkillAllowedMode(skill, 'inline')}
+                                      aria-label={`allow inline skill ${key}`}
+                                    />
+                                    Allow inline
+                                  </label>
+                                  <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                    <input
+                                      type="checkbox"
+                                      checked={
+                                        executionOverride?.allowedModes?.includes('fork') ?? false
+                                      }
+                                      onChange={() => toggleSkillAllowedMode(skill, 'fork')}
+                                      aria-label={`allow fork skill ${key}`}
+                                    />
+                                    Allow fork
+                                  </label>
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })
-                      )}
+                            );
+                          })
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </CapabilityDisclosure>
+                  ) : (
+                    <CapabilityNote
+                      title="Managed by ~/.claude"
+                      body="Skills for the Claude runtime come from your ~/.claude configuration and aren't set per profile here."
+                    />
+                  ))}
               </EditorSection>
             </div>
           )}
