@@ -1541,10 +1541,12 @@ function ModelSelector({
   value,
   onChange,
   llmProfile,
+  hideLabel = false,
 }: {
   value: string;
   onChange: (v: string) => void;
   llmProfile: LlmProfileConfig | undefined;
+  hideLabel?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -1571,7 +1573,7 @@ function ModelSelector({
 
   return (
     <div ref={ref} className="relative">
-      <FieldLabel>Model *</FieldLabel>
+      {!hideLabel && <FieldLabel>Model *</FieldLabel>}
       <button
         type="button"
         onClick={() => hasModels && setOpen(!open)}
@@ -1710,10 +1712,12 @@ function LlmProfileSelector({
   value,
   onChange,
   profiles,
+  hideLabel = false,
 }: {
   value: string;
   onChange: (v: string) => void;
   profiles: LlmProfileConfig[];
+  hideLabel?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -1731,7 +1735,7 @@ function LlmProfileSelector({
 
   return (
     <div ref={ref} className="relative">
-      <FieldLabel>LLM Profile *</FieldLabel>
+      {!hideLabel && <FieldLabel>LLM Profile *</FieldLabel>}
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -1785,9 +1789,11 @@ function LlmProfileSelector({
 function ThinkingLevelSelector({
   value,
   onChange,
+  hideLabel = false,
 }: {
   value: ThinkingLevelOption;
   onChange: (v: ThinkingLevelOption) => void;
+  hideLabel?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -1805,7 +1811,7 @@ function ThinkingLevelSelector({
 
   return (
     <div ref={ref} className="relative">
-      <FieldLabel>Thinking Level</FieldLabel>
+      {!hideLabel && <FieldLabel>Thinking Level</FieldLabel>}
       <button
         type="button"
         onClick={() => setOpen(!open)}
