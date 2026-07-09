@@ -101,7 +101,13 @@ describe('FileViewerWindow', () => {
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalled();
     });
-    expect(mockFetch.mock.calls[0][0]).toContain('http://localhost:3100/api/files/content');
+    // The freshness poll issues a stat request first, then the content request —
+    // both against the provided serverUrl. Assert the content fetch targets it,
+    // regardless of call order.
+    const contentCall = mockFetch.mock.calls.find(call =>
+      String(call[0]).includes('/api/files/content')
+    );
+    expect(contentCall?.[0]).toContain('http://localhost:3100/api/files/content');
 
     vi.unstubAllGlobals();
   });
