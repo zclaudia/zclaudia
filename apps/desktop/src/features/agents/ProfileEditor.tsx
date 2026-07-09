@@ -897,6 +897,7 @@ export function ProfileEditor({
                               <div className="w-56">
                                 <LlmProfileSelector
                                   hideLabel
+                                  aria-label="LLM Profile"
                                   value={formLlmProfileId}
                                   onChange={id => {
                                     setFormLlmProfileId(id);
@@ -917,10 +918,12 @@ export function ProfileEditor({
                           />
                           <EditorRow
                             title="Model"
+                            description="Required"
                             control={
                               <div className="w-56">
                                 <ModelSelector
                                   hideLabel
+                                  aria-label="Model"
                                   value={formModel}
                                   onChange={setFormModel}
                                   llmProfile={llmProfiles.find(p => p.id === formLlmProfileId)}
@@ -959,6 +962,7 @@ export function ProfileEditor({
                             <div className="w-56">
                               <ThinkingLevelSelector
                                 hideLabel
+                                aria-label="Thinking Level"
                                 value={formThinkingLevel}
                                 onChange={setFormThinkingLevel}
                               />
@@ -1539,11 +1543,13 @@ function ModelSelector({
   onChange,
   llmProfile,
   hideLabel = false,
+  'aria-label': ariaLabel,
 }: {
   value: string;
   onChange: (v: string) => void;
   llmProfile: LlmProfileConfig | undefined;
   hideLabel?: boolean;
+  'aria-label'?: string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -1575,6 +1581,7 @@ function ModelSelector({
         type="button"
         onClick={() => hasModels && setOpen(!open)}
         disabled={!hasModels}
+        aria-label={ariaLabel}
         className={`${FIELD_CLASS} flex items-center justify-between text-left font-mono disabled:cursor-not-allowed disabled:opacity-50`}
       >
         <span className="truncate">{displayLabel}</span>
@@ -1710,11 +1717,13 @@ function LlmProfileSelector({
   onChange,
   profiles,
   hideLabel = false,
+  'aria-label': ariaLabel,
 }: {
   value: string;
   onChange: (v: string) => void;
   profiles: LlmProfileConfig[];
   hideLabel?: boolean;
+  'aria-label'?: string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -1736,6 +1745,7 @@ function LlmProfileSelector({
       <button
         type="button"
         onClick={() => setOpen(!open)}
+        aria-label={ariaLabel}
         className={`${FIELD_CLASS} flex items-center justify-between text-left`}
       >
         <span>
@@ -1787,10 +1797,12 @@ function ThinkingLevelSelector({
   value,
   onChange,
   hideLabel = false,
+  'aria-label': ariaLabel,
 }: {
   value: ThinkingLevelOption;
   onChange: (v: ThinkingLevelOption) => void;
   hideLabel?: boolean;
+  'aria-label'?: string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -1812,6 +1824,7 @@ function ThinkingLevelSelector({
       <button
         type="button"
         onClick={() => setOpen(!open)}
+        aria-label={ariaLabel}
         className={`${FIELD_CLASS} flex items-center justify-between text-left`}
       >
         <span>{selected?.label ?? 'Auto'}</span>
