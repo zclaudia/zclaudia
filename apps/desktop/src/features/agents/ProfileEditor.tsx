@@ -703,9 +703,9 @@ export function ProfileEditor({
     }
     const fallbackProfile = llmProfiles.find(p => p.id === formFallbackLlmProfileId);
     const trimmedFallbackModel = formFallbackModel.trim();
-    const isClaudeRuntime = formRuntimeType === 'claude';
+    const descriptor = getProfileConfigDescriptor(formRuntimeType);
     if (
-      !isClaudeRuntime &&
+      descriptor.model.multimodalFallback &&
       formFallbackLlmProfileId &&
       !fallbackModelValidForProfile(trimmedFallbackModel, fallbackProfile)
     ) {

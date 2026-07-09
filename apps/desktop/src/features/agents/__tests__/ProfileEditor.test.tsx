@@ -245,15 +245,21 @@ describe('ProfileEditor', () => {
         />
       );
       // catalog load resolves on fake timers
-      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
 
       // No Update button in edit mode.
       expect(screen.queryByRole('button', { name: 'Update' })).toBeNull();
 
-      fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), { target: { value: 'Coding 2' } });
+      fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), {
+        target: { value: 'Coding 2' },
+      });
 
       // Debounce window elapses → one autosave.
-      await act(async () => { await vi.advanceTimersByTimeAsync(600); });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(600);
+      });
 
       expect(api.updateAgentProfileForBackend).toHaveBeenCalledWith(
         'b1',
@@ -285,7 +291,13 @@ describe('ProfileEditor', () => {
 
     const onDeleted = vi.fn();
     const view = render(
-      <ProfileEditor backendId="b1" profile={makeProfile('p1', 'Coding')} onBack={vi.fn()} onSaved={vi.fn()} onDeleted={onDeleted} />
+      <ProfileEditor
+        backendId="b1"
+        profile={makeProfile('p1', 'Coding')}
+        onBack={vi.fn()}
+        onSaved={vi.fn()}
+        onDeleted={onDeleted}
+      />
     );
     await screen.findByPlaceholderText(NAME_PLACEHOLDER);
 
@@ -295,7 +307,9 @@ describe('ProfileEditor', () => {
     await waitFor(() => {
       expect(api.deleteAgentProfileForBackend).toHaveBeenCalledWith('b1', 'p1');
     });
-    await waitFor(() => { expect(onDeleted).toHaveBeenCalled(); });
+    await waitFor(() => {
+      expect(onDeleted).toHaveBeenCalled();
+    });
     view.unmount();
   });
 
@@ -363,21 +377,33 @@ describe('ProfileEditor', () => {
   });
 
   it('create: a Claude profile is valid without an LLM profile and saves llmProfileId ""', async () => {
-    vi.mocked(api.createAgentProfileForBackend).mockResolvedValue(makeProfile('n1', 'Claude Agent'));
+    vi.mocked(api.createAgentProfileForBackend).mockResolvedValue(
+      makeProfile('n1', 'Claude Agent')
+    );
     const { onSaved } = await renderEditor(null); // create mode
 
-    fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), { target: { value: 'Claude Agent' } });
+    fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), {
+      target: { value: 'Claude Agent' },
+    });
     fireEvent.change(screen.getByLabelText('Agent Type'), { target: { value: 'claude' } });
-    fireEvent.change(screen.getByLabelText('Claude Model'), { target: { value: 'claude-opus-4-8' } });
+    fireEvent.change(screen.getByLabelText('Claude Model'), {
+      target: { value: 'claude-opus-4-8' },
+    });
 
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
 
     await waitFor(() => {
       expect(api.createAgentProfileForBackend).toHaveBeenCalledWith(
         'b1',
-        expect.objectContaining({ runtimeType: 'claude', llmProfileId: '', model: 'claude-opus-4-8' })
+        expect.objectContaining({
+          runtimeType: 'claude',
+          llmProfileId: '',
+          model: 'claude-opus-4-8',
+        })
       );
     });
-    await waitFor(() => { expect(onSaved).toHaveBeenCalled(); });
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalled();
+    });
   });
 });
