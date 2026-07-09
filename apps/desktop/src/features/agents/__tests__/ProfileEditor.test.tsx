@@ -217,7 +217,7 @@ describe('ProfileEditor', () => {
         {
           modelId: 'vision-model',
           displayName: 'Vision Model',
-          capabilities: { vision: true },
+          inputModalities: ['image'],
         },
       ],
     };
@@ -263,7 +263,7 @@ describe('ProfileEditor', () => {
       id: 'vision-lp',
       name: 'Vision',
       models: [
-        { modelId: 'vision-model', displayName: 'Vision Model', capabilities: { vision: true } },
+        { modelId: 'vision-model', displayName: 'Vision Model', inputModalities: ['image'] },
       ],
     };
     vi.mocked(api.listLlmProfilesForBackend).mockResolvedValue([llmProfile, visionProfile]);
@@ -282,10 +282,33 @@ describe('ProfileEditor', () => {
     fireEvent.change(screen.getByLabelText('Fallback Model'), {
       target: { value: 'vision-model' },
     });
+    expect(screen.getByLabelText('Fallback Model')).toHaveValue('vision-model');
 
     // Remove collapses and clears the selects.
     fireEvent.click(screen.getByRole('button', { name: 'Remove fallback' }));
     expect(screen.queryByLabelText('Fallback LLM Profile')).toBeNull();
+  });
+
+  it('edit mode: a profile with an existing fallback opens expanded', async () => {
+    const visionProfile: LlmProfileConfig = {
+      ...llmProfile,
+      id: 'vision-lp',
+      name: 'Vision',
+      models: [
+        { modelId: 'vision-model', displayName: 'Vision Model', inputModalities: ['image'] },
+      ],
+    };
+    vi.mocked(api.listLlmProfilesForBackend).mockResolvedValue([llmProfile, visionProfile]);
+    const existing: AgentProfileConfig = {
+      ...makeProfile('p1', 'Coding'),
+      multimodalFallback: { llmProfileId: 'vision-lp', model: 'vision-model' },
+    };
+    await renderEditor(existing);
+
+    // Expanded by default (no Add button; selects visible with the saved values).
+    expect(screen.queryByRole('button', { name: 'Add fallback model' })).toBeNull();
+    expect(screen.getByLabelText('Fallback LLM Profile')).toHaveValue('vision-lp');
+    expect(screen.getByLabelText('Fallback Model')).toHaveValue('vision-model');
   });
 
   it('edit mode: autosaves an edit via updateAgentProfileForBackend (no Update button)', async () => {

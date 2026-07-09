@@ -679,6 +679,18 @@ export function ProfileEditor({
     }
   };
 
+  const handleFallbackProfileChange = (id: string) => {
+    setFormFallbackLlmProfileId(id);
+    if (!id) {
+      setFormFallbackModel('');
+      return;
+    }
+    const nextProfile = llmProfiles.find(p => p.id === id);
+    if (formFallbackModel && !fallbackModelValidForProfile(formFallbackModel, nextProfile)) {
+      setFormFallbackModel('');
+    }
+  };
+
   const handleSubmit = async () => {
     if (!formName.trim()) return;
     if (runtimeRequiresLlmProfile(formRuntimeType) && !formLlmProfileId) {
@@ -992,143 +1004,26 @@ export function ProfileEditor({
                   flush
                 >
                   {formFallbackOpen || formFallbackLlmProfileId ? (
-                    (() => {
-                      const fallbackProfile = llmProfiles.find(
-                        p => p.id === formFallbackLlmProfileId
-                      );
-                      const declaredModels = fallbackProfile?.models ?? [];
-                      const hasDeclaredModels = declaredModels.length > 0;
-                      const visionModels = visionCapableModels(fallbackProfile);
-                      const modelValue =
-                        hasDeclaredModels &&
-                        !visionModels.some(entry => entry.modelId === formFallbackModel)
-                          ? ''
-                          : formFallbackModel;
-                      return (
-                        <>
-                          <div className="divide-y divide-border/60">
-                            <EditorRow
-                              title="Fallback LLM Profile"
-                              control={
-                                <select
-                                  aria-label="Fallback LLM Profile"
-                                  value={formFallbackLlmProfileId}
-                                  onChange={event => {
-                                    const id = event.target.value;
-                                    setFormFallbackLlmProfileId(id);
-                                    if (!id) {
-                                      setFormFallbackModel('');
-                                      return;
-                                    }
-                                    const nextProfile = llmProfiles.find(p => p.id === id);
-                                    if (
-                                      formFallbackModel &&
-                                      !fallbackModelValidForProfile(formFallbackModel, nextProfile)
-                                    ) {
-                                      setFormFallbackModel('');
-                                    }
-                                  }}
-                                  onBlur={autosave.flush}
-                                  className={`${FIELD_CLASS} w-56`}
-                                >
-                                  <option value="">None</option>
-                                  {llmProfiles.map(profile => (
-                                    <option key={profile.id} value={profile.id}>
-                                      {profile.name}
-                                    </option>
-                                  ))}
-                                </select>
-                              }
-                            />
-
-                            {formFallbackLlmProfileId && hasDeclaredModels && (
-                              <EditorRow
-                                title="Fallback Model"
-                                description="Must support image input"
-                                control={
-                                  <select
-                                    aria-label="Fallback Model"
-                                    value={modelValue}
-                                    onChange={event => setFormFallbackModel(event.target.value)}
-                                    onBlur={autosave.flush}
-                                    disabled={visionModels.length === 0}
-                                    className={`${FIELD_CLASS} w-56 disabled:opacity-50`}
-                                  >
-                                    <option value="">Select a Vision-capable model</option>
-                                    {visionModels.map(entry => {
-                                      const label = entry.displayName || entry.modelId;
-                                      return (
-                                        <option key={entry.modelId} value={entry.modelId}>
-                                          {label === entry.modelId
-                                            ? label
-                                            : `${label} (${entry.modelId})`}
-                                        </option>
-                                      );
-                                    })}
-                                  </select>
-                                }
-                              />
-                            )}
-
-                            {formFallbackLlmProfileId && !hasDeclaredModels && (
-                              <EditorRow
-                                title="Fallback Model"
-                                description="Must support image input"
-                                control={
-                                  <input
-                                    type="text"
-                                    aria-label="Fallback Model"
-                                    value={formFallbackModel}
-                                    onChange={event => setFormFallbackModel(event.target.value)}
-                                    onBlur={autosave.flush}
-                                    placeholder="model id"
-                                    className={`${MONO_FIELD_CLASS} w-56`}
-                                  />
-                                }
-                              />
-                            )}
-
-                            <EditorRow
-                              title={
-                                <span className="text-xs text-muted-foreground">
-                                  {formFallbackLlmProfileId
-                                    ? 'Vision fallback enabled'
-                                    : 'No fallback selected'}
-                                </span>
-                              }
-                              control={
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setFormFallbackLlmProfileId('');
-                                    setFormFallbackModel('');
-                                    setFormFallbackOpen(false);
-                                  }}
-                                  className="rounded-md border border-border bg-background/70 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                                >
-                                  Remove fallback
-                                </button>
-                              }
-                            />
-                          </div>
-
-                          {formFallbackLlmProfileId &&
-                            hasDeclaredModels &&
-                            visionModels.length === 0 && (
-                              <p className="mx-4 mb-4 text-xs text-amber-600">
-                                No Vision-capable models declared on this LLM profile.
-                              </p>
-                            )}
-                        </>
-                      );
-                    })()
+                    <MultimodalFallbackSection
+                      llmProfiles={llmProfiles}
+                      profileId={formFallbackLlmProfileId}
+                      model={formFallbackModel}
+                      onProfileChange={handleFallbackProfileChange}
+                      onModelChange={setFormFallbackModel}
+                      onFlush={autosave.flush}
+                      onRemove={() => {
+                        setFormFallbackLlmProfileId('');
+                        setFormFallbackModel('');
+                        setFormFallbackOpen(false);
+                      }}
+                    />
                   ) : (
                     <button
                       type="button"
                       onClick={() => setFormFallbackOpen(true)}
                       className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-muted-foreground transition-colors hover:text-foreground"
                     >
-                      <span className="text-base leading-none" aria-hidden="true">
+                      <span aria-hidden="true" className="text-base leading-none">
                         +
                       </span>
                       Add fallback model
@@ -1652,6 +1547,124 @@ export function ProfileEditor({
         </div>
       </div>
     </div>
+  );
+}
+
+function MultimodalFallbackSection({
+  llmProfiles,
+  profileId,
+  model,
+  onProfileChange,
+  onModelChange,
+  onRemove,
+  onFlush,
+}: {
+  llmProfiles: LlmProfileConfig[];
+  profileId: string;
+  model: string;
+  onProfileChange: (id: string) => void;
+  onModelChange: (v: string) => void;
+  onRemove: () => void;
+  onFlush: () => void;
+}) {
+  const fallbackProfile = llmProfiles.find(p => p.id === profileId);
+  const declaredModels = fallbackProfile?.models ?? [];
+  const hasDeclaredModels = declaredModels.length > 0;
+  const visionModels = visionCapableModels(fallbackProfile);
+  const modelValue =
+    hasDeclaredModels && !visionModels.some(entry => entry.modelId === model) ? '' : model;
+  return (
+    <>
+      <div className="divide-y divide-border/60">
+        <EditorRow
+          title="Fallback LLM Profile"
+          control={
+            <select
+              aria-label="Fallback LLM Profile"
+              value={profileId}
+              onChange={event => onProfileChange(event.target.value)}
+              onBlur={onFlush}
+              className={`${FIELD_CLASS} w-56`}
+            >
+              <option value="">None</option>
+              {llmProfiles.map(profile => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.name}
+                </option>
+              ))}
+            </select>
+          }
+        />
+
+        {profileId && hasDeclaredModels && (
+          <EditorRow
+            title="Fallback Model"
+            description="Must support image input"
+            control={
+              <select
+                aria-label="Fallback Model"
+                value={modelValue}
+                onChange={event => onModelChange(event.target.value)}
+                onBlur={onFlush}
+                disabled={visionModels.length === 0}
+                className={`${FIELD_CLASS} w-56 disabled:opacity-50`}
+              >
+                <option value="">Select a Vision-capable model</option>
+                {visionModels.map(entry => {
+                  const label = entry.displayName || entry.modelId;
+                  return (
+                    <option key={entry.modelId} value={entry.modelId}>
+                      {label === entry.modelId ? label : `${label} (${entry.modelId})`}
+                    </option>
+                  );
+                })}
+              </select>
+            }
+          />
+        )}
+
+        {profileId && !hasDeclaredModels && (
+          <EditorRow
+            title="Fallback Model"
+            description="Must support image input"
+            control={
+              <input
+                type="text"
+                aria-label="Fallback Model"
+                value={model}
+                onChange={event => onModelChange(event.target.value)}
+                onBlur={onFlush}
+                placeholder="model id"
+                className={`${MONO_FIELD_CLASS} w-56`}
+              />
+            }
+          />
+        )}
+
+        <EditorRow
+          title={
+            <span className="text-xs text-muted-foreground">
+              {profileId ? 'Vision fallback enabled' : 'No fallback selected'}
+            </span>
+          }
+          control={
+            <button
+              type="button"
+              onClick={onRemove}
+              className="rounded-md border border-border bg-background/70 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Remove fallback
+            </button>
+          }
+        />
+      </div>
+
+      {profileId && hasDeclaredModels && visionModels.length === 0 && (
+        <p className="mx-4 mb-4 text-xs text-amber-600">
+          No Vision-capable models declared on this LLM profile.
+        </p>
+      )}
+    </>
   );
 }
 
