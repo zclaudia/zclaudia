@@ -30,7 +30,9 @@ import * as api from '../../services/api';
 import { EditorSection, FieldLabel } from './ui/EditorSection';
 import { Chip } from './ui/Chip';
 import { useProfileAutosave } from './useProfileAutosave';
-import { SaveStateIndicator } from './ui/SaveStateIndicator';
+import { ProfileHeader } from './ui/ProfileHeader';
+import type { DetailBadge } from './ui/DetailHeader';
+import { confirm } from '../../stores/confirmDialogStore';
 
 /**
  * Parent must remount this component per identity — key it by
@@ -42,6 +44,8 @@ export interface ProfileEditorProps {
   backendId: string;
   /** null = create mode */
   profile: AgentProfileConfig | null;
+  onBack: () => void;
+  backendName?: string;
   onSaved: (saved: AgentProfileConfig) => void;
   onDeleted: () => void;
 }
@@ -54,8 +58,9 @@ type CapabilitySectionId = 'tool-sets' | 'external-tools' | 'skills';
 
 const FIELD_CLASS =
   'w-full rounded-lg border border-border/70 bg-background/70 px-3 py-2 text-sm text-foreground shadow-apple-sm focus:outline-none focus:ring-1 focus:ring-primary/50';
-const TEXTAREA_CLASS = `${FIELD_CLASS} resize-y`;
 const MONO_FIELD_CLASS = `${FIELD_CLASS} font-mono`;
+
+export const NAME_PLACEHOLDER = 'e.g., Default Coding Agent';
 
 const THINKING_LEVEL_OPTIONS: { value: ThinkingLevelOption; label: string }[] = [
   { value: '', label: 'Auto' },
@@ -188,7 +193,14 @@ function mcpTrustSummaryLabels(server: McpServerConfig): string[] {
   return labels;
 }
 
-export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: ProfileEditorProps) {
+export function ProfileEditor({
+  backendId,
+  profile,
+  onBack,
+  backendName,
+  onSaved,
+  onDeleted,
+}: ProfileEditorProps) {
   const [llmProfiles, setLlmProfiles] = useState<LlmProfileConfig[]>([]);
   const [skillCatalog, setSkillCatalog] = useState<api.WorkspaceSkillInfo[]>([]);
   const [mcpServers, setMcpServers] = useState<McpServerConfig[]>([]);
@@ -222,17 +234,12 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
   >([]);
   const [systemPromptExpanded, setSystemPromptExpanded] = useState(false);
 
-  const [pendingDelete, setPendingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const deleteConfirmTimeoutRef = useRef<number | null>(null);
 
-  const clearDeleteConfirmation = () => {
-    if (deleteConfirmTimeoutRef.current !== null) {
-      window.clearTimeout(deleteConfirmTimeoutRef.current);
-      deleteConfirmTimeoutRef.current = null;
-    }
-    setPendingDelete(false);
-  };
+  const mountedRef = useRef(true);
+  useEffect(() => () => {
+    mountedRef.current = false;
+  }, []);
 
   // Supporting catalogs for the target backend. Skills / MCP failures degrade
   // gracefully to empty catalogs — only the LLM profile list is a hard error.
@@ -282,16 +289,7 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
     };
   }, [backendId]);
 
-  useEffect(() => {
-    return () => {
-      if (deleteConfirmTimeoutRef.current !== null) {
-        window.clearTimeout(deleteConfirmTimeoutRef.current);
-      }
-    };
-  }, []);
-
   const resetForm = () => {
-    clearDeleteConfirmation();
     setFormName('');
     setFormDescription('');
     setFormRuntimeType('zclaudia');
@@ -312,7 +310,6 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
   };
 
   const populateForm = (agent: AgentProfileConfig) => {
-    clearDeleteConfirmation();
     setFormName(agent.name);
     setFormDescription(agent.description ?? '');
     setFormRuntimeType(agent.runtimeType === 'claude' ? 'claude' : 'zclaudia');
@@ -639,6 +636,7 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
   const performAutosave = useCallback(async () => {
     if (!profile) return;
     const saved = await api.updateAgentProfileForBackend(backendId, profile.id, buildPayload());
+    if (!mountedRef.current) return;
     onSaved(saved);
   }, [profile, backendId, buildPayload, onSaved]);
 
@@ -685,33 +683,27 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
     }
   };
 
-  const handleDelete = async () => {
+  const handleRequestDelete = useCallback(async () => {
     if (!profile || deleting) return;
-
-    if (!pendingDelete) {
-      clearDeleteConfirmation();
-      setPendingDelete(true);
-      deleteConfirmTimeoutRef.current = window.setTimeout(() => {
-        setPendingDelete(false);
-        deleteConfirmTimeoutRef.current = null;
-      }, 3000);
-      return;
-    }
-
-    clearDeleteConfirmation();
+    const ok = await confirm({
+      title: 'Delete profile?',
+      message: `"${profile.name}" will be permanently deleted.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok || !mountedRef.current) return;
     setDeleting(true);
-    setFormError(null);
     try {
       await api.deleteAgentProfileForBackend(backendId, profile.id);
-      onDeleted();
+      if (mountedRef.current) onDeleted();
     } catch (error) {
       console.error('Failed to delete agent profile:', error);
       const message = error instanceof Error ? error.message : String(error);
-      setFormError(message);
+      if (mountedRef.current) setFormError(`Failed to delete agent: ${message}`);
     } finally {
-      setDeleting(false);
+      if (mountedRef.current) setDeleting(false);
     }
-  };
+  }, [profile, deleting, backendId, onDeleted]);
 
   if (loading) {
     return <p className="text-muted-foreground text-center py-8">Loading...</p>;
@@ -756,11 +748,33 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
 
   const systemPromptPreview = formSystemPrompt.trim().split('\n')[0] || '';
 
+  const headerBadges: DetailBadge[] = [
+    ...(backendName ? [{ label: backendName }] : []),
+    ...(profile?.isDefault ? [{ label: 'Default', tone: 'accent' as const }] : []),
+  ];
+
   return (
-    <div
-      data-testid="agent-profile-editor"
-      className="mx-auto flex w-full max-w-[760px] flex-col gap-4 pb-4"
-    >
+    <div className="flex h-full flex-col bg-background text-foreground">
+      <ProfileHeader
+        crumb="Agent Profiles"
+        onBack={onBack}
+        name={formName}
+        onNameChange={setFormName}
+        onFieldBlur={autosave.flush}
+        namePlaceholder={NAME_PLACEHOLDER}
+        description={formDescription}
+        onDescriptionChange={setFormDescription}
+        badges={headerBadges}
+        saveStatus={profile ? autosave.status : undefined}
+        onRetry={autosave.retry}
+        onRequestDelete={profile ? handleRequestDelete : undefined}
+      />
+      {profile && formError && <p className="px-4 pb-2 text-xs text-destructive">{formError}</p>}
+      <div className="flex-1 overflow-y-auto p-4">
+        <div
+          data-testid="agent-profile-editor"
+          className="mx-auto flex w-full max-w-[760px] flex-col gap-4 pb-4"
+        >
       <div className="grid gap-3 sm:grid-cols-2">
         <EditorSection title="Model">
           <LlmProfileSelector
@@ -1268,30 +1282,6 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
       </EditorSection>
 
       <EditorSection title="Profile details">
-        <div>
-          <FieldLabel>Name *</FieldLabel>
-          <input
-            type="text"
-            value={formName}
-            onChange={e => setFormName(e.target.value)}
-            onBlur={autosave.flush}
-            placeholder="e.g., Default Coding Agent"
-            className={FIELD_CLASS}
-          />
-        </div>
-
-        <div>
-          <FieldLabel>Description (optional)</FieldLabel>
-          <textarea
-            value={formDescription}
-            onChange={e => setFormDescription(e.target.value)}
-            onBlur={autosave.flush}
-            placeholder="What this agent is for"
-            rows={2}
-            className={TEXTAREA_CLASS}
-          />
-        </div>
-
         <label className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/55 px-3 py-2.5">
           <span className="min-w-0">
             <span className="block text-sm text-foreground">Set as default agent</span>
@@ -1331,28 +1321,10 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
         )}
       </EditorSection>
 
-      <div className="sticky bottom-0 z-10 -mx-1 bg-background/90 px-1 py-3 backdrop-blur">
-        {formError && <p className="mb-2 text-xs text-destructive">{formError}</p>}
-        <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-card/95 p-2 shadow-apple-sm">
-          {profile ? (
-            <>
-              <div className="flex-1">
-                <SaveStateIndicator status={autosave.status} onRetry={autosave.retry} />
-              </div>
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${
-                  pendingDelete
-                    ? 'bg-destructive/15 text-destructive hover:bg-destructive/25'
-                    : 'bg-secondary text-destructive hover:bg-secondary/80'
-                }`}
-                title={pendingDelete ? 'Click again to confirm delete' : 'Delete'}
-              >
-                {deleting ? 'Deleting...' : pendingDelete ? 'Confirm delete' : 'Delete'}
-              </button>
-            </>
-          ) : (
+      {!profile && (
+        <div className="sticky bottom-0 z-10 -mx-1 bg-background/90 px-1 py-3 backdrop-blur">
+          {formError && <p className="mb-2 text-xs text-destructive">{formError}</p>}
+          <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-card/95 p-2 shadow-apple-sm">
             <button
               onClick={handleSubmit}
               disabled={!formName.trim() || saving}
@@ -1360,7 +1332,9 @@ export function ProfileEditor({ backendId, profile, onSaved, onDeleted }: Profil
             >
               {saving ? 'Saving...' : 'Create'}
             </button>
-          )}
+          </div>
+        </div>
+      )}
         </div>
       </div>
     </div>

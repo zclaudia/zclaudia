@@ -23,17 +23,25 @@ vi.mock('../../../services/api', async importOriginal => {
 
 // The stub exposes buttons wired to onSaved/onDeleted so tests can drive the
 // parent's handlers without the real (network-heavy) editor.
+// ProfileEditor now owns its own header (ProfileHeader) — it no longer renders
+// inside DetailShell, so the stub surfaces the profile name and backendName
+// itself (mirroring what the real header would show) to keep the parent-level
+// assertions below meaningful.
 vi.mock('../ProfileEditor', () => ({
   ProfileEditor: ({
     profile,
+    backendName,
     onSaved,
     onDeleted,
   }: {
     profile: AgentProfileConfig | null;
+    backendName?: string;
     onSaved: (saved: AgentProfileConfig) => void;
     onDeleted: () => void;
   }) => (
     <div data-testid="profile-editor" data-profile-id={profile?.id ?? 'null'}>
+      {backendName && <span>{backendName}</span>}
+      {profile?.name && <span>{profile.name}</span>}
       <button onClick={() => onSaved(makeProfile('saved-1', 'Saved One'))}>stub-save</button>
       <button onClick={() => onDeleted()}>stub-delete</button>
     </div>
@@ -337,7 +345,7 @@ describe('AgentsContent', () => {
     expect(screen.queryByTestId('profile-editor')).toBeNull();
   });
 
-  it('renders create mode with a null profile and "New profile" header', () => {
+  it('renders create mode with a null profile, passing the backend name through', () => {
     useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b2', kind: 'new-profile' } });
 
     render(
@@ -350,8 +358,10 @@ describe('AgentsContent', () => {
       />
     );
 
+    // Create mode has no name yet — the editor now owns its own header (which
+    // shows the name placeholder, not a static "New profile" title), so the
+    // parent-level assertion is limited to what AgentsContent itself supplies.
     expect(screen.getByTestId('profile-editor').getAttribute('data-profile-id')).toBe('null');
-    expect(screen.getByText('New profile')).toBeTruthy();
     expect(screen.getByText('Backend 2')).toBeTruthy();
   });
 

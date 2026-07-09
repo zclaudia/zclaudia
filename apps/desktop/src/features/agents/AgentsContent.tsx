@@ -322,22 +322,16 @@ export function AgentsContent({
         refreshGlobalStoresIfActive();
       };
 
-      const title = selection.kind === 'profile' ? (profile?.name ?? '') : 'New profile';
-
       return (
-        <DetailShell title={title} backendName={backendName}
-            crumb={crumbForSelectionKind(selection.kind)}
-            onBack={() => selectAgentsItem(null)}
-            badges={profile?.isDefault ? [{ label: 'Default', tone: 'accent' }] : undefined}
-          >
-          <ProfileEditor
-            key={`${editedBackendId}:${selection.kind === 'profile' ? selection.id : 'new'}`}
-            backendId={editedBackendId}
-            profile={profile}
-            onSaved={handleSaved}
-            onDeleted={handleDeleted}
-          />
-        </DetailShell>
+        <ProfileEditor
+          key={`${editedBackendId}:${selection.kind === 'profile' ? selection.id : 'new'}`}
+          backendId={editedBackendId}
+          profile={profile}
+          onBack={() => selectAgentsItem(null)}
+          backendName={backendName}
+          onSaved={handleSaved}
+          onDeleted={handleDeleted}
+        />
       );
     }
 

@@ -16,6 +16,10 @@ vi.mock('../../../services/api', () => ({
   deleteAgentProfileForBackend: vi.fn(),
 }));
 
+vi.mock('../../../stores/confirmDialogStore', () => ({
+  confirm: vi.fn().mockResolvedValue(true),
+}));
+
 const llmProfile: LlmProfileConfig = {
   id: 'lp1',
   name: 'Anthropic',
@@ -46,7 +50,13 @@ async function renderEditor(profile: AgentProfileConfig | null) {
   const onSaved = vi.fn();
   const onDeleted = vi.fn();
   const view = render(
-    <ProfileEditor backendId="b1" profile={profile} onSaved={onSaved} onDeleted={onDeleted} />
+    <ProfileEditor
+      backendId="b1"
+      profile={profile}
+      onBack={vi.fn()}
+      onSaved={onSaved}
+      onDeleted={onDeleted}
+    />
   );
   // Wait for the catalog load to settle and the form to render.
   await screen.findByPlaceholderText(NAME_PLACEHOLDER);
@@ -224,7 +234,13 @@ describe('ProfileEditor', () => {
 
       const onSaved = vi.fn();
       render(
-        <ProfileEditor backendId="b1" profile={existing} onSaved={onSaved} onDeleted={vi.fn()} />
+        <ProfileEditor
+          backendId="b1"
+          profile={existing}
+          onBack={vi.fn()}
+          onSaved={onSaved}
+          onDeleted={vi.fn()}
+        />
       );
       // catalog load resolves on fake timers
       await act(async () => { await vi.advanceTimersByTimeAsync(0); });
@@ -258,48 +274,30 @@ describe('ProfileEditor', () => {
     expect(queryAllByLabelText(/enable full tool set/).length).toBeGreaterThan(0);
   });
 
-  it('delete: first click arms confirmation, second click deletes and fires onDeleted', async () => {
+  it('edit mode: ⋯ menu Delete confirms then calls deleteAgentProfileForBackend + onDeleted', async () => {
+    const { confirm } = await import('../../../stores/confirmDialogStore');
+    vi.mocked(confirm).mockResolvedValue(true);
     vi.mocked(api.deleteAgentProfileForBackend).mockResolvedValue(undefined);
 
-    const { onDeleted } = await renderEditor(makeProfile('p1', 'Coder'));
+    const onDeleted = vi.fn();
+    const view = render(
+      <ProfileEditor backendId="b1" profile={makeProfile('p1', 'Coding')} onBack={vi.fn()} onSaved={vi.fn()} onDeleted={onDeleted} />
+    );
+    await screen.findByPlaceholderText(NAME_PLACEHOLDER);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-    expect(api.deleteAgentProfileForBackend).not.toHaveBeenCalled();
-
-    const confirmButton = await screen.findByRole('button', { name: 'Confirm delete' });
-    fireEvent.click(confirmButton);
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete profile' }));
 
     await waitFor(() => {
       expect(api.deleteAgentProfileForBackend).toHaveBeenCalledWith('b1', 'p1');
     });
-    await waitFor(() => {
-      expect(onDeleted).toHaveBeenCalled();
-    });
+    await waitFor(() => { expect(onDeleted).toHaveBeenCalled(); });
+    view.unmount();
   });
 
-  it('create mode shows no delete button', async () => {
+  it('create mode shows no delete entry point', async () => {
     await renderEditor(null);
-    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
-  });
-
-  it('clears an armed delete confirmation when the profile prop switches', async () => {
-    const { rerender, onSaved, onDeleted } = await renderEditor(makeProfile('p1', 'Coder'));
-
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-    await screen.findByRole('button', { name: 'Confirm delete' });
-
-    rerender(
-      <ProfileEditor
-        backendId="b1"
-        profile={makeProfile('p2', 'Reviewer')}
-        onSaved={onSaved}
-        onDeleted={onDeleted}
-      />
-    );
-
-    expect(await screen.findByRole('button', { name: 'Delete' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Confirm delete' })).toBeNull();
-    expect(api.deleteAgentProfileForBackend).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'More actions' })).toBeNull();
   });
 
   it('repopulates the form when the profile prop switches', async () => {
@@ -310,6 +308,7 @@ describe('ProfileEditor', () => {
       <ProfileEditor
         backendId="b1"
         profile={makeProfile('p2', 'Reviewer')}
+        onBack={vi.fn()}
         onSaved={onSaved}
         onDeleted={onDeleted}
       />
