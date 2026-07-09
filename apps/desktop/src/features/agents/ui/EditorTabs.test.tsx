@@ -9,6 +9,12 @@ const tabs = [
   { id: 'prompt', label: 'Prompt' },
 ];
 
+const subTabs = [
+  { id: 'tools', label: 'Tools', count: 2 },
+  { id: 'providers', label: 'Providers' },
+  { id: 'skills', label: 'Skills' },
+];
+
 describe('EditorTabs', () => {
   it('renders a tab per item and marks the active one selected', () => {
     render(<EditorTabs tabs={tabs} active="model" onChange={vi.fn()} />);
@@ -27,5 +33,19 @@ describe('EditorTabs', () => {
     render(<EditorTabs tabs={tabs} active="model" onChange={onChange} />);
     fireEvent.click(screen.getByRole('tab', { name: /Prompt/ }));
     expect(onChange).toHaveBeenCalledWith('prompt');
+  });
+
+  it('defaults to the primary variant', () => {
+    render(<EditorTabs tabs={tabs} active="model" onChange={vi.fn()} />);
+    expect(screen.getByRole('tablist')).toHaveAttribute('data-variant', 'primary');
+  });
+
+  it('renders the sub variant and stays interactive', () => {
+    const onChange = vi.fn();
+    render(<EditorTabs tabs={subTabs} active="tools" onChange={onChange} variant="sub" />);
+    expect(screen.getByRole('tablist')).toHaveAttribute('data-variant', 'sub');
+    expect(screen.getAllByRole('tab')).toHaveLength(3);
+    fireEvent.click(screen.getByRole('tab', { name: /Providers/ }));
+    expect(onChange).toHaveBeenCalledWith('providers');
   });
 });
