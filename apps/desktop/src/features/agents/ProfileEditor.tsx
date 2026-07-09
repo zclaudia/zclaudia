@@ -26,6 +26,11 @@ import {
   defaultSkillSelection,
   skillRefKey,
 } from '@zclaudia/shared';
+import {
+  getProfileConfigDescriptor,
+  enabledRuntimeDescriptors,
+  runtimeRequiresLlmProfile,
+} from '@zclaudia/shared/core/profile-config-descriptor';
 import * as api from '../../services/api';
 import { EditorSection, FieldLabel } from './ui/EditorSection';
 import { EditorTabs } from './ui/EditorTabs';
@@ -246,6 +251,12 @@ export function ProfileEditor({
     },
     []
   );
+
+  // Captured once per mount (the editor is keyed by profile id, so this is stable
+  // per identity). Used to decide null (clear existing) vs undefined (omit) for the
+  // multimodal fallback — reading the live `profile` prop instead would re-fire a
+  // no-op save after the saved profile round-trips back.
+  const hadFallbackAtMount = useRef(Boolean(profile?.multimodalFallback));
 
   // Supporting catalogs for the target backend. Skills / MCP failures degrade
   // gracefully to empty catalogs — only the LLM profile list is a hard error.
@@ -592,15 +603,15 @@ export function ProfileEditor({
 
   const buildPayload = useCallback(() => {
     const resolvedTools = resolveToolSelection(formToolSelection).builtinTools;
-    const isClaudeRuntime = formRuntimeType === 'claude';
+    const descriptor = getProfileConfigDescriptor(formRuntimeType);
     const trimmedFallbackModel = formFallbackModel.trim();
-    const multimodalFallback = isClaudeRuntime
-      ? profile?.multimodalFallback
+    const multimodalFallback = !descriptor.model.multimodalFallback
+      ? hadFallbackAtMount.current
         ? null
         : undefined
       : formFallbackLlmProfileId && trimmedFallbackModel
         ? { llmProfileId: formFallbackLlmProfileId, model: trimmedFallbackModel }
-        : profile?.multimodalFallback
+        : hadFallbackAtMount.current
           ? null
           : undefined;
     return {
@@ -632,12 +643,12 @@ export function ProfileEditor({
     formSkillExecution,
     formThinkingLevel,
     formIsDefault,
-    llmProfiles,
-    profile,
   ]);
 
+  const activeDescriptor = getProfileConfigDescriptor(formRuntimeType);
+
   const fallbackVisionValid =
-    formRuntimeType === 'claude' ||
+    !activeDescriptor.model.multimodalFallback ||
     !formFallbackLlmProfileId ||
     fallbackModelValidForProfile(
       formFallbackModel.trim(),
@@ -645,7 +656,10 @@ export function ProfileEditor({
     );
 
   const formValid = Boolean(
-    formName.trim() && formLlmProfileId && formModel.trim() && fallbackVisionValid
+    formName.trim() &&
+    (runtimeRequiresLlmProfile(formRuntimeType) ? formLlmProfileId : true) &&
+    formModel.trim() &&
+    fallbackVisionValid
   );
 
   const signature = useMemo(() => JSON.stringify(buildPayload()), [buildPayload]);
@@ -664,9 +678,22 @@ export function ProfileEditor({
     save: performAutosave,
   });
 
+  const handleRuntimeChange = (next: RuntimeOption) => {
+    setFormRuntimeType(next);
+    // Model ids are not interchangeable across runtimes → clear and let the form
+    // sit in `pending` until a model is chosen for the new runtime.
+    setFormModel('');
+    if (!runtimeRequiresLlmProfile(next)) {
+      // Native runtimes don't bind an LLM profile or a multimodal fallback.
+      setFormLlmProfileId('');
+      setFormFallbackLlmProfileId('');
+      setFormFallbackModel('');
+    }
+  };
+
   const handleSubmit = async () => {
     if (!formName.trim()) return;
-    if (!formLlmProfileId) {
+    if (runtimeRequiresLlmProfile(formRuntimeType) && !formLlmProfileId) {
       setFormError('LLM Profile is required');
       return;
     }
@@ -816,81 +843,106 @@ export function ProfileEditor({
                   <select
                     id="agent-profile-runtime"
                     value={formRuntimeType}
-                    onChange={e => setFormRuntimeType(e.target.value as RuntimeOption)}
+                    onChange={e => handleRuntimeChange(e.target.value as RuntimeOption)}
                     className={FIELD_CLASS}
                   >
-                    <option value="zclaudia">ZClaudia</option>
-                    <option value="claude">Claude</option>
+                    {enabledRuntimeDescriptors().map(d => (
+                      <option key={d.runtime} value={d.runtime}>
+                        {d.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
-
-                {formRuntimeType === 'claude' && (
-                  <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-muted-foreground">
-                    Claude uses the Claude Agent SDK runtime. AI review, multimodal attachments and
-                    fallback, and background task controls are zclaudia-only in this phase.
-                  </p>
-                )}
               </EditorSection>
 
               <div className="grid gap-3 sm:grid-cols-2">
-            <EditorSection title="Model">
-              <LlmProfileSelector
-                value={formLlmProfileId}
-                onChange={id => {
-                  setFormLlmProfileId(id);
-                  // Clearing the model when the LLM profile changes avoids referencing
-                  // a model id that doesn't exist in the new profile's models list.
-                  const newProfile = llmProfiles.find(p => p.id === id);
-                  const newProfileModels = newProfile?.models;
-                  if (
-                    formModel &&
-                    (!newProfileModels || !newProfileModels.some(m => m.modelId === formModel))
-                  ) {
-                    setFormModel('');
-                  }
-                }}
-                profiles={llmProfiles}
-              />
+                <EditorSection title="Model">
+                  {activeDescriptor.model.kind === 'llm-profile' ? (
+                    <>
+                      <LlmProfileSelector
+                        value={formLlmProfileId}
+                        onChange={id => {
+                          setFormLlmProfileId(id);
+                          // Clearing the model when the LLM profile changes avoids referencing
+                          // a model id that doesn't exist in the new profile's models list.
+                          const newProfile = llmProfiles.find(p => p.id === id);
+                          const newProfileModels = newProfile?.models;
+                          if (
+                            formModel &&
+                            (!newProfileModels ||
+                              !newProfileModels.some(m => m.modelId === formModel))
+                          ) {
+                            setFormModel('');
+                          }
+                        }}
+                        profiles={llmProfiles}
+                      />
 
-              <ModelSelector
-                value={formModel}
-                onChange={setFormModel}
-                llmProfile={llmProfiles.find(p => p.id === formLlmProfileId)}
-              />
+                      <ModelSelector
+                        value={formModel}
+                        onChange={setFormModel}
+                        llmProfile={llmProfiles.find(p => p.id === formLlmProfileId)}
+                      />
 
-              <ModelDeclarationWarning
-                formModel={formModel}
-                llmProfile={llmProfiles.find(p => p.id === formLlmProfileId)}
-              />
+                      <ModelDeclarationWarning
+                        formModel={formModel}
+                        llmProfile={llmProfiles.find(p => p.id === formLlmProfileId)}
+                      />
+                    </>
+                  ) : (
+                    <div>
+                      <FieldLabel htmlFor="agent-profile-native-model">Claude Model</FieldLabel>
+                      <input
+                        id="agent-profile-native-model"
+                        type="text"
+                        value={formModel}
+                        onChange={e => setFormModel(e.target.value)}
+                        onBlur={autosave.flush}
+                        placeholder="e.g., claude-sonnet-4-6"
+                        className={FIELD_CLASS}
+                      />
+                    </div>
+                  )}
 
-              <ThinkingLevelSelector value={formThinkingLevel} onChange={setFormThinkingLevel} />
-            </EditorSection>
+                  {activeDescriptor.model.thinkingLevel && (
+                    <ThinkingLevelSelector
+                      value={formThinkingLevel}
+                      onChange={setFormThinkingLevel}
+                    />
+                  )}
 
-            {formRuntimeType !== 'claude' && (
-              <EditorSection title="Multimodal fallback">
-                <MultimodalFallbackSelector
-                  profiles={llmProfiles}
-                  profileId={formFallbackLlmProfileId}
-                  model={formFallbackModel}
-                  onProfileChange={id => {
-                    setFormFallbackLlmProfileId(id);
-                    if (!id) {
-                      setFormFallbackModel('');
-                      return;
-                    }
-                    const nextProfile = llmProfiles.find(p => p.id === id);
-                    if (
-                      formFallbackModel &&
-                      !fallbackModelValidForProfile(formFallbackModel, nextProfile)
-                    ) {
-                      setFormFallbackModel('');
-                    }
-                  }}
-                  onModelChange={setFormFallbackModel}
-                />
-              </EditorSection>
-            )}
-          </div>
+                  {activeDescriptor.authNote && (
+                    <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-muted-foreground">
+                      {activeDescriptor.authNote}
+                    </p>
+                  )}
+                </EditorSection>
+
+                {activeDescriptor.model.multimodalFallback && (
+                  <EditorSection title="Multimodal fallback">
+                    <MultimodalFallbackSelector
+                      profiles={llmProfiles}
+                      profileId={formFallbackLlmProfileId}
+                      model={formFallbackModel}
+                      onProfileChange={id => {
+                        setFormFallbackLlmProfileId(id);
+                        if (!id) {
+                          setFormFallbackModel('');
+                          return;
+                        }
+                        const nextProfile = llmProfiles.find(p => p.id === id);
+                        if (
+                          formFallbackModel &&
+                          !fallbackModelValidForProfile(formFallbackModel, nextProfile)
+                        ) {
+                          setFormFallbackModel('');
+                        }
+                      }}
+                      onModelChange={setFormFallbackModel}
+                    />
+                  </EditorSection>
+                )}
+              </div>
 
               <EditorSection title="Profile details">
                 <label className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/55 px-3 py-2.5">
@@ -914,463 +966,469 @@ export function ProfileEditor({
 
           {activeTab === 'capabilities' && (
             <div className="flex flex-col gap-4">
-          <EditorSection
-            title="Capabilities"
-            description="Configure built-in tools, external providers, and skill execution for this profile."
-          >
-            <div>
-              <div className="mb-2 text-xs font-medium text-muted-foreground">
-                Attached capabilities
-              </div>
-              {hasAttachedCapabilities ? (
-                <div className="flex flex-wrap gap-2">
-                  {enabledToolSetChips.map(set => (
-                    <Chip
-                      key={`toolset:${set.id}`}
-                      label={set.label}
-                      onRemove={() => toggleToolSet(set.id)}
-                    />
-                  ))}
-                  {mcpProviderChips.map(provider => (
-                    <Chip
-                      key={`mcp:${provider.serverId}`}
-                      label={`mcp/${provider.serverId}`}
-                      onRemove={() => toggleMcpProvider(provider.serverId)}
-                    />
-                  ))}
-                  {pinnedSkillChips.map(chip => (
-                    <Chip
-                      key={`skill:${chip.key}`}
-                      label={chip.label}
-                      onRemove={chip.skill ? () => togglePinnedSkill(chip.skill!) : undefined}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">No capabilities attached yet.</p>
-              )}
-            </div>
-            <CapabilityDisclosure
-              title="Tool Sets"
-              summary={`${resolvedBuiltinTools.length} built-in tools resolved`}
-              open={expandedCapabilitySectionIds.includes('tool-sets')}
-              onToggle={() => toggleCapabilitySection('tool-sets')}
-            >
-              <div className="space-y-2">
-                {builtinToolSetEntries.map(set => {
-                  const checked = formToolSelection.sets.some(
-                    selected => selected.source === 'builtin' && selected.id === set.id
-                  );
-                  const customized = customizedToolSetIds.includes(set.id);
-                  const expanded = expandedToolSetIds.includes(set.id);
-                  return (
-                    <div
-                      key={set.id}
-                      className={`min-w-0 rounded-lg border p-3 text-sm transition-colors ${
-                        checked
-                          ? 'bg-muted/60 border-primary/45 text-primary shadow-sm'
-                          : customized
-                            ? 'bg-secondary/80 border-primary/25 text-foreground'
-                            : 'bg-secondary/60 border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground/40'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleToolSet(set.id)}
-                          aria-label={`enable full tool set ${set.id}`}
-                          className="rounded-md border-border shrink-0"
+              <EditorSection
+                title="Capabilities"
+                description="Configure built-in tools, external providers, and skill execution for this profile."
+              >
+                <div>
+                  <div className="mb-2 text-xs font-medium text-muted-foreground">
+                    Attached capabilities
+                  </div>
+                  {hasAttachedCapabilities ? (
+                    <div className="flex flex-wrap gap-2">
+                      {enabledToolSetChips.map(set => (
+                        <Chip
+                          key={`toolset:${set.id}`}
+                          label={set.label}
+                          onRemove={() => toggleToolSet(set.id)}
                         />
-                        <button
-                          type="button"
-                          onClick={() => toggleToolSetExpanded(set.id)}
-                          aria-label={`expand tool set ${set.id}`}
-                          className="min-w-0 flex-1 text-left"
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className="font-medium truncate">{set.label}</div>
-                            <span className="shrink-0 rounded-full bg-background/70 border border-border/70 px-2 py-0.5 text-[10px] text-muted-foreground">
-                              {set.tools.length} tools
-                            </span>
-                            <span className="min-w-0 truncate text-xs text-muted-foreground">
-                              {set.tools.slice(0, 4).join(', ')}
-                              {set.tools.length > 4 ? '...' : ''}
-                            </span>
-                          </div>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => toggleToolSetCustomize(set.id)}
-                          aria-label={`customize tool set ${set.id}`}
-                          className={`shrink-0 rounded-md border px-2 py-1 text-[11px] transition-colors ${
-                            customized
-                              ? 'border-primary/40 bg-muted/60 text-primary'
-                              : 'border-border bg-background/70 text-muted-foreground hover:text-foreground'
+                      ))}
+                      {mcpProviderChips.map(provider => (
+                        <Chip
+                          key={`mcp:${provider.serverId}`}
+                          label={`mcp/${provider.serverId}`}
+                          onRemove={() => toggleMcpProvider(provider.serverId)}
+                        />
+                      ))}
+                      {pinnedSkillChips.map(chip => (
+                        <Chip
+                          key={`skill:${chip.key}`}
+                          label={chip.label}
+                          onRemove={chip.skill ? () => togglePinnedSkill(chip.skill!) : undefined}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No capabilities attached yet.</p>
+                  )}
+                </div>
+                <CapabilityDisclosure
+                  title="Tool Sets"
+                  summary={`${resolvedBuiltinTools.length} built-in tools resolved`}
+                  open={expandedCapabilitySectionIds.includes('tool-sets')}
+                  onToggle={() => toggleCapabilitySection('tool-sets')}
+                >
+                  <div className="space-y-2">
+                    {builtinToolSetEntries.map(set => {
+                      const checked = formToolSelection.sets.some(
+                        selected => selected.source === 'builtin' && selected.id === set.id
+                      );
+                      const customized = customizedToolSetIds.includes(set.id);
+                      const expanded = expandedToolSetIds.includes(set.id);
+                      return (
+                        <div
+                          key={set.id}
+                          className={`min-w-0 rounded-lg border p-3 text-sm transition-colors ${
+                            checked
+                              ? 'bg-muted/60 border-primary/45 text-primary shadow-sm'
+                              : customized
+                                ? 'bg-secondary/80 border-primary/25 text-foreground'
+                                : 'bg-secondary/60 border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground/40'
                           }`}
                         >
-                          {customized ? 'Custom' : 'Customize'}
-                        </button>
-                      </div>
-                      {expanded && (
-                        <div className="mt-3 space-y-1 border-t border-border/70 pt-2">
-                          {set.tools.map(tool => {
-                            const selected = customized
-                              ? formToolSelection.include.some(
-                                  ref => ref.source === 'builtin' && ref.name === tool
-                                )
-                              : checked;
-                            const metadata = BUILTIN_TOOL_METADATA[tool];
-                            return (
-                              <label
-                                key={tool}
-                                className={`flex items-start gap-3 rounded-md bg-background/60 px-2 py-2 ${
-                                  customized ? 'cursor-pointer hover:bg-background/80' : ''
-                                }`}
-                              >
-                                {customized ? (
-                                  <input
-                                    type="checkbox"
-                                    checked={selected}
-                                    onChange={() => toggleCustomTool(set.id, tool)}
-                                    aria-label={`select tool ${tool}`}
-                                    className="mt-0.5 shrink-0"
-                                  />
-                                ) : (
-                                  <span
-                                    className={`mt-1 h-2 w-2 shrink-0 rounded-full ${selected ? 'bg-primary' : 'bg-muted-foreground/40'}`}
-                                  />
-                                )}
-                                <span className="min-w-0 flex-1">
-                                  <span className="block truncate font-mono text-xs" title={tool}>
-                                    {tool}
-                                  </span>
-                                  <span
-                                    className="mt-0.5 block truncate text-[11px] text-muted-foreground"
-                                    title={metadata.description || metadata.label}
-                                  >
-                                    {metadata.description || metadata.label}
-                                  </span>
+                          <div className="flex items-center gap-3 min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleToolSet(set.id)}
+                              aria-label={`enable full tool set ${set.id}`}
+                              className="rounded-md border-border shrink-0"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => toggleToolSetExpanded(set.id)}
+                              aria-label={`expand tool set ${set.id}`}
+                              className="min-w-0 flex-1 text-left"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="font-medium truncate">{set.label}</div>
+                                <span className="shrink-0 rounded-full bg-background/70 border border-border/70 px-2 py-0.5 text-[10px] text-muted-foreground">
+                                  {set.tools.length} tools
                                 </span>
-                              </label>
-                            );
-                          })}
+                                <span className="min-w-0 truncate text-xs text-muted-foreground">
+                                  {set.tools.slice(0, 4).join(', ')}
+                                  {set.tools.length > 4 ? '...' : ''}
+                                </span>
+                              </div>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => toggleToolSetCustomize(set.id)}
+                              aria-label={`customize tool set ${set.id}`}
+                              className={`shrink-0 rounded-md border px-2 py-1 text-[11px] transition-colors ${
+                                customized
+                                  ? 'border-primary/40 bg-muted/60 text-primary'
+                                  : 'border-border bg-background/70 text-muted-foreground hover:text-foreground'
+                              }`}
+                            >
+                              {customized ? 'Custom' : 'Customize'}
+                            </button>
+                          </div>
+                          {expanded && (
+                            <div className="mt-3 space-y-1 border-t border-border/70 pt-2">
+                              {set.tools.map(tool => {
+                                const selected = customized
+                                  ? formToolSelection.include.some(
+                                      ref => ref.source === 'builtin' && ref.name === tool
+                                    )
+                                  : checked;
+                                const metadata = BUILTIN_TOOL_METADATA[tool];
+                                return (
+                                  <label
+                                    key={tool}
+                                    className={`flex items-start gap-3 rounded-md bg-background/60 px-2 py-2 ${
+                                      customized ? 'cursor-pointer hover:bg-background/80' : ''
+                                    }`}
+                                  >
+                                    {customized ? (
+                                      <input
+                                        type="checkbox"
+                                        checked={selected}
+                                        onChange={() => toggleCustomTool(set.id, tool)}
+                                        aria-label={`select tool ${tool}`}
+                                        className="mt-0.5 shrink-0"
+                                      />
+                                    ) : (
+                                      <span
+                                        className={`mt-1 h-2 w-2 shrink-0 rounded-full ${selected ? 'bg-primary' : 'bg-muted-foreground/40'}`}
+                                      />
+                                    )}
+                                    <span className="min-w-0 flex-1">
+                                      <span
+                                        className="block truncate font-mono text-xs"
+                                        title={tool}
+                                      >
+                                        {tool}
+                                      </span>
+                                      <span
+                                        className="mt-0.5 block truncate text-[11px] text-muted-foreground"
+                                        title={metadata.description || metadata.label}
+                                      >
+                                        {metadata.description || metadata.label}
+                                      </span>
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-2 text-[10px] text-muted-foreground">
+                    Resolved built-in tools: {resolvedBuiltinTools.join(', ') || 'none'}
+                  </p>
+                </CapabilityDisclosure>
+                <CapabilityDisclosure
+                  title="External Tool Providers"
+                  summary={`${externalProviders.length} providers, ${formatPinnedExternalToolCount(pinnedExternalToolLabels.length)}`}
+                  open={expandedCapabilitySectionIds.includes('external-tools')}
+                  onToggle={() => toggleCapabilitySection('external-tools')}
+                >
+                  <div className="rounded-lg border border-border bg-secondary/50 p-3 text-sm">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs text-muted-foreground">Configured MCP servers</p>
+                        <span className="text-[10px] text-muted-foreground">
+                          {externalProviders.filter(provider => provider.source === 'mcp').length}{' '}
+                          selected
+                        </span>
+                      </div>
+                      {mcpServers.length === 0 ? (
+                        <p className="rounded-md bg-background/60 px-2 py-2 text-xs text-muted-foreground">
+                          No MCP servers configured.
+                        </p>
+                      ) : (
+                        mcpServers.map(server => {
+                          const status = mcpStatuses[server.name];
+                          const selected = mcpProviderSelected(server.name);
+                          const state =
+                            status?.state ?? (server.enabled ? 'configured' : 'disabled');
+                          return (
+                            <div
+                              key={server.id}
+                              className="flex min-w-0 items-center justify-between gap-3 rounded-md bg-background/60 px-2 py-2"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <span
+                                    className="truncate font-mono text-xs"
+                                    title={`mcp/${server.name}`}
+                                  >
+                                    mcp/{server.name}
+                                  </span>
+                                  <span
+                                    className={`shrink-0 rounded-full border border-border px-2 py-0.5 text-[10px] ${
+                                      state === 'connected'
+                                        ? 'text-green-400'
+                                        : state === 'failed'
+                                          ? 'text-red-400'
+                                          : state === 'needs-auth'
+                                            ? 'text-orange-300'
+                                            : 'text-muted-foreground'
+                                    }`}
+                                  >
+                                    {state}
+                                  </span>
+                                </div>
+                                <p className="mt-1 truncate text-[10px] text-muted-foreground">
+                                  tools {status?.inventory?.tools ?? 'unknown'} | resources{' '}
+                                  {status?.inventory?.resources ?? 'unknown'} | prompts{' '}
+                                  {status?.inventory?.prompts ?? 'unknown'}
+                                </p>
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                  {mcpTrustSummaryLabels(server).map(label => (
+                                    <span
+                                      key={label}
+                                      className="rounded-full bg-secondary/80 px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                                    >
+                                      {label}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => toggleMcpProvider(server.name)}
+                                className={`shrink-0 rounded-md px-2 py-1 text-[10px] transition-colors ${
+                                  selected
+                                    ? 'bg-muted text-primary hover:bg-muted'
+                                    : 'bg-secondary text-muted-foreground hover:text-foreground'
+                                } disabled:opacity-50`}
+                              >
+                                {selected ? 'Remove' : 'Add'}
+                              </button>
+                            </div>
+                          );
+                        })
+                      )}
+                      {externalProviders.some(provider => provider.source === 'plugin') && (
+                        <div className="border-t border-border/70 pt-2">
+                          <p className="mb-1 text-xs text-muted-foreground">Plugin providers</p>
+                          {externalProviders
+                            .filter(provider => provider.source === 'plugin')
+                            .map(provider => {
+                              const label = externalProviderLabel(provider);
+                              return (
+                                <div key={label} className="rounded-md bg-background/60 px-2 py-2">
+                                  <span className="font-mono text-xs" title={label}>
+                                    {label}
+                                  </span>
+                                  <span className="ml-2 text-[10px] text-muted-foreground">
+                                    not yet connected
+                                  </span>
+                                </div>
+                              );
+                            })}
                         </div>
                       )}
                     </div>
-                  );
-                })}
-              </div>
-              <p className="mt-2 text-[10px] text-muted-foreground">
-                Resolved built-in tools: {resolvedBuiltinTools.join(', ') || 'none'}
-              </p>
-            </CapabilityDisclosure>
-            <CapabilityDisclosure
-              title="External Tool Providers"
-              summary={`${externalProviders.length} providers, ${formatPinnedExternalToolCount(pinnedExternalToolLabels.length)}`}
-              open={expandedCapabilitySectionIds.includes('external-tools')}
-              onToggle={() => toggleCapabilitySection('external-tools')}
-            >
-              <div className="rounded-lg border border-border bg-secondary/50 p-3 text-sm">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs text-muted-foreground">Configured MCP servers</p>
-                    <span className="text-[10px] text-muted-foreground">
-                      {externalProviders.filter(provider => provider.source === 'mcp').length}{' '}
-                      selected
-                    </span>
-                  </div>
-                  {mcpServers.length === 0 ? (
-                    <p className="rounded-md bg-background/60 px-2 py-2 text-xs text-muted-foreground">
-                      No MCP servers configured.
-                    </p>
-                  ) : (
-                    mcpServers.map(server => {
-                      const status = mcpStatuses[server.name];
-                      const selected = mcpProviderSelected(server.name);
-                      const state = status?.state ?? (server.enabled ? 'configured' : 'disabled');
-                      return (
-                        <div
-                          key={server.id}
-                          className="flex min-w-0 items-center justify-between gap-3 rounded-md bg-background/60 px-2 py-2"
+                    <div className="mt-2 border-t border-border/70 pt-2">
+                      <p className="text-[10px] text-muted-foreground">
+                        {formatPinnedExternalToolCount(pinnedExternalToolLabels.length)}
+                      </p>
+                      {pinnedExternalToolLabels.length > 0 && (
+                        <p
+                          className="mt-1 truncate font-mono text-[10px] text-muted-foreground"
+                          title={pinnedExternalToolLabels.join(', ')}
                         >
-                          <div className="min-w-0 flex-1">
-                            <div className="flex min-w-0 items-center gap-2">
-                              <span
-                                className="truncate font-mono text-xs"
-                                title={`mcp/${server.name}`}
-                              >
-                                mcp/{server.name}
-                              </span>
-                              <span
-                                className={`shrink-0 rounded-full border border-border px-2 py-0.5 text-[10px] ${
-                                  state === 'connected'
-                                    ? 'text-green-400'
-                                    : state === 'failed'
-                                      ? 'text-red-400'
-                                      : state === 'needs-auth'
-                                        ? 'text-orange-300'
-                                        : 'text-muted-foreground'
-                                }`}
-                              >
-                                {state}
-                              </span>
-                            </div>
-                            <p className="mt-1 truncate text-[10px] text-muted-foreground">
-                              tools {status?.inventory?.tools ?? 'unknown'} | resources{' '}
-                              {status?.inventory?.resources ?? 'unknown'} | prompts{' '}
-                              {status?.inventory?.prompts ?? 'unknown'}
-                            </p>
-                            <div className="mt-1 flex flex-wrap gap-1">
-                              {mcpTrustSummaryLabels(server).map(label => (
-                                <span
-                                  key={label}
-                                  className="rounded-full bg-secondary/80 px-1.5 py-0.5 text-[10px] text-muted-foreground"
-                                >
-                                  {label}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => toggleMcpProvider(server.name)}
-                            className={`shrink-0 rounded-md px-2 py-1 text-[10px] transition-colors ${
-                              selected
-                                ? 'bg-muted text-primary hover:bg-muted'
-                                : 'bg-secondary text-muted-foreground hover:text-foreground'
-                            } disabled:opacity-50`}
-                          >
-                            {selected ? 'Remove' : 'Add'}
-                          </button>
-                        </div>
-                      );
-                    })
-                  )}
-                  {externalProviders.some(provider => provider.source === 'plugin') && (
-                    <div className="border-t border-border/70 pt-2">
-                      <p className="mb-1 text-xs text-muted-foreground">Plugin providers</p>
-                      {externalProviders
-                        .filter(provider => provider.source === 'plugin')
-                        .map(provider => {
-                          const label = externalProviderLabel(provider);
+                          {pinnedExternalToolLabels.join(', ')}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </CapabilityDisclosure>
+                <CapabilityDisclosure
+                  title="Skills"
+                  summary={`${skillProviderCount} sources, ${skillIncludeCount} included, ${pinnedSkillCount} pinned, ${skillPolicyOverrideCount} policy overrides`}
+                  open={expandedCapabilitySectionIds.includes('skills')}
+                  onToggle={() => toggleCapabilitySection('skills')}
+                >
+                  <div className="rounded-lg border border-border bg-secondary/50 p-3 text-sm">
+                    <div className="mb-3 flex flex-wrap gap-2 text-[10px] text-muted-foreground">
+                      <span>{skillProviderCount} sources</span>
+                      <span>{skillIncludeCount} included</span>
+                      <span>{pinnedSkillCount} pinned inline</span>
+                      <span>{skillPolicyOverrideCount} policy overrides</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(['workspace', 'external', 'plugin'] as SkillSource[]).map(source => (
+                        <label
+                          key={source}
+                          className="flex items-center gap-2 rounded-md bg-background/60 px-2 py-1.5 text-xs capitalize"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={skillSourceEnabled(source)}
+                            onChange={() => toggleSkillSource(source)}
+                            aria-label={`enable ${source} skills`}
+                          />
+                          {source}
+                        </label>
+                      ))}
+                    </div>
+                    <div className="mt-3 space-y-2 border-t border-border/70 pt-2">
+                      {skillCatalog.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">No skills discovered.</p>
+                      ) : (
+                        skillCatalog.map(skill => {
+                          const ref = skillRefFor(skill);
+                          const key = skillRefKey(ref);
+                          const pinned = (formSkillSelection.pinned ?? []).some(
+                            item => skillRefKey(item) === key
+                          );
+                          const executionOverride = skillExecutionOverrideFor(skill);
                           return (
-                            <div key={label} className="rounded-md bg-background/60 px-2 py-2">
-                              <span className="font-mono text-xs" title={label}>
-                                {label}
-                              </span>
-                              <span className="ml-2 text-[10px] text-muted-foreground">
-                                not yet connected
-                              </span>
+                            <div key={key} className="rounded-md bg-background/60 px-2 py-2">
+                              <div className="flex min-w-0 items-center gap-2">
+                                <span
+                                  className="min-w-0 flex-1 truncate font-medium text-xs"
+                                  title={`${ref.source}/${skill.id}`}
+                                >
+                                  {skill.name || skill.id}
+                                </span>
+                                <select
+                                  aria-label={`skill visibility ${key}`}
+                                  value={skillVisibility(skill)}
+                                  onChange={event =>
+                                    setSkillVisibility(
+                                      skill,
+                                      event.target.value as 'default' | 'include' | 'exclude'
+                                    )
+                                  }
+                                  className="rounded border border-border bg-secondary px-1 py-0.5 text-[10px]"
+                                >
+                                  <option value="default">Default</option>
+                                  <option value="include">Include</option>
+                                  <option value="exclude">Exclude</option>
+                                </select>
+                                <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                  <input
+                                    type="checkbox"
+                                    checked={pinned}
+                                    disabled={skillVisibility(skill) === 'exclude'}
+                                    onChange={() => togglePinnedSkill(skill)}
+                                    aria-label={`pin skill ${key}`}
+                                  />
+                                  Pin
+                                </label>
+                              </div>
+                              <p
+                                className="mt-1 truncate font-mono text-[10px] text-muted-foreground"
+                                title={skill.description || `${ref.source}/${skill.id}`}
+                              >
+                                {ref.source}/{skill.id} · {skill.description || 'No description'}
+                              </p>
+                              <div className="mt-2 grid gap-2 border-t border-border/60 pt-2 sm:grid-cols-2">
+                                <label className="min-w-0 text-[10px] text-muted-foreground">
+                                  <span className="mb-1 block">Default mode</span>
+                                  <select
+                                    aria-label={`skill default mode ${key}`}
+                                    value={executionOverride?.defaultMode ?? 'default'}
+                                    onChange={event =>
+                                      setSkillDefaultMode(
+                                        skill,
+                                        event.target.value as SkillDefaultModeOption
+                                      )
+                                    }
+                                    className="w-full rounded border border-border bg-secondary px-1 py-0.5 text-[10px]"
+                                  >
+                                    <option value="default">Default</option>
+                                    <option value="inline">Inline</option>
+                                    <option value="fork">Fork</option>
+                                  </select>
+                                </label>
+                                <label className="min-w-0 text-[10px] text-muted-foreground">
+                                  <span className="mb-1 block">Fork tools</span>
+                                  <select
+                                    aria-label={`skill fork tool policy ${key}`}
+                                    value={executionOverride?.forkToolPolicy ?? 'default'}
+                                    onChange={event =>
+                                      setSkillForkToolPolicy(
+                                        skill,
+                                        event.target.value as SkillForkToolPolicyOption
+                                      )
+                                    }
+                                    className="w-full rounded border border-border bg-secondary px-1 py-0.5 text-[10px]"
+                                  >
+                                    <option value="default">Default</option>
+                                    <option value="read-only">Read-only</option>
+                                    <option value="web">Web</option>
+                                    <option value="workspace-edit">Workspace edit</option>
+                                    <option value="agent-default">Agent default</option>
+                                  </select>
+                                </label>
+                                <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                  <input
+                                    type="checkbox"
+                                    checked={
+                                      executionOverride?.allowedModes?.includes('inline') ?? false
+                                    }
+                                    onChange={() => toggleSkillAllowedMode(skill, 'inline')}
+                                    aria-label={`allow inline skill ${key}`}
+                                  />
+                                  Allow inline
+                                </label>
+                                <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                  <input
+                                    type="checkbox"
+                                    checked={
+                                      executionOverride?.allowedModes?.includes('fork') ?? false
+                                    }
+                                    onChange={() => toggleSkillAllowedMode(skill, 'fork')}
+                                    aria-label={`allow fork skill ${key}`}
+                                  />
+                                  Allow fork
+                                </label>
+                              </div>
                             </div>
                           );
-                        })}
+                        })
+                      )}
                     </div>
-                  )}
-                </div>
-                <div className="mt-2 border-t border-border/70 pt-2">
-                  <p className="text-[10px] text-muted-foreground">
-                    {formatPinnedExternalToolCount(pinnedExternalToolLabels.length)}
-                  </p>
-                  {pinnedExternalToolLabels.length > 0 && (
-                    <p
-                      className="mt-1 truncate font-mono text-[10px] text-muted-foreground"
-                      title={pinnedExternalToolLabels.join(', ')}
-                    >
-                      {pinnedExternalToolLabels.join(', ')}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </CapabilityDisclosure>
-            <CapabilityDisclosure
-              title="Skills"
-              summary={`${skillProviderCount} sources, ${skillIncludeCount} included, ${pinnedSkillCount} pinned, ${skillPolicyOverrideCount} policy overrides`}
-              open={expandedCapabilitySectionIds.includes('skills')}
-              onToggle={() => toggleCapabilitySection('skills')}
-            >
-              <div className="rounded-lg border border-border bg-secondary/50 p-3 text-sm">
-                <div className="mb-3 flex flex-wrap gap-2 text-[10px] text-muted-foreground">
-                  <span>{skillProviderCount} sources</span>
-                  <span>{skillIncludeCount} included</span>
-                  <span>{pinnedSkillCount} pinned inline</span>
-                  <span>{skillPolicyOverrideCount} policy overrides</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['workspace', 'external', 'plugin'] as SkillSource[]).map(source => (
-                    <label
-                      key={source}
-                      className="flex items-center gap-2 rounded-md bg-background/60 px-2 py-1.5 text-xs capitalize"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={skillSourceEnabled(source)}
-                        onChange={() => toggleSkillSource(source)}
-                        aria-label={`enable ${source} skills`}
-                      />
-                      {source}
-                    </label>
-                  ))}
-                </div>
-                <div className="mt-3 space-y-2 border-t border-border/70 pt-2">
-                  {skillCatalog.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">No skills discovered.</p>
-                  ) : (
-                    skillCatalog.map(skill => {
-                      const ref = skillRefFor(skill);
-                      const key = skillRefKey(ref);
-                      const pinned = (formSkillSelection.pinned ?? []).some(
-                        item => skillRefKey(item) === key
-                      );
-                      const executionOverride = skillExecutionOverrideFor(skill);
-                      return (
-                        <div key={key} className="rounded-md bg-background/60 px-2 py-2">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <span
-                              className="min-w-0 flex-1 truncate font-medium text-xs"
-                              title={`${ref.source}/${skill.id}`}
-                            >
-                              {skill.name || skill.id}
-                            </span>
-                            <select
-                              aria-label={`skill visibility ${key}`}
-                              value={skillVisibility(skill)}
-                              onChange={event =>
-                                setSkillVisibility(
-                                  skill,
-                                  event.target.value as 'default' | 'include' | 'exclude'
-                                )
-                              }
-                              className="rounded border border-border bg-secondary px-1 py-0.5 text-[10px]"
-                            >
-                              <option value="default">Default</option>
-                              <option value="include">Include</option>
-                              <option value="exclude">Exclude</option>
-                            </select>
-                            <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                              <input
-                                type="checkbox"
-                                checked={pinned}
-                                disabled={skillVisibility(skill) === 'exclude'}
-                                onChange={() => togglePinnedSkill(skill)}
-                                aria-label={`pin skill ${key}`}
-                              />
-                              Pin
-                            </label>
-                          </div>
-                          <p
-                            className="mt-1 truncate font-mono text-[10px] text-muted-foreground"
-                            title={skill.description || `${ref.source}/${skill.id}`}
-                          >
-                            {ref.source}/{skill.id} · {skill.description || 'No description'}
-                          </p>
-                          <div className="mt-2 grid gap-2 border-t border-border/60 pt-2 sm:grid-cols-2">
-                            <label className="min-w-0 text-[10px] text-muted-foreground">
-                              <span className="mb-1 block">Default mode</span>
-                              <select
-                                aria-label={`skill default mode ${key}`}
-                                value={executionOverride?.defaultMode ?? 'default'}
-                                onChange={event =>
-                                  setSkillDefaultMode(
-                                    skill,
-                                    event.target.value as SkillDefaultModeOption
-                                  )
-                                }
-                                className="w-full rounded border border-border bg-secondary px-1 py-0.5 text-[10px]"
-                              >
-                                <option value="default">Default</option>
-                                <option value="inline">Inline</option>
-                                <option value="fork">Fork</option>
-                              </select>
-                            </label>
-                            <label className="min-w-0 text-[10px] text-muted-foreground">
-                              <span className="mb-1 block">Fork tools</span>
-                              <select
-                                aria-label={`skill fork tool policy ${key}`}
-                                value={executionOverride?.forkToolPolicy ?? 'default'}
-                                onChange={event =>
-                                  setSkillForkToolPolicy(
-                                    skill,
-                                    event.target.value as SkillForkToolPolicyOption
-                                  )
-                                }
-                                className="w-full rounded border border-border bg-secondary px-1 py-0.5 text-[10px]"
-                              >
-                                <option value="default">Default</option>
-                                <option value="read-only">Read-only</option>
-                                <option value="web">Web</option>
-                                <option value="workspace-edit">Workspace edit</option>
-                                <option value="agent-default">Agent default</option>
-                              </select>
-                            </label>
-                            <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                              <input
-                                type="checkbox"
-                                checked={
-                                  executionOverride?.allowedModes?.includes('inline') ?? false
-                                }
-                                onChange={() => toggleSkillAllowedMode(skill, 'inline')}
-                                aria-label={`allow inline skill ${key}`}
-                              />
-                              Allow inline
-                            </label>
-                            <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                              <input
-                                type="checkbox"
-                                checked={executionOverride?.allowedModes?.includes('fork') ?? false}
-                                onChange={() => toggleSkillAllowedMode(skill, 'fork')}
-                                aria-label={`allow fork skill ${key}`}
-                              />
-                              Allow fork
-                            </label>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            </CapabilityDisclosure>
-          </EditorSection>
+                  </div>
+                </CapabilityDisclosure>
+              </EditorSection>
             </div>
           )}
 
           {activeTab === 'prompt' && (
             <div className="flex flex-col gap-4">
-          <EditorSection title="System Prompt">
-            {systemPromptExpanded ? (
-              <div className="space-y-2">
-                <div className="flex justify-end">
+              <EditorSection title="System Prompt">
+                {systemPromptExpanded ? (
+                  <div className="space-y-2">
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setSystemPromptExpanded(false)}
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        Collapse
+                      </button>
+                    </div>
+                    <textarea
+                      value={formSystemPrompt}
+                      onChange={e => setFormSystemPrompt(e.target.value)}
+                      onBlur={autosave.flush}
+                      placeholder="You are a helpful coding agent..."
+                      rows={9}
+                      className={`${MONO_FIELD_CLASS} min-h-[180px] resize-y`}
+                    />
+                  </div>
+                ) : (
                   <button
                     type="button"
-                    onClick={() => setSystemPromptExpanded(false)}
-                    className="text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => setSystemPromptExpanded(true)}
+                    className="flex w-full items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/55 px-3 py-2.5 text-left transition-colors hover:bg-secondary/50"
                   >
-                    Collapse
+                    <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                      {systemPromptPreview || 'No system prompt set — click to edit.'}
+                    </span>
+                    <span className="shrink-0 text-xs text-muted-foreground">Edit</span>
                   </button>
-                </div>
-                <textarea
-                  value={formSystemPrompt}
-                  onChange={e => setFormSystemPrompt(e.target.value)}
-                  onBlur={autosave.flush}
-                  placeholder="You are a helpful coding agent..."
-                  rows={9}
-                  className={`${MONO_FIELD_CLASS} min-h-[180px] resize-y`}
-                />
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setSystemPromptExpanded(true)}
-                className="flex w-full items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/55 px-3 py-2.5 text-left transition-colors hover:bg-secondary/50"
-              >
-                <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-                  {systemPromptPreview || 'No system prompt set — click to edit.'}
-                </span>
-                <span className="shrink-0 text-xs text-muted-foreground">Edit</span>
-              </button>
-            )}
-          </EditorSection>
+                )}
+              </EditorSection>
             </div>
           )}
 

@@ -141,8 +141,9 @@ describe('ProfileEditor', () => {
     fireEvent.change(screen.getByLabelText('Agent Type'), {
       target: { value: 'claude' },
     });
-    fireEvent.click(screen.getByText('Select a model'));
-    fireEvent.click(screen.getByText('Sonnet'));
+    fireEvent.change(screen.getByLabelText('Claude Model'), {
+      target: { value: 'claude-opus-4-8' },
+    });
 
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
 
@@ -170,7 +171,7 @@ describe('ProfileEditor', () => {
     expect(screen.getByText(/Claude Agent SDK/)).toBeInTheDocument();
     expect(
       screen.getByText(
-        /AI review, multimodal attachments and fallback, and background task controls are zclaudia-only/
+        /MCP servers and skills come from ~\/\.claude; built-in tool sets are not injected/
       )
     ).toBeInTheDocument();
     expect(screen.queryByText('Multimodal fallback')).toBeNull();
@@ -209,8 +210,9 @@ describe('ProfileEditor', () => {
     fireEvent.change(screen.getByLabelText('Agent Type'), {
       target: { value: 'claude' },
     });
-    fireEvent.click(screen.getByText('Select a model'));
-    fireEvent.click(screen.getByText('Sonnet'));
+    fireEvent.change(screen.getByLabelText('Claude Model'), {
+      target: { value: 'claude-opus-4-8' },
+    });
 
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
 
@@ -335,5 +337,47 @@ describe('ProfileEditor', () => {
 
     await screen.findByDisplayValue('Reviewer');
     expect(screen.queryByDisplayValue('Coder')).toBeNull();
+  });
+
+  it('Claude runtime reshapes the Model tab: native model input, no LLM model dropdown, no fallback, authNote', async () => {
+    // model: '' so the zclaudia model dropdown trigger renders its placeholder
+    // ("Select a model") rather than the already-matched "Sonnet" label.
+    await renderEditor({ ...makeProfile('p1', 'Coding'), model: '' }); // zclaudia by default
+
+    // zclaudia shows the LLM-profile-bound model dropdown trigger:
+    expect(screen.getByText('Select a model')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Agent Type'), { target: { value: 'claude' } });
+
+    // native: free-text Claude model input replaces the dropdown; fallback section gone; authNote shown.
+    expect(screen.queryByText('Select a model')).toBeNull();
+    expect(screen.getByLabelText('Claude Model')).toBeInTheDocument();
+    expect(screen.queryByText('Multimodal fallback')).toBeNull();
+    expect(screen.getByText(/Claude Agent SDK runtime/)).toBeInTheDocument();
+  });
+
+  it('switching runtime clears the model (pending re-selection)', async () => {
+    await renderEditor(makeProfile('p1', 'Coding'));
+    fireEvent.change(screen.getByLabelText('Agent Type'), { target: { value: 'claude' } });
+    expect(screen.getByLabelText('Claude Model')).toHaveValue('');
+  });
+
+  it('create: a Claude profile is valid without an LLM profile and saves llmProfileId ""', async () => {
+    vi.mocked(api.createAgentProfileForBackend).mockResolvedValue(makeProfile('n1', 'Claude Agent'));
+    const { onSaved } = await renderEditor(null); // create mode
+
+    fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), { target: { value: 'Claude Agent' } });
+    fireEvent.change(screen.getByLabelText('Agent Type'), { target: { value: 'claude' } });
+    fireEvent.change(screen.getByLabelText('Claude Model'), { target: { value: 'claude-opus-4-8' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() => {
+      expect(api.createAgentProfileForBackend).toHaveBeenCalledWith(
+        'b1',
+        expect.objectContaining({ runtimeType: 'claude', llmProfileId: '', model: 'claude-opus-4-8' })
+      );
+    });
+    await waitFor(() => { expect(onSaved).toHaveBeenCalled(); });
   });
 });
