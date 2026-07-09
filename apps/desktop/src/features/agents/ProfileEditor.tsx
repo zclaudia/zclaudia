@@ -735,8 +735,8 @@ export function ProfileEditor({
   const pinnedSkillCount = formSkillSelection.pinned?.length ?? 0;
   const skillPolicyOverrideCount = formSkillExecution.overrides?.length ?? 0;
 
-  // Chip summary of the currently-attached capabilities. Display-only preview
-  // above the accordions; removal reuses the existing disable handlers.
+  // Per-area attachment tallies for the Capabilities sub-tab counts and the
+  // aggregate capabilityCount badge on the top-level Capabilities tab.
   const enabledToolSetChips = builtinToolSetEntries.filter(set =>
     formToolSelection.sets.some(selected => selected.source === 'builtin' && selected.id === set.id)
   );
