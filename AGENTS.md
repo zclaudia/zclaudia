@@ -31,6 +31,7 @@ Non-obvious caveats for running/testing this repo in the cloud VM. The startup u
 - The server auto-seeds a "Default Coding Agent" at startup ONLY once a default LLM profile exists (`ensureDefaultAgentProfile`, runs at DB init). After creating the first LLM profile, restart the server to trigger the seed.
 - The seeded agent's default `model` may not match the LLM profile's declared `models[]`, giving readiness `no_model`; align them (PATCH `/api/agent-profiles/:id` with a model that is in the profile's `models[]`).
 - Real AI chat needs a provider key (`ANTHROPIC_API_KEY` or `OPENAI_*` — see `.env.example`); no key is present by default. Profiles created via the API are NOT network-validated, but the LLM-profile editor's model probe/fetch in the UI hits the network and will hang without a reachable provider.
+- Env credentials are materialized onto the default LLM profile at startup (`autoDetectProviders`), but the seeded profile has an EMPTY `models[]`. For a custom/non-registry model id (e.g. an OpenAI-compatible proxy serving a model pi-ai's registry doesn't know), readiness reports `no_model` until that model is declared in the profile's `models[]` (PUT `/api/llm-profiles/:id`) AND the agent's `model` matches it. Runtime execution itself still works for unregistered ids via the openai-compat literal path; only the readiness gate needs the declaration.
 
 ### Gateway & known environment-limited test failures
 
