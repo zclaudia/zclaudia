@@ -18,7 +18,7 @@ export interface UseProfileAutosaveResult {
   status: SaveStatus;
   /** Persist now if dirty+valid+enabled (e.g. on blur). */
   flush: () => void;
-  /** Re-attempt after a failure. */
+  /** Re-attempt after a failure (gated on enabled+valid). */
   retry: () => void;
 }
 
@@ -32,9 +32,24 @@ export function useProfileAutosave({
   const [status, setStatus] = useState<SaveStatus>('saved');
   const lastSaved = useRef(signature); // signature known to be persisted
   const sigRef = useRef(signature);
+  const saveRef = useRef(save);
+  const enabledRef = useRef(enabled);
+  const validRef = useRef(valid);
   const savingRef = useRef(false);
+  const mountedRef = useRef(true);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   sigRef.current = signature;
+  saveRef.current = save;
+  enabledRef.current = enabled;
+  validRef.current = valid;
+
+  useEffect(
+    () => () => {
+      mountedRef.current = false;
+      if (timer.current) clearTimeout(timer.current);
+    },
+    []
+  );
 
   const clearTimer = () => {
     if (timer.current) {
@@ -43,15 +58,18 @@ export function useProfileAutosave({
     }
   };
 
+  // Stable: reads live values from refs so the debounce effect need not depend
+  // on the (often inline) `save` closure.
   const runSave = useCallback(async () => {
     if (savingRef.current) return;
     if (sigRef.current === lastSaved.current) return;
     const saving = sigRef.current;
     savingRef.current = true;
-    setStatus('saving');
+    if (mountedRef.current) setStatus('saving');
     try {
-      await save();
+      await saveRef.current();
       lastSaved.current = saving;
+      if (!mountedRef.current) return;
       if (sigRef.current === lastSaved.current) {
         setStatus('saved');
       } else {
@@ -61,16 +79,15 @@ export function useProfileAutosave({
         timer.current = setTimeout(() => void runSave(), 0);
       }
     } catch {
-      setStatus('failed');
+      if (mountedRef.current) setStatus('failed');
     } finally {
       savingRef.current = false;
     }
-  }, [save]);
+  }, []);
 
   useEffect(() => {
     if (!enabled) return;
     if (signature === lastSaved.current) {
-      // Unchanged (or just-saved) — don't clobber a failure state.
       setStatus(s => (s === 'failed' ? s : 'saved'));
       return;
     }
@@ -86,12 +103,13 @@ export function useProfileAutosave({
   }, [signature, enabled, valid, debounceMs, runSave]);
 
   const flush = useCallback(() => {
-    if (!enabled || !valid) return;
+    if (!enabledRef.current || !validRef.current) return;
     clearTimer();
     void runSave();
-  }, [enabled, valid, runSave]);
+  }, [runSave]);
 
   const retry = useCallback(() => {
+    if (!enabledRef.current || !validRef.current) return;
     clearTimer();
     void runSave();
   }, [runSave]);
