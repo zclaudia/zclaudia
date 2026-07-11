@@ -1,4 +1,4 @@
-import { GitBranch, FileDiff } from 'lucide-react';
+import { GitBranch, FileDiff, ChevronRight } from 'lucide-react';
 import { TOOL_ICONS } from './rightSidebarToolIcons';
 import { usePluginStore, selectPluginPanels } from '../stores/pluginStore';
 import { useChangesData } from './changes/useSessionChanges';
@@ -88,7 +88,7 @@ export function RightSidebarEmptyState({
   return (
     <div className="h-full overflow-y-auto p-3 flex flex-col">
       {showStatus && (
-        <div className="flex items-center gap-2 mb-3 px-2.5 py-1.5 rounded-md bg-secondary text-xs text-muted-foreground">
+        <div className="flex items-center gap-2 mb-3 px-2.5 py-1.5 rounded-xl bg-secondary text-xs text-muted-foreground">
           {branchName && (
             <span className="flex items-center gap-1.5 min-w-0">
               <GitBranch className="w-3.5 h-3.5 flex-shrink-0" />
@@ -104,33 +104,40 @@ export function RightSidebarEmptyState({
         </div>
       )}
 
-      <div className="flex-1 flex flex-col items-center justify-center gap-1.5">
-        <div className="mb-2 text-center px-2">
+      <div className="flex-1 flex flex-col items-center justify-center">
+        <div className="mb-3 text-center px-2">
           <p className="text-sm font-medium text-foreground">Open a tool</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             Pick a tool below to open it in the workspace
           </p>
         </div>
-        {orderedTiles.map(tile => {
-          const Icon = TOOL_ICONS[tile.iconKey];
-          const subtitle = subtitleFor(tile);
-          return (
-            <button
-              key={tile.id}
-              onClick={() => openToolInWorkspace(sessionId, tile.id, { projectId, backendId })}
-              title={subtitle ?? undefined}
-              className="flex items-center justify-center gap-1.5 w-full max-w-[220px] px-2.5 py-1.5 rounded-md border border-border hover:bg-secondary"
-            >
-              {Icon && <Icon className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />}
-              <span
-                data-testid="empty-tile-label"
-                className="text-xs font-medium text-foreground truncate"
+        <div className="flex w-full max-w-[240px] flex-col gap-1.5">
+          {orderedTiles.map(tile => {
+            const Icon = TOOL_ICONS[tile.iconKey];
+            const subtitle = subtitleFor(tile);
+            return (
+              <button
+                key={tile.id}
+                onClick={() => openToolInWorkspace(sessionId, tile.id, { projectId, backendId })}
+                title={subtitle ?? undefined}
+                className="group flex w-full items-center gap-2.5 rounded-xl border border-border bg-background px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-secondary"
               >
-                {tile.label}
-              </span>
-            </button>
-          );
-        })}
+                {Icon && <Icon className="h-4 w-4 flex-shrink-0 text-muted-foreground" />}
+                <span
+                  data-testid="empty-tile-label"
+                  className="min-w-0 flex-1 truncate text-[13px] text-foreground"
+                >
+                  {tile.label}
+                </span>
+                <ChevronRight
+                  size={14}
+                  strokeWidth={1.75}
+                  className="flex-shrink-0 text-muted-foreground/30 transition-colors group-hover:text-muted-foreground"
+                />
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

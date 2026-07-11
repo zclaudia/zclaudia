@@ -21,11 +21,10 @@ import { ProjectListItem } from './ProjectListItem';
 import { NewSessionModal } from './NewSessionModal';
 import { BackendRow } from './BackendRow';
 import { useProjectStore } from '../../stores/projectStore';
-import { useOwnershipStore } from '../../stores/ownershipStore';
 import { useOnlineBackends } from './onlineBackends';
 import { useBackendConnectionLifecycle } from './useBackendConnectionLifecycle';
 import { useSidebarExpansionStore } from '../../stores/sidebarExpansionStore';
-import { NewProjectForm } from './NewProjectForm';
+import { NewProjectModal } from './NewProjectModal';
 import { SidebarFooter } from './SidebarFooter';
 import { useSidebarData } from './useSidebarData';
 import { useSidebarActions } from './useSidebarActions';
@@ -184,7 +183,6 @@ export function Sidebar({
   } | null>(null);
   const [newSessionName, setNewSessionName] = useState('');
   const [newSessionAgentProfileId, setNewSessionAgentProfileId] = useState<string>('');
-  const [newSessionWorkingDirectory, setNewSessionWorkingDirectory] = useState<string | null>(null);
   const [contextMenuProject, setContextMenuProject] = useState<string | null>(null);
   const [contextMenuPos, setContextMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [settingsProjectId, setSettingsProjectId] = useState<string | null>(null);
@@ -292,13 +290,6 @@ export function Sidebar({
   const newSessionProject = newSessionRequest?.projectId
     ? (allProjects.find(p => p.id === newSessionRequest.projectId) ?? null)
     : null;
-  // Subscribed selector (not a one-shot getState snapshot): the long-lived
-  // modal's DirectoryPicker makes live backend calls, so backendId must react
-  // to ownership changes. Safe to call unconditionally — returns null when no
-  // session is being created.
-  const newSessionBackendId = useOwnershipStore(s =>
-    s.getProjectBackendId(newSessionRequest?.projectId ?? null)
-  );
 
   // --- Automation mode wiring ---
   // Hook must run unconditionally; only consumed when automationMode is present.
@@ -325,8 +316,6 @@ export function Sidebar({
     setShowNewProjectForm,
     setNewSessionName,
     setNewSessionAgentProfileId,
-    newSessionWorkingDirectory,
-    setNewSessionWorkingDirectory,
     setCreatingSessionForProject: (projectId: string | null) =>
       setNewSessionRequest(projectId ? { projectId, pickerEnabled: false } : null),
     setCreatingProject,
@@ -593,30 +582,6 @@ export function Sidebar({
                     renderProjectItems(backendProjects)
                   )}
                 </BackendRow>
-                {showNewProjectForm && newProjectBackendId === backend.backendId && (
-                  <div className="pl-3">
-                    <NewProjectForm
-                      showForm
-                      onShowForm={(show: boolean) => {
-                        if (!show) setShowNewProjectForm(false);
-                      }}
-                      newProjectName={newProjectName}
-                      onProjectNameChange={setNewProjectName}
-                      newProjectRootPath={newProjectRootPath}
-                      onProjectRootPathChange={setNewProjectRootPath}
-                      onCreateProject={() =>
-                        runAfterAgentGate(() => actions.handleCreateProject(backend.backendId), {
-                          forceRefresh: true,
-                        })
-                      }
-                      creatingProject={creatingProject}
-                      isMobile={isMobile}
-                      backends={[backend]}
-                      selectedBackendId={backend.backendId}
-                      onSelectedBackendIdChange={setNewProjectBackendId}
-                    />
-                  </div>
-                )}
               </div>
             );
           })}
@@ -659,23 +624,18 @@ export function Sidebar({
             setNewSessionRequest(null);
             setNewSessionName('');
             setNewSessionAgentProfileId('');
-            setNewSessionWorkingDirectory(null);
           }}
           project={newSessionProject}
           projects={allProjects.filter(p => !p.isInternal)}
           showProjectPicker={newSessionRequest.pickerEnabled}
           onProjectChange={projectId => {
             setNewSessionRequest(r => (r ? { ...r, projectId } : r));
-            setNewSessionWorkingDirectory(null);
           }}
-          backendId={newSessionBackendId}
           agents={agents}
           name={newSessionName}
           onNameChange={setNewSessionName}
           agentProfileId={newSessionAgentProfileId}
           onAgentProfileIdChange={setNewSessionAgentProfileId}
-          workingDirectory={newSessionWorkingDirectory}
-          onWorkingDirectoryChange={setNewSessionWorkingDirectory}
           onCreate={() => {
             if (!newSessionProject) return;
             runAfterAgentGate(() => actions.handleCreateSession(newSessionProject.id), {
@@ -684,6 +644,36 @@ export function Sidebar({
           }}
           isConnected={isConnected}
           isMobile={isMobile}
+        />
+      )}
+      {showNewProjectForm && (
+        <NewProjectModal
+          open
+          onClose={() => {
+            setShowNewProjectForm(false);
+            setNewProjectName('');
+            setNewProjectRootPath('');
+            setNewProjectBackendId(null);
+          }}
+          name={newProjectName}
+          onNameChange={setNewProjectName}
+          rootPath={newProjectRootPath}
+          onRootPathChange={setNewProjectRootPath}
+          onCreate={() =>
+            runAfterAgentGate(() => actions.handleCreateProject(newProjectBackendId), {
+              forceRefresh: true,
+            })
+          }
+          creatingProject={creatingProject}
+          isConnected={isConnected}
+          isMobile={isMobile}
+          backends={onlineBackends.map(b => ({
+            backendId: b.backendId,
+            name: b.name,
+            online: b.online,
+          }))}
+          selectedBackendId={newProjectBackendId}
+          onSelectedBackendIdChange={setNewProjectBackendId}
         />
       )}
     </>

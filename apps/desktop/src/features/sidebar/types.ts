@@ -81,22 +81,6 @@ export interface ProjectListItemProps {
   onPopOutSession?: (sessionId: string, projectId: string) => void;
 }
 
-/** Props for NewProjectForm */
-export interface NewProjectFormProps {
-  showForm: boolean;
-  onShowForm: (show: boolean) => void;
-  newProjectName: string;
-  onProjectNameChange: (name: string) => void;
-  newProjectRootPath: string;
-  onProjectRootPathChange: (path: string) => void;
-  onCreateProject: () => void;
-  creatingProject: boolean;
-  isMobile?: boolean;
-  backends: { backendId: string; name: string; online: boolean }[];
-  selectedBackendId: string | null;
-  onSelectedBackendIdChange: (backendId: string) => void;
-}
-
 /** Props for SidebarFooter */
 export interface SidebarFooterProps {
   onShowSettings: () => void;

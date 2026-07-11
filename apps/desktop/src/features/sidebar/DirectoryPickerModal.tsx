@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowUp, Folder, Loader2 } from 'lucide-react';
+import { ArrowUp, ChevronRight, Folder, Loader2 } from 'lucide-react';
 import type { DirectoryBrowseEntry } from '@zclaudia/shared';
 import { browseDirectories } from '../../services/api';
 import { useIsMobile } from '../../hooks/useMediaQuery';
@@ -71,7 +71,13 @@ export function DirectoryPickerModal({
       isMobile={isMobile}
       zClassName="z-[110]"
       footer={
-        <div className="flex gap-2">
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="h-7 rounded-xl px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          >
+            Cancel
+          </button>
           <button
             onClick={() => {
               if (currentPath) {
@@ -80,25 +86,19 @@ export function DirectoryPickerModal({
               }
             }}
             disabled={!currentPath || loading}
-            className="flex-1 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-foreground shadow-apple-sm hover:bg-accent/80 disabled:opacity-50"
+            className="h-7 rounded-xl bg-primary px-3 text-[13px] font-medium text-primary-foreground shadow-apple-sm transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Use this folder
-          </button>
-          <button
-            onClick={onClose}
-            className="flex-1 rounded-lg bg-muted/60 px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            Cancel
           </button>
         </div>
       }
     >
-      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+      <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
         <button
           onClick={() => parent && load(parent)}
           disabled={!parent || loading}
           aria-label="Up one level"
-          className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-40 disabled:hover:bg-transparent"
+          className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-40 disabled:hover:bg-transparent"
         >
           <ArrowUp size={16} strokeWidth={1.75} />
         </button>
@@ -109,24 +109,29 @@ export function DirectoryPickerModal({
           {currentPath ?? '…'}
         </span>
       </div>
-      <div className="min-h-[140px]">
+      <div className="min-h-[140px] p-2">
         {error ? (
-          <p className="px-4 py-6 text-sm text-destructive">{error}</p>
+          <p className="px-2.5 py-6 text-sm text-destructive">{error}</p>
         ) : loading && directories.length === 0 ? (
           <div className="flex items-center justify-center py-10 text-muted-foreground">
             <Loader2 size={18} className="animate-spin" />
           </div>
         ) : directories.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-muted-foreground">No subfolders here.</p>
+          <p className="px-2.5 py-6 text-sm text-muted-foreground">No subfolders here.</p>
         ) : (
           directories.map(dir => (
             <button
               key={dir.path}
               onClick={() => load(dir.path)}
-              className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-foreground transition-colors hover:bg-secondary"
+              className="group flex w-full items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-secondary"
             >
               <Folder size={16} strokeWidth={1.75} className="flex-shrink-0 text-muted-foreground" />
-              <span className="truncate">{dir.name}</span>
+              <span className="min-w-0 flex-1 truncate">{dir.name}</span>
+              <ChevronRight
+                size={14}
+                strokeWidth={1.75}
+                className="flex-shrink-0 text-muted-foreground/40 transition-colors group-hover:text-muted-foreground"
+              />
             </button>
           ))
         )}

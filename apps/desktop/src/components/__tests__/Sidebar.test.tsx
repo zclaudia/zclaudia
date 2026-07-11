@@ -709,10 +709,12 @@ describe('Sidebar', () => {
     )!;
     fireEvent.click(newProjectBtn);
 
-    const inputs = container.querySelectorAll('input');
-    // Should show project name and root path inputs
+    const inputs = document.querySelectorAll('input');
+    // Should show project name and root path inputs (portaled modal)
     const nameInput = Array.from(inputs).find(i => i.placeholder === 'Project name');
-    const pathInput = Array.from(inputs).find(i => i.placeholder?.includes('Working directory'));
+    const pathInput = Array.from(inputs).find(
+      i => i.getAttribute('aria-label') === 'Working directory'
+    );
     expect(nameInput).toBeTruthy();
     expect(pathInput).toBeTruthy();
   });
@@ -741,7 +743,7 @@ describe('Sidebar', () => {
       expect(document.body.textContent).toContain('No agent available yet');
     });
     expect(refresh).toHaveBeenCalled();
-    expect(container.querySelector('input[placeholder="Project name"]')).toBeFalsy();
+    expect(document.querySelector('input[placeholder="Project name"]')).toBeFalsy();
   });
 
   it('opens the Agents shell mode from the agent setup dialog configure action', async () => {
@@ -826,12 +828,12 @@ describe('Sidebar', () => {
     )!;
     fireEvent.click(newProjectBtn);
 
-    const inputs = container.querySelectorAll('input');
+    const inputs = document.querySelectorAll('input');
     const nameInput = Array.from(inputs).find(i => i.placeholder === 'Project name')!;
     fireEvent.change(nameInput, { target: { value: 'My New Project' } });
 
-    // Click Create button
-    const allButtons = Array.from(container.querySelectorAll('button'));
+    // Click Create button (portaled modal footer)
+    const allButtons = Array.from(document.querySelectorAll('button'));
     const createBtn = allButtons.find(b => b.textContent === 'Create')!;
     await act(async () => {
       fireEvent.click(createBtn);
@@ -870,12 +872,12 @@ describe('Sidebar', () => {
     )!;
     fireEvent.click(newProjectBtn);
 
-    const nameInput = container.querySelector('input[placeholder="Project name"]')!;
+    const nameInput = document.querySelector('input[placeholder="Project name"]')!;
     fireEvent.change(nameInput, { target: { value: 'Blocked Project' } });
     shouldFailReadiness = true;
     useAgentReadinessStore.setState({ readiness: null, refresh } as any);
 
-    const createBtn = Array.from(container.querySelectorAll('button')).find(
+    const createBtn = Array.from(document.querySelectorAll('button')).find(
       b => b.textContent === 'Create'
     )!;
     await act(async () => {
@@ -896,12 +898,12 @@ describe('Sidebar', () => {
     fireEvent.click(newProjectBtn);
 
     // Click Cancel
-    const allButtons = Array.from(container.querySelectorAll('button'));
+    const allButtons = Array.from(document.querySelectorAll('button'));
     const cancelBtn = allButtons.find(b => b.textContent === 'Cancel')!;
     fireEvent.click(cancelBtn);
 
     // Form should be gone
-    const inputs = container.querySelectorAll('input');
+    const inputs = document.querySelectorAll('input');
     const nameInput = Array.from(inputs).find(i => i.placeholder === 'Project name');
     expect(nameInput).toBeFalsy();
   });
@@ -913,12 +915,12 @@ describe('Sidebar', () => {
     )!;
     fireEvent.click(newProjectBtn);
 
-    const inputs = container.querySelectorAll('input');
+    const inputs = document.querySelectorAll('input');
     const nameInput = Array.from(inputs).find(i => i.placeholder === 'Project name')!;
     fireEvent.keyDown(nameInput, { key: 'Escape' });
 
     // Form should be gone
-    const nameInputAfter = Array.from(container.querySelectorAll('input')).find(
+    const nameInputAfter = Array.from(document.querySelectorAll('input')).find(
       i => i.placeholder === 'Project name'
     );
     expect(nameInputAfter).toBeFalsy();
@@ -934,9 +936,11 @@ describe('Sidebar', () => {
     )!;
     fireEvent.click(newProjectBtn);
 
-    const inputs = container.querySelectorAll('input');
+    const inputs = document.querySelectorAll('input');
     const nameInput = Array.from(inputs).find(i => i.placeholder === 'Project name')!;
-    const pathInput = Array.from(inputs).find(i => i.placeholder?.includes('Working directory'))!;
+    const pathInput = Array.from(inputs).find(
+      i => i.getAttribute('aria-label') === 'Working directory'
+    )!;
     fireEvent.change(nameInput, { target: { value: 'Test Project' } });
     fireEvent.change(pathInput, { target: { value: '/tmp/test' } });
 
