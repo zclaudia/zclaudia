@@ -35,9 +35,14 @@ vi.mock('fs', () => ({
 }));
 
 // Mock os
+// `tmpdir` is included because `initDatabase` transitively pulls in the provider
+// registry (via agent-profiles repository -> runtime-type-guard -> registry), whose
+// module graph reaches pi-runtime/file-history.ts, which calls `os.tmpdir()` at
+// module load time.
 vi.mock('os', () => ({
-  default: { homedir: vi.fn(() => '/home/testuser') },
+  default: { homedir: vi.fn(() => '/home/testuser'), tmpdir: vi.fn(() => '/tmp') },
   homedir: vi.fn(() => '/home/testuser'),
+  tmpdir: vi.fn(() => '/tmp'),
 }));
 
 describe('storage/db', () => {
@@ -365,8 +370,9 @@ describe('storage/db', () => {
       vi.resetModules();
       // Need to re-mock after reset
       vi.doMock('os', () => ({
-        default: { homedir: vi.fn(() => '/home/testuser') },
+        default: { homedir: vi.fn(() => '/home/testuser'), tmpdir: vi.fn(() => '/tmp') },
         homedir: vi.fn(() => '/home/testuser'),
+        tmpdir: vi.fn(() => '/tmp'),
       }));
       vi.doMock('fs', () => ({
         default: mockFsMethods,

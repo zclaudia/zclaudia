@@ -2,7 +2,6 @@ import { BaseRepository } from '../../infra/repositories/base.js';
 import type { Database } from 'better-sqlite3';
 import type {
   AgentProfileConfig,
-  AgentRuntimeType,
   MultimodalFallbackConfig,
   ThinkingLevel,
 } from '@zclaudia/shared/core/agent-profile';
@@ -26,6 +25,7 @@ import {
   type ToolSetRef,
 } from '@zclaudia/shared/core/tools';
 import { newId } from '../../utils/uuid.js';
+import { isValidRuntimeType } from './runtime-type-guard.js';
 
 const VALID_THINKING_LEVELS = new Set<ThinkingLevel>([
   'off',
@@ -35,8 +35,6 @@ const VALID_THINKING_LEVELS = new Set<ThinkingLevel>([
   'high',
   'xhigh',
 ]);
-const AGENT_RUNTIME_TYPES: readonly AgentRuntimeType[] = ['zclaudia', 'claude', 'codex', 'cursor'];
-const VALID_RUNTIME_TYPES = new Set<string>(AGENT_RUNTIME_TYPES);
 
 type AgentProfileCreate = Omit<AgentProfileConfig, 'id' | 'createdAt' | 'updatedAt'>;
 type AgentProfileUpdate = Partial<Omit<AgentProfileConfig, 'id' | 'createdAt' | 'updatedAt'>> & {
@@ -44,10 +42,8 @@ type AgentProfileUpdate = Partial<Omit<AgentProfileConfig, 'id' | 'createdAt' | 
   cliPath?: string | null;
 };
 
-function normalizeRuntimeType(raw: unknown): AgentRuntimeType {
-  return typeof raw === 'string' && VALID_RUNTIME_TYPES.has(raw)
-    ? (raw as AgentRuntimeType)
-    : 'zclaudia';
+function normalizeRuntimeType(raw: unknown): string {
+  return typeof raw === 'string' && isValidRuntimeType(raw) ? raw : 'zclaudia';
 }
 
 function normalizeEnabledTools(tools: string[]): string[] {

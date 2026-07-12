@@ -19,8 +19,20 @@ export class ProviderRegistry implements ProviderRegistryPort {
   private adapters = new Map<string, ProviderAdapter>();
   private defaultType = 'zclaudia';
   private pluginAdapterTypes = new Map<string, Set<string>>(); // pluginId -> types
+  private builtinsRegistered = false;
 
-  constructor() {
+  /**
+   * Built-in adapters are registered lazily (on first real use) rather than in the
+   * constructor. Several domains transitively import this module as part of a
+   * dependency cycle that loops back through `pi-agent/adapter.ts` (the module that
+   * defines `PiAgentProviderAdapter`); constructing that adapter eagerly at module
+   * top-level can run while `PiAgentProviderAdapter`'s own module is still mid-evaluation,
+   * throwing "PiAgentProviderAdapter is not a constructor". Deferring registration until
+   * a method is actually called sidesteps that import-order hazard.
+   */
+  private ensureBuiltinsRegistered(): void {
+    if (this.builtinsRegistered) return;
+    this.builtinsRegistered = true;
     this.register(new PiAgentProviderAdapter());
     this.register(new ClaudeAgentAdapter());
   }
@@ -30,6 +42,7 @@ export class ProviderRegistry implements ProviderRegistryPort {
   }
 
   registerPluginAdapter(pluginId: string, adapter: ProviderAdapter): void {
+    this.ensureBuiltinsRegistered();
     const ownedByPlugin = this.pluginAdapterTypes.get(pluginId)?.has(adapter.type) ?? false;
     if (this.adapters.has(adapter.type) && !ownedByPlugin) {
       throw new Error(
@@ -50,33 +63,40 @@ export class ProviderRegistry implements ProviderRegistryPort {
   }
 
   hasType(type: string): boolean {
+    this.ensureBuiltinsRegistered();
     return this.adapters.has(type);
   }
 
   listTypes(): string[] {
+    this.ensureBuiltinsRegistered();
     return Array.from(this.adapters.keys());
   }
 
   get(type: string): ProviderAdapter | undefined {
+    this.ensureBuiltinsRegistered();
     return this.adapters.get(type);
   }
 
   getOrDefault(type: string): ProviderAdapter {
+    this.ensureBuiltinsRegistered();
     return this.adapters.get(type) || this.adapters.get(this.defaultType)!;
   }
 
   /** Get PCP manifest for a provider */
   getManifest(type: string): PCPProviderManifest | undefined {
+    this.ensureBuiltinsRegistered();
     return this.adapters.get(type)?.manifest;
   }
 
   /** Get ZClaudia runtime policy for a provider */
   getPolicy(type: string): ProviderPolicy | undefined {
+    this.ensureBuiltinsRegistered();
     return this.adapters.get(type)?.policy;
   }
 
   /** Get the composed provider definition used by the runtime. */
   getDefinition(type: string): ProviderDefinition | undefined {
+    this.ensureBuiltinsRegistered();
     const adapter = this.adapters.get(type);
     if (!adapter?.manifest) return undefined;
     return {
@@ -89,6 +109,7 @@ export class ProviderRegistry implements ProviderRegistryPort {
 
   /** Get all registered PCP manifests */
   getAllManifests(): PCPProviderManifest[] {
+    this.ensureBuiltinsRegistered();
     return Array.from(this.adapters.values())
       .map(a => a.manifest)
       .filter((m): m is PCPProviderManifest => !!m);

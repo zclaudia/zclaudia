@@ -1,12 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type Database from 'better-sqlite3';
-import type {
-  AgentProfileConfig,
-  AgentRuntimeType,
-  ThinkingLevel,
-} from '@zclaudia/shared/core/agent-profile';
-import { AGENT_RUNTIME_TYPES } from '@zclaudia/shared/core/agent-profile';
+import type { AgentProfileConfig, ThinkingLevel } from '@zclaudia/shared/core/agent-profile';
 import { runtimeRequiresLlmProfile } from '@zclaudia/shared/core/profile-config-descriptor';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import { AgentProfileRepository } from './repository.js';
@@ -17,6 +12,8 @@ import {
   AgentProfileNotFoundError,
 } from './agent-profile-deletion-service.js';
 import { resolveAgentReadiness } from '../agent-readiness/check.js';
+import { isValidRuntimeType } from './runtime-type-guard.js';
+import { providerRegistry } from '../../infra/providers/registry.js';
 
 const VALID_THINKING_LEVELS: readonly ThinkingLevel[] = [
   'off',
@@ -27,14 +24,12 @@ const VALID_THINKING_LEVELS: readonly ThinkingLevel[] = [
   'xhigh',
 ];
 
-const VALID_RUNTIME_TYPES: readonly AgentRuntimeType[] = AGENT_RUNTIME_TYPES;
-
-function validateRuntimeType(input: unknown): AgentRuntimeType | undefined | null {
+function validateRuntimeType(input: unknown): string | undefined | null {
   if (input === undefined) return undefined;
-  if (typeof input !== 'string' || !VALID_RUNTIME_TYPES.includes(input as AgentRuntimeType)) {
+  if (typeof input !== 'string' || !isValidRuntimeType(input)) {
     return null;
   }
-  return input as AgentRuntimeType;
+  return input;
 }
 
 type MultimodalFallbackValidation =
@@ -197,7 +192,7 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
           success: false,
           error: {
             code: 'VALIDATION_ERROR',
-            message: `Invalid runtimeType. Must be one of: ${VALID_RUNTIME_TYPES.join(', ')}`,
+            message: `Invalid runtimeType. Must be one of: ${providerRegistry.listTypes().join(', ')}`,
           },
         });
         return;
@@ -307,7 +302,7 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
           success: false,
           error: {
             code: 'VALIDATION_ERROR',
-            message: `Invalid runtimeType. Must be one of: ${VALID_RUNTIME_TYPES.join(', ')}`,
+            message: `Invalid runtimeType. Must be one of: ${providerRegistry.listTypes().join(', ')}`,
           },
         });
         return;
