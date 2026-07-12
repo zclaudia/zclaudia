@@ -2,9 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { RuntimeDescriptorRegistry } from '../runtime-descriptor-registry.js';
 import type { AgentRuntimeDescriptor } from '@zclaudia/shared/providers';
 
-// NOTE: type is 'other' (not 'claude') because 'claude' is now transitionally
-// seeded as a built-in descriptor (Task 2.9) and would collide with these
-// plugin-registration fixtures.
 const otherDesc: AgentRuntimeDescriptor = {
   type: 'other',
   label: 'Other',
@@ -22,12 +19,12 @@ describe('RuntimeDescriptorRegistry', () => {
     expect(reg.list().some(d => d.type === 'zclaudia')).toBe(true);
   });
 
-  it('transitionally seeds claude and lists it', () => {
+  it('does not seed claude; a plugin can register it', () => {
     const reg = new RuntimeDescriptorRegistry();
-    const claude = reg.get('claude');
-    expect(claude?.label).toBe('Claude');
-    expect(claude?.model).toEqual({ kind: 'native', multimodalFallback: false, thinkingLevel: true });
-    expect(reg.list().some(d => d.type === 'claude')).toBe(true);
+    expect(reg.get('claude')).toBeUndefined();
+    const claudeDesc: AgentRuntimeDescriptor = { ...otherDesc, type: 'claude', label: 'Claude' };
+    expect(() => reg.registerForPlugin('com.zclaudia.claude', claudeDesc)).not.toThrow();
+    expect(reg.get('claude')?.label).toBe('Claude');
   });
 
   it('adds and removes plugin descriptors by plugin id', () => {
@@ -42,14 +39,6 @@ describe('RuntimeDescriptorRegistry', () => {
     const reg = new RuntimeDescriptorRegistry();
     const collide: AgentRuntimeDescriptor = { ...otherDesc, type: 'zclaudia' };
     expect(() => reg.registerForPlugin('com.zclaudia.other', collide)).toThrow(
-      /already registered/
-    );
-  });
-
-  it('throws when a plugin tries to claim the transitionally-seeded claude type', () => {
-    const reg = new RuntimeDescriptorRegistry();
-    const claimClaude: AgentRuntimeDescriptor = { ...otherDesc, type: 'claude' };
-    expect(() => reg.registerForPlugin('com.zclaudia.claude', claimClaude)).toThrow(
       /already registered/
     );
   });

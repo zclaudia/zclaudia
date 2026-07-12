@@ -3,7 +3,6 @@ import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
 import type { ProviderDefinition } from './definitions.js';
 import type { ProviderAdapter } from './types.js';
 import { PiAgentProviderAdapter } from './pi-agent/adapter.js';
-import { ClaudeAgentAdapter } from './external-agents/claude/adapter.js';
 
 /** Port interface — conversation domain depends on this, not on the concrete registry. */
 export interface ProviderRegistryPort {
@@ -34,7 +33,6 @@ export class ProviderRegistry implements ProviderRegistryPort {
     if (this.builtinsRegistered) return;
     this.builtinsRegistered = true;
     this.register(new PiAgentProviderAdapter());
-    this.register(new ClaudeAgentAdapter());
   }
 
   register(adapter: ProviderAdapter): void {

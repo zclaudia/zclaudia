@@ -1,3 +1,4 @@
+import { runtimeRequiresLlmProfile as staticRuntimeRequiresLlmProfile } from '@zclaudia/shared/core/profile-config-descriptor';
 import { providerRegistry } from '../../infra/providers/registry.js';
 import { runtimeDescriptorRegistry } from '../../infra/providers/runtime-descriptor-registry.js';
 
@@ -11,4 +12,17 @@ import { runtimeDescriptorRegistry } from '../../infra/providers/runtime-descrip
  */
 export function isValidRuntimeType(type: string): boolean {
   return providerRegistry.hasType(type) || runtimeDescriptorRegistry.hasType(type);
+}
+
+/**
+ * Whether a runtime binds an LLM profile. Plugin-contributed runtimes (e.g. the
+ * claude plugin) declare this via their registered descriptor's `model.kind`;
+ * runtimes without a registered descriptor fall back to the static shared map.
+ */
+export function runtimeRequiresLlmProfile(runtimeType: string | undefined): boolean {
+  if (runtimeType) {
+    const descriptor = runtimeDescriptorRegistry.get(runtimeType);
+    if (descriptor) return descriptor.model.kind === 'llm-profile';
+  }
+  return staticRuntimeRequiresLlmProfile(runtimeType);
 }

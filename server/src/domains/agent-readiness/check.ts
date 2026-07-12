@@ -5,7 +5,7 @@ import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import { AgentProfileRepository } from '../agent-profiles/repository.js';
 import { LlmProfileRepository } from '../llm-profiles/repository.js';
 import { hasLlmCredential } from './credential.js';
-import { runtimeRequiresLlmProfile } from '@zclaudia/shared/core/profile-config-descriptor';
+import { runtimeRequiresLlmProfile } from '../agent-profiles/runtime-type-guard.js';
 import {
   findInRegistryCrossProvider,
   tryGetRegistryModel,

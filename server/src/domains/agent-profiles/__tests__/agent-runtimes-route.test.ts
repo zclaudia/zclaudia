@@ -17,7 +17,7 @@ describe('GET /api/agent-runtimes', () => {
     app = buildApp();
   });
 
-  it('returns an array including zclaudia and claude with label, model, capabilities', async () => {
+  it('returns only the built-in zclaudia runtime by default (claude ships as a plugin)', async () => {
     const res = await request(app).get('/api/agent-runtimes');
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
@@ -32,17 +32,6 @@ describe('GET /api/agent-runtimes', () => {
     expect(byRuntime.zclaudia.model).toBeDefined();
     expect(byRuntime.zclaudia.capabilities).toBeDefined();
 
-    expect(byRuntime.claude).toBeDefined();
-    expect(byRuntime.claude.label).toBe('Claude');
-    expect(byRuntime.claude.model).toEqual({
-      kind: 'native',
-      multimodalFallback: false,
-      thinkingLevel: true,
-    });
-    expect(byRuntime.claude.capabilities).toEqual({
-      tools: 'native-readonly',
-      providers: 'external',
-      skills: 'external',
-    });
+    expect(byRuntime.claude).toBeUndefined();
   });
 });

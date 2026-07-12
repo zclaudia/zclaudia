@@ -5,6 +5,11 @@ import Database from 'better-sqlite3';
 import { applyMigrations } from '../../../infra/storage/migrations/index.js';
 import { createAgentProfileRoutes } from '../routes.js';
 import { LlmProfileRepository } from '../../llm-profiles/repository.js';
+import { registerClaudeTestRuntime } from '../../../test/claude-runtime-fixture.js';
+
+// The claude runtime ships as a plugin; simulate it being active so the routes
+// accept 'claude' as a valid runtime type.
+registerClaudeTestRuntime();
 
 function buildApp(db: Database.Database) {
   const app = express();

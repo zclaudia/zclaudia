@@ -29,10 +29,16 @@ describe('ProviderRegistry', () => {
       expect(adapter!.type).toBe('zclaudia');
     });
 
-    it('has a claude runtime adapter registered by default', () => {
-      const adapter = providerRegistry.get('claude');
-      expect(adapter).toBeDefined();
-      expect(adapter!.type).toBe('claude');
+    it('does not register claude as a built-in (it is a plugin runtime)', () => {
+      const reg = new ProviderRegistry();
+      expect(reg.get('claude')).toBeUndefined();
+    });
+
+    it('accepts claude when registered via a plugin adapter', () => {
+      const reg = new ProviderRegistry();
+      reg.registerPluginAdapter('com.zclaudia.claude', fakeAdapter('claude'));
+      expect(reg.hasType('claude')).toBe(true);
+      expect(reg.get('claude')?.type).toBe('claude');
     });
   });
 
@@ -101,27 +107,13 @@ describe('ProviderRegistry', () => {
       expect(definition?.policy).toBe(policy);
     });
 
-    it('only registers migrated coding agent adapters by default', () => {
-      expect(providerRegistry.get('claude')).toBeDefined();
+    it('only registers the built-in zclaudia adapter by default', () => {
+      expect(providerRegistry.get('zclaudia')).toBeDefined();
+      expect(providerRegistry.get('claude')).toBeUndefined();
       expect(providerRegistry.get('opencode')).toBeUndefined();
       expect(providerRegistry.get('codex')).toBeUndefined();
       expect(providerRegistry.get('cursor')).toBeUndefined();
       expect(providerRegistry.get('kimi')).toBeUndefined();
-    });
-
-    it('declares Claude advanced capabilities as unsupported until implemented', () => {
-      const definition = providerRegistry.getDefinition('claude');
-      const capabilities = Object.fromEntries(
-        definition!.capabilityManifest.capabilities.map(capability => [
-          capability.id,
-          capability.supported,
-        ])
-      );
-
-      expect(capabilities['input.image']).toBe(false);
-      expect(capabilities['input.text_file']).toBe(false);
-      expect(capabilities['input.binary_file']).toBe(false);
-      expect(capabilities['session.background_task']).toBe(false);
     });
   });
 });

@@ -15,33 +15,20 @@ describe('profile config descriptors', () => {
     expect(runtimeRequiresLlmProfile('zclaudia')).toBe(true);
   });
 
-  it('claude uses a native model, no fallback, native-readonly tools', () => {
-    const d = getProfileConfigDescriptor('claude');
-    expect(d.model.kind).toBe('native');
-    expect(d.model.multimodalFallback).toBe(false);
-    expect(d.capabilities.tools).toBe('native-readonly');
-    expect(d.capabilities.providers).toBe('external');
-    expect(runtimeRequiresLlmProfile('claude')).toBe(false);
-  });
-
   it('defaults to the zclaudia descriptor when runtime is undefined', () => {
     expect(getProfileConfigDescriptor(undefined).runtime).toBe('zclaudia');
+  });
+
+  it('falls back to the zclaudia descriptor for runtimes contributed by plugins', () => {
+    expect(getProfileConfigDescriptor('claude').runtime).toBe('zclaudia');
   });
 
   it('only exposes enabled runtimes in the selector list', () => {
     const enabled = enabledRuntimeDescriptors().map(d => d.runtime);
     expect(enabled).toContain('zclaudia');
-    expect(enabled).toContain('claude');
-    expect(enabled).not.toContain('codex');
-    expect(enabled).not.toContain('cursor');
   });
 
-  it('covers every AgentRuntimeType', () => {
-    expect(Object.keys(PROFILE_CONFIG_DESCRIPTORS).sort()).toEqual([
-      'claude',
-      'codex',
-      'cursor',
-      'zclaudia',
-    ]);
+  it('only ships the built-in zclaudia descriptor; plugins add the rest', () => {
+    expect(Object.keys(PROFILE_CONFIG_DESCRIPTORS).sort()).toEqual(['zclaudia']);
   });
 });

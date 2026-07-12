@@ -12,7 +12,6 @@
     "start": "node dist/index.js",
     "clean": "rm -rf dist bundle",
     "bundle": "node scripts/bundle.mjs",
-    "smoke:claude-runtime": "tsx scripts/smoke-claude-runtime.ts",
     "trace:llm-profile": "tsx scripts/trace-llm-profile-session.ts",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
@@ -22,7 +21,6 @@
     "postinstall": "node scripts/fix-node-pty.js"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.104",
     "@anthropic-ai/sandbox-runtime": "^0.0.54",
     "@ast-grep/napi": "^0.43.0",
     "@earendil-works/pi-agent-core": "^0.79.3",

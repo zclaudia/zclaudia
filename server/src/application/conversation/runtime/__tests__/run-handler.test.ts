@@ -304,7 +304,7 @@ async function* createProviderStream() {
 }
 
 describe('ws/run-handler', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     getGatewayClientMock.mockReturnValue(null);
     providerRunMock.mockReturnValue(createProviderStream());
@@ -312,6 +312,12 @@ describe('ws/run-handler', () => {
     assembleSystemPromptMock.mockResolvedValue('workspace prompt');
     buildSkillDirectoryHintMock.mockReturnValue('skill directory');
     toolRegistryGetAllMock.mockReturnValue([]);
+    // Simulate the com.zclaudia.claude plugin being active so a profile with
+    // runtimeType 'claude' persists rather than normalizing to zclaudia.
+    // Imported lazily (like run-handler.js below) so the real registry module
+    // graph loads after vi.mock hoisting completes.
+    const { registerClaudeTestRuntime } = await import('../../../../test/claude-runtime-fixture.js');
+    registerClaudeTestRuntime();
   });
 
   it('selects the runtime adapter from the resolved agent profile runtime type', async () => {

@@ -39,29 +39,6 @@ export const PROFILE_CONFIG_DESCRIPTORS: Record<string, ProfileConfigDescriptor>
     model: { kind: 'llm-profile', multimodalFallback: true, thinkingLevel: true },
     capabilities: { tools: 'profile', providers: 'profile', skills: 'profile' },
   },
-  claude: {
-    runtime: 'claude',
-    label: 'Claude',
-    enabled: true,
-    model: { kind: 'native', multimodalFallback: false, thinkingLevel: true },
-    capabilities: { tools: 'native-readonly', providers: 'external', skills: 'external' },
-    authNote:
-      'Claude uses the Claude Agent SDK runtime. MCP servers and skills come from ~/.claude; built-in tool sets are not injected.',
-  },
-  codex: {
-    runtime: 'codex',
-    label: 'Codex',
-    enabled: false,
-    model: { kind: 'native', multimodalFallback: false, thinkingLevel: false },
-    capabilities: { tools: 'native-readonly', providers: 'external', skills: 'external' },
-  },
-  cursor: {
-    runtime: 'cursor',
-    label: 'Cursor',
-    enabled: false,
-    model: { kind: 'native', multimodalFallback: false, thinkingLevel: false },
-    capabilities: { tools: 'native-readonly', providers: 'external', skills: 'external' },
-  },
 };
 
 export function getProfileConfigDescriptor(

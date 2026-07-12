@@ -4,6 +4,11 @@ import { applyMigrations } from '../../../infra/storage/migrations/index.js';
 import { AgentProfileRepository } from '../../agent-profiles/repository.js';
 import { LlmProfileRepository } from '../../llm-profiles/repository.js';
 import { resolveAgentReadiness } from '../check.js';
+import { registerClaudeTestRuntime } from '../../../test/claude-runtime-fixture.js';
+
+// The claude runtime ships as a plugin; simulate it being active so its native
+// (no-llm-profile) readiness path is exercised.
+registerClaudeTestRuntime();
 
 let db: Database.Database;
 const SAVED: Record<string, string | undefined> = {};

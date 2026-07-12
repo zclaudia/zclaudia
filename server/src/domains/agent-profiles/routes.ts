@@ -2,7 +2,6 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type Database from 'better-sqlite3';
 import type { AgentProfileConfig, ThinkingLevel } from '@zclaudia/shared/core/agent-profile';
-import { runtimeRequiresLlmProfile } from '@zclaudia/shared/core/profile-config-descriptor';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import { AgentProfileRepository } from './repository.js';
 import { LlmProfileRepository } from '../llm-profiles/repository.js';
@@ -12,7 +11,7 @@ import {
   AgentProfileNotFoundError,
 } from './agent-profile-deletion-service.js';
 import { resolveAgentReadiness } from '../agent-readiness/check.js';
-import { isValidRuntimeType } from './runtime-type-guard.js';
+import { isValidRuntimeType, runtimeRequiresLlmProfile } from './runtime-type-guard.js';
 import { providerRegistry } from '../../infra/providers/registry.js';
 
 const VALID_THINKING_LEVELS: readonly ThinkingLevel[] = [

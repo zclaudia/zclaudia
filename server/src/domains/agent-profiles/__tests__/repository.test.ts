@@ -4,6 +4,11 @@ import { ALL_TOOL_NAMES } from '@zclaudia/shared/core/tools';
 import { applyMigrations } from '../../../infra/storage/migrations/index.js';
 import { AgentProfileRepository } from '../repository.js';
 import { LlmProfileRepository } from '../../llm-profiles/repository.js';
+import { registerClaudeTestRuntime } from '../../../test/claude-runtime-fixture.js';
+
+// The claude runtime ships as a plugin; simulate it being active so 'claude'
+// validates as a runtime type and persists rather than normalizing to zclaudia.
+registerClaudeTestRuntime();
 
 describe('AgentProfileRepository', () => {
   let db: Database.Database;
