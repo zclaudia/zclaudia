@@ -63,7 +63,14 @@ export function useProfileAutosave({
   // on the (often inline) `save` closure.
   const runSave = useCallback(async () => {
     if (savingRef.current) return;
-    if (sigRef.current === lastSaved.current) return;
+    if (sigRef.current === lastSaved.current) {
+      // Nothing new to persist and no save in flight. Never leave a stale
+      // "saving" spinner up: this fires when a scheduled/trailing run finds the
+      // current signature already saved (e.g. the signature blipped and settled
+      // back to the persisted value while a save was completing).
+      if (mountedRef.current) setStatus(s => (s === 'saving' ? 'saved' : s));
+      return;
+    }
     const saving = sigRef.current;
     savingRef.current = true;
     if (mountedRef.current) setStatus('saving');
@@ -85,6 +92,17 @@ export function useProfileAutosave({
       savingRef.current = false;
     }
   }, []);
+
+  // Safety net: the spinner must never outlive the work. If a render settles
+  // with no save in flight and the current signature already persisted, the
+  // status can only legitimately be "saved" — converge there. Guards against
+  // timing/batching races (e.g. a prop blip around a completing save) that
+  // could otherwise strand the indicator on "saving".
+  useEffect(() => {
+    if (status === 'saving' && !savingRef.current && sigRef.current === lastSaved.current) {
+      setStatus('saved');
+    }
+  });
 
   useEffect(() => {
     const justEnabled = enabled && !prevEnabledRef.current;

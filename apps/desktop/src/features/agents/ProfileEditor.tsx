@@ -838,21 +838,15 @@ export function ProfileEditor({
               <EditorSection title="Runtime & model" flush>
                 <div className="divide-y divide-border/60">
                   <EditorRow
-                    title={<label htmlFor="agent-profile-runtime">Agent Type</label>}
+                    title="Agent Type"
                     control={
-                      <select
-                        id="agent-profile-runtime"
-                        aria-label="Agent Type"
-                        value={formRuntimeType}
-                        onChange={e => handleRuntimeChange(e.target.value as RuntimeOption)}
-                        className={`${FIELD_CLASS} w-56`}
-                      >
-                        {enabledRuntimeDescriptors().map(d => (
-                          <option key={d.runtime} value={d.runtime}>
-                            {d.label}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="w-56">
+                        <RuntimeSelector
+                          aria-label="Agent Type"
+                          value={formRuntimeType}
+                          onChange={handleRuntimeChange}
+                        />
+                      </div>
                     }
                   />
 
@@ -862,43 +856,38 @@ export function ProfileEditor({
                         title={<label htmlFor="agent-profile-cli-path">CLI Path</label>}
                         description="Optional — custom Claude CLI binary"
                         control={
-                          <input
-                            id="agent-profile-cli-path"
-                            type="text"
-                            aria-label="CLI Path (optional)"
-                            value={formCliPath}
-                            onChange={e => setFormCliPath(e.target.value)}
-                            onBlur={autosave.flush}
-                            placeholder="/opt/homebrew/bin/claude"
-                            className={`${MONO_FIELD_CLASS} w-56`}
-                          />
+                          <div className="w-56">
+                            <input
+                              id="agent-profile-cli-path"
+                              type="text"
+                              aria-label="CLI Path (optional)"
+                              value={formCliPath}
+                              onChange={e => setFormCliPath(e.target.value)}
+                              onBlur={autosave.flush}
+                              placeholder="/opt/homebrew/bin/claude"
+                              className={MONO_FIELD_CLASS}
+                            />
+                          </div>
                         }
                       />
                       <EditorRow
                         title="Claude Model"
                         control={
-                          <input
-                            type="text"
-                            readOnly
-                            aria-readonly="true"
-                            aria-label="Claude Model"
-                            value="Auto (Claude CLI default)"
-                            className={`${FIELD_CLASS} w-56 cursor-default text-muted-foreground`}
-                          />
+                          <span aria-label="Claude Model" className="text-sm text-muted-foreground">
+                            Auto (Claude CLI default)
+                          </span>
                         }
                       />
                       {activeDescriptor.model.thinkingLevel && (
                         <EditorRow
                           title="Thinking Level"
                           control={
-                            <input
-                              type="text"
-                              readOnly
-                              aria-readonly="true"
+                            <span
                               aria-label="Thinking Level"
-                              value="Auto"
-                              className={`${FIELD_CLASS} w-56 cursor-default text-muted-foreground`}
-                            />
+                              className="text-sm text-muted-foreground"
+                            >
+                              Auto
+                            </span>
                           }
                         />
                       )}
@@ -1929,6 +1918,72 @@ function ThinkingLevelSelector({
             >
               <span className="w-4 flex-shrink-0">
                 {opt.value === value && <Check size={14} strokeWidth={2.5} />}
+              </span>
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RuntimeSelector({
+  value,
+  onChange,
+  'aria-label': ariaLabel,
+}: {
+  value: RuntimeOption;
+  onChange: (v: RuntimeOption) => void;
+  'aria-label'?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const options = enabledRuntimeDescriptors();
+  const selected = options.find(o => o.runtime === value);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-label={ariaLabel}
+        className={`${FIELD_CLASS} flex items-center justify-between text-left`}
+      >
+        <span>{selected?.label ?? value}</span>
+        <ChevronDown
+          size={14}
+          className={`text-muted-foreground transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {open && (
+        <div className="absolute left-0 right-0 top-full mt-1 bg-popover/95 glass border border-border/50 rounded-xl shadow-apple-xl animate-apple-fade-in z-50 py-1 overflow-hidden">
+          {options.map(opt => (
+            <button
+              key={opt.runtime}
+              type="button"
+              onClick={() => {
+                onChange(opt.runtime as RuntimeOption);
+                setOpen(false);
+              }}
+              className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
+                opt.runtime === value
+                  ? 'text-primary font-medium bg-muted/40'
+                  : 'text-foreground hover:bg-secondary/80'
+              }`}
+            >
+              <span className="w-4 flex-shrink-0">
+                {opt.runtime === value && <Check size={14} strokeWidth={2.5} />}
               </span>
               {opt.label}
             </button>

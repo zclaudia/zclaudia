@@ -111,7 +111,7 @@ export function RightSidebarEmptyState({
             Pick a tool below to open it in the workspace
           </p>
         </div>
-        <div className="flex w-full max-w-[240px] flex-col gap-1.5">
+        <div className="flex w-full max-w-[240px] flex-col gap-1">
           {orderedTiles.map(tile => {
             const Icon = TOOL_ICONS[tile.iconKey];
             const subtitle = subtitleFor(tile);
@@ -120,9 +120,9 @@ export function RightSidebarEmptyState({
                 key={tile.id}
                 onClick={() => openToolInWorkspace(sessionId, tile.id, { projectId, backendId })}
                 title={subtitle ?? undefined}
-                className="group flex w-full items-center gap-2.5 rounded-xl border border-border bg-background px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-secondary"
+                className="group flex w-full items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-1.5 text-left transition-colors hover:border-primary/40 hover:bg-secondary"
               >
-                {Icon && <Icon className="h-4 w-4 flex-shrink-0 text-muted-foreground" />}
+                {Icon && <Icon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />}
                 <span
                   data-testid="empty-tile-label"
                   className="min-w-0 flex-1 truncate text-[13px] text-foreground"
@@ -130,7 +130,7 @@ export function RightSidebarEmptyState({
                   {tile.label}
                 </span>
                 <ChevronRight
-                  size={14}
+                  size={13}
                   strokeWidth={1.75}
                   className="flex-shrink-0 text-muted-foreground/30 transition-colors group-hover:text-muted-foreground"
                 />

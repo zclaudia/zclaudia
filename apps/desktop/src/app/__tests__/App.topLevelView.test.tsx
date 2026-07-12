@@ -156,7 +156,7 @@ describe('App top-level view routing', () => {
     const { getByText, getByTestId, queryByTestId, queryByText } = render(<App />);
 
     expect(getByTestId('app-sidebar')).toBeTruthy();
-    expect(getByText('Welcome to ZClaudia')).toBeTruthy();
+    expect(getByText(/Good (morning|afternoon|evening)/)).toBeTruthy();
 
     fireEvent.click(getByText('Open Settings'));
 
@@ -165,14 +165,14 @@ describe('App top-level view routing', () => {
     });
     expect(getByTestId('settings-panel').getAttribute('data-initial-tab')).toBe('permissions');
     expect(queryByTestId('app-sidebar')).toBeNull();
-    expect(queryByText('Welcome to ZClaudia')).toBeNull();
+    expect(queryByText(/Good (morning|afternoon|evening)/)).toBeNull();
 
     fireEvent.click(getByText('Back to app'));
 
     await waitFor(() => {
       expect(getByTestId('app-sidebar')).toBeTruthy();
     });
-    expect(getByText('Welcome to ZClaudia')).toBeTruthy();
+    expect(getByText(/Good (morning|afternoon|evening)/)).toBeTruthy();
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 

@@ -5,24 +5,47 @@ import fs from 'fs';
 import { migrations, applyPendingMigrations } from './migrations/index.js';
 import { ensureDefaultAgentProfile } from '../../domains/agent-profiles/ensure-default-agent-profile.js';
 import { backfillProtectedMcpOAuthCredentials } from '../services/mcp-oauth-credential-protector.js';
+import { withDevAutoReset } from './dev-db-recovery.js';
 
-const DB_DIR = process.env.ZCLAUDIA_DATA_DIR
+const DEFAULT_DB_DIR = process.env.ZCLAUDIA_DATA_DIR
   ? path.resolve(process.env.ZCLAUDIA_DATA_DIR)
   : path.join(os.homedir(), '.zclaudia');
-const DB_PATH = path.join(DB_DIR, 'data.db');
 
-export function initDatabase(): Database.Database {
+export function initDatabase(dbDir: string = DEFAULT_DB_DIR): Database.Database {
   // Ensure directory exists
-  if (!fs.existsSync(DB_DIR)) {
-    fs.mkdirSync(DB_DIR, { recursive: true });
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
   }
 
-  const db = new Database(DB_PATH);
+  const dbPath = path.join(dbDir, 'data.db');
 
+  // Migrate first; only a genuine schema/migration failure triggers a reset,
+  // and only in dev — where the old DB is backed up (never `rm -rf`'d) and a
+  // fresh one is recreated. In production the failure propagates untouched.
+  const db = withDevAutoReset({
+    dbPath,
+    env: process.env,
+    open: () => openDatabase(dbPath),
+    prepare: prepareSchema,
+    close: closeForReset,
+  });
+
+  // Seed the default agent profile (no-op if one already exists, or if no
+  // LlmProfile exists yet — in which case the user will need to create one
+  // before they can spawn sessions).
+  ensureDefaultAgentProfile(db);
+
+  return db;
+}
+
+function openDatabase(dbPath: string): Database.Database {
+  const db = new Database(dbPath);
   // Enable WAL mode for better concurrent access
   db.pragma('journal_mode = WAL');
+  return db;
+}
 
-  // Run migrations
+function prepareSchema(db: Database.Database): void {
   runMigrations(db);
   backfillProtectedMcpOAuthCredentials(db);
 
@@ -32,13 +55,16 @@ export function initDatabase(): Database.Database {
   // the migration record and skip the re-run, so legacy `providers` table sticks
   // around without `llm_profiles` being created.
   ensureSchemaIsCurrent(db);
+}
 
-  // Seed the default agent profile (no-op if one already exists, or if no
-  // LlmProfile exists yet — in which case the user will need to create one
-  // before they can spawn sessions).
-  ensureDefaultAgentProfile(db);
-
-  return db;
+function closeForReset(db: Database.Database): void {
+  // Fold the WAL back into the main file so the backup is self-contained.
+  try {
+    db.pragma('wal_checkpoint(TRUNCATE)');
+  } catch {
+    // best effort — an unclosed WAL still travels with the backup below
+  }
+  db.close();
 }
 
 /**

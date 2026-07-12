@@ -7,6 +7,7 @@ import type {
   SdkPluginConfig,
 } from '@anthropic-ai/claude-agent-sdk';
 import type { ProviderRuntimeEvent, SystemInfo } from '../../message-types.js';
+import { resolveClaudeCliFromPath } from './resolve-cli.js';
 
 export interface ClaudeAgentRunOptions {
   cwd: string;
@@ -47,8 +48,17 @@ export async function* runClaudeAgent(
       append: options.systemPrompt,
     };
   }
-  if (options.cliPath) sdkOptions.pathToClaudeCodeExecutable = options.cliPath;
-  if (options.env) sdkOptions.env = { ...process.env, ...options.env };
+  const effectiveEnv = options.env ? { ...process.env, ...options.env } : process.env;
+  if (options.cliPath) {
+    // Explicit override (profile/options) always wins.
+    sdkOptions.pathToClaudeCodeExecutable = options.cliPath;
+  } else {
+    // Otherwise prefer a `claude` found on PATH; fall back to the SDK-bundled
+    // binary when none is installed (leave pathToClaudeCodeExecutable unset).
+    const pathCli = resolveClaudeCliFromPath(effectiveEnv.PATH);
+    if (pathCli) sdkOptions.pathToClaudeCodeExecutable = pathCli;
+  }
+  if (options.env) sdkOptions.env = effectiveEnv;
   if (options.canUseTool) sdkOptions.canUseTool = options.canUseTool;
   if (options.mcpServers && Object.keys(options.mcpServers).length > 0) {
     sdkOptions.mcpServers = options.mcpServers;

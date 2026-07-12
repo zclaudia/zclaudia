@@ -44,11 +44,11 @@ export function ProfileHeader({
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+          className="inline-flex flex-shrink-0 items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.75} /> {crumb}
+          <ArrowLeft className="h-4 w-4" strokeWidth={1.75} /> {crumb}
         </button>
-        <span className="text-muted-foreground">/</span>
+        <span className="flex-shrink-0 text-sm text-muted-foreground/50">/</span>
         <input
           type="text"
           value={name}
@@ -56,13 +56,14 @@ export function ProfileHeader({
           onBlur={onFieldBlur}
           placeholder={namePlaceholder}
           aria-label="Profile name"
-          className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1 py-0.5 text-sm font-medium text-foreground hover:border-border focus:border-border focus:bg-background/60 focus:outline-none"
+          size={1}
+          className="w-auto min-w-[3rem] max-w-full rounded-md border border-transparent bg-transparent px-1 py-0.5 text-sm font-medium text-foreground [field-sizing:content] hover:border-border focus:border-border focus:bg-background/60 focus:outline-none"
         />
-        {badges.map(b => (
-          <Badge key={b.label} label={b.label} tone={b.tone} online={b.online} />
-        ))}
-        {(saveStatus || onRequestDelete) && (
-          <div className="ml-auto flex items-center gap-2">
+        {(badges.length > 0 || saveStatus || onRequestDelete) && (
+          <div className="ml-auto flex flex-shrink-0 items-center gap-2 pl-2">
+            {badges.map(b => (
+              <Badge key={b.label} label={b.label} tone={b.tone} online={b.online} />
+            ))}
             {saveStatus && <SaveStateIndicator status={saveStatus} onRetry={onRetry} />}
             {onRequestDelete && (
               <div className="relative">
@@ -111,7 +112,8 @@ export function ProfileHeader({
         onBlur={onFieldBlur}
         placeholder="Add a description"
         aria-label="Profile description"
-        className="mt-1 w-full rounded-md border border-transparent bg-transparent px-1 py-0.5 text-xs text-muted-foreground hover:border-border focus:border-border focus:bg-background/60 focus:outline-none"
+        size={1}
+        className="mt-1 block w-auto min-w-[3rem] max-w-full rounded-md border border-transparent bg-transparent px-1 py-0.5 text-xs text-muted-foreground [field-sizing:content] hover:border-border focus:border-border focus:bg-background/60 focus:outline-none"
       />
     </div>
   );

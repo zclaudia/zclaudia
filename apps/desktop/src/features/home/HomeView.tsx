@@ -135,8 +135,14 @@ export function HomeView({ onNewSession, onAddProject }: HomeViewProps) {
 
   const isEmpty = running.length === 0 && recent.length === 0;
 
+  // Before the initial REST load finishes the stores are empty regardless of
+  // real data — rendering the empty state then would flash onboarding on every
+  // cold start. Stay blank until useDataLoader has stamped the load complete.
+  // Once there's activity (running/recent), the load is implicitly done.
+  if (isEmpty && !dataLoaded) return null;
+
   const quickActions = (
-    <div className={`flex gap-2 ${isEmpty ? 'justify-center' : ''}`}>
+    <div className="flex gap-2">
       <button
         onClick={onNewSession}
         className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
@@ -154,52 +160,43 @@ export function HomeView({ onNewSession, onAddProject }: HomeViewProps) {
     </div>
   );
 
-  if (isEmpty) {
-    // Before the initial REST load finishes the stores are empty regardless of
-    // real data — showing the welcome state then would flash it on every cold
-    // start. Stay blank until useDataLoader has stamped the load as complete.
-    if (!dataLoaded) return null;
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold mb-2">Welcome to ZClaudia</h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            Start a session or add a project to get going.
-          </p>
-          {quickActions}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-2xl px-6 pt-12 pb-10">
-        {/* Populated home leads with just the greeting — creating sessions and
-            projects is already covered by the sidebar (per-project "New session",
-            per-backend "New project"), so the header buttons would be redundant.
-            The empty state still shows them as the only onboarding entry point. */}
+        {/* Home always leads with the greeting. When there's activity, the
+            sidebar already covers creating sessions/projects (per-project "New
+            session", per-backend "New project"), so the header buttons would be
+            redundant; when empty they're the only onboarding entry point. */}
         <h2 className="text-xl font-semibold">{greeting(new Date().getHours())}</h2>
 
-        {/* First group opens with more air after the header; siblings tighten. */}
-        <div className="[&>*:first-child]:mt-9 [&>*+*]:mt-8">
-          {running.length > 0 && (
-            <SessionGroup
-              label="Running"
-              rows={running}
-              backendName={backendName}
-              onOpen={openSession}
-            />
-          )}
-          {recent.length > 0 && (
-            <SessionGroup
-              label="Recent"
-              rows={recent}
-              backendName={backendName}
-              onOpen={openSession}
-            />
-          )}
-        </div>
+        {isEmpty ? (
+          <div className="mt-3">
+            <p className="text-sm text-muted-foreground">
+              Start a session or add a project to get going.
+            </p>
+            <div className="mt-4">{quickActions}</div>
+          </div>
+        ) : (
+          // First group opens with more air after the header; siblings tighten.
+          <div className="[&>*:first-child]:mt-9 [&>*+*]:mt-8">
+            {running.length > 0 && (
+              <SessionGroup
+                label="Running"
+                rows={running}
+                backendName={backendName}
+                onOpen={openSession}
+              />
+            )}
+            {recent.length > 0 && (
+              <SessionGroup
+                label="Recent"
+                rows={recent}
+                backendName={backendName}
+                onOpen={openSession}
+              />
+            )}
+          </div>
+        )}
 
         <UsageStatsStrip />
       </div>

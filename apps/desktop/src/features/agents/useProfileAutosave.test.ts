@@ -183,6 +183,36 @@ describe('useProfileAutosave', () => {
     expect(view.result.current.status).toBe('saved');
   });
 
+  it('never strands on "saving": a redundant run for an already-saved signature resolves to saved', async () => {
+    let resolveFirst!: () => void;
+    const save = vi.fn().mockImplementationOnce(
+      () =>
+        new Promise<void>(r => {
+          resolveFirst = r;
+        })
+    );
+    const view = renderHook(p => useProfileAutosave(p), {
+      initialProps: { enabled: true, valid: true, signature: 'v0', save, debounceMs: 600 },
+    });
+    // Edit → debounce → first save starts (stays in flight).
+    view.rerender({ enabled: true, valid: true, signature: 'v1', save, debounceMs: 600 });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600);
+    });
+    expect(save).toHaveBeenCalledTimes(1);
+    // While the save is in flight, a prop blip re-runs the effect and schedules a
+    // redundant trailing run for the same (soon-to-be-saved) signature.
+    view.rerender({ enabled: true, valid: false, signature: 'v1', save, debounceMs: 600 });
+    view.rerender({ enabled: true, valid: true, signature: 'v1', save, debounceMs: 600 });
+    // Complete the save, then let any scheduled trailing run fire.
+    await act(async () => {
+      resolveFirst();
+      await vi.advanceTimersByTimeAsync(600);
+    });
+    expect(save).toHaveBeenCalledTimes(1); // no redundant PATCH
+    expect(view.result.current.status).toBe('saved'); // spinner cleared, not stuck on "saving"
+  });
+
   it('uses the default debounce (600ms) when debounceMs is omitted', async () => {
     const save = vi.fn().mockResolvedValue(undefined);
     const view = renderHook(p => useProfileAutosave(p), {

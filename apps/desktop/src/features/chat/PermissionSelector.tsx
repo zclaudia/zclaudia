@@ -17,6 +17,7 @@ import type {
   PermissionCategory,
   CategoryProfile,
 } from '@zclaudia/shared';
+import { SelectorTrigger } from './SelectorTrigger';
 
 interface PermissionSelectorProps {
   value: Partial<UnifiedPermissionPolicy> | null;
@@ -187,30 +188,28 @@ export function PermissionSelector({ value, onChange, disabled }: PermissionSele
     onChange({ ...value, enabled: true, profile: newProfile });
   };
 
+  const triggerStateClass = disabled
+    ? ''
+    : isElevated
+      ? 'bg-warning/10 text-warning border border-warning/40 hover:bg-warning/15 hover:text-warning active:bg-warning/20'
+      : hasOverride
+        ? 'text-primary'
+        : '';
+
   return (
     <div ref={ref} className="relative">
-      <button
-        onClick={() => !disabled && setIsOpen(!isOpen)}
+      <SelectorTrigger
+        onClick={() => setIsOpen(!isOpen)}
         disabled={disabled}
-        className={`
-          flex items-center gap-1 px-1.5 py-1 rounded-md text-[11px] font-medium
-          transition-colors h-7
-          ${
-            disabled
-              ? 'opacity-50 cursor-not-allowed text-muted-foreground'
-              : isElevated
-                ? 'bg-warning/10 text-warning border border-warning/40 hover:bg-warning/15 active:bg-warning/20 cursor-pointer'
-                : hasOverride
-                  ? 'text-primary hover:bg-secondary active:bg-secondary/80 hover:text-foreground cursor-pointer'
-                  : 'text-muted-foreground hover:bg-secondary active:bg-secondary/80 hover:text-foreground cursor-pointer'
-          }
-        `}
         title={triggerLabel}
+        ariaHasPopup="menu"
+        ariaExpanded={isOpen}
+        className={triggerStateClass}
       >
         <Shield size={14} strokeWidth={1.75} />
         <span className="hidden md:inline truncate max-w-[80px] lg:max-w-none">{triggerLabel}</span>
         <ChevronDown size={12} className={isElevated ? '' : 'text-muted-foreground'} />
-      </button>
+      </SelectorTrigger>
 
       {isOpen && (
         <div className="absolute bottom-full left-0 mb-1 z-50 bg-popover/95 glass border border-border/50 rounded-xl shadow-apple-xl py-1 min-w-[260px] max-h-[400px] overflow-y-auto animate-apple-fade-in">

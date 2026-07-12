@@ -60,14 +60,18 @@ describe('HomeView', () => {
     expect(container.innerHTML).toBe('');
   });
 
-  it('renders the empty state with quick actions when there are no sessions', () => {
+  it('renders the new home layout (greeting + quick actions) when there are no sessions', () => {
     markDataLoaded();
     render(<HomeView onNewSession={vi.fn()} onAddProject={vi.fn()} />);
-    expect(screen.getByText('Welcome to ZClaudia')).toBeTruthy();
+    // Greeting leads even when empty — the old "Welcome to ZClaudia" card is gone.
+    expect(screen.getByText(/Good (morning|afternoon|evening)/)).toBeTruthy();
+    expect(screen.queryByText('Welcome to ZClaudia')).toBeNull();
     expect(screen.getByText('Start a session or add a project to get going.')).toBeTruthy();
     expect(screen.getByRole('button', { name: /New session/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Add project/ })).toBeTruthy();
+    // No activity yet → the session groups stay hidden.
     expect(screen.queryByText('Recent')).toBeNull();
+    expect(screen.queryByText('Running')).toBeNull();
   });
 
   it('greets instead of welcoming once there is activity', () => {
@@ -190,15 +194,21 @@ describe('HomeView', () => {
     expect(generateSessionTitle).not.toHaveBeenCalled();
   });
 
-  it('renders the usage strip only in the populated state', () => {
+  it('renders the usage strip in both the empty and populated states', () => {
     markDataLoaded();
     const empty = render(<HomeView onNewSession={vi.fn()} onAddProject={vi.fn()} />);
-    expect(empty.container.querySelector('[data-testid="usage-strip"]')).toBeNull();
+    expect(empty.container.querySelector('[data-testid="usage-strip"]')).toBeTruthy();
     empty.unmount();
 
     seedProject('p1', 'zclaudia');
     seedLocalSession('s1', { name: 'Fix the thing' });
     render(<HomeView onNewSession={vi.fn()} onAddProject={vi.fn()} />);
     expect(screen.getByTestId('usage-strip')).toBeTruthy();
+  });
+
+  it('still renders nothing (no usage strip) before the initial load even when empty', () => {
+    // dataServerId stays null → cold-start guard suppresses the whole view.
+    const { container } = render(<HomeView onNewSession={vi.fn()} onAddProject={vi.fn()} />);
+    expect(container.innerHTML).toBe('');
   });
 });

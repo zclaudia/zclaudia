@@ -95,7 +95,7 @@ describe('ProfileEditor', () => {
   it('uses an Agent Type dropdown for runtime selection', async () => {
     await renderEditor(null);
 
-    expect(screen.getByLabelText('Agent Type')).toHaveValue('zclaudia');
+    expect(screen.getByLabelText('Agent Type')).toHaveTextContent('ZClaudia');
   });
 
   it('create mode: saves via createAgentProfileForBackend and fires onSaved', async () => {
@@ -139,9 +139,8 @@ describe('ProfileEditor', () => {
     fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), {
       target: { value: 'Claude Agent' },
     });
-    fireEvent.change(screen.getByLabelText('Agent Type'), {
-      target: { value: 'claude' },
-    });
+    fireEvent.click(screen.getByLabelText('Agent Type'));
+    fireEvent.click(screen.getByRole('button', { name: 'Claude' }));
 
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
 
@@ -178,9 +177,8 @@ describe('ProfileEditor', () => {
     fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), {
       target: { value: 'Claude Agent' },
     });
-    fireEvent.change(screen.getByLabelText('Agent Type'), {
-      target: { value: 'claude' },
-    });
+    fireEvent.click(screen.getByLabelText('Agent Type'));
+    fireEvent.click(screen.getByRole('button', { name: 'Claude' }));
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
 
     await waitFor(() => {
@@ -195,9 +193,8 @@ describe('ProfileEditor', () => {
     expect(screen.queryByText(/Claude Agent SDK/)).toBeNull();
     expect(screen.getByText('Multimodal fallback')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Agent Type'), {
-      target: { value: 'claude' },
-    });
+    fireEvent.click(screen.getByLabelText('Agent Type'));
+    fireEvent.click(screen.getByRole('button', { name: 'Claude' }));
 
     expect(screen.getByText(/Claude Agent SDK/)).toBeInTheDocument();
     expect(
@@ -239,9 +236,8 @@ describe('ProfileEditor', () => {
     fireEvent.change(screen.getByLabelText('Fallback Model'), {
       target: { value: 'vision-model' },
     });
-    fireEvent.change(screen.getByLabelText('Agent Type'), {
-      target: { value: 'claude' },
-    });
+    fireEvent.click(screen.getByLabelText('Agent Type'));
+    fireEvent.click(screen.getByRole('button', { name: 'Claude' }));
 
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
 
@@ -416,7 +412,8 @@ describe('ProfileEditor', () => {
   it('Claude runtime shows read-only capability notes instead of editable panels', async () => {
     const { queryAllByLabelText } = await renderEditor(null);
 
-    fireEvent.change(screen.getByLabelText('Agent Type'), { target: { value: 'claude' } });
+    fireEvent.click(screen.getByLabelText('Agent Type'));
+    fireEvent.click(screen.getByRole('button', { name: 'Claude' }));
     fireEvent.click(screen.getByRole('tab', { name: /Capabilities/ }));
 
     // Tools: native read-only note, no editable checkboxes.
@@ -511,24 +508,27 @@ describe('ProfileEditor', () => {
     // zclaudia shows the LLM-profile-bound model dropdown trigger:
     expect(screen.getByText('Select a model')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Agent Type'), { target: { value: 'claude' } });
+    fireEvent.click(screen.getByLabelText('Agent Type'));
+    fireEvent.click(screen.getByRole('button', { name: 'Claude' }));
 
     // Claude keeps native model settings in Runtime and removes the separate Model card.
     expect(screen.queryByText('Select a model')).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Model' })).toBeNull();
-    expect(screen.getByLabelText('Claude Model')).toHaveValue('Auto (Claude CLI default)');
-    expect(screen.getByLabelText('Claude Model')).toHaveAttribute('readonly');
-    expect(screen.getByLabelText('Thinking Level')).toHaveValue('Auto');
-    expect(screen.getByLabelText('Thinking Level')).toHaveAttribute('readonly');
+    // Claude auto-defaults render as plain read-only values, not editable fields.
+    expect(screen.getByLabelText('Claude Model').tagName).toBe('SPAN');
+    expect(screen.getByLabelText('Claude Model')).toHaveTextContent('Auto (Claude CLI default)');
+    expect(screen.getByLabelText('Thinking Level').tagName).toBe('SPAN');
+    expect(screen.getByLabelText('Thinking Level')).toHaveTextContent('Auto');
     expect(screen.queryByText('Multimodal fallback')).toBeNull();
     expect(screen.getByText(/Claude Agent SDK runtime/)).toBeInTheDocument();
   });
 
   it('switching runtime shows read-only Claude auto defaults', async () => {
     await renderEditor(makeProfile('p1', 'Coding'));
-    fireEvent.change(screen.getByLabelText('Agent Type'), { target: { value: 'claude' } });
-    expect(screen.getByLabelText('Claude Model')).toHaveValue('Auto (Claude CLI default)');
-    expect(screen.getByLabelText('Thinking Level')).toHaveValue('Auto');
+    fireEvent.click(screen.getByLabelText('Agent Type'));
+    fireEvent.click(screen.getByRole('button', { name: 'Claude' }));
+    expect(screen.getByLabelText('Claude Model')).toHaveTextContent('Auto (Claude CLI default)');
+    expect(screen.getByLabelText('Thinking Level')).toHaveTextContent('Auto');
   });
 
   it('create: a Claude profile is valid without an LLM profile and saves llmProfileId ""', async () => {
@@ -540,7 +540,8 @@ describe('ProfileEditor', () => {
     fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), {
       target: { value: 'Claude Agent' },
     });
-    fireEvent.change(screen.getByLabelText('Agent Type'), { target: { value: 'claude' } });
+    fireEvent.click(screen.getByLabelText('Agent Type'));
+    fireEvent.click(screen.getByRole('button', { name: 'Claude' }));
 
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
 
@@ -572,7 +573,8 @@ describe('ProfileEditor', () => {
     fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), {
       target: { value: 'Claude Auto' },
     });
-    fireEvent.change(screen.getByLabelText('Agent Type'), { target: { value: 'claude' } });
+    fireEvent.click(screen.getByLabelText('Agent Type'));
+    fireEvent.click(screen.getByRole('button', { name: 'Claude' }));
     fireEvent.change(screen.getByLabelText('CLI Path (optional)'), {
       target: { value: '/opt/homebrew/bin/claude' },
     });

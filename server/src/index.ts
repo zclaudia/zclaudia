@@ -1,7 +1,6 @@
 import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
-import { maybeWipeDevDataDir, writeSchemaVersion } from './infra/storage/dev-clear.js';
 import {
   createServer,
   createVirtualClient,
@@ -107,18 +106,9 @@ async function probeMacOSFolderPermissions(): Promise<void> {
 
 async function main() {
   try {
-    // Dev-mode: wipe data dir if schema version has changed (no-op in prod)
-    const dataDir = process.env.ZCLAUDIA_DATA_DIR
-      ? path.resolve(process.env.ZCLAUDIA_DATA_DIR)
-      : path.join(os.homedir(), '.zclaudia');
-    const wipeResult = maybeWipeDevDataDir(dataDir);
-    if (wipeResult.wiped) {
-      console.log(`[startup] dev data dir wiped: ${wipeResult.reason}`);
-    }
-
+    // Schema recovery (migrate-first, dev-only backup+reset on failure) lives in
+    // initDatabase → withDevAutoReset; no pre-flight data-dir wipe here.
     const serverContext = await createServer();
-    // Record schema version after successful migration (dev-clear reads this on next startup)
-    writeSchemaVersion(dataDir);
     const { server, connectGateway, disconnectGateway } = serverContext;
 
     const gatewayManager = new GatewayManager({
