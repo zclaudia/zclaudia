@@ -38,6 +38,7 @@ import { migration as m_034_model_usage_index } from './034_model_usage_index.js
 import { migration as m_035_agent_profile_runtime_type } from './035_agent_profile_runtime_type.js';
 import { migration as m_036_agent_profile_nullable_llm_profile_id } from './036_agent_profile_nullable_llm_profile_id.js';
 import { migration as m_037_agent_profile_cli_path } from './037_agent_profile_cli_path.js';
+import { migration as m_038_agent_profile_status } from './038_agent_profile_status.js';
 
 export type { Migration };
 
@@ -79,6 +80,7 @@ export const migrations: Migration[] = [
   m_035_agent_profile_runtime_type,
   m_036_agent_profile_nullable_llm_profile_id,
   m_037_agent_profile_cli_path,
+  m_038_agent_profile_status,
 ];
 
 /**

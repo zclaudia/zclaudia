@@ -7,7 +7,6 @@ import { AgentProfileRepository } from './repository.js';
 import { LlmProfileRepository } from '../llm-profiles/repository.js';
 import {
   AgentProfileDeletionService,
-  AgentProfileInUseError,
   AgentProfileNotFoundError,
 } from './agent-profile-deletion-service.js';
 import { resolveAgentReadiness } from '../agent-readiness/check.js';
@@ -358,10 +357,22 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         }
       }
 
-      if (!repo.findById(req.params.id)) {
+      const existing = repo.findById(req.params.id);
+      if (!existing) {
         res.status(404).json({
           success: false,
           error: { code: 'NOT_FOUND', message: 'AgentProfile not found' },
+        });
+        return;
+      }
+      // A readonly profile is frozen — its lifecycle is driven by delete/restore, not PATCH.
+      if (existing.status === 'readonly') {
+        res.status(409).json({
+          success: false,
+          error: {
+            code: 'READONLY',
+            message: 'Cannot edit a read-only agent profile',
+          },
         });
         return;
       }
@@ -410,8 +421,17 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
 
   router.delete('/:id', (req: Request, res: Response) => {
     try {
-      deletionService.deleteAgentProfile(req.params.id);
-      res.json({ success: true } as ApiResponse<void>);
+      const result = deletionService.deleteAgentProfile(req.params.id);
+      // Hard-delete → 200 {success:true}. Archived → 200 {success:true, data:{archived,sessionCount}}.
+      // Unified 200 so the client always reaches the success branch and branches on `data.archived`.
+      if (result.archived) {
+        res.json({
+          success: true,
+          data: { archived: true, sessionCount: result.sessionCount },
+        } as ApiResponse<{ archived: true; sessionCount: number }>);
+      } else {
+        res.json({ success: true } as ApiResponse<void>);
+      }
     } catch (error) {
       if (error instanceof AgentProfileNotFoundError) {
         res.status(404).json({
@@ -420,21 +440,38 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         });
         return;
       }
-      if (error instanceof AgentProfileInUseError) {
-        res.status(409).json({
-          success: false,
-          error: {
-            code: 'IN_USE',
-            message: error.message,
-            sessionCount: error.sessionCount,
-          },
-        });
-        return;
-      }
       console.error('Error deleting agent profile:', error);
       res.status(500).json({
         success: false,
         error: { code: 'DB_ERROR', message: 'Failed to delete agent profile' },
+      });
+    }
+  });
+
+  router.post('/:id/restore', (req: Request, res: Response) => {
+    try {
+      if (!repo.findById(req.params.id)) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'AgentProfile not found' },
+        });
+        return;
+      }
+      repo.restore(req.params.id);
+      const restored = repo.findById(req.params.id);
+      if (!restored) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'AgentProfile not found' },
+        });
+        return;
+      }
+      res.json({ success: true, data: restored } as ApiResponse<AgentProfileConfig>);
+    } catch (error) {
+      console.error('Error restoring agent profile:', error);
+      res.status(500).json({
+        success: false,
+        error: { code: 'DB_ERROR', message: 'Failed to restore agent profile' },
       });
     }
   });

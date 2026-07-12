@@ -33,6 +33,7 @@ import { useDraftEditorStore } from '../../stores/draftEditorStore';
 import { useComposerStore } from '../../stores/composerStore';
 import { activatePanel, usePanelIsActive } from '../../utils/openPanel';
 import * as api from '../../services/api';
+import { useAgentForSession } from '../../hooks/useAgentForSession';
 import type { UnifiedPermissionPolicy, SlashCommand, Session, Project } from '@zclaudia/shared';
 import type { ProviderCapabilities } from '@zclaudia/shared/core/runtime-capabilities';
 import type { SessionDraft } from '../../stores/composerStore';
@@ -190,6 +191,11 @@ export function ChatInputArea({
   const setStoreGoal = useGoalStore(s => s.setGoal);
   const [goalDialogOpen, setGoalDialogOpen] = useState(false);
 
+  // Agent lifecycle: a read-only agent (deleted-while-in-use) freezes the session.
+  // Derived from the agent profile, not persisted on the session — see useAgentForSession.
+  const { agent: sessionAgent } = useAgentForSession(sessionId);
+  const agentReadOnly = !currentSession.isReadOnly && sessionAgent?.status === 'readonly';
+
   useEffect(() => {
     if (!sessionId) return;
     let cancelled = false;
@@ -246,6 +252,26 @@ export function ChatInputArea({
       console.error('[goal] clear failed', err);
     }
   }, [sessionId, setStoreGoal]);
+
+  // Agent read-only mode: the session's agent was converted to read-only
+  // (deleted-while-in-use). The conversation history is preserved, but new turns
+  // are blocked — the user should start a new session with an active agent.
+  // Distinct from the Supervisor `isReadOnly` lock above.
+  if (agentReadOnly) {
+    return (
+      <div className="border-t border-border p-3 md:p-4 safe-bottom-pad flex-shrink-0">
+        <div className="flex items-center justify-between gap-3 px-3 py-2.5 bg-secondary/50 border border-border rounded-lg">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Lock size={14} />
+            <span>
+              This session&apos;s agent (&ldquo;{sessionAgent?.name ?? 'Unknown'}&rdquo;) is
+              read-only — start a new session to continue with another agent.
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Read-only mode
   if (currentSession.isReadOnly) {

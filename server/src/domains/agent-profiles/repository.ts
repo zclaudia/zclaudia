@@ -2,6 +2,7 @@ import { BaseRepository } from '../../infra/repositories/base.js';
 import type { Database } from 'better-sqlite3';
 import type {
   AgentProfileConfig,
+  AgentProfileStatus,
   MultimodalFallbackConfig,
   ThinkingLevel,
 } from '@zclaudia/shared/core/agent-profile';
@@ -193,6 +194,7 @@ export class AgentProfileRepository extends BaseRepository<
       multimodalFallback: this.parseMultimodalFallback(row.multimodal_fallback),
       thinkingLevel: this.parseThinkingLevel(row.thinking_level),
       isDefault: row.is_default === 1,
+      status: row.status === 'readonly' ? 'readonly' : 'active',
       source: row.source === 'plugin' ? 'plugin' : 'user',
       pluginId: row.plugin_id ?? undefined,
       pluginProfileId: row.plugin_profile_id ?? undefined,
@@ -310,8 +312,8 @@ export class AgentProfileRepository extends BaseRepository<
     const enabledTools = resolveToolSelection(toolSelection).builtinTools;
     return {
       sql: `
-        INSERT INTO agent_profiles (id, name, description, runtime_type, llm_profile_id, model, cli_path, system_prompt, enabled_tools, tool_selection, skill_selection, skill_execution, multimodal_fallback, thinking_level, is_default, source, plugin_id, plugin_profile_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO agent_profiles (id, name, description, runtime_type, llm_profile_id, model, cli_path, system_prompt, enabled_tools, tool_selection, skill_selection, skill_execution, multimodal_fallback, thinking_level, is_default, status, source, plugin_id, plugin_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       params: [
         id,
@@ -329,6 +331,7 @@ export class AgentProfileRepository extends BaseRepository<
         data.multimodalFallback ? JSON.stringify(data.multimodalFallback) : null,
         data.thinkingLevel ?? null,
         data.isDefault ? 1 : 0,
+        (data.status ?? 'active') satisfies AgentProfileStatus,
         data.source ?? 'user',
         data.pluginId ?? null,
         data.pluginProfileId ?? null,
@@ -428,14 +431,18 @@ export class AgentProfileRepository extends BaseRepository<
 
   findDefault(): AgentProfileConfig | undefined {
     const row = this.db
-      .prepare('SELECT * FROM agent_profiles WHERE is_default = 1 ORDER BY updated_at DESC LIMIT 1')
+      .prepare(
+        "SELECT * FROM agent_profiles WHERE is_default = 1 AND status = 'active' ORDER BY updated_at DESC LIMIT 1"
+      )
       .get();
     return row ? this.mapRow(row) : undefined;
   }
 
   findAllOrdered(): AgentProfileConfig[] {
     const rows = this.db
-      .prepare('SELECT * FROM agent_profiles ORDER BY is_default DESC, name ASC')
+      .prepare(
+        `SELECT * FROM agent_profiles ORDER BY (status = 'readonly') ASC, is_default DESC, name ASC`
+      )
       .all();
     return rows.map(r => this.mapRow(r));
   }
@@ -475,6 +482,38 @@ export class AgentProfileRepository extends BaseRepository<
       if (!profile) throw new Error(`AgentProfile not found: ${id}`);
       return profile;
     })();
+  }
+
+  /** Transition an active profile to readonly. Idempotent — no-op if already readonly. */
+  archive(id: string): void {
+    this.db
+      .prepare(
+        "UPDATE agent_profiles SET status = 'readonly', updated_at = ? WHERE id = ? AND status = 'active'"
+      )
+      .run(Date.now(), id);
+  }
+
+  /** Transition a readonly profile back to active. Idempotent — no-op if already active. */
+  restore(id: string): void {
+    this.db
+      .prepare(
+        "UPDATE agent_profiles SET status = 'active', updated_at = ? WHERE id = ? AND status = 'readonly'"
+      )
+      .run(Date.now(), id);
+  }
+
+  /**
+   * Count ACTIVE sessions referencing a profile. Archived sessions
+   * (`archived_at IS NOT NULL`) do not count — they are soft-deleted and should
+   * not block hard-deletion of a readonly profile once all active sessions are gone.
+   */
+  countActiveSessionsReferencing(agentProfileId: string): number {
+    const row = this.db
+      .prepare(
+        'SELECT COUNT(*) AS n FROM sessions WHERE agent_profile_id = ? AND archived_at IS NULL'
+      )
+      .get(agentProfileId) as { n: number } | undefined;
+    return row?.n ?? 0;
   }
 
   findByPluginProfile(pluginId: string, pluginProfileId: string): AgentProfileConfig | undefined {

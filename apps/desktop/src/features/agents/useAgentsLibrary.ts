@@ -8,6 +8,7 @@ interface ProfileLike {
   isDefault?: boolean;
   model?: string;
   runtimeType?: string;
+  status?: 'active' | 'readonly';
 }
 interface SkillLike {
   id: string;
@@ -60,7 +61,7 @@ export function buildLibraryItems(
         id: p.id,
         title: p.name ?? p.id,
         subtitle: p.model || (p.runtimeType === 'claude' ? 'Auto' : undefined),
-        status: p.isDefault ? 'Default' : undefined,
+        status: p.isDefault ? 'Default' : p.status === 'readonly' ? 'Read-only' : undefined,
       })
     );
   if (wantKind('skill'))

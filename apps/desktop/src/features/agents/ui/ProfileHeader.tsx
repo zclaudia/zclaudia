@@ -19,6 +19,8 @@ export interface ProfileHeaderProps {
   onRetry?: () => void;
   onRequestDelete?: () => void;
   deleting?: boolean;
+  /** When true, name/description inputs are disabled (read-only profile). */
+  disabled?: boolean;
 }
 
 export function ProfileHeader({
@@ -35,6 +37,7 @@ export function ProfileHeader({
   onRetry,
   onRequestDelete,
   deleting,
+  disabled,
 }: ProfileHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -57,7 +60,8 @@ export function ProfileHeader({
           placeholder={namePlaceholder}
           aria-label="Profile name"
           size={1}
-          className="w-auto min-w-[3rem] max-w-full rounded-md border border-transparent bg-transparent px-1 py-0.5 text-sm font-medium text-foreground [field-sizing:content] hover:border-border focus:border-border focus:bg-background/60 focus:outline-none"
+          disabled={disabled}
+          className="w-auto min-w-[3rem] max-w-full rounded-md border border-transparent bg-transparent px-1 py-0.5 text-sm font-medium text-foreground [field-sizing:content] hover:border-border focus:border-border focus:bg-background/60 focus:outline-none disabled:cursor-default disabled:opacity-70"
         />
         {(badges.length > 0 || saveStatus || onRequestDelete) && (
           <div className="ml-auto flex flex-shrink-0 items-center gap-2 pl-2">
@@ -113,7 +117,8 @@ export function ProfileHeader({
         placeholder="Add a description"
         aria-label="Profile description"
         size={1}
-        className="mt-1 block w-auto min-w-[3rem] max-w-full rounded-md border border-transparent bg-transparent px-1 py-0.5 text-xs text-muted-foreground [field-sizing:content] hover:border-border focus:border-border focus:bg-background/60 focus:outline-none"
+        disabled={disabled}
+        className="mt-1 block w-auto min-w-[3rem] max-w-full rounded-md border border-transparent bg-transparent px-1 py-0.5 text-xs text-muted-foreground [field-sizing:content] hover:border-border focus:border-border focus:bg-background/60 focus:outline-none disabled:cursor-default disabled:opacity-70"
       />
     </div>
   );

@@ -210,6 +210,23 @@ export function initializeRunBootstrap(
     db as unknown as import('better-sqlite3').Database,
     { explicitAgentId: session.agent_profile_id ?? undefined }
   );
+  // A readonly agent freezes new turns on its sessions. Existing conversations keep
+  // their history, but the user must start a new session with an active agent to
+  // continue. In-flight turns are unaffected — they already passed this gate.
+  if (agentProfile.status === 'readonly') {
+    trace.log(
+      'server_norm',
+      'run_start_rejected',
+      { reason: 'AGENT_READONLY', agentId: agentProfile.id },
+      'agent is read-only'
+    );
+    sendMessage(client.ws, {
+      type: 'error',
+      code: 'AGENT_READONLY',
+      message: "This session's agent is read-only. Start a new session with another agent.",
+    } as ErrorMessage);
+    return null;
+  }
   const llmProfileId = providerConfig?.id ?? null;
   const enabledTools = agentProfile.enabledTools as ToolName[];
 

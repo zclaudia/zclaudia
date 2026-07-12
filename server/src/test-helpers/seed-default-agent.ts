@@ -76,6 +76,7 @@ export function createAgentProfilesTable(db: Database.Database): void {
       skill_execution TEXT,
       thinking_level TEXT,
       is_default INTEGER DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','readonly')),
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );

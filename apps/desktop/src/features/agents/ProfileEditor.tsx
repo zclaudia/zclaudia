@@ -682,7 +682,7 @@ export function ProfileEditor({
   }, [profile, backendId, buildPayload, onSaved]);
 
   const autosave = useProfileAutosave({
-    enabled: profile !== null && hydrated,
+    enabled: profile !== null && hydrated && profile.status !== 'readonly',
     valid: formValid,
     signature,
     save: performAutosave,
@@ -756,17 +756,37 @@ export function ProfileEditor({
 
   const handleRequestDelete = useCallback(async () => {
     if (!profile || deleting) return;
+    const isReadonly = profile.status === 'readonly';
     const ok = await confirm({
-      title: 'Delete profile?',
-      message: `"${profile.name}" will be permanently deleted.`,
+      title: isReadonly ? 'Permanently delete profile?' : 'Delete profile?',
+      message: isReadonly
+        ? `"${profile.name}" is read-only and no longer referenced by any active session. It will be permanently deleted.`
+        : `"${profile.name}" will be permanently deleted.`,
       confirmLabel: 'Delete',
       destructive: true,
     });
     if (!ok || !mountedRef.current) return;
     setDeleting(true);
     try {
-      await api.deleteAgentProfileForBackend(backendId, profile.id);
-      if (mountedRef.current) onDeleted();
+      const result = await api.deleteAgentProfileForBackend(backendId, profile.id);
+      if (!mountedRef.current) return;
+      if (result.ok) {
+        if (result.archived) {
+          // Converted to read-only — refresh the profile so the editor re-renders
+          // in read-only mode rather than navigating away.
+          setFormError(null);
+          const refreshed = (await api.listAgentProfilesForBackend(backendId)).find(
+            p => p.id === profile.id
+          );
+          if (mountedRef.current && refreshed) onSaved(refreshed);
+        } else {
+          // Hard-deleted — leave the editor.
+          onDeleted();
+        }
+      } else {
+        console.error('Failed to delete agent profile:', result);
+        if (mountedRef.current) setFormError(`Failed to delete agent: ${result.message}`);
+      }
     } catch (error) {
       console.error('Failed to delete agent profile:', error);
       const message = error instanceof Error ? error.message : String(error);
@@ -774,7 +794,7 @@ export function ProfileEditor({
     } finally {
       if (mountedRef.current) setDeleting(false);
     }
-  }, [profile, deleting, backendId, onDeleted]);
+  }, [profile, deleting, backendId, onDeleted, onSaved]);
 
   if (loading) {
     return <p className="text-muted-foreground text-center py-8">Loading...</p>;
@@ -816,9 +836,14 @@ export function ProfileEditor({
   });
   const systemPromptPreview = formSystemPrompt.trim().split('\n')[0] || '';
 
+  // A read-only profile (deleted-while-in-use) is frozen: no autosave, no edits,
+  // fields disabled. It can only be hard-deleted once no active session references it.
+  const isReadonly = profile?.status === 'readonly';
+
   const headerBadges: DetailBadge[] = [
     ...(backendName ? [{ label: backendName }] : []),
     ...(profile?.isDefault ? [{ label: 'Default', tone: 'accent' as const }] : []),
+    ...(isReadonly ? [{ label: 'Read-only', tone: 'neutral' as const }] : []),
   ];
 
   const capabilityCount =
@@ -841,11 +866,18 @@ export function ProfileEditor({
         description={formDescription}
         onDescriptionChange={setFormDescription}
         badges={headerBadges}
-        saveStatus={profile ? autosave.status : undefined}
+        saveStatus={profile && !isReadonly ? autosave.status : undefined}
         onRetry={autosave.retry}
         onRequestDelete={profile ? handleRequestDelete : undefined}
         deleting={deleting}
+        disabled={isReadonly}
       />
+      {isReadonly && (
+        <div className="mx-4 my-2 rounded-lg border border-border/60 bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
+          This agent is referenced by active sessions and has been converted to read-only.
+          Archive or delete those sessions to enable permanent deletion.
+        </div>
+      )}
       {profile && formError && <p className="px-4 pb-2 text-xs text-destructive">{formError}</p>}
       <div className="flex-1 overflow-y-auto p-4">
         <div

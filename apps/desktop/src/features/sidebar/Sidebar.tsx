@@ -285,7 +285,8 @@ export function Sidebar({
       void loadAllAgents();
     }
   }, [agentLoaded, agentLoading, loadAllAgents]);
-  const agents = Object.values(agentProfiles);
+  // Exclude read-only agents — they're frozen and not selectable for new sessions.
+  const agents = Object.values(agentProfiles).filter(a => a.status !== 'readonly');
   const allProjects = useProjectStore(s => s.projects);
   const newSessionProject = newSessionRequest?.projectId
     ? (allProjects.find(p => p.id === newSessionRequest.projectId) ?? null)

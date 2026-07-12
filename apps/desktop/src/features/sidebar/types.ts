@@ -2,7 +2,10 @@ import type { Session, GitWorktree, Project, AgentProfileConfig } from '@zclaudi
 import type { SearchSidebarState } from './useSearchSidebar';
 
 /** Agent profile meta shape used within sidebar (subset of full agent profile) */
-export type SidebarAgent = Pick<AgentProfileConfig, 'id' | 'name' | 'isDefault' | 'model'>;
+export type SidebarAgent = Pick<
+  AgentProfileConfig,
+  'id' | 'name' | 'isDefault' | 'model' | 'status'
+>;
 
 /** Agent phase info from supervision store */
 export interface AgentPhaseInfo {

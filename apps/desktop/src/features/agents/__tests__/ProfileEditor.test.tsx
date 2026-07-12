@@ -58,6 +58,7 @@ vi.mock('../../../services/api', () => ({
   createAgentProfileForBackend: vi.fn(),
   updateAgentProfileForBackend: vi.fn(),
   deleteAgentProfileForBackend: vi.fn(),
+  listAgentProfilesForBackend: vi.fn(),
 }));
 
 vi.mock('../../../stores/confirmDialogStore', () => ({
@@ -480,7 +481,7 @@ describe('ProfileEditor', () => {
   it('edit mode: ⋯ menu Delete confirms then calls deleteAgentProfileForBackend + onDeleted', async () => {
     const { confirm } = await import('../../../stores/confirmDialogStore');
     vi.mocked(confirm).mockResolvedValue(true);
-    vi.mocked(api.deleteAgentProfileForBackend).mockResolvedValue(undefined);
+    vi.mocked(api.deleteAgentProfileForBackend).mockResolvedValue({ ok: true });
 
     const onDeleted = vi.fn();
     const view = render(
@@ -503,6 +504,64 @@ describe('ProfileEditor', () => {
     await waitFor(() => {
       expect(onDeleted).toHaveBeenCalled();
     });
+    view.unmount();
+  });
+
+  it('edit mode: delete when agent is referenced archives it (signals onSaved with read-only profile)', async () => {
+    const { confirm } = await import('../../../stores/confirmDialogStore');
+    vi.mocked(confirm).mockResolvedValue(true);
+    // Server reports the profile was archived (referenced by active sessions).
+    vi.mocked(api.deleteAgentProfileForBackend).mockResolvedValue({
+      ok: true,
+      archived: true,
+      sessionCount: 2,
+    });
+    // Refresh after archive returns the profile now marked read-only.
+    vi.mocked(api.listAgentProfilesForBackend).mockResolvedValue([
+      { ...makeProfile('p1', 'Coding'), status: 'readonly' },
+    ]);
+
+    const onSaved = vi.fn();
+    const onDeleted = vi.fn();
+    const view = render(
+      <ProfileEditor
+        backendId="b1"
+        profile={makeProfile('p1', 'Coding')}
+        onBack={vi.fn()}
+        onSaved={onSaved}
+        onDeleted={onDeleted}
+      />
+    );
+    await screen.findByPlaceholderText(NAME_PLACEHOLDER);
+
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete profile' }));
+
+    // Archived → onSaved fires with the refreshed (read-only) profile, NOT onDeleted.
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'p1', status: 'readonly' })
+      );
+    });
+    expect(onDeleted).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
+  it('edit mode: read-only profile shows a read-only banner and disables the name field', async () => {
+    const view = render(
+      <ProfileEditor
+        backendId="b1"
+        profile={{ ...makeProfile('p1', 'Coding'), status: 'readonly' }}
+        onBack={vi.fn()}
+        onSaved={vi.fn()}
+        onDeleted={vi.fn()}
+      />
+    );
+    const name = await screen.findByPlaceholderText(NAME_PLACEHOLDER);
+    expect(name).toBeDisabled();
+    expect(
+      screen.getByText(/has been converted to read-only/i)
+    ).toBeInTheDocument();
     view.unmount();
   });
 

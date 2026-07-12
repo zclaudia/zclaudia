@@ -18,6 +18,19 @@ export interface MultimodalFallbackConfig {
   model: string;
 }
 
+/**
+ * Lifecycle status of an agent profile.
+ * - `active` — normal: editable, selectable for new sessions, eligible as default.
+ * - `readonly` — frozen: still resolved by existing sessions (the FK is preserved),
+ *   but not editable, not selectable for new sessions, and its sessions become
+ *   read-only (derived). Reached by deleting an agent that active sessions reference;
+ *   cleared once no active session references it (then it can be hard-deleted).
+ *
+ * This is distinct from session `archived_at` (soft-delete of a session) and from
+ * session `isReadOnly` (Supervisor plan-mode lock).
+ */
+export type AgentProfileStatus = 'active' | 'readonly';
+
 export interface AgentProfileConfig {
   id: string;
   name: string;
@@ -42,6 +55,8 @@ export interface AgentProfileConfig {
   multimodalFallback?: MultimodalFallbackConfig;
   thinkingLevel?: ThinkingLevel;
   isDefault?: boolean;
+  /** Lifecycle status; omitted/undefined treated as 'active'. */
+  status?: AgentProfileStatus;
   source?: 'user' | 'plugin';
   pluginId?: string;
   pluginProfileId?: string;

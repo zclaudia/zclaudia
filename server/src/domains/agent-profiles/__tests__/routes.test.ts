@@ -266,7 +266,7 @@ describe('agent-profiles routes', () => {
     expect(res.body.data.multimodalFallback).toBeUndefined();
   });
 
-  it('DELETE rejects when sessions reference the agent (409)', async () => {
+  it('DELETE archives (200) when active sessions reference the agent', async () => {
     const create = await request(app)
       .post('/api/agent-profiles')
       .send({
@@ -286,8 +286,128 @@ describe('agent-profiles routes', () => {
     ).run('s1', 'p1', agentId, now, now);
 
     const res = await request(app).delete(`/api/agent-profiles/${agentId}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.archived).toBe(true);
+    expect(res.body.data.sessionCount).toBe(1);
+
+    // The profile is now read-only, not gone.
+    const get = await request(app).get(`/api/agent-profiles/${agentId}`);
+    expect(get.status).toBe(200);
+    expect(get.body.data.status).toBe('readonly');
+  });
+
+  it('DELETE hard-deletes once active sessions are archived (archived sessions do not count)', async () => {
+    const create = await request(app)
+      .post('/api/agent-profiles')
+      .send({
+        name: 'a',
+        llmProfileId,
+        model: 'm',
+        systemPrompt: '',
+        enabledTools: ['read'],
+      });
+    const agentId = create.body.data.id;
+    const now = Date.now();
+    db.prepare(
+      'INSERT INTO projects (id, name, root_path, created_at, updated_at) VALUES (?,?,?,?,?)'
+    ).run('p1', 'p1', '/tmp', now, now);
+    db.prepare(
+      'INSERT INTO sessions (id, project_id, agent_profile_id, created_at, updated_at) VALUES (?,?,?,?,?)'
+    ).run('s1', 'p1', agentId, now, now);
+
+    // First delete → archived (1 active session references it).
+    const archive = await request(app).delete(`/api/agent-profiles/${agentId}`);
+    expect(archive.body.data.archived).toBe(true);
+
+    // Archive the referencing session — it no longer counts as a blocker.
+    db.prepare('UPDATE sessions SET archived_at = ? WHERE id = ?').run(now, 's1');
+
+    // Second delete → hard-deleted.
+    const hard = await request(app).delete(`/api/agent-profiles/${agentId}`);
+    expect(hard.status).toBe(200);
+    expect(hard.body.data).toBeUndefined();
+    const get = await request(app).get(`/api/agent-profiles/${agentId}`);
+    expect(get.status).toBe(404);
+  });
+
+  it('DELETE archives default agent and transfers default to another active agent', async () => {
+    const a = await request(app)
+      .post('/api/agent-profiles')
+      .send({
+        name: 'a',
+        llmProfileId,
+        model: 'm',
+        systemPrompt: '',
+        enabledTools: ['read'],
+        isDefault: true,
+      });
+    await request(app)
+      .post('/api/agent-profiles')
+      .send({
+        name: 'b',
+        llmProfileId,
+        model: 'm',
+        systemPrompt: '',
+        enabledTools: ['read'],
+      });
+    const agentId = a.body.data.id;
+    const now = Date.now();
+    db.prepare(
+      'INSERT INTO projects (id, name, root_path, created_at, updated_at) VALUES (?,?,?,?,?)'
+    ).run('p1', 'p1', '/tmp', now, now);
+    db.prepare(
+      'INSERT INTO sessions (id, project_id, agent_profile_id, created_at, updated_at) VALUES (?,?,?,?,?)'
+    ).run('s1', 'p1', agentId, now, now);
+
+    const del = await request(app).delete(`/api/agent-profiles/${agentId}`);
+    expect(del.status).toBe(200);
+    expect(del.body.data.archived).toBe(true);
+
+    const list = await request(app).get('/api/agent-profiles');
+    const archived = list.body.data.find((p: { id: string }) => p.id === agentId);
+    const other = list.body.data.find((p: { id: string }) => p.id !== agentId);
+    expect(archived.status).toBe('readonly');
+    expect(archived.isDefault).toBe(false);
+    expect(other.isDefault).toBe(true);
+  });
+
+  it('PATCH on a read-only profile returns 409 READONLY', async () => {
+    const create = await request(app)
+      .post('/api/agent-profiles')
+      .send({
+        name: 'a',
+        llmProfileId,
+        model: 'm',
+        systemPrompt: '',
+        enabledTools: ['read'],
+      });
+    const agentId = create.body.data.id;
+    // Force the profile into read-only via the repository.
+    db.prepare("UPDATE agent_profiles SET status = 'readonly' WHERE id = ?").run(agentId);
+
+    const res = await request(app)
+      .patch(`/api/agent-profiles/${agentId}`)
+      .send({ name: 'renamed' });
     expect(res.status).toBe(409);
-    expect(res.body.error.sessionCount).toBe(1);
+    expect(res.body.error.code).toBe('READONLY');
+  });
+
+  it('POST /:id/restore clears read-only status', async () => {
+    const create = await request(app)
+      .post('/api/agent-profiles')
+      .send({
+        name: 'a',
+        llmProfileId,
+        model: 'm',
+        systemPrompt: '',
+        enabledTools: ['read'],
+      });
+    const agentId = create.body.data.id;
+    db.prepare("UPDATE agent_profiles SET status = 'readonly' WHERE id = ?").run(agentId);
+
+    const res = await request(app).post(`/api/agent-profiles/${agentId}/restore`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('active');
   });
 
   it('DELETE default transfers default to another agent', async () => {

@@ -213,6 +213,11 @@ export function SessionHeader({
             {/* leading-tight (not the pill's leading-none) so truncate's
                 overflow:hidden doesn't clip descenders like the "g" in "Coding" */}
             <span className="truncate leading-tight">{agentLabel}</span>
+            {agent?.status === 'readonly' && (
+              <span className="shrink-0 rounded bg-muted px-1 py-0.5 text-[10px] font-medium text-muted-foreground">
+                read-only
+              </span>
+            )}
             {contextPercent != null && contextPercent >= CONTEXT_WARN_PERCENT && (
               <span
                 className={`shrink-0 font-medium ${contextPercent >= CONTEXT_DANGER_PERCENT ? 'text-destructive' : 'text-warning'}`}

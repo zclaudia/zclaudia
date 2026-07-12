@@ -18,6 +18,8 @@ interface CreateDbOptions {
   agentSkillSelection?: Record<string, unknown>;
   agentThinkingLevel?: string | null;
   agentModel?: string;
+  /** Set the seeded agent's lifecycle status (default 'active'). */
+  agentStatus?: 'active' | 'readonly';
   /** Override the agent.id assigned to the session (default 'agent-1'); use to test stale agent_profile_id. */
   sessionAgentProfileId?: string | null;
 }
@@ -177,6 +179,13 @@ function createDb(providerType: string, options: CreateDbOptions = {}): Database
     )
   `
   ).run(sessionAgentId, now, now);
+
+  if (options.agentStatus) {
+    db.prepare('UPDATE agent_profiles SET status = ? WHERE id = ?').run(
+      options.agentStatus,
+      'agent-1'
+    );
+  }
 
   return db;
 }
@@ -519,6 +528,16 @@ describe('initializeRunBootstrap Agent profile resolution', () => {
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('nonexistent-llm-id'));
 
     warnSpy.mockRestore();
+  });
+
+  it('rejects run_start when the agent is read-only (returns null)', () => {
+    // A read-only agent (deleted-while-in-use) freezes new turns. The bootstrap
+    // must bail before launching a provider run.
+    const result = bootstrap('anthropic', 'default', {
+      agentStatus: 'readonly',
+      apiKey: 'sk-test',
+    });
+    expect(result).toBeNull();
   });
 });
 
