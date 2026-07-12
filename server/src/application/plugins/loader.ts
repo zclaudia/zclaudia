@@ -50,6 +50,11 @@ import type {
 } from '@zclaudia/shared/plugin-types';
 import { PluginAgentProfileService } from './agent-profile-service.js';
 import { createPluginContext } from './plugin-context.js';
+import {
+  registerAgentRuntimeContributions,
+  unregisterAgentRuntimeContributions,
+} from './agent-runtime-contributions.js';
+import { providerRegistry } from '../../infra/providers/registry.js';
 
 // ============================================
 // Types
@@ -782,6 +787,14 @@ export class PluginLoader {
       this.broadcastFn?.({ type: 'workflow_trigger_sources_changed' });
     }
 
+    // Register agentRuntimes descriptors BEFORE agentProfiles below: when a plugin
+    // ships both, the runtime descriptor must exist before its bundled profile
+    // installs and validates its runtimeType (see runtime-type-guard.ts).
+    if (contributes.agentRuntimes) {
+      const n = registerAgentRuntimeContributions(manifest.id, contributes.agentRuntimes);
+      if (n > 0) this.broadcastFn?.({ type: 'agent_runtimes_changed' });
+    }
+
     if (contributes.agentProfiles) {
       if (this.db) {
         const service = new PluginAgentProfileService(this.db);
@@ -879,6 +892,11 @@ export class PluginLoader {
 
     // Notify frontend to unregister panels
     this.broadcastFn?.({ type: 'plugin_panel_unregistered', pluginId });
+
+    // Clear agentRuntimes descriptors + any registered adapters for this plugin.
+    unregisterAgentRuntimeContributions(pluginId);
+    providerRegistry.removePluginAdapters(pluginId);
+    this.broadcastFn?.({ type: 'agent_runtimes_changed' });
   }
 
   /**

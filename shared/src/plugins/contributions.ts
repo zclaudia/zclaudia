@@ -2,6 +2,7 @@ import type { Permission } from './permissions.js';
 import type { ThinkingLevel } from '../core/agent-profile.js';
 import type { SkillExecutionSelection, SkillSelection } from '../core/skills.js';
 import type { ToolSelection } from '../core/tools.js';
+import type { AgentRuntimeContribution } from '../providers/agent-runtime.js';
 
 export interface CommandContribution {
   command: string; // e.g., '/my-command'
@@ -145,6 +146,7 @@ export interface PluginContributes {
   skills?: SkillContribution[];
   agentProfiles?: AgentProfileContribution[];
   notchTabs?: NotchTabContribution[];
+  agentRuntimes?: AgentRuntimeContribution[];
 }
 
 export interface UIExtensionRegistration {
