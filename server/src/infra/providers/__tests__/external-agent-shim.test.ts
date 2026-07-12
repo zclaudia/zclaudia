@@ -70,4 +70,14 @@ describe('wrapExternalAgentAdapter', () => {
     }
     expect(events).toEqual(['hi@/repo']);
   });
+
+  it('throws when the adapter type does not match the descriptor type', () => {
+    const ext: ExternalAgentAdapter = {
+      type: 'other',
+      async *run() {
+        /* no-op */
+      },
+    };
+    expect(() => wrapExternalAgentAdapter(ext, descriptor)).toThrow(/does not match descriptor/);
+  });
 });

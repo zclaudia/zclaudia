@@ -30,6 +30,12 @@ export class ProviderRegistry implements ProviderRegistryPort {
   }
 
   registerPluginAdapter(pluginId: string, adapter: ProviderAdapter): void {
+    const ownedByPlugin = this.pluginAdapterTypes.get(pluginId)?.has(adapter.type) ?? false;
+    if (this.adapters.has(adapter.type) && !ownedByPlugin) {
+      throw new Error(
+        `Runtime type "${adapter.type}" is already registered (built-in or another plugin); plugin ${pluginId} cannot claim it`
+      );
+    }
     this.register(adapter);
     const set = this.pluginAdapterTypes.get(pluginId) ?? new Set<string>();
     set.add(adapter.type);

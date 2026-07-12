@@ -146,4 +146,25 @@ describe('ProviderRegistry plugin ownership', () => {
     reg.removePluginAdapters('com.test.x');
     expect(reg.hasType('zclaudia')).toBe(true);
   });
+
+  it('throws when a plugin adapter type collides with a built-in', () => {
+    const reg = new ProviderRegistry();
+    expect(() => reg.registerPluginAdapter('com.test.x', fakeAdapter('zclaudia'))).toThrow(
+      /already registered/
+    );
+  });
+
+  it('throws when a second plugin claims a type owned by another plugin', () => {
+    const reg = new ProviderRegistry();
+    reg.registerPluginAdapter('com.test.a', fakeAdapter('shared-type'));
+    expect(() => reg.registerPluginAdapter('com.test.b', fakeAdapter('shared-type'))).toThrow(
+      /already registered/
+    );
+  });
+
+  it('allows the same plugin to re-register its own type', () => {
+    const reg = new ProviderRegistry();
+    reg.registerPluginAdapter('com.test.a', fakeAdapter('own-type'));
+    expect(() => reg.registerPluginAdapter('com.test.a', fakeAdapter('own-type'))).not.toThrow();
+  });
 });

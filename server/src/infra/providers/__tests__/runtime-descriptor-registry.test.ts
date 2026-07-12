@@ -26,4 +26,24 @@ describe('RuntimeDescriptorRegistry', () => {
     reg.removeForPlugin('com.zclaudia.claude');
     expect(reg.get('claude')).toBeUndefined();
   });
+
+  it('throws when a descriptor type collides with the seeded zclaudia', () => {
+    const reg = new RuntimeDescriptorRegistry();
+    const collide: AgentRuntimeDescriptor = { ...claudeDesc, type: 'zclaudia' };
+    expect(() => reg.registerForPlugin('com.zclaudia.claude', collide)).toThrow(
+      /already registered/
+    );
+  });
+
+  it('throws when a second plugin claims a type owned by another plugin', () => {
+    const reg = new RuntimeDescriptorRegistry();
+    reg.registerForPlugin('com.plugin.a', claudeDesc);
+    expect(() => reg.registerForPlugin('com.plugin.b', claudeDesc)).toThrow(/already registered/);
+  });
+
+  it('allows the same plugin to re-register its own type', () => {
+    const reg = new RuntimeDescriptorRegistry();
+    reg.registerForPlugin('com.plugin.a', claudeDesc);
+    expect(() => reg.registerForPlugin('com.plugin.a', claudeDesc)).not.toThrow();
+  });
 });

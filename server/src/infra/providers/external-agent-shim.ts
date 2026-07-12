@@ -26,6 +26,11 @@ export function wrapExternalAgentAdapter(
   ext: ExternalAgentAdapter,
   descriptor: AgentRuntimeDescriptor
 ): ProviderAdapter {
+  if (ext.type !== descriptor.type) {
+    throw new Error(
+      `External agent adapter type "${ext.type}" does not match descriptor type "${descriptor.type}"`
+    );
+  }
   return {
     type: ext.type,
     manifest: descriptor.manifest,

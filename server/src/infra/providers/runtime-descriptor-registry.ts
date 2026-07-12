@@ -30,6 +30,12 @@ export class RuntimeDescriptorRegistry {
   }
 
   registerForPlugin(pluginId: string, descriptor: AgentRuntimeDescriptor): void {
+    const ownedByPlugin = this.byPlugin.get(pluginId)?.has(descriptor.type) ?? false;
+    if (this.descriptors.has(descriptor.type) && !ownedByPlugin) {
+      throw new Error(
+        `Runtime type "${descriptor.type}" is already registered (built-in or another plugin); plugin ${pluginId} cannot claim it`
+      );
+    }
     this.descriptors.set(descriptor.type, descriptor);
     const set = this.byPlugin.get(pluginId) ?? new Set<string>();
     set.add(descriptor.type);
