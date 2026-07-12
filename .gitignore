@@ -122,7 +122,10 @@ server/data/
 
 # Top-level runtime plugin installs (anchored to repo root so it does not
 # match source dirs like shared/src/plugins/, server/src/application/plugins/).
-/plugins/
+# First-party plugin workspace packages (plugins/*) are tracked source and
+# must be excluded from this ignore individually.
+/plugins/*
+!/plugins/claude/
 
 # Superpowers plugin generated docs
 docs/superpowers/
