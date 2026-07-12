@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
 import type {
   AgentProfileConfig,
-  AgentRuntimeType,
   ThinkingLevel,
   LlmProfileConfig,
   McpServerConfig,
@@ -26,12 +25,9 @@ import {
   defaultSkillSelection,
   skillRefKey,
 } from '@zclaudia/shared';
-import {
-  getProfileConfigDescriptor,
-  enabledRuntimeDescriptors,
-  runtimeRequiresLlmProfile,
-} from '@zclaudia/shared/core/profile-config-descriptor';
+import type { ProfileConfigDescriptor } from '@zclaudia/shared/core/profile-config-descriptor';
 import * as api from '../../services/api';
+import { useRuntimeDescriptorStore } from '../../stores/runtimeDescriptorStore';
 import { Toggle } from '../../components/ui/Toggle';
 import { EditorSection, EditorRow, FieldLabel } from './ui/EditorSection';
 import { EditorTabs } from './ui/EditorTabs';
@@ -58,9 +54,23 @@ export interface ProfileEditorProps {
 }
 
 type ThinkingLevelOption = '' | ThinkingLevel;
-type RuntimeOption = Extract<AgentRuntimeType, 'zclaudia' | 'claude'>;
+/** Runtime type is an open string set — plugins can register additional runtimes. */
+type RuntimeOption = string;
 type SkillDefaultModeOption = 'default' | SkillExecutionMode;
 type SkillForkToolPolicyOption = 'default' | SkillForkToolPolicy;
+
+/** Fallback descriptor for a runtime the active backend does not currently provide
+ *  (e.g. its plugin is not installed/active). Keeps the editor renderable instead of crashing. */
+function unavailableDescriptor(runtime: string): ProfileConfigDescriptor {
+  return {
+    runtime,
+    label: runtime,
+    enabled: false,
+    model: { kind: 'none', multimodalFallback: false, thinkingLevel: false },
+    capabilities: { tools: 'unsupported', providers: 'unsupported', skills: 'unsupported' },
+    authNote: `Runtime "${runtime}" is not available on this backend. Enable the plugin that provides it.`,
+  };
+}
 
 const FIELD_CLASS =
   'w-full rounded-lg border border-border/70 bg-background/70 px-3 py-2 text-sm text-foreground shadow-apple-sm focus:outline-none focus:ring-1 focus:ring-primary/50';
@@ -308,7 +318,7 @@ export function ProfileEditor({
   const populateForm = (agent: AgentProfileConfig) => {
     setFormName(agent.name);
     setFormDescription(agent.description ?? '');
-    setFormRuntimeType(agent.runtimeType === 'claude' ? 'claude' : 'zclaudia');
+    setFormRuntimeType(agent.runtimeType ?? 'zclaudia');
     setFormLlmProfileId(agent.llmProfileId);
     setFormModel(agent.model);
     setFormCliPath(agent.cliPath ?? '');
@@ -576,9 +586,20 @@ export function ProfileEditor({
     });
   };
 
+  const descriptors = useRuntimeDescriptorStore(s => s.getDescriptors(backendId));
+  const descriptorFor = useCallback(
+    (runtime: string): ProfileConfigDescriptor =>
+      descriptors.find(d => d.runtime === runtime) ?? unavailableDescriptor(runtime),
+    [descriptors]
+  );
+  const requiresLlmProfile = useCallback(
+    (runtime: string) => descriptorFor(runtime).model.kind === 'llm-profile',
+    [descriptorFor]
+  );
+
   const buildPayload = useCallback(() => {
     const resolvedTools = resolveToolSelection(formToolSelection).builtinTools;
-    const descriptor = getProfileConfigDescriptor(formRuntimeType);
+    const descriptor = descriptorFor(formRuntimeType);
     const isClaudeRuntime = formRuntimeType === 'claude';
     const trimmedFallbackModel = formFallbackModel.trim();
     const trimmedCliPath = formCliPath.trim();
@@ -628,9 +649,10 @@ export function ProfileEditor({
     formSkillExecution,
     formThinkingLevel,
     formIsDefault,
+    descriptorFor,
   ]);
 
-  const activeDescriptor = getProfileConfigDescriptor(formRuntimeType);
+  const activeDescriptor = descriptorFor(formRuntimeType);
 
   const fallbackVisionValid =
     !activeDescriptor.model.multimodalFallback ||
@@ -642,7 +664,7 @@ export function ProfileEditor({
 
   const formValid = Boolean(
     formName.trim() &&
-    (runtimeRequiresLlmProfile(formRuntimeType) ? formLlmProfileId : true) &&
+    (requiresLlmProfile(formRuntimeType) ? formLlmProfileId : true) &&
     (formRuntimeType === 'claude' || formModel.trim()) &&
     fallbackVisionValid
   );
@@ -671,7 +693,7 @@ export function ProfileEditor({
     if (next === 'claude') {
       setFormThinkingLevel('');
     }
-    if (!runtimeRequiresLlmProfile(next)) {
+    if (!requiresLlmProfile(next)) {
       // Native runtimes don't bind an LLM profile or a multimodal fallback.
       setFormLlmProfileId('');
       setFormFallbackLlmProfileId('');
@@ -694,7 +716,7 @@ export function ProfileEditor({
 
   const handleSubmit = async () => {
     if (!formName.trim()) return;
-    if (runtimeRequiresLlmProfile(formRuntimeType) && !formLlmProfileId) {
+    if (requiresLlmProfile(formRuntimeType) && !formLlmProfileId) {
       setFormError('LLM Profile is required');
       return;
     }
@@ -704,7 +726,7 @@ export function ProfileEditor({
     }
     const fallbackProfile = llmProfiles.find(p => p.id === formFallbackLlmProfileId);
     const trimmedFallbackModel = formFallbackModel.trim();
-    const descriptor = getProfileConfigDescriptor(formRuntimeType);
+    const descriptor = descriptorFor(formRuntimeType);
     if (
       descriptor.model.multimodalFallback &&
       formFallbackLlmProfileId &&
@@ -845,6 +867,7 @@ export function ProfileEditor({
                           aria-label="Agent Type"
                           value={formRuntimeType}
                           onChange={handleRuntimeChange}
+                          options={descriptors.filter(d => d.enabled)}
                         />
                       </div>
                     }
@@ -1931,10 +1954,12 @@ function ThinkingLevelSelector({
 function RuntimeSelector({
   value,
   onChange,
+  options,
   'aria-label': ariaLabel,
 }: {
   value: RuntimeOption;
   onChange: (v: RuntimeOption) => void;
+  options: ProfileConfigDescriptor[];
   'aria-label'?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -1949,7 +1974,6 @@ function RuntimeSelector({
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  const options = enabledRuntimeDescriptors();
   const selected = options.find(o => o.runtime === value);
 
   return (
@@ -1973,7 +1997,7 @@ function RuntimeSelector({
               key={opt.runtime}
               type="button"
               onClick={() => {
-                onChange(opt.runtime as RuntimeOption);
+                onChange(opt.runtime);
                 setOpen(false);
               }}
               className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors ${

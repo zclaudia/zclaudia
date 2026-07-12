@@ -6,6 +6,34 @@ import type { AgentProfileConfig, LlmProfileConfig } from '@zclaudia/shared';
 
 import { ProfileEditor } from '../ProfileEditor';
 import * as api from '../../../services/api';
+import { useRuntimeDescriptorStore } from '../../../stores/runtimeDescriptorStore';
+
+const RUNTIME_DESCRIPTORS = [
+  {
+    runtime: 'zclaudia',
+    label: 'ZClaudia',
+    enabled: true,
+    model: { kind: 'llm-profile' as const, multimodalFallback: true, thinkingLevel: true },
+    capabilities: {
+      tools: 'profile' as const,
+      providers: 'profile' as const,
+      skills: 'profile' as const,
+    },
+  },
+  {
+    runtime: 'claude',
+    label: 'Claude',
+    enabled: true,
+    model: { kind: 'native' as const, multimodalFallback: false, thinkingLevel: true },
+    capabilities: {
+      tools: 'native-readonly' as const,
+      providers: 'external' as const,
+      skills: 'external' as const,
+    },
+    authNote:
+      'Claude uses the Claude Agent SDK runtime. MCP servers and skills come from ~/.claude; built-in tool sets are not injected.',
+  },
+];
 
 vi.mock('../../../services/api', () => ({
   listLlmProfilesForBackend: vi.fn(),
@@ -71,6 +99,9 @@ describe('ProfileEditor', () => {
     vi.mocked(api.getWorkspaceSkillsForBackend).mockResolvedValue([]);
     vi.mocked(api.getMcpServersForBackend).mockResolvedValue([]);
     vi.mocked(api.getMcpServerStatusesForBackend).mockResolvedValue([]);
+    // ProfileEditor reads runtime descriptors for its backendId ('b1') from the store.
+    useRuntimeDescriptorStore.setState({ byBackend: {} });
+    useRuntimeDescriptorStore.getState().setDescriptors(RUNTIME_DESCRIPTORS, 'b1');
   });
 
   it('loads supporting catalogs for the given backendId', async () => {
@@ -600,5 +631,16 @@ describe('ProfileEditor', () => {
     expect(toggle).toHaveAttribute('aria-checked', 'false');
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('renders an unavailable note for a runtime with no descriptor (plugin not active)', async () => {
+    const ghost = { ...makeProfile('g1', 'Ghost'), runtimeType: 'ghost' };
+    await renderEditor(ghost);
+    // Does not crash; surfaces the unavailable note instead of a normal runtime form.
+    expect(
+      await screen.findByText(
+        'Runtime "ghost" is not available on this backend. Enable the plugin that provides it.'
+      )
+    ).toBeInTheDocument();
   });
 });
