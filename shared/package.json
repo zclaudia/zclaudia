@@ -45,6 +45,10 @@
     "./plugins/*": {
       "import": "./dist/plugins/*.js",
       "types": "./dist/plugins/*.d.ts"
+    },
+    "./providers": {
+      "import": "./dist/providers/index.js",
+      "types": "./dist/providers/index.d.ts"
     }
   },
   "scripts": {
