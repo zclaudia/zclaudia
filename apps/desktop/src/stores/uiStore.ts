@@ -13,28 +13,28 @@ interface FontSizeConfig {
 
 const FONT_CONFIGS: Record<FontSizePreset, FontSizeConfig> = {
   small: {
-    prose: '0.75rem', // 12px
-    code: '0.6875rem', // 11px
-    input: '0.8125rem', // 13px
-    h1: '1.5em',
-    h2: '1.25em',
-    h3: '1.125em',
+    prose: '0.6875rem', // 11px
+    code: '0.625rem', // 10px
+    input: '0.75rem', // 12px
+    h1: '1.15em',
+    h2: '1.08em',
+    h3: '1em',
   },
   medium: {
-    prose: '0.875rem', // 14px
-    code: '0.8125rem', // 13px
-    input: '0.875rem', // 14px
-    h1: '1.715em',
-    h2: '1.43em',
-    h3: '1.286em',
+    prose: '0.8125rem', // 13px
+    code: '0.75rem', // 12px
+    input: '0.8125rem', // 13px
+    h1: '1.15em',
+    h2: '1.08em',
+    h3: '1em',
   },
   large: {
-    prose: '1rem', // 16px
+    prose: '0.9375rem', // 15px
     code: '0.875rem', // 14px
-    input: '1rem', // 16px
-    h1: '2em',
-    h2: '1.5em',
-    h3: '1.25em',
+    input: '0.9375rem', // 15px
+    h1: '1.2em',
+    h2: '1.1em',
+    h3: '1.05em',
   },
 };
 

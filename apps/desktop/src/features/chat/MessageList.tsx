@@ -585,7 +585,7 @@ function CodeBlock({ language, children }: { language: string; children: string 
             margin: 0,
             borderRadius: 0,
             padding: '0.75rem',
-            fontSize: 'var(--chat-font-code, 0.8125rem)',
+            fontSize: 'var(--chat-font-code, 0.75rem)',
             overflowX: 'auto',
             whiteSpace: 'pre',
           }}
@@ -1154,7 +1154,7 @@ const AssistantContent = memo(function AssistantContent({ content }: { content: 
                 }
                 return (
                   <code
-                    className="bg-secondary px-1.5 py-0.5 rounded-md text-sm text-primary break-all"
+                    className="bg-secondary px-1.5 py-0.5 rounded-md text-primary break-all"
                     {...props}
                   >
                     {hasInlineMarkdownIcon(codeText) ? (

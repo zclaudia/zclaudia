@@ -1049,7 +1049,7 @@ export function MessageInput({
             rows={1}
             className="relative w-full resize-none min-h-[1.5rem] overflow-y-auto border-0 bg-transparent p-0 whitespace-pre-wrap break-words placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
-              fontSize: 'var(--chat-font-input, 0.875rem)',
+              fontSize: 'var(--chat-font-input, 0.8125rem)',
               width: '100%',
               maxHeight: `${Math.max(120, availableViewportHeight * 0.3)}px`,
               color: 'hsl(var(--foreground))',
@@ -1163,7 +1163,7 @@ export function MessageInput({
               rows={1}
               className="relative block w-full resize-none border-0 bg-transparent p-0 leading-6 whitespace-pre-wrap break-words placeholder:text-muted-foreground/60 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
               style={{
-                fontSize: 'var(--chat-font-input, 0.875rem)',
+                fontSize: 'var(--chat-font-input, 0.8125rem)',
                 width: '100%',
                 minHeight: '1.5rem',
                 color: 'hsl(var(--foreground))',

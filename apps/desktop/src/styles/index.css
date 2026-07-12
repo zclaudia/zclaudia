@@ -557,20 +557,28 @@ body.notch-window {
 
 /* Chat font sizing via CSS variables (set by uiStore) */
 .prose.prose-sm {
-  font-size: var(--chat-font-prose, 0.875rem); /* 14px - same as text-sm */
+  font-size: var(--chat-font-prose, 0.8125rem); /* 13px */
 }
 
-/* Heading hierarchy in prose */
+/* Heading hierarchy in prose (sizes from --chat-font-h* via uiStore) */
 .prose.prose-sm :where(h1, h2, h3, h4, h5, h6):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
   font-weight: 500;
   line-height: 1.4;
-  margin-top: 1.5em;
-  margin-bottom: 0.6em;
+  margin-top: 1.15em;
+  margin-bottom: 0.45em;
 }
-.prose.prose-sm :where(h1):not(:where([class~="not-prose"], [class~="not-prose"] *)) { font-size: 1.3em; }
-.prose.prose-sm :where(h2):not(:where([class~="not-prose"], [class~="not-prose"] *)) { font-size: 1.15em; }
-.prose.prose-sm :where(h3):not(:where([class~="not-prose"], [class~="not-prose"] *)) { font-size: 1em; }
-.prose.prose-sm :where(h4, h5, h6):not(:where([class~="not-prose"], [class~="not-prose"] *)) { font-size: 0.9em; }
+.prose.prose-sm :where(h1):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+  font-size: var(--chat-font-h1, 1.15em);
+}
+.prose.prose-sm :where(h2):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+  font-size: var(--chat-font-h2, 1.08em);
+}
+.prose.prose-sm :where(h3):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+  font-size: var(--chat-font-h3, 1em);
+}
+.prose.prose-sm :where(h4, h5, h6):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+  font-size: 0.95em;
+}
 .prose.prose-sm :where(table, th, td):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
   font-size: inherit;
 }
