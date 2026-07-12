@@ -3,8 +3,15 @@ import type { SkillExecutionSelection, SkillSelection } from './skills.js';
 
 export type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 
+/** Built-in runtimes always present. Plugins register additional runtime types at runtime. */
+export const BUILTIN_AGENT_RUNTIME_TYPES = ['zclaudia'] as const;
+/** Known built-in runtime literals, kept for ergonomic narrowing; any string is accepted. */
+export type BuiltinAgentRuntimeType = (typeof BUILTIN_AGENT_RUNTIME_TYPES)[number];
+/** A runtime type is an open string set (plugin-extensible). */
+export type AgentRuntimeType = BuiltinAgentRuntimeType | (string & {});
+
+/** @deprecated use provider registry for validation; kept for legacy imports. */
 export const AGENT_RUNTIME_TYPES = ['zclaudia', 'claude', 'codex', 'cursor'] as const;
-export type AgentRuntimeType = (typeof AGENT_RUNTIME_TYPES)[number];
 
 export interface MultimodalFallbackConfig {
   llmProfileId: string;

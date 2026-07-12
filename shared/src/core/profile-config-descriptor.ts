@@ -31,7 +31,7 @@ export interface ProfileConfigDescriptor {
   authNote?: string;
 }
 
-export const PROFILE_CONFIG_DESCRIPTORS: Record<AgentRuntimeType, ProfileConfigDescriptor> = {
+export const PROFILE_CONFIG_DESCRIPTORS: Record<string, ProfileConfigDescriptor> = {
   zclaudia: {
     runtime: 'zclaudia',
     label: 'ZClaudia',
