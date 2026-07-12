@@ -1,6 +1,7 @@
 import type { Express, RequestHandler } from 'express';
 import type Database from 'better-sqlite3';
 import { createAgentProfileRoutes } from './routes.js';
+import { createRuntimeDescriptorRoutes } from './runtime-descriptors-routes.js';
 
 export interface AgentProfilesDomainDeps {
   app: Express;
@@ -11,4 +12,5 @@ export interface AgentProfilesDomainDeps {
 export function registerAgentProfilesDomain(deps: AgentProfilesDomainDeps): void {
   const { app, authMiddleware, db } = deps;
   app.use('/api/agent-profiles', authMiddleware, createAgentProfileRoutes(db));
+  app.use('/api/agent-runtimes', authMiddleware, createRuntimeDescriptorRoutes());
 }

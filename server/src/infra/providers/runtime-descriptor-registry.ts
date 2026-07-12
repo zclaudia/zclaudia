@@ -21,12 +21,67 @@ const ZCLAUDIA_DESCRIPTOR: AgentRuntimeDescriptor = {
   },
 };
 
+// TRANSITIONAL (removed in Phase 4 when claude becomes a plugin):
+// Seeded here as a built-in so the endpoint returns it and the desktop keeps
+// working until the `com.zclaudia.claude` plugin registers it itself. The
+// manifest/policy literals below are copied from
+// server/src/infra/providers/external-agents/claude/manifest.ts
+// (CLAUDE_AGENT_MANIFEST / CLAUDE_AGENT_POLICY) rather than imported, so this
+// registry stays self-contained.
+const CLAUDE_DESCRIPTOR: AgentRuntimeDescriptor = {
+  type: 'claude',
+  label: 'Claude',
+  model: { kind: 'native', multimodalFallback: false, thinkingLevel: true },
+  capabilities: { tools: 'native-readonly', providers: 'external', skills: 'external' },
+  authNote:
+    'Claude uses the Claude Agent SDK runtime. MCP servers and skills come from ~/.claude; built-in tool sets are not injected.',
+  manifest: {
+    id: 'claude',
+    name: 'Claude',
+    version: '1.0.0',
+    apiVersion: 'pcp/v1',
+    providerType: 'claude',
+    runtime: 'cli',
+    capabilities: [
+      { id: 'chat.stream', supported: true, mode: 'native', reliability: 'strict' },
+      { id: 'tool.call', supported: true, mode: 'native', reliability: 'strict' },
+      { id: 'tool.inject', supported: false, degradation: 'fallback_to_text' },
+      { id: 'interaction.form', supported: false, degradation: 'fallback_to_text' },
+      { id: 'interaction.approval', supported: true, mode: 'bridged', reliability: 'best_effort' },
+      { id: 'interaction.todo', supported: false, degradation: 'fallback_to_text' },
+      { id: 'input.image', supported: false, degradation: 'fallback_to_notice' },
+      { id: 'input.text_file', supported: false, degradation: 'fallback_to_notice' },
+      { id: 'input.binary_file', supported: false, degradation: 'fallback_to_notice' },
+      { id: 'permission.mode', supported: true, mode: 'native', reliability: 'strict' },
+      { id: 'session.abort', supported: true, mode: 'native', reliability: 'strict' },
+      { id: 'session.steer', supported: false, degradation: 'fallback_to_text' },
+      { id: 'session.background_task', supported: false, degradation: 'fallback_to_text' },
+    ],
+    permissionModeMap: {
+      supervised: 'default',
+      auto_edit: 'acceptEdits',
+      autonomous: 'bypassPermissions',
+      plan_only: 'plan',
+    },
+  },
+  policy: {
+    nativeInteractionTools: ['enter_plan_mode', 'exit_plan_mode'],
+    modeSwitchSessionPolicy: 'preserve',
+    sessionCwdPolicy: 'requested',
+    escalateAlwaysTools: ['ExitPlanMode'],
+  },
+};
+
 export class RuntimeDescriptorRegistry {
   private descriptors = new Map<string, AgentRuntimeDescriptor>();
   private byPlugin = new Map<string, Set<string>>();
 
   constructor() {
     this.descriptors.set(ZCLAUDIA_DESCRIPTOR.type, ZCLAUDIA_DESCRIPTOR);
+    // TRANSITIONAL (removed in Phase 4 when claude becomes a plugin): seeded
+    // built-in-style like zclaudia — never registered under a pluginId, so
+    // removeForPlugin() never touches it.
+    this.descriptors.set('claude', CLAUDE_DESCRIPTOR);
   }
 
   registerForPlugin(pluginId: string, descriptor: AgentRuntimeDescriptor): void {
