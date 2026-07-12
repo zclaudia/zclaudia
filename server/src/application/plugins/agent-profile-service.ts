@@ -3,6 +3,7 @@ import type { AgentProfileContribution } from '@zclaudia/shared/plugin-types';
 import { defaultToolSelection, resolveToolSelection } from '@zclaudia/shared/core/tools';
 import { AgentProfileRepository } from '../../domains/agent-profiles/repository.js';
 import { LlmProfileRepository } from '../../domains/llm-profiles/repository.js';
+import { isValidRuntimeType } from '../../domains/agent-profiles/runtime-type-guard.js';
 
 export class PluginAgentProfileService {
   constructor(private readonly db: Database.Database) {}
@@ -34,6 +35,10 @@ export class PluginAgentProfileService {
     const toolSelection = contribution.toolSelection ?? defaultToolSelection;
     const enabledTools = resolveToolSelection(toolSelection).builtinTools;
 
+    const requestedRuntime = contribution.runtimeType;
+    const runtimeType =
+      requestedRuntime && isValidRuntimeType(requestedRuntime) ? requestedRuntime : 'zclaudia';
+
     agentRepo.create({
       name: contribution.name,
       description: contribution.description,
@@ -45,7 +50,7 @@ export class PluginAgentProfileService {
       skillSelection: contribution.skillSelection,
       skillExecution: contribution.skillExecution,
       thinkingLevel: contribution.thinkingLevel,
-      runtimeType: 'zclaudia',
+      runtimeType,
       source: 'plugin',
       pluginId,
       pluginProfileId: contribution.id,

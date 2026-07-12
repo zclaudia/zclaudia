@@ -130,6 +130,8 @@ export interface AgentProfileContribution {
    * against local LLM profiles at install time.
    */
   llmProfileStrategy?: 'default' | 'first-available';
+  /** Runtime the profile binds to. Defaults to 'zclaudia'. Validated against active providers at install. */
+  runtimeType?: string;
 }
 
 export interface PluginContributes {

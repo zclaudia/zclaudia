@@ -55,6 +55,7 @@ import {
   unregisterAgentRuntimeContributions,
 } from './agent-runtime-contributions.js';
 import { providerRegistry } from '../../infra/providers/registry.js';
+import { AgentProfileRepository } from '../../domains/agent-profiles/repository.js';
 
 // ============================================
 // Types
@@ -897,6 +898,12 @@ export class PluginLoader {
     unregisterAgentRuntimeContributions(pluginId);
     providerRegistry.removePluginAdapters(pluginId);
     this.broadcastFn?.({ type: 'agent_runtimes_changed' });
+
+    // Uninstall plugin-owned agent profiles.
+    if (this.db) {
+      const removed = new AgentProfileRepository(this.db).deleteByPlugin(pluginId);
+      if (removed > 0) this.broadcastFn?.({ type: 'agent_profiles_changed' });
+    }
   }
 
   /**

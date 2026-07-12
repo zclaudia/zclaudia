@@ -483,4 +483,10 @@ export class AgentProfileRepository extends BaseRepository<
       .get(pluginId, pluginProfileId);
     return row ? this.mapRow(row) : undefined;
   }
+
+  /** Delete all agent profiles owned by a plugin. Returns the number of rows deleted. */
+  deleteByPlugin(pluginId: string): number {
+    const res = this.db.prepare('DELETE FROM agent_profiles WHERE plugin_id = ?').run(pluginId);
+    return res.changes;
+  }
 }
