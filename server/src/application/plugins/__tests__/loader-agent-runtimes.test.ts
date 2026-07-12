@@ -10,7 +10,8 @@ const PLUGIN = 'com.test.loader-rt';
 const contribution: AgentRuntimeContribution = {
   type: 'loader-rt',
   label: 'LoaderRT',
-  model: { kind: 'native', multimodalFallback: false, thinkingLevel: false },
+  model: { kind: 'native', multimodalFallback: false, thinkingLevel: 'off' },
+  hasCliPath: false,
   capabilities: { tools: 'native-readonly', providers: 'external', skills: 'external' },
   manifest: {
     id: 'loader-rt',

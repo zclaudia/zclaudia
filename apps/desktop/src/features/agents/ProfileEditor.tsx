@@ -66,7 +66,8 @@ function unavailableDescriptor(runtime: string): ProfileConfigDescriptor {
     runtime,
     label: runtime,
     enabled: false,
-    model: { kind: 'none', multimodalFallback: false, thinkingLevel: false },
+    model: { kind: 'none', multimodalFallback: false, thinkingLevel: 'off' },
+    hasCliPath: false,
     capabilities: { tools: 'unsupported', providers: 'unsupported', skills: 'unsupported' },
     authNote: `Runtime "${runtime}" is not available on this backend. Enable the plugin that provides it.`,
   };
@@ -600,7 +601,6 @@ export function ProfileEditor({
   const buildPayload = useCallback(() => {
     const resolvedTools = resolveToolSelection(formToolSelection).builtinTools;
     const descriptor = descriptorFor(formRuntimeType);
-    const isClaudeRuntime = formRuntimeType === 'claude';
     const trimmedFallbackModel = formFallbackModel.trim();
     const trimmedCliPath = formCliPath.trim();
     const multimodalFallback = !descriptor.model.multimodalFallback
@@ -612,18 +612,17 @@ export function ProfileEditor({
         : hadFallbackAtMount.current
           ? null
           : undefined;
-    const cliPath =
-      formRuntimeType === 'claude'
-        ? trimmedCliPath || (hadCliPathAtMount.current ? null : undefined)
-        : hadCliPathAtMount.current
-          ? null
-          : undefined;
+    const cliPath = descriptor.hasCliPath
+      ? trimmedCliPath || (hadCliPathAtMount.current ? null : undefined)
+      : hadCliPathAtMount.current
+        ? null
+        : undefined;
     return {
       name: formName.trim(),
       description: formDescription.trim() || undefined,
       runtimeType: formRuntimeType,
       llmProfileId: formLlmProfileId,
-      model: isClaudeRuntime ? '' : formModel.trim(),
+      model: descriptor.model.kind === 'none' ? '' : formModel.trim(),
       cliPath,
       multimodalFallback,
       systemPrompt: formSystemPrompt,
@@ -631,7 +630,10 @@ export function ProfileEditor({
       toolSelection: formToolSelection,
       skillSelection: formSkillSelection,
       skillExecution: formSkillExecution,
-      thinkingLevel: isClaudeRuntime || formThinkingLevel === '' ? undefined : formThinkingLevel,
+      thinkingLevel:
+        descriptor.model.thinkingLevel === 'selectable' && formThinkingLevel !== ''
+          ? formThinkingLevel
+          : undefined,
       isDefault: formIsDefault,
     };
   }, [
@@ -653,6 +655,7 @@ export function ProfileEditor({
   ]);
 
   const activeDescriptor = descriptorFor(formRuntimeType);
+  const modelRequired = activeDescriptor.model.kind === 'llm-profile';
 
   const fallbackVisionValid =
     !activeDescriptor.model.multimodalFallback ||
@@ -665,7 +668,7 @@ export function ProfileEditor({
   const formValid = Boolean(
     formName.trim() &&
     (requiresLlmProfile(formRuntimeType) ? formLlmProfileId : true) &&
-    (formRuntimeType === 'claude' || formModel.trim()) &&
+    (modelRequired ? formModel.trim() : true) &&
     fallbackVisionValid
   );
 
@@ -690,7 +693,7 @@ export function ProfileEditor({
     // Model ids are not interchangeable across runtimes → clear and let the form
     // sit in `pending` until a model is chosen for the new runtime.
     setFormModel('');
-    if (next === 'claude') {
+    if (descriptorFor(next).model.thinkingLevel !== 'selectable') {
       setFormThinkingLevel('');
     }
     if (!requiresLlmProfile(next)) {
@@ -720,7 +723,7 @@ export function ProfileEditor({
       setFormError('LLM Profile is required');
       return;
     }
-    if (formRuntimeType !== 'claude' && !formModel.trim()) {
+    if (modelRequired && !formModel.trim()) {
       setFormError('Model is required');
       return;
     }
@@ -873,133 +876,132 @@ export function ProfileEditor({
                     }
                   />
 
-                  {formRuntimeType === 'claude' ? (
+                  {activeDescriptor.model.kind === 'llm-profile' && (
                     <>
                       <EditorRow
-                        title={<label htmlFor="agent-profile-cli-path">CLI Path</label>}
-                        description="Optional — custom Claude CLI binary"
+                        title="LLM Profile"
+                        description="Required"
                         control={
                           <div className="w-56">
-                            <input
-                              id="agent-profile-cli-path"
-                              type="text"
-                              aria-label="CLI Path (optional)"
-                              value={formCliPath}
-                              onChange={e => setFormCliPath(e.target.value)}
-                              onBlur={autosave.flush}
-                              placeholder="/opt/homebrew/bin/claude"
-                              className={MONO_FIELD_CLASS}
+                            <LlmProfileSelector
+                              hideLabel
+                              aria-label="LLM Profile"
+                              value={formLlmProfileId}
+                              onChange={id => {
+                                setFormLlmProfileId(id);
+                                const newProfile = llmProfiles.find(p => p.id === id);
+                                const newProfileModels = newProfile?.models;
+                                if (
+                                  formModel &&
+                                  (!newProfileModels ||
+                                    !newProfileModels.some(m => m.modelId === formModel))
+                                ) {
+                                  setFormModel('');
+                                }
+                              }}
+                              profiles={llmProfiles}
                             />
                           </div>
                         }
                       />
                       <EditorRow
-                        title="Claude Model"
+                        title="Model"
+                        description="Required"
                         control={
-                          <span aria-label="Claude Model" className="text-sm text-muted-foreground">
-                            Auto (Claude CLI default)
-                          </span>
-                        }
-                      />
-                      {activeDescriptor.model.thinkingLevel && (
-                        <EditorRow
-                          title="Thinking Level"
-                          control={
-                            <span
-                              aria-label="Thinking Level"
-                              className="text-sm text-muted-foreground"
-                            >
-                              Auto
-                            </span>
-                          }
-                        />
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      {activeDescriptor.model.kind === 'llm-profile' ? (
-                        <>
-                          <EditorRow
-                            title="LLM Profile"
-                            description="Required"
-                            control={
-                              <div className="w-56">
-                                <LlmProfileSelector
-                                  hideLabel
-                                  aria-label="LLM Profile"
-                                  value={formLlmProfileId}
-                                  onChange={id => {
-                                    setFormLlmProfileId(id);
-                                    const newProfile = llmProfiles.find(p => p.id === id);
-                                    const newProfileModels = newProfile?.models;
-                                    if (
-                                      formModel &&
-                                      (!newProfileModels ||
-                                        !newProfileModels.some(m => m.modelId === formModel))
-                                    ) {
-                                      setFormModel('');
-                                    }
-                                  }}
-                                  profiles={llmProfiles}
-                                />
-                              </div>
-                            }
-                          />
-                          <EditorRow
-                            title="Model"
-                            description="Required"
-                            control={
-                              <div className="w-56">
-                                <ModelSelector
-                                  hideLabel
-                                  aria-label="Model"
-                                  value={formModel}
-                                  onChange={setFormModel}
-                                  llmProfile={llmProfiles.find(p => p.id === formLlmProfileId)}
-                                />
-                              </div>
-                            }
-                          >
-                            <ModelDeclarationWarning
-                              formModel={formModel}
+                          <div className="w-56">
+                            <ModelSelector
+                              hideLabel
+                              aria-label="Model"
+                              value={formModel}
+                              onChange={setFormModel}
                               llmProfile={llmProfiles.find(p => p.id === formLlmProfileId)}
                             />
-                          </EditorRow>
-                        </>
-                      ) : (
-                        <EditorRow
-                          title={<label htmlFor="agent-profile-native-model">Claude Model</label>}
-                          description="Leave blank to use Claude Code's configured default model."
-                          control={
-                            <input
-                              id="agent-profile-native-model"
-                              type="text"
-                              value={formModel}
-                              onChange={e => setFormModel(e.target.value)}
-                              onBlur={autosave.flush}
-                              placeholder="Auto (Claude CLI default)"
-                              className={`${FIELD_CLASS} w-56`}
-                            />
-                          }
+                          </div>
+                        }
+                      >
+                        <ModelDeclarationWarning
+                          formModel={formModel}
+                          llmProfile={llmProfiles.find(p => p.id === formLlmProfileId)}
                         />
-                      )}
-
-                      {activeDescriptor.model.thinkingLevel && (
-                        <EditorRow
-                          title="Thinking Level"
-                          control={
-                            <div className="w-56">
-                              <ThinkingLevelSelector
-                                hideLabel
-                                aria-label="Thinking Level"
-                                value={formThinkingLevel}
-                                onChange={setFormThinkingLevel}
-                              />
-                            </div>
-                          }
-                        />
-                      )}
+                      </EditorRow>
                     </>
+                  )}
+
+                  {activeDescriptor.model.kind === 'native' && (
+                    <EditorRow
+                      title={<label htmlFor="agent-profile-native-model">Model</label>}
+                      description="Leave blank to use the runtime's default model."
+                      control={
+                        <input
+                          id="agent-profile-native-model"
+                          type="text"
+                          value={formModel}
+                          onChange={e => setFormModel(e.target.value)}
+                          onBlur={autosave.flush}
+                          placeholder="Auto (default)"
+                          className={`${FIELD_CLASS} w-56`}
+                        />
+                      }
+                    />
+                  )}
+
+                  {activeDescriptor.model.kind === 'none' && (
+                    <EditorRow
+                      title="Model"
+                      control={
+                        <span aria-label="Model" className="text-sm text-muted-foreground">
+                          Auto (CLI default)
+                        </span>
+                      }
+                    />
+                  )}
+
+                  {activeDescriptor.hasCliPath && (
+                    <EditorRow
+                      title={<label htmlFor="agent-profile-cli-path">CLI Path</label>}
+                      description="Optional — custom Claude CLI binary"
+                      control={
+                        <div className="w-56">
+                          <input
+                            id="agent-profile-cli-path"
+                            type="text"
+                            aria-label="CLI Path (optional)"
+                            value={formCliPath}
+                            onChange={e => setFormCliPath(e.target.value)}
+                            onBlur={autosave.flush}
+                            placeholder="/opt/homebrew/bin/claude"
+                            className={MONO_FIELD_CLASS}
+                          />
+                        </div>
+                      }
+                    />
+                  )}
+
+                  {activeDescriptor.model.thinkingLevel === 'selectable' && (
+                    <EditorRow
+                      title="Thinking Level"
+                      control={
+                        <div className="w-56">
+                          <ThinkingLevelSelector
+                            hideLabel
+                            aria-label="Thinking Level"
+                            value={formThinkingLevel}
+                            onChange={setFormThinkingLevel}
+                          />
+                        </div>
+                      }
+                    />
+                  )}
+
+                  {activeDescriptor.model.thinkingLevel === 'auto' && (
+                    <EditorRow
+                      title="Thinking Level"
+                      control={
+                        <span aria-label="Thinking Level" className="text-sm text-muted-foreground">
+                          Auto
+                        </span>
+                      }
+                    />
                   )}
                 </div>
 
@@ -1010,7 +1012,7 @@ export function ProfileEditor({
                 )}
               </EditorSection>
 
-              {formRuntimeType !== 'claude' && activeDescriptor.model.multimodalFallback && (
+              {activeDescriptor.model.multimodalFallback && (
                 <EditorSection
                   title="Multimodal fallback"
                   description="Route image input to a vision-capable model."

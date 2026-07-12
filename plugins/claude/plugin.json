@@ -13,7 +13,8 @@
       {
         "type": "claude",
         "label": "Claude",
-        "model": { "kind": "native", "multimodalFallback": false, "thinkingLevel": true },
+        "model": { "kind": "none", "multimodalFallback": false, "thinkingLevel": "auto" },
+        "hasCliPath": true,
         "capabilities": { "tools": "native-readonly", "providers": "external", "skills": "external" },
         "authNote": "Claude uses the Claude Agent SDK runtime. MCP servers and skills come from ~/.claude; built-in tool sets are not injected.",
         "manifest": {

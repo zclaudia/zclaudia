@@ -6,7 +6,8 @@ import type { AgentRuntimeDescriptor, ExternalAgentAdapter } from '@zclaudia/sha
 const descriptor: AgentRuntimeDescriptor = {
   type: 'claude',
   label: 'Claude',
-  model: { kind: 'native', multimodalFallback: false, thinkingLevel: true },
+  model: { kind: 'none', multimodalFallback: false, thinkingLevel: 'auto' },
+  hasCliPath: true,
   capabilities: { tools: 'native-readonly', providers: 'external', skills: 'external' },
   manifest: {
     id: 'claude', name: 'Claude', version: '1.0.0', apiVersion: 'pcp/v1',

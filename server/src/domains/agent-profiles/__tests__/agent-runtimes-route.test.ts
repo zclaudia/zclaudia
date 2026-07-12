@@ -30,6 +30,7 @@ describe('GET /api/agent-runtimes', () => {
     expect(byRuntime.zclaudia).toBeDefined();
     expect(byRuntime.zclaudia.label).toBe('ZClaudia');
     expect(byRuntime.zclaudia.model).toBeDefined();
+    expect(byRuntime.zclaudia.hasCliPath).toBe(false);
     expect(byRuntime.zclaudia.capabilities).toBeDefined();
 
     expect(byRuntime.claude).toBeUndefined();

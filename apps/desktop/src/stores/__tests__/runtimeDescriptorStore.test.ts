@@ -6,7 +6,8 @@ const claude: ProfileConfigDescriptor = {
   runtime: 'claude',
   label: 'Claude',
   enabled: true,
-  model: { kind: 'native', multimodalFallback: false, thinkingLevel: true },
+  model: { kind: 'none', multimodalFallback: false, thinkingLevel: 'auto' },
+  hasCliPath: true,
   capabilities: { tools: 'native-readonly', providers: 'external', skills: 'external' },
 };
 

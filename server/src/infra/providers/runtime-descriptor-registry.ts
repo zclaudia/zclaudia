@@ -8,7 +8,8 @@ import type { AgentRuntimeDescriptor } from '@zclaudia/shared/providers';
 const ZCLAUDIA_DESCRIPTOR: AgentRuntimeDescriptor = {
   type: 'zclaudia',
   label: 'ZClaudia',
-  model: { kind: 'llm-profile', multimodalFallback: true, thinkingLevel: true },
+  model: { kind: 'llm-profile', multimodalFallback: true, thinkingLevel: 'selectable' },
+  hasCliPath: false,
   capabilities: { tools: 'profile', providers: 'profile', skills: 'profile' },
   manifest: {
     id: 'zclaudia',

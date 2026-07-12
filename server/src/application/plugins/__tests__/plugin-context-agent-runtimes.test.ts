@@ -31,7 +31,8 @@ const PLUGIN = 'com.test.rt-ctx';
 const descriptor: AgentRuntimeDescriptor = {
   type: 'test-ctx-rt',
   label: 'Test',
-  model: { kind: 'native', multimodalFallback: false, thinkingLevel: false },
+  model: { kind: 'native', multimodalFallback: false, thinkingLevel: 'off' },
+  hasCliPath: false,
   capabilities: { tools: 'native-readonly', providers: 'external', skills: 'external' },
   manifest: {
     id: 'test-ctx-rt',

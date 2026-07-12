@@ -10,8 +10,9 @@ export interface AgentRuntimeSummary {
   model: {
     kind: string;
     multimodalFallback: boolean;
-    thinkingLevel: boolean;
+    thinkingLevel: string;
   };
+  hasCliPath: boolean;
   capabilities: {
     tools: string;
     providers: string;
@@ -30,6 +31,7 @@ export function createRuntimeDescriptorRoutes(): Router {
         label: d.label,
         enabled: true,
         model: d.model,
+        hasCliPath: d.hasCliPath,
         capabilities: d.capabilities,
         authNote: d.authNote,
       }));

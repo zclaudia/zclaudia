@@ -5,7 +5,8 @@ import type { AgentRuntimeDescriptor } from '@zclaudia/shared/providers';
 const otherDesc: AgentRuntimeDescriptor = {
   type: 'other',
   label: 'Other',
-  model: { kind: 'native', multimodalFallback: false, thinkingLevel: true },
+  model: { kind: 'native', multimodalFallback: false, thinkingLevel: 'auto' },
+  hasCliPath: false,
   capabilities: { tools: 'native-readonly', providers: 'external', skills: 'external' },
   manifest: {
     id: 'other', name: 'Other', version: '1.0.0', apiVersion: 'pcp/v1',

@@ -13,7 +13,8 @@ const RUNTIME_DESCRIPTORS = [
     runtime: 'zclaudia',
     label: 'ZClaudia',
     enabled: true,
-    model: { kind: 'llm-profile' as const, multimodalFallback: true, thinkingLevel: true },
+    model: { kind: 'llm-profile' as const, multimodalFallback: true, thinkingLevel: 'selectable' as const },
+    hasCliPath: false,
     capabilities: {
       tools: 'profile' as const,
       providers: 'profile' as const,
@@ -24,7 +25,8 @@ const RUNTIME_DESCRIPTORS = [
     runtime: 'claude',
     label: 'Claude',
     enabled: true,
-    model: { kind: 'native' as const, multimodalFallback: false, thinkingLevel: true },
+    model: { kind: 'none' as const, multimodalFallback: false, thinkingLevel: 'auto' as const },
+    hasCliPath: true,
     capabilities: {
       tools: 'native-readonly' as const,
       providers: 'external' as const,
@@ -34,6 +36,19 @@ const RUNTIME_DESCRIPTORS = [
       'Claude uses the Claude Agent SDK runtime. MCP servers and skills come from ~/.claude; built-in tool sets are not injected.',
   },
 ];
+
+const GENERIC_NATIVE_DESCRIPTOR = {
+  runtime: 'gennative',
+  label: 'Generic Native',
+  enabled: true,
+  model: { kind: 'native' as const, multimodalFallback: false, thinkingLevel: 'selectable' as const },
+  hasCliPath: false,
+  capabilities: {
+    tools: 'native-readonly' as const,
+    providers: 'external' as const,
+    skills: 'external' as const,
+  },
+};
 
 vi.mock('../../../services/api', () => ({
   listLlmProfilesForBackend: vi.fn(),
@@ -546,8 +561,8 @@ describe('ProfileEditor', () => {
     expect(screen.queryByText('Select a model')).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Model' })).toBeNull();
     // Claude auto-defaults render as plain read-only values, not editable fields.
-    expect(screen.getByLabelText('Claude Model').tagName).toBe('SPAN');
-    expect(screen.getByLabelText('Claude Model')).toHaveTextContent('Auto (Claude CLI default)');
+    expect(screen.getByLabelText('Model').tagName).toBe('SPAN');
+    expect(screen.getByLabelText('Model')).toHaveTextContent('Auto (CLI default)');
     expect(screen.getByLabelText('Thinking Level').tagName).toBe('SPAN');
     expect(screen.getByLabelText('Thinking Level')).toHaveTextContent('Auto');
     expect(screen.queryByText('Multimodal fallback')).toBeNull();
@@ -558,7 +573,7 @@ describe('ProfileEditor', () => {
     await renderEditor(makeProfile('p1', 'Coding'));
     fireEvent.click(screen.getByLabelText('Agent Type'));
     fireEvent.click(screen.getByRole('button', { name: 'Claude' }));
-    expect(screen.getByLabelText('Claude Model')).toHaveTextContent('Auto (Claude CLI default)');
+    expect(screen.getByLabelText('Model')).toHaveTextContent('Auto (CLI default)');
     expect(screen.getByLabelText('Thinking Level')).toHaveTextContent('Auto');
   });
 
@@ -642,5 +657,28 @@ describe('ProfileEditor', () => {
         'Runtime "ghost" is not available on this backend. Enable the plugin that provides it.'
       )
     ).toBeInTheDocument();
+  });
+
+  it('a generic native runtime renders a free-text model input, interactive thinking selector, and no CLI Path field', async () => {
+    useRuntimeDescriptorStore.getState().setDescriptors(
+      [...RUNTIME_DESCRIPTORS, GENERIC_NATIVE_DESCRIPTOR],
+      'b1'
+    );
+    await renderEditor(null);
+
+    fireEvent.click(screen.getByLabelText('Agent Type'));
+    fireEvent.click(screen.getByRole('button', { name: 'Generic Native' }));
+
+    // Free-text model input, not the LLM-profile-bound dropdown or a static "none" row.
+    const modelInput = screen.getByLabelText('Model') as HTMLInputElement;
+    expect(modelInput.tagName).toBe('INPUT');
+    fireEvent.change(modelInput, { target: { value: 'some-model-id' } });
+    expect(modelInput).toHaveValue('some-model-id');
+
+    // Interactive thinking selector (not a static "Auto" row).
+    expect(screen.getByLabelText('Thinking Level').tagName).not.toBe('SPAN');
+
+    // No CLI Path field for a runtime with hasCliPath: false.
+    expect(screen.queryByLabelText('CLI Path (optional)')).toBeNull();
   });
 });

@@ -24,7 +24,8 @@ describe('isValidRuntimeType', () => {
     const descriptor: AgentRuntimeDescriptor = {
       type: 'test-descriptor-only-rt',
       label: 'Descriptor Only',
-      model: { kind: 'native', multimodalFallback: false, thinkingLevel: false },
+      model: { kind: 'native', multimodalFallback: false, thinkingLevel: 'off' },
+      hasCliPath: false,
       capabilities: { tools: 'native-readonly', providers: 'external', skills: 'external' },
       manifest: {
         id: 'test-descriptor-only-rt',

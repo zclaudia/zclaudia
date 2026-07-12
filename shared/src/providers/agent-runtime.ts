@@ -4,6 +4,7 @@ import type { ProviderPolicy } from '../core/provider-policy.js';
 import type {
   CapabilityMode,
   ModelConfigKind,
+  ThinkingLevelMode,
 } from '../core/profile-config-descriptor.js';
 
 /**
@@ -18,8 +19,10 @@ export interface AgentRuntimeDescriptor {
   model: {
     kind: ModelConfigKind;
     multimodalFallback: boolean;
-    thinkingLevel: boolean;
+    thinkingLevel: ThinkingLevelMode;
   };
+  /** Whether the profile editor surfaces a CLI Path field for this runtime. */
+  hasCliPath: boolean;
   capabilities: {
     tools: CapabilityMode;
     providers: CapabilityMode;
