@@ -959,7 +959,7 @@ export function ProfileEditor({
                   {activeDescriptor.hasCliPath && (
                     <EditorRow
                       title={<label htmlFor="agent-profile-cli-path">CLI Path</label>}
-                      description="Optional — custom Claude CLI binary"
+                      description={`Optional — custom ${activeDescriptor.label} CLI binary`}
                       control={
                         <div className="w-56">
                           <input
@@ -969,7 +969,7 @@ export function ProfileEditor({
                             value={formCliPath}
                             onChange={e => setFormCliPath(e.target.value)}
                             onBlur={autosave.flush}
-                            placeholder="/opt/homebrew/bin/claude"
+                            placeholder="/path/to/cli"
                             className={MONO_FIELD_CLASS}
                           />
                         </div>
