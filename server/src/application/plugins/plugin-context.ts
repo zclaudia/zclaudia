@@ -10,6 +10,10 @@ import type {
   WorkflowStepHandler,
 } from '@zclaudia/shared/plugin-types';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
+import type {
+  ExternalAgentAdapter,
+  ProviderToolBridgeRequest,
+} from '@zclaudia/shared/providers';
 import { pluginEvents, type EventData, type EventListener } from '../../infra/events/index.js';
 import { mcpClientManager } from '../../utils/mcp-client-manager.js';
 import { loadMcpServersFromDb } from '../../utils/mcp-config.js';
@@ -21,6 +25,13 @@ import { pluginStorageManager } from './storage.js';
 import { toolRegistry } from './tool-registry.js';
 import { workflowStepRegistry } from './workflow-step-registry.js';
 import type { CommandHandler as ServerCommandHandler } from '../commands/registry.js';
+import { providerRegistry } from '../../infra/providers/registry.js';
+import { runtimeDescriptorRegistry } from '../../infra/providers/runtime-descriptor-registry.js';
+import { wrapExternalAgentAdapter } from '../../infra/providers/external-agent-shim.js';
+import {
+  createAgentPluginToolBridgeMcpEntry,
+  DEFAULT_AGENT_PLUGIN_BRIDGE_MCP_SERVER_NAME,
+} from '../../infra/providers/external-agents/agent-plugin/tool-bridge.js';
 
 type PluginDatabase = Database.Database;
 type RuntimePluginContext = PluginContext & Record<string, unknown>;
@@ -365,6 +376,40 @@ export function createPluginContext(options: PluginContextOptions): RuntimePlugi
       db && permissionManager.hasPermission(pluginId, 'provider.call')
         ? createProviderAPI(db, pluginId)
         : undefined,
+
+    // External-agent runtime registration (requires provider.register permission)
+    agentRuntimes: permissionManager.hasPermission(pluginId, 'provider.register')
+      ? {
+          register: (adapter: ExternalAgentAdapter) => {
+            const descriptor = runtimeDescriptorRegistry.get(adapter.type);
+            if (!descriptor) {
+              throw new Error(
+                `No agentRuntimes contribution declares runtime "${adapter.type}" for plugin ${pluginId}`
+              );
+            }
+            providerRegistry.registerPluginAdapter(
+              pluginId,
+              wrapExternalAgentAdapter(adapter, descriptor)
+            );
+            broadcast?.({ type: 'agent_runtimes_changed' });
+          },
+          unregister: (type: string) => {
+            providerRegistry.removePluginAdapters(pluginId);
+            broadcast?.({ type: 'agent_runtimes_changed' });
+            void type;
+          },
+          createToolBridge: async (request: ProviderToolBridgeRequest) => {
+            const entry = await createAgentPluginToolBridgeMcpEntry({
+              serverPort: request.serverPort,
+              zclaudiaSessionId: request.sessionId,
+            });
+            if (!entry) return null;
+            // createAgentPluginToolBridgeMcpEntry returns the MCP server config directly
+            // (not a keyed map), so pair it with the bridge's well-known server name.
+            return { name: DEFAULT_AGENT_PLUGIN_BRIDGE_MCP_SERVER_NAME, config: entry };
+          },
+        }
+      : undefined,
 
     // MCP API (requires network.fetch permission; operates through server-side manager)
     mcp:

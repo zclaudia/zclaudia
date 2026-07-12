@@ -15,6 +15,7 @@ import type {
   ProjectAPI,
   UIAPI,
   ProviderAPI,
+  AgentRuntimesAPI,
   McpAPI,
   PluginSchedulerAPI,
 } from './runtime-apis.js';
@@ -56,6 +57,9 @@ export interface PluginContext {
 
   // AI Provider API（按权限提供）
   providers?: ProviderAPI;
+
+  // External-agent runtime registration (requires provider.register permission)
+  agentRuntimes?: AgentRuntimesAPI;
 
   // MCP API（按 network.fetch 权限提供）
   mcp?: McpAPI;

@@ -8,6 +8,7 @@ export type Permission =
   | 'network.fetch'
   | 'timer'
   | 'provider.call'
+  | 'provider.register'
   // 敏感级别
   | 'fs.write'
   | 'session.write'

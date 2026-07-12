@@ -1,3 +1,9 @@
+import type {
+  ExternalAgentAdapter,
+  ProviderToolBridgeEntry,
+  ProviderToolBridgeRequest,
+} from '../providers/index.js';
+
 export type EventHandler = (data: unknown) => void | Promise<void>;
 
 export interface EventAPI {
@@ -176,4 +182,13 @@ export interface PluginSchedulerAPI {
   unregister(taskId: string): void;
   /** Trigger a task immediately (outside its schedule). */
   trigger(taskId: string): Promise<void>;
+}
+
+export interface AgentRuntimesAPI {
+  /** Register a live external-agent adapter for a runtime declared in contributes.agentRuntimes. */
+  register(adapter: ExternalAgentAdapter): void;
+  /** Remove a previously-registered adapter by runtime type. */
+  unregister(type: string): void;
+  /** Build the host tool-bridge MCP entry so the agent can reach zclaudia's plugin tools. */
+  createToolBridge(request: ProviderToolBridgeRequest): Promise<ProviderToolBridgeEntry | null>;
 }

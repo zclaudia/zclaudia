@@ -34,6 +34,11 @@ export interface WorkflowTriggerSourcesChangedMessage {
   type: 'workflow_trigger_sources_changed';
 }
 
+// Plugin-registered agent runtimes changed (Server → Client)
+export interface AgentRuntimesChangedMessage {
+  type: 'agent_runtimes_changed';
+}
+
 // System task updates (Server → Client)
 export interface SystemTaskUpdateMessage {
   type: 'system_task_update';
@@ -108,6 +113,7 @@ export type WorkflowServerMessage =
   | WorkflowDeletedMessage
   | WorkflowStepTypesChangedMessage
   | WorkflowTriggerSourcesChangedMessage
+  | AgentRuntimesChangedMessage
   | SystemTaskUpdateMessage
   | LocalPRUpdateMessage
   | LocalPRDeletedMessage

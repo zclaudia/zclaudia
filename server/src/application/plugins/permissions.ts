@@ -35,6 +35,7 @@ const PERMISSION_LEVELS: Record<Permission, number> = {
   'clipboard.read': 3,
   'clipboard.write': 3,
   'shell.execute': 4,
+  'provider.register': 4,
 };
 
 export class PermissionManager {
