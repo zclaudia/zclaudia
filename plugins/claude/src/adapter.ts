@@ -62,9 +62,12 @@ export class ClaudeAgentAdapter implements ExternalAgentAdapter {
         serverPort: context.serverPort,
         sessionId: context.claudiaSessionId,
       });
-      const mcpServers: ClaudeMcpServers = bridge
-        ? { ...claudeConfig.mcpServers, [bridge.name]: bridge.config as ClaudeMcpServers[string] }
-        : claudeConfig.mcpServers;
+      // A user-configured MCP server already registered under the bridge's name
+      // wins over the injected tool bridge (mirrors the original mergeClaudeMcpServers).
+      const mcpServers: ClaudeMcpServers =
+        bridge && !claudeConfig.mcpServers[bridge.name]
+          ? { ...claudeConfig.mcpServers, [bridge.name]: bridge.config as ClaudeMcpServers[string] }
+          : claudeConfig.mcpServers;
       const thinkingOptions = toClaudeThinkingOptions(context.thinkingLevel);
       yield* runClaudeAgent(input, {
         cwd: context.cwd,
