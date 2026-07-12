@@ -62,6 +62,15 @@ export class ProviderRegistry implements ProviderRegistryPort {
     this.pluginAdapterTypes.delete(pluginId);
   }
 
+  /** Remove one plugin-owned runtime type. No-op if not owned by this plugin. */
+  removePluginAdapter(pluginId: string, type: string): void {
+    const set = this.pluginAdapterTypes.get(pluginId);
+    if (!set || !set.has(type)) return;
+    this.adapters.delete(type);
+    set.delete(type);
+    if (set.size === 0) this.pluginAdapterTypes.delete(pluginId);
+  }
+
   hasType(type: string): boolean {
     this.ensureBuiltinsRegistered();
     return this.adapters.has(type);

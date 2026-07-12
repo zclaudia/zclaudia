@@ -394,9 +394,8 @@ export function createPluginContext(options: PluginContextOptions): RuntimePlugi
             broadcast?.({ type: 'agent_runtimes_changed' });
           },
           unregister: (type: string) => {
-            providerRegistry.removePluginAdapters(pluginId);
+            providerRegistry.removePluginAdapter(pluginId, type);
             broadcast?.({ type: 'agent_runtimes_changed' });
-            void type;
           },
           createToolBridge: async (request: ProviderToolBridgeRequest) => {
             const entry = await createAgentPluginToolBridgeMcpEntry({

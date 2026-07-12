@@ -167,4 +167,50 @@ describe('ProviderRegistry plugin ownership', () => {
     reg.registerPluginAdapter('com.test.a', fakeAdapter('own-type'));
     expect(() => reg.registerPluginAdapter('com.test.a', fakeAdapter('own-type'))).not.toThrow();
   });
+
+  it('removePluginAdapter removes only the named type, leaving other types of the same plugin', () => {
+    const reg = new ProviderRegistry();
+    reg.registerPluginAdapter('com.test.multi', fakeAdapter('a'));
+    reg.registerPluginAdapter('com.test.multi', fakeAdapter('b'));
+    expect(reg.hasType('a')).toBe(true);
+    expect(reg.hasType('b')).toBe(true);
+
+    reg.removePluginAdapter('com.test.multi', 'a');
+    expect(reg.hasType('a')).toBe(false);
+    expect(reg.hasType('b')).toBe(true);
+  });
+
+  it('removePluginAdapter is a no-op for a type not owned by the plugin', () => {
+    const reg = new ProviderRegistry();
+    reg.registerPluginAdapter('com.test.multi', fakeAdapter('a'));
+
+    // Type owned by a different plugin
+    reg.registerPluginAdapter('com.test.other', fakeAdapter('b'));
+    reg.removePluginAdapter('com.test.multi', 'b');
+    expect(reg.hasType('b')).toBe(true);
+
+    // Type not registered at all
+    reg.removePluginAdapter('com.test.multi', 'never');
+    expect(reg.hasType('a')).toBe(true);
+
+    // Unknown plugin entirely
+    expect(() => reg.removePluginAdapter('com.test.nobody', 'a')).not.toThrow();
+    expect(reg.hasType('a')).toBe(true);
+  });
+
+  it('removePluginAdapter cleans up the ownership entry when the last type is removed', () => {
+    const reg = new ProviderRegistry();
+    reg.registerPluginAdapter('com.test.multi', fakeAdapter('a'));
+    reg.removePluginAdapter('com.test.multi', 'a');
+    expect(reg.hasType('a')).toBe(false);
+
+    // Ownership entry is gone, so a later collision with a built-in still throws
+    // (i.e. the plugin is no longer treated as the owner of anything).
+    expect(() => reg.registerPluginAdapter('com.test.multi', fakeAdapter('zclaudia'))).toThrow(
+      /already registered/
+    );
+    // And it can freshly claim a new non-colliding type again.
+    expect(() => reg.registerPluginAdapter('com.test.multi', fakeAdapter('a'))).not.toThrow();
+    expect(reg.hasType('a')).toBe(true);
+  });
 });

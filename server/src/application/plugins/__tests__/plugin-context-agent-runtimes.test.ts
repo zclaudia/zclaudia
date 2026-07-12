@@ -49,6 +49,18 @@ const ext: ExternalAgentAdapter = {
   async *run() {},
 };
 
+function descriptorFor(type: string): AgentRuntimeDescriptor {
+  return {
+    ...descriptor,
+    type,
+    manifest: { ...descriptor.manifest, id: type, providerType: type },
+  };
+}
+
+function extFor(type: string): ExternalAgentAdapter {
+  return { type, async *run() {} };
+}
+
 function makeContext(broadcast: ((msg: unknown) => void) | null = null) {
   return createPluginContext({
     pluginId: PLUGIN,
@@ -126,6 +138,30 @@ describe('context.agentRuntimes', () => {
 
     expect(providerRegistry.hasType('test-ctx-rt')).toBe(false);
     expect(broadcast).toHaveBeenLastCalledWith({ type: 'agent_runtimes_changed' });
+  });
+
+  it('unregister(type) removes only that runtime, leaving the plugin\'s other runtimes', () => {
+    vi.mocked(permissionManager.hasPermission).mockImplementation(
+      (_pluginId: string, permission: string) => permission === 'provider.register'
+    );
+    const descA = descriptorFor('rt-a');
+    const descB = descriptorFor('rt-b');
+    runtimeDescriptorRegistry.registerForPlugin(PLUGIN, descA);
+    runtimeDescriptorRegistry.registerForPlugin(PLUGIN, descB);
+
+    const ctx = makeContext();
+    ctx.agentRuntimes.register(extFor('rt-a'));
+    ctx.agentRuntimes.register(extFor('rt-b'));
+    expect(providerRegistry.hasType('rt-a')).toBe(true);
+    expect(providerRegistry.hasType('rt-b')).toBe(true);
+
+    ctx.agentRuntimes.unregister('rt-a');
+
+    expect(providerRegistry.hasType('rt-a')).toBe(false);
+    expect(providerRegistry.hasType('rt-b')).toBe(true);
+
+    // Clean up the extra plugin adapters registered in this test.
+    providerRegistry.removePluginAdapters(PLUGIN);
   });
 
   it('createToolBridge resolves to null when no serverPort is supplied', async () => {

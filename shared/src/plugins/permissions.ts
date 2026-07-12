@@ -8,7 +8,6 @@ export type Permission =
   | 'network.fetch'
   | 'timer'
   | 'provider.call'
-  | 'provider.register'
   // 敏感级别
   | 'fs.write'
   | 'session.write'
@@ -16,4 +15,5 @@ export type Permission =
   | 'clipboard.read'
   | 'clipboard.write'
   // 危险级别
-  | 'shell.execute';
+  | 'shell.execute'
+  | 'provider.register';
