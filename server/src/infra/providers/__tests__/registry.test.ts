@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { providerRegistry } from '../registry.js';
+import { providerRegistry, ProviderRegistry } from '../registry.js';
 import type { ProviderAdapter } from '../types.js';
 
 /** Minimal fake adapter used for testing register/get */
@@ -8,6 +8,15 @@ function createFakeAdapter(type: string): ProviderAdapter {
     type,
     async *run() {
       // no-op generator
+    },
+  };
+}
+
+function fakeAdapter(type: string): ProviderAdapter {
+  return {
+    type,
+    async *run() {
+      /* no-op */
     },
   };
 }
@@ -114,5 +123,27 @@ describe('ProviderRegistry', () => {
       expect(capabilities['input.binary_file']).toBe(false);
       expect(capabilities['session.background_task']).toBe(false);
     });
+  });
+});
+
+describe('ProviderRegistry plugin ownership', () => {
+  it('registers and lists plugin adapters, then removes them by plugin', () => {
+    const reg = new ProviderRegistry();
+    expect(reg.hasType('zclaudia')).toBe(true);
+    expect(reg.hasType('claude-x')).toBe(false);
+
+    reg.registerPluginAdapter('com.test.x', fakeAdapter('claude-x'));
+    expect(reg.hasType('claude-x')).toBe(true);
+    expect(reg.listTypes()).toContain('claude-x');
+
+    reg.removePluginAdapters('com.test.x');
+    expect(reg.hasType('claude-x')).toBe(false);
+  });
+
+  it('does not remove built-in adapters when removing a plugin', () => {
+    const reg = new ProviderRegistry();
+    reg.registerPluginAdapter('com.test.x', fakeAdapter('claude-x'));
+    reg.removePluginAdapters('com.test.x');
+    expect(reg.hasType('zclaudia')).toBe(true);
   });
 });

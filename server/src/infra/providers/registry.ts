@@ -11,11 +11,14 @@ export interface ProviderRegistryPort {
   getOrDefault(type: string): ProviderAdapter;
   getPolicy(type: string): ProviderPolicy | undefined;
   getDefinition(type: string): ProviderDefinition | undefined;
+  hasType(type: string): boolean;
+  listTypes(): string[];
 }
 
-class ProviderRegistry implements ProviderRegistryPort {
+export class ProviderRegistry implements ProviderRegistryPort {
   private adapters = new Map<string, ProviderAdapter>();
   private defaultType = 'zclaudia';
+  private pluginAdapterTypes = new Map<string, Set<string>>(); // pluginId -> types
 
   constructor() {
     this.register(new PiAgentProviderAdapter());
@@ -24,6 +27,28 @@ class ProviderRegistry implements ProviderRegistryPort {
 
   register(adapter: ProviderAdapter): void {
     this.adapters.set(adapter.type, adapter);
+  }
+
+  registerPluginAdapter(pluginId: string, adapter: ProviderAdapter): void {
+    this.register(adapter);
+    const set = this.pluginAdapterTypes.get(pluginId) ?? new Set<string>();
+    set.add(adapter.type);
+    this.pluginAdapterTypes.set(pluginId, set);
+  }
+
+  removePluginAdapters(pluginId: string): void {
+    const set = this.pluginAdapterTypes.get(pluginId);
+    if (!set) return;
+    for (const type of set) this.adapters.delete(type);
+    this.pluginAdapterTypes.delete(pluginId);
+  }
+
+  hasType(type: string): boolean {
+    return this.adapters.has(type);
+  }
+
+  listTypes(): string[] {
+    return Array.from(this.adapters.keys());
   }
 
   get(type: string): ProviderAdapter | undefined {
