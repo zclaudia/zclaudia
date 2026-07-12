@@ -31,6 +31,8 @@ export function useDataLoader() {
         ]);
         // Sync plugin state from server (non-blocking — don't fail data load if plugins API is unavailable)
         api.fetchAndSyncPlugins({ signal }).catch(() => {});
+        // Sync agent-runtime descriptors from server (non-blocking)
+        api.fetchAndSyncRuntimeDescriptors({ signal }).catch(() => {});
         const store = useProjectStore.getState();
         store.setProjects(projects);
         store.mergeSessions(sessions);
