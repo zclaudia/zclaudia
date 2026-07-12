@@ -46,6 +46,14 @@
           "escalateAlwaysTools": ["ExitPlanMode"]
         }
       }
+    ],
+    "agentProfiles": [
+      {
+        "id": "claude-default",
+        "name": "Claude",
+        "description": "Claude Agent SDK runtime",
+        "runtimeType": "claude"
+      }
     ]
   }
 }
