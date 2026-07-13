@@ -245,4 +245,28 @@ describe('EmbeddedFacadeClient', () => {
 
     expect(MockWebSocket.instances[0].url).toBe('ws://127.0.0.1:3100/ws/backend-facade');
   });
+
+  it('returns localhost HTTP proxy base URL for numeric port target', () => {
+    const client = new EmbeddedFacadeClient(3100);
+
+    expect(client.getHttpBaseUrl('backend-1')).toBe(
+      'http://localhost:3100/api/backend-facade/proxy/backend-1'
+    );
+  });
+
+  it('derives HTTP proxy base URL from explicit ws facade URL', () => {
+    const client = new EmbeddedFacadeClient({ url: 'ws://127.0.0.1:3100/ws/backend-facade' });
+
+    expect(client.getHttpBaseUrl('backend-1')).toBe(
+      'http://127.0.0.1:3100/api/backend-facade/proxy/backend-1'
+    );
+  });
+
+  it('derives HTTPS proxy base URL from explicit wss facade URL', () => {
+    const client = new EmbeddedFacadeClient({ url: 'wss://example.com/ws/backend-facade' });
+
+    expect(client.getHttpBaseUrl('backend-1')).toBe(
+      'https://example.com/api/backend-facade/proxy/backend-1'
+    );
+  });
 });

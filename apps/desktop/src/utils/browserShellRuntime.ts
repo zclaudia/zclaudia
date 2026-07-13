@@ -1,5 +1,6 @@
 export function isBrowserShellRuntime(): boolean {
   if (typeof window === 'undefined') return false;
+  if ('__TAURI_INTERNALS__' in window) return false;
   const protocol = window.location?.protocol;
   return protocol === 'http:' || protocol === 'https:';
 }

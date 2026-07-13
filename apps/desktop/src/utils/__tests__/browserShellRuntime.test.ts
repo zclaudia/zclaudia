@@ -10,6 +10,11 @@ function setLocation(url: string): void {
   vi.stubGlobal('window', { location: new URL(url) });
 }
 
+function setTauriLocation(url: string): void {
+  vi.stubGlobal('location', new URL(url));
+  vi.stubGlobal('window', { location: new URL(url), __TAURI_INTERNALS__: {} });
+}
+
 describe('browserShellRuntime', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -32,6 +37,14 @@ describe('browserShellRuntime', () => {
 
   it('does not activate for tauri protocol', () => {
     setLocation('tauri://localhost/');
+
+    expect(isBrowserShellRuntime()).toBe(false);
+    expect(getBrowserShellBaseUrl()).toBeNull();
+    expect(getBrowserShellFacadeWsUrl()).toBeNull();
+  });
+
+  it('does not activate for tauri dev http pages', () => {
+    setTauriLocation('http://127.0.0.1:1420/');
 
     expect(isBrowserShellRuntime()).toBe(false);
     expect(getBrowserShellBaseUrl()).toBeNull();

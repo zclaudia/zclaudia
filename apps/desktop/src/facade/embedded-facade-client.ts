@@ -273,9 +273,9 @@ export class EmbeddedFacadeClient implements BackendFacade {
   // --------------------------------------------------------------------------
 
   getHttpBaseUrl(backendId: string): string | null {
-    const port = this.url.match(/:(\d+)\//)?.[1];
-    if (!port) return null;
-    return `http://localhost:${port}/api/backend-facade/proxy/${backendId}`;
+    const url = new URL(this.url);
+    const protocol = url.protocol === 'wss:' ? 'https:' : 'http:';
+    return `${protocol}//${url.host}/api/backend-facade/proxy/${backendId}`;
   }
 
   getHttpHeaders(): Record<string, string> {
