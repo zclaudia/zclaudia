@@ -11,7 +11,7 @@ if (!label || !repoRoot || !nodeBin || !dataDir || !logDir) {
 }
 
 const port = Number(portRaw || '3100');
-if (!Number.isFinite(port) || port <= 0) {
+if (!Number.isInteger(port) || port < 1 || port > 65535) {
   console.error(`Invalid port: ${portRaw}`);
   process.exit(1);
 }

@@ -79,16 +79,18 @@ test('launch agent plist binds localhost and writes user logs', () => {
   assert.match(plist, /<key>KeepAlive<\/key>\s*<true\/>/);
 });
 
-test('render launch agent CLI rejects invalid port', () => {
-  const result = spawnSync(
-    process.execPath,
-    ['scripts/deploy/render-launch-agent.mjs', ...launchAgentArgs, 'nope'],
-    { cwd: repoRoot, encoding: 'utf8' }
-  );
+for (const port of ['nope', '3.14', '70000']) {
+  test(`render launch agent CLI rejects invalid port ${port}`, () => {
+    const result = spawnSync(
+      process.execPath,
+      ['scripts/deploy/render-launch-agent.mjs', ...launchAgentArgs, port],
+      { cwd: repoRoot, encoding: 'utf8' }
+    );
 
-  assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /invalid port/i);
-});
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /invalid port/i);
+  });
+}
 
 test('render launch agent CLI writes localhost and provided port', () => {
   const result = spawnSync(
