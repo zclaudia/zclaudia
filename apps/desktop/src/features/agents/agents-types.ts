@@ -6,7 +6,6 @@ export type AgentsTab = 'profiles' | 'skills' | 'mcp-servers' | 'providers';
 // (Providers tab), not agent profiles (Profiles tab).
 export type AgentsSelection =
   | { backendId: string; kind: 'profile'; id: string }
-  | { backendId: string; kind: 'new-profile' }
   | { backendId: string; kind: 'skill'; id: string }
   | { backendId: string; kind: 'new-skill' }
   | { backendId: string; kind: 'skill-dirs' }

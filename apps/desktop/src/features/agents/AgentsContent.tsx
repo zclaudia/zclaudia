@@ -9,7 +9,7 @@
  * MCP mutations never touch those stores).
  */
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import { useTopLevelViewStore } from '../../stores/topLevelViewStore';
 import { useServerStore } from '../../stores/serverStore';
@@ -28,6 +28,7 @@ import { useSavedBridge } from './useSavedBridge';
 import { DetailHeader } from './ui/DetailHeader';
 import type { DetailBadge } from './ui/DetailHeader';
 import { BrowseView } from './BrowseView';
+import { NewAgentProfileModal } from './NewAgentProfileModal';
 import { resolveNewTarget } from './NewItemMenu';
 import { useAgentsLibrary } from './useAgentsLibrary';
 import type { AgentsBackend, AgentsSelection, LibraryItem } from './agents-types';
@@ -127,6 +128,7 @@ export function AgentsContent({
   const bumpAgentsRefresh = useTopLevelViewStore(s => s.bumpAgentsRefresh);
   const activeServerId = useServerStore(s => s.activeServerId);
   const localBackendId = useFacadeStore(s => s.localBackendId);
+  const [newProfileBackendId, setNewProfileBackendId] = useState<string | null>(null);
 
   const activeTab = view.kind === 'agents' ? view.tab : 'profiles';
   const backendFilter = useTopLevelViewStore(s => s.agentsBackendFilter);
@@ -158,6 +160,10 @@ export function AgentsContent({
     backendFilter !== 'all' ? backendFilter : (backends[0]?.backendId ?? localBackendId ?? '');
 
   const startNew = () => {
+    if (activeTab === 'profiles') {
+      setNewProfileBackendId(backendForNew());
+      return;
+    }
     const target = resolveNewTarget(activeTab);
     selectAgentsItem({ backendId: backendForNew(), kind: target } as AgentsSelection);
   };
@@ -190,6 +196,28 @@ export function AgentsContent({
       (providersData.profiles.get(backendId) ?? []).some(p => p.id === id),
   });
 
+  // Mirrors what the old settings Agents tab used to do after mutations: keep
+  // the app-wide agent profile cache and readiness gate fresh — but only when
+  // the edited backend is the one the rest of the app is talking to.
+  // activeServerId may still hold the legacy 'local' id while backendId is
+  // canonical, so canonicalize before comparing.
+  const refreshProfileMetaIfActive = (backendId: string) => {
+    const activeBackendId = resolveCanonicalBackendId(activeServerId, localBackendId);
+    if (backendId === activeBackendId) {
+      void useAgentProfileMetaStore.getState().loadAll();
+      void useAgentReadinessStore.getState().refresh();
+    }
+  };
+
+  const handleProfileCreated = (saved: AgentProfileConfig) => {
+    const backendId = newProfileBackendId ?? backendForNew();
+    profileBridge.record(backendId, saved.id, saved);
+    bumpAgentsRefresh();
+    selectAgentsItem({ backendId, kind: 'profile', id: saved.id });
+    refreshProfileMetaIfActive(backendId);
+    setNewProfileBackendId(null);
+  };
+
   if (!selection) {
     return (
       <div className="relative h-full">
@@ -202,6 +230,14 @@ export function AgentsContent({
           onSelectBackendFilter={setBackendFilter}
           onNew={startNew}
         />
+        {newProfileBackendId !== null && (
+          <NewAgentProfileModal
+            open
+            backendId={newProfileBackendId}
+            onClose={() => setNewProfileBackendId(null)}
+            onCreated={handleProfileCreated}
+          />
+        )}
       </div>
     );
   }
@@ -209,21 +245,7 @@ export function AgentsContent({
   const editedBackendId = selection.backendId;
   const backendName = backends.find(b => b.backendId === editedBackendId)?.name;
 
-  // Mirrors what the old settings Agents tab used to do after mutations: keep
-  // the app-wide agent profile cache and readiness gate fresh — but only when the edited
-  // backend is the one the rest of the app is talking to. activeServerId may
-  // still hold the legacy 'local' id while editedBackendId is canonical, so
-  // canonicalize before comparing. Profile-specific: skills mutations must not
-  // trigger this.
-  const refreshGlobalStoresIfActive = () => {
-    const activeBackendId = resolveCanonicalBackendId(activeServerId, localBackendId);
-    if (editedBackendId === activeBackendId) {
-      void useAgentProfileMetaStore.getState().loadAll();
-      void useAgentReadinessStore.getState().refresh();
-    }
-  };
-
-  // Provider (LLM profile) counterpart of refreshGlobalStoresIfActive.
+  // Provider (LLM profile) counterpart of refreshProfileMetaIfActive.
   //
   // Key audit of useLlmProfileMetaStore.providersByBackend: every writer keys
   // by the RAW activeServerId — useDataLoader/SessionChatWindow/
@@ -274,26 +296,14 @@ export function AgentsContent({
   };
 
   switch (selection.kind) {
-    case 'profile':
-    case 'new-profile': {
+    case 'profile': {
       const fetchedProfile =
-        selection.kind === 'profile'
-          ? ((data.profiles.get(selection.backendId) ?? []).find(p => p.id === selection.id) ??
-            null)
-          : null;
-      const bridged =
-        selection.kind === 'profile'
-          ? profileBridge.lookup(selection.backendId, selection.id)
-          : undefined;
+        (data.profiles.get(selection.backendId) ?? []).find(p => p.id === selection.id) ?? null;
+      const bridged = profileBridge.lookup(selection.backendId, selection.id);
       const bridgedProfile = bridged !== undefined && bridged !== true ? bridged : null;
-      // The fetched object wins once it exists; the bridge only spans the gap.
       const profile = fetchedProfile ?? bridgedProfile;
 
-      // Stale selection (e.g. the profile was deleted elsewhere) falls back to the
-      // quiet empty state rather than an editor for a phantom record. When the
-      // backend's fetch failed we say so — a missing profile then means "couldn't
-      // load", not "deleted".
-      if (selection.kind === 'profile' && !profile) {
+      if (!profile) {
         return (
           <EmptyState
             noun="profile"
@@ -309,21 +319,19 @@ export function AgentsContent({
       const handleSaved = (saved: AgentProfileConfig) => {
         profileBridge.record(editedBackendId, saved.id, saved);
         bumpAgentsRefresh();
-        // Create mode lands on the newly created profile's id; the editor remounts
-        // (its key flips from ':new' to the id) populated from the bridge.
         selectAgentsItem({ backendId: editedBackendId, kind: 'profile', id: saved.id });
-        refreshGlobalStoresIfActive();
+        refreshProfileMetaIfActive(editedBackendId);
       };
 
       const handleDeleted = () => {
         selectAgentsItem(null);
         bumpAgentsRefresh();
-        refreshGlobalStoresIfActive();
+        refreshProfileMetaIfActive(editedBackendId);
       };
 
       return (
         <ProfileEditor
-          key={`${editedBackendId}:${selection.kind === 'profile' ? selection.id : 'new'}`}
+          key={`${editedBackendId}:${selection.id}`}
           backendId={editedBackendId}
           profile={profile}
           onBack={() => selectAgentsItem(null)}

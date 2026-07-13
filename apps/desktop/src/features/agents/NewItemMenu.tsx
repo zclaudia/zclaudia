@@ -1,19 +1,15 @@
 import type { AgentsTab } from './agents-types';
 
 /**
- * The creatable selection kinds. Deliberately narrower than
- * `AgentsSelection['kind']` (excludes item and `skill-dirs` kinds) so callers
- * that build a `new-*` selection from a `NewTarget` are provably constructing a
- * fieldless `{ backendId, kind }` selection — no accidental id-bearing kind.
+ * Creatable selection kinds handled by the inline editor path. Profiles are
+ * created via the pre-flight NewAgentProfileModal, so 'new-profile' is not here.
  */
-export type NewSelectionKind = 'new-profile' | 'new-skill' | 'new-mcp-server' | 'new-llm-profile';
+export type NewSelectionKind = 'new-skill' | 'new-mcp-server' | 'new-llm-profile';
 
 export type NewTarget = NewSelectionKind;
 
-export function resolveNewTarget(tab: AgentsTab): NewTarget {
+export function resolveNewTarget(tab: Exclude<AgentsTab, 'profiles'>): NewTarget {
   switch (tab) {
-    case 'profiles':
-      return 'new-profile';
     case 'skills':
       return 'new-skill';
     case 'mcp-servers':

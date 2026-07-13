@@ -136,6 +136,15 @@ vi.mock('../LlmProfileEditor', () => ({
   ),
 }));
 
+// Mock the modal so we assert wiring, not its internals.
+vi.mock('../NewAgentProfileModal', () => ({
+  NewAgentProfileModal: (props: { backendId: string; onCreated: (p: unknown) => void }) => (
+    <div data-testid="new-agent-modal" data-backend={props.backendId}>
+      <button onClick={() => props.onCreated({ id: 'p-new', name: 'X' })}>mock-create</button>
+    </div>
+  ),
+}));
+
 vi.mock('../../../stores/agentProfileMetaStore', () => ({
   useAgentProfileMetaStore: { getState: () => ({ loadAll: mockLoadAll }) },
 }));
@@ -345,9 +354,8 @@ describe('AgentsContent', () => {
     expect(screen.queryByTestId('profile-editor')).toBeNull();
   });
 
-  it('renders create mode with a null profile, passing the backend name through', () => {
-    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b2', kind: 'new-profile' } });
-
+  it('opens the New Agent modal (not the inline editor) when New is clicked on the Profiles tab', () => {
+    // No selection (browse view), Profiles tab active (default from beforeEach).
     render(
       <AgentsContent
         providersData={emptyProviders}
@@ -358,16 +366,12 @@ describe('AgentsContent', () => {
       />
     );
 
-    // Create mode has no name yet — the editor now owns its own header (which
-    // shows the name placeholder, not a static "New profile" title), so the
-    // parent-level assertion is limited to what AgentsContent itself supplies.
-    expect(screen.getByTestId('profile-editor').getAttribute('data-profile-id')).toBe('null');
-    expect(screen.getByText('Backend 2')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /New/ }));
+
+    expect(screen.getByTestId('new-agent-modal')).toBeInTheDocument();
   });
 
-  it('onSaved bumps the refresh nonce and selects the saved profile id', () => {
-    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new-profile' } });
-
+  it('selects the created profile after the modal reports success', () => {
     render(
       <AgentsContent
         providersData={emptyProviders}
@@ -378,89 +382,11 @@ describe('AgentsContent', () => {
       />
     );
 
-    fireEvent.click(screen.getByText('stub-save'));
+    fireEvent.click(screen.getByRole('button', { name: /New/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'mock-create' }));
 
-    const state = useTopLevelViewStore.getState();
-    expect(state.agentsRefreshNonce).toBe(1);
-    expect(state.agentsSelection).toEqual({ backendId: 'b1', kind: 'profile', id: 'saved-1' });
-  });
-
-  it('keeps the saved profile visible while the refetch is still stale', () => {
-    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new-profile' } });
-
-    render(
-      <AgentsContent
-        providersData={emptyProviders}
-        backends={backends}
-        mcpData={emptyMcp}
-        data={makeData({})}
-        skillsData={emptySkills}
-      />
-    );
-
-    // data does not contain saved-1 yet — the overlay must bridge the gap
-    // instead of flashing the empty state.
-    fireEvent.click(screen.getByText('stub-save'));
-
-    expect(screen.queryByText('Select a profile')).toBeNull();
-    expect(screen.getByTestId('profile-editor').getAttribute('data-profile-id')).toBe('saved-1');
-    expect(screen.getByText('Saved One')).toBeTruthy();
-  });
-
-  it('prefers the fetched profile over the overlay once the refetch lands', () => {
-    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new-profile' } });
-
-    const { rerender } = render(
-      <AgentsContent
-        providersData={emptyProviders}
-        backends={backends}
-        mcpData={emptyMcp}
-        data={makeData({})}
-        skillsData={emptySkills}
-      />
-    );
-    fireEvent.click(screen.getByText('stub-save'));
-    expect(screen.getByText('Saved One')).toBeTruthy();
-
-    // Refetch lands with the authoritative record — it wins over the overlay.
-    rerender(
-      <AgentsContent
-        providersData={emptyProviders}
-        mcpData={emptyMcp}
-        backends={backends}
-        data={makeData({ b1: [makeProfile('saved-1', 'Fetched One')] })}
-        skillsData={emptySkills}
-      />
-    );
-
-    expect(screen.getByText('Fetched One')).toBeTruthy();
-    expect(screen.queryByText('Saved One')).toBeNull();
-  });
-
-  it('does not leak the overlay into a different selection', () => {
-    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new-profile' } });
-
-    render(
-      <AgentsContent
-        providersData={emptyProviders}
-        backends={backends}
-        mcpData={emptyMcp}
-        data={makeData({})}
-        skillsData={emptySkills}
-      />
-    );
-    fireEvent.click(screen.getByText('stub-save'));
-    expect(screen.getByTestId('profile-editor')).toBeTruthy();
-
-    // Select a different (absent) profile — the overlay must not stand in.
-    act(() => {
-      useTopLevelViewStore.setState({
-        agentsSelection: { backendId: 'b1', kind: 'profile', id: 'other' },
-      });
-    });
-
-    expect(screen.getByText('Select a profile')).toBeTruthy();
-    expect(screen.queryByTestId('profile-editor')).toBeNull();
+    const selection = useTopLevelViewStore.getState().agentsSelection;
+    expect(selection).toEqual(expect.objectContaining({ kind: 'profile', id: 'p-new' }));
   });
 
   it('onDeleted clears the selection and bumps the refresh nonce', () => {
@@ -487,13 +413,15 @@ describe('AgentsContent', () => {
 
   it('refreshes the global stores only when the edited backend is active', () => {
     // b1 is the active backend (activeServerId null → localBackendId 'b1').
-    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new-profile' } });
+    useTopLevelViewStore.setState({
+      agentsSelection: { backendId: 'b1', kind: 'profile', id: 'ap1' },
+    });
     const { unmount } = render(
       <AgentsContent
         providersData={emptyProviders}
         backends={backends}
         mcpData={emptyMcp}
-        data={makeData({})}
+        data={makeData({ b1: [makeProfile('ap1')] })}
         skillsData={emptySkills}
       />
     );
@@ -505,13 +433,15 @@ describe('AgentsContent', () => {
 
     // b2 is not the active backend — no global refresh.
     vi.clearAllMocks();
-    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b2', kind: 'new-profile' } });
+    useTopLevelViewStore.setState({
+      agentsSelection: { backendId: 'b2', kind: 'profile', id: 'ap2' },
+    });
     render(
       <AgentsContent
         providersData={emptyProviders}
         backends={backends}
         mcpData={emptyMcp}
-        data={makeData({})}
+        data={makeData({ b2: [makeProfile('ap2')] })}
         skillsData={emptySkills}
       />
     );
@@ -523,14 +453,16 @@ describe('AgentsContent', () => {
 
   it('refreshes the global stores when activeServerId directly matches the edited backend', () => {
     useServerStore.setState({ activeServerId: 'b2' } as never);
-    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b2', kind: 'new-profile' } });
+    useTopLevelViewStore.setState({
+      agentsSelection: { backendId: 'b2', kind: 'profile', id: 'ap2' },
+    });
 
     render(
       <AgentsContent
         providersData={emptyProviders}
         backends={backends}
         mcpData={emptyMcp}
-        data={makeData({})}
+        data={makeData({ b2: [makeProfile('ap2')] })}
         skillsData={emptySkills}
       />
     );
@@ -545,14 +477,16 @@ describe('AgentsContent', () => {
     // the canonical local backend id — the refresh must still fire.
     useServerStore.setState({ activeServerId: 'local' } as never);
     useFacadeStore.setState({ localBackendId: 'b1' } as never);
-    useTopLevelViewStore.setState({ agentsSelection: { backendId: 'b1', kind: 'new-profile' } });
+    useTopLevelViewStore.setState({
+      agentsSelection: { backendId: 'b1', kind: 'profile', id: 'ap1' },
+    });
 
     render(
       <AgentsContent
         providersData={emptyProviders}
         backends={backends}
         mcpData={emptyMcp}
-        data={makeData({})}
+        data={makeData({ b1: [makeProfile('ap1')] })}
         skillsData={emptySkills}
       />
     );
