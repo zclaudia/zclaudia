@@ -112,6 +112,7 @@ import { useServerStore } from '../../stores/serverStore';
 import { checkoutGitBranch, createGitBranch, deleteGitBranch } from '../api/git';
 
 let mockControlPlaneMode = 'embedded-local';
+let mockBrowserShellBaseUrl: string | null = null;
 
 const mockServerStore = {
   activeServerId: 'server-1',
@@ -176,6 +177,10 @@ vi.mock('../../utils/controlPlane', () => ({
   ) => backendId ?? fallback,
 }));
 
+vi.mock('../../utils/browserShellRuntime', () => ({
+  getBrowserShellBaseUrl: () => mockBrowserShellBaseUrl,
+}));
+
 // Mock the gatewayStore
 vi.mock('../../stores/gatewayStore', () => ({
   useGatewayStore: {
@@ -203,7 +208,9 @@ describe('api', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mockServerStore.activeServerId = 'server-1';
+    mockServerStore.localServerPort = 3100;
     mockControlPlaneMode = 'embedded-local';
+    mockBrowserShellBaseUrl = null;
   });
 
   // Helper to setup fetch mock response
@@ -238,6 +245,21 @@ describe('api', () => {
       expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:3100/api/projects',
         expect.objectContaining({ headers: expect.any(Object) })
+      );
+    });
+
+    it('uses browser shell origin for local backend API requests', async () => {
+      mockBrowserShellBaseUrl = 'http://127.0.0.1:3100';
+      mockServerStore.localServerPort = null;
+      mockResponse([]);
+
+      await getProjects();
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://127.0.0.1:3100/api/projects',
+        expect.objectContaining({
+          headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
+        })
       );
     });
 

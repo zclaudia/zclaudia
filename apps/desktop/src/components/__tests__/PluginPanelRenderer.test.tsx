@@ -5,6 +5,10 @@ import { usePluginStore } from '../../stores/pluginStore';
 import { useServerStore } from '../../stores/serverStore';
 import { renderHook } from '@testing-library/react';
 
+vi.mock('../../utils/browserShellRuntime', () => ({
+  getBrowserShellBaseUrl: () => null,
+}));
+
 // Mock getComputedStyle for CSS variable collection
 const originalGetComputedStyle = window.getComputedStyle;
 

@@ -17,6 +17,7 @@ import {
 import { usePluginStore, selectPluginPanels } from '../stores/pluginStore';
 import { useServerStore } from '../stores/serverStore';
 import { isDesktopTauri } from '../utils/platform';
+import { getBrowserShellBaseUrl } from '../utils/browserShellRuntime';
 
 // Icon name → Lucide component mapping for plugin-declared icons.
 const PLUGIN_ICON_MAP: Record<string, LucideIcon> = {
@@ -41,7 +42,8 @@ export function PluginIcon({
 }) {
   const localServerPort = useServerStore(s => s.localServerPort);
   if (name && pluginId && /\.\w+$/.test(name)) {
-    const baseUrl = `http://localhost:${localServerPort || 3100}`;
+    const browserShellBaseUrl = getBrowserShellBaseUrl();
+    const baseUrl = browserShellBaseUrl ?? `http://localhost:${localServerPort || 3100}`;
     const src = `${baseUrl}/api/plugins/${encodeURIComponent(pluginId)}/frontend/${name}`;
     return (
       <img src={src} alt="" style={{ width: size, height: size }} className="object-contain" />

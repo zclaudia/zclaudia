@@ -14,6 +14,7 @@
 import { useEffect, useRef } from 'react';
 import { usePluginStore, selectPluginPanels } from '../../stores/pluginStore';
 import { useServerStore } from '../../stores/serverStore';
+import { getBrowserShellBaseUrl } from '../../utils/browserShellRuntime';
 
 interface PluginPanelRendererProps {
   activePluginPanelId: string | null;
@@ -161,7 +162,8 @@ export function PluginPanelRenderer({
   // ── Iframe panel (third-party plugins with frontend HTML) ──────────────────
   if (activePanel.iframeUrl) {
     const port = useServerStore.getState().localServerPort || 3100;
-    const baseUrl = `http://localhost:${port}`;
+    const browserShellBaseUrl = getBrowserShellBaseUrl();
+    const baseUrl = browserShellBaseUrl ?? `http://localhost:${port}`;
     const url = new URL(activePanel.iframeUrl, baseUrl);
     if (projectRoot) url.searchParams.set('projectRoot', projectRoot);
     if (projectId) url.searchParams.set('projectId', projectId);

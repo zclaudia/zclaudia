@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { resolveGatewayBackendUrl, getGatewayAuthHeaders } from '../gatewayProxy.js';
+import {
+  resolveGatewayBackendUrl,
+  resolveGatewayDirectUrl,
+  getGatewayAuthHeaders,
+} from '../gatewayProxy.js';
+
+let mockBrowserShellBaseUrl: string | null = null;
 
 // Mock stores
 vi.mock('../../stores/serverStore', () => ({
@@ -14,12 +20,17 @@ vi.mock('../../stores/gatewayStore', () => ({
   },
 }));
 
+vi.mock('../../utils/browserShellRuntime', () => ({
+  getBrowserShellBaseUrl: () => mockBrowserShellBaseUrl,
+}));
+
 import { useServerStore } from '../../stores/serverStore';
 import { useGatewayStore } from '../../stores/gatewayStore';
 
 describe('services/gatewayProxy', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockBrowserShellBaseUrl = null;
   });
 
   describe('resolveGatewayBackendUrl', () => {
@@ -38,6 +49,15 @@ describe('services/gatewayProxy', () => {
       const result = resolveGatewayBackendUrl('my-backend');
 
       expect(result).toBe('http://127.0.0.1:3456/api/gateway-proxy/my-backend');
+    });
+
+    it('routes gateway backend proxy through browser shell origin', () => {
+      mockBrowserShellBaseUrl = 'http://127.0.0.1:3100';
+      vi.mocked(useServerStore.getState).mockReturnValue({ localServerPort: null } as any);
+
+      expect(resolveGatewayBackendUrl('backend-1')).toBe(
+        'http://127.0.0.1:3100/api/gateway-proxy/backend-1'
+      );
     });
 
     it('routes directly to gateway on mobile (with ws://)', () => {
@@ -82,6 +102,17 @@ describe('services/gatewayProxy', () => {
       const result = resolveGatewayBackendUrl('backend-1');
 
       expect(result).toBe('http://127.0.0.1:3456/api/gateway-proxy/backend-1');
+    });
+  });
+
+  describe('resolveGatewayDirectUrl', () => {
+    it('routes gateway direct proxy through browser shell origin', () => {
+      mockBrowserShellBaseUrl = 'http://127.0.0.1:3100';
+      vi.mocked(useServerStore.getState).mockReturnValue({ localServerPort: null } as any);
+
+      expect(resolveGatewayDirectUrl('/api/notifications/config')).toBe(
+        'http://127.0.0.1:3100/api/gateway-direct/api/notifications/config'
+      );
     });
   });
 

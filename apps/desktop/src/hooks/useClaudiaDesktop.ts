@@ -11,6 +11,7 @@ import {
   resolveCanonicalBackendId,
   resolveLocalBackendId,
 } from '../utils/controlPlane';
+import { getBrowserShellBaseUrl } from '../utils/browserShellRuntime';
 
 interface ClaudiaDesktopOptions {
   isMobile: boolean;
@@ -54,7 +55,8 @@ export function useClaudiaDesktop({
     claudiaContextProjectId === claudiaProjectId ? null : claudiaContextProjectId;
 
   const claudiaServerUrl = useMemo(() => {
-    return `http://localhost:${localServerPort || 3100}`;
+    const browserShellBaseUrl = getBrowserShellBaseUrl();
+    return browserShellBaseUrl ?? `http://localhost:${localServerPort || 3100}`;
   }, [localServerPort]);
 
   // Load agent config when control plane is ready

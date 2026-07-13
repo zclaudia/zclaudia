@@ -103,6 +103,10 @@ vi.mock('../gatewayProxy', () => ({
   getGatewayAuthHeaders: (...args: any[]) => mockGetGatewayAuthHeaders(...args),
 }));
 
+vi.mock('../../utils/browserShellRuntime', () => ({
+  getBrowserShellBaseUrl: () => null,
+}));
+
 vi.mock('../api', () => ({
   getSessionMessages: (...args: any[]) => mockGetSessionMessages(...args),
 }));

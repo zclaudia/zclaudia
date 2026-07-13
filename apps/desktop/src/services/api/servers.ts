@@ -3,6 +3,7 @@ import type { ServerInfo, ApiResponse } from '@zclaudia/shared';
 import { resolveGatewayBackendUrl } from '../gatewayProxy';
 import { useServerStore } from '../../stores/serverStore';
 import { getControlPlaneMode, isLocalBackendId } from '../../utils/controlPlane';
+import { getBrowserShellBaseUrl } from '../../utils/browserShellRuntime';
 import { fetchApiForBackend, fetchLocalApi } from './base';
 
 /**
@@ -25,12 +26,16 @@ function resolveProbeBaseUrl(serverId: string): string | null {
 
   if (serverId) {
     if (controlPlaneMode === 'embedded-local' && isLocalBackendId(serverId)) {
+      const browserShellBaseUrl = getBrowserShellBaseUrl();
+      if (browserShellBaseUrl) return browserShellBaseUrl;
       if (!localPort) return null;
       return `http://localhost:${localPort}`;
     }
     return resolveGatewayBackendUrl(serverId);
   }
 
+  const browserShellBaseUrl = getBrowserShellBaseUrl();
+  if (browserShellBaseUrl) return browserShellBaseUrl;
   if (!localPort) return null;
   return `http://localhost:${localPort}`;
 }

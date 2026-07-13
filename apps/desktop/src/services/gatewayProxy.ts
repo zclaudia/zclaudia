@@ -11,6 +11,7 @@
 
 import { useServerStore } from '../stores/serverStore';
 import { useGatewayStore } from '../stores/gatewayStore';
+import { getBrowserShellBaseUrl } from '../utils/browserShellRuntime';
 
 /**
  * Resolve a gateway backend ID to its HTTP base URL.
@@ -23,6 +24,11 @@ export function resolveGatewayBackendUrl(backendId: string): string | null {
   const localPort = useServerStore.getState().localServerPort;
   if (localPort) {
     return `http://127.0.0.1:${localPort}/api/gateway-proxy/${backendId}`;
+  }
+
+  const browserShellBaseUrl = getBrowserShellBaseUrl();
+  if (browserShellBaseUrl) {
+    return `${browserShellBaseUrl}/api/gateway-proxy/${backendId}`;
   }
 
   // Mobile fallback: direct connection to gateway
@@ -49,6 +55,11 @@ export function resolveGatewayDirectUrl(path: string): string | null {
     return `http://127.0.0.1:${localPort}/api/gateway-direct${path}`;
   }
 
+  const browserShellBaseUrl = getBrowserShellBaseUrl();
+  if (browserShellBaseUrl) {
+    return `${browserShellBaseUrl}/api/gateway-direct${path}`;
+  }
+
   // Mobile fallback: direct connection to gateway
   const { gatewayUrl } = useGatewayStore.getState();
   if (!gatewayUrl) return null;
@@ -68,6 +79,7 @@ export function getGatewayAuthHeaders(): Record<string, string> {
   // Desktop: local proxy handles gateway auth
   const localPort = useServerStore.getState().localServerPort;
   if (localPort) return {};
+  if (getBrowserShellBaseUrl()) return {};
 
   // Mobile: need Bearer token for direct gateway connection
   const { gatewaySecret } = useGatewayStore.getState();

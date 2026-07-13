@@ -16,6 +16,7 @@ import { useSelectionStore } from '../stores/selectionStore';
 import { useSessionRunStateStore } from '../stores/sessionRunStateStore';
 import * as api from './api';
 import { getControlPlaneMode, isLocalBackendId } from '../utils/controlPlane';
+import { getBrowserShellBaseUrl } from '../utils/browserShellRuntime';
 import { findDeletedSessionIds, planDeltaSessionEvents } from './sessionSyncReconciliation';
 
 interface BackendSyncState {
@@ -86,6 +87,8 @@ function getSyncRequestBaseUrl(targetBackendId?: string): string | null {
 
   if (targetBackendId) {
     if (controlPlaneMode === 'embedded-local' && isLocalBackendId(targetBackendId)) {
+      const browserShellBaseUrl = getBrowserShellBaseUrl();
+      if (browserShellBaseUrl) return browserShellBaseUrl;
       if (!localPort) return null;
       return `http://localhost:${localPort}`;
     }
@@ -96,12 +99,16 @@ function getSyncRequestBaseUrl(targetBackendId?: string): string | null {
   const activeId = useServerStore.getState().activeServerId;
   if (activeId) {
     if (controlPlaneMode === 'embedded-local' && isLocalBackendId(activeId)) {
+      const browserShellBaseUrl = getBrowserShellBaseUrl();
+      if (browserShellBaseUrl) return browserShellBaseUrl;
       if (!localPort) return null;
       return `http://localhost:${localPort}`;
     }
     return resolveGatewayBackendUrl(activeId);
   }
 
+  const browserShellBaseUrl = getBrowserShellBaseUrl();
+  if (browserShellBaseUrl) return browserShellBaseUrl;
   if (!localPort) return null;
   return `http://localhost:${localPort}`;
 }

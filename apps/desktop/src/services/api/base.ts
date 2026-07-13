@@ -9,6 +9,7 @@ import {
   resolveCanonicalBackendId,
   resolveLocalBackendId,
 } from '../../utils/controlPlane';
+import { getBrowserShellBaseUrl } from '../../utils/browserShellRuntime';
 
 /** Check if the active server advertises a specific feature. */
 export function activeServerSupports(feature: ServerFeature): boolean {
@@ -53,8 +54,13 @@ export function getBaseUrlForBackend(backendId?: string | null): string {
   const activeId = backendId ?? useServerStore.getState().activeServerId;
   const controlPlaneMode = getControlPlaneMode();
   const localPort = useServerStore.getState().localServerPort;
+  const browserShellBaseUrl = getBrowserShellBaseUrl();
 
   if (controlPlaneMode === 'embedded-local') {
+    if (browserShellBaseUrl && (!activeId || isLocalBackendId(activeId))) {
+      return browserShellBaseUrl;
+    }
+
     if (!localPort) throw new Error('No server configured');
 
     // Known local backend → direct connection
@@ -176,6 +182,9 @@ function getLocalBaseUrl(): string {
   if (backendId) {
     return getBaseUrlForBackend(backendId);
   }
+
+  const browserShellBaseUrl = getBrowserShellBaseUrl();
+  if (browserShellBaseUrl) return browserShellBaseUrl;
 
   const port = useServerStore.getState().localServerPort || 3100;
   return `http://localhost:${port}`;
