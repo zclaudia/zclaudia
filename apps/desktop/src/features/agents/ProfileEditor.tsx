@@ -28,14 +28,12 @@ import {
 import type { ProfileConfigDescriptor } from '@zclaudia/shared/core/profile-config-descriptor';
 import * as api from '../../services/api';
 import { useRuntimeDescriptorStore } from '../../stores/runtimeDescriptorStore';
-import { Toggle } from '../../components/ui/Toggle';
 import { EditorSection, EditorRow, FieldLabel } from './ui/EditorSection';
 import { EditorTabs } from './ui/EditorTabs';
 import type { EditorTab } from './ui/EditorTabs';
 import { useProfileAutosave } from './useProfileAutosave';
 import { ProfileHeader } from './ui/ProfileHeader';
 import type { DetailBadge } from './ui/DetailHeader';
-import { confirm } from '../../stores/confirmDialogStore';
 
 /**
  * Parent must remount this component per identity — key it by
@@ -190,7 +188,6 @@ export function ProfileEditor({
   onBack,
   backendName,
   onSaved,
-  onDeleted,
 }: ProfileEditorProps) {
   const [llmProfiles, setLlmProfiles] = useState<LlmProfileConfig[]>([]);
   const [skillCatalog, setSkillCatalog] = useState<api.WorkspaceSkillInfo[]>([]);
@@ -229,7 +226,6 @@ export function ProfileEditor({
   // pre-hydration form is never seen as a dirty edit.
   const [hydrated, setHydrated] = useState(false);
 
-  const [deleting, setDeleting] = useState(false);
 
   const mountedRef = useRef(true);
   useEffect(() => {
@@ -677,48 +673,6 @@ export function ProfileEditor({
     }
   };
 
-  const handleRequestDelete = useCallback(async () => {
-    if (deleting) return;
-    const isReadonly = profile.status === 'readonly';
-    const ok = await confirm({
-      title: isReadonly ? 'Permanently delete profile?' : 'Delete profile?',
-      message: isReadonly
-        ? `"${profile.name}" is read-only and no longer referenced by any active session. It will be permanently deleted.`
-        : `"${profile.name}" will be permanently deleted.`,
-      confirmLabel: 'Delete',
-      destructive: true,
-    });
-    if (!ok || !mountedRef.current) return;
-    setDeleting(true);
-    try {
-      const result = await api.deleteAgentProfileForBackend(backendId, profile.id);
-      if (!mountedRef.current) return;
-      if (result.ok) {
-        if (result.archived) {
-          // Converted to read-only — refresh the profile so the editor re-renders
-          // in read-only mode rather than navigating away.
-          setFormError(null);
-          const refreshed = (await api.listAgentProfilesForBackend(backendId)).find(
-            p => p.id === profile.id
-          );
-          if (mountedRef.current && refreshed) onSaved(refreshed);
-        } else {
-          // Hard-deleted — leave the editor.
-          onDeleted();
-        }
-      } else {
-        console.error('Failed to delete agent profile:', result);
-        if (mountedRef.current) setFormError(`Failed to delete agent: ${result.message}`);
-      }
-    } catch (error) {
-      console.error('Failed to delete agent profile:', error);
-      const message = error instanceof Error ? error.message : String(error);
-      if (mountedRef.current) setFormError(`Failed to delete agent: ${message}`);
-    } finally {
-      if (mountedRef.current) setDeleting(false);
-    }
-  }, [profile, deleting, backendId, onDeleted, onSaved]);
-
   if (loading) {
     return <p className="text-muted-foreground text-center py-8">Loading...</p>;
   }
@@ -791,8 +745,6 @@ export function ProfileEditor({
         badges={headerBadges}
         saveStatus={!isReadonly ? autosave.status : undefined}
         onRetry={autosave.retry}
-        onRequestDelete={handleRequestDelete}
-        deleting={deleting}
         disabled={isReadonly}
       />
       {isReadonly && (
@@ -815,7 +767,7 @@ export function ProfileEditor({
 
           {activeTab === 'model' && (
             <div className="flex flex-col gap-4">
-              <EditorSection title="Runtime & model" flush>
+              <EditorSection title="Runtime & model" flush overflowVisible>
                 <div className="divide-y divide-border/60">
                   <EditorRow
                     title="Agent Type"
@@ -1002,21 +954,6 @@ export function ProfileEditor({
                 </EditorSection>
               )}
 
-              <EditorSection title="Profile details" flush>
-                <div className="divide-y divide-border/60">
-                  <EditorRow
-                    title="Set as default agent"
-                    description="Use this profile when a project has no explicit agent selection."
-                    control={
-                      <Toggle
-                        aria-label="Set as default agent"
-                        checked={formIsDefault}
-                        onChange={setFormIsDefault}
-                      />
-                    }
-                  />
-                </div>
-              </EditorSection>
             </div>
           )}
 

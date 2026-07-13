@@ -17,6 +17,10 @@ interface ModalProps {
   title?: string;
   /** Optional pinned action row at the bottom of the card. */
   footer?: ReactNode;
+  /** Whether the content area scrolls when it exceeds the modal height. */
+  bodyScrollable?: boolean;
+  /** Optional maximum-height utility for compact, non-scrolling dialogs. */
+  maxHeightClassName?: string;
   size?: ModalSize;
   placement?: ModalPlacement;
   /** On mobile, expand the card to a full-screen sheet (inset-0, no radius). */
@@ -44,6 +48,8 @@ export function Modal({
   children,
   title,
   footer,
+  bodyScrollable = true,
+  maxHeightClassName = 'max-h-[80vh]',
   size = 'md',
   placement = 'top',
   mobileFullscreen = false,
@@ -74,7 +80,7 @@ export function Modal({
   const wrapperAlign = placement === 'center' ? 'items-center pt-0' : 'items-start pt-[12vh]';
   const cardLayout = fullscreen
     ? 'inset-0 rounded-none safe-top-pad safe-bottom-pad'
-    : `relative w-full ${SIZE_CLASS[size]} max-h-[80vh] rounded-2xl border border-border`;
+    : `relative w-full ${SIZE_CLASS[size]} ${maxHeightClassName} rounded-2xl border border-border`;
 
   return createPortal(
     <div
@@ -107,7 +113,12 @@ export function Modal({
             </button>
           </div>
         )}
-        <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+        <div
+          data-testid="modal-body"
+          className={`min-h-0 flex-1 ${bodyScrollable ? 'overflow-y-auto' : ''}`}
+        >
+          {children}
+        </div>
         {footer && <div className="border-t border-border px-4 py-3">{footer}</div>}
       </div>
     </div>,

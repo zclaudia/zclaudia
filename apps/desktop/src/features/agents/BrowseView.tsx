@@ -19,6 +19,10 @@ export function BrowseView({
   onOpen,
   onSelectBackendFilter,
   onNew,
+  onSetProfileDefault,
+  onDeleteProfile,
+  onSetLlmProfileDefault,
+  onDeleteLlmProfile,
 }: {
   tab: AgentsTab;
   backendFilter: string;
@@ -27,6 +31,10 @@ export function BrowseView({
   onOpen: (item: LibraryItem) => void;
   onSelectBackendFilter: (key: string) => void;
   onNew: () => void;
+  onSetProfileDefault?: (item: LibraryItem) => void;
+  onDeleteProfile?: (item: LibraryItem) => void;
+  onSetLlmProfileDefault?: (item: LibraryItem) => void;
+  onDeleteLlmProfile?: (item: LibraryItem) => void;
 }) {
   const [query, setQuery] = useState('');
   const byName = useMemo(
@@ -97,6 +105,35 @@ export function BrowseView({
                 backendName={b?.name ?? item.backendId}
                 backendOnline={b?.online ?? false}
                 onOpen={() => onOpen(item)}
+                actions={
+                  item.kind === 'profile'
+                    ? [
+                        {
+                          label: 'Set as default agent',
+                          onSelect: () => onSetProfileDefault?.(item),
+                          disabled: item.isDefault,
+                        },
+                        {
+                          label: 'Delete agent',
+                          onSelect: () => onDeleteProfile?.(item),
+                          destructive: true,
+                        },
+                      ]
+                    : item.kind === 'llm-profile'
+                      ? [
+                          {
+                            label: 'Set as default provider',
+                            onSelect: () => onSetLlmProfileDefault?.(item),
+                            disabled: item.isDefault,
+                          },
+                          {
+                            label: 'Delete provider',
+                            onSelect: () => onDeleteLlmProfile?.(item),
+                            destructive: true,
+                          },
+                        ]
+                      : undefined
+                }
               />
             );
           })}

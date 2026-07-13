@@ -109,6 +109,8 @@ export function NewAgentProfileModal({
       title="New agent profile"
       footer={footer}
       size="md"
+      bodyScrollable={false}
+      maxHeightClassName="max-h-[calc(100vh-2rem)]"
     >
       <div className="flex flex-col gap-4 px-4 py-4">
         <label className="flex flex-col gap-1.5">
@@ -134,6 +136,8 @@ export function NewAgentProfileModal({
             onChange={setRuntimeType}
             block
             size="md"
+            ariaLabel="Agent Type"
+            panelPosition="fixed"
             triggerClassName="!h-9 !rounded-xl !text-[13px]"
             options={enabled.map(d => ({ value: d.runtime, label: d.label }))}
           />

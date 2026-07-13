@@ -26,6 +26,8 @@ export interface LibraryItem {
   subtitle?: string;
   /** e.g. 'Default' for the default profile — rendered as a status badge. */
   status?: string;
+  /** Whether an agent profile is the current default. */
+  isDefault?: boolean;
 }
 
 /** A backend in the Agents shell mode (library cards + editor header). */

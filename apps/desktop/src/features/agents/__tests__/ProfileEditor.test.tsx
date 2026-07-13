@@ -348,73 +348,11 @@ describe('ProfileEditor', () => {
     expect(screen.getAllByText(/managed by ~\/\.claude/i).length).toBeGreaterThan(0);
   });
 
-  it('edit mode: ⋯ menu Delete confirms then calls deleteAgentProfileForBackend + onDeleted', async () => {
-    const { confirm } = await import('../../../stores/confirmDialogStore');
-    vi.mocked(confirm).mockResolvedValue(true);
-    vi.mocked(api.deleteAgentProfileForBackend).mockResolvedValue({ ok: true });
+  it('keeps default and delete actions on the profile card instead of the editor', async () => {
+    await renderEditor(makeProfile('p1', 'Coding'));
 
-    const onDeleted = vi.fn();
-    const view = render(
-      <ProfileEditor
-        backendId="b1"
-        profile={makeProfile('p1', 'Coding')}
-        onBack={vi.fn()}
-        onSaved={vi.fn()}
-        onDeleted={onDeleted}
-      />
-    );
-    await screen.findByPlaceholderText(NAME_PLACEHOLDER);
-
-    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete profile' }));
-
-    await waitFor(() => {
-      expect(api.deleteAgentProfileForBackend).toHaveBeenCalledWith('b1', 'p1');
-    });
-    await waitFor(() => {
-      expect(onDeleted).toHaveBeenCalled();
-    });
-    view.unmount();
-  });
-
-  it('edit mode: delete when agent is referenced archives it (signals onSaved with read-only profile)', async () => {
-    const { confirm } = await import('../../../stores/confirmDialogStore');
-    vi.mocked(confirm).mockResolvedValue(true);
-    // Server reports the profile was archived (referenced by active sessions).
-    vi.mocked(api.deleteAgentProfileForBackend).mockResolvedValue({
-      ok: true,
-      archived: true,
-      sessionCount: 2,
-    });
-    // Refresh after archive returns the profile now marked read-only.
-    vi.mocked(api.listAgentProfilesForBackend).mockResolvedValue([
-      { ...makeProfile('p1', 'Coding'), status: 'readonly' },
-    ]);
-
-    const onSaved = vi.fn();
-    const onDeleted = vi.fn();
-    const view = render(
-      <ProfileEditor
-        backendId="b1"
-        profile={makeProfile('p1', 'Coding')}
-        onBack={vi.fn()}
-        onSaved={onSaved}
-        onDeleted={onDeleted}
-      />
-    );
-    await screen.findByPlaceholderText(NAME_PLACEHOLDER);
-
-    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete profile' }));
-
-    // Archived → onSaved fires with the refreshed (read-only) profile, NOT onDeleted.
-    await waitFor(() => {
-      expect(onSaved).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'p1', status: 'readonly' })
-      );
-    });
-    expect(onDeleted).not.toHaveBeenCalled();
-    view.unmount();
+    expect(screen.queryByRole('button', { name: 'More actions' })).toBeNull();
+    expect(screen.queryByRole('switch', { name: 'Set as default agent' })).toBeNull();
   });
 
   it('edit mode: read-only profile shows a read-only banner and disables the name field', async () => {
@@ -497,14 +435,6 @@ describe('ProfileEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Claude' }));
     expect(screen.getByLabelText('Model')).toHaveTextContent('Auto (CLI default)');
     expect(screen.getByLabelText('Thinking Level')).toHaveTextContent('Auto');
-  });
-
-  it('default-agent Toggle flips isDefault', async () => {
-    await renderEditor(makeProfile('p1', 'Coding'));
-    const toggle = screen.getByRole('switch', { name: 'Set as default agent' });
-    expect(toggle).toHaveAttribute('aria-checked', 'false');
-    fireEvent.click(toggle);
-    expect(toggle).toHaveAttribute('aria-checked', 'true');
   });
 
   it('renders an unavailable note for a runtime with no descriptor (plugin not active)', async () => {

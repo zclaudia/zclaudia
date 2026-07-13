@@ -23,6 +23,7 @@ interface LlmProfileLike {
   id: string;
   name?: string;
   models?: unknown[];
+  isDefault?: boolean;
 }
 
 export interface LibrarySources {
@@ -62,6 +63,7 @@ export function buildLibraryItems(
         title: p.name ?? p.id,
         subtitle: p.model || (p.runtimeType === 'claude' ? 'Auto' : undefined),
         status: p.isDefault ? 'Default' : p.status === 'readonly' ? 'Read-only' : undefined,
+        isDefault: p.isDefault,
       })
     );
   if (wantKind('skill'))
@@ -86,6 +88,8 @@ export function buildLibraryItems(
         id: l.id,
         title: l.name ?? l.id,
         subtitle: l.models ? `${l.models.length} models` : undefined,
+        status: l.isDefault ? 'Default' : undefined,
+        isDefault: l.isDefault,
       })
     );
 

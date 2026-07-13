@@ -33,6 +33,15 @@ describe('ProfileHeader', () => {
     expect(onDescriptionChange).toHaveBeenCalledWith('x');
   });
 
+  it('omits the description input when onDescriptionChange is absent', () => {
+    const { onDescriptionChange: _omit, description: _omitDesc, ...noDescription } = base;
+    void _omit;
+    void _omitDesc;
+    render(<ProfileHeader {...noDescription} />);
+    expect(screen.getByPlaceholderText('e.g., Default Coding Agent')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Add a description')).toBeNull();
+  });
+
   it('flushes on blur of the name field', () => {
     const onFieldBlur = vi.fn();
     render(<ProfileHeader {...base} onFieldBlur={onFieldBlur} />);
@@ -40,16 +49,13 @@ describe('ProfileHeader', () => {
     expect(onFieldBlur).toHaveBeenCalledTimes(1);
   });
 
-  it('edit mode: shows the save indicator and a ⋯ menu with Delete', () => {
-    const onRequestDelete = vi.fn();
-    render(<ProfileHeader {...base} saveStatus="saved" onRequestDelete={onRequestDelete} />);
+  it('edit mode: shows the save indicator without profile actions', () => {
+    render(<ProfileHeader {...base} saveStatus="saved" />);
     expect(screen.getByTestId('save-state')).toHaveTextContent('Saved');
-    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete profile' }));
-    expect(onRequestDelete).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'More actions' })).toBeNull();
   });
 
-  it('create mode: no ⋯ menu and no save indicator when handlers are absent', () => {
+  it('create mode: no save indicator when handlers are absent', () => {
     render(<ProfileHeader {...base} />);
     expect(screen.queryByRole('button', { name: 'More actions' })).toBeNull();
     expect(screen.queryByTestId('save-state')).toBeNull();

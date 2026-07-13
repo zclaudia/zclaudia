@@ -5,6 +5,7 @@ export function EditorSection({
   description,
   children,
   flush = false,
+  overflowVisible = false,
 }: {
   title: string;
   description?: ReactNode;
@@ -12,9 +13,16 @@ export function EditorSection({
   /** When true, render children edge-to-edge (for divided EditorRows) instead
    *  of the default padded `space-y-3` stack. */
   flush?: boolean;
+  /** When true, drop `overflow-hidden` so an absolutely-positioned popover in a
+   *  row (e.g. a dropdown menu) can escape the section's bounds. The rounded
+   *  corners still clip the background/border natively. Use for any section
+   *  whose last visible row hosts a dropdown. */
+  overflowVisible?: boolean;
 }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-border/60 bg-secondary/25 shadow-apple-sm">
+    <section
+      className={`rounded-lg border border-border/60 bg-secondary/25 shadow-apple-sm ${overflowVisible ? '' : 'overflow-hidden'}`}
+    >
       <div className="border-b border-border/60 px-4 py-3">
         <h2 className="text-sm font-medium text-foreground">{title}</h2>
         {description && <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>}

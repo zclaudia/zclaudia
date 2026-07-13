@@ -1,10 +1,16 @@
 /**
  * Backend-scoped LLM profile (provider) editor
  *
- * Standalone create/edit form + per-profile actions for one LLM profile on one
- * backend, extracted from the old settings Providers tab's monolith
- * (LlmProfileManager). Talks to the ForBackend API variants directly — no
- * global store; the parent syncs stores via onSaved/onDeleted.
+ * Standalone create/edit form for one LLM profile on one backend, extracted
+ * from the old settings Providers tab's monolith (LlmProfileManager). Talks to
+ * the ForBackend API variants directly — no global store; the parent syncs
+ * stores via onSaved. Autosaves on change (no explicit Save button).
+ *
+ * Matches the agent profile editor (ProfileEditor) design language: it owns its
+ * own ProfileHeader (breadcrumb + inline-editable name + badges + save
+ * indicator) and lays fields out with EditorSection / EditorRow. Delete and
+ * set-default are not in the editor — they live on the library card in
+ * AgentsContent (handleDeleteLlmProfile / handleSetLlmProfileDefault).
  *
  * Parent must remount this component per identity — key it by
  * `${backendId}:${profile?.id ?? 'new'}`. Form state initializes from the
@@ -17,22 +23,25 @@
  * error surfacing (inline errors instead).
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { ChevronDown, Check, AlertTriangle } from 'lucide-react';
 import type { LlmProfileConfig, LlmProfileCompat, ContextWindowSource } from '@zclaudia/shared';
 import { LLM_PROVIDER_TYPES } from '@zclaudia/shared';
 import {
   createLlmProfileForBackend,
   updateLlmProfileForBackend,
-  deleteLlmProfileForBackend,
-  setDefaultLlmProfileForBackend,
   fetchModelsForLlmProfilePreviewForBackend,
   probeLlmProfileModelPreviewForBackend,
   resolveContextWindowPreviewForBackend,
 } from '../../services/api';
 import type { LlmProfilePreviewInput } from '../../services/api';
 import { CodexOAuthSection } from './CodexOAuthSection';
-import { EditorSection, FieldLabel } from './ui/EditorSection';
+import { EditorSection, EditorRow, FieldLabel } from './ui/EditorSection';
+import { EditorTabs } from './ui/EditorTabs';
+import type { EditorTab } from './ui/EditorTabs';
+import { ProfileHeader } from './ui/ProfileHeader';
+import type { DetailBadge } from './ui/DetailHeader';
+import { useProfileAutosave } from './useProfileAutosave';
 import {
   draftsToEntries,
   entryToDraft,
@@ -41,67 +50,34 @@ import {
   type ModelRowDraft,
 } from './llmProfileModelDraft';
 
-/** Lightweight PCP capability summary for UI display (mirrors server manifests) */
-type CapLevel = 'strict' | 'best_effort' | 'none';
-interface CapabilitySummary {
-  stream: CapLevel;
-  tools: CapLevel;
-  interactions: CapLevel;
-  backgroundTask: CapLevel;
-}
-const PROVIDER_CAPABILITIES: Record<string, CapabilitySummary> = {
-  anthropic: { stream: 'strict', tools: 'none', interactions: 'none', backgroundTask: 'none' },
-};
-
 const RESERVED_HEADER_KEYS = new Set(['authorization', 'content-type', 'host']);
 
-function CapabilityTags({ providerType }: { providerType: string }) {
-  const caps = PROVIDER_CAPABILITIES[providerType];
-  if (!caps) return null;
+/** Field styling shared with the agent profile editor (ProfileEditor). */
+const FIELD_CLASS =
+  'w-full rounded-lg border border-border/70 bg-background/70 px-3 py-2 text-sm text-foreground shadow-apple-sm focus:outline-none focus:ring-1 focus:ring-primary/50';
+const MONO_FIELD_CLASS = `${FIELD_CLASS} font-mono`;
+/** Compact variant for the dense model-row grid; append a border-color class. */
+const MODEL_FIELD_BASE =
+  'w-full rounded-md border bg-background/70 px-2 py-1.5 text-sm text-foreground shadow-apple-sm focus:outline-none focus:ring-1 focus:ring-primary/50';
 
-  const tags: Array<{ label: string; level: CapLevel }> = [
-    { label: 'Stream', level: caps.stream },
-    { label: 'Tools', level: caps.tools },
-    { label: 'Interactions', level: caps.interactions },
-    ...(caps.backgroundTask !== 'none'
-      ? [{ label: 'Background', level: caps.backgroundTask }]
-      : []),
-  ];
-
-  return (
-    <div className="flex items-center gap-1 mt-1 flex-wrap">
-      {tags.map(({ label, level }) => (
-        <span
-          key={label}
-          className={`inline-flex items-center gap-0.5 px-1.5 py-0 text-[10px] rounded-full border ${
-            level === 'strict'
-              ? 'border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/5'
-              : 'border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/5'
-          }`}
-        >
-          <span
-            className={`inline-block w-1 h-1 rounded-full ${level === 'strict' ? 'bg-emerald-500' : 'bg-amber-500'}`}
-          />
-          {label}
-        </span>
-      ))}
-    </div>
-  );
-}
+export const LLM_NAME_PLACEHOLDER = 'e.g., Local ZClaudia Agent';
 
 export interface LlmProfileEditorProps {
   backendId: string;
   /** null = create mode */
   profile: LlmProfileConfig | null;
+  /** Display name of the target backend, shown as a header badge. */
+  backendName?: string;
+  onBack: () => void;
   onSaved: (id: string) => void;
-  onDeleted: () => void;
 }
 
 export function LlmProfileEditor({
   backendId,
   profile,
+  backendName,
+  onBack,
   onSaved,
-  onDeleted,
 }: LlmProfileEditorProps) {
   // Form state — initialized from `profile` (keyed remount contract).
   const initialHasCompat = Boolean(profile?.compat && Object.keys(profile.compat).length > 0);
@@ -115,12 +91,14 @@ export function LlmProfileEditor({
     initialHasCompat ? JSON.stringify(profile?.compat, null, 2) : ''
   );
   const [formCompatError, setFormCompatError] = useState<string | null>(null);
-  const [showAdvanced, setShowAdvanced] = useState(initialHasCompat);
+  const [activeTab, setActiveTab] = useState<'connection' | 'models' | 'advanced'>('connection');
   const [formRequestHeaders, setFormRequestHeaders] = useState(
     profile?.requestHeaders ? JSON.stringify(profile.requestHeaders, null, 2) : ''
   );
   const [formRequestHeadersError, setFormRequestHeadersError] = useState<string | null>(null);
-  const [formIsDefault, setFormIsDefault] = useState(profile?.isDefault || false);
+  // Set-default now lives on the library card; the editor only carries the
+  // current value through to the payload (and the header "Default" badge).
+  const [formIsDefault] = useState(profile?.isDefault || false);
   const [formCacheRetention, setFormCacheRetention] = useState<
     'default' | 'none' | 'short' | 'long'
   >(profile?.cacheRetention ?? 'default');
@@ -137,13 +115,7 @@ export function LlmProfileEditor({
     candidates: string[];
     selected: Set<string>;
   } | null>(null);
-  const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [pendingDelete, setPendingDelete] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-  const deleteConfirmTimeoutRef = useRef<number | null>(null);
   const testStatusTimersRef = useRef<Map<string, number>>(new Map());
   /**
    * The persisted identity this editor targets. Starts as the profile prop's
@@ -155,20 +127,9 @@ export function LlmProfileEditor({
    */
   const savedIdRef = useRef<string | null>(profile?.id ?? null);
 
-  const clearDeleteConfirmation = () => {
-    if (deleteConfirmTimeoutRef.current !== null) {
-      window.clearTimeout(deleteConfirmTimeoutRef.current);
-      deleteConfirmTimeoutRef.current = null;
-    }
-    setPendingDelete(false);
-  };
-
   useEffect(() => {
     const timers = testStatusTimersRef.current;
     return () => {
-      if (deleteConfirmTimeoutRef.current !== null) {
-        window.clearTimeout(deleteConfirmTimeoutRef.current);
-      }
       for (const t of timers.values()) window.clearTimeout(t);
       timers.clear();
     };
@@ -216,6 +177,67 @@ export function LlmProfileEditor({
    */
   const hasAtLeastOneModelEntry = draftsToEntries(formModels).length > 0;
   const isCodexProvider = formProviderType === 'openai-codex';
+  const isAnthropicProvider = formProviderType === 'anthropic';
+  const formValid = useMemo(() => {
+    if (!formName.trim()) return false;
+    if (!isCodexProvider) {
+      if (!hasAtLeastOneModelEntry) return false;
+      for (let i = 0; i < formModels.length; i += 1) {
+        const row = formModels[i];
+        const isEmpty =
+          !row.modelId.trim() &&
+          !row.displayName.trim() &&
+          !row.contextWindowStr.trim() &&
+          !row.maxTokensStr.trim() &&
+          !row.supportsImage;
+        if (!isEmpty) {
+          const errors = validateModelDraftRow(row, formModels, i);
+          if (errors.modelId || errors.contextWindow || errors.maxTokens) return false;
+        }
+      }
+      for (const source of [formRequestHeaders, formCompat]) {
+        const trimmed = source.trim();
+        if (!trimmed || trimmed === '{}') continue;
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false;
+        } catch {
+          return false;
+        }
+      }
+    }
+    return true;
+  }, [formName, isCodexProvider, hasAtLeastOneModelEntry, formModels, formRequestHeaders, formCompat]);
+
+  const autosaveSignature = useMemo(
+    () =>
+      JSON.stringify({
+        name: formName,
+        providerType: formProviderType,
+        baseUrl: formBaseUrl,
+        apiKey: formApiKey,
+        compat: formCompat,
+        requestHeaders: formRequestHeaders,
+        isDefault: formIsDefault,
+        cacheRetention: formCacheRetention,
+        cacheMarkers: formCacheMarkers,
+        models: formModels.map(
+          ({ rowUid, testStatus: _testStatus, ...model }) => ({ rowUid, ...model })
+        ),
+      }),
+    [
+      formName,
+      formProviderType,
+      formBaseUrl,
+      formApiKey,
+      formCompat,
+      formRequestHeaders,
+      formIsDefault,
+      formCacheRetention,
+      formCacheMarkers,
+      formModels,
+    ]
+  );
 
   const handleSubmit = async (
     opts: { notify?: boolean } = {}
@@ -223,7 +245,6 @@ export function LlmProfileEditor({
     const notify = opts.notify ?? true;
     if (!formName.trim()) return null;
 
-    setSaving(true);
     setSaveError(null);
     try {
       let requestHeadersObj: Record<string, string> | undefined;
@@ -234,20 +255,17 @@ export function LlmProfileEditor({
           const parsed = JSON.parse(formRequestHeaders);
           if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
             setFormRequestHeadersError('Request headers must be a JSON object');
-            setSaving(false);
             return null;
           }
           for (const [key, value] of Object.entries(parsed)) {
             if (typeof value !== 'string') {
               setFormRequestHeadersError(`Header "${key}" value must be a string`);
-              setSaving(false);
               return null;
             }
             if (RESERVED_HEADER_KEYS.has(key.toLowerCase())) {
               setFormRequestHeadersError(
                 `Header "${key}" is reserved (managed by API key); remove it from Request Headers`
               );
-              setSaving(false);
               return null;
             }
           }
@@ -258,7 +276,6 @@ export function LlmProfileEditor({
           setFormRequestHeadersError(
             `Invalid JSON: ${err instanceof Error ? err.message : String(err)}`
           );
-          setSaving(false);
           return null;
         }
       } else {
@@ -278,12 +295,10 @@ export function LlmProfileEditor({
             }
           } else {
             setFormCompatError('Compat must be a JSON object');
-            setSaving(false);
             return null;
           }
         } catch {
           setFormCompatError('Invalid JSON in compat field');
-          setSaving(false);
           return null;
         }
       }
@@ -323,7 +338,6 @@ export function LlmProfileEditor({
       }
       if (modelsSaveError) {
         setFormModelsSaveError(modelsSaveError);
-        setSaving(false);
         return null;
       }
       const modelsArr = isCodexProvider ? [] : draftsToEntries(formModels);
@@ -335,7 +349,6 @@ export function LlmProfileEditor({
       // an empty models array is valid on initial save.
       if (modelsArr.length === 0 && formProviderType !== 'openai-codex') {
         setFormModelsSaveError('Add at least one model before saving');
-        setSaving(false);
         return null;
       }
       setFormModelsSaveError(null);
@@ -358,13 +371,13 @@ export function LlmProfileEditor({
         // PUT null clears the cacheRetention field on the server side.
         saved = await updateLlmProfileForBackend(backendId, updateTargetId, {
           ...baseData,
-          cacheRetention: isCodexProvider ? null : cacheRetentionValue,
+          cacheRetention: isAnthropicProvider ? cacheRetentionValue : null,
         });
       } else {
         // POST ignores null server-side; only send a defined value.
         saved = await createLlmProfileForBackend(backendId, {
           ...baseData,
-          ...(!isCodexProvider && cacheRetentionValue !== null
+          ...(isAnthropicProvider && cacheRetentionValue !== null
             ? { cacheRetention: cacheRetentionValue }
             : {}),
         });
@@ -381,10 +394,18 @@ export function LlmProfileEditor({
       const message = error instanceof Error ? error.message : String(error);
       setSaveError(`Failed to ${savedIdRef.current ? 'update' : 'create'} provider: ${message}`);
       return null;
-    } finally {
-      setSaving(false);
     }
   };
+
+  const autosave = useProfileAutosave({
+    enabled: true,
+    valid: formValid,
+    signature: autosaveSignature,
+    save: async () => {
+      const saved = await handleSubmit();
+      if (!saved) throw new Error('Unable to save provider');
+    },
+  });
 
   const addEmptyModelRow = () => {
     if (formModelsSaveError) setFormModelsSaveError(null);
@@ -513,53 +534,6 @@ export function LlmProfileEditor({
     }
   };
 
-  const handleDelete = async () => {
-    if (!profile || deleting) return;
-
-    if (!pendingDelete) {
-      clearDeleteConfirmation();
-      setPendingDelete(true);
-      deleteConfirmTimeoutRef.current = window.setTimeout(() => {
-        setPendingDelete(false);
-        deleteConfirmTimeoutRef.current = null;
-      }, 3000);
-      return;
-    }
-
-    clearDeleteConfirmation();
-    setDeleteError(null);
-    setDeleting(true);
-    const result = await deleteLlmProfileForBackend(backendId, profile.id);
-    setDeleting(false);
-
-    if (result.ok) {
-      onDeleted();
-      return;
-    }
-
-    let message = result.message;
-    if (result.code === 'IN_USE') {
-      const count = result.agentCount ?? 0;
-      const noun = count === 1 ? 'agent profile' : 'agent profiles';
-      message = `This LLM profile is used by ${count} ${noun}. Edit those agents to bind a different profile before deleting.`;
-    }
-    console.error('Failed to delete provider:', result);
-    setDeleteError(message);
-  };
-
-  const handleSetDefault = async () => {
-    if (!profile) return;
-    clearDeleteConfirmation();
-    setActionError(null);
-    try {
-      await setDefaultLlmProfileForBackend(backendId, profile.id);
-      onSaved(profile.id);
-    } catch (error) {
-      console.error('Failed to set default provider:', error);
-      setActionError(error instanceof Error ? error.message : String(error));
-    }
-  };
-
   /**
    * CodexOAuthSection credential/model changes need the parent to refetch. In
    * the old manager this was a loadProfiles() refetch; here the parent owns
@@ -579,286 +553,235 @@ export function LlmProfileEditor({
     updatedAt: Date.now(),
   };
 
-  return (
-    <div className="space-y-4">
-      {profile && (
-        <div className="space-y-1">
-          <div className="p-3 bg-secondary/50 rounded-lg border border-border/50 flex flex-wrap items-center gap-2">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="font-medium truncate">{profile.name}</span>
-                {profile.isDefault && (
-                  <span className="px-1.5 py-0.5 bg-muted text-primary text-xs rounded-md">
-                    Default
-                  </span>
-                )}
-                <span className="px-1.5 py-0.5 bg-secondary text-muted-foreground text-xs rounded-md">
-                  {profile.providerType || 'anthropic'}
-                </span>
-              </div>
-              {profile.baseUrl && (
-                <div className="text-xs text-muted-foreground truncate font-mono mt-1">
-                  {profile.baseUrl}
-                </div>
-              )}
-              <CapabilityTags providerType={profile.providerType || 'anthropic'} />
-            </div>
-            <div className="flex items-center gap-1 ml-auto">
-              {!profile.isDefault && (
-                <button
-                  type="button"
-                  onClick={() => void handleSetDefault()}
-                  className="px-2 py-1 text-[10px] rounded-md bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-colors"
-                  title="Set as default"
-                >
-                  Set default
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => void handleDelete()}
-                disabled={deleting}
-                className={`px-2 py-1 text-[10px] rounded-md transition-colors disabled:opacity-50 ${
-                  pendingDelete
-                    ? 'bg-destructive/15 text-destructive hover:bg-destructive/25'
-                    : 'bg-secondary text-destructive hover:bg-secondary/80'
-                }`}
-                title={pendingDelete ? 'Click again to confirm delete' : 'Delete'}
-              >
-                {deleting ? 'Deleting...' : pendingDelete ? 'Confirm delete' : 'Delete'}
-              </button>
-            </div>
-          </div>
-          {(deleteError || actionError) && (
-            <div
-              role="alert"
-              className="flex items-start gap-1.5 px-3 py-1.5 text-xs text-destructive"
-            >
-              <AlertTriangle size={12} className="shrink-0 mt-0.5" aria-hidden="true" />
-              <span>{deleteError ?? actionError}</span>
-            </div>
-          )}
-        </div>
-      )}
+  const providerLabel = PROVIDER_TYPE_LABELS[formProviderType] ?? formProviderType;
+  const headerBadges: DetailBadge[] = [
+    ...(backendName ? [{ label: backendName }] : []),
+    ...(formIsDefault ? [{ label: 'Default', tone: 'accent' as const }] : []),
+    { label: providerLabel, tone: 'neutral' as const },
+  ];
 
-      <EditorSection title="Configuration">
-        <div>
-          <FieldLabel>Name *</FieldLabel>
-          <input
-            type="text"
-            value={formName}
-            onChange={e => setFormName(e.target.value)}
-            placeholder="e.g., Local ZClaudia Agent"
-            className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary"
-          />
-        </div>
+  const modelCount = draftsToEntries(formModels).length;
+  const editorTabs: EditorTab[] = [
+    { id: 'connection', label: 'Connection' },
+    { id: 'models', label: 'Models', count: modelCount || undefined },
+    { id: 'advanced', label: 'Advanced' },
+  ];
 
-        <ProviderTypeSelector value={formProviderType} onChange={setFormProviderType} />
-
-        {formProviderType !== 'openai-codex' && (
-          <>
-            <div>
-              <FieldLabel>Base URL (optional)</FieldLabel>
-              <input
-                type="text"
-                value={formBaseUrl}
-                onChange={e => setFormBaseUrl(e.target.value)}
-                placeholder="http://api.example.com/v1"
-                className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary font-mono"
+  // Provider Type (+ Anthropic cache retention) — shared by the Connection tab
+  // and the tab-less Codex layout, so the provider can always be switched.
+  const providerSection = (
+    <EditorSection title="Provider" flush overflowVisible>
+      <div className="divide-y divide-border/60">
+        <EditorRow
+          title="Provider Type"
+          control={
+            <div className="w-56">
+              <ProviderTypeSelector
+                hideLabel
+                value={formProviderType}
+                onChange={setFormProviderType}
               />
-              <p className="text-xs text-muted-foreground mt-1">
-                Override default endpoint. Required for OpenAI-compatible third-party proxies (e.g.
-                DeepSeek, Moonshot, local gateways).
-              </p>
             </div>
-
-            <div>
-              <FieldLabel>API Key (optional)</FieldLabel>
-              <input
-                type="password"
-                value={formApiKey}
-                onChange={e => setFormApiKey(e.target.value)}
-                placeholder="sk-..."
-                autoComplete="off"
-                className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary font-mono"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Stored on the server. Falls back to environment if omitted.
-              </p>
-            </div>
-
-            <div>
-              <FieldLabel>Prompt cache retention</FieldLabel>
+          }
+        />
+        {isAnthropicProvider && (
+          <EditorRow
+            title="Prompt cache retention"
+            description='Anthropic prompt caching. "Off" is an escape hatch for proxies that reject cache_control.'
+            align="start"
+            control={
               <select
                 value={formCacheRetention}
                 onChange={e =>
                   setFormCacheRetention(e.target.value as 'default' | 'none' | 'short' | 'long')
                 }
                 aria-label="Prompt cache retention"
-                className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary"
+                className={`${FIELD_CLASS} w-56`}
               >
                 <option value="default">Default (short, 5 min TTL)</option>
                 <option value="long">Long (1 hour TTL, higher write cost)</option>
                 <option value="none">Off (no cache_control markers)</option>
                 <option value="short">Short (explicit 5 min TTL)</option>
               </select>
-              <p className="text-xs text-muted-foreground mt-1">
-                Anthropic prompt caching. "Off" is an escape hatch for proxies that reject
-                cache_control.
-              </p>
-            </div>
-          </>
-        )}
-
-        {formProviderType === 'openai-codex' && (
-          <CodexOAuthSection
-            backendId={backendId}
-            profile={codexOAuthProfile}
-            onCredentialsChanged={handleCredentialsChanged}
-            onBeforeSignIn={
-              !profile || profile.providerType !== 'openai-codex'
-                ? () => handleSubmit({ notify: false })
-                : undefined
             }
           />
         )}
+      </div>
+    </EditorSection>
+  );
 
-        {!isCodexProvider && (
-          <div>
-            <FieldLabel>Request Headers (JSON)</FieldLabel>
-            <textarea
-              value={formRequestHeaders}
-              onChange={e => {
-                setFormRequestHeaders(e.target.value);
-                if (formRequestHeadersError) setFormRequestHeadersError(null);
-              }}
-              placeholder={`{
+  return (
+    <div className="flex h-full flex-col bg-background text-foreground">
+      <ProfileHeader
+        crumb="LLM Providers"
+        onBack={onBack}
+        name={formName}
+        onNameChange={setFormName}
+        onFieldBlur={autosave.flush}
+        namePlaceholder={LLM_NAME_PLACEHOLDER}
+        badges={headerBadges}
+        saveStatus={autosave.status}
+        onRetry={autosave.retry}
+      />
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="mx-auto flex w-full max-w-[760px] flex-col gap-4 pb-4">
+          {isCodexProvider ? (
+            // Codex only has OAuth sign-in — no Base URL / API Key / model rows /
+            // compat — so it skips the tab bar entirely.
+            <>
+              {providerSection}
+              <EditorSection title="Authentication">
+                <CodexOAuthSection
+                  backendId={backendId}
+                  profile={codexOAuthProfile}
+                  onCredentialsChanged={handleCredentialsChanged}
+                  onBeforeSignIn={
+                    !profile || profile.providerType !== 'openai-codex'
+                      ? () => handleSubmit({ notify: false })
+                      : undefined
+                  }
+                />
+              </EditorSection>
+            </>
+          ) : (
+            <>
+              <EditorTabs
+                tabs={editorTabs}
+                active={activeTab}
+                onChange={id => setActiveTab(id as typeof activeTab)}
+              />
+
+              {activeTab === 'connection' && (
+                <div className="flex flex-col gap-4">
+                  {providerSection}
+                  <EditorSection title="Connection">
+                    <div>
+                      <FieldLabel>Base URL (optional)</FieldLabel>
+                      <input
+                        type="text"
+                        value={formBaseUrl}
+                        onChange={e => setFormBaseUrl(e.target.value)}
+                        onBlur={autosave.flush}
+                        placeholder="http://api.example.com/v1"
+                        className={MONO_FIELD_CLASS}
+                      />
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Override default endpoint. Required for OpenAI-compatible third-party
+                        proxies (e.g. DeepSeek, Moonshot, local gateways).
+                      </p>
+                    </div>
+
+                    <div>
+                      <FieldLabel>API Key (optional)</FieldLabel>
+                      <input
+                        type="password"
+                        value={formApiKey}
+                        onChange={e => setFormApiKey(e.target.value)}
+                        onBlur={autosave.flush}
+                        placeholder="sk-..."
+                        autoComplete="off"
+                        className={MONO_FIELD_CLASS}
+                      />
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Stored on the server. Falls back to environment if omitted.
+                      </p>
+                    </div>
+                  </EditorSection>
+                </div>
+              )}
+
+              {activeTab === 'models' && (
+                <div className="flex flex-col gap-4">
+                  <EditorSection
+                    title="Models"
+                    description="Agent profiles bound to this provider pick their model id from this list."
+                  >
+                    <ModelsSection
+                      backendId={backendId}
+                      models={formModels}
+                      providerType={formProviderType}
+                      fetching={fetchingModels}
+                      fetchError={fetchModelsError}
+                      saveError={formModelsSaveError}
+                      onAdd={addEmptyModelRow}
+                      onUpdate={updateModelRow}
+                      onRemove={removeModelRow}
+                      onFetch={handleFetchModels}
+                      onProbe={handleProbeModel}
+                      buildPreviewInput={buildPreviewInputFromForm}
+                    />
+                  </EditorSection>
+                </div>
+              )}
+
+              {activeTab === 'advanced' && (
+                <div className="flex flex-col gap-4">
+                  <EditorSection
+                    title="Request headers"
+                    description="Extra HTTP headers added to LLM API requests. Authorization / Content-Type / Host are reserved."
+                  >
+                    <textarea
+                      value={formRequestHeaders}
+                      onChange={e => {
+                        setFormRequestHeaders(e.target.value);
+                        if (formRequestHeadersError) setFormRequestHeadersError(null);
+                      }}
+                      placeholder={`{
 "X-Org-Id": "abc",
 "User-Agent": "ZClaudia/1.0"
 }`}
-              rows={5}
-              className={`w-full px-3 py-2 bg-secondary border ${formRequestHeadersError ? 'border-destructive' : 'border-border'} rounded-lg text-sm focus:outline-none focus:border-primary font-mono`}
-            />
-            {formRequestHeadersError ? (
-              <p className="text-xs text-destructive mt-1">{formRequestHeadersError}</p>
-            ) : (
-              <p className="text-xs text-muted-foreground mt-1">
-                Extra HTTP headers added to LLM API requests. Authorization / Content-Type / Host
-                are reserved.
-              </p>
-            )}
-          </div>
-        )}
+                      rows={5}
+                      aria-label="Request Headers (JSON)"
+                      className={`${MONO_FIELD_CLASS} resize-y ${formRequestHeadersError ? 'border-destructive' : ''}`}
+                    />
+                    {formRequestHeadersError && (
+                      <p className="mt-1 text-xs text-destructive">{formRequestHeadersError}</p>
+                    )}
+                  </EditorSection>
 
-        {!isCodexProvider && (
-          <ModelsSection
-            backendId={backendId}
-            models={formModels}
-            providerType={formProviderType}
-            fetching={fetchingModels}
-            fetchError={fetchModelsError}
-            saveError={formModelsSaveError}
-            onAdd={addEmptyModelRow}
-            onUpdate={updateModelRow}
-            onRemove={removeModelRow}
-            onFetch={handleFetchModels}
-            onProbe={handleProbeModel}
-            buildPreviewInput={buildPreviewInputFromForm}
-          />
-        )}
-
-        {!isCodexProvider && (
-          <div>
-            <button
-              type="button"
-              onClick={() => setShowAdvanced(v => !v)}
-              className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
-            >
-              <ChevronDown
-                size={14}
-                className={`transition-transform duration-200 ${showAdvanced ? 'rotate-0' : '-rotate-90'}`}
-              />
-              Advanced (compat)
-            </button>
-            {showAdvanced && (
-              <div className="mt-2">
-                <div className="flex items-center gap-2 mb-2">
-                  <input
-                    type="checkbox"
-                    id="cacheMarkers"
-                    checked={formCacheMarkers}
-                    onChange={e => setFormCacheMarkers(e.target.checked)}
-                    aria-label="Anthropic-style cache markers"
-                  />
-                  <label htmlFor="cacheMarkers" className="text-sm">
-                    Anthropic-style cache markers (enable when routing Claude through an
-                    OpenAI-compatible proxy)
-                  </label>
-                </div>
-                <textarea
-                  value={formCompat}
-                  onChange={e => {
-                    setFormCompat(e.target.value);
-                    if (formCompatError) setFormCompatError(null);
-                  }}
-                  placeholder={`{
+                  <EditorSection
+                    title="Compatibility overrides"
+                    description="Per-provider capability overrides for OpenAI-compatible proxies. Leave empty for defaults."
+                  >
+                    <label className="flex items-start gap-2 text-sm text-foreground">
+                      <input
+                        type="checkbox"
+                        id="cacheMarkers"
+                        checked={formCacheMarkers}
+                        onChange={e => setFormCacheMarkers(e.target.checked)}
+                        aria-label="Anthropic-style cache markers"
+                        className="mt-0.5"
+                      />
+                      <span>
+                        Anthropic-style cache markers (enable when routing Claude through an
+                        OpenAI-compatible proxy)
+                      </span>
+                    </label>
+                    <textarea
+                      value={formCompat}
+                      onChange={e => {
+                        setFormCompat(e.target.value);
+                        if (formCompatError) setFormCompatError(null);
+                      }}
+                      placeholder={`{
 "supportsDeveloperRole": false,
 "supportsReasoningEffort": true,
 "supportsStrictMode": false
 }`}
-                  rows={5}
-                  aria-label="Compat JSON"
-                  className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary font-mono"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Per-provider capability overrides (JSON object). Leave empty for defaults.
-                </p>
-                {formCompatError && (
-                  <p className="text-xs text-destructive mt-1">{formCompatError}</p>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+                      rows={5}
+                      aria-label="Compat JSON"
+                      className={`${MONO_FIELD_CLASS} resize-y`}
+                    />
+                    {formCompatError && <p className="text-xs text-destructive">{formCompatError}</p>}
+                  </EditorSection>
+                </div>
+              )}
+            </>
+          )}
 
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="isDefault"
-            checked={formIsDefault}
-            onChange={e => setFormIsDefault(e.target.checked)}
-            className="rounded-md border-border bg-secondary"
-          />
-          <label htmlFor="isDefault" className="text-sm">
-            Set as default runtime
-          </label>
+          {saveError && <p className="text-xs text-destructive">{saveError}</p>}
         </div>
-
-        {saveError && <p className="text-xs text-destructive">{saveError}</p>}
-
-        <div className="flex gap-2 justify-end">
-          <button
-            type="button"
-            onClick={() => {
-              void handleSubmit();
-            }}
-            disabled={
-              !formName.trim() ||
-              saving ||
-              (!isCodexProvider && !!formRequestHeadersError) ||
-              (!isCodexProvider && !hasAtLeastOneModelEntry)
-            }
-            title={
-              !isCodexProvider && !hasAtLeastOneModelEntry
-                ? 'Add at least one model before saving'
-                : undefined
-            }
-            className="px-3 py-1.5 text-sm bg-muted/60 text-foreground rounded-lg hover:bg-muted disabled:opacity-50 transition-colors"
-          >
-            {saving ? 'Saving...' : profile ? 'Save' : 'Create'}
-          </button>
-        </div>
-      </EditorSection>
+      </div>
 
       {fetchPicker && (
         <FetchModelsPickerDialog
@@ -937,29 +860,26 @@ function ModelsSection({
   const fetchDisabled = !providerType || fetching;
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
-        <label className="block text-sm font-medium text-muted-foreground">Models</label>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={onFetch}
-            disabled={fetchDisabled}
-            title={fetchDisabledReason}
-            className="px-2.5 py-1 text-xs rounded-md border border-border bg-secondary hover:bg-secondary/80 text-foreground disabled:opacity-50"
-          >
-            {fetching ? 'Fetching…' : 'Fetch from /models'}
-          </button>
-          <button
-            type="button"
-            onClick={onAdd}
-            className="px-2.5 py-1 text-xs rounded-md border border-border bg-secondary hover:bg-secondary/80 text-foreground"
-          >
-            + Add model
-          </button>
-        </div>
+      <div className="mb-2 flex items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={onFetch}
+          disabled={fetchDisabled}
+          title={fetchDisabledReason}
+          className="rounded-md border border-border bg-background/70 px-2.5 py-1 text-xs text-foreground hover:bg-secondary disabled:opacity-50"
+        >
+          {fetching ? 'Fetching…' : 'Fetch from /models'}
+        </button>
+        <button
+          type="button"
+          onClick={onAdd}
+          className="rounded-md border border-border bg-background/70 px-2.5 py-1 text-xs text-foreground hover:bg-secondary"
+        >
+          + Add model
+        </button>
       </div>
-      {fetchError && <p className="text-xs text-destructive mb-2">{fetchError}</p>}
-      {saveError && <p className="text-xs text-destructive mb-2">{saveError}</p>}
+      {fetchError && <p className="mb-2 text-xs text-destructive">{fetchError}</p>}
+      {saveError && <p className="mb-2 text-xs text-destructive">{saveError}</p>}
       {models.length === 0 ? (
         <p className="text-xs text-muted-foreground">
           No models declared. Add at least one model entry before saving — agent profiles bound to
@@ -1120,8 +1040,8 @@ function ModelRow({
   }, []);
 
   return (
-    <div className="p-3 bg-secondary/40 border border-border rounded-lg space-y-2">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+    <div className="space-y-2 rounded-lg border border-border/60 bg-background/40 p-3">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <div>
           <input
             type="text"
@@ -1129,7 +1049,7 @@ function ModelRow({
             onChange={e => onChange({ modelId: e.target.value })}
             placeholder="model id (e.g. claude-opus-4-7)"
             aria-label="model id"
-            className={`w-full px-2 py-1.5 bg-background border ${errs.modelId ? 'border-destructive' : 'border-border'} rounded-md text-sm focus:outline-none focus:border-primary font-mono`}
+            className={`${MODEL_FIELD_BASE} font-mono ${errs.modelId ? 'border-destructive' : 'border-border/70'}`}
           />
           {errs.modelId && (
             <p className="text-[10px] text-destructive mt-0.5">
@@ -1145,7 +1065,7 @@ function ModelRow({
           onChange={e => onChange({ displayName: e.target.value })}
           placeholder="display name (optional)"
           aria-label="display name"
-          className="w-full px-2 py-1.5 bg-background border border-border rounded-md text-sm focus:outline-none focus:border-primary"
+          className={`${MODEL_FIELD_BASE} border-border/70`}
         />
         <div>
           <input
@@ -1155,7 +1075,7 @@ function ModelRow({
             onChange={e => onChange({ contextWindowStr: e.target.value })}
             placeholder="context window (optional override)"
             aria-label="context window"
-            className={`w-full px-2 py-1.5 bg-background border ${errs.contextWindow ? 'border-destructive' : 'border-border'} rounded-md text-sm focus:outline-none focus:border-primary font-mono`}
+            className={`${MODEL_FIELD_BASE} font-mono ${errs.contextWindow ? 'border-destructive' : 'border-border/70'}`}
           />
           {errs.contextWindow && (
             <p className="text-[10px] text-destructive mt-0.5">
@@ -1176,7 +1096,7 @@ function ModelRow({
             onChange={e => onChange({ maxTokensStr: e.target.value })}
             placeholder="max tokens (optional override)"
             aria-label="max tokens"
-            className={`w-full px-2 py-1.5 bg-background border ${errs.maxTokens ? 'border-destructive' : 'border-border'} rounded-md text-sm focus:outline-none focus:border-primary font-mono`}
+            className={`${MODEL_FIELD_BASE} font-mono ${errs.maxTokens ? 'border-destructive' : 'border-border/70'}`}
           />
           {errs.maxTokens && (
             <p className="text-[10px] text-destructive mt-0.5">maxTokens {errs.maxTokens}</p>
@@ -1205,7 +1125,7 @@ function ModelRow({
             onClick={onProbe}
             disabled={testDisabled}
             title={testDisabledReason}
-            className="px-2.5 py-1 text-xs rounded-md border border-border bg-background hover:bg-secondary text-foreground disabled:opacity-50"
+            className="rounded-md border border-border/70 bg-background/70 px-2.5 py-1 text-xs text-foreground hover:bg-secondary disabled:opacity-50"
           >
             {isRunning ? 'Testing…' : 'Test'}
           </button>
@@ -1213,7 +1133,7 @@ function ModelRow({
             type="button"
             onClick={onRemove}
             title="Remove model"
-            className="px-2 py-1 text-xs rounded-md border border-border bg-background hover:bg-destructive/10 text-destructive"
+            className="rounded-md border border-border/70 bg-background/70 px-2 py-1 text-xs text-destructive hover:bg-destructive/10"
           >
             Remove
           </button>
@@ -1414,9 +1334,11 @@ function FetchModelsPickerDialog({
 function ProviderTypeSelector({
   value,
   onChange,
+  hideLabel = false,
 }: {
   value: string;
   onChange: (v: string) => void;
+  hideLabel?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -1434,11 +1356,11 @@ function ProviderTypeSelector({
 
   return (
     <div ref={ref} className="relative">
-      <FieldLabel>Provider Type</FieldLabel>
+      {!hideLabel && <FieldLabel>Provider Type</FieldLabel>}
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary text-left"
+        className={`${FIELD_CLASS} flex items-center justify-between text-left`}
       >
         <span>{selected?.label ?? value}</span>
         <ChevronDown

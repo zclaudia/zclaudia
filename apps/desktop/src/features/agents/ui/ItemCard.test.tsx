@@ -24,4 +24,25 @@ describe('ItemCard', () => {
     fireEvent.click(screen.getByRole('button', { name: /Coding/ }));
     expect(onOpen).toHaveBeenCalledTimes(1);
   });
+
+  it('opens profile actions without opening the card', () => {
+    const onOpen = vi.fn();
+    const onSetDefault = vi.fn();
+    render(
+      <ItemCard
+        item={item}
+        backendName="This Device"
+        backendOnline
+        onOpen={onOpen}
+        actions={[{ label: 'Set as default agent', onSelect: onSetDefault }]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    expect(screen.getByRole('menu')).toHaveClass('top-full', 'right-0', 'mt-1');
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Set as default agent' }));
+
+    expect(onSetDefault).toHaveBeenCalledTimes(1);
+    expect(onOpen).not.toHaveBeenCalled();
+  });
 });

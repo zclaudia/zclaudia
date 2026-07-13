@@ -64,4 +64,14 @@ describe('Modal', () => {
     );
     expect(screen.getByRole('button', { name: 'Go' })).toBeTruthy();
   });
+
+  it('can render a short form without a scrollable body', () => {
+    render(
+      <Modal open onClose={vi.fn()} ariaLabel="Test" bodyScrollable={false}>
+        <p>Body</p>
+      </Modal>
+    );
+
+    expect(screen.getByTestId('modal-body')).not.toHaveClass('overflow-y-auto');
+  });
 });

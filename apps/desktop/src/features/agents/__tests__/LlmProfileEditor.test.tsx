@@ -53,11 +53,17 @@ function makeProfile(overrides: Partial<LlmProfileConfig> = {}): LlmProfileConfi
 
 function renderEditor(profile: LlmProfileConfig | null) {
   const onSaved = vi.fn();
-  const onDeleted = vi.fn();
+  const onBack = vi.fn();
   const view = render(
-    <LlmProfileEditor backendId="b1" profile={profile} onSaved={onSaved} onDeleted={onDeleted} />
+    <LlmProfileEditor
+      backendId="b1"
+      backendName="Backend 1"
+      profile={profile}
+      onBack={onBack}
+      onSaved={onSaved}
+    />
   );
-  return { onSaved, onDeleted, ...view };
+  return { onSaved, onBack, ...view };
 }
 
 describe('LlmProfileEditor', () => {
@@ -83,16 +89,20 @@ describe('LlmProfileEditor', () => {
   });
 
   it('create mode: saves via createLlmProfileForBackend and fires onSaved with the new id', async () => {
-    const { onSaved } = renderEditor(null);
+    vi.useFakeTimers();
+    try {
+      const { onSaved } = renderEditor(null);
 
-    fireEvent.change(screen.getByPlaceholderText('e.g., Local ZClaudia Agent'), {
-      target: { value: 'My Provider' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: '+ Add model' }));
-    fireEvent.change(screen.getByLabelText('model id'), { target: { value: 'claude-x' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+      fireEvent.change(screen.getByPlaceholderText('e.g., Local ZClaudia Agent'), {
+        target: { value: 'My Provider' },
+      });
+      fireEvent.click(screen.getByRole('tab', { name: /Models/ }));
+      fireEvent.click(screen.getByRole('button', { name: '+ Add model' }));
+      fireEvent.change(screen.getByLabelText('model id'), { target: { value: 'claude-x' } });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(600);
+      });
 
-    await waitFor(() => {
       expect(api.createLlmProfileForBackend).toHaveBeenCalledWith('b1', {
         name: 'My Provider',
         providerType: 'anthropic',
@@ -103,32 +113,35 @@ describe('LlmProfileEditor', () => {
         models: [{ modelId: 'claude-x' }],
         isDefault: false,
       });
-    });
-    await waitFor(() => {
       expect(onSaved).toHaveBeenCalledWith('created-1');
-    });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
-  it('create mode: no model rows disables save (F2 hard gate)', () => {
+  it('create mode: no model rows remains pending (F2 hard gate)', () => {
     renderEditor(null);
 
     fireEvent.change(screen.getByPlaceholderText('e.g., Local ZClaudia Agent'), {
       target: { value: 'My Provider' },
     });
 
-    expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
+    expect(screen.getByTestId('save-state')).toHaveTextContent('Not saved');
     expect(api.createLlmProfileForBackend).not.toHaveBeenCalled();
   });
 
   it('edit mode: populates the form and updates via updateLlmProfileForBackend', async () => {
-    const { onSaved } = renderEditor(makeProfile());
+    vi.useFakeTimers();
+    try {
+      const { onSaved } = renderEditor(makeProfile());
 
-    fireEvent.change(screen.getByDisplayValue('My Anthropic'), {
-      target: { value: 'Renamed' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      fireEvent.change(screen.getByDisplayValue('My Anthropic'), {
+        target: { value: 'Renamed' },
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(600);
+      });
 
-    await waitFor(() => {
       expect(api.updateLlmProfileForBackend).toHaveBeenCalledWith(
         'b1',
         'p1',
@@ -139,95 +152,111 @@ describe('LlmProfileEditor', () => {
           cacheRetention: null,
         })
       );
-    });
-    await waitFor(() => {
       expect(onSaved).toHaveBeenCalledWith('p1');
-    });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('autosaves profile changes without rendering a Save button', async () => {
+    vi.useFakeTimers();
+    try {
+      const { onSaved } = renderEditor(makeProfile());
+
+      expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+      fireEvent.change(screen.getByDisplayValue('My Anthropic'), {
+        target: { value: 'Renamed automatically' },
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(600);
+      });
+
+      expect(api.updateLlmProfileForBackend).toHaveBeenCalledWith(
+        'b1',
+        'p1',
+        expect.objectContaining({ name: 'Renamed automatically' })
+      );
+      expect(onSaved).toHaveBeenCalledWith('p1');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('edit mode: reserved request header blocks save with an inline error', async () => {
-    const { onSaved } = renderEditor(makeProfile());
+    vi.useFakeTimers();
+    try {
+      const { onSaved } = renderEditor(makeProfile());
 
-    fireEvent.change(screen.getByPlaceholderText(/X-Org-Id/), {
-      target: { value: '{"Authorization": "Bearer x"}' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      fireEvent.click(screen.getByRole('tab', { name: /Advanced/ }));
+      fireEvent.change(screen.getByPlaceholderText(/X-Org-Id/), {
+        target: { value: '{"Authorization": "Bearer x"}' },
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(600);
+      });
 
-    expect(
-      await screen.findByText(
+      expect(
+        screen.getByText(
         'Header "Authorization" is reserved (managed by API key); remove it from Request Headers'
-      )
-    ).toBeInTheDocument();
-    expect(api.updateLlmProfileForBackend).not.toHaveBeenCalled();
-    expect(onSaved).not.toHaveBeenCalled();
+        )
+      ).toBeInTheDocument();
+      expect(api.updateLlmProfileForBackend).not.toHaveBeenCalled();
+      expect(onSaved).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('edit mode: shows an inline error when save fails (no alert)', async () => {
     vi.mocked(api.updateLlmProfileForBackend).mockRejectedValue(new Error('save boom'));
+    vi.useFakeTimers();
+    try {
+      const { onSaved } = renderEditor(makeProfile());
+      fireEvent.change(screen.getByDisplayValue('My Anthropic'), { target: { value: 'Renamed' } });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(600);
+      });
 
-    const { onSaved } = renderEditor(makeProfile());
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-
-    expect(await screen.findByText('Failed to update provider: save boom')).toBeInTheDocument();
-    expect(onSaved).not.toHaveBeenCalled();
+      expect(screen.getByText('Failed to update provider: save boom')).toBeInTheDocument();
+      expect(onSaved).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
-  it('delete: first click arms confirmation, second click deletes and fires onDeleted', async () => {
-    const { onDeleted } = renderEditor(makeProfile());
-
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-    expect(api.deleteLlmProfileForBackend).not.toHaveBeenCalled();
-
-    const confirmButton = await screen.findByRole('button', { name: 'Confirm delete' });
-    fireEvent.click(confirmButton);
-
-    await waitFor(() => {
-      expect(api.deleteLlmProfileForBackend).toHaveBeenCalledWith('b1', 'p1');
-    });
-    await waitFor(() => {
-      expect(onDeleted).toHaveBeenCalled();
-    });
-  });
-
-  it('delete: 409 IN_USE renders the agent-count message and skips onDeleted', async () => {
-    vi.mocked(api.deleteLlmProfileForBackend).mockResolvedValue({
-      ok: false,
-      code: 'IN_USE',
-      message: 'in use',
-      agentCount: 2,
-    });
-
-    const { onDeleted } = renderEditor(makeProfile());
-
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Confirm delete' }));
-
-    expect(
-      await screen.findByText(
-        'This LLM profile is used by 2 agent profiles. Edit those agents to bind a different profile before deleting.'
-      )
-    ).toBeInTheDocument();
-    expect(onDeleted).not.toHaveBeenCalled();
-  });
-
-  it('set default fires setDefaultLlmProfileForBackend and onSaved', async () => {
-    const { onSaved } = renderEditor(makeProfile());
-
-    fireEvent.click(screen.getByRole('button', { name: 'Set default' }));
-
-    await waitFor(() => {
-      expect(api.setDefaultLlmProfileForBackend).toHaveBeenCalledWith('b1', 'p1');
-    });
-    await waitFor(() => {
-      expect(onSaved).toHaveBeenCalledWith('p1');
-    });
-  });
-
-  it('set default button is hidden for the default profile', () => {
+  // Delete / set-default moved to the library card (see AgentsContent) — the
+  // editor no longer renders those controls. A default profile surfaces a
+  // "Default" badge in its ProfileHeader instead.
+  it('renders a Default badge in the header and no in-editor delete/set-default controls', () => {
     renderEditor(makeProfile({ isDefault: true }));
 
-    expect(screen.queryByRole('button', { name: 'Set default' })).toBeNull();
     expect(screen.getByText('Default')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Set default' })).toBeNull();
+  });
+
+  it('splits fields across Connection / Models / Advanced tabs', () => {
+    renderEditor(makeProfile());
+
+    // Connection is the default tab: Base URL is visible, model rows are not.
+    expect(screen.getByPlaceholderText('http://api.example.com/v1')).toBeInTheDocument();
+    expect(screen.queryByLabelText('model id')).toBeNull();
+    expect(screen.queryByPlaceholderText(/X-Org-Id/)).toBeNull();
+
+    fireEvent.click(screen.getByRole('tab', { name: /Models/ }));
+    expect(screen.getByLabelText('model id')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('http://api.example.com/v1')).toBeNull();
+
+    fireEvent.click(screen.getByRole('tab', { name: /Advanced/ }));
+    expect(screen.getByPlaceholderText(/X-Org-Id/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Compat JSON')).toBeInTheDocument();
+  });
+
+  it('openai-codex profile hides the tab bar and shows the OAuth section', () => {
+    renderEditor(makeProfile({ providerType: 'openai-codex', models: [] }));
+    expect(screen.queryByRole('tab', { name: /Models/ })).toBeNull();
+    expect(screen.getByTestId('codex-oauth-section')).toHaveTextContent('b1');
   });
 
   it('openai-codex profile hides baseUrl/apiKey inputs and shows the OAuth section', () => {
@@ -238,7 +267,15 @@ describe('LlmProfileEditor', () => {
     expect(screen.getByTestId('codex-oauth-section')).toHaveTextContent('b1');
   });
 
-  it('codex create: onBeforeSignIn persists silently and promotes later saves to update (no double create)', async () => {
+  it('shows prompt cache retention only for Anthropic providers', () => {
+    renderEditor(makeProfile({ providerType: 'openai' }));
+    expect(screen.queryByLabelText('Prompt cache retention')).toBeNull();
+
+    renderEditor(makeProfile({ providerType: 'anthropic' }));
+    expect(screen.getByLabelText('Prompt cache retention')).toBeInTheDocument();
+  });
+
+  it('codex create: onBeforeSignIn persists silently and later autosaves update (no double create)', async () => {
     vi.mocked(api.updateLlmProfileForBackend).mockResolvedValue(
       makeProfile({ id: 'created-1', providerType: 'openai-codex' })
     );
@@ -262,14 +299,21 @@ describe('LlmProfileEditor', () => {
     expect(api.createLlmProfileForBackend).toHaveBeenCalledTimes(1);
     expect(onSaved).not.toHaveBeenCalled();
 
-    // The silent create promoted savedIdRef: the next Save updates the
+    // The silent create promoted savedIdRef: a subsequent edit updates the
     // persisted profile instead of creating a duplicate.
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    vi.useFakeTimers();
+    fireEvent.change(screen.getByPlaceholderText('e.g., Local ZClaudia Agent'), {
+      target: { value: 'My Codex Renamed' },
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600);
+    });
+    vi.useRealTimers();
     await waitFor(() => {
       expect(api.updateLlmProfileForBackend).toHaveBeenCalledWith(
         'b1',
         'created-1',
-        expect.objectContaining({ name: 'My Codex', providerType: 'openai-codex' })
+        expect.objectContaining({ name: 'My Codex Renamed', providerType: 'openai-codex' })
       );
     });
     expect(api.createLlmProfileForBackend).toHaveBeenCalledTimes(1);
@@ -286,6 +330,7 @@ describe('LlmProfileEditor', () => {
   it('fetch models calls the ForBackend preview api with the form draft and opens the picker', async () => {
     renderEditor(makeProfile());
 
+    fireEvent.click(screen.getByRole('tab', { name: /Models/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Fetch from /models' }));
 
     await waitFor(() => {
@@ -304,6 +349,7 @@ describe('LlmProfileEditor', () => {
   it('probe (Test) calls the ForBackend probe preview api with the model id', async () => {
     renderEditor(makeProfile());
 
+    fireEvent.click(screen.getByRole('tab', { name: /Models/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Test' }));
 
     await waitFor(() => {

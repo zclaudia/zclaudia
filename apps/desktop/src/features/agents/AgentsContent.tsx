@@ -18,7 +18,15 @@ import { useAgentProfileMetaStore } from '../../stores/agentProfileMetaStore';
 import { useAgentReadinessStore } from '../../stores/agentReadinessStore';
 import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
 import { resolveCanonicalBackendId } from '../../utils/controlPlane';
-import { listLlmProfilesForBackend } from '../../services/api';
+import {
+  deleteAgentProfileForBackend,
+  deleteLlmProfileForBackend,
+  listLlmProfilesForBackend,
+  setDefaultLlmProfileForBackend,
+  updateAgentProfileForBackend,
+} from '../../services/api';
+import { confirm } from '../../stores/confirmDialogStore';
+import { useToastStore } from '../../stores/toastStore';
 import { ProfileEditor } from './ProfileEditor';
 import { SkillEditor } from './SkillEditor';
 import { SkillDirsEditor } from './SkillDirsEditor';
@@ -209,6 +217,97 @@ export function AgentsContent({
     }
   };
 
+  // Provider (LLM profile) counterpart of refreshProfileMetaIfActive, keyed by
+  // an explicit backendId so it works from both the library card actions (list
+  // view) and the editor branch below.
+  //
+  // Key audit of useLlmProfileMetaStore.providersByBackend: every writer keys
+  // by the RAW activeServerId — useDataLoader/SessionChatWindow/
+  // WorkflowEditorWindow call projectStore.setProviders(), which forwards
+  // `useServerStore.getState().activeServerId` verbatim, and the settings
+  // components (ProjectSettings/PermissionSettings) pass `activeServerId`
+  // explicitly. Every reader (useSidebarData, useChatSession,
+  // useAgentForSession, LocalPRCard, projectStore.getProviders) also passes the
+  // raw `activeServerId`. So the map is uniformly keyed on the raw active id,
+  // which may still be the legacy 'local' string rather than the canonical
+  // backend id. We therefore always cache under the canonical edited backend id
+  // (future-proof, harmless) AND, when the edited backend is the active one but
+  // the raw key differs (the legacy-'local' case), mirror under the raw key so
+  // today's readers actually see the fresh list.
+  const syncLlmProfileMetaForBackend = async (backendId: string) => {
+    const activeBackendId = resolveCanonicalBackendId(activeServerId, localBackendId);
+    const editedIsActive = backendId === activeBackendId;
+    if (editedIsActive) {
+      // Provider mutations can flip agent readiness (e.g. adding the first
+      // credentialed profile) — refresh the gate like the profiles path does.
+      void useAgentReadinessStore.getState().refresh();
+    }
+    try {
+      const list = await listLlmProfilesForBackend(backendId);
+      const { setProviders } = useLlmProfileMetaStore.getState();
+      setProviders(list, backendId);
+      if (editedIsActive && activeServerId && activeServerId !== backendId) {
+        setProviders(list, activeServerId);
+      }
+    } catch (err) {
+      // Best-effort cache refresh: the Providers tree still refetches via the
+      // nonce bump, and stale global data self-heals on the next data load.
+      console.warn('[AgentsContent] provider cache refresh failed:', err);
+    }
+  };
+
+  const handleSetLlmProfileDefault = async (item: LibraryItem) => {
+    try {
+      await setDefaultLlmProfileForBackend(item.backendId, item.id);
+      bumpAgentsRefresh();
+      void syncLlmProfileMetaForBackend(item.backendId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      useToastStore.getState().add({
+        title: 'Failed to set default provider',
+        message,
+        type: 'error',
+        icon: 'error',
+      });
+    }
+  };
+
+  const handleDeleteLlmProfile = async (item: LibraryItem) => {
+    const ok = await confirm({
+      title: 'Delete provider?',
+      message: `"${item.title}" will be permanently deleted.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
+    const result = await deleteLlmProfileForBackend(item.backendId, item.id);
+    if (result.ok) {
+      // Clear the selection if the deleted provider was open, then refresh.
+      if (
+        selection?.kind === 'llm-profile' &&
+        selection.backendId === item.backendId &&
+        selection.id === item.id
+      ) {
+        selectAgentsItem(null);
+      }
+      bumpAgentsRefresh();
+      void syncLlmProfileMetaForBackend(item.backendId);
+      return;
+    }
+    let message = result.message;
+    if (result.code === 'IN_USE') {
+      const count = result.agentCount ?? 0;
+      const noun = count === 1 ? 'agent profile' : 'agent profiles';
+      message = `This LLM profile is used by ${count} ${noun}. Edit those agents to bind a different profile before deleting.`;
+    }
+    useToastStore.getState().add({
+      title: 'Failed to delete provider',
+      message,
+      type: 'error',
+      icon: 'error',
+    });
+  };
+
   const handleProfileCreated = (saved: AgentProfileConfig) => {
     const backendId = newProfileBackendId ?? backendForNew();
     profileBridge.record(backendId, saved.id, saved);
@@ -216,6 +315,44 @@ export function AgentsContent({
     selectAgentsItem({ backendId, kind: 'profile', id: saved.id });
     refreshProfileMetaIfActive(backendId);
     setNewProfileBackendId(null);
+  };
+
+  const handleSetProfileDefault = async (item: LibraryItem) => {
+    try {
+      await updateAgentProfileForBackend(item.backendId, item.id, { isDefault: true });
+      bumpAgentsRefresh();
+      refreshProfileMetaIfActive(item.backendId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      useToastStore.getState().add({
+        title: 'Failed to set default agent',
+        message,
+        type: 'error',
+        icon: 'error',
+      });
+    }
+  };
+
+  const handleDeleteProfile = async (item: LibraryItem) => {
+    const ok = await confirm({
+      title: 'Delete profile?',
+      message: `"${item.title}" will be permanently deleted.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
+    const result = await deleteAgentProfileForBackend(item.backendId, item.id);
+    if (result.ok) {
+      bumpAgentsRefresh();
+      refreshProfileMetaIfActive(item.backendId);
+      return;
+    }
+    useToastStore.getState().add({
+      title: 'Failed to delete agent',
+      message: result.message,
+      type: 'error',
+      icon: 'error',
+    });
   };
 
   if (!selection) {
@@ -229,6 +366,10 @@ export function AgentsContent({
           onOpen={openItem}
           onSelectBackendFilter={setBackendFilter}
           onNew={startNew}
+          onSetProfileDefault={handleSetProfileDefault}
+          onDeleteProfile={handleDeleteProfile}
+          onSetLlmProfileDefault={handleSetLlmProfileDefault}
+          onDeleteLlmProfile={handleDeleteLlmProfile}
         />
         {newProfileBackendId !== null && (
           <NewAgentProfileModal
@@ -244,43 +385,6 @@ export function AgentsContent({
 
   const editedBackendId = selection.backendId;
   const backendName = backends.find(b => b.backendId === editedBackendId)?.name;
-
-  // Provider (LLM profile) counterpart of refreshProfileMetaIfActive.
-  //
-  // Key audit of useLlmProfileMetaStore.providersByBackend: every writer keys
-  // by the RAW activeServerId — useDataLoader/SessionChatWindow/
-  // WorkflowEditorWindow call projectStore.setProviders(), which forwards
-  // `useServerStore.getState().activeServerId` verbatim, and the settings
-  // components (ProjectSettings/PermissionSettings) pass `activeServerId`
-  // explicitly. Every reader (useSidebarData, useChatSession,
-  // useAgentForSession, LocalPRCard, projectStore.getProviders) also passes the
-  // raw `activeServerId`. So the map is uniformly keyed on the raw active id,
-  // which may still be the legacy 'local' string rather than the canonical
-  // backend id. We therefore always cache under the canonical edited backend id
-  // (future-proof, harmless) AND, when the edited backend is the active one but
-  // the raw key differs (the legacy-'local' case), mirror under the raw key so
-  // today's readers actually see the fresh list.
-  const syncLlmProfileGlobalStoresIfActive = async () => {
-    const activeBackendId = resolveCanonicalBackendId(activeServerId, localBackendId);
-    const editedIsActive = editedBackendId === activeBackendId;
-    if (editedIsActive) {
-      // Provider mutations can flip agent readiness (e.g. adding the first
-      // credentialed profile) — refresh the gate like the profiles path does.
-      void useAgentReadinessStore.getState().refresh();
-    }
-    try {
-      const list = await listLlmProfilesForBackend(editedBackendId);
-      const { setProviders } = useLlmProfileMetaStore.getState();
-      setProviders(list, editedBackendId);
-      if (editedIsActive && activeServerId && activeServerId !== editedBackendId) {
-        setProviders(list, activeServerId);
-      }
-    } catch (err) {
-      // Best-effort cache refresh: the Providers tree still refetches via the
-      // nonce bump, and stale global data self-heals on the next data load.
-      console.warn('[AgentsContent] provider cache refresh failed:', err);
-    }
-  };
 
   const handleSkillSaved = (id: string) => {
     skillBridge.record(editedBackendId, id);
@@ -518,32 +622,21 @@ export function AgentsContent({
         // Create mode lands on the newly created provider's id; the marker
         // bridges the gap until the refetch delivers the record.
         selectAgentsItem({ backendId: editedBackendId, kind: 'llm-profile', id });
-        void syncLlmProfileGlobalStoresIfActive();
+        void syncLlmProfileMetaForBackend(editedBackendId);
       };
 
-      const handleDeleted = () => {
-        selectAgentsItem(null);
-        bumpAgentsRefresh();
-        void syncLlmProfileGlobalStoresIfActive();
-      };
-
-      const title = selection.kind === 'llm-profile' ? (llmProfile?.name ?? '') : 'New provider';
-
+      // Delete / set-default now live on the library card (handleDeleteLlmProfile
+      // / handleSetLlmProfileDefault); the editor renders its own ProfileHeader,
+      // matching the agent profile editor, so it no longer needs DetailShell.
       return (
-        <DetailShell
-          title={title}
+        <LlmProfileEditor
+          key={`${editedBackendId}:${selection.kind === 'llm-profile' ? selection.id : 'new'}`}
+          backendId={editedBackendId}
           backendName={backendName}
-          crumb={crumbForSelectionKind(selection.kind)}
+          profile={llmProfile}
           onBack={() => selectAgentsItem(null)}
-        >
-          <LlmProfileEditor
-            key={`${editedBackendId}:${selection.kind === 'llm-profile' ? selection.id : 'new'}`}
-            backendId={editedBackendId}
-            profile={llmProfile}
-            onSaved={handleSaved}
-            onDeleted={handleDeleted}
-          />
-        </DetailShell>
+          onSaved={handleSaved}
+        />
       );
     }
 

@@ -1,16 +1,30 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 
 import { useTopLevelViewStore } from '../../../stores/topLevelViewStore';
 import { useServerStore } from '../../../stores/serverStore';
 import { useFacadeStore } from '../../../stores/facadeStore';
 
-const { mockLoadAll, mockRefresh, mockListLlmProfilesForBackend } = vi.hoisted(() => ({
+const {
+  mockLoadAll,
+  mockRefresh,
+  mockListLlmProfilesForBackend,
+  mockUpdateAgentProfileForBackend,
+  mockDeleteAgentProfileForBackend,
+  mockDeleteLlmProfileForBackend,
+  mockSetDefaultLlmProfileForBackend,
+  mockConfirm,
+} = vi.hoisted(() => ({
   mockLoadAll: vi.fn().mockResolvedValue(undefined),
   mockRefresh: vi.fn().mockResolvedValue(undefined),
   mockListLlmProfilesForBackend: vi.fn(),
+  mockUpdateAgentProfileForBackend: vi.fn(),
+  mockDeleteAgentProfileForBackend: vi.fn(),
+  mockDeleteLlmProfileForBackend: vi.fn(),
+  mockSetDefaultLlmProfileForBackend: vi.fn(),
+  mockConfirm: vi.fn().mockResolvedValue(true),
 }));
 
 // AgentsContent's provider store sync refetches the edited backend's LLM
@@ -18,8 +32,17 @@ const { mockLoadAll, mockRefresh, mockListLlmProfilesForBackend } = vi.hoisted((
 // (the test only imports types from it).
 vi.mock('../../../services/api', async importOriginal => {
   const mod = await importOriginal<Record<string, unknown>>();
-  return { ...mod, listLlmProfilesForBackend: mockListLlmProfilesForBackend };
+  return {
+    ...mod,
+    listLlmProfilesForBackend: mockListLlmProfilesForBackend,
+    updateAgentProfileForBackend: mockUpdateAgentProfileForBackend,
+    deleteAgentProfileForBackend: mockDeleteAgentProfileForBackend,
+    deleteLlmProfileForBackend: mockDeleteLlmProfileForBackend,
+    setDefaultLlmProfileForBackend: mockSetDefaultLlmProfileForBackend,
+  };
 });
+
+vi.mock('../../../stores/confirmDialogStore', () => ({ confirm: mockConfirm }));
 
 // The stub exposes buttons wired to onSaved/onDeleted so tests can drive the
 // parent's handlers without the real (network-heavy) editor.
@@ -119,19 +142,22 @@ vi.mock('../McpServerEditor', () => ({
 }));
 
 // LLM profile (provider) editor stub: like MCP, onSaved reports only the id.
+// Delete / set-default now live on the library card, so the editor no longer
+// takes an onDeleted — it owns its own ProfileHeader with an onBack instead.
 vi.mock('../LlmProfileEditor', () => ({
   LlmProfileEditor: ({
     profile,
+    backendName,
     onSaved,
-    onDeleted,
   }: {
-    profile: { id: string } | null;
+    profile: { id: string; name?: string } | null;
+    backendName?: string;
     onSaved: (id: string) => void;
-    onDeleted: () => void;
   }) => (
     <div data-testid="llm-profile-editor" data-profile-id={profile?.id ?? 'null'}>
+      {backendName && <span>{backendName}</span>}
+      {profile?.name && <span>{profile.name}</span>}
       <button onClick={() => onSaved('llm-saved-1')}>llm-stub-save</button>
-      <button onClick={() => onDeleted()}>llm-stub-delete</button>
     </div>
   ),
 }));
@@ -268,6 +294,10 @@ describe('AgentsContent', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockListLlmProfilesForBackend.mockResolvedValue([]);
+    mockUpdateAgentProfileForBackend.mockResolvedValue(makeProfile('ap1'));
+    mockDeleteAgentProfileForBackend.mockResolvedValue({ ok: true });
+    mockDeleteLlmProfileForBackend.mockResolvedValue({ ok: true });
+    mockSetDefaultLlmProfileForBackend.mockResolvedValue(undefined);
     useTopLevelViewStore.setState({
       view: { kind: 'agents', tab: 'profiles' },
       agentsSelection: null,
@@ -369,6 +399,51 @@ describe('AgentsContent', () => {
     fireEvent.click(screen.getByRole('button', { name: /New/ }));
 
     expect(screen.getByTestId('new-agent-modal')).toBeInTheDocument();
+  });
+
+  it('sets a profile as the default from its card menu', async () => {
+    render(
+      <AgentsContent
+        providersData={emptyProviders}
+        backends={backends}
+        mcpData={emptyMcp}
+        data={makeData({ b1: [makeProfile('ap1', 'Coding Agent')] })}
+        skillsData={emptySkills}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Set as default agent' }));
+
+    await waitFor(() =>
+      expect(mockUpdateAgentProfileForBackend).toHaveBeenCalledWith('b1', 'ap1', {
+        isDefault: true,
+      })
+    );
+    expect(useTopLevelViewStore.getState().agentsRefreshNonce).toBe(1);
+  });
+
+  it('confirms before deleting a profile from its card menu', async () => {
+    render(
+      <AgentsContent
+        providersData={emptyProviders}
+        backends={backends}
+        mcpData={emptyMcp}
+        data={makeData({ b1: [makeProfile('ap1', 'Coding Agent')] })}
+        skillsData={emptySkills}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete agent' }));
+
+    await waitFor(() =>
+      expect(mockDeleteAgentProfileForBackend).toHaveBeenCalledWith('b1', 'ap1')
+    );
+    expect(mockConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Delete profile?', destructive: true })
+    );
+    expect(useTopLevelViewStore.getState().agentsRefreshNonce).toBe(1);
   });
 
   it('selects the created profile after the modal reports success', () => {
@@ -1216,7 +1291,7 @@ describe('AgentsContent', () => {
     expect(screen.getByText('Backend 1')).toBeTruthy();
   });
 
-  it('renders provider create mode with a null profile and "New provider" header', () => {
+  it('renders provider create mode with a null profile (editor owns its own header)', () => {
     useTopLevelViewStore.setState({
       view: { kind: 'agents', tab: 'providers' },
       agentsSelection: { backendId: 'b2', kind: 'new-llm-profile' },
@@ -1233,7 +1308,8 @@ describe('AgentsContent', () => {
     );
 
     expect(screen.getByTestId('llm-profile-editor').getAttribute('data-profile-id')).toBe('null');
-    expect(screen.getByText('New provider')).toBeTruthy();
+    // The editor now renders its own ProfileHeader (no DetailShell), so the
+    // backend name is surfaced by the editor itself.
     expect(screen.getByText('Backend 2')).toBeTruthy();
   });
 
@@ -1411,15 +1487,15 @@ describe('AgentsContent', () => {
     expect(screen.queryByText('Loading…')).toBeNull();
   });
 
-  it('provider delete clears the selection and bumps the refresh nonce', () => {
+  it('sets a provider as the default from its card menu', async () => {
     useTopLevelViewStore.setState({
       view: { kind: 'agents', tab: 'providers' },
-      agentsSelection: { backendId: 'b1', kind: 'llm-profile', id: 'lp1' },
+      agentsSelection: null,
     });
 
     render(
       <AgentsContent
-        providersData={makeProvidersData({ b1: [makeLlmProfile('lp1')] })}
+        providersData={makeProvidersData({ b1: [makeLlmProfile('lp1', 'Anthropic Direct')] })}
         mcpData={emptyMcp}
         backends={backends}
         data={makeData({})}
@@ -1427,11 +1503,41 @@ describe('AgentsContent', () => {
       />
     );
 
-    fireEvent.click(screen.getByText('llm-stub-delete'));
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Set as default provider' }));
 
-    const state = useTopLevelViewStore.getState();
-    expect(state.agentsSelection).toBeNull();
-    expect(state.agentsRefreshNonce).toBe(1);
+    await waitFor(() =>
+      expect(mockSetDefaultLlmProfileForBackend).toHaveBeenCalledWith('b1', 'lp1')
+    );
+    expect(useTopLevelViewStore.getState().agentsRefreshNonce).toBe(1);
+  });
+
+  it('confirms before deleting a provider from its card menu and bumps the refresh nonce', async () => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'providers' },
+      agentsSelection: null,
+    });
+
+    render(
+      <AgentsContent
+        providersData={makeProvidersData({ b1: [makeLlmProfile('lp1', 'Anthropic Direct')] })}
+        mcpData={emptyMcp}
+        backends={backends}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete provider' }));
+
+    await waitFor(() =>
+      expect(mockDeleteLlmProfileForBackend).toHaveBeenCalledWith('b1', 'lp1')
+    );
+    expect(mockConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Delete provider?', destructive: true })
+    );
+    expect(useTopLevelViewStore.getState().agentsRefreshNonce).toBe(1);
   });
 
   it('provider save on the active backend refreshes readiness and the global provider cache', async () => {
@@ -1530,11 +1636,11 @@ describe('AgentsContent', () => {
     expect(providersByBackend['b1']).toBeUndefined();
   });
 
-  it('provider delete also syncs the global provider cache', async () => {
+  it('provider delete from the card menu also syncs the global provider cache', async () => {
     mockListLlmProfilesForBackend.mockResolvedValue([]);
     useTopLevelViewStore.setState({
       view: { kind: 'agents', tab: 'providers' },
-      agentsSelection: { backendId: 'b1', kind: 'llm-profile', id: 'lp1' },
+      agentsSelection: null,
     });
 
     render(
@@ -1547,10 +1653,12 @@ describe('AgentsContent', () => {
       />
     );
 
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
     await act(async () => {
-      fireEvent.click(screen.getByText('llm-stub-delete'));
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete provider' }));
     });
 
+    expect(mockDeleteLlmProfileForBackend).toHaveBeenCalledWith('b1', 'lp1');
     expect(mockRefresh).toHaveBeenCalledTimes(1);
     expect(mockListLlmProfilesForBackend).toHaveBeenCalledWith('b1');
     expect(useLlmProfileMetaStore.getState().providersByBackend['b1']).toEqual([]);

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, useCallback, useMemo, type ReactNode } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo, type CSSProperties, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Check } from 'lucide-react';
 
 export interface SelectOption<T extends string = string> {
@@ -9,6 +10,7 @@ export interface SelectOption<T extends string = string> {
 }
 
 export type SelectSize = 'sm' | 'md' | 'lg';
+export type SelectPanelPosition = 'absolute' | 'fixed';
 
 export interface SelectProps<T extends string = string> {
   value: T | '';
@@ -21,6 +23,8 @@ export interface SelectProps<T extends string = string> {
   className?: string;
   triggerClassName?: string;
   panelClassName?: string;
+  /** Render the menu at viewport level to escape a scrollable parent such as a modal. */
+  panelPosition?: SelectPanelPosition;
   title?: string;
   align?: 'left' | 'right';
   ariaLabel?: string;
@@ -52,6 +56,7 @@ export function Select<T extends string = string>({
   className = '',
   triggerClassName = '',
   panelClassName = '',
+  panelPosition = 'absolute',
   title,
   align = 'left',
   ariaLabel,
@@ -59,6 +64,8 @@ export function Select<T extends string = string>({
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [panelStyle, setPanelStyle] = useState<CSSProperties>();
 
   const selected = useMemo(() => options.find(opt => opt.value === value), [options, value]);
   const sizing = SIZE_CLASSES[size];
@@ -66,7 +73,11 @@ export function Select<T extends string = string>({
   useEffect(() => {
     if (!isOpen) return;
     const handleMouseDown = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        !containerRef.current?.contains(target) &&
+        !panelRef.current?.contains(target)
+      ) {
         setIsOpen(false);
       }
     };
@@ -84,6 +95,28 @@ export function Select<T extends string = string>({
     };
   }, [isOpen]);
 
+  const updateFixedPanelPosition = useCallback(() => {
+    if (panelPosition !== 'fixed') return;
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setPanelStyle({
+      top: rect.bottom + 4,
+      left: rect.left,
+      width: rect.width,
+    });
+  }, [panelPosition]);
+
+  useEffect(() => {
+    if (!isOpen || panelPosition !== 'fixed') return;
+    updateFixedPanelPosition();
+    window.addEventListener('resize', updateFixedPanelPosition);
+    window.addEventListener('scroll', updateFixedPanelPosition, true);
+    return () => {
+      window.removeEventListener('resize', updateFixedPanelPosition);
+      window.removeEventListener('scroll', updateFixedPanelPosition, true);
+    };
+  }, [isOpen, panelPosition, updateFixedPanelPosition]);
+
   const handleSelect = useCallback(
     (next: T, optionDisabled: boolean | undefined) => {
       if (optionDisabled) return;
@@ -95,6 +128,63 @@ export function Select<T extends string = string>({
   );
 
   const triggerLabel = selected ? selected.label : (placeholder ?? '');
+
+  const panel = isOpen && (
+    <div
+      ref={panelRef}
+      role="listbox"
+      style={panelPosition === 'fixed' ? panelStyle : undefined}
+      className={`
+        ${panelPosition === 'fixed' ? 'fixed z-[110]' : 'absolute z-50 mt-1 min-w-full'}
+        ${align === 'right' && panelPosition === 'absolute' ? 'right-0' : 'left-0'}
+        bg-popover/95 glass border border-border/50
+        rounded-xl shadow-apple-xl py-1
+        max-h-[280px] overflow-y-auto
+        animate-apple-fade-in
+        ${panelClassName}
+      `}
+    >
+      {options.map(opt => {
+        const isActive = opt.value === value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            role="option"
+            aria-selected={isActive}
+            disabled={opt.disabled}
+            onClick={() => handleSelect(opt.value, opt.disabled)}
+            className={`
+              w-full text-left px-3 py-1.5 ${sizing.panelText}
+              flex items-start gap-2
+              transition-colors whitespace-nowrap
+              ${
+                opt.disabled
+                  ? 'opacity-50 cursor-not-allowed'
+                  : isActive
+                    ? 'bg-muted/60 text-primary font-medium'
+                    : 'text-foreground hover:bg-muted active:bg-muted'
+              }
+            `}
+          >
+            <Check
+              size={12}
+              strokeWidth={2.5}
+              className={`mt-[3px] flex-shrink-0 ${isActive ? 'opacity-100 text-primary' : 'opacity-0'}`}
+            />
+            <span className="flex-1 min-w-0">
+              <span className="block truncate">{opt.label}</span>
+              {opt.description && (
+                <span className="block text-[10px] text-muted-foreground mt-0.5 truncate">
+                  {opt.description}
+                </span>
+              )}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
 
   return (
     <div
@@ -131,60 +221,7 @@ export function Select<T extends string = string>({
         />
       </button>
 
-      {isOpen && (
-        <div
-          role="listbox"
-          className={`
-            absolute z-50 mt-1 min-w-full
-            ${align === 'right' ? 'right-0' : 'left-0'}
-            bg-popover/95 glass border border-border/50
-            rounded-xl shadow-apple-xl py-1
-            max-h-[280px] overflow-y-auto
-            animate-apple-fade-in
-            ${panelClassName}
-          `}
-        >
-          {options.map(opt => {
-            const isActive = opt.value === value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                role="option"
-                aria-selected={isActive}
-                disabled={opt.disabled}
-                onClick={() => handleSelect(opt.value, opt.disabled)}
-                className={`
-                  w-full text-left px-3 py-1.5 ${sizing.panelText}
-                  flex items-start gap-2
-                  transition-colors whitespace-nowrap
-                  ${
-                    opt.disabled
-                      ? 'opacity-50 cursor-not-allowed'
-                      : isActive
-                        ? 'bg-muted/60 text-primary font-medium'
-                        : 'text-foreground hover:bg-muted active:bg-muted'
-                  }
-                `}
-              >
-                <Check
-                  size={12}
-                  strokeWidth={2.5}
-                  className={`mt-[3px] flex-shrink-0 ${isActive ? 'opacity-100 text-primary' : 'opacity-0'}`}
-                />
-                <span className="flex-1 min-w-0">
-                  <span className="block truncate">{opt.label}</span>
-                  {opt.description && (
-                    <span className="block text-[10px] text-muted-foreground mt-0.5 truncate">
-                      {opt.description}
-                    </span>
-                  )}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {panelPosition === 'fixed' && panel ? createPortal(panel, document.body) : panel}
     </div>
   );
 }

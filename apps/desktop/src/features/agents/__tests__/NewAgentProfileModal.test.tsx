@@ -80,6 +80,15 @@ describe('NewAgentProfileModal', () => {
     expect(create).toBeEnabled();
   });
 
+  it('opens the Agent Type menu above the modal footer', async () => {
+    setup();
+    await waitFor(() => expect(api.listLlmProfilesForBackend).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Agent Type' }));
+
+    expect(screen.getByRole('listbox')).toHaveClass('fixed');
+  });
+
   it('creates immediately and fires onCreated with the saved profile', async () => {
     const props = setup();
     await waitFor(() => expect(api.listLlmProfilesForBackend).toHaveBeenCalled());
