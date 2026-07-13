@@ -53,7 +53,7 @@ Environment=${quoteSystemd(`PATH=${nodeDir}:/usr/local/bin:/usr/bin:/bin`)}
 Environment=SERVER_HOST=127.0.0.1
 Environment=NODE_ENV=production
 Environment=${quoteSystemd(`ZCLAUDIA_DATA_DIR=${dataDir}`)}
-ExecStart=${quoteSystemd(nodeBin)} ${quoteSystemd(`${repoRoot}/server/dist/index.js`)}
+ExecStart=${quoteSystemd('/usr/bin/env')} SERVER_HOST=127.0.0.1 ${quoteSystemd(nodeBin)} ${quoteSystemd(`${repoRoot}/server/dist/index.js`)}
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal

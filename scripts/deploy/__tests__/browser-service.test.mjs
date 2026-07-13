@@ -158,7 +158,25 @@ test('systemd unit runs server dist under the repository root', () => {
   assert.match(unit, /Description=ZClaudia Local Browser Shell/);
   assert.match(unit, /WorkingDirectory="\/opt\/zclaudia"/);
   assert.match(unit, /EnvironmentFile="\/home\/alice\/\.zclaudia\/browser\.env"/);
-  assert.match(unit, /ExecStart="\/usr\/bin\/node" "\/opt\/zclaudia\/server\/dist\/index\.js"/);
+  assert.match(unit, /ExecStart="\/usr\/bin\/env" SERVER_HOST=127\.0\.0\.1 "\/usr\/bin\/node" "\/opt\/zclaudia\/server\/dist\/index\.js"/);
+});
+
+test('systemd unit pins localhost even when env file is preserved', () => {
+  const unit = renderSystemdUnit({
+    serviceName: 'zclaudia-browser',
+    user: 'alice',
+    repoRoot: '/opt/zclaudia',
+    nodeBin: '/usr/bin/node',
+    nodeDir: '/usr/bin',
+    envFile: '/home/alice/.zclaudia/browser.env',
+    dataDir: '/home/alice/.zclaudia',
+  });
+
+  assert.match(unit, /^EnvironmentFile="\/home\/alice\/\.zclaudia\/browser\.env"$/m);
+  assert.match(
+    unit,
+    /^ExecStart="\/usr\/bin\/env" SERVER_HOST=127\.0\.0\.1 "\/usr\/bin\/node" "\/opt\/zclaudia\/server\/dist\/index\.js"$/m
+  );
 });
 
 test('systemd unit quotes paths with spaces', () => {
@@ -177,7 +195,7 @@ test('systemd unit quotes paths with spaces', () => {
   assert.match(unit, /^Environment="ZCLAUDIA_DATA_DIR=\/home\/alice\/Z Claudia"$/m);
   assert.match(
     unit,
-    /^ExecStart="\/usr\/local\/bin\/node with space" "\/opt\/Z Claudia\/server\/dist\/index\.js"$/m
+    /^ExecStart="\/usr\/bin\/env" SERVER_HOST=127\.0\.0\.1 "\/usr\/local\/bin\/node with space" "\/opt\/Z Claudia\/server\/dist\/index\.js"$/m
   );
 });
 
