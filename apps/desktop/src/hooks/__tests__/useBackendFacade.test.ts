@@ -1,15 +1,84 @@
+import { renderHook } from '@testing-library/react';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+
+const backendFacadeHookMocks = vi.hoisted(() => {
+  function createFacadeMock() {
+    return {
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+      getSnapshot: vi.fn(),
+      subscribe: vi.fn(() => vi.fn()),
+      onEvent: vi.fn(() => vi.fn()),
+      openBackend: vi.fn(),
+      closeBackend: vi.fn(),
+      sendToBackend: vi.fn(),
+      openSessionStream: vi.fn(),
+      closeSessionStream: vi.fn(),
+      catchUpContent: vi.fn(),
+      getHttpBaseUrl: vi.fn(() => null),
+      getHttpHeaders: vi.fn(() => ({})),
+      forceReconnect: vi.fn(),
+    };
+  }
+
+  const embeddedInstances: any[] = [];
+  const directInstances: any[] = [];
+
+  return {
+    embeddedInstances,
+    directInstances,
+    getBrowserShellFacadeWsUrl: vi.fn(),
+    EmbeddedFacadeClient: vi.fn(function (_target: unknown) {
+      const target = _target;
+      const instance = { ...createFacadeMock(), target };
+      embeddedInstances.push(instance);
+      return instance;
+    }),
+    DirectBackendFacadeProvider: vi.fn(function (_config: unknown) {
+      const config = _config;
+      const instance = { ...createFacadeMock(), config };
+      directInstances.push(instance);
+      return instance;
+    }),
+    refreshNotificationConfig: vi.fn(() => Promise.resolve()),
+    appLifecycleManager: {
+      start: vi.fn(),
+      stop: vi.fn(),
+    },
+  };
+});
 
 vi.mock('../../services/messageHandler', () => ({
   handleServerMessage: vi.fn(),
   cleanupServerSyncState: vi.fn(),
 }));
 
-import { syncToGatewayStore } from '../useBackendFacade';
+vi.mock('../../facade/embedded-facade-client', () => ({
+  EmbeddedFacadeClient: backendFacadeHookMocks.EmbeddedFacadeClient,
+}));
+
+vi.mock('../../facade/direct-provider', () => ({
+  DirectBackendFacadeProvider: backendFacadeHookMocks.DirectBackendFacadeProvider,
+}));
+
+vi.mock('../../utils/browserShellRuntime', () => ({
+  getBrowserShellFacadeWsUrl: backendFacadeHookMocks.getBrowserShellFacadeWsUrl,
+}));
+
+vi.mock('../../services/api/notifications', () => ({
+  refreshNotificationConfig: backendFacadeHookMocks.refreshNotificationConfig,
+}));
+
+vi.mock('../../services/appLifecycleManager', () => ({
+  appLifecycleManager: backendFacadeHookMocks.appLifecycleManager,
+}));
+
+import { syncToGatewayStore, useBackendFacade } from '../useBackendFacade';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useToastStore } from '../../stores/toastStore';
 import { handleServerMessage } from '../../services/messageHandler';
 import { useServerStore } from '../../stores/serverStore';
+import { useGatewayStore } from '../../stores/gatewayStore';
 import { useRunStore } from '../../stores/runStore';
 import { useChatMessageStore } from '../../stores/chatMessageStore';
 import { useSessionConfigStore } from '../../stores/sessionConfigStore';
@@ -56,6 +125,16 @@ describe('useBackendFacade run_event forwarding', () => {
       currentInstanceId: 'instance-local',
       currentDeviceId: 'device-local',
       snapshotVersion: 1,
+    });
+    useGatewayStore.setState({
+      gatewayUrl: null,
+      gatewaySecret: null,
+      isConnected: false,
+      backendAuthStatus: {},
+      directGatewayUrl: null,
+      directGatewaySecret: null,
+      lastActiveBackendId: null,
+      showLocalBackend: false,
     });
     useRunStore.setState({
       activeRuns: {},
@@ -121,12 +200,81 @@ describe('useBackendFacade run_event forwarding', () => {
       poppedOutTerminals: {},
       reattachTerminals: {},
     } as any);
+    backendFacadeHookMocks.embeddedInstances.length = 0;
+    backendFacadeHookMocks.directInstances.length = 0;
+    backendFacadeHookMocks.getBrowserShellFacadeWsUrl.mockReturnValue(null);
   });
 
   afterEach(() => {
     vi.runOnlyPendingTimers();
     vi.useRealTimers();
     consoleWarnSpy.mockRestore();
+  });
+
+  it('uses browser shell facade URL before waiting for embedded server port', () => {
+    const browserFacadeUrl = 'ws://127.0.0.1:3100/ws/backend-facade';
+    backendFacadeHookMocks.getBrowserShellFacadeWsUrl.mockReturnValue(browserFacadeUrl);
+    useServerStore.setState({ ...useServerStore.getState(), localServerPort: null });
+    useGatewayStore.setState({
+      ...useGatewayStore.getState(),
+      directGatewayUrl: null,
+      directGatewaySecret: null,
+    });
+
+    const { unmount } = renderHook(() => useBackendFacade());
+
+    expect(backendFacadeHookMocks.EmbeddedFacadeClient).toHaveBeenCalledWith({
+      url: browserFacadeUrl,
+    });
+    expect(backendFacadeHookMocks.DirectBackendFacadeProvider).not.toHaveBeenCalled();
+    expect(useFacadeStore.getState().facade).toBe(backendFacadeHookMocks.embeddedInstances[0]);
+    expect(backendFacadeHookMocks.embeddedInstances[0].connect).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('waits for embedded server port when browser shell URL is unavailable', () => {
+    backendFacadeHookMocks.getBrowserShellFacadeWsUrl.mockReturnValue(null);
+    useServerStore.setState({ ...useServerStore.getState(), localServerPort: null });
+    useGatewayStore.setState({
+      ...useGatewayStore.getState(),
+      directGatewayUrl: null,
+      directGatewaySecret: null,
+    });
+
+    const { unmount } = renderHook(() => useBackendFacade());
+
+    expect(backendFacadeHookMocks.EmbeddedFacadeClient).not.toHaveBeenCalled();
+    expect(backendFacadeHookMocks.DirectBackendFacadeProvider).not.toHaveBeenCalled();
+    expect(useFacadeStore.getState().facade).toBeNull();
+
+    unmount();
+  });
+
+  it('uses direct provider in direct gateway mode without creating embedded client', () => {
+    backendFacadeHookMocks.getBrowserShellFacadeWsUrl.mockReturnValue(
+      'ws://127.0.0.1:3100/ws/backend-facade'
+    );
+    useServerStore.setState({ ...useServerStore.getState(), localServerPort: null });
+    useGatewayStore.setState({
+      ...useGatewayStore.getState(),
+      directGatewayUrl: 'wss://gateway.example/ws',
+      directGatewaySecret: 'secret-1',
+    });
+
+    const { unmount } = renderHook(() => useBackendFacade());
+
+    expect(backendFacadeHookMocks.DirectBackendFacadeProvider).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'wss://gateway.example/ws',
+        gatewaySecret: 'secret-1',
+      })
+    );
+    expect(backendFacadeHookMocks.EmbeddedFacadeClient).not.toHaveBeenCalled();
+    expect(useFacadeStore.getState().facade).toBe(backendFacadeHookMocks.directInstances[0]);
+    expect(backendFacadeHookMocks.directInstances[0].connect).toHaveBeenCalledTimes(1);
+
+    unmount();
   });
 
   it('forwards local backend run events to the shared message handler', () => {
