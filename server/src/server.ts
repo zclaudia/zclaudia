@@ -29,6 +29,7 @@ import { errorHandlingMiddleware as routerErrorMiddleware } from './interfaces/h
 import { isLocalhost } from './interfaces/http/middleware/local-only.js';
 import { expressErrorHandler } from './interfaces/http/middleware/express-error.js';
 import { createCorsOriginGuard, isRequestOriginAllowed } from './interfaces/http/trust-boundary.js';
+import { mountBrowserShell } from './interfaces/http/browser-shell.js';
 
 // Extracted modules
 import type { ConnectedClient, MessageSender } from './application/conversation/transport/types.js';
@@ -156,6 +157,8 @@ export async function createServer(): Promise<ServerContext> {
   serverState.agentTaskExecutor = setup.agentTaskExecutor;
   serverState.goalCoordinator = setup.goalCoordinator;
   serverState.goalService = setup.goalService;
+
+  mountBrowserShell(app);
 
   // Error handling middleware (must be after routes)
   app.use(expressErrorHandler);
