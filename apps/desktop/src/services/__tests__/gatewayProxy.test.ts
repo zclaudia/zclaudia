@@ -60,6 +60,15 @@ describe('services/gatewayProxy', () => {
       );
     });
 
+    it('prioritizes browser shell origin over stale local port for backend proxy', () => {
+      mockBrowserShellBaseUrl = 'http://127.0.0.1:3100';
+      vi.mocked(useServerStore.getState).mockReturnValue({ localServerPort: 3456 } as any);
+
+      expect(resolveGatewayBackendUrl('backend-1')).toBe(
+        'http://127.0.0.1:3100/api/gateway-proxy/backend-1'
+      );
+    });
+
     it('routes directly to gateway on mobile (with ws://)', () => {
       vi.mocked(useServerStore.getState).mockReturnValue({ localServerPort: null } as any);
       vi.mocked(useGatewayStore.getState).mockReturnValue({
@@ -109,6 +118,15 @@ describe('services/gatewayProxy', () => {
     it('routes gateway direct proxy through browser shell origin', () => {
       mockBrowserShellBaseUrl = 'http://127.0.0.1:3100';
       vi.mocked(useServerStore.getState).mockReturnValue({ localServerPort: null } as any);
+
+      expect(resolveGatewayDirectUrl('/api/notifications/config')).toBe(
+        'http://127.0.0.1:3100/api/gateway-direct/api/notifications/config'
+      );
+    });
+
+    it('prioritizes browser shell origin over stale local port for direct proxy', () => {
+      mockBrowserShellBaseUrl = 'http://127.0.0.1:3100';
+      vi.mocked(useServerStore.getState).mockReturnValue({ localServerPort: 3456 } as any);
 
       expect(resolveGatewayDirectUrl('/api/notifications/config')).toBe(
         'http://127.0.0.1:3100/api/gateway-direct/api/notifications/config'

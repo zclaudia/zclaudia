@@ -20,15 +20,15 @@ import { getBrowserShellBaseUrl } from '../utils/browserShellRuntime';
  * Mobile (no localServerPort): routes directly to gateway.
  */
 export function resolveGatewayBackendUrl(backendId: string): string | null {
+  const browserShellBaseUrl = getBrowserShellBaseUrl();
+  if (browserShellBaseUrl) {
+    return `${browserShellBaseUrl}/api/gateway-proxy/${backendId}`;
+  }
+
   // Desktop: route through local backend proxy (supports SOCKS5)
   const localPort = useServerStore.getState().localServerPort;
   if (localPort) {
     return `http://127.0.0.1:${localPort}/api/gateway-proxy/${backendId}`;
-  }
-
-  const browserShellBaseUrl = getBrowserShellBaseUrl();
-  if (browserShellBaseUrl) {
-    return `${browserShellBaseUrl}/api/gateway-proxy/${backendId}`;
   }
 
   // Mobile fallback: direct connection to gateway
@@ -49,15 +49,15 @@ export function resolveGatewayBackendUrl(backendId: string): string | null {
  * @param path - gateway API path, e.g. "/api/notifications/config"
  */
 export function resolveGatewayDirectUrl(path: string): string | null {
+  const browserShellBaseUrl = getBrowserShellBaseUrl();
+  if (browserShellBaseUrl) {
+    return `${browserShellBaseUrl}/api/gateway-direct${path}`;
+  }
+
   // Desktop: route through local backend proxy
   const localPort = useServerStore.getState().localServerPort;
   if (localPort) {
     return `http://127.0.0.1:${localPort}/api/gateway-direct${path}`;
-  }
-
-  const browserShellBaseUrl = getBrowserShellBaseUrl();
-  if (browserShellBaseUrl) {
-    return `${browserShellBaseUrl}/api/gateway-direct${path}`;
   }
 
   // Mobile fallback: direct connection to gateway
