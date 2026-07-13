@@ -174,7 +174,7 @@ describe('agents view', () => {
 
   it('selectAgentsItem(null) clears the selection', () => {
     useTopLevelViewStore.getState().openAgents();
-    useTopLevelViewStore.getState().selectAgentsItem({ backendId: 'b1', kind: 'new-profile' });
+    useTopLevelViewStore.getState().selectAgentsItem({ backendId: 'b1', kind: 'new-skill' });
     useTopLevelViewStore.getState().selectAgentsItem(null);
     expect(useTopLevelViewStore.getState().agentsSelection).toBeNull();
   });
@@ -230,7 +230,7 @@ describe('agents view', () => {
 
   it('returnToApp clears agents selection', () => {
     useTopLevelViewStore.getState().openAgents();
-    useTopLevelViewStore.getState().selectAgentsItem({ backendId: 'b1', kind: 'new-profile' });
+    useTopLevelViewStore.getState().selectAgentsItem({ backendId: 'b1', kind: 'new-skill' });
     useTopLevelViewStore.getState().returnToApp();
     expect(useTopLevelViewStore.getState().agentsSelection).toBeNull();
   });
