@@ -91,4 +91,33 @@ describe('browser shell static serving', () => {
       expect.stringContaining('Browser shell assets not found')
     );
   });
+
+  it('does not mount browser shell when LAN mode is enabled', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const app = express();
+    app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
+
+    mountBrowserShell(app, { repoRoot: tmpDir, env: { ZCLAUDIA_ALLOW_LAN: '1' } });
+
+    const browserRes = await request(app).get('/projects/abc');
+    const apiRes = await request(app).get('/api/health');
+
+    expect(browserRes.status).toBe(404);
+    expect(browserRes.text).not.toBe('<div id="root"></div>');
+    expect(apiRes.status).toBe(200);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('disabled for non-local host 0.0.0.0')
+    );
+  });
+
+  it('does not mount browser shell for explicit wildcard host', async () => {
+    const app = express();
+
+    mountBrowserShell(app, { repoRoot: tmpDir, env: { SERVER_HOST: '0.0.0.0' } });
+
+    const res = await request(app).get('/projects/abc');
+
+    expect(res.status).toBe(404);
+    expect(res.text).not.toBe('<div id="root"></div>');
+  });
 });

@@ -19,6 +19,10 @@ export function defaultServerHost(env: NodeJS.ProcessEnv = process.env): string 
   return env.ZCLAUDIA_ALLOW_LAN === '1' ? '0.0.0.0' : '127.0.0.1';
 }
 
+export function isLocalServerHost(host: string): boolean {
+  return host === '127.0.0.1' || host === 'localhost' || host === '::1' || host === '[::1]';
+}
+
 export function isRequestOriginAllowed(
   origin: string | undefined,
   env: NodeJS.ProcessEnv = process.env

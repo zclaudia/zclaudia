@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createCorsOriginGuard,
   defaultServerHost,
+  isLocalServerHost,
   isRequestOriginAllowed,
 } from '../trust-boundary.js';
 
@@ -13,6 +14,14 @@ describe('trust boundary helpers', () => {
   it('allows explicit LAN mode or SERVER_HOST override', () => {
     expect(defaultServerHost({ ZCLAUDIA_ALLOW_LAN: '1' })).toBe('0.0.0.0');
     expect(defaultServerHost({ SERVER_HOST: '::' })).toBe('::');
+  });
+
+  it('identifies local bind hosts', () => {
+    expect(isLocalServerHost('127.0.0.1')).toBe(true);
+    expect(isLocalServerHost('localhost')).toBe(true);
+    expect(isLocalServerHost('::1')).toBe(true);
+    expect(isLocalServerHost('0.0.0.0')).toBe(false);
+    expect(isLocalServerHost('::')).toBe(false);
   });
 
   it('allows no-origin and local desktop origins', () => {

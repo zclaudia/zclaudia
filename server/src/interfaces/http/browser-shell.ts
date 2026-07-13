@@ -2,9 +2,11 @@ import express, { type Express, type Request, type Response, type NextFunction }
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+import { defaultServerHost, isLocalServerHost } from './trust-boundary.js';
 
 export interface BrowserShellOptions {
   repoRoot?: string;
+  env?: NodeJS.ProcessEnv;
 }
 
 function defaultRepoRoot(): string {
@@ -27,6 +29,12 @@ function isBrowserRoute(req: Request): boolean {
 }
 
 export function mountBrowserShell(app: Express, options: BrowserShellOptions = {}): void {
+  const host = defaultServerHost(options.env);
+  if (!isLocalServerHost(host)) {
+    console.warn(`[BrowserShell] Browser shell disabled for non-local host ${host}.`);
+    return;
+  }
+
   const distDir = resolveBrowserShellDist(options);
   const indexPath = path.join(distDir, 'index.html');
 
