@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { renderLaunchAgentPlist } from './browser-service-lib.mjs';
+import { parseServicePort, renderLaunchAgentPlist } from './browser-service-lib.mjs';
 
 const [label, repoRoot, nodeBin, dataDir, logDir, portRaw] = process.argv.slice(2);
 
@@ -10,8 +10,10 @@ if (!label || !repoRoot || !nodeBin || !dataDir || !logDir) {
   process.exit(1);
 }
 
-const port = Number(portRaw || '3100');
-if (!Number.isInteger(port) || port < 1 || port > 65535) {
+let port;
+try {
+  port = parseServicePort(portRaw || '3100');
+} catch {
   console.error(`Invalid port: ${portRaw}`);
   process.exit(1);
 }

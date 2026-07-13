@@ -64,16 +64,72 @@ launch_agent_file() {
   printf '%s/Library/LaunchAgents/%s.plist\n' "$HOME" "$LABEL"
 }
 
-write_env_file() {
-  mkdir -p "$DATA_DIR"
-  {
-    echo "# ZClaudia local browser shell"
-    echo "PORT=$PORT"
-    echo "SERVER_HOST=127.0.0.1"
-    echo "NODE_ENV=production"
-    echo "ZCLAUDIA_DATA_DIR=$DATA_DIR"
-  } > "$ENV_FILE"
-  ok "Wrote $ENV_FILE"
+as_root() {
+  if [[ $EUID -ne 0 ]]; then
+    sudo "$@"
+  else
+    "$@"
+  fi
+}
+
+render_env_template() {
+  node --input-type=module -e "
+    import { pathToFileURL } from 'node:url';
+    const { parseServicePort, renderBrowserEnv } = await import(pathToFileURL(process.argv[1]));
+    try {
+      process.stdout.write(renderBrowserEnv({
+        port: parseServicePort(process.argv[2]),
+        dataDir: process.argv[3],
+      }));
+    } catch (error) {
+      console.error(error.message);
+      process.exit(1);
+    }
+  " "$PROJECT_ROOT/scripts/deploy/browser-service-lib.mjs" "$PORT" "$DATA_DIR"
+}
+
+validate_port() {
+  PORT="$(node --input-type=module -e "
+    import { pathToFileURL } from 'node:url';
+    const { parseServicePort } = await import(pathToFileURL(process.argv[1]));
+    try {
+      console.log(parseServicePort(process.argv[2]));
+    } catch (error) {
+      console.error(error.message);
+      process.exit(1);
+    }
+  " "$PROJECT_ROOT/scripts/deploy/browser-service-lib.mjs" "$PORT")"
+}
+
+ensure_env_file() {
+  mkdir -p "$(dirname "$ENV_FILE")"
+  if [[ -f "$ENV_FILE" ]]; then
+    info "Using existing $ENV_FILE"
+    return
+  fi
+
+  render_env_template > "$ENV_FILE"
+  ok "Created $ENV_FILE"
+}
+
+load_env_file() {
+  ensure_env_file
+
+  local line key value
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ -z "$line" || "$line" == \#* ]] && continue
+    line="${line#export }"
+    [[ "$line" == *=* ]] || continue
+    key="${line%%=*}"
+    value="${line#*=}"
+
+    case "$key" in
+      PORT) PORT="$value" ;;
+      ZCLAUDIA_DATA_DIR) DATA_DIR="$value" ;;
+    esac
+  done < "$ENV_FILE"
+
+  validate_port
 }
 
 prepare_corepack() {
@@ -97,7 +153,7 @@ install_linux() {
   local service_file
   service_file="$(systemd_service_file)"
 
-  write_env_file
+  load_env_file
   build_project
 
   info "Installing systemd service: $SERVICE_NAME"
@@ -115,15 +171,13 @@ install_linux() {
     }));
   " "$SERVICE_NAME" "$SERVICE_USER" "$PROJECT_ROOT" "$(node_bin)" "$(node_dir)" "$ENV_FILE" "$DATA_DIR")"
 
-  if [[ $EUID -ne 0 ]]; then
-    echo "$unit" | sudo tee "$service_file" > /dev/null
-    sudo systemctl daemon-reload
-    sudo systemctl enable "$SERVICE_NAME"
-  else
+  if [[ $EUID -eq 0 ]]; then
     echo "$unit" > "$service_file"
-    systemctl daemon-reload
-    systemctl enable "$SERVICE_NAME"
+  else
+    echo "$unit" | sudo tee "$service_file" > /dev/null
   fi
+  as_root systemctl daemon-reload
+  as_root systemctl enable "$SERVICE_NAME"
 
   ok "Installed $service_file"
 }
@@ -134,7 +188,7 @@ install_macos() {
   launch_file="$(launch_agent_file)"
   log_dir="$HOME/Library/Logs/zclaudia"
 
-  write_env_file
+  load_env_file
   build_project
   mkdir -p "$(dirname "$launch_file")" "$log_dir"
 
@@ -162,7 +216,7 @@ cmd_install() {
 
 cmd_start() {
   case "$(os_name)" in
-    Linux) sudo systemctl start "$SERVICE_NAME" ;;
+    Linux) as_root systemctl start "$SERVICE_NAME" ;;
     Darwin) launchctl start "$LABEL" ;;
     *) die "Unsupported OS: $(os_name)" ;;
   esac
@@ -170,7 +224,7 @@ cmd_start() {
 
 cmd_stop() {
   case "$(os_name)" in
-    Linux) sudo systemctl stop "$SERVICE_NAME" ;;
+    Linux) as_root systemctl stop "$SERVICE_NAME" ;;
     Darwin) launchctl stop "$LABEL" ;;
     *) die "Unsupported OS: $(os_name)" ;;
   esac
@@ -179,7 +233,7 @@ cmd_stop() {
 cmd_restart() {
   case "$(os_name)" in
     Linux)
-      sudo systemctl restart "$SERVICE_NAME"
+      as_root systemctl restart "$SERVICE_NAME"
       ;;
     Darwin)
       launchctl stop "$LABEL" >/dev/null 2>&1 || true
@@ -211,17 +265,17 @@ cmd_logs() {
 }
 
 cmd_env() {
-  write_env_file
+  load_env_file
   echo "$ENV_FILE"
 }
 
 cmd_uninstall() {
   case "$(os_name)" in
     Linux)
-      sudo systemctl stop "$SERVICE_NAME" >/dev/null 2>&1 || true
-      sudo systemctl disable "$SERVICE_NAME" >/dev/null 2>&1 || true
-      sudo rm -f "$(systemd_service_file)"
-      sudo systemctl daemon-reload
+      as_root systemctl stop "$SERVICE_NAME" >/dev/null 2>&1 || true
+      as_root systemctl disable "$SERVICE_NAME" >/dev/null 2>&1 || true
+      as_root rm -f "$(systemd_service_file)"
+      as_root systemctl daemon-reload
       ok "Uninstalled $SERVICE_NAME"
       ;;
     Darwin)

@@ -6,15 +6,29 @@ export function requiredBuildCommands() {
   ];
 }
 
+export function parseServicePort(value = 3100) {
+  const port = Number(value);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`Invalid port: ${value}`);
+  }
+  return port;
+}
+
 export function renderBrowserEnv({ port = 3100, dataDir }) {
+  const parsedPort = parseServicePort(port);
+
   return [
     '# ZClaudia local browser shell',
-    `PORT=${port}`,
+    `PORT=${parsedPort}`,
     'SERVER_HOST=127.0.0.1',
     'NODE_ENV=production',
     `ZCLAUDIA_DATA_DIR=${dataDir}`,
     '',
   ].join('\n');
+}
+
+function quoteSystemd(value) {
+  return `"${String(value).replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
 }
 
 export function renderSystemdUnit({
@@ -33,11 +47,13 @@ After=network.target
 [Service]
 Type=simple
 User=${user}
-WorkingDirectory=${repoRoot}
-EnvironmentFile=${envFile}
-Environment=PATH=${nodeDir}:/usr/local/bin:/usr/bin:/bin
-Environment=ZCLAUDIA_DATA_DIR=${dataDir}
-ExecStart=${nodeBin} ${repoRoot}/server/dist/index.js
+WorkingDirectory=${quoteSystemd(repoRoot)}
+EnvironmentFile=${quoteSystemd(envFile)}
+Environment=${quoteSystemd(`PATH=${nodeDir}:/usr/local/bin:/usr/bin:/bin`)}
+Environment=SERVER_HOST=127.0.0.1
+Environment=NODE_ENV=production
+Environment=${quoteSystemd(`ZCLAUDIA_DATA_DIR=${dataDir}`)}
+ExecStart=${quoteSystemd(nodeBin)} ${quoteSystemd(`${repoRoot}/server/dist/index.js`)}
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal
@@ -66,6 +82,8 @@ export function renderLaunchAgentPlist({
   logDir,
   port = 3100,
 }) {
+  const parsedPort = parseServicePort(port);
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -82,7 +100,7 @@ export function renderLaunchAgentPlist({
   <key>EnvironmentVariables</key>
   <dict>
     <key>PORT</key>
-    <string>${port}</string>
+    <string>${parsedPort}</string>
     <key>SERVER_HOST</key>
     <string>127.0.0.1</string>
     <key>NODE_ENV</key>

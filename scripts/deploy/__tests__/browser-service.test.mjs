@@ -1,9 +1,17 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import {
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
+  parseServicePort,
   renderBrowserEnv,
   renderLaunchAgentPlist,
   renderSystemdUnit,
@@ -19,6 +27,18 @@ const launchAgentArgs = [
   '/Users/alice/Library/Logs/zclaudia',
 ];
 
+function runBrowserService(args, env = {}) {
+  return spawnSync('bash', ['scripts/deploy/browser-service.sh', ...args], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    env: { ...process.env, ...env },
+  });
+}
+
+function browserServiceShell() {
+  return readFileSync(resolve(repoRoot, 'scripts/deploy/browser-service.sh'), 'utf8');
+}
+
 test('browser service env binds localhost only', () => {
   const env = renderBrowserEnv({ port: 3100, dataDir: '/home/me/.zclaudia' });
 
@@ -27,6 +47,93 @@ test('browser service env binds localhost only', () => {
   assert.match(env, /^NODE_ENV=production$/m);
   assert.match(env, /^ZCLAUDIA_DATA_DIR=\/home\/me\/\.zclaudia$/m);
   assert.doesNotMatch(env, /SERVER_HOST=0\.0\.0\.0/);
+});
+
+test('browser service env command preserves existing env file', () => {
+  const dataDir = mkdtempSync(resolve(tmpdir(), 'zclaudia-browser-env-'));
+  const envFile = resolve(dataDir, 'browser.env');
+
+  try {
+    const existing = [
+      '# user edits',
+      'PORT=4567',
+      'SERVER_HOST=127.0.0.1',
+      'ZCLAUDIA_DATA_DIR=/custom/zclaudia data',
+      '',
+    ].join('\n');
+    writeFileSync(envFile, existing);
+
+    const result = runBrowserService(['env'], {
+      DATA_DIR: dataDir,
+      ENV_FILE: envFile,
+      PORT: '3100',
+    });
+
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, new RegExp(`${envFile.replaceAll('/', '\\/')}`));
+    assert.equal(readFileSync(envFile, 'utf8'), existing);
+  } finally {
+    rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+
+test('browser service env command creates localhost-only env when missing', () => {
+  const dataDir = mkdtempSync(resolve(tmpdir(), 'zclaudia-browser-env-'));
+  const envFile = resolve(dataDir, 'browser.env');
+
+  try {
+    const result = runBrowserService(['env'], {
+      DATA_DIR: dataDir,
+      ENV_FILE: envFile,
+      PORT: '4217',
+    });
+
+    assert.equal(result.status, 0);
+    assert.match(readFileSync(envFile, 'utf8'), /^PORT=4217$/m);
+    assert.match(readFileSync(envFile, 'utf8'), /^SERVER_HOST=127\.0\.0\.1$/m);
+    assert.doesNotMatch(readFileSync(envFile, 'utf8'), /SERVER_HOST=0\.0\.0\.0/);
+  } finally {
+    rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+
+test('browser service shell rejects invalid PORT before writing env', () => {
+  const dataDir = mkdtempSync(resolve(tmpdir(), 'zclaudia-browser-env-'));
+  const envFile = resolve(dataDir, 'browser.env');
+
+  try {
+    const result = runBrowserService(['env'], {
+      DATA_DIR: dataDir,
+      ENV_FILE: envFile,
+      PORT: '70000',
+    });
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /invalid port/i);
+  } finally {
+    rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+
+test('macOS install loads env before rendering launch agent plist', () => {
+  const script = browserServiceShell();
+  const macosInstall = script.match(/install_macos\(\) \{[\s\S]*?\n\}/)?.[0] ?? '';
+
+  assert.notEqual(macosInstall, '');
+  assert.ok(macosInstall.indexOf('load_env_file') < macosInstall.indexOf('render-launch-agent.mjs'));
+});
+
+test('linux service control avoids unconditional sudo', () => {
+  const script = browserServiceShell();
+
+  assert.match(script, /as_root\(\)/);
+  assert.doesNotMatch(script, /Linux\) sudo systemctl (start|stop|restart)/);
+});
+
+test('service port parser rejects non-integer and out-of-range ports', () => {
+  assert.equal(parseServicePort('3100'), 3100);
+  assert.throws(() => parseServicePort('3.14'), /invalid port/i);
+  assert.throws(() => parseServicePort('70000'), /invalid port/i);
 });
 
 test('browser service build commands include desktop assets', () => {
@@ -49,9 +156,29 @@ test('systemd unit runs server dist under the repository root', () => {
   });
 
   assert.match(unit, /Description=ZClaudia Local Browser Shell/);
-  assert.match(unit, /WorkingDirectory=\/opt\/zclaudia/);
-  assert.match(unit, /EnvironmentFile=\/home\/alice\/\.zclaudia\/browser\.env/);
-  assert.match(unit, /ExecStart=\/usr\/bin\/node \/opt\/zclaudia\/server\/dist\/index\.js/);
+  assert.match(unit, /WorkingDirectory="\/opt\/zclaudia"/);
+  assert.match(unit, /EnvironmentFile="\/home\/alice\/\.zclaudia\/browser\.env"/);
+  assert.match(unit, /ExecStart="\/usr\/bin\/node" "\/opt\/zclaudia\/server\/dist\/index\.js"/);
+});
+
+test('systemd unit quotes paths with spaces', () => {
+  const unit = renderSystemdUnit({
+    serviceName: 'zclaudia-browser',
+    user: 'alice',
+    repoRoot: '/opt/Z Claudia',
+    nodeBin: '/usr/local/bin/node with space',
+    nodeDir: '/usr/local/bin',
+    envFile: '/home/alice/Z Claudia/browser.env',
+    dataDir: '/home/alice/Z Claudia',
+  });
+
+  assert.match(unit, /^WorkingDirectory="\/opt\/Z Claudia"$/m);
+  assert.match(unit, /^EnvironmentFile="\/home\/alice\/Z Claudia\/browser\.env"$/m);
+  assert.match(unit, /^Environment="ZCLAUDIA_DATA_DIR=\/home\/alice\/Z Claudia"$/m);
+  assert.match(
+    unit,
+    /^ExecStart="\/usr\/local\/bin\/node with space" "\/opt\/Z Claudia\/server\/dist\/index\.js"$/m
+  );
 });
 
 test('launch agent plist binds localhost and writes user logs', () => {
