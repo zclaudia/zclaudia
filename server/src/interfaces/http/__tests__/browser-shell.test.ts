@@ -66,6 +66,17 @@ describe('browser shell static serving', () => {
     expect(res.text).not.toBe('<div id="root"></div>');
   });
 
+  it('returns 404 for exact /assets instead of redirecting or returning index.html', async () => {
+    const app = express();
+    mountBrowserShell(app, { repoRoot: tmpDir });
+
+    const res = await request(app).get('/assets');
+
+    expect(res.status).toBe(404);
+    expect(res.headers.location).toBeUndefined();
+    expect(res.text).not.toBe('<div id="root"></div>');
+  });
+
   it('continues without routes when the desktop dist directory is missing', async () => {
     fs.rmSync(distDir, { recursive: true, force: true });
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});

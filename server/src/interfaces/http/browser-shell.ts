@@ -21,6 +21,7 @@ function isBrowserRoute(req: Request): boolean {
   if (req.path.startsWith('/api/')) return false;
   if (req.path === '/api') return false;
   if (req.path.startsWith('/ws')) return false;
+  if (req.path === '/assets') return false;
   if (req.path.startsWith('/assets/')) return false;
   return true;
 }
@@ -40,6 +41,7 @@ export function mountBrowserShell(app: Express, options: BrowserShellOptions = {
     express.static(distDir, {
       index: false,
       fallthrough: true,
+      redirect: false,
     })
   );
 
