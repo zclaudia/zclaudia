@@ -237,4 +237,12 @@ describe('EmbeddedFacadeClient', () => {
     // A single reconnect should be scheduled (not duplicated)
     expect(MockWebSocket.instances).toHaveLength(2);
   });
+
+  it('can connect to an explicit browser-shell facade URL', () => {
+    const client = new EmbeddedFacadeClient({ url: 'ws://127.0.0.1:3100/ws/backend-facade' });
+
+    client.connect();
+
+    expect(MockWebSocket.instances[0].url).toBe('ws://127.0.0.1:3100/ws/backend-facade');
+  });
 });

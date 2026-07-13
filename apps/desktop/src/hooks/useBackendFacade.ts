@@ -20,6 +20,7 @@ import { useServerStore } from '../stores/serverStore';
 import { appLifecycleManager } from '../services/appLifecycleManager';
 import { refreshNotificationConfig } from '../services/api/notifications';
 import { clearPendingAutoOpen, resetFacadeSyncState, syncToGatewayStore } from '../facade/sync';
+import { getBrowserShellFacadeWsUrl } from '../utils/browserShellRuntime';
 
 export { syncToGatewayStore } from '../facade/sync';
 
@@ -71,11 +72,16 @@ export function useBackendFacade(): void {
     resetFacadeSyncState();
 
     let facade: BackendFacade | null = null;
+    const browserFacadeUrl = mode === 'embedded' ? getBrowserShellFacadeWsUrl() : null;
 
     if (mode === 'embedded') {
-      // Wait for embedded server port
-      if (!embeddedPort) return;
-      facade = new EmbeddedFacadeClient(embeddedPort);
+      if (browserFacadeUrl) {
+        facade = new EmbeddedFacadeClient({ url: browserFacadeUrl });
+      } else {
+        // Wait for embedded server port
+        if (!embeddedPort) return;
+        facade = new EmbeddedFacadeClient(embeddedPort);
+      }
     } else {
       // Direct mode — need gateway URL and secret
       if (!directGatewayUrl || !directGatewaySecret) return;

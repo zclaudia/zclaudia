@@ -18,6 +18,8 @@ import type {
 // EmbeddedFacadeClient
 // ============================================================================
 
+export type EmbeddedFacadeClientTarget = number | { url: string };
+
 export class EmbeddedFacadeClient implements BackendFacade {
   private ws: WebSocket | null = null;
   private expectedCloseWs: WebSocket | null = null;
@@ -30,8 +32,8 @@ export class EmbeddedFacadeClient implements BackendFacade {
   private desiredOpenBackends = new Set<string>();
   private desiredSessionStreams = new Map<string, { backendId: string; sessionId: string }>();
 
-  constructor(serverPort: number) {
-    this.url = `ws://localhost:${serverPort}/ws/backend-facade`;
+  constructor(target: EmbeddedFacadeClientTarget) {
+    this.url = typeof target === 'number' ? `ws://localhost:${target}/ws/backend-facade` : target.url;
   }
 
   // --------------------------------------------------------------------------
