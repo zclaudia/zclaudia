@@ -70,11 +70,11 @@ describe('browser shell static serving', () => {
     fs.rmSync(distDir, { recursive: true, force: true });
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const app = express();
-    app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+    app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 
     mountBrowserShell(app, { repoRoot: tmpDir });
 
-    const res = await request(app).get('/health');
+    const res = await request(app).get('/api/health');
     expect(res.status).toBe(200);
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining('Browser shell assets not found')
