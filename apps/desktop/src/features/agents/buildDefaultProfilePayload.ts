@@ -1,5 +1,9 @@
 import type { LlmProfileConfig } from '@zclaudia/shared';
-import { resolveToolSelection, defaultToolSelection, defaultSkillSelection } from '@zclaudia/shared';
+import {
+  resolveToolSelection,
+  defaultToolSelection,
+  defaultSkillSelection,
+} from '@zclaudia/shared';
 import type { ProfileConfigDescriptor } from '@zclaudia/shared/core/profile-config-descriptor';
 import type { AgentProfileWriteInput } from '../../services/api/agent-profiles';
 
@@ -39,7 +43,7 @@ export function buildDefaultProfilePayload(params: {
     description: undefined,
     runtimeType,
     llmProfileId,
-    model: descriptor.model.kind === 'none' ? '' : model,
+    model,
     systemPrompt: '',
     enabledTools: resolveToolSelection(defaultToolSelection).builtinTools,
     toolSelection: defaultToolSelection,

@@ -16,9 +16,17 @@ const RUNTIME_DESCRIPTORS = [
     runtime: 'zclaudia',
     label: 'ZClaudia',
     enabled: true,
-    model: { kind: 'llm-profile' as const, multimodalFallback: true, thinkingLevel: 'selectable' as const },
+    model: {
+      kind: 'llm-profile' as const,
+      multimodalFallback: true,
+      thinkingLevel: 'selectable' as const,
+    },
     hasCliPath: false,
-    capabilities: { tools: 'profile' as const, providers: 'profile' as const, skills: 'profile' as const },
+    capabilities: {
+      tools: 'profile' as const,
+      providers: 'profile' as const,
+      skills: 'profile' as const,
+    },
   },
 ];
 
@@ -80,7 +88,12 @@ describe('NewAgentProfileModal', () => {
     await waitFor(() =>
       expect(api.createAgentProfileForBackend).toHaveBeenCalledWith(
         'b1',
-        expect.objectContaining({ name: 'Coding', runtimeType: 'zclaudia', llmProfileId: 'lp1', model: 'deepseek-v4-flash' })
+        expect.objectContaining({
+          name: 'Coding',
+          runtimeType: 'zclaudia',
+          llmProfileId: 'lp1',
+          model: 'deepseek-v4-flash',
+        })
       )
     );
     await waitFor(() => expect(props.onCreated).toHaveBeenCalledWith(saved));
@@ -92,6 +105,16 @@ describe('NewAgentProfileModal', () => {
     await waitFor(() => expect(api.listLlmProfilesForBackend).toHaveBeenCalled());
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Coding' } });
     expect(screen.getByText(/no available models/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
+    expect(api.createAgentProfileForBackend).not.toHaveBeenCalled();
+  });
+
+  it('shows a loading hint and keeps Create disabled when no runtime descriptors are available yet', async () => {
+    useRuntimeDescriptorStore.setState({ byBackend: {} });
+    setup();
+    await waitFor(() => expect(api.listLlmProfilesForBackend).toHaveBeenCalled());
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Coding' } });
+    expect(screen.getByText(/agent runtimes are still loading/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
     expect(api.createAgentProfileForBackend).not.toHaveBeenCalled();
   });

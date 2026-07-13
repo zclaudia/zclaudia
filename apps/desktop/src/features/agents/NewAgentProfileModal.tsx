@@ -13,7 +13,12 @@ interface NewAgentProfileModalProps {
   onCreated: (saved: AgentProfileConfig) => void;
 }
 
-export function NewAgentProfileModal({ open, backendId, onClose, onCreated }: NewAgentProfileModalProps) {
+export function NewAgentProfileModal({
+  open,
+  backendId,
+  onClose,
+  onCreated,
+}: NewAgentProfileModalProps) {
   const descriptors = useRuntimeDescriptorStore(s => s.getDescriptors(backendId));
   const enabled = useMemo(() => descriptors.filter(d => d.enabled), [descriptors]);
 
@@ -51,6 +56,10 @@ export function NewAgentProfileModal({ open, backendId, onClose, onCreated }: Ne
   const build = descriptor
     ? buildDefaultProfilePayload({ name, runtimeType: selectedRuntime, descriptor, llmProfiles })
     : null;
+  const noRuntimeHint =
+    enabled.length === 0 || !descriptor
+      ? 'Agent runtimes are still loading — try again in a moment.'
+      : null;
   const buildError =
     build && !build.ok
       ? build.reason === 'no-model'
@@ -93,7 +102,14 @@ export function NewAgentProfileModal({ open, backendId, onClose, onCreated }: Ne
   );
 
   return (
-    <Modal open={open} onClose={onClose} ariaLabel="New agent profile" title="New agent profile" footer={footer} size="md">
+    <Modal
+      open={open}
+      onClose={onClose}
+      ariaLabel="New agent profile"
+      title="New agent profile"
+      footer={footer}
+      size="md"
+    >
       <div className="flex flex-col gap-4 px-4 py-4">
         <label className="flex flex-col gap-1.5">
           <span className="text-[11px] font-medium text-muted-foreground">Name</span>
@@ -123,8 +139,8 @@ export function NewAgentProfileModal({ open, backendId, onClose, onCreated }: Ne
           />
         </div>
 
-        {(buildError || error) && (
-          <p className="text-[11px] text-destructive">{error ?? buildError}</p>
+        {(error ?? buildError ?? noRuntimeHint) && (
+          <p className="text-[11px] text-destructive">{error ?? buildError ?? noRuntimeHint}</p>
         )}
       </div>
     </Modal>
