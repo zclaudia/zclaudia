@@ -33,6 +33,26 @@ pnpm --filter @zclaudia/server run dev  # Backend
 pnpm --filter @zclaudia/desktop run dev # Frontend
 ```
 
+### Local Browser Mode
+
+Use this when you want the backend to serve the built UI directly on the same machine, without installing the desktop app.
+
+```bash
+pnpm browser:build
+pnpm browser:start
+```
+
+Open `http://127.0.0.1:3100` in your browser. The service binds to `127.0.0.1` by default.
+
+On Linux or macOS, install it as a user-facing service:
+
+```bash
+pnpm browser:service install
+pnpm browser:service start
+pnpm browser:service logs
+pnpm browser:service uninstall
+```
+
 ### Build
 
 ```bash

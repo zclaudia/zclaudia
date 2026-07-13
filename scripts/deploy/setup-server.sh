@@ -142,7 +142,7 @@ create_env_file() {
 
 # Server binding
 PORT=3100
-SERVER_HOST=0.0.0.0
+SERVER_HOST=127.0.0.1
 
 # Gateway connection (optional — can also be configured via the UI)
 # GATEWAY_URL=wss://your-gateway.example.com
@@ -267,7 +267,7 @@ cmd_install() {
   echo "     ./scripts/deploy/setup-server.sh logs"
   echo ""
   echo "  Data directory: /home/${SERVICE_USER}/.zclaudia"
-  echo "  Server address: http://0.0.0.0:3100 (edit in .env.server)"
+  echo "  Server address: http://127.0.0.1:3100 (edit in .env.server)"
   echo ""
 }
 

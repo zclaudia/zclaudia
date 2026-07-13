@@ -99,7 +99,7 @@ if [[ ! -f "$ENV_FILE" ]]; then
   info "Creating default $ENV_FILE"
   cat > "$ENV_FILE" <<'EOF'
 PORT=3100
-SERVER_HOST=0.0.0.0
+SERVER_HOST=127.0.0.1
 # GATEWAY_URL=wss://your-gateway
 # GATEWAY_SECRET=
 # GATEWAY_NAME=

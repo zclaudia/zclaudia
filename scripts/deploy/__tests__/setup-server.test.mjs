@@ -16,3 +16,9 @@ test('setup-server does not fall back from frozen install to mutable install', (
   assert.match(script, /pnpm install --frozen-lockfile/);
   assert.doesNotMatch(script, /pnpm install --frozen-lockfile[^\n]+(?:\|\||;)[^\n]+pnpm install/);
 });
+
+test('setup-server defaults to localhost binding', () => {
+  assert.match(script, /SERVER_HOST=127\.0\.0\.1/);
+  assert.match(script, /Server address: http:\/\/127\.0\.0\.1:3100/);
+  assert.doesNotMatch(script, /SERVER_HOST=0\.0\.0\.0/);
+});

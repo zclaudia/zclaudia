@@ -23,7 +23,7 @@ zclaudia/
 
 | Service  | Default Port | Port Env                         | Notes                               |
 | -------- | ------------ | -------------------------------- | ----------------------------------- |
-| Server   | 3100         | `PORT` (supports `0` for random) | `SERVER_HOST` defaults to `0.0.0.0` |
+| Server   | 3100         | `PORT` (supports `0` for random) | `SERVER_HOST` defaults to `127.0.0.1`; use `ZCLAUDIA_ALLOW_LAN=1` only for explicit LAN exposure |
 | Gateway  | 3200         | `GATEWAY_PORT`                   |                                     |
 | Vite dev | 1420         | -                                | hardcoded, `strictPort: true`       |
 
@@ -83,6 +83,9 @@ zclaudia/
 | `scripts/deploy/gateway.sh`              | Deploy gateway Docker container (supports multi-instance) |
 | `scripts/deploy/server.sh`               | Deploy server on remote host (systemd)                    |
 | `scripts/deploy/setup-server.sh`         | Initial server setup + systemd service install            |
+| `pnpm browser:build`                     | Build shared, server, and browser shell assets            |
+| `pnpm browser:start`                     | Start local browser shell backend on `127.0.0.1:3100`     |
+| `pnpm browser:service install`           | Install local browser shell service via systemd/launchd   |
 | `scripts/build/{android,linux,macos}.sh` | Platform-specific builds                                  |
 | `scripts/release/version-bump.sh`        | Version management                                        |
 
@@ -94,6 +97,9 @@ pnpm server:dev             # Server only (port 3100)
 pnpm server:dev:isolated    # Server with random port + isolated data dir
 pnpm gateway:dev            # Gateway only (port 3200)
 pnpm desktop:dev            # Desktop app only (Vite port 1420)
+pnpm browser:build          # Build browser shell assets
+pnpm browser:start          # Serve browser shell at http://127.0.0.1:3100
+pnpm browser:service install # Install systemd/launchd local browser service
 pnpm test                   # Run all tests
 pnpm test:e2e               # End-to-end tests
 ```

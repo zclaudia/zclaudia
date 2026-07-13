@@ -16,3 +16,8 @@ test('server deploy does not fall back from frozen install to mutable install by
   assert.match(script, /pnpm install --frozen-lockfile/);
   assert.doesNotMatch(script, /pnpm install --frozen-lockfile[^\n]+(?:\|\||;)[^\n]+pnpm install/);
 });
+
+test('server deploy defaults to localhost binding', () => {
+  assert.match(script, /SERVER_HOST=127\.0\.0\.1/);
+  assert.doesNotMatch(script, /SERVER_HOST=0\.0\.0\.0/);
+});
