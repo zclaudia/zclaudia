@@ -55,6 +55,14 @@ test('launch agent plist binds localhost and writes user logs', () => {
   assert.match(plist, /<string>com\.zclaudia\.browser<\/string>/);
   assert.match(plist, /<key>SERVER_HOST<\/key>\s*<string>127\.0\.0\.1<\/string>/);
   assert.match(plist, /<string>server\/dist\/index\.js<\/string>/);
+  assert.match(
+    plist,
+    /<key>StandardOutPath<\/key>\s*<string>\/Users\/alice\/Library\/Logs\/zclaudia\/browser\.out\.log<\/string>/
+  );
+  assert.match(
+    plist,
+    /<key>StandardErrorPath<\/key>\s*<string>\/Users\/alice\/Library\/Logs\/zclaudia\/browser\.err\.log<\/string>/
+  );
   assert.match(plist, /<key>RunAtLoad<\/key>\s*<true\/>/);
   assert.match(plist, /<key>KeepAlive<\/key>\s*<true\/>/);
 });
