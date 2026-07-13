@@ -10,6 +10,12 @@ if (!label || !repoRoot || !nodeBin || !dataDir || !logDir) {
   process.exit(1);
 }
 
+const port = Number(portRaw || '3100');
+if (!Number.isFinite(port) || port <= 0) {
+  console.error(`Invalid port: ${portRaw}`);
+  process.exit(1);
+}
+
 process.stdout.write(
   renderLaunchAgentPlist({
     label,
@@ -17,6 +23,6 @@ process.stdout.write(
     nodeBin,
     dataDir,
     logDir,
-    port: Number(portRaw || '3100'),
+    port,
   })
 );

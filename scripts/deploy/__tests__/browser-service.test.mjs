@@ -1,11 +1,23 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { dirname, resolve } from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   renderBrowserEnv,
   renderLaunchAgentPlist,
   renderSystemdUnit,
   requiredBuildCommands,
 } from '../browser-service-lib.mjs';
+
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+const launchAgentArgs = [
+  'com.zclaudia.browser',
+  '/Users/alice/Code/zclaudia',
+  '/opt/homebrew/bin/node',
+  '/Users/alice/.zclaudia',
+  '/Users/alice/Library/Logs/zclaudia',
+];
 
 test('browser service env binds localhost only', () => {
   const env = renderBrowserEnv({ port: 3100, dataDir: '/home/me/.zclaudia' });
@@ -65,4 +77,27 @@ test('launch agent plist binds localhost and writes user logs', () => {
   );
   assert.match(plist, /<key>RunAtLoad<\/key>\s*<true\/>/);
   assert.match(plist, /<key>KeepAlive<\/key>\s*<true\/>/);
+});
+
+test('render launch agent CLI rejects invalid port', () => {
+  const result = spawnSync(
+    process.execPath,
+    ['scripts/deploy/render-launch-agent.mjs', ...launchAgentArgs, 'nope'],
+    { cwd: repoRoot, encoding: 'utf8' }
+  );
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /invalid port/i);
+});
+
+test('render launch agent CLI writes localhost and provided port', () => {
+  const result = spawnSync(
+    process.execPath,
+    ['scripts/deploy/render-launch-agent.mjs', ...launchAgentArgs, '4217'],
+    { cwd: repoRoot, encoding: 'utf8' }
+  );
+
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /<key>SERVER_HOST<\/key>\s*<string>127\.0\.0\.1<\/string>/);
+  assert.match(result.stdout, /<key>PORT<\/key>\s*<string>4217<\/string>/);
 });
