@@ -15,7 +15,7 @@ const BASE = '/api/agent-profiles';
 export type DeleteAgentProfileResult =
   | { ok: true; archived?: boolean; sessionCount?: number }
   | { ok: false; code: string; message: string; sessionCount?: number };
-type AgentProfileWriteInput = Omit<
+export type AgentProfileWriteInput = Omit<
   AgentProfileConfig,
   'id' | 'createdAt' | 'updatedAt' | 'multimodalFallback' | 'cliPath'
 > & {
