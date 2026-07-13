@@ -142,7 +142,7 @@ export function MessageInput({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commandListRef = useRef<HTMLDivElement>(null);
   const mentionListRef = useRef<HTMLDivElement>(null);
-  const compositionTimeoutRef = useRef<number | null>(null); // Timer for composition end delay
+  const compositionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const draftPersistTimeoutRef = useRef<number | null>(null);
   const pendingDraftValueRef = useRef('');
   const pendingDraftAttachmentsRef = useRef<Attachment[]>([]);

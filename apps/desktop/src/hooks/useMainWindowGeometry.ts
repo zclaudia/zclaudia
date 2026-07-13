@@ -139,12 +139,12 @@ export function useMainWindowGeometry() {
     if (!isDesktopTauri()) return;
 
     let disposed = false;
-    let saveTimer: ReturnType<typeof window.setTimeout> | null = null;
+    let saveTimer: ReturnType<typeof setTimeout> | null = null;
     const unlisteners: Array<() => void> = [];
 
     const clearSaveTimer = () => {
       if (saveTimer !== null) {
-        window.clearTimeout(saveTimer);
+        clearTimeout(saveTimer);
         saveTimer = null;
       }
     };
@@ -199,7 +199,7 @@ export function useMainWindowGeometry() {
 
         const scheduleSave = () => {
           clearSaveTimer();
-          saveTimer = window.setTimeout(() => {
+          saveTimer = setTimeout(() => {
             void saveCurrentGeometry();
           }, SAVE_DEBOUNCE_MS);
         };
