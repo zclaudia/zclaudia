@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-import { StrictMode } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import type { AgentProfileConfig, LlmProfileConfig } from '@zclaudia/shared';
@@ -13,7 +12,11 @@ const RUNTIME_DESCRIPTORS = [
     runtime: 'zclaudia',
     label: 'ZClaudia',
     enabled: true,
-    model: { kind: 'llm-profile' as const, multimodalFallback: true, thinkingLevel: 'selectable' as const },
+    model: {
+      kind: 'llm-profile' as const,
+      multimodalFallback: true,
+      thinkingLevel: 'selectable' as const,
+    },
     hasCliPath: false,
     capabilities: {
       tools: 'profile' as const,
@@ -41,7 +44,11 @@ const GENERIC_NATIVE_DESCRIPTOR = {
   runtime: 'gennative',
   label: 'Generic Native',
   enabled: true,
-  model: { kind: 'native' as const, multimodalFallback: false, thinkingLevel: 'selectable' as const },
+  model: {
+    kind: 'native' as const,
+    multimodalFallback: false,
+    thinkingLevel: 'selectable' as const,
+  },
   hasCliPath: false,
   capabilities: {
     tools: 'native-readonly' as const,
@@ -91,7 +98,7 @@ function makeProfile(id: string, name: string): AgentProfileConfig {
 
 const NAME_PLACEHOLDER = 'e.g., Default Coding Agent';
 
-async function renderEditor(profile: AgentProfileConfig | null) {
+async function renderEditor(profile: AgentProfileConfig) {
   const onSaved = vi.fn();
   const onDeleted = vi.fn();
   const view = render(
@@ -121,7 +128,7 @@ describe('ProfileEditor', () => {
   });
 
   it('loads supporting catalogs for the given backendId', async () => {
-    await renderEditor(null);
+    await renderEditor(makeProfile('p1', 'Coding'));
 
     expect(api.listLlmProfilesForBackend).toHaveBeenCalledWith('b1');
     await waitFor(() => {
@@ -132,7 +139,7 @@ describe('ProfileEditor', () => {
   });
 
   it('renders as a compact centered editor', async () => {
-    await renderEditor(null);
+    await renderEditor(makeProfile('p1', 'Coding'));
 
     const editor = screen.getByTestId('agent-profile-editor');
     expect(editor.className).toContain('mx-auto');
@@ -140,102 +147,13 @@ describe('ProfileEditor', () => {
   });
 
   it('uses an Agent Type dropdown for runtime selection', async () => {
-    await renderEditor(null);
+    await renderEditor(makeProfile('p1', 'Coding'));
 
     expect(screen.getByLabelText('Agent Type')).toHaveTextContent('ZClaudia');
   });
 
-  it('create mode: saves via createAgentProfileForBackend and fires onSaved', async () => {
-    const saved = makeProfile('new1', 'My Agent');
-    vi.mocked(api.createAgentProfileForBackend).mockResolvedValue(saved);
-
-    const { onSaved } = await renderEditor(null);
-
-    fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), {
-      target: { value: 'My Agent' },
-    });
-
-    // LLM profile is pre-selected (default profile); pick a model.
-    fireEvent.click(screen.getByText('Select a model'));
-    fireEvent.click(screen.getByText('Sonnet'));
-
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
-
-    await waitFor(() => {
-      expect(api.createAgentProfileForBackend).toHaveBeenCalledWith(
-        'b1',
-        expect.objectContaining({
-          name: 'My Agent',
-          llmProfileId: 'lp1',
-          model: 'claude-sonnet-4-6',
-        })
-      );
-    });
-    await waitFor(() => {
-      expect(onSaved).toHaveBeenCalledWith(saved);
-    });
-    expect(api.updateAgentProfileForBackend).not.toHaveBeenCalled();
-  });
-
-  it('create mode: includes the selected runtime type in the save payload', async () => {
-    const saved = { ...makeProfile('new1', 'Claude Agent'), runtimeType: 'claude' as const };
-    vi.mocked(api.createAgentProfileForBackend).mockResolvedValue(saved);
-
-    await renderEditor(null);
-
-    fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), {
-      target: { value: 'Claude Agent' },
-    });
-    fireEvent.click(screen.getByLabelText('Agent Type'));
-    fireEvent.click(screen.getByRole('button', { name: 'Claude' }));
-
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
-
-    await waitFor(() => {
-      expect(api.createAgentProfileForBackend).toHaveBeenCalledWith(
-        'b1',
-        expect.objectContaining({
-          name: 'Claude Agent',
-          runtimeType: 'claude',
-          model: '',
-        })
-      );
-    });
-  });
-
-  it('create mode completes under React StrictMode', async () => {
-    const saved = { ...makeProfile('new1', 'Claude Agent'), runtimeType: 'claude' as const };
-    vi.mocked(api.createAgentProfileForBackend).mockResolvedValue(saved);
-    const onSaved = vi.fn();
-
-    render(
-      <StrictMode>
-        <ProfileEditor
-          backendId="b1"
-          profile={null}
-          onBack={vi.fn()}
-          onSaved={onSaved}
-          onDeleted={vi.fn()}
-        />
-      </StrictMode>
-    );
-    await screen.findByPlaceholderText(NAME_PLACEHOLDER);
-
-    fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), {
-      target: { value: 'Claude Agent' },
-    });
-    fireEvent.click(screen.getByLabelText('Agent Type'));
-    fireEvent.click(screen.getByRole('button', { name: 'Claude' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
-
-    await waitFor(() => {
-      expect(onSaved).toHaveBeenCalledWith(saved);
-    });
-    expect(screen.getByRole('button', { name: 'Create' })).toBeInTheDocument();
-  });
-
   it('shows Claude runtime limitations when Claude is selected', async () => {
-    await renderEditor(null);
+    await renderEditor(makeProfile('p1', 'Coding'));
 
     expect(screen.queryByText(/Claude Agent SDK/)).toBeNull();
     expect(screen.getByText('Multimodal fallback')).toBeInTheDocument();
@@ -252,54 +170,6 @@ describe('ProfileEditor', () => {
     expect(screen.queryByText('Multimodal fallback')).toBeNull();
   });
 
-  it('does not save multimodal fallback config for Claude runtime', async () => {
-    const visionProfile: LlmProfileConfig = {
-      ...llmProfile,
-      id: 'vision-lp',
-      name: 'Vision',
-      models: [
-        {
-          modelId: 'vision-model',
-          displayName: 'Vision Model',
-          inputModalities: ['image'],
-        },
-      ],
-    };
-    vi.mocked(api.listLlmProfilesForBackend).mockResolvedValue([llmProfile, visionProfile]);
-    vi.mocked(api.createAgentProfileForBackend).mockResolvedValue({
-      ...makeProfile('new1', 'Claude Agent'),
-      runtimeType: 'claude',
-    });
-
-    await renderEditor(null);
-
-    fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), {
-      target: { value: 'Claude Agent' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Add fallback model' }));
-    fireEvent.change(screen.getByLabelText('Fallback LLM Profile'), {
-      target: { value: 'vision-lp' },
-    });
-    fireEvent.change(screen.getByLabelText('Fallback Model'), {
-      target: { value: 'vision-model' },
-    });
-    fireEvent.click(screen.getByLabelText('Agent Type'));
-    fireEvent.click(screen.getByRole('button', { name: 'Claude' }));
-
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
-
-    await waitFor(() => {
-      expect(api.createAgentProfileForBackend).toHaveBeenCalledWith(
-        'b1',
-        expect.objectContaining({
-          runtimeType: 'claude',
-          model: '',
-          multimodalFallback: undefined,
-        })
-      );
-    });
-  });
-
   it('multimodal fallback: opens via Add, sets fields, removes to clear', async () => {
     const visionProfile: LlmProfileConfig = {
       ...llmProfile,
@@ -310,9 +180,9 @@ describe('ProfileEditor', () => {
       ],
     };
     vi.mocked(api.listLlmProfilesForBackend).mockResolvedValue([llmProfile, visionProfile]);
-    await renderEditor(null);
+    await renderEditor(makeProfile('p1', 'Coding'));
 
-    // Collapsed by default in create mode: the fallback selects are not mounted.
+    // Collapsed by default when the profile has no existing fallback: the fallback selects are not mounted.
     expect(screen.queryByLabelText('Fallback LLM Profile')).toBeNull();
 
     // Open it.
@@ -428,7 +298,7 @@ describe('ProfileEditor', () => {
   });
 
   it('Capabilities tab defaults to the Tools sub-panel with tool sets visible', async () => {
-    const { queryAllByLabelText } = await renderEditor(null);
+    const { queryAllByLabelText } = await renderEditor(makeProfile('p1', 'Coding'));
 
     fireEvent.click(screen.getByRole('tab', { name: /Capabilities/ }));
 
@@ -437,7 +307,7 @@ describe('ProfileEditor', () => {
   });
 
   it('Capabilities sub-tabs switch between Tools, Providers, and Skills', async () => {
-    const { queryAllByLabelText } = await renderEditor(null);
+    const { queryAllByLabelText } = await renderEditor(makeProfile('p1', 'Coding'));
 
     fireEvent.click(screen.getByRole('tab', { name: /Capabilities/ }));
 
@@ -457,7 +327,7 @@ describe('ProfileEditor', () => {
   });
 
   it('Claude runtime shows read-only capability notes instead of editable panels', async () => {
-    const { queryAllByLabelText } = await renderEditor(null);
+    const { queryAllByLabelText } = await renderEditor(makeProfile('p1', 'Coding'));
 
     fireEvent.click(screen.getByLabelText('Agent Type'));
     fireEvent.click(screen.getByRole('button', { name: 'Claude' }));
@@ -559,15 +429,8 @@ describe('ProfileEditor', () => {
     );
     const name = await screen.findByPlaceholderText(NAME_PLACEHOLDER);
     expect(name).toBeDisabled();
-    expect(
-      screen.getByText(/has been converted to read-only/i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/has been converted to read-only/i)).toBeInTheDocument();
     view.unmount();
-  });
-
-  it('create mode shows no delete entry point', async () => {
-    await renderEditor(null);
-    expect(screen.queryByRole('button', { name: 'More actions' })).toBeNull();
   });
 
   it('shows Model tab by default and switches to the Prompt tab', async () => {
@@ -636,71 +499,8 @@ describe('ProfileEditor', () => {
     expect(screen.getByLabelText('Thinking Level')).toHaveTextContent('Auto');
   });
 
-  it('create: a Claude profile is valid without an LLM profile and saves llmProfileId ""', async () => {
-    vi.mocked(api.createAgentProfileForBackend).mockResolvedValue(
-      makeProfile('n1', 'Claude Agent')
-    );
-    const { onSaved } = await renderEditor(null); // create mode
-
-    fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), {
-      target: { value: 'Claude Agent' },
-    });
-    fireEvent.click(screen.getByLabelText('Agent Type'));
-    fireEvent.click(screen.getByRole('button', { name: 'Claude' }));
-
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
-
-    await waitFor(() => {
-      expect(api.createAgentProfileForBackend).toHaveBeenCalledWith(
-        'b1',
-        expect.objectContaining({
-          runtimeType: 'claude',
-          llmProfileId: '',
-          model: '',
-          thinkingLevel: undefined,
-        })
-      );
-    });
-    await waitFor(() => {
-      expect(onSaved).toHaveBeenCalled();
-    });
-  });
-
-  it('create: a Claude profile can use CLI path and auto model', async () => {
-    vi.mocked(api.createAgentProfileForBackend).mockResolvedValue({
-      ...makeProfile('n1', 'Claude Auto'),
-      runtimeType: 'claude',
-      model: '',
-      cliPath: '/opt/homebrew/bin/claude',
-    });
-    await renderEditor(null);
-
-    fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), {
-      target: { value: 'Claude Auto' },
-    });
-    fireEvent.click(screen.getByLabelText('Agent Type'));
-    fireEvent.click(screen.getByRole('button', { name: 'Claude' }));
-    fireEvent.change(screen.getByLabelText('CLI Path (optional)'), {
-      target: { value: '/opt/homebrew/bin/claude' },
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
-
-    await waitFor(() => {
-      expect(api.createAgentProfileForBackend).toHaveBeenCalledWith(
-        'b1',
-        expect.objectContaining({
-          runtimeType: 'claude',
-          llmProfileId: '',
-          model: '',
-          cliPath: '/opt/homebrew/bin/claude',
-        })
-      );
-    });
-  });
-
   it('default-agent Toggle flips isDefault', async () => {
-    await renderEditor(null);
+    await renderEditor(makeProfile('p1', 'Coding'));
     const toggle = screen.getByRole('switch', { name: 'Set as default agent' });
     expect(toggle).toHaveAttribute('aria-checked', 'false');
     fireEvent.click(toggle);
@@ -719,11 +519,10 @@ describe('ProfileEditor', () => {
   });
 
   it('a generic native runtime renders a free-text model input, interactive thinking selector, and no CLI Path field', async () => {
-    useRuntimeDescriptorStore.getState().setDescriptors(
-      [...RUNTIME_DESCRIPTORS, GENERIC_NATIVE_DESCRIPTOR],
-      'b1'
-    );
-    await renderEditor(null);
+    useRuntimeDescriptorStore
+      .getState()
+      .setDescriptors([...RUNTIME_DESCRIPTORS, GENERIC_NATIVE_DESCRIPTOR], 'b1');
+    await renderEditor(makeProfile('p1', 'Coding'));
 
     fireEvent.click(screen.getByLabelText('Agent Type'));
     fireEvent.click(screen.getByRole('button', { name: 'Generic Native' }));

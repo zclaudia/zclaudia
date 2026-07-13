@@ -39,14 +39,14 @@ import { confirm } from '../../stores/confirmDialogStore';
 
 /**
  * Parent must remount this component per identity — key it by
- * `${backendId}:${profile?.id ?? 'new'}`. The populate effect deliberately
+ * `${backendId}:${profile.id}`. The populate effect deliberately
  * depends on profile id only; prop-driven switching of backendId or same-id
  * content updates without a key change is not supported.
  */
 export interface ProfileEditorProps {
   backendId: string;
-  /** null = create mode */
-  profile: AgentProfileConfig | null;
+  /** The profile being edited. Creation is handled by NewAgentProfileModal. */
+  profile: AgentProfileConfig;
   onBack: () => void;
   backendName?: string;
   onSaved: (saved: AgentProfileConfig) => void;
@@ -219,7 +219,6 @@ export function ProfileEditor({
   const [formThinkingLevel, setFormThinkingLevel] = useState<ThinkingLevelOption>('');
   const [formIsDefault, setFormIsDefault] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
   const [customizedToolSetIds, setCustomizedToolSetIds] = useState<BuiltinToolSetId[]>([]);
   const [expandedToolSetIds, setExpandedToolSetIds] = useState<BuiltinToolSetId[]>([]);
   const [systemPromptExpanded, setSystemPromptExpanded] = useState(false);
@@ -244,8 +243,8 @@ export function ProfileEditor({
   // per identity). Used to decide null (clear existing) vs undefined (omit) for the
   // multimodal fallback — reading the live `profile` prop instead would re-fire a
   // no-op save after the saved profile round-trips back.
-  const hadFallbackAtMount = useRef(Boolean(profile?.multimodalFallback));
-  const hadCliPathAtMount = useRef(Boolean(profile?.cliPath));
+  const hadFallbackAtMount = useRef(Boolean(profile.multimodalFallback));
+  const hadCliPathAtMount = useRef(Boolean(profile.cliPath));
 
   // Supporting catalogs for the target backend. Skills / MCP failures degrade
   // gracefully to empty catalogs — only the LLM profile list is a hard error.
@@ -295,27 +294,6 @@ export function ProfileEditor({
     };
   }, [backendId]);
 
-  const resetForm = () => {
-    setFormName('');
-    setFormDescription('');
-    setFormRuntimeType('zclaudia');
-    setFormLlmProfileId('');
-    setFormModel('');
-    setFormCliPath('');
-    setFormFallbackLlmProfileId('');
-    setFormFallbackModel('');
-    setFormFallbackOpen(false);
-    setFormSystemPrompt('');
-    setFormToolSelection(defaultToolSelection);
-    setFormSkillSelection(defaultSkillSelection);
-    setFormSkillExecution({ overrides: [] });
-    setFormThinkingLevel('');
-    setFormIsDefault(false);
-    setFormError(null);
-    setCustomizedToolSetIds([]);
-    setExpandedToolSetIds([]);
-  };
-
   const populateForm = (agent: AgentProfileConfig) => {
     setFormName(agent.name);
     setFormDescription(agent.description ?? '');
@@ -340,27 +318,10 @@ export function ProfileEditor({
   };
 
   useEffect(() => {
-    if (profile) {
-      populateForm(profile);
-    } else {
-      resetForm();
-    }
+    populateForm(profile);
     setHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.id]);
-
-  // Create mode: pre-select the default LLM profile once the catalog arrives
-  // (mirrors the old settings Agents tab's Add Agent pre-selection).
-  useEffect(() => {
-    if (profile) return;
-    if (llmProfiles.length === 0) return;
-    setFormLlmProfileId(current => {
-      if (current) return current;
-      const defaultLlm = llmProfiles.find(p => p.isDefault) ?? llmProfiles[0];
-      return defaultLlm ? defaultLlm.id : current;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.id, llmProfiles]);
+  }, [profile.id]);
 
   const toggleToolSetExpanded = (setId: BuiltinToolSetId) => {
     setExpandedToolSetIds(current =>
@@ -675,14 +636,13 @@ export function ProfileEditor({
   const signature = useMemo(() => JSON.stringify(buildPayload()), [buildPayload]);
 
   const performAutosave = useCallback(async () => {
-    if (!profile) return;
     const saved = await api.updateAgentProfileForBackend(backendId, profile.id, buildPayload());
     if (!mountedRef.current) return;
     onSaved(saved);
   }, [profile, backendId, buildPayload, onSaved]);
 
   const autosave = useProfileAutosave({
-    enabled: profile !== null && hydrated && profile.status !== 'readonly',
+    enabled: hydrated && profile.status !== 'readonly',
     valid: formValid,
     signature,
     save: performAutosave,
@@ -717,45 +677,8 @@ export function ProfileEditor({
     }
   };
 
-  const handleSubmit = async () => {
-    if (!formName.trim()) return;
-    if (requiresLlmProfile(formRuntimeType) && !formLlmProfileId) {
-      setFormError('LLM Profile is required');
-      return;
-    }
-    if (modelRequired && !formModel.trim()) {
-      setFormError('Model is required');
-      return;
-    }
-    const fallbackProfile = llmProfiles.find(p => p.id === formFallbackLlmProfileId);
-    const trimmedFallbackModel = formFallbackModel.trim();
-    const descriptor = descriptorFor(formRuntimeType);
-    if (
-      descriptor.model.multimodalFallback &&
-      formFallbackLlmProfileId &&
-      !fallbackModelValidForProfile(trimmedFallbackModel, fallbackProfile)
-    ) {
-      setFormError('Fallback model must support image input on the selected LLM profile');
-      return;
-    }
-
-    setSaving(true);
-    setFormError(null);
-    try {
-      const saved = await api.createAgentProfileForBackend(backendId, buildPayload());
-      if (!mountedRef.current) return;
-      onSaved(saved);
-    } catch (error) {
-      console.error('Failed to save agent profile:', error);
-      const message = error instanceof Error ? error.message : String(error);
-      if (mountedRef.current) setFormError(`Failed to create agent: ${message}`);
-    } finally {
-      if (mountedRef.current) setSaving(false);
-    }
-  };
-
   const handleRequestDelete = useCallback(async () => {
-    if (!profile || deleting) return;
+    if (deleting) return;
     const isReadonly = profile.status === 'readonly';
     const ok = await confirm({
       title: isReadonly ? 'Permanently delete profile?' : 'Delete profile?',
@@ -838,11 +761,11 @@ export function ProfileEditor({
 
   // A read-only profile (deleted-while-in-use) is frozen: no autosave, no edits,
   // fields disabled. It can only be hard-deleted once no active session references it.
-  const isReadonly = profile?.status === 'readonly';
+  const isReadonly = profile.status === 'readonly';
 
   const headerBadges: DetailBadge[] = [
     ...(backendName ? [{ label: backendName }] : []),
-    ...(profile?.isDefault ? [{ label: 'Default', tone: 'accent' as const }] : []),
+    ...(profile.isDefault ? [{ label: 'Default', tone: 'accent' as const }] : []),
     ...(isReadonly ? [{ label: 'Read-only', tone: 'neutral' as const }] : []),
   ];
 
@@ -866,19 +789,19 @@ export function ProfileEditor({
         description={formDescription}
         onDescriptionChange={setFormDescription}
         badges={headerBadges}
-        saveStatus={profile && !isReadonly ? autosave.status : undefined}
+        saveStatus={!isReadonly ? autosave.status : undefined}
         onRetry={autosave.retry}
-        onRequestDelete={profile ? handleRequestDelete : undefined}
+        onRequestDelete={handleRequestDelete}
         deleting={deleting}
         disabled={isReadonly}
       />
       {isReadonly && (
         <div className="mx-4 my-2 rounded-lg border border-border/60 bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
-          This agent is referenced by active sessions and has been converted to read-only.
-          Archive or delete those sessions to enable permanent deletion.
+          This agent is referenced by active sessions and has been converted to read-only. Archive
+          or delete those sessions to enable permanent deletion.
         </div>
       )}
-      {profile && formError && <p className="px-4 pb-2 text-xs text-destructive">{formError}</p>}
+      {formError && <p className="px-4 pb-2 text-xs text-destructive">{formError}</p>}
       <div className="flex-1 overflow-y-auto p-4">
         <div
           data-testid="agent-profile-editor"
@@ -1572,21 +1495,6 @@ export function ProfileEditor({
                   </button>
                 )}
               </EditorSection>
-            </div>
-          )}
-
-          {!profile && (
-            <div className="sticky bottom-0 z-10 -mx-1 bg-background/90 px-1 py-3 backdrop-blur">
-              {formError && <p className="mb-2 text-xs text-destructive">{formError}</p>}
-              <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-card/95 p-2 shadow-apple-sm">
-                <button
-                  onClick={handleSubmit}
-                  disabled={!formName.trim() || saving}
-                  className="flex-1 rounded-lg bg-muted/70 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50"
-                >
-                  {saving ? 'Saving...' : 'Create'}
-                </button>
-              </div>
             </div>
           )}
         </div>
