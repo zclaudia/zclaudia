@@ -18,4 +18,10 @@ describe('Toggle', () => {
     fireEvent.click(screen.getByRole('switch', { name: 'Feature' }));
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  it('has focus-visible ring for accessibility', () => {
+    render(<Toggle checked={false} onChange={() => {}} aria-label="Feature" />);
+    const sw = screen.getByRole('switch', { name: 'Feature' });
+    expect(sw.className).toContain('focus-visible:ring-2');
+  });
 });
