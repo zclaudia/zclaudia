@@ -78,7 +78,48 @@ describe('CursorAgentAdapter', () => {
     );
   });
 
-  it('abort with provider session id clears claudia-keyed session mode', async () => {
+  it('abort with provider session id clears claudia-keyed session mode while run is active', async () => {
+    let unblockRun: (() => void) | undefined;
+    const runBlocked = new Promise<void>(resolve => {
+      unblockRun = resolve;
+    });
+    runCursorMock.mockImplementationOnce(async function* (_input, options) {
+      options.onSessionId?.('prov-1');
+      yield { type: 'init', sessionId: 'prov-1' };
+      await runBlocked;
+    });
+    const adapter = new CursorAgentAdapter(async () => null);
+    adapter.setSessionMode('claudia-sess', 'plan');
+    const collected: unknown[] = [];
+    const runTask = (async () => {
+      for await (const ev of adapter.run(
+        'hi',
+        { cwd: '/p', claudiaSessionId: 'claudia-sess', mode: 'default' },
+        vi.fn()
+      )) {
+        collected.push(ev);
+      }
+    })();
+    await vi.waitFor(() => expect(collected.length).toBe(1));
+    await adapter.abort('prov-1', '/p');
+    unblockRun?.();
+    await runTask;
+    expect(abortCursorSessionMock).toHaveBeenCalledWith('prov-1');
+    runCursorMock.mockClear();
+    for await (const _ of adapter.run(
+      'hi',
+      { cwd: '/p', claudiaSessionId: 'claudia-sess', mode: 'default' },
+      vi.fn()
+    )) {
+      /* drain */
+    }
+    expect(runCursorMock).toHaveBeenCalledWith(
+      'hi',
+      expect.objectContaining({ mode: 'default' })
+    );
+  });
+
+  it('clears providerToClaudiaSessionId after normal run completion', async () => {
     runCursorMock.mockImplementationOnce(async function* (_input, options) {
       options.onSessionId?.('prov-1');
       yield { type: 'init', sessionId: 'prov-1' };
@@ -92,8 +133,8 @@ describe('CursorAgentAdapter', () => {
     )) {
       /* drain */
     }
+    // Stale abort with provider id should not resolve to claudia session after cleanup.
     await adapter.abort('prov-1', '/p');
-    expect(abortCursorSessionMock).toHaveBeenCalledWith('prov-1');
     runCursorMock.mockClear();
     for await (const _ of adapter.run(
       'hi',
@@ -104,7 +145,7 @@ describe('CursorAgentAdapter', () => {
     }
     expect(runCursorMock).toHaveBeenCalledWith(
       'hi',
-      expect.objectContaining({ mode: 'default' })
+      expect.objectContaining({ mode: 'plan' })
     );
   });
 

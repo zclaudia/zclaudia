@@ -12,8 +12,22 @@ export function makeFileChangeEffect(files: FileChangeEffectFile[]): ToolEffect 
   return normalized.length > 0 ? { kind: 'file_change', files: normalized } : undefined;
 }
 
+const DEFAULT_PATH_KEYS = [
+  'file_path',
+  'notebook_path',
+  'path',
+  'file',
+  'filename',
+  'target_file',
+  'targetFile',
+  'relative_path',
+  'relativePath',
+  'absolute_path',
+  'absolutePath',
+] as const;
+
 function filePathFromRecord(record: Record<string, unknown>): string | undefined {
-  for (const key of ['path', 'file', 'file_path', 'filename'] as const) {
+  for (const key of DEFAULT_PATH_KEYS) {
     const value = record[key];
     if (typeof value === 'string' && value) return value;
   }

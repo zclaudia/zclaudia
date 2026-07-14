@@ -95,6 +95,30 @@ describe('mapCursorEvent', () => {
       });
     });
 
+    it('extracts editToolCall file change effect from target_file arg', () => {
+      const { events } = mapCursorEvent(
+        {
+          type: 'tool_call',
+          subtype: 'started',
+          call_id: 'call-target-file',
+          tool_call: {
+            editToolCall: {
+              args: { target_file: '/repo/src/lib.ts', content: 'updated' },
+            },
+          },
+        },
+        false
+      );
+      expect(events[0]).toMatchObject({
+        type: 'tool_use',
+        toolName: 'Edit',
+        toolEffect: {
+          kind: 'file_change',
+          files: [{ path: '/repo/src/lib.ts', changeKind: 'modify' }],
+        },
+      });
+    });
+
     it('extracts shellToolCall with shell effect', () => {
       const { events } = mapCursorEvent(
         {

@@ -44,6 +44,7 @@ export class CursorAgentAdapter implements ExternalAgentAdapter {
 
     this.runStates.set(context, { providerSessionId: context.sessionId, providerCwd: context.cwd });
     let currentKey = sessionKey;
+    const registeredProviderIds: string[] = [];
 
     try {
       yield* runCursor(input, {
@@ -61,6 +62,7 @@ export class CursorAgentAdapter implements ExternalAgentAdapter {
         onSessionId: id => {
           if (id && claudiaSessionId) {
             this.providerToClaudiaSessionId.set(id, claudiaSessionId);
+            registeredProviderIds.push(id);
           }
           if (id && id !== currentKey) {
             this.abortControllers.delete(currentKey);
@@ -73,6 +75,9 @@ export class CursorAgentAdapter implements ExternalAgentAdapter {
     } finally {
       if (currentKey) {
         this.abortControllers.delete(currentKey);
+      }
+      for (const id of registeredProviderIds) {
+        this.providerToClaudiaSessionId.delete(id);
       }
     }
   }
