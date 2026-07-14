@@ -211,6 +211,28 @@ describe('PlanReviewRenderer — todos rendering', () => {
   });
 });
 
+describe('InteractionItem — confirm field', () => {
+  it('renders the confirm field as a labeled switch exposing checked state', () => {
+    const promptInteraction = {
+      type: 'interaction_prompt' as const,
+      interactionId: 'prompt-1',
+      sessionId: 'session-1',
+      source: 'tool_call' as const,
+      createdAt: 0,
+      title: 'Confirm action',
+      fields: [{ id: 'proceed', label: 'Proceed anyway?', type: 'confirm' as const }],
+    };
+
+    render(<InteractionItem interaction={promptInteraction} />);
+
+    const toggle = screen.getByRole('switch', { name: 'Proceed anyway?' });
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+  });
+});
+
 const handleSendMessage = vi.fn();
 const setMode = vi.fn();
 

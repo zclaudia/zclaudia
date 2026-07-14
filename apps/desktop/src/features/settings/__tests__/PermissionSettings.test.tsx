@@ -181,4 +181,23 @@ describe('PermissionSettings', () => {
     expect(screen.queryByRole('option', { name: '[Global] System Fallback' })).toBeNull();
     expect(screen.queryByRole('option', { name: '[Global] Disabled Review' })).toBeNull();
   });
+
+  it('names the numeric permission controls', async () => {
+    render(<PermissionSettings />);
+
+    await screen.findByText('Review timeout');
+
+    expect(screen.getByLabelText(/review timeout/i)).toBeTruthy();
+    expect(screen.getByLabelText(/confidence/i)).toBeTruthy();
+    expect(screen.getByLabelText(/rate limit/i)).toBeTruthy();
+  });
+
+  it('names the safety guard checkboxes', async () => {
+    render(<PermissionSettings />);
+
+    await screen.findByText('Safety guards');
+
+    expect(screen.getByLabelText(/protect sensitive files/i)).toBeTruthy();
+    expect(screen.getByLabelText(/enforce workspace scope/i)).toBeTruthy();
+  });
 });

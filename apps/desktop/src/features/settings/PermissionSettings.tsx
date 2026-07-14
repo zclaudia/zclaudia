@@ -430,6 +430,7 @@ export function PermissionSettings() {
                 control={
                   <input
                     type="number"
+                    aria-label="Review timeout"
                     min={10}
                     max={300}
                     defaultValue={policy.aiReview.timeoutBeforeReview}
@@ -449,6 +450,7 @@ export function PermissionSettings() {
                 control={
                   <input
                     type="number"
+                    aria-label="Confidence threshold"
                     min={50}
                     max={100}
                     defaultValue={Math.round(policy.aiReview.confidenceThreshold * 100)}
@@ -471,6 +473,7 @@ export function PermissionSettings() {
                 control={
                   <input
                     type="number"
+                    aria-label="Rate limit"
                     min={1}
                     max={60}
                     defaultValue={policy.aiReview.maxAutoApprovalsPerMinute}
@@ -536,6 +539,7 @@ export function PermissionSettings() {
             control={
               <input
                 type="checkbox"
+                aria-label="Protect sensitive files"
                 checked={policy.globalGuards.blockSensitiveFiles}
                 onChange={e => updateGuard('blockSensitiveFiles', e.target.checked)}
                 disabled={saving}
@@ -550,6 +554,7 @@ export function PermissionSettings() {
             control={
               <input
                 type="checkbox"
+                aria-label="Enforce workspace scope"
                 checked={policy.globalGuards.blockOutsideWorkspace}
                 onChange={e => updateGuard('blockOutsideWorkspace', e.target.checked)}
                 disabled={saving}

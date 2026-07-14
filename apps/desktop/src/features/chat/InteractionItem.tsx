@@ -31,6 +31,7 @@ import { useSessionConfigStore } from '../../stores/sessionConfigStore';
 import { useInteractionStore } from '../../stores/interactionStore';
 import { SavePlanAsIssueDialog } from './SavePlanAsIssueDialog';
 import { useChatActionsOptional } from './ChatActionsContext';
+import { Toggle } from '../../components/ui/Toggle';
 
 const ALLOW_MESSAGE = 'Proceed with the plan above.';
 const DEFAULT_DENY_MESSAGE = 'Please revise the plan.';
@@ -185,6 +186,7 @@ function ChoiceField({
 }
 
 function ConfirmField({
+  field,
   value,
   onChange,
 }: {
@@ -192,17 +194,7 @@ function ConfirmField({
   value: boolean;
   onChange: (v: boolean) => void;
 }) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!value)}
-      className={`w-8 h-4 rounded-full transition-colors relative ${value ? 'bg-primary' : 'bg-muted-foreground/30'}`}
-    >
-      <span
-        className={`block w-3 h-3 rounded-full bg-white absolute top-0.5 transition-transform ${value ? 'translate-x-4' : 'translate-x-0.5'}`}
-      />
-    </button>
-  );
+  return <Toggle checked={value} onChange={onChange} aria-label={field.label} />;
 }
 
 // ============================================
