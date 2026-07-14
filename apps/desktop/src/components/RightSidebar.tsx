@@ -195,6 +195,25 @@ export function RightSidebar({
     [widthFraction, setWidthFraction]
   );
 
+  // Keyboard resize: the handle sits on the left edge of this right-anchored
+  // panel, so ArrowLeft (pulling the edge left) widens it and ArrowRight
+  // narrows it — same direction as dragging. Reuses setWidthFraction, which
+  // applies the same clamp as the drag path.
+  const onHandleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      const stepPx = 16;
+      const container = rootRef.current?.parentElement?.clientWidth || window.innerWidth;
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        setWidthFraction(widthFraction + stepPx / container);
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        setWidthFraction(widthFraction - stepPx / container);
+      }
+    },
+    [widthFraction, setWidthFraction]
+  );
+
   if (isMobile) return null;
   if (collapsed) return null;
 
@@ -214,6 +233,14 @@ export function RightSidebar({
         className="group absolute top-0 left-0 w-1.5 h-full flex items-center justify-center cursor-ew-resize z-10"
         onMouseDown={onDragStart}
         onTouchStart={onDragStart}
+        onKeyDown={onHandleKeyDown}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize right sidebar"
+        tabIndex={0}
+        aria-valuenow={Math.round(widthFraction * 100)}
+        aria-valuemin={Math.round(RIGHT_SIDEBAR_LIMITS.MIN_WIDTH_FRACTION * 100)}
+        aria-valuemax={Math.round(RIGHT_SIDEBAR_LIMITS.MAX_WIDTH_FRACTION * 100)}
       >
         <div className="h-8 w-1 rounded-full bg-muted-foreground/0 transition-colors group-hover:bg-muted-foreground/30 group-active:bg-muted-foreground/50" />
       </div>

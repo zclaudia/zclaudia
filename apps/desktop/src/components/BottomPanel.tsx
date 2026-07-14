@@ -10,6 +10,14 @@ const MIN_HEIGHT = 100;
 const MAX_HEIGHT_VH = 70;
 const DEFAULT_HEIGHT_DESKTOP = 300;
 const DEFAULT_HEIGHT_MOBILE = 350;
+const RESIZE_KEY_STEP_PX = 16;
+
+/** Shared clamp for both the mouse-drag and keyboard resize paths. */
+function clampHeight(px: number): number {
+  const maxPx =
+    ((typeof window !== 'undefined' ? window.innerHeight : 900) * MAX_HEIGHT_VH) / 100;
+  return Math.max(MIN_HEIGHT, Math.min(maxPx, px));
+}
 
 interface BottomPanelProps {
   projectId: string | undefined;
@@ -69,14 +77,11 @@ export function BottomPanel({ projectId, projectRoot, workingDirectory }: Bottom
       startY.current = 'touches' in e ? e.touches[0].clientY : e.clientY;
       startHeight.current = heightPx;
 
-      const maxPx = (window.innerHeight * MAX_HEIGHT_VH) / 100;
-
       const onMove = (ev: MouseEvent | TouchEvent) => {
         if (!dragging.current) return;
         const clientY = 'touches' in ev ? ev.touches[0].clientY : ev.clientY;
         const deltaPx = startY.current - clientY;
-        const newHeight = Math.max(MIN_HEIGHT, Math.min(maxPx, startHeight.current + deltaPx));
-        setHeightPx(newHeight);
+        setHeightPx(clampHeight(startHeight.current + deltaPx));
       };
 
       const cleanup = () => {
@@ -98,6 +103,20 @@ export function BottomPanel({ projectId, projectRoot, workingDirectory }: Bottom
     },
     [heightPx]
   );
+
+  // Keyboard resize: the handle sits at the top edge of this bottom-anchored
+  // panel, so ArrowUp (pulling the edge up) grows it and ArrowDown shrinks
+  // it — same direction as dragging. Reuses clampHeight, the same clamp the
+  // drag path applies.
+  const onResizeKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHeightPx(h => clampHeight(h + RESIZE_KEY_STEP_PX));
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHeightPx(h => clampHeight(h - RESIZE_KEY_STEP_PX));
+    }
+  }, []);
 
   const handleClose = () => {
     const { updatePanelVisibility } = usePluginStore.getState();
@@ -198,6 +217,16 @@ export function BottomPanel({ projectId, projectRoot, workingDirectory }: Bottom
         className="flex items-center gap-1 px-2 py-1 cursor-ns-resize select-none border-b border-border flex-shrink-0"
         onMouseDown={onDragStart}
         onTouchStart={onDragStart}
+        onKeyDown={onResizeKeyDown}
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Resize bottom panel"
+        tabIndex={0}
+        aria-valuenow={Math.round(heightPx)}
+        aria-valuemin={MIN_HEIGHT}
+        aria-valuemax={Math.round(
+          ((typeof window !== 'undefined' ? window.innerHeight : 900) * MAX_HEIGHT_VH) / 100
+        )}
       >
         {/* Tabs */}
         <div

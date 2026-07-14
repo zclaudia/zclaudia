@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { usePluginStore } from '../../stores/pluginStore';
 import { useRightSidebarStore } from '../../stores/rightSidebarStore';
 import { useRightWorkspaceStore } from '../../stores/rightWorkspaceStore';
@@ -119,5 +119,20 @@ describe('RightSidebar', () => {
     );
     // Session A has no tools open → empty-state is shown (not null)
     expect(getByTestId('empty-state')).toBeTruthy();
+  });
+
+  it('exposes the resize handle as a keyboard-operable separator', () => {
+    render(<RightSidebar sessionId="A" projectId="p1" projectRoot="/test" />);
+    const sep = screen.getByRole('separator', { name: /resize/i });
+    expect(sep.getAttribute('aria-orientation')).toBe('vertical');
+    expect(sep.getAttribute('tabindex')).toBe('0');
+
+    const before = useRightSidebarStore.getState().widthFraction;
+    fireEvent.keyDown(sep, { key: 'ArrowLeft' });
+    expect(useRightSidebarStore.getState().widthFraction).toBeGreaterThan(before);
+
+    const afterLeft = useRightSidebarStore.getState().widthFraction;
+    fireEvent.keyDown(sep, { key: 'ArrowRight' });
+    expect(useRightSidebarStore.getState().widthFraction).toBeLessThan(afterLeft);
   });
 });

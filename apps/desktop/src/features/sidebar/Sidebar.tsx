@@ -43,6 +43,9 @@ import type { WorktreeGroup } from './worktreeGrouping';
 import { runWithToast } from '../git/runWithToast';
 import { confirm } from '../../stores/confirmDialogStore';
 
+/** Keyboard resize step, in px, for the sidebar's resize handle. */
+const RESIZE_KEY_STEP_PX = 16;
+
 function agentReadinessReasonFromDetails(details: unknown): AgentReadinessReason | undefined {
   if (!details || typeof details !== 'object') return undefined;
   const reason = (details as { reason?: unknown }).reason;
@@ -237,6 +240,21 @@ export function Sidebar({
       document.addEventListener('mouseup', onUp);
       document.addEventListener('touchmove', onMove);
       document.addEventListener('touchend', onUp);
+    },
+    [setSidebarWidth]
+  );
+  // Keyboard resize: the handle sits on the right edge, so ArrowRight widens
+  // the sidebar and ArrowLeft narrows it — same direction as dragging the
+  // handle. Reuses the store's setWidth, which applies the same clamp as drag.
+  const onResizeKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        setSidebarWidth(useSidebarWidthStore.getState().widthPx + RESIZE_KEY_STEP_PX);
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        setSidebarWidth(useSidebarWidthStore.getState().widthPx - RESIZE_KEY_STEP_PX);
+      }
     },
     [setSidebarWidth]
   );
@@ -773,13 +791,12 @@ export function Sidebar({
   }
 
   // Desktop — expanded
+  const maxSidebarWidthPx =
+    (typeof window !== 'undefined' ? window.innerWidth : 1920) *
+    (SIDEBAR_WIDTH_LIMITS.MAX_WIDTH_VW / 100);
   const clampedSidebarWidth = Math.max(
     SIDEBAR_WIDTH_LIMITS.MIN_WIDTH_PX,
-    Math.min(
-      (typeof window !== 'undefined' ? window.innerWidth : 1920) *
-        (SIDEBAR_WIDTH_LIMITS.MAX_WIDTH_VW / 100),
-      sidebarWidth
-    )
+    Math.min(maxSidebarWidthPx, sidebarWidth)
   );
   return (
     <>
@@ -792,7 +809,14 @@ export function Sidebar({
           className="absolute top-0 right-0 z-20 h-full w-1 cursor-ew-resize hover:bg-muted"
           onMouseDown={onResizeStart}
           onTouchStart={onResizeStart}
-          aria-hidden
+          onKeyDown={onResizeKeyDown}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize sidebar"
+          tabIndex={0}
+          aria-valuenow={Math.round(clampedSidebarWidth)}
+          aria-valuemin={SIDEBAR_WIDTH_LIMITS.MIN_WIDTH_PX}
+          aria-valuemax={Math.round(maxSidebarWidthPx)}
         />
 
         <SearchModal
