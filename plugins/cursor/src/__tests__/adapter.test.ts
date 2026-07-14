@@ -1,0 +1,93 @@
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+
+const runCursorMock = vi.fn(async function* () {
+  yield { type: 'init', sessionId: 'prov-1' } as const;
+});
+const abortCursorSessionMock = vi.fn(async () => {});
+
+vi.mock('../runner.js', () => ({
+  runCursor: (...args: unknown[]) => runCursorMock(...args),
+  abortCursorSession: (...args: unknown[]) => abortCursorSessionMock(...args),
+}));
+
+import { CursorAgentAdapter } from '../adapter.js';
+
+describe('CursorAgentAdapter', () => {
+  beforeEach(() => {
+    runCursorMock.mockClear();
+    abortCursorSessionMock.mockClear();
+  });
+
+  it('registers type cursor', () => {
+    expect(new CursorAgentAdapter(async () => null).type).toBe('cursor');
+  });
+
+  it('calls createToolBridge and passes bridge into runCursor', async () => {
+    const bridge = { name: 'claudia-plugins', config: { command: 'node' } };
+    const createToolBridge = vi.fn(async () => bridge);
+    const adapter = new CursorAgentAdapter(createToolBridge);
+    for await (const _ of adapter.run(
+      'hi',
+      { cwd: '/p', claudiaSessionId: 'sess', serverPort: 3100, mode: 'default' },
+      vi.fn()
+    )) {
+      /* drain */
+    }
+    expect(createToolBridge).toHaveBeenCalledWith({
+      serverPort: 3100,
+      sessionId: 'sess',
+    });
+    expect(runCursorMock).toHaveBeenCalledWith(
+      'hi',
+      expect.objectContaining({ cwd: '/p', bridge, mode: 'default' })
+    );
+  });
+
+  it('uses setSessionMode over context.mode for the next turn', async () => {
+    const adapter = new CursorAgentAdapter(async () => null);
+    adapter.setSessionMode('sess', 'plan');
+    for await (const _ of adapter.run(
+      'hi',
+      { cwd: '/p', claudiaSessionId: 'sess', mode: 'default' },
+      vi.fn()
+    )) {
+      /* drain */
+    }
+    expect(runCursorMock).toHaveBeenCalledWith(
+      'hi',
+      expect.objectContaining({ mode: 'plan' })
+    );
+  });
+
+  it('abort clears session mode and kills runner session', async () => {
+    const adapter = new CursorAgentAdapter(async () => null);
+    adapter.setSessionMode('sess', 'ask');
+    await adapter.abort('sess', '/p');
+    expect(abortCursorSessionMock).toHaveBeenCalledWith('sess');
+    // next run should not force ask
+    for await (const _ of adapter.run(
+      'hi',
+      { cwd: '/p', claudiaSessionId: 'sess', mode: 'default' },
+      vi.fn()
+    )) {
+      /* drain */
+    }
+    expect(runCursorMock).toHaveBeenCalledWith(
+      'hi',
+      expect.objectContaining({ mode: 'default' })
+    );
+  });
+
+  it('updates getRunState when onSessionId fires', async () => {
+    runCursorMock.mockImplementationOnce(async function* (_input, options) {
+      options.onSessionId?.('prov-9');
+      yield { type: 'init', sessionId: 'prov-9' };
+    });
+    const adapter = new CursorAgentAdapter(async () => null);
+    const context = { cwd: '/p', claudiaSessionId: 'sess' };
+    for await (const _ of adapter.run('hi', context, vi.fn())) {
+      /* drain */
+    }
+    expect(adapter.getRunState(context).providerSessionId).toBe('prov-9');
+  });
+});
