@@ -500,6 +500,21 @@ body.notch-window {
   animation: apple-slide-up 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
+/* Loading dots: staggered opacity pulse (replaces animate-bounce). */
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 1.1s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+}
+
 /* Smooth theme transitions — Apple ease curve.
    box-shadow is intentionally excluded: it is not GPU-composited, so
    transitioning it on every node causes main-thread repaints. Components

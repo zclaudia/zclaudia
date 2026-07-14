@@ -221,6 +221,15 @@ describe('LoadingIndicator Time Display', () => {
     expect(banner.textContent).toMatch(/\(2\/5\)/);
   });
 
+  it('loading dots do not use bounce easing', () => {
+    const { container } = render(
+      <LoadingIndicator isLoading={true} startedAt={Date.now()} lastActivityAt={Date.now()} />
+    );
+
+    expect(container.querySelector('.animate-bounce')).toBeNull();
+    expect(container.querySelectorAll('.animate-pulse-dot').length).toBeGreaterThan(0);
+  });
+
   it('shows connection-failure wording when status is absent', () => {
     render(
       <LoadingIndicator
