@@ -1,5 +1,6 @@
 import type { PluginContext } from '@zclaudia/shared/plugins';
 import { CodexAgentAdapter } from './adapter.js';
+import { destroyAllCodexClients } from './runner.js';
 
 export async function activate(context: PluginContext): Promise<void> {
   if (!context.agentRuntimes) {
@@ -11,5 +12,5 @@ export async function activate(context: PluginContext): Promise<void> {
 }
 
 export async function deactivate(): Promise<void> {
-  // Loader unregisters contributions.
+  destroyAllCodexClients();
 }

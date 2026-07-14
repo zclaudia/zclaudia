@@ -1,4 +1,5 @@
-import type { PermissionCallback, PermissionRequest } from '@zclaudia/shared/providers';
+import type { PermissionRequest } from '@zclaudia/shared/interaction/permissions';
+import type { PermissionCallback } from '@zclaudia/shared/providers';
 
 export type ApprovalDecisionResult = {
   decision?: 'accept' | 'decline';
