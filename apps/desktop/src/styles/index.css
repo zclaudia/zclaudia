@@ -500,9 +500,12 @@ body.notch-window {
   animation: apple-slide-up 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
-/* Smooth theme transitions — Apple ease curve */
+/* Smooth theme transitions — Apple ease curve.
+   box-shadow is intentionally excluded: it is not GPU-composited, so
+   transitioning it on every node causes main-thread repaints. Components
+   that need a shadow transition opt in locally (e.g. `transition-shadow`). */
 * {
-  transition-property: background-color, border-color, color, opacity, box-shadow;
+  transition-property: background-color, border-color, color, opacity;
   transition-duration: 200ms;
   transition-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
 }
@@ -510,6 +513,19 @@ body.notch-window {
 /* Disable transitions on page load */
 .no-transitions * {
   transition: none !important;
+}
+
+/* Reduced motion: honor the OS preference everywhere. Mirrors the
+   .no-transitions reset but driven by the user's accessibility setting. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Frosted glass / vibrancy effects */
