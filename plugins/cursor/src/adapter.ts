@@ -16,6 +16,7 @@ export type ToolBridgeFactory = (
 export class CursorAgentAdapter implements ExternalAgentAdapter {
   readonly type = 'cursor';
   private readonly sessionModes = new Map<string, string>();
+  private readonly providerToClaudiaSessionId = new Map<string, string>();
   private readonly runStates = new WeakMap<ExternalAgentRunContext, ExternalAgentRunState>();
   private readonly abortControllers = new Map<string, AbortController>();
 
@@ -26,7 +27,8 @@ export class CursorAgentAdapter implements ExternalAgentAdapter {
     context: ExternalAgentRunContext,
     _onPermission?: PermissionCallback
   ): AsyncGenerator<ProviderRuntimeEvent, void, void> {
-    const sessionKey = context.claudiaSessionId ?? context.sessionId ?? '';
+    const claudiaSessionId = context.claudiaSessionId ?? context.sessionId ?? '';
+    const sessionKey = claudiaSessionId;
     const effectiveMode =
       (sessionKey && this.sessionModes.get(sessionKey)) ?? context.mode;
 
@@ -57,6 +59,9 @@ export class CursorAgentAdapter implements ExternalAgentAdapter {
         abortController,
         bridge,
         onSessionId: id => {
+          if (id && claudiaSessionId) {
+            this.providerToClaudiaSessionId.set(id, claudiaSessionId);
+          }
           if (id && id !== currentKey) {
             this.abortControllers.delete(currentKey);
             currentKey = id;
@@ -82,7 +87,10 @@ export class CursorAgentAdapter implements ExternalAgentAdapter {
   }
 
   async abort(sessionId: string, _cwd: string): Promise<void> {
+    const claudiaId = this.providerToClaudiaSessionId.get(sessionId) ?? sessionId;
+    this.sessionModes.delete(claudiaId);
     this.sessionModes.delete(sessionId);
+    this.providerToClaudiaSessionId.delete(sessionId);
     const controller = this.abortControllers.get(sessionId);
     if (controller) {
       controller.abort();

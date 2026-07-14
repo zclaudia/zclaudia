@@ -78,6 +78,36 @@ describe('CursorAgentAdapter', () => {
     );
   });
 
+  it('abort with provider session id clears claudia-keyed session mode', async () => {
+    runCursorMock.mockImplementationOnce(async function* (_input, options) {
+      options.onSessionId?.('prov-1');
+      yield { type: 'init', sessionId: 'prov-1' };
+    });
+    const adapter = new CursorAgentAdapter(async () => null);
+    adapter.setSessionMode('claudia-sess', 'plan');
+    for await (const _ of adapter.run(
+      'hi',
+      { cwd: '/p', claudiaSessionId: 'claudia-sess', mode: 'default' },
+      vi.fn()
+    )) {
+      /* drain */
+    }
+    await adapter.abort('prov-1', '/p');
+    expect(abortCursorSessionMock).toHaveBeenCalledWith('prov-1');
+    runCursorMock.mockClear();
+    for await (const _ of adapter.run(
+      'hi',
+      { cwd: '/p', claudiaSessionId: 'claudia-sess', mode: 'default' },
+      vi.fn()
+    )) {
+      /* drain */
+    }
+    expect(runCursorMock).toHaveBeenCalledWith(
+      'hi',
+      expect.objectContaining({ mode: 'default' })
+    );
+  });
+
   it('updates getRunState when onSessionId fires', async () => {
     runCursorMock.mockImplementationOnce(async function* (_input, options) {
       options.onSessionId?.('prov-9');
