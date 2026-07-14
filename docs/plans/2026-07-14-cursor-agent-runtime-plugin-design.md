@@ -75,7 +75,11 @@ Host changes stay minimal: load/register plugin contributions; surface Cursor in
 
 ### Manifest and policy (phase 1)
 
-- `permissionModeMap` must map host permission / mode concepts onto Cursor CLI modes `default`, `plan`, and `ask`.
+- Chat / run modes exposed to the UI and passed as `context.mode`: `default`, `plan`, `ask` (CLI `--mode=` / default `--yolo`).
+- `permissionModeMap` (PCP keys → Cursor CLI mode), starting from my-claudia Cursor:
+  - `supervised` → `default`
+  - `plan_only` → `plan`
+  - Include an `ask` mapping only if the host PCP permission enum already has a matching key; otherwise `ask` is selected as a chat mode id, not inventing new PCP enum values in this phase.
 - Policy: `modeSwitchSessionPolicy: 'preserve'` (required so `--resume` works with `--mode=plan|ask`).
 - Capability claims (truthful):
   - Supported: `chat.stream`, `tool.call` (native), `tool.inject` (bridged via mcp.json), `permission.mode`, `session.abort`.
