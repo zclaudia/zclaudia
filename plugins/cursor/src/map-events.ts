@@ -207,7 +207,7 @@ export function mapCursorEvent(
     }
 
     case 'result': {
-      const usage = event.usage as {
+      const rawUsage = event.usage as {
         inputTokens?: number;
         outputTokens?: number;
       } | undefined;
@@ -216,11 +216,20 @@ export function mapCursorEvent(
         const errMsg = (event.result as string) || 'cursor-agent returned an error';
         results.push({ type: 'error', error: errMsg });
       } else {
+        const input = rawUsage?.inputTokens ?? 0;
+        const output = rawUsage?.outputTokens ?? 0;
         results.push({
           type: 'result',
           isComplete: true,
-          usage: usage
-            ? { inputTokens: usage.inputTokens || 0, outputTokens: usage.outputTokens || 0 }
+          usage: rawUsage
+            ? {
+                input,
+                output,
+                cacheRead: 0,
+                cacheWrite: 0,
+                totalTokens: input + output,
+                cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+              }
             : undefined,
         });
       }

@@ -389,7 +389,13 @@ describe('mapCursorEvent', () => {
       expect(events[0]).toMatchObject({
         type: 'result',
         isComplete: true,
-        usage: { inputTokens: 100, outputTokens: 50 },
+        usage: {
+          input: 100,
+          output: 50,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 150,
+        },
       });
     });
 
