@@ -12,16 +12,20 @@ export function makeFileChangeEffect(files: FileChangeEffectFile[]): ToolEffect 
   return normalized.length > 0 ? { kind: 'file_change', files: normalized } : undefined;
 }
 
+function filePathFromRecord(record: Record<string, unknown>): string | undefined {
+  for (const key of ['path', 'file', 'file_path', 'filename'] as const) {
+    const value = record[key];
+    if (typeof value === 'string' && value) return value;
+  }
+  return undefined;
+}
+
 export function fileChangeEffectFromInput(
   input: unknown,
   changeKind: FileChangeEffectFile['changeKind'] = 'unknown'
 ): ToolEffect | undefined {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return undefined;
-  const record = input as Record<string, unknown>;
-  const path =
-    (typeof record.path === 'string' && record.path) ||
-    (typeof record.file_path === 'string' && record.file_path) ||
-    undefined;
+  const path = filePathFromRecord(input as Record<string, unknown>);
   if (!path) return undefined;
   return makeFileChangeEffect([{ path, changeKind }]);
 }
@@ -35,10 +39,10 @@ export function readCursorEditResultEffect(args: unknown, result: unknown): Tool
     : undefined;
   const diffString = typeof success?.diffString === 'string' ? success.diffString : undefined;
   if (diffString) {
-    const path = typeof success?.path === 'string'
-      ? success.path
-      : args && typeof args === 'object' && !Array.isArray(args) && typeof (args as Record<string, unknown>).path === 'string'
-        ? (args as Record<string, unknown>).path as string
+    const path = success
+      ? filePathFromRecord(success)
+      : args && typeof args === 'object' && !Array.isArray(args)
+        ? filePathFromRecord(args as Record<string, unknown>)
         : undefined;
     if (path) {
       return makeFileChangeEffect([{ path, changeKind: 'modify', summary: diffString }]);

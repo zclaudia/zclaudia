@@ -78,7 +78,7 @@ describe('mapCursorEvent', () => {
           call_id: 'call-1',
           tool_call: {
             editToolCall: {
-              args: { path: '/path/to/file.ts', content: 'new content' },
+              args: { file: '/path/to/file.ts', content: 'new content' },
             },
           },
         },
@@ -87,7 +87,7 @@ describe('mapCursorEvent', () => {
       expect(events[0]).toMatchObject({
         type: 'tool_use',
         toolName: 'Edit',
-        toolInput: { path: '/path/to/file.ts', content: 'new content' },
+        toolInput: { file: '/path/to/file.ts', content: 'new content' },
         toolEffect: {
           kind: 'file_change',
           files: [{ path: '/path/to/file.ts', changeKind: 'modify' }],
@@ -125,7 +125,7 @@ describe('mapCursorEvent', () => {
           call_id: 'call-3',
           tool_call: {
             readToolCall: {
-              args: { path: '/file.ts' },
+              args: { file: '/file.ts' },
             },
           },
         },
@@ -134,7 +134,7 @@ describe('mapCursorEvent', () => {
       expect(events[0]).toMatchObject({
         type: 'tool_use',
         toolName: 'Read',
-        toolInput: { path: '/file.ts' },
+        toolInput: { file: '/file.ts' },
       });
     });
   });
