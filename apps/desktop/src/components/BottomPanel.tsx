@@ -12,11 +12,17 @@ const DEFAULT_HEIGHT_DESKTOP = 300;
 const DEFAULT_HEIGHT_MOBILE = 350;
 const RESIZE_KEY_STEP_PX = 16;
 
+/**
+ * Max panel height in px, derived from the viewport. Shared by `clampHeight`
+ * and the resize separator's `aria-valuemax` so the two can't desync.
+ */
+function getMaxHeightPx(): number {
+  return ((typeof window !== 'undefined' ? window.innerHeight : 900) * MAX_HEIGHT_VH) / 100;
+}
+
 /** Shared clamp for both the mouse-drag and keyboard resize paths. */
 function clampHeight(px: number): number {
-  const maxPx =
-    ((typeof window !== 'undefined' ? window.innerHeight : 900) * MAX_HEIGHT_VH) / 100;
-  return Math.max(MIN_HEIGHT, Math.min(maxPx, px));
+  return Math.max(MIN_HEIGHT, Math.min(getMaxHeightPx(), px));
 }
 
 interface BottomPanelProps {
@@ -212,9 +218,14 @@ export function BottomPanel({ projectId, projectRoot, workingDirectory }: Bottom
       className={`flex flex-col flex-shrink-0 bg-card ${isOpen ? 'border-t border-border' : ''}`}
       style={{ height: isOpen ? `${heightPx}px` : '0px', overflow: 'hidden' }}
     >
-      {/* Drag handle + tabs + actions */}
+      {/*
+        Resize grip — a dedicated, atomic separator element. ARIA APG forbids
+        focusable descendants inside role="separator": it must be a leaf
+        widget, not a container for the tabs/actions below. Mouse/touch drag
+        lives here too, alongside the keyboard resize handler.
+      */}
       <div
-        className="flex items-center gap-1 px-2 py-1 cursor-ns-resize select-none border-b border-border flex-shrink-0"
+        className="group h-1.5 w-full flex-shrink-0 flex items-center justify-center cursor-ns-resize select-none"
         onMouseDown={onDragStart}
         onTouchStart={onDragStart}
         onKeyDown={onResizeKeyDown}
@@ -224,10 +235,13 @@ export function BottomPanel({ projectId, projectRoot, workingDirectory }: Bottom
         tabIndex={0}
         aria-valuenow={Math.round(heightPx)}
         aria-valuemin={MIN_HEIGHT}
-        aria-valuemax={Math.round(
-          ((typeof window !== 'undefined' ? window.innerHeight : 900) * MAX_HEIGHT_VH) / 100
-        )}
+        aria-valuemax={Math.round(getMaxHeightPx())}
       >
+        <div className="w-8 h-1 rounded-full bg-muted-foreground/0 transition-colors group-hover:bg-muted-foreground/30 group-active:bg-muted-foreground/50" />
+      </div>
+
+      {/* Tabs + actions */}
+      <div className="flex items-center gap-1 px-2 py-1 select-none border-b border-border flex-shrink-0">
         {/* Tabs */}
         <div
           className="flex items-center gap-0.5 flex-shrink-0"

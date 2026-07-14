@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { usePluginStore } from '../../stores/pluginStore';
 import { useBottomPanelStore } from '../../stores/bottomPanelStore';
 
@@ -297,6 +297,36 @@ describe('BottomPanel', () => {
     fireEvent.mouseUp(document);
 
     expect(panel.style.height).toBe('400px');
+  });
+
+  it('exposes the resize handle as a dedicated separator with no interactive descendants', () => {
+    registerTerminalPanel(true);
+    useBottomPanelStore.setState({ activeTab: 'terminal' });
+
+    render(<BottomPanel projectId="p1" projectRoot="/test" />);
+    const sep = screen.getByRole('separator', { name: /resize bottom/i });
+    expect(sep.getAttribute('aria-orientation')).toBe('horizontal');
+    expect(sep.getAttribute('tabindex')).toBe('0');
+    // A separator must be an atomic control — it must not contain the tab
+    // buttons or the close button as focusable descendants.
+    expect(within(sep).queryByRole('button')).toBeNull();
+  });
+
+  it('resizes on keyboard (ArrowUp grows, ArrowDown shrinks)', () => {
+    registerTerminalPanel(true);
+    useBottomPanelStore.setState({ activeTab: 'terminal' });
+
+    const { container } = render(<BottomPanel projectId="p1" projectRoot="/test" />);
+    const sep = screen.getByRole('separator', { name: /resize bottom/i });
+    const panel = container.firstChild as HTMLElement;
+
+    expect(panel.style.height).toBe('300px');
+
+    fireEvent.keyDown(sep, { key: 'ArrowUp' });
+    expect(panel.style.height).toBe('316px');
+
+    fireEvent.keyDown(sep, { key: 'ArrowDown' });
+    expect(panel.style.height).toBe('300px');
   });
 
   // ── Plugin tabs ────────────────────────────────────────────────────────
