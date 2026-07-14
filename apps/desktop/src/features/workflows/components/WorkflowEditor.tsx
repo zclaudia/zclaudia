@@ -27,6 +27,8 @@ import type { Node, Edge } from '@xyflow/react';
 import { isDesktopTauri } from '../../../utils/platform';
 import { openPopoutWindow } from '../../../utils/popoutWindow';
 import { useOwnershipStore } from '../../../stores/ownershipStore';
+import { FormField } from '../../../components/ui/FormField';
+import { Input } from '../../../components/ui/Input';
 
 interface WorkflowEditorProps {
   workflow?: Workflow;
@@ -342,19 +344,21 @@ export function WorkflowEditor({
         >
           <input
             type="text"
+            aria-label="Workflow name"
             value={name}
             onChange={e => setName(e.target.value)}
             placeholder="Workflow name..."
-            className="text-sm font-medium bg-transparent border-none outline-none placeholder:text-muted-foreground min-w-0 w-48"
+            className="text-sm font-medium bg-transparent border-none outline-none placeholder:text-muted-foreground min-w-0 w-48 rounded-sm focus-visible:ring-1 focus-visible:ring-ring"
             readOnly={readOnly}
           />
           <span className="text-muted-foreground/30 shrink-0">|</span>
           <input
             type="text"
+            aria-label="Workflow description"
             value={description}
             onChange={e => setDescription(e.target.value)}
             placeholder="Description (optional)"
-            className="text-xs bg-transparent border-none outline-none text-muted-foreground placeholder:text-muted-foreground/40 flex-1 min-w-0"
+            className="text-xs bg-transparent border-none outline-none text-muted-foreground placeholder:text-muted-foreground/40 flex-1 min-w-0 rounded-sm focus-visible:ring-1 focus-visible:ring-ring"
             readOnly={readOnly}
           />
           {readOnly && (
@@ -492,23 +496,24 @@ export function WorkflowEditor({
                 </div>
                 {fullSelectedEdge.type === 'loop' ? (
                   <div>
-                    <label className="text-xs font-medium text-muted-foreground block mb-1">
-                      Max Iterations
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={99}
-                      value={fullSelectedEdge.maxIterations ?? 3}
-                      onChange={e => {
-                        const nextValue = Number.parseInt(e.target.value, 10);
-                        updateSelectedEdge(fullSelectedEdge.id, {
-                          maxIterations:
-                            Number.isFinite(nextValue) && nextValue > 0 ? nextValue : 1,
-                        });
-                      }}
-                      className="w-full px-2.5 py-1.5 text-sm rounded-full border border-border bg-background focus:outline-none focus:border-primary"
-                    />
+                    <FormField label="Max Iterations">
+                      {f => (
+                        <Input
+                          {...f}
+                          type="number"
+                          min={1}
+                          max={99}
+                          value={fullSelectedEdge.maxIterations ?? 3}
+                          onChange={e => {
+                            const nextValue = Number.parseInt(e.target.value, 10);
+                            updateSelectedEdge(fullSelectedEdge.id, {
+                              maxIterations:
+                                Number.isFinite(nextValue) && nextValue > 0 ? nextValue : 1,
+                            });
+                          }}
+                        />
+                      )}
+                    </FormField>
                     <p className="text-xs text-muted-foreground mt-1">
                       Number of times this loop edge may revisit its target before taking
                       `loop_exhausted`.

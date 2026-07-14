@@ -47,6 +47,22 @@ vi.mock('../WorkflowGraphEditor', () => ({
   WorkflowGraphEditor: (props: any) => (
     <div data-testid="graph-editor" data-graph-editor>
       GraphEditor
+      <button
+        data-testid="select-loop-edge"
+        onClick={() => {
+          props.onEdgesChange?.([
+            {
+              id: 'e1',
+              source: 'n1',
+              target: 'n2',
+              data: { edgeType: 'loop', maxIterations: 3 },
+            },
+          ]);
+          props.onEdgeSelect?.('e1');
+        }}
+      >
+        Select Loop Edge
+      </button>
     </div>
   ),
   fromFlowNodes: (nodes: any[]) =>
@@ -394,6 +410,42 @@ describe('WorkflowEditor', () => {
         expect.objectContaining({ method: 'PATCH' })
       );
     });
+  });
+
+  it('labels the workflow name, description, and max-iterations fields', () => {
+    render(<WorkflowEditor projectId="proj-1" onBack={mockOnBack} onSaved={mockOnSaved} />);
+
+    expect(screen.getByLabelText(/workflow name/i)).toBeTruthy();
+    expect(screen.getByLabelText(/description/i)).toBeTruthy();
+  });
+
+  it('labels the max-iterations field when a loop edge is selected', () => {
+    const workflow = {
+      id: 'wf-1',
+      name: 'Existing',
+      definition: {
+        nodes: [
+          { id: 'n1', name: 'Step 1', type: 'ai_prompt', config: {}, position: { x: 0, y: 0 } },
+          { id: 'n2', name: 'Step 2', type: 'ai_prompt', config: {}, position: { x: 100, y: 0 } },
+        ],
+        edges: [{ id: 'e1', source: 'n1', target: 'n2', type: 'loop', maxIterations: 3 }],
+        entryNodeId: 'n1',
+        triggers: [{ type: 'manual' }],
+      },
+    } as any;
+
+    render(
+      <WorkflowEditor
+        workflow={workflow}
+        projectId="proj-1"
+        onBack={mockOnBack}
+        onSaved={mockOnSaved}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('select-loop-edge'));
+
+    expect(screen.getByLabelText(/max.*iterations/i)).toBeTruthy();
   });
 
   it('renders existing workflow definition directly', () => {
