@@ -122,6 +122,15 @@ function isTurnComplete(msg: ProviderRuntimeEvent): boolean {
 const activeThreadIds = new Map<string, { client: CodexAppServerClient; threadId: string }>();
 const sessionClientMap = new Map<string, CodexAppServerClient>();
 
+function registerSessionClient(
+  sessionKey: string | undefined,
+  client: CodexAppServerClient
+): void {
+  if (sessionKey) {
+    sessionClientMap.set(sessionKey, client);
+  }
+}
+
 export async function* runCodexAppServer(
   input: string,
   options: CodexRunOptions,
@@ -130,9 +139,8 @@ export async function* runCodexAppServer(
   const client = getOrCreateAppServerClient(options);
   client.currentMode = options.mode;
 
-  if (options.sessionId) {
-    sessionClientMap.set(options.sessionId, client);
-  }
+  registerSessionClient(options.claudiaSessionId, client);
+  registerSessionClient(options.sessionId, client);
 
   let threadId: string;
   let isResumed = false;
@@ -166,6 +174,7 @@ export async function* runCodexAppServer(
   }
   debugLog(`[Codex AppServer] Using threadId: ${threadId}`);
 
+  registerSessionClient(threadId, client);
   activeThreadIds.set(threadId, { client, threadId });
 
   try {
@@ -228,6 +237,7 @@ export async function* runCodexAppServer(
 
       const freshThreadId = await client.startThread(options.cwd);
       rememberThreadCwd(freshThreadId, options.cwd);
+      registerSessionClient(freshThreadId, client);
       debugLog(`[Codex AppServer] Recovery: new threadId=${freshThreadId}`);
 
       inputBlocks = prepareAppServerInput(input);

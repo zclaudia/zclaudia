@@ -45,6 +45,7 @@ import {
   destroyAllCodexClients,
   resetCodexRunnerForTests,
   runCodexAppServer,
+  setCodexSessionMode,
 } from '../runner.js';
 
 const denyAll: PermissionCallback = async () => ({ behavior: 'deny' as const });
@@ -104,6 +105,60 @@ describe('runner', () => {
     await abortCodexSession('thread-1');
 
     expect(mockClient.interruptTurn).toHaveBeenCalledWith('thread-1');
+  });
+
+  it('setCodexSessionMode updates client.currentMode when called with claudiaSessionId during run', async () => {
+    mockClient.startThread.mockResolvedValueOnce('thread-new');
+    let unblockTurn: (() => void) | undefined;
+    const turnBlocked = new Promise<void>((resolve) => {
+      unblockTurn = resolve;
+    });
+    mockClient.runTurn.mockImplementationOnce(async function* () {
+      yield { type: 'init', sessionId: 'thread-new' };
+      await turnBlocked;
+      yield { type: 'assistant_delta', content: 'done' };
+    });
+
+    const gen = runCodexAppServer(
+      'hello',
+      { cwd: '/tmp/project', claudiaSessionId: 'claudia-sess-1', bridge: null },
+      denyAll
+    );
+    await gen.next();
+
+    mockClient.currentMode = 'default';
+    setCodexSessionMode('claudia-sess-1', 'plan');
+    expect(mockClient.currentMode).toBe('plan');
+
+    unblockTurn?.();
+    await gen.next();
+    await gen.return(undefined);
+  });
+
+  it('setCodexSessionMode updates client.currentMode when called with provider threadId', async () => {
+    mockClient.startThread.mockResolvedValueOnce('thread-new');
+    let unblockTurn: (() => void) | undefined;
+    const turnBlocked = new Promise<void>((resolve) => {
+      unblockTurn = resolve;
+    });
+    mockClient.runTurn.mockImplementationOnce(async function* () {
+      yield { type: 'init', sessionId: 'thread-new' };
+      await turnBlocked;
+    });
+
+    const gen = runCodexAppServer(
+      'hello',
+      { cwd: '/tmp/project', claudiaSessionId: 'claudia-sess-1', bridge: null },
+      denyAll
+    );
+    await gen.next();
+
+    mockClient.currentMode = 'default';
+    setCodexSessionMode('thread-new', 'bypassPermissions');
+    expect(mockClient.currentMode).toBe('bypassPermissions');
+
+    unblockTurn?.();
+    await gen.return(undefined);
   });
 
   afterEach(() => {

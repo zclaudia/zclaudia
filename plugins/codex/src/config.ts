@@ -236,26 +236,31 @@ export function writeMcpConfig(
   bridge: ProviderToolBridgeEntry | null
 ): { configDir: string; configSignature: string } {
   const configDir = getCodexConfigDir();
-  mkdirSync(configDir, { recursive: true });
-  ensureCodexProjectTrusted(configDir);
-  const configToml = buildMcpConfigToml(bridge);
+  try {
+    mkdirSync(configDir, { recursive: true });
+    ensureCodexProjectTrusted(configDir);
+    const configToml = buildMcpConfigToml(bridge);
 
-  if (configToml !== lastWrittenConfig) {
-    const codexDir = join(configDir, '.codex');
-    mkdirSync(codexDir, { recursive: true });
-    const configPath = join(codexDir, 'config.toml');
+    if (configToml !== lastWrittenConfig) {
+      const codexDir = join(configDir, '.codex');
+      mkdirSync(codexDir, { recursive: true });
+      const configPath = join(codexDir, 'config.toml');
 
-    if (configToml) {
-      writeFileSync(configPath, configToml, 'utf-8');
-      debugLog(`[Codex AppServer] Wrote MCP config: ${configPath}`);
-    } else if (existsSync(configPath)) {
-      unlinkSync(configPath);
-      debugLog(`[Codex AppServer] Removed MCP config: ${configPath}`);
+      if (configToml) {
+        writeFileSync(configPath, configToml, 'utf-8');
+        debugLog(`[Codex AppServer] Wrote MCP config: ${configPath}`);
+      } else if (existsSync(configPath)) {
+        unlinkSync(configPath);
+        debugLog(`[Codex AppServer] Removed MCP config: ${configPath}`);
+      }
+      lastWrittenConfig = configToml;
     }
-    lastWrittenConfig = configToml;
-  }
 
-  return { configDir, configSignature: configToml };
+    return { configDir, configSignature: configToml };
+  } catch (error) {
+    debugLog(`[Codex AppServer] WARN: Failed to write MCP config: ${error}`);
+    return { configDir, configSignature: '' };
+  }
 }
 
 export function buildEnv(options: {
