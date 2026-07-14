@@ -166,7 +166,7 @@ describe('ProjectSettings', () => {
 
   it('renders all form fields', async () => {
     await renderProjectSettings();
-    expect(screen.getByText('Project Name *')).toBeTruthy();
+    expect(screen.getByLabelText(/project name/i)).toBeTruthy();
     expect(screen.getByText('Working Directory')).toBeTruthy();
     expect(screen.getByText('Default Agent for this Project')).toBeTruthy();
     expect(screen.getByText('Review Provider')).toBeTruthy();
@@ -450,15 +450,9 @@ describe('ProjectSettings', () => {
     const api = await import('../../services/api');
 
     await renderProjectSettings();
-    // The supervisor toggle is a rounded-full button near the Supervisor Agent label
-    // Toggle switches use w-10 h-5; other rounded-full buttons (e.g. Select triggers) don't.
-    const toggleButtons = screen
-      .getAllByRole('button')
-      .filter(b => b.className?.includes('w-10') && b.className?.includes('rounded-full'));
-    // Second rounded-full button is the supervisor toggle (first is permission override)
-    if (toggleButtons.length >= 2) {
-      await clickAsync(toggleButtons[1]);
-    }
+    // Switches: [0] permission override, [1] project workspace.
+    const switches = screen.getAllByRole('switch');
+    await clickAsync(switches[1]);
 
     await waitFor(() => {
       expect(api.initSupervisionAgent).toHaveBeenCalledWith('proj-1', expect.any(Object), 'lite');
@@ -474,13 +468,9 @@ describe('ProjectSettings', () => {
     } as any);
 
     await renderProjectSettings();
-    // Toggle switches use w-10 h-5; other rounded-full buttons (e.g. Select triggers) don't.
-    const toggleButtons = screen
-      .getAllByRole('button')
-      .filter(b => b.className?.includes('w-10') && b.className?.includes('rounded-full'));
-    if (toggleButtons.length >= 2) {
-      await clickAsync(toggleButtons[1]);
-    }
+    // Switches: [0] permission override, [1] project workspace.
+    const switches = screen.getAllByRole('switch');
+    await clickAsync(switches[1]);
 
     await waitFor(() => {
       expect(api.updateSupervisionAgentAction).toHaveBeenCalledWith('proj-1', 'archive');

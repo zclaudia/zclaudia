@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useId } from 'react';
 import type {
   Project,
   LlmProfileConfig,
@@ -22,6 +22,9 @@ import { Select } from '../../components/ui/Select';
 import { listAllWorkflows } from '../workflows/api';
 import { ToolRuleList } from '../../components/permission/ToolRuleList';
 import { HookList } from '../../components/permission/HookList';
+import { FormField } from '../../components/ui/FormField';
+import { Input, FIELD_CLASS } from '../../components/ui/Input';
+import { Toggle } from '../../components/ui/Toggle';
 
 const CATEGORY_LABELS: Record<PermissionCategory, { label: string; description: string }> = {
   fileRead: { label: 'File Read', description: 'Read, Glob, Grep, WebFetch' },
@@ -57,6 +60,7 @@ interface ProjectSettingsProps {
 }
 
 export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsProps) {
+  const titleId = useId();
   const activeServerId = useServerStore(s => s.activeServerId);
   const facadeConnectionState = useFacadeStore(s => s.connectionState);
   const facadeBackends = useFacadeStore(s => s.backends);
@@ -314,13 +318,19 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
       {/* Modal */}
       <div
         data-testid="project-settings"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[500px] md:max-h-[80vh] bg-card border border-border rounded-lg shadow-xl z-50 flex flex-col"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <h2 className="text-lg font-semibold text-card-foreground">Project Settings</h2>
+          <h2 id={titleId} className="text-lg font-semibold text-card-foreground">
+            Project Settings
+          </h2>
           <button
             onClick={onClose}
+            aria-label="Close"
             className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -337,30 +347,24 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {/* Project Name */}
-          <div>
-            <label className="block text-sm font-medium text-muted-foreground mb-1">
-              Project Name *
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              className="w-full px-3 py-2 bg-input border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary"
-            />
-          </div>
+          <FormField label="Project Name" required>
+            {f => <Input {...f} type="text" value={name} onChange={e => setName(e.target.value)} />}
+          </FormField>
 
           {/* Working Directory */}
           <div>
-            <label className="block text-sm font-medium text-muted-foreground mb-1">
-              Working Directory
-            </label>
-            <input
-              type="text"
-              value={rootPath}
-              onChange={e => setRootPath(e.target.value)}
-              placeholder="/path/to/project"
-              className="w-full px-3 py-2 bg-input border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary font-mono"
-            />
+            <FormField label="Working Directory">
+              {f => (
+                <Input
+                  {...f}
+                  type="text"
+                  value={rootPath}
+                  onChange={e => setRootPath(e.target.value)}
+                  placeholder="/path/to/project"
+                  className="font-mono"
+                />
+              )}
+            </FormField>
             <p className="text-xs text-muted-foreground mt-1">
               The directory where Claude will execute commands
             </p>
@@ -416,16 +420,18 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
 
           {/* System Prompt */}
           <div>
-            <label className="block text-sm font-medium text-muted-foreground mb-1">
-              System Prompt
-            </label>
-            <textarea
-              value={systemPrompt}
-              onChange={e => setSystemPrompt(e.target.value)}
-              placeholder="You are a helpful assistant..."
-              rows={4}
-              className="w-full px-3 py-2 bg-input border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary resize-none"
-            />
+            <FormField label="System Prompt">
+              {f => (
+                <textarea
+                  {...f}
+                  value={systemPrompt}
+                  onChange={e => setSystemPrompt(e.target.value)}
+                  placeholder="You are a helpful assistant..."
+                  rows={4}
+                  className={`${FIELD_CLASS} resize-none`}
+                />
+              )}
+            </FormField>
             <p className="text-xs text-muted-foreground mt-1">
               Custom instructions to prepend to every conversation
             </p>
@@ -467,24 +473,17 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
                   Override the global agent permission policy for this project
                 </p>
               </div>
-              <button
-                onClick={() => {
-                  setHasOverride(!hasOverride);
-                  if (!hasOverride) {
+              <Toggle
+                checked={hasOverride}
+                onChange={next => {
+                  setHasOverride(next);
+                  if (next) {
                     // Start with empty override — all categories inherit from global
                     setPermOverride({});
                   }
                 }}
-                className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${
-                  hasOverride ? 'bg-primary' : 'bg-muted'
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                    hasOverride ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
+                aria-label="Agent permission override"
+              />
             </div>
 
             {!hasOverride && (
@@ -583,19 +582,12 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
                   Enable the Project Workspace entry for managing tasks and sub-sessions
                 </p>
               </div>
-              <button
-                onClick={handleToggleProjectWorkspace}
+              <Toggle
+                checked={isProjectWorkspaceEnabled}
+                onChange={handleToggleProjectWorkspace}
                 disabled={projectWorkspaceLoading || !isConnected}
-                className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 disabled:opacity-50 ${
-                  isProjectWorkspaceEnabled ? 'bg-primary' : 'bg-muted'
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                    isProjectWorkspaceEnabled ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
+                aria-label="Project workspace"
+              />
             </div>
 
             {!isProjectWorkspaceEnabled && (
