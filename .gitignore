@@ -127,6 +127,7 @@ server/data/
 /plugins/*
 !/plugins/claude/
 !/plugins/cursor/
+!/plugins/codex/
 
 # Superpowers plugin generated docs
 docs/superpowers/
