@@ -473,6 +473,44 @@ export function Sidebar({
     threshold: 60,
   });
 
+  // Mobile drawer is a modal dialog: move focus into it on open so keyboard
+  // and screen-reader users land inside instead of on whatever was focused
+  // behind the (still-mounted) app.
+  useEffect(() => {
+    if (isMobile && isOpen) {
+      sidebarSwipeRef.current?.focus();
+    }
+  }, [isMobile, isOpen, sidebarSwipeRef]);
+
+  // Escape closes the drawer; Tab/Shift+Tab is trapped within the panel so
+  // keyboard focus can't leak out to the visually-hidden app behind the scrim.
+  const handleDrawerKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose?.();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const focusable = sidebarSwipeRef.current?.querySelectorAll<HTMLElement>(
+        'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+      );
+      if (!focusable || focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else if (document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    },
+    [onClose, sidebarSwipeRef]
+  );
+
   // Returns true if creation may proceed; otherwise opens the guidance dialog.
   // Refresh when readiness is unknown or currently unusable so first-load/null
   // readiness cannot fail open, while known-good state keeps the UI instant.
@@ -706,10 +744,15 @@ export function Sidebar({
 
     return (
       <>
-        <div className="fixed inset-0 bg-black/50 z-40" onClick={onClose} />
+        <div className="fixed inset-0 bg-black/50 z-40" onClick={onClose} aria-hidden="true" />
         <div
           ref={sidebarSwipeRef}
-          className="fixed inset-y-0 left-0 w-64 bg-card/80 glass z-50 shadow-apple-xl flex flex-col safe-top-pad safe-bottom-pad"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Navigation"
+          tabIndex={-1}
+          onKeyDown={handleDrawerKeyDown}
+          className="fixed inset-y-0 left-0 w-64 bg-card/80 glass z-50 shadow-apple-xl flex flex-col safe-top-pad safe-bottom-pad outline-none"
         >
           <MobileSidebarHeader
             onClose={onClose}
