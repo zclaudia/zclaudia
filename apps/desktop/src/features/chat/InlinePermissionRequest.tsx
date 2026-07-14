@@ -162,7 +162,9 @@ export function InlinePermissionRequest({ request, onDecision }: InlinePermissio
   const credentialLabel =
     request.credentialHint === 'sudo_password' ? 'sudo password' : 'credential';
   const isCredential = request.requiresCredential;
-  const borderColor = isCredential ? 'border-l-amber-500' : 'border-l-warning';
+  // Full hairline + faint tint replaces the old side-stripe accent, while still
+  // distinguishing the credential (locked) case from a plain permission request.
+  const panelTint = isCredential ? 'border-warning/40 bg-warning/5' : 'border-border';
 
   // Resolved compact state
   if (resolved) {
@@ -184,7 +186,7 @@ export function InlinePermissionRequest({ request, onDecision }: InlinePermissio
   }
 
   return (
-    <div className={`rounded-xl border border-border overflow-hidden border-l-4 ${borderColor}`}>
+    <div className={`rounded-xl border overflow-hidden ${panelTint}`}>
       {/* Timeout progress bar (legacy — hidden when workflow manages timeout) */}
       {hasTimeout && (
         <div className="h-0.5 bg-muted">

@@ -492,7 +492,7 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
             )}
 
             {hasOverride && (
-              <div className="space-y-2 mt-3 pl-3 border-l-2 border-primary/30">
+              <div className="space-y-2 mt-3 pl-3 border-l border-border">
                 <p className="text-xs font-medium text-muted-foreground mb-1">
                   Permission Categories
                 </p>
@@ -605,7 +605,7 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
             )}
 
             {effectiveAgent && isProjectWorkspaceEnabled && (
-              <div className="space-y-2 mt-3 pl-3 border-l-2 border-primary/30">
+              <div className="space-y-2 mt-3 pl-3 border-l border-border">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium text-muted-foreground">Status:</span>
                   <span
