@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# ZClaudia App — start dev app (Tauri or Standalone mode)
+# ZClaudia App — start dev app (Tauri, Standalone, or Browser mode)
 #
 # Usage:
-#   ./scripts/dev/start-app.sh [tauri|desktop|standalone|server]
+#   ./scripts/dev/start-app.sh [tauri|desktop|standalone|server|browser|web] [--no-build] [--port PORT]
 #
 # Default: Tauri dev mode
 #
@@ -17,6 +17,10 @@ ok()   { echo -e "\033[0;32m+\033[0m $*"; }
 warn() { echo -e "\033[0;33m!\033[0m $*"; }
 die()  { echo -e "\033[0;31mx\033[0m $*" >&2; exit 1; }
 
+usage() {
+  sed -n '3,9p' "$0"
+}
+
 # --- Pin the WHOLE script to the project's Node (.node-version) up front ---
 # Re-execs this script once under the project Node so every node/pnpm/npx below
 # — install, native-module rebuild check, builds, and the pre-launched server —
@@ -24,6 +28,11 @@ die()  { echo -e "\033[0;31mx\033[0m $*" >&2; exit 1; }
 # could rebuild better-sqlite3 to a mismatched ABI and the server dies with
 # NODE_MODULE_VERSION / ERR_DLOPEN_FAILED.
 source "$SCRIPT_DIR/../lib/use-project-node.sh"
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
 
 # --- Source .env files (auto-export). Order: most general first, most specific last (later wins). ---
 source_env() {
@@ -61,14 +70,43 @@ setup_node() {
   fnm use --silent-if-unchanged 2>/dev/null || true
 }
 
-# Determine mode from argument
+run_pnpm() {
+  corepack pnpm "$@"
+}
+
 MODE="tauri"
-ARG="${1:-}"
-case "$ARG" in
-  standalone|server) MODE="standalone" ;;
-  tauri|desktop|"") MODE="tauri" ;;
-  *) die "Unknown mode: $ARG. Use: tauri, desktop, standalone, or server" ;;
-esac
+SKIP_BUILD=0
+BROWSER_PORT="${PORT:-3100}"
+
+validate_browser_port() {
+  if ! [[ "$BROWSER_PORT" =~ ^[0-9]+$ ]] || (( BROWSER_PORT < 1 || BROWSER_PORT > 65535 )); then
+    die "Invalid --port value: $BROWSER_PORT"
+  fi
+}
+
+# Determine mode and options from arguments
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    standalone|server) MODE="standalone" ;;
+    tauri|desktop) MODE="tauri" ;;
+    browser|web) MODE="browser" ;;
+    --no-build) SKIP_BUILD=1 ;;
+    --port)
+      shift
+      [[ $# -gt 0 ]] || die "--port requires a value"
+      BROWSER_PORT="$1"
+      ;;
+    --port=*) BROWSER_PORT="${1#--port=}" ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *) die "Unknown argument: $1. Use: tauri, desktop, standalone, server, browser, web, --no-build, or --port PORT" ;;
+  esac
+  shift
+done
+
+validate_browser_port
 
 info "Mode: $MODE"
 
@@ -122,45 +160,39 @@ wait_for_url() {
   die "$label did not become ready at $url within ${timeout}s"
 }
 
-# --- Ensure better-sqlite3 matches the project Node that runs the dev server ---
-# Both dev modes run the server under the fnm project Node (.node-version), NOT
-# the Tauri sidecar: tauri mode pre-launches `node server/dist/index.js` and
-# standalone mode uses `tsx watch`. If better-sqlite3 was built under a different
-# Node (e.g. a bare shell on a newer Homebrew Node), its native ABI won't load
-# and the server dies on startup with ERR_DLOPEN_FAILED / NODE_MODULE_VERSION
-# mismatch. Detect that against the project Node and rebuild so this script is
-# self-healing — no need to run scripts/with-project-node.sh by hand.
+# --- Ensure native modules match the project Node that runs the dev server ---
+# Dev modes run the server under the fnm project Node (.node-version), NOT the
+# Tauri sidecar. Native modules built under a different Node can fail on startup
+# with ERR_DLOPEN_FAILED / NODE_MODULE_VERSION / missing native binary errors.
 # Precondition: setup_node has already selected the project Node on PATH.
 ensure_native_modules() {
-  if (cd "$PROJECT_ROOT" && node -e "require('better-sqlite3')") >/dev/null 2>&1; then
-    return 0
-  fi
-  warn "better-sqlite3 native ABI does not match project Node ($(node --version)); rebuilding..."
-  (cd "$PROJECT_ROOT" && pnpm rebuild better-sqlite3)
-  if (cd "$PROJECT_ROOT" && node -e "require('better-sqlite3')") >/dev/null 2>&1; then
-    ok "Native modules rebuilt for project Node ($(node --version))"
-  else
-    die "better-sqlite3 still fails to load under project Node after rebuild. Try: rm -rf node_modules && bash scripts/with-project-node.sh pnpm install"
-  fi
+  (cd "$PROJECT_ROOT" && node scripts/hooks/check-native-modules.mjs)
 }
 
 # --- Install deps + build shared + server ---
 build() {
+  local include_desktop="${1:-0}"
   setup_node
 
   info "Installing dependencies..."
-  (cd "$PROJECT_ROOT" && pnpm install --frozen-lockfile 2>/dev/null || pnpm install)
+  (cd "$PROJECT_ROOT" && run_pnpm install --frozen-lockfile 2>/dev/null || run_pnpm install)
   ok "Dependencies ready"
 
   ensure_native_modules
 
   info "Building shared..."
-  (cd "$PROJECT_ROOT/shared" && setup_node && pnpm build)
+  (cd "$PROJECT_ROOT/shared" && setup_node && run_pnpm build)
   ok "Shared built"
 
   info "Building server..."
-  (cd "$PROJECT_ROOT/server" && setup_node && pnpm build)
+  (cd "$PROJECT_ROOT/server" && setup_node && run_pnpm build)
   ok "Server built"
+
+  if [[ "$include_desktop" == "1" ]]; then
+    info "Building desktop browser assets..."
+    (cd "$PROJECT_ROOT/apps/desktop" && setup_node && run_pnpm build)
+    ok "Desktop browser assets built"
+  fi
 }
 
 # ============================================================
@@ -180,6 +212,9 @@ cleanup() {
   sleep 1
   # Port-level fallback: kill anything still on 3100 and 1420
   lsof -ti:3100 | xargs -r kill 2>/dev/null || true
+  if [[ "${BROWSER_PORT:-3100}" != "3100" ]]; then
+    lsof -ti:"$BROWSER_PORT" | xargs -r kill 2>/dev/null || true
+  fi
   lsof -ti:1420 | xargs -r kill 2>/dev/null || true
   wait 2>/dev/null || true
   ok "Dev processes stopped"
@@ -218,7 +253,7 @@ start_tauri() {
   cd "$PROJECT_ROOT/apps/desktop"
   setup_node
   # Run in foreground (not exec) so trap cleanup fires on exit
-  pnpm exec tauri dev --config src-tauri/tauri.dev.conf.json &
+  run_pnpm exec tauri dev --config src-tauri/tauri.dev.conf.json &
   TAURI_PID=$!
   wait "$TAURI_PID" || true
 }
@@ -239,7 +274,7 @@ start_standalone() {
   SERVER_PID=$!
 
   info "Starting frontend (vite)..."
-  (cd "$PROJECT_ROOT/apps/desktop" && setup_node && VITE_LOCAL_SERVER_PORT=3100 pnpm dev) &
+  (cd "$PROJECT_ROOT/apps/desktop" && setup_node && VITE_LOCAL_SERVER_PORT=3100 run_pnpm dev) &
   FRONTEND_PID=$!
 
   wait_for_url "http://localhost:3100/api/sessions" 20 "Backend"
@@ -251,8 +286,45 @@ start_standalone() {
   wait
 }
 
+# ============================================================
+# Browser mode (built UI served by local backend)
+# ============================================================
+start_browser() {
+  kill_stale
+
+  wait_port_free "$BROWSER_PORT"
+
+  if [[ "$SKIP_BUILD" == "1" ]]; then
+    setup_node
+    ensure_native_modules
+    warn "Skipping build; using existing server/dist and apps/desktop/dist"
+  else
+    build 1
+  fi
+
+  info "Starting browser shell backend..."
+  (
+    cd "$PROJECT_ROOT"
+    setup_node
+    ZCLAUDIA_DATA_DIR="${ZCLAUDIA_DATA_DIR:-$HOME/.zclaudia}" \
+    ZCLAUDIA_CHANNEL="${ZCLAUDIA_CHANNEL:-dev}" \
+    PORT="$BROWSER_PORT" \
+    SERVER_HOST=127.0.0.1 \
+    node server/dist/index.js
+  ) &
+  SERVER_PID=$!
+
+  wait_for_url "http://127.0.0.1:$BROWSER_PORT/" 20 "Browser shell"
+
+  ok "Browser mode ready — http://127.0.0.1:$BROWSER_PORT"
+  ok "Press Ctrl+C to stop"
+
+  wait "$SERVER_PID" || true
+}
+
 # --- Main ---
 case "$MODE" in
   tauri)       start_tauri ;;
   standalone)  start_standalone ;;
+  browser)     start_browser ;;
 esac

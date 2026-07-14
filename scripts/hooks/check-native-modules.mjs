@@ -19,8 +19,8 @@ import path from 'path';
 import process from 'process';
 import { fileURLToPath } from 'url';
 
-const require = createRequire(import.meta.url);
 const repoRoot = path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
+const require = createRequire(path.join(repoRoot, 'server/package.json'));
 
 const modules = [
   {
@@ -35,7 +35,26 @@ const modules = [
       }
     },
   },
+  {
+    name: 'node-pty',
+    check() {
+      require('node-pty');
+    },
+  },
 ];
+
+function isMissingPackage(error, packageName) {
+  return error?.code === 'MODULE_NOT_FOUND' && error.message?.includes(`'${packageName}'`);
+}
+
+function isNativeLoadFailure(error) {
+  return (
+    error?.code === 'ERR_DLOPEN_FAILED' ||
+    /Failed to load native module|NODE_MODULE_VERSION|Module did not self-register/.test(
+      error?.message ?? ''
+    )
+  );
+}
 
 function readPnpmStoreDir() {
   const modulesYaml = path.join(repoRoot, 'node_modules', '.modules.yaml');
@@ -54,9 +73,9 @@ function checkModules() {
     try {
       mod.check();
     } catch (e) {
-      if (e?.code === 'MODULE_NOT_FOUND') {
+      if (isMissingPackage(e, mod.name)) {
         missing.push(mod.name);
-      } else if (e?.code === 'ERR_DLOPEN_FAILED') {
+      } else if (isNativeLoadFailure(e)) {
         failed.push(mod.name);
       } else {
         throw e;
@@ -67,23 +86,35 @@ function checkModules() {
   return { failed, missing };
 }
 
-function hasPnpm() {
+function resolvePnpmCommand() {
   try {
     execFileSync('pnpm', ['--version'], { stdio: 'ignore', cwd: repoRoot });
-    return true;
+    return { command: 'pnpm', args: [] };
   } catch {
-    return false;
+    try {
+      execFileSync('corepack', ['pnpm', '--version'], { stdio: 'ignore', cwd: repoRoot });
+      return { command: 'corepack', args: ['pnpm'] };
+    } catch {
+      return null;
+    }
   }
 }
 
-function rebuildModules(failed) {
+function rebuildModules(failed, pnpmCommand) {
   const storeDir = readPnpmStoreDir();
   const storeArgs = storeDir ? ['--store-dir', storeDir] : [];
 
   console.log(
     `\x1b[33m! Native module ABI mismatch for ${failed.join(', ')} under Node ${process.version} (ABI ${process.versions.modules}); rebuilding...\x1b[0m`
   );
-  execFileSync('pnpm', [...storeArgs, 'rebuild', ...failed], { stdio: 'inherit', cwd: repoRoot });
+  execFileSync(
+    pnpmCommand.command,
+    [...pnpmCommand.args, ...storeArgs, '--filter', '@zclaudia/server', 'rebuild', ...failed],
+    {
+      stdio: 'inherit',
+      cwd: repoRoot,
+    }
+  );
 }
 
 const initial = checkModules();
@@ -94,7 +125,8 @@ if (initial.missing.length > 0) {
 }
 
 if (initial.failed.length > 0) {
-  if (!hasPnpm()) {
+  const pnpmCommand = resolvePnpmCommand();
+  if (!pnpmCommand) {
     console.error(
       `\x1b[31m✗ Native module ABI mismatch for ${initial.failed.join(', ')} under Node ${process.version} (ABI ${process.versions.modules}), but pnpm is not available.\x1b[0m`
     );
@@ -103,7 +135,7 @@ if (initial.failed.length > 0) {
   }
 
   try {
-    rebuildModules(initial.failed);
+    rebuildModules(initial.failed, pnpmCommand);
   } catch {
     console.error(
       `\x1b[31m✗ Failed to rebuild native modules. Try: pnpm rebuild ${initial.failed.join(' ')}\x1b[0m`
