@@ -34,51 +34,54 @@ interface DashboardHomeProps {
 // Status badge helpers
 // ---------------------------------------------------------------------------
 
+const GLYPH_ORANGE_BG = 'bg-[hsl(var(--glyph-orange)/0.1)]';
+const GLYPH_ORANGE_TEXT = 'text-[hsl(var(--glyph-orange))]';
+
 const PR_STATUS_COLORS: Record<string, string> = {
-  open: 'bg-blue-500/10 text-blue-500',
-  reviewing: 'bg-yellow-500/10 text-yellow-500',
-  review_failed: 'bg-red-500/10 text-red-500',
-  approved: 'bg-green-500/10 text-green-500',
-  merging: 'bg-purple-500/10 text-purple-500',
-  conflict: 'bg-red-500/10 text-red-500',
-  merged: 'bg-gray-500/10 text-gray-400',
-  closed: 'bg-gray-500/10 text-gray-400',
+  open: 'bg-primary/10 text-primary',
+  reviewing: 'bg-warning/10 text-warning',
+  review_failed: 'bg-destructive/10 text-destructive',
+  approved: 'bg-success/10 text-success',
+  merging: 'bg-thinking/10 text-thinking',
+  conflict: 'bg-destructive/10 text-destructive',
+  merged: 'bg-muted text-muted-foreground',
+  closed: 'bg-muted text-muted-foreground',
 };
 
 const ISSUE_STATUS_COLORS: Record<string, string> = {
-  open: 'bg-green-500/10 text-green-500',
-  in_progress: 'bg-blue-500/10 text-blue-500',
-  closed: 'bg-gray-500/10 text-gray-400',
+  open: 'bg-success/10 text-success',
+  in_progress: 'bg-primary/10 text-primary',
+  closed: 'bg-muted text-muted-foreground',
 };
 
 const ISSUE_PRIORITY_COLORS: Record<string, string> = {
-  low: 'bg-gray-500/10 text-gray-400',
-  medium: 'bg-blue-500/10 text-blue-500',
-  high: 'bg-orange-500/10 text-orange-500',
-  critical: 'bg-red-500/10 text-red-500',
+  low: 'bg-muted text-muted-foreground',
+  medium: 'bg-primary/10 text-primary',
+  high: `${GLYPH_ORANGE_BG} ${GLYPH_ORANGE_TEXT}`,
+  critical: 'bg-destructive/10 text-destructive',
 };
 
 const TASK_STATUS_COLORS: Record<string, string> = {
-  proposed: 'bg-orange-500/10 text-orange-500',
-  pending: 'bg-gray-500/10 text-gray-400',
-  queued: 'bg-blue-500/10 text-blue-500',
-  planning: 'bg-yellow-500/10 text-yellow-500',
-  running: 'bg-green-500/10 text-green-500',
-  reviewing: 'bg-yellow-500/10 text-yellow-500',
-  approved: 'bg-green-500/10 text-green-500',
-  integrated: 'bg-green-500/10 text-green-500',
-  merge_conflict: 'bg-red-500/10 text-red-500',
-  failed: 'bg-red-500/10 text-red-500',
-  rejected: 'bg-red-500/10 text-red-500',
-  blocked: 'bg-orange-500/10 text-orange-500',
-  cancelled: 'bg-gray-500/10 text-gray-400',
-  completed: 'bg-green-500/10 text-green-500',
+  proposed: `${GLYPH_ORANGE_BG} ${GLYPH_ORANGE_TEXT}`,
+  pending: 'bg-muted text-muted-foreground',
+  queued: 'bg-primary/10 text-primary',
+  planning: 'bg-warning/10 text-warning',
+  running: 'bg-success/10 text-success',
+  reviewing: 'bg-warning/10 text-warning',
+  approved: 'bg-success/10 text-success',
+  integrated: 'bg-success/10 text-success',
+  merge_conflict: 'bg-destructive/10 text-destructive',
+  failed: 'bg-destructive/10 text-destructive',
+  rejected: 'bg-destructive/10 text-destructive',
+  blocked: `${GLYPH_ORANGE_BG} ${GLYPH_ORANGE_TEXT}`,
+  cancelled: 'bg-muted text-muted-foreground',
+  completed: 'bg-success/10 text-success',
 };
 
 function StatusBadge({ status, colors }: { status: string; colors: Record<string, string> }) {
   return (
     <span
-      className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${colors[status] ?? 'bg-gray-500/10 text-gray-400'}`}
+      className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${colors[status] ?? 'bg-muted text-muted-foreground'}`}
     >
       {status.replace('_', ' ')}
     </span>
@@ -90,12 +93,12 @@ function StatusBadge({ status, colors }: { status: string; colors: Record<string
 // ---------------------------------------------------------------------------
 
 const PHASE_CONFIG: Record<string, { label: string; color: string }> = {
-  initializing: { label: 'Initializing', color: 'text-blue-500' },
-  setup: { label: 'Setup', color: 'text-yellow-500' },
-  active: { label: 'Active', color: 'text-green-500' },
-  paused: { label: 'Paused', color: 'text-orange-500' },
-  idle: { label: 'Idle', color: 'text-gray-400' },
-  archived: { label: 'Archived', color: 'text-gray-500' },
+  initializing: { label: 'Initializing', color: 'text-primary' },
+  setup: { label: 'Setup', color: 'text-warning' },
+  active: { label: 'Active', color: 'text-success' },
+  paused: { label: 'Paused', color: GLYPH_ORANGE_TEXT },
+  idle: { label: 'Idle', color: 'text-muted-foreground' },
+  archived: { label: 'Archived', color: 'text-muted-foreground' },
 };
 
 export function DashboardHome({
@@ -109,7 +112,7 @@ export function DashboardHome({
   // Supervisor agent
   const agent = useSupervisionStore(s => s.agents[projectId]) ?? null;
   const agentPhase = agent
-    ? (PHASE_CONFIG[agent.phase] ?? { label: agent.phase, color: 'text-gray-400' })
+    ? (PHASE_CONFIG[agent.phase] ?? { label: agent.phase, color: 'text-muted-foreground' })
     : null;
 
   // Tasks
@@ -209,7 +212,7 @@ export function DashboardHome({
                     {agentPhase?.label}
                   </span>
                   {agent.phase === 'active' && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
                   )}
                 </div>
                 <div className="text-xs text-muted-foreground">
@@ -257,7 +260,7 @@ export function DashboardHome({
             <div className="text-2xl font-bold">{activeTasks.length}</div>
             <div className="text-xs text-muted-foreground">active</div>
             {needsAttentionTasks.length > 0 && (
-              <div className="text-xs text-red-500">
+              <div className="text-xs text-destructive">
                 {needsAttentionTasks.length} needs attention
               </div>
             )}
@@ -283,7 +286,7 @@ export function DashboardHome({
             <div className="text-2xl font-bold">{activePRs.length}</div>
             <div className="text-xs text-muted-foreground">active</div>
             {needsAttentionPRs.length > 0 && (
-              <div className="text-xs text-red-500">{needsAttentionPRs.length} needs attention</div>
+              <div className="text-xs text-destructive">{needsAttentionPRs.length} needs attention</div>
             )}
           </div>
         </button>
@@ -304,7 +307,7 @@ export function DashboardHome({
             <div className="text-2xl font-bold">{openIssues.length}</div>
             <div className="text-xs text-muted-foreground">open</div>
             {inProgressIssues.length > 0 && (
-              <div className="text-xs text-blue-500">{inProgressIssues.length} in progress</div>
+              <div className="text-xs text-primary">{inProgressIssues.length} in progress</div>
             )}
           </div>
         </button>
@@ -327,7 +330,7 @@ export function DashboardHome({
               worktree{worktrees.length === 1 ? '' : 's'}
             </div>
             {dirtyWorktrees.length > 0 && (
-              <div className="text-xs text-orange-500">{dirtyWorktrees.length} with changes</div>
+              <div className={`text-xs ${GLYPH_ORANGE_TEXT}`}>{dirtyWorktrees.length} with changes</div>
             )}
           </div>
         </button>
@@ -428,16 +431,16 @@ export function DashboardHome({
           {activeWorkflows.slice(0, 3).map(wf => {
             const latestRun = (runs[wf.id] ?? [])[0];
             const RUN_STATUS_COLORS: Record<string, string> = {
-              pending: 'bg-gray-500/10 text-gray-400',
-              running: 'bg-blue-500/10 text-blue-500',
-              completed: 'bg-green-500/10 text-green-500',
-              failed: 'bg-red-500/10 text-red-500',
-              cancelled: 'bg-gray-500/10 text-gray-400',
+              pending: 'bg-muted text-muted-foreground',
+              running: 'bg-primary/10 text-primary',
+              completed: 'bg-success/10 text-success',
+              failed: 'bg-destructive/10 text-destructive',
+              cancelled: 'bg-muted text-muted-foreground',
             };
             return (
               <div key={wf.id} className="flex items-center justify-between py-1.5">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-green-500" />
+                  <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-success" />
                   <span className="text-sm truncate">{wf.name}</span>
                 </div>
                 {latestRun && <StatusBadge status={latestRun.status} colors={RUN_STATUS_COLORS} />}

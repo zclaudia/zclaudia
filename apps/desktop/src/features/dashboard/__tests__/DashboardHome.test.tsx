@@ -4,6 +4,7 @@ import { DashboardHome } from '../DashboardHome';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useSupervisionStore } from '../../../features/supervision/store';
 import { useLocalPRStore } from '../../../features/local-pr/store';
+import { useLocalIssueStore } from '../../../features/local-issues/store';
 import { useWorkflowStore } from '../../../features/workflows/store';
 
 describe('DashboardHome', () => {
@@ -157,5 +158,58 @@ describe('DashboardHome', () => {
     } as any);
     const { container } = render(<DashboardHome projectId={projectId} onNavigate={onNavigate} />);
     expect(container.textContent).toContain('1 needs attention');
+  });
+
+  it('status badges use semantic tokens, not raw tailwind palette', () => {
+    useSupervisionStore.setState({
+      tasks: {
+        [projectId]: [
+          { id: 't1', status: 'running', title: 'Running task', priority: 1 },
+          { id: 't2', status: 'planning', title: 'Planning task', priority: 1 },
+          { id: 't3', status: 'blocked', title: 'Blocked task', priority: 1 },
+          { id: 't4', status: 'failed', title: 'Failed task', priority: 1 },
+          { id: 't5', status: 'proposed', title: 'Proposed task', priority: 1 },
+        ],
+      },
+      agents: { [projectId]: { phase: 'active', mode: 'full' } },
+      lastCheckpoint: {},
+    } as any);
+    useLocalPRStore.setState({
+      prs: {
+        [projectId]: [
+          { id: 'pr1', status: 'open', title: 'Open PR', branchName: 'feat-1' },
+          { id: 'pr2', status: 'reviewing', title: 'Reviewing PR', branchName: 'feat-2' },
+          { id: 'pr3', status: 'review_failed', title: 'Failed PR', branchName: 'feat-3' },
+          { id: 'pr4', status: 'merging', title: 'Merging PR', branchName: 'feat-4' },
+        ],
+      },
+      loadPRs: vi.fn().mockResolvedValue(undefined),
+    } as any);
+    useLocalIssueStore.setState({
+      issues: {
+        [projectId]: [
+          {
+            id: 'i1',
+            status: 'open',
+            title: 'Open issue',
+            priority: 'high',
+          },
+          {
+            id: 'i2',
+            status: 'tracked',
+            title: 'Tracked issue',
+            priority: 'low',
+          },
+        ],
+      },
+      loadIssues: vi.fn().mockResolvedValue(undefined),
+    } as any);
+
+    const { container } = render(
+      <DashboardHome projectId={projectId} onNavigate={onNavigate} onOpenAutomations={vi.fn()} />
+    );
+    const html = container.innerHTML;
+    expect(html).not.toMatch(/text-(blue|green|red|yellow|orange|purple|gray)-\d00/);
+    expect(html).not.toMatch(/bg-(blue|green|red|yellow|orange|purple|gray)-\d00/);
   });
 });
