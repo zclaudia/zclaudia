@@ -57,7 +57,7 @@ function NotchEmptyState({
         draggable={false}
       />
       <p className="mt-3 text-[13px] text-white/60">{emptyTitle}</p>
-      <p className="mt-1 text-[11px] text-white/40">{emptySubtitle}</p>
+      <p className="mt-1 text-[11px] text-white/60">{emptySubtitle}</p>
     </div>
   );
 }

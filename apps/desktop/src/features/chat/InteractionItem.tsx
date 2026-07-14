@@ -367,7 +367,7 @@ function PromptRenderer({ interaction }: { interaction: InteractionPromptMessage
         )}
         <button
           onClick={handleSubmit}
-          className="flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-md bg-muted/60 text-foreground hover:bg-muted transition-colors"
+          className="flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
         >
           <Send size={10} />
           {interaction.submitLabel || 'Submit'}
@@ -432,7 +432,7 @@ function ApprovalRenderer({ interaction }: { interaction: ApprovalInteractionMes
         </button>
         <button
           onClick={() => handleDecision(true)}
-          className="flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-md bg-muted/60 text-foreground hover:bg-muted transition-colors"
+          className="flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
         >
           <ThumbsUp size={10} />
           {interaction.approveLabel || 'Approve'}
@@ -616,7 +616,7 @@ function PlanReviewRenderer({ interaction }: { interaction: PlanReviewInteractio
       </div>
 
       <div
-        className={`text-xs text-foreground whitespace-pre-wrap overflow-auto rounded-md bg-muted/30 p-2 ${
+        className={`border-y border-border/50 py-2 text-xs text-foreground whitespace-pre-wrap overflow-auto ${
           expanded ? 'max-h-[80vh]' : 'max-h-60'
         }`}
       >
@@ -708,7 +708,7 @@ function PlanReviewRenderer({ interaction }: { interaction: PlanReviewInteractio
         <button
           onClick={handleApprove}
           disabled={saving}
-          className="flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-md bg-muted/60 text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <ThumbsUp size={10} />
           Approve Plan

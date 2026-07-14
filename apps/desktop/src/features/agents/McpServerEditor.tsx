@@ -713,7 +713,7 @@ export function McpServerEditor({
         )}
 
         {formTransport !== 'stdio' && (
-          <div className="rounded-lg border border-border/50 bg-background/30 p-3 space-y-3">
+          <div className="space-y-3 border-t border-border/60 pt-3">
             <label className="flex items-center gap-2 text-xs text-muted-foreground">
               <input
                 type="checkbox"
@@ -818,7 +818,7 @@ export function McpServerEditor({
         )}
 
         {/* Trust policy */}
-        <div className="rounded-lg border border-border/50 bg-background/30 p-3 space-y-3">
+        <div className="space-y-3 border-t border-border/60 pt-3">
           <div>
             <div className="text-xs font-medium text-foreground">Trust Policy</div>
             <p className="mt-0.5 text-[10px] text-muted-foreground">

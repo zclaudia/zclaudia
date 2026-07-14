@@ -172,6 +172,7 @@
     --thinking: 265 42% 65%;
     --thinking-foreground: 265 60% 10%;
     --terminal-cursor: 214 70% 60%;
+    --terminal-selection: 35 6% 20%;
     --glyph-red: 4 60% 64%;
     --glyph-orange: 24 65% 62%;
     --glyph-amber: 44 65% 60%;
@@ -197,7 +198,6 @@
     --terminal-ansi-bright-magenta: 285 50% 74%;
     --terminal-ansi-bright-cyan: 185 50% 63%;
     --terminal-ansi-bright-white: 35 12% 93%;
-    --terminal-selection: 35 6% 20%;
     /* @generated:tokens end */
 
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.2);
@@ -240,6 +240,7 @@
     --thinking: 265 42% 65%;
     --thinking-foreground: 265 60% 10%;
     --terminal-cursor: 214 70% 60%;
+    --terminal-selection: 30 7% 20%;
     --glyph-red: 4 60% 64%;
     --glyph-orange: 24 65% 62%;
     --glyph-amber: 44 65% 60%;
@@ -265,7 +266,6 @@
     --terminal-ansi-bright-magenta: 285 50% 74%;
     --terminal-ansi-bright-cyan: 185 50% 63%;
     --terminal-ansi-bright-white: 35 12% 93%;
-    --terminal-selection: 30 7% 20%;
     /* @generated:tokens end */
 
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.2);
@@ -308,6 +308,7 @@
     --thinking: 265 42% 65%;
     --thinking-foreground: 265 60% 10%;
     --terminal-cursor: 214 70% 60%;
+    --terminal-selection: 225 13% 20%;
     --glyph-red: 4 60% 64%;
     --glyph-orange: 24 65% 62%;
     --glyph-amber: 44 65% 60%;
@@ -333,7 +334,6 @@
     --terminal-ansi-bright-magenta: 285 50% 74%;
     --terminal-ansi-bright-cyan: 185 50% 63%;
     --terminal-ansi-bright-white: 35 12% 93%;
-    --terminal-selection: 225 13% 20%;
     /* @generated:tokens end */
 
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.2);
@@ -708,7 +708,7 @@ body.notch-window {
 
 /* Increase line spacing in chat messages */
 .prose :where(p):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
-  line-height: 1.8;
+  line-height: 1.65;
   margin-top: 0.75em;
   margin-bottom: 0.75em;
 }
@@ -721,7 +721,7 @@ body.notch-window {
 .prose :where(li):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
   margin-top: 0.35em;
   margin-bottom: 0.35em;
-  line-height: 1.75;
+  line-height: 1.55;
 }
 
 .prose :where(pre):not(:where([class~="not-prose"], [class~="not-prose"] *)) {

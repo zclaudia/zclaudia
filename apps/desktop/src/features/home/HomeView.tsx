@@ -167,7 +167,7 @@ export function HomeView({ onNewSession, onAddProject }: HomeViewProps) {
             sidebar already covers creating sessions/projects (per-project "New
             session", per-backend "New project"), so the header buttons would be
             redundant; when empty they're the only onboarding entry point. */}
-        <h2 className="text-xl font-semibold">{greeting(new Date().getHours())}</h2>
+        <h1 className="text-xl font-semibold">{greeting(new Date().getHours())}</h1>
 
         {isEmpty ? (
           <div className="mt-3">

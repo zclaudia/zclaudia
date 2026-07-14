@@ -106,6 +106,7 @@ const darkAccents = {
   thinking: [265, 42, 65],
   'thinking-foreground': [265, 60, 10],
   'terminal-cursor': [214, 70, 60],
+  'terminal-selection': [214, 10, 20],
   ...darkGlyphs,
   ...darkAnsi,
 };
