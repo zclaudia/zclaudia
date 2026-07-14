@@ -30,6 +30,9 @@ import {
 import type { McpOAuthStartResult } from '../../services/api';
 import { McpOAuthLoginModal } from './McpOAuthLoginModal';
 import { EditorSection, FieldLabel } from './ui/EditorSection';
+import { FormField } from '../../components/ui/FormField';
+import { Input } from '../../components/ui/Input';
+import { Toggle } from '../../components/ui/Toggle';
 import type { McpServerConfig, McpServerStatus } from '@zclaudia/shared';
 import type {
   McpRiskAction,
@@ -455,20 +458,11 @@ export function McpServerEditor({
             )}
           </>
         )}
-        <button
-          type="button"
-          onClick={() => void runAction(() => toggleMcpServerForBackend(backendId, current.id))}
-          className={`relative w-10 h-5 rounded-full transition-colors ${
-            current.enabled ? 'bg-primary' : 'bg-secondary'
-          }`}
-          title={current.enabled ? 'Disable' : 'Enable'}
-        >
-          <span
-            className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
-              current.enabled ? 'left-5' : 'left-0.5'
-            }`}
-          />
-        </button>
+        <Toggle
+          checked={current.enabled}
+          onChange={() => void runAction(() => toggleMcpServerForBackend(backendId, current.id))}
+          aria-label={current.enabled ? 'Disable' : 'Enable'}
+        />
         <button
           type="button"
           onClick={() => void handleDelete()}
@@ -498,16 +492,17 @@ export function McpServerEditor({
 
       <EditorSection title="Configuration">
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <FieldLabel>Name *</FieldLabel>
-            <input
-              type="text"
-              value={formName}
-              onChange={e => setFormName(e.target.value)}
-              placeholder="e.g. filesystem"
-              className="w-full px-3 py-1.5 text-sm bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
-          </div>
+          <FormField label="Name" required>
+            {f => (
+              <Input
+                {...f}
+                type="text"
+                value={formName}
+                onChange={e => setFormName(e.target.value)}
+                placeholder="e.g. filesystem"
+              />
+            )}
+          </FormField>
           <div>
             <FieldLabel htmlFor="mcp-transport">Transport</FieldLabel>
             <select
@@ -526,51 +521,57 @@ export function McpServerEditor({
 
         {formTransport === 'stdio' ? (
           <>
-            <div>
-              <FieldLabel>Command *</FieldLabel>
-              <input
-                type="text"
-                value={formCommand}
-                onChange={e => setFormCommand(e.target.value)}
-                placeholder="e.g. npx"
-                className="w-full px-3 py-1.5 text-sm bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
-              />
-            </div>
+            <FormField label="Command" required>
+              {f => (
+                <Input
+                  {...f}
+                  type="text"
+                  value={formCommand}
+                  onChange={e => setFormCommand(e.target.value)}
+                  placeholder="e.g. npx"
+                />
+              )}
+            </FormField>
 
-            <div>
-              <FieldLabel>Arguments (space-separated)</FieldLabel>
-              <input
-                type="text"
-                value={formArgs}
-                onChange={e => setFormArgs(e.target.value)}
-                placeholder="e.g. -y @modelcontextprotocol/server-filesystem /path/to/dir"
-                className="w-full px-3 py-1.5 text-sm bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono"
-              />
-            </div>
+            <FormField label="Arguments (space-separated)">
+              {f => (
+                <Input
+                  {...f}
+                  type="text"
+                  value={formArgs}
+                  onChange={e => setFormArgs(e.target.value)}
+                  placeholder="e.g. -y @modelcontextprotocol/server-filesystem /path/to/dir"
+                  className="font-mono"
+                />
+              )}
+            </FormField>
           </>
         ) : (
-          <div>
-            <FieldLabel>Remote MCP URL *</FieldLabel>
-            <input
-              type="text"
-              value={formUrl}
-              onChange={e => setFormUrl(e.target.value)}
-              placeholder="https://mcp.example.com/mcp"
-              className="w-full px-3 py-1.5 text-sm bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono"
-            />
-          </div>
+          <FormField label="Remote MCP URL" required>
+            {f => (
+              <Input
+                {...f}
+                type="text"
+                value={formUrl}
+                onChange={e => setFormUrl(e.target.value)}
+                placeholder="https://mcp.example.com/mcp"
+                className="font-mono"
+              />
+            )}
+          </FormField>
         )}
 
-        <div>
-          <FieldLabel>Description</FieldLabel>
-          <input
-            type="text"
-            value={formDescription}
-            onChange={e => setFormDescription(e.target.value)}
-            placeholder="Optional description"
-            className="w-full px-3 py-1.5 text-sm bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
-          />
-        </div>
+        <FormField label="Description">
+          {f => (
+            <Input
+              {...f}
+              type="text"
+              value={formDescription}
+              onChange={e => setFormDescription(e.target.value)}
+              placeholder="Optional description"
+            />
+          )}
+        </FormField>
 
         {/* Env vars / headers */}
         {formTransport === 'stdio' ? (
@@ -723,55 +724,92 @@ export function McpServerEditor({
             </label>
             {formOAuthEnabled && (
               <div className="grid gap-2 md:grid-cols-2">
-                <input
-                  type="text"
-                  value={formOAuthMetadataUrl}
-                  onChange={e => setFormOAuthMetadataUrl(e.target.value)}
-                  placeholder="https://auth.example.com/.well-known/oauth-authorization-server"
-                  className="px-3 py-1.5 text-xs bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono md:col-span-2"
-                />
-                <input
-                  type="text"
-                  value={formOAuthAuthorizationEndpoint}
-                  onChange={e => setFormOAuthAuthorizationEndpoint(e.target.value)}
-                  placeholder="https://auth.example.com/oauth/authorize"
-                  className="px-3 py-1.5 text-xs bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono"
-                />
-                <input
-                  type="text"
-                  value={formOAuthTokenEndpoint}
-                  onChange={e => setFormOAuthTokenEndpoint(e.target.value)}
-                  placeholder="https://auth.example.com/oauth/token"
-                  className="px-3 py-1.5 text-xs bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono"
-                />
-                <input
-                  type="text"
-                  value={formOAuthDeviceEndpoint}
-                  onChange={e => setFormOAuthDeviceEndpoint(e.target.value)}
-                  placeholder="https://auth.example.com/oauth/device"
-                  className="px-3 py-1.5 text-xs bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono"
-                />
-                <input
-                  type="text"
-                  value={formOAuthClientId}
-                  onChange={e => setFormOAuthClientId(e.target.value)}
-                  placeholder="zclaudia-client-id"
-                  className="px-3 py-1.5 text-xs bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono"
-                />
-                <input
-                  type="password"
-                  value={formOAuthClientSecret}
-                  onChange={e => setFormOAuthClientSecret(e.target.value)}
-                  placeholder="client secret (optional)"
-                  className="px-3 py-1.5 text-xs bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono"
-                />
-                <input
-                  type="text"
-                  value={formOAuthScopes}
-                  onChange={e => setFormOAuthScopes(e.target.value)}
-                  placeholder="repo read:user"
-                  className="px-3 py-1.5 text-xs bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono"
-                />
+                <div className="md:col-span-2">
+                  <FormField label="Metadata URL">
+                    {f => (
+                      <Input
+                        {...f}
+                        type="text"
+                        value={formOAuthMetadataUrl}
+                        onChange={e => setFormOAuthMetadataUrl(e.target.value)}
+                        placeholder="https://auth.example.com/.well-known/oauth-authorization-server"
+                        className="text-xs font-mono"
+                      />
+                    )}
+                  </FormField>
+                </div>
+                <FormField label="Authorization Endpoint">
+                  {f => (
+                    <Input
+                      {...f}
+                      type="text"
+                      value={formOAuthAuthorizationEndpoint}
+                      onChange={e => setFormOAuthAuthorizationEndpoint(e.target.value)}
+                      placeholder="https://auth.example.com/oauth/authorize"
+                      className="text-xs font-mono"
+                    />
+                  )}
+                </FormField>
+                <FormField label="Token Endpoint">
+                  {f => (
+                    <Input
+                      {...f}
+                      type="text"
+                      value={formOAuthTokenEndpoint}
+                      onChange={e => setFormOAuthTokenEndpoint(e.target.value)}
+                      placeholder="https://auth.example.com/oauth/token"
+                      className="text-xs font-mono"
+                    />
+                  )}
+                </FormField>
+                <FormField label="Device Authorization Endpoint">
+                  {f => (
+                    <Input
+                      {...f}
+                      type="text"
+                      value={formOAuthDeviceEndpoint}
+                      onChange={e => setFormOAuthDeviceEndpoint(e.target.value)}
+                      placeholder="https://auth.example.com/oauth/device"
+                      className="text-xs font-mono"
+                    />
+                  )}
+                </FormField>
+                <FormField label="Client ID">
+                  {f => (
+                    <Input
+                      {...f}
+                      type="text"
+                      value={formOAuthClientId}
+                      onChange={e => setFormOAuthClientId(e.target.value)}
+                      placeholder="zclaudia-client-id"
+                      className="text-xs font-mono"
+                    />
+                  )}
+                </FormField>
+                <FormField label="Client Secret">
+                  {f => (
+                    <Input
+                      {...f}
+                      type="password"
+                      value={formOAuthClientSecret}
+                      onChange={e => setFormOAuthClientSecret(e.target.value)}
+                      placeholder="client secret (optional)"
+                      className="text-xs font-mono"
+                    />
+                  )}
+                </FormField>
+                <FormField label="Scopes">
+                  {f => (
+                    <Input
+                      {...f}
+                      type="text"
+                      value={formOAuthScopes}
+                      onChange={e => setFormOAuthScopes(e.target.value)}
+                      placeholder="repo read:user"
+                      className="text-xs font-mono"
+                    />
+                  )}
+                </FormField>
               </div>
             )}
           </div>

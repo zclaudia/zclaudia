@@ -208,7 +208,7 @@ describe('McpServerEditor', () => {
   it('toggle fires toggleMcpServerForBackend with the server id and onStatusChanged', async () => {
     const { onStatusChanged } = renderEditor(makeServer());
 
-    fireEvent.click(screen.getByTitle('Disable'));
+    fireEvent.click(screen.getByRole('switch', { name: 'Disable' }));
 
     await waitFor(() => {
       expect(api.toggleMcpServerForBackend).toHaveBeenCalledWith('b1', 's1');
@@ -224,7 +224,7 @@ describe('McpServerEditor', () => {
     expect(screen.queryByRole('button', { name: 'Connect' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Disconnect' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Refresh' })).toBeNull();
-    expect(screen.getByTitle('Enable')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Enable' })).toBeInTheDocument();
   });
 
   it('OAuth login button starts the flow for the backend and opens the modal', async () => {
@@ -289,6 +289,32 @@ describe('McpServerEditor', () => {
     );
 
     expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull();
+  });
+
+  it('every MCP text field is labeled', () => {
+    const stdio = renderEditor(makeServer({ transport: 'stdio' }));
+    ['Name', 'Command', 'Arguments', 'Description'].forEach(name => {
+      expect(screen.getByLabelText(new RegExp(name, 'i'))).toBeTruthy();
+    });
+    stdio.unmount();
+
+    renderEditor(
+      makeServer({
+        transport: 'streamable-http',
+        url: 'https://mcp.example.com/mcp',
+        oauthConfig: { enabled: true },
+      })
+    );
+    expect(screen.getByLabelText(/Name/i)).toBeTruthy();
+    expect(screen.getByLabelText(/Remote MCP URL/i)).toBeTruthy();
+    expect(screen.getByLabelText(/Description/i)).toBeTruthy();
+    expect(screen.getByLabelText(/^Metadata URL$/i)).toBeTruthy();
+    expect(screen.getByLabelText(/^Authorization Endpoint$/i)).toBeTruthy();
+    expect(screen.getByLabelText(/Token Endpoint/i)).toBeTruthy();
+    expect(screen.getByLabelText(/Device Authorization Endpoint/i)).toBeTruthy();
+    expect(screen.getByLabelText(/Client ID/i)).toBeTruthy();
+    expect(screen.getByLabelText(/Client Secret/i)).toBeTruthy();
+    expect(screen.getByLabelText(/Scopes/i)).toBeTruthy();
   });
 
   it('shows an inline error when save fails', async () => {
