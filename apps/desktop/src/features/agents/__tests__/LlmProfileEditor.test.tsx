@@ -284,9 +284,10 @@ describe('LlmProfileEditor', () => {
     fireEvent.change(screen.getByPlaceholderText('e.g., Local ZClaudia Agent'), {
       target: { value: 'My Codex' },
     });
-    // Switch the provider type dropdown to openai-codex.
+    // Switch the provider type dropdown to openai-codex. The trigger keeps
+    // its implicit button role; the popup items are listbox options.
     fireEvent.click(screen.getByRole('button', { name: 'Anthropic' }));
-    fireEvent.click(screen.getByRole('button', { name: 'OpenAI Codex (ChatGPT Plus/Pro)' }));
+    fireEvent.click(screen.getByRole('option', { name: 'OpenAI Codex (ChatGPT Plus/Pro)' }));
 
     // Sign-in pre-save: persists via create, resolves with the saved profile,
     // but does NOT notify the parent (a keyed remount would tear down the
@@ -344,6 +345,20 @@ describe('LlmProfileEditor', () => {
     });
     expect(await screen.findByText('Import models from /models')).toBeInTheDocument();
     expect(screen.getByText('claude-new')).toBeInTheDocument();
+  });
+
+  it('labels connection fields and exposes provider selector as a combobox', () => {
+    renderEditor(makeProfile({ providerType: 'my-custom-provider' }));
+
+    expect(screen.getByLabelText(/base url/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/api key/i)).toBeInTheDocument();
+
+    // Query by the exact trigger text (the raw providerType, since this
+    // custom provider has no display label) rather than a loose /provider/i
+    // match — the header breadcrumb ("LLM Providers") also matches that.
+    const providerTrigger = screen.getByRole('button', { name: 'my-custom-provider' });
+    expect(providerTrigger.getAttribute('aria-haspopup')).toBe('listbox');
+    expect(providerTrigger.getAttribute('aria-expanded')).toBe('false');
   });
 
   it('probe (Test) calls the ForBackend probe preview api with the model id', async () => {

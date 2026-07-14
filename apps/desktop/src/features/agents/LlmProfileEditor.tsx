@@ -23,7 +23,7 @@
  * error surfacing (inline errors instead).
  */
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useId } from 'react';
 import { ChevronDown, Check, AlertTriangle } from 'lucide-react';
 import type { LlmProfileConfig, LlmProfileCompat, ContextWindowSource } from '@zclaudia/shared';
 import { LLM_PROVIDER_TYPES } from '@zclaudia/shared';
@@ -36,6 +36,8 @@ import {
 } from '../../services/api';
 import type { LlmProfilePreviewInput } from '../../services/api';
 import { CodexOAuthSection } from './CodexOAuthSection';
+import { FormField } from '../../components/ui/FormField';
+import { Input } from '../../components/ui/Input';
 import { EditorSection, EditorRow, FieldLabel } from './ui/EditorSection';
 import { EditorTabs } from './ui/EditorTabs';
 import type { EditorTab } from './ui/EditorTabs';
@@ -656,15 +658,19 @@ export function LlmProfileEditor({
                   {providerSection}
                   <EditorSection title="Connection">
                     <div>
-                      <FieldLabel>Base URL (optional)</FieldLabel>
-                      <input
-                        type="text"
-                        value={formBaseUrl}
-                        onChange={e => setFormBaseUrl(e.target.value)}
-                        onBlur={autosave.flush}
-                        placeholder="http://api.example.com/v1"
-                        className={MONO_FIELD_CLASS}
-                      />
+                      <FormField label="Base URL (optional)">
+                        {f => (
+                          <Input
+                            {...f}
+                            type="text"
+                            value={formBaseUrl}
+                            onChange={e => setFormBaseUrl(e.target.value)}
+                            onBlur={autosave.flush}
+                            placeholder="http://api.example.com/v1"
+                            className="font-mono"
+                          />
+                        )}
+                      </FormField>
                       <p className="mt-1 text-xs text-muted-foreground">
                         Override default endpoint. Required for OpenAI-compatible third-party
                         proxies (e.g. DeepSeek, Moonshot, local gateways).
@@ -672,16 +678,20 @@ export function LlmProfileEditor({
                     </div>
 
                     <div>
-                      <FieldLabel>API Key (optional)</FieldLabel>
-                      <input
-                        type="password"
-                        value={formApiKey}
-                        onChange={e => setFormApiKey(e.target.value)}
-                        onBlur={autosave.flush}
-                        placeholder="sk-..."
-                        autoComplete="off"
-                        className={MONO_FIELD_CLASS}
-                      />
+                      <FormField label="API Key (optional)">
+                        {f => (
+                          <Input
+                            {...f}
+                            type="password"
+                            value={formApiKey}
+                            onChange={e => setFormApiKey(e.target.value)}
+                            onBlur={autosave.flush}
+                            placeholder="sk-..."
+                            autoComplete="off"
+                            className="font-mono"
+                          />
+                        )}
+                      </FormField>
                       <p className="mt-1 text-xs text-muted-foreground">
                         Stored on the server. Falls back to environment if omitted.
                       </p>
@@ -1261,13 +1271,38 @@ function FetchModelsPickerDialog({
   onCancel,
   onConfirm,
 }: FetchModelsPickerDialogProps) {
+  const titleId = useId();
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Focus the first control (the close button) when the dialog mounts, and
+  // wire Escape to close it — the backdrop-click close (below) stays as is.
+  useEffect(() => {
+    closeButtonRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancel();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onCancel]);
+
   return (
     <>
       <div className="fixed inset-0 bg-black/60 z-[60]" onClick={onCancel} />
-      <div className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[480px] md:max-h-[70vh] bg-card rounded-lg shadow-xl z-[60] flex flex-col border border-border">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[480px] md:max-h-[70vh] bg-card rounded-lg shadow-xl z-[60] flex flex-col border border-border"
+      >
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <h3 className="text-sm font-semibold">Import models from /models</h3>
+          <h3 id={titleId} className="text-sm font-semibold">
+            Import models from /models
+          </h3>
           <button
+            ref={closeButtonRef}
             onClick={onCancel}
             className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
             aria-label="Close picker"
@@ -1341,7 +1376,10 @@ function ProviderTypeSelector({
   hideLabel?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const optionRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -1352,14 +1390,69 @@ function ProviderTypeSelector({
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  const selected = PROVIDER_TYPE_OPTIONS.find(o => o.value === value);
+  // Roving focus: whenever the popup opens (or the active option changes via
+  // arrow keys), move DOM focus onto that option so screen readers announce
+  // it and further arrow/Enter/Escape keydowns land on the listbox.
+  useEffect(() => {
+    if (open) optionRefs.current[activeIndex]?.focus();
+  }, [open, activeIndex]);
+
+  const selectedIndex = PROVIDER_TYPE_OPTIONS.findIndex(o => o.value === value);
+  const selected = PROVIDER_TYPE_OPTIONS[selectedIndex];
+
+  const openList = () => {
+    setActiveIndex(selectedIndex >= 0 ? selectedIndex : 0);
+    setOpen(true);
+  };
+
+  const closeList = () => {
+    setOpen(false);
+    triggerRef.current?.focus();
+  };
+
+  const selectOption = (index: number) => {
+    const opt = PROVIDER_TYPE_OPTIONS[index];
+    if (!opt) return;
+    onChange(opt.value);
+    closeList();
+  };
+
+  const handleTriggerKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      openList();
+    } else if (e.key === 'Escape' && open) {
+      e.preventDefault();
+      closeList();
+    }
+  };
+
+  const handleOptionKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIndex(i => Math.min(i + 1, PROVIDER_TYPE_OPTIONS.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex(i => Math.max(i - 1, 0));
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      selectOption(index);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closeList();
+    }
+  };
 
   return (
     <div ref={ref} className="relative">
       {!hideLabel && <FieldLabel>Provider Type</FieldLabel>}
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => setOpen(!open)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => (open ? setOpen(false) : openList())}
+        onKeyDown={handleTriggerKeyDown}
         className={`${FIELD_CLASS} flex items-center justify-between text-left`}
       >
         <span>{selected?.label ?? value}</span>
@@ -1369,15 +1462,23 @@ function ProviderTypeSelector({
         />
       </button>
       {open && (
-        <div className="absolute left-0 right-0 top-full mt-1 bg-popover/95 glass border border-border/50 rounded-xl shadow-apple-xl animate-apple-fade-in z-50 py-1 overflow-hidden">
-          {PROVIDER_TYPE_OPTIONS.map(opt => (
+        <div
+          role="listbox"
+          aria-label="Provider Type"
+          className="absolute left-0 right-0 top-full mt-1 bg-popover/95 glass border border-border/50 rounded-xl shadow-apple-xl animate-apple-fade-in z-50 py-1 overflow-hidden"
+        >
+          {PROVIDER_TYPE_OPTIONS.map((opt, index) => (
             <button
               key={opt.value}
-              type="button"
-              onClick={() => {
-                onChange(opt.value);
-                setOpen(false);
+              ref={el => {
+                optionRefs.current[index] = el;
               }}
+              type="button"
+              role="option"
+              aria-selected={opt.value === value}
+              tabIndex={-1}
+              onClick={() => selectOption(index)}
+              onKeyDown={e => handleOptionKeyDown(e, index)}
               className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
                 opt.value === value
                   ? 'text-primary font-medium bg-muted/40'
