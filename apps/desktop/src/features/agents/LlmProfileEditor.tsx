@@ -1273,6 +1273,7 @@ function FetchModelsPickerDialog({
 }: FetchModelsPickerDialogProps) {
   const titleId = useId();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   // Focus the first control (the close button) when the dialog mounts, and
   // wire Escape to close it — the backdrop-click close (below) stays as is.
@@ -1288,13 +1289,36 @@ function FetchModelsPickerDialog({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onCancel]);
 
+  // Trap Tab/Shift+Tab focus within the dialog so keyboard users can't tab
+  // out into the (visually obscured but still-present) editor behind it.
+  const handleTrapKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'Tab') return;
+    const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    if (!focusable || focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey) {
+      if (document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else if (document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
+
   return (
     <>
       <div className="fixed inset-0 bg-black/60 z-[60]" onClick={onCancel} />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        onKeyDown={handleTrapKeyDown}
         className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[480px] md:max-h-[70vh] bg-card rounded-lg shadow-xl z-[60] flex flex-col border border-border"
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">

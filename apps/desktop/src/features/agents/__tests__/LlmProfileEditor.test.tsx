@@ -347,6 +347,36 @@ describe('LlmProfileEditor', () => {
     expect(screen.getByText('claude-new')).toBeInTheDocument();
   });
 
+  it('fetch-models picker dialog traps Tab focus inside its boundaries', async () => {
+    renderEditor(makeProfile());
+
+    fireEvent.click(screen.getByRole('tab', { name: /Models/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Fetch from /models' }));
+    await screen.findByText('Import models from /models');
+
+    const dialog = screen.getByRole('dialog');
+    const focusable = Array.from(
+      dialog.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      )
+    );
+    expect(focusable.length).toBeGreaterThan(1);
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+
+    // Tab on the last focusable element wraps around to the first.
+    last.focus();
+    expect(document.activeElement).toBe(last);
+    fireEvent.keyDown(dialog, { key: 'Tab' });
+    expect(document.activeElement).toBe(first);
+
+    // Shift+Tab on the first focusable element wraps around to the last.
+    first.focus();
+    expect(document.activeElement).toBe(first);
+    fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(last);
+  });
+
   it('labels connection fields and exposes provider selector as a combobox', () => {
     renderEditor(makeProfile({ providerType: 'my-custom-provider' }));
 
