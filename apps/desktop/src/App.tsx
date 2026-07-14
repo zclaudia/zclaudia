@@ -51,6 +51,7 @@ import { isDesktopTauri } from './utils/platform';
 import { initBuiltinPanels } from './plugins/builtinPanels';
 import { shouldShowDirectGatewaySetup } from './utils/directGatewaySetup';
 import { getMobileControlPlaneState } from './services/mobileConnectionState';
+import { PaneSkeleton } from './components/ui/Skeleton';
 
 const FileViewerWindow = lazy(() =>
   import('./components/fileviewer/FileViewerWindow').then(m => ({ default: m.FileViewerWindow }))
@@ -76,7 +77,7 @@ const MOBILE_TOAST_CONTAINER_CLASS =
 
 const LazyFallback = () => (
   <div className="flex items-center justify-center h-full">
-    <div className="text-sm text-muted-foreground animate-pulse">Loading...</div>
+    <PaneSkeleton />
   </div>
 );
 
