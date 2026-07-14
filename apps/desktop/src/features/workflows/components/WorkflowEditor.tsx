@@ -95,6 +95,7 @@ export function WorkflowEditor({
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [leftPanelMode, setLeftPanelMode] = useState<'toolbox' | 'ai'>(initialMode ?? 'toolbox');
   // Track workflow ID for standalone mode (may be assigned after first create)
@@ -186,6 +187,7 @@ export function WorkflowEditor({
     if (!name.trim()) return;
     setSaving(true);
     setSaveStatus('idle');
+    setSaveError(null);
     try {
       const nodes = fromFlowNodes(nodesRef.current);
       const edges = fromFlowEdges(edgesRef.current);
@@ -248,6 +250,7 @@ export function WorkflowEditor({
       }
     } catch (err) {
       console.error('[WorkflowEditor] Save failed:', err);
+      setSaveError(err instanceof Error ? err.message : 'Failed to save workflow');
     } finally {
       setSaving(false);
     }
@@ -391,6 +394,11 @@ export function WorkflowEditor({
             </button>
           )}
         </div>
+        {saveError && (
+          <p role="alert" className="text-xs text-destructive px-3 pb-2">
+            {saveError}
+          </p>
+        )}
       </div>
 
       {/* Main layout */}

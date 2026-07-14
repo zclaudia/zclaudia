@@ -448,6 +448,21 @@ describe('WorkflowEditor', () => {
     expect(screen.getByLabelText(/max.*iterations/i)).toBeTruthy();
   });
 
+  it('shows an inline error when save fails and keeps the editor open', async () => {
+    mockCreateWorkflow.mockRejectedValueOnce(new Error('Name already exists'));
+
+    render(<WorkflowEditor projectId="proj-1" onBack={mockOnBack} onSaved={mockOnSaved} />);
+
+    fireEvent.change(screen.getByPlaceholderText('Workflow name...'), {
+      target: { value: 'Test Workflow' },
+    });
+    fireEvent.click(screen.getByText('Save'));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/name already exists/i);
+    expect(mockOnSaved).not.toHaveBeenCalled();
+    expect(screen.getByPlaceholderText('Workflow name...')).toBeTruthy();
+  });
+
   it('renders existing workflow definition directly', () => {
     const workflow = {
       id: 'wf-existing',
