@@ -100,7 +100,7 @@ function ThinkingBlock({ content }: { content: string }) {
 
       {/* Preview (when collapsed) */}
       {!expanded && previewText && (
-        <div className="px-3 pb-2 text-muted-foreground italic leading-relaxed line-clamp-2 opacity-70">
+        <div className="px-3 pb-2 text-muted-foreground italic leading-relaxed line-clamp-2">
           {previewText}
           {hasMore && <span className="text-thinking/40"> ...</span>}
         </div>
@@ -998,7 +998,7 @@ const MessageItem = memo(function MessageItem({
           isStreaming={Boolean(streamingContentBlocks)}
         />
         <div className="mt-1 flex items-center gap-2 px-3">
-          <span className="text-xs opacity-50">{formatMessageTimestamp(message.createdAt)}</span>
+          <span className="text-xs text-muted-foreground">{formatMessageTimestamp(message.createdAt)}</span>
           {messageActions && (
             <MessageActionsMenu
               treeEntryId={messageActions.treeEntryId}
@@ -1091,7 +1091,7 @@ const MessageItem = memo(function MessageItem({
           <AssistantContent content={mainContent} />
         )}
         <div className="mt-1 flex items-center gap-2">
-          <span className="text-xs opacity-50">{formatMessageTimestamp(message.createdAt)}</span>
+          <span className="text-xs text-muted-foreground">{formatMessageTimestamp(message.createdAt)}</span>
           {messageActions && (
             <MessageActionsMenu
               treeEntryId={messageActions.treeEntryId}

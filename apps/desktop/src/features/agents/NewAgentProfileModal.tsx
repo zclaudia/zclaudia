@@ -125,7 +125,7 @@ export function NewAgentProfileModal({
               if (e.key === 'Enter' && canCreate) void handleCreate();
             }}
             placeholder="e.g., Default Coding Agent"
-            className="h-9 w-full rounded-xl border border-border bg-background px-3 text-[13px] text-foreground placeholder:text-muted-foreground/50 transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/50"
+            className="h-9 w-full rounded-xl border border-border bg-background px-3 text-[13px] text-foreground placeholder:text-muted-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/50"
           />
         </label>
 

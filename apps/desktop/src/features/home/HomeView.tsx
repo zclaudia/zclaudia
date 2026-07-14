@@ -230,12 +230,12 @@ function SessionGroup({
                   <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse shrink-0" />
                 )}
                 <span className="truncate text-sm text-foreground">{row.title}</span>
-                <span className="ml-auto shrink-0 pl-4 text-[11px] text-muted-foreground/60">
+                <span className="ml-auto shrink-0 pl-4 text-[11px] text-muted-foreground">
                   {timeAgo(row.updatedAt)}
                 </span>
               </span>
               <span
-                className={`block mt-px truncate text-xs text-muted-foreground/60 ${
+                className={`block mt-px truncate text-xs text-muted-foreground ${
                   row.isRunning ? 'pl-[14px]' : ''
                 }`}
               >

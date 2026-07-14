@@ -53,7 +53,7 @@ function PidBadge({ pid, cliPid, serverId }: { pid: number; cliPid?: number; ser
 
   return (
     <span
-      className="text-muted-foreground/40 font-mono flex-shrink-0 cursor-default"
+      className="text-muted-foreground font-mono flex-shrink-0 cursor-default"
       title={tooltip}
       onMouseEnter={handleMouseEnter}
     >
@@ -103,7 +103,7 @@ function TaskItem({
         {task.taskRootPid && (
           <PidBadge pid={task.taskRootPid} cliPid={task.cliPid} serverId={task.serverId} />
         )}
-        <span className="text-muted-foreground/60 flex-shrink-0">
+        <span className="text-muted-foreground flex-shrink-0">
           {formatTimeAgo(task.startedAt)}
         </span>
         {(task.summary || task.taskCommand) && (
@@ -137,7 +137,7 @@ function TaskItem({
         <div className="w-full pl-5 pt-1 pb-0.5">
           {task.cliPid && (
             <div
-              className="text-[11px] font-mono text-muted-foreground/50 truncate mb-0.5"
+              className="text-[11px] font-mono text-muted-foreground truncate mb-0.5"
               title={`Provider PID: ${task.cliPid}`}
             >
               cli pid: {task.cliPid}
@@ -145,7 +145,7 @@ function TaskItem({
           )}
           {task.taskCommand && (
             <div
-              className="text-[11px] font-mono text-muted-foreground/60 truncate mb-0.5"
+              className="text-[11px] font-mono text-muted-foreground truncate mb-0.5"
               title={task.taskCommand}
             >
               $ {task.taskCommand}
