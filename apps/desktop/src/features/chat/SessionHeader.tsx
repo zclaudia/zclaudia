@@ -154,6 +154,7 @@ export function SessionHeader({
           onClick={() => onReturnToDashboard(currentSession.projectId)}
           className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors shrink-0"
           title="Back to dashboard"
+          aria-label="Back to dashboard"
         >
           <ArrowLeft size={14} />
         </button>
@@ -371,6 +372,7 @@ export function SessionHeader({
                 onClick={onToggleSessionMenu}
                 className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                 title="Session actions"
+                aria-label="Session actions"
               >
                 <MoreHorizontal size={16} strokeWidth={1.75} />
               </button>

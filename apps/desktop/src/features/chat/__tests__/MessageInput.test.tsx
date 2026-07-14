@@ -789,4 +789,22 @@ describe('MessageInput', () => {
     render(<MessageInput {...defaultProps} />);
     expect(screen.getByTestId('send-button')).toBeInTheDocument();
   });
+
+  // ── Accessible names ─────────────────────────────────────────────────────
+
+  describe('icon button accessible names', () => {
+    it('names the composer icon buttons with a dedicated aria-label', () => {
+      render(<MessageInput {...defaultProps} />);
+      // Exact match: the aria-label must be the concise accessible name, not
+      // just a substring caught inside the longer tooltip `title` text.
+      expect(screen.getByRole('button', { name: 'Send message' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Attach file' })).toBeInTheDocument();
+    });
+
+    it('names the cancel button when loading', () => {
+      const onCancel = vi.fn();
+      render(<MessageInput {...defaultProps} onCancel={onCancel} isLoading />);
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    });
+  });
 });

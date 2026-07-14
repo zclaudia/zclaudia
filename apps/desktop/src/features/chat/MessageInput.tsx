@@ -1065,6 +1065,7 @@ export function MessageInput({
               disabled={disabled}
               className="h-10 w-10 flex-shrink-0 flex items-center justify-center text-muted-foreground hover:text-foreground rounded-full transition-colors disabled:opacity-50"
               title="Add attachment"
+              aria-label="Attach file"
             >
               <Paperclip size={20} strokeWidth={1.75} />
             </button>
@@ -1085,6 +1086,7 @@ export function MessageInput({
                 onClick={onCancel}
                 className="h-10 w-10 flex-shrink-0 flex items-center justify-center bg-foreground text-background hover:bg-foreground/90 rounded-full transition-colors"
                 title="Cancel (Esc)"
+                aria-label="Cancel"
               >
                 <Square size={14} fill="currentColor" strokeWidth={0} />
               </button>
@@ -1094,6 +1096,7 @@ export function MessageInput({
                 disabled={disabled || (!value.trim() && attachments.length === 0)}
                 className="h-10 w-10 flex-shrink-0 flex items-center justify-center bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed rounded-full transition-colors"
                 title="Send message"
+                aria-label="Send message"
                 data-testid="send-button"
               >
                 <ArrowUp size={21} strokeWidth={2.25} />
@@ -1117,6 +1120,7 @@ export function MessageInput({
             disabled={disabled}
             className="flex h-8 w-8 flex-shrink-0 self-end items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
             title="Add attachment (images, files)"
+            aria-label="Attach file"
           >
             <Plus size={18} strokeWidth={1.75} />
           </button>
@@ -1181,6 +1185,7 @@ export function MessageInput({
               onClick={onCancel}
               className="flex h-8 w-8 flex-shrink-0 self-end items-center justify-center rounded-full bg-foreground text-background hover:bg-foreground/90"
               title="Cancel (Esc)"
+              aria-label="Cancel"
             >
               <Square size={12} fill="currentColor" strokeWidth={0} />
             </button>
@@ -1191,6 +1196,7 @@ export function MessageInput({
               disabled={disabled || (!value.trim() && attachments.length === 0)}
               className="flex h-8 w-8 flex-shrink-0 self-end items-center justify-center rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
               title="Send message (Enter)"
+              aria-label="Send message"
             >
               <ArrowUp size={18} strokeWidth={2.25} />
             </button>
