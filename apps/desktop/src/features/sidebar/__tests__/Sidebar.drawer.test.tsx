@@ -282,4 +282,9 @@ describe('Sidebar mobile drawer — modal dialog semantics', () => {
     fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true });
     expect(document.activeElement).toBe(last);
   });
+
+  it('close drawer button is reachable by accessible name', () => {
+    renderSidebarMobileOpen();
+    expect(screen.getByRole('button', { name: /close menu/i })).toBeTruthy();
+  });
 });

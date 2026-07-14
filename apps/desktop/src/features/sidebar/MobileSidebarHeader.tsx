@@ -25,6 +25,7 @@ export function MobileSidebarHeader({
           onClick={onClose}
           className="p-2 min-w-[44px] min-h-[44px] rounded-md hover:bg-secondary active:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center"
           title="Close menu"
+          aria-label="Close menu"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
