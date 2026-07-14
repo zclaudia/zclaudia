@@ -126,6 +126,7 @@ server/data/
 # must be excluded from this ignore individually.
 /plugins/*
 !/plugins/claude/
+!/plugins/cursor/
 
 # Superpowers plugin generated docs
 docs/superpowers/
