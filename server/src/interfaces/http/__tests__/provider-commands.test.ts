@@ -96,10 +96,21 @@ describe('provider command routes', () => {
     expect(Array.isArray(res.body.data)).toBe(true);
   });
 
+  it('returns scanner-backed commands for Codex runtime', async () => {
+    scanCustomCommandsMock.mockResolvedValueOnce([]);
+    getCommandsBySourceMock.mockReturnValueOnce([]);
+
+    const app = makeApp();
+    const res = await request(app).get('/api/providers/type/codex/commands');
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
   it('rejects unknown runtime types for command metadata', async () => {
     const app = makeApp();
 
-    const res = await request(app).get('/api/providers/type/codex/commands');
+    const res = await request(app).get('/api/providers/type/unknown/commands');
 
     expect(res.status).toBe(404);
   });

@@ -49,7 +49,12 @@ export function mountCommandRoutes(router: Router, db: Database.Database): void 
   });
 
   router.get('/type/:type/commands', async (req: Request, res: Response) => {
-    if (req.params.type !== 'zclaudia' && req.params.type !== 'claude' && req.params.type !== 'cursor') {
+    if (
+      req.params.type !== 'zclaudia' &&
+      req.params.type !== 'claude' &&
+      req.params.type !== 'cursor' &&
+      req.params.type !== 'codex'
+    ) {
       res.status(404).json({
         success: false,
         error: { code: 'NOT_FOUND', message: 'Runtime type not found' },

@@ -40,10 +40,25 @@ const CURSOR_CAPABILITIES: ProviderCapabilities = {
   supportsAIReview: false,
 };
 
+const CODEX_CAPABILITIES: ProviderCapabilities = {
+  modeLabel: 'Mode',
+  defaultModeId: 'default',
+  modes: [
+    { id: 'default', label: 'Default', description: 'Supervised Codex turns' },
+    { id: 'plan', label: 'Plan', description: 'Read-only planning (decline writes)' },
+    { id: 'acceptEdits', label: 'Accept Edits', description: 'Auto-accept file changes' },
+    { id: 'bypassPermissions', label: 'Bypass', description: 'Auto-accept approvals' },
+  ],
+  modelLabel: 'Model',
+  models: [],
+  supportsAIReview: false,
+};
+
 const RUNTIME_CAPABILITIES: Record<string, ProviderCapabilities> = {
   zclaudia: ZCLAUDIA_CAPABILITIES,
   claude: CLAUDE_CAPABILITIES,
   cursor: CURSOR_CAPABILITIES,
+  codex: CODEX_CAPABILITIES,
 };
 
 export function mountCapabilityRoutes(router: Router, db: Database.Database): void {
