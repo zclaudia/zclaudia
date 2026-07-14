@@ -61,13 +61,15 @@ export interface McpServerEditorProps {
   onStatusChanged: () => void;
 }
 
+const GLYPH_ORANGE_TEXT = 'text-[hsl(var(--glyph-orange))]';
+
 const statusBadgeClass = (state?: string) => {
-  if (state === 'connected') return 'bg-green-500/20 text-green-400';
-  if (state === 'failed') return 'bg-red-500/20 text-red-400';
-  if (state === 'needs-auth') return 'bg-orange-500/20 text-orange-300';
-  if (state === 'connecting') return 'bg-yellow-500/20 text-yellow-400';
-  if (state === 'disabled') return 'bg-gray-500/20 text-gray-500';
-  return 'bg-blue-500/10 text-blue-400';
+  if (state === 'connected') return 'bg-success/20 text-success';
+  if (state === 'failed') return 'bg-destructive/20 text-destructive';
+  if (state === 'needs-auth') return `bg-[hsl(var(--glyph-orange)/0.2)] ${GLYPH_ORANGE_TEXT}`;
+  if (state === 'connecting') return 'bg-warning/20 text-warning';
+  if (state === 'disabled') return 'bg-muted text-muted-foreground';
+  return 'bg-primary/10 text-primary';
 };
 
 export function McpServerEditor({
@@ -363,7 +365,7 @@ export function McpServerEditor({
       <span className="font-medium text-sm truncate">{current.name}</span>
       <span
         className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium ${
-          current.enabled ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-500'
+          current.enabled ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'
         }`}
       >
         {current.enabled ? 'Enabled' : 'Disabled'}
@@ -413,7 +415,7 @@ export function McpServerEditor({
                   type="button"
                   onClick={() => void handleOAuthLogin('browser')}
                   disabled={startingOAuth}
-                  className="px-2 py-1 text-[10px] rounded-md bg-orange-500/20 text-orange-200 hover:bg-orange-500/30 disabled:opacity-50 transition-colors"
+                  className={`px-2 py-1 text-[10px] rounded-md bg-[hsl(var(--glyph-orange)/0.2)] ${GLYPH_ORANGE_TEXT} hover:bg-[hsl(var(--glyph-orange)/0.3)] disabled:opacity-50 transition-colors`}
                   title="Start MCP OAuth login"
                 >
                   OAuth Login
@@ -423,7 +425,7 @@ export function McpServerEditor({
                     type="button"
                     onClick={() => void handleOAuthLogin('device_code')}
                     disabled={startingOAuth}
-                    className="px-2 py-1 text-[10px] rounded-md bg-orange-500/10 text-orange-200 hover:bg-orange-500/20 disabled:opacity-50 transition-colors"
+                    className={`px-2 py-1 text-[10px] rounded-md bg-[hsl(var(--glyph-orange)/0.1)] ${GLYPH_ORANGE_TEXT} hover:bg-[hsl(var(--glyph-orange)/0.2)] disabled:opacity-50 transition-colors`}
                     title="Start MCP OAuth device-code login"
                   >
                     Device Login
@@ -449,7 +451,7 @@ export function McpServerEditor({
                   onClick={() =>
                     void runAction(() => refreshMcpServerForBackend(backendId, current.name))
                   }
-                  className="px-2 py-1 text-[10px] rounded-md bg-orange-500/20 text-orange-200 hover:bg-orange-500/30 transition-colors"
+                  className={`px-2 py-1 text-[10px] rounded-md bg-[hsl(var(--glyph-orange)/0.2)] ${GLYPH_ORANGE_TEXT} hover:bg-[hsl(var(--glyph-orange)/0.3)] transition-colors`}
                   title="Refresh after updating MCP credentials"
                 >
                   Authenticate
@@ -485,8 +487,8 @@ export function McpServerEditor({
       {server && renderActionRow(server)}
 
       {actionError && (
-        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-          <p className="text-red-400 text-sm">{actionError}</p>
+        <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+          <p className="text-destructive text-sm">{actionError}</p>
         </div>
       )}
 
@@ -613,7 +615,7 @@ export function McpServerEditor({
                 <button
                   type="button"
                   onClick={() => setFormEnvPairs(formEnvPairs.filter((_, j) => j !== i))}
-                  className="p-0.5 rounded-md hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-colors"
+                  className="p-0.5 rounded-md hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
                   aria-label="Remove environment variable"
                 >
                   <svg
@@ -672,7 +674,7 @@ export function McpServerEditor({
                 <button
                   type="button"
                   onClick={() => setFormHeaderPairs(formHeaderPairs.filter((_, j) => j !== i))}
-                  className="p-0.5 rounded-md hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-colors"
+                  className="p-0.5 rounded-md hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
                   aria-label="Remove header"
                 >
                   <svg
@@ -910,7 +912,7 @@ export function McpServerEditor({
           </div>
         </div>
 
-        {formError && <p className="text-xs text-red-400">{formError}</p>}
+        {formError && <p className="text-xs text-destructive">{formError}</p>}
 
         <div className="flex gap-2 justify-end">
           <button

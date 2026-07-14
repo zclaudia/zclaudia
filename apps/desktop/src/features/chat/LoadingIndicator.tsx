@@ -122,34 +122,34 @@ export function LoadingIndicator({
 
   const warningColors = {
     none: '',
-    slow: 'text-yellow-500',
-    idle: 'text-amber-500',
-    loop: 'text-red-500',
+    slow: 'text-warning',
+    idle: 'text-warning',
+    loop: 'text-destructive',
   };
 
   const warningBgColors = {
     none: '',
-    slow: 'bg-yellow-500/10 border-yellow-500/20',
-    idle: 'bg-amber-500/10 border-amber-500/20',
-    loop: 'bg-red-500/10 border-red-500/20',
+    slow: 'bg-warning/10 border-warning/20',
+    idle: 'bg-warning/10 border-warning/20',
+    loop: 'bg-destructive/10 border-destructive/20',
   };
 
   const dotColor =
     warningLevel === 'loop'
-      ? 'bg-red-500'
+      ? 'bg-destructive'
       : warningLevel === 'idle'
-        ? 'bg-amber-500'
+        ? 'bg-warning'
         : warningLevel === 'slow'
-          ? 'bg-yellow-500'
+          ? 'bg-warning'
           : 'bg-primary';
 
   const barColor =
     warningLevel === 'loop'
-      ? 'bg-red-500'
+      ? 'bg-destructive'
       : warningLevel === 'idle'
-        ? 'bg-amber-500'
+        ? 'bg-warning'
         : warningLevel === 'slow'
-          ? 'bg-yellow-500'
+          ? 'bg-warning'
           : 'bg-primary';
 
   return (
@@ -235,7 +235,7 @@ export function LoadingIndicator({
         {retryStatus && (
           <div
             role="status"
-            className="mt-2 px-3 py-2 rounded-md border bg-amber-500/10 border-amber-500/20 text-xs flex items-center gap-2 text-amber-600"
+            className="mt-2 px-3 py-2 rounded-md border bg-warning/10 border-warning/20 text-xs flex items-center gap-2 text-warning"
           >
             <span>
               {retryReason} — retrying{retryCountdown > 0 ? ` in ${retryCountdown}s` : '…'} (
