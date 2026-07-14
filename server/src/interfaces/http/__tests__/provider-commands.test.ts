@@ -85,6 +85,17 @@ describe('provider command routes', () => {
     );
   });
 
+  it('returns scanner-backed commands for Cursor runtime', async () => {
+    scanCustomCommandsMock.mockResolvedValueOnce([]);
+    getCommandsBySourceMock.mockReturnValueOnce([]);
+
+    const app = makeApp();
+    const res = await request(app).get('/api/providers/type/cursor/commands');
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
   it('rejects unknown runtime types for command metadata', async () => {
     const app = makeApp();
 

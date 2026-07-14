@@ -31,6 +31,21 @@ describe('provider capability routes', () => {
     expect(byProfile.body.data.supportsAIReview).toBe(true);
   });
 
+  it('returns cursor runtime capabilities with default/plan/ask modes', async () => {
+    const app = makeApp();
+    const res = await request(app).get('/api/providers/type/cursor/capabilities');
+    expect(res.status).toBe(200);
+    expect(res.body.data.supportsAIReview).toBe(false);
+    expect(res.body.data.defaultModeId).toBe('default');
+    expect(res.body.data.modes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'default' }),
+        expect.objectContaining({ id: 'plan' }),
+        expect.objectContaining({ id: 'ask' }),
+      ])
+    );
+  });
+
   it('returns claude runtime capabilities by type', async () => {
     const app = makeApp();
 

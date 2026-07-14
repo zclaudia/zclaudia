@@ -27,9 +27,23 @@ const CLAUDE_CAPABILITIES: ProviderCapabilities = {
   supportsAIReview: false,
 };
 
+const CURSOR_CAPABILITIES: ProviderCapabilities = {
+  modeLabel: 'Mode',
+  defaultModeId: 'default',
+  modes: [
+    { id: 'default', label: 'Default', description: 'Normal Cursor agent turns (--yolo)' },
+    { id: 'plan', label: 'Plan', description: 'Cursor plan mode' },
+    { id: 'ask', label: 'Ask', description: 'Cursor ask (read-oriented) mode' },
+  ],
+  modelLabel: 'Model',
+  models: [],
+  supportsAIReview: false,
+};
+
 const RUNTIME_CAPABILITIES: Record<string, ProviderCapabilities> = {
   zclaudia: ZCLAUDIA_CAPABILITIES,
   claude: CLAUDE_CAPABILITIES,
+  cursor: CURSOR_CAPABILITIES,
 };
 
 export function mountCapabilityRoutes(router: Router, db: Database.Database): void {
