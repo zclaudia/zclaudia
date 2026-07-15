@@ -50,6 +50,41 @@ describe('splitSegments', () => {
       { text: '/usr/local/bin', kind: 'plain', start: 0 },
     ]);
   });
+
+  it('merges an unmatched token into the plain gap before a matched one', () => {
+    expect(splitSegments('/unknown /clear', commands, skills)).toEqual([
+      { text: '/unknown ', kind: 'plain', start: 0 },
+      { text: '/clear', kind: 'command', start: 9 },
+    ]);
+  });
+
+  it('keeps the separator between two matched tokens as a plain segment', () => {
+    expect(splitSegments('/clear /commit', commands, skills)).toEqual([
+      { text: '/clear', kind: 'command', start: 0 },
+      { text: ' ', kind: 'plain', start: 6 },
+      { text: '/commit', kind: 'skill', start: 7 },
+    ]);
+  });
+
+  it('matches a token preceded by a newline', () => {
+    expect(splitSegments('a\n/clear', commands, skills)).toEqual([
+      { text: 'a\n', kind: 'plain', start: 0 },
+      { text: '/clear', kind: 'command', start: 2 },
+    ]);
+  });
+
+  it('reconstructs the input and keeps offsets consistent', () => {
+    const inputs = ['/unknown /clear x', 'run /commit /clear', '/usr/bin /commit:x end'];
+    for (const value of inputs) {
+      const segments = splitSegments(value, commands, skills);
+      expect(segments.map((s) => s.text).join('')).toBe(value);
+      let offset = 0;
+      for (const seg of segments) {
+        expect(seg.start).toBe(offset);
+        offset += seg.text.length;
+      }
+    }
+  });
 });
 
 describe('renderSkillTokens', () => {
