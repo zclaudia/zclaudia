@@ -94,7 +94,7 @@ export function TextWithFileRefs({
         className={refClassName}
         title={`View ${filePath}`}
       >
-        <FileSymbol name={basename} className="mr-1 h-3.5 w-3.5 align-[-2px]" />
+        <FileSymbol name={basename} className="mr-1 h-[1em] w-[1em] align-[-0.125em]" />
         {ref}
       </button>
     );
