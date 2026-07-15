@@ -285,7 +285,7 @@ export function MessageInput({
     (tokenStart: number) => {
       const result = deleteTokenAt(value, tokenStart, commandSet, skillIds);
       if (!result) return;
-      setValue(result.next);
+      updateValue(result.next);
       setHoveredTokenStart(null);
       setDeleteZoneHovered(false);
       // Restore the caret after React commits the new value.
@@ -296,7 +296,7 @@ export function MessageInput({
         el.focus();
       });
     },
-    [value, commandSet, skillIds]
+    [value, commandSet, skillIds, updateValue]
   );
 
   const tokenInteraction: TokenInteraction = useMemo(
