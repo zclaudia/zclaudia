@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Goal } from '@zclaudia/shared';
 import { GOAL_DEFAULTS } from '@zclaudia/shared';
+import { trapTab } from '../utils/focusTrap';
 
 interface GoalDialogProps {
   goal: Goal | null;
@@ -14,6 +15,7 @@ export function GoalDialog({ goal, open, onClose, onSubmit, onClear }: GoalDialo
   const [objective, setObjective] = useState(goal?.objective ?? '');
   const [tokenBudget, setTokenBudget] = useState(goal?.tokenBudget ?? GOAL_DEFAULTS.tokenBudget);
   const [maxTurns, setMaxTurns] = useState(goal?.maxTurns ?? GOAL_DEFAULTS.maxTurns);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   // Reset form when the goal changes (e.g., opening dialog for a different session).
   useEffect(() => {
@@ -32,6 +34,8 @@ export function GoalDialog({ goal, open, onClose, onSubmit, onClear }: GoalDialo
     if (e.key === 'Escape') {
       e.preventDefault();
       onClose();
+    } else {
+      trapTab(e, dialogRef.current);
     }
   };
 
@@ -45,6 +49,7 @@ export function GoalDialog({ goal, open, onClose, onSubmit, onClear }: GoalDialo
       role="presentation"
     >
       <div
+        ref={dialogRef}
         className="bg-popover border border-border rounded-xl shadow-lg max-w-[440px] w-full mx-4"
         role="dialog"
         aria-modal="true"

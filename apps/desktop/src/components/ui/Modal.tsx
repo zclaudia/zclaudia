@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
+import { trapTab } from '../../utils/focusTrap';
 
 type ModalSize = 'md' | 'lg' | '2xl';
 type ModalPlacement = 'top' | 'center';
@@ -38,8 +39,9 @@ const SIZE_CLASS: Record<ModalSize, string> = {
 
 /**
  * Shared modal shell: portal to body, dimmed blurred backdrop, focus-on-open,
- * Esc / backdrop / × dismissal. Consumers supply the body (and optional
- * title/footer); placement/size/mobileFullscreen tune layout.
+ * focus trap (Tab cycles within the dialog), Esc / backdrop / × dismissal.
+ * Consumers supply the body (and optional title/footer); placement/size/
+ * mobileFullscreen tune layout.
  */
 export function Modal({
   open,
@@ -65,7 +67,9 @@ export function Modal({
       if (e.key === 'Escape') {
         e.preventDefault();
         onClose();
+        return;
       }
+      trapTab(e, dialogRef.current);
     },
     [onClose]
   );

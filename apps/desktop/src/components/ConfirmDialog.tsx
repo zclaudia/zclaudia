@@ -4,6 +4,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useConfirmDialogStore } from '../stores/confirmDialogStore';
+import { trapTab } from '../utils/focusTrap';
 
 export function ConfirmDialog() {
   const current = useConfirmDialogStore(s => s.current);
@@ -13,6 +14,7 @@ export function ConfirmDialog() {
   const [inputValue, setInputValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const confirmBtnRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   // Reset the input and move focus when a new request opens.
   useEffect(() => {
@@ -39,6 +41,8 @@ export function ConfirmDialog() {
       // For confirm-mode (no input) the focused button handles Enter natively.
       e.preventDefault();
       confirm(inputValue);
+    } else {
+      trapTab(e, dialogRef.current);
     }
   };
 
@@ -53,6 +57,7 @@ export function ConfirmDialog() {
       role="presentation"
     >
       <div
+        ref={dialogRef}
         className="bg-popover border border-border rounded-xl shadow-lg max-w-md w-full mx-4"
         role="dialog"
         aria-modal="true"
