@@ -2,6 +2,7 @@ import { useFileViewerStore } from '../../stores/fileViewerStore';
 import { useToastStore } from '../../stores/toastStore';
 import * as api from '../../services/api';
 import { activatePanel } from '../../utils/openPanel';
+import { FileSymbol } from '../../components/filesymbols';
 
 /**
  * Matches inline-code content of the form `path/to/file.ext:N` or
@@ -129,6 +130,8 @@ export function FileLineReference({ text, projectRoot, backendId }: Props) {
     }
   };
 
+  const basename = text.split(':')[0].split('/').pop() ?? text;
+
   return (
     <button
       type="button"
@@ -136,6 +139,7 @@ export function FileLineReference({ text, projectRoot, backendId }: Props) {
       className="bg-secondary px-1.5 py-0.5 rounded-md text-primary break-all font-mono cursor-pointer hover:bg-secondary/70 hover:underline"
       title={`Open ${text}`}
     >
+      <FileSymbol name={basename} className="mr-1 h-3.5 w-3.5 align-[-2px]" />
       {text}
     </button>
   );

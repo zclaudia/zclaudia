@@ -7,6 +7,7 @@ import {
   INLINE_FILE_REF_REGEX,
   FILE_LINE_REF_REGEX,
 } from '../FileLineReference';
+import { symbolMarkupForFile } from '../../../components/filesymbols/mapping';
 
 const mockOpenFile = vi.fn();
 vi.mock('../../../stores/fileViewerStore', () => ({
@@ -298,5 +299,39 @@ describe('FileLineReference', () => {
       );
     });
     expect(mockOpenFile).not.toHaveBeenCalled();
+  });
+
+  // jsdom (like real browsers) normalizes self-closing foreign-element tags
+  // (e.g. `<path ... />`) to explicit closing tags (`<path ...></path>`) when
+  // serializing via .innerHTML. symbolMarkupForFile() returns the raw
+  // generated string, which still uses self-closing syntax, so a direct
+  // string comparison against a live element's .innerHTML would always fail
+  // regardless of correctness. Round-trip the expected markup through the
+  // same DOM serialization before comparing.
+  function domNormalize(html: string) {
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    return div.innerHTML;
+  }
+
+  it('renders a file-type icon before the reference text', () => {
+    render(<FileLineReference text="src/routes.test.ts:317" projectRoot="/repo" />);
+    const button = screen.getByRole('button');
+    const icon = button.querySelector('span[aria-hidden="true"]');
+    expect(icon).not.toBeNull();
+    // basename is derived by stripping the :line suffix and path segments
+    expect(icon!.innerHTML).toBe(domNormalize(symbolMarkupForFile('routes.test.ts')));
+    // icon sits before the filename text
+    expect(button.firstElementChild).toBe(icon);
+    // the visible/accessible text is unchanged
+    expect(button.textContent).toBe('src/routes.test.ts:317');
+  });
+
+  it('renders a file-type icon for a path-only reference', () => {
+    render(<FileLineReference text="apps/desktop/vite.config.ts" projectRoot="/repo" />);
+    const button = screen.getByRole('button');
+    const icon = button.querySelector('span[aria-hidden="true"]');
+    expect(icon).not.toBeNull();
+    expect(icon!.innerHTML).toBe(domNormalize(symbolMarkupForFile('vite.config.ts')));
   });
 });
