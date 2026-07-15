@@ -1,4 +1,13 @@
-import { useEffect, useRef, useState, useCallback, useMemo, type CSSProperties, type ReactNode } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+  useMemo,
+  useId,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Check } from 'lucide-react';
 
@@ -66,9 +75,81 @@ export function Select<T extends string = string>({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const [panelStyle, setPanelStyle] = useState<CSSProperties>();
+  // Highlighted option for keyboard navigation (roving focus among options).
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const optionRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const typeahead = useRef<{ query: string; timer: number | null }>({ query: '', timer: null });
+  const listboxId = useId();
 
   const selected = useMemo(() => options.find(opt => opt.value === value), [options, value]);
   const sizing = SIZE_CLASSES[size];
+
+  const firstEnabled = useCallback(
+    (from: number, dir: 1 | -1) => {
+      const n = options.length;
+      if (n === 0) return -1;
+      let i = from;
+      for (let step = 0; step < n; step++) {
+        if (i >= 0 && i < n && !options[i].disabled) return i;
+        i += dir;
+        if (i < 0) i = n - 1;
+        if (i >= n) i = 0;
+      }
+      return -1;
+    },
+    [options]
+  );
+
+  // On open, highlight the selected option (or the first enabled one).
+  useEffect(() => {
+    if (!isOpen) {
+      setActiveIndex(-1);
+      return;
+    }
+    const selIdx = options.findIndex(opt => opt.value === value && !opt.disabled);
+    setActiveIndex(selIdx >= 0 ? selIdx : firstEnabled(0, 1));
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Move DOM focus to the highlighted option so screen readers announce it.
+  useEffect(() => {
+    if (isOpen && activeIndex >= 0) optionRefs.current[activeIndex]?.focus();
+  }, [isOpen, activeIndex]);
+
+  const moveActive = useCallback(
+    (dir: 1 | -1) => {
+      setActiveIndex(cur => {
+        const n = options.length;
+        if (n === 0) return -1;
+        let i = cur < 0 ? (dir === 1 ? -1 : 0) : cur;
+        for (let step = 0; step < n; step++) {
+          i = (i + dir + n) % n;
+          if (!options[i].disabled) return i;
+        }
+        return cur;
+      });
+    },
+    [options]
+  );
+
+  const runTypeahead = useCallback(
+    (char: string) => {
+      const ta = typeahead.current;
+      if (ta.timer) window.clearTimeout(ta.timer);
+      ta.query += char.toLowerCase();
+      const match = options.findIndex(
+        opt =>
+          !opt.disabled &&
+          typeof opt.label === 'string' &&
+          opt.label.toLowerCase().startsWith(ta.query)
+      );
+      if (match >= 0) setActiveIndex(match);
+      ta.timer = window.setTimeout(() => {
+        ta.query = '';
+        ta.timer = null;
+      }, 500);
+    },
+    [options]
+  );
 
   useEffect(() => {
     if (!isOpen) return;
@@ -129,10 +210,46 @@ export function Select<T extends string = string>({
 
   const triggerLabel = selected ? selected.label : (placeholder ?? '');
 
+  const handlePanelKeyDown = (e: React.KeyboardEvent) => {
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        moveActive(1);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        moveActive(-1);
+        break;
+      case 'Home':
+        e.preventDefault();
+        setActiveIndex(firstEnabled(0, 1));
+        break;
+      case 'End':
+        e.preventDefault();
+        setActiveIndex(firstEnabled(options.length - 1, -1));
+        break;
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        if (activeIndex >= 0) handleSelect(options[activeIndex].value, options[activeIndex].disabled);
+        break;
+      case 'Tab':
+        setIsOpen(false); // let focus proceed to the next control
+        break;
+      default:
+        if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) runTypeahead(e.key);
+    }
+  };
+
+  const activeOptionId = activeIndex >= 0 ? `${listboxId}-opt-${activeIndex}` : undefined;
+
   const panel = isOpen && (
     <div
       ref={panelRef}
+      id={listboxId}
       role="listbox"
+      aria-activedescendant={activeOptionId}
+      onKeyDown={handlePanelKeyDown}
       style={panelPosition === 'fixed' ? panelStyle : undefined}
       className={`
         ${panelPosition === 'fixed' ? 'fixed z-[110]' : 'absolute z-50 mt-1 min-w-full'}
@@ -144,11 +261,16 @@ export function Select<T extends string = string>({
         ${panelClassName}
       `}
     >
-      {options.map(opt => {
+      {options.map((opt, index) => {
         const isActive = opt.value === value;
         return (
           <button
             key={opt.value}
+            id={`${listboxId}-opt-${index}`}
+            ref={el => {
+              optionRefs.current[index] = el;
+            }}
+            tabIndex={-1}
             type="button"
             role="option"
             aria-selected={isActive}
@@ -158,6 +280,7 @@ export function Select<T extends string = string>({
               w-full text-left px-3 py-1.5 ${sizing.panelText}
               flex items-start gap-2
               transition-colors whitespace-nowrap
+              outline-none focus:bg-muted
               ${
                 opt.disabled
                   ? 'opacity-50 cursor-not-allowed'
@@ -195,10 +318,18 @@ export function Select<T extends string = string>({
         ref={triggerRef}
         type="button"
         onClick={() => !disabled && setIsOpen(v => !v)}
+        onKeyDown={e => {
+          if (disabled || isOpen) return;
+          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            setIsOpen(true);
+          }
+        }}
         disabled={disabled}
         title={title}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
+        aria-controls={isOpen ? listboxId : undefined}
         aria-label={ariaLabel}
         className={`
           flex items-center justify-between w-full
