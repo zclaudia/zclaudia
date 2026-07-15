@@ -1,18 +1,17 @@
-import type { CSSProperties, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 /**
  * Token renderer for the composer's `rich-textarea` backdrop.
  *
  * `rich-textarea` keeps the underlying <textarea> text transparent and renders
  * the nodes returned here as the visible text, perfectly aligned with the
- * caret. We color `/skill` / `/command` tokens and HIDE their leading `/` by
- * rendering it as a transparent (but width-occupying) span so the caret stays
- * aligned with the raw value.
+ * caret. We render `/skill` / `/command` tokens as icon + primary-colored
+ * name.
  *
  * Token matching: a candidate token starts with `/` and runs to the next
  * whitespace. It's a **command** if it exactly matches a string in
  * `commandSet`; a **skill** if the id segment (before any `:`) is in
- * `skillIds`. Commands render purple; skills render blue.
+ * `skillIds`.
  *
  * INVARIANT: the concatenated text of the returned nodes must equal `value`
  * exactly — rich-textarea relies on this for alignment. Do not add or drop
@@ -23,15 +22,16 @@ export type TokenKind = 'skill' | 'command';
 
 export interface Segment {
   text: string;
-  // 'plain' = visible foreground text
-  // 'hidden' = transparent (used for the `/` of a matched token)
-  // 'skill' | 'command' = colored chip
-  kind: 'plain' | 'hidden' | TokenKind;
+  // 'plain' = ordinary foreground text; token kinds render icon + colored name
+  kind: 'plain' | TokenKind;
+  /** Offset of `text` within the raw composer value. */
+  start: number;
 }
 
 /**
- * Split `value` into segments. A token is `/` + non-whitespace. Matched
- * tokens become [hidden `/`][colored name]; unmatched text stays plain.
+ * Split `value` into segments. A candidate token is `/` + non-whitespace,
+ * preceded by line start or whitespace. Matched tokens become one segment
+ * whose text INCLUDES the leading slash; everything else stays plain.
  */
 export function splitSegments(
   value: string,
@@ -43,12 +43,8 @@ export function splitSegments(
   let last = 0;
   let match: RegExpExecArray | null;
   while ((match = re.exec(value)) !== null) {
-    const leadingSpace = match[0].slice(0, match[0].length - match[1].length);
     const token = match[1];
-    const tokenStart = match.index + leadingSpace.length;
-    if (tokenStart > last) {
-      segments.push({ text: value.slice(last, tokenStart), kind: 'plain' });
-    }
+    const tokenStart = match.index + (match[0].length - token.length);
     let kind: TokenKind | null = null;
     if (commandSet.has(token)) {
       kind = 'command';
@@ -56,34 +52,18 @@ export function splitSegments(
       const idPart = token.slice(1).split(':')[0];
       if (idPart && skillIds.has(idPart)) kind = 'skill';
     }
-    if (kind) {
-      segments.push({ text: '/', kind: 'hidden' });
-      segments.push({ text: token.slice(1), kind });
-    } else {
-      segments.push({ text: token, kind: 'plain' });
+    if (!kind) continue;
+    if (tokenStart > last) {
+      segments.push({ text: value.slice(last, tokenStart), kind: 'plain', start: last });
     }
+    segments.push({ text: token, kind, start: tokenStart });
     last = tokenStart + token.length;
   }
   if (last < value.length) {
-    segments.push({ text: value.slice(last), kind: 'plain' });
+    segments.push({ text: value.slice(last), kind: 'plain', start: last });
   }
   return segments;
 }
-
-const CHIP_STYLE_BY_KIND: Record<TokenKind, CSSProperties> = {
-  skill: {
-    backgroundColor: 'hsl(var(--primary) / 0.18)',
-    boxShadow: 'inset 0 0 0 1px hsl(var(--primary) / 0.35)',
-    color: 'hsl(var(--primary))',
-    borderRadius: '4px',
-  },
-  command: {
-    backgroundColor: 'hsl(var(--thinking) / 0.18)',
-    boxShadow: 'inset 0 0 0 1px hsl(var(--thinking) / 0.35)',
-    color: 'hsl(var(--thinking))',
-    borderRadius: '4px',
-  },
-};
 
 /**
  * rich-textarea render-prop. Returns the visible, colored nodes for `value`.
@@ -101,26 +81,10 @@ export function renderSkillTokens(
         </span>
       );
     }
-    if (seg.kind === 'hidden') {
-      return (
-        <span key={i} style={{ color: 'transparent', WebkitTextFillColor: 'transparent' }}>
-          {seg.text}
-        </span>
-      );
-    }
     return (
-      <mark
-        key={i}
-        style={{
-          ...CHIP_STYLE_BY_KIND[seg.kind],
-          padding: '0.5px 2px',
-          margin: '0 -2px',
-          WebkitBackgroundClip: 'padding-box',
-          backgroundClip: 'padding-box',
-        }}
-      >
+      <span key={i} style={{ color: 'hsl(var(--primary))' }}>
         {seg.text}
-      </mark>
+      </span>
     );
   });
 }

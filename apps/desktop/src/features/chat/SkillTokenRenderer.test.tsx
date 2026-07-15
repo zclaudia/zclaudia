@@ -8,64 +8,62 @@ const commands = new Set(['/clear', '/commit-commands:commit']);
 describe('splitSegments', () => {
   it('returns a single plain segment for text with no tokens', () => {
     expect(splitSegments('hello world', commands, skills)).toEqual([
-      { text: 'hello world', kind: 'plain' },
+      { text: 'hello world', kind: 'plain', start: 0 },
     ]);
   });
 
-  it('splits a known skill into a hidden slash + a skill chip', () => {
+  it('splits a known skill into one token segment with its offset', () => {
     expect(splitSegments('/commit now', commands, skills)).toEqual([
-      { text: '/', kind: 'hidden' },
-      { text: 'commit', kind: 'skill' },
-      { text: ' now', kind: 'plain' },
+      { text: '/commit', kind: 'skill', start: 0 },
+      { text: ' now', kind: 'plain', start: 7 },
     ]);
   });
 
-  it('treats an exact command match as a command chip', () => {
+  it('treats an exact command match as a command token', () => {
     expect(splitSegments('/clear', commands, skills)).toEqual([
-      { text: '/', kind: 'hidden' },
-      { text: 'clear', kind: 'command' },
+      { text: '/clear', kind: 'command', start: 0 },
     ]);
   });
 
   it('matches a plugin command by full string', () => {
     expect(splitSegments('/commit-commands:commit', commands, skills)).toEqual([
-      { text: '/', kind: 'hidden' },
-      { text: 'commit-commands:commit', kind: 'command' },
+      { text: '/commit-commands:commit', kind: 'command', start: 0 },
     ]);
   });
 
   it('matches a skill by the id segment before a colon', () => {
-    // 'commit' is a known skill; '/commit:foo' id-part is 'commit'
     expect(splitSegments('/commit:foo', commands, skills)).toEqual([
-      { text: '/', kind: 'hidden' },
-      { text: 'commit:foo', kind: 'skill' },
+      { text: '/commit:foo', kind: 'skill', start: 0 },
+    ]);
+  });
+
+  it('records the offset of a mid-text token', () => {
+    expect(splitSegments('run /commit now', commands, skills)).toEqual([
+      { text: 'run ', kind: 'plain', start: 0 },
+      { text: '/commit', kind: 'skill', start: 4 },
+      { text: ' now', kind: 'plain', start: 11 },
     ]);
   });
 
   it('leaves an unknown /path as plain text', () => {
     expect(splitSegments('/usr/local/bin', commands, skills)).toEqual([
-      { text: '/usr/local/bin', kind: 'plain' },
+      { text: '/usr/local/bin', kind: 'plain', start: 0 },
     ]);
   });
 });
 
 describe('renderSkillTokens', () => {
-  it('renders a colored chip for a known skill and keeps the full text', () => {
+  it('renders a colored token and keeps the full text', () => {
     const { container } = render(
       <div>{renderSkillTokens('/commit go', skills, commands)}</div>
     );
-    // the visible chip shows the skill name without the leading slash
-    const mark = container.querySelector('mark');
-    expect(mark?.textContent).toBe('commit');
-    // full textContent still equals the raw value (slash hidden but present)
     expect(container.textContent).toBe('/commit go');
   });
 
-  it('renders plain text with no <mark> when nothing matches', () => {
+  it('renders plain text when nothing matches', () => {
     const { container } = render(
       <div>{renderSkillTokens('just text', skills, commands)}</div>
     );
-    expect(container.querySelector('mark')).toBeNull();
     expect(container.textContent).toBe('just text');
   });
 });
