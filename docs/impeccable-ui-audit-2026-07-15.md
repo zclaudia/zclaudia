@@ -50,9 +50,9 @@ Status legend: `[ ]` open · `[~]` discussing · `[x]` done · `[-]` won't-fix
 - [x] **P2-6 `GoalDialog` fields no label association** — DONE. `components/GoalDialog.tsx`: `useId`-based `htmlFor`/`id` pairs on Objective / Token budget / Max turns (focus trap was already added in P1-1).
 - [x] **P2-7 Local-PR status map raw palette** — DONE. `LocalPRCard.tsx`: both `STATUS_CONFIG` and `EXECUTION_STATE_CONFIG` maps + the fallback now use semantic tokens (primary/success/warning/destructive/muted); also swept two stragglers in the same file — the close-action `hover:text-red-400` and the `actionError` `text-red-500` → `text-destructive`. File is now token-only.
 - [x] **P2-8 WorkflowEdge mixes tokens + hardcoded hex** — DONE. `WorkflowEdge.tsx`: error/condition_false/loop_exhausted → `hsl(var(--destructive))`, condition_true → `hsl(var(--success))`, loop → `hsl(var(--warning))` for both stroke and label (loop stays amber, exhausted goes red to preserve the distinction). Dash patterns unchanged; labels now adapt across themes.
-- [ ] **P2-9 Side-stripe accent border** — `features/openspec/components/init/EditCapabilityForm.tsx:42` (`border-l-2 border-primary pl-2`). Same absolute-ban pattern removed on 07-14. Fix: indent + `bg-muted/30`, or neutral hairline. _Cmd: /impeccable polish_
-- [ ] **P2-10 Nested card** — `features/supervision/components/ActiveChangeCard.tsx:66` (outer card) wraps bordered `bg-secondary/20` box at `:93`. Fix: flatten inner to borderless region. _Cmd: /impeccable polish_
-- [ ] **P2-11 BottomPanel mobile close button ~28px (< 44px)** — `components/BottomPanel.tsx:175-180` (`p-1.5`+`w-4 h-4`). Only dismiss for full-screen mobile overlay. Fix: `min-h/w-[44px]`. _Cmd: /impeccable adapt_
+- [x] **P2-9 Side-stripe accent border** — DONE. `EditCapabilityForm.tsx`: `border-l-2 border-primary pl-2` → a contained `rounded-md bg-muted/40 p-2.5` sub-form region (no colored stripe). Also swept 3 `text-red-500` validation/error leaks → `text-destructive`.
+- [x] **P2-10 Nested card** — DONE. `ActiveChangeCard.tsx`: the inner "Next Action" box dropped its `border border-border`, now a borderless `bg-secondary/50` fill inside the outer card.
+- [x] **P2-11 BottomPanel mobile close button ~28px (< 44px)** — DONE. `BottomPanel.tsx`: the mobile full-screen overlay close is now a `min-h-[44px] min-w-[44px]` centered hit target (icon unchanged); added an `aria-label` (it previously had only `title`).
 
 ### P3 — polish
 

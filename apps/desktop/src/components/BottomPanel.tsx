@@ -174,8 +174,9 @@ export function BottomPanel({ projectId, projectRoot, workingDirectory }: Bottom
             {activePanel && <PanelActions panel={activePanel} projectId={projectId} />}
             <button
               onClick={handleClose}
-              className="p-1.5 rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground flex-shrink-0"
+              className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground flex-shrink-0"
               title="Close panel"
+              aria-label="Close panel"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path

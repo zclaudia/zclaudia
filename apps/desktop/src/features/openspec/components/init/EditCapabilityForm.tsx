@@ -39,7 +39,7 @@ export function EditCapabilityForm({
   };
 
   return (
-    <div className="mt-2 space-y-2 border-l-2 border-primary pl-2">
+    <div className="mt-2 space-y-2 rounded-md bg-muted/40 p-2.5">
       {allowNameEdit && (
         <div>
           <label className="text-[10px] text-muted-foreground">Name (kebab-case)</label>
@@ -50,7 +50,7 @@ export function EditCapabilityForm({
             pattern="^[a-z][a-z0-9-]*$"
           />
           {!nameValid && (
-            <div className="text-[10px] text-red-500">
+            <div className="text-[10px] text-destructive">
               Must be kebab-case (a-z, 0-9, hyphens), ≤60 chars.
             </div>
           )}
@@ -64,9 +64,9 @@ export function EditCapabilityForm({
           value={description}
           onChange={e => setDescription(e.target.value)}
         />
-        {!descValid && <div className="text-[10px] text-red-500">Required, ≤200 chars.</div>}
+        {!descValid && <div className="text-[10px] text-destructive">Required, ≤200 chars.</div>}
       </div>
-      {err && <div className="text-[10px] text-red-500">{err}</div>}
+      {err && <div className="text-[10px] text-destructive">{err}</div>}
       <div className="flex gap-2">
         <button
           className="px-2 py-0.5 text-xs rounded bg-muted/60 text-foreground disabled:opacity-50"
