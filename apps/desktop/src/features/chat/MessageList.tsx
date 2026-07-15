@@ -217,6 +217,12 @@ export const MessageList = memo(function MessageList({
   const [itemHeights, setItemHeights] = useState<ReadonlyMap<number, number>>(() => new Map());
   const itemHeightsRef = useRef<Map<number, number>>(new Map());
   const observersRef = useRef<Map<number, ResizeObserver>>(new Map());
+  // Stable per-index ref callbacks so React doesn't tear down and re-attach
+  // every visible item's ResizeObserver on each re-render.
+  const measureRefsRef = useRef<Map<number, (el: HTMLDivElement | null) => void>>(new Map());
+  // Coalesce height updates into one state flush per frame instead of one per
+  // ResizeObserver callback (the streaming last item fires continuously).
+  const heightFlushFrameRef = useRef<number | null>(null);
 
   // Filter out empty messages (permission approvals, empty inputs, placeholder assistant messages).
   // Compaction markers ride on synthetic system messages with empty content, so they would
@@ -257,7 +263,12 @@ export const MessageList = memo(function MessageList({
         ro.disconnect();
       }
       observersRef.current.clear();
+      measureRefsRef.current.clear();
       itemHeightsRef.current.clear();
+      if (heightFlushFrameRef.current != null) {
+        cancelAnimationFrame(heightFlushFrameRef.current);
+        heightFlushFrameRef.current = null;
+      }
       setItemHeights(new Map());
       prevFirstMessageIdRef.current = firstMessageId;
     }
@@ -270,7 +281,19 @@ export const MessageList = memo(function MessageList({
         ro.disconnect();
       }
       observers.clear();
+      if (heightFlushFrameRef.current != null) {
+        cancelAnimationFrame(heightFlushFrameRef.current);
+        heightFlushFrameRef.current = null;
+      }
     };
+  }, []);
+
+  const scheduleHeightFlush = useCallback(() => {
+    if (heightFlushFrameRef.current != null) return;
+    heightFlushFrameRef.current = requestAnimationFrame(() => {
+      heightFlushFrameRef.current = null;
+      setItemHeights(new Map(itemHeightsRef.current));
+    });
   }, []);
 
   const shouldVirtualize = filteredMessages.length >= VIRTUALIZE_THRESHOLD && viewportHeight > 0;
@@ -296,7 +319,7 @@ export const MessageList = memo(function MessageList({
       const prev = itemHeightsRef.current.get(index);
       if (prev !== nextHeight) {
         itemHeightsRef.current.set(index, nextHeight);
-        setItemHeights(new Map(itemHeightsRef.current));
+        scheduleHeightFlush();
       }
     };
 
@@ -309,7 +332,21 @@ export const MessageList = memo(function MessageList({
     });
     ro.observe(element);
     observersRef.current.set(index, ro);
-  }, []);
+  }, [scheduleHeightFlush]);
+
+  // Cache one stable ref callback per index. React only invokes it when the
+  // element at that position actually mounts/unmounts, not on every render.
+  const getMeasureRef = useCallback(
+    (index: number) => {
+      let ref = measureRefsRef.current.get(index);
+      if (!ref) {
+        ref = (element: HTMLDivElement | null) => setMeasuredRef(index, element);
+        measureRefsRef.current.set(index, ref);
+      }
+      return ref;
+    },
+    [setMeasuredRef]
+  );
 
   // Precompute the index of the last assistant message for streaming block assignment
   const lastAssistantIndex = useMemo(() => {
@@ -489,7 +526,7 @@ export const MessageList = memo(function MessageList({
           return (
             <div
               key={message.id}
-              ref={el => setMeasuredRef(absoluteIndex, el)}
+              ref={getMeasureRef(absoluteIndex)}
               className="mb-4 min-w-0 max-w-full"
             >
               {renderMessage(message, absoluteIndex)}
@@ -505,7 +542,15 @@ export const MessageList = memo(function MessageList({
 
 const SHELL_LANGUAGES = new Set(['bash', 'shell', 'sh', 'zsh']);
 
-function CodeBlock({ language, children }: { language: string; children: string }) {
+// Memoized so completed code blocks in a streaming message don't re-run Prism
+// tokenization on every token — only the block whose code string changed does.
+const CodeBlock = memo(function CodeBlock({
+  language,
+  children,
+}: {
+  language: string;
+  children: string;
+}) {
   const [copied, setCopied] = useState(false);
   const { resolvedTheme } = useTheme();
   const { sendMessage } = useConnection();
@@ -595,7 +640,7 @@ function CodeBlock({ language, children }: { language: string; children: string 
       </div>
     </div>
   );
-}
+});
 
 // Attachment display component — lazy load: only download on click
 function AttachmentDisplay({ attachment }: { attachment: MessageAttachment }) {
@@ -1121,14 +1166,49 @@ const MessageItem = memo(function MessageItem({
   );
 });
 
+/**
+ * Coalesce rapid value changes to at most one commit per animation frame, so a
+ * streaming string that changes on every websocket token re-parses ~60×/s at
+ * most (not hundreds). Always converges to the final value.
+ */
+function useAnimationFrameThrottle<T>(value: T): T {
+  const [throttled, setThrottled] = useState(value);
+  const latestRef = useRef(value);
+  const frameRef = useRef<number | null>(null);
+  latestRef.current = value;
+
+  useEffect(() => {
+    if (frameRef.current != null) return; // a frame is already pending
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = null;
+      setThrottled(latestRef.current);
+    });
+  }, [value]);
+
+  useEffect(
+    () => () => {
+      if (frameRef.current != null) cancelAnimationFrame(frameRef.current);
+    },
+    []
+  );
+
+  return throttled;
+}
+
 /** Renders assistant message markdown (thinking blocks already extracted at MessageItem level) */
 const AssistantContent = memo(function AssistantContent({ content }: { content: string }) {
-  const normalizedContent = useMemo(() => normalizeMarkdownForRender(content), [content]);
+  // Throttle the string that drives the (expensive) markdown parse; the raw
+  // prop still updates every frame so streaming stays smooth.
+  const renderContent = useAnimationFrameThrottle(content);
+  const normalizedContent = useMemo(
+    () => normalizeMarkdownForRender(renderContent),
+    [renderContent]
+  );
   const fileRef = useContext(FileRefContext);
 
   useEffect(() => {
-    logSuspiciousMarkdownRender(content, normalizedContent);
-  }, [content, normalizedContent]);
+    logSuspiciousMarkdownRender(renderContent, normalizedContent);
+  }, [renderContent, normalizedContent]);
 
   return (
     <>
