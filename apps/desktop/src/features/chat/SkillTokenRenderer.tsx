@@ -33,8 +33,7 @@ export type TokenKind = 'skill' | 'command';
 
 export interface Segment {
   text: string;
-  // 'plain' = ordinary foreground text; token kinds render as primary-colored
-  // spans (icon + hover-delete rendering lands in a follow-up task)
+  // 'plain' = ordinary foreground text; token kinds render icon + primary-colored name
   kind: 'plain' | TokenKind;
   /** Offset of `text` within the raw composer value. */
   start: number;

@@ -24,7 +24,7 @@ import { downscaleImageFile } from '../attachments/downscale-image';
 import { SlashMenu, type SlashSuggestion } from './SlashMenu';
 import { PinnedSkillChips } from './PinnedSkillChips';
 import { RichTextarea, type RichTextareaHandle } from 'rich-textarea';
-import { renderSkillTokens } from './SkillTokenRenderer';
+import { renderSkillTokens, deleteTokenAt, type TokenInteraction } from './SkillTokenRenderer';
 
 export interface Attachment {
   id: string;
@@ -122,6 +122,8 @@ export function MessageInput({
   const clearDraft = useComposerStore(s => s.clearDraft);
   const { agent } = useAgentForSession(sessionId);
   const [value, setValue] = useState('');
+  const [hoveredTokenStart, setHoveredTokenStart] = useState<number | null>(null);
+  const [deleteZoneHovered, setDeleteZoneHovered] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [showCommands, setShowCommands] = useState(false);
@@ -276,6 +278,36 @@ export function MessageInput({
   // Full command strings (e.g. `/clear`, `/commit-commands:commit`) for the
   // same purpose — commands are highlighted in a different color than skills.
   const commandSet = useMemo(() => new Set(commands.map(c => c.command)), [commands]);
+
+  // Delete a `/skill` or `/command` token (plus its trailing space) from the
+  // composer text and restore the caret to where the token used to start.
+  const handleDeleteToken = useCallback(
+    (tokenStart: number) => {
+      const result = deleteTokenAt(value, tokenStart, commandSet, skillIds);
+      if (!result) return;
+      setValue(result.next);
+      setHoveredTokenStart(null);
+      setDeleteZoneHovered(false);
+      // Restore the caret after React commits the new value.
+      requestAnimationFrame(() => {
+        const el = textareaRef.current;
+        if (!el) return;
+        el.setSelectionRange(result.caret, result.caret);
+        el.focus();
+      });
+    },
+    [value, commandSet, skillIds]
+  );
+
+  const tokenInteraction: TokenInteraction = useMemo(
+    () => ({
+      hoveredTokenStart,
+      onTokenHover: setHoveredTokenStart,
+      onDeleteZoneHover: setDeleteZoneHovered,
+      onDeleteToken: handleDeleteToken,
+    }),
+    [hoveredTokenStart, handleDeleteToken]
+  );
 
   // Pinned skill refs on the active agent profile. Empty when there is no
   // profile (or before it loads). These are the source of truth for pin state;
@@ -1054,9 +1086,14 @@ export function MessageInput({
               maxHeight: `${Math.max(120, availableViewportHeight * 0.3)}px`,
               color: 'hsl(var(--foreground))',
               caretColor: 'hsl(var(--foreground))',
+              // rich-textarea copies this padding to its backdrop and clips
+              // paint at the box edge; 0.5em gives line-start token icons
+              // room to paint. Wins over the p-0 class (inline style).
+              paddingLeft: '0.5em',
+              cursor: deleteZoneHovered ? 'pointer' : undefined,
             }}
           >
-            {(v: string) => renderSkillTokens(v, skillIds, commandSet)}
+            {(v: string) => renderSkillTokens(v, skillIds, commandSet, tokenInteraction)}
           </RichTextarea>
           <div className="flex items-center gap-2 mt-2">
             {/* Attachment button */}
@@ -1172,9 +1209,11 @@ export function MessageInput({
                 minHeight: '1.5rem',
                 color: 'hsl(var(--foreground))',
                 caretColor: 'hsl(var(--foreground))',
+                paddingLeft: '0.5em',
+                cursor: deleteZoneHovered ? 'pointer' : undefined,
               }}
             >
-              {(v: string) => renderSkillTokens(v, skillIds, commandSet)}
+              {(v: string) => renderSkillTokens(v, skillIds, commandSet, tokenInteraction)}
             </RichTextarea>
           </div>
 

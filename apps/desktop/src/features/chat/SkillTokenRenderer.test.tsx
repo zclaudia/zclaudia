@@ -145,10 +145,33 @@ describe('renderSkillTokens', () => {
     expect(interaction.onTokenHover).toHaveBeenCalledWith(null);
 
     const slashSlot = token.querySelector('[data-token-delete]')!;
+    interaction.onTokenHover.mockClear();
     fireEvent.mouseOver(slashSlot);
     expect(interaction.onDeleteZoneHover).toHaveBeenCalledWith(true);
+    // stopPropagation on the slot means only its own handler fires, not the
+    // outer token span's too — pin the single call.
+    expect(interaction.onTokenHover).toHaveBeenCalledTimes(1);
+    expect(interaction.onTokenHover).toHaveBeenCalledWith(4);
     fireEvent.click(slashSlot);
     expect(interaction.onDeleteToken).toHaveBeenCalledWith(4);
+  });
+
+  it('does not delete when clicking the token name span', () => {
+    const interaction = {
+      hoveredTokenStart: null,
+      onTokenHover: vi.fn(),
+      onDeleteZoneHover: vi.fn(),
+      onDeleteToken: vi.fn(),
+    };
+    const { container } = render(
+      <div>{renderSkillTokens('run /commit go', skills, commands, interaction)}</div>
+    );
+    const token = container.querySelector('[data-token-start="4"]')!;
+    const nameSpan = Array.from(token.querySelectorAll('span')).find(
+      s => s.textContent === 'commit'
+    )!;
+    fireEvent.click(nameSpan);
+    expect(interaction.onDeleteToken).not.toHaveBeenCalled();
   });
 });
 
@@ -182,6 +205,10 @@ describe('deleteTokenAt', () => {
   it('does not absorb a trailing newline or tab', () => {
     expect(deleteTokenAt('/commit\nnow', 0, commands, skills)).toEqual({
       next: '\nnow',
+      caret: 0,
+    });
+    expect(deleteTokenAt('/commit\tnow', 0, commands, skills)).toEqual({
+      next: '\tnow',
       caret: 0,
     });
   });
