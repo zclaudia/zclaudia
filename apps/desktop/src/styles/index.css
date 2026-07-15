@@ -446,18 +446,16 @@ body.notch-window {
   }
 }
 
+/* Indeterminate sweep. Uses transform (GPU-composited) instead of width/
+   margin-left, which force a layout + paint on every frame — costly while it
+   runs for the whole duration of an active run, competing with token streaming.
+   A 40%-wide segment sweeps across the overflow-hidden track. */
 @keyframes loading-bar {
   0% {
-    width: 0%;
-    margin-left: 0%;
-  }
-  50% {
-    width: 60%;
-    margin-left: 20%;
+    transform: translateX(-100%);
   }
   100% {
-    width: 0%;
-    margin-left: 100%;
+    transform: translateX(250%);
   }
 }
 
@@ -489,7 +487,21 @@ body.notch-window {
 }
 
 .animate-loading-bar {
-  animation: loading-bar 2s ease-in-out infinite;
+  width: 40%;
+  animation: loading-bar 1.5s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  will-change: transform;
+}
+
+/* Reduced motion jumps animations to their end frame (translateX(250%) = off
+   the right edge, invisible). Pin a static full-width bar so the "working"
+   affordance stays visible without motion. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-loading-bar {
+    animation: none !important;
+    width: 100%;
+    transform: none;
+    opacity: 0.6;
+  }
 }
 
 .animate-apple-fade-in {
