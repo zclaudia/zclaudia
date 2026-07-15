@@ -22,6 +22,7 @@ export function ImageLightbox({ attachment, onClose }: ImageLightboxProps) {
   return (
     <div
       role="dialog"
+      aria-modal="true"
       aria-label={`Preview ${attachment.name}`}
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4"
       onClick={onClose}

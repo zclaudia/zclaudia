@@ -161,9 +161,16 @@ export function LoadingIndicator({
 
       {/* Loading content */}
       <div className="flex-1 min-w-0">
+        {/* Stable live-region label — announces once that work is in progress,
+            without the per-second timer / animated dots spamming a reader.
+            Plain aria-live (not role=status) so it doesn't collide with the
+            retry banner's status role below. */}
+        <span className="sr-only" aria-live="polite">
+          Assistant is working…
+        </span>
         <div className="flex items-center gap-3">
           {/* Pulsing dots animation */}
-          <div className="flex gap-1">
+          <div className="flex gap-1" aria-hidden="true">
             <span
               className={`w-2 h-2 rounded-full ${dotColor} animate-pulse-dot`}
               style={{ animationDelay: '0ms' }}
@@ -206,7 +213,7 @@ export function LoadingIndicator({
         </div>
 
         {/* Progress bar */}
-        <div className="mt-2 h-1 w-48 bg-muted rounded-full overflow-hidden">
+        <div className="mt-2 h-1 w-48 bg-muted rounded-full overflow-hidden" aria-hidden="true">
           <div className={`h-full ${barColor} rounded-full animate-loading-bar`} />
         </div>
 

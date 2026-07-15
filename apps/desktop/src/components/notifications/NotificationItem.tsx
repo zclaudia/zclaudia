@@ -53,10 +53,15 @@ export function NotificationItem({ item, onDismiss, onAfterSelect }: Notificatio
   return (
     <button
       onClick={handleClick}
-      className={`group w-full text-left px-3 py-2.5 hover:bg-secondary/50 transition-colors relative ${
-        isUnread ? 'border-l-2 border-primary' : 'border-l-2 border-transparent'
-      }`}
+      className="group w-full text-left px-3 py-2.5 hover:bg-secondary/50 transition-colors relative"
     >
+      {/* Unread marker — a leading dot instead of a colored side-stripe */}
+      {isUnread && (
+        <span
+          className="absolute left-1 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-primary"
+          aria-hidden="true"
+        />
+      )}
       {/* Dismiss button — visible on hover */}
       {onDismiss && (
         <span

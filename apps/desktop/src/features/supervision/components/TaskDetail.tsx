@@ -4,6 +4,7 @@ import * as api from '../../../services/api';
 import { useSupervisionStore } from '../store';
 import { useAndroidBack } from '../../../hooks/useAndroidBack';
 import { taskStatusStyle, ACTION_BUTTON } from './statusStyles';
+import { EYEBROW } from '../../../components/ui/typography';
 
 interface TaskDetailProps {
   task: SupervisionTask;
@@ -49,7 +50,7 @@ export function TaskDetail({ task, onClose }: TaskDetailProps) {
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
         {/* Description */}
         <section>
-          <h4 className="text-xs font-medium text-muted-foreground uppercase mb-1">Description</h4>
+          <h4 className={`${EYEBROW} mb-1`}>Description</h4>
           <p className="text-sm whitespace-pre-wrap">{task.description || 'No description'}</p>
         </section>
 
@@ -80,7 +81,7 @@ export function TaskDetail({ task, onClose }: TaskDetailProps) {
         {/* Acceptance criteria */}
         {task.acceptanceCriteria.length > 0 && (
           <section>
-            <h4 className="text-xs font-medium text-muted-foreground uppercase mb-1">
+            <h4 className={`${EYEBROW} mb-1`}>
               Acceptance Criteria
             </h4>
             <ul className="space-y-1">
@@ -97,7 +98,7 @@ export function TaskDetail({ task, onClose }: TaskDetailProps) {
         {/* Scope */}
         {task.scope && task.scope.length > 0 && (
           <section>
-            <h4 className="text-xs font-medium text-muted-foreground uppercase mb-1">Scope</h4>
+            <h4 className={`${EYEBROW} mb-1`}>Scope</h4>
             <div className="flex flex-wrap gap-1">
               {task.scope.map((s, i) => (
                 <span
@@ -114,7 +115,7 @@ export function TaskDetail({ task, onClose }: TaskDetailProps) {
         {/* Result */}
         {task.result && (
           <section>
-            <h4 className="text-xs font-medium text-muted-foreground uppercase mb-1">Result</h4>
+            <h4 className={`${EYEBROW} mb-1`}>Result</h4>
             <div className="bg-secondary/50 rounded-md p-3 space-y-2">
               <p className="text-sm">{task.result.summary}</p>
               {task.result.filesChanged.length > 0 && (
@@ -154,7 +155,7 @@ export function TaskDetail({ task, onClose }: TaskDetailProps) {
         {/* Review notes */}
         {task.result?.reviewNotes && (
           <section>
-            <h4 className="text-xs font-medium text-muted-foreground uppercase mb-1">
+            <h4 className={`${EYEBROW} mb-1`}>
               Review Notes
             </h4>
             <div className="bg-warning/5 border border-warning/20 rounded-md p-3">

@@ -1006,7 +1006,7 @@ export function MessageInput({
               )}
               <button
                 onClick={() => removeAttachment(attachment.id)}
-                className="absolute top-1 right-1 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                className="absolute top-1 right-1 w-7 h-7 md:w-6 md:h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity before:absolute before:-inset-2 before:content-[''] md:before:content-none"
                 aria-label={`Remove attachment ${attachment.name}`}
               >
                 <X size={12} strokeWidth={2} />
@@ -1063,7 +1063,7 @@ export function MessageInput({
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled}
-              className="h-10 w-10 flex-shrink-0 flex items-center justify-center text-muted-foreground hover:text-foreground rounded-full transition-colors disabled:opacity-50"
+              className="h-11 w-11 md:h-10 md:w-10 flex-shrink-0 flex items-center justify-center text-muted-foreground hover:text-foreground rounded-full transition-colors disabled:opacity-50"
               title="Add attachment"
               aria-label="Attach file"
             >
@@ -1084,7 +1084,7 @@ export function MessageInput({
               <button
                 data-testid="cancel-button"
                 onClick={onCancel}
-                className="h-10 w-10 flex-shrink-0 flex items-center justify-center bg-foreground text-background hover:bg-foreground/90 rounded-full transition-colors"
+                className="h-11 w-11 md:h-10 md:w-10 flex-shrink-0 flex items-center justify-center bg-foreground text-background hover:bg-foreground/90 rounded-full transition-colors"
                 title="Cancel (Esc)"
                 aria-label="Cancel"
               >
@@ -1094,7 +1094,7 @@ export function MessageInput({
               <button
                 onClick={handleSend}
                 disabled={disabled || (!value.trim() && attachments.length === 0)}
-                className="h-10 w-10 flex-shrink-0 flex items-center justify-center bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed rounded-full transition-colors"
+                className="h-11 w-11 md:h-10 md:w-10 flex-shrink-0 flex items-center justify-center bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed rounded-full transition-colors"
                 title="Send message"
                 aria-label="Send message"
                 data-testid="send-button"

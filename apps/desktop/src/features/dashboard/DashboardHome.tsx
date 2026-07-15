@@ -504,9 +504,9 @@ function PreviewSection({
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5">
-        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
           {title}
-        </h3>
+        </h2>
         <button
           onClick={onViewAll}
           className="text-xs text-primary hover:underline flex items-center gap-0.5"

@@ -7,6 +7,7 @@ import type {
 } from '@zclaudia/shared';
 import { LegacyBadge } from '../../openspec/components/LegacyBadge.js';
 import { changeStatusLabel, getNextAction } from './supervisor-utils';
+import { EYEBROW } from '../../../components/ui/typography';
 
 interface ActiveChangeCardProps {
   activeChange: ProjectChange;
@@ -66,7 +67,7 @@ export function ActiveChangeCard({
     <div className="rounded-lg border border-border bg-card px-3 py-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">Active Change</div>
+          <div className={EYEBROW}>Active Change</div>
           <div className="mt-1 text-sm font-semibold">
             {activeChange.title}
             {isLegacy && <LegacyBadge />}
@@ -91,7 +92,7 @@ export function ActiveChangeCard({
 
       {nextAction && (
         <div className="mt-3 rounded-md bg-secondary/50 px-3 py-2">
-          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          <div className={EYEBROW}>
             Next Action
           </div>
           <div className="mt-1 text-xs text-foreground">{nextAction.title}</div>

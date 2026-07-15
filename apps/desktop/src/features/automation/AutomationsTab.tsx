@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { EYEBROW } from '../../components/ui/typography';
 import { Plus, RefreshCw, Play, Pause, Trash2, FolderOpen, Globe } from 'lucide-react';
 import type { Automation, Workflow, WorkflowStepTypeMeta } from '@zclaudia/shared';
 import type { AutomationApiType } from './useAutomationApi';
@@ -317,7 +318,7 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
       {/* Enabled Automations */}
       {enabledItems.length > 0 && (
         <div>
-          <h3 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
+          <h3 className={`${EYEBROW} mb-2`}>
             Active ({enabledItems.length})
           </h3>
           <div className="space-y-1.5">
@@ -339,7 +340,7 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
       {/* Disabled Automations */}
       {disabledItems.length > 0 && (
         <div>
-          <h3 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
+          <h3 className={`${EYEBROW} mb-2`}>
             Disabled ({disabledItems.length})
           </h3>
           <div className="space-y-1.5">

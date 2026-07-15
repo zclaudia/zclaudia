@@ -447,7 +447,7 @@ export const ChatMessagePane = memo(function ChatMessagePane({
       {showScrollToBottom && (
         <button
           onClick={handleJumpToBottom}
-          className="absolute bottom-4 right-2 z-10 w-9 h-9 rounded-full bg-muted/90 border border-border shadow-md flex items-center justify-center hover:bg-muted transition-colors"
+          className="absolute bottom-4 right-2 z-10 w-11 h-11 md:w-9 md:h-9 rounded-full bg-muted/90 border border-border shadow-md flex items-center justify-center hover:bg-muted transition-colors"
           aria-label="Scroll to bottom"
         >
           <ArrowDown size={16} strokeWidth={1.5} className="text-foreground" />
