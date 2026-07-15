@@ -1089,7 +1089,7 @@ export function MessageInput({
               color: 'hsl(var(--foreground))',
               caretColor: 'hsl(var(--foreground))',
               // rich-textarea copies this padding to its backdrop and clips
-              // paint at the box edge; 0.5em gives line-start token icons
+              // paint at the box edge; 0.6em gives line-start token icons
               // room to paint. Wins over the p-0 class (inline style).
               paddingLeft: '0.6em',
               cursor: deleteZoneHovered ? 'pointer' : undefined,
