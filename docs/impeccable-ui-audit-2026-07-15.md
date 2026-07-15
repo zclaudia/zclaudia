@@ -56,14 +56,14 @@ Status legend: `[ ]` open · `[~]` discussing · `[x]` done · `[-]` won't-fix
 
 ### P3 — polish
 
-- [ ] **P3-1 Live "Thinking…" status not announced** — `features/chat/LoadingIndicator.tsx:155-206`. Rotating message + progress bar no `role="status"`/`aria-live`; dots/bar no text alt. Fix: wrap in `role="status" aria-live="polite"`.
-- [ ] **P3-2 Inconsistent uppercase eyebrows across sections** — `ActiveChangeCard.tsx:69,94`; `supervision/TaskDetail.tsx:69,100,117,134,174`; `chat/CompactionMarkerCard.tsx:59,69,86,100`; `LocalIssueDetailView.tsx:157,172`; `WorkspaceDocsPanel.tsx:171,184`; `AutomationsTab.tsx:320,342`; `AutomationWorkflowDetail.tsx:100`. Mixed `text-xs`/`text-[10px]`/`text-[11px]`, `tracking-wide`/`wider`/none, `font-medium`/`semibold` — templating tell. Fix: one shared label token; demote/remove where content is self-evident. _Cmd: /impeccable typeset_
-- [ ] **P3-3 NotificationItem unread stripe** — `components/notifications/NotificationItem.tsx:57` (`border-l-2 border-primary`). Borderline (functional) side-stripe. Fix: leading `bg-primary` dot instead of colored edge. _Cmd: /impeccable polish_
-- [ ] **P3-4 Scattered `text-red-*`/`text-emerald-*` instead of tokens** — `features/local-issues/.../CommentList.tsx:109,126,196`, `CreateIssueDialog.tsx:209,310`, `openspec/.../ReviewStep.tsx:75,82,99`, `SubIssueDetailScreen.tsx:271,282`, `agents/SkillDirsEditor.tsx:71-157`, `agents/CodexOAuthCard.tsx:51-92` & `CodexOAuthSection.tsx:186` (`bg-emerald-600`), `ActiveTasksPanel.tsx:27-33`. Renders OK but bypasses tuned tokens. Fix: `text-destructive`/`text-success`/`bg-success`. _Cmd: /impeccable colorize_
-- [ ] **P3-5 `ImageLightbox` missing `aria-modal`** — `features/attachments/components/ImageLightbox.tsx:23-24`. Has role/Esc/labeled close but no `aria-modal="true"`. Fix: add it.
-- [ ] **P3-6 DashboardHome heading skip h1→h3** — `features/dashboard/DashboardHome.tsx:179`→`:507`. No h2. Fix: section headers to `<h2>`.
-- [ ] **P3-7 Chat scroll-to-bottom 36px on mobile** — `features/chat/ChatMessagePane.tsx:447-454` (`w-9 h-9`). Fix: `w-11 h-11` on mobile.
-- [ ] **P3-8 MessageInput attachment remove 24px on mobile** — `features/chat/MessageInput.tsx:1007-1013` (`w-6 h-6`); composer send/attach `h-10 w-10` (40px) also marginal. Fix: ≥44px mobile hit areas.
+- [x] **P3-1 Live "Thinking…" status not announced** — DONE. `LoadingIndicator.tsx`: added an `sr-only` `aria-live="polite"` "Assistant is working…" label (stable, so the per-second timer / animated dots don't spam a reader; plain aria-live to avoid colliding with the retry banner's `role="status"`), and marked the decorative dots + progress bar `aria-hidden`.
+- [x] **P3-2 Inconsistent uppercase eyebrows across sections** — DONE. Added shared `components/ui/typography.ts` `EYEBROW` token (`text-[11px] font-medium uppercase tracking-wide text-muted-foreground`) and applied it across ActiveChangeCard, TaskDetail (×5), CompactionMarkerCard (×4), LocalIssueDetailView (×2), AutomationsTab (×2), AutomationWorkflowDetail — one source of truth, no more size/tracking/weight drift. (WorkspaceDocsPanel had no matching eyebrows — audit ref was stale.)
+- [x] **P3-3 NotificationItem unread stripe** — DONE. `NotificationItem.tsx`: `border-l-2 border-primary` → a leading `bg-primary` dot; row border removed.
+- [x] **P3-4 Scattered `text-red-*`/`text-emerald-*` instead of tokens** — DONE. Swept 8 files to tokens: CommentList, CreateIssueDialog, ReviewStep, SubIssueDetailScreen, SkillDirsEditor (red + amber diagnostics), CodexOAuthCard + CodexOAuthSection (emerald → success), ActiveTasksPanel (status dots → destructive/warning/primary/muted-foreground). All palette-clean.
+- [x] **P3-5 `ImageLightbox` missing `aria-modal`** — DONE. Added `aria-modal="true"`.
+- [x] **P3-6 DashboardHome heading skip h1→h3** — DONE. Section header `<h3>` → `<h2>` (styling unchanged).
+- [x] **P3-7 Chat scroll-to-bottom 36px on mobile** — DONE. `ChatMessagePane.tsx`: `w-11 h-11 md:w-9 md:h-9` (44px mobile, 36px desktop).
+- [x] **P3-8 MessageInput attachment remove 24px on mobile** — DONE. Attachment remove → `w-7 h-7` + an invisible `before:-inset-2` slop = 44px mobile hit target (desktop unchanged); composer send/attach `h-10 w-10` → `h-11 w-11 md:h-10 md:w-10`.
 
 ---
 

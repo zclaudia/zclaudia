@@ -206,7 +206,7 @@ export function CreateIssueDialog({
             <button
               type="button"
               onClick={() => removePending(p.localId)}
-              className="absolute top-0.5 right-0.5 p-0.5 rounded-md bg-background/90 text-muted-foreground hover:text-red-500"
+              className="absolute top-0.5 right-0.5 p-0.5 rounded-md bg-background/90 text-muted-foreground hover:text-destructive"
               aria-label={`Remove ${p.file.name}`}
             >
               <X className="w-3 h-3" />
@@ -307,7 +307,7 @@ export function CreateIssueDialog({
               </div>
             </div>
 
-            {error && <div className="text-xs text-red-500">{error}</div>}
+            {error && <div className="text-xs text-destructive">{error}</div>}
 
             <div className="flex justify-end gap-2 pt-1">
               <button

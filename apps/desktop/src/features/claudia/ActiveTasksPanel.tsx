@@ -24,13 +24,13 @@ function getStatusInfo(
   interrupted: boolean,
   permissionRequired: boolean
 ): { label: string; dotClass: string } {
-  if (interrupted) return { label: 'Interrupted', dotClass: 'bg-red-400 animate-pulse' };
+  if (interrupted) return { label: 'Interrupted', dotClass: 'bg-destructive animate-pulse' };
   if (permissionRequired)
-    return { label: 'Permission Required', dotClass: 'bg-orange-500 animate-pulse' };
+    return { label: 'Permission Required', dotClass: 'bg-warning animate-pulse' };
   if (task.status === 'running')
-    return { label: 'Running', dotClass: 'bg-amber-500 animate-pulse' };
+    return { label: 'Running', dotClass: 'bg-primary animate-pulse' };
   if (task.status === 'queued') return { label: 'Queued', dotClass: 'bg-muted-foreground' };
-  return { label: 'Waiting', dotClass: 'bg-blue-400 animate-pulse' };
+  return { label: 'Waiting', dotClass: 'bg-muted-foreground animate-pulse' };
 }
 
 export function ActiveTasksPanel({
@@ -113,7 +113,7 @@ export function ActiveTasksPanel({
                       )}
                       <button
                         onClick={() => onCancel(task)}
-                        className="text-red-400 hover:underline"
+                        className="text-destructive hover:underline"
                       >
                         Cancel
                       </button>

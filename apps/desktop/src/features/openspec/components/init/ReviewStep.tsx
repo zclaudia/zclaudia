@@ -72,14 +72,14 @@ export function ReviewStep({ scan, onClose }: Props): React.ReactElement {
                 {c.phase === 'generated' && (
                   <>
                     <button
-                      className="px-2 py-0.5 text-xs rounded bg-green-500/15 text-green-600"
+                      className="px-2 py-0.5 text-xs rounded bg-success/15 text-success"
                       disabled={busyId === c.id}
                       onClick={() => void doApprove(c)}
                     >
                       ✅ Approve
                     </button>
                     <button
-                      className="px-2 py-0.5 text-xs rounded bg-red-500/15 text-red-500"
+                      className="px-2 py-0.5 text-xs rounded bg-destructive/15 text-destructive"
                       disabled={busyId === c.id}
                       onClick={() => void doReject(c)}
                     >
@@ -89,21 +89,23 @@ export function ReviewStep({ scan, onClose }: Props): React.ReactElement {
                 )}
                 {c.phase === 'failed' && (
                   <button
-                    className="px-2 py-0.5 text-xs rounded bg-yellow-500/15 text-yellow-700"
+                    className="px-2 py-0.5 text-xs rounded bg-warning/15 text-warning"
                     disabled={busyId === c.id}
                     onClick={() => void doRetry(c)}
                   >
                     🔁 Retry
                   </button>
                 )}
-                {c.phase === 'approved' && <span className="text-xs text-green-600">approved</span>}
+                {c.phase === 'approved' && <span className="text-xs text-success">approved</span>}
                 {c.phase === 'rejected' && (
                   <span className="text-xs text-muted-foreground">rejected</span>
                 )}
               </div>
             </div>
             {c.generated_md && <SpecMarkdownPreview md={c.generated_md} />}
-            {c.error_message && <div className="text-xs text-red-500 mt-1">{c.error_message}</div>}
+            {c.error_message && (
+              <div className="text-xs text-destructive mt-1">{c.error_message}</div>
+            )}
           </div>
         ))}
       </div>

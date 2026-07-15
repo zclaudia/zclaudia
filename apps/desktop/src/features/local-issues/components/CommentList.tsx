@@ -106,7 +106,7 @@ function CommentItem({ comment }: { comment: LocalIssueComment }) {
             <button
               type="button"
               onClick={handleDelete}
-              className="p-0.5 hover:text-red-500"
+              className="p-0.5 hover:text-destructive"
               title="Delete comment"
             >
               <Trash2 className="w-3 h-3" />
@@ -123,7 +123,7 @@ function CommentItem({ comment }: { comment: LocalIssueComment }) {
               className="w-full min-h-[80px] rounded-md border border-border bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary resize-y"
               autoFocus
             />
-            {error && <div className="text-[11px] text-red-500">{error}</div>}
+            {error && <div className="text-[11px] text-destructive">{error}</div>}
             <div className="flex justify-end gap-1.5">
               <button
                 type="button"
@@ -193,7 +193,7 @@ function CommentComposer({ issueId }: { issueId: string }) {
           placeholder="Add a comment… (⌘+Enter to send, supports markdown)"
           className="w-full min-h-[60px] rounded-md border border-border bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary resize-y"
         />
-        {error && <div className="text-[11px] text-red-500 mt-1">{error}</div>}
+        {error && <div className="text-[11px] text-destructive mt-1">{error}</div>}
         <div className="flex justify-end mt-2">
           <button
             type="button"

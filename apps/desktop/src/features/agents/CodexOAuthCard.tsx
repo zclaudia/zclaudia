@@ -48,7 +48,7 @@ export function CodexOAuthCard({
           type="button"
           onClick={onSignIn}
           disabled={inFlight}
-          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-700 disabled:opacity-50"
+          className="rounded-lg bg-success px-3 py-1.5 text-sm text-success-foreground hover:bg-success/90 disabled:opacity-50"
         >
           {inFlight ? 'Signing in…' : 'Sign in with ChatGPT'}
         </button>
@@ -67,7 +67,7 @@ export function CodexOAuthCard({
           type="button"
           onClick={onSignIn}
           disabled={inFlight}
-          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-700 disabled:opacity-50"
+          className="rounded-lg bg-success px-3 py-1.5 text-sm text-success-foreground hover:bg-success/90 disabled:opacity-50"
         >
           {inFlight ? 'Signing in…' : 'Sign in again'}
         </button>
@@ -77,8 +77,8 @@ export function CodexOAuthCard({
 
   const creds = profile.oauthCredentials!;
   return (
-    <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
-      <div className="text-sm text-emerald-700 dark:text-emerald-400">
+    <div className="rounded-lg border border-success/30 bg-success/5 p-4">
+      <div className="text-sm text-success">
         Signed in as <code className="font-mono text-xs">{maskAccountId(creds.accountId)}</code>
       </div>
       <div className="mt-1 text-xs text-muted-foreground">
@@ -89,7 +89,7 @@ export function CodexOAuthCard({
           type="button"
           onClick={onSignIn}
           disabled={inFlight}
-          className="rounded-lg border border-emerald-500/50 px-3 py-1.5 text-xs text-emerald-700 hover:bg-emerald-500/10 disabled:opacity-50 dark:text-emerald-400"
+          className="rounded-lg border border-success/50 px-3 py-1.5 text-xs text-success hover:bg-success/10 disabled:opacity-50"
         >
           Sign in again
         </button>

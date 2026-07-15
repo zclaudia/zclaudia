@@ -68,11 +68,11 @@ export function SkillDirsEditor({ backendId, dirs, diagnostics, onSaved }: Skill
       </p>
 
       {error && (
-        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-          <p className="text-red-400 text-sm">{error}</p>
+        <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+          <p className="text-destructive text-sm">{error}</p>
           <button
             onClick={() => setError(null)}
-            className="text-xs text-red-400/70 hover:text-red-400 mt-1"
+            className="text-xs text-destructive/70 hover:text-destructive mt-1"
           >
             dismiss
           </button>
@@ -104,7 +104,7 @@ export function SkillDirsEditor({ backendId, dirs, diagnostics, onSaved }: Skill
                 type="button"
                 onClick={() => handleRemoveDir(dir)}
                 disabled={saving}
-                className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-red-400 disabled:opacity-50 transition-colors shrink-0"
+                className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-destructive disabled:opacity-50 transition-colors shrink-0"
                 title="Remove"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -140,21 +140,21 @@ export function SkillDirsEditor({ backendId, dirs, diagnostics, onSaved }: Skill
       </div>
 
       {diagnostics.length > 0 && (
-        <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg space-y-2">
+        <div className="p-4 bg-warning/10 border border-warning/20 rounded-lg space-y-2">
           <div className="flex items-center justify-between">
-            <p className="text-amber-300 text-sm font-medium">Skill diagnostics</p>
-            <span className="text-xs text-amber-300/70">{diagnostics.length}</span>
+            <p className="text-warning text-sm font-medium">Skill diagnostics</p>
+            <span className="text-xs text-warning/70">{diagnostics.length}</span>
           </div>
           <div className="space-y-1">
             {diagnostics.slice(0, 4).map((diagnostic, index) => (
               <div
                 key={`${diagnostic.path}:${diagnostic.code}:${index}`}
-                className="text-xs text-amber-100/90"
+                className="text-xs text-foreground/90"
               >
                 <span className="font-medium">{diagnostic.code}</span>
-                <span className="text-amber-100/60"> ({diagnostic.source}) </span>
+                <span className="text-muted-foreground"> ({diagnostic.source}) </span>
                 <span>{diagnostic.message}</span>
-                <div className="font-mono text-amber-100/50 truncate">{diagnostic.path}</div>
+                <div className="font-mono text-muted-foreground/80 truncate">{diagnostic.path}</div>
               </div>
             ))}
           </div>

@@ -183,7 +183,7 @@ export function CodexOAuthSection({
               type="button"
               onClick={() => void loadModels(true)}
               disabled={modelsLoading}
-              className="text-xs text-emerald-600 underline disabled:opacity-50 dark:text-emerald-400"
+              className="text-xs text-success underline disabled:opacity-50"
             >
               {modelsLoading ? 'Refreshing…' : 'Refresh model list'}
             </button>

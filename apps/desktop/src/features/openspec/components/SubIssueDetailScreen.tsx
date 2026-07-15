@@ -268,7 +268,7 @@ export function SubIssueDetailScreen({ projectId, subIssueId }: Props): React.Re
                   )}
                   {e.statusSummary === 'executing' && e.type === 'manual' && (
                     <button
-                      className="px-2 py-0.5 text-xs rounded-md bg-green-500/15 text-green-600 hover:bg-green-500/25"
+                      className="px-2 py-0.5 text-xs rounded-md bg-success/15 text-success hover:bg-success/25"
                       disabled={busy !== null}
                       onClick={() => void doExecAction(e, api.completeExecutor, 'complete')}
                     >
@@ -279,7 +279,7 @@ export function SubIssueDetailScreen({ projectId, subIssueId }: Props): React.Re
                     e.statusSummary === 'executing' ||
                     e.statusSummary === 'paused') && (
                     <button
-                      className="px-2 py-0.5 text-xs rounded-md bg-red-500/15 text-red-500 hover:bg-red-500/25"
+                      className="px-2 py-0.5 text-xs rounded-md bg-destructive/15 text-destructive hover:bg-destructive/25"
                       disabled={busy !== null}
                       onClick={() => void doExecAction(e, api.cancelExecutor, 'cancel')}
                     >
@@ -516,14 +516,14 @@ function SpecChangeArtifactTabs({
                 Reload
               </button>
               <button
-                className="px-2.5 py-1 text-xs rounded-md bg-purple-500/15 text-purple-600 hover:bg-purple-500/25 disabled:opacity-50"
+                className="px-2.5 py-1 text-xs rounded-md bg-primary/15 text-primary hover:bg-primary/25 disabled:opacity-50"
                 disabled={drafting || saving || (activeTab === 'delta' && !selectedCap)}
                 onClick={() => void doDraft()}
                 title={`Have AI draft this ${activeTab} from sub-issue context`}
               >
                 {drafting ? 'Drafting…' : '✨ Draft with AI'}
               </button>
-              {error && <span className="text-xs text-red-500">Error: {error}</span>}
+              {error && <span className="text-xs text-destructive">Error: {error}</span>}
             </div>
           </>
         )}
