@@ -42,3 +42,8 @@ export function recordChip(status: RecordStatus): RecordChip {
   if (status.disabled) return 'disabled';
   return 'ready';
 }
+
+/** True only when the record is safe to run/use: complete, usable, not disabled. */
+export function isRecordRunnable(status: RecordStatus): boolean {
+  return status.completeness === 'ready' && status.availability.usable && !status.disabled;
+}

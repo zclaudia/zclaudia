@@ -38,6 +38,7 @@ export * from './core/context-graph.js';
 export * from './core/project.js';
 export * from './core/api.js';
 export * from './core/mcp.js';
+export * from './core/record-status.js';
 export * from './core/pcp.js';
 export * from './core/provider-policy.js';
 export * from './core/usage-stats.js';
