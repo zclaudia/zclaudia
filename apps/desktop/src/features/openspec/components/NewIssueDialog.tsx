@@ -9,10 +9,11 @@
 // On submit, the dialog routes to `createEpic` or `createSubIssue`, upserts
 // the returned record into the store, then closes.
 
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import type { LocalIssueType } from '@zclaudia/shared/features/local-issue';
 import { useOpenSpecStore } from '../store.js';
 import * as api from '../api.js';
+import { Modal } from '../../../components/ui/Modal';
 
 interface Props {
   projectId: string;
@@ -35,6 +36,9 @@ const SUB_TYPES: { value: LocalIssueType; label: string }[] = [
 export function NewIssueDialog({ projectId, parentEpicId, onClose }: Props): React.ReactElement {
   const upsertIssue = useOpenSpecStore(s => s.upsertIssue);
   const setSpecChange = useOpenSpecStore(s => s.setSpecChange);
+  const fieldId = useId();
+  const typeId = `${fieldId}-type`;
+  const titleId = `${fieldId}-title`;
   const [mode, setMode] = useState<DialogMode>(parentEpicId ? 'implement' : 'epic');
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
@@ -68,55 +72,14 @@ export function NewIssueDialog({ projectId, parentEpicId, onClose }: Props): Rea
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-popover border border-border rounded-xl shadow-lg max-w-md w-full">
-        <div className="px-4 py-3 border-b border-border">
-          <h3 className="text-base font-semibold">New Issue</h3>
-        </div>
-        <div className="px-4 py-3 space-y-3">
-          <div>
-            <label className="block text-xs text-muted-foreground mb-1">Type</label>
-            {parentEpicId ? (
-              <select
-                className="w-full bg-background border border-border rounded-md px-2 py-1 text-sm"
-                value={mode as string}
-                onChange={e => setMode(e.target.value as DialogMode)}
-              >
-                {SUB_TYPES.map(s => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <select
-                className="w-full bg-background border border-border rounded-md px-2 py-1 text-sm"
-                value={mode as string}
-                onChange={e => setMode(e.target.value as DialogMode)}
-              >
-                <option value="epic">Epic (organizational container)</option>
-                {SUB_TYPES.map(s => (
-                  <option key={s.value} value={s.value}>
-                    {s.label} (standalone)
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-          <div>
-            <label className="block text-xs text-muted-foreground mb-1">Title</label>
-            <input
-              type="text"
-              className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50"
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              placeholder={mode === 'epic' ? 'Epic title' : 'Issue title'}
-              autoFocus
-            />
-          </div>
-          {error && <div className="text-xs text-red-500">Error: {error}</div>}
-        </div>
-        <div className="px-4 py-3 border-t border-border flex items-center justify-end gap-2">
+    <Modal
+      open
+      onClose={onClose}
+      ariaLabel="New Issue"
+      title="New Issue"
+      placement="center"
+      footer={
+        <div className="flex items-center justify-end gap-2">
           <button
             className="px-3 py-1.5 text-sm rounded-md bg-secondary hover:bg-secondary/80"
             onClick={onClose}
@@ -131,7 +94,58 @@ export function NewIssueDialog({ projectId, parentEpicId, onClose }: Props): Rea
             {busy ? 'Creating…' : 'Create'}
           </button>
         </div>
+      }
+    >
+      <div className="px-4 py-3 space-y-3">
+        <div>
+          <label htmlFor={typeId} className="block text-xs text-muted-foreground mb-1">
+            Type
+          </label>
+          {parentEpicId ? (
+            <select
+              id={typeId}
+              className="w-full bg-background border border-border rounded-md px-2 py-1 text-sm"
+              value={mode as string}
+              onChange={e => setMode(e.target.value as DialogMode)}
+            >
+              {SUB_TYPES.map(s => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <select
+              id={typeId}
+              className="w-full bg-background border border-border rounded-md px-2 py-1 text-sm"
+              value={mode as string}
+              onChange={e => setMode(e.target.value as DialogMode)}
+            >
+              <option value="epic">Epic (organizational container)</option>
+              {SUB_TYPES.map(s => (
+                <option key={s.value} value={s.value}>
+                  {s.label} (standalone)
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+        <div>
+          <label htmlFor={titleId} className="block text-xs text-muted-foreground mb-1">
+            Title
+          </label>
+          <input
+            id={titleId}
+            type="text"
+            className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50"
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            placeholder={mode === 'epic' ? 'Epic title' : 'Issue title'}
+            autoFocus
+          />
+        </div>
+        {error && <div className="text-xs text-destructive">Error: {error}</div>}
       </div>
-    </div>
+    </Modal>
   );
 }

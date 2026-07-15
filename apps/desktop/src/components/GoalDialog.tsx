@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useId } from 'react';
 import type { Goal } from '@zclaudia/shared';
 import { GOAL_DEFAULTS } from '@zclaudia/shared';
 import { trapTab } from '../utils/focusTrap';
@@ -16,6 +16,10 @@ export function GoalDialog({ goal, open, onClose, onSubmit, onClear }: GoalDialo
   const [tokenBudget, setTokenBudget] = useState(goal?.tokenBudget ?? GOAL_DEFAULTS.tokenBudget);
   const [maxTurns, setMaxTurns] = useState(goal?.maxTurns ?? GOAL_DEFAULTS.maxTurns);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const fieldId = useId();
+  const objectiveId = `${fieldId}-objective`;
+  const budgetId = `${fieldId}-budget`;
+  const maxTurnsId = `${fieldId}-max-turns`;
 
   // Reset form when the goal changes (e.g., opening dialog for a different session).
   useEffect(() => {
@@ -61,8 +65,11 @@ export function GoalDialog({ goal, open, onClose, onSubmit, onClear }: GoalDialo
 
         <div className="px-4 py-3 space-y-3">
           <div>
-            <label className="block text-xs text-muted-foreground mb-1">Objective</label>
+            <label htmlFor={objectiveId} className="block text-xs text-muted-foreground mb-1">
+              Objective
+            </label>
             <textarea
+              id={objectiveId}
               value={objective}
               onChange={e => setObjective(e.target.value)}
               maxLength={GOAL_DEFAULTS.objectiveMaxChars}
@@ -75,8 +82,11 @@ export function GoalDialog({ goal, open, onClose, onSubmit, onClear }: GoalDialo
 
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="block text-xs text-muted-foreground mb-1">Token budget</label>
+              <label htmlFor={budgetId} className="block text-xs text-muted-foreground mb-1">
+                Token budget
+              </label>
               <input
+                id={budgetId}
                 type="number"
                 min={10000}
                 max={10_000_000}
@@ -87,8 +97,11 @@ export function GoalDialog({ goal, open, onClose, onSubmit, onClear }: GoalDialo
               />
             </div>
             <div className="flex-1">
-              <label className="block text-xs text-muted-foreground mb-1">Max turns</label>
+              <label htmlFor={maxTurnsId} className="block text-xs text-muted-foreground mb-1">
+                Max turns
+              </label>
               <input
+                id={maxTurnsId}
                 type="number"
                 min={1}
                 max={500}
