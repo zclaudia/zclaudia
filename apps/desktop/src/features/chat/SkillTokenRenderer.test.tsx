@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
-import { splitSegments, renderSkillTokens } from './SkillTokenRenderer';
+import { splitSegments, renderSkillTokens, deleteTokenAt } from './SkillTokenRenderer';
 
 const skills = new Set(['commit', 'brainstorming']);
 const commands = new Set(['/clear', '/commit-commands:commit']);
@@ -100,5 +100,33 @@ describe('renderSkillTokens', () => {
       <div>{renderSkillTokens('just text', skills, commands)}</div>
     );
     expect(container.textContent).toBe('just text');
+  });
+});
+
+describe('deleteTokenAt', () => {
+  it('deletes a leading token and one trailing space', () => {
+    expect(deleteTokenAt('/commit now', 0, commands, skills)).toEqual({
+      next: 'now',
+      caret: 0,
+    });
+  });
+
+  it('deletes a mid-text token', () => {
+    expect(deleteTokenAt('run /commit now', 4, commands, skills)).toEqual({
+      next: 'run now',
+      caret: 4,
+    });
+  });
+
+  it('deletes a token at the end without a trailing space', () => {
+    expect(deleteTokenAt('run /commit', 4, commands, skills)).toEqual({
+      next: 'run ',
+      caret: 4,
+    });
+  });
+
+  it('returns null when no token starts at the offset', () => {
+    expect(deleteTokenAt('run /commit now', 5, commands, skills)).toBeNull();
+    expect(deleteTokenAt('plain text', 0, commands, skills)).toBeNull();
   });
 });

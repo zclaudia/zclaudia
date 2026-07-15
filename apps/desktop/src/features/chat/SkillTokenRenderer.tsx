@@ -68,6 +68,26 @@ export function splitSegments(
 }
 
 /**
+ * Remove the matched token that starts at `tokenStart` from `value`, plus one
+ * trailing space if present. Returns the next value and the caret offset to
+ * restore, or null if no matched token starts there.
+ */
+export function deleteTokenAt(
+  value: string,
+  tokenStart: number,
+  commandSet: Set<string>,
+  skillIds: Set<string>
+): { next: string; caret: number } | null {
+  const seg = splitSegments(value, commandSet, skillIds).find(
+    s => s.kind !== 'plain' && s.start === tokenStart
+  );
+  if (!seg) return null;
+  let end = tokenStart + seg.text.length;
+  if (value[end] === ' ') end += 1;
+  return { next: value.slice(0, tokenStart) + value.slice(end), caret: tokenStart };
+}
+
+/**
  * rich-textarea render-prop. Returns the visible, colored nodes for `value`.
  */
 export function renderSkillTokens(
