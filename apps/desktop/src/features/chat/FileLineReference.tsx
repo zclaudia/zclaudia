@@ -139,7 +139,7 @@ export function FileLineReference({ text, projectRoot, backendId }: Props) {
       className="bg-secondary px-1.5 py-0.5 rounded-md text-primary break-all font-mono cursor-pointer hover:bg-secondary/70 hover:underline"
       title={`Open ${text}`}
     >
-      <FileSymbol name={basename} className="mr-1 h-[1em] w-[1em] align-[-0.125em]" />
+      <FileSymbol name={basename} className="mr-1 h-[1em] w-[1em] align-middle" />
       {text}
     </button>
   );
