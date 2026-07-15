@@ -113,7 +113,8 @@ const TOKEN_ICON: Record<TokenKind, typeof Sparkles> = {
 // Paint-only icon: absolute (zero layout width), right-aligned to the end of
 // the hidden slash slot. 0.85em keeps the ink inside the preceding
 // space+slash advance so it never covers the previous word; the composer's
-// 0.5em paddingLeft (MessageInput) gives line-start tokens room to paint.
+// 0.6em paddingLeft (MessageInput) gives line-start tokens room to paint
+// (icon box overhangs the slash slot by ~0.55em; 0.6em keeps it unclipped).
 const ICON_STYLE: CSSProperties = {
   position: 'absolute',
   right: 0,

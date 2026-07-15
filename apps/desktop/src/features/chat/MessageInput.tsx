@@ -288,13 +288,15 @@ export function MessageInput({
       updateValue(result.next);
       setHoveredTokenStart(null);
       setDeleteZoneHovered(false);
-      // Restore the caret after React commits the new value.
-      requestAnimationFrame(() => {
+      // Restore the caret after React commits the new value (same setTimeout(0)
+      // pattern as the other caret restores in this file — a rAF can fire
+      // before the controlled value commits, leaving the caret at the end).
+      setTimeout(() => {
         const el = textareaRef.current;
         if (!el) return;
         el.setSelectionRange(result.caret, result.caret);
         el.focus();
-      });
+      }, 0);
     },
     [value, commandSet, skillIds, updateValue]
   );
@@ -1089,7 +1091,7 @@ export function MessageInput({
               // rich-textarea copies this padding to its backdrop and clips
               // paint at the box edge; 0.5em gives line-start token icons
               // room to paint. Wins over the p-0 class (inline style).
-              paddingLeft: '0.5em',
+              paddingLeft: '0.6em',
               cursor: deleteZoneHovered ? 'pointer' : undefined,
             }}
           >
@@ -1209,7 +1211,7 @@ export function MessageInput({
                 minHeight: '1.5rem',
                 color: 'hsl(var(--foreground))',
                 caretColor: 'hsl(var(--foreground))',
-                paddingLeft: '0.5em',
+                paddingLeft: '0.6em',
                 cursor: deleteZoneHovered ? 'pointer' : undefined,
               }}
             >
