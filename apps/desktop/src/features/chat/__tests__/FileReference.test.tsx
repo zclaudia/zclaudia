@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { TextWithFileRefs, MarkdownChildrenWithFileRefs } from '../FileReference';
+import { symbolMarkupForFile } from '../../../components/filesymbols/mapping';
 
 const mockOpenFile = vi.fn();
 vi.mock('../../../stores/fileViewerStore', () => ({
@@ -75,6 +76,37 @@ describe('TextWithFileRefs', () => {
   it('renders text at start with file reference', () => {
     render(<TextWithFileRefs text="@src/main.ts is the entry" />);
     expect(screen.getByRole('button')).toBeInTheDocument();
+  });
+
+  // jsdom (like real browsers) normalizes self-closing foreign-element tags
+  // (e.g. `<path ... />`) to explicit closing tags (`<path ...></path>`) when
+  // serializing via .innerHTML. symbolMarkupForFile() returns the raw
+  // generated string, which still uses self-closing syntax, so a direct
+  // string comparison against a live element's .innerHTML would always fail
+  // regardless of correctness. Round-trip the expected markup through the
+  // same DOM serialization before comparing.
+  function domNormalize(html: string) {
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    return div.innerHTML;
+  }
+
+  it('renders a file-type icon before the @file reference', () => {
+    render(<TextWithFileRefs text="Check @src/index.ts for details" />);
+    const button = screen.getByRole('button');
+    const icon = button.querySelector('span[aria-hidden="true"]');
+    expect(icon).not.toBeNull();
+    expect(icon!.innerHTML).toBe(domNormalize(symbolMarkupForFile('index.ts')));
+    expect(button.firstElementChild).toBe(icon);
+    expect(button.textContent).toBe('@src/index.ts');
+  });
+
+  it('renders the file-type icon in the user variant too', () => {
+    render(<TextWithFileRefs text="See @docs/readme.md" variant="user" />);
+    const button = screen.getByRole('button');
+    const icon = button.querySelector('span[aria-hidden="true"]');
+    expect(icon).not.toBeNull();
+    expect(icon!.innerHTML).toBe(domNormalize(symbolMarkupForFile('readme.md')));
   });
 });
 

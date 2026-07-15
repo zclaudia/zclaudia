@@ -5,6 +5,7 @@ import {
   pushTextWithInlineMarkdownIcons,
   TextWithInlineMarkdownIcons,
 } from '../../components/markdown/InlineMarkdownIcons';
+import { FileSymbol } from '../../components/filesymbols';
 import { useFileViewerStore } from '../../stores/fileViewerStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { activatePanel } from '../../utils/openPanel';
@@ -85,6 +86,7 @@ export function TextWithFileRefs({
 
     // Add clickable reference
     const filePath = ref.slice(1); // remove @
+    const basename = filePath.split('/').pop() ?? filePath;
     parts.push(
       <button
         key={`${fullMatchStart}-${filePath}`}
@@ -92,6 +94,7 @@ export function TextWithFileRefs({
         className={refClassName}
         title={`View ${filePath}`}
       >
+        <FileSymbol name={basename} className="mr-1 h-3.5 w-3.5 align-[-2px]" />
         {ref}
       </button>
     );
