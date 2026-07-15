@@ -16,6 +16,7 @@ import type {
   MetaWorkflowPhase,
 } from '@zclaudia/shared/features/meta-workflow';
 import { useMetaWorkflowStore } from '../store.js';
+import { useTheme, isDarkTheme } from '../../../contexts/ThemeContext';
 
 interface Props {
   projectId: string;
@@ -23,16 +24,20 @@ interface Props {
   socket: { send: (msg: string) => void };
 }
 
-const STATUS_COLOR: Record<string, string> = {
-  pending: '#f3f4f6',
-  searching_reuse: '#dbeafe',
-  generating: '#bfdbfe',
-  ready_to_run: '#fef9c3',
-  running: '#fde68a',
-  verifying_gates: '#fed7aa',
-  done: '#bbf7d0',
-  failed: '#fecaca',
-  stale: '#e9d5ff',
+// Map each phase status to a semantic theme token (same category approach as
+// supervision's statusStyles). React-Flow node styles are inline, so we drive
+// them from `hsl(var(--token) / a)` instead of fixed pastels — otherwise the
+// nodes render as bright light hues on a dark canvas in every dark theme.
+const STATUS_TOKEN: Record<string, string> = {
+  pending: 'muted-foreground',
+  searching_reuse: 'primary',
+  generating: 'primary',
+  ready_to_run: 'primary',
+  running: 'success',
+  verifying_gates: 'warning',
+  done: 'success',
+  failed: 'destructive',
+  stale: 'warning',
 };
 
 function toFlow(doc: PhasesDoc, phases: MetaWorkflowPhase[]): { nodes: Node[]; edges: Edge[] } {
@@ -63,6 +68,7 @@ function toFlow(doc: PhasesDoc, phases: MetaWorkflowPhase[]): { nodes: Node[]; e
     const d = depth[p.id];
     const lane = byDepth[d].indexOf(p.id);
     const status = statusByPhaseId[p.id] ?? 'pending';
+    const token = STATUS_TOKEN[status] ?? 'muted-foreground';
     return {
       id: p.id,
       position: { x: d * 220, y: lane * 100 },
@@ -70,16 +76,17 @@ function toFlow(doc: PhasesDoc, phases: MetaWorkflowPhase[]): { nodes: Node[]; e
         label: (
           <div style={{ padding: 6 }}>
             <div style={{ fontWeight: 600 }}>{p.id}</div>
-            <div style={{ fontSize: 10, color: '#6b7280' }}>{p.phaseType}</div>
+            <div style={{ fontSize: 10, color: 'hsl(var(--muted-foreground))' }}>{p.phaseType}</div>
             <div style={{ fontSize: 10, fontFamily: 'monospace' }}>{status}</div>
           </div>
         ),
       },
       style: {
-        background: STATUS_COLOR[status] ?? '#fff',
-        border: '1px solid #cbd5e1',
+        background: `hsl(var(--${token}) / 0.12)`,
+        border: `1px solid hsl(var(--${token}) / 0.35)`,
         borderRadius: 6,
         width: 180,
+        color: 'hsl(var(--card-foreground))',
       },
     };
   });
@@ -94,6 +101,8 @@ function toFlow(doc: PhasesDoc, phases: MetaWorkflowPhase[]): { nodes: Node[]; e
 }
 
 export function PhaseGraphScreen({ projectId, run, socket: _socket }: Props): React.ReactElement {
+  const { resolvedTheme } = useTheme();
+  const colorMode = isDarkTheme(resolvedTheme) ? 'dark' : 'light';
   const phases = useMetaWorkflowStore(s => s.phases[run.id] ?? []);
   const patchView = useMetaWorkflowStore(s => s.patchView);
   const layouts = useMetaWorkflowStore(s => s.layouts[run.id] ?? {});
@@ -169,9 +178,10 @@ export function PhaseGraphScreen({ projectId, run, socket: _socket }: Props): Re
           edges={edges}
           onNodesChange={onNodesChange}
           onNodeDragStop={onNodeDragStop}
+          colorMode={colorMode}
           fitView
         >
-          <Background />
+          <Background color="hsl(var(--border))" />
           <Controls />
         </ReactFlow>
       </div>
