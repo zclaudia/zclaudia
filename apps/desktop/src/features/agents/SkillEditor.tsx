@@ -61,9 +61,6 @@ export function SkillEditor({
   const [pendingDelete, setPendingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const deleteConfirmTimeoutRef = useRef<number | null>(null);
-  // The persisted identity this editor targets — used so a create-mode autosave
-  // switches to updates on subsequent edits instead of writing a second file.
-  const savedIdRef = useRef<string | null>(skill?.id ?? null);
 
   const clearDeleteConfirmation = () => {
     if (deleteConfirmTimeoutRef.current !== null) {
@@ -109,6 +106,12 @@ export function SkillEditor({
   // Autosave — enabled only once the form has hydrated (create: immediately;
   // edit: after the async content load lands, so hydrating the loaded content
   // isn't mistaken for a user edit). See useProfileAutosave's justEnabled path.
+  //
+  // The save is an upsert keyed by skillId, so create and edit call the same
+  // API. A create-mode save doesn't need in-place update targeting: onSaved
+  // re-selects the created id, so the parent remounts into edit mode with the
+  // id frozen (a skill's id IS its filename — there is no server-side rename),
+  // which is what prevents a second file.
   const autosave = useProfileAutosave({
     enabled: isWorkspace && !loading,
     valid: Boolean(skillId && content.trim()),
@@ -117,7 +120,6 @@ export function SkillEditor({
       setError(null);
       try {
         await api.saveWorkspaceSkillForBackend(backendId, skillId, content);
-        savedIdRef.current = skillId;
         onSaved(skillId);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to save skill');
