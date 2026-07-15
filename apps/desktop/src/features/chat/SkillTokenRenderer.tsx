@@ -1,13 +1,23 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
+import { Sparkles, SquareSlash, X } from 'lucide-react';
 
 /**
  * Token renderer for the composer's `rich-textarea` backdrop.
  *
  * `rich-textarea` keeps the underlying <textarea> text transparent and renders
  * the nodes returned here as the visible text, perfectly aligned with the
- * caret. Matched `/skill` / `/command` tokens currently render as plain
- * primary-colored spans; icon + hover-delete rendering lands in a follow-up
- * task.
+ * caret. Matched `/skill` / `/command` tokens render as an icon (Sparkles for
+ * skills, SquareSlash for commands) painted over the hidden leading slash,
+ * followed by the token name in `--primary`. The icon is absolutely
+ * positioned so it adds no layout width — the slash still occupies its
+ * normal (transparent) width, keeping the caret aligned with the raw text.
+ *
+ * Hovering a token (via `interaction`) swaps its icon to an X and tints the
+ * token with `--secondary`; clicking the icon slot deletes the token. This
+ * works because `rich-textarea` re-dispatches the real textarea's mouse
+ * events to whichever backdrop node sits under the cursor and synthesizes
+ * mouseover/mouseout — so plain React handlers on these spans fire at
+ * runtime even though the textarea itself is what receives the events.
  *
  * Token matching: a candidate token starts with `/` and runs to the next
  * whitespace. It's a **command** if it exactly matches a string in
@@ -87,13 +97,43 @@ export function deleteTokenAt(
   return { next: value.slice(0, tokenStart) + value.slice(end), caret: tokenStart };
 }
 
+/** Callbacks wired by MessageInput; all offsets are token `start` values. */
+export interface TokenInteraction {
+  hoveredTokenStart: number | null;
+  onTokenHover: (tokenStart: number | null) => void;
+  /** Hovering the slash/icon slot specifically (drives the pointer cursor). */
+  onDeleteZoneHover: (hovering: boolean) => void;
+  onDeleteToken: (tokenStart: number) => void;
+}
+
+const TOKEN_ICON: Record<TokenKind, typeof Sparkles> = {
+  skill: Sparkles,
+  command: SquareSlash,
+};
+
+// Paint-only icon: absolute (zero layout width), right-aligned to the end of
+// the hidden slash slot. 0.85em keeps the ink inside the preceding
+// space+slash advance so it never covers the previous word; the composer's
+// 0.5em paddingLeft (MessageInput) gives line-start tokens room to paint.
+const ICON_STYLE: CSSProperties = {
+  position: 'absolute',
+  right: 0,
+  top: '50%',
+  transform: 'translateY(-50%)',
+  width: '0.85em',
+  height: '0.85em',
+  color: 'hsl(var(--primary))',
+};
+
 /**
- * rich-textarea render-prop. Returns the visible, colored nodes for `value`.
+ * rich-textarea render-prop. Returns the visible nodes for `value`.
+ * INVARIANT: concatenated text of the returned nodes equals `value` exactly.
  */
 export function renderSkillTokens(
   value: string,
   skillIds: Set<string>,
-  commandSet: Set<string>
+  commandSet: Set<string>,
+  interaction?: TokenInteraction
 ): ReactNode {
   return splitSegments(value, commandSet, skillIds).map((seg, i) => {
     if (seg.kind === 'plain') {
@@ -103,9 +143,43 @@ export function renderSkillTokens(
         </span>
       );
     }
+    const hovered = interaction?.hoveredTokenStart === seg.start;
+    const Icon = hovered ? X : TOKEN_ICON[seg.kind];
     return (
-      <span key={i} style={{ color: 'hsl(var(--primary))' }}>
-        {seg.text}
+      <span
+        key={i}
+        data-token-start={seg.start}
+        onMouseOver={() => interaction?.onTokenHover(seg.start)}
+        onMouseOut={() => interaction?.onTokenHover(null)}
+        style={
+          hovered
+            ? { backgroundColor: 'hsl(var(--secondary))', borderRadius: '4px' }
+            : undefined
+        }
+      >
+        <span
+          data-token-delete
+          onMouseOver={e => {
+            e.stopPropagation();
+            interaction?.onTokenHover(seg.start);
+            interaction?.onDeleteZoneHover(true);
+          }}
+          onMouseOut={e => {
+            e.stopPropagation();
+            interaction?.onTokenHover(null);
+            interaction?.onDeleteZoneHover(false);
+          }}
+          onClick={() => interaction?.onDeleteToken(seg.start)}
+          style={{
+            position: 'relative',
+            color: 'transparent',
+            WebkitTextFillColor: 'transparent',
+          }}
+        >
+          /
+          <Icon aria-hidden strokeWidth={1.75} style={ICON_STYLE} />
+        </span>
+        <span style={{ color: 'hsl(var(--primary))' }}>{seg.text.slice(1)}</span>
       </span>
     );
   });

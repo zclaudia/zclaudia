@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { render } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, fireEvent } from '@testing-library/react';
 import { splitSegments, renderSkillTokens, deleteTokenAt } from './SkillTokenRenderer';
 
 const skills = new Set(['commit', 'brainstorming']);
@@ -88,18 +88,67 @@ describe('splitSegments', () => {
 });
 
 describe('renderSkillTokens', () => {
-  it('renders a colored token and keeps the full text', () => {
+  it('renders icon + colored name and keeps the full text', () => {
     const { container } = render(
       <div>{renderSkillTokens('/commit go', skills, commands)}</div>
     );
+    // full textContent still equals the raw value (slash transparent but present)
     expect(container.textContent).toBe('/commit go');
+    // skill icon present, no filled-pill <mark> anymore
+    expect(container.querySelector('svg.lucide-sparkles')).not.toBeNull();
+    expect(container.querySelector('mark')).toBeNull();
   });
 
-  it('renders plain text when nothing matches', () => {
+  it('uses the command icon for commands', () => {
+    const { container } = render(
+      <div>{renderSkillTokens('/clear', skills, commands)}</div>
+    );
+    expect(container.querySelector('svg.lucide-square-slash')).not.toBeNull();
+  });
+
+  it('renders plain text with no icon when nothing matches', () => {
     const { container } = render(
       <div>{renderSkillTokens('just text', skills, commands)}</div>
     );
+    expect(container.querySelector('svg')).toBeNull();
     expect(container.textContent).toBe('just text');
+  });
+
+  it('swaps to the X icon when the token is hovered', () => {
+    const interaction = {
+      hoveredTokenStart: 4,
+      onTokenHover: vi.fn(),
+      onDeleteZoneHover: vi.fn(),
+      onDeleteToken: vi.fn(),
+    };
+    const { container } = render(
+      <div>{renderSkillTokens('run /commit go', skills, commands, interaction)}</div>
+    );
+    expect(container.querySelector('svg.lucide-x')).not.toBeNull();
+    expect(container.querySelector('svg.lucide-sparkles')).toBeNull();
+  });
+
+  it('reports hover and delete interactions with the token offset', () => {
+    const interaction = {
+      hoveredTokenStart: null,
+      onTokenHover: vi.fn(),
+      onDeleteZoneHover: vi.fn(),
+      onDeleteToken: vi.fn(),
+    };
+    const { container } = render(
+      <div>{renderSkillTokens('run /commit go', skills, commands, interaction)}</div>
+    );
+    const token = container.querySelector('[data-token-start="4"]')!;
+    fireEvent.mouseOver(token);
+    expect(interaction.onTokenHover).toHaveBeenCalledWith(4);
+    fireEvent.mouseOut(token);
+    expect(interaction.onTokenHover).toHaveBeenCalledWith(null);
+
+    const slashSlot = token.querySelector('[data-token-delete]')!;
+    fireEvent.mouseOver(slashSlot);
+    expect(interaction.onDeleteZoneHover).toHaveBeenCalledWith(true);
+    fireEvent.click(slashSlot);
+    expect(interaction.onDeleteToken).toHaveBeenCalledWith(4);
   });
 });
 
@@ -128,5 +177,19 @@ describe('deleteTokenAt', () => {
   it('returns null when no token starts at the offset', () => {
     expect(deleteTokenAt('run /commit now', 5, commands, skills)).toBeNull();
     expect(deleteTokenAt('plain text', 0, commands, skills)).toBeNull();
+  });
+
+  it('does not absorb a trailing newline or tab', () => {
+    expect(deleteTokenAt('/commit\nnow', 0, commands, skills)).toEqual({
+      next: '\nnow',
+      caret: 0,
+    });
+  });
+
+  it('deletes the second of two tokens', () => {
+    expect(deleteTokenAt('/clear /commit', 7, commands, skills)).toEqual({
+      next: '/clear ',
+      caret: 7,
+    });
   });
 });
