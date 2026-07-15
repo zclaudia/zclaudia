@@ -24,15 +24,18 @@ import * as api from '../../../services/api';
 import { cancelLocalPRQueue, retryLocalPR } from '../api';
 import { DiffViewerModal } from './DiffViewerModal';
 
+// Status → semantic theme tokens (label carries the exact state, color the
+// category). Raw `-500` palette on its own `/10` tint failed WCAG AA in light
+// mode and never re-tuned per theme.
 const STATUS_CONFIG: Record<LocalPRStatus, { label: string; color: string }> = {
-  open: { label: 'Open', color: 'bg-blue-500/10 text-blue-500' },
-  reviewing: { label: 'Reviewing', color: 'bg-yellow-500/10 text-yellow-500' },
-  review_failed: { label: 'Review Failed', color: 'bg-red-500/10 text-red-500' },
-  approved: { label: 'Approved', color: 'bg-green-500/10 text-green-600' },
-  merging: { label: 'Merging', color: 'bg-cyan-500/10 text-cyan-500' },
-  merged: { label: 'Merged', color: 'bg-emerald-600/10 text-emerald-600' },
-  conflict: { label: 'Conflict', color: 'bg-orange-500/10 text-orange-500' },
-  closed: { label: 'Closed', color: 'bg-gray-500/10 text-gray-400' },
+  open: { label: 'Open', color: 'bg-primary/10 text-primary' },
+  reviewing: { label: 'Reviewing', color: 'bg-warning/10 text-warning' },
+  review_failed: { label: 'Review Failed', color: 'bg-destructive/10 text-destructive' },
+  approved: { label: 'Approved', color: 'bg-success/10 text-success' },
+  merging: { label: 'Merging', color: 'bg-primary/10 text-primary' },
+  merged: { label: 'Merged', color: 'bg-success/10 text-success' },
+  conflict: { label: 'Conflict', color: 'bg-warning/10 text-warning' },
+  closed: { label: 'Closed', color: 'bg-muted text-muted-foreground' },
 };
 
 const EXECUTION_STATE_CONFIG: Record<
@@ -42,17 +45,17 @@ const EXECUTION_STATE_CONFIG: Record<
   idle: { label: 'Idle', color: '', icon: null },
   queued: {
     label: 'Queued',
-    color: 'bg-amber-500/10 text-amber-500',
+    color: 'bg-warning/10 text-warning',
     icon: <Clock className="w-3 h-3" />,
   },
   running: {
     label: 'Running',
-    color: 'bg-blue-500/10 text-blue-500',
+    color: 'bg-primary/10 text-primary',
     icon: <Loader2 className="w-3 h-3 animate-spin" />,
   },
   failed: {
     label: 'Failed',
-    color: 'bg-red-500/10 text-red-500',
+    color: 'bg-destructive/10 text-destructive',
     icon: <AlertCircle className="w-3 h-3" />,
   },
 };
@@ -80,7 +83,7 @@ export function LocalPRCard({ pr, projectId }: LocalPRCardProps) {
   const selectSession = useProjectStore(s => s.selectSession);
   const status = STATUS_CONFIG[pr.status] ?? {
     label: pr.status,
-    color: 'bg-gray-500/10 text-gray-400',
+    color: 'bg-muted text-muted-foreground',
   };
   const executionState = EXECUTION_STATE_CONFIG[pr.executionState] ?? EXECUTION_STATE_CONFIG.idle;
   const showExecutionState = pr.executionState !== 'idle';
@@ -425,7 +428,7 @@ export function LocalPRCard({ pr, projectId }: LocalPRCardProps) {
                 onClick={handleClose}
                 disabled={loading}
                 title="Close PR"
-                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-red-400 disabled:opacity-50"
+                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-destructive disabled:opacity-50"
               >
                 <XCircle className="w-3.5 h-3.5" />
               </button>
@@ -561,7 +564,7 @@ export function LocalPRCard({ pr, projectId }: LocalPRCardProps) {
 
       {pr.statusMessage && <p className="text-xs text-muted-foreground">{pr.statusMessage}</p>}
 
-      {actionError && <p className="text-xs text-red-500">{actionError}</p>}
+      {actionError && <p className="text-xs text-destructive">{actionError}</p>}
     </div>
   );
 }

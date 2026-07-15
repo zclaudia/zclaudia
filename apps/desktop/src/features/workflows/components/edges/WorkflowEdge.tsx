@@ -11,16 +11,36 @@ const EDGE_STYLES: Record<
     labelColor: string;
   }
 > = {
+  // Token-driven so strokes/labels adapt across themes instead of shipping fixed
+  // hex (the amber loop label was low-contrast on the dark flow canvas).
   success: { stroke: 'hsl(var(--muted-foreground) / 0.4)', label: '', labelColor: '' },
-  error: { stroke: '#ef4444', strokeDasharray: '5,5', label: 'Error', labelColor: '#ef4444' },
-  condition_true: { stroke: '#22c55e', label: 'True', labelColor: '#22c55e' },
-  condition_false: { stroke: '#ef4444', label: 'False', labelColor: '#ef4444' },
-  loop: { stroke: '#f59e0b', strokeDasharray: '6,4', label: 'Loop', labelColor: '#d97706' },
+  error: {
+    stroke: 'hsl(var(--destructive))',
+    strokeDasharray: '5,5',
+    label: 'Error',
+    labelColor: 'hsl(var(--destructive))',
+  },
+  condition_true: {
+    stroke: 'hsl(var(--success))',
+    label: 'True',
+    labelColor: 'hsl(var(--success))',
+  },
+  condition_false: {
+    stroke: 'hsl(var(--destructive))',
+    label: 'False',
+    labelColor: 'hsl(var(--destructive))',
+  },
+  loop: {
+    stroke: 'hsl(var(--warning))',
+    strokeDasharray: '6,4',
+    label: 'Loop',
+    labelColor: 'hsl(var(--warning))',
+  },
   loop_exhausted: {
-    stroke: '#fb7185',
+    stroke: 'hsl(var(--destructive))',
     strokeDasharray: '3,3',
     label: 'Loop Exhausted',
-    labelColor: '#e11d48',
+    labelColor: 'hsl(var(--destructive))',
   },
 };
 
