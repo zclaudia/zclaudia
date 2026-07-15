@@ -1,36 +1,17 @@
-import type { SupervisionTask, TaskStatus } from '@zclaudia/shared';
+import type { SupervisionTask } from '@zclaudia/shared';
 import { CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import * as api from '../../../services/api';
 import { useSupervisionStore } from '../store';
+import { taskStatusStyle, ACTION_BUTTON } from './statusStyles';
 
 interface TaskCardProps {
   task: SupervisionTask;
   onSelect: (task: SupervisionTask) => void;
 }
 
-const statusConfig: Record<TaskStatus, { label: string; color: string }> = {
-  proposed: { label: 'Proposed', color: 'bg-purple-500/10 text-purple-500' },
-  pending: { label: 'Pending', color: 'bg-blue-500/10 text-blue-500' },
-  queued: { label: 'Queued', color: 'bg-cyan-500/10 text-cyan-500' },
-  planning: { label: 'Planning', color: 'bg-blue-500/10 text-blue-500' },
-  running: { label: 'Running', color: 'bg-green-500/10 text-green-500' },
-  completed: { label: 'Completed', color: 'bg-emerald-600/10 text-emerald-600' },
-  reviewing: { label: 'Reviewing', color: 'bg-yellow-500/10 text-yellow-500' },
-  approved: { label: 'Approved', color: 'bg-green-500/10 text-green-600' },
-  integrated: { label: 'Integrated', color: 'bg-emerald-600/10 text-emerald-600' },
-  rejected: { label: 'Rejected', color: 'bg-red-500/10 text-red-500' },
-  merge_conflict: { label: 'Conflict', color: 'bg-orange-500/10 text-orange-500' },
-  blocked: { label: 'Blocked', color: 'bg-gray-500/10 text-gray-400' },
-  failed: { label: 'Failed', color: 'bg-red-600/10 text-red-600' },
-  cancelled: { label: 'Cancelled', color: 'bg-gray-500/10 text-gray-500' },
-};
-
 export function TaskCard({ task, onSelect }: TaskCardProps) {
   const upsertTask = useSupervisionStore(s => s.upsertTask);
-  const status = statusConfig[task.status] ?? {
-    label: task.status,
-    color: 'bg-gray-500/10 text-gray-400',
-  };
+  const status = taskStatusStyle(task.status);
 
   const handleApproveProposed = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -91,12 +72,12 @@ export function TaskCard({ task, onSelect }: TaskCardProps) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span
-              className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full shrink-0 ${status.color}`}
+              className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full shrink-0 ${status.badge}`}
             >
               {status.label}
             </span>
             {task.status === 'running' && (
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shrink-0" />
+              <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse shrink-0" />
             )}
             {task.priority > 0 && (
               <span className="text-[10px] text-muted-foreground">P{task.priority}</span>
@@ -124,13 +105,13 @@ export function TaskCard({ task, onSelect }: TaskCardProps) {
         <div className="flex items-center gap-1 mt-2">
           <button
             onClick={handleApproveProposed}
-            className="flex items-center gap-1 px-2 py-0.5 text-xs bg-green-500/10 text-green-500 hover:bg-green-500/20 rounded-md"
+            className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded-md ${ACTION_BUTTON.approve}`}
           >
             <CheckCircle size={12} /> Approve
           </button>
           <button
             onClick={handleRejectProposed}
-            className="flex items-center gap-1 px-2 py-0.5 text-xs bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-md"
+            className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded-md ${ACTION_BUTTON.reject}`}
           >
             <XCircle size={12} /> Reject
           </button>
@@ -141,13 +122,13 @@ export function TaskCard({ task, onSelect }: TaskCardProps) {
         <div className="flex items-center gap-1 mt-2">
           <button
             onClick={handleApproveResult}
-            className="flex items-center gap-1 px-2 py-0.5 text-xs bg-green-500/10 text-green-500 hover:bg-green-500/20 rounded-md"
+            className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded-md ${ACTION_BUTTON.approve}`}
           >
             <CheckCircle size={12} /> Approve Result
           </button>
           <button
             onClick={handleRejectResult}
-            className="flex items-center gap-1 px-2 py-0.5 text-xs bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-md"
+            className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded-md ${ACTION_BUTTON.reject}`}
           >
             <XCircle size={12} /> Reject Result
           </button>
@@ -158,7 +139,7 @@ export function TaskCard({ task, onSelect }: TaskCardProps) {
         <div className="flex items-center gap-1 mt-2">
           <button
             onClick={handleResolveConflict}
-            className="flex items-center gap-1 px-2 py-0.5 text-xs bg-orange-500/10 text-orange-500 hover:bg-orange-500/20 rounded-md"
+            className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded-md ${ACTION_BUTTON.resolve}`}
           >
             <AlertTriangle size={12} /> Resolve Conflict
           </button>

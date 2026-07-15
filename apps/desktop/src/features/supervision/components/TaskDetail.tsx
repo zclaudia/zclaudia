@@ -3,33 +3,16 @@ import type { SupervisionTask } from '@zclaudia/shared';
 import * as api from '../../../services/api';
 import { useSupervisionStore } from '../store';
 import { useAndroidBack } from '../../../hooks/useAndroidBack';
+import { taskStatusStyle, ACTION_BUTTON } from './statusStyles';
 
 interface TaskDetailProps {
   task: SupervisionTask;
   onClose: () => void;
 }
 
-const statusConfig: Record<string, { label: string; color: string }> = {
-  proposed: { label: 'Proposed', color: 'bg-purple-500/10 text-purple-500' },
-  pending: { label: 'Pending', color: 'bg-blue-500/10 text-blue-500' },
-  queued: { label: 'Queued', color: 'bg-cyan-500/10 text-cyan-500' },
-  running: { label: 'Running', color: 'bg-green-500/10 text-green-500' },
-  reviewing: { label: 'Reviewing', color: 'bg-yellow-500/10 text-yellow-500' },
-  approved: { label: 'Approved', color: 'bg-green-500/10 text-green-600' },
-  integrated: { label: 'Integrated', color: 'bg-emerald-600/10 text-emerald-600' },
-  rejected: { label: 'Rejected', color: 'bg-red-500/10 text-red-500' },
-  merge_conflict: { label: 'Conflict', color: 'bg-orange-500/10 text-orange-500' },
-  blocked: { label: 'Blocked', color: 'bg-gray-500/10 text-gray-400' },
-  failed: { label: 'Failed', color: 'bg-red-600/10 text-red-600' },
-  cancelled: { label: 'Cancelled', color: 'bg-gray-500/10 text-gray-500' },
-};
-
 export function TaskDetail({ task, onClose }: TaskDetailProps) {
   const upsertTask = useSupervisionStore(s => s.upsertTask);
-  const status = statusConfig[task.status] ?? {
-    label: task.status,
-    color: 'bg-gray-500/10 text-gray-400',
-  };
+  const status = taskStatusStyle(task.status);
 
   useAndroidBack(onClose, true, 20);
 
@@ -48,7 +31,7 @@ export function TaskDetail({ task, onClose }: TaskDetailProps) {
       <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <span
-            className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full shrink-0 ${status.color}`}
+            className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full shrink-0 ${status.badge}`}
           >
             {status.label}
           </span>
@@ -151,7 +134,7 @@ export function TaskDetail({ task, onClose }: TaskDetailProps) {
                   <span className="text-xs text-muted-foreground">Workflow outputs:</span>
                   {task.result.workflowOutputs.map((w, i) => (
                     <div key={i} className="mt-1 text-xs">
-                      <span className={w.success ? 'text-green-500' : 'text-red-500'}>
+                      <span className={w.success ? 'text-success' : 'text-destructive'}>
                         {w.success ? 'PASS' : 'FAIL'}
                       </span>{' '}
                       <span className="text-muted-foreground">{w.action}</span>
@@ -174,7 +157,7 @@ export function TaskDetail({ task, onClose }: TaskDetailProps) {
             <h4 className="text-xs font-medium text-muted-foreground uppercase mb-1">
               Review Notes
             </h4>
-            <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-md p-3">
+            <div className="bg-warning/5 border border-warning/20 rounded-md p-3">
               <p className="text-sm whitespace-pre-wrap">{task.result.reviewNotes}</p>
             </div>
           </section>
@@ -187,13 +170,13 @@ export function TaskDetail({ task, onClose }: TaskDetailProps) {
           <>
             <button
               onClick={() => handleAction(() => api.approveSupervisionTask(task.id))}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm bg-green-500/10 text-green-500 hover:bg-green-500/20 rounded-md"
+              className={`flex items-center gap-1 px-3 py-1.5 text-sm rounded-md ${ACTION_BUTTON.approve}`}
             >
               <CheckCircle size={14} /> Approve
             </button>
             <button
               onClick={() => handleAction(() => api.rejectSupervisionTask(task.id))}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-md"
+              className={`flex items-center gap-1 px-3 py-1.5 text-sm rounded-md ${ACTION_BUTTON.reject}`}
             >
               <XCircle size={14} /> Reject
             </button>
@@ -203,7 +186,7 @@ export function TaskDetail({ task, onClose }: TaskDetailProps) {
           <>
             <button
               onClick={() => handleAction(() => api.approveSupervisionTaskResult(task.id))}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm bg-green-500/10 text-green-500 hover:bg-green-500/20 rounded-md"
+              className={`flex items-center gap-1 px-3 py-1.5 text-sm rounded-md ${ACTION_BUTTON.approve}`}
             >
               <CheckCircle size={14} /> Approve Result
             </button>
@@ -211,7 +194,7 @@ export function TaskDetail({ task, onClose }: TaskDetailProps) {
               onClick={() =>
                 handleAction(() => api.rejectSupervisionTaskResult(task.id, 'Rejected by user'))
               }
-              className="flex items-center gap-1 px-3 py-1.5 text-sm bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-md"
+              className={`flex items-center gap-1 px-3 py-1.5 text-sm rounded-md ${ACTION_BUTTON.reject}`}
             >
               <XCircle size={14} /> Reject Result
             </button>
@@ -220,7 +203,7 @@ export function TaskDetail({ task, onClose }: TaskDetailProps) {
         {task.status === 'merge_conflict' && (
           <button
             onClick={() => handleAction(() => api.resolveSupervisionConflict(task.id))}
-            className="flex items-center gap-1 px-3 py-1.5 text-sm bg-orange-500/10 text-orange-500 hover:bg-orange-500/20 rounded-md"
+            className={`flex items-center gap-1 px-3 py-1.5 text-sm rounded-md ${ACTION_BUTTON.resolve}`}
           >
             <AlertTriangle size={14} /> Resolve Conflict
           </button>
