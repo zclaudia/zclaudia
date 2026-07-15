@@ -23,13 +23,21 @@ function makeSkill(overrides: Partial<WorkspaceSkillInfo> = {}): WorkspaceSkillI
   };
 }
 
-async function renderEditor(skill: WorkspaceSkillInfo | null) {
+function renderEditor(skill: WorkspaceSkillInfo | null) {
   const onSaved = vi.fn();
   const onDeleted = vi.fn();
+  const onBack = vi.fn();
   const view = render(
-    <SkillEditor backendId="b1" skill={skill} onSaved={onSaved} onDeleted={onDeleted} />
+    <SkillEditor
+      backendId="b1"
+      skill={skill}
+      backendName="Backend 1"
+      onBack={onBack}
+      onSaved={onSaved}
+      onDeleted={onDeleted}
+    />
   );
-  return { onSaved, onDeleted, ...view };
+  return { onSaved, onDeleted, onBack, ...view };
 }
 
 describe('SkillEditor', () => {
@@ -43,14 +51,14 @@ describe('SkillEditor', () => {
     vi.mocked(api.deleteWorkspaceSkillForBackend).mockResolvedValue(undefined);
   });
 
-  it('edit mode: loads content for the backend + skill and saves via saveWorkspaceSkillForBackend', async () => {
-    const { onSaved } = await renderEditor(makeSkill());
+  it('edit mode: loads content for the backend + skill and autosaves edits on blur', async () => {
+    const { onSaved } = renderEditor(makeSkill());
 
     const textarea = await screen.findByDisplayValue('# My Skill Instructions');
     expect(api.getWorkspaceSkillForBackend).toHaveBeenCalledWith('b1', 'my-skill');
 
     fireEvent.change(textarea, { target: { value: '# Updated' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.blur(textarea);
 
     await waitFor(() => {
       expect(api.saveWorkspaceSkillForBackend).toHaveBeenCalledWith('b1', 'my-skill', '# Updated');
@@ -60,23 +68,19 @@ describe('SkillEditor', () => {
     });
   });
 
-  it('create mode: requires an id and content, then saves with the typed id', async () => {
-    const { onSaved } = await renderEditor(null);
+  it('create mode: holds save until an id and content are present, then autosaves with the typed id', async () => {
+    const { onSaved } = renderEditor(null);
 
-    const createButton = screen.getByRole('button', { name: 'Create' });
-    expect(createButton).toBeDisabled();
+    const idInput = screen.getByPlaceholderText('e.g. my-skill');
+    const contentInput = screen.getByLabelText('SKILL.md content');
 
-    fireEvent.change(screen.getByPlaceholderText('e.g. my-skill'), {
-      target: { value: 'new-skill' },
-    });
-    expect(createButton).toBeDisabled();
+    fireEvent.change(idInput, { target: { value: 'new-skill' } });
+    // Id present but no content yet → not valid, nothing persisted.
+    expect(screen.getByTestId('save-state')).toHaveTextContent('Not saved');
+    expect(api.saveWorkspaceSkillForBackend).not.toHaveBeenCalled();
 
-    fireEvent.change(screen.getByPlaceholderText(/name: My Skill/), {
-      target: { value: '# New Skill' },
-    });
-    expect(createButton).not.toBeDisabled();
-
-    fireEvent.click(createButton);
+    fireEvent.change(contentInput, { target: { value: '# New Skill' } });
+    fireEvent.blur(contentInput);
 
     await waitFor(() => {
       expect(api.saveWorkspaceSkillForBackend).toHaveBeenCalledWith(
@@ -92,7 +96,7 @@ describe('SkillEditor', () => {
   });
 
   it('delete: first click arms confirmation, second click deletes and fires onDeleted', async () => {
-    const { onDeleted } = await renderEditor(makeSkill());
+    const { onDeleted } = renderEditor(makeSkill());
     await screen.findByDisplayValue('# My Skill Instructions');
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
@@ -109,35 +113,36 @@ describe('SkillEditor', () => {
     });
   });
 
-  it('non-workspace skill: read-only info with no content fetch and no Save/Delete', async () => {
-    await renderEditor(makeSkill({ id: 'ext-skill', name: 'External Skill', source: 'external' }));
+  it('non-workspace skill: read-only info with no content fetch, no autosave, no delete', async () => {
+    renderEditor(makeSkill({ id: 'ext-skill', name: 'External Skill', source: 'external' }));
 
     expect(screen.getByText('External Skill')).toBeInTheDocument();
     expect(screen.getByText('Managed by its source — read-only.')).toBeInTheDocument();
     // The server's GET /skills/:skillId only reads workspace skills, so no fetch.
     expect(api.getWorkspaceSkillForBackend).not.toHaveBeenCalled();
-    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    // Read-only records don't surface the autosave indicator or a delete action.
+    expect(screen.queryByTestId('save-state')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
   });
 
   it('plugin skill: also read-only', async () => {
-    await renderEditor(makeSkill({ id: 'plug-skill', name: 'Plugin Skill', source: 'plugin' }));
+    renderEditor(makeSkill({ id: 'plug-skill', name: 'Plugin Skill', source: 'plugin' }));
 
     expect(screen.getByText('Managed by its source — read-only.')).toBeInTheDocument();
     expect(api.getWorkspaceSkillForBackend).not.toHaveBeenCalled();
-    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    expect(screen.queryByTestId('save-state')).toBeNull();
   });
 
   it('shows an inline error when the content load fails', async () => {
     vi.mocked(api.getWorkspaceSkillForBackend).mockRejectedValue(new Error('load boom'));
 
-    await renderEditor(makeSkill());
+    renderEditor(makeSkill());
 
     expect(await screen.findByText('load boom')).toBeInTheDocument();
   });
 
   it('eligible badge uses the green pair', async () => {
-    await renderEditor(makeSkill({ eligible: true }));
+    renderEditor(makeSkill({ eligible: true }));
 
     const badge = screen.getByText('Eligible');
     expect(badge.className).toContain('bg-green-500/20');
@@ -145,7 +150,7 @@ describe('SkillEditor', () => {
   });
 
   it('blocked badge uses destructive tokens, not green', async () => {
-    await renderEditor(makeSkill({ eligible: false }));
+    renderEditor(makeSkill({ eligible: false }));
 
     const badge = screen.getByText('Blocked');
     expect(badge.className).toContain('bg-destructive/20');
@@ -153,15 +158,19 @@ describe('SkillEditor', () => {
     expect(badge.className).not.toContain('green');
   });
 
-  it('shows an inline error when save fails', async () => {
+  it('surfaces a failed save via the save-state indicator and an inline error', async () => {
     vi.mocked(api.saveWorkspaceSkillForBackend).mockRejectedValue(new Error('save boom'));
 
-    const { onSaved } = await renderEditor(makeSkill());
-    await screen.findByDisplayValue('# My Skill Instructions');
+    const { onSaved } = renderEditor(makeSkill());
+    const textarea = await screen.findByDisplayValue('# My Skill Instructions');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.change(textarea, { target: { value: '# Updated' } });
+    fireEvent.blur(textarea);
 
     expect(await screen.findByText('save boom')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId('save-state')).toHaveTextContent('Save failed');
+    });
     expect(onSaved).not.toHaveBeenCalled();
   });
 });

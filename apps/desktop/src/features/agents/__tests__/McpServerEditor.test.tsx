@@ -44,17 +44,20 @@ function renderEditor(server: McpServerConfig | null, overrides: Partial<McpServ
   const onSaved = vi.fn();
   const onDeleted = vi.fn();
   const onStatusChanged = vi.fn();
+  const onBack = vi.fn();
   const view = render(
     <McpServerEditor
       backendId="b1"
       server={resolved}
       status={undefined}
+      backendName="Backend 1"
+      onBack={onBack}
       onSaved={onSaved}
       onDeleted={onDeleted}
       onStatusChanged={onStatusChanged}
     />
   );
-  return { onSaved, onDeleted, onStatusChanged, ...view };
+  return { onSaved, onDeleted, onStatusChanged, onBack, ...view };
 }
 
 describe('McpServerEditor', () => {
@@ -71,14 +74,15 @@ describe('McpServerEditor', () => {
     });
   });
 
-  it('create mode: saves via createMcpServerForBackend and fires onSaved with the new id', async () => {
+  it('create mode: autosaves via createMcpServerForBackend and fires onSaved with the new id', async () => {
     const { onSaved } = renderEditor(null);
 
     fireEvent.change(screen.getByPlaceholderText('e.g. filesystem'), {
       target: { value: 'my-server' },
     });
-    fireEvent.change(screen.getByPlaceholderText('e.g. npx'), { target: { value: 'npx' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    const command = screen.getByPlaceholderText('e.g. npx');
+    fireEvent.change(command, { target: { value: 'npx' } });
+    fireEvent.blur(command);
 
     await waitFor(() => {
       expect(api.createMcpServerForBackend).toHaveBeenCalledWith('b1', {
@@ -106,27 +110,28 @@ describe('McpServerEditor', () => {
     });
   });
 
-  it('create mode: empty name shows a validation error and skips the api call', async () => {
+  it('create mode: an empty name holds the save (Not saved) and never calls the api', () => {
     const { onSaved } = renderEditor(null);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    const command = screen.getByPlaceholderText('e.g. npx');
+    fireEvent.change(command, { target: { value: 'npx' } });
+    fireEvent.blur(command);
 
-    expect(await screen.findByText('Name and command are required')).toBeInTheDocument();
+    expect(screen.getByTestId('save-state')).toHaveTextContent('Not saved');
     expect(api.createMcpServerForBackend).not.toHaveBeenCalled();
     expect(onSaved).not.toHaveBeenCalled();
   });
 
-  it('edit mode: populates the form from the server and updates via updateMcpServerForBackend', async () => {
+  it('edit mode: populates the form from the server and autosaves via updateMcpServerForBackend', async () => {
     const { onSaved } = renderEditor(makeServer());
 
     expect(screen.getByDisplayValue('filesystem')).toBeInTheDocument();
     expect(screen.getByDisplayValue('npx')).toBeInTheDocument();
     expect(screen.getByDisplayValue('-y mcp-fs')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByDisplayValue('filesystem'), {
-      target: { value: 'renamed' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    const nameInput = screen.getByDisplayValue('filesystem');
+    fireEvent.change(nameInput, { target: { value: 'renamed' } });
+    fireEvent.blur(nameInput);
 
     await waitFor(() => {
       expect(api.updateMcpServerForBackend).toHaveBeenCalledWith(
@@ -148,7 +153,9 @@ describe('McpServerEditor', () => {
   it('edit mode: empty args/env/headers fall back to [] / {} / {} in the update payload', async () => {
     const { onSaved } = renderEditor(makeServer({ args: undefined }));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    const nameInput = screen.getByDisplayValue('filesystem');
+    fireEvent.change(nameInput, { target: { value: 'filesystem2' } });
+    fireEvent.blur(nameInput);
 
     await waitFor(() => {
       expect(api.updateMcpServerForBackend).toHaveBeenCalledWith(
@@ -293,6 +300,7 @@ describe('McpServerEditor', () => {
 
   it('every MCP text field is labeled', () => {
     const stdio = renderEditor(makeServer({ transport: 'stdio' }));
+    // Name + Description are inline-editable in the header (ProfileHeader).
     ['Name', 'Command', 'Arguments', 'Description'].forEach(name => {
       expect(screen.getByLabelText(new RegExp(name, 'i'))).toBeTruthy();
     });
@@ -317,13 +325,18 @@ describe('McpServerEditor', () => {
     expect(screen.getByLabelText(/Scopes/i)).toBeTruthy();
   });
 
-  it('shows an inline error when save fails', async () => {
+  it('surfaces a failed save via the save-state indicator and an inline error', async () => {
     vi.mocked(api.updateMcpServerForBackend).mockRejectedValue(new Error('save boom'));
 
     const { onSaved } = renderEditor(makeServer());
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    const nameInput = screen.getByDisplayValue('filesystem');
+    fireEvent.change(nameInput, { target: { value: 'renamed' } });
+    fireEvent.blur(nameInput);
 
     expect(await screen.findByText('save boom')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId('save-state')).toHaveTextContent('Save failed');
+    });
     expect(onSaved).not.toHaveBeenCalled();
   });
 });

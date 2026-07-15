@@ -76,14 +76,18 @@ vi.mock('../ProfileEditor', () => ({
 vi.mock('../SkillEditor', () => ({
   SkillEditor: ({
     skill,
+    backendName,
     onSaved,
     onDeleted,
   }: {
-    skill: { id: string } | null;
+    skill: { id: string; name?: string } | null;
+    backendName?: string;
     onSaved: (id: string) => void;
     onDeleted: () => void;
   }) => (
     <div data-testid="skill-editor" data-skill-id={skill?.id ?? 'null'}>
+      {skill && <span>{skill.name ?? skill.id}</span>}
+      <span>{backendName}</span>
       <button onClick={() => onSaved('skill-saved-1')}>skill-stub-save</button>
       <button onClick={() => onDeleted()}>skill-stub-delete</button>
     </div>
@@ -119,12 +123,14 @@ vi.mock('../McpServerEditor', () => ({
   McpServerEditor: ({
     server,
     status,
+    backendName,
     onSaved,
     onDeleted,
     onStatusChanged,
   }: {
-    server: { id: string } | null;
+    server: { id: string; name?: string } | null;
     status: { state: string } | undefined;
+    backendName?: string;
     onSaved: (id: string) => void;
     onDeleted: () => void;
     onStatusChanged: () => void;
@@ -134,6 +140,8 @@ vi.mock('../McpServerEditor', () => ({
       data-server-id={server?.id ?? 'null'}
       data-status={status?.state ?? 'none'}
     >
+      {server && <span>{server.name ?? server.id}</span>}
+      <span>{backendName}</span>
       <button onClick={() => onSaved('mcp-saved-1')}>mcp-stub-save</button>
       <button onClick={() => onDeleted()}>mcp-stub-delete</button>
       <button onClick={() => onStatusChanged()}>mcp-stub-status</button>
@@ -676,7 +684,7 @@ describe('AgentsContent', () => {
     expect(screen.getByText('Loading…')).toBeTruthy();
   });
 
-  it('renders skill create mode with a null skill and "New skill" header', () => {
+  it('renders skill create mode with a null skill and forwards the backend name', () => {
     useTopLevelViewStore.setState({
       view: { kind: 'agents', tab: 'skills' },
       agentsSelection: { backendId: 'b2', kind: 'new-skill' },
@@ -693,7 +701,6 @@ describe('AgentsContent', () => {
     );
 
     expect(screen.getByTestId('skill-editor').getAttribute('data-skill-id')).toBe('null');
-    expect(screen.getByText('New skill')).toBeTruthy();
     expect(screen.getByText('Backend 2')).toBeTruthy();
   });
 
@@ -1024,7 +1031,7 @@ describe('AgentsContent', () => {
     expect(screen.getByTestId('mcp-editor').getAttribute('data-status')).toBe('none');
   });
 
-  it('renders MCP create mode with a null server and "New MCP server" header', () => {
+  it('renders MCP create mode with a null server and forwards the backend name', () => {
     useTopLevelViewStore.setState({
       view: { kind: 'agents', tab: 'mcp-servers' },
       agentsSelection: { backendId: 'b2', kind: 'new-mcp-server' },
@@ -1041,7 +1048,6 @@ describe('AgentsContent', () => {
     );
 
     expect(screen.getByTestId('mcp-editor').getAttribute('data-server-id')).toBe('null');
-    expect(screen.getByText('New MCP server')).toBeTruthy();
     expect(screen.getByText('Backend 2')).toBeTruthy();
   });
 

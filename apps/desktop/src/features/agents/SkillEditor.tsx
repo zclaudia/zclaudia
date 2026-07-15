@@ -1,9 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
 import * as api from '../../services/api';
 import type { WorkspaceSkillInfo } from '../../services/api';
-import { EditorSection, FieldLabel } from './ui/EditorSection';
+import { EditorSection } from './ui/EditorSection';
+import { ProfileHeader } from './ui/ProfileHeader';
+import type { DetailBadge } from './ui/DetailHeader';
+import { useProfileAutosave } from './useProfileAutosave';
+import { FIELD_CLASS } from '../../components/ui/Input';
 
 /**
+ * Backend-scoped skill editor.
+ *
+ * Matches the agent/LLM profile editor design language: it owns its own
+ * full-height chrome (ProfileHeader breadcrumb + inline skill id + save
+ * indicator) and autosaves on change (no explicit Create/Save button). The
+ * skill id doubles as the record identity, so it is editable only in create
+ * mode and frozen (read-only) once the skill exists.
+ *
  * Parent must remount this component per identity — key it by
  * `${backendId}:${skill?.id ?? 'new'}`. Content loads on identity only;
  * prop-driven switching of backendId or same-id content updates without a
@@ -13,11 +25,24 @@ export interface SkillEditorProps {
   backendId: string;
   /** null = create mode */
   skill: WorkspaceSkillInfo | null;
+  /** Display name of the target backend, shown as a header badge. */
+  backendName?: string;
+  onBack: () => void;
   onSaved: (id: string) => void;
   onDeleted: () => void;
 }
 
-export function SkillEditor({ backendId, skill, onSaved, onDeleted }: SkillEditorProps) {
+const CONTENT_PLACEHOLDER =
+  '---\nname: My Skill\ndescription: What this skill does\n---\n\n# My Skill\n\nInstructions here...';
+
+export function SkillEditor({
+  backendId,
+  skill,
+  backendName,
+  onBack,
+  onSaved,
+  onDeleted,
+}: SkillEditorProps) {
   const isCreate = skill === null;
   const source = skill?.source ?? 'workspace';
   // Workspace-source skills (and create mode) are editable; external/plugin
@@ -29,14 +54,16 @@ export function SkillEditor({ backendId, skill, onSaved, onDeleted }: SkillEdito
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(!isCreate && isWorkspace);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
 
-  // Create mode form
+  // Create mode form — the skill id lives in the header (ProfileHeader name).
   const [newSkillId, setNewSkillId] = useState('');
 
   const [pendingDelete, setPendingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const deleteConfirmTimeoutRef = useRef<number | null>(null);
+  // The persisted identity this editor targets — used so a create-mode autosave
+  // switches to updates on subsequent edits instead of writing a second file.
+  const savedIdRef = useRef<string | null>(skill?.id ?? null);
 
   const clearDeleteConfirmation = () => {
     if (deleteConfirmTimeoutRef.current !== null) {
@@ -77,20 +104,27 @@ export function SkillEditor({ backendId, skill, onSaved, onDeleted }: SkillEdito
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [backendId, skill?.id]);
 
-  const handleSave = async () => {
-    const skillId = isCreate ? newSkillId.trim() : skill!.id;
-    if (!skillId || !content.trim()) return;
-    setSaving(true);
-    setError(null);
-    try {
-      await api.saveWorkspaceSkillForBackend(backendId, skillId, content);
-      onSaved(skillId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save skill');
-    } finally {
-      setSaving(false);
-    }
-  };
+  const skillId = isCreate ? newSkillId.trim() : (skill?.id ?? '');
+
+  // Autosave — enabled only once the form has hydrated (create: immediately;
+  // edit: after the async content load lands, so hydrating the loaded content
+  // isn't mistaken for a user edit). See useProfileAutosave's justEnabled path.
+  const autosave = useProfileAutosave({
+    enabled: isWorkspace && !loading,
+    valid: Boolean(skillId && content.trim()),
+    signature: JSON.stringify({ id: skillId, content }),
+    save: async () => {
+      setError(null);
+      try {
+        await api.saveWorkspaceSkillForBackend(backendId, skillId, content);
+        savedIdRef.current = skillId;
+        onSaved(skillId);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to save skill');
+        throw err;
+      }
+    },
+  });
 
   const handleDelete = async () => {
     if (!skill || deleting) return;
@@ -118,109 +152,81 @@ export function SkillEditor({ backendId, skill, onSaved, onDeleted }: SkillEdito
     }
   };
 
+  const headerBadges: DetailBadge[] = [
+    ...(backendName ? [{ label: backendName }] : []),
+    ...(!isWorkspace ? [{ label: 'Read-only', tone: 'neutral' as const }] : []),
+  ];
+
   return (
-    <div className="space-y-4">
-      {skill && <SkillInfoCard skill={skill} />}
+    <div className="flex h-full flex-col bg-background text-foreground">
+      <ProfileHeader
+        crumb="Skills"
+        onBack={onBack}
+        name={isCreate ? newSkillId : (skill?.id ?? '')}
+        onNameChange={setNewSkillId}
+        onFieldBlur={autosave.flush}
+        namePlaceholder="e.g. my-skill"
+        badges={headerBadges}
+        saveStatus={isWorkspace ? autosave.status : undefined}
+        onRetry={autosave.retry}
+        // The id is the record identity: editable only while creating.
+        disabled={!isCreate}
+      />
 
-      {error && (
-        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-          <p className="text-red-400 text-sm">{error}</p>
-          <button
-            onClick={() => setError(null)}
-            className="text-xs text-red-400/70 hover:text-red-400 mt-1"
-          >
-            dismiss
-          </button>
-        </div>
-      )}
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="mx-auto flex w-full max-w-[760px] flex-col gap-4 pb-4">
+          {skill && <SkillInfoCard skill={skill} />}
 
-      {!isWorkspace ? (
-        <p className="text-xs text-muted-foreground">Managed by its source — read-only.</p>
-      ) : isCreate ? (
-        <EditorSection title="New skill">
-          <div>
-            <FieldLabel>Skill ID *</FieldLabel>
-            <input
-              type="text"
-              placeholder="e.g. my-skill"
-              value={newSkillId}
-              onChange={e => setNewSkillId(e.target.value)}
-              className="w-full px-3 py-1.5 text-sm bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono"
-            />
-          </div>
-          <div>
-            <FieldLabel>SKILL.md Content *</FieldLabel>
-            <textarea
-              placeholder={
-                '---\nname: My Skill\ndescription: What this skill does\n---\n\n# My Skill\n\nInstructions here...'
-              }
-              value={content}
-              onChange={e => setContent(e.target.value)}
-              className="w-full h-40 px-3 py-2 text-sm font-mono bg-secondary/50 border border-border rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-primary/50"
-              spellCheck={false}
-            />
-          </div>
-          <div className="flex gap-2 justify-end">
-            <button
-              onClick={handleSave}
-              disabled={!newSkillId.trim() || !content.trim() || saving}
-              className="px-3 py-1.5 text-sm bg-muted/60 text-foreground rounded-lg hover:bg-muted disabled:opacity-50 transition-colors"
-            >
-              {saving ? 'Creating...' : 'Create'}
-            </button>
-          </div>
-        </EditorSection>
-      ) : loading ? (
-        <p className="text-muted-foreground text-center py-8">Loading...</p>
-      ) : (
-        <div className="bg-secondary/50 border border-border/50 rounded-lg p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <svg
-                className="w-4 h-4 text-muted-foreground"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+          {error && (
+            <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-4">
+              <p className="text-sm text-destructive">{error}</p>
+              <button
+                onClick={() => setError(null)}
+                className="mt-1 text-xs text-destructive/70 hover:text-destructive"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                dismiss
+              </button>
+            </div>
+          )}
+
+          {!isWorkspace ? (
+            <p className="text-xs text-muted-foreground">Managed by its source — read-only.</p>
+          ) : loading ? (
+            <p className="py-8 text-center text-muted-foreground">Loading…</p>
+          ) : (
+            <>
+              <EditorSection title="SKILL.md">
+                <textarea
+                  aria-label="SKILL.md content"
+                  placeholder={CONTENT_PLACEHOLDER}
+                  value={content}
+                  onChange={e => setContent(e.target.value)}
+                  onBlur={autosave.flush}
+                  className={`${FIELD_CLASS} h-80 resize-y font-mono`}
+                  spellCheck={false}
                 />
-              </svg>
-              <span className="font-medium text-sm">{skill!.id}</span>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className={`px-3 py-1.5 text-sm rounded-lg transition-colors disabled:opacity-50 ${
-                  pendingDelete
-                    ? 'bg-destructive/15 text-destructive hover:bg-destructive/25'
-                    : 'bg-secondary text-destructive hover:bg-secondary/80'
-                }`}
-                title={pendingDelete ? 'Click again to confirm delete' : 'Delete'}
-              >
-                {deleting ? 'Deleting...' : pendingDelete ? 'Confirm delete' : 'Delete'}
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={!content.trim() || saving}
-                className="px-3 py-1.5 text-sm bg-muted/60 text-foreground rounded-lg hover:bg-muted disabled:opacity-50 transition-colors"
-              >
-                {saving ? 'Saving...' : 'Save'}
-              </button>
-            </div>
-          </div>
-          <textarea
-            value={content}
-            onChange={e => setContent(e.target.value)}
-            className="w-full h-80 px-3 py-2 text-sm font-mono bg-secondary/50 border border-border rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-primary/50"
-            spellCheck={false}
-          />
+              </EditorSection>
+
+              {!isCreate && (
+                <div className="flex justify-end">
+                  <button
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    className={`rounded-md border px-3 py-1.5 text-sm transition-colors disabled:opacity-50 ${
+                      pendingDelete
+                        ? 'border-destructive/30 bg-destructive/15 text-destructive hover:bg-destructive/25'
+                        : 'border-border bg-background/70 text-destructive hover:bg-destructive/10'
+                    }`}
+                    title={pendingDelete ? 'Click again to confirm delete' : 'Delete'}
+                  >
+                    {deleting ? 'Deleting…' : pendingDelete ? 'Confirm delete' : 'Delete'}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

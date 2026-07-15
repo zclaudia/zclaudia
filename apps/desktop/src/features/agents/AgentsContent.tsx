@@ -483,39 +483,29 @@ export function AgentsContent({
       }
 
       return (
-        <DetailShell
-          title={skill.name || skill.id}
+        <SkillEditor
+          key={`${editedBackendId}:${selection.id}`}
+          backendId={editedBackendId}
+          skill={skill}
           backendName={backendName}
-          crumb={crumbForSelectionKind(selection.kind)}
           onBack={() => selectAgentsItem(null)}
-        >
-          <SkillEditor
-            key={`${editedBackendId}:${selection.id}`}
-            backendId={editedBackendId}
-            skill={skill}
-            onSaved={handleSkillSaved}
-            onDeleted={handleSkillDeleted}
-          />
-        </DetailShell>
+          onSaved={handleSkillSaved}
+          onDeleted={handleSkillDeleted}
+        />
       );
     }
 
     case 'new-skill': {
       return (
-        <DetailShell
-          title="New skill"
+        <SkillEditor
+          key={`${editedBackendId}:new`}
+          backendId={editedBackendId}
+          skill={null}
           backendName={backendName}
-          crumb={crumbForSelectionKind(selection.kind)}
           onBack={() => selectAgentsItem(null)}
-        >
-          <SkillEditor
-            key={`${editedBackendId}:new`}
-            backendId={editedBackendId}
-            skill={null}
-            onSaved={handleSkillSaved}
-            onDeleted={handleSkillDeleted}
-          />
-        </DetailShell>
+          onSaved={handleSkillSaved}
+          onDeleted={handleSkillDeleted}
+        />
       );
     }
 
@@ -697,27 +687,20 @@ export function AgentsContent({
         bumpAgentsRefresh();
       };
 
-      const title = selection.kind === 'mcp-server' ? (server?.name ?? '') : 'New MCP server';
-
       return (
-        <DetailShell
-          title={title}
+        <McpServerEditor
+          key={`${editedBackendId}:${selection.kind === 'mcp-server' ? selection.id : 'new'}`}
+          backendId={editedBackendId}
+          server={server}
+          status={status}
           backendName={backendName}
-          crumb={crumbForSelectionKind(selection.kind)}
           onBack={() => selectAgentsItem(null)}
-        >
-          <McpServerEditor
-            key={`${editedBackendId}:${selection.kind === 'mcp-server' ? selection.id : 'new'}`}
-            backendId={editedBackendId}
-            server={server}
-            status={status}
-            onSaved={handleSaved}
-            onDeleted={handleDeleted}
-            // Connect/disconnect/refresh/toggle/oauth changed connection state —
-            // bump so the statuses refetch.
-            onStatusChanged={bumpAgentsRefresh}
-          />
-        </DetailShell>
+          onSaved={handleSaved}
+          onDeleted={handleDeleted}
+          // Connect/disconnect/refresh/toggle/oauth changed connection state —
+          // bump so the statuses refetch.
+          onStatusChanged={bumpAgentsRefresh}
+        />
       );
     }
 
