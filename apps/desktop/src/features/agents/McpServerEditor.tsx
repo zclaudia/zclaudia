@@ -559,10 +559,10 @@ export function McpServerEditor({
     </EditorSection>
   );
 
-  const headerBadges: DetailBadge[] = [
-    ...(backendName ? [{ label: backendName }] : []),
-    ...(server ? [{ label: server.enabled ? 'Enabled' : 'Disabled', tone: 'neutral' as const }] : []),
-  ];
+  // Enabled/Disabled is now surfaced by the header StatusChip (disabled) and the
+  // Connection section (full detail) — no separate header badge, to avoid a
+  // duplicate "Disabled" label next to the chip.
+  const headerBadges: DetailBadge[] = [...(backendName ? [{ label: backendName }] : [])];
 
   return (
     <div className="flex h-full flex-col bg-background text-foreground">
