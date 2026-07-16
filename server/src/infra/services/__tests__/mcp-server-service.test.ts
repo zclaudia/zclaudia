@@ -260,6 +260,28 @@ describe('McpServerService', () => {
     );
   });
 
+  it('createServer persists a name-only stdio draft (no command)', () => {
+    const service = new McpServerService(db, () => 1234);
+    const created = service.createServer({ name: 'draft-server', transport: 'stdio' } as any);
+    expect(created.name).toBe('draft-server');
+    expect(created.recordStatus).toEqual({
+      completeness: 'draft',
+      availability: { usable: true },
+      disabled: false,
+    });
+  });
+
+  it('rowToConfig marks a complete enabled stdio server ready (availability optimistic without live state)', () => {
+    const service = new McpServerService(db, () => 1234);
+    const created = service.createServer({ name: 'fs', command: 'npx', transport: 'stdio' } as any);
+    const listed = service.listServers().find(s => s.name === 'fs');
+    expect(listed?.recordStatus).toEqual({
+      completeness: 'ready',
+      availability: { usable: true },
+      disabled: false,
+    });
+  });
+
   it('continues reading legacy plaintext MCP OAuth credentials', () => {
     db.prepare(
       `

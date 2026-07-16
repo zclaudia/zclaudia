@@ -2,6 +2,7 @@
 
 import type { LlmProviderType } from './llm-profile.js';
 import type { ExternalToolRiskPolicy } from './tools.js';
+import type { RecordStatus } from './record-status.js';
 
 export interface McpServerConfig {
   id: string;
@@ -20,6 +21,9 @@ export interface McpServerConfig {
   providerScope?: LlmProviderType[];
   trustPolicy?: McpServerTrustPolicy;
   source: 'user' | 'imported';
+  /** Computed on read for display; not persisted. In the plain config it reflects
+   *  completeness + disabled; the /status endpoint recomputes it with live state. */
+  recordStatus?: RecordStatus;
   createdAt: number;
   updatedAt: number;
 }

@@ -133,9 +133,13 @@ describe('mcp-servers routes', () => {
       expect(res.status).toBe(400);
     });
 
-    it('returns 400 without command', async () => {
+    it('persists a name-only draft without command', async () => {
       const res = await request(app).post('/api/mcp-servers').send({ name: 'test' });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(201);
+      expect(res.body.data.name).toBe('test');
+      expect(res.body.data.recordStatus).toEqual(
+        expect.objectContaining({ completeness: 'draft' })
+      );
     });
 
     it('returns 409 for duplicate name', async () => {

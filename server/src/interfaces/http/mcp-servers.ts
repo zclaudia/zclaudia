@@ -15,6 +15,7 @@ import type {
   McpServerTrustPolicy,
 } from '@zclaudia/shared/core/mcp';
 import { normalizeMcpServerTrustPolicy } from '@zclaudia/shared/core/mcp';
+import { resolveMcpServerStatus } from '@zclaudia/shared/core/record-status-resolvers';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import type { ExternalToolRiskPolicy } from '@zclaudia/shared/core/tools';
 import { mcpClientManager } from '../../utils/mcp-client-manager.js';
@@ -70,10 +71,18 @@ export function createMcpServerRoutes(db: Database.Database): Router {
       const servers = mcpServerService.listServers();
       const data = servers.map(server => {
         const status = statusWithInventory(server);
+        const state = server.enabled ? status.state : 'disabled';
+        const hasEndpoint =
+          (server.transport ?? 'stdio') === 'stdio' ? Boolean(server.command) : Boolean(server.url);
         return {
           ...status,
           enabled: server.enabled,
-          state: server.enabled ? status.state : 'disabled',
+          state,
+          recordStatus: resolveMcpServerStatus({
+            hasEndpoint,
+            enabled: server.enabled,
+            connectionState: status.state,
+          }),
         };
       });
       res.json({ success: true, data });

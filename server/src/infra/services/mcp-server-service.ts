@@ -18,6 +18,7 @@ import {
   protectMcpOAuthCredentials,
   unprotectMcpOAuthCredentials,
 } from './mcp-oauth-credential-protector.js';
+import { resolveMcpServerStatus } from '@zclaudia/shared/core/record-status-resolvers';
 
 export interface McpServerRow {
   id: string;
@@ -85,13 +86,14 @@ export class McpServerServiceError extends Error {
 }
 
 function rowToConfig(row: McpServerRow): McpServerConfig {
-  return {
+  const transport = normalizeMcpServerTransport(row.transport);
+  const config: McpServerConfig = {
     id: row.id,
     name: row.name,
     command: row.command,
     args: row.args ? JSON.parse(row.args) : undefined,
     env: row.env ? JSON.parse(row.env) : undefined,
-    transport: normalizeMcpServerTransport(row.transport),
+    transport,
     url: row.url || undefined,
     headers: parseHeaders(row.headers),
     headersHelper: normalizeMcpHeadersHelper(row.headers_helper),
@@ -105,6 +107,9 @@ function rowToConfig(row: McpServerRow): McpServerConfig {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+  const hasEndpoint = transport === 'stdio' ? Boolean(config.command) : Boolean(config.url);
+  config.recordStatus = resolveMcpServerStatus({ hasEndpoint, enabled: config.enabled });
+  return config;
 }
 
 function parseHeaders(raw: string | null | undefined): Record<string, string> | undefined {
@@ -180,19 +185,10 @@ export class McpServerService {
 
   createServer(input: CreateMcpServerInput): McpServerConfig {
     const transport = normalizeMcpServerTransport(input.transport);
-    if (!input.name || (transport === 'stdio' && !input.command)) {
-      throw new McpServerServiceError(
-        400,
-        'INVALID_INPUT',
-        'name and command are required for stdio MCP servers'
-      );
-    }
-    if (transport !== 'stdio' && !input.url) {
-      throw new McpServerServiceError(
-        400,
-        'INVALID_INPUT',
-        'name and url are required for remote MCP servers'
-      );
+    // A record can be created as a draft (name only); the endpoint (command/url)
+    // is completeness, surfaced via recordStatus, not a hard create gate.
+    if (!input.name) {
+      throw new McpServerServiceError(400, 'INVALID_INPUT', 'name is required');
     }
 
     const existing = this.db.prepare('SELECT id FROM mcp_servers WHERE name = ?').get(input.name);
