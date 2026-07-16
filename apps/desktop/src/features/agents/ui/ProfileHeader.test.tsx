@@ -65,4 +65,19 @@ describe('ProfileHeader', () => {
     render(<ProfileHeader {...base} badges={[{ label: 'Default', tone: 'accent' }]} />);
     expect(screen.getByText('Default')).toBeInTheDocument();
   });
+
+  it('renders a StatusChip when recordStatus is provided', () => {
+    render(
+      <ProfileHeader
+        {...base}
+        recordStatus={{ completeness: 'draft', availability: { usable: true } }}
+      />
+    );
+    expect(screen.getByText('Draft')).toBeInTheDocument();
+  });
+
+  it('renders no chip when recordStatus is omitted', () => {
+    render(<ProfileHeader {...base} />);
+    expect(screen.queryByText('Draft')).toBeNull();
+  });
 });

@@ -655,6 +655,7 @@ export function LlmProfileEditor({
         badges={headerBadges}
         saveStatus={autosave.status}
         onRetry={autosave.retry}
+        recordStatus={profile?.recordStatus}
       />
       <div className="flex-1 overflow-y-auto p-4">
         <div className="mx-auto flex w-full max-w-[760px] flex-col gap-4 pb-4">

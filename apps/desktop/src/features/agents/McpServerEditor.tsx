@@ -578,6 +578,7 @@ export function McpServerEditor({
         badges={headerBadges}
         saveStatus={autosave.status}
         onRetry={autosave.retry}
+        recordStatus={server?.recordStatus}
       />
       {saveError && <p className="px-4 pb-2 text-xs text-destructive">{saveError}</p>}
 

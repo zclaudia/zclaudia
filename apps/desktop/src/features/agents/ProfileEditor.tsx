@@ -746,6 +746,7 @@ export function ProfileEditor({
         saveStatus={!isReadonly ? autosave.status : undefined}
         onRetry={autosave.retry}
         disabled={isReadonly}
+        recordStatus={profile.recordStatus}
       />
       {isReadonly && (
         <div className="mx-4 my-2 rounded-lg border border-border/60 bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">

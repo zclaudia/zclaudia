@@ -173,6 +173,7 @@ export function SkillEditor({
         onRetry={autosave.retry}
         // The id is the record identity: editable only while creating.
         disabled={!isCreate}
+        recordStatus={skill?.recordStatus}
       />
 
       <div className="flex-1 overflow-y-auto p-4">
