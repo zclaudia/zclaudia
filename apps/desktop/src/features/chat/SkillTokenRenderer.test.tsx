@@ -208,6 +208,46 @@ describe('renderSkillTokens', () => {
     fireEvent.click(nameSpan);
     expect(interaction.onDeleteToken).not.toHaveBeenCalled();
   });
+
+  it('renders a FileSymbol glyph and keeps the full text for a file token', () => {
+    const { container } = render(
+      <div>{renderSkillTokens('see @src/cli.py now', skills, commands)}</div>
+    );
+    expect(container.textContent).toBe('see @src/cli.py now');
+    const fileIcon = container.querySelector('[data-token-file-icon]');
+    expect(fileIcon).not.toBeNull();
+    // FileSymbol renders generated svg markup inside the wrapper
+    expect(fileIcon!.querySelector('svg')).not.toBeNull();
+  });
+
+  it('swaps a hovered file token to the X icon', () => {
+    const interaction = {
+      hoveredTokenStart: 4,
+      onTokenHover: vi.fn(),
+      onDeleteZoneHover: vi.fn(),
+      onDeleteToken: vi.fn(),
+    };
+    const { container } = render(
+      <div>{renderSkillTokens('see @cli.py', skills, commands, interaction)}</div>
+    );
+    expect(container.querySelector('svg.lucide-x')).not.toBeNull();
+    expect(container.querySelector('[data-token-file-icon]')).toBeNull();
+  });
+
+  it('reports delete for a file token with its offset', () => {
+    const interaction = {
+      hoveredTokenStart: null,
+      onTokenHover: vi.fn(),
+      onDeleteZoneHover: vi.fn(),
+      onDeleteToken: vi.fn(),
+    };
+    const { container } = render(
+      <div>{renderSkillTokens('see @cli.py', skills, commands, interaction)}</div>
+    );
+    const slot = container.querySelector('[data-token-start="4"] [data-token-delete]')!;
+    fireEvent.click(slot);
+    expect(interaction.onDeleteToken).toHaveBeenCalledWith(4);
+  });
 });
 
 describe('deleteTokenAt', () => {
@@ -252,6 +292,13 @@ describe('deleteTokenAt', () => {
     expect(deleteTokenAt('/clear /commit', 7, commands, skills)).toEqual({
       next: '/clear ',
       caret: 7,
+    });
+  });
+
+  it('deletes a file token and one trailing space', () => {
+    expect(deleteTokenAt('see @cli.py now', 4, commands, skills)).toEqual({
+      next: 'see now',
+      caret: 4,
     });
   });
 });
