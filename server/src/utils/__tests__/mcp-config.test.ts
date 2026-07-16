@@ -68,6 +68,17 @@ describe('mcp-config', () => {
     expect(result).toEqual({});
   });
 
+  it('excludes an enabled stdio draft with no command (name-only record)', () => {
+    db.prepare('INSERT INTO mcp_servers (name, command, enabled) VALUES (?, ?, ?)').run(
+      'draft',
+      '',
+      1
+    );
+
+    const result = loadMcpServersFromDb(db);
+    expect(result).toEqual({});
+  });
+
   it('includes args when present', () => {
     db.prepare('INSERT INTO mcp_servers (name, command, args, enabled) VALUES (?, ?, ?, ?)').run(
       's1',

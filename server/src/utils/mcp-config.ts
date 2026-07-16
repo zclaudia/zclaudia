@@ -93,6 +93,10 @@ export function loadMcpServersFromDb(
         }),
       };
     } else {
+      // Endpoint-less stdio drafts (name-only records created via the relaxed
+      // create gate) must not be spawned — an empty command would fail to
+      // connect on every run. Mirrors the remote `!row.url` guard above.
+      if (!row.command) continue;
       servers[row.name] = {
         command: row.command,
         transport: 'stdio',
