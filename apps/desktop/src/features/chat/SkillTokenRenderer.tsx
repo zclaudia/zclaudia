@@ -154,6 +154,10 @@ const FILE_ICON_STYLE: CSSProperties = {
   width: '1em',
   height: '1em',
   display: 'flex',
+  // Optical correction: box-center alignment reads slightly high against
+  // text (whose visual mass sits below the em-box center), so bias the
+  // glyph down a hair.
+  top: 'calc(50% + 0.075em)',
 };
 
 /**
