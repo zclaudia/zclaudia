@@ -19,17 +19,24 @@ import { Sparkles, SquareSlash, X } from 'lucide-react';
  * mouseover/mouseout — so plain React handlers on these spans fire at
  * runtime even though the textarea itself is what receives the events.
  *
- * Token matching: a candidate token starts with `/` and runs to the next
- * whitespace. It's a **command** if it exactly matches a string in
- * `commandSet`; a **skill** if the id segment (before any `:`) is in
- * `skillIds`.
+ * Token matching: a candidate token starts with `/` or `@` and runs to the
+ * next whitespace. A `/` token is a **command** if it exactly matches a
+ * string in `commandSet`; a **skill** if the id segment (before any `:`) is
+ * in `skillIds`. An `@` token is a **file** reference if it matches the
+ * chat area's linkify rule (see `FILE_TOKEN_RE` below / `FileReference.tsx`)
+ * — composer highlighting mirrors exactly what the chat side will linkify
+ * after send.
  *
  * INVARIANT: the concatenated text of the returned nodes must equal `value`
  * exactly — rich-textarea relies on this for alignment. Do not add or drop
  * characters (no trailing newline).
  */
 
-export type TokenKind = 'skill' | 'command';
+export type TokenKind = 'skill' | 'command' | 'file';
+
+// Whole-token form of the chat area's @file rule (FileReference.tsx): the
+// composer highlights exactly what the chat side will linkify after send.
+const FILE_TOKEN_RE = /^@[a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+$/;
 
 export interface Segment {
   text: string;
@@ -50,18 +57,22 @@ export function splitSegments(
   skillIds: Set<string>
 ): Segment[] {
   const segments: Segment[] = [];
-  const re = /(?:^|\s)(\/\S*)/g;
+  const re = /(?:^|\s)([/@]\S*)/g;
   let last = 0;
   let match: RegExpExecArray | null;
   while ((match = re.exec(value)) !== null) {
     const token = match[1];
     const tokenStart = match.index + (match[0].length - token.length);
     let kind: TokenKind | null = null;
-    if (commandSet.has(token)) {
-      kind = 'command';
-    } else {
-      const idPart = token.slice(1).split(':')[0];
-      if (idPart && skillIds.has(idPart)) kind = 'skill';
+    if (token[0] === '/') {
+      if (commandSet.has(token)) {
+        kind = 'command';
+      } else {
+        const idPart = token.slice(1).split(':')[0];
+        if (idPart && skillIds.has(idPart)) kind = 'skill';
+      }
+    } else if (FILE_TOKEN_RE.test(token)) {
+      kind = 'file';
     }
     if (!kind) continue;
     if (tokenStart > last) {
@@ -105,7 +116,7 @@ export interface TokenInteraction {
   onDeleteToken: (tokenStart: number) => void;
 }
 
-const TOKEN_ICON: Record<TokenKind, typeof Sparkles> = {
+const TOKEN_ICON: Record<Exclude<TokenKind, 'file'>, typeof Sparkles> = {
   skill: Sparkles,
   command: SquareSlash,
 };
@@ -144,7 +155,8 @@ export function renderSkillTokens(
       );
     }
     const hovered = interaction?.hoveredTokenStart === seg.start;
-    const Icon = hovered ? X : TOKEN_ICON[seg.kind];
+    // interim: FileSymbol glyph lands in the next commit
+    const Icon = hovered ? X : seg.kind === 'file' ? Sparkles : TOKEN_ICON[seg.kind];
     return (
       <span
         key={i}
@@ -176,7 +188,7 @@ export function renderSkillTokens(
             WebkitTextFillColor: 'transparent',
           }}
         >
-          /
+          {seg.text[0]}
           <Icon aria-hidden strokeWidth={1.75} style={ICON_STYLE} />
         </span>
         <span style={{ color: 'hsl(var(--primary))' }}>{seg.text.slice(1)}</span>

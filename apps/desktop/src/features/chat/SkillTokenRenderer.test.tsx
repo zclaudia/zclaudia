@@ -85,6 +85,41 @@ describe('splitSegments', () => {
       }
     }
   });
+
+  it('splits a file reference into one file segment', () => {
+    expect(splitSegments('@cli.py now', commands, skills)).toEqual([
+      { text: '@cli.py', kind: 'file', start: 0 },
+      { text: ' now', kind: 'plain', start: 7 },
+    ]);
+  });
+
+  it('matches a mid-text file reference with a nested path', () => {
+    expect(splitSegments('check @src/chat/MessageInput.tsx please', commands, skills)).toEqual([
+      { text: 'check ', kind: 'plain', start: 0 },
+      { text: '@src/chat/MessageInput.tsx', kind: 'file', start: 6 },
+      { text: ' please', kind: 'plain', start: 32 },
+    ]);
+  });
+
+  it('leaves an @token without a file extension as plain text', () => {
+    expect(splitSegments('@src/utils and @everyone', commands, skills)).toEqual([
+      { text: '@src/utils and @everyone', kind: 'plain', start: 0 },
+    ]);
+  });
+
+  it('leaves an email address as plain text', () => {
+    expect(splitSegments('mail foo@bar.com now', commands, skills)).toEqual([
+      { text: 'mail foo@bar.com now', kind: 'plain', start: 0 },
+    ]);
+  });
+
+  it('handles a file token adjacent to a command token', () => {
+    expect(splitSegments('/clear @cli.py', commands, skills)).toEqual([
+      { text: '/clear', kind: 'command', start: 0 },
+      { text: ' ', kind: 'plain', start: 6 },
+      { text: '@cli.py', kind: 'file', start: 7 },
+    ]);
+  });
 });
 
 describe('renderSkillTokens', () => {
