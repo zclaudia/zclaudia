@@ -686,6 +686,7 @@ describe('AgentsContent', () => {
       id: 'mcp-new',
     });
     expect(useTopLevelViewStore.getState().agentsRefreshNonce).toBe(1);
+    expect(screen.queryByText('New MCP server')).toBeNull();
   });
 
   it('New on the providers tab opens the NewRecordModal, creates the LLM profile, and selects it', async () => {
@@ -725,6 +726,7 @@ describe('AgentsContent', () => {
     });
     expect(useTopLevelViewStore.getState().agentsRefreshNonce).toBe(1);
     expect(mockListLlmProfilesForBackend).toHaveBeenCalledWith('b1');
+    expect(screen.queryByText('New LLM provider')).toBeNull();
   });
 
   it('renders the skill editor and header for a selected skill', () => {

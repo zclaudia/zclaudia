@@ -46,6 +46,10 @@ describe('NewRecordModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
     expect(await screen.findByText('boom')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create' })).not.toBeDisabled();
+
+    // Typing a new value clears the stale error.
+    fireEvent.change(screen.getByLabelText('Skill ID'), { target: { value: 'y' } });
+    expect(screen.queryByText('boom')).toBeNull();
   });
 
   it('Cancel calls onClose without submitting', () => {

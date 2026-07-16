@@ -88,7 +88,10 @@ export function NewRecordModal({
             type="text"
             aria-label={label}
             value={value}
-            onChange={e => setValue(e.target.value)}
+            onChange={e => {
+              setValue(e.target.value);
+              if (error) setError(null);
+            }}
             onKeyDown={e => {
               if (e.key === 'Enter' && canCreate) void handleCreate();
             }}
