@@ -65,8 +65,14 @@ So the create surfaces become: **LLM/MCP = instant draft**, **Skill = ID prompt 
 
 ## Server / data changes
 
-1. **Persist incomplete records.** Add a `draft`/completeness marker (or derive from fields) for llm/mcp/agent. **Relax the LLM F2 reject** so a model-less profile saves as `draft` instead of erroring; same for MCP no-command and agent no-LLM on the create path.
-2. **Migration** to add the status column(s) where persisted; backfill existing rows as `ready` (they were valid under the old invariant). Follow the repo's migration numbering (see CLAUDE.md's migration notes).
+> **Research corrections (2026-07-16, from the server map):**
+> - The "LLM F2 model-less reject" is **client-only** (`apps/desktop/.../LlmProfileEditor.tsx:352`). The server (`server/src/domains/llm-profiles/routes.ts`) already persists model-less profiles — there is **no server reject to relax** for LLM; only the desktop create-flow (Phase 4) changes.
+> - **No DB migration is required to persist drafts.** Every required column is already nullable or empty-permissive: `llm_profiles.models` (nullable TEXT), `mcp_servers.command` (NOT NULL but the service writes `''`), `agent_profiles.llm_profile_id` (nullable since migration 036). So **completeness is derived on read**, not persisted — a migration is only needed if we later choose to store the flag.
+> - The only genuine **server-side** create gate to relax for drafts is **MCP** (`server/src/infra/services/mcp-server-service.ts:181` requires name + command/url; keep `name` for the UNIQUE identity). Agent's gate stays (the modal keeps agents complete).
+> - **Availability signals are scattered:** MCP connection state lives in `GET /api/mcp-servers/status` (+ `mcpClientManager`), skill `eligible` is computed live in `toDiscoveredSkill`, LLM credential via `agent-readiness/credential.ts`. The existing `readinessForResolvedAgent` reasons map 1:1 onto `RecordAvailabilityReason`.
+
+1. **Derive status on read.** Compute `RecordStatus` per type from existing fields/signals (no persisted completeness column unless later warranted). Relax only the **MCP** create gate to accept a name-only draft.
+2. ~~Migration to add status columns.~~ **Not needed** for drafts (see corrections above); revisit only if persisting the flag.
 3. **Availability computation per type** on read, returned on the record DTO (generalizes the current `AgentReadiness` from global to per-record, and folds in skill `eligible` and MCP `status.state`).
 4. **Invariant change:** "a persisted record is always valid" becomes "a persisted record is `ready` **or** `draft`." Every server consumer must respect it (below).
 
