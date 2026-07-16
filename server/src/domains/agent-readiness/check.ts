@@ -23,7 +23,7 @@ import {
  * explicitly declares it in models[] or pi-ai's registry knows the id. This
  * rejects typo/nonexistent model ids before creating sessions.
  */
-function hasUsableModel(agentModel: string | undefined, llm: LlmProfileConfig): boolean {
+export function hasUsableModel(agentModel: string | undefined, llm: LlmProfileConfig): boolean {
   const model = agentModel?.trim();
   if (!model) return false;
   const declared = llm.models;

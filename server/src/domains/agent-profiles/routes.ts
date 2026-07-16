@@ -10,6 +10,7 @@ import {
   AgentProfileNotFoundError,
 } from './agent-profile-deletion-service.js';
 import { resolveAgentReadiness } from '../agent-readiness/check.js';
+import { resolveAgentProfileRecordStatus } from '../agent-readiness/record-status.js';
 import { isValidRuntimeType, runtimeRequiresLlmProfile } from './runtime-type-guard.js';
 import { providerRegistry } from '../../infra/providers/registry.js';
 
@@ -90,7 +91,11 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
 
   router.get('/', (_req: Request, res: Response) => {
     try {
-      res.json({ success: true, data: repo.findAllOrdered() } as ApiResponse<AgentProfileConfig[]>);
+      const data = repo.findAllOrdered().map(agent => ({
+        ...agent,
+        recordStatus: resolveAgentProfileRecordStatus(agent, llmRepo.findById(agent.llmProfileId)),
+      }));
+      res.json({ success: true, data } as ApiResponse<AgentProfileConfig[]>);
     } catch (error) {
       console.error('Error fetching agent profiles:', error);
       res.status(500).json({
@@ -124,7 +129,11 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         });
         return;
       }
-      res.json({ success: true, data: profile } as ApiResponse<AgentProfileConfig>);
+      const withStatus = {
+        ...profile,
+        recordStatus: resolveAgentProfileRecordStatus(profile, llmRepo.findById(profile.llmProfileId)),
+      };
+      res.json({ success: true, data: withStatus } as ApiResponse<AgentProfileConfig>);
     } catch (error) {
       console.error('Error fetching agent profile:', error);
       res.status(500).json({

@@ -1,5 +1,6 @@
 import type { ToolRef, ToolSelection } from './tools.js';
 import type { SkillExecutionSelection, SkillSelection } from './skills.js';
+import type { RecordStatus } from './record-status.js';
 
 export type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 
@@ -57,6 +58,8 @@ export interface AgentProfileConfig {
   isDefault?: boolean;
   /** Lifecycle status; omitted/undefined treated as 'active'. */
   status?: AgentProfileStatus;
+  /** Computed on read for display; not persisted. Distinct from `status` (lifecycle). */
+  recordStatus?: RecordStatus;
   source?: 'user' | 'plugin';
   pluginId?: string;
   pluginProfileId?: string;
