@@ -32,6 +32,12 @@ describe('resolveMcpServerStatus', () => {
     expect(recordChip(resolveMcpServerStatus({ hasEndpoint: false, enabled: true }))).toBe('draft');
   });
 
+  it('ready + usable with an endpoint when no connection state is known yet', () => {
+    const s = resolveMcpServerStatus({ hasEndpoint: true, enabled: true });
+    expect(s).toEqual({ completeness: 'ready', availability: { usable: true }, disabled: false });
+    expect(recordChip(s)).toBe('ready');
+  });
+
   it('unavailable(needs_auth) on a needs-auth connection', () => {
     const s = resolveMcpServerStatus({ hasEndpoint: true, enabled: true, connectionState: 'needs-auth' });
     expect(s.availability).toEqual({ usable: false, reason: 'needs_auth' });
@@ -87,6 +93,7 @@ describe('resolveAgentProfileStatus', () => {
     // No binding but a model → draft dominates the chip, and availability names no_llm_profile.
     const noBind = resolveAgentProfileStatus({ requiresLlm: true, hasLlmBinding: false, hasModel: true, llmUsable: false });
     expect(noBind.availability).toEqual({ usable: false, reason: 'no_llm_profile' });
+    expect(recordChip(noBind)).toBe('draft');
     // Bound + model but the LLM is unusable → complete, unavailable(llm_unavailable).
     const broken = resolveAgentProfileStatus({ requiresLlm: true, hasLlmBinding: true, hasModel: true, llmUsable: false });
     expect(broken.availability).toEqual({ usable: false, reason: 'llm_unavailable' });

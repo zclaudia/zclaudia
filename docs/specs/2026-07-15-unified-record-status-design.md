@@ -50,12 +50,14 @@ One `<StatusChip>` component + one reason→copy/fix-action map, reused in every
 
 ## Per-type mapping
 
+> Reason semantics below match the shipped resolvers in `shared/src/core/record-status-resolvers.ts` (the source of truth): completeness = the record's own required fields; availability = a dependency/precondition. `unreachable` / `no_model` remain in the `RecordAvailabilityReason` vocabulary for future use (e.g. a persisted LLM probe) but no resolver emits them yet.
+
 | Type | `draft` when… | `unavailable(reason)` when… | New-flow |
 |---|---|---|---|
-| **LLM** | 0 models **or** no credential | `unreachable` (probe fails) | **instant blank draft** (server id, name "Untitled"); relax F2 to persist drafts |
+| **LLM** | no model | no credential → `no_credential` | **instant blank draft** (server id, name "Untitled"); relax the client-side model-gate to persist drafts (server already persists them) |
 | **MCP** | no command (stdio) / no url (remote) | `needs_auth`, `connect_failed` | **instant blank draft** (server id) |
-| **Agent** | no LLM bound / no model | `no_llm_profile`, `no_credential`, `no_model`, `llm_unavailable` | **keep the create modal** (auto-binds default LLM+model → born `ready`); gains the chip afterward |
-| **Skill** | content empty/template-only | `requirement_unmet` (os/bin/env) | **tiny ID-only prompt** → seed a draft `SKILL.md` from the template; `draft` until content is meaningful |
+| **Agent** | no LLM bound / no model | no binding → `no_llm_profile`; bound LLM unusable → `llm_unavailable` (the LLM profile itself surfaces its own `no_credential`/`no_model`) | **keep the create modal** (auto-binds default LLM+model → born `ready`); gains the chip afterward |
+| **Skill** | content empty/template-only | not eligible → `requirement_unmet` (os/bin/env) | **tiny ID-only prompt** → seed a draft `SKILL.md` from the template; `draft` until content is meaningful |
 
 Two constraints drove the new-flow column:
 1. **Skill is file-backed — the ID is the filename.** It cannot persist without an ID, so a minimal ID prompt is irreducible (decided: keep an ID-only prompt, not a full modal).
