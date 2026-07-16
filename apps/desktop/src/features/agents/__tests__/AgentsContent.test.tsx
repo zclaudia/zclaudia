@@ -15,6 +15,9 @@ const {
   mockDeleteAgentProfileForBackend,
   mockDeleteLlmProfileForBackend,
   mockSetDefaultLlmProfileForBackend,
+  mockCreateMcpServerForBackend,
+  mockCreateLlmProfileForBackend,
+  mockSaveWorkspaceSkillForBackend,
   mockConfirm,
 } = vi.hoisted(() => ({
   mockLoadAll: vi.fn().mockResolvedValue(undefined),
@@ -24,6 +27,9 @@ const {
   mockDeleteAgentProfileForBackend: vi.fn(),
   mockDeleteLlmProfileForBackend: vi.fn(),
   mockSetDefaultLlmProfileForBackend: vi.fn(),
+  mockCreateMcpServerForBackend: vi.fn().mockResolvedValue({ id: 'mcp-new' }),
+  mockCreateLlmProfileForBackend: vi.fn().mockResolvedValue({ id: 'llm-new' }),
+  mockSaveWorkspaceSkillForBackend: vi.fn().mockResolvedValue(undefined),
   mockConfirm: vi.fn().mockResolvedValue(true),
 }));
 
@@ -39,6 +45,9 @@ vi.mock('../../../services/api', async importOriginal => {
     deleteAgentProfileForBackend: mockDeleteAgentProfileForBackend,
     deleteLlmProfileForBackend: mockDeleteLlmProfileForBackend,
     setDefaultLlmProfileForBackend: mockSetDefaultLlmProfileForBackend,
+    createMcpServerForBackend: mockCreateMcpServerForBackend,
+    createLlmProfileForBackend: mockCreateLlmProfileForBackend,
+    saveWorkspaceSkillForBackend: mockSaveWorkspaceSkillForBackend,
   };
 });
 
@@ -599,6 +608,123 @@ describe('AgentsContent', () => {
 
     expect(screen.getByText('Skills')).toBeTruthy();
     expect(screen.queryByTestId('skill-editor')).toBeNull();
+  });
+
+  it('New on the skills tab opens the NewRecordModal, creates the skill, and selects it', async () => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'skills' },
+      agentsSelection: null,
+    });
+
+    render(
+      <AgentsContent
+        providersData={emptyProviders}
+        backends={backends}
+        mcpData={emptyMcp}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /New/ }));
+
+    expect(screen.getByText('New skill')).toBeTruthy();
+    const input = screen.getByLabelText('Skill ID');
+    fireEvent.change(input, { target: { value: 'my-skill' } });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    });
+
+    expect(mockSaveWorkspaceSkillForBackend).toHaveBeenCalledWith(
+      'b1',
+      'my-skill',
+      expect.stringContaining('my-skill')
+    );
+    expect(useTopLevelViewStore.getState().agentsSelection).toEqual({
+      backendId: 'b1',
+      kind: 'skill',
+      id: 'my-skill',
+    });
+    expect(useTopLevelViewStore.getState().agentsRefreshNonce).toBe(1);
+    expect(screen.queryByText('New skill')).toBeNull();
+  });
+
+  it('New on the MCP servers tab opens the NewRecordModal, creates the server, and selects it', async () => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'mcp-servers' },
+      agentsSelection: null,
+    });
+
+    render(
+      <AgentsContent
+        providersData={emptyProviders}
+        backends={backends}
+        mcpData={emptyMcp}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /New/ }));
+
+    expect(screen.getByText('New MCP server')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'filesystem' } });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    });
+
+    expect(mockCreateMcpServerForBackend).toHaveBeenCalledWith('b1', {
+      name: 'filesystem',
+      command: '',
+      transport: 'stdio',
+    });
+    expect(useTopLevelViewStore.getState().agentsSelection).toEqual({
+      backendId: 'b1',
+      kind: 'mcp-server',
+      id: 'mcp-new',
+    });
+    expect(useTopLevelViewStore.getState().agentsRefreshNonce).toBe(1);
+  });
+
+  it('New on the providers tab opens the NewRecordModal, creates the LLM profile, and selects it', async () => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'agents', tab: 'providers' },
+      agentsSelection: null,
+    });
+
+    render(
+      <AgentsContent
+        providersData={emptyProviders}
+        backends={backends}
+        mcpData={emptyMcp}
+        data={makeData({})}
+        skillsData={emptySkills}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /New/ }));
+
+    expect(screen.getByText('New LLM provider')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Local ZClaudia Agent' } });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    });
+
+    expect(mockCreateLlmProfileForBackend).toHaveBeenCalledWith('b1', {
+      name: 'Local ZClaudia Agent',
+      providerType: 'anthropic',
+      models: [],
+    });
+    expect(useTopLevelViewStore.getState().agentsSelection).toEqual({
+      backendId: 'b1',
+      kind: 'llm-profile',
+      id: 'llm-new',
+    });
+    expect(useTopLevelViewStore.getState().agentsRefreshNonce).toBe(1);
+    expect(mockListLlmProfilesForBackend).toHaveBeenCalledWith('b1');
   });
 
   it('renders the skill editor and header for a selected skill', () => {

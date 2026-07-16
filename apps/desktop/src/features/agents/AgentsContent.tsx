@@ -19,9 +19,12 @@ import { useAgentReadinessStore } from '../../stores/agentReadinessStore';
 import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
 import { resolveCanonicalBackendId } from '../../utils/controlPlane';
 import {
+  createLlmProfileForBackend,
+  createMcpServerForBackend,
   deleteAgentProfileForBackend,
   deleteLlmProfileForBackend,
   listLlmProfilesForBackend,
+  saveWorkspaceSkillForBackend,
   setDefaultLlmProfileForBackend,
   updateAgentProfileForBackend,
 } from '../../services/api';
@@ -37,7 +40,7 @@ import { DetailHeader } from './ui/DetailHeader';
 import type { DetailBadge } from './ui/DetailHeader';
 import { BrowseView } from './BrowseView';
 import { NewAgentProfileModal } from './NewAgentProfileModal';
-import { resolveNewTarget } from './NewItemMenu';
+import { NewRecordModal } from './NewRecordModal';
 import { useAgentsLibrary } from './useAgentsLibrary';
 import type { AgentsBackend, AgentsSelection, LibraryItem } from './agents-types';
 import type { ProfilesByBackend } from './useProfilesByBackend';
@@ -52,6 +55,9 @@ interface AgentsContentProps {
   mcpData: McpServersByBackend;
   providersData: LlmProfilesByBackend;
 }
+
+const NEW_SKILL_TEMPLATE = (id: string) =>
+  `---\nname: ${id}\ndescription: What this skill does\n---\n\n# ${id}\n\nInstructions here...\n`;
 
 type EmptyStateNoun = 'profile' | 'skill' | 'MCP server' | 'provider';
 
@@ -137,6 +143,10 @@ export function AgentsContent({
   const activeServerId = useServerStore(s => s.activeServerId);
   const localBackendId = useFacadeStore(s => s.localBackendId);
   const [newProfileBackendId, setNewProfileBackendId] = useState<string | null>(null);
+  const [newDraft, setNewDraft] = useState<{
+    kind: 'skill' | 'mcp-server' | 'llm-profile';
+    backendId: string;
+  } | null>(null);
 
   const activeTab = view.kind === 'agents' ? view.tab : 'profiles';
   const backendFilter = useTopLevelViewStore(s => s.agentsBackendFilter);
@@ -172,8 +182,9 @@ export function AgentsContent({
       setNewProfileBackendId(backendForNew());
       return;
     }
-    const target = resolveNewTarget(activeTab);
-    selectAgentsItem({ backendId: backendForNew(), kind: target } as AgentsSelection);
+    const kind =
+      activeTab === 'skills' ? 'skill' : activeTab === 'mcp-servers' ? 'mcp-server' : 'llm-profile';
+    setNewDraft({ kind, backendId: backendForNew() });
   };
 
   // Just-saved bridges: save handlers re-select the saved id before the nonce
@@ -203,6 +214,48 @@ export function AgentsContent({
     contains: (backendId, id) =>
       (providersData.profiles.get(backendId) ?? []).some(p => p.id === id),
   });
+
+  const createDraftRecord = async (
+    kind: 'skill' | 'mcp-server' | 'llm-profile',
+    backendId: string,
+    value: string
+  ) => {
+    if (kind === 'skill') {
+      await saveWorkspaceSkillForBackend(backendId, value, NEW_SKILL_TEMPLATE(value));
+      skillBridge.record(backendId, value);
+      bumpAgentsRefresh();
+      selectAgentsItem({ backendId, kind: 'skill', id: value });
+    } else if (kind === 'mcp-server') {
+      const created = await createMcpServerForBackend(backendId, {
+        name: value,
+        command: '',
+        transport: 'stdio',
+      });
+      mcpBridge.record(backendId, created.id);
+      bumpAgentsRefresh();
+      selectAgentsItem({ backendId, kind: 'mcp-server', id: created.id });
+    } else {
+      const created = await createLlmProfileForBackend(backendId, {
+        name: value,
+        providerType: 'anthropic',
+        models: [],
+      });
+      llmProfileBridge.record(backendId, created.id);
+      bumpAgentsRefresh();
+      selectAgentsItem({ backendId, kind: 'llm-profile', id: created.id });
+      void syncLlmProfileMetaForBackend(backendId);
+    }
+  };
+
+  const NEW_DRAFT_CONFIG = {
+    skill: { title: 'New skill', label: 'Skill ID', placeholder: 'e.g. my-skill', mono: true },
+    'mcp-server': { title: 'New MCP server', label: 'Name', placeholder: 'e.g. filesystem' },
+    'llm-profile': {
+      title: 'New LLM provider',
+      label: 'Name',
+      placeholder: 'e.g. Local ZClaudia Agent',
+    },
+  } as const;
 
   // Mirrors what the old settings Agents tab used to do after mutations: keep
   // the app-wide agent profile cache and readiness gate fresh — but only when
@@ -377,6 +430,17 @@ export function AgentsContent({
             backendId={newProfileBackendId}
             onClose={() => setNewProfileBackendId(null)}
             onCreated={handleProfileCreated}
+          />
+        )}
+        {newDraft && (
+          <NewRecordModal
+            open
+            {...NEW_DRAFT_CONFIG[newDraft.kind]}
+            onSubmit={async value => {
+              await createDraftRecord(newDraft.kind, newDraft.backendId, value);
+              setNewDraft(null);
+            }}
+            onClose={() => setNewDraft(null)}
           />
         )}
       </div>
