@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { BotMessageSquare, Lightbulb, Database, MoreHorizontal, Plug } from 'lucide-react';
 import type { LibraryItem, LibraryItemKind } from '../agents-types';
 import { Badge } from './Badge';
+import { StatusChip } from '../../../components/ui/StatusChip';
 
 const KIND_ICON: Record<LibraryItemKind, typeof Plug> = {
   profile: BotMessageSquare,
@@ -52,6 +53,7 @@ export function ItemCard({
       <div className="mt-0.5 flex items-center gap-1.5">
         <Badge label={backendName} online={backendOnline} />
         {item.status && <Badge label={item.status} tone="accent" />}
+        {item.recordStatus && <StatusChip status={item.recordStatus} />}
       </div>
     </>
   );

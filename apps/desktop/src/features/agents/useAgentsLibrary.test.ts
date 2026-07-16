@@ -6,9 +6,11 @@ const backends = [
   { backendId: 'b2', name: 'Studio Mac', online: false },
 ];
 
+const draft = { completeness: 'draft', availability: { usable: true } } as const;
+
 const sources = {
   profiles: new Map([['b1', [{ id: 'p1', name: 'Coding', isDefault: true, model: 'deepseek-v4-flash' }]]]),
-  skills: new Map([['b1', [{ id: 's1', name: 'web-search', description: 'Fan-out research' }]]]),
+  skills: new Map([['b1', [{ id: 's1', name: 'web-search', description: 'Fan-out research', recordStatus: draft }]]]),
   servers: new Map([['b2', [{ id: 'm1', name: 'filesystem' }]]]),
   llmProfiles: new Map([['b1', [{ id: 'l1', name: 'Local' }]]]),
 };
@@ -33,5 +35,11 @@ describe('buildLibraryItems', () => {
     const items = buildLibraryItems(sources, backends, { tab: 'mcp-servers', backendFilter: 'b2' });
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({ kind: 'mcp-server', backendId: 'b2' });
+  });
+
+  it('threads recordStatus onto the library item', () => {
+    const items = buildLibraryItems(sources, backends, { tab: 'skills', backendFilter: 'all' });
+    const item = items.find(i => i.kind === 'skill' && i.id === 's1');
+    expect(item?.recordStatus).toEqual(draft);
   });
 });

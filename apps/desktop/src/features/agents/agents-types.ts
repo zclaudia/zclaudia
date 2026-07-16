@@ -1,3 +1,5 @@
+import type { RecordStatus } from '@zclaudia/shared/core/record-status';
+
 /** Tabs inside the Agents shell mode. */
 export type AgentsTab = 'profiles' | 'skills' | 'mcp-servers' | 'providers';
 
@@ -26,6 +28,8 @@ export interface LibraryItem {
   subtitle?: string;
   /** e.g. 'Default' for the default profile — rendered as a status badge. */
   status?: string;
+  /** Unified record status (draft/unavailable/disabled) — rendered as a StatusChip. */
+  recordStatus?: RecordStatus;
   /** Whether an agent profile is the current default. */
   isDefault?: boolean;
 }

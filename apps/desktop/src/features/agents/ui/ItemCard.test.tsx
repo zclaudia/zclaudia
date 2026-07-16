@@ -45,4 +45,24 @@ describe('ItemCard', () => {
     expect(onSetDefault).toHaveBeenCalledTimes(1);
     expect(onOpen).not.toHaveBeenCalled();
   });
+
+  it('renders the Draft chip when recordStatus is draft', () => {
+    const draftItem: LibraryItem = {
+      ...item,
+      recordStatus: { completeness: 'draft', availability: { usable: true } },
+    };
+    render(<ItemCard item={draftItem} backendName="This Device" backendOnline onOpen={() => {}} />);
+    expect(screen.getByText('Draft')).toBeInTheDocument();
+  });
+
+  it('renders no chip when recordStatus is ready', () => {
+    const readyItem: LibraryItem = {
+      ...item,
+      recordStatus: { completeness: 'ready', availability: { usable: true } },
+    };
+    render(<ItemCard item={readyItem} backendName="This Device" backendOnline onOpen={() => {}} />);
+    expect(screen.queryByText('Draft')).not.toBeInTheDocument();
+    expect(screen.queryByText('Unavailable')).not.toBeInTheDocument();
+    expect(screen.queryByText('Disabled')).not.toBeInTheDocument();
+  });
 });

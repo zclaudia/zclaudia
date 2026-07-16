@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import type { AgentsBackend, AgentsTab, LibraryItem } from './agents-types';
+import type { RecordStatus } from '@zclaudia/shared/core/record-status';
 
 // Minimal shapes we read — kept loose so upstream record types can widen.
 interface ProfileLike {
@@ -9,21 +10,25 @@ interface ProfileLike {
   model?: string;
   runtimeType?: string;
   status?: 'active' | 'readonly';
+  recordStatus?: RecordStatus;
 }
 interface SkillLike {
   id: string;
   name?: string;
   description?: string;
+  recordStatus?: RecordStatus;
 }
 interface ServerLike {
   id: string;
   name?: string;
+  recordStatus?: RecordStatus;
 }
 interface LlmProfileLike {
   id: string;
   name?: string;
   models?: unknown[];
   isDefault?: boolean;
+  recordStatus?: RecordStatus;
 }
 
 export interface LibrarySources {
@@ -64,6 +69,7 @@ export function buildLibraryItems(
         subtitle: p.model || (p.runtimeType === 'claude' ? 'Auto' : undefined),
         status: p.isDefault ? 'Default' : p.status === 'readonly' ? 'Read-only' : undefined,
         isDefault: p.isDefault,
+        recordStatus: p.recordStatus,
       })
     );
   if (wantKind('skill'))
@@ -74,11 +80,12 @@ export function buildLibraryItems(
         id: s.id,
         title: s.name ?? s.id,
         subtitle: s.description,
+        recordStatus: s.recordStatus,
       })
     );
   if (wantKind('mcp-server'))
     eachBackend(sources.servers, (backendId, m) =>
-      out.push({ kind: 'mcp-server', backendId, id: m.id, title: m.name ?? m.id })
+      out.push({ kind: 'mcp-server', backendId, id: m.id, title: m.name ?? m.id, recordStatus: m.recordStatus })
     );
   if (wantKind('llm-profile'))
     eachBackend(sources.llmProfiles, (backendId, l) =>
@@ -90,6 +97,7 @@ export function buildLibraryItems(
         subtitle: l.models ? `${l.models.length} models` : undefined,
         status: l.isDefault ? 'Default' : undefined,
         isDefault: l.isDefault,
+        recordStatus: l.recordStatus,
       })
     );
 

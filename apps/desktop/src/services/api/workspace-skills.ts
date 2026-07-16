@@ -1,4 +1,5 @@
 import type { ApiResponse } from '@zclaudia/shared';
+import type { RecordStatus } from '@zclaudia/shared/core/record-status';
 import { fetchLocalApi, fetchApiForBackend } from './base';
 export interface WorkspaceSkillInfo {
   id: string;
@@ -7,6 +8,8 @@ export interface WorkspaceSkillInfo {
   path: string;
   source?: 'workspace' | 'external' | 'plugin';
   eligible?: boolean;
+  /** Computed on read by the server; present on the API response. */
+  recordStatus?: RecordStatus;
   requirements?: {
     binaries?: string[];
     env?: string[];
