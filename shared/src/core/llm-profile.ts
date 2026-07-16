@@ -1,5 +1,7 @@
 // LLM connection profile types (replaces the old `provider.ts` profile shape).
 
+import type { RecordStatus } from './record-status.js';
+
 /**
  * Canonical LLM provider type list. `openai-custom` was merged into `openai`
  * in migration 004 — both shapes had identical wire behaviour (the only
@@ -103,6 +105,8 @@ export interface LlmProfileConfig {
    */
   cacheRetention?: CacheRetentionSetting;
   isDefault?: boolean;
+  /** Computed on read for display; not persisted. */
+  recordStatus?: RecordStatus;
   createdAt: number;
   updatedAt: number;
 }

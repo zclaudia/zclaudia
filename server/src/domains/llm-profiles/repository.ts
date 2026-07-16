@@ -6,7 +6,9 @@ import type {
   LlmProfileModelEntry,
   CacheRetentionSetting,
 } from '@zclaudia/shared/core/llm-profile';
+import { resolveLlmProfileStatus } from '@zclaudia/shared/core/record-status-resolvers';
 import { newId } from '../../utils/uuid.js';
+import { hasLlmCredential } from '../agent-readiness/credential.js';
 
 export class LlmProfileRepository extends BaseRepository<
   LlmProfileConfig,
@@ -18,7 +20,7 @@ export class LlmProfileRepository extends BaseRepository<
   }
 
   mapRow(row: any): LlmProfileConfig {
-    return {
+    const profile: LlmProfileConfig = {
       id: row.id,
       name: row.name,
       providerType: row.provider_type,
@@ -35,6 +37,13 @@ export class LlmProfileRepository extends BaseRepository<
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
+    // openai-codex fetches its models via OAuth, so an empty models[] is not "draft" for it.
+    const hasModel = (profile.models?.length ?? 0) > 0 || profile.providerType === 'openai-codex';
+    profile.recordStatus = resolveLlmProfileStatus({
+      hasModel,
+      hasCredential: hasLlmCredential(profile),
+    });
+    return profile;
   }
 
   private parseCacheRetention(raw: unknown): CacheRetentionSetting | undefined {

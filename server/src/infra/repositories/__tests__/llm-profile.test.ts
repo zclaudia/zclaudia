@@ -47,9 +47,27 @@ describe('LlmProfileRepository', () => {
         compat: undefined,
         requestHeaders: { 'X-Test-Header': 'test-value' },
         isDefault: true,
+        recordStatus: {
+          completeness: 'draft',
+          availability: { usable: false, reason: 'no_credential' },
+        },
         createdAt: 1000,
         updatedAt: 2000,
       });
+    });
+
+    it('computes recordStatus ready+usable for a profile with a model and an api key', () => {
+      const result = repository.mapRow({
+        id: 'p2',
+        name: 'Ready',
+        provider_type: 'anthropic',
+        api_key: 'sk-live',
+        models: JSON.stringify([{ modelId: 'claude-x' }]),
+        is_default: 0,
+        created_at: 1,
+        updated_at: 2,
+      });
+      expect(result.recordStatus).toEqual({ completeness: 'ready', availability: { usable: true } });
     });
 
     it('handles null values correctly', () => {
