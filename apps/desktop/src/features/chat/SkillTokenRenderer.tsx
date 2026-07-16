@@ -142,6 +142,20 @@ const ICON_STYLE: CSSProperties = {
   color: 'hsl(var(--primary))',
 };
 
+// FileSymbol wrapper geometry. Two deltas vs ICON_STYLE: display:flex kills
+// the wrapper's line box — without it the inline-flex FileSymbol child sits
+// on the baseline of the composer's inherited 24px line-height and paints
+// ~6px too low. And the glyph gets a 1em box because the Symbols artwork
+// carries internal padding (visible ink is smaller than lucide's); the `@`
+// advance is ~0.92em wide, so a right-aligned 1em box overhangs the slot by
+// only ~0.08em and never covers the previous word.
+const FILE_ICON_STYLE: CSSProperties = {
+  ...ICON_STYLE,
+  width: '1em',
+  height: '1em',
+  display: 'flex',
+};
+
 /**
  * rich-textarea render-prop. Returns the visible nodes for `value`.
  * INVARIANT: concatenated text of the returned nodes equals `value` exactly.
@@ -168,7 +182,7 @@ export function renderSkillTokens(
     } else if (seg.kind === 'file') {
       const basename = name.split('/').pop() ?? name;
       icon = (
-        <span data-token-file-icon style={ICON_STYLE}>
+        <span data-token-file-icon style={FILE_ICON_STYLE}>
           <FileSymbol name={basename} className="h-full w-full" />
         </span>
       );
