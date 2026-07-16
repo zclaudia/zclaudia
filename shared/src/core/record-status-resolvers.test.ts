@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { recordChip } from './record-status.js';
-import { resolveLlmProfileStatus, resolveMcpServerStatus } from './record-status-resolvers.js';
+import { resolveLlmProfileStatus, resolveMcpServerStatus, resolveSkillStatus, resolveAgentProfileStatus } from './record-status-resolvers.js';
 
 describe('resolveLlmProfileStatus', () => {
   it('ready + usable when it has a model and a credential', () => {
@@ -45,5 +45,51 @@ describe('resolveMcpServerStatus', () => {
 
   it('disabled when not enabled (disabled outranks ready but not unavailable)', () => {
     expect(recordChip(resolveMcpServerStatus({ hasEndpoint: true, enabled: false, connectionState: 'connected' }))).toBe('disabled');
+  });
+});
+
+describe('resolveSkillStatus', () => {
+  it('ready + usable with meaningful content and requirements met', () => {
+    const s = resolveSkillStatus({ contentMeaningful: true, eligible: true });
+    expect(s).toEqual({ completeness: 'ready', availability: { usable: true } });
+    expect(recordChip(s)).toBe('ready');
+  });
+
+  it('draft when content is not meaningful', () => {
+    expect(recordChip(resolveSkillStatus({ contentMeaningful: false, eligible: true }))).toBe('draft');
+  });
+
+  it('unavailable(requirement_unmet) when complete but not eligible', () => {
+    const s = resolveSkillStatus({ contentMeaningful: true, eligible: false });
+    expect(s.availability).toEqual({ usable: false, reason: 'requirement_unmet' });
+    expect(recordChip(s)).toBe('unavailable');
+  });
+});
+
+describe('resolveAgentProfileStatus', () => {
+  it('always ready + usable when the runtime does not require an LLM', () => {
+    const s = resolveAgentProfileStatus({ requiresLlm: false, hasLlmBinding: false, hasModel: false, llmUsable: false });
+    expect(s).toEqual({ completeness: 'ready', availability: { usable: true } });
+  });
+
+  it('ready + usable when it has a binding, a model, and the LLM is usable', () => {
+    const s = resolveAgentProfileStatus({ requiresLlm: true, hasLlmBinding: true, hasModel: true, llmUsable: true });
+    expect(s).toEqual({ completeness: 'ready', availability: { usable: true } });
+    expect(recordChip(s)).toBe('ready');
+  });
+
+  it('draft when it lacks a binding or a model', () => {
+    expect(recordChip(resolveAgentProfileStatus({ requiresLlm: true, hasLlmBinding: false, hasModel: false, llmUsable: false }))).toBe('draft');
+    expect(recordChip(resolveAgentProfileStatus({ requiresLlm: true, hasLlmBinding: true, hasModel: false, llmUsable: true }))).toBe('draft');
+  });
+
+  it('unavailable(no_llm_profile) when complete-looking but no binding, or llm_unavailable when the bound LLM is broken', () => {
+    // No binding but a model → draft dominates the chip, and availability names no_llm_profile.
+    const noBind = resolveAgentProfileStatus({ requiresLlm: true, hasLlmBinding: false, hasModel: true, llmUsable: false });
+    expect(noBind.availability).toEqual({ usable: false, reason: 'no_llm_profile' });
+    // Bound + model but the LLM is unusable → complete, unavailable(llm_unavailable).
+    const broken = resolveAgentProfileStatus({ requiresLlm: true, hasLlmBinding: true, hasModel: true, llmUsable: false });
+    expect(broken.availability).toEqual({ usable: false, reason: 'llm_unavailable' });
+    expect(recordChip(broken)).toBe('unavailable');
   });
 });
