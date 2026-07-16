@@ -27,6 +27,8 @@ import {
   type SourcedSkill,
 } from './skill-loader.js';
 import { meetsRequirements } from './skill-requirements.js';
+import { resolveSkillStatus } from '@zclaudia/shared/core/record-status-resolvers';
+import type { RecordStatus } from '@zclaudia/shared/core/record-status';
 
 /**
  * Metadata projection of a discovered skill. Exposed to admin UI / agent API
@@ -40,6 +42,9 @@ export interface DiscoveredSkill {
   filePath: string;
   dirPath: string;
   eligible?: boolean;
+  /** Computed on read for display; not persisted. Completeness is 'ready' here —
+   *  draft detection for freshly-seeded skills is handled by the create flow. */
+  recordStatus?: RecordStatus;
   requirements?: import('./skill-requirements.js').SkillRequirements;
   metadata?: SkillFrontmatterMetadata;
   execution?: SkillExecutionMetadata;
@@ -144,6 +149,8 @@ function byUsageRank(a: SourcedSkill, b: SourcedSkill): number {
 
 function toDiscoveredSkill(s: SourcedSkill): DiscoveredSkill {
   const usage = skillUsageFor(s);
+  const eligible = meetsRequirements(s.requirements);
+  const recordStatus = resolveSkillStatus({ contentMeaningful: true, eligible });
   return {
     id: skillId(s),
     name: s.skill.name,
@@ -151,7 +158,8 @@ function toDiscoveredSkill(s: SourcedSkill): DiscoveredSkill {
     source: s.source,
     filePath: s.skill.filePath,
     dirPath: path.dirname(s.skill.filePath),
-    eligible: meetsRequirements(s.requirements),
+    eligible,
+    recordStatus,
     ...(s.requirements ? { requirements: s.requirements } : {}),
     ...(s.metadata ? { metadata: s.metadata } : {}),
     ...(s.execution ? { execution: s.execution } : {}),

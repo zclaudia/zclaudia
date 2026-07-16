@@ -287,6 +287,32 @@ describe('skill-tools (pi-backed)', () => {
     );
   });
 
+  it('computes recordStatus: ready+usable when eligible, unavailable(requirement_unmet) when not', async () => {
+    writeSkill(
+      WORKSPACE_SKILLS_DIR,
+      'win-only',
+      'name: win-only\ndescription: gated\nrequires:\n  os:\n    - win32'
+    );
+    writeSkill(WORKSPACE_SKILLS_DIR, 'ok', 'name: ok\ndescription: no gate');
+    const env = createExecutionEnv(tmpRoot);
+    await loadAndCacheSkills(env);
+
+    const discovered = getDiscoveredSkills();
+    const eligibleSkill = discovered.find(s => s.id === 'ok')!;
+    expect(eligibleSkill.recordStatus).toEqual({
+      completeness: 'ready',
+      availability: { usable: true },
+    });
+
+    if (process.platform !== 'win32') {
+      const blockedSkill = discovered.find(s => s.id === 'win-only')!;
+      expect(blockedSkill.recordStatus).toEqual({
+        completeness: 'ready',
+        availability: { usable: false, reason: 'requirement_unmet' },
+      });
+    }
+  });
+
   it('projects flat skill execution metadata aliases and ignores invalid metadata', async () => {
     writeSkill(
       WORKSPACE_SKILLS_DIR,
