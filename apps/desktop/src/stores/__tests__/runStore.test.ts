@@ -82,4 +82,32 @@ describe('runStore', () => {
     expect(finalized.toolCalls).toHaveLength(1);
     expect(finalized.contentBlocks).toHaveLength(1);
   });
+
+  it('finalizeRunToMessage prefers server-authoritative final content over local accumulation', () => {
+    // Locally accumulated deltas can be missing a lost tail; the terminal
+    // event's content/contentBlocks are authoritative when provided.
+    const am: MessageWithToolCalls = {
+      id: 'm1',
+      role: 'assistant',
+      content: 'partial tex',
+      createdAt: 1,
+    } as MessageWithToolCalls;
+    useChatMessageStore.getState().setMessages('s1', [am]);
+    useRunStore.getState().startRun('r1', 's1');
+    useRunStore.getState().addToolUseBlock('r1', 't1');
+    useRunStore.getState().appendTextBlock('r1', 'partial tex');
+    useRunStore.getState().finalizeRunToMessage('r1', {
+      content: 'partial text plus lost tail',
+      contentBlocks: [
+        { type: 'tool_use', toolUseId: 't1' },
+        { type: 'text', content: 'partial text plus lost tail' },
+      ],
+    });
+    const finalized = useChatMessageStore.getState().messages.s1[0];
+    expect(finalized.content).toBe('partial text plus lost tail');
+    expect(finalized.contentBlocks).toEqual([
+      { type: 'tool_use', toolUseId: 't1' },
+      { type: 'text', content: 'partial text plus lost tail' },
+    ]);
+  });
 });

@@ -438,13 +438,40 @@ describe('handleServerMessage', () => {
       expect(mockPromptRequestStore.clearRequestsForSession).toHaveBeenCalledWith('s1');
       expect(mockPermissionStore.clearRequestsForSession).toHaveBeenCalledWith('s1');
       expect(mockInteractionStore.clearSession).toHaveBeenCalledWith('s1');
-      expect(mockChatStore.finalizeRunToMessage).toHaveBeenCalledWith('r1');
+      expect(mockChatStore.finalizeRunToMessage).toHaveBeenCalledWith('r1', {
+        content: undefined,
+        contentBlocks: undefined,
+      });
       expect(mockSessionConfigStore.addSessionUsage).toHaveBeenCalledWith('s1', { tokens: 100 });
       expect(mockProjectStore.setSessionActive).toHaveBeenCalledWith('s1', false);
       expect(mockChatStore.endRun).toHaveBeenCalledWith('r1');
       expect(mockEagerSyncCurrentSession).toHaveBeenCalledWith('server-1');
       expect(mockRecoverCurrentSessionTail).toHaveBeenCalledWith('server-1', 's1');
       expect(ctx.serverRunsRef.get('server-1')?.has('r1')).toBe(false);
+    });
+
+    it('passes server-authoritative final content to finalizeRunToMessage', () => {
+      mockChatStore.activeRuns = { r1: 's1' };
+      handleServerMessage(
+        {
+          type: 'run_completed',
+          runId: 'r1',
+          sessionId: 's1',
+          content: 'full final text',
+          contentBlocks: [
+            { type: 'tool_use', toolUseId: 't1' },
+            { type: 'text', content: 'full final text' },
+          ],
+        },
+        makeCtx()
+      );
+      expect(mockChatStore.finalizeRunToMessage).toHaveBeenCalledWith('r1', {
+        content: 'full final text',
+        contentBlocks: [
+          { type: 'tool_use', toolUseId: 't1' },
+          { type: 'text', content: 'full final text' },
+        ],
+      });
     });
 
     it('uses sessionId from message when available', () => {
@@ -500,7 +527,10 @@ describe('handleServerMessage', () => {
 
       handleServerMessage({ type: 'run_completed', runId: 'r1', sessionId: 's1', seq: 2 }, ctx);
 
-      expect(mockChatStore.finalizeRunToMessage).toHaveBeenCalledWith('r1');
+      expect(mockChatStore.finalizeRunToMessage).toHaveBeenCalledWith('r1', {
+        content: undefined,
+        contentBlocks: undefined,
+      });
       expect(mockChatStore.endRun).toHaveBeenCalledWith('r1');
       expect(mockProjectStore.setSessionActive).toHaveBeenCalledWith('s1', false);
       expect(mockSessionsStore.setSessionActiveFlag).toHaveBeenCalledWith('remote-1', 's1', false);

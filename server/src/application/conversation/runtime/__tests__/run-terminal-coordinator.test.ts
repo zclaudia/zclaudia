@@ -116,7 +116,11 @@ describe('run terminal coordinator', () => {
         type: 'run.completed',
         runId: 'run-1',
         sessionId: 'session-1',
-        payload: { usage },
+        payload: {
+          usage,
+          content: 'done',
+          contentBlocks: [{ type: 'text', content: 'done' }],
+        },
       })
     );
     expect(broadcastHeartbeat).toHaveBeenCalled();
@@ -126,6 +130,51 @@ describe('run terminal coordinator', () => {
       sessionId: 'session-1',
       status: 'completed',
     });
+  });
+
+  it('emits run_completed carrying the final accumulated content and blocks', async () => {
+    // The live client accumulates the message purely from streamed deltas; the
+    // terminal event must carry the authoritative final content so a lost tail
+    // delta cannot leave the rendered message truncated until refresh.
+    const activeRun = buildRun({
+      fullContent: 'Full final text',
+      contentBlocks: [
+        { type: 'tool_use', toolUseId: 'tool-1' },
+        { type: 'text', content: 'Full final text' },
+      ],
+    });
+    const sendRunEvent = vi.fn();
+
+    const { completeProviderTurn } = await import('../run-terminal-coordinator.js');
+
+    completeProviderTurn({
+      activeRun,
+      broadcastHeartbeat: vi.fn(),
+      db: {} as any,
+      input: 'hello',
+      msg: { type: 'result' } as any,
+      notificationService: { notify: vi.fn() } as any,
+      providerRegistry: providerRegistry as any,
+      providerType: 'zclaudia',
+      runId: 'run-1',
+      sendRunEvent,
+      sessionId: 'session-1',
+      sessionType: 'interactive',
+      state: {},
+    });
+
+    expect(sendRunEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'run_completed',
+        runId: 'run-1',
+        sessionId: 'session-1',
+        content: 'Full final text',
+        contentBlocks: [
+          { type: 'tool_use', toolUseId: 'tool-1' },
+          { type: 'text', content: 'Full final text' },
+        ],
+      })
+    );
   });
 
   it('emits compaction event before run_completed when auto compaction succeeds', async () => {

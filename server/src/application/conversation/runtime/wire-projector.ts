@@ -103,6 +103,8 @@ export function projectRunDomainEventToWireMessages(event: RunDomainEvent): Serv
           runId: event.runId,
           sessionId: event.sessionId,
           usage: event.payload.usage,
+          content: event.payload.content,
+          contentBlocks: event.payload.contentBlocks,
           seq: event.seq,
         },
       ];

@@ -126,7 +126,12 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
         usePromptRequestStore.getState().clearRequestsForSession(completedSession);
         usePermissionStore.getState().clearRequestsForSession(completedSession);
         useInteractionStore.getState().clearSession(completedSession);
-        useRunStore.getState().finalizeRunToMessage(msg.runId);
+        // Server-authoritative final content repairs any delta frames lost in
+        // transit; without it the message stays truncated until a full reload.
+        useRunStore.getState().finalizeRunToMessage(msg.runId, {
+          content: msg.content,
+          contentBlocks: msg.contentBlocks,
+        });
         if (msg.usage) {
           useSessionConfigStore.getState().addSessionUsage(completedSession, msg.usage);
         }

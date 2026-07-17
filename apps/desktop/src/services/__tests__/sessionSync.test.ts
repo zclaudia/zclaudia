@@ -295,6 +295,46 @@ describe('services/sessionSync', () => {
       });
     });
 
+    it('hydrates contentBlocks and toolCalls from metadata before appending', async () => {
+      selectionState.selectedSessionId = 'session-1';
+      chatState.pagination = { 'session-1': { maxOffset: 5 } };
+      mockGetSessionMessages.mockResolvedValue({
+        messages: [
+          {
+            id: 'message-6',
+            metadata: {
+              contentBlocks: [
+                { type: 'tool_use', toolUseId: 't1' },
+                { type: 'text', content: 'full text' },
+              ],
+              toolCalls: [{ toolUseId: 't1', name: 'Read', input: { p: 1 }, output: 'ok' }],
+            },
+          },
+        ],
+        pagination: { maxOffset: 6 },
+      });
+
+      const { eagerSyncCurrentSession } = await import('../sessionSync.js');
+      await eagerSyncCurrentSession('backend-1');
+
+      expect(chatState.appendMessages).toHaveBeenCalledWith(
+        'session-1',
+        [
+          expect.objectContaining({
+            id: 'message-6',
+            contentBlocks: [
+              { type: 'tool_use', toolUseId: 't1' },
+              { type: 'text', content: 'full text' },
+            ],
+            toolCalls: [
+              expect.objectContaining({ id: 't1', toolName: 'Read', status: 'completed' }),
+            ],
+          }),
+        ],
+        { maxOffset: 6 }
+      );
+    });
+
     it('skips when there is no selected session or pagination offset', async () => {
       const { eagerSyncCurrentSession } = await import('../sessionSync.js');
 
@@ -323,6 +363,47 @@ describe('services/sessionSync', () => {
       expect(chatState.mergeMessages).toHaveBeenCalledWith('session-1', [{ id: 'message-10' }], {
         maxOffset: 10,
       });
+    });
+
+    it('hydrates contentBlocks from metadata so recovery can repair the rendered blocks', async () => {
+      // The segmented (tool-call) message view renders from top-level
+      // contentBlocks; recovery must rebuild them from metadata or the repair
+      // is invisible until a full reload.
+      selectionState.selectedSessionId = 'session-1';
+      serverState.activeServerId = 'backend-1';
+      mockGetSessionMessages.mockResolvedValue({
+        messages: [
+          {
+            id: 'message-10',
+            content: 'full text',
+            metadata: {
+              contentBlocks: [
+                { type: 'tool_use', toolUseId: 't1' },
+                { type: 'text', content: 'full text' },
+              ],
+            },
+          },
+        ],
+        pagination: { maxOffset: 10 },
+      });
+
+      const { recoverCurrentSessionTail } = await import('../sessionSync.js');
+      await recoverCurrentSessionTail('backend-1', 'session-1');
+
+      expect(chatState.mergeMessages).toHaveBeenCalledWith(
+        'session-1',
+        [
+          expect.objectContaining({
+            id: 'message-10',
+            content: 'full text',
+            contentBlocks: [
+              { type: 'tool_use', toolUseId: 't1' },
+              { type: 'text', content: 'full text' },
+            ],
+          }),
+        ],
+        { maxOffset: 10 }
+      );
     });
 
     it('coalesces concurrent recovery calls and runs one trailing retry', async () => {

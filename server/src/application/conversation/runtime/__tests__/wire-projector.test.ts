@@ -91,6 +91,32 @@ describe('wire projector', () => {
 
     expect(
       projectRunDomainEventToWireMessages(
+        event('run.completed', {
+          usage: undefined,
+          content: 'final text',
+          contentBlocks: [
+            { type: 'tool_use', toolUseId: 'tool-1' },
+            { type: 'text', content: 'final text' },
+          ],
+        })
+      )
+    ).toEqual([
+      {
+        type: 'run_completed',
+        runId: 'run-1',
+        sessionId: 'session-1',
+        usage: undefined,
+        content: 'final text',
+        contentBlocks: [
+          { type: 'tool_use', toolUseId: 'tool-1' },
+          { type: 'text', content: 'final text' },
+        ],
+        seq: 9,
+      },
+    ]);
+
+    expect(
+      projectRunDomainEventToWireMessages(
         event('run.failed', {
           error: 'provider error',
           errorCode: 'BAD_MODEL',

@@ -127,7 +127,13 @@ export function completeProviderTurn(input: CompleteProviderTurnInput): void {
     dispatchTerminalDomainEvent({
       activeRun,
       listeners,
-      payload: { usage: msg.usage },
+      payload: {
+        usage: msg.usage,
+        ...(activeRun.fullContent ? { content: activeRun.fullContent } : {}),
+        ...(activeRun.contentBlocks.length > 0
+          ? { contentBlocks: [...activeRun.contentBlocks] }
+          : {}),
+      },
       runId,
       sendRunEvent,
       type: 'run.completed',

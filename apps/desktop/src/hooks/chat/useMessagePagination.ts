@@ -4,34 +4,15 @@ import { useChatMessageStore, type MessageWithToolCalls } from '../../stores/cha
 import { useFilePushStore } from '../../stores/filePushStore';
 import { useUIStore } from '../../stores/uiStore';
 import * as api from '../../services/api';
-import type { Message } from '@zclaudia/shared';
+import { restoreToolCalls } from '../../services/message-hydration';
+
+// Re-export for existing importers (e.g. ChatInterface).
+export { restoreToolCalls };
 
 const MESSAGES_PER_PAGE = 50;
 const BOTTOM_REFRESH_LIMIT = 12;
 const BOTTOM_REFRESH_COOLDOWN_MS = 2500;
 const SUPPRESS_LOAD_MORE_MS = 1200;
-
-// Restore tool calls and content blocks from persisted metadata when loading messages from the server
-export function restoreToolCalls(messages: Message[]): MessageWithToolCalls[] {
-  return messages.map(msg => {
-    const result: MessageWithToolCalls = { ...msg };
-    if (msg.metadata?.toolCalls && msg.metadata.toolCalls.length > 0) {
-      result.toolCalls = msg.metadata.toolCalls.map((tc, i) => ({
-        id: tc.toolUseId || `persisted-${msg.id}-${i}`,
-        toolName: tc.name,
-        toolInput: tc.input,
-        status: tc.isError ? ('error' as const) : ('completed' as const),
-        result: tc.output,
-        isError: tc.isError,
-        effect: tc.effect,
-      }));
-    }
-    if (msg.metadata?.contentBlocks && msg.metadata.contentBlocks.length > 0) {
-      result.contentBlocks = msg.metadata.contentBlocks;
-    }
-    return result;
-  });
-}
 
 interface UseMessagePaginationParams {
   sessionId: string;

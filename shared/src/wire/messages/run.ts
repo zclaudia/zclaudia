@@ -4,7 +4,7 @@
  */
 
 import type { SessionType } from '../../core/session.js';
-import type { ToolEffect, UsageInfo } from '../../core/message.js';
+import type { ContentBlock, ToolEffect, UsageInfo } from '../../core/message.js';
 import type { PCPEffectiveProfile } from '../../core/pcp.js';
 import type { UnifiedPermissionPolicy } from '../../interaction/permissions.js';
 
@@ -142,6 +142,11 @@ export interface RunCompletedMessage {
   runId: string;
   sessionId: string;
   usage?: UsageInfo;
+  /** Authoritative final assistant text. Live clients accumulate the message
+   *  from streamed deltas; a lost delta frame would otherwise leave the
+   *  rendered message truncated until a full history reload. */
+  content?: string;
+  contentBlocks?: ContentBlock[];
   seq?: number;
 }
 

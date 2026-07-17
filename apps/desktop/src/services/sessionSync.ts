@@ -18,6 +18,7 @@ import * as api from './api';
 import { getControlPlaneMode, isLocalBackendId } from '../utils/controlPlane';
 import { getBrowserShellBaseUrl } from '../utils/browserShellRuntime';
 import { findDeletedSessionIds, planDeltaSessionEvents } from './sessionSyncReconciliation';
+import { restoreToolCalls } from './message-hydration';
 
 interface BackendSyncState {
   lastSyncTime: number;
@@ -60,7 +61,7 @@ async function fillMessageGapForSession(
     if (result.messages.length > 0) {
       useChatMessageStore
         .getState()
-        .appendMessages(currentSessionId, result.messages, result.pagination);
+        .appendMessages(currentSessionId, restoreToolCalls(result.messages), result.pagination);
       console.log(`[SessionSync] Filled ${result.messages.length} missing messages`);
     }
   } catch (error) {
@@ -352,7 +353,7 @@ export async function eagerSyncCurrentSession(_backendId: string): Promise<void>
     if (result.messages.length > 0) {
       useChatMessageStore
         .getState()
-        .appendMessages(currentSessionId, result.messages, result.pagination);
+        .appendMessages(currentSessionId, restoreToolCalls(result.messages), result.pagination);
       console.log(
         `[SessionSync] Eager sync filled ${result.messages.length} messages for session ${currentSessionId}`
       );
@@ -396,9 +397,12 @@ export async function recoverCurrentSessionTail(
   const run = async () => {
     try {
       const result = await api.getSessionMessages(targetSessionId, { limit: 100 });
+      // Hydrate top-level contentBlocks/toolCalls from metadata: the segmented
+      // message view renders from them, so merging raw wire messages would
+      // repair `content` invisibly while the rendered blocks stay truncated.
       useChatMessageStore
         .getState()
-        .mergeMessages(targetSessionId, result.messages, result.pagination);
+        .mergeMessages(targetSessionId, restoreToolCalls(result.messages), result.pagination);
       console.log(
         `[SessionSync] Recovered tail snapshot for session ${targetSessionId}: ${result.messages.length} messages`
       );

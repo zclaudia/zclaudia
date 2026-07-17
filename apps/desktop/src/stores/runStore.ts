@@ -86,8 +86,14 @@ interface RunState {
   appendTextBlock: (runId: string, content: string) => void;
   addToolUseBlock: (runId: string, toolUseId: string) => void;
 
-  // Finalize run data onto the assistant message (single atomic update)
-  finalizeRunToMessage: (runId: string) => void;
+  // Finalize run data onto the assistant message (single atomic update).
+  // `final` is the server-authoritative content from run_completed; when
+  // present it wins over locally accumulated deltas (which may have lost a
+  // tail frame in transit).
+  finalizeRunToMessage: (
+    runId: string,
+    final?: { content?: string; contentBlocks?: ContentBlock[] }
+  ) => void;
 
   // Getters
   isSessionLoading: (sessionId: string) => boolean;
@@ -285,7 +291,7 @@ export const useRunStore = create<RunState>((set, get) => ({
 
   // Finalize run data (tool calls + content blocks) onto the assistant message in one atomic update.
   // Prefers existing data when it's more complete (e.g., from API/metadata loaded before mid-stream join).
-  finalizeRunToMessage: runId => {
+  finalizeRunToMessage: (runId, final) => {
     const sessionId = get().activeRuns[runId];
     if (!sessionId) return;
     const runHistory = get().toolCallsHistory[runId] || [];
@@ -300,10 +306,15 @@ export const useRunStore = create<RunState>((set, get) => ({
       const toolCalls =
         runHistory.length >= existingToolCalls.length ? [...runHistory] : existingToolCalls;
       const existingBlocks = assistantMessage.contentBlocks || [];
-      const contentBlocks = blocks.length >= existingBlocks.length ? [...blocks] : existingBlocks;
+      const contentBlocks = final?.contentBlocks?.length
+        ? [...final.contentBlocks]
+        : blocks.length >= existingBlocks.length
+          ? [...blocks]
+          : existingBlocks;
+      const content = final?.content ? final.content : assistantMessage.content;
       const updatedMessages = [
         ...sessionMessages.slice(0, assistantIdx),
-        { ...assistantMessage, toolCalls, contentBlocks },
+        { ...assistantMessage, content, toolCalls, contentBlocks },
         ...sessionMessages.slice(assistantIdx + 1),
       ];
       return { messages: { ...state.messages, [sessionId]: updatedMessages } };

@@ -1,4 +1,4 @@
-import type { ToolEffect } from '@zclaudia/shared/core/message';
+import type { ContentBlock, ToolEffect } from '@zclaudia/shared/core/message';
 import type { UsageInfo } from '@zclaudia/shared/core/message';
 import type { PCPEffectiveProfile } from '@zclaudia/shared/core/pcp';
 import type { ToolSemantic } from '@zclaudia/shared/wire/messages/run';
@@ -131,6 +131,10 @@ export interface RunDomainEventPayloadMap {
   };
   'run.completed': {
     usage?: UsageInfo;
+    /** Authoritative final assistant text/blocks so live clients can repair a
+     *  delta-accumulated message that lost a tail frame in transit. */
+    content?: string;
+    contentBlocks?: ContentBlock[];
   };
   'run.failed': {
     error: string;
