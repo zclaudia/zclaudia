@@ -128,7 +128,10 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
         useInteractionStore.getState().clearSession(completedSession);
         // Server-authoritative final content repairs any delta frames lost in
         // transit; without it the message stays truncated until a full reload.
+        // sessionId lets it apply even if a racing heartbeat already endRun()'d
+        // the client-side tracking.
         useRunStore.getState().finalizeRunToMessage(msg.runId, {
+          sessionId: completedSession,
           content: msg.content,
           contentBlocks: msg.contentBlocks,
         });

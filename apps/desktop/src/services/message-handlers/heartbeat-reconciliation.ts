@@ -9,6 +9,7 @@ import { useInteractionStore } from '../../stores/interactionStore';
 import { useSessionsStore, getSessionBucketKeyForBackend } from '../../stores/sessionsStore';
 import { useSessionRunStateStore } from '../../stores/sessionRunStateStore';
 import { eagerSyncCurrentSession, recoverCurrentSessionTail } from '../sessionSync';
+import { flushDeltaForRun } from './delta-buffer';
 import { getProjectsForBackend } from '../api/projects';
 import { resolveCanonicalBackendId, resolveLocalBackendId } from '../../utils/controlPlane';
 import { parseBackendId } from '../../stores/gatewayStore';
@@ -73,7 +74,19 @@ export interface HeartbeatState {
   serverSyncGenerations: Map<string, number>;
   terminalRunSeqByRun: Map<string, { seq?: number; endedAt: number }>;
   TERMINAL_RUN_TOMBSTONE_MS: number;
+  /** Consecutive heartbeats a tracked run has been missing from. */
+  heartbeatMissesByRun: Map<string, number>;
 }
+
+/**
+ * A tracked run must be missing from this many consecutive heartbeats before
+ * the client tears it down. The server's terminal sequence can emit a heartbeat
+ * that no longer lists the run *before* run_completed reaches the client (the
+ * auto-compaction branch marks the run phase terminal, then emits run_completed
+ * only after an async gap) — cleaning up on the first miss would race that
+ * terminal event and drop its authoritative final content.
+ */
+const HEARTBEAT_MISS_GRACE = 2;
 
 function clearExpiredTerminalRuns(state: HeartbeatState, now = Date.now()): void {
   for (const [runId, tombstone] of state.terminalRunSeqByRun) {
@@ -166,13 +179,25 @@ export function handleHeartbeat(
     }
   }
 
-  // Clean up stale runs
+  // Clean up stale runs (only after HEARTBEAT_MISS_GRACE consecutive misses —
+  // a single miss can be the terminal heartbeat racing ahead of run_completed).
+  // Runs still within grace are collected so the session-run-state
+  // reconciliation below also keeps treating them as active.
+  const graceRuns: Array<{ runId: string; sessionId?: string }> = [];
   const trackedRuns = serverRunsRef.get(serverId);
   if (trackedRuns) {
     for (const runId of trackedRuns) {
       if (!serverActiveRunIds.has(runId)) {
+        const misses = (state.heartbeatMissesByRun.get(runId) ?? 0) + 1;
+        if (misses < HEARTBEAT_MISS_GRACE) {
+          state.heartbeatMissesByRun.set(runId, misses);
+          graceRuns.push({ runId, sessionId: chatState.activeRuns[runId] });
+          continue;
+        }
+        state.heartbeatMissesByRun.delete(runId);
         console.log(`[${logTag}] Cleaning up stale run ${runId} (not in server heartbeat)`);
         const sessionId = chatState.activeRuns[runId];
+        flushDeltaForRun(runId);
         chatState.finalizeRunToMessage(runId);
         chatState.endRun(runId);
         if (sessionId) {
@@ -187,6 +212,8 @@ export function handleHeartbeat(
           void recoverCurrentSessionTail(serverId, sessionId);
         }
         trackedRuns.delete(runId);
+      } else {
+        state.heartbeatMissesByRun.delete(runId);
       }
     }
   }
@@ -249,17 +276,27 @@ export function handleHeartbeat(
     }
   }
 
-  // Reconcile active sessions
+  // Reconcile active sessions. Runs within the missing-heartbeat grace window
+  // are still reported as active so the store-level foreground cleanup does
+  // not tear them down before their terminal run event arrives.
   const activeSessionIds = new Set<string>(
     heartbeat.activeRuns.filter(r => r.sessionType !== 'background').map(r => r.sessionId)
   );
+  for (const grace of graceRuns) {
+    if (grace.sessionId) activeSessionIds.add(grace.sessionId);
+  }
   useSessionRunStateStore.getState().reconcileBackendActiveRuns({
     backendId,
-    activeRuns: heartbeat.activeRuns.map(run => ({
-      runId: run.runId,
-      sessionId: run.sessionId,
-      sessionType: run.sessionType,
-    })),
+    activeRuns: [
+      ...heartbeat.activeRuns.map(run => ({
+        runId: run.runId,
+        sessionId: run.sessionId,
+        sessionType: run.sessionType,
+      })),
+      ...graceRuns
+        .filter((g): g is { runId: string; sessionId: string } => Boolean(g.sessionId))
+        .map(g => ({ runId: g.runId, sessionId: g.sessionId, sessionType: undefined })),
+    ],
     source: 'heartbeat',
   });
 

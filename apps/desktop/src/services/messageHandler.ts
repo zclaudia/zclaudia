@@ -82,12 +82,15 @@ const projectFetchInFlight = new Map<
 >();
 const serverSyncGenerations = new Map<string, number>();
 
+const heartbeatMissesByRun = new Map<string, number>();
+
 const heartbeatState: HeartbeatState = {
   entityVersions,
   projectFetchInFlight,
   serverSyncGenerations,
   terminalRunSeqByRun,
   TERMINAL_RUN_TOMBSTONE_MS,
+  heartbeatMissesByRun,
 };
 
 function isStaleRunEvent(runId: string, seq?: number): boolean {
@@ -291,7 +294,10 @@ export function handleServerMessage(
     recoverRunGap: (runId, seq, sessionId) => recoverRunGap(ctx, runId, seq, sessionId),
     recordTerminalRun,
     clearRunActivity: runId => lastActivityUpdate.delete(runId),
-    clearRunSeq: runId => maxSeqByRun.delete(runId),
+    clearRunSeq: runId => {
+      maxSeqByRun.delete(runId);
+      heartbeatMissesByRun.delete(runId);
+    },
     clearTerminalRunSeq: runId => terminalRunSeqByRun.delete(runId),
   };
   if (messageDispatcher.dispatch(msg, dispatchCtx)) return;

@@ -439,6 +439,7 @@ describe('handleServerMessage', () => {
       expect(mockPermissionStore.clearRequestsForSession).toHaveBeenCalledWith('s1');
       expect(mockInteractionStore.clearSession).toHaveBeenCalledWith('s1');
       expect(mockChatStore.finalizeRunToMessage).toHaveBeenCalledWith('r1', {
+        sessionId: 's1',
         content: undefined,
         contentBlocks: undefined,
       });
@@ -466,6 +467,7 @@ describe('handleServerMessage', () => {
         makeCtx()
       );
       expect(mockChatStore.finalizeRunToMessage).toHaveBeenCalledWith('r1', {
+        sessionId: 's1',
         content: 'full final text',
         contentBlocks: [
           { type: 'tool_use', toolUseId: 't1' },
@@ -528,6 +530,7 @@ describe('handleServerMessage', () => {
       handleServerMessage({ type: 'run_completed', runId: 'r1', sessionId: 's1', seq: 2 }, ctx);
 
       expect(mockChatStore.finalizeRunToMessage).toHaveBeenCalledWith('r1', {
+        sessionId: 's1',
         content: undefined,
         contentBlocks: undefined,
       });
@@ -1260,19 +1263,88 @@ describe('handleServerMessage', () => {
       expect(mockChatStore.startRun).not.toHaveBeenCalled();
     });
 
-    it('cleans up stale runs', () => {
-      mockChatStore.activeRuns = { r1: 's1' };
+    it('does not clean up a tracked run on a single missing heartbeat', () => {
+      // A completing run's terminal heartbeat can race ahead of run_completed
+      // on the wire (compaction defers the terminal event past an async gap);
+      // one missing heartbeat must not kill client-side run tracking.
+      mockChatStore.activeRuns = { 'hb-grace-1': 's1' };
       const ctx = makeCtx();
-      ctx.serverRunsRef.set('server-1', new Set(['r1']));
+      ctx.serverRunsRef.set('server-1', new Set(['hb-grace-1']));
       const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       handleServerMessage(makeHeartbeat({ activeRuns: [] }), ctx);
 
-      expect(mockChatStore.finalizeRunToMessage).toHaveBeenCalledWith('r1');
-      expect(mockChatStore.endRun).toHaveBeenCalledWith('r1');
+      expect(mockChatStore.finalizeRunToMessage).not.toHaveBeenCalled();
+      expect(mockChatStore.endRun).not.toHaveBeenCalled();
+      expect(ctx.serverRunsRef.get('server-1')?.has('hb-grace-1')).toBe(true);
+      logSpy.mockRestore();
+    });
+
+    it('cleans up a tracked run after two consecutive missing heartbeats', () => {
+      mockChatStore.activeRuns = { 'hb-grace-2': 's1' };
+      const ctx = makeCtx();
+      ctx.serverRunsRef.set('server-1', new Set(['hb-grace-2']));
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      handleServerMessage(makeHeartbeat({ activeRuns: [] }), ctx);
+      handleServerMessage(makeHeartbeat({ activeRuns: [] }), ctx);
+
+      expect(mockChatStore.finalizeRunToMessage).toHaveBeenCalledWith('hb-grace-2');
+      expect(mockChatStore.endRun).toHaveBeenCalledWith('hb-grace-2');
       expect(mockProjectStore.setSessionActive).toHaveBeenCalledWith('s1', false);
       expect(mockEagerSyncCurrentSession).toHaveBeenCalledWith('server-1');
       expect(mockRecoverCurrentSessionTail).toHaveBeenCalledWith('server-1', 's1');
+      expect(ctx.serverRunsRef.get('server-1')?.has('hb-grace-2')).toBe(false);
+      logSpy.mockRestore();
+    });
+
+    it('reappearing in a heartbeat resets the missing-heartbeat counter', () => {
+      mockChatStore.activeRuns = { 'hb-grace-3': 's1' };
+      const ctx = makeCtx();
+      ctx.serverRunsRef.set('server-1', new Set(['hb-grace-3']));
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      handleServerMessage(makeHeartbeat({ activeRuns: [] }), ctx);
+      handleServerMessage(
+        makeHeartbeat({
+          activeRuns: [{ runId: 'hb-grace-3', sessionId: 's1', sessionType: 'foreground' }],
+        }),
+        ctx
+      );
+      handleServerMessage(makeHeartbeat({ activeRuns: [] }), ctx);
+
+      expect(mockChatStore.endRun).not.toHaveBeenCalled();
+      logSpy.mockRestore();
+    });
+
+    it('flushes buffered deltas before finalizing a heartbeat-cleaned run', () => {
+      let pendingCb: FrameRequestCallback | null = null;
+      (
+        globalThis as { requestAnimationFrame?: (cb: FrameRequestCallback) => number }
+      ).requestAnimationFrame = (cb: FrameRequestCallback) => {
+        pendingCb = cb;
+        return 1;
+      };
+      mockChatStore.activeRuns = { 'hb-grace-4': 's1' };
+      const ctx = makeCtx();
+      ctx.serverRunsRef.set('server-1', new Set(['hb-grace-4']));
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      handleServerMessage(
+        { type: 'delta', sessionId: 's1', runId: 'hb-grace-4', content: 'buffered tail' },
+        ctx
+      );
+      handleServerMessage(makeHeartbeat({ activeRuns: [] }), ctx);
+      handleServerMessage(makeHeartbeat({ activeRuns: [] }), ctx);
+
+      const appendOrder = mockChatStore.appendToLastMessage.mock.invocationCallOrder[0];
+      const finalizeOrder = mockChatStore.finalizeRunToMessage.mock.invocationCallOrder[0];
+      expect(mockChatStore.appendToLastMessage).toHaveBeenCalledWith('s1', 'buffered tail');
+      expect(appendOrder).toBeLessThan(finalizeOrder);
+
+      mockChatStore.appendToLastMessage.mockClear();
+      pendingCb?.(0);
+      expect(mockChatStore.appendToLastMessage).not.toHaveBeenCalled();
       logSpy.mockRestore();
     });
 

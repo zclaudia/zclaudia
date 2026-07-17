@@ -110,4 +110,26 @@ describe('runStore', () => {
       { type: 'text', content: 'partial text plus lost tail' },
     ]);
   });
+
+  it('finalizeRunToMessage applies authoritative content via sessionId fallback when run tracking is gone', () => {
+    // A stale heartbeat can endRun() the client-side tracking just before
+    // run_completed arrives; the terminal event still carries sessionId, so
+    // the authoritative content must land even without activeRuns.
+    const am: MessageWithToolCalls = {
+      id: 'm1',
+      role: 'assistant',
+      content: 'partial tex',
+      createdAt: 1,
+    } as MessageWithToolCalls;
+    useChatMessageStore.getState().setMessages('s1', [am]);
+    // No startRun: activeRuns has no entry for this run.
+    useRunStore.getState().finalizeRunToMessage('r-gone', {
+      sessionId: 's1',
+      content: 'full final text',
+      contentBlocks: [{ type: 'text', content: 'full final text' }],
+    });
+    const finalized = useChatMessageStore.getState().messages.s1[0];
+    expect(finalized.content).toBe('full final text');
+    expect(finalized.contentBlocks).toEqual([{ type: 'text', content: 'full final text' }]);
+  });
 });

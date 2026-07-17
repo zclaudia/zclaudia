@@ -89,10 +89,12 @@ interface RunState {
   // Finalize run data onto the assistant message (single atomic update).
   // `final` is the server-authoritative content from run_completed; when
   // present it wins over locally accumulated deltas (which may have lost a
-  // tail frame in transit).
+  // tail frame in transit). `final.sessionId` lets the terminal event apply
+  // even when run tracking was already torn down (e.g. by a heartbeat that
+  // raced ahead of run_completed).
   finalizeRunToMessage: (
     runId: string,
-    final?: { content?: string; contentBlocks?: ContentBlock[] }
+    final?: { sessionId?: string; content?: string; contentBlocks?: ContentBlock[] }
   ) => void;
 
   // Getters
@@ -292,7 +294,7 @@ export const useRunStore = create<RunState>((set, get) => ({
   // Finalize run data (tool calls + content blocks) onto the assistant message in one atomic update.
   // Prefers existing data when it's more complete (e.g., from API/metadata loaded before mid-stream join).
   finalizeRunToMessage: (runId, final) => {
-    const sessionId = get().activeRuns[runId];
+    const sessionId = get().activeRuns[runId] ?? final?.sessionId;
     if (!sessionId) return;
     const runHistory = get().toolCallsHistory[runId] || [];
     const blocks = get().runContentBlocks[runId] || [];
