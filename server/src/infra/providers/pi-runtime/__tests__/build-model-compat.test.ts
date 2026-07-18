@@ -67,9 +67,22 @@ describe('buildModel — model dialect', () => {
   });
 
   it('auto-inherits the registry provider from a cross-provider hit', () => {
+    // deepseek-v4-flash is registered under several providers (deepseek,
+    // opencode, …). Inheritance scans ALL of them for an allowlisted dialect
+    // — it does NOT depend on which provider wins findInRegistryCrossProvider's
+    // contextWindow tie-break, so a pi-ai registry reorder can't flip this.
     const { model } = buildModel(proxyProfile(), 'deepseek-v4-flash');
     expect(model.provider).toBe('deepseek');
     expect((model as any).dialect).toBe('deepseek');
+  });
+
+  it('explicit dialect beats an inherit-eligible registry hit', () => {
+    const { model } = buildModel(proxyProfile(), 'deepseek-v4-flash', {
+      modelId: 'deepseek-v4-flash',
+      dialect: 'zai',
+    });
+    expect(model.provider).toBe('zai');
+    expect((model as any).dialect).toBe('zai');
   });
 
   it('dialect "openai" suppresses auto-inherit', () => {

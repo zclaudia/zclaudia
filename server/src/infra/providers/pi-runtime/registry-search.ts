@@ -43,6 +43,25 @@ export function tryGetRegistryModel(provider: string, modelId: string): Registry
  * estimate means we trigger compaction later than ideal, but the user can
  * always override via `models[*].contextWindow`).
  */
+/**
+ * All registry providers that declare `modelId`, in registry enumeration
+ * order. Used for dialect inheritance, which must consider every provider a
+ * model is registered under — not just the contextWindow-ranked winner that
+ * findInRegistryCrossProvider returns.
+ */
+export function findRegistryProvidersForModel(modelId: string): string[] {
+  const getProvidersFn = getProviders as () => string[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const getModelsFn = getModels as (p: string) => Model<any>[];
+  const providers: string[] = [];
+  for (const provider of getProvidersFn()) {
+    if (getModelsFn(provider).some(model => model.id === modelId)) {
+      providers.push(provider);
+    }
+  }
+  return providers;
+}
+
 export function findInRegistryCrossProvider(modelId: string): RegistryHit | undefined {
   const getProvidersFn = getProviders as () => string[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

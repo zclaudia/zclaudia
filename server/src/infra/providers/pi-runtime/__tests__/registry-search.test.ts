@@ -32,7 +32,11 @@ vi.mock('@earendil-works/pi-ai', () => {
   };
 });
 
-import { tryGetRegistryModel, findInRegistryCrossProvider } from '../registry-search.js';
+import {
+  tryGetRegistryModel,
+  findInRegistryCrossProvider,
+  findRegistryProvidersForModel,
+} from '../registry-search.js';
 
 describe('tryGetRegistryModel', () => {
   it('returns the model + provider when same-provider lookup hits', () => {
@@ -82,5 +86,17 @@ describe('findInRegistryCrossProvider', () => {
   it('returns undefined when no provider has the requested model id', () => {
     const hit = findInRegistryCrossProvider('nonexistent-model');
     expect(hit).toBeUndefined();
+  });
+});
+
+describe('findRegistryProvidersForModel', () => {
+  it('returns every provider a model id is registered under', () => {
+    expect(findRegistryProvidersForModel('deepseek-v4-flash')).toContain('deepseek');
+    // gpt-4o is registered under both openai and openrouter.
+    expect(findRegistryProvidersForModel('gpt-4o')).toEqual(['openai', 'openrouter']);
+  });
+
+  it('returns an empty array for an unknown model id', () => {
+    expect(findRegistryProvidersForModel('nonexistent-model')).toEqual([]);
   });
 });

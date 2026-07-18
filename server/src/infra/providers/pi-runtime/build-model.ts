@@ -8,6 +8,7 @@ import {
 import {
   tryGetRegistryModel,
   findInRegistryCrossProvider,
+  findRegistryProvidersForModel,
   type RegistryHit,
 } from './registry-search.js';
 import { refreshIfNeeded } from '../../../domains/llm-profiles/codex-oauth-service.js';
@@ -173,8 +174,8 @@ export type BuiltModel = {
  */
 /**
  * Resolve the effective dialect for a model. Explicit entry dialect wins.
- * In Auto mode, a cross-provider registry hit whose provider is a known
- * dialect is inherited (e.g. `deepseek-v4-flash` behind a generic proxy) —
+ * In Auto mode, a registry hit whose id is registered under a known dialect
+ * provider is inherited (e.g. `deepseek-v4-flash` behind a generic proxy) —
  * restricted to the allowlist so oddball registry providers with pi-ai
  * side-effect branches (github-copilot, cloudflare-*, anthropic, …) can
  * never leak into `model.provider`.
@@ -182,15 +183,20 @@ export type BuiltModel = {
 function resolveDialect(
   entry: LlmProfileModelEntry | undefined,
   registryHit: RegistryHit | undefined,
+  modelId: string,
   providerType: string
 ): LlmModelDialect | undefined {
   if (entry?.dialect) return entry.dialect;
-  if (
-    registryHit &&
-    registryHit.provider !== providerType &&
-    (LLM_MODEL_DIALECTS as readonly string[]).includes(registryHit.provider)
-  ) {
-    return registryHit.provider as LlmModelDialect;
+  if (!registryHit) return undefined;
+  // Scan every provider the id is registered under — the contextWindow-ranked
+  // winner in registryHit can be a non-dialect provider (e.g. opencode) even
+  // when an allowlisted one exists. Preference order = allowlist order, so
+  // ambiguous ids (registered under two dialects) resolve deterministically.
+  const registeredProviders = findRegistryProvidersForModel(modelId);
+  for (const dialect of LLM_MODEL_DIALECTS) {
+    if (dialect !== providerType && registeredProviders.includes(dialect)) {
+      return dialect;
+    }
   }
   return undefined;
 }
@@ -276,7 +282,7 @@ export function buildModel(
   // stamp itself is wire-agnostic (read by tool-schema-compat); the provider
   // override only applies to the openai-completions wire — anthropic/codex
   // providers use `provider` for OAuth/key/header logic and stay untouched.
-  const dialect = resolveDialect(modelEntry, registryHit, providerType);
+  const dialect = resolveDialect(modelEntry, registryHit, modelId, providerType);
   if (dialect) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (model as any).dialect = dialect;
