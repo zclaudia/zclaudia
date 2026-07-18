@@ -279,6 +279,31 @@ describe('llm-profiles routes', () => {
       expect(res.status).toBe(400);
     });
 
+    it('persists a valid dialect', async () => {
+      const res = await request(app)
+        .post('/api/llm-profiles')
+        .send({
+          name: 'dialect-ok',
+          providerType: 'openai',
+          models: [{ modelId: 'kimi-k2', dialect: 'moonshotai' }],
+        });
+      expect(res.status).toBe(201);
+      expect(res.body.data.models).toEqual([{ modelId: 'kimi-k2', dialect: 'moonshotai' }]);
+    });
+
+    it('rejects unknown dialect values', async () => {
+      const res = await request(app)
+        .post('/api/llm-profiles')
+        .send({
+          name: 'dialect-bad',
+          providerType: 'openai',
+          models: [{ modelId: 'x', dialect: 'kimi' }],
+        });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+      expect(res.body.error.message).toMatch(/models\[0\]\.dialect/);
+    });
+
     it('rejects models not being an array', async () => {
       const res = await request(app).post('/api/llm-profiles').send({
         name: 'bad',

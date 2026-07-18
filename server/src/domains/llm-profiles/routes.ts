@@ -19,6 +19,7 @@ import { probeModel } from './models-probe.js';
 import { resolveContextWindow } from '../../application/conversation/compaction/context-windows.js';
 
 const VALID_PROVIDER_TYPES: readonly string[] = LLM_PROVIDER_TYPES;
+const VALID_MODEL_DIALECTS: readonly string[] = LLM_MODEL_DIALECTS;
 const VALID_CACHE_RETENTION = ['none', 'short', 'long'];
 const VALID_INPUT_MODALITIES: readonly ModelInputModality[] = ['text', 'image'];
 
@@ -116,11 +117,8 @@ export function validateModels(input: unknown): LlmProfileModelEntry[] | undefin
       normalized.maxTokens = mt;
     }
     if (entry.dialect !== undefined && entry.dialect !== null) {
-      if (
-        typeof entry.dialect !== 'string' ||
-        !(LLM_MODEL_DIALECTS as readonly string[]).includes(entry.dialect)
-      ) {
-        throw new Error(`models[${i}].dialect must be one of: ${LLM_MODEL_DIALECTS.join(', ')}`);
+      if (typeof entry.dialect !== 'string' || !VALID_MODEL_DIALECTS.includes(entry.dialect)) {
+        throw new Error(`models[${i}].dialect must be one of: ${VALID_MODEL_DIALECTS.join(', ')}`);
       }
       normalized.dialect = entry.dialect as LlmModelDialect;
     }
