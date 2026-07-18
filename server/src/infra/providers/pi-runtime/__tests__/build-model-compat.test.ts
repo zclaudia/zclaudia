@@ -55,3 +55,59 @@ describe('buildModel — openai-compat developer role', () => {
     expect(devRole(model)).not.toBe(false);
   });
 });
+
+describe('buildModel — model dialect', () => {
+  it('explicit dialect overrides provider on the openai-completions wire and is stamped', () => {
+    const { model } = buildModel(proxyProfile(), 'my-kimi-alias', {
+      modelId: 'my-kimi-alias',
+      dialect: 'moonshotai',
+    });
+    expect(model.provider).toBe('moonshotai');
+    expect((model as any).dialect).toBe('moonshotai');
+  });
+
+  it('auto-inherits the registry provider from a cross-provider hit', () => {
+    const { model } = buildModel(proxyProfile(), 'deepseek-v4-flash');
+    expect(model.provider).toBe('deepseek');
+    expect((model as any).dialect).toBe('deepseek');
+  });
+
+  it('dialect "openai" suppresses auto-inherit', () => {
+    const { model } = buildModel(proxyProfile(), 'deepseek-v4-flash', {
+      modelId: 'deepseek-v4-flash',
+      dialect: 'openai',
+    });
+    expect(model.provider).toBe('openai');
+    expect((model as any).dialect).toBe('openai');
+  });
+
+  it('does not inherit registry providers outside the dialect allowlist', () => {
+    // claude ids hit the registry under providers like 'anthropic' — not a
+    // dialect, so provider must stay the profile providerType.
+    const { model } = buildModel(proxyProfile(), 'claude-opus-4-7');
+    expect(model.provider).toBe('openai');
+    expect((model as any).dialect).toBeUndefined();
+  });
+
+  it('leaves provider untouched on the anthropic wire but still stamps dialect', () => {
+    // Must use a REGISTERED claude id: an unregistered id on an anthropic
+    // profile falls to the openai-compat literal (api 'openai-completions'),
+    // where the provider override intentionally applies. A registry hit on
+    // providerType 'anthropic' gets api 'anthropic-messages' — the wire this
+    // test pins.
+    const { model } = buildModel(
+      proxyProfile({ providerType: 'anthropic', baseUrl: undefined }),
+      'claude-opus-4-7',
+      { modelId: 'claude-opus-4-7', dialect: 'moonshotai' }
+    );
+    expect(model.api).toBe('anthropic-messages');
+    expect(model.provider).toBe('anthropic');
+    expect((model as any).dialect).toBe('moonshotai');
+  });
+
+  it('unregistered model without dialect keeps current behavior', () => {
+    const { model } = buildModel(proxyProfile(), 'some-unregistered-model-xyz');
+    expect(model.provider).toBe('openai');
+    expect((model as any).dialect).toBeUndefined();
+  });
+});

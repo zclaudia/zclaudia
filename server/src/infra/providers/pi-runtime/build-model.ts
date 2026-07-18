@@ -1,5 +1,10 @@
 import type { Model } from '@earendil-works/pi-ai';
-import type { LlmProfileConfig, LlmProfileModelEntry } from '@zclaudia/shared/core/llm-profile';
+import {
+  LLM_MODEL_DIALECTS,
+  type LlmModelDialect,
+  type LlmProfileConfig,
+  type LlmProfileModelEntry,
+} from '@zclaudia/shared/core/llm-profile';
 import {
   tryGetRegistryModel,
   findInRegistryCrossProvider,
@@ -166,6 +171,30 @@ export type BuiltModel = {
  * entry by `modelId` and pass it here so any downstream code reading
  * `model.contextWindow` sees the user-declared value.
  */
+/**
+ * Resolve the effective dialect for a model. Explicit entry dialect wins.
+ * In Auto mode, a cross-provider registry hit whose provider is a known
+ * dialect is inherited (e.g. `deepseek-v4-flash` behind a generic proxy) —
+ * restricted to the allowlist so oddball registry providers with pi-ai
+ * side-effect branches (github-copilot, cloudflare-*, anthropic, …) can
+ * never leak into `model.provider`.
+ */
+function resolveDialect(
+  entry: LlmProfileModelEntry | undefined,
+  registryHit: RegistryHit | undefined,
+  providerType: string
+): LlmModelDialect | undefined {
+  if (entry?.dialect) return entry.dialect;
+  if (
+    registryHit &&
+    registryHit.provider !== providerType &&
+    (LLM_MODEL_DIALECTS as readonly string[]).includes(registryHit.provider)
+  ) {
+    return registryHit.provider as LlmModelDialect;
+  }
+  return undefined;
+}
+
 export function buildModel(
   profile?: LlmProfileConfig,
   modelOverride?: string,
@@ -240,6 +269,20 @@ export function buildModel(
     // No registry match — fall back to a literal openai-compat shape. Works
     // for unregistered model ids served via OpenAI-compatible endpoints.
     model = buildOpenAiCompatLiteral(modelId, providerType, profile);
+  }
+
+  // Dialect: force the upstream family so pi-ai's detectCompat activates the
+  // full quirk bundle even behind proxies that mask the real provider. The
+  // stamp itself is wire-agnostic (read by tool-schema-compat); the provider
+  // override only applies to the openai-completions wire — anthropic/codex
+  // providers use `provider` for OAuth/key/header logic and stay untouched.
+  const dialect = resolveDialect(modelEntry, registryHit, providerType);
+  if (dialect) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (model as any).dialect = dialect;
+    if (model.api === 'openai-completions') {
+      model.provider = dialect;
+    }
   }
 
   // Third-party openai-compatible proxies only support the `system` role for the
