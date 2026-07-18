@@ -15,7 +15,8 @@ export const EDIT_TOOL_SELECTION_GUIDANCE = [
 
 export const SANDBOX_PRIVILEGE_SELECTION_GUIDANCE = [
   '# Sandbox Privilege Selection',
-  'Bash and Eval normally run in a sandbox. Prefer sandbox_mode:"auto" for ordinary commands: the runtime will request least-privilege SandboxCapabilityAccess only after confirmed sandbox denials.',
+  "Bash and Eval normally run in a sandbox on the user's own machine — not a remote container. Unsandboxed execution runs on that same host with full access to host-installed toolchains and SDKs, connected devices (for example USB/adb), keychains, and home-directory caches. Never conclude a task is impossible because of sandbox restrictions without first attempting it with sandbox_mode:\"unsandboxed\" and a privilege_reason — the user approves or denies each request.",
+  'Prefer sandbox_mode:"auto" for ordinary commands: the runtime will request least-privilege SandboxCapabilityAccess only after confirmed sandbox denials.',
   'Use sandbox_mode:"unsandboxed" with a concrete privilege_reason when the task is known before execution to require host integration that the sandbox cannot provide.',
   'Host-only examples include: bind a localhost port for a dev server or proxy (for example uvicorn --host 127.0.0.1 --port ...), open or complete browser-based login flows such as AWS SSO, run aws sso / credential commands, interact with host credential agents/keychains, or reach services/devices only available from the user host.',
   'If Bash or Eval output shows http_proxy=http://localhost:<port>, HTTP_PROXY=http://localhost:<port>, or similar localhost proxy variables while sandboxed, treat that as the sandbox-runtime internal network proxy, not as the user\'s proxy configuration.',

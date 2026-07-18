@@ -59,10 +59,14 @@ function parseSandboxMode(value: unknown): SandboxPrivilegeMode {
 
 /**
  * Sandbox FS denials surface as kernel-level EPERM ("Operation not permitted")
- * or EROFS ("Read-only file system") in bash stderr — both are macOS
- * sandbox-exec-specific phrasings, so false positives on a normal-Unix Permission
- * denied are avoided. We split the two reasons so the remediation hint can steer
- * the model differently (workspace-relative path vs. ExitPlanMode).
+ * or EROFS ("Read-only file system") in bash stderr; Node-based tools (npm,
+ * pnpm, gradle wrappers) re-render the same syscall failures as lowercase
+ * `EPERM: operation not permitted` / `EACCES: permission denied` error codes,
+ * so those count too. Bare "Permission denied" without an error code is still
+ * excluded — that phrasing is the common one for genuine host permission
+ * problems (root-owned files, mode bits) that escalation would not fix. We
+ * split the two reasons so the remediation hint can steer the model
+ * differently (workspace-relative path or unsandboxed retry vs. ExitPlanMode).
  */
 export function detectSandboxFsDenial(
   output: string,
@@ -70,8 +74,8 @@ export function detectSandboxFsDenial(
   readOnly: boolean
 ): SandboxFsDenial | undefined {
   if (!sandboxed) return undefined;
-  if (/: Read-only file system\b/.test(output)) return 'read_only';
-  if (/: Operation not permitted\b/.test(output)) {
+  if (/: Read-only file system\b/i.test(output) || /\bEROFS\b/.test(output)) return 'read_only';
+  if (/: operation not permitted\b/i.test(output) || /\bE(?:PERM|ACCES)\b/.test(output)) {
     return readOnly ? 'read_only' : 'write_outside_workspace';
   }
   return undefined;

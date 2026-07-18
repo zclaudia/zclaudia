@@ -4,6 +4,7 @@ import {
   EDIT_TOOL_SELECTION_GUIDANCE,
   formatMcpInstructionsForPrompt,
   PLAN_MODE_SYSTEM_PROMPT_SUFFIX,
+  SANDBOX_PRIVILEGE_SELECTION_GUIDANCE,
 } from '../run-prompt.js';
 
 const base = {
@@ -12,6 +13,19 @@ const base = {
   activeSkillContext: '',
   isPlanMode: false,
 };
+
+describe('SANDBOX_PRIVILEGE_SELECTION_GUIDANCE', () => {
+  it('states that the sandbox runs on the user own machine and unsandboxed reaches host tools and devices', () => {
+    expect(SANDBOX_PRIVILEGE_SELECTION_GUIDANCE).toMatch(/user'?s own machine/i);
+    expect(SANDBOX_PRIVILEGE_SELECTION_GUIDANCE).toMatch(/same host|same machine/i);
+    expect(SANDBOX_PRIVILEGE_SELECTION_GUIDANCE).toMatch(/adb|devices/i);
+  });
+
+  it('instructs the model to attempt unsandboxed before declaring a task impossible', () => {
+    expect(SANDBOX_PRIVILEGE_SELECTION_GUIDANCE).toMatch(/impossible/i);
+    expect(SANDBOX_PRIVILEGE_SELECTION_GUIDANCE).toMatch(/approves or denies/i);
+  });
+});
 
 describe('formatMcpInstructionsForPrompt', () => {
   it('returns empty string when there are no instruction sources', () => {

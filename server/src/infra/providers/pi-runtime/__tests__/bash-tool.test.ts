@@ -40,6 +40,38 @@ describe('detectSandboxFsDenial', () => {
       'read_only'
     );
   });
+
+  it('classifies Node-style lowercase EPERM output as a write denial', () => {
+    expect(
+      detectSandboxFsDenial(
+        "npm error EPERM: operation not permitted, mkdir '/Users/me/.npm/_cacache'",
+        true,
+        false
+      )
+    ).toBe('write_outside_workspace');
+  });
+
+  it('classifies Node-style EACCES output as a write denial', () => {
+    expect(
+      detectSandboxFsDenial(
+        "npm error EACCES: permission denied, mkdir '/Users/me/.npm/_cacache/content-v2'",
+        true,
+        false
+      )
+    ).toBe('write_outside_workspace');
+  });
+
+  it('ignores Node-style EACCES output when the command was not sandboxed', () => {
+    expect(
+      detectSandboxFsDenial("EACCES: permission denied, mkdir '/Users/me/.npm'", false, false)
+    ).toBeUndefined();
+  });
+
+  it('classifies Node-style EACCES under a read-only sandbox as read-only', () => {
+    expect(
+      detectSandboxFsDenial("EACCES: permission denied, open '/Users/me/notes.txt'", true, true)
+    ).toBe('read_only');
+  });
 });
 
 describe('Bash bridge tool module', () => {

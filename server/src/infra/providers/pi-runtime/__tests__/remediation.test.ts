@@ -99,6 +99,20 @@ describe('remediationForResult', () => {
     expect(hint).toMatch(/sandbox/i);
   });
 
+  it('offers unsandboxed escalation when a write denial hits home caches or host paths', () => {
+    const hint = remediationForResult(
+      'Bash',
+      det({
+        ok: false,
+        exitCode: 1,
+        sandboxed: true,
+        sandboxFsDenied: 'write_outside_workspace',
+      })
+    );
+    expect(hint).toMatch(/sandbox_mode:"unsandboxed"/);
+    expect(hint).toMatch(/privilege_reason/);
+  });
+
   it('steers to ExitPlanMode on read-only sandbox denial', () => {
     const hint = remediationForResult(
       'Bash',

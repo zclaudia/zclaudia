@@ -33,7 +33,7 @@ const SELF_EXPLANATORY = new Set([
 
 function bashHint(details: NonNullable<ToolDetails>): string | undefined {
   if (details.sandboxFsDenied === 'write_outside_workspace') {
-    return 'The Bash sandbox blocks file writes outside the workspace root. Re-run with a workspace-relative path (e.g. a scratch file at the repo root); or pipe the data straight to the next step instead of staging it in /tmp.';
+    return 'The Bash sandbox blocks file writes outside the workspace root. If the data can live in the workspace, re-run with a workspace-relative path (e.g. a scratch file at the repo root) or point the tool cache into the workspace. If the command legitimately needs host paths — home-directory caches such as ~/.npm or ~/.gradle, system locations, or device state — retry with sandbox_mode:"unsandboxed" and a concrete privilege_reason so the user can approve one-shot host execution.';
   }
   if (details.sandboxFsDenied === 'read_only') {
     return 'Plan mode runs Bash read-only — file writes are blocked. Use Read/Grep/Glob/LS to inspect; call ExitPlanMode first if the task genuinely needs to write.';
