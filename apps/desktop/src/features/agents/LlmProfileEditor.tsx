@@ -25,8 +25,13 @@
 
 import { useState, useEffect, useRef, useMemo, useId } from 'react';
 import { ChevronDown, Check, AlertTriangle } from 'lucide-react';
-import type { LlmProfileConfig, LlmProfileCompat, ContextWindowSource } from '@zclaudia/shared';
-import { LLM_PROVIDER_TYPES } from '@zclaudia/shared';
+import type {
+  LlmProfileConfig,
+  LlmProfileCompat,
+  ContextWindowSource,
+  LlmModelDialect,
+} from '@zclaudia/shared';
+import { LLM_PROVIDER_TYPES, LLM_MODEL_DIALECTS } from '@zclaudia/shared';
 import {
   createLlmProfileForBackend,
   updateLlmProfileForBackend,
@@ -61,6 +66,17 @@ const MONO_FIELD_CLASS = `${FIELD_CLASS} font-mono`;
 /** Compact variant for the dense model-row grid; append a border-color class. */
 const MODEL_FIELD_BASE =
   'w-full rounded-md border bg-background/70 px-2 py-1.5 text-sm text-foreground shadow-apple-sm focus:outline-none focus:ring-1 focus:ring-primary/50';
+
+/** Human-readable labels for the per-model dialect override select. */
+const DIALECT_LABELS: Record<LlmModelDialect, string> = {
+  moonshotai: 'Moonshot (Kimi)',
+  deepseek: 'DeepSeek',
+  zai: 'GLM (Z.ai)',
+  together: 'Together',
+  openrouter: 'OpenRouter',
+  xai: 'Grok (xAI)',
+  openai: 'OpenAI (standard)',
+};
 
 export const LLM_NAME_PLACEHOLDER = 'e.g., Local ZClaudia Agent';
 
@@ -978,6 +994,21 @@ function ModelRow({
   const contextOverrideEmpty = !row.contextWindowStr.trim();
   const helperEligible = !!providerType && !!modelIdInput && contextOverrideEmpty && !errs.modelId;
 
+  // The Auto option's label annotates what the runtime would detect from the
+  // existing context-window preview resolution (when it happens to have run
+  // and matched a provider with a known dialect label). This piggybacks on
+  // the resolve-preview call already fired below for the contextWindow
+  // helper — no separate fetch. `DIALECT_LABELS[...]` is looked up (not just
+  // `matchedProvider` truthiness) because matches like 'anthropic' have no
+  // dialect label and must fall back to plain "Auto".
+  const detectedDialectLabel =
+    resolved.status === 'ok' && resolved.matchedProvider
+      ? DIALECT_LABELS[resolved.matchedProvider as LlmModelDialect]
+      : undefined;
+  const autoDialectLabel = detectedDialectLabel
+    ? `Auto — detected: ${detectedDialectLabel}`
+    : 'Auto';
+
   useEffect(() => {
     // Clear any pending debounce on every input change (in-flight responses
     // are neutralized by the request-id staleness guard below). If we're no
@@ -1130,6 +1161,31 @@ function ModelRow({
             />
             Vision
           </label>
+          {providerType !== 'anthropic' && (
+            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              Dialect
+              <select
+                value={row.dialect}
+                onChange={e => onChange({ dialect: e.target.value as '' | LlmModelDialect })}
+                aria-label={`dialect for model ${row.modelId.trim() || index + 1}`}
+                className={`rounded-md border bg-background/70 px-1.5 py-1 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 ${
+                  row.dialect ? 'border-primary/50' : 'border-border/70'
+                }`}
+              >
+                <option value="">{autoDialectLabel}</option>
+                {LLM_MODEL_DIALECTS.map(d => (
+                  <option key={d} value={d}>
+                    {DIALECT_LABELS[d]}
+                  </option>
+                ))}
+              </select>
+              {row.dialect && (
+                <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
+                  forced
+                </span>
+              )}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1">
           <button

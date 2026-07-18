@@ -406,4 +406,49 @@ describe('LlmProfileEditor', () => {
     });
     expect(await screen.findByText('✓ 42 ms')).toBeInTheDocument();
   });
+
+  it('renders a per-model dialect select for openai profiles and saves the choice', async () => {
+    const { onSaved } = renderEditor({
+      ...makeProfile(),
+      providerType: 'openai',
+      baseUrl: 'http://192.168.2.1:3200',
+      models: [{ modelId: 'kimi-k2-0905-preview' }],
+    });
+
+    fireEvent.click(screen.getByRole('tab', { name: /Models/ }));
+    const select = screen.getByLabelText(/dialect for model kimi-k2-0905-preview/i);
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.change(select, { target: { value: 'moonshotai' } });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(600);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalled();
+    });
+    // onSaved only forwards the saved id — the persisted payload is asserted
+    // via the updateLlmProfileForBackend call args (same pattern as the other
+    // "edit mode: ... updates via updateLlmProfileForBackend" test above).
+    const payload = vi.mocked(api.updateLlmProfileForBackend).mock.calls.at(-1)![2] as {
+      models: { modelId: string; dialect?: string }[];
+    };
+    expect(payload.models[0].dialect).toBe('moonshotai');
+    expect(screen.getByText('forced')).toBeInTheDocument();
+  });
+
+  it('hides the dialect select for anthropic profiles', () => {
+    renderEditor({
+      ...makeProfile(),
+      providerType: 'anthropic',
+      models: [{ modelId: 'claude-opus-4-7' }],
+    });
+
+    fireEvent.click(screen.getByRole('tab', { name: /Models/ }));
+    expect(screen.queryByLabelText(/dialect for model/i)).toBeNull();
+  });
 });
