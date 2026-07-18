@@ -1,7 +1,8 @@
 import { Router, type Request, type Response } from 'express';
 import type Database from 'better-sqlite3';
-import { LLM_PROVIDER_TYPES } from '@zclaudia/shared/core/llm-profile';
+import { LLM_MODEL_DIALECTS, LLM_PROVIDER_TYPES } from '@zclaudia/shared/core/llm-profile';
 import type {
+  LlmModelDialect,
   LlmProfileConfig,
   LlmProfileModelEntry,
   ModelInputModality,
@@ -44,6 +45,7 @@ const RESERVED_HEADER_KEYS = new Set(['authorization', 'content-type', 'host']);
  * - `modelId` is unique within the list (trim-compared).
  * - `displayName` (optional) is a string.
  * - `contextWindow` / `maxTokens` (optional) are positive integers.
+ * - `dialect` (optional) must be one of the `LLM_MODEL_DIALECTS` values.
  */
 function normalizeInputModalities(input: unknown, index: number): ModelInputModality[] | undefined {
   if (input === undefined || input === null) return undefined;
@@ -67,7 +69,7 @@ function normalizeInputModalities(input: unknown, index: number): ModelInputModa
   return VALID_INPUT_MODALITIES.filter(value => seen.has(value));
 }
 
-function validateModels(input: unknown): LlmProfileModelEntry[] | undefined {
+export function validateModels(input: unknown): LlmProfileModelEntry[] | undefined {
   if (input === undefined || input === null) return undefined;
   if (!Array.isArray(input)) {
     throw new Error('models must be an array');
@@ -112,6 +114,15 @@ function validateModels(input: unknown): LlmProfileModelEntry[] | undefined {
         throw new Error(`models[${i}].maxTokens must be a positive integer`);
       }
       normalized.maxTokens = mt;
+    }
+    if (entry.dialect !== undefined && entry.dialect !== null) {
+      if (
+        typeof entry.dialect !== 'string' ||
+        !(LLM_MODEL_DIALECTS as readonly string[]).includes(entry.dialect)
+      ) {
+        throw new Error(`models[${i}].dialect must be one of: ${LLM_MODEL_DIALECTS.join(', ')}`);
+      }
+      normalized.dialect = entry.dialect as LlmModelDialect;
     }
     out.push(normalized);
   }
