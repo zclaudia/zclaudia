@@ -154,18 +154,6 @@ export function LlmProfileEditor({
   }, []);
 
   /**
-   * Build a `LlmProfilePreviewInput` snapshot of the *current form state* for
-   * the pre-save fetch/probe preview endpoints. Unlike the legacy /:id/models
-   * routes, the preview endpoints don't need the profile to be persisted —
-   * they accept providerType + baseUrl + apiKey + headers + models directly,
-   * so Fetch / Test can run on a brand-new create form and reflect unsaved
-   * edits without a save-first round trip.
-   *
-   * We parse requestHeaders defensively here; on JSON parse failure we fall
-   * back to omitting them rather than throwing, mirroring the lenient behavior
-   * the server-side preview validator already accepts.
-   */
-  /**
    * Serialize the model drafts into wire entries, stripping fields that don't
    * apply to the current provider type. Anthropic profiles have no dialect
    * select in the UI, so a dialect chosen under a previous provider type must
@@ -178,6 +166,18 @@ export function LlmProfileEditor({
     return entries.map(({ dialect: _dialect, ...rest }) => rest);
   };
 
+  /**
+   * Build a `LlmProfilePreviewInput` snapshot of the *current form state* for
+   * the pre-save fetch/probe preview endpoints. Unlike the legacy /:id/models
+   * routes, the preview endpoints don't need the profile to be persisted —
+   * they accept providerType + baseUrl + apiKey + headers + models directly,
+   * so Fetch / Test can run on a brand-new create form and reflect unsaved
+   * edits without a save-first round trip.
+   *
+   * We parse requestHeaders defensively here; on JSON parse failure we fall
+   * back to omitting them rather than throwing, mirroring the lenient behavior
+   * the server-side preview validator already accepts.
+   */
   const buildPreviewInputFromForm = (): LlmProfilePreviewInput => {
     let requestHeadersObj: Record<string, string> | undefined;
     if (formRequestHeaders.trim()) {
