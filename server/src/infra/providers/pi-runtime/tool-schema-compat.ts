@@ -2,7 +2,8 @@ interface ToolSchemaModel {
   id?: string;
   provider: string;
   baseUrl: string;
-  compat?: unknown;
+  /** Stamped by buildModel from LlmProfileModelEntry.dialect / registry inherit. */
+  dialect?: unknown;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -81,7 +82,12 @@ export function normalizeMoonshotJsonSchema(schema: unknown, isRoot = true): unk
 }
 
 export function usesMoonshotToolSchemaFlavor(model: ToolSchemaModel): boolean {
-  if (isRecord(model.compat) && model.compat.toolSchemaFlavor === 'moonshot') return true;
+  // An explicit dialect is authoritative in both directions: 'moonshotai'
+  // forces normalization on, anything else (incl. 'openai') forces it off —
+  // heuristics below only apply when no dialect was resolved.
+  if (typeof model.dialect === 'string' && model.dialect.length > 0) {
+    return model.dialect === 'moonshotai';
+  }
 
   const provider = model.provider.toLowerCase();
   if (provider === 'moonshotai' || provider === 'moonshotai-cn' || provider === 'kimi-coding') {
@@ -113,4 +119,19 @@ export function normalizeToolSchemasForModel<T extends { parameters: unknown }>(
     const parameters = normalizeMoonshotJsonSchema(tool.parameters);
     return parameters === tool.parameters ? tool : { ...tool, parameters };
   });
+}
+
+type AnyStreamFn = (model: any, context: any, options?: any) => any;
+
+/**
+ * Wrap a pi StreamFn so outbound tool schemas are normalized per-model at the
+ * final boundary. Single chokepoint shared by the main session stream
+ * (agent-stream.ts) and the lightweight agent loop (pi-agent-loop-executor.ts).
+ */
+export function wrapStreamFnWithToolSchemaCompat<T extends AnyStreamFn>(base: T): T {
+  const wrapped = (model: any, context: any, options?: any) =>
+    context?.tools
+      ? base(model, { ...context, tools: normalizeToolSchemasForModel(context.tools, model) }, options)
+      : base(model, context, options);
+  return wrapped as T;
 }

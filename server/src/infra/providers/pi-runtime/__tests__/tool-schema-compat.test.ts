@@ -4,6 +4,7 @@ import {
   normalizeMoonshotJsonSchema,
   normalizeToolSchemasForModel,
   usesMoonshotToolSchemaFlavor,
+  wrapStreamFnWithToolSchemaCompat,
 } from '../tool-schema-compat.js';
 
 const openAiModel = {
@@ -41,9 +42,17 @@ describe('Moonshot tool schema compatibility', () => {
         id: 'private-model-alias',
         provider: 'openai',
         baseUrl: 'https://llm-gateway.example/v1',
-        compat: { toolSchemaFlavor: 'moonshot' },
+        dialect: 'moonshotai',
       })
     ).toBe(true);
+    expect(
+      usesMoonshotToolSchemaFlavor({
+        id: 'kimi-k3',
+        provider: 'openai',
+        baseUrl: 'https://api.moonshot.ai/v1',
+        dialect: 'openai',
+      })
+    ).toBe(false);
     expect(usesMoonshotToolSchemaFlavor(openAiModel)).toBe(false);
   });
 
@@ -116,5 +125,37 @@ describe('Moonshot tool schema compatibility', () => {
       type: 'object',
       properties: { query: { type: 'string' }, id: { type: 'number' } },
     });
+  });
+
+  it('wrapStreamFnWithToolSchemaCompat normalizes outbound tools at the stream boundary', async () => {
+    const seen: any[] = [];
+    const base = ((model: any, context: any, options: any) => {
+      seen.push({ model, context, options });
+      return 'stream-result' as any;
+    }) as any;
+    const wrapped = wrapStreamFnWithToolSchemaCompat(base);
+
+    const moonshotModel = { id: 'kimi-k3', provider: 'moonshotai', baseUrl: 'https://x' } as any;
+    const tools = [
+      {
+        name: 'Read',
+        parameters: {
+          type: 'object',
+          properties: { path: { type: 'string' } },
+          anyOf: [{ required: ['path'] }, { required: ['file_path'] }],
+        },
+      },
+    ];
+
+    expect(wrapped(moonshotModel, { tools } as any, { opt: 1 } as any)).toBe('stream-result');
+    expect((seen[0].context.tools[0].parameters as any).anyOf).toBeUndefined();
+    expect(seen[0].options).toEqual({ opt: 1 });
+
+    const noTools = { messages: [] } as any;
+    wrapped(moonshotModel, noTools, undefined as any);
+    expect(seen[1].context).toBe(noTools);
+
+    wrapped(openAiModel, { tools } as any, undefined as any);
+    expect(seen[2].context.tools).toBe(tools);
   });
 });
