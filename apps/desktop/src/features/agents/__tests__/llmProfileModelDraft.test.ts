@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   draftsToEntries,
+  entryToDraft,
   validateModelDraftRow,
   type ModelRowDraft,
 } from '../llmProfileModelDraft';
@@ -14,6 +15,7 @@ function draft(patch: Partial<ModelRowDraft>): ModelRowDraft {
     maxTokensStr: patch.maxTokensStr ?? '',
     supportsImage: patch.supportsImage ?? false,
     inputModalitiesTouched: patch.inputModalitiesTouched ?? false,
+    dialect: patch.dialect ?? '',
     testStatus: patch.testStatus,
   };
 }
@@ -68,5 +70,17 @@ describe('llmProfileModelDraft', () => {
         inputModalities: ['text'],
       },
     ]);
+  });
+
+  it('round-trips dialect through draft and entries', () => {
+    const entries = draftsToEntries([
+      draft({ modelId: 'kimi-k2', dialect: 'moonshotai' }),
+      draft({ rowUid: 'row-2', modelId: 'plain-model', dialect: '' }),
+    ]);
+    expect(entries[0].dialect).toBe('moonshotai');
+    expect('dialect' in entries[1]).toBe(false);
+
+    expect(entryToDraft({ modelId: 'kimi-k2', dialect: 'moonshotai' }).dialect).toBe('moonshotai');
+    expect(entryToDraft({ modelId: 'plain-model' }).dialect).toBe('');
   });
 });

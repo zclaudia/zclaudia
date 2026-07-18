@@ -1,4 +1,4 @@
-import type { LlmProfileModelEntry } from '@zclaudia/shared';
+import type { LlmModelDialect, LlmProfileModelEntry } from '@zclaudia/shared';
 
 /**
  * Draft shape used by the Models repeater. We keep contextWindow / maxTokens as
@@ -16,6 +16,8 @@ export interface ModelRowDraft {
   displayName: string;
   contextWindowStr: string;
   maxTokensStr: string;
+  /** '' = Auto (no forced dialect). */
+  dialect: '' | LlmModelDialect;
   supportsImage: boolean;
   inputModalitiesTouched: boolean;
   /** Last probe result; cleared after a few seconds via a setTimeout. */
@@ -39,6 +41,7 @@ export function entryToDraft(entry: LlmProfileModelEntry): ModelRowDraft {
     displayName: entry.displayName ?? '',
     contextWindowStr: entry.contextWindow != null ? String(entry.contextWindow) : '',
     maxTokensStr: entry.maxTokens != null ? String(entry.maxTokens) : '',
+    dialect: entry.dialect ?? '',
     supportsImage: entry.inputModalities?.includes('image') ?? false,
     inputModalitiesTouched: entry.inputModalities !== undefined,
   };
@@ -98,6 +101,7 @@ export function draftsToEntries(drafts: ModelRowDraft[]): LlmProfileModelEntry[]
     if (mt.value !== undefined) entry.maxTokens = mt.value;
     if (d.supportsImage) entry.inputModalities = ['text', 'image'];
     else if (d.inputModalitiesTouched) entry.inputModalities = ['text'];
+    if (d.dialect) entry.dialect = d.dialect;
     out.push(entry);
   }
   return out;
