@@ -99,6 +99,23 @@ describe('remediationForResult', () => {
     expect(hint).toMatch(/sandbox/i);
   });
 
+  it('prefers the FS-denial hint over an ambiguous classifier verdict', () => {
+    const hint = remediationForResult(
+      'Bash',
+      det({
+        ok: false,
+        exitCode: 1,
+        sandboxed: true,
+        sandboxFsDenied: 'write_outside_workspace',
+        failureClassification: 'ambiguous_failure',
+        recommendedNextStep:
+          'No sandbox-denial signals detected. Debug this as an ordinary command failure.',
+      })
+    );
+    expect(hint).toMatch(/sandbox_mode:"unsandboxed"/);
+    expect(hint).not.toMatch(/ordinary command failure/);
+  });
+
   it('offers unsandboxed escalation when a write denial hits home caches or host paths', () => {
     const hint = remediationForResult(
       'Bash',

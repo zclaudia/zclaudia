@@ -31,13 +31,21 @@ const SELF_EXPLANATORY = new Set([
   'bash_tool_routing_blocked',
 ]);
 
-function bashHint(details: NonNullable<ToolDetails>): string | undefined {
+/** A concrete FS denial must beat the network classifier's verdict: the
+ * classifier only recognizes network/bind denials, so it reads a pure FS write
+ * denial as "ambiguous" and would steer the model away from the escalation
+ * that actually fixes it. */
+function sandboxFsDenialHint(details: NonNullable<ToolDetails>): string | undefined {
   if (details.sandboxFsDenied === 'write_outside_workspace') {
     return 'The Bash sandbox blocks file writes outside the workspace root. If the data can live in the workspace, re-run with a workspace-relative path (e.g. a scratch file at the repo root) or point the tool cache into the workspace. If the command legitimately needs host paths — home-directory caches such as ~/.npm or ~/.gradle, system locations, or device state — retry with sandbox_mode:"unsandboxed" and a concrete privilege_reason so the user can approve one-shot host execution.';
   }
   if (details.sandboxFsDenied === 'read_only') {
     return 'Plan mode runs Bash read-only — file writes are blocked. Use Read/Grep/Glob/LS to inspect; call ExitPlanMode first if the task genuinely needs to write.';
   }
+  return undefined;
+}
+
+function bashHint(details: NonNullable<ToolDetails>): string | undefined {
   if (details.exitCode === 127) {
     return 'Exit 127 usually means the command was not found — check the name, or that the tool is installed and on PATH.';
   }
@@ -273,6 +281,8 @@ export function remediationForResult(toolName: string, details: ToolDetails): st
   }
 
   if (toolName === 'Bash') {
+    const fsHint = sandboxFsDenialHint(details);
+    if (fsHint) return fsHint;
     const sandboxHint = sandboxExecutionHint(details);
     if (sandboxHint) return sandboxHint;
     const hint = bashHint(details);
