@@ -94,6 +94,16 @@ describe('buildModel — model dialect', () => {
     expect((model as any).dialect).toBe('openai');
   });
 
+  it('never auto-inherits when the id is registered under the profile providerType itself', () => {
+    // gpt-5.5 is registered under BOTH openai-codex and openai. A
+    // same-provider hit means Auto mode has nothing to infer — the profile's
+    // own providerType covers the id, so no other allowlisted registration
+    // (here 'openai') may stamp a dialect.
+    const { model } = buildModel(proxyProfile({ providerType: 'openai-codex' }), 'gpt-5.5');
+    expect((model as any).dialect).toBeUndefined();
+    expect(model.provider).toBe('openai-codex');
+  });
+
   it('does not inherit registry providers outside the dialect allowlist', () => {
     // claude ids hit the registry under providers like 'anthropic' — not a
     // dialect, so provider must stay the profile providerType.

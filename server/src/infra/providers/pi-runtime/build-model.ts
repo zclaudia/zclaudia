@@ -193,6 +193,7 @@ function resolveDialect(
   // when an allowlisted one exists. Preference order = allowlist order, so
   // ambiguous ids (registered under two dialects) resolve deterministically.
   const registeredProviders = findRegistryProvidersForModel(modelId);
+  if (registeredProviders.includes(providerType)) return undefined; // same-provider hit — Auto mode inherits nothing
   for (const dialect of LLM_MODEL_DIALECTS) {
     if (dialect !== providerType && registeredProviders.includes(dialect)) {
       return dialect;
