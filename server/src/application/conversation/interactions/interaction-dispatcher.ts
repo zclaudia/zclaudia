@@ -9,11 +9,13 @@
  */
 
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
+import type { InteractionResolvedReason } from '@zclaudia/shared/interaction/forms';
 
 interface PendingInteraction {
   resolve: (response: Record<string, unknown>) => void;
-  timeout: ReturnType<typeof setTimeout>;
+  timeout: ReturnType<typeof setTimeout> | null;
   sessionId: string;
+  eventType: string;
 }
 
 type SendFunction = (sessionId: string, event: ServerMessage) => void;
@@ -35,12 +37,14 @@ class InteractionDispatcher {
   /**
    * Send an interaction event and wait for the user's response.
    * Used by transactional tools like ask_user_form.
+   * Pass timeoutMs: null for human-in-the-loop gates that must wait
+   * indefinitely (cleanup happens via cancelBySession when the run ends).
    */
   async dispatchAndWait(
     interactionId: string,
     sessionId: string,
     event: ServerMessage,
-    timeoutMs = DEFAULT_TIMEOUT_MS
+    timeoutMs: number | null = DEFAULT_TIMEOUT_MS
   ): Promise<Record<string, unknown>> {
     const sendFn = this.sendFn;
     if (!sendFn) {
@@ -49,19 +53,23 @@ class InteractionDispatcher {
     }
 
     return new Promise<Record<string, unknown>>(resolve => {
-      const timeout = setTimeout(() => {
-        this.pending.delete(interactionId);
-        console.log(`[InteractionDispatcher] Interaction ${interactionId} timed out`);
-        resolve({ error: 'User did not respond within timeout' });
-      }, timeoutMs);
+      const timeout =
+        timeoutMs === null
+          ? null
+          : setTimeout(() => {
+              this.pending.delete(interactionId);
+              console.log(`[InteractionDispatcher] Interaction ${interactionId} timed out`);
+              this.broadcastResolved(sessionId, interactionId, 'timeout');
+              resolve({ error: 'User did not respond within timeout' });
+            }, timeoutMs);
 
-      this.pending.set(interactionId, { resolve, timeout, sessionId });
+      this.pending.set(interactionId, { resolve, timeout, sessionId, eventType: event.type });
 
       try {
         sendFn(sessionId, event);
       } catch (err) {
         this.pending.delete(interactionId);
-        clearTimeout(timeout);
+        if (timeout !== null) clearTimeout(timeout);
         console.error(`[InteractionDispatcher] Send failed for ${interactionId}:`, err);
         resolve({ error: err instanceof Error ? err.message : 'Send failed' });
       }
@@ -88,7 +96,7 @@ class InteractionDispatcher {
     const entry = this.pending.get(interactionId);
     if (!entry) return false;
 
-    clearTimeout(entry.timeout);
+    if (entry.timeout !== null) clearTimeout(entry.timeout);
     this.pending.delete(interactionId);
     entry.resolve(response);
     console.log(`[InteractionDispatcher] Resolved interaction ${interactionId}`);
@@ -101,10 +109,45 @@ class InteractionDispatcher {
   cancelBySession(sessionId: string): void {
     for (const [id, entry] of this.pending) {
       if (entry.sessionId === sessionId) {
-        clearTimeout(entry.timeout);
-        entry.resolve({ error: 'Session ended' });
+        if (entry.timeout !== null) clearTimeout(entry.timeout);
         this.pending.delete(id);
+        this.broadcastResolved(sessionId, id, 'cancelled');
+        entry.resolve({ error: 'Session ended' });
       }
+    }
+  }
+
+  /**
+   * Cancel pending interactions of one event type for a session, so a fresh
+   * interaction of the same kind replaces them instead of stacking a second
+   * card in the client (e.g. a re-issued plan review).
+   */
+  supersede(sessionId: string, eventType: string): void {
+    for (const [id, entry] of this.pending) {
+      if (entry.sessionId === sessionId && entry.eventType === eventType) {
+        if (entry.timeout !== null) clearTimeout(entry.timeout);
+        this.pending.delete(id);
+        this.broadcastResolved(sessionId, id, 'superseded');
+        entry.resolve({ error: 'superseded' });
+      }
+    }
+  }
+
+  /**
+   * Tell clients an interaction is no longer answerable, so they retire the
+   * card instead of leaving live-looking buttons behind. Best-effort: the run
+   * may already be gone.
+   */
+  private broadcastResolved(
+    sessionId: string,
+    interactionId: string,
+    reason: InteractionResolvedReason
+  ): void {
+    if (!this.sendFn) return;
+    try {
+      this.sendFn(sessionId, { type: 'interaction_resolved', interactionId, sessionId, reason });
+    } catch (err) {
+      console.warn(`[InteractionDispatcher] Failed to broadcast resolution for ${interactionId}:`, err);
     }
   }
 

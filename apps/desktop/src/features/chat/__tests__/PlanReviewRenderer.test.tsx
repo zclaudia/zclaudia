@@ -342,6 +342,46 @@ describe('PlanReviewRenderer — client_synth', () => {
   });
 });
 
+describe('InteractionItem — expired interactions', () => {
+  beforeEach(() => {
+    useInteractionStore.setState({ interactions: {}, expiredReasons: {} } as any);
+  });
+
+  it('renders an expired notice instead of action buttons when the plan review expired', () => {
+    useInteractionStore.setState({ expiredReasons: { 'i-1': 'timeout' } } as any);
+    render(<InteractionItem interaction={interaction} />);
+
+    expect(screen.getByText(/expired/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /approve/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^deny$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /save as issue/i })).not.toBeInTheDocument();
+  });
+
+  it('renders an expired notice for an expired prompt interaction', () => {
+    const promptInteraction = {
+      type: 'interaction_prompt' as const,
+      interactionId: 'prompt-expired',
+      sessionId: 'session-1',
+      source: 'tool_call' as const,
+      createdAt: 0,
+      title: 'Confirm action',
+      fields: [{ id: 'proceed', label: 'Proceed anyway?', type: 'confirm' as const }],
+    };
+    useInteractionStore.setState({ expiredReasons: { 'prompt-expired': 'cancelled' } } as any);
+    render(<InteractionItem interaction={promptInteraction} />);
+
+    expect(screen.getByText(/expired/i)).toBeInTheDocument();
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+  });
+
+  it('still renders live action buttons when a different interaction expired', () => {
+    useInteractionStore.setState({ expiredReasons: { 'someone-else': 'timeout' } } as any);
+    render(<InteractionItem interaction={interaction} />);
+
+    expect(screen.getByRole('button', { name: /approve/i })).toBeInTheDocument();
+  });
+});
+
 describe('PlanReviewRenderer — tool_call regression', () => {
   it('on Approve: still sends interaction_response (not handleSendMessage)', () => {
     renderWithActions(<InteractionItem interaction={interaction} />);

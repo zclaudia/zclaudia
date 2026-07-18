@@ -123,6 +123,7 @@ vi.mock('../../../services/toolRendererRegistry', () => ({
 
 const mockInteractionState = {
   interactions: {} as Record<string, any>,
+  expiredReasons: {} as Record<string, string>,
 };
 vi.mock('../../../stores/interactionStore', () => ({
   useInteractionStore: Object.assign((selector: any) => selector(mockInteractionState), {

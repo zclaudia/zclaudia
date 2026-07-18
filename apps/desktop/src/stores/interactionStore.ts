@@ -1,14 +1,23 @@
 import { create } from 'zustand';
 import type { InteractionMessage } from '@zclaudia/shared';
+import type { InteractionResolvedReason } from '@zclaudia/shared/interaction/forms';
 
 interface InteractionState {
   /** All active interactions keyed by interactionId */
   interactions: Record<string, InteractionMessage>;
+  /**
+   * Interactions the server can no longer answer (timed out, run cancelled,
+   * stale). Kept visible so the card can render as expired instead of
+   * silently vanishing or showing live buttons that do nothing.
+   */
+  expiredReasons: Record<string, InteractionResolvedReason>;
 
   /** Upsert an interaction (TodoUpdate with same ID overwrites previous) */
   upsertInteraction: (event: InteractionMessage) => void;
   /** Mark an interaction as resolved (remove it) */
   resolveInteraction: (interactionId: string) => void;
+  /** Keep the interaction but flag it as no longer answerable */
+  markExpired: (interactionId: string, reason: InteractionResolvedReason) => void;
   /** Check if an interaction exists */
   has: (interactionId: string) => boolean;
   /** Get all interactions for a session */
@@ -21,6 +30,7 @@ interface InteractionState {
 
 export const useInteractionStore = create<InteractionState>((set, get) => ({
   interactions: {},
+  expiredReasons: {},
 
   upsertInteraction: event =>
     set(state => ({
@@ -30,8 +40,14 @@ export const useInteractionStore = create<InteractionState>((set, get) => ({
   resolveInteraction: interactionId =>
     set(state => {
       const { [interactionId]: _, ...rest } = state.interactions;
-      return { interactions: rest };
+      const { [interactionId]: _reason, ...restReasons } = state.expiredReasons;
+      return { interactions: rest, expiredReasons: restReasons };
     }),
+
+  markExpired: (interactionId, reason) =>
+    set(state => ({
+      expiredReasons: { ...state.expiredReasons, [interactionId]: reason },
+    })),
 
   has: interactionId => interactionId in get().interactions,
 
@@ -60,7 +76,11 @@ export const useInteractionStore = create<InteractionState>((set, get) => ({
         }
         // Other same-session interactions: drop (existing behaviour).
       }
-      return { interactions: filtered };
+      const expiredReasons: InteractionState['expiredReasons'] = {};
+      for (const [id, reason] of Object.entries(state.expiredReasons)) {
+        if (id in filtered) expiredReasons[id] = reason;
+      }
+      return { interactions: filtered, expiredReasons };
     }),
 
   clearClientSynthPlanReviewsForSession: sessionId =>

@@ -147,6 +147,7 @@ const mockBackgroundTaskStore = {
 const mockInteractionStore = {
   upsertInteraction: vi.fn(),
   resolveInteraction: vi.fn(),
+  markExpired: vi.fn(),
   clearSession: vi.fn(),
   has: vi.fn(() => false),
 };
@@ -874,6 +875,34 @@ describe('handleServerMessage', () => {
     handleServerMessage({ type: 'interaction_resolved', interactionId: 'q1' }, makeCtx());
     expect(mockPromptRequestStore.clearRequestById).toHaveBeenCalledWith('q1');
     expect(mockInteractionStore.resolveInteraction).toHaveBeenCalledWith('q1');
+  });
+
+  it('marks the interaction expired instead of removing it when resolved with reason timeout', () => {
+    handleServerMessage(
+      { type: 'interaction_resolved', interactionId: 'q1', sessionId: 's1', reason: 'timeout' },
+      makeCtx()
+    );
+    expect(mockPromptRequestStore.clearRequestById).toHaveBeenCalledWith('q1');
+    expect(mockInteractionStore.markExpired).toHaveBeenCalledWith('q1', 'timeout');
+    expect(mockInteractionStore.resolveInteraction).not.toHaveBeenCalled();
+  });
+
+  it('marks the interaction expired when resolved with reason stale', () => {
+    handleServerMessage(
+      { type: 'interaction_resolved', interactionId: 'q2', sessionId: 's1', reason: 'stale' },
+      makeCtx()
+    );
+    expect(mockInteractionStore.markExpired).toHaveBeenCalledWith('q2', 'stale');
+    expect(mockInteractionStore.resolveInteraction).not.toHaveBeenCalled();
+  });
+
+  it('removes the interaction when resolved with reason superseded', () => {
+    handleServerMessage(
+      { type: 'interaction_resolved', interactionId: 'q3', sessionId: 's1', reason: 'superseded' },
+      makeCtx()
+    );
+    expect(mockInteractionStore.resolveInteraction).toHaveBeenCalledWith('q3');
+    expect(mockInteractionStore.markExpired).not.toHaveBeenCalled();
   });
 
   it('handles interaction_todo_update', () => {

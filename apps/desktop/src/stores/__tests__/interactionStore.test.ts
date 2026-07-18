@@ -3,7 +3,77 @@ import { useInteractionStore } from '../interactionStore';
 
 describe('interactionStore', () => {
   beforeEach(() => {
-    useInteractionStore.setState({ interactions: {} });
+    useInteractionStore.setState({ interactions: {}, expiredReasons: {} });
+  });
+
+  it('markExpired keeps the interaction and records the reason', () => {
+    useInteractionStore.setState({
+      interactions: {
+        'server-plan': {
+          type: 'interaction_plan_review',
+          interactionId: 'server-plan',
+          sessionId: 'session-1',
+          source: 'tool_call',
+          createdAt: 1,
+          plan: 'Server plan',
+        },
+      },
+    });
+
+    useInteractionStore.getState().markExpired('server-plan', 'timeout');
+
+    expect(useInteractionStore.getState().interactions).toHaveProperty('server-plan');
+    expect(useInteractionStore.getState().expiredReasons['server-plan']).toBe('timeout');
+  });
+
+  it('resolveInteraction removes the interaction and its expired reason', () => {
+    useInteractionStore.setState({
+      interactions: {
+        'server-plan': {
+          type: 'interaction_plan_review',
+          interactionId: 'server-plan',
+          sessionId: 'session-1',
+          source: 'tool_call',
+          createdAt: 1,
+          plan: 'Server plan',
+        },
+      },
+      expiredReasons: { 'server-plan': 'timeout' },
+    });
+
+    useInteractionStore.getState().resolveInteraction('server-plan');
+
+    expect(useInteractionStore.getState().interactions).not.toHaveProperty('server-plan');
+    expect(useInteractionStore.getState().expiredReasons).not.toHaveProperty('server-plan');
+  });
+
+  it('clearSession drops expired reasons for the interactions it removes', () => {
+    useInteractionStore.setState({
+      interactions: {
+        'server-plan': {
+          type: 'interaction_plan_review',
+          interactionId: 'server-plan',
+          sessionId: 'session-1',
+          source: 'tool_call',
+          createdAt: 1,
+          plan: 'Server plan',
+        },
+        'other-session-plan': {
+          type: 'interaction_plan_review',
+          interactionId: 'other-session-plan',
+          sessionId: 'session-2',
+          source: 'tool_call',
+          createdAt: 1,
+          plan: 'Other plan',
+        },
+      },
+      expiredReasons: { 'server-plan': 'timeout', 'other-session-plan': 'cancelled' },
+    });
+
+    useInteractionStore.getState().clearSession('session-1');
+
+    expect(useInteractionStore.getState().expiredReasons).not.toHaveProperty('server-plan');
+    expect(useInteractionStore.getState().expiredReasons['other-session-plan']).toBe('cancelled');
   });
 
   it('clears only client-synth plan reviews for the given session', () => {

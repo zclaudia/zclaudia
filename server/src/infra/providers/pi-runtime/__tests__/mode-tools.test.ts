@@ -7,6 +7,7 @@ import { createExitPlanModeTool } from '../mode-tools.js';
 vi.mock('../../../../application/conversation/interactions/interaction-dispatcher.js', () => ({
   interactionDispatcher: {
     dispatchAndWait: vi.fn(),
+    supersede: vi.fn(),
   },
 }));
 
@@ -63,5 +64,66 @@ describe('ExitPlanMode tool boundaries', () => {
       maxBytes: 128 * 1024,
     });
     expect(interactionDispatcher.dispatchAndWait).not.toHaveBeenCalled();
+  });
+
+  it('supersedes any prior pending plan review for the session before dispatching', async () => {
+    vi.mocked(interactionDispatcher.dispatchAndWait).mockResolvedValue({ approved: true });
+    vi.mocked(exitPlanMode).mockReturnValue({ ok: true, wasActive: true });
+
+    await tool().execute('exit-plan-4', { plan: '1. implement the fix' });
+
+    expect(interactionDispatcher.supersede).toHaveBeenCalledWith(
+      'session-1',
+      'interaction_plan_review'
+    );
+    const supersedeOrder = vi.mocked(interactionDispatcher.supersede).mock.invocationCallOrder[0];
+    const dispatchOrder = vi.mocked(interactionDispatcher.dispatchAndWait).mock
+      .invocationCallOrder[0];
+    expect(supersedeOrder).toBeLessThan(dispatchOrder);
+  });
+
+  it('dispatches the plan review without a timeout', async () => {
+    vi.mocked(interactionDispatcher.dispatchAndWait).mockResolvedValue({ approved: true });
+    vi.mocked(exitPlanMode).mockReturnValue({ ok: true, wasActive: true });
+
+    await tool().execute('exit-plan-5', { plan: '1. implement the fix' });
+
+    expect(interactionDispatcher.dispatchAndWait).toHaveBeenCalledWith(
+      expect.any(String),
+      'session-1',
+      expect.objectContaining({ type: 'interaction_plan_review' }),
+      null
+    );
+  });
+
+  it('tells the model to stop and wait when the review times out', async () => {
+    vi.mocked(interactionDispatcher.dispatchAndWait).mockResolvedValue({
+      error: 'User did not respond within timeout',
+    });
+
+    const res = await tool().execute('exit-plan-6', { plan: '1. implement the fix' });
+
+    expect(res.details).toMatchObject({ ok: false, error: 'plan_review_timeout' });
+    expect(res.content[0].text).toMatch(/wait/i);
+    expect(res.content[0].text).toMatch(/do not proceed/i);
+    expect(exitPlanMode).not.toHaveBeenCalled();
+  });
+
+  it('reports a superseded review distinctly and does not exit plan mode', async () => {
+    vi.mocked(interactionDispatcher.dispatchAndWait).mockResolvedValue({ error: 'superseded' });
+
+    const res = await tool().execute('exit-plan-7', { plan: '1. implement the fix' });
+
+    expect(res.details).toMatchObject({ ok: false, error: 'plan_superseded' });
+    expect(exitPlanMode).not.toHaveBeenCalled();
+  });
+
+  it('tells the model the run ended when the review is cancelled', async () => {
+    vi.mocked(interactionDispatcher.dispatchAndWait).mockResolvedValue({ error: 'Session ended' });
+
+    const res = await tool().execute('exit-plan-8', { plan: '1. implement the fix' });
+
+    expect(res.details).toMatchObject({ ok: false, error: 'plan_review_cancelled' });
+    expect(exitPlanMode).not.toHaveBeenCalled();
   });
 });

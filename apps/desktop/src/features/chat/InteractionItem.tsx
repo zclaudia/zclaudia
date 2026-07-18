@@ -15,6 +15,7 @@ import {
   Maximize2,
   Minimize2,
   Bookmark,
+  Clock,
 } from 'lucide-react';
 import type {
   InteractionMessage,
@@ -731,10 +732,47 @@ function PlanReviewRenderer({ interaction }: { interaction: PlanReviewInteractio
 }
 
 // ============================================
+// Expired Interaction Notice
+// ============================================
+
+const EXPIRED_LABELS: Record<InteractionMessage['type'], string> = {
+  interaction_prompt: 'Question',
+  interaction_todo_update: 'Task List',
+  interaction_approval: 'Approval',
+  interaction_plan_review: 'Plan Review',
+};
+
+const EXPIRED_DETAILS: Record<string, string> = {
+  timeout: 'The agent stopped waiting for a response.',
+  cancelled: 'The run ended before a response.',
+  stale: 'This request is no longer active.',
+};
+
+function ExpiredInteractionNotice({ interaction }: { interaction: InteractionMessage }) {
+  const reason = useInteractionStore(s => s.expiredReasons[interaction.interactionId]);
+  return (
+    <div className="flex flex-col gap-1 px-3 py-2 rounded-md border bg-muted/40 border-border/50 text-muted-foreground">
+      <div className="flex items-center gap-2 text-xs font-medium">
+        <Clock size={12} />
+        <span>{EXPIRED_LABELS[interaction.type]} Expired</span>
+      </div>
+      {reason && EXPIRED_DETAILS[reason] && (
+        <span className="text-xs">{EXPIRED_DETAILS[reason]}</span>
+      )}
+    </div>
+  );
+}
+
+// ============================================
 // Main InteractionItem
 // ============================================
 
 function InteractionItemInner({ interaction }: InteractionItemProps) {
+  const isExpired = useInteractionStore(s => Boolean(s.expiredReasons[interaction.interactionId]));
+  if (isExpired && interaction.type !== 'interaction_todo_update') {
+    return <ExpiredInteractionNotice interaction={interaction} />;
+  }
+
   if (interaction.type === 'interaction_todo_update') {
     return (
       <div className="flex flex-col gap-1 px-3 py-2 rounded-md bg-muted/30 border border-border/50">

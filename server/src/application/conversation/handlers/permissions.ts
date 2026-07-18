@@ -48,20 +48,23 @@ export function handleInteractionResponse(
   clients: Map<string, ConnectedClient>
 ): void {
   const resolved = interactionDispatcher.resolve(message.interactionId, message.response);
-  if (resolved) {
-    for (const [, run] of activeRuns) {
-      if (run.sessionId === message.sessionId) {
-        const resolvedEvent = {
-          type: 'interaction_resolved' as const,
-          interactionId: message.interactionId,
-          sessionId: message.sessionId,
-        };
-        broadcastRunMessage(run, resolvedEvent as InteractionResolvedMessage);
-        break;
-      }
-    }
-  } else {
+  if (!resolved) {
+    // Unknown interaction (timed out, cancelled, or answered elsewhere): still
+    // broadcast so every client retires the zombie card instead of keeping
+    // live-looking buttons.
     console.warn(`[InteractionResponse] No pending interaction for ${message.interactionId}`);
+  }
+  for (const [, run] of activeRuns) {
+    if (run.sessionId === message.sessionId) {
+      const resolvedEvent: InteractionResolvedMessage = {
+        type: 'interaction_resolved',
+        interactionId: message.interactionId,
+        sessionId: message.sessionId,
+        ...(resolved ? {} : { reason: 'stale' as const }),
+      };
+      broadcastRunMessage(run, resolvedEvent);
+      break;
+    }
   }
 }
 

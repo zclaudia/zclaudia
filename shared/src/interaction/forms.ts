@@ -74,11 +74,22 @@ export interface TodoUpdateInteractionMessage extends InteractionBase {
   todos: NormalizedTodoItem[];
 }
 
+/**
+ * Why an interaction was resolved without a user response.
+ * Absent when the user responded normally.
+ * - 'timeout': the dispatcher gave up waiting for a response
+ * - 'cancelled': the run ended before the user responded
+ * - 'superseded': a newer interaction of the same kind replaced this one
+ * - 'stale': a response arrived for an interaction the server no longer tracks
+ */
+export type InteractionResolvedReason = 'timeout' | 'cancelled' | 'superseded' | 'stale';
+
 /** Resolution event for any interaction */
 export interface InteractionResolvedMessage {
   type: 'interaction_resolved';
   interactionId: string;
   sessionId?: string;
+  reason?: InteractionResolvedReason;
 }
 
 /** Approval request interaction (from internal request_approval tool) */

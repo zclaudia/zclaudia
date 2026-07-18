@@ -25,7 +25,14 @@ export function handleInteractionMessage(msg: ServerMessage, ctx: MessageHandler
 
     case 'interaction_resolved':
       usePromptRequestStore.getState().clearRequestById(msg.interactionId);
-      useInteractionStore.getState().resolveInteraction(msg.interactionId);
+      if (msg.reason === 'timeout' || msg.reason === 'cancelled' || msg.reason === 'stale') {
+        // Nobody can answer this interaction anymore: keep the card but render
+        // it as expired instead of leaving live-looking buttons behind.
+        useInteractionStore.getState().markExpired(msg.interactionId, msg.reason);
+      } else {
+        // User responded, or a newer interaction superseded this one.
+        useInteractionStore.getState().resolveInteraction(msg.interactionId);
+      }
       return true;
 
     case 'process_cleanup_result':

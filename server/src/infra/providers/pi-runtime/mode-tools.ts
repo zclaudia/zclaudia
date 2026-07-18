@@ -193,12 +193,39 @@ export function createExitPlanModeTool(_cwd: string, options?: ModeToolOptions):
           plan,
           ...(allowedPrompts.value !== undefined ? { allowedPrompts: allowedPrompts.value } : {}),
         };
+        // A re-issued plan review replaces any earlier one still pending for
+        // this session, so clients never stack two live review cards.
+        interactionDispatcher.supersede(sessionId, 'interaction_plan_review');
+        // Plan approval is a human-in-the-loop gate: wait indefinitely. The
+        // pending entry is cleaned up via cancelBySession when the run ends.
         const response = await interactionDispatcher.dispatchAndWait(
           interactionId,
           sessionId,
-          event
+          event,
+          null
         );
-        if (response.error) return errorResult('plan_review_failed', String(response.error));
+        if (response.error) {
+          const error = String(response.error);
+          if (error === 'superseded') {
+            return errorResult(
+              'plan_superseded',
+              'This plan review was replaced by a newer one. Only the latest review is active — wait for the user to respond to it.'
+            );
+          }
+          if (error.includes('timeout')) {
+            return errorResult(
+              'plan_review_timeout',
+              'The user has not responded to the plan review. Stop and wait for the user — do not proceed with changes and do not re-submit the plan.'
+            );
+          }
+          if (error === 'Session ended') {
+            return errorResult(
+              'plan_review_cancelled',
+              'The run ended before the user responded to the plan review. Do not proceed with the plan.'
+            );
+          }
+          return errorResult('plan_review_failed', error);
+        }
         if (response.approved !== true) {
           const feedback =
             typeof response.feedback === 'string' && response.feedback.trim()
