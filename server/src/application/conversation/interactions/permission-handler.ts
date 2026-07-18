@@ -267,7 +267,9 @@ export function handlePromptAnswer(
     }
   }
 
-  // requestId not found — already resolved by another device. Broadcast idempotent resolution.
+  // requestId not found — timed out, answered elsewhere, or otherwise gone.
+  // Broadcast with reason 'stale' so clients retire the zombie card instead of
+  // silently dropping the click.
   console.warn(
     `[PromptRequest] Request ${message.requestId} not found in any active run — broadcasting interaction_resolved`
   );
@@ -275,6 +277,7 @@ export function handlePromptAnswer(
     broadcastRunMessage(run, {
       type: 'interaction_resolved',
       interactionId: message.requestId,
+      reason: 'stale',
     } as import('@zclaudia/shared/interaction/forms').InteractionResolvedMessage);
     break;
   }

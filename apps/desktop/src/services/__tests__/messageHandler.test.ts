@@ -129,6 +129,11 @@ const mockPluginStore = {
   clearPluginExtensions: vi.fn(),
   updatePanelVisibility: vi.fn(),
   panels: [] as Array<{ id: string; openMode?: string }>,
+  pendingPermissionRequest: null as {
+    pluginId: string;
+    pluginName: string;
+    permissions: string[];
+  } | null,
 };
 
 const mockOpenToolInWorkspace = vi.fn();
@@ -1822,6 +1827,34 @@ describe('handleServerMessage', () => {
         makeCtx()
       );
       expect(mockPluginStore.setPendingPermissionRequest).toHaveBeenCalled();
+    });
+
+    it('retires the matching plugin permission dialog on plugin_permission_resolved', () => {
+      mockPluginStore.pendingPermissionRequest = {
+        pluginId: 'p1',
+        pluginName: 'Test',
+        permissions: ['read'],
+      };
+      handleServerMessage(
+        { type: 'plugin_permission_resolved', pluginId: 'p1', granted: true },
+        makeCtx()
+      );
+      expect(mockPluginStore.setPendingPermissionRequest).toHaveBeenCalledWith(null);
+      mockPluginStore.pendingPermissionRequest = null;
+    });
+
+    it('keeps an unrelated plugin permission dialog on plugin_permission_resolved', () => {
+      mockPluginStore.pendingPermissionRequest = {
+        pluginId: 'other-plugin',
+        pluginName: 'Other',
+        permissions: ['read'],
+      };
+      handleServerMessage(
+        { type: 'plugin_permission_resolved', pluginId: 'p1', granted: false },
+        makeCtx()
+      );
+      expect(mockPluginStore.setPendingPermissionRequest).not.toHaveBeenCalled();
+      mockPluginStore.pendingPermissionRequest = null;
     });
 
     it('handles plugin_notification', async () => {

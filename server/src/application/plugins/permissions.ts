@@ -21,6 +21,11 @@ export interface PermissionRequest {
   reject: (error: Error) => void;
 }
 
+export interface PermissionResponse {
+  pluginId: string;
+  granted: boolean;
+}
+
 const PERMISSION_LEVELS: Record<Permission, number> = {
   'session.read': 1,
   'project.read': 1,
@@ -43,6 +48,7 @@ export class PermissionManager {
   private storePath: string;
   private pendingRequests: Map<string, PermissionRequest[]> = new Map();
   private requestHandlers: Set<(request: PermissionRequest) => void> = new Set();
+  private responseHandlers: Set<(response: PermissionResponse) => void> = new Set();
 
   constructor() {
     this.storePath = path.join(os.homedir(), '.claudia', 'plugin-permissions.json');
@@ -218,6 +224,7 @@ export class PermissionManager {
       for (const request of allRequests) {
         request.resolve(true);
       }
+      this.notifyResponseHandlers({ pluginId, granted: true });
       return;
     }
 
@@ -231,11 +238,48 @@ export class PermissionManager {
     for (const request of allRequests) {
       request.resolve(false);
     }
+    this.notifyResponseHandlers({ pluginId, granted: false });
+  }
+
+  /**
+   * Resolve any pending requests for a plugin as denied without persisting a
+   * denial (e.g. the plugin is being deactivated while a dialog is open).
+   * Returns false when nothing was pending.
+   */
+  cancelPendingRequests(pluginId: string): boolean {
+    const requests = this.pendingRequests.get(pluginId);
+    if (!requests || requests.length === 0) return false;
+
+    this.pendingRequests.delete(pluginId);
+    for (const request of requests) {
+      request.resolve(false);
+    }
+    this.notifyResponseHandlers({ pluginId, granted: false });
+    return true;
   }
 
   onRequest(handler: (request: PermissionRequest) => void): () => void {
     this.requestHandlers.add(handler);
     return () => this.requestHandlers.delete(handler);
+  }
+
+  /**
+   * Observe request resolutions (answered or cancelled), so every connected
+   * client can retire its permission dialog — not just the device that clicked.
+   */
+  onResponse(handler: (response: PermissionResponse) => void): () => void {
+    this.responseHandlers.add(handler);
+    return () => this.responseHandlers.delete(handler);
+  }
+
+  private notifyResponseHandlers(response: PermissionResponse): void {
+    this.responseHandlers.forEach(handler => {
+      try {
+        handler(response);
+      } catch (error) {
+        console.error('[PermissionManager] Response handler error:', error);
+      }
+    });
   }
 
   private notifyHandlers(request: PermissionRequest): void {

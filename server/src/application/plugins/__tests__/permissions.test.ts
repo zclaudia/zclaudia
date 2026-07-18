@@ -237,6 +237,47 @@ describe('PermissionManager', () => {
       // Clean up
       manager.respondToRequest('test-plugin', true);
     });
+
+    it('should notify response handlers when a request is answered', async () => {
+      const responseHandler = vi.fn();
+      manager.onResponse(responseHandler);
+
+      const manifest = { id: 'test-plugin', name: 'Test', version: '1.0.0', description: 'Test' };
+      const promise = manager.request('test-plugin', ['storage'], manifest);
+      manager.respondToRequest('test-plugin', true);
+      await promise;
+
+      expect(responseHandler).toHaveBeenCalledWith({ pluginId: 'test-plugin', granted: true });
+    });
+
+    it('should not notify response handlers when there is no pending request', () => {
+      const responseHandler = vi.fn();
+      manager.onResponse(responseHandler);
+
+      manager.respondToRequest('test-plugin', true);
+
+      expect(responseHandler).not.toHaveBeenCalled();
+    });
+
+    it('cancelPendingRequests resolves pending requests as denied and notifies handlers', async () => {
+      const responseHandler = vi.fn();
+      manager.onResponse(responseHandler);
+
+      const manifest = { id: 'test-plugin', name: 'Test', version: '1.0.0', description: 'Test' };
+      const promise = manager.request('test-plugin', ['storage'], manifest);
+
+      const cancelled = manager.cancelPendingRequests('test-plugin');
+
+      expect(cancelled).toBe(true);
+      await expect(promise).resolves.toBe(false);
+      // Cancellation must not persist a permanent denial.
+      expect(manager.getDeniedPermissions('test-plugin')).not.toContain('storage');
+      expect(responseHandler).toHaveBeenCalledWith({ pluginId: 'test-plugin', granted: false });
+    });
+
+    it('cancelPendingRequests returns false when nothing is pending', () => {
+      expect(manager.cancelPendingRequests('test-plugin')).toBe(false);
+    });
   });
 
   describe('utility methods', () => {

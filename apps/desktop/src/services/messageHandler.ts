@@ -233,6 +233,7 @@ const messageDispatcher = createMessageDispatcher<ServerMessage, MessageDispatch
     types: [
       'plugin_state',
       'plugin_permission_request',
+      'plugin_permission_resolved',
       'plugin_notification',
       'plugin_show_panel',
       'plugin_panel_registered',

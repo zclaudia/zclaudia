@@ -100,4 +100,19 @@ export function registerPluginsDomain(deps: PluginsDomainDeps): void {
       }
     });
   });
+
+  // Answered on one device (or cancelled by deactivation) → every other
+  // device must retire its dialog too.
+  pluginPermissionManager.onResponse(response => {
+    const msg: import('@zclaudia/shared/wire/messages').PluginPermissionResolvedMessage = {
+      type: 'plugin_permission_resolved',
+      pluginId: response.pluginId,
+      granted: response.granted,
+    };
+    clients.forEach(client => {
+      if (client.authenticated) {
+        sendMessage(client.ws, msg);
+      }
+    });
+  });
 }

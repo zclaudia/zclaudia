@@ -1272,6 +1272,21 @@ describe('PluginLoader', () => {
       expect(workerHost.stopPlugin).toHaveBeenCalledWith('com.test.plugin');
     });
 
+    it('should cancel pending permission requests so open dialogs get retired', async () => {
+      setupSinglePlugin(mockPluginDir, 'test-plugin', makeManifest());
+      await loader.discover();
+      await loader.activate('com.test.plugin');
+
+      const { permissionManager } = await import('../permissions.js');
+      const pending = permissionManager.request('com.test.plugin', ['fs.read'], makeManifest());
+
+      await loader.deactivate('com.test.plugin');
+
+      await expect(pending).resolves.toBe(false);
+      // Cancellation must not persist a permanent denial.
+      expect(permissionManager.getDeniedPermissions('com.test.plugin')).not.toContain('fs.read');
+    });
+
     it('should call module deactivate() if it exists and not in worker mode', async () => {
       setupSinglePlugin(mockPluginDir, 'test-plugin', makeManifest());
       await loader.discover();

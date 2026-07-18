@@ -123,6 +123,14 @@ export interface PluginPermissionRequestMessage {
   permissions: string[];
 }
 
+// Server → Client: a plugin permission request was answered (on any device) or
+// cancelled (plugin deactivated) — clients should retire their dialogs.
+export interface PluginPermissionResolvedMessage {
+  type: 'plugin_permission_resolved';
+  pluginId: string;
+  granted: boolean;
+}
+
 export type PermissionsClientMessage =
   | PermissionDecisionMessage
   | PromptAnswerMessage
@@ -135,4 +143,5 @@ export type PermissionsServerMessage =
   | PermissionAutoResolvedMessage
   | AIReviewCompletedMessage
   | PermissionWorkflowProgressMessage
-  | PluginPermissionRequestMessage;
+  | PluginPermissionRequestMessage
+  | PluginPermissionResolvedMessage;

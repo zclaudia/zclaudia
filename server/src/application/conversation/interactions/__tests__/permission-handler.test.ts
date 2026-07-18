@@ -199,4 +199,27 @@ describe('permission-handler', () => {
       })
     );
   });
+
+  it('broadcasts interaction_resolved with reason stale for an unknown prompt request', async () => {
+    const { broadcastRunMessage } = await import('../../transport/broadcast.js');
+
+    handlePromptAnswer(
+      {
+        type: 'prompt_answer',
+        requestId: 'question-zombie',
+        formattedAnswer: 'Yes',
+      },
+      activeRuns,
+      connectedClients
+    );
+
+    expect(broadcastRunMessage).toHaveBeenCalledWith(
+      run,
+      expect.objectContaining({
+        type: 'interaction_resolved',
+        interactionId: 'question-zombie',
+        reason: 'stale',
+      })
+    );
+  });
 });

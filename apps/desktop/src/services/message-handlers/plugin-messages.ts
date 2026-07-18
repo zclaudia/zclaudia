@@ -89,6 +89,16 @@ export function handlePluginMessage(
       return true;
     }
 
+    case 'plugin_permission_resolved': {
+      // Answered on another device or cancelled by deactivation: retire our
+      // dialog too, so a later click doesn't silently no-op server-side.
+      const store = usePluginStore.getState();
+      if (store.pendingPermissionRequest?.pluginId === (msg as any).pluginId) {
+        store.setPendingPermissionRequest(null);
+      }
+      return true;
+    }
+
     case 'plugin_notification': {
       const pluginMsg = msg as import('@zclaudia/shared').PluginNotificationMessage;
       import('../../stores/notificationFeedStore').then(m =>

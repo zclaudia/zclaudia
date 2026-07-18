@@ -222,7 +222,14 @@ export function registerInteractionTools(config?: InteractionToolsConfig): void 
         variant: 'form',
       };
 
-      const response = await interactionDispatcher.dispatchAndWait(interactionId, sessionId, event);
+      // Human-in-the-loop gate: wait indefinitely. Pending entries are cleaned
+      // up via cancelBySession when the run ends.
+      const response = await interactionDispatcher.dispatchAndWait(
+        interactionId,
+        sessionId,
+        event,
+        null
+      );
       if (response.error) {
         throw new Error(String(response.error));
       }
@@ -279,7 +286,15 @@ export function registerInteractionTools(config?: InteractionToolsConfig): void 
         rejectLabel: args.rejectLabel as string | undefined,
       };
 
-      const response = await interactionDispatcher.dispatchAndWait(interactionId, sessionId, event);
+      // Approval gates destructive/irreversible actions: wait indefinitely
+      // rather than timing out into an ambiguous error the model might treat
+      // as tacit permission. Run end cleans up via cancelBySession.
+      const response = await interactionDispatcher.dispatchAndWait(
+        interactionId,
+        sessionId,
+        event,
+        null
+      );
 
       if (response.error) {
         throw new Error(String(response.error));

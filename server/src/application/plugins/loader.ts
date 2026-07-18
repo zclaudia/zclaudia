@@ -680,6 +680,10 @@ export class PluginLoader {
       // Unregister all contributions
       this.unregisterContributions(pluginId);
 
+      // Resolve any permission dialog still waiting on this plugin as denied
+      // (without persisting the denial) so open dialogs get retired.
+      permissionManager.cancelPendingRequests(pluginId);
+
       instance.isActive = false;
       instance.module = undefined;
 
