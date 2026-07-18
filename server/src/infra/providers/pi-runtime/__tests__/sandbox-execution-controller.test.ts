@@ -196,6 +196,104 @@ describe('runSandboxedWithEscalation', () => {
     expect(result.result.outputText).toBe('credentials ok');
   });
 
+  it('preflights adb device commands as unsandboxed', async () => {
+    const permissionCallback = vi.fn(async () => ({ behavior: 'allow' as const }));
+    const operation = vi.fn(async () => ({
+      ok: false,
+      sandboxed: true,
+      outputText: 'should not run sandbox first',
+    }));
+    const unsandboxedOperation = vi.fn(async () => ({
+      ok: true,
+      sandboxed: false,
+      outputText: 'List of devices attached\nemulator-5554\tdevice',
+      exitCode: 0,
+    }));
+
+    const result = await runSandboxedWithEscalation({
+      toolCallId: 'call-preflight-adb',
+      toolName: 'Bash',
+      sourceText: 'adb install -r hermes-mobile.apk',
+      allowedDomains: new Set(),
+      sandboxMode: 'auto',
+      operation,
+      unsandboxedOperation,
+      permissionCallback,
+    });
+
+    expect(operation).not.toHaveBeenCalled();
+    expect(permissionCallback).toHaveBeenCalledWith(
+      expect.objectContaining({ toolName: 'SandboxUnsandboxedAccess' })
+    );
+    expect(unsandboxedOperation).toHaveBeenCalledOnce();
+    expect(result.details.privilegeMode).toBe('unsandboxed');
+  });
+
+  it('preflights xcodebuild commands as unsandboxed', async () => {
+    const permissionCallback = vi.fn(async () => ({ behavior: 'allow' as const }));
+    const operation = vi.fn(async () => ({
+      ok: false,
+      sandboxed: true,
+      outputText: 'should not run sandbox first',
+    }));
+    const unsandboxedOperation = vi.fn(async () => ({
+      ok: true,
+      sandboxed: false,
+      outputText: 'BUILD SUCCEEDED',
+      exitCode: 0,
+    }));
+
+    const result = await runSandboxedWithEscalation({
+      toolCallId: 'call-preflight-xcodebuild',
+      toolName: 'Bash',
+      sourceText: 'xcodebuild -scheme App -configuration Release build',
+      allowedDomains: new Set(),
+      sandboxMode: 'auto',
+      operation,
+      unsandboxedOperation,
+      permissionCallback,
+    });
+
+    expect(operation).not.toHaveBeenCalled();
+    expect(permissionCallback).toHaveBeenCalledWith(
+      expect.objectContaining({ toolName: 'SandboxUnsandboxedAccess' })
+    );
+    expect(unsandboxedOperation).toHaveBeenCalledOnce();
+    expect(result.details.privilegeMode).toBe('unsandboxed');
+  });
+
+  it('does not preflight commands that merely contain adb-like substrings', async () => {
+    const permissionCallback = vi.fn(async () => ({ behavior: 'allow' as const }));
+    const operation = vi.fn(async () => ({
+      ok: true,
+      sandboxed: true,
+      outputText: 'ok',
+      exitCode: 0,
+    }));
+    const unsandboxedOperation = vi.fn(async () => ({
+      ok: true,
+      sandboxed: false,
+      outputText: 'should not run on host',
+      exitCode: 0,
+    }));
+
+    const result = await runSandboxedWithEscalation({
+      toolCallId: 'call-preflight-negative',
+      toolName: 'Bash',
+      sourceText: 'grep -r deadbeef src/',
+      allowedDomains: new Set(),
+      sandboxMode: 'auto',
+      operation,
+      unsandboxedOperation,
+      permissionCallback,
+    });
+
+    expect(operation).toHaveBeenCalledOnce();
+    expect(unsandboxedOperation).not.toHaveBeenCalled();
+    expect(permissionCallback).not.toHaveBeenCalled();
+    expect(result.result.outputText).toBe('ok');
+  });
+
   it('requires privilege reason for explicit unsandboxed mode', async () => {
     const result = await runSandboxedWithEscalation({
       toolCallId: 'call-3',

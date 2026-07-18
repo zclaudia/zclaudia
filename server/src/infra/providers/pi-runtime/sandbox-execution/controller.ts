@@ -83,6 +83,12 @@ function preflightHostOnlyReason(input: SandboxEscalationInput): string | undefi
   if (/\baws\b/i.test(source) && /\b(?:sso|credential|credentials|sts)\b/i.test(source)) {
     return 'AWS SSO and credential commands depend on host credential/browser state and should run as one-shot host execution.';
   }
+  if (/(?:^|[\s;|&])adb\s/i.test(source)) {
+    return 'adb needs the host adb server and USB/emulator device access, which the sandbox cannot provide.';
+  }
+  if (/(?:^|[\s;|&])xcodebuild\s/i.test(source)) {
+    return 'xcodebuild depends on the host Xcode toolchain, signing certificates, and keychain, which the sandbox cannot provide.';
+  }
   return undefined;
 }
 
