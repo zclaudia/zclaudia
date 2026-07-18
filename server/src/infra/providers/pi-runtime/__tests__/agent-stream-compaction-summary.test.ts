@@ -15,11 +15,15 @@ const am = (over: Partial<AssistantMessage> = {}): AssistantMessage =>
  * would go on the wire) and returns a minimal terminal assistant stream so the
  * agent loop completes after one turn.
  */
-function captureStreamFn(): { fn: StreamFn; captured: { messages: unknown[] } } {
-  const captured: { messages: unknown[] } = { messages: [] };
+function captureStreamFn(): {
+  fn: StreamFn;
+  captured: { messages: unknown[]; tools?: unknown[] };
+} {
+  const captured: { messages: unknown[]; tools?: unknown[] } = { messages: [] };
 
   const fn: StreamFn = (_model: any, llmContext: any) => {
     captured.messages = llmContext.messages;
+    captured.tools = llmContext.tools;
     const stream = createAssistantMessageEventStream();
     void (async () => {
       stream.push({ type: 'start', partial: am() } as never);
@@ -89,5 +93,62 @@ describe('runPiAgentStream — compaction summary delivery', () => {
       (captured.messages as Array<{ role?: string }>).some(m => m.role === 'compactionSummary')
     ).toBe(false);
     expect((captured.messages as Array<{ role?: string }>).some(m => m.role === 'user')).toBe(true);
+  });
+
+  it('normalizes tool schemas for a Kimi model behind a private OpenAI-compatible gateway', async () => {
+    const { fn, captured } = captureStreamFn();
+    const originalParameters = {
+      type: 'object',
+      properties: { path: { type: 'string' }, file_path: { type: 'string' } },
+      anyOf: [{ required: ['path'] }, { required: ['file_path'] }],
+    };
+    const tools = [
+      {
+        name: 'Read',
+        label: 'Read',
+        description: 'Read a file',
+        parameters: originalParameters,
+        execute: async () => ({ content: [], details: {} }),
+      },
+    ] as any;
+
+    const gen = runPiAgentStream({
+      userInput: 'read the file',
+      options: { claudiaSessionId: 's-kimi' } as any,
+      sessionId: 's-kimi',
+      ctx: { sessionId: 's-kimi', model: 'kimi-k3', cwd: '/tmp' },
+      modelInfo: {
+        model: {
+          id: 'kimi-k3',
+          name: 'Kimi K3',
+          api: 'openai-completions',
+          provider: 'openai',
+          baseUrl: 'http://192.168.2.150:3022/v1',
+          reasoning: true,
+          input: ['text'],
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+          contextWindow: 1_000_000,
+          maxTokens: 8192,
+        },
+      } as any,
+      supportsVision: false,
+      history: [],
+      tools,
+      hooks: { streamFn: fn } as any,
+      effectiveSystemPrompt: 'You are a coding agent.',
+    });
+
+    for await (const _event of gen) {
+      /* drain to completion */
+    }
+
+    expect(captured.tools?.[0]).toMatchObject({
+      parameters: {
+        type: 'object',
+        properties: { path: { type: 'string' }, file_path: { type: 'string' } },
+      },
+    });
+    expect((captured.tools?.[0] as any).parameters.anyOf).toBeUndefined();
+    expect(originalParameters.type).toBe('object');
   });
 });

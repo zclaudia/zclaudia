@@ -19,6 +19,12 @@ export interface LlmProfileCompat {
   supportsReasoningEffort?: boolean;
   supportsStrictMode?: boolean;
   /**
+   * Tool JSON Schema dialect required by the upstream endpoint. Moonshot/Kimi
+   * require `type` to live inside each `anyOf` branch. Normally inferred from
+   * provider, host, or model id; set explicitly for aliases behind a proxy.
+   */
+  toolSchemaFlavor?: 'moonshot';
+  /**
    * Anthropic-style `cache_control` markers on openai-compat requests.
    * Set to 'anthropic' when routing Claude models through an
    * OpenAI-compatible proxy so prompt caching still works.

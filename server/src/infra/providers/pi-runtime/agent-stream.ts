@@ -23,6 +23,7 @@ import {
   withContextUsedTokens,
 } from './usage-extractor.js';
 import { recordPiContextUsage } from './context-observer.js';
+import { normalizeToolSchemasForModel } from './tool-schema-compat.js';
 
 export async function* runPiAgentStream(input: {
   userInput: string;
@@ -93,9 +94,19 @@ export async function* runPiAgentStream(input: {
   // disable cache_control markers (pi-ai treats it as opt-out, not default).
   const cacheRetention = options.llmProfileConfig?.cacheRetention;
   const baseStreamFn: StreamFn = hooks.streamFn ?? streamSimple;
+  // Normalize at the final outbound boundary on every turn. This also covers
+  // concrete MCP tools loaded dynamically after the Agent was constructed.
+  const schemaCompatibleStreamFn: StreamFn = (model, context, streamOptions) =>
+    baseStreamFn(
+      model,
+      context.tools
+        ? { ...context, tools: normalizeToolSchemasForModel(context.tools, model) }
+        : context,
+      streamOptions
+    );
   const cachedStreamFn: StreamFn = cacheRetention
-    ? (((m, c, o) => baseStreamFn(m, c, { ...o, cacheRetention })) as StreamFn)
-    : baseStreamFn;
+    ? (((m, c, o) => schemaCompatibleStreamFn(m, c, { ...o, cacheRetention })) as StreamFn)
+    : schemaCompatibleStreamFn;
   // Retry wrapping is unconditional: pre-first-token transient failures
   // (429/529/5xx/network) back off and retry instead of failing the run.
   agentOpts.streamFn = withStreamRetry(cachedStreamFn, {
