@@ -23,7 +23,7 @@ import {
   withContextUsedTokens,
 } from './usage-extractor.js';
 import { recordPiContextUsage } from './context-observer.js';
-import { normalizeToolSchemasForModel } from './tool-schema-compat.js';
+import { wrapStreamFnWithToolSchemaCompat } from './tool-schema-compat.js';
 
 export async function* runPiAgentStream(input: {
   userInput: string;
@@ -96,14 +96,7 @@ export async function* runPiAgentStream(input: {
   const baseStreamFn: StreamFn = hooks.streamFn ?? streamSimple;
   // Normalize at the final outbound boundary on every turn. This also covers
   // concrete MCP tools loaded dynamically after the Agent was constructed.
-  const schemaCompatibleStreamFn: StreamFn = (model, context, streamOptions) =>
-    baseStreamFn(
-      model,
-      context.tools
-        ? { ...context, tools: normalizeToolSchemasForModel(context.tools, model) }
-        : context,
-      streamOptions
-    );
+  const schemaCompatibleStreamFn: StreamFn = wrapStreamFnWithToolSchemaCompat(baseStreamFn);
   const cachedStreamFn: StreamFn = cacheRetention
     ? (((m, c, o) => schemaCompatibleStreamFn(m, c, { ...o, cacheRetention })) as StreamFn)
     : schemaCompatibleStreamFn;
