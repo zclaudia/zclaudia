@@ -13,6 +13,7 @@ import type { BuiltModel } from '../build-model.js';
 import type { AgentHooksOutput } from '../agent-hooks.js';
 import { withStreamRetry } from '../retry-stream.js';
 import { extractErrorStop, extractLastCallUsage, extractUsage } from '../usage-extractor.js';
+import { wrapStreamFnWithToolSchemaCompat } from '../tool-schema-compat.js';
 
 export interface AgentLoopExecutorInput {
   systemPrompt: string;
@@ -44,7 +45,9 @@ export class AgentLoopTimeoutError extends Error {
 }
 
 export const runPiAgentLoop: AgentLoopExecutor = async input => {
-  const baseStreamFn: StreamFn = input.hooks.streamFn ?? input.streamFn ?? streamSimple;
+  const baseStreamFn: StreamFn = wrapStreamFnWithToolSchemaCompat(
+    input.hooks.streamFn ?? input.streamFn ?? streamSimple
+  );
   const cacheRetention = input.cacheRetention;
   const cachedStreamFn: StreamFn = cacheRetention
     ? (((model, context, options) =>

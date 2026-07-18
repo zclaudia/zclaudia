@@ -127,4 +127,54 @@ describe('runPiAgentLoop', () => {
       expect.objectContaining({ temperature: 0, cacheRetention: 'long' })
     );
   });
+
+  it('normalizes tool schemas at the stream boundary for moonshot models', async () => {
+    let capturedStreamFn: StreamFn | undefined;
+    testState.runAgentLoop.mockImplementation(
+      async (_prompts, _context, _config, emit, _signal, streamFn) => {
+        capturedStreamFn = streamFn as StreamFn;
+        emit({ type: 'agent_end', messages: [] } as never);
+        return [];
+      }
+    );
+
+    const baseStreamFn = vi.fn().mockReturnValue('ok');
+    await runPiAgentLoop({
+      systemPrompt: 'system',
+      userInput: 'hello',
+      history: [],
+      modelInfo: { model: { id: 'kimi-k3' } } as never,
+      tools: [],
+      hooks: {},
+      timeoutMs: 1000,
+      sessionId: 'session-1',
+      streamFn: baseStreamFn as never,
+    });
+
+    const moonshotModel = { id: 'kimi-k3', provider: 'moonshotai', baseUrl: 'https://x' };
+    const context = {
+      tools: [
+        {
+          name: 'Read',
+          parameters: {
+            type: 'object',
+            properties: { path: { type: 'string' } },
+            anyOf: [{ required: ['path'] }, { required: ['file_path'] }],
+          },
+        },
+      ],
+    };
+    (capturedStreamFn as never as (m: unknown, c: unknown, o?: unknown) => unknown)(
+      moonshotModel,
+      context,
+      undefined
+    );
+
+    expect(baseStreamFn).toHaveBeenCalledTimes(1);
+    const forwardedContext = baseStreamFn.mock.calls[0][1] as {
+      tools: Array<{ parameters: Record<string, unknown> }>;
+    };
+    expect(forwardedContext.tools[0].parameters.anyOf).toBeUndefined();
+    expect(forwardedContext.tools[0].parameters.type).toBe('object');
+  });
 });
