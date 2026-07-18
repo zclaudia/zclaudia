@@ -11,6 +11,24 @@ export const LLM_PROVIDER_TYPES = ['anthropic', 'openai', 'openai-codex'] as con
 
 export type LlmProviderType = (typeof LLM_PROVIDER_TYPES)[number] | string;
 
+/**
+ * Per-model upstream dialect presets. Values align with pi-ai provider ids so
+ * a dialect maps 1:1 onto pi-ai's compat auto-detection. 'openai' means
+ * "force plain OpenAI behavior, no quirks" (escape hatch for normalizing
+ * proxies). Absent dialect = Auto (infer from providerType / registry hit).
+ */
+export const LLM_MODEL_DIALECTS = [
+  'moonshotai',
+  'deepseek',
+  'zai',
+  'together',
+  'openrouter',
+  'xai',
+  'openai',
+] as const;
+
+export type LlmModelDialect = (typeof LLM_MODEL_DIALECTS)[number];
+
 export type CacheRetentionSetting = 'none' | 'short' | 'long';
 export type ModelInputModality = 'text' | 'image';
 
@@ -18,12 +36,6 @@ export interface LlmProfileCompat {
   supportsDeveloperRole?: boolean;
   supportsReasoningEffort?: boolean;
   supportsStrictMode?: boolean;
-  /**
-   * Tool JSON Schema dialect required by the upstream endpoint. Moonshot/Kimi
-   * require `type` to live inside each `anyOf` branch. Normally inferred from
-   * provider, host, or model id; set explicitly for aliases behind a proxy.
-   */
-  toolSchemaFlavor?: 'moonshot';
   /**
    * Anthropic-style `cache_control` markers on openai-compat requests.
    * Set to 'anthropic' when routing Claude models through an
@@ -43,6 +55,12 @@ export interface LlmProfileModelEntry {
   contextWindow?: number;
   /** Override pi-ai's default max output tokens. Positive integer. */
   maxTokens?: number;
+  /**
+   * Upstream provider dialect. Forces provider-specific request shaping
+   * (pi-ai compat quirks + tool-schema normalization) regardless of baseUrl —
+   * the escape hatch for proxies that mask the real upstream. Absent = Auto.
+   */
+  dialect?: LlmModelDialect;
 }
 
 /**
