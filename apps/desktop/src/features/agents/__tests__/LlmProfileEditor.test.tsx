@@ -451,4 +451,38 @@ describe('LlmProfileEditor', () => {
     fireEvent.click(screen.getByRole('tab', { name: /Models/ }));
     expect(screen.queryByLabelText(/dialect for model/i)).toBeNull();
   });
+
+  it('strips a stale dialect from the payload when switching the provider type to anthropic', async () => {
+    renderEditor({
+      ...makeProfile(),
+      providerType: 'openai',
+      models: [{ modelId: 'kimi-k2', dialect: 'moonshotai' }],
+    });
+
+    // Switch Provider Type openai -> anthropic via the custom listbox. The
+    // dialect select disappears, and the stale forced dialect must NOT keep
+    // riding along in the persisted models payload.
+    fireEvent.click(screen.getByRole('button', { name: 'OpenAI' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Anthropic' }));
+
+    vi.useFakeTimers();
+    try {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(600);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+
+    await waitFor(() => {
+      expect(api.updateLlmProfileForBackend).toHaveBeenCalled();
+    });
+    const payload = vi.mocked(api.updateLlmProfileForBackend).mock.calls.at(-1)![2] as {
+      providerType: string;
+      models: Record<string, unknown>[];
+    };
+    expect(payload.providerType).toBe('anthropic');
+    expect(payload.models[0].modelId).toBe('kimi-k2');
+    expect(payload.models[0]).not.toHaveProperty('dialect');
+  });
 });

@@ -165,6 +165,19 @@ export function LlmProfileEditor({
    * back to omitting them rather than throwing, mirroring the lenient behavior
    * the server-side preview validator already accepts.
    */
+  /**
+   * Serialize the model drafts into wire entries, stripping fields that don't
+   * apply to the current provider type. Anthropic profiles have no dialect
+   * select in the UI, so a dialect chosen under a previous provider type must
+   * not silently keep forcing openai-compat request shaping — drop it at the
+   * serialize boundary (draftsToEntries itself stays provider-agnostic).
+   */
+  const serializeModelEntries = () => {
+    const entries = draftsToEntries(formModels);
+    if (formProviderType !== 'anthropic') return entries;
+    return entries.map(({ dialect: _dialect, ...rest }) => rest);
+  };
+
   const buildPreviewInputFromForm = (): LlmProfilePreviewInput => {
     let requestHeadersObj: Record<string, string> | undefined;
     if (formRequestHeaders.trim()) {
@@ -183,7 +196,7 @@ export function LlmProfileEditor({
       baseUrl: formBaseUrl.trim() || undefined,
       apiKey: formApiKey.trim() || undefined,
       requestHeaders: requestHeadersObj,
-      models: draftsToEntries(formModels),
+      models: serializeModelEntries(),
     };
   };
 
@@ -358,7 +371,7 @@ export function LlmProfileEditor({
         setFormModelsSaveError(modelsSaveError);
         return null;
       }
-      const modelsArr = isCodexProvider ? [] : draftsToEntries(formModels);
+      const modelsArr = isCodexProvider ? [] : serializeModelEntries();
       // F2: a profile with no declared models is no longer accepted. Agent
       // profiles consume `llmProfile.models` to choose which model id to send
       // and to resolve the context window — saving an empty list silently
@@ -1003,7 +1016,7 @@ function ModelRow({
   // dialect label and must fall back to plain "Auto".
   const detectedDialectLabel =
     resolved.status === 'ok' && resolved.matchedProvider
-      ? DIALECT_LABELS[resolved.matchedProvider as LlmModelDialect]
+      ? (DIALECT_LABELS as Record<string, string | undefined>)[resolved.matchedProvider]
       : undefined;
   const autoDialectLabel = detectedDialectLabel
     ? `Auto — detected: ${detectedDialectLabel}`
@@ -1147,7 +1160,7 @@ function ModelRow({
         </div>
       </div>
       <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
           <ModelTestStatus status={row.testStatus} />
           <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <input
@@ -1162,13 +1175,13 @@ function ModelRow({
             Vision
           </label>
           {providerType !== 'anthropic' && (
-            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
               Dialect
               <select
                 value={row.dialect}
                 onChange={e => onChange({ dialect: e.target.value as '' | LlmModelDialect })}
                 aria-label={`dialect for model ${row.modelId.trim() || index + 1}`}
-                className={`rounded-md border bg-background/70 px-1.5 py-1 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 ${
+                className={`max-w-[180px] rounded-md border bg-background/70 px-1.5 py-1 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 ${
                   row.dialect ? 'border-primary/50' : 'border-border/70'
                 }`}
               >
@@ -1184,7 +1197,7 @@ function ModelRow({
                   forced
                 </span>
               )}
-            </span>
+            </label>
           )}
         </div>
         <div className="flex items-center gap-1">
