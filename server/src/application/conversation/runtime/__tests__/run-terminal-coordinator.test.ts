@@ -14,6 +14,7 @@ const pluginEventsEmitMock = vi.fn(async () => {});
 
 vi.mock('../run-lifecycle.js', () => ({
   cleanupPendingPermissions: cleanupPendingPermissionsMock,
+  getSessionMessageVersion: vi.fn(() => 7),
   upsertAssistantMessage: upsertAssistantMessageMock,
 }));
 
@@ -58,11 +59,15 @@ function buildRun(overrides: Record<string, unknown> = {}): any {
 describe('run terminal coordinator', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    upsertAssistantMessageMock.mockReturnValue(7);
   });
 
   it('persists, completes, emits plugin event, heartbeat, notification, and background update', async () => {
     const activeRun = buildRun({ sessionType: 'background' });
-    const sendRunEvent = vi.fn();
+    const terminalSendPhases: string[] = [];
+    const sendRunEvent = vi.fn(event => {
+      if (event.type === 'run_completed') terminalSendPhases.push(activeRun.phase);
+    });
     const broadcastHeartbeat = vi.fn();
     const notificationsService = { postItem: vi.fn() };
     const usage = {
@@ -111,6 +116,7 @@ describe('run terminal coordinator', () => {
       })
     );
     expect(activeRun.phase).toBe('completed');
+    expect(terminalSendPhases).toEqual(['finalizing']);
     expect(runCompletedListener).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'run.completed',
@@ -118,6 +124,8 @@ describe('run terminal coordinator', () => {
         sessionId: 'session-1',
         payload: {
           usage,
+          assistantMessageId: 'assistant-1',
+          messageVersion: 7,
           content: 'done',
           contentBlocks: [{ type: 'text', content: 'done' }],
         },
@@ -177,7 +185,65 @@ describe('run terminal coordinator', () => {
     );
   });
 
-  it('emits compaction event before run_completed when auto compaction succeeds', async () => {
+  it('publishes the terminal snapshot without waiting for a stalled compaction', async () => {
+    const usage = {
+      input: 1,
+      output: 2,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 3,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    };
+    const activeRun = buildRun({
+      fullContent: 'persisted final text',
+      contentBlocks: [{ type: 'text', content: 'persisted final text' }],
+      agentProfile: { id: 'agent-1', model: 'model-1' },
+      llmProfile: { id: 'llm-1', providerType: 'zclaudia', models: [] },
+    });
+    let releaseCompaction!: (outcome: {
+      outcome: 'skipped';
+      compacted: false;
+      reason: string;
+    }) => void;
+    maybeCompactMock.mockImplementationOnce(
+      () => new Promise(resolve => (releaseCompaction = resolve))
+    );
+    const sendRunEvent = vi.fn();
+    const broadcastHeartbeat = vi.fn();
+    const { completeProviderTurn } = await import('../run-terminal-coordinator.js');
+
+    completeProviderTurn({
+      activeRun,
+      broadcastHeartbeat,
+      db: {} as any,
+      input: 'hello',
+      msg: { type: 'result', usage } as any,
+      notificationService: { notify: vi.fn() } as any,
+      providerRegistry: providerRegistry as any,
+      providerType: 'zclaudia',
+      runId: 'run-1',
+      sendRunEvent,
+      sessionId: 'session-1',
+      sessionType: 'regular',
+      state: {},
+    });
+
+    expect(activeRun.phase).toBe('completed');
+    expect(broadcastHeartbeat).toHaveBeenCalledOnce();
+    expect(sendRunEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'run_completed',
+        assistantMessageId: 'assistant-1',
+        messageVersion: 7,
+        content: 'persisted final text',
+      })
+    );
+
+    releaseCompaction({ outcome: 'skipped', compacted: false, reason: 'below_threshold' });
+    await Promise.resolve();
+  });
+
+  it('emits run_completed before asynchronous auto compaction succeeds', async () => {
     const usage = {
       input: 1,
       output: 2,
@@ -226,8 +292,8 @@ describe('run terminal coordinator', () => {
     });
     const eventTypes = sendRunEvent.mock.calls.map(([event]) => event.type);
     expect(eventTypes.indexOf('compaction_completed')).toBeGreaterThanOrEqual(0);
-    expect(eventTypes.indexOf('compaction_completed')).toBeLessThan(
-      eventTypes.indexOf('run_completed')
+    expect(eventTypes.indexOf('run_completed')).toBeLessThan(
+      eventTypes.indexOf('compaction_completed')
     );
     expect(compactionCompletedListener).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -242,7 +308,7 @@ describe('run terminal coordinator', () => {
     );
   });
 
-  it('emits compaction.failed domain event before run_completed when auto compaction fails', async () => {
+  it('emits run_completed before asynchronous auto compaction fails', async () => {
     const usage = {
       input: 1,
       output: 2,
@@ -294,8 +360,8 @@ describe('run terminal coordinator', () => {
     });
     const eventTypes = sendRunEvent.mock.calls.map(([event]) => event.type);
     expect(eventTypes.indexOf('compaction_failed')).toBeGreaterThanOrEqual(0);
-    expect(eventTypes.indexOf('compaction_failed')).toBeLessThan(
-      eventTypes.indexOf('run_completed')
+    expect(eventTypes.indexOf('run_completed')).toBeLessThan(
+      eventTypes.indexOf('compaction_failed')
     );
     expect(compactionFailedListener).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -346,6 +412,8 @@ describe('run terminal coordinator', () => {
       sessionId: 'session-1',
       error: 'formatted provider error',
       errorCode: 'BAD_MODEL',
+      assistantMessageId: 'assistant-1',
+      messageVersion: 7,
     });
     expect(activeRun.phase).toBe('failed');
     expect(runFailedListener).toHaveBeenCalledWith(
@@ -356,6 +424,8 @@ describe('run terminal coordinator', () => {
         payload: {
           error: 'formatted provider error',
           errorCode: 'BAD_MODEL',
+          assistantMessageId: 'assistant-1',
+          messageVersion: 7,
         },
       })
     );

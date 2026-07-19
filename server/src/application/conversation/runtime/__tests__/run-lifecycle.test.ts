@@ -46,7 +46,9 @@ function makeActiveRun(
       authenticated: true,
     },
     pendingPermissions: new Map(),
-    db: {} as never,
+    db: {
+      prepare: vi.fn(() => ({ get: vi.fn(() => ({ messageVersion: 0 })) })),
+    } as never,
     sessionId: overrides.sessionId ?? 's1',
     projectId: 'p1',
     assistantMessageId: 'a1',

@@ -51,6 +51,7 @@ vi.mock('../../transport/broadcast.js', () => ({
 describe('ws/run-events', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    upsertAssistantMessageMock.mockReturnValue(7);
     vi.useFakeTimers();
   });
 
@@ -1540,7 +1541,7 @@ describe('run-events agent_end -> maybeCompact', () => {
     );
   });
 
-  it('sends compaction_completed event before run_completed when compaction succeeds', async () => {
+  it('sends run_completed before asynchronous compaction_completed', async () => {
     const sendRunEventMock = vi.fn();
     const agentProfile = { id: 'ap1', model: 'claude-sonnet-4-6' } as any;
     const llmProfile = {
@@ -1611,7 +1612,7 @@ describe('run-events agent_end -> maybeCompact', () => {
     const completedIdx = calls.findIndex(e => e?.type === 'run_completed');
     expect(compactionIdx).toBeGreaterThanOrEqual(0);
     expect(completedIdx).toBeGreaterThanOrEqual(0);
-    expect(compactionIdx).toBeLessThan(completedIdx);
+    expect(completedIdx).toBeLessThan(compactionIdx);
     expect(calls[compactionIdx]).toMatchObject({
       type: 'compaction_completed',
       runId: 'run-1',

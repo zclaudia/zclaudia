@@ -170,6 +170,7 @@ interface PaginationInfo {
   oldestTimestamp?: number;
   newestTimestamp?: number;
   maxOffset?: number;
+  messageVersion?: number;
 }
 
 interface MessagesResponse {

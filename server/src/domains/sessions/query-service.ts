@@ -13,7 +13,8 @@ const SESSION_SELECT = `id, project_id as projectId, name, agent_profile_id as a
                last_run_status as lastRunStatus,
                CASE WHEN is_read_only = 1 THEN 1 ELSE NULL END as isReadOnly,
                sort_order as sortOrder,
-               created_at as createdAt, updated_at as updatedAt`;
+               created_at as createdAt, updated_at as updatedAt,
+               message_version as messageVersion`;
 
 export interface SyncedSessionSummary {
   id: string;
@@ -25,6 +26,7 @@ export interface SyncedSessionSummary {
   updatedAt: number;
   isActive: boolean;
   lastMessageOffset?: number;
+  messageVersion: number;
 }
 
 export interface SessionSyncResult {
@@ -131,13 +133,17 @@ export class SessionQueryService {
              s.plan_status as planStatus,
              CASE WHEN s.is_read_only = 1 THEN 1 ELSE NULL END as isReadOnly,
              s.created_at as createdAt, s.updated_at as updatedAt,
+             s.message_version as messageVersion,
              (SELECT MAX(offset) FROM messages WHERE session_id = s.id) as lastMessageOffset
       FROM sessions s
       WHERE s.updated_at > ? AND s.archived_at IS NULL
       ORDER BY s.updated_at DESC
     `
       )
-      .all(sinceTimestamp) as (Session & { lastMessageOffset: number | null })[];
+      .all(sinceTimestamp) as (Session & {
+      lastMessageOffset: number | null;
+      messageVersion: number;
+    })[];
 
     const syncedSessions: SyncedSessionSummary[] = sessions.map(session => ({
       id: session.id,
@@ -149,6 +155,7 @@ export class SessionQueryService {
       updatedAt: session.updatedAt,
       isActive: hasForegroundActiveRunForSession(this.activeRuns as Map<string, any>, session.id),
       lastMessageOffset: session.lastMessageOffset ?? undefined,
+      messageVersion: session.messageVersion,
     }));
 
     return {

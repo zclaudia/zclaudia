@@ -41,28 +41,44 @@ async function fillMessageGapForSession(
 ): Promise<void> {
   const currentSessionId = useSelectionStore.getState().selectedSessionId;
   if (!currentSessionId || session.id !== currentSessionId) return;
-  if (!session.lastMessageOffset) return;
+  if (!session.lastMessageOffset && session.messageVersion == null) return;
 
   const pagination = useChatMessageStore.getState().pagination[currentSessionId];
   const localMaxOffset = afterOffsetOverride ?? pagination?.maxOffset ?? 0;
+  const localMessageVersion = pagination?.messageVersion ?? 0;
+  const hasOffsetGap = (session.lastMessageOffset ?? 0) > localMaxOffset;
+  const hasStaleProjection =
+    session.messageVersion != null && session.messageVersion > localMessageVersion;
 
-  // If server's max offset is ahead of what we have, fetch missing messages.
-  if (session.lastMessageOffset <= localMaxOffset) return;
+  // Offsets detect inserted rows; messageVersion also detects an UPSERT that
+  // changed the final assistant body without allocating a new offset.
+  if (!hasOffsetGap && !hasStaleProjection) return;
 
   try {
-    console.log(
-      `[SessionSync] Gap detected for session ${currentSessionId}: ` +
-        `local maxOffset=${localMaxOffset}, server lastMessageOffset=${session.lastMessageOffset}`
-    );
-    const result = await api.getSessionMessages(currentSessionId, {
-      afterOffset: localMaxOffset,
-      limit: 100,
-    });
-    if (result.messages.length > 0) {
+    if (hasOffsetGap) {
+      console.log(
+        `[SessionSync] Offset gap for session ${currentSessionId}: ` +
+          `local=${localMaxOffset}, server=${session.lastMessageOffset}`
+      );
+      const result = await api.getSessionMessages(currentSessionId, {
+        afterOffset: localMaxOffset,
+        limit: 100,
+      });
       useChatMessageStore
         .getState()
-        .appendMessages(currentSessionId, restoreToolCalls(result.messages), result.pagination);
-      console.log(`[SessionSync] Filled ${result.messages.length} missing messages`);
+        .mergeMessages(currentSessionId, restoreToolCalls(result.messages), result.pagination);
+      console.log(`[SessionSync] Reconciled ${result.messages.length} offset-gap messages`);
+    }
+
+    if (hasStaleProjection) {
+      console.log(
+        `[SessionSync] Stale message projection for session ${currentSessionId}: ` +
+          `local version=${localMessageVersion}, server version=${session.messageVersion}`
+      );
+      const result = await api.getSessionMessages(currentSessionId, { limit: 100 });
+      useChatMessageStore
+        .getState()
+        .mergeMessages(currentSessionId, restoreToolCalls(result.messages), result.pagination);
     }
   } catch (error) {
     console.error('[SessionSync] Failed to fill message gap:', error);

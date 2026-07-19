@@ -44,6 +44,8 @@ export interface RunRetryStatus {
 interface RunState {
   // Active runs: runId → sessionId (supports concurrent runs)
   activeRuns: Record<string, string>;
+  // Run → persisted assistant row. Terminal events must update this exact row.
+  assistantMessageIds: Record<string, string>;
   // Background run IDs: runs that should not affect the session's loading state
   backgroundRunIds: Set<string>;
   // Run health info from server heartbeat: runId → RunHealth
@@ -58,7 +60,12 @@ interface RunState {
   runContentBlocks: Record<string, ContentBlock[]>;
 
   // Actions — Run lifecycle
-  startRun: (runId: string, sessionId: string, isBackground?: boolean) => void;
+  startRun: (
+    runId: string,
+    sessionId: string,
+    isBackground?: boolean,
+    assistantMessageId?: string
+  ) => void;
   endRun: (runId: string) => void;
   updateRunHealth: (runId: string, health: RunHealth) => void;
   updateRunRetryStatus: (runId: string, status: RunRetryStatus) => void;
@@ -94,7 +101,14 @@ interface RunState {
   // raced ahead of run_completed).
   finalizeRunToMessage: (
     runId: string,
-    final?: { sessionId?: string; content?: string; contentBlocks?: ContentBlock[] }
+    final?: {
+      sessionId?: string;
+      assistantMessageId?: string;
+      messageVersion?: number;
+      content?: string;
+      contentBlocks?: ContentBlock[];
+      error?: string;
+    }
   ) => void;
 
   // Getters
@@ -108,6 +122,7 @@ interface RunState {
 
 export const useRunStore = create<RunState>((set, get) => ({
   activeRuns: {},
+  assistantMessageIds: {},
   backgroundRunIds: new Set<string>(),
   runHealth: {},
   runRetryStatus: {},
@@ -117,11 +132,14 @@ export const useRunStore = create<RunState>((set, get) => ({
 
   // ── Run lifecycle ──────────────────────────────────────────────
 
-  startRun: (runId, sessionId, isBackground) => {
+  startRun: (runId, sessionId, isBackground, assistantMessageId) => {
     const newBackgroundRunIds = new Set(get().backgroundRunIds);
     if (isBackground) newBackgroundRunIds.add(runId);
     set(state => ({
       activeRuns: { ...state.activeRuns, [runId]: sessionId },
+      assistantMessageIds: assistantMessageId
+        ? { ...state.assistantMessageIds, [runId]: assistantMessageId }
+        : state.assistantMessageIds,
       backgroundRunIds: newBackgroundRunIds,
       activeToolCalls: { ...state.activeToolCalls, [runId]: {} },
       toolCallsHistory: { ...state.toolCallsHistory, [runId]: [] },
@@ -133,6 +151,7 @@ export const useRunStore = create<RunState>((set, get) => ({
     const sessionId = get().activeRuns[runId];
     set(state => {
       const { [runId]: _removedRun, ...remainingRuns } = state.activeRuns;
+      const { [runId]: _removedMessageId, ...remainingMessageIds } = state.assistantMessageIds;
       const { [runId]: _removedTC, ...remainingTC } = state.activeToolCalls;
       const { [runId]: _removedHist, ...remainingHist } = state.toolCallsHistory;
       const { [runId]: _removedCB, ...remainingCB } = state.runContentBlocks;
@@ -142,6 +161,7 @@ export const useRunStore = create<RunState>((set, get) => ({
       newBackgroundRunIds.delete(runId);
       return {
         activeRuns: remainingRuns,
+        assistantMessageIds: remainingMessageIds,
         backgroundRunIds: newBackgroundRunIds,
         activeToolCalls: remainingTC,
         toolCallsHistory: remainingHist,
@@ -294,14 +314,23 @@ export const useRunStore = create<RunState>((set, get) => ({
   // Finalize run data (tool calls + content blocks) onto the assistant message in one atomic update.
   // Prefers existing data when it's more complete (e.g., from API/metadata loaded before mid-stream join).
   finalizeRunToMessage: (runId, final) => {
-    const sessionId = get().activeRuns[runId] ?? final?.sessionId;
+    const trackedSessionId = get().activeRuns[runId];
+    const sessionId = trackedSessionId ?? final?.sessionId;
     if (!sessionId) return;
+    const assistantMessageId = final?.assistantMessageId ?? get().assistantMessageIds[runId];
     const runHistory = get().toolCallsHistory[runId] || [];
     const blocks = get().runContentBlocks[runId] || [];
     useChatMessageStore.setState(state => {
       const sessionMessages = state.messages[sessionId] || [];
       if (sessionMessages.length === 0) return state;
-      const assistantIdx = findLastAssistantMessageIndex(sessionMessages);
+      // Legacy events without an assistantMessageId may only use the old
+      // last-assistant fallback while the run is still actively tracked. A
+      // late terminal event for an old run must never overwrite a newer run.
+      const assistantIdx = assistantMessageId
+        ? sessionMessages.findIndex(message => message.id === assistantMessageId)
+        : trackedSessionId
+          ? findLastAssistantMessageIndex(sessionMessages)
+          : -1;
       if (assistantIdx === -1) return state;
       const assistantMessage = sessionMessages[assistantIdx];
       const existingToolCalls = assistantMessage.toolCalls || [];
@@ -313,13 +342,31 @@ export const useRunStore = create<RunState>((set, get) => ({
         : blocks.length >= existingBlocks.length
           ? [...blocks]
           : existingBlocks;
-      const content = final?.content ? final.content : assistantMessage.content;
+      let content = final?.content !== undefined ? final.content : assistantMessage.content;
+      if (final?.error && !content.includes(`**Error:** ${final.error}`)) {
+        content += `\n\n**Error:** ${final.error}`;
+      }
       const updatedMessages = [
         ...sessionMessages.slice(0, assistantIdx),
         { ...assistantMessage, content, toolCalls, contentBlocks },
         ...sessionMessages.slice(assistantIdx + 1),
       ];
-      return { messages: { ...state.messages, [sessionId]: updatedMessages } };
+      const existingPagination = state.pagination[sessionId];
+      const pagination =
+        final?.messageVersion != null
+          ? {
+              ...state.pagination,
+              [sessionId]: {
+                ...(existingPagination ?? { total: sessionMessages.length, hasMore: false }),
+                messageVersion: Math.max(
+                  final.messageVersion,
+                  existingPagination?.messageVersion ?? 0
+                ),
+                isLoadingMore: false,
+              },
+            }
+          : state.pagination;
+      return { messages: { ...state.messages, [sessionId]: updatedMessages }, pagination };
     });
   },
 

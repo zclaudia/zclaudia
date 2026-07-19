@@ -6,6 +6,8 @@ import { useRecoveryStore } from '../../stores/recoveryStore';
 import { useToastStore } from '../../stores/toastStore';
 import { handleServerMessage } from '../../services/messageHandler';
 import { getFacadeServerRuns } from './state';
+import { restoreToolCalls } from '../../services/message-hydration';
+import type { MessageMetadata } from '@zclaudia/shared';
 
 export function forwardRunEvent(event: Extract<BackendFacadeEvent, { type: 'run_event' }>): void {
   const { backendId, event: serverEvent } = event;
@@ -24,17 +26,23 @@ export function syncContentPatch(
   event: Extract<BackendFacadeEvent, { type: 'content_patch' }>
 ): void {
   const { sessionId, messages, latestOffset } = event;
-  const restoredMessages: MessageWithToolCalls[] = messages.map((msg: SessionMessage) => ({
-    id: msg.messageId,
-    sessionId: msg.sessionId,
-    role: msg.role === 'tool' ? 'assistant' : msg.role,
-    createdAt: msg.createdAt,
-    offset: msg.offset,
-    content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
-  }));
+  const restoredMessages: MessageWithToolCalls[] = restoreToolCalls(
+    messages.map((msg: SessionMessage) => {
+      const extended = msg as SessionMessage & { metadata?: MessageMetadata };
+      return {
+        id: msg.messageId,
+        sessionId: msg.sessionId,
+        role: msg.role === 'tool' ? 'assistant' : msg.role,
+        createdAt: msg.createdAt,
+        offset: msg.offset,
+        content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
+        metadata: extended.metadata,
+      };
+    })
+  );
   useChatMessageStore
     .getState()
-    .appendMessages(sessionId, restoredMessages, { maxOffset: latestOffset });
+    .mergeMessages(sessionId, restoredMessages, { maxOffset: latestOffset });
   useRecoveryStore.getState().noteActiveSessionMessage();
 }
 

@@ -10,6 +10,7 @@ import { LEGACY_LOCAL_SERVER_ID, resolveCanonicalBackendId } from '../utils/cont
 export interface RemoteSession extends Session {
   isActive: boolean; // Whether there's an active run
   lastMessageOffset?: number; // Max message offset (for gap detection)
+  messageVersion?: number; // Detects updates to an existing same-offset message
 }
 
 export const LOCAL_BACKEND_KEY = '__local__';

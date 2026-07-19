@@ -41,6 +41,20 @@ describe('chatMessageStore', () => {
     expect(useChatMessageStore.getState().messages.s1[1].content).toBe('hi there');
   });
 
+  it('appendToMessage targets the specified assistant instead of the latest one', () => {
+    useChatMessageStore.getState().setMessages('s1', [
+      { id: 'a1', sessionId: 's1', role: 'assistant', content: 'old', createdAt: 1 },
+      { id: 'a2', sessionId: 's1', role: 'assistant', content: 'new', createdAt: 2 },
+    ]);
+
+    useChatMessageStore.getState().appendToMessage('s1', 'a1', ' tail');
+
+    expect(useChatMessageStore.getState().messages.s1.map(message => message.content)).toEqual([
+      'old tail',
+      'new',
+    ]);
+  });
+
   it('mergeMessages merges by id and sorts by createdAt', () => {
     useChatMessageStore.getState().setMessages('s1', [msg('b', 'assistant', 2)]);
     useChatMessageStore.getState().mergeMessages('s1', [msg('a', 'user', 1)]);

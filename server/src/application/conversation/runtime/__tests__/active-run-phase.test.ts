@@ -29,6 +29,7 @@ describe('isTerminalPhase', () => {
     expect(isTerminalPhase('awaiting_permission')).toBe(false);
     expect(isTerminalPhase('awaiting_followup')).toBe(false);
     expect(isTerminalPhase('cancelling')).toBe(false);
+    expect(isTerminalPhase('finalizing')).toBe(false);
   });
 });
 
@@ -37,8 +38,15 @@ describe('isValidTransition', () => {
     expect(isValidTransition('running', 'awaiting_permission')).toBe(true);
     expect(isValidTransition('running', 'awaiting_followup')).toBe(true);
     expect(isValidTransition('running', 'cancelling')).toBe(true);
+    expect(isValidTransition('running', 'finalizing')).toBe(true);
     expect(isValidTransition('running', 'completed')).toBe(true);
     expect(isValidTransition('running', 'failed')).toBe(true);
+  });
+
+  it('finalizing can only publish a terminal success or failure', () => {
+    expect(isValidTransition('finalizing', 'completed')).toBe(true);
+    expect(isValidTransition('finalizing', 'failed')).toBe(true);
+    expect(isValidTransition('finalizing', 'running')).toBe(false);
   });
 
   it('awaiting_permission and awaiting_followup can interchange and return to running', () => {

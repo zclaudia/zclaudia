@@ -285,7 +285,10 @@ export const useSessionRunStateStore = create<SessionRunState>((set, get) => ({
   applySessionRunStatus: ({ backendId, sessionId, runStatus, isActive, source }) => {
     const phase = runStatusToPhase(runStatus, isActive);
     if (phase === 'idle') {
-      get().markSessionInactive({ backendId, sessionId, source });
+      // Session catalog state is not an authoritative run terminal signal.
+      // Keep the chat run/assistant identity until run_completed/run_failed or
+      // heartbeat reconciliation can finalize it and recover the persisted tail.
+      get().markSessionInactive({ backendId, sessionId, source, cleanupChatRuns: false });
       return;
     }
 
@@ -417,12 +420,14 @@ export const useSessionRunStateStore = create<SessionRunState>((set, get) => ({
       if (activeSessionIds.has(session.sessionId)) {
         setLegacySessionActive(normalizedBackendId, session.sessionId, true);
       } else {
-        cleanupForegroundChatRunsForSession(session.sessionId);
-        clearSessionBlockingState(session.sessionId);
         setLegacySessionActive(normalizedBackendId, session.sessionId, false);
       }
     }
-    cleanupForegroundChatRunsForBackend(normalizedBackendId, new Set(), cleanupKnownSessionIds);
+    // Do not tear down chat runs from a catalog snapshot. A terminal event or
+    // active-run heartbeat owns that transition and preserves final-message
+    // ordering. cleanupKnownSessionIds remains part of snapshot accounting for
+    // callers but is intentionally not used as terminal evidence.
+    void cleanupKnownSessionIds;
   },
 
   markSessionInactive: ({ backendId, sessionId, source, cleanupChatRuns = true }) => {

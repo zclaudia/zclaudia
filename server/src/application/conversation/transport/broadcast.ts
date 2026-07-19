@@ -92,6 +92,7 @@ export function buildStateHeartbeat(activeRuns: Map<string, ActiveRun>): StateHe
     runs.push({
       runId,
       sessionId: run.sessionId,
+      assistantMessageId: run.assistantMessageId,
       startedAt: run.startedAt,
       lastActivityAt: run.lastActivityAt,
       health,

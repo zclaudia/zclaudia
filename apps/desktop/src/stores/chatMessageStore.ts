@@ -8,6 +8,7 @@ export interface PaginationInfo {
   oldestTimestamp?: number;
   newestTimestamp?: number;
   maxOffset?: number; // Highest message offset loaded (for gap detection)
+  messageVersion?: number; // Monotonic server revision (detects same-offset updates)
   isLoadingMore: boolean;
 }
 
@@ -62,6 +63,7 @@ interface ChatMessageState {
     newId: string
   ) => void;
   appendToLastMessage: (sessionId: string, content: string) => void;
+  appendToMessage: (sessionId: string, messageId: string, content: string) => void;
   clearMessages: (sessionId: string) => void;
   setLoadingMore: (sessionId: string, loading: boolean) => void;
   getPagination: (sessionId: string) => PaginationInfo | undefined;
@@ -113,10 +115,16 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
       // Deduplicate by message ID
       const existingIds = new Set(existingMessages.map(m => m.id));
       const deduped = newMessages.filter(m => !existingIds.has(m.id));
-      if (deduped.length === 0) return state;
+      const existingPagination = state.pagination[sessionId] || DEFAULT_PAGINATION;
+      const nextMessageVersion =
+        pagination?.messageVersion != null
+          ? Math.max(pagination.messageVersion, existingPagination.messageVersion ?? 0)
+          : existingPagination.messageVersion;
+      if (deduped.length === 0 && nextMessageVersion === existingPagination.messageVersion) {
+        return state;
+      }
 
       const combined = [...existingMessages, ...deduped];
-      const existingPagination = state.pagination[sessionId] || DEFAULT_PAGINATION;
 
       return {
         messages: { ...state.messages, [sessionId]: combined },
@@ -133,6 +141,7 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
               pagination?.maxOffset != null
                 ? Math.max(pagination.maxOffset, existingPagination.maxOffset ?? 0)
                 : existingPagination.maxOffset,
+            messageVersion: nextMessageVersion,
             isLoadingMore: false,
           },
         },
@@ -169,6 +178,10 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
               pagination.maxOffset != null
                 ? Math.max(pagination.maxOffset, existingPagination.maxOffset ?? 0)
                 : existingPagination.maxOffset,
+            messageVersion:
+              pagination.messageVersion != null
+                ? Math.max(pagination.messageVersion, existingPagination.messageVersion ?? 0)
+                : existingPagination.messageVersion,
             isLoadingMore: false,
           }
         : existingPagination;
@@ -245,6 +258,17 @@ export const useChatMessageStore = create<ChatMessageState>((set, get) => ({
       return {
         messages: { ...state.messages, [sessionId]: updatedMessages },
       };
+    }),
+
+  appendToMessage: (sessionId, messageId, content) =>
+    set(state => {
+      const sessionMessages = state.messages[sessionId] || [];
+      const messageIdx = sessionMessages.findIndex(message => message.id === messageId);
+      if (messageIdx === -1) return state;
+      const message = sessionMessages[messageIdx];
+      const updatedMessages = [...sessionMessages];
+      updatedMessages[messageIdx] = { ...message, content: message.content + content };
+      return { messages: { ...state.messages, [sessionId]: updatedMessages } };
     }),
 
   clearMessages: sessionId =>

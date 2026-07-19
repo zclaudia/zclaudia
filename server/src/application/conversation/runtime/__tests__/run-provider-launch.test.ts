@@ -48,6 +48,7 @@ vi.mock('../../../../infra/providers/pi-runtime/skills.js', () => ({
 
 vi.mock('../../compaction/compaction-service.js', () => ({
   maybeCompact: maybeCompactMock,
+  waitForPendingCompaction: vi.fn(async () => undefined),
 }));
 
 async function* providerStream() {
@@ -61,6 +62,7 @@ async function* providerStream() {
 describe('ws/run-provider-launch', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    upsertAssistantMessageMock.mockReturnValue(7);
     vi.useFakeTimers();
     buildRunContextMock.mockResolvedValue({
       nativeMode: 'default',

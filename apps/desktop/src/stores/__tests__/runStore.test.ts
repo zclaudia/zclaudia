@@ -7,6 +7,7 @@ import type { MessageWithToolCalls } from '../chatMessageStore';
 const reset = () => {
   useRunStore.setState({
     activeRuns: {},
+    assistantMessageIds: {},
     backgroundRunIds: new Set(),
     runHealth: {},
     runRetryStatus: {},
@@ -28,10 +29,11 @@ describe('runStore', () => {
   beforeEach(reset);
 
   it('startRun registers run + initializes per-run buckets', () => {
-    useRunStore.getState().startRun('r1', 's1');
+    useRunStore.getState().startRun('r1', 's1', false, 'm1');
     expect(useRunStore.getState().activeRuns.r1).toBe('s1');
     expect(useRunStore.getState().getSessionRunId('s1')).toBe('r1');
     expect(useRunStore.getState().activeToolCalls.r1).toEqual({});
+    expect(useRunStore.getState().assistantMessageIds.r1).toBe('m1');
   });
 
   it('isSessionLoading ignores background runs', () => {
@@ -125,11 +127,52 @@ describe('runStore', () => {
     // No startRun: activeRuns has no entry for this run.
     useRunStore.getState().finalizeRunToMessage('r-gone', {
       sessionId: 's1',
+      assistantMessageId: 'm1',
       content: 'full final text',
       contentBlocks: [{ type: 'text', content: 'full final text' }],
     });
     const finalized = useChatMessageStore.getState().messages.s1[0];
     expect(finalized.content).toBe('full final text');
     expect(finalized.contentBlocks).toEqual([{ type: 'text', content: 'full final text' }]);
+  });
+
+  it('finalizes the run-bound assistant row and never overwrites a newer assistant', () => {
+    useChatMessageStore.getState().setMessages('s1', [
+      { id: 'old-assistant', sessionId: 's1', role: 'assistant', content: 'partial', createdAt: 1 },
+      { id: 'new-assistant', sessionId: 's1', role: 'assistant', content: 'new run', createdAt: 2 },
+    ]);
+    useRunStore.getState().startRun('old-run', 's1', false, 'old-assistant');
+
+    useRunStore.getState().finalizeRunToMessage('old-run', {
+      assistantMessageId: 'old-assistant',
+      content: 'complete old run',
+      messageVersion: 12,
+    });
+
+    const [oldMessage, newMessage] = useChatMessageStore.getState().messages.s1;
+    expect(oldMessage.content).toBe('complete old run');
+    expect(newMessage.content).toBe('new run');
+    expect(useChatMessageStore.getState().pagination.s1.messageVersion).toBe(12);
+  });
+
+  it('ignores an identity-less late terminal event after run tracking was removed', () => {
+    useChatMessageStore
+      .getState()
+      .setMessages('s1', [
+        {
+          id: 'new-assistant',
+          sessionId: 's1',
+          role: 'assistant',
+          content: 'new run',
+          createdAt: 2,
+        },
+      ]);
+
+    useRunStore.getState().finalizeRunToMessage('old-run', {
+      sessionId: 's1',
+      content: 'late old result',
+    });
+
+    expect(useChatMessageStore.getState().messages.s1[0].content).toBe('new run');
   });
 });

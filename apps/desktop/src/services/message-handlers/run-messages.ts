@@ -71,7 +71,7 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
 
       const chat = useRunStore.getState();
       const alreadyTrackingRun = chat.activeRuns[msg.runId] === targetSessionId;
-      chat.startRun(msg.runId, targetSessionId, isBackground);
+      chat.startRun(msg.runId, targetSessionId, isBackground, assistantMsgId);
       const now = Date.now();
       chat.updateRunHealth(msg.runId, {
         sessionId: targetSessionId,
@@ -132,6 +132,8 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
         // the client-side tracking.
         useRunStore.getState().finalizeRunToMessage(msg.runId, {
           sessionId: completedSession,
+          assistantMessageId: msg.assistantMessageId,
+          messageVersion: msg.messageVersion,
           content: msg.content,
           contentBlocks: msg.contentBlocks,
         });
@@ -181,11 +183,15 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
               icon: 'error',
             });
           }
-          useChatMessageStore
-            .getState()
-            .appendToLastMessage(failedSession, `\n\n**Error:** ${msg.error}`);
         }
-        useRunStore.getState().finalizeRunToMessage(msg.runId);
+        useRunStore.getState().finalizeRunToMessage(msg.runId, {
+          sessionId: failedSession,
+          assistantMessageId: msg.assistantMessageId,
+          messageVersion: msg.messageVersion,
+          content: msg.content,
+          contentBlocks: msg.contentBlocks,
+          error: msg.error,
+        });
         useSessionRunStateStore.getState().markRunEnded({
           backendId,
           runId: msg.runId,

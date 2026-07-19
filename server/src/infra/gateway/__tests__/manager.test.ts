@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import { GatewayManager } from '../manager.js';
 
 const { gatewayClientInstances } = vi.hoisted(() => ({
@@ -205,6 +204,61 @@ describe('GatewayManager', () => {
     const localHandler = (manager as any).createLocalBackendHandler();
 
     await expect(localHandler.onCatchUp('session-1', 5)).rejects.toThrow('db failed');
+  });
+
+  it('gateway catch-up rethrows DB errors so clients receive a patch failure', async () => {
+    const { manager, serverContext } = createManager();
+    await manager.connect({
+      id: 1,
+      enabled: true,
+      gatewayUrl: 'ws://gateway.example.com',
+      gatewaySecret: 'secret',
+      backendName: 'backend',
+      gatewayBackendId: null,
+      registerAsBackend: true,
+      createdAt: 0,
+      updatedAt: 0,
+    });
+    serverContext.db.prepare = vi.fn().mockReturnValue({
+      all: vi.fn(() => {
+        throw new Error('db failed');
+      }),
+    });
+
+    const client = gatewayClientInstances.at(-1)!;
+    await expect(client.onCatchUp?.('session-1', 5)).rejects.toThrow('db failed');
+  });
+
+  it('local backend catch-up carries persisted assistant metadata', async () => {
+    const { manager, serverContext } = createManager();
+    serverContext.db.prepare = vi.fn().mockReturnValue({
+      all: vi.fn(() => [
+        {
+          messageId: 'assistant-1',
+          sessionId: 'session-1',
+          offset: 2,
+          role: 'assistant',
+          createdAt: 1,
+          content: 'complete body',
+          metadata: JSON.stringify({
+            contentBlocks: [{ type: 'text', content: 'complete body' }],
+          }),
+        },
+      ]),
+    });
+
+    const localHandler = (manager as any).createLocalBackendHandler();
+    const messages = await localHandler.onCatchUp('session-1', 1);
+
+    expect(messages).toEqual([
+      expect.objectContaining({
+        messageId: 'assistant-1',
+        content: 'complete body',
+        metadata: {
+          contentBlocks: [{ type: 'text', content: 'complete body' }],
+        },
+      }),
+    ]);
   });
 
   it('does not reattach orphaned runs to an unrelated incoming channel', async () => {

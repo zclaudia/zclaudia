@@ -1,5 +1,6 @@
 import type { StateHeartbeatMessage } from '@zclaudia/shared';
 import { useRunStore } from '../../stores/runStore';
+import { useChatMessageStore } from '../../stores/chatMessageStore';
 import { useSessionConfigStore } from '../../stores/sessionConfigStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useServerStore } from '../../stores/serverStore';
@@ -80,11 +81,9 @@ export interface HeartbeatState {
 
 /**
  * A tracked run must be missing from this many consecutive heartbeats before
- * the client tears it down. The server's terminal sequence can emit a heartbeat
- * that no longer lists the run *before* run_completed reaches the client (the
- * auto-compaction branch marks the run phase terminal, then emits run_completed
- * only after an async gap) — cleaning up on the first miss would race that
- * terminal event and drop its authoritative final content.
+ * the client tears it down. Current servers publish the authoritative terminal
+ * snapshot before removing the run; this grace remains for rolling upgrades,
+ * reconnect replay, and older backends that may still expose the inverse order.
  */
 const HEARTBEAT_MISS_GRACE = 2;
 
@@ -169,7 +168,21 @@ export function handleHeartbeat(
       console.log(
         `[${logTag}] Heartbeat resurrecting run ${run.runId} sessionId=${run.sessionId} lastSeq=${run.lastSeq ?? 'none'}`
       );
-      chatState.startRun(run.runId, run.sessionId, isBackground);
+      if (run.assistantMessageId) {
+        chatState.startRun(run.runId, run.sessionId, isBackground, run.assistantMessageId);
+        const messages = useChatMessageStore.getState().messages[run.sessionId] ?? [];
+        if (!messages.some(message => message.id === run.assistantMessageId)) {
+          useChatMessageStore.getState().addMessage(run.sessionId, {
+            id: run.assistantMessageId,
+            sessionId: run.sessionId,
+            role: 'assistant',
+            content: '',
+            createdAt: run.startedAt,
+          });
+        }
+      } else {
+        chatState.startRun(run.runId, run.sessionId, isBackground);
+      }
       if (!isBackground) {
         if (!serverRunsRef.has(serverId)) {
           serverRunsRef.set(serverId, new Set());
@@ -179,8 +192,8 @@ export function handleHeartbeat(
     }
   }
 
-  // Clean up stale runs (only after HEARTBEAT_MISS_GRACE consecutive misses —
-  // a single miss can be the terminal heartbeat racing ahead of run_completed).
+  // Treat the grace interval as "awaiting final snapshot". Do not destructively
+  // end the local run on the first missing heartbeat.
   // Runs still within grace are collected so the session-run-state
   // reconciliation below also keeps treating them as active.
   const graceRuns: Array<{ runId: string; sessionId?: string }> = [];

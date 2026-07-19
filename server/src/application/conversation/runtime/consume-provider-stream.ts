@@ -8,6 +8,7 @@ import { handleProviderEvent, type ProviderEventState } from './run-events.js';
 import { postRunCompletedNotification } from './run-terminal-notifications.js';
 import { spawnBackgroundFollowUpConsumer } from './background-follow-up.js';
 import { setPhase, isTerminalPhase } from './active-run-phase.js';
+import { persistAssistantTerminalSnapshot } from './run-terminal-snapshot.js';
 
 interface ConsumeProviderStreamInput {
   activeRun: ActiveRun;
@@ -174,10 +175,13 @@ export async function consumeProviderStream(input: ConsumeProviderStreamInput): 
       { runId, providerType },
       'provider stream ended without result event'
     );
+    setPhase(activeRun, 'finalizing');
+    const terminalSnapshot = persistAssistantTerminalSnapshot(activeRun, { indexMetadata: true });
     sendRunEvent({
       type: 'run_completed',
       runId,
       sessionId,
+      ...terminalSnapshot,
     });
     setPhase(activeRun, 'completed');
     broadcastHeartbeat();

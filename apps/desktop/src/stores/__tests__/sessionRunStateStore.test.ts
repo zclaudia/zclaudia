@@ -26,6 +26,7 @@ function resetStores() {
   useSessionRunStateStore.setState({ records: {} });
   useRunStore.setState({
     activeRuns: {},
+    assistantMessageIds: {},
     backgroundRunIds: new Set(),
     runHealth: {},
     activeToolCalls: {},
@@ -84,7 +85,7 @@ describe('sessionRunStateStore', () => {
     expect(useSessionsStore.getState().activeSessionIdsByBackend.get('b1')?.has('s1')).toBe(true);
   });
 
-  it('authoritative idle status clears a stale chat run', () => {
+  it('catalog idle status preserves the chat run until terminal reconciliation', () => {
     useRunStore.getState().startRun('r1', 's1');
     useSessionRunStateStore.getState().markRunStarted({
       backendId: 'b1',
@@ -100,7 +101,7 @@ describe('sessionRunStateStore', () => {
       source: 'backend_event',
     });
 
-    expect(useRunStore.getState().activeRuns.r1).toBeUndefined();
+    expect(useRunStore.getState().activeRuns.r1).toBe('s1');
     expect(useSessionRunStateStore.getState().records['b1::s1'].phase).toBe('idle');
     expect(useProjectStore.getState().sessions[0].isActive).toBe(false);
     expect(useSessionsStore.getState().activeSessionIdsByBackend.get('b1')?.has('s1')).toBe(false);

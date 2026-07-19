@@ -1,7 +1,7 @@
 import * as os from 'os';
 import { ALL_SERVER_FEATURES } from '@zclaudia/shared/core/server';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
-import type { SessionItem, ProjectItem } from '@zclaudia/protocol/zclaudia';
+import type { SessionItem, ProjectItem, SessionMessage } from '@zclaudia/protocol/zclaudia';
 import { GatewayClient, type GatewayClientConfig } from './gateway-client.js';
 import { setGatewayClient } from './gateway-instance.js';
 import { handleChannelClosed } from './gateway-channel-cleanup.js';
@@ -13,7 +13,11 @@ import type Database from 'better-sqlite3';
 import type { GatewayConfig } from '../../interfaces/http/gateway.js';
 import type { ServerContext } from '../../server.js';
 import { hasForegroundActiveRunForSession } from '../../utils/run-state.js';
-import { parsePersistedMessageContent } from '../../utils/persisted-message.js';
+import {
+  parsePersistedMessageContent,
+  parsePersistedMessageMetadata,
+} from '../../utils/persisted-message.js';
+import type { MessageMetadata } from '@zclaudia/shared/core/message';
 
 type FacadeProvider = {
   connect(): void;
@@ -36,15 +40,7 @@ interface MessageCatchUpRow {
   role: string;
   createdAt: number;
   content: string | null;
-}
-
-/** DB row shape for session catalog queries. */
-interface SessionCatalogRow {
-  id: string;
-  name: string | null;
-  createdAt: number;
-  updatedAt: number;
-  archivedAt: number | null;
+  metadata: string | null;
 }
 
 export interface GatewayManagerDeps {
@@ -278,7 +274,8 @@ export class GatewayManager {
         const rows = serverContext.db
           .prepare(
             `
-          SELECT id as messageId, session_id as sessionId, offset, role, created_at as createdAt, content
+          SELECT id as messageId, session_id as sessionId, offset, role,
+                 created_at as createdAt, content, metadata
           FROM messages
           WHERE session_id = ? AND offset > ?
           ORDER BY offset ASC
@@ -293,10 +290,11 @@ export class GatewayManager {
           role: r.role as 'user' | 'assistant' | 'system' | 'tool',
           createdAt: r.createdAt,
           content: parsePersistedMessageContent(r.content),
-        }));
+          metadata: parsePersistedMessageMetadata<MessageMetadata>(r.metadata),
+        })) as unknown as SessionMessage[];
       } catch (error) {
         console.error('[Gateway] Catch-up query error:', error);
-        return [];
+        throw error;
       }
     });
 
@@ -399,7 +397,8 @@ export class GatewayManager {
           const rows = serverContext.db
             .prepare(
               `
-            SELECT id as messageId, session_id as sessionId, offset, role, created_at as createdAt, content
+            SELECT id as messageId, session_id as sessionId, offset, role,
+                   created_at as createdAt, content, metadata
             FROM messages
             WHERE session_id = ? AND offset > ?
             ORDER BY offset ASC
@@ -413,7 +412,8 @@ export class GatewayManager {
             role: r.role as 'user' | 'assistant' | 'system' | 'tool',
             createdAt: r.createdAt,
             content: parsePersistedMessageContent(r.content),
-          }));
+            metadata: parsePersistedMessageMetadata<MessageMetadata>(r.metadata),
+          })) as unknown as SessionMessage[];
         } catch (error) {
           console.error('[LocalHandler] Catch-up error:', error);
           throw error;

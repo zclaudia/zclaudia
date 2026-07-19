@@ -9,7 +9,12 @@ import {
 } from '../../../../domains/sessions/compaction-tree-read.js';
 import { appendMessagesToTree } from '../../../../infra/providers/pi-runtime/session-tree/write-path.js';
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
-import { maybeCompact, forceCompact, compactForOverflow } from '../compaction-service.js';
+import {
+  maybeCompact,
+  forceCompact,
+  compactForOverflow,
+  waitForPendingCompaction,
+} from '../compaction-service.js';
 import { compactionCircuitBreaker } from '../circuit-breaker.js';
 import * as pi from '@earendil-works/pi-agent-core';
 
@@ -166,6 +171,46 @@ describe('compaction-service', () => {
     const created = latestCompaction(db, 's1')!;
     expect(created.source).toBe('manual');
     expect(created.customInstructions).toBe('focus on auth');
+  });
+
+  it('serializes compaction entry points for the same session', async () => {
+    const { generateSummary } = await import('@earendil-works/pi-agent-core');
+    const seed = seedSession(db, 100);
+    let releaseFirst!: (value: { ok: true; value: string }) => void;
+    vi.mocked(generateSummary).mockImplementationOnce(
+      () => new Promise(resolve => (releaseFirst = resolve))
+    );
+
+    const first = forceCompact({
+      db,
+      sessionId: 's1',
+      agentProfile: seed.agentProfile,
+      llmProfile: seed.llmProfile,
+      source: 'manual',
+    });
+    await vi.waitFor(() => expect(generateSummary).toHaveBeenCalledTimes(1));
+
+    const second = maybeCompact({
+      db,
+      sessionId: 's1',
+      agentProfile: seed.agentProfile,
+      llmProfile: seed.llmProfile,
+      source: 'preflight',
+    });
+    await Promise.resolve();
+    expect(generateSummary).toHaveBeenCalledTimes(1);
+    let queueReleased = false;
+    const waitForQueue = waitForPendingCompaction('s1').then(() => {
+      queueReleased = true;
+    });
+    await Promise.resolve();
+    expect(queueReleased).toBe(false);
+
+    releaseFirst({ ok: true, value: 'SERIALIZED-SUMMARY' });
+    await first;
+    await second;
+    await waitForQueue;
+    expect(queueReleased).toBe(true);
   });
 
   it('forceCompact returns no_cut_point on short conversations (recent budget covers all)', async () => {

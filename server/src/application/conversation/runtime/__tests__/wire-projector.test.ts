@@ -83,16 +83,30 @@ describe('wire projector', () => {
       projectRunDomainEventToWireMessages(
         event('run.completed', {
           usage: undefined,
+          assistantMessageId: 'assistant-1',
+          messageVersion: 7,
         })
       )
     ).toEqual([
-      { type: 'run_completed', runId: 'run-1', sessionId: 'session-1', usage: undefined, seq: 9 },
+      {
+        type: 'run_completed',
+        runId: 'run-1',
+        sessionId: 'session-1',
+        usage: undefined,
+        assistantMessageId: 'assistant-1',
+        messageVersion: 7,
+        content: undefined,
+        contentBlocks: undefined,
+        seq: 9,
+      },
     ]);
 
     expect(
       projectRunDomainEventToWireMessages(
         event('run.completed', {
           usage: undefined,
+          assistantMessageId: 'assistant-1',
+          messageVersion: 7,
           content: 'final text',
           contentBlocks: [
             { type: 'tool_use', toolUseId: 'tool-1' },
@@ -106,6 +120,8 @@ describe('wire projector', () => {
         runId: 'run-1',
         sessionId: 'session-1',
         usage: undefined,
+        assistantMessageId: 'assistant-1',
+        messageVersion: 7,
         content: 'final text',
         contentBlocks: [
           { type: 'tool_use', toolUseId: 'tool-1' },

@@ -13,6 +13,7 @@ export type RunPhase =
   | 'awaiting_permission' // permission request enqueued, waiting for user
   | 'awaiting_followup' // pendingBackgroundTasks > 0, pi will emit follow-up
   | 'cancelling' // user abort triggered, cleanup pending
+  | 'finalizing' // final assistant snapshot is being persisted/published
   | 'completed' // terminal: normal completion (success)
   | 'cancelled' // terminal: user-initiated cancel, cleanup OK
   | 'failed'; // terminal: error termination (provider / runtime / cleanup-itself-errored)
@@ -31,10 +32,32 @@ export function isTerminalPhase(p: RunPhase): boolean {
  * - terminal states are sinks
  */
 const VALID_TRANSITIONS: Record<RunPhase, ReadonlyArray<RunPhase>> = {
-  running: ['awaiting_permission', 'awaiting_followup', 'cancelling', 'completed', 'failed'],
-  awaiting_permission: ['running', 'awaiting_followup', 'cancelling', 'completed', 'failed'],
-  awaiting_followup: ['running', 'awaiting_permission', 'cancelling', 'completed', 'failed'],
+  running: [
+    'awaiting_permission',
+    'awaiting_followup',
+    'cancelling',
+    'finalizing',
+    'completed',
+    'failed',
+  ],
+  awaiting_permission: [
+    'running',
+    'awaiting_followup',
+    'cancelling',
+    'finalizing',
+    'completed',
+    'failed',
+  ],
+  awaiting_followup: [
+    'running',
+    'awaiting_permission',
+    'cancelling',
+    'finalizing',
+    'completed',
+    'failed',
+  ],
   cancelling: ['cancelled', 'failed'],
+  finalizing: ['completed', 'failed'],
   completed: [],
   cancelled: [],
   failed: [],
@@ -117,7 +140,7 @@ export interface PhaseBlockers {
  * Terminal phases are sticky — recomputePhase is a no-op for them.
  */
 export function recomputePhase(run: PhaseHolder, blockers: PhaseBlockers): void {
-  if (isTerminalPhase(run.phase)) return;
+  if (isTerminalPhase(run.phase) || run.phase === 'finalizing') return;
   if (blockers.isCancelling) {
     setPhase(run, 'cancelling');
     return;

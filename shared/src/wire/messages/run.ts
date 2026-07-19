@@ -142,6 +142,10 @@ export interface RunCompletedMessage {
   runId: string;
   sessionId: string;
   usage?: UsageInfo;
+  /** Stable persisted row targeted by this terminal snapshot. */
+  assistantMessageId?: string;
+  /** Session message revision after the final assistant row was persisted. */
+  messageVersion?: number;
   /** Authoritative final assistant text. Live clients accumulate the message
    *  from streamed deltas; a lost delta frame would otherwise leave the
    *  rendered message truncated until a full history reload. */
@@ -188,6 +192,11 @@ export interface RunFailedMessage {
   error: string;
   /** Machine-readable error code for structured error handling (e.g. CodexOAuth error codes). */
   errorCode?: string;
+  /** Persisted partial assistant snapshot, when the run produced output before failing. */
+  assistantMessageId?: string;
+  messageVersion?: number;
+  content?: string;
+  contentBlocks?: ContentBlock[];
   seq?: number;
   /** When cancel was triggered with un-consumed steer messages still queued, server returns them joined here for the client to repopulate the input. */
   restoreDraft?: string;

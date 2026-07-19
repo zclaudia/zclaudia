@@ -21,6 +21,32 @@ import { buildModel, modelEntryFor } from '../../../infra/providers/pi-runtime/b
 import { resolveContextWindow } from './context-windows.js';
 import { compactionCircuitBreaker } from './circuit-breaker.js';
 
+// Compaction reads and advances a session tree leaf. Serialize every entry
+// point per session so a post-turn auto compaction cannot overlap the next
+// run's preflight/overflow/manual compaction and race the context snapshot.
+const sessionCompactionQueue = new Map<string, Promise<void>>();
+
+/** Wait until any previous turn's compaction has released this session tree. */
+export async function waitForPendingCompaction(sessionId: string): Promise<void> {
+  await sessionCompactionQueue.get(sessionId);
+}
+
+function serializeSessionCompaction<T>(sessionId: string, task: () => Promise<T>): Promise<T> {
+  const previous = sessionCompactionQueue.get(sessionId) ?? Promise.resolve();
+  const current = previous.catch(() => undefined).then(task);
+  const completion = current.then(
+    () => undefined,
+    () => undefined
+  );
+  sessionCompactionQueue.set(sessionId, completion);
+  void completion.finally(() => {
+    if (sessionCompactionQueue.get(sessionId) === completion) {
+      sessionCompactionQueue.delete(sessionId);
+    }
+  });
+  return current;
+}
+
 export interface CompactionContext {
   db: Database;
   sessionId: string;
@@ -75,7 +101,11 @@ function classifyFailure(ctx: CompactionContext, err: unknown, now: number): Com
  *
  * This is the SOLE breaker mutation point for automatic compaction.
  */
-export async function maybeCompact(ctx: CompactionContext): Promise<CompactionOutcome> {
+export function maybeCompact(ctx: CompactionContext): Promise<CompactionOutcome> {
+  return serializeSessionCompaction(ctx.sessionId, () => maybeCompactUnlocked(ctx));
+}
+
+async function maybeCompactUnlocked(ctx: CompactionContext): Promise<CompactionOutcome> {
   const now = ctx.now ?? Date.now();
   const decision = compactionCircuitBreaker.evaluate(ctx.sessionId, now);
   if (decision.action === 'skip') {
@@ -126,7 +156,11 @@ export async function maybeCompact(ctx: CompactionContext): Promise<CompactionOu
  * Does NOT consult the circuit breaker. Resets the breaker on success so that
  * a successful manual compact clears any accumulated failure state.
  */
-export async function forceCompact(ctx: CompactionContext): Promise<CompactionOutcome> {
+export function forceCompact(ctx: CompactionContext): Promise<CompactionOutcome> {
+  return serializeSessionCompaction(ctx.sessionId, () => forceCompactUnlocked(ctx));
+}
+
+async function forceCompactUnlocked(ctx: CompactionContext): Promise<CompactionOutcome> {
   try {
     const { session, branch, messages } = await loadTreeSnapshot(ctx);
     if (messages.length === 0) return skipped('no_messages');
@@ -154,7 +188,11 @@ export async function forceCompact(ctx: CompactionContext): Promise<CompactionOu
  * keep-recent budget — the caller must then fall through to normal failure
  * (retrying would just overflow again).
  */
-export async function compactForOverflow(ctx: CompactionContext): Promise<CompactionOutcome> {
+export function compactForOverflow(ctx: CompactionContext): Promise<CompactionOutcome> {
+  return serializeSessionCompaction(ctx.sessionId, () => compactForOverflowUnlocked(ctx));
+}
+
+async function compactForOverflowUnlocked(ctx: CompactionContext): Promise<CompactionOutcome> {
   const now = ctx.now ?? Date.now();
   const decision = compactionCircuitBreaker.evaluate(ctx.sessionId, now);
   if (decision.action === 'skip') {

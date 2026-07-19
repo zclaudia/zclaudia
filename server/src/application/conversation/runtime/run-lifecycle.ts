@@ -11,8 +11,8 @@ import {
   extractAndIndexMetadata,
   removeIndexedMetadata,
 } from '../../../infra/storage/metadata-extractor.js';
-import { broadcastRunMessage, sendMessage } from '../transport/broadcast.js';
-import type { ConnectedClient, ActiveRun } from '../transport/types.js';
+import { broadcastRunMessage } from '../transport/broadcast.js';
+import type { ActiveRun } from '../transport/types.js';
 import { setPhase, isTerminalPhase } from './active-run-phase.js';
 import {
   appendMessagesToTree,
@@ -173,8 +173,22 @@ export function cancelRun(
     }
 
     // Save accumulated content before discarding the run
+    let terminalSnapshot:
+      | {
+          assistantMessageId: string;
+          messageVersion: number;
+          content?: string;
+          contentBlocks?: ActiveRun['contentBlocks'];
+        }
+      | undefined;
     try {
-      upsertAssistantMessage(run, { indexMetadata: true });
+      const messageVersion = upsertAssistantMessage(run, { indexMetadata: true });
+      terminalSnapshot = {
+        assistantMessageId: run.assistantMessageId,
+        messageVersion,
+        ...(run.fullContent ? { content: run.fullContent } : {}),
+        ...(run.contentBlocks.length > 0 ? { contentBlocks: [...run.contentBlocks] } : {}),
+      };
       if (run.fullContent) {
         console.log(
           `[Cancel] Saved partial assistant message for run ${runId} (${run.fullContent.length} chars)`
@@ -208,6 +222,7 @@ export function cancelRun(
       sessionId: run.sessionId,
       error: options.clientError ?? 'Run cancelled by user',
       seq: run.eventSeq,
+      ...terminalSnapshot,
       ...(restoreDraft ? { restoreDraft } : {}),
     });
 
@@ -255,7 +270,7 @@ export function getNextOffset(db: import('better-sqlite3').Database, sessionId: 
 export function upsertAssistantMessage(
   run: ActiveRun,
   options?: { usage?: Usage; indexMetadata?: boolean }
-): void {
+): number {
   const metadata: Record<string, unknown> = {};
   if (options?.usage) {
     metadata.usage = options.usage;
@@ -290,7 +305,7 @@ export function upsertAssistantMessage(
     run.contentBlocks.length > 0 ||
     (run.thinkingBlocks?.length ?? 0) > 0;
 
-  if (!hasPersistableContent) return;
+  if (!hasPersistableContent) return getSessionMessageVersion(run.db, run.sessionId);
 
   const metadataJson = Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null;
 
@@ -358,6 +373,18 @@ export function upsertAssistantMessage(
     }
   })();
   if (willAppendTree) run.treeTurnAppended = true;
+  return getSessionMessageVersion(run.db, run.sessionId);
+}
+
+/** Current persisted message projection revision for terminal/catch-up events. */
+export function getSessionMessageVersion(
+  db: import('better-sqlite3').Database,
+  sessionId: string
+): number {
+  const row = db
+    .prepare('SELECT message_version as messageVersion FROM sessions WHERE id = ?')
+    .get(sessionId) as { messageVersion: number } | undefined;
+  return row?.messageVersion ?? 0;
 }
 
 // --- Message parsing ---

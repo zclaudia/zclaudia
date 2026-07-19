@@ -1,11 +1,15 @@
-import { cleanupPendingPermissions, upsertAssistantMessage } from './run-lifecycle.js';
+import { cleanupPendingPermissions } from './run-lifecycle.js';
+import {
+  persistAssistantTerminalSnapshot,
+  type AssistantTerminalSnapshot,
+} from './run-terminal-snapshot.js';
 import { interactionDispatcher } from '../interactions/interaction-dispatcher.js';
 import type { ActiveRun } from '../transport/types.js';
 import type { SessionSyncPort } from '../../../application/conversation/session-sync-port.js';
 import type { ProcessMonitor } from '../../../utils/process-monitor.js';
 import type { ConnectedClient } from '../transport/types.js';
 import type { NotificationSender } from '../../../infra/push/notification-sender.js';
-import { broadcastRunMessage, sendMessage } from '../transport/broadcast.js';
+import { broadcastRunMessage } from '../transport/broadcast.js';
 import { MAX_SESSION_RESET_RETRIES, MAX_OVERFLOW_RETRIES } from '../transport/types.js';
 import { compactForOverflow } from '../compaction/compaction-service.js';
 import { ContextOverflowError } from './context-overflow.js';
@@ -168,8 +172,12 @@ export async function handleRunException(
     }
   }
 
+  if (activeRun.phase !== 'cancelling' && activeRun.phase !== 'finalizing') {
+    setPhase(activeRun, 'finalizing');
+  }
+  let terminalSnapshot: AssistantTerminalSnapshot | undefined;
   try {
-    upsertAssistantMessage(activeRun, { indexMetadata: true });
+    terminalSnapshot = persistAssistantTerminalSnapshot(activeRun, { indexMetadata: true });
   } catch (saveErr) {
     console.error(`[Error Save] Failed for run ${runId}:`, saveErr);
   }
@@ -178,6 +186,7 @@ export async function handleRunException(
     runId,
     sessionId: activeRun.sessionId,
     error: formattedErrMsg,
+    ...terminalSnapshot,
   });
   setPhase(activeRun, 'failed');
   broadcastHeartbeat();

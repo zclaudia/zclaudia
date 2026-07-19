@@ -20,6 +20,7 @@ import { launchProviderRun } from './run-provider-launch.js';
 import { prepareProviderRun } from './run-provider-setup.js';
 import { finalizeRun, handleRunException } from './run-recovery.js';
 import { setPhase } from './active-run-phase.js';
+import { persistAssistantTerminalSnapshot } from './run-terminal-snapshot.js';
 import type { TaskExecutor } from '../../../domains/tasks/executors/types.js';
 import type { PermissionBridge } from '../agent/permission-bridge.js';
 import type { PermissionWorkflowResolver } from '../../../domains/workflows/index.js';
@@ -127,11 +128,16 @@ export async function handleRunStart(
     // Validate cwd exists — spawn() fails with cryptic ENOENT if cwd is invalid
     if (!fs.existsSync(cwd)) {
       console.warn(`[Run] cwd does not exist: ${cwd}`);
+      setPhase(activeRun, 'finalizing');
+      const terminalSnapshot = persistAssistantTerminalSnapshot(activeRun, {
+        indexMetadata: true,
+      });
       sendRunEvent({
         type: 'run_failed',
         runId,
         sessionId: activeRun.sessionId,
         error: `Project path does not exist: ${cwd}`,
+        ...terminalSnapshot,
       });
       setPhase(activeRun, 'failed');
       broadcastHeartbeat();

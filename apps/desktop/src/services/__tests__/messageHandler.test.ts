@@ -1,12 +1,14 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { MessageHandlerContext } from '../messageHandler';
 
 // Mock all stores
 const mockChatStore = {
   activeRuns: {} as Record<string, string>,
+  assistantMessageIds: {} as Record<string, string>,
   runHealth: {} as Record<string, any>,
   runRetryStatus: {} as Record<string, any>,
   appendToLastMessage: vi.fn(),
+  appendToMessage: vi.fn(),
   appendTextBlock: vi.fn(),
   startRun: vi.fn(),
   updateMessageIdByClientMessageId: vi.fn(),
@@ -29,6 +31,7 @@ const mockChatMessageStore = {
   messages: {} as Record<string, any>,
   pagination: {} as Record<string, any>,
   appendToLastMessage: mockChatStore.appendToLastMessage,
+  appendToMessage: mockChatStore.appendToMessage,
   updateMessageIdByClientMessageId: mockChatStore.updateMessageIdByClientMessageId,
   addMessage: mockChatStore.addMessage,
   setMessages: vi.fn(),
@@ -257,7 +260,9 @@ describe('handleServerMessage', () => {
     useSessionRunStateStore.setState({ records: {} });
     mockGetProjectsForBackend.mockReset();
     mockChatStore.activeRuns = {};
+    mockChatStore.assistantMessageIds = {};
     mockChatStore.runHealth = {};
+    mockChatMessageStore.messages = {};
     mockSessionConfigStore.compactionNotice = {};
     mockBackgroundTaskStore.tasks = {};
     mockProjectStore.selectedSessionId = 'current-session';
@@ -360,7 +365,7 @@ describe('handleServerMessage', () => {
         makeCtx()
       );
 
-      expect(mockChatStore.startRun).toHaveBeenCalledWith('r1', 's1', false);
+      expect(mockChatStore.startRun).toHaveBeenCalledWith('r1', 's1', false, 'am1');
       expect(mockSessionConfigStore.clearSystemInfo).toHaveBeenCalledWith('s1');
       expect(mockChatStore.updateMessageIdByClientMessageId).toHaveBeenCalledWith(
         's1',
@@ -383,7 +388,7 @@ describe('handleServerMessage', () => {
         makeCtx()
       );
 
-      expect(mockChatStore.startRun).toHaveBeenCalledWith('r1', 's1', true);
+      expect(mockChatStore.startRun).toHaveBeenCalledWith('r1', 's1', true, 'r1');
       expect(mockProjectStore.setSessionActive).not.toHaveBeenCalled();
     });
 
@@ -446,6 +451,8 @@ describe('handleServerMessage', () => {
       expect(mockInteractionStore.clearSession).toHaveBeenCalledWith('s1');
       expect(mockChatStore.finalizeRunToMessage).toHaveBeenCalledWith('r1', {
         sessionId: 's1',
+        assistantMessageId: undefined,
+        messageVersion: undefined,
         content: undefined,
         contentBlocks: undefined,
       });
@@ -474,6 +481,8 @@ describe('handleServerMessage', () => {
       );
       expect(mockChatStore.finalizeRunToMessage).toHaveBeenCalledWith('r1', {
         sessionId: 's1',
+        assistantMessageId: undefined,
+        messageVersion: undefined,
         content: 'full final text',
         contentBlocks: [
           { type: 'tool_use', toolUseId: 't1' },
@@ -537,6 +546,8 @@ describe('handleServerMessage', () => {
 
       expect(mockChatStore.finalizeRunToMessage).toHaveBeenCalledWith('r1', {
         sessionId: 's1',
+        assistantMessageId: undefined,
+        messageVersion: undefined,
         content: undefined,
         contentBlocks: undefined,
       });
@@ -558,11 +569,14 @@ describe('handleServerMessage', () => {
 
       expect(mockPermissionStore.clearRequestsForSession).toHaveBeenCalledWith('s1');
       expect(mockInteractionStore.clearSession).toHaveBeenCalledWith('s1');
-      expect(mockChatStore.appendToLastMessage).toHaveBeenCalledWith(
-        's1',
-        expect.stringContaining('boom')
-      );
-      expect(mockChatStore.finalizeRunToMessage).toHaveBeenCalledWith('r1');
+      expect(mockChatStore.finalizeRunToMessage).toHaveBeenCalledWith('r1', {
+        sessionId: 's1',
+        assistantMessageId: undefined,
+        messageVersion: undefined,
+        content: undefined,
+        contentBlocks: undefined,
+        error: 'boom',
+      });
       expect(mockChatStore.endRun).toHaveBeenCalledWith('r1');
       expect(mockEagerSyncCurrentSession).toHaveBeenCalledWith('server-1');
       expect(mockRecoverCurrentSessionTail).toHaveBeenCalledWith('server-1', 's1');
@@ -589,17 +603,17 @@ describe('handleServerMessage', () => {
         makeCtx()
       );
 
-      // First append = buffered delta; second append = error suffix.
+      // Buffered delta is committed first; the targeted finalizer adds the
+      // error to the run-bound assistant row.
       expect(mockChatStore.appendToLastMessage).toHaveBeenNthCalledWith(1, 's1', 'before-fail');
-      expect(mockChatStore.appendToLastMessage).toHaveBeenNthCalledWith(
-        2,
-        's1',
-        expect.stringContaining('boom')
+      expect(mockChatStore.finalizeRunToMessage).toHaveBeenCalledWith(
+        'r1',
+        expect.objectContaining({ error: 'boom' })
       );
 
       pendingCb?.(0);
       // No duplicate delta committed after rAF tick.
-      expect(mockChatStore.appendToLastMessage).toHaveBeenCalledTimes(2);
+      expect(mockChatStore.appendToLastMessage).toHaveBeenCalledTimes(1);
       errSpy.mockRestore();
     });
   });
@@ -1286,6 +1300,33 @@ describe('handleServerMessage', () => {
       expect(mockChatStore.startRun).toHaveBeenCalledWith('hb-1', 's1', false);
     });
 
+    it('restores assistant identity and placeholder from heartbeat replay', () => {
+      handleServerMessage(
+        makeHeartbeat({
+          activeRuns: [
+            {
+              runId: 'hb-identified',
+              sessionId: 's1',
+              assistantMessageId: 'assistant-hb',
+              startedAt: 10,
+            },
+          ],
+        }),
+        makeCtx()
+      );
+
+      expect(mockChatStore.startRun).toHaveBeenCalledWith(
+        'hb-identified',
+        's1',
+        false,
+        'assistant-hb'
+      );
+      expect(mockChatMessageStore.addMessage).toHaveBeenCalledWith(
+        's1',
+        expect.objectContaining({ id: 'assistant-hb', role: 'assistant', createdAt: 10 })
+      );
+    });
+
     it('skips already known runs', () => {
       mockChatStore.activeRuns = { r1: 's1' };
       handleServerMessage(
@@ -1298,9 +1339,8 @@ describe('handleServerMessage', () => {
     });
 
     it('does not clean up a tracked run on a single missing heartbeat', () => {
-      // A completing run's terminal heartbeat can race ahead of run_completed
-      // on the wire (compaction defers the terminal event past an async gap);
-      // one missing heartbeat must not kill client-side run tracking.
+      // Keep one-miss grace for reconnect replay and older backends; one
+      // missing heartbeat must not kill client-side run tracking.
       mockChatStore.activeRuns = { 'hb-grace-1': 's1' };
       const ctx = makeCtx();
       ctx.serverRunsRef.set('server-1', new Set(['hb-grace-1']));

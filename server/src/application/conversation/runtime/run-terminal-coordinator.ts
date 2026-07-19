@@ -7,7 +7,12 @@ import type { NotificationService } from '../../../domains/notification-feed/ind
 import { buildStatusOutput, SYSTEM_INFO_COMMANDS } from '../../../utils/server-utils.js';
 import { maybeCompact } from '../compaction/compaction-service.js';
 import { clearSession } from '../interactions/todo-state-tracker.js';
-import { cleanupPendingPermissions, upsertAssistantMessage } from './run-lifecycle.js';
+import { cleanupPendingPermissions } from './run-lifecycle.js';
+import {
+  buildAssistantTerminalSnapshot,
+  persistAssistantTerminalSnapshot,
+  type AssistantTerminalSnapshot,
+} from './run-terminal-snapshot.js';
 import { compactionDomainEventFor } from './compaction-events.js';
 import { isTerminalPhase, setPhase } from './active-run-phase.js';
 import {
@@ -86,10 +91,14 @@ export function completeProviderTurn(input: CompleteProviderTurnInput): void {
 
   applyTerminalContentFallbacks(input);
 
-  upsertAssistantMessage(activeRun, {
-    usage: msg.usage,
-    indexMetadata: true,
-  });
+  const wasAlreadyCompleted = isTerminalPhase(activeRun.phase);
+  if (!wasAlreadyCompleted) setPhase(activeRun, 'finalizing');
+  const terminalSnapshot = wasAlreadyCompleted
+    ? buildAssistantTerminalSnapshot(activeRun)
+    : persistAssistantTerminalSnapshot(activeRun, {
+        usage: msg.usage,
+        indexMetadata: true,
+      });
 
   if (msg.usage) {
     input.state.lastTurnTotalTokens =
@@ -105,12 +114,11 @@ export function completeProviderTurn(input: CompleteProviderTurnInput): void {
   });
 
   const shouldRunCompaction =
-    !isTerminalPhase(activeRun.phase) &&
+    !wasAlreadyCompleted &&
     Boolean(msg.usage) &&
     Boolean(activeRun.agentProfile) &&
     Boolean(activeRun.llmProfile);
 
-  const wasAlreadyCompleted = isTerminalPhase(activeRun.phase);
   const emitRunCompleted = () => {
     if (wasAlreadyCompleted) {
       if (msg.usage) {
@@ -119,25 +127,23 @@ export function completeProviderTurn(input: CompleteProviderTurnInput): void {
           runId,
           sessionId: activeRun.sessionId,
           usage: msg.usage,
+          ...terminalSnapshot,
         });
       }
       return;
     }
-    setPhase(activeRun, 'completed');
     dispatchTerminalDomainEvent({
       activeRun,
       listeners,
       payload: {
         usage: msg.usage,
-        ...(activeRun.fullContent ? { content: activeRun.fullContent } : {}),
-        ...(activeRun.contentBlocks.length > 0
-          ? { contentBlocks: [...activeRun.contentBlocks] }
-          : {}),
+        ...terminalSnapshot,
       },
       runId,
       sendRunEvent,
       type: 'run.completed',
     });
+    setPhase(activeRun, 'completed');
     broadcastHeartbeat();
     postRunCompletedNotification({
       db,
@@ -168,9 +174,14 @@ export function completeProviderTurn(input: CompleteProviderTurnInput): void {
     });
   };
 
+  // Completion is now independent from post-turn compaction. The client first
+  // receives the persisted terminal snapshot; compaction runs asynchronously
+  // and is serialized per session by compaction-service.
+  emitRunCompleted();
+  emitBackgroundUpdate();
+
   if (shouldRunCompaction) {
-    setPhase(activeRun, 'completed');
-    maybeCompact({
+    void maybeCompact({
       db,
       sessionId: activeRun.sessionId,
       agentProfile: activeRun.agentProfile!,
@@ -217,14 +228,8 @@ export function completeProviderTurn(input: CompleteProviderTurnInput): void {
           err instanceof Error ? err.message : err
         );
       })
-      .finally(() => {
-        emitRunCompleted();
-        emitBackgroundUpdate();
-        triggerSessionTitle();
-      });
+      .finally(triggerSessionTitle);
   } else {
-    emitRunCompleted();
-    emitBackgroundUpdate();
     triggerSessionTitle();
   }
 }
@@ -247,23 +252,28 @@ export function failProviderTurn(input: FailProviderTurnInput): void {
   } = input;
 
   if (!isTerminalPhase(activeRun.phase)) {
+    if (activeRun.phase !== 'cancelling' && activeRun.phase !== 'finalizing') {
+      setPhase(activeRun, 'finalizing');
+    }
+    let terminalSnapshot: AssistantTerminalSnapshot | undefined;
     try {
-      upsertAssistantMessage(activeRun, { indexMetadata: true });
+      terminalSnapshot = persistAssistantTerminalSnapshot(activeRun, { indexMetadata: true });
     } catch (saveErr) {
       console.error(`[Error Save] Failed for run ${runId}:`, saveErr);
     }
-    setPhase(activeRun, 'failed');
     dispatchTerminalDomainEvent({
       activeRun,
       listeners,
       payload: {
         error: errorMessage,
         ...(errorCode ? { errorCode } : {}),
+        ...terminalSnapshot,
       },
       runId,
       sendRunEvent,
       type: 'run.failed',
     });
+    setPhase(activeRun, 'failed');
     broadcastHeartbeat();
     postRunFailedNotification({
       db,

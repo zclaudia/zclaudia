@@ -6,6 +6,7 @@ import type { UserHookDefinition } from '@zclaudia/shared/interaction/user-hooks
 import type { BackgroundTaskUpdateMessage, ServerMessage } from '@zclaudia/shared/wire/messages';
 import type { ResolvedImage } from './resolve-image-attachments.js';
 import { buildRunContext } from './run-context.js';
+import { persistAssistantTerminalSnapshot } from './run-terminal-snapshot.js';
 import { upsertAssistantMessage } from './run-lifecycle.js';
 import {
   PERIODIC_SAVE_INTERVAL_MS,
@@ -25,7 +26,7 @@ import {
   prepareDirectSkillInvocation,
 } from '../../../infra/providers/pi-runtime/skills.js';
 import { setPhase } from './active-run-phase.js';
-import { maybeCompact } from '../compaction/compaction-service.js';
+import { maybeCompact, waitForPendingCompaction } from '../compaction/compaction-service.js';
 import { compactionDomainEventFor } from './compaction-events.js';
 import { createSkillActivationObserver } from './skill-activation-observer.js';
 import { createRunDomainEvent, type RunDomainEvent } from './run-domain-events.js';
@@ -183,6 +184,11 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
   }
 
   persistMcpInstructionsDeltaForSession(db as Database.Database, message.sessionId);
+
+  // A previous turn may have published its terminal snapshot and continued
+  // auto-compaction in the background. Never let the next run read or mutate
+  // the same session tree until that compaction has finished.
+  await waitForPendingCompaction(message.sessionId);
 
   let effectiveInput = processedInput;
   const directSkill = await prepareDirectSkillInvocation(activeRun.skillState, processedInput, {
@@ -434,11 +440,13 @@ function completeRunLocally(input: {
     sessionId: message.sessionId,
     content,
   });
-  upsertAssistantMessage(activeRun, { indexMetadata: true });
+  setPhase(activeRun, 'finalizing');
+  const terminalSnapshot = persistAssistantTerminalSnapshot(activeRun, { indexMetadata: true });
   sendRunEvent({
     type: 'run_completed',
     runId,
     sessionId: message.sessionId,
+    ...terminalSnapshot,
   });
   setPhase(activeRun, 'completed');
   return { providerRunner: emptyProviderStream() };

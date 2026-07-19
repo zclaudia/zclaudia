@@ -138,6 +138,9 @@ export function mountMessageRoutes(
 
       const activeRunId = findForegroundActiveRunIdForSession(activeRuns, req.params.id);
       const activeRun = activeRunId ? { runId: activeRunId } : null;
+      const versionRow = db
+        .prepare('SELECT message_version as messageVersion FROM sessions WHERE id = ?')
+        .get(req.params.id) as { messageVersion: number } | undefined;
 
       res.json({
         success: true,
@@ -149,6 +152,7 @@ export function mountMessageRoutes(
             oldestTimestamp,
             newestTimestamp,
             maxOffset,
+            messageVersion: versionRow?.messageVersion ?? 0,
           },
           activeRun,
         },

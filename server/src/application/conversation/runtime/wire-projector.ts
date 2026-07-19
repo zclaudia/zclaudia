@@ -103,6 +103,8 @@ export function projectRunDomainEventToWireMessages(event: RunDomainEvent): Serv
           runId: event.runId,
           sessionId: event.sessionId,
           usage: event.payload.usage,
+          assistantMessageId: event.payload.assistantMessageId,
+          messageVersion: event.payload.messageVersion,
           content: event.payload.content,
           contentBlocks: event.payload.contentBlocks,
           seq: event.seq,
@@ -116,6 +118,16 @@ export function projectRunDomainEventToWireMessages(event: RunDomainEvent): Serv
           runId: event.runId,
           sessionId: event.sessionId,
           error: event.payload.error,
+          ...(event.payload.assistantMessageId
+            ? { assistantMessageId: event.payload.assistantMessageId }
+            : {}),
+          ...(event.payload.messageVersion !== undefined
+            ? { messageVersion: event.payload.messageVersion }
+            : {}),
+          ...(event.payload.content !== undefined ? { content: event.payload.content } : {}),
+          ...(event.payload.contentBlocks !== undefined
+            ? { contentBlocks: event.payload.contentBlocks }
+            : {}),
           ...(event.payload.errorCode ? { errorCode: event.payload.errorCode } : {}),
           seq: event.seq,
         },

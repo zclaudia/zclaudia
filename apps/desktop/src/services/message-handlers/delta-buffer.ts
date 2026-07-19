@@ -33,7 +33,9 @@ function flushAll(): void {
   const chat = useRunStore.getState();
   const messageStore = useChatMessageStore.getState();
   for (const [runId, { sessionId, content }] of snapshot) {
-    messageStore.appendToLastMessage(sessionId, content);
+    const assistantMessageId = chat.assistantMessageIds[runId];
+    if (assistantMessageId) messageStore.appendToMessage(sessionId, assistantMessageId, content);
+    else messageStore.appendToLastMessage(sessionId, content);
     chat.appendTextBlock(runId, content);
   }
 }
@@ -76,7 +78,12 @@ export function flushDeltaForRun(runId: string): void {
   pendingByRun.delete(runId);
   const chat = useRunStore.getState();
   const messageStore = useChatMessageStore.getState();
-  messageStore.appendToLastMessage(pending.sessionId, pending.content);
+  const assistantMessageId = chat.assistantMessageIds[runId];
+  if (assistantMessageId) {
+    messageStore.appendToMessage(pending.sessionId, assistantMessageId, pending.content);
+  } else {
+    messageStore.appendToLastMessage(pending.sessionId, pending.content);
+  }
   chat.appendTextBlock(runId, pending.content);
 }
 

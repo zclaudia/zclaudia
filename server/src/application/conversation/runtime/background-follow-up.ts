@@ -18,13 +18,13 @@ import type { ActiveRun, ConnectedClient } from '../transport/types.js';
 import type { initDatabase } from '../../../infra/storage/db.js';
 import { sendMessage, broadcastToOtherAuthenticatedClients } from '../transport/broadcast.js';
 import { handleProviderEvent, type ProviderEventState } from './run-events.js';
-import { upsertAssistantMessage } from './run-lifecycle.js';
+import { persistAssistantTerminalSnapshot } from './run-terminal-snapshot.js';
 import { postRunCompletedNotification } from './run-terminal-notifications.js';
 import {
   loadSessionRememberedDecisions,
   loadProjectAllowedOutsideWorkspaceRoots,
 } from '../agent/permission-evaluator.js';
-import { PhaseEmitter, isTerminalPhase } from './active-run-phase.js';
+import { PhaseEmitter, isTerminalPhase, setPhase } from './active-run-phase.js';
 import { createRunDomainEvent, type RunDomainEvent } from './run-domain-events.js';
 import {
   runDomainEventListeners,
@@ -250,8 +250,10 @@ function createFollowUpRun(ctx: BackgroundFollowUpContext): {
 }
 
 function finalizeFollowUpRun(run: ActiveRun, ctx: BackgroundFollowUpContext): void {
+  let terminalSnapshot;
   try {
-    upsertAssistantMessage(run, { indexMetadata: true });
+    if (!isTerminalPhase(run.phase)) setPhase(run, 'finalizing');
+    terminalSnapshot = persistAssistantTerminalSnapshot(run, { indexMetadata: true });
   } catch (err) {
     console.error(`[BackgroundFollowUp] Failed to save message for run ${run.runId}:`, err);
   }
@@ -261,7 +263,9 @@ function finalizeFollowUpRun(run: ActiveRun, ctx: BackgroundFollowUpContext): vo
       type: 'run_completed',
       runId: run.runId,
       sessionId: run.sessionId,
+      ...terminalSnapshot,
     });
+    setPhase(run, 'completed');
   }
 
   ctx.activeRuns.delete(run.runId);

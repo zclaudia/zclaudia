@@ -138,6 +138,7 @@ describe('useBackendFacade run_event forwarding', () => {
     });
     useRunStore.setState({
       activeRuns: {},
+      assistantMessageIds: {},
       backgroundRunIds: new Set(),
       runHealth: {},
       activeToolCalls: {},
@@ -324,6 +325,45 @@ describe('useBackendFacade run_event forwarding', () => {
         logTag: 'Facade:local-standalone',
       })
     );
+  });
+
+  it('merges a content patch into an existing same-offset assistant row', () => {
+    useChatMessageStore.getState().setMessages('session-1', [
+      {
+        id: 'assistant-1',
+        sessionId: 'session-1',
+        role: 'assistant',
+        content: 'partial',
+        createdAt: 1,
+        offset: 2,
+      },
+    ]);
+
+    syncToGatewayStore({
+      type: 'content_patch',
+      backendId: 'remote-1',
+      sessionId: 'session-1',
+      latestOffset: 2,
+      messages: [
+        {
+          messageId: 'assistant-1',
+          sessionId: 'session-1',
+          role: 'assistant',
+          content: 'complete body',
+          createdAt: 1,
+          offset: 2,
+          metadata: {
+            contentBlocks: [{ type: 'text', content: 'complete body' }],
+          },
+        },
+      ],
+    } as any);
+
+    expect(useChatMessageStore.getState().messages['session-1'][0]).toMatchObject({
+      id: 'assistant-1',
+      content: 'complete body',
+      contentBlocks: [{ type: 'text', content: 'complete body' }],
+    });
   });
 
   it('shows toast when content catch-up fails', () => {
@@ -584,7 +624,7 @@ describe('useBackendFacade run_event forwarding', () => {
     expect(backend.status).toBe('ready');
   });
 
-  it('cleans up stale runs only for the snapshot backend', () => {
+  it('preserves stale runs from catalog snapshots until terminal reconciliation', () => {
     useRunStore.getState().startRun('run-remote', 'session-1');
     useRunStore.getState().startRun('run-local', 'session-local');
     useProjectStore.setState({
@@ -604,11 +644,11 @@ describe('useBackendFacade run_event forwarding', () => {
       projects: [],
     } as any);
 
-    expect(useRunStore.getState().activeRuns['run-remote']).toBeUndefined();
+    expect(useRunStore.getState().activeRuns['run-remote']).toBe('session-1');
     expect(useRunStore.getState().activeRuns['run-local']).toBe('session-local');
   });
 
-  it('snapshot stale-run cleanup clears backend activity markers', () => {
+  it('does not treat snapshot idle state as an authoritative terminal event', () => {
     useRunStore.getState().startRun('run-1', 'session-1');
     useOwnershipStore.getState().setSessionOwner('session-1', 'remote-1');
 
@@ -637,7 +677,7 @@ describe('useBackendFacade run_event forwarding', () => {
       error: 'transport_disconnected',
     } as any);
 
-    expect(useRunStore.getState().activeRuns['run-1']).toBeUndefined();
+    expect(useRunStore.getState().activeRuns['run-1']).toBe('session-1');
     expect(useToastStore.getState().toasts).toEqual([]);
   });
 

@@ -109,6 +109,8 @@ export interface StateHeartbeatMessage {
   activeRuns: Array<{
     runId: string;
     sessionId: string;
+    /** Persisted assistant row for exact reconnect/finalization targeting. */
+    assistantMessageId?: string;
     startedAt: number;
     lastActivityAt: number;
     health: RunHealthStatus;

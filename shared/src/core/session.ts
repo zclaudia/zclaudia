@@ -21,6 +21,8 @@ export interface Session {
   sortOrder?: number;
   createdAt: number;
   updatedAt: number;
+  /** Monotonic revision of the session's persisted message projection. */
+  messageVersion?: number;
   isActive?: boolean; // Whether this session has an active AI request running
   archivedAt?: number; // Timestamp when session was archived, undefined = not archived
 

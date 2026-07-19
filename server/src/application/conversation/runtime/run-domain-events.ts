@@ -131,6 +131,8 @@ export interface RunDomainEventPayloadMap {
   };
   'run.completed': {
     usage?: UsageInfo;
+    assistantMessageId: string;
+    messageVersion: number;
     /** Authoritative final assistant text/blocks so live clients can repair a
      *  delta-accumulated message that lost a tail frame in transit. */
     content?: string;
@@ -139,6 +141,10 @@ export interface RunDomainEventPayloadMap {
   'run.failed': {
     error: string;
     errorCode?: string;
+    assistantMessageId?: string;
+    messageVersion?: number;
+    content?: string;
+    contentBlocks?: ContentBlock[];
   };
   'run.cancelled': {
     reason?: string;

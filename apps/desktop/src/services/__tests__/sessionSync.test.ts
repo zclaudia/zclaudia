@@ -272,6 +272,43 @@ describe('services/sessionSync', () => {
       expect(global.fetch).not.toHaveBeenCalled();
       expect(result).toEqual({ completed: false, sessions: [] });
     });
+
+    it('repairs a same-offset message update when the server version advances', async () => {
+      selectionState.selectedSessionId = 'session-1';
+      chatState.pagination = {
+        'session-1': { maxOffset: 9, messageVersion: 4 },
+      };
+      (global.fetch as any).mockImplementation(() =>
+        createFetchResponse({
+          success: true,
+          data: {
+            sessions: [
+              {
+                id: 'session-1',
+                updatedAt: 2,
+                lastMessageOffset: 9,
+                messageVersion: 5,
+              },
+            ],
+            timestamp: 123,
+          },
+        })
+      );
+      mockGetSessionMessages.mockResolvedValue({
+        messages: [{ id: 'assistant-9', content: 'complete persisted body', offset: 9 }],
+        pagination: { maxOffset: 9, messageVersion: 5 },
+      });
+
+      const { syncBackendData } = await import('../sessionSync.js');
+      await syncBackendData('local-standalone', 'full');
+
+      expect(mockGetSessionMessages).toHaveBeenCalledWith('session-1', { limit: 100 });
+      expect(chatState.mergeMessages).toHaveBeenCalledWith(
+        'session-1',
+        [{ id: 'assistant-9', content: 'complete persisted body', offset: 9 }],
+        { maxOffset: 9, messageVersion: 5 }
+      );
+    });
   });
 
   describe('eagerSyncCurrentSession', () => {
