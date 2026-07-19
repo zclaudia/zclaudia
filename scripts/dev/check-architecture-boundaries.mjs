@@ -230,47 +230,8 @@ function assertServerRouteLikeFilesNoRawSql(repoRoot, failures) {
   }
 }
 
-function assertStandalonePluginBoundaries(repoRoot, failures) {
-  const pluginSourceFiles = walk(
-    repoRoot,
-    'plugins',
-    relativePath =>
-      (relativePath.endsWith('.ts') || relativePath.endsWith('.tsx')) &&
-      !relativePath.includes('/dist/') &&
-      !relativePath.includes('/node_modules/')
-  );
-
-  for (const relativePath of pluginSourceFiles) {
-    assertNoMatch(
-      repoRoot,
-      failures,
-      relativePath,
-      /['"]@zclaudia\/shared(?:\/[^'"]*)?['"]/,
-      'Standalone plugins must import public contracts from @zclaudia/plugin-sdk, not @zclaudia/shared.'
-    );
-  }
-
-  const pluginPackageFiles = walk(
-    repoRoot,
-    'plugins',
-    relativePath =>
-      relativePath.endsWith('/package.json') && !relativePath.includes('/node_modules/')
-  );
-
-  for (const relativePath of pluginPackageFiles) {
-    assertNoMatch(
-      repoRoot,
-      failures,
-      relativePath,
-      /"[^"]+"\s*:\s*"workspace:/,
-      'Standalone plugins must not use workspace: dependencies.'
-    );
-  }
-}
-
 export function runArchitectureChecks(repoRoot = process.cwd(), options = {}) {
   const failures = [];
-  assertStandalonePluginBoundaries(repoRoot, failures);
   assertServerRouteLikeFilesNoRawSql(repoRoot, failures);
   assertDesktopProviderMetaBoundaries(repoRoot, failures);
   assertDesktopSelectionStoreBoundaries(repoRoot, failures, options);

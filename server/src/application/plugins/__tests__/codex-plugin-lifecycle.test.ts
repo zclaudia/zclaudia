@@ -14,7 +14,7 @@ import type { AgentRuntimeContribution } from '@zclaudia/shared/providers';
 
 const PLUGIN = 'com.zclaudia.codex';
 
-// Minimal valid AgentRuntimeDescriptor mirroring plugins/codex/plugin.json's
+// Minimal valid AgentRuntimeDescriptor mirroring zclaudia-plugins/agents/codex/plugin.json's
 // contributes.agentRuntimes[0] — only the fields required by the type, not the
 // full 13-capability manifest.
 const codexContribution: AgentRuntimeContribution = {
@@ -58,7 +58,9 @@ describe('codex plugin lifecycle', () => {
     providerRegistry.registerPluginAdapter(PLUGIN, { type: 'codex', async *run() {} });
 
     const svc = new PluginAgentProfileService(db);
-    svc.installContributions(PLUGIN, [{ id: 'codex-default', name: 'Codex', runtimeType: 'codex' }]);
+    svc.installContributions(PLUGIN, [
+      { id: 'codex-default', name: 'Codex', runtimeType: 'codex' },
+    ]);
     const repo = new AgentProfileRepository(db);
     expect(repo.findByPluginProfile(PLUGIN, 'codex-default')?.runtimeType).toBe('codex');
 

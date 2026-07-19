@@ -77,12 +77,18 @@ zclaudia/
 └── scripts/          # Build, deploy, and dev tooling
 
 ../zclaudia-gateway/  # WebSocket relay for remote access
+../zclaudia-plugins/  # Official Claude, Codex, and Cursor agent plugins
 ```
 
 `@zclaudia/protocol` is consumed from npm. ZClaudia uses the package's
 `/zclaudia` models internally and adapts them to the neutral `/gateway`
 resource, stream, and notification envelopes before sending them through
 `../zclaudia-gateway/`.
+
+Official agent runtime plugins are maintained in
+[zclaudia/zclaudia-plugins](https://github.com/zclaudia/zclaudia-plugins). For local development,
+build that repository and add an `agents/<name>` package directory through ZClaudia's plugin
+directory settings.
 
 Additional architecture notes:
 

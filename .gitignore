@@ -122,12 +122,8 @@ server/data/
 
 # Top-level runtime plugin installs (anchored to repo root so it does not
 # match source dirs like shared/src/plugins/, server/src/application/plugins/).
-# First-party plugin workspace packages (plugins/*) are tracked source and
-# must be excluded from this ignore individually.
+# First-party agent plugins live in the zclaudia-plugins repository.
 /plugins/*
-!/plugins/claude/
-!/plugins/cursor/
-!/plugins/codex/
 
 # Superpowers plugin generated docs
 docs/superpowers/
@@ -139,4 +135,3 @@ docs/superpowers/
 .claire/
 .codex/
 .zcode/
-

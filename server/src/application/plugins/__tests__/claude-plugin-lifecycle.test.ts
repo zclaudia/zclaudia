@@ -14,7 +14,7 @@ import type { AgentRuntimeContribution } from '@zclaudia/shared/providers';
 
 const PLUGIN = 'com.zclaudia.claude';
 
-// Minimal valid AgentRuntimeDescriptor mirroring plugins/claude/plugin.json's
+// Minimal valid AgentRuntimeDescriptor mirroring zclaudia-plugins/agents/claude/plugin.json's
 // contributes.agentRuntimes[0] — only the fields required by the type, not the
 // full 13-capability manifest.
 const claudeContribution: AgentRuntimeContribution = {
@@ -58,7 +58,9 @@ describe('claude plugin lifecycle', () => {
     providerRegistry.registerPluginAdapter(PLUGIN, { type: 'claude', async *run() {} });
 
     const svc = new PluginAgentProfileService(db);
-    svc.installContributions(PLUGIN, [{ id: 'claude-default', name: 'Claude', runtimeType: 'claude' }]);
+    svc.installContributions(PLUGIN, [
+      { id: 'claude-default', name: 'Claude', runtimeType: 'claude' },
+    ]);
     const repo = new AgentProfileRepository(db);
     expect(repo.findByPluginProfile(PLUGIN, 'claude-default')?.runtimeType).toBe('claude');
 

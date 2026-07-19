@@ -14,7 +14,7 @@ import type { AgentRuntimeContribution } from '@zclaudia/shared/providers';
 
 const PLUGIN = 'com.zclaudia.cursor';
 
-// Minimal valid AgentRuntimeDescriptor mirroring plugins/cursor/plugin.json's
+// Minimal valid AgentRuntimeDescriptor mirroring zclaudia-plugins/agents/cursor/plugin.json's
 // contributes.agentRuntimes[0] — only the fields required by the type, not the
 // full 13-capability manifest.
 const cursorContribution: AgentRuntimeContribution = {
@@ -58,7 +58,9 @@ describe('cursor plugin lifecycle', () => {
     providerRegistry.registerPluginAdapter(PLUGIN, { type: 'cursor', async *run() {} });
 
     const svc = new PluginAgentProfileService(db);
-    svc.installContributions(PLUGIN, [{ id: 'cursor-default', name: 'Cursor', runtimeType: 'cursor' }]);
+    svc.installContributions(PLUGIN, [
+      { id: 'cursor-default', name: 'Cursor', runtimeType: 'cursor' },
+    ]);
     const repo = new AgentProfileRepository(db);
     expect(repo.findByPluginProfile(PLUGIN, 'cursor-default')?.runtimeType).toBe('cursor');
 
