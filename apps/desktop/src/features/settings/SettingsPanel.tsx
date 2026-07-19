@@ -8,34 +8,22 @@ import {
 } from 'react';
 import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
-import { useGatewayStore } from '../../stores/gatewayStore';
 import { useConnection } from '../../contexts/ConnectionContext';
 import { useIsMobile } from '../../hooks/useMediaQuery';
-import { useIsActiveLocalBackend } from '../../hooks/useIsActiveLocalBackend';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { useSidebarWidthStore, SIDEBAR_WIDTH_LIMITS } from '../../stores/sidebarWidthStore';
 import { ServerGatewayConfig } from './ServerGatewayConfig';
 import { usePluginStore, selectPluginSettingsTabs } from '../../stores/pluginStore';
-import type { GatewayBackendInfo } from '@zclaudia/shared';
 import { AgentSettings } from './AgentSettings';
 import { PermissionSettings } from './PermissionSettings';
 import { NotificationSettingsInline } from './NotificationSettings';
 import { MobileGatewayConfig } from './MobileGatewayConfig';
 import { DebugSettings } from './DebugSettings';
 import { GeneralSettings } from './GeneralSettings';
-import {
-  type SettingsTab,
-  type SettingsTabDef,
-  getAppTabs,
-  getServerTabs,
-} from './settingsTabDefs';
+import { AboutSettings } from './AboutSettings';
+import { type SettingsTab, type SettingsTabDef, getSettingsTabs } from './settingsTabDefs';
 
-import {
-  getMobileBackendViewState,
-  getVisibleMobileBackends,
-  isMobileBackendUsable,
-} from '../../services/mobileConnectionState';
-import { ServerPickerDropdown } from './ServerPickerDropdown';
+import { isMobileBackendUsable } from '../../services/mobileConnectionState';
 
 interface SettingsPanelProps {
   isOpen: boolean;
@@ -45,38 +33,25 @@ interface SettingsPanelProps {
 
 export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab ?? 'general');
-  const [serverPickerOpen, setServerPickerOpen] = useState(false);
   const [mobileShowContent, setMobileShowContent] = useState(false);
   const [navQuery, setNavQuery] = useState('');
   const isMobile = useIsMobile();
   const pluginSettingsTabs = usePluginStore(selectPluginSettingsTabs);
 
+  // Settings always show/edit this device's local backend; backend switching
+  // lives in the app header's ServerSelector, not in this panel.
   const activeServerId = useServerStore(s => s.activeServerId);
-  const setActiveServer = useServerStore(s => s.setActiveServer);
-  const { isConnected: isGatewayConnected, showLocalBackend } = useGatewayStore();
-  const { sendMessage, connectServer, embeddedServerStatus, embeddedServerPort } = useConnection();
+  const { sendMessage, embeddedServerStatus } = useConnection();
 
   const facadeBackends = useFacadeStore(s => s.backends);
   const facadeConnectionState = useFacadeStore(s => s.connectionState);
-  const localBackendId = useFacadeStore(s => s.localBackendId);
-  const currentInstanceId = useFacadeStore(s => s.currentInstanceId);
-  const { activeServer, isActiveLocalBackend } = useIsActiveLocalBackend();
   const isConnected = isMobileBackendUsable({
     backendId: activeServerId,
     connectionState: facadeConnectionState,
     backends: facadeBackends,
   });
 
-  const isActiveRemote = !!activeServerId && !!localBackendId && activeServerId !== localBackendId;
-  const effectiveShowLocal = showLocalBackend || isActiveRemote;
-  const visibleGatewayBackends = getVisibleMobileBackends(
-    facadeBackends,
-    currentInstanceId,
-    effectiveShowLocal
-  );
-
-  const appTabs = getAppTabs(!!isMobile);
-  const serverTabs = getServerTabs({ isActiveLocalBackend, pluginSettingsTabs });
+  const tabs = getSettingsTabs({ isMobile: !!isMobile, pluginSettingsTabs });
   const sidebarWidth = useSidebarWidthStore(s => s.widthPx);
   const setSidebarWidth = useSidebarWidthStore(s => s.setWidth);
   const resizeDragging = useRef(false);
@@ -85,32 +60,11 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
   const resizeCleanupRef = useRef<(() => void) | null>(null);
 
   const navQ = navQuery.trim().toLowerCase();
-  const filterTabs = (tabs: SettingsTabDef[]) =>
-    navQ ? tabs.filter(t => t.label.toLowerCase().includes(navQ)) : tabs;
-  const visibleAppTabs = filterTabs(appTabs);
-  const visibleServerTabs = filterTabs(serverTabs);
+  const visibleTabs = navQ ? tabs.filter(t => t.label.toLowerCase().includes(navQ)) : tabs;
 
   useEffect(() => {
     if (isOpen && initialTab) setActiveTab(initialTab);
   }, [isOpen, initialTab]);
-
-  useEffect(() => {
-    if (!isActiveLocalBackend && !isMobile && activeTab === 'gateway') {
-      setActiveTab('agent');
-    }
-  }, [activeTab, isActiveLocalBackend, isMobile]);
-
-  const handleBackendSwitch = (backend: GatewayBackendInfo) => {
-    const viewState = getMobileBackendViewState(
-      backend.backendId,
-      facadeConnectionState,
-      facadeBackends
-    );
-    if (viewState === 'offline') return;
-    setActiveServer(backend.backendId);
-    connectServer(backend.backendId);
-    setServerPickerOpen(false);
-  };
 
   const handleSwipeBack = useCallback(() => {
     if (mobileShowContent) {
@@ -237,7 +191,7 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
             </button>
             <h2 className="text-lg font-semibold">
               {mobileShowContent
-                ? [...appTabs, ...serverTabs].find(t => t.id === activeTab)?.label || 'Settings'
+                ? tabs.find(t => t.id === activeTab)?.label || 'Settings'
                 : 'Settings'}
             </h2>
           </div>
@@ -247,17 +201,7 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
       <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
         {/* Mobile: Tab list */}
         {isMobile && !mobileShowContent && (
-          <div className="flex-1 overflow-y-auto p-2">
-            <div className="px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-              App
-            </div>
-            {appTabs.map(renderMobileTabItem)}
-
-            <div className="px-3 py-2 mt-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider border-t border-border">
-              {activeServer?.name || 'Server'}
-            </div>
-            {serverTabs.map(renderMobileTabItem)}
-          </div>
+          <div className="flex-1 overflow-y-auto p-2">{tabs.map(renderMobileTabItem)}</div>
         )}
 
         {/* Desktop: Tabs vertical sidebar */}
@@ -317,55 +261,7 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
                   />
                 </div>
 
-                {visibleAppTabs.length > 0 && (
-                  <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    App
-                  </div>
-                )}
-                {visibleAppTabs.map(renderTabButton)}
-
-                {visibleServerTabs.length > 0 && (
-                  <div className="relative border-t border-border mt-2">
-                    <button
-                      onClick={() => setServerPickerOpen(!serverPickerOpen)}
-                      className="w-full px-3 pt-3 pb-1.5 flex items-center justify-between group"
-                    >
-                      <span
-                        className="text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate"
-                        title={activeServer?.name || 'Server'}
-                      >
-                        {activeServer?.name || 'Server'}
-                      </span>
-                      <svg
-                        className={`w-3 h-3 text-muted-foreground group-hover:text-foreground transition-transform ${serverPickerOpen ? 'rotate-180' : ''}`}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 9l-7 7-7-7"
-                        />
-                      </svg>
-                    </button>
-
-                    {serverPickerOpen && (
-                      <ServerPickerDropdown
-                        isGatewayConnected={isGatewayConnected}
-                        visibleGatewayBackends={visibleGatewayBackends}
-                        activeServerId={activeServerId}
-                        facadeConnectionState={facadeConnectionState}
-                        facadeBackends={facadeBackends}
-                        onClose={() => setServerPickerOpen(false)}
-                        onSwitch={handleBackendSwitch}
-                      />
-                    )}
-                  </div>
-                )}
-
-                {visibleServerTabs.map(renderTabButton)}
+                {visibleTabs.map(renderTabButton)}
               </div>
             </div>
           </div>
@@ -377,13 +273,7 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
             {!isMobile && <div className="h-9 flex-shrink-0" data-tauri-drag-region />}
             <div className="flex-1 overflow-y-auto">
               <div className={isMobile ? 'p-3' : 'max-w-[640px] mx-auto px-8 pt-2 pb-10'}>
-                {activeTab === 'general' && (
-                  <GeneralSettings
-                    isOpen={isOpen}
-                    activeServerExists={!!activeServer}
-                    embeddedServerPort={embeddedServerPort}
-                  />
-                )}
+                {activeTab === 'general' && <GeneralSettings />}
 
                 {activeTab === 'agent' && <AgentSettings />}
                 {activeTab === 'permissions' && <PermissionSettings />}
@@ -403,6 +293,8 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
                     embeddedServerStatus={embeddedServerStatus}
                   />
                 )}
+
+                {activeTab === 'about' && <AboutSettings isOpen={isOpen} />}
 
                 {typeof activeTab === 'string' &&
                   activeTab.startsWith('plugin:') &&

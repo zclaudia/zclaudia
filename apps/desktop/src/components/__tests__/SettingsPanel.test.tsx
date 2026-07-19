@@ -33,21 +33,9 @@ vi.mock('../../stores/llmProfileMetaStore', () => ({
 vi.mock('../../features/settings/GeneralSettings', async () => {
   const React = await import('react');
   const uiStoreModule = await import('../../stores/uiStore');
-  const connectionModule = await import('../../contexts/ConnectionContext');
-  const apiModule = await import('../../services/api');
 
-  function GeneralSettings({ isOpen, activeServerExists, embeddedServerPort }: any) {
-    const { fontSize, setFontSize } = uiStoreModule.useUIStore();
-    const { embeddedServerStatus, restartEmbeddedServer } = connectionModule.useConnection();
-    const [sdkVersions, setSdkVersions] = React.useState<any>(null);
-
-    React.useEffect(() => {
-      if (!isOpen || !activeServerExists || !embeddedServerPort) return;
-      const address = `localhost:${embeddedServerPort}`;
-      (apiModule.getServerInfo as any)(address)
-        .then((info: any) => setSdkVersions(info?.sdkVersions ?? null))
-        .catch(() => setSdkVersions(null));
-    }, [isOpen, activeServerExists, embeddedServerPort]);
+  function GeneralSettings() {
+    const { setFontSize } = uiStoreModule.useUIStore();
 
     return React.createElement(
       'div',
@@ -69,9 +57,21 @@ vi.mock('../../features/settings/GeneralSettings', async () => {
             size.charAt(0).toUpperCase() + size.slice(1)
           )
         )
-      ),
-      React.createElement('h3', null, 'Local Server'),
-      React.createElement('div', null, 'Embedded Server: ', embeddedServerStatus),
+      )
+    );
+  }
+  return { GeneralSettings };
+});
+vi.mock('../../features/settings/ServerGatewayConfig', async () => {
+  const React = await import('react');
+  const connectionModule = await import('../../contexts/ConnectionContext');
+
+  function ServerGatewayConfig() {
+    const { embeddedServerStatus, restartEmbeddedServer } = connectionModule.useConnection();
+    return React.createElement(
+      'div',
+      { 'data-testid': 'server-gateway-config' },
+      React.createElement('span', null, `Embedded Server: ${embeddedServerStatus}`),
       embeddedServerStatus !== 'disabled'
         ? React.createElement(
             'button',
@@ -82,28 +82,14 @@ vi.mock('../../features/settings/GeneralSettings', async () => {
             },
             'Restart Embedded Server'
           )
-        : null,
-      React.createElement('h3', null, 'About'),
-      React.createElement('span', null, 'Version'),
-      sdkVersions && sdkVersions.sdks
-        ? sdkVersions.sdks.map((sdk: any) =>
-            React.createElement(
-              'div',
-              { key: sdk.name },
-              React.createElement('span', null, sdk.name),
-              React.createElement('span', null, sdk.current)
-            )
-          )
         : null
     );
   }
-  return { GeneralSettings };
+  return { ServerGatewayConfig };
 });
-vi.mock('../../features/settings/ServerGatewayConfig', () => ({
-  ServerGatewayConfig: () => <div data-testid="server-gateway-config">ServerGatewayConfig</div>,
-}));
 vi.mock('../../features/workflows/api', () => ({
   listAllWorkflows: vi.fn().mockResolvedValue([]),
+  listAllWorkflowsForBackend: vi.fn().mockResolvedValue([]),
 }));
 
 // Mock hooks
@@ -342,13 +328,17 @@ describe('SettingsPanel', () => {
   it('renders General tab by default', async () => {
     const { container } = await renderSettingsPanel();
     expect(container.textContent).toContain('Appearance');
-    expect(container.textContent).toContain('Local Server');
     expect(container.textContent).toContain('Theme');
     expect(container.textContent).toContain('Font Size');
+    // Local server / About moved out of General
+    expect(container.textContent).not.toContain('Local Server');
   });
 
-  it('restarts embedded server from local server section', async () => {
-    const { getByText } = await renderSettingsPanel();
+  it('restarts embedded server from the embedded server section on the Connection tab', async () => {
+    const { container, getByText } = await renderSettingsPanel();
+    const gatewayTab = container.querySelector('[data-testid="gateway-tab"]');
+    expect(gatewayTab).toBeTruthy();
+    await clickAsync(gatewayTab!);
     await clickAsync(getByText('Restart Embedded Server'));
     expect(mockRestartEmbeddedServer).toHaveBeenCalledTimes(1);
   });
@@ -409,13 +399,13 @@ describe('SettingsPanel', () => {
 
   // ---- Tab navigation ----
 
-  it('shows all app tabs', async () => {
+  it('shows General and Claudia tabs', async () => {
     const { container } = await renderSettingsPanel();
     expect(container.textContent).toContain('General');
     expect(container.textContent).toContain('Claudia');
   });
 
-  it('shows server tabs', async () => {
+  it('shows Permissions tab but not Notifications on desktop', async () => {
     const { container } = await renderSettingsPanel();
     expect(container.textContent).toContain('Permissions');
     expect(container.textContent).not.toContain('Notifications');
@@ -438,12 +428,14 @@ describe('SettingsPanel', () => {
     expect(container.querySelector('[data-testid="notifications-tab"]')).toBeTruthy();
   });
 
-  it('shows Gateway tab for local server', async () => {
+  it('shows the Connection tab (gateway id) on desktop', async () => {
     const { container } = await renderSettingsPanel();
-    expect(container.textContent).toContain('Gateway');
+    const gatewayTab = container.querySelector('[data-testid="gateway-tab"]');
+    expect(gatewayTab).toBeTruthy();
+    expect(gatewayTab?.textContent).toContain('Connection');
   });
 
-  it('hides Gateway tab for non-local server', async () => {
+  it('shows the Connection tab even when a remote backend is active', async () => {
     await act(async () => {
       setupStores({
         serverStore: {
@@ -457,7 +449,37 @@ describe('SettingsPanel', () => {
       await Promise.resolve();
     });
     const { container } = await renderSettingsPanel();
-    expect(container.querySelector('[data-testid="gateway-tab"]')).toBeFalsy();
+    // Settings are pinned to this device: the Connection tab stays visible…
+    const gatewayTab = container.querySelector('[data-testid="gateway-tab"]');
+    expect(gatewayTab).toBeTruthy();
+    // …and opening it does not redirect away.
+    await clickAsync(gatewayTab!);
+    expect(container.querySelector('[data-testid="server-gateway-config"]')).toBeTruthy();
+  });
+
+  it('renders a flat sidebar without group headers or a backend switcher', async () => {
+    const { getByTestId } = await renderSettingsPanel();
+    const sidebar = getByTestId('settings-sidebar');
+    // No "APP" / server-name group headers in the merged list
+    expect(sidebar.querySelector('.uppercase')).toBeNull();
+    // Server name button (previous backend switcher) is gone
+    const buttons = Array.from(sidebar.querySelectorAll('button'));
+    expect(buttons.some(b => b.textContent?.trim() === 'Local')).toBe(false);
+  });
+
+  it('filters the merged tab list via the search box', async () => {
+    const { container, getByPlaceholderText } = await renderSettingsPanel();
+    fireEvent.change(getByPlaceholderText('Search settings…'), { target: { value: 'perm' } });
+    expect(container.querySelector('[data-testid="permissions-tab"]')).toBeTruthy();
+    expect(container.querySelector('[data-testid="general-tab"]')).toBeNull();
+    expect(container.querySelector('[data-testid="about-tab"]')).toBeNull();
+  });
+
+  it('shows the About tab last in the sidebar', async () => {
+    const { container } = await renderSettingsPanel();
+    const aboutTab = container.querySelector('[data-testid="about-tab"]');
+    expect(aboutTab).toBeTruthy();
+    expect(aboutTab?.textContent).toContain('About');
   });
 
   // ---- Tab switching ----
@@ -474,7 +496,7 @@ describe('SettingsPanel', () => {
     expect(api.getNotificationConfig).toHaveBeenCalled();
   });
 
-  it('switches to Gateway tab', async () => {
+  it('switches to Connection tab', async () => {
     const { container } = await renderSettingsPanel();
     const gatewayTab = container.querySelector('[data-testid="gateway-tab"]');
     expect(gatewayTab).toBeTruthy();
@@ -549,15 +571,18 @@ describe('SettingsPanel', () => {
     expect(permissionsTab?.classList.toString()).toBeTruthy();
   });
 
-  // ---- General tab: About ----
+  // ---- About tab ----
 
-  it('shows About section with version and connection status', async () => {
+  it('shows About tab with version and SDK check', async () => {
     const { container } = await renderSettingsPanel();
+    const aboutTab = container.querySelector('[data-testid="about-tab"]');
+    expect(aboutTab).toBeTruthy();
+    await clickAsync(aboutTab!);
     expect(container.textContent).toContain('About');
     expect(container.textContent).toContain('Version');
   });
 
-  it('shows disconnected status when not connected', async () => {
+  it('shows version on the About tab regardless of connection state', async () => {
     setupStores({
       serverStore: {
         connections: {
@@ -576,16 +601,18 @@ describe('SettingsPanel', () => {
       },
     });
     const { container } = await renderSettingsPanel();
-    // The About section shows version info regardless of connection state
+    await clickAsync(container.querySelector('[data-testid="about-tab"]')!);
+    // The About tab shows version info regardless of connection state
     expect(container.textContent).toContain('Version');
   });
 
-  it('shows embedded server status', async () => {
+  it('shows embedded server status on the Connection tab', async () => {
     const { container } = await renderSettingsPanel();
+    await clickAsync(container.querySelector('[data-testid="gateway-tab"]')!);
     expect(container.textContent).toContain('Embedded Server');
   });
 
-  it('shows SDK versions when available', async () => {
+  it('shows SDK versions on the About tab when available', async () => {
     (api.getServerInfo as ReturnType<typeof vi.fn>).mockResolvedValue({
       sdkVersions: {
         sdks: [
@@ -596,6 +623,7 @@ describe('SettingsPanel', () => {
     });
 
     const { container } = await renderSettingsPanel();
+    await clickAsync(container.querySelector('[data-testid="about-tab"]')!);
 
     await waitFor(() => {
       expect(container.textContent).toContain('sdk');
@@ -945,93 +973,6 @@ describe('SettingsPanel', () => {
     });
   });
 
-  // ---- Server picker ----
-
-  it('opens server picker dropdown', async () => {
-    setupStores({
-      gatewayStore: {
-        isConnected: true,
-      },
-      facadeStore: {
-        backends: [
-          {
-            backendId: 'local-standalone',
-            name: 'Local',
-            online: true,
-            runtimeState: 'ready',
-            isThisInstance: true,
-            instanceId: 'instance-local',
-          },
-          {
-            backendId: 'remote-1',
-            name: 'Remote',
-            online: true,
-            runtimeState: 'ready',
-            isThisInstance: false,
-            instanceId: 'instance-remote',
-          },
-        ],
-      },
-    });
-
-    const { container } = await renderSettingsPanel();
-    // The server picker is in the sidebar with the server name label
-    const serverPickerBtn = Array.from(container.querySelectorAll('button')).find(
-      b => b.textContent?.includes('Local') && b.className.includes('w-full')
-    );
-    if (serverPickerBtn) {
-      await clickAsync(serverPickerBtn);
-      // Should show dropdown with server options
-      expect(container.textContent).toContain('Remote');
-    }
-  });
-
-  it('switches server from picker', async () => {
-    const setActiveServer = vi.fn();
-    setupStores({
-      serverStore: {
-        setActiveServer,
-      },
-      facadeStore: {
-        backends: [
-          {
-            backendId: 'local-standalone',
-            name: 'Local',
-            online: true,
-            runtimeState: 'ready',
-            isThisInstance: true,
-            instanceId: 'instance-local',
-          },
-          {
-            backendId: 'remote-1',
-            name: 'Remote',
-            online: true,
-            runtimeState: 'ready',
-            isThisInstance: false,
-            instanceId: 'instance-remote',
-          },
-        ],
-      },
-    });
-
-    const { container } = await renderSettingsPanel();
-    // Open server picker
-    const serverPickerBtn = Array.from(container.querySelectorAll('button')).find(
-      b => b.textContent?.includes('Local') && b.className.includes('w-full')
-    );
-    if (serverPickerBtn) {
-      await clickAsync(serverPickerBtn);
-      // Click Remote server
-      const remoteBtn = Array.from(container.querySelectorAll('button')).find(
-        b => b.textContent?.includes('Remote') && !b.textContent?.includes('Local')
-      );
-      if (remoteBtn) {
-        await clickAsync(remoteBtn);
-        expect(setActiveServer).toHaveBeenCalledWith('remote-1');
-      }
-    }
-  });
-
   // ---- Gateway tab ----
 
   it('renders ServerGatewayConfig on desktop gateway tab', async () => {
@@ -1061,7 +1002,7 @@ describe('SettingsPanel', () => {
 
   // ---- Connection status colors ----
 
-  it('shows correct status colors in server picker', async () => {
+  it('renders without crashing across backend connection statuses', async () => {
     setupStores({
       serverStore: {
         connections: {
@@ -1076,7 +1017,6 @@ describe('SettingsPanel', () => {
     });
 
     const { container } = await renderSettingsPanel();
-    // The sidebar shows the active tab, status is reflected in the server picker dropdown
     // Just verifying no crash with various statuses
     expect(container).toBeTruthy();
   });

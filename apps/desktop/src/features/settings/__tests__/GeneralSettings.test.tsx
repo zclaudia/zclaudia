@@ -1,15 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
-vi.mock('../../../contexts/ConnectionContext', () => ({
-  useConnection: () => ({
-    embeddedServerStatus: 'ready',
-    embeddedServerError: null,
-    restartEmbeddedServer: vi.fn(),
-  }),
-}));
 vi.mock('../../../hooks/useMediaQuery', () => ({ useIsMobile: () => true }));
-vi.mock('../../../utils/platform', () => ({ isMacOS: () => false }));
 vi.mock('../ThemeToggle', () => ({ ThemeToggle: () => <div>theme-toggle</div> }));
 vi.mock('../../../stores/uiStore', () => ({
   useUIStore: () => ({
@@ -22,25 +14,25 @@ vi.mock('../../../stores/uiStore', () => ({
   }),
 }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn().mockResolvedValue(undefined) }));
-vi.mock('../../../services/api', () => ({
-  getServerInfo: vi.fn().mockResolvedValue({ sdkVersions: null }),
-}));
 
 import { GeneralSettings } from '../GeneralSettings';
 
 describe('GeneralSettings', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('renders grouped sections with their rows', () => {
-    render(<GeneralSettings isOpen activeServerExists={false} embeddedServerPort={3100} />);
+  it('renders only the Appearance section', () => {
+    render(<GeneralSettings />);
     expect(screen.getByText('Appearance')).toBeTruthy();
-    expect(screen.getByText('Local server')).toBeTruthy();
-    expect(screen.getByText('About')).toBeTruthy();
     expect(screen.getByText('Theme')).toBeTruthy();
     expect(screen.getByText('Font size')).toBeTruthy();
-    expect(screen.getByText('Embedded server runtime')).toBeTruthy();
-    expect(screen.getByText('Version')).toBeTruthy();
-    expect(screen.getByText('Runtime status')).toBeTruthy();
-    expect(screen.getByText('ready')).toBeTruthy();
+  });
+
+  it('no longer renders the Local server, Permissions, or About sections', () => {
+    render(<GeneralSettings />);
+    expect(screen.queryByText('Local server')).toBeNull();
+    expect(screen.queryByText('Embedded server runtime')).toBeNull();
+    expect(screen.queryByText('Permissions')).toBeNull();
+    expect(screen.queryByText('About')).toBeNull();
+    expect(screen.queryByText('Version')).toBeNull();
   });
 });

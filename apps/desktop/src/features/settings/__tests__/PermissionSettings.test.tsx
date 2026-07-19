@@ -3,12 +3,22 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { PermissionSettings } from '../PermissionSettings';
 import { useLlmProfileMetaStore } from '../../../stores/llmProfileMetaStore';
 import { useServerStore } from '../../../stores/serverStore';
+import { useFacadeStore } from '../../../stores/facadeStore';
+import { isMacOS } from '../../../utils/platform';
+import { invoke } from '@tauri-apps/api/core';
 
 const mockGetAgentConfig = vi.fn();
 const mockUpdateAgentConfig = vi.fn();
-const mockListAllWorkflows = vi.fn();
-const mockGetProviders = vi.fn();
+const mockListAllWorkflowsForBackend = vi.fn();
+const mockListLlmProfilesForBackend = vi.fn();
 const mockGetProviderCapabilities = vi.fn();
+
+vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
+
+vi.mock('../../../utils/platform', async importOriginal => {
+  const mod = await importOriginal<Record<string, unknown>>();
+  return { ...mod, isMacOS: vi.fn(() => false) };
+});
 
 vi.mock('../../../services/api/servers', () => ({
   getAgentConfig: (...args: unknown[]) => mockGetAgentConfig(...args),
@@ -16,41 +26,46 @@ vi.mock('../../../services/api/servers', () => ({
 }));
 
 vi.mock('../../../features/workflows/api', () => ({
-  listAllWorkflows: (...args: unknown[]) => mockListAllWorkflows(...args),
+  listAllWorkflowsForBackend: (...args: unknown[]) => mockListAllWorkflowsForBackend(...args),
 }));
 
 vi.mock('../../../services/api/llm-profiles', () => ({
-  listLlmProfiles: (...args: unknown[]) => mockGetProviders(...args),
+  listLlmProfilesForBackend: (...args: unknown[]) => mockListLlmProfilesForBackend(...args),
   getProviderCapabilities: (...args: unknown[]) => mockGetProviderCapabilities(...args),
 }));
+
+const LOCAL_PROVIDERS = [
+  {
+    id: 'prov-supported',
+    name: 'Primary',
+    providerType: 'zclaudia',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  },
+  {
+    id: 'prov-unsupported',
+    name: 'Legacy',
+    providerType: 'zclaudia',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  },
+];
 
 describe('PermissionSettings', () => {
   beforeEach(() => {
     mockGetAgentConfig.mockReset();
     mockUpdateAgentConfig.mockReset();
-    mockListAllWorkflows.mockReset();
-    mockGetProviders.mockReset();
+    mockListAllWorkflowsForBackend.mockReset();
+    mockListLlmProfilesForBackend.mockReset();
     mockGetProviderCapabilities.mockReset();
+    vi.mocked(isMacOS).mockReturnValue(false);
+    vi.mocked(invoke).mockReset();
 
     useServerStore.setState({ activeServerId: 'local' } as any);
+    useFacadeStore.setState({ localBackendId: 'local', backends: [] } as any);
     useLlmProfileMetaStore.setState({
       providersByBackend: {
-        local: [
-          {
-            id: 'prov-supported',
-            name: 'Primary',
-            providerType: 'zclaudia',
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          },
-          {
-            id: 'prov-unsupported',
-            name: 'Legacy',
-            providerType: 'zclaudia',
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          },
-        ],
+        local: LOCAL_PROVIDERS,
       },
     } as any);
 
@@ -77,14 +92,14 @@ describe('PermissionSettings', () => {
       permissionWorkflowOverrideId: null,
       permissionPolicy: null,
     });
-    mockListAllWorkflows.mockResolvedValue([]);
+    mockListAllWorkflowsForBackend.mockResolvedValue([]);
 
     mockGetProviderCapabilities.mockImplementation(async (llmProfileId: string) => ({
       modes: [],
       models: [],
       supportsAIReview: llmProfileId === 'prov-supported',
     }));
-    mockGetProviders.mockResolvedValue([]);
+    mockListLlmProfilesForBackend.mockResolvedValue([]);
   });
 
   function findTriggerByText(textFragment: string): HTMLElement {
@@ -102,8 +117,12 @@ describe('PermissionSettings', () => {
     await screen.findByText('Review provider');
 
     await waitFor(() => {
-      expect(mockGetProviderCapabilities).toHaveBeenCalledWith('prov-supported');
-      expect(mockGetProviderCapabilities).toHaveBeenCalledWith('prov-unsupported');
+      expect(mockGetProviderCapabilities).toHaveBeenCalledWith('prov-supported', undefined, 'local');
+      expect(mockGetProviderCapabilities).toHaveBeenCalledWith(
+        'prov-unsupported',
+        undefined,
+        'local'
+      );
     });
 
     fireEvent.click(findTriggerByText('Session default'));
@@ -112,12 +131,12 @@ describe('PermissionSettings', () => {
     expect(screen.queryByRole('option', { name: 'Legacy (zclaudia)' })).toBeNull();
   });
 
-  it('loads providers when provider store is empty', async () => {
+  it('loads providers from the local backend when provider store is empty', async () => {
     useLlmProfileMetaStore.setState({
       providersByBackend: { local: [] },
     } as any);
 
-    mockGetProviders.mockResolvedValue([
+    mockListLlmProfilesForBackend.mockResolvedValue([
       {
         id: 'prov-supported',
         name: 'Primary',
@@ -130,12 +149,47 @@ describe('PermissionSettings', () => {
     render(<PermissionSettings />);
 
     await waitFor(() => {
-      expect(mockGetProviders).toHaveBeenCalled();
-      expect(mockGetProviderCapabilities).toHaveBeenCalledWith('prov-supported');
+      expect(mockListLlmProfilesForBackend).toHaveBeenCalledWith('local');
+      expect(mockGetProviderCapabilities).toHaveBeenCalledWith('prov-supported', undefined, 'local');
     });
 
     fireEvent.click(findTriggerByText('Session default'));
     expect(screen.getByRole('option', { name: 'Primary (zclaudia)' })).toBeInTheDocument();
+  });
+
+  it('stays pinned to the local backend when a remote backend is active', async () => {
+    useServerStore.setState({ activeServerId: 'remote-1' } as any);
+    useFacadeStore.setState({
+      localBackendId: 'local',
+      backends: [
+        { backendId: 'local', isThisInstance: true },
+        { backendId: 'remote-1', isThisInstance: false },
+      ],
+    } as any);
+
+    render(<PermissionSettings />);
+
+    await screen.findByText('Review provider');
+
+    await waitFor(() => {
+      expect(mockGetProviderCapabilities).toHaveBeenCalledWith('prov-supported', undefined, 'local');
+      expect(mockListAllWorkflowsForBackend).toHaveBeenCalledWith('local');
+    });
+  });
+
+  it('falls back to the backends list when localBackendId is not synced yet', async () => {
+    useFacadeStore.setState({
+      localBackendId: null,
+      backends: [{ backendId: 'local', isThisInstance: true }],
+    } as any);
+
+    render(<PermissionSettings />);
+
+    await screen.findByText('Review provider');
+
+    await waitFor(() => {
+      expect(mockGetProviderCapabilities).toHaveBeenCalledWith('prov-supported', undefined, 'local');
+    });
   });
 
   it('renders the master toggle and grouped sections once loaded', async () => {
@@ -151,7 +205,7 @@ describe('PermissionSettings', () => {
   });
 
   it('lists non-system workflows as global override options', async () => {
-    mockListAllWorkflows.mockResolvedValue([
+    mockListAllWorkflowsForBackend.mockResolvedValue([
       {
         id: 'wf-global',
         name: 'Global Review',
@@ -199,5 +253,32 @@ describe('PermissionSettings', () => {
 
     expect(screen.getByLabelText(/protect sensitive files/i)).toBeTruthy();
     expect(screen.getByLabelText(/enforce workspace scope/i)).toBeTruthy();
+  });
+
+  it('does not render the System permissions section off macOS', async () => {
+    render(<PermissionSettings />);
+    await screen.findByText('Auto-approve tools');
+    expect(screen.queryByText('System permissions')).toBeNull();
+  });
+
+  it('renders macOS system permissions at the top', async () => {
+    vi.mocked(isMacOS).mockReturnValue(true);
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === 'check_full_disk_access') return false;
+      if (cmd === 'check_folder_permissions') return [{ name: 'Documents', granted: false }];
+      return undefined;
+    });
+
+    render(<PermissionSettings />);
+
+    expect(await screen.findByText('System permissions')).toBeTruthy();
+    expect(screen.getByText('Full disk access')).toBeTruthy();
+    expect(screen.getByText('Folder access')).toBeTruthy();
+    expect(screen.getByText('~/Documents')).toBeTruthy();
+
+    // System permissions render above the agent permission settings
+    const systemEl = screen.getByText('System permissions');
+    const agentEl = screen.getByText('Auto-approve tools');
+    expect(systemEl.compareDocumentPosition(agentEl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

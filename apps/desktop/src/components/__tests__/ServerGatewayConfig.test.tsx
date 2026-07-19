@@ -1,6 +1,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, fireEvent, waitFor, act } from '@testing-library/react';
 
+const mockRestartEmbeddedServer = vi.fn().mockResolvedValue(undefined);
+
+// Mock ConnectionContext (embedded server section)
+vi.mock('../../contexts/ConnectionContext', () => ({
+  useConnection: () => ({
+    embeddedServerStatus: 'ready',
+    embeddedServerError: null,
+    embeddedServerPort: 3100,
+    restartEmbeddedServer: mockRestartEmbeddedServer,
+  }),
+}));
+
 // Mock API
 vi.mock('../../services/api', () => ({
   getServerGatewayConfig: vi.fn().mockResolvedValue({
@@ -137,5 +149,21 @@ describe('ServerGatewayConfig', () => {
     });
 
     alertSpy.mockRestore();
+  });
+
+  it('shows the embedded server section and restarts the embedded server', async () => {
+    const { container, getByText } = render(<ServerGatewayConfig />);
+
+    await waitFor(() => {
+      expect(container.textContent).toContain('Gateway Configuration');
+    });
+
+    expect(container.textContent).toContain('Embedded server');
+    expect(container.textContent).toContain('Runtime status');
+    expect(container.textContent).toContain('ready');
+    expect(container.textContent).toContain('3100');
+
+    fireEvent.click(getByText('Restart Embedded Server'));
+    expect(mockRestartEmbeddedServer).toHaveBeenCalledTimes(1);
   });
 });

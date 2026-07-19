@@ -8,6 +8,7 @@ export type SettingsTab =
   | 'notifications'
   | 'gateway'
   | 'debug'
+  | 'about'
   | `plugin:${string}`;
 
 export interface SettingsTabDef {
@@ -16,7 +17,23 @@ export interface SettingsTabDef {
   icon: JSX.Element;
 }
 
-export function getAppTabs(isMobile: boolean): SettingsTabDef[] {
+interface SettingsTabsOptions {
+  isMobile: boolean;
+  pluginSettingsTabs: { id: string; label: string }[];
+}
+
+/**
+ * Single flat settings tab list. Settings always edit this device's local
+ * backend, so the list is no longer split into "app" vs "active server"
+ * groups. Platform conditions preserved from the previous split:
+ * - Notifications tab is Android-only.
+ * - The gateway tab renders the mobile gateway config on mobile; on desktop
+ *   it is labeled "Connection" (id stays `gateway` for deep links).
+ */
+export function getSettingsTabs({
+  isMobile,
+  pluginSettingsTabs,
+}: SettingsTabsOptions): SettingsTabDef[] {
   const android = isAndroid();
   return [
     {
@@ -57,51 +74,6 @@ export function getAppTabs(isMobile: boolean): SettingsTabDef[] {
           },
         ]
       : []),
-    ...(isMobile
-      ? [
-          {
-            id: 'gateway' as SettingsTab,
-            label: 'Gateway',
-            icon: (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"
-                />
-              </svg>
-            ),
-          },
-        ]
-      : []),
-    {
-      id: 'debug' as SettingsTab,
-      label: 'Debug',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-      ),
-    },
-  ];
-}
-
-interface ServerTabsOptions {
-  isActiveLocalBackend: boolean;
-  pluginSettingsTabs: { id: string; label: string }[];
-}
-
-export function getServerTabs({
-  isActiveLocalBackend,
-  pluginSettingsTabs,
-}: ServerTabsOptions): SettingsTabDef[] {
-  return [
     {
       id: 'agent',
       label: 'Claudia',
@@ -144,23 +116,47 @@ export function getServerTabs({
         </svg>
       ),
     })),
-    ...(isActiveLocalBackend
-      ? [
-          {
-            id: 'gateway' as SettingsTab,
-            label: 'Gateway',
-            icon: (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"
-                />
-              </svg>
-            ),
-          },
-        ]
-      : []),
+    {
+      id: 'gateway',
+      label: isMobile ? 'Gateway' : 'Connection',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"
+          />
+        </svg>
+      ),
+    },
+    {
+      id: 'debug',
+      label: 'Debug',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
+        </svg>
+      ),
+    },
+    {
+      id: 'about',
+      label: 'About',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
+          />
+        </svg>
+      ),
+    },
   ];
 }

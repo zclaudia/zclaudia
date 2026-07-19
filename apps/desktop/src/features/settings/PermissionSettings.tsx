@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { getAgentConfig, updateAgentConfig } from '../../services/api/servers';
-import { listAllWorkflows } from '../../features/workflows/api';
+import { listAllWorkflowsForBackend } from '../../features/workflows/api';
 import * as providersApi from '../../services/api/llm-profiles';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
-import { useServerStore } from '../../stores/serverStore';
+import { useLocalBackendId } from '../../hooks/useLocalBackendId';
+import { isMacOS } from '../../utils/platform';
 import { Select } from '../../components/ui/Select';
 import type {
   UnifiedPermissionPolicy,
@@ -90,8 +92,11 @@ function AIReviewProviderSelector({
   onChange: (id: string | undefined) => void;
   disabled: boolean;
 }) {
-  const activeServerId = useServerStore(s => s.activeServerId);
-  const storeProviders = useLlmProfileMetaStore(s => s.getProviders(activeServerId));
+  // Settings always edit this device's local backend, even when a remote
+  // backend is active for chat — so provider metadata is keyed by (and
+  // fetched from) the local backend id, not the active server id.
+  const localBackendId = useLocalBackendId();
+  const storeProviders = useLlmProfileMetaStore(s => s.getProviders(localBackendId));
   const [providers, setProviders] = useState<LlmProfileConfig[]>(storeProviders);
   const [eligibleProviderIds, setEligibleProviderIds] = useState<Record<string, boolean>>({});
 
@@ -103,18 +108,18 @@ function AIReviewProviderSelector({
 
     let cancelled = false;
     void providersApi
-      .listLlmProfiles()
+      .listLlmProfilesForBackend(localBackendId)
       .then(loadedProviders => {
         if (cancelled) return;
         setProviders(loadedProviders);
-        useLlmProfileMetaStore.getState().setProviders(loadedProviders, activeServerId);
+        useLlmProfileMetaStore.getState().setProviders(loadedProviders, localBackendId);
       })
       .catch(() => {});
 
     return () => {
       cancelled = true;
     };
-  }, [activeServerId, storeProviders]);
+  }, [localBackendId, storeProviders]);
 
   useEffect(() => {
     let cancelled = false;
@@ -123,7 +128,11 @@ function AIReviewProviderSelector({
       const results = await Promise.all(
         providers.map(async provider => {
           try {
-            const capabilities = await providersApi.getProviderCapabilities(provider.id);
+            const capabilities = await providersApi.getProviderCapabilities(
+              provider.id,
+              undefined,
+              localBackendId
+            );
             return [provider.id, capabilities.supportsAIReview === true] as const;
           } catch {
             return [provider.id, false] as const;
@@ -140,7 +149,7 @@ function AIReviewProviderSelector({
     return () => {
       cancelled = true;
     };
-  }, [providers]);
+  }, [providers, localBackendId]);
 
   const eligibleProviders = providers.filter(provider => eligibleProviderIds[provider.id] === true);
   const selectedProvider = value ? providers.find(provider => provider.id === value) : undefined;
@@ -196,11 +205,31 @@ export function PermissionSettings() {
   const [error, setError] = useState<string | null>(null);
   const [hookList, setHookList] = useState<UserHookDefinition[]>([]);
 
+  // Pin all data in this page to this device's local backend (see
+  // AIReviewProviderSelector for the rationale).
+  const localBackendId = useLocalBackendId();
+
+  // macOS system permission checks (moved from General settings)
+  const [fdaGranted, setFdaGranted] = useState<boolean | null>(null);
+  const [folderPerms, setFolderPerms] = useState<{ name: string; granted: boolean }[]>([]);
+  useEffect(() => {
+    if (!isMacOS()) return;
+    invoke<boolean>('check_full_disk_access')
+      .then(setFdaGranted)
+      .catch(() => setFdaGranted(null));
+    invoke<{ name: string; granted: boolean }[]>('check_folder_permissions')
+      .then(setFolderPerms)
+      .catch(() => {});
+  }, []);
+
   const loadPolicy = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [config, workflows] = await Promise.all([getAgentConfig(), listAllWorkflows()]);
+      const [config, workflows] = await Promise.all([
+        getAgentConfig(),
+        listAllWorkflowsForBackend(localBackendId),
+      ]);
 
       setSelectedWorkflowId(config.permissionWorkflowOverrideId ?? '');
       setWorkflowOptions(
@@ -238,7 +267,7 @@ export function PermissionSettings() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [localBackendId]);
 
   useEffect(() => {
     loadPolicy();
@@ -325,9 +354,71 @@ export function PermissionSettings() {
     }
   }, []);
 
+  // macOS system permissions (full disk access + folder access), shown above
+  // the agent tool permission settings regardless of load state.
+  const systemPermissionsGroup =
+    isMacOS() && fdaGranted !== null ? (
+      <SettingsGroup label="System permissions">
+        <SettingsRow
+          icon={
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+              />
+            </svg>
+          }
+          title="Full disk access"
+          description={!fdaGranted ? 'Required for terminal to access all directories' : undefined}
+          control={
+            fdaGranted ? (
+              <span className="text-sm text-success">Granted</span>
+            ) : (
+              <button
+                onClick={() => invoke('open_full_disk_access_settings')}
+                className="px-3 py-1 text-xs bg-muted/60 text-foreground rounded-lg hover:bg-muted font-medium transition-colors"
+              >
+                Open Settings
+              </button>
+            )
+          }
+        />
+        {folderPerms.length > 0 && folderPerms.some(f => !f.granted) && (
+          <SettingsRow
+            align="start"
+            title="Folder access"
+            control={
+              <button
+                onClick={() => invoke('open_files_and_folders_settings')}
+                className="px-3 py-1 text-xs bg-muted/60 text-foreground rounded-lg hover:bg-muted font-medium transition-colors"
+              >
+                Open Settings
+              </button>
+            }
+          >
+            <div className="space-y-1">
+              {folderPerms.map(f => (
+                <div key={f.name} className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">~/{f.name}</span>
+                  {f.granted ? (
+                    <span className="text-success">Granted</span>
+                  ) : (
+                    <span className="text-destructive">Denied</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </SettingsRow>
+        )}
+      </SettingsGroup>
+    ) : null;
+
   if (loading) {
     return (
       <div className="space-y-6">
+        {systemPermissionsGroup}
         <div className="p-3 bg-secondary/50 rounded-lg text-sm text-muted-foreground">
           Loading...
         </div>
@@ -337,6 +428,8 @@ export function PermissionSettings() {
 
   return (
     <div className="space-y-6">
+      {systemPermissionsGroup}
+
       {/* Master toggle (standalone, label-less card) */}
       <SettingsGroup>
         <SettingsRow

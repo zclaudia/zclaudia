@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchApi, listLlmProfiles } from '../../services/api';
+import { listLlmProfilesForBackend } from '../../services/api';
+import { fetchApiForBackend } from '../../services/api/base';
 import type { LlmProfileConfig } from '@zclaudia/shared';
 import { ShortcutSettings } from './ShortcutSettings';
 import { isDesktopTauri } from '../../utils/platform';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
+import { useLocalBackendId } from '../../hooks/useLocalBackendId';
 import { Select } from '../../components/ui/Select';
 
 interface AgentCapabilities {
@@ -25,14 +27,18 @@ export function AgentSettings() {
   const [metaLoading, setMetaLoading] = useState(true);
   const [metaError, setMetaError] = useState<string | null>(null);
 
+  // Settings always edit this device's local backend, even when a remote
+  // backend is active for chat.
+  const localBackendId = useLocalBackendId();
+
   const loadData = useCallback(async () => {
     setMetaLoading(true);
     setMetaError(null);
     try {
       await loadConfig();
       const [capsRes, providerList] = await Promise.all([
-        fetchApi<AgentCapabilities>('/api/agent/capabilities'),
-        listLlmProfiles().catch(() => [] as LlmProfileConfig[]),
+        fetchApiForBackend<AgentCapabilities>('/api/agent/capabilities', localBackendId),
+        listLlmProfilesForBackend(localBackendId).catch(() => [] as LlmProfileConfig[]),
       ]);
       if (capsRes.success && capsRes.data) setCapabilities(capsRes.data);
       setProviders(providerList);
@@ -41,7 +47,7 @@ export function AgentSettings() {
     } finally {
       setMetaLoading(false);
     }
-  }, [loadConfig]);
+  }, [loadConfig, localBackendId]);
 
   useEffect(() => {
     loadData();

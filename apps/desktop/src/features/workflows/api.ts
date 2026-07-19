@@ -25,6 +25,11 @@ export async function listAllWorkflows(): Promise<Workflow[]> {
   return apiCall<Workflow[]>('/api/workflows');
 }
 
+/** List workflows on an explicit backend (e.g. settings pinned to the local backend). */
+export async function listAllWorkflowsForBackend(backendId: string | null): Promise<Workflow[]> {
+  return apiCallForBackend<Workflow[]>(backendId, '/api/workflows');
+}
+
 export async function createGlobalWorkflow(data: {
   name: string;
   description?: string;

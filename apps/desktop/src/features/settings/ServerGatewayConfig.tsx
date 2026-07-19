@@ -8,8 +8,11 @@ import {
 } from '../../services/api';
 import type { ServerGatewayConfig as GatewayConfig, ServerGatewayStatus } from '@zclaudia/shared';
 import { useGatewayStore, shouldShowNonCurrentInstanceBackend } from '../../stores/gatewayStore';
+import { useConnection } from '../../contexts/ConnectionContext';
 
 export function ServerGatewayConfig() {
+  const { embeddedServerStatus, embeddedServerError, embeddedServerPort, restartEmbeddedServer } =
+    useConnection();
   const [config, setConfig] = useState<GatewayConfig | null>(null);
   const [status, setStatus] = useState<ServerGatewayStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -487,6 +490,49 @@ export function ServerGatewayConfig() {
             Connect
           </button>
         )}
+      </div>
+
+      {/* Embedded Server (moved from General settings) */}
+      <div className="pt-4 border-t border-border">
+        <h4 className="text-sm font-semibold text-foreground mb-3">Embedded server</h4>
+        <div className="bg-muted rounded-lg p-3 space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Runtime status</span>
+            <span
+              className={
+                embeddedServerStatus === 'ready'
+                  ? 'text-success'
+                  : embeddedServerStatus === 'error'
+                    ? 'text-destructive'
+                    : 'text-muted-foreground'
+              }
+            >
+              {embeddedServerStatus}
+            </span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Port</span>
+            <span>{embeddedServerPort ?? '-'}</span>
+          </div>
+          {embeddedServerError && (
+            <div className="text-xs text-destructive break-all">{embeddedServerError}</div>
+          )}
+        </div>
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <span className="text-xs text-muted-foreground">
+            Changes to AI review and permission behavior apply on the next embedded server start.
+          </span>
+          {embeddedServerStatus !== 'disabled' && (
+            <button
+              onClick={() => {
+                void restartEmbeddedServer();
+              }}
+              className="flex-shrink-0 px-3 py-1 text-xs bg-muted/60 hover:bg-muted text-foreground rounded-lg font-medium transition-colors"
+            >
+              Restart Embedded Server
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

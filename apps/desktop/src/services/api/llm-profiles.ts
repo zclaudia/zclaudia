@@ -381,13 +381,29 @@ export async function getProviderTypeCommands(
 
 export async function getProviderCapabilities(
   llmProfileId: string,
-  options?: RequestInit
+  options?: RequestInit,
+  backendId?: string | null
 ): Promise<ProviderCapabilities> {
-  if (activeServerSupports('providerCapabilities')) {
-    const result = await fetchApi<ProviderCapabilities>(
-      `/api/providers/${llmProfileId}/capabilities`,
-      options
-    );
+  // When a backendId is given (even null → active fallback inside the helpers),
+  // the capability check and the request both target that backend instead of
+  // whatever backend happens to be active. Settings pages pass the local
+  // backend id so they stay pinned to this device.
+  const supports =
+    backendId === undefined
+      ? activeServerSupports('providerCapabilities')
+      : backendSupports(backendId, 'providerCapabilities');
+  if (supports) {
+    const result =
+      backendId === undefined
+        ? await fetchApi<ProviderCapabilities>(
+            `/api/providers/${llmProfileId}/capabilities`,
+            options
+          )
+        : await fetchApiForBackend<ProviderCapabilities>(
+            `/api/providers/${llmProfileId}/capabilities`,
+            backendId,
+            options
+          );
     if (result.success && result.data) return result.data;
   }
   const localResult = await fetchLocalApi<ProviderCapabilities>(
