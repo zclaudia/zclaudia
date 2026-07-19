@@ -1,5 +1,5 @@
-import type { PermissionCallback, ProviderRuntimeEvent } from '@zclaudia/shared/providers';
-import type { ProviderToolBridgeEntry } from '@zclaudia/shared/providers';
+import type { PermissionCallback, ProviderRuntimeEvent } from '@zclaudia/plugin-sdk/providers';
+import type { ProviderToolBridgeEntry } from '@zclaudia/plugin-sdk/providers';
 import { CodexAppServerClient } from './app-server-client.js';
 import {
   buildEnv,
@@ -58,7 +58,7 @@ export function getCacheKey(
   const envSignature = JSON.stringify(
     Object.keys(env)
       .sort()
-      .map((key) => [key, env[key]])
+      .map(key => [key, env[key]])
   );
   return `${options.cliPath || '__default__'}::${configSignature}::${envSignature}`;
 }
@@ -94,7 +94,7 @@ const SESSION_RECOVERY_PATTERNS = [
 ];
 
 function isRecoverableSessionError(error: string): boolean {
-  return SESSION_RECOVERY_PATTERNS.some((p) => p.test(error));
+  return SESSION_RECOVERY_PATTERNS.some(p => p.test(error));
 }
 
 function isProviderError(msg: ProviderRuntimeEvent): boolean {
@@ -122,10 +122,7 @@ function isTurnComplete(msg: ProviderRuntimeEvent): boolean {
 const activeThreadIds = new Map<string, { client: CodexAppServerClient; threadId: string }>();
 const sessionClientMap = new Map<string, CodexAppServerClient>();
 
-function registerSessionClient(
-  sessionKey: string | undefined,
-  client: CodexAppServerClient
-): void {
+function registerSessionClient(sessionKey: string | undefined, client: CodexAppServerClient): void {
   if (sessionKey) {
     sessionClientMap.set(sessionKey, client);
   }
@@ -182,7 +179,7 @@ export async function* runCodexAppServer(
 
     if (options.systemPrompt && !options.sessionId) {
       const systemContext = `[System Context]\n${options.systemPrompt}`;
-      const firstText = inputBlocks.find((b) => b.type === 'text');
+      const firstText = inputBlocks.find(b => b.type === 'text');
       if (firstText && firstText.text) {
         firstText.text = `${systemContext}\n\n${firstText.text}`;
       } else {

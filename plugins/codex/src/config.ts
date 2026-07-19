@@ -9,7 +9,7 @@ import {
 } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import type { ProviderToolBridgeEntry } from '@zclaudia/shared/providers';
+import type { ProviderToolBridgeEntry } from '@zclaudia/plugin-sdk/providers';
 
 // File-based debug log (stdout may be captured by host runtime)
 export const DEBUG_LOG = '/tmp/codex-app-server-debug.log';
@@ -64,7 +64,8 @@ export function deriveCodexModeTransition(
     return { mode: 'plan', reason: 'enter', sourceToolUseId };
   }
   if (toolName === 'ExitPlanMode') {
-    const record = input && typeof input === 'object' ? (input as Record<string, unknown>) : undefined;
+    const record =
+      input && typeof input === 'object' ? (input as Record<string, unknown>) : undefined;
     const plan = typeof record?.plan === 'string' ? (record.plan as string) : undefined;
     return { mode: 'default', reason: 'exit', plan, sourceToolUseId };
   }
@@ -182,7 +183,7 @@ export function upsertTrustedProjectConfig(existing: string, projectPath: string
     return `${trimmed ? `${trimmed}\n\n` : ''}${header}\ntrust_level = "trusted"\n`;
   }
 
-  return existing.replace(sectionPattern, (match) => {
+  return existing.replace(sectionPattern, match => {
     if (/^\s*trust_level\s*=.*$/m.test(match)) {
       return match.replace(/^\s*trust_level\s*=.*$/m, 'trust_level = "trusted"');
     }
@@ -232,9 +233,10 @@ export function ensureCodexProjectTrusted(configDir: string): void {
 /** Last written config content — skip redundant writes */
 let lastWrittenConfig = '';
 
-export function writeMcpConfig(
-  bridge: ProviderToolBridgeEntry | null
-): { configDir: string; configSignature: string } {
+export function writeMcpConfig(bridge: ProviderToolBridgeEntry | null): {
+  configDir: string;
+  configSignature: string;
+} {
   const configDir = getCodexConfigDir();
   try {
     mkdirSync(configDir, { recursive: true });

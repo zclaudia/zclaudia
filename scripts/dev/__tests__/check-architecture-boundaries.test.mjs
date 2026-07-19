@@ -16,6 +16,21 @@ function createFixture(files) {
   return root;
 }
 
+test('fails when standalone plugins depend on monorepo contracts', () => {
+  const root = createFixture({
+    'plugins/example/src/main.ts':
+      "import type { PluginContext } from '@zclaudia/shared/plugins';\n",
+    'plugins/example/package.json': '{"dependencies":{"@zclaudia/shared":"workspace:*"}}\n',
+  });
+
+  const failures = runArchitectureChecks(root);
+
+  assert.deepEqual(failures, [
+    'plugins/example/src/main.ts: Standalone plugins must import public contracts from @zclaudia/plugin-sdk, not @zclaudia/shared.',
+    'plugins/example/package.json: Standalone plugins must not use workspace: dependencies.',
+  ]);
+});
+
 test('fails when services api barrel re-exports feature APIs', () => {
   const root = createFixture({
     'apps/desktop/src/services/api.ts': "export * from '../features/new-feature/api';\n",

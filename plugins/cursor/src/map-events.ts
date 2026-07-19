@@ -1,7 +1,10 @@
-import type { ProviderRuntimeEvent } from '@zclaudia/shared/providers';
-import type { ToolEffect } from '@zclaudia/shared/core/message';
-import type { ToolSemantic } from '@zclaudia/shared/wire/messages/run';
-import { fileChangeEffectFromInput, makeShellEffect, readCursorEditResultEffect } from './tool-effects.js';
+import type { ProviderRuntimeEvent } from '@zclaudia/plugin-sdk/providers';
+import type { ToolEffect, ToolSemantic } from '@zclaudia/plugin-sdk/types';
+import {
+  fileChangeEffectFromInput,
+  makeShellEffect,
+  readCursorEditResultEffect,
+} from './tool-effects.js';
 
 // Tool call key → friendly name mapping
 const TOOL_CALL_KEY_MAP: Record<string, string> = {
@@ -25,7 +28,7 @@ interface ToolCallInfo {
 
 export function detectCursorToolSemantic(
   toolName: string,
-  args: unknown,
+  args: unknown
 ): 'plan_enter' | 'plan_exit' | 'plan_proposal' | undefined {
   if (toolName === 'createPlan') return 'plan_proposal';
   if (toolName === 'switchMode') {
@@ -39,7 +42,7 @@ export function detectCursorToolSemantic(
 export function deriveCursorModeTransition(
   toolName: string,
   args: unknown,
-  sourceToolUseId: string | undefined,
+  sourceToolUseId: string | undefined
 ): { mode: string; reason: 'enter' | 'exit'; sourceToolUseId?: string; plan?: string } | undefined {
   if (toolName !== 'switchMode') return undefined;
   const target = readSwitchModeTarget(args);
@@ -87,7 +90,8 @@ function extractToolCall(toolCallObj: Record<string, unknown>): ToolCallInfo | n
     if (toolName === 'Edit') {
       effect = readCursorEditResultEffect(tc.args, tc.result);
     } else if (toolName === 'Bash') {
-      const args = tc.args && typeof tc.args === 'object' ? tc.args as Record<string, unknown> : {};
+      const args =
+        tc.args && typeof tc.args === 'object' ? (tc.args as Record<string, unknown>) : {};
       effect = makeShellEffect(typeof args.command === 'string' ? args.command : undefined);
     }
 
@@ -103,7 +107,7 @@ export interface MapCursorEventResult {
 
 export function mapCursorEvent(
   event: Record<string, unknown>,
-  inThinkBlock: boolean,
+  inThinkBlock: boolean
 ): MapCursorEventResult {
   const results: ProviderRuntimeEvent[] = [];
   const evType = event.type as string;
@@ -153,9 +157,11 @@ export function mapCursorEvent(
         results.push({ type: 'assistant', content: '</think>' });
         newThinkBlock = false;
       }
-      const message = event.message as {
-        content?: Array<{ type: string; text?: string }>;
-      } | undefined;
+      const message = event.message as
+        | {
+            content?: Array<{ type: string; text?: string }>;
+          }
+        | undefined;
       if (message?.content) {
         for (const block of message.content) {
           if (block.type === 'text' && block.text) {
@@ -187,7 +193,9 @@ export function mapCursorEvent(
         });
       } else if (evSubtype === 'completed') {
         const resultStr = info.result
-          ? (typeof info.result === 'string' ? info.result : JSON.stringify(info.result))
+          ? typeof info.result === 'string'
+            ? info.result
+            : JSON.stringify(info.result)
           : 'Done';
         results.push({
           type: 'tool_result',
@@ -207,10 +215,12 @@ export function mapCursorEvent(
     }
 
     case 'result': {
-      const rawUsage = event.usage as {
-        inputTokens?: number;
-        outputTokens?: number;
-      } | undefined;
+      const rawUsage = event.usage as
+        | {
+            inputTokens?: number;
+            outputTokens?: number;
+          }
+        | undefined;
 
       if (evSubtype === 'error' || event.is_error) {
         const errMsg = (event.result as string) || 'cursor-agent returned an error';
@@ -237,7 +247,7 @@ export function mapCursorEvent(
     }
 
     default:
-      // Unhandled event type — skip silently
+    // Unhandled event type — skip silently
   }
 
   return { events: results, inThinkBlock: newThinkBlock };

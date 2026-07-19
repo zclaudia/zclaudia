@@ -6,13 +6,15 @@ import type {
   ProviderRuntimeEvent,
   ProviderToolBridgeEntry,
   ProviderToolBridgeRequest,
-} from '@zclaudia/shared/providers';
+} from '@zclaudia/plugin-sdk/providers';
 import { loadClaudeAgentConfig } from './config.js';
 import { buildClaudeCanUseTool } from './permissions.js';
 import type { ClaudeAgentRunOptions } from './runner.js';
 import { runClaudeAgent } from './runner.js';
 
-type ToolBridgeFactory = (req: ProviderToolBridgeRequest) => Promise<ProviderToolBridgeEntry | null>;
+type ToolBridgeFactory = (
+  req: ProviderToolBridgeRequest
+) => Promise<ProviderToolBridgeEntry | null>;
 type ClaudeMcpServers = NonNullable<ClaudeAgentRunOptions['mcpServers']>;
 type ClaudeThinkingOptions = Pick<ClaudeAgentRunOptions, 'thinking' | 'effort'>;
 
@@ -31,7 +33,9 @@ function toClaudePermissionMode(mode?: string): ClaudeAgentRunOptions['permissio
     : undefined;
 }
 
-function toClaudeThinkingOptions(level: ExternalAgentRunContext['thinkingLevel']): ClaudeThinkingOptions {
+function toClaudeThinkingOptions(
+  level: ExternalAgentRunContext['thinkingLevel']
+): ClaudeThinkingOptions {
   if (!level) return {};
   if (level === 'off') return { thinking: { type: 'disabled' } };
   const effort = level === 'minimal' ? 'low' : level;

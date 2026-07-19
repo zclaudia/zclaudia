@@ -1,6 +1,6 @@
 import { spawn } from 'child_process';
 import { createInterface } from 'readline';
-import type { ProviderRuntimeEvent } from '@zclaudia/shared/providers';
+import type { ProviderRuntimeEvent } from '@zclaudia/plugin-sdk/providers';
 import { mapCursorEvent } from './map-events.js';
 import { injectCursorMcpBridge, type CursorMcpBridge } from './mcp-inject.js';
 import { resolveCursorCliFromPath } from './resolve-cli.js';
@@ -25,7 +25,7 @@ const activeProcesses = new Map<string, ReturnType<typeof spawn>>();
 
 export async function* runCursor(
   input: string,
-  options: CursorRunOptions,
+  options: CursorRunOptions
 ): AsyncGenerator<ProviderRuntimeEvent, void, void> {
   let promptText = input;
 
@@ -98,7 +98,7 @@ export async function* runCursor(
 
   // Capture spawn errors (e.g. ENOENT)
   let spawnError: Error | null = null;
-  proc.on('error', (err) => {
+  proc.on('error', err => {
     spawnError = err;
   });
 
@@ -206,7 +206,7 @@ export async function abortCursorSession(sessionId: string): Promise<void> {
   activeProcesses.delete(sessionId);
   if (proc) {
     proc.kill('SIGTERM');
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 500));
     if (!proc.killed) {
       proc.kill('SIGKILL');
     }

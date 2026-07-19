@@ -62,6 +62,7 @@
   },
   "dependencies": {
     "@earendil-works/pi-ai": "^0.79.3",
+    "@zclaudia/plugin-sdk": "^0.1.0",
     "@zclaudia/protocol": "^0.2.0"
   },
   "devDependencies": {

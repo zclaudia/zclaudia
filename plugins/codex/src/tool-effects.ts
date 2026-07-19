@@ -1,4 +1,4 @@
-import type { FileChangeEffectFile, ToolEffect } from '@zclaudia/shared/core/message';
+import type { FileChangeEffectFile, ToolEffect } from '@zclaudia/plugin-sdk/types';
 
 export function makeShellEffect(command: string | undefined): ToolEffect | undefined {
   const trimmed = command?.trim();
@@ -21,7 +21,7 @@ export function makeFileChangeEffect(files: FileChangeEffectFile[]): ToolEffect 
     .map(f => ({
       ...f,
       path: cleanEffectPath(f.path) ?? '',
-      changeKind: f.changeKind ?? ('unknown' as const)
+      changeKind: f.changeKind ?? ('unknown' as const),
     }))
     .filter(f => f.path);
   return normalized.length > 0 ? { kind: 'file_change', files: normalized } : undefined;
@@ -40,7 +40,7 @@ export function fileChangeEffectFromMap(value: unknown): ToolEffect | undefined 
     if (!path) continue;
 
     const type = (change?.type as string | undefined)?.toLowerCase();
-    
+
     let changeKind: FileChangeEffectFile['changeKind'];
     if (type === 'add') {
       changeKind = 'add';

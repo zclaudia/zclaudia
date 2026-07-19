@@ -6,7 +6,7 @@ import type {
   PermissionMode,
   SdkPluginConfig,
 } from '@anthropic-ai/claude-agent-sdk';
-import type { ProviderRuntimeEvent, SystemInfo } from '@zclaudia/shared/providers';
+import type { ProviderRuntimeEvent, SystemInfo } from '@zclaudia/plugin-sdk/providers';
 import { resolveClaudeCliFromPath } from './resolve-cli.js';
 
 export interface ClaudeAgentRunOptions {

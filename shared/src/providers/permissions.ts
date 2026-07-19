@@ -1,10 +1,3 @@
-// shared/src/providers/permissions.ts
-import type { PermissionRequest } from '../interaction/permissions.js';
-
-export interface PermissionDecision {
-  behavior: 'allow' | 'deny';
-  updatedInput?: unknown;
-  message?: string;
-}
-
-export type PermissionCallback = (request: PermissionRequest) => Promise<PermissionDecision>;
+// Backward-compatible host entrypoint. The public plugin contract lives in
+// @zclaudia/plugin-sdk so external plugins never depend on this workspace.
+export type { PermissionCallback, PermissionDecision } from '@zclaudia/plugin-sdk/providers';

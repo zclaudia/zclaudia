@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'child_process';
 import { createInterface, type Interface as ReadlineInterface } from 'readline';
 import { EventEmitter } from 'events';
-import type { PermissionCallback, ProviderRuntimeEvent } from '@zclaudia/shared/providers';
+import type { PermissionCallback, ProviderRuntimeEvent } from '@zclaudia/plugin-sdk/providers';
 import { debugLog, type AppServerInputBlock } from './config.js';
 import { mapCodexNotification, type MapEventState } from './map-events.js';
 import { resolveApprovalDecision } from './permissions.js';
@@ -94,7 +94,7 @@ export class CodexAppServerClient {
     });
 
     this.readline = createInterface({ input: this.process.stdout!, crlfDelay: Infinity });
-    this.readline.on('line', (line) => this.handleLine(line));
+    this.readline.on('line', line => this.handleLine(line));
 
     debugLog('[Codex AppServer] Sending initialize...');
     try {
@@ -187,7 +187,7 @@ export class CodexAppServerClient {
         msg.id as number,
         msg.method as string,
         msg.params as Record<string, unknown> | undefined
-      ).catch((err) => {
+      ).catch(err => {
         console.error(
           `[Codex AppServer] Unhandled error in server request handler (${msg.method}):`,
           err
@@ -223,7 +223,9 @@ export class CodexAppServerClient {
     }
 
     if (method === 'item/tool/call') {
-      debugLog(`[Codex AppServer] Dynamic tool call: tool=${params?.tool} callId=${params?.callId}`);
+      debugLog(
+        `[Codex AppServer] Dynamic tool call: tool=${params?.tool} callId=${params?.callId}`
+      );
       this.sendResponse(id, {
         success: false,
         contentItems: [
@@ -240,7 +242,9 @@ export class CodexAppServerClient {
     }
 
     if (method === 'mcpServer/elicitation/request') {
-      debugLog(`[Codex AppServer] MCP elicitation: server=${params?.serverName} mode=${params?.mode}`);
+      debugLog(
+        `[Codex AppServer] MCP elicitation: server=${params?.serverName} mode=${params?.mode}`
+      );
       this.sendResponse(id, { action: 'decline' });
       return;
     }
@@ -333,7 +337,7 @@ export class CodexAppServerClient {
 
     const waitForItem = (): Promise<void> => {
       if (queue.length > 0) return Promise.resolve();
-      return new Promise<void>((r) => {
+      return new Promise<void>(r => {
         resolve = r;
       });
     };
@@ -345,9 +349,7 @@ export class CodexAppServerClient {
       }
 
       if (method === 'turn/completed') {
-        const turn = params.turn as
-          | { status?: string; error?: { message?: string } }
-          | undefined;
+        const turn = params.turn as { status?: string; error?: { message?: string } } | undefined;
         const turnStatus = turn?.status || (params as { status?: string }).status;
 
         if (turnStatus === 'failed') {
@@ -406,7 +408,7 @@ export class CodexAppServerClient {
     try {
       await this.ensureRunning();
       debugLog(`[Codex AppServer] Sending turn/start for thread: ${threadId}`);
-      this.sendRequest('turn/start', turnParams).catch((err) => {
+      this.sendRequest('turn/start', turnParams).catch(err => {
         enqueue({ type: 'error', error: err instanceof Error ? err : new Error(String(err)) });
       });
 

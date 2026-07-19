@@ -1,5 +1,5 @@
-import type { PermissionRequest } from '@zclaudia/shared/interaction/permissions';
-import type { PermissionCallback } from '@zclaudia/shared/providers';
+import type { PermissionRequest } from '@zclaudia/plugin-sdk/interactions';
+import type { PermissionCallback } from '@zclaudia/plugin-sdk/providers';
 
 export type ApprovalDecisionResult = {
   decision?: 'accept' | 'decline';
@@ -14,9 +14,7 @@ type RequestedPermissions = {
 
 function isApprovalMethod(method: string): boolean {
   return (
-    method.includes('requestApproval') ||
-    method.includes('Approval') ||
-    method.includes('approval')
+    method.includes('requestApproval') || method.includes('Approval') || method.includes('approval')
   );
 }
 
@@ -97,7 +95,7 @@ async function resolvePermissionsApproval(
     try {
       const detail = requestedPermissions
         ? JSON.stringify(requestedPermissions)
-        : ((params?.reason as string) || 'Additional permissions requested');
+        : (params?.reason as string) || 'Additional permissions requested';
       const permissionRequest: PermissionRequest = {
         toolName: 'Permissions',
         toolInput: requestedPermissions || {},

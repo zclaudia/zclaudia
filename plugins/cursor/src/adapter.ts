@@ -6,7 +6,7 @@ import type {
   ProviderRuntimeEvent,
   ProviderToolBridgeEntry,
   ProviderToolBridgeRequest,
-} from '@zclaudia/shared/providers';
+} from '@zclaudia/plugin-sdk/providers';
 import { runCursor, abortCursorSession } from './runner.js';
 
 export type ToolBridgeFactory = (
@@ -29,8 +29,7 @@ export class CursorAgentAdapter implements ExternalAgentAdapter {
   ): AsyncGenerator<ProviderRuntimeEvent, void, void> {
     const claudiaSessionId = context.claudiaSessionId ?? context.sessionId ?? '';
     const sessionKey = claudiaSessionId;
-    const effectiveMode =
-      (sessionKey && this.sessionModes.get(sessionKey)) ?? context.mode;
+    const effectiveMode = (sessionKey && this.sessionModes.get(sessionKey)) ?? context.mode;
 
     const bridge = await this.createToolBridge({
       serverPort: context.serverPort,

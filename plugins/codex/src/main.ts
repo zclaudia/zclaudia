@@ -1,4 +1,4 @@
-import type { PluginContext } from '@zclaudia/shared/plugins';
+import type { PluginContext } from '@zclaudia/plugin-sdk/runtime';
 import { CodexAgentAdapter } from './adapter.js';
 import { destroyAllCodexClients } from './runner.js';
 

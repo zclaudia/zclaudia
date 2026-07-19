@@ -9,10 +9,10 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.104"
+    "@anthropic-ai/claude-agent-sdk": "^0.2.104",
+    "@zclaudia/plugin-sdk": "^0.1.0"
   },
   "devDependencies": {
-    "@zclaudia/shared": "workspace:*",
     "typescript": "^5.9.3",
     "vitest": "^4.1.8"
   }

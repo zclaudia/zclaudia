@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { PermissionCallback } from '@zclaudia/shared/providers';
+import type { PermissionCallback } from '@zclaudia/plugin-sdk/providers';
 
 const { mockClient, MockCodexAppServerClient } = vi.hoisted(() => {
   const mockClient = {
@@ -32,7 +32,7 @@ const writeMcpConfigMock = vi.hoisted(() =>
   vi.fn(() => ({ configDir: '/tmp/codex-config', configSignature: 'sig-1' }))
 );
 
-vi.mock('../config.js', async (importOriginal) => {
+vi.mock('../config.js', async importOriginal => {
   const original = await importOriginal<typeof import('../config.js')>();
   return {
     ...original,
@@ -110,7 +110,7 @@ describe('runner', () => {
   it('setCodexSessionMode updates client.currentMode when called with claudiaSessionId during run', async () => {
     mockClient.startThread.mockResolvedValueOnce('thread-new');
     let unblockTurn: (() => void) | undefined;
-    const turnBlocked = new Promise<void>((resolve) => {
+    const turnBlocked = new Promise<void>(resolve => {
       unblockTurn = resolve;
     });
     mockClient.runTurn.mockImplementationOnce(async function* () {
@@ -138,7 +138,7 @@ describe('runner', () => {
   it('setCodexSessionMode updates client.currentMode when called with provider threadId', async () => {
     mockClient.startThread.mockResolvedValueOnce('thread-new');
     let unblockTurn: (() => void) | undefined;
-    const turnBlocked = new Promise<void>((resolve) => {
+    const turnBlocked = new Promise<void>(resolve => {
       unblockTurn = resolve;
     });
     mockClient.runTurn.mockImplementationOnce(async function* () {

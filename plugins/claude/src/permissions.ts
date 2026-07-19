@@ -1,5 +1,5 @@
 import type { CanUseTool, PermissionResult } from '@anthropic-ai/claude-agent-sdk';
-import type { PermissionCallback } from '@zclaudia/shared/providers';
+import type { PermissionCallback } from '@zclaudia/plugin-sdk/providers';
 
 function detailFromClaudeRequest(input: {
   title?: string;

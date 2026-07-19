@@ -1,4 +1,4 @@
-import type { ProviderRuntimeEvent } from '@zclaudia/shared/providers';
+import type { ProviderRuntimeEvent } from '@zclaudia/plugin-sdk/providers';
 import {
   debugLog,
   normalizeClaudiaToolName,
@@ -192,9 +192,7 @@ function mapItemStarted(item: AppServerItem): ProviderRuntimeEvent[] {
       ];
 
     default:
-      debugLog(
-        `[Codex AppServer] Unhandled item/started type: ${item.type} (id=${item.id})`
-      );
+      debugLog(`[Codex AppServer] Unhandled item/started type: ${item.type} (id=${item.id})`);
       return [];
   }
 }
@@ -282,9 +280,7 @@ function mapItemCompleted(item: AppServerItem): ProviderRuntimeEvent[] {
     }
 
     default:
-      debugLog(
-        `[Codex AppServer] Unhandled item/completed type: ${item.type} (id=${item.id})`
-      );
+      debugLog(`[Codex AppServer] Unhandled item/completed type: ${item.type} (id=${item.id})`);
       return [];
   }
 }

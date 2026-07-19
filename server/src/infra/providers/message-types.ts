@@ -1,8 +1,8 @@
 /**
  * Core provider message types — shared across ALL providers.
  *
- * The type definitions now live in @zclaudia/shared/providers so plugins can
- * implement the external-agent contract. This module re-exports them for the
+ * The public definitions live in @zclaudia/plugin-sdk/providers.
+ * @zclaudia/shared/providers remains a compatibility re-export for the
  * server's existing import sites.
  */
 export type {

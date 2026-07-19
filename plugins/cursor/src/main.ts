@@ -1,4 +1,4 @@
-import type { PluginContext } from '@zclaudia/shared/plugins';
+import type { PluginContext } from '@zclaudia/plugin-sdk/runtime';
 import { CursorAgentAdapter } from './adapter.js';
 
 export async function activate(context: PluginContext): Promise<void> {

@@ -1,4 +1,4 @@
-import type { FileChangeEffectFile, ToolEffect } from '@zclaudia/shared/core/message';
+import type { FileChangeEffectFile, ToolEffect } from '@zclaudia/plugin-sdk/types';
 
 export function makeShellEffect(command: string | undefined): ToolEffect | undefined {
   const trimmed = command?.trim();
@@ -7,7 +7,11 @@ export function makeShellEffect(command: string | undefined): ToolEffect | undef
 
 export function makeFileChangeEffect(files: FileChangeEffectFile[]): ToolEffect | undefined {
   const normalized = files
-    .map(f => ({ ...f, path: (f.path ?? '').trim(), changeKind: f.changeKind ?? ('unknown' as const) }))
+    .map(f => ({
+      ...f,
+      path: (f.path ?? '').trim(),
+      changeKind: f.changeKind ?? ('unknown' as const),
+    }))
     .filter(f => f.path);
   return normalized.length > 0 ? { kind: 'file_change', files: normalized } : undefined;
 }
@@ -45,12 +49,16 @@ export function fileChangeEffectFromInput(
 }
 
 export function readCursorEditResultEffect(args: unknown, result: unknown): ToolEffect | undefined {
-  const resultRecord = result && typeof result === 'object' && !Array.isArray(result)
-    ? result as Record<string, unknown>
-    : undefined;
-  const success = resultRecord?.success && typeof resultRecord.success === 'object' && !Array.isArray(resultRecord.success)
-    ? resultRecord.success as Record<string, unknown>
-    : undefined;
+  const resultRecord =
+    result && typeof result === 'object' && !Array.isArray(result)
+      ? (result as Record<string, unknown>)
+      : undefined;
+  const success =
+    resultRecord?.success &&
+    typeof resultRecord.success === 'object' &&
+    !Array.isArray(resultRecord.success)
+      ? (resultRecord.success as Record<string, unknown>)
+      : undefined;
   const diffString = typeof success?.diffString === 'string' ? success.diffString : undefined;
   if (diffString) {
     const path = success
