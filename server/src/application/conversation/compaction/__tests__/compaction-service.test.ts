@@ -43,8 +43,12 @@ vi.mock('@earendil-works/pi-agent-core', async importOriginal => {
 });
 
 // Mock buildModel — compaction-service uses it but a stub model is fine for
-// tests since generateSummary itself is also mocked.
-vi.mock('../../../../infra/providers/pi-runtime/build-model.js', () => ({
+// tests since generateSummary itself is also mocked. modelEntryFor stays real
+// (pure lookup) so the service resolves the per-model entry as in production.
+vi.mock('../../../../infra/providers/pi-runtime/build-model.js', async importOriginal => ({
+  ...(await importOriginal<
+    typeof import('../../../../infra/providers/pi-runtime/build-model.js')
+  >()),
   buildModel: vi.fn(() => ({
     model: {
       id: 'fake',
@@ -239,6 +243,26 @@ describe('compaction-service', () => {
     });
     expect(result.compacted).toBe(false);
     expect(result.reason).toMatch(/^error:/);
+  });
+
+  it('passes the per-model entry to buildModel so overrides and dialect apply to summarization', async () => {
+    const { buildModel } = await import('../../../../infra/providers/pi-runtime/build-model.js');
+    const seed = seedSession(db, 100);
+    const entry = {
+      modelId: seed.agentProfile.model,
+      contextWindow: 100,
+      dialect: 'deepseek' as const,
+    };
+    const lp = { ...seed.llmProfile, models: [entry] };
+    const result = await forceCompact({
+      db,
+      sessionId: 's1',
+      agentProfile: seed.agentProfile,
+      llmProfile: lp,
+      source: 'manual',
+    });
+    expect(result.compacted).toBe(true);
+    expect(vi.mocked(buildModel)).toHaveBeenCalledWith(lp, seed.agentProfile.model, entry);
   });
 
   it('stores a boundary id that points at a real tree entry', async () => {

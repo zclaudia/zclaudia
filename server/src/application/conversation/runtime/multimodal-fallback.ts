@@ -1,8 +1,8 @@
 import type Database from 'better-sqlite3';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
-import type { LlmProfileConfig, LlmProfileModelEntry } from '@zclaudia/shared/core/llm-profile';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import { LlmProfileRepository } from '../../../domains/llm-profiles/repository.js';
-import { buildModel } from '../../../infra/providers/pi-runtime/build-model.js';
+import { buildModel, modelEntryFor } from '../../../infra/providers/pi-runtime/build-model.js';
 import type { ResolvedImage } from './resolve-image-attachments.js';
 
 export interface MultimodalFallbackResolution {
@@ -11,13 +11,6 @@ export interface MultimodalFallbackResolution {
   llmProfileId: string;
   providerType: string;
   applied: boolean;
-}
-
-function modelEntryFor(
-  profile: LlmProfileConfig | undefined,
-  model: string
-): LlmProfileModelEntry | undefined {
-  return profile?.models?.find(entry => entry.modelId === model);
 }
 
 function modelSupportsImage(profile: LlmProfileConfig | undefined, model: string): boolean {

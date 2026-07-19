@@ -17,7 +17,7 @@ import type { Database } from 'better-sqlite3';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import { SqliteSessionStorage } from '../../../infra/providers/pi-runtime/session-tree/index.js';
-import { buildModel } from '../../../infra/providers/pi-runtime/build-model.js';
+import { buildModel, modelEntryFor } from '../../../infra/providers/pi-runtime/build-model.js';
 import { resolveContextWindow } from './context-windows.js';
 import { compactionCircuitBreaker } from './circuit-breaker.js';
 
@@ -263,7 +263,11 @@ async function runCompaction(
   // Build the model with the agent's model id over the llm profile config so
   // compaction uses the SAME provider/model the session is already using. A
   // separate summarizer model is intentionally NOT introduced in this pass.
-  const built = buildModel(ctx.llmProfile, ctx.agentProfile.model);
+  const built = buildModel(
+    ctx.llmProfile,
+    ctx.agentProfile.model,
+    modelEntryFor(ctx.llmProfile, ctx.agentProfile.model)
+  );
 
   // Summarize in window-sized chunks so a to-summarize history LARGER than the
   // model's own context window (e.g. after switching to a smaller-window model)

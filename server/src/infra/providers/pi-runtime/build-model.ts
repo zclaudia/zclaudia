@@ -202,6 +202,20 @@ function resolveDialect(
   return undefined;
 }
 
+/**
+ * Look up the per-model entry declared on `profile.models[]` for a model id.
+ * Call sites that build a model for a profile-declared model id should pass
+ * the result as {@link buildModel}'s `modelEntry` so contextWindow / maxTokens
+ * / dialect overrides are honored.
+ */
+export function modelEntryFor(
+  profile: LlmProfileConfig | undefined,
+  modelId: string | undefined
+): LlmProfileModelEntry | undefined {
+  if (!modelId) return undefined;
+  return profile?.models?.find(entry => entry.modelId === modelId);
+}
+
 export function buildModel(
   profile?: LlmProfileConfig,
   modelOverride?: string,

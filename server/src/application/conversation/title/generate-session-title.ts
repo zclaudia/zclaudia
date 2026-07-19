@@ -1,6 +1,6 @@
 import { completeSimple } from '@earendil-works/pi-ai';
 import type { Message } from '@earendil-works/pi-ai';
-import { buildModel } from '../../../infra/providers/pi-runtime/build-model.js';
+import { buildModel, modelEntryFor } from '../../../infra/providers/pi-runtime/build-model.js';
 import { readRecentMessages } from '../../../infra/providers/pi-runtime/session-tree/index.js';
 import type { TitleGenerateInput } from './session-title-service.js';
 import {
@@ -17,7 +17,11 @@ import {
  */
 export async function generateSessionTitle(input: TitleGenerateInput): Promise<string | null> {
   const { db, sessionId, agentProfile, llmProfile } = input;
-  const built = buildModel(llmProfile, agentProfile.model);
+  const built = buildModel(
+    llmProfile,
+    agentProfile.model,
+    modelEntryFor(llmProfile, agentProfile.model)
+  );
 
   // Title only needs a handful of messages (pickTitleWindow keeps ~9). Read a
   // bounded recent window from the session tree (Route C) so long sessions don't
