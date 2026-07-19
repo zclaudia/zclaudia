@@ -1,5 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { Agent, type AgentOptions, type AgentTool } from '@earendil-works/pi-agent-core';
+import { streamSimple } from '@earendil-works/pi-ai';
+import {
+  Agent,
+  type AgentOptions,
+  type AgentTool,
+  type StreamFn,
+} from '@earendil-works/pi-agent-core';
 import type Database from 'better-sqlite3';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
@@ -19,6 +25,7 @@ import {
 import type { PermissionCallback } from '../message-types.js';
 import { buildModel } from './build-model.js';
 import { buildTools } from './tool-bridge.js';
+import { wrapStreamFnWithToolSchemaCompat } from './tool-schema-compat.js';
 
 type ToolContent = Array<{ type: 'text'; text: string }>;
 type AgentToolParameters = AgentTool['parameters'];
@@ -111,6 +118,7 @@ export interface SkillExecutionDependencies {
   permissionOverride?: Partial<UnifiedPermissionPolicy>;
   permissionCallback?: PermissionCallback;
   agentFactory?: (opts: AgentOptions) => NestedAgentLike;
+  streamFn?: StreamFn;
 }
 
 function textResult(
@@ -609,6 +617,7 @@ async function executeForkedSkill(
       messages: [],
       tools: buildForkSkillTools(execution, policy),
     },
+    streamFn: wrapStreamFnWithToolSchemaCompat(execution.streamFn ?? streamSimple),
     ...(builtModel.getApiKey ? { getApiKey: builtModel.getApiKey } : {}),
   });
   const unsubscribe = agent.subscribe((event: unknown) => {

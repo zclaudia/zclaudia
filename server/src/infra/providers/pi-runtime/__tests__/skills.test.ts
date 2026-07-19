@@ -505,6 +505,79 @@ describe('progressive skill runtime', () => {
     });
   });
 
+  it('forked skill agents normalize tool schemas at the stream boundary for moonshot models', async () => {
+    loadDiscoveredSkillContentMock.mockResolvedValue('# Audit\nReview the target carefully.');
+    const capturedOpts: any[] = [];
+    const agentFactory = (opts: any) => {
+      capturedOpts.push(opts);
+      let listener: ((event: any) => void) | undefined;
+      return {
+        subscribe: (fn: (event: any) => void) => {
+          listener = fn;
+          return () => {
+            listener = undefined;
+          };
+        },
+        prompt: vi.fn(async () => {
+          listener?.({
+            type: 'agent_end',
+            messages: [{ role: 'assistant', content: [{ type: 'text', text: 'done' }] }],
+          });
+        }),
+      };
+    };
+    const state = createSkillRuntimeState([
+      {
+        id: 'security-audit',
+        name: 'security-audit',
+        description: 'Audit and report',
+        source: 'workspace',
+        filePath: '/skills/security-audit/SKILL.md',
+        dirPath: '/skills/security-audit',
+        execution: {
+          allowedModes: ['fork'],
+          defaultMode: 'fork',
+          forkToolPolicy: 'read-only',
+        },
+      },
+    ]);
+
+    const prepared = await prepareDirectSkillInvocation(state, '/security-audit target');
+    const baseStreamFn = vi.fn().mockReturnValue('ok');
+    const executed = await executePreparedDirectSkillInvocation(state, prepared, {
+      cwd: '/tmp/project',
+      enabledTools: ['Read', 'Grep'],
+      agentFactory,
+      streamFn: baseStreamFn,
+    } as any);
+    expect(executed).toEqual(expect.objectContaining({ ok: true, mode: 'fork' }));
+
+    const forkStreamFn = capturedOpts[0]?.streamFn;
+    expect(typeof forkStreamFn).toBe('function');
+
+    const moonshotModel = { id: 'kimi-k3', provider: 'moonshotai', baseUrl: 'https://x' };
+    const context = {
+      tools: [
+        {
+          name: 'Read',
+          parameters: {
+            type: 'object',
+            properties: { path: { type: 'string' } },
+            anyOf: [{ required: ['path'] }, { required: ['file_path'] }],
+          },
+        },
+      ],
+    };
+    forkStreamFn(moonshotModel, context, undefined);
+
+    expect(baseStreamFn).toHaveBeenCalledTimes(1);
+    const forwardedContext = baseStreamFn.mock.calls[0][1] as {
+      tools: Array<{ parameters: Record<string, unknown> }>;
+    };
+    expect(forwardedContext.tools[0].parameters.anyOf).toBeUndefined();
+    expect(forwardedContext.tools[0].parameters.type).toBe('object');
+  });
+
   it('rejects direct invocation for model-only skills', async () => {
     const state = createSkillRuntimeState([
       {
