@@ -200,10 +200,11 @@ export async function fetchLocalApi<T>(
   options?: RequestInit
 ): Promise<ApiResponse<T>> {
   const baseUrl = getLocalBaseUrl();
+  const isMultipart = typeof FormData !== 'undefined' && options?.body instanceof FormData;
   const response = await fetch(`${baseUrl}${path}`, {
     ...options,
     headers: {
-      'Content-Type': 'application/json',
+      ...(isMultipart ? {} : { 'Content-Type': 'application/json' }),
       ...getLocalAuthHeaders(),
       ...options?.headers,
     },

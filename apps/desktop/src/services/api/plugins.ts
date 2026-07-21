@@ -14,6 +14,18 @@ interface PluginData {
   enabled: boolean;
   error?: string;
   path: string;
+  source?: 'managed' | 'development';
+  installedAt?: string;
+  updatedAt?: string;
+  activeVersion?: string;
+  availableVersions?: string[];
+  canRollback?: boolean;
+  requirements?: Array<{
+    name: string;
+    found: boolean;
+    path?: string;
+    source: 'manifest' | 'official';
+  }>;
   panels?: Array<{
     id: string;
     label: string;
@@ -32,22 +44,30 @@ export async function fetchAndSyncPlugins(options?: RequestInit): Promise<void> 
   const pluginStore = usePluginStore.getState();
   const now = new Date().toISOString();
 
-  const mapped: InstalledPlugin[] = plugins.map(p => ({
-    manifest: {
-      id: p.id,
-      name: p.name,
-      version: p.version,
-      description: p.description,
-      permissions: p.permissions as Permission[] | undefined,
-      platform: p.platform as PluginPlatform | undefined,
-    },
-    path: p.path,
-    status: p.status === 'active' ? 'active' : p.status === 'error' ? 'error' : 'idle',
-    enabled: p.enabled,
-    error: p.error,
-    installedAt: now,
-    updatedAt: now,
-  }));
+  const mapped: InstalledPlugin[] = plugins.map(p => {
+    const previous = pluginStore.plugins.find(item => item.manifest.id === p.id);
+    return {
+      manifest: {
+        id: p.id,
+        name: p.name,
+        version: p.version,
+        description: p.description,
+        permissions: p.permissions as Permission[] | undefined,
+        platform: p.platform as PluginPlatform | undefined,
+      },
+      path: p.path,
+      status: p.status === 'active' ? 'active' : p.status === 'error' ? 'error' : 'idle',
+      enabled: p.enabled,
+      error: p.error,
+      installedAt: p.installedAt ?? previous?.installedAt ?? now,
+      updatedAt: p.updatedAt ?? previous?.updatedAt ?? now,
+      source: p.source ?? 'development',
+      activeVersion: p.activeVersion,
+      availableVersions: p.availableVersions ?? [],
+      canRollback: p.canRollback ?? false,
+      requirements: p.requirements ?? [],
+    };
+  });
 
   pluginStore.setPlugins(mapped);
 

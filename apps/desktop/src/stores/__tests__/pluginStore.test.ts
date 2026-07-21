@@ -33,6 +33,10 @@ function createTestPlugin(overrides: Partial<InstalledPlugin> = {}): InstalledPl
     enabled: true,
     installedAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-01T00:00:00Z',
+    source: 'development',
+    availableVersions: [],
+    canRollback: false,
+    requirements: [],
     ...overrides,
   };
 }

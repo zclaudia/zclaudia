@@ -4,10 +4,14 @@ import request from 'supertest';
 import { createPluginRoutes } from '../../../application/plugins/routes.js';
 
 // Mock fs module
-vi.mock('fs', () => ({
-  existsSync: vi.fn(),
-  default: { existsSync: vi.fn() },
-}));
+vi.mock('fs', async importOriginal => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return {
+    ...actual,
+    existsSync: vi.fn(),
+    default: { ...actual, existsSync: vi.fn() },
+  };
+});
 
 // Mock pluginLoader
 vi.mock('../../../application/plugins/loader.js', () => ({
@@ -58,7 +62,10 @@ import { commandRegistry } from '../../../application/commands/registry.js';
 function createTestApp() {
   const app = express();
   app.use(express.json());
-  app.use('/api/plugins', createPluginRoutes());
+  app.use(
+    '/api/plugins',
+    createPluginRoutes((_req, _res, next) => next())
+  );
   return app;
 }
 
@@ -68,6 +75,19 @@ describe('plugin routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     app = createTestApp();
+  });
+
+  it('denies package mutations unless a localhost guard is supplied', async () => {
+    const lockedApp = express();
+    lockedApp.use(express.json());
+    lockedApp.use('/api/plugins', createPluginRoutes());
+
+    const res = await request(lockedApp)
+      .post('/api/plugins/packages/install')
+      .send({ token: 'preview-token' });
+
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('LOCAL_ONLY');
   });
 
   describe('GET /api/plugins', () => {
@@ -527,6 +547,19 @@ describe('plugin routes', () => {
   });
 
   describe('DELETE /api/plugins/:id', () => {
+    beforeEach(() => {
+      vi.mocked(pluginLoader.getPlugin).mockReturnValue({
+        manifest: {
+          id: 'test-plugin',
+          name: 'Test Plugin',
+          version: '1.0.0',
+          description: 'Test plugin',
+        },
+        path: '/plugins/test-plugin',
+        isActive: false,
+      } as any);
+    });
+
     it('returns 404 when plugin not found', async () => {
       vi.mocked(pluginLoader.hasPlugin).mockReturnValue(false);
 

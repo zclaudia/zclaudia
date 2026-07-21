@@ -24,22 +24,30 @@ export function handlePluginMessage(
       const pluginStore = usePluginStore.getState();
       const now = new Date().toISOString();
       pluginStore.setPlugins(
-        msg.plugins.map((p: any) => ({
-          manifest: {
-            id: p.id,
-            name: p.name,
-            version: p.version,
-            description: p.description,
-            permissions: p.permissions,
-            platform: p.platform,
-          },
-          path: p.path,
-          status: p.status === 'active' ? 'active' : p.status === 'error' ? 'error' : 'idle',
-          enabled: p.enabled,
-          error: p.error,
-          installedAt: now,
-          updatedAt: now,
-        }))
+        msg.plugins.map((p: any) => {
+          const previous = pluginStore.plugins?.find(item => item.manifest.id === p.id);
+          return {
+            manifest: {
+              id: p.id,
+              name: p.name,
+              version: p.version,
+              description: p.description,
+              permissions: p.permissions,
+              platform: p.platform,
+            },
+            path: p.path,
+            status: p.status === 'active' ? 'active' : p.status === 'error' ? 'error' : 'idle',
+            enabled: p.enabled,
+            error: p.error,
+            installedAt: p.installedAt ?? previous?.installedAt ?? now,
+            updatedAt: p.updatedAt ?? previous?.updatedAt ?? now,
+            source: p.source ?? previous?.source ?? 'development',
+            activeVersion: p.activeVersion ?? previous?.activeVersion,
+            availableVersions: p.availableVersions ?? previous?.availableVersions ?? [],
+            canRollback: p.canRollback ?? previous?.canRollback ?? false,
+            requirements: p.requirements ?? previous?.requirements ?? [],
+          };
+        })
       );
 
       for (const p of msg.plugins as any[]) {

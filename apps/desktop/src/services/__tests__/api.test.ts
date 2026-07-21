@@ -1354,6 +1354,18 @@ describe('api', () => {
       expect(mockFetch).toHaveBeenCalledWith('http://localhost:3100/api/test', expect.any(Object));
     });
 
+    it('lets the runtime set the multipart boundary for FormData uploads', async () => {
+      mockResponse({ inspected: true });
+      const body = new FormData();
+      body.append('package', new Blob(['plugin']), 'test.zplugin');
+
+      await fetchLocalApi('/api/plugins/packages/inspect', { method: 'POST', body });
+
+      const options = mockFetch.mock.calls.at(-1)?.[1] as RequestInit;
+      expect(options.body).toBe(body);
+      expect(options.headers).not.toHaveProperty('Content-Type');
+    });
+
     it('throws AuthError on 401', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,

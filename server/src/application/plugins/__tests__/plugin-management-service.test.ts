@@ -71,6 +71,16 @@ describe('PluginManagementService', () => {
     loader.reload.mockResolvedValue(true);
     loader.remove.mockResolvedValue(undefined);
     loader.deactivate.mockResolvedValue(undefined);
+    loader.getPlugin.mockReturnValue({
+      manifest: {
+        id: 'plugin-1',
+        name: 'Plugin 1',
+        version: '1.0.0',
+        description: 'Desc',
+      },
+      path: '/plugins/plugin-1',
+      isActive: false,
+    });
 
     const service = new PluginManagementService({
       loader: loader as never,

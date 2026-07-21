@@ -36,7 +36,7 @@ export function registerPluginsDomain(deps: PluginsDomainDeps): void {
     broadcastPluginState,
   } = deps;
 
-  app.use('/api/plugins', authMiddleware, createPluginRoutes());
+  app.use('/api/plugins', authMiddleware, createPluginRoutes(localOnlyMiddleware));
   app.use(
     '/api/plugins',
     localOnlyMiddleware,

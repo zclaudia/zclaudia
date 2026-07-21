@@ -3,6 +3,15 @@ export { createPluginRoutes } from './routes.js';
 export { createPluginToolsRoutes, type PluginToolsRoutesDeps } from './tools-routes.js';
 export { PluginLoader, pluginLoader, type PluginLoaderOptions } from './loader.js';
 export { PluginManagementError, PluginManagementService } from './management-service.js';
+export {
+  PluginPackageError,
+  PluginPackageService,
+  pluginPackageService,
+  type ManagedPluginInfo,
+  type PluginExecutableRequirement,
+  type PluginPackageMutationResult,
+  type PluginPackagePreview,
+} from './package-service.js';
 export { PluginFrontendError, PluginFrontendService } from './frontend-service.js';
 export {
   permissionManager,

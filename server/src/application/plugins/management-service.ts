@@ -3,6 +3,7 @@ import { pluginLoader } from './loader.js';
 import { permissionManager } from './permissions.js';
 import { toolRegistry } from './tool-registry.js';
 import { commandRegistry } from '../commands/registry.js';
+import { pluginPackageService, type PluginPackageService } from './package-service.js';
 
 interface PluginManifestSummary {
   id: string;
@@ -15,6 +16,7 @@ interface PluginManagementDependencies {
   permissions?: typeof permissionManager;
   tools?: typeof toolRegistry;
   commands?: typeof commandRegistry;
+  packages?: PluginPackageService;
 }
 
 export class PluginManagementError extends Error {
@@ -32,17 +34,20 @@ export class PluginManagementService {
   private readonly permissions: typeof permissionManager;
   private readonly tools: typeof toolRegistry;
   private readonly commands: typeof commandRegistry;
+  private readonly packages: PluginPackageService;
 
   constructor(deps: PluginManagementDependencies = {}) {
     this.loader = deps.loader ?? pluginLoader;
     this.permissions = deps.permissions ?? permissionManager;
     this.tools = deps.tools ?? toolRegistry;
     this.commands = deps.commands ?? commandRegistry;
+    this.packages = deps.packages ?? pluginPackageService;
   }
 
   listPlugins() {
     return this.loader.getPlugins().map(plugin => {
       const contributes = plugin.manifest.contributes || {};
+      const packageInfo = this.packages.describePlugin(plugin.manifest, plugin.path);
       const panels = (contributes.panels || []).map(
         (panel: {
           id: string;
@@ -66,6 +71,7 @@ export class PluginManagementService {
         version: plugin.manifest.version,
         description: plugin.manifest.description,
         author: plugin.manifest.author,
+        platform: plugin.manifest.platform,
         status: plugin.isActive ? 'active' : plugin.error ? 'error' : 'inactive',
         enabled: plugin.isActive,
         error: plugin.error,
@@ -78,6 +84,7 @@ export class PluginManagementService {
         commands: this.commands.getByPlugin(plugin.manifest.id).map(command => command.command),
         path: plugin.path,
         panels,
+        ...packageInfo,
       };
     });
   }
@@ -159,8 +166,25 @@ export class PluginManagementService {
 
   async removePlugin(id: string): Promise<{ removed: true }> {
     this.assertPluginExists(id);
-    await this.loader.remove(id);
+    const plugin = this.loader.getPlugin(id);
+    if (!plugin) {
+      throw new PluginManagementError(404, 'NOT_FOUND', `Plugin not found: ${id}`);
+    }
+    const packageInfo = this.packages.describePlugin(plugin.manifest, plugin.path);
+    if (packageInfo.source === 'managed') {
+      await this.packages.uninstallPlugin(id);
+    } else {
+      await this.loader.remove(id);
+    }
     return { removed: true };
+  }
+
+  async rollbackPlugin(id: string, version?: unknown) {
+    this.assertPluginExists(id);
+    if (version !== undefined && typeof version !== 'string') {
+      throw new PluginManagementError(400, 'INVALID_INPUT', 'version must be a string');
+    }
+    return await this.packages.rollbackPlugin(id, version);
   }
 
   private async autoActivateDiscoveredPlugins() {

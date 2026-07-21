@@ -20,6 +20,8 @@ import { WebSearchSettings } from '../settings/WebSearchSettings';
 import { PluginDirsManager } from './PluginDirsManager';
 import { PluginsBrowseView } from './PluginsBrowseView';
 import type { PluginCardModel } from './plugins-types';
+import { PluginInstallModal } from './PluginInstallModal';
+import { PluginDetailModal } from './PluginDetailModal';
 
 const BUILTIN_ICONS: Record<string, LucideIcon> = {
   'com.claudia.terminal': Terminal,
@@ -55,6 +57,8 @@ export function PluginsContent() {
   const panels = usePluginStore(selectPluginPanels);
 
   const [dirsOpen, setDirsOpen] = useState(false);
+  const [installOpen, setInstallOpen] = useState(false);
+  const [detailPluginId, setDetailPluginId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchAndSyncPlugins().catch(() => {});
@@ -82,9 +86,27 @@ export function PluginsContent() {
         pluginId: p.manifest.id,
         icon: Blocks,
         enabled: p.enabled && p.status === 'active',
+        version: p.manifest.version,
+        description: p.manifest.description,
+        source: p.source,
+        status: p.status === 'active' ? 'active' : p.status === 'error' ? 'error' : 'inactive',
+        error: p.error,
+        missingRequirements: p.requirements
+          .filter(requirement => !requirement.found)
+          .map(requirement => requirement.name),
+        onOpen: () => setDetailPluginId(p.manifest.id),
       })),
     [plugins]
   );
+
+  const detailPlugin = useMemo(
+    () => plugins.find(plugin => plugin.manifest.id === detailPluginId) ?? null,
+    [detailPluginId, plugins]
+  );
+
+  const refreshPlugins = useCallback(async () => {
+    await fetchAndSyncPlugins();
+  }, []);
 
   const toggleInstalled = useCallback(
     async (pluginId: string) => {
@@ -140,9 +162,10 @@ export function PluginsContent() {
         models={installedModels}
         kind="Installed"
         onToggle={toggleInstalled}
-        emptyText="No plugins installed. Add a plugin directory to get started."
+        emptyText="No plugins installed. Install a .zplugin package to get started."
         searchPlaceholder="Search plugins…"
         onAddDirectory={() => setDirsOpen(true)}
+        onInstallPlugin={() => setInstallOpen(true)}
       />
       <Modal
         open={dirsOpen}
@@ -155,6 +178,29 @@ export function PluginsContent() {
           <PluginDirsManager embedded />
         </div>
       </Modal>
+      <PluginInstallModal
+        open={installOpen}
+        onClose={() => setInstallOpen(false)}
+        onInstalled={refreshPlugins}
+        onViewPlugin={pluginId => {
+          setInstallOpen(false);
+          setDetailPluginId(pluginId);
+        }}
+      />
+      <PluginDetailModal
+        plugin={detailPlugin}
+        open={detailPlugin !== null}
+        onClose={() => setDetailPluginId(null)}
+        onChanged={refreshPlugins}
+        onInstallAnother={() => {
+          setDetailPluginId(null);
+          setInstallOpen(true);
+        }}
+        onManageDirectories={() => {
+          setDetailPluginId(null);
+          setDirsOpen(true);
+        }}
+      />
     </>
   );
 }

@@ -46,15 +46,22 @@ describe('PluginsBrowseView', () => {
     expect(screen.getByText('No plugins installed.')).toBeInTheDocument();
   });
 
-  it('omits Add directory when onAddDirectory is not provided', () => {
+  it('omits development directories when onAddDirectory is not provided', () => {
     setup();
-    expect(screen.queryByRole('button', { name: /add directory/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /development directories/i })).toBeNull();
   });
 
-  it('renders Add directory when provided and calls it', () => {
+  it('renders development directories when provided and calls it', () => {
     const onAddDirectory = vi.fn();
     setup({ onAddDirectory });
-    fireEvent.click(screen.getByRole('button', { name: /add directory/i }));
+    fireEvent.click(screen.getByRole('button', { name: /development directories/i }));
     expect(onAddDirectory).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders the primary package installation action', () => {
+    const onInstallPlugin = vi.fn();
+    setup({ onInstallPlugin });
+    fireEvent.click(screen.getByRole('button', { name: /install plugin/i }));
+    expect(onInstallPlugin).toHaveBeenCalledTimes(1);
   });
 });

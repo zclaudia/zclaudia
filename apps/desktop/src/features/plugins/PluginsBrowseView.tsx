@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Search, Plus } from 'lucide-react';
+import { FolderCog, PackagePlus, Search } from 'lucide-react';
 import type { PluginCardModel } from './plugins-types';
 import { PluginCard } from './ui/PluginCard';
 
@@ -24,6 +24,7 @@ export function PluginsBrowseView({
   emptyText,
   searchPlaceholder,
   onAddDirectory,
+  onInstallPlugin,
 }: {
   title: string;
   models: PluginCardModel[];
@@ -33,6 +34,8 @@ export function PluginsBrowseView({
   searchPlaceholder: string;
   /** When provided, an "Add directory" button renders in the header. */
   onAddDirectory?: () => void;
+  /** Primary action for installing a managed `.zplugin` package. */
+  onInstallPlugin?: () => void;
 }) {
   const [query, setQuery] = useState('');
   const visible = useMemo(() => filterModels(models, query.trim()), [models, query]);
@@ -56,9 +59,22 @@ export function PluginsBrowseView({
             <button
               type="button"
               onClick={onAddDirectory}
+              aria-label="Development directories"
               className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-secondary"
             >
-              <Plus className="h-3.5 w-3.5" strokeWidth={1.75} /> Add directory
+              <FolderCog className="h-3.5 w-3.5" strokeWidth={1.75} />
+              <span className="hidden lg:inline">Development directories</span>
+            </button>
+          )}
+          {onInstallPlugin && (
+            <button
+              type="button"
+              onClick={onInstallPlugin}
+              aria-label="Install plugin"
+              className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-xs text-primary-foreground hover:bg-primary/90"
+            >
+              <PackagePlus className="h-3.5 w-3.5" strokeWidth={1.75} />
+              <span className="hidden sm:inline">Install plugin</span>
             </button>
           )}
         </div>

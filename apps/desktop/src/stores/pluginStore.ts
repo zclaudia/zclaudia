@@ -29,6 +29,16 @@ export interface InstalledPlugin {
   enabled: boolean;
   installedAt: string;
   updatedAt: string;
+  source: 'managed' | 'development';
+  activeVersion?: string;
+  availableVersions: string[];
+  canRollback: boolean;
+  requirements: Array<{
+    name: string;
+    found: boolean;
+    path?: string;
+    source: 'manifest' | 'official';
+  }>;
 }
 
 export type PanelPlacement = 'bottom' | 'right';

@@ -21,6 +21,9 @@ describe('version utilities', () => {
   });
 
   describe('satisfiesVersion', () => {
+    it('accepts wildcard plugin ranges', () => {
+      expect(satisfiesVersion('*')).toBe(true);
+    });
     it('should return true for a very low version range', () => {
       // This should always be true
       expect(satisfiesVersion('>=0.0.0')).toBe(true);

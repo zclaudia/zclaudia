@@ -1,9 +1,50 @@
-import { Router, type Request, type Response } from 'express';
+import { mkdirSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
+import path from 'node:path';
+import {
+  Router,
+  type NextFunction,
+  type Request,
+  type RequestHandler,
+  type Response,
+} from 'express';
+import multer from 'multer';
 import { PluginManagementError, PluginManagementService } from './management-service.js';
 import { PluginFrontendError, PluginFrontendService } from './frontend-service.js';
 import { sendApiError } from '../../interfaces/http/response.js';
+import {
+  PluginPackageError,
+  pluginPackageService,
+  resolvePluginDataDir,
+} from './package-service.js';
+import { PLUGIN_PACKAGE_LIMITS } from './package-archive.js';
 
-export function createPluginRoutes(): Router {
+const uploadDirectory = path.join(resolvePluginDataDir(), 'plugin-uploads');
+mkdirSync(uploadDirectory, { recursive: true });
+const packageUpload = multer({
+  dest: uploadDirectory,
+  limits: { fileSize: PLUGIN_PACKAGE_LIMITS.archiveSize, files: 1 },
+});
+
+function sendPluginRouteError(res: Response, error: unknown): void {
+  if (error instanceof PluginManagementError || error instanceof PluginPackageError) {
+    sendApiError(
+      res,
+      error.status,
+      error.code,
+      error.message,
+      error instanceof PluginPackageError ? error.details : undefined
+    );
+    return;
+  }
+  sendApiError(res, 500, 'INTERNAL_ERROR', error instanceof Error ? error.message : String(error));
+}
+
+export function createPluginRoutes(
+  localOnlyMiddleware: RequestHandler = (_req, res) => {
+    sendApiError(res, 403, 'LOCAL_ONLY', 'Plugin package mutations require localhost');
+  }
+): Router {
   const router = Router();
   const pluginManagementService = new PluginManagementService();
   const pluginFrontendService = new PluginFrontendService();
@@ -11,6 +52,41 @@ export function createPluginRoutes(): Router {
   router.get('/', (_req: Request, res: Response) => {
     const plugins = pluginManagementService.listPlugins();
     res.json({ success: true, data: plugins });
+  });
+
+  router.post(
+    '/packages/inspect',
+    localOnlyMiddleware,
+    packageUpload.single('package'),
+    async (req: Request, res: Response) => {
+      if (!req.file) {
+        sendApiError(res, 400, 'INVALID_INPUT', 'A .zplugin file is required');
+        return;
+      }
+      try {
+        const preview = await pluginPackageService.inspectPackage(
+          req.file.path,
+          req.file.originalname
+        );
+        res.json({ success: true, data: preview });
+      } catch (error) {
+        sendPluginRouteError(res, error);
+      } finally {
+        await rm(req.file.path, { force: true }).catch(() => {});
+      }
+    }
+  );
+
+  router.post('/packages/install', localOnlyMiddleware, async (req: Request, res: Response) => {
+    try {
+      if (typeof req.body?.token !== 'string' || !req.body.token.trim()) {
+        throw new PluginPackageError(400, 'INVALID_INPUT', 'A package preview token is required');
+      }
+      const result = await pluginPackageService.installPackage(req.body.token);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      sendPluginRouteError(res, error);
+    }
   });
 
   router.post('/:id/activate', async (req: Request, res: Response) => {
@@ -64,6 +140,15 @@ export function createPluginRoutes(): Router {
         'INTERNAL_ERROR',
         error instanceof Error ? error.message : String(error)
       );
+    }
+  });
+
+  router.post('/:id/rollback', localOnlyMiddleware, async (req: Request, res: Response) => {
+    try {
+      const result = await pluginManagementService.rollbackPlugin(req.params.id, req.body?.version);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      sendPluginRouteError(res, error);
     }
   });
 
@@ -286,7 +371,7 @@ export function createPluginRoutes(): Router {
     try {
       const fullPath = pluginFrontendService.resolveFrontendFile(
         req.params.id,
-        (req.params as any)[0] as string
+        req.params[0] as string
       );
       res.sendFile(fullPath);
     } catch (error) {
@@ -298,22 +383,22 @@ export function createPluginRoutes(): Router {
     }
   });
 
-  router.delete('/:id', async (req: Request, res: Response) => {
+  router.delete('/:id', localOnlyMiddleware, async (req: Request, res: Response) => {
     try {
       const result = await pluginManagementService.removePlugin(req.params.id);
       res.json({ success: true, data: result });
     } catch (error) {
-      if (error instanceof PluginManagementError) {
-        sendApiError(res, error.status, error.code, error.message);
-        return;
-      }
-      sendApiError(
-        res,
-        500,
-        'INTERNAL_ERROR',
-        error instanceof Error ? error.message : String(error)
-      );
+      sendPluginRouteError(res, error);
     }
+  });
+
+  router.use((error: unknown, _req: Request, res: Response, next: NextFunction) => {
+    if (error instanceof multer.MulterError) {
+      const status = error.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+      sendApiError(res, status, error.code, error.message);
+      return;
+    }
+    next(error);
   });
 
   return router;

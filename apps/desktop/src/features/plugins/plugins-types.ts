@@ -20,6 +20,12 @@ export interface PluginCardModel {
   pluginId: string;
   icon: LucideIcon;
   enabled: boolean;
+  version?: string;
+  description?: string;
+  source?: 'managed' | 'development';
+  status?: 'active' | 'inactive' | 'error';
+  error?: string;
+  missingRequirements?: string[];
   /** Optional detail action (e.g. installed plugin settings). */
   onOpen?: () => void;
 }

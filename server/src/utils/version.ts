@@ -38,6 +38,9 @@ function satisfiesSimple(version: string, range: string): boolean {
   // Parse range
   const cleanRange = range.trim();
 
+  // A wildcard is the conventional manifest declaration for every host version.
+  if (cleanRange === '*' || cleanRange.toLowerCase() === 'latest') return true;
+
   // Handle different operators
   if (cleanRange.startsWith('>=')) {
     const target = cleanRange.slice(2).trim();

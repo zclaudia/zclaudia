@@ -86,13 +86,16 @@ resource, stream, and notification envelopes before sending them through
 `../zclaudia-gateway/`.
 
 Official agent runtime plugins are maintained in
-[zclaudia/zclaudia-plugins](https://github.com/zclaudia/zclaudia-plugins). For local development,
-build that repository and add an `agents/<name>` package directory through ZClaudia's plugin
-directory settings.
+[zclaudia/zclaudia-plugins](https://github.com/zclaudia/zclaudia-plugins). Install a release
+`.zplugin` from **Plugins → Install plugin**. ZClaudia validates the archive before installing it,
+keeps previous managed versions for rollback, and leaves a newly selected version inactive until
+you enable it. For local development, build that repository and add an `agents/<name>` package
+through **Development directories** instead.
 
 Additional architecture notes:
 
 - [Runtime Event Model](docs/runtime-events.md)
+- [Plugin Package Installation](docs/plugin-packages.md)
 
 ## License
 

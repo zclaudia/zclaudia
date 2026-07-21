@@ -24,6 +24,7 @@ export * from './api/files';
 export * from './api/commands';
 export * from './api/debug';
 export * from './api/plugins';
+export * from './api/plugin-packages';
 export * from './api/runtime-descriptors';
 export * from './api/provider-diagnostics';
 export * from './api/context-usage';
