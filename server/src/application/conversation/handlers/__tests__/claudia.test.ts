@@ -215,6 +215,7 @@ describe('handleClaudiaMessage', () => {
         model TEXT NOT NULL DEFAULT 'claude-sonnet-4-6',
         system_prompt TEXT NOT NULL DEFAULT '',
         is_default INTEGER DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','readonly')),
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       );
