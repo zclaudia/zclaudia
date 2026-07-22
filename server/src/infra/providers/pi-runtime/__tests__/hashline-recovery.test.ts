@@ -43,6 +43,56 @@ describe('replaceHashlineLine with snapshot disambiguation', () => {
   });
 });
 
+describe('replaceHashlineLine CRLF round-trip', () => {
+  it('matches read-side anchors (CR stripped) against CRLF content', () => {
+    // Read builds anchors from text.split(/\r?\n/), so hashes never see '\r'.
+    const content = 'alpha\r\nbeta\r\ngamma\r\n';
+    const updated = replaceHashlineLine(content, hashlineForLine('beta'), 'BETA');
+    // Output is LF-normalized; the Edit tool re-applies the file's CRLF style
+    // on write (applyLineEndingStyle).
+    expect(updated).toBe('alpha\nBETA\ngamma\n');
+  });
+
+  it('preserves a missing trailing newline on CRLF content', () => {
+    const updated = replaceHashlineLine('alpha\r\nbeta', hashlineForLine('beta'), 'BETA');
+    expect(updated).toBe('alpha\nBETA');
+  });
+
+  it('disambiguates duplicates in CRLF content with a CRLF snapshot', () => {
+    const snapshot = 'function a() {\r\n  go();\r\n}\r\nfunction b() {\r\n  go();\r\n}\r\n';
+    const current = 'function z() {\r\n  go();\r\n}\r\n' + snapshot;
+    const updated = replaceHashlineLine(current, hashlineForLine('  go();'), '  GO();', snapshot);
+    expect(updated).toBe(
+      'function z() {\n  go();\n}\nfunction a() {\n  GO();\n}\nfunction b() {\n  go();\n}\n'
+    );
+  });
+
+  it('read-side anchors from a CRLF file match at edit time (integration)', async () => {
+    const dir = makeWorkspace();
+    writeFileSync(
+      path.join(dir, 'crlf.ts'),
+      'const a = 1;\r\nconst target = "old";\r\nconst b = 2;\r\n'
+    );
+    const tools = getTools(dir);
+    const read = await tools.Read.execute('r1', { path: 'crlf.ts', hashline: true });
+    const anchor = read.details.hashline.lines.find((l: { text: string }) =>
+      l.text.includes('target')
+    );
+
+    const res = await tools.Edit.execute('e1', {
+      file_path: 'crlf.ts',
+      hashline_operation: `replace:${anchor.hash}`,
+      hashline_tag: read.details.hashline.tag,
+      new_string: 'const target = "new";',
+    });
+    const after = readFileSync(path.join(dir, 'crlf.ts'), 'utf8');
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+    // The file's CRLF style is preserved on write.
+    expect(after).toBe('const a = 1;\r\nconst target = "new";\r\nconst b = 2;\r\n');
+  });
+});
+
 describe('hashline edit drift tolerance (integration)', () => {
   it('edits the anchored line even after the file drifted out-of-band', async () => {
     const dir = makeWorkspace();

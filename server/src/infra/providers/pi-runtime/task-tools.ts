@@ -232,19 +232,22 @@ export function createTaskOutputTool(
 }
 
 export function createMonitorTool(
-  sessionId?: string,
-  runId?: string,
+  // Unused since P1-7 disabled monitor start (no monitor runtime exists);
+  // positions kept so tool-catalog's call site stays stable.
+  _sessionId?: string,
+  _runId?: string,
   db?: Database.Database,
   runtimeRegistryFactory: TaskRuntimeRegistryFactory = createDefaultTaskRuntimeRegistry
 ): AgentTool {
   return {
     name: 'Monitor',
     label: 'Monitor',
-    description: 'Create, inspect, or stop a monitor task using the shared Task lifecycle.',
+    description:
+      'Inspect or stop an existing monitor task using the shared Task lifecycle. Starting new monitor tasks is not supported (no monitor runtime exists); use TaskOutput with wait_ms to watch a task.',
     parameters: agentToolParameters({
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['start', 'status', 'stop'], default: 'start' },
+        action: { type: 'string', enum: ['start', 'status', 'stop'] },
         task_id: { type: 'string' },
         taskId: { type: 'string' },
         title: { type: 'string' },
@@ -263,22 +266,17 @@ export function createMonitorTool(
       const taskId = args.task_id ?? args.taskId;
 
       if (action === 'start') {
-        const task = service.createTask({
-          type: 'monitor',
-          title: typeof args.title === 'string' ? args.title : undefined,
-          description: typeof args.description === 'string' ? args.description : undefined,
-          parentSessionId: sessionId,
-          parentRunId: runId,
-          parentToolUseId: typeof toolCallId === 'string' ? toolCallId : undefined,
-          metadata: {
-            targetTaskId: typeof args.target_task_id === 'string' ? args.target_task_id : undefined,
-            intervalMs: typeof args.interval_ms === 'number' ? args.interval_ms : undefined,
-          },
-        });
-        const running = service.startTask(task.id, {
-          executorRef: { providerType: 'task-monitor', taskId: task.id },
-        });
-        return jsonResult({ ok: true, taskId: running.id, status: running.status });
+        // P1-7: Monitor start used to mint a 'monitor' task that was marked
+        // running forever — no monitor runtime exists (only command and eval
+        // runtimes are registered) and nothing ever drove the task, so every
+        // started monitor became a permanent zombie. Fail explicitly instead;
+        // TaskOutput with wait_ms is the supported way to watch a task.
+        // status/stop stay available so pre-existing monitor rows can still
+        // be inspected and settled.
+        return errorResult(
+          'monitor_start_unsupported',
+          'Monitor start is not supported: no monitor runtime exists to drive monitor tasks, so a started monitor would stay "running" forever. To watch an existing task, poll TaskOutput with wait_ms (it blocks until new output arrives or the task finishes). To inspect or stop an existing monitor task, use action:"status" or action:"stop".'
+        );
       }
 
       if (typeof taskId !== 'string' || !taskId.trim()) {

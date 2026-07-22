@@ -403,6 +403,75 @@ describe('LightweightAgentRunner', () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
+  it('forwards request.abortSignal into the agent hooks (P1-10)', async () => {
+    const execute: AgentLoopExecutor = vi.fn(async () => ({
+      text: '{"result":"done"}',
+      messages: [],
+    }));
+    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
+    const abortController = new AbortController();
+    abortController.abort();
+
+    const result = await runner.run({
+      owner: { type: 'workflow_run', id: 'run-1' },
+      purpose: 'workflow.ai_prompt',
+      llmProfileId: 'llm-1',
+      cwd: '/tmp',
+      systemPrompt: 'system',
+      input: 'say done',
+      toolset: { id: 'none' },
+      outputContract: {
+        type: 'json',
+        schema: {
+          type: 'object',
+          required: ['result'],
+          properties: { result: { type: 'string' } },
+        },
+      },
+      context: { policy: 'none' },
+      limits: { maxTurns: 2, timeoutMs: 1_000 },
+      abortSignal: abortController.signal,
+      permissionMode: 'deny-external',
+    });
+
+    expect(result.status).toBe('completed');
+    const hooks = (execute as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]?.hooks;
+    // The wired signal reaches shouldStopAfterTurn: an aborted run stops.
+    await expect(hooks?.shouldStopAfterTurn?.({})).resolves.toBe(true);
+  });
+
+  it('shouldStopAfterTurn stays false when the request carries no abortSignal', async () => {
+    const execute: AgentLoopExecutor = vi.fn(async () => ({
+      text: '{"result":"done"}',
+      messages: [],
+    }));
+    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
+
+    await runner.run({
+      owner: { type: 'workflow_run', id: 'run-1' },
+      purpose: 'workflow.ai_prompt',
+      llmProfileId: 'llm-1',
+      cwd: '/tmp',
+      systemPrompt: 'system',
+      input: 'say done',
+      toolset: { id: 'none' },
+      outputContract: {
+        type: 'json',
+        schema: {
+          type: 'object',
+          required: ['result'],
+          properties: { result: { type: 'string' } },
+        },
+      },
+      context: { policy: 'none' },
+      limits: { maxTurns: 2, timeoutMs: 1_000 },
+      permissionMode: 'deny-external',
+    });
+
+    const hooks = (execute as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]?.hooks;
+    await expect(hooks?.shouldStopAfterTurn?.({})).resolves.toBe(false);
+  });
+
   it('replays workflow-thread context using context.maxEvents', async () => {
     const execute: AgentLoopExecutor = vi.fn(async () => ({
       text: '{"result":"done"}',

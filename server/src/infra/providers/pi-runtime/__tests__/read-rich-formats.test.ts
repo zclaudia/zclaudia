@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { mkdtempSync, rmSync, writeFileSync, truncateSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import { Jimp } from 'jimp';
@@ -96,6 +96,25 @@ describe('Read .pdf integration', () => {
     expect(res.details.totalPages).toBe(1);
     expect(res.content[0].text).toContain('Hello PDF extraction');
     expect(res.content[0].text).toContain('Page 1 of 1');
+  });
+});
+
+describe('Read image file-size ceiling', () => {
+  it('rejects an image above the stat gate before reading it into memory', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-readimg-cap-'));
+    const filePath = path.join(dir, 'huge.png');
+    // 1x1 PNG, then sparse-extended past the 50MB gate — the gate must fire on
+    // stat size alone, without readFile/Jimp ever touching the content.
+    writeFileSync(filePath, Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex'));
+    truncateSync(filePath, 50 * 1024 * 1024 + 1);
+
+    const res = await readTool(dir, { supportsVision: true }).execute('r1', { path: 'huge.png' });
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(false);
+    expect(res.details.error).toBe('file_too_large');
+    expect(res.details.size).toBe(50 * 1024 * 1024 + 1);
+    expect(res.details.maxBytes).toBe(50 * 1024 * 1024);
+    expect(res.details.suggestion).toMatch(/[Dd]ownscale/);
   });
 });
 

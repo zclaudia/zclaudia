@@ -5,7 +5,7 @@ import * as path from 'path';
 import { promisify } from 'util';
 
 import { runRipgrep } from './ripgrep-runner.js';
-import { errorResult, jsonResult, textResult, toolParams } from './tool-common.js';
+import { errorResult, textResult, toolParams } from './tool-common.js';
 import { resolveInsideWorkspace, toWorkspaceRelative } from './workspace-paths.js';
 
 const execFileAsync = promisify(execFile);
@@ -25,6 +25,21 @@ function parseRipgrepLines(
     .filter(Boolean)
     .slice(0, maxResults)
     .flatMap(line => {
+      // rg runs with `--null`: `path<NUL>line:text` — the only unambiguous
+      // framing for paths containing separators (dashed dates, drive letters).
+      const nul = line.indexOf('\0');
+      if (nul >= 0) {
+        const match = /^(\d+):(.*)$/.exec(line.slice(nul + 1));
+        if (!match) return [];
+        return [
+          {
+            file: toWorkspaceRelative(cwd, line.slice(0, nul)),
+            line: Number(match[1]),
+            preview: match[2].trim(),
+          },
+        ];
+      }
+      // Legacy fallback for rg without --null (not expected; we always pass it).
       const match = /^(.*?):(\d+):(.*)$/.exec(line);
       if (!match) return [];
       return [
@@ -60,6 +75,24 @@ function parseRipgrepContextLines(
   for (const group of groups) {
     if (matchCount >= maxResults) break;
     const parsedGroup = group.flatMap(line => {
+      // rg runs with `--null`: `path<NUL>line<sep>text` where sep is `:` for
+      // match lines and `-` for context lines. Parsing left-to-right with a
+      // non-greedy file group misparses paths like `report-2024-01.ts` (the
+      // `-2024-` segment wins over the real line number) — P1-13.
+      const nul = line.indexOf('\0');
+      if (nul >= 0) {
+        const match = /^(\d+)([:-])(.*)$/.exec(line.slice(nul + 1));
+        if (!match) return [];
+        return [
+          {
+            file: toWorkspaceRelative(cwd, line.slice(0, nul)),
+            line: Number(match[1]),
+            preview: match[3].trim(),
+            isMatch: match[2] === ':',
+          },
+        ];
+      }
+      // Legacy fallback for rg without --null (not expected; we always pass it).
       const match = /^(.*?)([:-])(\d+)\2(.*)$/.exec(line);
       if (!match) return [];
       return [
@@ -86,11 +119,15 @@ async function ripgrepSearch(
   maxResults: number,
   include?: string
 ): Promise<Array<{ file: string; line: number; preview: string }>> {
+  // Used only by LSPTool: the query is matched literally (--fixed-strings),
+  // so regex metacharacters in a symbol name can never break the search.
   const args = [
     '--line-number',
     '--no-heading',
     '--color',
     'never',
+    '--null',
+    '--fixed-strings',
     '--max-count',
     String(maxResults),
     ...(include ? ['--glob', include] : []),
@@ -136,8 +173,11 @@ export function createGrepBridgeTool(cwd: string): AgentTool {
     }),
     execute: async (toolCallId: string, params: unknown, signal?: AbortSignal) => {
       const args = toolParams(toolCallId, params);
-      const pattern = String(args.pattern || '').trim();
-      if (!pattern) return errorResult('missing_pattern', 'grep requires a pattern');
+      // Trim only for the empty-check: leading/trailing whitespace in the
+      // pattern is significant (e.g. searching for an indented `    def foo`),
+      // so the raw pattern is passed to ripgrep verbatim (P1-13).
+      const pattern = String(args.pattern ?? '');
+      if (!pattern.trim()) return errorResult('missing_pattern', 'grep requires a pattern');
       let searchRoot: string;
       try {
         searchRoot = resolveInsideWorkspace(cwd, args.path);
@@ -227,6 +267,9 @@ export function createGrepBridgeTool(cwd: string): AgentTool {
             '--color',
             'never',
             '--with-filename',
+            // NUL-terminated path prefix so the parsers handle any filename
+            // (dashed dates, colons, drive letters) unambiguously (P1-13).
+            '--null',
             ...ci,
             ...(context > 0 ? ['-C', String(context)] : []),
             ...include,
@@ -434,7 +477,7 @@ export function createLspTool(cwd: string): AgentTool {
     name: 'LSPTool',
     label: 'LSPTool',
     description:
-      'Find symbols, references, definitions, or diagnostics in the workspace. Uses ripgrep as a structured fallback when no language server is attached.',
+      'Text-based symbol search over the workspace, powered by ripgrep literal matching (no language server is attached and there are no LSP semantics: results are plain text matches, not compiler-verified symbols). All actions currently behave the same: "symbols", "references", and "definition" return the literal occurrences of query (file/line/preview) as candidate locations to inspect — they do NOT distinguish definitions from references; "diagnostics" returns no diagnostics today. The query is matched literally (like rg --fixed-strings), so regex metacharacters need no escaping. Use Grep when you need regex search or context lines.',
     parameters: agentToolParameters({
       type: 'object',
       properties: {
@@ -443,7 +486,7 @@ export function createLspTool(cwd: string): AgentTool {
           enum: ['symbols', 'references', 'definition', 'diagnostics'],
           default: 'symbols',
         },
-        query: { type: 'string' },
+        query: { type: 'string', description: 'Literal text to search for (not a regex)' },
         path: { type: 'string', description: 'Optional workspace-relative directory to search' },
         include: { type: 'string', description: 'Optional ripgrep glob filter, such as *.ts' },
         max_results: { type: 'number', default: 50 },
@@ -453,8 +496,11 @@ export function createLspTool(cwd: string): AgentTool {
     execute: async (toolCallId: string, params: unknown) => {
       const args = toolParams(toolCallId, params);
       const action = String(args.action || 'symbols');
-      const query = String(args.query || '').trim();
-      if (!query) return jsonResult({ error: 'query is required' });
+      // Trim only for the empty-check; the raw query is matched literally.
+      const query = String(args.query ?? '');
+      if (!query.trim()) {
+        return errorResult('missing_query', 'LSPTool requires a query', { action });
+      }
       const maxResults = Math.max(1, Math.min(Number(args.max_results ?? 50) || 50, 200));
       let searchRoot: string;
       try {
@@ -466,33 +512,42 @@ export function createLspTool(cwd: string): AgentTool {
           { action, query }
         );
       }
-      const results = await ripgrepSearch(
-        cwd,
-        searchRoot,
-        query,
-        maxResults,
-        typeof args.include === 'string' ? args.include : undefined
-      );
-      return textResult(
-        JSON.stringify(
+      try {
+        const results = await ripgrepSearch(
+          cwd,
+          searchRoot,
+          query,
+          maxResults,
+          typeof args.include === 'string' ? args.include : undefined
+        );
+        return textResult(
+          JSON.stringify(
+            {
+              action,
+              query,
+              fallback: 'ripgrep',
+              results,
+              total: results.length,
+            },
+            null,
+            2
+          ),
           {
+            ok: true,
             action,
             query,
             fallback: 'ripgrep',
-            results,
             total: results.length,
-          },
-          null,
-          2
-        ),
-        {
-          ok: true,
-          action,
-          query,
-          fallback: 'ripgrep',
-          total: results.length,
-        }
-      );
+          }
+        );
+      } catch (err) {
+        // Same guarded shape as Grep: structured error instead of a raw rejection.
+        return errorResult(
+          'lsp_search_failed',
+          err instanceof Error ? err.message : String(err),
+          { action, query }
+        );
+      }
     },
   };
 }

@@ -109,6 +109,11 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
   const MAX_TIMEOUT_SEC = 600;
   const UPDATE_THROTTLE_MS = 100;
   const DEFAULT_AUTO_BACKGROUND_MS = 60_000;
+  const TERMINAL_TASK_STATUSES: ReadonlySet<string> = new Set([
+    'completed',
+    'failed',
+    'stopped',
+  ]);
   const grantedDomains = new Set<string>(options?.sandboxAllowedDomains ?? []);
   return {
     name: 'Bash',
@@ -568,7 +573,13 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
             result.fullOutput,
             result.fullOutputPath
           );
-          service.startTask(task.id, { executorRef: adopted.executorRef });
+          // adopt() settles synchronously when the child already exited
+          // between handoff and adoption; starting an already-terminal task
+          // would throw an invalid-transition error.
+          const postAdopt = repo.findById(task.id);
+          if (postAdopt && !TERMINAL_TASK_STATUSES.has(postAdopt.status)) {
+            service.startTask(task.id, { executorRef: adopted.executorRef });
+          }
           const reason = manualBackground?.signal.aborted
             ? "Moved to background at the user's request"
             : `Still running after ${Math.round((autoBackgroundMs ?? 0) / 1000)}s - moved to background`;
@@ -612,6 +623,7 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
             timedOut: false,
             sandboxed: wrap.sandboxed,
             ...(fullOutputPath ? { fullOutputPath } : {}),
+            ...(result.fullOutputCapped ? { fullOutputCapped: true } : {}),
             aborted: true,
           },
           insights
@@ -644,6 +656,7 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
           timedOut: result.timedOut,
           sandboxed: wrap.sandboxed,
           ...(fullOutputPath ? { fullOutputPath } : {}),
+          ...(result.fullOutputCapped ? { fullOutputCapped: true } : {}),
         },
         insights
       );

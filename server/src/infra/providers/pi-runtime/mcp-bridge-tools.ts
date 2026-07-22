@@ -3,8 +3,15 @@ import type Database from 'better-sqlite3';
 
 import { loadMcpServersFromDb } from '../../../utils/mcp-config.js';
 import { mcpClientManager } from '../../../utils/mcp-client-manager.js';
+import {
+  enforceMcpToolTrustPolicy,
+  extensionForMimeType,
+  getMcpInventory,
+  persistMcpOutput,
+  truncateMcpTextContent,
+} from './external-tools.js';
 import type { ToolContent } from './tool-common.js';
-import { errorResult, textResult, toolParams } from './tool-common.js';
+import { errorResult, toolParams } from './tool-common.js';
 
 type AgentToolParameters = AgentTool['parameters'];
 
@@ -47,6 +54,52 @@ function mcpErrorCode(err: unknown): string {
   return 'mcp_error';
 }
 
+/**
+ * Look up a tool's schema/annotations from the (cached) server inventory so the
+ * generic bridge can enforce the same trust policy as concrete MCP tools
+ * (P1-15). A tool the server does not advertise is treated as unannotated
+ * (open-world → high risk) so deny-by-risk policies still catch it; when the
+ * inventory is unreachable, return undefined and let callTool surface the real
+ * connection error instead of inventing a policy decision.
+ */
+async function lookupBridgeToolMetadata(
+  server: string,
+  config: ReturnType<typeof getMcpServer>,
+  tool: string
+): Promise<
+  { annotations?: Record<string, unknown>; inputSchema?: Record<string, unknown> } | undefined
+> {
+  try {
+    const inventory = await getMcpInventory(server, config);
+    const found = inventory.tools.find(item => item.name === tool);
+    if (found) {
+      return found as {
+        annotations?: Record<string, unknown>;
+        inputSchema?: Record<string, unknown>;
+      };
+    }
+    return {};
+  } catch {
+    return undefined;
+  }
+}
+
+/** Details fragment for the shared MCP output-budget contract. */
+function outputBudgetDetails(output: {
+  outputTruncated: boolean;
+  originalOutputChars?: number;
+  outputFiles: string[];
+}): Record<string, unknown> {
+  return output.outputTruncated
+    ? {
+        outputTruncated: true,
+        originalOutputChars: output.originalOutputChars,
+        outputPersisted: output.outputFiles.length > 0,
+        outputFiles: output.outputFiles,
+      }
+    : {};
+}
+
 export function createMcpTool(db?: Database.Database): AgentTool {
   return {
     name: 'MCPTool',
@@ -69,15 +122,33 @@ export function createMcpTool(db?: Database.Database): AgentTool {
       if (!tool) return errorResult('missing_tool', 'MCPTool requires a tool name', { server });
       try {
         const config = getMcpServer(db, server);
+        // P1-15: enforce the same MCP trust policy as createConcreteMcpTool —
+        // a policy-denied tool must not stay callable through the generic bridge.
+        const metadata = await lookupBridgeToolMetadata(server, config, tool);
+        const enforcement = enforceMcpToolTrustPolicy({ db, server, tool, metadata });
+        if (enforcement.denial) return enforcement.denial;
         const result = await mcpClientManager.callTool(
           server,
           config,
           tool,
           (args.arguments as Record<string, unknown>) || {}
         );
+        // P1-15: same output budget as concrete tools — truncate oversized text
+        // and persist the full output to disk instead of flooding model context.
+        const output = await truncateMcpTextContent(
+          normalizeMcpToolContent(result.content),
+          tool
+        );
         return {
-          content: normalizeMcpToolContent(result.content),
-          details: { ok: !result.isError, server, tool, isError: !!result.isError },
+          content: output.content,
+          details: {
+            ok: !result.isError,
+            server,
+            tool,
+            isError: !!result.isError,
+            permissionSummary: enforcement.permissionSummary,
+            ...outputBudgetDetails(output),
+          },
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -147,19 +218,28 @@ export function createToolSearchTool(db?: Database.Database): AgentTool {
         if (results.length >= maxResults) break;
       }
 
-      return textResult(
-        JSON.stringify(
+      const output = await truncateMcpTextContent(
+        [
           {
-            query,
-            results,
-            errors,
-            total: results.length,
+            type: 'text' as const,
+            text: JSON.stringify(
+              {
+                query,
+                results,
+                errors,
+                total: results.length,
+              },
+              null,
+              2
+            ),
           },
-          null,
-          2
-        ),
-        { ok: true, query, total: results.length, errors }
+        ],
+        'tool-search'
       );
+      return {
+        content: output.content,
+        details: { ok: true, query, total: results.length, errors, ...outputBudgetDetails(output) },
+      };
     },
   };
 }
@@ -200,7 +280,14 @@ export function createListMcpResourcesTool(db?: Database.Database): AgentTool {
           resources.push({ server, error: err instanceof Error ? err.message : String(err) });
         }
       }
-      return textResult(JSON.stringify(resources, null, 2), { ok: true, count: resources.length });
+      const output = await truncateMcpTextContent(
+        [{ type: 'text' as const, text: JSON.stringify(resources, null, 2) }],
+        'resource-list'
+      );
+      return {
+        content: output.content,
+        details: { ok: true, count: resources.length, ...outputBudgetDetails(output) },
+      };
     },
   };
 }
@@ -228,12 +315,49 @@ export function createReadMcpResourceTool(db?: Database.Database): AgentTool {
       try {
         const config = getMcpServer(db, server);
         const result = await mcpClientManager.readResource(server, config, uri);
-        return textResult(JSON.stringify(result, null, 2), {
-          ok: true,
-          server,
-          uri,
-          count: result.contents?.length ?? 0,
-        });
+        // P1-15: same output budget as ReadExternalResource — persist binary
+        // blobs to disk instead of inlining base64, and truncate oversized
+        // text payloads with the full content saved to a file.
+        const blobFiles: string[] = [];
+        const contents = await Promise.all(
+          (result.contents ?? []).map(async (item, index) => {
+            if (item?.blob) {
+              const bytes = Buffer.from(item.blob, 'base64');
+              const outputPath = await persistMcpOutput(
+                item.uri || uri,
+                index,
+                bytes,
+                extensionForMimeType(item.mimeType)
+              );
+              blobFiles.push(outputPath);
+              const { blob: _blob, ...rest } = item;
+              return { ...rest, binary: true, size: bytes.length, savedTo: outputPath };
+            }
+            return item;
+          })
+        );
+        const output = await truncateMcpTextContent(
+          [{ type: 'text' as const, text: JSON.stringify({ ...result, contents }, null, 2) }],
+          uri
+        );
+        const allOutputFiles = [...blobFiles, ...output.outputFiles];
+        return {
+          content: output.content,
+          details: {
+            ok: true,
+            server,
+            uri,
+            count: result.contents?.length ?? 0,
+            ...(allOutputFiles.length > 0 && {
+              outputPersisted: true,
+              outputFiles: allOutputFiles,
+            }),
+            ...(output.outputTruncated && {
+              outputTruncated: true,
+              originalOutputChars: output.originalOutputChars,
+            }),
+          },
+        };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return errorResult(mcpErrorCode(err), message, { server, uri });

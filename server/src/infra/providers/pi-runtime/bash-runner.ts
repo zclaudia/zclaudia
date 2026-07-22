@@ -1,13 +1,15 @@
 import { spawn, type ChildProcess } from 'child_process';
 import { randomUUID } from 'crypto';
 import {
-  appendFileSync,
+  closeSync,
   existsSync,
   mkdirSync,
+  openSync,
   readdirSync,
   statSync,
   unlinkSync,
   writeFileSync,
+  writeSync,
 } from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -40,7 +42,11 @@ export interface BashRunOptions {
 
 export interface BashHandoff {
   child: ChildProcess;
-  /** Remove the runner's stdio listeners so the adopter can attach its own. */
+  /**
+   * Remove the runner's 'data' listeners so the adopter can attach its own.
+   * waitForChild is already disarmed at handoff time; detach() completes the
+   * ownership transfer and leaves every stream untouched for the adopter.
+   */
   detach(): void;
 }
 
@@ -58,6 +64,11 @@ export interface BashRunResult {
   stderrOutput: string;
   /** Secure path containing full output when in-memory output was capped. */
   fullOutputPath?: string;
+  /**
+   * True when the spill file hit BASH_SPILL_MAX_BYTES: the file holds the head
+   * plus a drop marker, while `fullOutput`/`output` still track the live tail.
+   */
+  fullOutputCapped?: boolean;
   /** Present when the run was handed off at autoBackgroundMs; the child is still alive. */
   handoff?: BashHandoff;
 }
@@ -66,6 +77,18 @@ const DEFAULT_MAX_LINES = 2000;
 const DEFAULT_MAX_BYTES = 50 * 1024;
 const STDIO_GRACE_MS = 100;
 const STDERR_CAPTURE_LIMIT = 64 * 1024;
+
+/**
+ * Hard cap on a single command's spill file. Past the cap, subsequent output
+ * is dropped from the file (a marker is appended once) while the in-memory
+ * tail keeps tracking the end of the stream — preserving the head-on-disk +
+ * tail-in-memory shape the tool result already exposes. Without a cap, a
+ * `yes`-class command would append unboundedly for up to the 600s timeout.
+ */
+export const BASH_SPILL_MAX_BYTES = 64 * 1024 * 1024;
+const SPILL_CAP_MARKER = `\n[zclaudia: output exceeded the ${
+  BASH_SPILL_MAX_BYTES / (1024 * 1024)
+}MB spill cap; output after this point was dropped from this file. The result tail still reflects the command's final output.]\n`;
 
 function resolveDataDir(): string {
   return process.env.ZCLAUDIA_DATA_DIR
@@ -151,49 +174,86 @@ export function killProcessTree(pid: number): void {
  * Resolve when the child has exited, without hanging on stdio pipes a detached
  * descendant keeps open. Resolve on `exit`; give stdout/stderr a short grace to
  * `end`, then force-finalize (destroy the streams). Resolve on `close` if first.
+ *
+ * `disarm()` fully transfers stdio ownership to an adopter (handoff): every
+ * listener is removed and finalize becomes a no-op, so the exit+grace destroy
+ * can never tear down stdout/stderr while the adopter is still draining them.
  */
-function waitForChild(child: ChildProcess): Promise<number | null> {
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    let exited = false;
-    let exitCode: number | null = null;
-    let timer: NodeJS.Timeout | undefined;
-    let stdoutEnded = child.stdout === null;
-    let stderrEnded = child.stderr === null;
+interface ChildWaitHandle {
+  promise: Promise<number | null>;
+  disarm(): void;
+}
 
-    const finalize = (code: number | null) => {
-      if (settled) return;
+function waitForChild(child: ChildProcess): ChildWaitHandle {
+  let settled = false;
+  let exited = false;
+  let exitCode: number | null = null;
+  let timer: NodeJS.Timeout | undefined;
+  let stdoutEnded = child.stdout === null;
+  let stderrEnded = child.stderr === null;
+
+  // Assigned synchronously by the promise executor below.
+  let resolvePromise: (code: number | null) => void = () => {};
+  let rejectPromise: (err: unknown) => void = () => {};
+
+  const finalize = (code: number | null) => {
+    if (settled) return;
+    settled = true;
+    if (timer) clearTimeout(timer);
+    child.stdout?.destroy();
+    child.stderr?.destroy();
+    resolvePromise(code);
+  };
+  const maybeFinalize = () => {
+    if (exited && !settled && stdoutEnded && stderrEnded) finalize(exitCode);
+  };
+  const onStdoutEnd = () => {
+    stdoutEnded = true;
+    maybeFinalize();
+  };
+  const onStderrEnd = () => {
+    stderrEnded = true;
+    maybeFinalize();
+  };
+  const onExit = (code: number | null) => {
+    exited = true;
+    exitCode = code;
+    maybeFinalize();
+    if (!settled) timer = setTimeout(() => finalize(code), STDIO_GRACE_MS);
+  };
+  const onClose = (code: number | null) => finalize(code);
+  const onError = (err: Error) => {
+    if (!settled) {
       settled = true;
-      if (timer) clearTimeout(timer);
-      child.stdout?.destroy();
-      child.stderr?.destroy();
-      resolve(code);
-    };
-    const maybeFinalize = () => {
-      if (exited && !settled && stdoutEnded && stderrEnded) finalize(exitCode);
-    };
-    child.stdout?.on('end', () => {
-      stdoutEnded = true;
-      maybeFinalize();
-    });
-    child.stderr?.on('end', () => {
-      stderrEnded = true;
-      maybeFinalize();
-    });
-    child.on('exit', code => {
-      exited = true;
-      exitCode = code;
-      maybeFinalize();
-      if (!settled) timer = setTimeout(() => finalize(code), STDIO_GRACE_MS);
-    });
-    child.on('close', code => finalize(code));
-    child.on('error', err => {
-      if (!settled) {
-        settled = true;
-        reject(err);
-      }
-    });
+      rejectPromise(err);
+    }
+  };
+
+  child.stdout?.on('end', onStdoutEnd);
+  child.stderr?.on('end', onStderrEnd);
+  child.on('exit', onExit);
+  child.on('close', onClose);
+  child.on('error', onError);
+
+  const promise = new Promise<number | null>((resolve, reject) => {
+    resolvePromise = resolve;
+    rejectPromise = reject;
   });
+
+  const disarm = () => {
+    if (settled) return;
+    settled = true; // neuters every pending callback (grace timer, end/close)
+    if (timer) clearTimeout(timer);
+    child.stdout?.off('end', onStdoutEnd);
+    child.stderr?.off('end', onStderrEnd);
+    child.off('exit', onExit);
+    child.off('close', onClose);
+    child.off('error', onError);
+    // Keep an inert error listener so a post-handoff child 'error' can never
+    // crash the process in the gap before the adopter attaches its own.
+    child.on('error', () => {});
+  };
+  return { promise, disarm };
 }
 
 /** Keep the last `maxLines` lines, then cap to the last `maxBytes` bytes. Trailing-newline aware. */
@@ -276,11 +336,50 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
     let timedOut = false;
     let aborted = false;
 
+    // Spill state: once in-memory output exceeds maxBytes the complete content
+    // lives in the spill file and `full` becomes the tail. The fd is held open
+    // across chunks (writeSync per chunk instead of appendFileSync's
+    // open+write+close) and closed at finish/handoff; growth is hard-capped at
+    // BASH_SPILL_MAX_BYTES with a drop marker (see SPILL_CAP_MARKER).
+    let spillFd: number | undefined;
+    let spillBytes = 0;
+    let spillCapped = false;
+
+    const writeSpill = (text: string): void => {
+      if (!fullOutputPath) return;
+      try {
+        if (spillFd === undefined) spillFd = openSync(fullOutputPath, 'a');
+        const buf = Buffer.from(text, 'utf8');
+        writeSync(spillFd, buf, 0, buf.length);
+        spillBytes += buf.length;
+      } catch {
+        // Best-effort persistence: keep collecting the in-memory tail even if
+        // the disk write fails (previously this throw escaped the data handler).
+      }
+    };
+    const closeSpill = (): void => {
+      if (spillFd === undefined) return;
+      try {
+        closeSync(spillFd);
+      } catch {
+        /* already closed */
+      }
+      spillFd = undefined;
+    };
+
     const appendOutput = (text: string) => {
       if (fullOutputPath) {
-        appendFileSync(fullOutputPath, text, 'utf8');
+        if (!spillCapped) {
+          if (spillBytes + Buffer.byteLength(text, 'utf8') > BASH_SPILL_MAX_BYTES) {
+            spillCapped = true;
+            writeSpill(SPILL_CAP_MARKER);
+          } else {
+            writeSpill(text);
+          }
+        }
       } else if (Buffer.byteLength(full + text, 'utf8') > maxBytes) {
         fullOutputPath = persistBashFullOutput(full + text);
+        spillBytes = Buffer.byteLength(full + text, 'utf8');
       }
       full += text;
       if (fullOutputPath) {
@@ -318,6 +417,7 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
     let handedOff = false;
     let finished = false;
     let handoffTimer: NodeJS.Timeout | undefined;
+    const childWait = waitForChild(child);
     const performHandoff = () => {
       if (handedOff || finished) return;
       handedOff = true;
@@ -327,6 +427,13 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
       if (handoffTimer) clearTimeout(handoffTimer);
       if (signal) signal.removeEventListener('abort', onAbort);
       opts.backgroundSignal?.removeEventListener('abort', performHandoff);
+      // Full stdio ownership transfers to the adopter: disarm waitForChild so
+      // its exit+grace finalize can never destroy stdout/stderr out from under
+      // the adopter while it is still draining the pipes (P1-4).
+      childWait.disarm();
+      // The spill file is sealed here — never written again after handoff —
+      // which is what allows the adopter to rename it instead of copying.
+      closeSpill();
       const { display, truncated } = truncateTail(full, maxLines, maxBytes);
       resolve({
         exitCode: null,
@@ -338,11 +445,18 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
         durationMs: Date.now() - startedAt,
         stderrOutput: stderrChunks.join(''),
         ...(fullOutputPath ? { fullOutputPath } : {}),
+        ...(spillCapped ? { fullOutputCapped: true } : {}),
         handoff: {
           child,
           detach: () => {
             child.stdout?.off('data', onData);
             child.stderr?.off('data', onStderrData);
+            // Removing the last 'data' listener does NOT pause a flowing
+            // stream — it keeps reading and silently discards output until
+            // the adopter attaches. Pause explicitly so every byte survives
+            // the ownership transfer (P1-4).
+            child.stdout?.pause();
+            child.stderr?.pause();
           },
         },
       });
@@ -359,6 +473,7 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
       opts.backgroundSignal?.removeEventListener('abort', performHandoff);
       if (handedOff) return; // already resolved with a handoff; adopter owns the child
       finished = true;
+      closeSpill();
       const { display, truncated } = truncateTail(full, maxLines, maxBytes);
       resolve({
         exitCode,
@@ -370,14 +485,13 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
         durationMs: Date.now() - startedAt,
         stderrOutput: stderrChunks.join(''),
         ...(fullOutputPath ? { fullOutputPath } : {}),
+        ...(spillCapped ? { fullOutputCapped: true } : {}),
       });
     };
 
-    waitForChild(child)
-      .then(finish)
-      .catch(err => {
-        full += (full ? '\n' : '') + (err instanceof Error ? err.message : String(err));
-        finish(null);
-      });
+    childWait.promise.then(finish).catch(err => {
+      full += (full ? '\n' : '') + (err instanceof Error ? err.message : String(err));
+      finish(null);
+    });
   });
 }

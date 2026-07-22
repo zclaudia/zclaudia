@@ -733,4 +733,57 @@ describe('afterToolCall — tool failure loop guard', () => {
       expect(last.details.error).toBe('edit_loop_detected');
     }
   });
+
+  it('P1-9: a tool that THROWS repeatedly trips the loop guard via ctx.isError', async () => {
+    const hooks = makeHooks();
+    // How pi-agent-core delivers a thrown tool error: error text content,
+    // details:{} and isError:true in the ctx — details.ok is never false, so
+    // pre-fix this never counted as a failure at all.
+    const throwingCtx = () => ({
+      toolCall: { name: 'ThirdPartyTool' },
+      args: { query: 'same-input' },
+      result: {
+        content: [{ type: 'text', text: 'boom: third-party exploded' }],
+        details: {},
+      },
+      isError: true,
+    });
+
+    const first = await hooks.afterToolCall!(throwingCtx() as any);
+    expect((first?.content ?? []).map((b: any) => b.text ?? '').join('\n')).not.toContain(
+      '[loop]'
+    );
+    await hooks.afterToolCall!(throwingCtx() as any);
+    const third = await hooks.afterToolCall!(throwingCtx() as any);
+
+    const text = (third?.content ?? []).map((b: any) => b.text ?? '').join('\n');
+    expect(text).toContain('[loop]');
+    expect(third?.details?.error).toBe('tool_loop_detected');
+    expect(third?.details?.loopAttempts).toBe(3);
+    expect(third?.details?.loopKind).toBe('generic');
+  });
+
+  it('P1-9: thrown failures use the generic signature — different inputs do not accumulate', async () => {
+    const hooks = makeHooks();
+    // Grep's generic signature embeds the normalized pattern, so distinct
+    // patterns throw independently of one another even with isError delivery.
+    const throwingCtx = (pattern: string) => ({
+      toolCall: { name: 'Grep' },
+      args: { pattern, path: 'src' },
+      result: { content: [{ type: 'text', text: 'boom' }], details: {} },
+      isError: true,
+    });
+
+    await hooks.afterToolCall!(throwingCtx('alpha') as any);
+    await hooks.afterToolCall!(throwingCtx('beta') as any);
+    const third = await hooks.afterToolCall!(throwingCtx('gamma') as any);
+    const text = (third?.content ?? []).map((b: any) => b.text ?? '').join('\n');
+    expect(text).not.toContain('[loop]');
+
+    await hooks.afterToolCall!(throwingCtx('alpha') as any);
+    const thirdAlpha = await hooks.afterToolCall!(throwingCtx('alpha') as any);
+    const textAlpha = (thirdAlpha?.content ?? []).map((b: any) => b.text ?? '').join('\n');
+    expect(textAlpha).toContain('[loop]');
+    expect(thirdAlpha?.details?.error).toBe('tool_loop_detected');
+  });
 });

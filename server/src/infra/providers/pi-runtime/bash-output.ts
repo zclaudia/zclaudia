@@ -26,6 +26,8 @@ export interface FormatBashResultInput {
   sandboxed: boolean;
   status?: 'queued' | 'running' | 'success' | 'failed' | 'stopped' | 'aborted' | 'timed out';
   fullOutputPath?: string;
+  /** Spill file hit its size cap: it holds head + drop marker, not the full stream. */
+  fullOutputCapped?: boolean;
   aborted?: boolean;
 }
 
@@ -192,6 +194,11 @@ export function formatBashResultText(
 
   if (input.truncated && input.fullOutputPath) {
     lines.push(`Output truncated (showing tail). Full output: ${input.fullOutputPath}`);
+    if (input.fullOutputCapped) {
+      lines.push(
+        'Full-output file hit its size cap; output past the cap marker was dropped from the file. The tail below still reflects the end of the stream.'
+      );
+    }
   }
   if (input.timedOut) lines.push('Timed out: true');
 

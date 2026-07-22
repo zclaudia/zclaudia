@@ -126,6 +126,9 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
         cwd: request.cwd,
         sessionId: resolvedContext.contextId,
         argOverrides,
+        // P1-10: forward the caller's abort signal so shouldStopAfterTurn's
+        // abort check is live and hook processes die with the run.
+        abortSignal: request.abortSignal,
       });
 
       const renderedInput = renderInput(currentInput, resolvedContext.loadedEvents);

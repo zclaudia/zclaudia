@@ -150,8 +150,6 @@ export function createReadFileStateStore(): ReadFileStateStore {
 
       if (normalizeContent(currentContent) === entry.content) return { ok: true };
 
-      await stat(filePath);
-
       return {
         ok: false,
         code: 'file_modified_since_read',

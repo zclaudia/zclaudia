@@ -72,6 +72,65 @@ describe('runBash auto-background handoff', () => {
       if (res.handoff?.child.pid) killProcessTree(res.handoff.child.pid);
     }
   });
+
+  it('handoff keeps stdio open for output a detached descendant writes after the main child exits (P1-4)', async () => {
+    // The main shell lives past the handoff threshold, then backgrounds a
+    // subshell (which inherits the stdout pipe) and exits. The descendant
+    // writes 500ms later — long after the old waitForChild finalize would
+    // have destroyed the streams at main-exit + STDIO_GRACE_MS (100ms),
+    // silently discarding the descendant's output before the adopter saw it.
+    const res = await runBash({
+      command: 'sleep 0.3; ( sleep 0.5; echo DESCENDANT_LATE ) & exit 0',
+      cwd: tmpdir(),
+      timeoutSec: 30,
+      autoBackgroundMs: 200,
+    });
+    expect(res.handoff).toBeDefined();
+    const { child, detach } = res.handoff!;
+    detach();
+    let received = '';
+    child.stdout!.on('data', (c: Buffer) => {
+      received += c.toString('utf8');
+    });
+    try {
+      const deadline = Date.now() + 5000;
+      while (!received.includes('DESCENDANT_LATE') && Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, 50));
+      }
+      expect(received).toContain('DESCENDANT_LATE');
+    } finally {
+      if (child.pid) killProcessTree(child.pid);
+    }
+  });
+
+  it('handoff keeps the spill fd sealed: pre-handoff spill stays readable for the adopter', async () => {
+    // Output spills (>1KB with the small maxBytes) before the handoff; the
+    // adopter path relies on the file being complete and closed at handoff.
+    const dataDir = mkdtempSync(path.join(tmpdir(), 'zc-handoff-spill-'));
+    const prev = process.env.ZCLAUDIA_DATA_DIR;
+    process.env.ZCLAUDIA_DATA_DIR = dataDir;
+    try {
+      const res = await runBash({
+        command: 'python3 -c "print(\'x\' * 5000)"; sleep 5',
+        cwd: tmpdir(),
+        timeoutSec: 30,
+        maxBytes: 1024,
+        autoBackgroundMs: 300,
+      });
+      try {
+        expect(res.handoff).toBeDefined();
+        expect(res.fullOutputPath).toBeDefined();
+        const spilled = readFileSync(res.fullOutputPath!, 'utf8');
+        expect(spilled.length).toBeGreaterThan(4900);
+      } finally {
+        if (res.handoff?.child.pid) killProcessTree(res.handoff.child.pid);
+      }
+    } finally {
+      if (prev === undefined) delete process.env.ZCLAUDIA_DATA_DIR;
+      else process.env.ZCLAUDIA_DATA_DIR = prev;
+      rmSync(dataDir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('Bash auto-background (tool integration)', () => {
@@ -148,6 +207,38 @@ describe('Bash auto-background (tool integration)', () => {
     expect(log).toContain('EARLY_END');
     expect(log).toContain('LATE_MARKER');
     expect(log.length).toBeGreaterThan(70_000);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('adopted task log includes a large tail emitted right at handoff when the child exits immediately (P1-4)', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-autobg-'));
+    const script = [
+      'const fs = require("fs");',
+      'setTimeout(() => {',
+      '  fs.writeSync(1, Buffer.alloc(61440, 84));', // "T" * 60KB, fits the pipe
+      '  fs.writeSync(1, Buffer.from("TAIL_BURST_END"));',
+      '  process.exit(0);',
+      '}, 400);',
+    ].join('');
+    const res = await bashTool(dir, { db, bashAutoBackgroundMs: 200 }).execute('ab-tail', {
+      command: `${JSON.stringify(process.execPath)} -e ${JSON.stringify(script)}`,
+    });
+
+    expect(res.details.background).toBe(true);
+    const repo = new TaskRepository(db);
+    const taskId = res.details.taskId as string;
+    const completed = await waitUntil(() => repo.findById(taskId)?.status === 'completed');
+    expect(completed).toBe(true);
+    const logReady = await waitUntil(() => {
+      try {
+        return readFileSync(commandTaskLogPath(taskId), 'utf8').includes('TAIL_BURST_END');
+      } catch {
+        return false;
+      }
+    });
+    expect(logReady).toBe(true);
+    const log = readFileSync(commandTaskLogPath(taskId), 'utf8');
+    expect(log.length).toBeGreaterThanOrEqual(61440);
     rmSync(dir, { recursive: true, force: true });
   });
 

@@ -113,5 +113,16 @@ export function readTaskLogWindow(
     windowParams.tailLines !== undefined
       ? size > Buffer.byteLength(output, 'utf8')
       : size - requestedOffset > Buffer.byteLength(output, 'utf8');
-  return { ok: true, output, size, nextOffset: size, eof, truncated };
+  // P1-6: for offset (non-tail) reads, nextOffset must point just past the
+  // bytes actually returned. The TaskOutput schema tells the model to page by
+  // re-reading from "the previous nextOffset"; when a log window is capped at
+  // capBytes, reporting nextOffset = size would silently skip the middle of
+  // the log. Tail mode keeps nextOffset = size: a tail read is terminal by
+  // definition (eof is always true), so a follow-up offset read should resume
+  // at end-of-log.
+  const nextOffset =
+    windowParams.tailLines !== undefined
+      ? size
+      : Math.min(requestedOffset, size) + Buffer.byteLength(output, 'utf8');
+  return { ok: true, output, size, nextOffset, eof, truncated };
 }

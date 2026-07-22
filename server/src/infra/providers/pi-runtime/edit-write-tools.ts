@@ -1040,12 +1040,37 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
               continue;
             }
             const editTool = createEditBridgeTool(cwd, options);
-            const result = await editTool.execute(`${toolCallId}:update:${operation.path}`, {
-              file_path: operation.path,
-              old_string: operation.oldText,
-              new_string: operation.newText,
-              ...(previewOnly ? { preview_only: true } : {}),
-            });
+            const runUpdate = (oldText: string, newText: string, attempt: string) =>
+              editTool.execute(`${toolCallId}:update:${operation.path}${attempt}`, {
+                file_path: operation.path,
+                old_string: oldText,
+                new_string: newText,
+                ...(previewOnly ? { preview_only: true } : {}),
+              });
+            let result = await runUpdate(operation.oldText, operation.newText, '');
+            {
+              const failed = resultDetails(result);
+              // The parser always emits newline-terminated oldText/newText, so
+              // a hunk anchored at EOF of a file without a trailing newline can
+              // never match. Retry with the trailing newline dropped — only
+              // when the target file itself ends without one, so mid-file
+              // matches are unaffected.
+              if (failed.ok === false && failed.error === 'not_found') {
+                try {
+                  const targetPath = resolveInsideWorkspace(cwd, operation.path);
+                  const targetMetadata = await readTextFileWithMetadata(targetPath);
+                  if (!targetMetadata.content.endsWith('\n')) {
+                    result = await runUpdate(
+                      operation.oldText.replace(/\n$/, ''),
+                      operation.newText.replace(/\n$/, ''),
+                      ':no-trailing-newline'
+                    );
+                  }
+                } catch {
+                  // Target unreadable or missing — keep the original failure.
+                }
+              }
+            }
             const details = resultDetails(result);
             if (details.ok === false) {
               if (perFileResults.length === 0) return result;

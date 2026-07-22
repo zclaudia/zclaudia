@@ -9,6 +9,9 @@ import * as path from 'path';
 import { toolRegistry } from '../../../application/plugins/index.js';
 import { MemoryStore } from '../memory/memory-store.js';
 import { isBlockedHostname } from './network-guard.js';
+import { readResponseBodyWithBudget } from './stream-read.js';
+import { scrubEnv } from '../../../infra/providers/pi-runtime/env-scrub.js';
+import { wrapCommand } from '../../../infra/providers/pi-runtime/sandbox.js';
 import type Database from 'better-sqlite3';
 import type { ProcessSupervisor } from '../../../infra/services/process-supervisor.js';
 
@@ -28,13 +31,13 @@ function resolveProjectCwd(db: Database.Database, sessionId?: string): string | 
   return row?.cwd ?? null;
 }
 
-/** Find the nearest existing ancestor path for a given path */
+/** Find the nearest existing ancestor path for a given path (lstat: does NOT follow symlinks) */
 async function findExistingAncestor(filePath: string): Promise<string> {
-  const { stat } = await import('fs/promises');
+  const { lstat } = await import('fs/promises');
   let current = filePath;
   while (true) {
     try {
-      await stat(current);
+      await lstat(current);
       return current;
     } catch {
       const parent = path.dirname(current);
@@ -50,7 +53,13 @@ async function isRealPathWithinBase(realPath: string, realBase: string): Promise
 }
 
 /** Resolve and validate a file path against the project directory.
- *  Also checks the real path (after symlink resolution) to prevent symlink traversal. */
+ *  Also checks the real path (after symlink resolution) to prevent symlink traversal.
+ *
+ *  P1-14: the final path is lstat'd and rejected outright if it is a symlink
+ *  (policy: no symlinks, aligned with memory-provider). The previous
+ *  stat-based ancestor check followed symlinks, so a DANGLING symlink inside
+ *  the project pointing outside failed stat, fell back to the (inside) parent,
+ *  and fs.writeFile then followed the link and wrote the external target. */
 async function safePath(filePath: string, baseDir: string): Promise<string | null> {
   const resolved = path.resolve(baseDir, filePath);
   const resolvedBase = path.resolve(baseDir);
@@ -61,7 +70,14 @@ async function safePath(filePath: string, baseDir: string): Promise<string | nul
   }
 
   try {
-    const { realpath } = await import('fs/promises');
+    const { realpath, lstat } = await import('fs/promises');
+    // Reject any symlink at the final path (dangling or not), before any
+    // read/write/list operation can follow it.
+    const finalEntry = await lstat(resolved).catch(() => null);
+    if (finalEntry?.isSymbolicLink()) {
+      return null;
+    }
+
     const realBase = await realpath(resolvedBase);
     const existingPath = await findExistingAncestor(resolved);
     const realExistingPath = await realpath(existingPath);
@@ -78,6 +94,118 @@ async function safePath(filePath: string, baseDir: string): Promise<string | nul
 
 const MAX_CONCURRENT_SHELLS = 5;
 let activeShells = 0;
+
+// Shell hardening knobs (P1-16). Timeout/kill-grace are env-overridable
+// primarily so tests can exercise the SIGTERM→SIGKILL escalation quickly.
+const SHELL_DEFAULT_TIMEOUT_MS = 30_000;
+const SHELL_DEFAULT_KILL_GRACE_MS = 3_000;
+const SHELL_STDOUT_HEAD_CHARS = 8 * 1024;
+const SHELL_STDOUT_TAIL_CHARS = 8 * 1024;
+const SHELL_STDERR_HEAD_CHARS = 2 * 1024;
+const SHELL_STDERR_TAIL_CHARS = 2 * 1024;
+
+function shellTimeoutMs(): number {
+  const parsed = Number(process.env.ZCLAUDIA_AGENT_SHELL_TIMEOUT_MS);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : SHELL_DEFAULT_TIMEOUT_MS;
+}
+
+function shellKillGraceMs(): number {
+  const parsed = Number(process.env.ZCLAUDIA_AGENT_SHELL_KILL_GRACE_MS);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : SHELL_DEFAULT_KILL_GRACE_MS;
+}
+
+const sleep = (ms: number): Promise<null> =>
+  new Promise(resolve => setTimeout(() => resolve(null), ms));
+
+/**
+ * Bounded stdout/stderr accumulator (P1-16): keeps the first `headChars` and
+ * last `tailChars` characters (head+tail, consistent with the bash-runner
+ * budget) so runaway output never accumulates in memory.
+ */
+function createStreamCollector(headChars: number, tailChars: number) {
+  let head = '';
+  let tail = '';
+  let totalChars = 0;
+  return {
+    append(chunk: Buffer | string): void {
+      let text = chunk.toString();
+      totalChars += text.length;
+      if (head.length < headChars) {
+        const take = headChars - head.length;
+        head += text.slice(0, take);
+        text = text.slice(take);
+        if (!text) return;
+      }
+      tail = (tail + text).slice(-tailChars);
+    },
+    result(): { text: string; truncated: boolean } {
+      const keptChars = head.length + tail.length;
+      if (totalChars <= keptChars) {
+        return { text: head + tail, truncated: false };
+      }
+      const omitted = totalChars - keptChars;
+      return {
+        text: `${head}\n... [${omitted} chars omitted] ...\n${tail}`,
+        truncated: true,
+      };
+    },
+  };
+}
+
+interface ShellExit {
+  code: number | null;
+  signal: string | null;
+}
+
+const SHELL_STDIO_GRACE_MS = 100;
+
+/**
+ * Resolve when a stream ends (i.e. the child closed its side of the pipe).
+ * Used to avoid losing trailing output when the `exit` event fires before the
+ * last stdout/stderr chunks have been delivered (same race bash-runner
+ * handles with its STDIO grace).
+ */
+function streamEnded(stream: NodeJS.ReadableStream): Promise<void> {
+  return new Promise(resolve => {
+    if ((stream as { readableEnded?: boolean }).readableEnded) {
+      resolve();
+      return;
+    }
+    stream.once('end', () => resolve());
+  });
+}
+
+/**
+ * Await process exit with a hard timeout (P1-16): on timeout send SIGTERM,
+ * then escalate to SIGKILL after a grace period if the process ignores it.
+ * The losing branch of each Promise.race gets a no-op catch so a late
+ * rejection can never surface as an unhandled rejection.
+ */
+async function awaitShellExit(
+  exitPromise: Promise<ShellExit>,
+  kill: (signal: NodeJS.Signals) => void,
+  timeoutMs: number,
+  graceMs: number
+): Promise<ShellExit & { timedOut: boolean }> {
+  exitPromise.catch(() => {
+    /* handled via the races below; prevents unhandled rejection on the losing branch */
+  });
+  const timeoutResult = await Promise.race([exitPromise, sleep(timeoutMs)]);
+  if (timeoutResult) {
+    return { ...timeoutResult, timedOut: false };
+  }
+  kill('SIGTERM');
+  const graceResult = await Promise.race([exitPromise, sleep(graceMs)]);
+  if (graceResult) {
+    return { ...graceResult, timedOut: true };
+  }
+  kill('SIGKILL');
+  const finalResult = await Promise.race([exitPromise, sleep(graceMs)]);
+  if (finalResult) {
+    return { ...finalResult, timedOut: true };
+  }
+  return { code: null, signal: 'SIGKILL', timedOut: true };
+}
 
 export function registerAgentTools(config: {
   getDb: () => Database.Database;
@@ -117,70 +245,94 @@ export function registerAgentTools(config: {
         });
       }
 
+      const command = args.command as string;
       const processSupervisor = config.getProcessSupervisor?.();
       activeShells++;
       try {
+        // P1-16: route through the shared sandbox wrapper (same one as the
+        // pi-runtime Bash tool). When sandboxing is available, the wrapped
+        // argv replaces the raw `/bin/sh -c`; otherwise fall back to a
+        // secret-scrubbed environment.
+        const wrap = await wrapCommand(command, { workspaceRoot: cwd });
+        const spawnSpec =
+          wrap.sandboxed && wrap.argv && wrap.argv.length > 0
+            ? { command: wrap.argv[0], args: wrap.argv.slice(1), env: wrap.env }
+            : { command: '/bin/sh', args: ['-c', command], env: scrubEnv(process.env) };
+
+        const stdout = createStreamCollector(SHELL_STDOUT_HEAD_CHARS, SHELL_STDOUT_TAIL_CHARS);
+        const stderr = createStreamCollector(SHELL_STDERR_HEAD_CHARS, SHELL_STDERR_TAIL_CHARS);
+
+        let kill: (signal: NodeJS.Signals) => void;
+        let exitPromise: Promise<ShellExit>;
+
         const shellResult = processSupervisor
           ? await processSupervisor.trackCommand({
-              command: '/bin/sh',
-              args: ['-c', args.command as string],
+              command: spawnSpec.command,
+              args: spawnSpec.args,
               cwd,
+              env: spawnSpec.env as Record<string, string | undefined>,
               owner: {
                 sessionId: context?.sessionId as string | undefined,
               },
             })
           : null;
 
-        if (!shellResult?.handle.stdout || !shellResult.handle.stderr) {
-          const { execFile } = await import('child_process');
-          const { promisify } = await import('util');
-          const execFileAsync = promisify(execFile);
-          const { stdout, stderr } = await execFileAsync(
-            '/bin/sh',
-            ['-c', args.command as string],
-            {
-              cwd,
-              timeout: 30000,
-              maxBuffer: 1024 * 1024,
+        if (shellResult?.handle.stdout && shellResult.handle.stderr) {
+          shellResult.handle.stdout.on('data', (chunk: Buffer | string) => stdout.append(chunk));
+          shellResult.handle.stderr.on('data', (chunk: Buffer | string) => stderr.append(chunk));
+          kill = signal => shellResult.handle.kill(signal);
+          // The supervisor's exitPromise resolves on `exit`, which can fire
+          // before the final output chunks arrive; give the streams a short
+          // grace to flush before reporting.
+          const stdoutDone = streamEnded(shellResult.handle.stdout);
+          const stderrDone = streamEnded(shellResult.handle.stderr);
+          exitPromise = shellResult.handle.exitPromise.then(async exit => {
+            await Promise.race([
+              Promise.all([stdoutDone, stderrDone]),
+              sleep(SHELL_STDIO_GRACE_MS),
+            ]);
+            return exit;
+          });
+        } else {
+          const { spawn } = await import('child_process');
+          const child = spawn(spawnSpec.command, spawnSpec.args, {
+            cwd,
+            env: spawnSpec.env,
+            stdio: ['ignore', 'pipe', 'pipe'],
+          });
+          child.stdout?.on('data', (chunk: Buffer) => stdout.append(chunk));
+          child.stderr?.on('data', (chunk: Buffer) => stderr.append(chunk));
+          kill = signal => {
+            try {
+              child.kill(signal);
+            } catch {
+              /* already exited */
             }
-          );
-          return JSON.stringify({
-            stdout: stdout.slice(0, 4000),
-            stderr: stderr.slice(0, 1000),
-            exitCode: 0,
+          };
+          exitPromise = new Promise<ShellExit>(resolve => {
+            child.once('error', () => resolve({ code: null, signal: null }));
+            // `close` fires after stdio streams are closed, so trailing output
+            // is already flushed into the collectors.
+            child.once('close', (code, signal) => resolve({ code, signal }));
           });
         }
 
-        let stdout = '';
-        let stderr = '';
-        shellResult.handle.stdout.on('data', (chunk: Buffer | string) => {
-          stdout += chunk.toString();
-        });
-        shellResult.handle.stderr.on('data', (chunk: Buffer | string) => {
-          stderr += chunk.toString();
-        });
-
-        const timeoutPromise = new Promise<{ code: number | null; signal: string | null }>(
-          resolve => {
-            setTimeout(() => resolve({ code: 124, signal: 'SIGTERM' }), 30000);
-          }
+        const outcome = await awaitShellExit(
+          exitPromise,
+          kill,
+          shellTimeoutMs(),
+          shellKillGraceMs()
         );
-        const result = await Promise.race([shellResult.handle.exitPromise, timeoutPromise]);
-        const exitCode = result.code ?? 1;
-        if (exitCode === 124) {
-          shellResult.handle.kill('SIGTERM');
-        }
-        if (exitCode !== 0) {
-          return JSON.stringify({
-            stdout: stdout.slice(0, 4000),
-            stderr: (stderr || 'Command exited with non-zero status').slice(0, 1000),
-            exitCode,
-          });
-        }
+        const stdoutResult = stdout.result();
+        const stderrResult = stderr.result();
+        const exitCode = outcome.timedOut ? 124 : (outcome.code ?? 1);
         return JSON.stringify({
-          stdout: stdout.slice(0, 4000),
-          stderr: stderr.slice(0, 1000),
-          exitCode: 0,
+          stdout: stdoutResult.text,
+          stderr:
+            stderrResult.text || (exitCode !== 0 ? 'Command exited with non-zero status' : ''),
+          exitCode,
+          ...(outcome.timedOut && { timedOut: true }),
+          ...((stdoutResult.truncated || stderrResult.truncated) && { truncated: true }),
         });
       } catch (err: unknown) {
         const execErr = err as {
@@ -246,13 +398,48 @@ export function registerAgentTools(config: {
       try {
         switch (args.operation) {
           case 'read': {
-            const content = await fs.readFile(filePath, 'utf-8');
-            return JSON.stringify({ content, path: path.relative(projectCwd, filePath) });
+            // P1-16: cap reads — never stringify an unbounded file into the
+            // result. Read at most MAX_READ_BYTES + 1 and report truncation.
+            const MAX_READ_BYTES = 64 * 1024;
+            const fileStat = await fs.stat(filePath);
+            const handle = await fs.open(filePath, 'r');
+            try {
+              const buffer = Buffer.alloc(MAX_READ_BYTES + 1);
+              const { bytesRead } = await handle.read(buffer, 0, MAX_READ_BYTES + 1, 0);
+              const truncated = fileStat.size > MAX_READ_BYTES;
+              const content = buffer
+                .subarray(0, Math.min(bytesRead, MAX_READ_BYTES))
+                .toString('utf-8');
+              return JSON.stringify({
+                content,
+                path: path.relative(projectCwd, filePath),
+                ...(truncated && {
+                  truncated: true,
+                  totalBytes: fileStat.size,
+                  message: `Content truncated to ${MAX_READ_BYTES} of ${fileStat.size} bytes`,
+                }),
+              });
+            } finally {
+              await handle.close();
+            }
           }
-          case 'write':
+          case 'write': {
+            // P1-16: reject unbounded write payloads.
+            const MAX_WRITE_BYTES = 1024 * 1024;
+            const content = args.content as string | undefined;
+            if (typeof content !== 'string') {
+              return JSON.stringify({ error: 'content is required for write' });
+            }
+            const sizeBytes = Buffer.byteLength(content, 'utf8');
+            if (sizeBytes > MAX_WRITE_BYTES) {
+              return JSON.stringify({
+                error: `Content exceeds the ${MAX_WRITE_BYTES}-byte write limit (${sizeBytes} bytes)`,
+              });
+            }
             await fs.mkdir(path.dirname(filePath), { recursive: true });
-            await fs.writeFile(filePath, args.content as string, 'utf-8');
+            await fs.writeFile(filePath, content, 'utf-8');
             return JSON.stringify({ success: true, path: path.relative(projectCwd, filePath) });
+          }
           case 'list': {
             const entries = await fs.readdir(filePath, { withFileTypes: true });
             return JSON.stringify(
@@ -302,14 +489,24 @@ export function registerAgentTools(config: {
     },
     handler: async args => {
       const urlStr = args.url as string;
+      const MAX_RESPONSE_BYTES = 16 * 1024; // 16 KB
+      // P1-16: overall request timeout (previously the AbortController only
+      // tripped on the byte cap, so a stalled server hung the tool forever).
+      // Env-overridable so tests can exercise the timeout quickly.
+      const parsedTimeout = Number(process.env.ZCLAUDIA_AGENT_HTTP_TIMEOUT_MS);
+      const timeoutMs = Number.isFinite(parsedTimeout) && parsedTimeout > 0 ? parsedTimeout : 30_000;
+      const controller = new AbortController();
+      let timedOut = false;
+      const timeout = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+      }, timeoutMs);
       try {
         const parsed = new URL(urlStr);
         if (await isBlockedHostname(parsed.hostname)) {
           return JSON.stringify({ error: 'Requests to private/internal addresses are blocked' });
         }
 
-        const MAX_RESPONSE_BYTES = 16 * 1024; // 16 KB
-        const controller = new AbortController();
         const response = await fetch(urlStr, {
           method: (args.method as string) || 'GET',
           headers: (args.headers as Record<string, string>) || {},
@@ -319,28 +516,11 @@ export function registerAgentTools(config: {
         });
 
         // Stream-read up to MAX_RESPONSE_BYTES to avoid OOM on large responses
-        const reader = response.body?.getReader();
-        let truncated = false;
-        let bodyText = '';
-        if (reader) {
-          const decoder = new TextDecoder();
-          let bytesRead = 0;
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            bytesRead += value.byteLength;
-            if (bytesRead > MAX_RESPONSE_BYTES) {
-              bodyText += decoder.decode(
-                value.slice(0, MAX_RESPONSE_BYTES - (bytesRead - value.byteLength)),
-                { stream: false }
-              );
-              truncated = true;
-              controller.abort();
-              break;
-            }
-            bodyText += decoder.decode(value, { stream: true });
-          }
-        }
+        const { text: bodyText, truncated } = await readResponseBodyWithBudget(
+          response,
+          MAX_RESPONSE_BYTES,
+          () => controller.abort()
+        );
 
         return JSON.stringify({
           status: response.status,
@@ -349,7 +529,12 @@ export function registerAgentTools(config: {
           truncated,
         });
       } catch (err: unknown) {
+        if (timedOut) {
+          return JSON.stringify({ error: `Request timed out after ${timeoutMs}ms` });
+        }
         return JSON.stringify({ error: err instanceof Error ? err.message : String(err) });
+      } finally {
+        clearTimeout(timeout);
       }
     },
   });

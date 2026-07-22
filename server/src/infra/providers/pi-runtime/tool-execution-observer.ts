@@ -61,12 +61,23 @@ export function withToolExecutionObserver(
       const result = await originalExecute(toolCallId, params, signal, onUpdate);
       if (observer?.afterToolExecute) {
         const eventParams = toolParams(toolCallId, params);
-        await observer.afterToolExecute({
-          toolName: name,
-          cwd,
-          params: eventParams,
-          touchedPaths: extractTouchedPaths(name, eventParams),
-        });
+        // P1-8: an observer must never corrupt a run. If the callback rejects
+        // AFTER the tool already succeeded, pi-agent-core converts the
+        // rejection into an error tool result that REPLACES the real result.
+        // Observability is strictly best-effort — swallow and log.
+        // (There is no beforeToolExecute observer path in this module; the
+        // only pre-execution hooks are agent-hooks beforeToolCall, where a
+        // permission/user-hook denial blocking execution is intended.)
+        try {
+          await observer.afterToolExecute({
+            toolName: name,
+            cwd,
+            params: eventParams,
+            touchedPaths: extractTouchedPaths(name, eventParams),
+          });
+        } catch (err) {
+          console.warn(`[tool-observer] afterToolExecute failed for ${name}:`, err);
+        }
       }
       return result;
     },

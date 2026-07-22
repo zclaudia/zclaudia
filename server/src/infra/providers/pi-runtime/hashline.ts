@@ -47,11 +47,14 @@ export function formatHashlineOutput(
 }
 
 function splitLines(content: string): { lines: string[]; hasTrailingNewline: boolean } {
-  const hasTrailingNewline = content.endsWith('\n');
-  return {
-    lines: (hasTrailingNewline ? content.slice(0, -1) : content).split('\n'),
-    hasTrailingNewline,
-  };
+  // Split exactly like the Read side does (read-tool.ts: text.split(/\r?\n/)
+  // plus dropping the empty tail): a "\r" that is part of "\r\n" is line
+  // ending, not content. Splitting on '\n' alone would leave a trailing '\r'
+  // on every line of a CRLF file, and no read-side anchor would ever match.
+  const lines = content.split(/\r?\n/);
+  const hasTrailingNewline = lines.length > 1 && lines[lines.length - 1] === '';
+  if (hasTrailingNewline) lines.pop();
+  return { lines, hasTrailingNewline };
 }
 
 /** Lines of surrounding context compared on each side when disambiguating. */
@@ -89,7 +92,8 @@ export function resolveHashlineTargetIndex(
   if (matches.length === 0) return -1;
   if (matches.length === 1 || !snapshot) return matches[0];
 
-  const snapshotLines = splitLines(snapshot.replace(/\r\n/g, '\n')).lines;
+  // splitLines already strips CRLF, so the snapshot needs no pre-normalizing.
+  const snapshotLines = splitLines(snapshot).lines;
   const anchor = snapshotLines.findIndex(line => hashlineForLine(line) === lineHash);
   if (anchor === -1) return matches[0];
 

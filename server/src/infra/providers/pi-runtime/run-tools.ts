@@ -124,6 +124,10 @@ export function buildPiRunToolBundle(input: {
     cwd: options.cwd,
     sessionId: options.claudiaSessionId,
     argOverrides,
+    // P1-10: wire the shared run abort controller into the hooks so
+    // shouldStopAfterTurn's abort check is live and Pre/PostToolUse hook
+    // processes are cancelled when the run aborts.
+    abortSignal: options.abortController?.signal,
   });
 
   return {

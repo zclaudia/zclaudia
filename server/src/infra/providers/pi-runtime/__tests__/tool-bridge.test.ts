@@ -22,6 +22,7 @@ import { getDeferredDiagnosticsResult } from '../write-lifecycle.js';
 import { filePathToUri, type LspTransport } from '../lsp-diagnostics-adapter.js';
 import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
 import { TaskRepository } from '../../../../domains/tasks/repository.js';
+import { TaskService } from '../../../../domains/tasks/task-service.js';
 import {
   CommandTaskExecutor,
   pidAlive,
@@ -101,6 +102,49 @@ describe('buildTools', () => {
       params: { path: 'sample.ts' },
       touchedPaths: ['sample.ts'],
     });
+  });
+
+  it('a throwing observer never corrupts a successful tool result (P1-8)', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-hook-throw-'));
+    tempDirs.push(root);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    // Rejecting (async) observer — pi would otherwise turn this rejection into
+    // an error tool result that REPLACES the real one.
+    const rejecting = vi.fn().mockRejectedValue(new Error('observer boom'));
+    const bash = buildTools(root, {
+      enabled: ['Bash'],
+      toolExecutionObserver: { afterToolExecute: rejecting },
+    })[0] as any;
+
+    const res = await bash.execute('bash-1', { command: 'printf ok' });
+
+    expect(res.details.ok).toBe(true);
+    expect(res.content[0].text).toContain('ok');
+    expect(rejecting).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledWith(
+      '[tool-observer] afterToolExecute failed for Bash:',
+      expect.any(Error)
+    );
+  });
+
+  it('a synchronously throwing observer never corrupts a successful tool result (P1-8)', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-hook-throwsync-'));
+    tempDirs.push(root);
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const throwing = vi.fn(() => {
+      throw new Error('observer sync boom');
+    });
+    const read = buildTools(root, {
+      enabled: ['Read'],
+      toolExecutionObserver: { afterToolExecute: throwing },
+    })[0] as any;
+    await writeFile(path.join(root, 'sample.ts'), 'const value = 1;\n');
+
+    const res = await read.execute('read-1', { path: 'sample.ts' });
+
+    expect(res.details.ok).toBe(true);
+    expect(res.content[0].text).toContain('const value = 1;');
+    expect(throwing).toHaveBeenCalledOnce();
   });
 
   it('returns core coding tools and first-batch agent tools by default', () => {
@@ -665,7 +709,7 @@ describe('buildTools', () => {
     db.close();
   });
 
-  it('Monitor starts and stops monitor tasks through the shared task lifecycle', async () => {
+  it('Monitor rejects start but still inspects/stops pre-existing monitor tasks (P1-7)', async () => {
     const db = new Database(':memory:');
     db.pragma('foreign_keys = ON');
     applyMigrations(db);
@@ -683,30 +727,53 @@ describe('buildTools', () => {
       target_task_id: 'task-agent-1',
       interval_ms: 30_000,
     });
-    const started = JSON.parse(startedResult.content[0].text);
-    const stoppedResult = await monitor.execute('monitor-2', {
+    // No monitor runtime exists, so start fails explicitly instead of minting
+    // a task that would stay 'running' forever.
+    expect(startedResult.details).toMatchObject({ ok: false, error: 'monitor_start_unsupported' });
+    expect(db.prepare(`SELECT COUNT(*) AS n FROM tasks`).get()).toEqual({ n: 0 });
+
+    // Legacy rows (created before start was disabled) remain inspectable and
+    // stoppable through the shared lifecycle.
+    const service = new TaskService(taskRepo);
+    const legacy = service.createTask({
+      type: 'monitor',
+      title: 'Watch tests',
+      parentSessionId: 'session-parent',
+      parentRunId: 'run-parent',
+      parentToolUseId: 'monitor-0',
+      metadata: { targetTaskId: 'task-agent-1', intervalMs: 30_000 },
+    });
+    service.startTask(legacy.id, {
+      executorRef: { providerType: 'task-monitor', taskId: legacy.id },
+    });
+
+    const statusResult = await monitor.execute('monitor-2', {
+      action: 'status',
+      task_id: legacy.id,
+    });
+    const status = JSON.parse(statusResult.content[0].text);
+    const stoppedResult = await monitor.execute('monitor-3', {
       action: 'stop',
-      task_id: started.taskId,
+      task_id: legacy.id,
       reason: 'No longer needed',
     });
     const stopped = JSON.parse(stoppedResult.content[0].text);
-    const task = taskRepo.findById(started.taskId);
+    const task = taskRepo.findById(legacy.id);
 
-    expect(started).toMatchObject({ ok: true, taskId: expect.any(String), status: 'running' });
-    expect(stopped).toMatchObject({ ok: true, taskId: started.taskId, status: 'stopped' });
+    expect(status).toMatchObject({ ok: true, task: { id: legacy.id, status: 'running' } });
+    expect(stopped).toMatchObject({ ok: true, taskId: legacy.id, status: 'stopped' });
     expect(task).toMatchObject({
       type: 'monitor',
       status: 'stopped',
       parentSessionId: 'session-parent',
       parentRunId: 'run-parent',
-      parentToolUseId: 'monitor-1',
       title: 'Watch tests',
       metadata: {
         targetTaskId: 'task-agent-1',
         intervalMs: 30_000,
       },
     });
-    expect(taskRepo.listEvents(started.taskId).map(event => event.type)).toEqual([
+    expect(taskRepo.listEvents(legacy.id).map(event => event.type)).toEqual([
       'created',
       'started',
       'stopped',

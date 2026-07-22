@@ -5,6 +5,7 @@
 
 import { toolRegistry } from '../../../application/plugins/index.js';
 import { isBlockedHostname } from './network-guard.js';
+import { readResponseBodyWithBudget } from './stream-read.js';
 
 /** Simple HTML to text conversion (strip tags, decode entities) */
 function htmlToText(html: string): string {
@@ -83,16 +84,32 @@ export function registerBrowserTool(): void {
           });
         }
 
-        const body = await response.text();
+        // P1-16: stream the body with a hard byte budget instead of buffering
+        // the entire response via response.text() before slicing (shared with
+        // agent_http_request). 256KB is generous enough that htmlToText still
+        // yields a useful amount of text for script-heavy pages.
+        const MAX_BODY_BYTES = 256 * 1024;
+        const { text: body, truncated } = await readResponseBodyWithBudget(
+          response,
+          MAX_BODY_BYTES
+        );
 
         switch (format) {
           case 'html':
-            return JSON.stringify({ url: urlStr, content: body.slice(0, 16000) });
+            return JSON.stringify({
+              url: urlStr,
+              content: body.slice(0, 16000),
+              ...(truncated && { truncated: true }),
+            });
           case 'raw':
             return body.slice(0, 16000);
           case 'text':
           default:
-            return JSON.stringify({ url: urlStr, content: htmlToText(body).slice(0, 8000) });
+            return JSON.stringify({
+              url: urlStr,
+              content: htmlToText(body).slice(0, 8000),
+              ...(truncated && { truncated: true }),
+            });
         }
       } catch (err: unknown) {
         return JSON.stringify({

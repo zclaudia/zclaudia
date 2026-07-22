@@ -174,4 +174,83 @@ describe('search and listing tools', () => {
     });
     expect(payload.results[0]).toMatchObject({ file: 'symbols.ts', line: 1 });
   });
+
+  it('Grep parses dashed-numeric filenames correctly in context mode', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-grep-dashed-'));
+    await writeFile(path.join(root, 'report-2024-01.ts'), 'before ctx\ntarget line\nafter ctx\n');
+    const grep = createGrepBridgeTool(root) as any;
+
+    const result = await grep.execute('grep-dashed', {
+      pattern: 'target',
+      context: 1,
+      max_results: 10,
+    });
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(result.details).toMatchObject({ ok: true, total: 3 });
+    expect(payload.results).toEqual([
+      { file: 'report-2024-01.ts', line: 1, preview: 'before ctx', isMatch: false },
+      { file: 'report-2024-01.ts', line: 2, preview: 'target line', isMatch: true },
+      { file: 'report-2024-01.ts', line: 3, preview: 'after ctx', isMatch: false },
+    ]);
+  });
+
+  it('Grep preserves significant leading whitespace in the pattern', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-grep-ws-'));
+    await writeFile(path.join(root, 'a.py'), 'def foo\ndef foo\n    def foo\n');
+    const grep = createGrepBridgeTool(root) as any;
+
+    const result = await grep.execute('grep-ws', { pattern: '    def foo' });
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(result.details).toMatchObject({ ok: true, pattern: '    def foo', total: 1 });
+    expect(payload.results).toEqual([
+      expect.objectContaining({ file: 'a.py', line: 3, isMatch: true }),
+    ]);
+  });
+
+  it('Grep returns a structured grep_failed error for an invalid regex', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-grep-bad-'));
+    await writeFile(path.join(root, 'a.ts'), 'x\n');
+    const grep = createGrepBridgeTool(root) as any;
+
+    const result = await grep.execute('grep-bad', { pattern: '(unclosed' });
+
+    expect(result.details).toMatchObject({ ok: false, error: 'grep_failed' });
+  });
+
+  it('LSPTool matches regex metacharacters literally instead of rejecting', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-lsp-literal-'));
+    await writeFile(
+      path.join(root, 'symbols.ts'),
+      'export function target(name) { return target(1); }\n'
+    );
+    const lsp = createLspTool(root) as any;
+
+    const result = await lsp.execute('lsp-literal', { action: 'definition', query: 'target(' });
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(result.details).toMatchObject({ ok: true, total: 1 });
+    expect(payload.results).toEqual([
+      expect.objectContaining({ file: 'symbols.ts', line: 1 }),
+    ]);
+  });
+
+  it('LSPTool reports a missing query with ok:false', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-lsp-missing-'));
+    const lsp = createLspTool(root) as any;
+
+    const result = await lsp.execute('lsp-missing', { action: 'symbols' });
+
+    expect(result.details).toMatchObject({ ok: false, error: 'missing_query' });
+  });
+
+  it('LSPTool returns a structured error when ripgrep fails', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-lsp-fail-'));
+    const lsp = createLspTool(root) as any;
+
+    const result = await lsp.execute('lsp-fail', { query: 'q', path: 'does-not-exist' });
+
+    expect(result.details).toMatchObject({ ok: false, error: 'lsp_search_failed' });
+  });
 });

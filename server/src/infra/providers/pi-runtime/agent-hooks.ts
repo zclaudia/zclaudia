@@ -338,7 +338,13 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
       // Tool failure loop guard: track consecutive identical failures; once the
       // hard limit is reached, append a [loop] nudge and upgrade the error code
       // so the model knows it must change strategy rather than retry blindly.
-      const isFailure = result?.details?.ok === false;
+      // P1-9: pi delivers THROWN tool errors (user overrides, third-party
+      // tools) as ctx.isError=true with details:{} — they never set
+      // details.ok=false, so reading only details would leave the guard blind
+      // to throwing tools. When details are absent the guard records with the
+      // generic args-based signature (bash signatures tolerate missing
+      // details too).
+      const isFailure = ctx.isError === true || result?.details?.ok === false;
       const alreadyLoopDetected =
         typeof result?.details?.error === 'string' &&
         result.details.error.endsWith('_loop_detected');

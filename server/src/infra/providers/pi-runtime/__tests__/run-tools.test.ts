@@ -54,3 +54,35 @@ describe('buildPiRunToolBundle plan mode external tool gating (P0-6)', () => {
     expect(names).toContain('LoadExternalTool');
   });
 });
+
+describe('buildPiRunToolBundle abortSignal wiring (P1-10)', () => {
+  function buildWithAbort(abortController?: AbortController) {
+    return buildPiRunToolBundle({
+      options: {
+        cwd: '/tmp',
+        abortController,
+      } as never,
+      effectiveTools: [],
+      supportsVision: false,
+      isPlanMode: false,
+      permissionCallback: async () => ({ behavior: 'allow' as const }),
+    });
+  }
+
+  it('shouldStopAfterTurn returns false when no abortController is provided', async () => {
+    const bundle = buildWithAbort();
+    await expect(bundle.hooks.shouldStopAfterTurn!({} as never)).resolves.toBe(false);
+  });
+
+  it('shouldStopAfterTurn returns false while the controller is not aborted', async () => {
+    const bundle = buildWithAbort(new AbortController());
+    await expect(bundle.hooks.shouldStopAfterTurn!({} as never)).resolves.toBe(false);
+  });
+
+  it('shouldStopAfterTurn returns true once the run abort controller fires', async () => {
+    const abortController = new AbortController();
+    const bundle = buildWithAbort(abortController);
+    abortController.abort();
+    await expect(bundle.hooks.shouldStopAfterTurn!({} as never)).resolves.toBe(true);
+  });
+});

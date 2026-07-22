@@ -42,6 +42,7 @@ import { registerPlatformRoutes } from './bootstrap/platform-routes.js';
 import { TaskExecutorRegistry } from '../domains/tasks/executors/registry.js';
 import { AgentTaskExecutor } from '../domains/tasks/executors/agent-executor.js';
 import { CommandTaskExecutor } from '../domains/tasks/executors/command-executor.js';
+import { reconcileUnresumableTasks } from '../domains/tasks/executors/reconcile-stale-tasks.js';
 import { TaskRepository } from '../domains/tasks/repository.js';
 import { createAgentTaskRunner } from './orchestration/agent-task-runner.js';
 import { SessionRepository } from '../domains/sessions/index.js';
@@ -283,6 +284,10 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
   taskExecutorRegistry.register(commandTaskExecutor);
   commandTaskExecutor.reconcile();
   new EvalTaskRuntime(backgroundTaskRepo).reconcile();
+  // P1-7: agent runs live only in AgentTaskExecutor's in-memory pendingRuns
+  // and monitor tasks have no runtime at all — neither can resume after a
+  // restart, so settle leftovers immediately instead of leaving zombies.
+  reconcileUnresumableTasks(backgroundTaskRepo);
 
   pluginEvents.on('run.completed', event => {
     try {

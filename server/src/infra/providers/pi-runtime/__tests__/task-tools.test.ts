@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import Database from 'better-sqlite3';
 
 import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
+import { TaskRepository } from '../../../../domains/tasks/repository.js';
+import { TaskService } from '../../../../domains/tasks/task-service.js';
 import * as taskTools from '../task-tools.js';
 import { createAgentTool, createMonitorTool, createTaskOutputTool } from '../task-tools.js';
 
@@ -63,6 +65,70 @@ describe('task bridge tools', () => {
       ok: false,
       code: 'invalid_tail_lines',
     });
+  });
+
+  it('Monitor start is rejected with a model-facing error and creates no task (P1-7)', async () => {
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    applyMigrations(db);
+    try {
+      const monitor = createMonitorTool('session-1', 'run-1', db) as any;
+
+      const res = await monitor.execute('monitor-start-1', {
+        action: 'start',
+        title: 'Watch tests',
+        target_task_id: 'task-agent-1',
+        interval_ms: 30_000,
+      });
+
+      expect(res.details).toMatchObject({ ok: false, error: 'monitor_start_unsupported' });
+      expect(res.content[0].text).toContain('no monitor runtime');
+      expect(res.content[0].text).toContain('TaskOutput');
+      // No zombie row: the failed start must not mint a perpetual-running task.
+      expect(
+        db.prepare(`SELECT COUNT(*) AS n FROM tasks WHERE type = 'monitor'`).get() as {
+          n: number;
+        }
+      ).toEqual({ n: 0 });
+    } finally {
+      db.close();
+    }
+  });
+
+  it('Monitor status and stop still work on a pre-existing monitor task', async () => {
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    applyMigrations(db);
+    try {
+      const repo = new TaskRepository(db);
+      const service = new TaskService(repo);
+      const legacy = service.createTask({ type: 'monitor', title: 'legacy watch' });
+      service.startTask(legacy.id, {
+        executorRef: { providerType: 'task-monitor', taskId: legacy.id },
+      });
+      const monitor = createMonitorTool(undefined, undefined, db) as any;
+
+      const statusRes = await monitor.execute('monitor-status-1', {
+        action: 'status',
+        task_id: legacy.id,
+      });
+      const status = JSON.parse(statusRes.content[0].text);
+      expect(status).toMatchObject({ ok: true, task: { id: legacy.id, status: 'running' } });
+
+      const stopRes = await monitor.execute('monitor-stop-1', {
+        action: 'stop',
+        task_id: legacy.id,
+        reason: 'no longer needed',
+      });
+      expect(JSON.parse(stopRes.content[0].text)).toMatchObject({
+        ok: true,
+        taskId: legacy.id,
+        status: 'stopped',
+      });
+      expect(repo.findById(legacy.id)!.status).toBe('stopped');
+    } finally {
+      db.close();
+    }
   });
 
   it('Agent never forwards model-supplied permission overrides into task metadata (P0-2)', async () => {

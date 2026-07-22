@@ -51,6 +51,10 @@ const IMAGE_MIME_BY_EXT: Record<string, string> = {
   '.webp': 'image/webp',
 };
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+// Hard ceiling for the image file itself, gated on stat before any readFile:
+// Jimp decodes to ~4 bytes/pixel, so even a fraction of the 256MB text ceiling
+// can decode into gigabytes of bitmap. In the spirit of the PDF cap below.
+const MAX_IMAGE_FILE_BYTES = 50 * 1024 * 1024;
 const MAX_PDF_BYTES = 50 * 1024 * 1024;
 const MAX_NOTEBOOK_BYTES = 20 * 1024 * 1024;
 
@@ -644,6 +648,15 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
           const imageMime = IMAGE_MIME_BY_EXT[fileExt];
           if (imageMime) {
             const relPath = toWorkspaceRelative(cwd, filePath);
+            if (fileStat.size > MAX_IMAGE_FILE_BYTES) {
+              return errorResult('file_too_large', `Image is too large to read: ${requestedPath}`, {
+                path: relPath,
+                size: fileStat.size,
+                maxBytes: MAX_IMAGE_FILE_BYTES,
+                suggestion:
+                  'Downscale or convert the image to a smaller file before reading it — decoding multiplies memory by pixel count.',
+              });
+            }
             if (!options?.supportsVision) {
               return textResult(
                 `Image file ${relPath} (${imageMime}, ${fileStat.size} bytes) - current model does not support vision.`,

@@ -209,13 +209,27 @@ function pythonSymbols(content: string): SymbolMatch[] {
     let endIndex = lines.length - 1;
     for (let cursor = headerEnd + 1; cursor < lines.length; cursor += 1) {
       const candidate = lines[cursor];
-      if (!candidate.text.trim()) continue;
+      const trimmed = candidate.text.trim();
+      // Blank lines never close a body. Comment lines never close one either:
+      // a comment at (or below) the def's indentation is still legal inside a
+      // Python block (comments don't affect indentation), so stopping there
+      // would truncate the body and EditSymbol would leave orphaned remainder
+      // lines behind, corrupting the file (P1-11).
+      if (!trimmed || trimmed.startsWith('#')) continue;
       if (indentation(candidate.text) <= indent) {
         endIndex = cursor - 1;
         break;
       }
     }
-    while (endIndex > headerEnd && !lines[endIndex].text.trim()) endIndex -= 1;
+    // A trailing run of blank/comment lines right before the next dedented
+    // construct belongs to that construct, not to this body — trim it so
+    // EditSymbol neither swallows the next symbol's header comments nor
+    // duplicates trailing comments in the replacement span.
+    while (endIndex > headerEnd) {
+      const text = lines[endIndex].text.trim();
+      if (text && !text.startsWith('#')) break;
+      endIndex -= 1;
+    }
     const kind: SymbolKind = match[3] === 'class' ? 'class' : 'function';
     matches.push(
       buildMatch(
@@ -291,9 +305,36 @@ function findOpeningBrace(content: string, startOffset: number, maxOffset: numbe
   return -1;
 }
 
+/** Line text with any trailing `//` comment removed, quote-aware so a `//`
+ * inside a string literal is preserved. Single-line heuristic: block comments
+ * spanning lines are not tracked (pre-existing limitation). */
+function stripJsLineComment(text: string): string {
+  let quote: '"' | "'" | '`' | undefined;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (quote) {
+      if (char === '\\') {
+        index += 1;
+        continue;
+      }
+      if (char === quote) quote = undefined;
+      continue;
+    }
+    if (char === '"' || char === "'" || char === '`') {
+      quote = char;
+      continue;
+    }
+    if (char === '/' && text[index + 1] === '/') return text.slice(0, index);
+  }
+  return text;
+}
+
 function findStatementEnd(lines: LineInfo[], startIndex: number): number {
   for (let index = startIndex; index < lines.length; index += 1) {
-    if (/[;}]$/.test(lines[index].text.trim())) return index;
+    // Test the code part of the line: a trailing `//` comment after `;`/`}`
+    // must not push the statement end into the following symbol, otherwise
+    // EditSymbol would swallow it (analogous to the P1-11 Python comment bug).
+    if (/[;}]$/.test(stripJsLineComment(lines[index].text).trim())) return index;
   }
   return startIndex;
 }

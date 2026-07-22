@@ -46,7 +46,7 @@ export interface LoadedExternalToolSchema {
   sourceServerConfigHash?: string;
 }
 
-function inferMcpToolRisk(
+export function inferMcpToolRisk(
   tool: {
     annotations?: Record<string, unknown>;
     inputSchema?: Record<string, unknown>;
@@ -173,7 +173,7 @@ function safeLoadMcpServers(db?: Database.Database) {
   }
 }
 
-function loadMcpTrustPolicy(
+export function loadMcpTrustPolicy(
   db: Database.Database | undefined,
   server: string
 ): McpServerTrustPolicy | undefined {
@@ -213,7 +213,7 @@ function sanitizeOutputName(value: string): string {
   return base.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'mcp-output';
 }
 
-function extensionForMimeType(mimeType?: string): string {
+export function extensionForMimeType(mimeType?: string): string {
   const normalized = (mimeType || '').split(';')[0].trim().toLowerCase();
   if (normalized === 'application/pdf') return 'pdf';
   if (normalized === 'application/json') return 'json';
@@ -227,7 +227,7 @@ function extensionForMimeType(mimeType?: string): string {
   return 'bin';
 }
 
-async function persistMcpOutput(
+export async function persistMcpOutput(
   name: string,
   index: number,
   data: string | Buffer,
@@ -243,11 +243,17 @@ async function persistMcpOutput(
   return filePath;
 }
 
-async function truncateMcpTextContent(
-  content: ToolContent,
+/**
+ * Shared MCP output budget (P1-15): truncate oversized text items and persist
+ * the full content to disk, returning the saved paths. Generic over the content
+ * item shape so both the concrete-tool path and the MCPTool bridge (which also
+ * carries image blocks) share the exact same contract.
+ */
+export async function truncateMcpTextContent<T extends { type: string; text?: string }>(
+  content: T[],
   name: string
 ): Promise<{
-  content: ToolContent;
+  content: T[];
   outputTruncated: boolean;
   originalOutputChars?: number;
   outputFiles: string[];
@@ -267,13 +273,70 @@ async function truncateMcpTextContent(
       return {
         ...item,
         text: `${item.text.slice(0, max)}\n\n${MCP_OUTPUT_TRUNCATED_MARKER} ${max} characters]\nFull output saved to ${outputPath}`,
-      };
+      } as T;
     })
   );
   return { content: truncated, outputTruncated, originalOutputChars, outputFiles };
 }
 
-async function getMcpInventory(server: string, config: McpServerRuntimeConfig) {
+/**
+ * Canonical trust-policy denial result (P1-15). Used identically by concrete
+ * MCP tools and the generic MCPTool bridge so a policy-denied tool is blocked
+ * with the same error shape on every call path.
+ */
+export function buildMcpTrustDenialResult(
+  server: string,
+  tool: string,
+  permissionSummary: ExternalToolRiskPolicy,
+  trustPolicy?: McpServerTrustPolicy
+): { content: ToolContent; details: Record<string, unknown> } {
+  const mcpTrust = {
+    server,
+    tool,
+    riskLevel: permissionSummary.riskLevel,
+    trustLevel: trustPolicy?.trustLevel ?? 'untrusted',
+    policyDecision: 'deny',
+  };
+  return textResult('Denied by MCP trust policy', {
+    ok: false,
+    error: 'mcp_tool_denied_by_policy',
+    server,
+    tool,
+    permissionSummary,
+    mcpTrust,
+  });
+}
+
+export interface McpToolTrustEnforcement {
+  permissionSummary?: ExternalToolRiskPolicy;
+  denial?: { content: ToolContent; details: Record<string, unknown> };
+}
+
+/**
+ * Shared MCP trust-policy gate. When `metadata` (tool schema + annotations) is
+ * available, risk is inferred exactly like createConcreteMcpTool; a 'deny'
+ * decision produces the canonical denial result via buildMcpTrustDenialResult.
+ */
+export function enforceMcpToolTrustPolicy(opts: {
+  db?: Database.Database;
+  server: string;
+  tool: string;
+  metadata?: { annotations?: Record<string, unknown>; inputSchema?: Record<string, unknown> };
+}): McpToolTrustEnforcement {
+  const trustPolicy = loadMcpTrustPolicy(opts.db, opts.server);
+  const permissionSummary = opts.metadata
+    ? inferMcpToolRisk(opts.metadata, trustPolicy)
+    : undefined;
+  if (permissionSummary?.policyDecision !== 'deny') {
+    return { permissionSummary };
+  }
+  return {
+    permissionSummary,
+    denial: buildMcpTrustDenialResult(opts.server, opts.tool, permissionSummary, trustPolicy),
+  };
+}
+
+export async function getMcpInventory(server: string, config: McpServerRuntimeConfig) {
   return mcpInventoryCache.getInventory(server, config, {
     listTools: () => mcpClientManager.listTools(server, config),
     listResources: () => mcpClientManager.listResources(server, config),
@@ -364,25 +427,16 @@ export function createConcreteMcpTool(
             tool: ref.tool,
           });
         }
-        const trustPolicy = loadMcpTrustPolicy(db, ref.server);
-        const permissionSummary = metadata ? inferMcpToolRisk(metadata, trustPolicy) : undefined;
-        if (permissionSummary?.policyDecision === 'deny') {
-          const mcpTrust = {
-            server: ref.server,
-            tool: ref.tool,
-            riskLevel: permissionSummary.riskLevel,
-            trustLevel: trustPolicy?.trustLevel ?? 'untrusted',
-            policyDecision: 'deny',
-          };
-          return textResult('Denied by MCP trust policy', {
-            ok: false,
-            error: 'mcp_tool_denied_by_policy',
-            server: ref.server,
-            tool: ref.tool,
-            permissionSummary,
-            mcpTrust,
-          });
+        const enforcement = enforceMcpToolTrustPolicy({
+          db,
+          server: ref.server,
+          tool: ref.tool,
+          metadata,
+        });
+        if (enforcement.denial) {
+          return enforcement.denial;
         }
+        const permissionSummary = enforcement.permissionSummary;
         const result = await mcpClientManager.callTool(
           ref.server,
           config,

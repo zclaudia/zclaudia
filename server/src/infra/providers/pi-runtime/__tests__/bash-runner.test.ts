@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync, utimesSync } from 'fs';
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync, statSync, utimesSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { runBash, persistBashFullOutput } from '../bash-runner.js';
+import { runBash, persistBashFullOutput, BASH_SPILL_MAX_BYTES } from '../bash-runner.js';
 
 const TMP = () => mkdtempSync(join(tmpdir(), 'zc-bash-'));
 
@@ -143,6 +143,49 @@ describe('runBash', () => {
       expect(result.fullOutputPath).toBeDefined();
       expect(result.fullOutput.length).toBeLessThanOrEqual(52 * 1024);
       expect(readFileSync(result.fullOutputPath!, 'utf8').length).toBeGreaterThan(99000);
+    } finally {
+      if (prev === undefined) delete process.env.ZCLAUDIA_DATA_DIR;
+      else process.env.ZCLAUDIA_DATA_DIR = prev;
+      rmSync(dataDir, { recursive: true, force: true });
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('caps the spill file at BASH_SPILL_MAX_BYTES with a drop marker, while the in-memory tail keeps tracking the end (P1-5)', async () => {
+    const dir = TMP();
+    const dataDir = mkdtempSync(join(tmpdir(), 'zc-bashdata-'));
+    const prev = process.env.ZCLAUDIA_DATA_DIR;
+    process.env.ZCLAUDIA_DATA_DIR = dataDir;
+    try {
+      // cap + 4MB of output; writeSync keeps this fast and deterministic.
+      // NB: joined with '' (like the other -e scripts here) — real newlines
+      // would survive JSON.stringify as literal \n and break bash -c quoting.
+      const extraMb = 4;
+      const script = [
+        'const fs = require("fs");',
+        'const block = Buffer.alloc(1024 * 1024, 120);', // 1MB of "x"
+        `const n = ${BASH_SPILL_MAX_BYTES / (1024 * 1024) + extraMb};`,
+        'for (let i = 0; i < n; i++) fs.writeSync(1, block);',
+        'fs.writeSync(1, Buffer.from("SPILL_TAIL_END"));',
+      ].join('');
+      const result = await runBash({
+        command: `${JSON.stringify(process.execPath)} -e ${JSON.stringify(script)}`,
+        cwd: dir,
+        timeoutSec: 60,
+      });
+      expect(result.exitCode).toBe(0);
+      expect(result.truncated).toBe(true);
+      expect(result.fullOutputPath).toBeDefined();
+      expect(result.fullOutputCapped).toBe(true);
+      const size = statSync(result.fullOutputPath!).size;
+      // Hard bound: never beyond the cap plus the one-line drop marker.
+      expect(size).toBeLessThanOrEqual(BASH_SPILL_MAX_BYTES + 4096);
+      // And it really did fill (nearly) to the cap rather than stopping early.
+      expect(size).toBeGreaterThan(BASH_SPILL_MAX_BYTES - 2 * 1024 * 1024);
+      const spilled = readFileSync(result.fullOutputPath!, 'utf8');
+      expect(spilled).toContain('spill cap');
+      // The in-memory tail still tracks the very end of the stream past the cap.
+      expect(result.fullOutput).toContain('SPILL_TAIL_END');
     } finally {
       if (prev === undefined) delete process.env.ZCLAUDIA_DATA_DIR;
       else process.env.ZCLAUDIA_DATA_DIR = prev;

@@ -5,7 +5,15 @@ export type ApplyPatchOperation =
   | { type: 'rename'; from: string; to: string };
 
 export function parseApplyPatch(input: string): ApplyPatchOperation[] {
-  const lines = input.split(/\r?\n/);
+  const rawLines = input.split(/\r?\n/);
+  // Models routinely paste the patch with a trailing newline (or a leading one)
+  // — blank lines around the markers carry no meaning, so drop them before the
+  // marker check instead of rejecting an otherwise well-formed patch.
+  let start = 0;
+  let end = rawLines.length;
+  while (start < end && rawLines[start].trim() === '') start += 1;
+  while (end > start && rawLines[end - 1].trim() === '') end -= 1;
+  const lines = rawLines.slice(start, end);
   if (lines[0] !== '*** Begin Patch' || lines[lines.length - 1] !== '*** End Patch') {
     throw new Error('Patch must start with "*** Begin Patch" and end with "*** End Patch"');
   }
@@ -20,16 +28,46 @@ export function parseApplyPatch(input: string): ApplyPatchOperation[] {
       if (lines[index] === '@@') index += 1;
       const oldLines: string[] = [];
       const newLines: string[] = [];
+      // Models often emit a bare empty line for a blank context line instead
+      // of " ". Buffer blanks and only flush them as context when more hunk
+      // lines follow — trailing blanks right before the next "***" marker are
+      // separators between operations, not context.
+      let pendingBlanks = 0;
       while (index < lines.length - 1 && !lines[index].startsWith('*** ')) {
         const patchLine = lines[index];
-        if (patchLine.startsWith('-')) oldLines.push(patchLine.slice(1));
-        else if (patchLine.startsWith('+')) newLines.push(patchLine.slice(1));
-        else if (patchLine.startsWith(' ')) {
+        if (patchLine === '') {
+          pendingBlanks += 1;
+          index += 1;
+          continue;
+        }
+        const isRemoval = patchLine.startsWith('-');
+        const isAddition = patchLine.startsWith('+');
+        const isContext = patchLine.startsWith(' ');
+        if (!isRemoval && !isAddition && !isContext) {
+          // Unprefixed lines used to be silently dropped, which shortened
+          // oldText/newText and surfaced later as a confusing not_found —
+          // fail loudly at parse time instead.
+          throw new Error(
+            `Malformed update hunk for "${filePath}": line ${index + 1} must start with "-", "+", or a space`
+          );
+        }
+        for (let blank = 0; blank < pendingBlanks; blank += 1) {
+          oldLines.push('');
+          newLines.push('');
+        }
+        pendingBlanks = 0;
+        if (isRemoval) oldLines.push(patchLine.slice(1));
+        if (isAddition) newLines.push(patchLine.slice(1));
+        if (isContext) {
           oldLines.push(patchLine.slice(1));
           newLines.push(patchLine.slice(1));
         }
         index += 1;
       }
+      // oldText/newText always end with '\n'. A hunk anchored at the end of a
+      // file that has no trailing newline therefore cannot match as-is; the
+      // caller (edit-write-tools) retries without the trailing newline when
+      // the target file itself ends without one.
       operations.push({
         type: 'update',
         path: filePath,

@@ -106,4 +106,32 @@ describe('agent-tools/browser', () => {
       url: 'https://example.com/rate-limited',
     });
   });
+
+  it('bounds large bodies with a streaming byte budget instead of buffering everything (P1-16)', async () => {
+    vi.mocked(isBlockedHostname).mockResolvedValue(false);
+    const chunk = new TextEncoder().encode(`<p>${'x'.repeat(4096)}</p>`);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        body: new ReadableStream<Uint8Array>({
+          start(controller) {
+            // ~4MB body: far beyond the 256KB read budget.
+            for (let i = 0; i < 1024; i++) controller.enqueue(chunk);
+            controller.close();
+          },
+        }),
+      })
+    );
+
+    const { registerBrowserTool } = await import('../browser.js');
+    registerBrowserTool();
+
+    const tool = toolRegistry.get('agent_browser');
+    const result = await tool!.handler({ url: 'https://example.com/huge' });
+    const parsed = JSON.parse(result);
+
+    expect(parsed.truncated).toBe(true);
+    expect(parsed.content.length).toBeLessThanOrEqual(8000);
+  });
 });
