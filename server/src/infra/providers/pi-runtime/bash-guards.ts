@@ -1,11 +1,21 @@
 /**
  * Critical Bash command patterns — a second gate alongside the sandbox.
  *
- * Kept intentionally tight: the cost of a false negative is data loss or a
- * compromised host, while false positives remain actionable through the
- * permission escalation channel. New patterns should target shapes that are
- * virtually never legitimate in automation.
+ * HONEST SCOPE: this guard is a UX / approval layer, NOT a security boundary.
+ * Pattern matching can always be evaded by sufficiently creative obfuscation;
+ * the actual isolation comes from the sandbox (denyRead lists, network
+ * allow-list) and from the human approval prompt that critical matches route
+ * through. Matching is deliberately biased toward false positives (which only
+ * cost an approval prompt) over false negatives (which would run unattended).
+ * Before matching, commands go through a normalization layer (quote
+ * stripping, split-flag merging, `--` collapsing — see
+ * normalizeBashCommandForMatch) that closes the cheap, verified bypasses.
+ *
+ * New patterns should target shapes that are virtually never legitimate in
+ * automation, keeping the approval-prompt cost of a false positive low.
  */
+
+import * as os from 'os';
 
 /** Permission-callback tool name for critical-command escalation. */
 export const CRITICAL_BASH_APPROVAL_TOOL = 'CriticalBashCommand';
@@ -97,10 +107,17 @@ const CRITICAL_BASH_PATTERNS: ReadonlyArray<{ pattern: RegExp; reason: string }>
   },
   { pattern: /(?:^|[\s;&|(])init\s+0\b/i, reason: 'host shutdown (init 0)' },
 
-  // Network-shell exfil.
+  // Network-shell exfil. The flag may glue directly to its payload
+  // (`nc -c/bin/sh`) as well as sit before a space (`nc -e /bin/sh`).
   {
-    pattern: /\bnc\b[^|;]*\s-[a-zA-Z]*[ec][a-zA-Z]*\s/i,
+    pattern: /\bnc\b[^|;]*\s-[a-zA-Z]*[ec][a-zA-Z]*(?:[\s/=]|$)/i,
     reason: 'netcat with command execution (reverse shell)',
+  },
+
+  // Obfuscated execution: decode-then-run (`echo cm0gLXJmIC8K | base64 -d | bash`).
+  {
+    pattern: /\bbase64\s+(?:-[a-zA-Z]*[dD][a-zA-Z]*|--decode)\b[^|]*\|\s*(?:bash|sh|zsh|fish)\b/i,
+    reason: 'base64-decoded payload piped into a shell (obfuscated execution)',
   },
 ];
 
@@ -136,6 +153,52 @@ const SENSITIVE_HOME_ALLOW_BACK: ReadonlyArray<RegExp> = [
   /^~\/\.config\/gh\/config\.yml$/,
 ];
 
+/**
+ * Literal form of the sensitive home paths, used to judge glob/substitution
+ * evasion candidates (`~/.ssh*`, `~/.s?s?`) that the regexes can't match.
+ */
+const SENSITIVE_HOME_LITERALS: readonly string[] = [
+  '~/.ssh',
+  '~/.gnupg',
+  '~/.aws/credentials',
+  '~/.config/gcloud',
+  '~/.azure',
+  '~/.docker/config.json',
+  '~/.kube/config',
+  '~/.config/gh/hosts.yml',
+  '~/.npmrc',
+  '~/.pypirc',
+  '~/.cargo/credentials.toml',
+  '~/.netrc',
+  '~/.vault-token',
+  '~/.terraformrc',
+  '~/.bash_history',
+  '~/.zsh_history',
+  '~/.zhistory',
+  '~/Library/Safari',
+  '~/Library/Application Support/Google/Chrome',
+  '~/Library/Application Support/Firefox/Profiles',
+];
+
+/**
+ * Glob / command-substitution evasion check. A candidate containing `*?[]`
+ * can't be resolved statically, so treat it as sensitive when its literal
+ * prefix (up to the first metacharacter) overlaps a sensitive path and is
+ * long enough to be meaningful (`~/.s` minimum). A `$(...)` substitution
+ * directly under a hidden home dot-dir (`~/.$(...)`) is never verifiable —
+ * always treat as sensitive. Both cases are UX-layer judgments: they block
+ * with a clear reason rather than pretending the path was resolved.
+ */
+function isObfuscatedSensitiveHomePath(candidate: string): boolean {
+  if (candidate.includes('$(')) return candidate.startsWith('~/.');
+  if (!/[*?[\]]/.test(candidate)) return false;
+  const literalPrefix = candidate.split(/[*?[\]]/, 1)[0];
+  if (literalPrefix.length < 4) return false;
+  return SENSITIVE_HOME_LITERALS.some(
+    literal => literal.startsWith(literalPrefix) || literalPrefix.startsWith(`${literal}/`)
+  );
+}
+
 function unquote(value: string): string {
   return value.replace(/^(['"])(.*)\1$/, '$2');
 }
@@ -160,12 +223,134 @@ function isWorkspaceSourceLikePath(pathText: string): boolean {
   return SOURCE_OR_CONFIG_PATH.test(value);
 }
 
+/**
+ * Split a command string into shell words. Adjacent quoted/unquoted segments
+ * of one word are concatenated the way the shell does (`package".json"` →
+ * `package.json`, `r"m"` → `rm`), so quote-concatenation obfuscation does not
+ * hide operands from the guards.
+ */
 function shellWords(text: string): string[] {
   const words: string[] = [];
-  const pattern = /"([^"]*)"|'([^']*)'|([^\s;&|<>]+)/g;
+  const pattern = /"([^"]*)"|'([^']*)'|([^\s;&|<>"']+)/g;
   let match: RegExpExecArray | null;
-  while ((match = pattern.exec(text))) words.push(match[1] ?? match[2] ?? match[3]);
+  let current = '';
+  let hasCurrent = false;
+  let prevEnd = -1;
+  while ((match = pattern.exec(text))) {
+    const part = match[1] ?? match[2] ?? match[3] ?? '';
+    if (hasCurrent && match.index === prevEnd) {
+      current += part;
+    } else {
+      if (hasCurrent) words.push(current);
+      current = part;
+      hasCurrent = true;
+    }
+    prevEnd = match.index + match[0].length;
+  }
+  if (hasCurrent) words.push(current);
   return words;
+}
+
+/**
+ * Strip quote characters that obfuscate guard matching (`r"m"` → `rm`,
+ * `package".json"` → `package.json`). Conservative rules — quotes are removed
+ * from a single-whitespace-free word only when:
+ *   - the word MIXES quoted and unquoted segments (true concatenation), or
+ *   - the word sits at a command position (after start / `;` / `|` / `&`), or
+ *   - the unquoted result looks like a flag (`"-rf"` → `-rf`).
+ * Quotes wrapping multi-word strings or ordinary quoted arguments are kept:
+ * `grep -r "mkfs" docs/` and `echo 'shutdown the queue'` must stay benign.
+ */
+function stripObfuscatingQuotes(command: string): string {
+  interface Word {
+    raw: string;
+    mixed: boolean;
+    commandPosition: boolean;
+  }
+  const words: Word[] = [];
+  let current = '';
+  let hasCurrent = false;
+  let hasQuoted = false;
+  let hasBare = false;
+  let quote: '"' | "'" | undefined;
+  let nextIsCommandPosition = true;
+  let wordIsCommandPosition = true;
+  const push = () => {
+    if (hasCurrent) {
+      words.push({
+        raw: current,
+        mixed: hasQuoted && hasBare,
+        commandPosition: wordIsCommandPosition,
+      });
+    }
+    current = '';
+    hasCurrent = false;
+    hasQuoted = false;
+    hasBare = false;
+  };
+  for (const ch of command) {
+    if (quote) {
+      current += ch;
+      if (ch === quote) quote = undefined;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      if (!hasCurrent) wordIsCommandPosition = nextIsCommandPosition;
+      quote = ch;
+      current += ch;
+      hasCurrent = true;
+      hasQuoted = true;
+      continue;
+    }
+    if (/\s/.test(ch)) {
+      push();
+      continue;
+    }
+    if (ch === ';' || ch === '&' || ch === '|') {
+      push();
+      nextIsCommandPosition = true;
+      continue; // separators are dropped; raw matching still covers them
+    }
+    if (!hasCurrent) wordIsCommandPosition = nextIsCommandPosition;
+    current += ch;
+    hasCurrent = true;
+    hasBare = true;
+    nextIsCommandPosition = false;
+  }
+  push();
+  return words
+    .map(word => {
+      const stripped = word.raw.replace(/["']/g, '');
+      if (/\s/.test(stripped)) return word.raw; // multi-word string argument
+      if (word.mixed || word.commandPosition || /^-[a-zA-Z0-9]/.test(stripped)) return stripped;
+      return word.raw;
+    })
+    .join(' ');
+}
+
+const SHORT_FLAG_TOKEN = /^-[a-zA-Z]+$/;
+
+/**
+ * Canonicalize a command for guard matching ONLY (never executed):
+ * - strips obfuscating quotes (`r"m" -rf /` → `rm -rf /`);
+ * - merges adjacent split short-flag tokens (`rm -r -f /etc` → `rm -rf /etc`),
+ *   since shells treat `-r -f` and `-rf` identically for the flagged commands;
+ * - drops standalone `--` separators (`rm -rf -- /` → `rm -rf /`).
+ * Over-normalizing is safe here: a false positive costs one approval prompt.
+ */
+export function normalizeBashCommandForMatch(command: string): string {
+  const tokens = stripObfuscatingQuotes(command).split(/\s+/).filter(Boolean);
+  const out: string[] = [];
+  for (const token of tokens) {
+    if (token === '--') continue;
+    const prev = out[out.length - 1];
+    if (prev !== undefined && SHORT_FLAG_TOKEN.test(prev) && SHORT_FLAG_TOKEN.test(token)) {
+      out[out.length - 1] = prev + token.slice(1);
+      continue;
+    }
+    out.push(token);
+  }
+  return out.join(' ');
 }
 
 function findSourceLikeWord(text: string): string | undefined {
@@ -195,7 +380,10 @@ function normalizeHomePath(value: string): string {
     .replace(/\\'/g, "'")
     .replace(/^\$HOME(?=\/)/, '~')
     .replace(/^\$\{HOME\}(?=\/)/, '~');
-  const home = process.env.HOME?.replace(/\/+$/, '');
+  // os.homedir() (not process.env.HOME): one consistent home source across the
+  // guards and bash-tool.ts. On POSIX os.homedir() honors $HOME, so tests that
+  // override HOME still work.
+  const home = os.homedir().replace(/\/+$/, '');
   if (home && (unquoted === home || unquoted.startsWith(`${home}/`))) {
     return `~${unquoted.slice(home.length)}`;
   }
@@ -369,7 +557,9 @@ export function findBashToolRoutingSuggestion(
 export function findBashSensitivePathAccess(command: string): BashSensitivePathMatch | undefined {
   const pathPattern =
     /(~\/(?:[^"'\s;&|)\\]+|Library\/(?:Safari|Application Support\/(?:Google\/Chrome|Firefox\/Profiles))(?:\/[^"'\s;&|)\\]*)?)|\$HOME\/[^"'\s;&|)\\]+|\$\{HOME\}\/[^"'\s;&|)\\]+)/g;
-  const home = process.env.HOME?.replace(/\/+$/, '');
+  // os.homedir() (not process.env.HOME): consistent with bash-tool.ts; on
+  // POSIX os.homedir() honors $HOME, so tests overriding HOME still work.
+  const home = os.homedir().replace(/\/+$/, '');
   const absoluteHomePattern = home
     ? new RegExp(`${home.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\/[^"'\\s;&|)\\\\]+`, 'g')
     : undefined;
@@ -379,7 +569,7 @@ export function findBashSensitivePathAccess(command: string): BashSensitivePathM
     let match: RegExpExecArray | null;
     while ((match = pattern.exec(command))) {
       const candidate = normalizeHomePath(match[0]);
-      if (isSensitiveHomePath(candidate)) {
+      if (isSensitiveHomePath(candidate) || isObfuscatedSensitiveHomePath(candidate)) {
         return {
           path: candidate,
           reason: `Bash command accesses sensitive home path ${candidate}`,
@@ -387,18 +577,51 @@ export function findBashSensitivePathAccess(command: string): BashSensitivePathM
       }
     }
   }
+
+  // `cd ~ && cat .ssh/id_rsa` style: paths relative to a home `cd` still
+  // count. Scan words in the segments following `cd ~` / `cd $HOME` /
+  // `cd ${HOME}` (up to the next `cd`) as if prefixed with `~/`.
+  const cdHomePattern = /(?:^|[;&|])\s*cd\s+(?:~|\$HOME|\$\{HOME\})(?=\s|&&|;|$)/g;
+  let cdMatch: RegExpExecArray | null;
+  while ((cdMatch = cdHomePattern.exec(command))) {
+    const rest = command.slice(cdMatch.index + cdMatch[0].length);
+    const nextCd = rest.slice(1).search(/[;&|]\s*cd\s/);
+    const scope = nextCd === -1 ? rest : rest.slice(0, nextCd + 1);
+    for (const segment of scope.split(/&&|\|\||[;|]/)) {
+      const words = shellWords(segment);
+      for (const word of words.slice(1)) {
+        if (word.startsWith('-')) continue;
+        const candidate = normalizeHomePath(`~/${word}`);
+        if (isSensitiveHomePath(candidate) || isObfuscatedSensitiveHomePath(candidate)) {
+          return {
+            path: candidate,
+            reason: `Bash command accesses sensitive home path ${candidate} (relative to cd ~)`,
+          };
+        }
+      }
+    }
+  }
   return undefined;
 }
 
 export function findCriticalBashPattern(command: string): CriticalBashMatch | undefined {
+  // Match both the raw command and its normalized form (quote-stripped,
+  // split flags merged, `--` collapsed) so cheap obfuscation — `rm -r -f /`,
+  // `r"m" -rf /`, `rm -rf -- /` — does not slip through.
+  const normalized = normalizeBashCommandForMatch(command);
   for (const { pattern, reason } of CRITICAL_BASH_PATTERNS) {
-    if (pattern.test(command)) return { reason };
+    if (pattern.test(command) || (normalized !== command && pattern.test(normalized))) {
+      return { reason };
+    }
   }
   return undefined;
 }
 
 export function findBashFileBypass(command: string): BashFileBypassMatch | undefined {
-  const redirectPattern = /(?:^|[^0-9])>>?\s*(?!&)(?:"([^"]+)"|'([^']+)'|([^\s;&|]+))/g;
+  // Optional fd prefix (`2>`, `2>>`, `1>`): `cmd 2> errors.txt` writes a file
+  // just like `>`, so it goes through the same Write-tool routing. `>&`
+  // (fd duplication) is still excluded.
+  const redirectPattern = /(?<!\d)\d*>>?\s*(?!&)(?:"([^"]+)"|'([^']+)'|([^\s;&|]+))/g;
   let redirect: RegExpExecArray | null;
   while ((redirect = redirectPattern.exec(command))) {
     const target = redirect[1] ?? redirect[2] ?? redirect[3];

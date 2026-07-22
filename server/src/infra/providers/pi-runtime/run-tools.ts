@@ -3,6 +3,7 @@ import type { ToolName } from '@zclaudia/shared/core/tools';
 import type { PermissionCallback, RunOptions } from '../types.js';
 import { loadSessionSandboxDomains } from '../../../application/conversation/agent/permission-memory.js';
 import { buildAgentHooks } from './agent-hooks.js';
+import { PendingArgOverrides } from './pending-arg-overrides.js';
 import {
   buildExternalMetaTools,
   buildExternalProviderCatalog,
@@ -23,6 +24,13 @@ export interface PiRunToolBundle {
   hooks: ReturnType<typeof buildAgentHooks>;
 }
 
+/**
+ * Meta tools that load new callable capabilities into the live tools array
+ * mid-run. They are excluded in plan mode because the concrete tools they add
+ * (e.g. MCP tools) are not part of the read-only plan-mode tool set.
+ */
+const PLAN_MODE_BLOCKED_META_TOOLS = new Set(['LoadExternalTool']);
+
 export function buildPiRunToolBundle(input: {
   options: RunOptions;
   effectiveTools: ToolName[];
@@ -31,6 +39,9 @@ export function buildPiRunToolBundle(input: {
   permissionCallback?: PermissionCallback;
 }): PiRunToolBundle {
   const { options, effectiveTools, supportsVision, isPlanMode, permissionCallback } = input;
+  // One store per run: carries permission-approved updatedInput rewrites from
+  // the beforeToolCall hook into the wrapped tool executes (pi drops `{ args }`).
+  const argOverrides = new PendingArgOverrides();
   const sandboxAllowedDomains =
     options.db && options.claudiaSessionId
       ? loadSessionSandboxDomains(options.db, options.claudiaSessionId)
@@ -49,25 +60,35 @@ export function buildPiRunToolBundle(input: {
     sandboxAllowedDomains,
     memoryDir: options.memoryDir,
     toolExecutionObserver: options.toolExecutionObserver,
+    argOverrides,
   });
   if (options.externalToolState) {
-    for (const ref of options.externalToolState.loadedExternalTools) {
-      if (ref.source === 'mcp') {
-        tools.push(
-          createConcreteMcpTool(
-            ref,
-            options.db,
-            options.externalToolState.loadedExternalToolSchemas?.[externalToolKey(ref)]
-          )
-        );
+    // Security (P0-6): plan mode is read-only, so concrete external/MCP tools
+    // (pinned or dynamically loaded) must not be callable, and the meta tool
+    // that appends them to the live tools array (LoadExternalTool) is excluded
+    // too. Read-only discovery meta tools (list/search/inspect/read) remain.
+    if (!isPlanMode) {
+      for (const ref of options.externalToolState.loadedExternalTools) {
+        if (ref.source === 'mcp') {
+          tools.push(
+            createConcreteMcpTool(
+              ref,
+              options.db,
+              options.externalToolState.loadedExternalToolSchemas?.[externalToolKey(ref)]
+            )
+          );
+        }
       }
     }
+    const externalMetaTools = buildExternalMetaTools({
+      db: options.db,
+      state: options.externalToolState,
+      toolsArray: tools,
+    });
     tools.push(
-      ...buildExternalMetaTools({
-        db: options.db,
-        state: options.externalToolState,
-        toolsArray: tools,
-      })
+      ...(isPlanMode
+        ? externalMetaTools.filter(tool => !PLAN_MODE_BLOCKED_META_TOOLS.has(tool.name))
+        : externalMetaTools)
     );
   }
   if (options.skillState) {
@@ -102,6 +123,7 @@ export function buildPiRunToolBundle(input: {
     userHooks: options.userHooks,
     cwd: options.cwd,
     sessionId: options.claudiaSessionId,
+    argOverrides,
   });
 
   return {

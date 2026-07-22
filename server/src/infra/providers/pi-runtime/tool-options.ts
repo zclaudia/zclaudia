@@ -22,6 +22,7 @@ import {
 } from './read-file-state.js';
 import type { TaskRuntimeRegistryFactory } from './task-tools.js';
 import type { ToolExecutionObserver } from './tool-execution-observer.js';
+import type { PendingArgOverrides } from './pending-arg-overrides.js';
 import type {
   DiagnosticsMode,
   WriteDiagnosticsProvider,
@@ -79,6 +80,13 @@ export interface ToolBridgeOptions {
   taskRuntimeRegistryFactory?: TaskRuntimeRegistryFactory;
   /** Optional observer for application policies that react after tool execution. */
   toolExecutionObserver?: ToolExecutionObserver;
+  /**
+   * Per-run store of permission-approved argument rewrites (sudo credential
+   * rewrite etc.). Must be the SAME instance passed to `buildAgentHooks` —
+   * pi ignores `{ args }` from beforeToolCall, so wrapped executes consume the
+   * rewrite from this store instead (see pending-arg-overrides.ts).
+   */
+  argOverrides?: PendingArgOverrides;
 }
 
 export function buildEffectiveToolOptions(

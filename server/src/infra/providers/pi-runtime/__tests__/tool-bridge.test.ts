@@ -29,6 +29,31 @@ import {
 import { mcpClientManager } from '../../../../utils/mcp-client-manager.js';
 import * as sandbox from '../sandbox.js';
 
+// Keep WebFetch validation hermetic: example.com resolves to a public IP,
+// IP literals echo like libuv, everything else fails like a DNS miss.
+// (Real resolvers — e.g. fake-IP proxy DNS answering from 198.18.0.0/15 —
+// would otherwise make these tests environment-dependent.)
+vi.mock('dns/promises', async () => {
+  const { isIP } = await import('net');
+  return {
+    lookup: vi.fn(async (hostname: string, options?: { all?: boolean }) => {
+      const bare = hostname.replace(/^\[|\]$/g, '');
+      const family = isIP(bare);
+      if (family !== 0) {
+        const entry = { address: bare, family };
+        return options?.all ? [entry] : entry;
+      }
+      if (hostname === 'example.com') {
+        const entry = { address: '93.184.216.34', family: 4 };
+        return options?.all ? [entry] : entry;
+      }
+      const error = new Error(`getaddrinfo ENOTFOUND ${hostname}`) as NodeJS.ErrnoException;
+      error.code = 'ENOTFOUND';
+      throw error;
+    }),
+  };
+});
+
 describe('buildTools', () => {
   const tempDirs: string[] = [];
 

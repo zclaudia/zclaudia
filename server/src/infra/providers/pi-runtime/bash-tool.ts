@@ -272,6 +272,19 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
 
       const sandboxRequired = Boolean(critical);
 
+      // Fail closed: a command that matched a critical-risk pattern must run
+      // sandboxed or not at all. sandbox_mode:"unsandboxed" (or an unsandboxed
+      // escalation retry) must NOT void the sandbox requirement — refuse the
+      // combination up front with the same structured error the sandbox path
+      // uses, directing the model back to sandboxed execution.
+      if (sandboxRequired && sandboxMode === 'unsandboxed') {
+        return errorResult(
+          'sandbox_required_for_critical_command',
+          `Command requires sandbox isolation because it matched a critical-risk Bash pattern (${critical?.reason}); sandbox_mode:"unsandboxed" is not allowed for critical commands. Retry with sandbox_mode "auto" or "sandbox".`,
+          { reason: critical?.reason }
+        );
+      }
+
       if (args.run_in_background === true) {
         const privilegeGate =
           sandboxMode === 'unsandboxed'
@@ -282,6 +295,7 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
                 allowedDomains: new Set([...sandbox.DEFAULT_ALLOWED_DOMAINS, ...grantedDomains]),
                 sandboxMode,
                 privilegeReason,
+                criticalReason: critical?.reason,
                 permissionCallback: options?.permissionCallback,
                 operation: async () => ({ ok: true, sandboxed: true, outputText: '' }),
                 unsandboxedOperation: async () => ({
@@ -429,12 +443,14 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
             errorCode: 'sandbox_unavailable_plan_mode',
           };
         }
-        if (!wrap.sandboxed && sandboxRequired && !forceUnsandboxed) {
+        // Fail closed (defense in depth): even when forceUnsandboxed was
+        // requested, a critical-pattern command must not run on the host.
+        if (!wrap.sandboxed && sandboxRequired) {
           return {
             ok: false,
             sandboxed: false,
             outputText:
-              'Command requires sandbox isolation because it matched a critical-risk Bash pattern, but the sandbox is unavailable.',
+              'Command requires sandbox isolation because it matched a critical-risk Bash pattern, but sandboxed execution is not in effect (sandbox unavailable, or host execution was requested — which is not allowed for critical commands). Retry with sandbox_mode "auto" or "sandbox".',
             exitCode: null,
             errorCode: 'sandbox_required_for_critical_command',
             errorDetails: { reason: critical?.reason },
@@ -477,6 +493,7 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
         allowedDomains: new Set([...sandbox.DEFAULT_ALLOWED_DOMAINS, ...grantedDomains]),
         sandboxMode,
         privilegeReason,
+        criticalReason: critical?.reason,
         permissionCallback: options?.permissionCallback,
         operation: grants => runOnce(grants),
         unsandboxedOperation: () => runOnce([], true),

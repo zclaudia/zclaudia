@@ -31,6 +31,11 @@ export {
   type TruncateResult,
 } from './agent-hooks.js';
 export { translateToolEvent, type TranslateToolContext } from './tool-event-translator.js';
+export {
+  PendingArgOverrides,
+  withPendingArgOverrides,
+  DEFAULT_OVERRIDE_TTL_MS,
+} from './pending-arg-overrides.js';
 export { buildPiRunToolBundle, type PiRunToolBundle } from './run-tools.js';
 export {
   buildPiRunPrompt,

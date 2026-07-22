@@ -147,7 +147,7 @@ export function createExitPlanModeTool(_cwd: string, options?: ModeToolOptions):
     name: 'ExitPlanMode',
     label: 'ExitPlanMode',
     description:
-      'Leave plan mode and resume normal (writable) execution. Pass a `plan` (markdown) to present it for user approval first - on approval, plan mode clears and you may proceed; on rejection, read the feedback and revise. Without a plan, exits immediately.',
+      'Leave plan mode and resume normal (writable) execution. Requires a non-empty `plan` (markdown) presented for user approval first - on approval, plan mode clears and you may proceed; on rejection, read the feedback and revise.',
     parameters: agentToolParameters({
       type: 'object',
       properties: {
@@ -178,7 +178,22 @@ export function createExitPlanModeTool(_cwd: string, options?: ModeToolOptions):
       const args = params && typeof params === 'object' ? (params as Record<string, unknown>) : {};
       const plan = typeof args.plan === 'string' ? args.plan.trim() : '';
 
-      if (plan) {
+      if (!plan) {
+        // Security (P0-5): a tool-driven exit must present a non-empty plan
+        // for user approval. A missing or whitespace-only plan would bypass
+        // the human plan-approval gate entirely. When plan mode is not active
+        // the call stays a harmless no-op.
+        const session = repo.findById(sessionId);
+        if (session?.planStatus === 'planning') {
+          return errorResult(
+            'plan_required',
+            'ExitPlanMode requires a non-empty `plan` (markdown): the user must review and approve a plan before plan mode can exit. Missing or whitespace-only plans are not accepted. If the user wants to leave plan mode without approving a plan, ask them to switch modes in the UI.'
+          );
+        }
+        return textResult('Not currently in plan mode.', { ok: true, wasActive: false });
+      }
+
+      {
         const planGuard = validatePlan(plan);
         if (!planGuard.ok) return planGuard.result;
         const allowedPrompts = parseAllowedPrompts(args.allowedPrompts);
@@ -254,14 +269,6 @@ export function createExitPlanModeTool(_cwd: string, options?: ModeToolOptions):
           wasActive: true,
         });
       }
-
-      const result = applyExitPlanMode(repo, sessionId);
-      return textResult(
-        result.wasActive
-          ? 'Exited plan mode - you may make changes now.'
-          : 'Not currently in plan mode.',
-        { ok: true, wasActive: result.wasActive ?? false }
-      );
     },
   };
 }

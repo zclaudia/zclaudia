@@ -3,6 +3,47 @@ import Database from 'better-sqlite3';
 
 import { createWebFetchTool, createWebSearchTool } from '../web-tools.js';
 
+vi.mock('undici', () => {
+  class MockAgent {
+    static instances: MockAgent[] = [];
+    options: unknown;
+    closed = false;
+    constructor(options: unknown) {
+      this.options = options;
+      MockAgent.instances.push(this);
+    }
+    async close(): Promise<void> {
+      this.closed = true;
+    }
+  }
+  return { Agent: MockAgent, __getAgentInstances: () => MockAgent.instances };
+});
+
+// Deterministic DNS: IP literals echo back (as libuv does without network),
+// example.com resolves to a public address, anything else fails. Keeps these
+// tests independent of the ambient resolver (some environments answer every
+// query with fake-IP ranges like 198.18.0.0/15, which the guard must block).
+vi.mock('dns/promises', async () => {
+  const { isIP } = await import('net');
+  return {
+    lookup: vi.fn(async (hostname: string, options?: { all?: boolean }) => {
+      const bare = hostname.replace(/^\[|\]$/g, '');
+      const family = isIP(bare);
+      if (family !== 0) {
+        const entry = { address: bare, family };
+        return options?.all ? [entry] : entry;
+      }
+      if (hostname === 'example.com') {
+        const entry = { address: '93.184.216.34', family: 4 };
+        return options?.all ? [entry] : entry;
+      }
+      const error = new Error(`getaddrinfo ENOTFOUND ${hostname}`) as NodeJS.ErrnoException;
+      error.code = 'ENOTFOUND';
+      throw error;
+    }),
+  };
+});
+
 describe('web tools', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -60,6 +101,101 @@ describe('web tools', () => {
     expect(result.details.redirects).toEqual([
       { from: 'https://example.com/start', to: 'http://127.0.0.1:3000/admin', status: 302 },
     ]);
+  });
+
+  it.each([
+    'http://[::ffff:169.254.169.254]/latest/meta-data', // mapped cloud metadata (dotted)
+    'http://[::ffff:a9fe:a9fe]/latest/meta-data', // mapped cloud metadata (hex tail)
+    'http://[::ffff:7f00:1]/', // mapped loopback (hex tail)
+    'http://169.254.169.254/latest/meta-data', // link-local cloud metadata
+    'http://100.64.0.1/', // CGNAT start
+    'http://100.127.1.1/', // CGNAT end
+    'http://224.0.0.1/', // multicast
+    'http://240.0.0.1/', // reserved
+    'http://198.18.0.23/', // benchmarking
+    'http://192.0.0.8/', // IETF protocol assignments
+  ])('WebFetch rejects special-use IP URL %s before fetch', async url => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const webFetch = createWebFetchTool() as any;
+
+    const result = await webFetch.execute('fetch-1', { url });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result.details).toMatchObject({ ok: false, error: 'blocked_private_network' });
+  });
+
+  it.each(['http://93.184.216.34/', 'http://192.0.2.1/', 'http://[2606:4700:4700::1111]/'])(
+    'WebFetch still fetches public IP URL %s',
+    async url => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(
+          async () =>
+            new Response('ok', {
+              status: 200,
+              statusText: 'OK',
+              headers: { 'content-type': 'text/plain' },
+            })
+        )
+      );
+      const webFetch = createWebFetchTool() as any;
+
+      const result = await webFetch.execute('fetch-1', { url });
+
+      expect(result.details).toMatchObject({ ok: true, url });
+    }
+  );
+
+  it('pins the validated DNS answers into the fetch dispatcher', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response('ok', {
+            status: 200,
+            statusText: 'OK',
+            headers: { 'content-type': 'text/plain' },
+          })
+      )
+    );
+    const undici = await import('undici');
+    const instances = (undici as any).__getAgentInstances() as Array<{
+      options: {
+        connect: {
+          lookup: (
+            hostname: string,
+            options: { all?: boolean },
+            callback: (err: unknown, address: unknown, family?: unknown) => void
+          ) => void;
+        };
+      };
+      closed: boolean;
+    }>;
+    instances.length = 0;
+    const webFetch = createWebFetchTool() as any;
+
+    const result = await webFetch.execute('fetch-1', { url: 'http://93.184.216.34/' });
+
+    expect(result.details).toMatchObject({ ok: true });
+    expect(instances).toHaveLength(1);
+    const pinnedLookup = instances[0].options.connect.lookup;
+
+    const all = await new Promise((resolve, reject) =>
+      pinnedLookup('93.184.216.34', { all: true }, (err: unknown, addresses: unknown) =>
+        err ? reject(err) : resolve(addresses)
+      )
+    );
+    expect(all).toEqual([{ address: '93.184.216.34', family: 4 }]);
+
+    const single = await new Promise((resolve, reject) =>
+      pinnedLookup('93.184.216.34', {}, (err: unknown, address: unknown, family: unknown) =>
+        err ? reject(err) : resolve([address, family])
+      )
+    );
+    expect(single).toEqual(['93.184.216.34', 4]);
+
+    expect(instances[0].closed).toBe(true); // dispatcher released after the body was read
   });
 
   it('WebFetch reports the final URL after safe redirects', async () => {

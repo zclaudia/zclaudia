@@ -8,6 +8,7 @@ import {
   type TruncationResult,
 } from '@earendil-works/pi-agent-core';
 import type { PermissionCallback } from '../types.js';
+import type { PendingArgOverrides } from './pending-arg-overrides.js';
 import type { UserHookDefinition } from '@zclaudia/shared/interaction/user-hooks';
 import { runPreToolUseHooks, runPostToolUseHooks } from './user-hooks.js';
 import { measureTextBytes, persistToolResultText } from './tool-result-store.js';
@@ -116,6 +117,13 @@ export interface AgentHooksInput {
   cwd?: string;
   /** Session id forwarded to hook processes via the stdin payload. */
   sessionId?: string;
+  /**
+   * Per-run store for permission-approved `updatedInput` rewrites. Must be the
+   * SAME instance passed to `buildTools` (see pending-arg-overrides.ts): pi
+   * ignores `{ args }` returned from beforeToolCall, so the store is the real
+   * channel that carries the rewrite into tool execution.
+   */
+  argOverrides?: PendingArgOverrides;
 }
 
 export interface AgentHooksOutput {
@@ -231,6 +239,16 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
         if (outcome.blocked) return { block: true, reason: outcome.reason };
       }
       if (decision.updatedInput !== undefined) {
+        // pi-agent-core honors only `block`/`reason` from BeforeToolCallResult
+        // (verified 0.79.3–0.81.1: prepareToolCall in dist/agent-loop.js reads
+        // nothing else and executes with its own validatedArgs). The `{ args }`
+        // return below is therefore IGNORED by pi — the real channel is the
+        // per-run store consumed by the execute wrapper that buildTools installs
+        // (withPendingArgOverrides), keyed by this tool call's id. Recording
+        // happens only after user hooks pass, so blocked calls never leave an
+        // orphan override. The `{ args }` return is kept for forward
+        // compatibility should pi add support upstream.
+        input.argOverrides?.record(toolCall.id, decision.updatedInput);
         return { args: decision.updatedInput };
       }
       return undefined;

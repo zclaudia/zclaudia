@@ -3,60 +3,39 @@
  */
 
 import { lookup } from 'dns/promises';
+import { isIP } from 'net';
+
+import { isPrivateOrReservedIp } from '../../../utils/ip-guard.js';
 
 /**
  * Check if a hostname is a private/internal address that should be blocked.
- * Covers RFC 1918, RFC 4193, loopback, and link-local addresses.
+ * Covers RFC 1918, RFC 4193, loopback, link-local, CGNAT, multicast, and
+ * IPv4-mapped/compatible IPv6 forms (see utils/ip-guard.ts). Non-IP strings
+ * (ordinary hostnames) are never blocked here — `fdn.fr` is not a ULA
+ * address — they must go through DNS resolution in `isBlockedHostname`.
  */
-function isPrivateIPv4(ip: string): boolean {
-  if (ip.startsWith('10.')) return true; // 10.0.0.0/8
-  if (ip.startsWith('192.168.')) return true; // 192.168.0.0/16
-  if (ip.startsWith('169.254.')) return true; // Link-local
-  if (ip.startsWith('127.')) return true; // Loopback
-  if (ip.startsWith('0.')) return true; // 0.0.0.0/8
-
-  // 172.16.0.0 - 172.31.255.255 (RFC 1918)
-  if (ip.startsWith('172.')) {
-    const second = parseInt(ip.split('.')[1], 10);
-    if (second >= 16 && second <= 31) return true;
-  }
-
-  return false;
-}
-
 export function isPrivateAddress(hostname: string): boolean {
-  // Exact blocked hosts
-  if (hostname === 'localhost' || hostname === '0.0.0.0') return true;
-
-  // Check plain IPv4
-  if (isPrivateIPv4(hostname)) return true;
-
-  // IPv6 handling (stripped of brackets)
-  const bare = hostname.replace(/^\[|\]$/g, '');
-
-  // IPv4-mapped IPv6: ::ffff:10.0.0.1, ::ffff:127.0.0.1, etc.
-  const v4mappedMatch = bare.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/i);
-  if (v4mappedMatch) return isPrivateIPv4(v4mappedMatch[1]);
-
-  if (bare === '::1') return true; // Loopback
-  if (bare === '::') return true; // Unspecified
-  if (bare.startsWith('fe80:') || bare.startsWith('fe80%')) return true; // Link-local
-  if (bare.startsWith('fc') || bare.startsWith('fd')) return true; // RFC 4193 unique-local
-
-  return false;
+  if (hostname === 'localhost' || hostname.endsWith('.localhost')) return true;
+  return isPrivateOrReservedIp(hostname);
 }
 
 /**
  * Resolve a hostname and block it if any resolved address is private/internal.
- * Falls back to hostname-only checks when DNS resolution is unavailable.
+ * Fails closed: a hostname that cannot be resolved/verified is blocked.
  */
 export async function isBlockedHostname(hostname: string): Promise<boolean> {
   if (isPrivateAddress(hostname)) return true;
 
+  // Literal IPs that passed the blocklist need no DNS verification.
+  const bare = hostname.replace(/^\[|\]$/g, '');
+  if (isIP(bare) !== 0) return false;
+
   try {
     const addresses = await lookup(hostname, { all: true, verbatim: true });
-    return addresses.some(addr => isPrivateAddress(addr.address));
+    return addresses.some(addr => isPrivateOrReservedIp(addr.address));
   } catch {
-    return false;
+    // Fail closed: DNS errors previously allowed the request through,
+    // leaving the guard blind exactly when resolution was interfered with.
+    return true;
   }
 }

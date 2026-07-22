@@ -174,3 +174,72 @@ describe('runBash', () => {
     }
   });
 });
+
+describe('runBash env scrubbing (P0-3)', () => {
+  it('strips secret-looking env vars from the child environment', async () => {
+    const dir = TMP();
+    process.env.ZC_TEST_SECRET_TOKEN = 'super-secret-value';
+    try {
+      const r = await runBash({
+        command: 'echo "tok=${ZC_TEST_SECRET_TOKEN:-<unset>}"',
+        cwd: dir,
+        timeoutSec: 10,
+      });
+      expect(r.exitCode).toBe(0);
+      expect(r.fullOutput).toContain('tok=<unset>');
+      expect(r.fullOutput).not.toContain('super-secret-value');
+    } finally {
+      delete process.env.ZC_TEST_SECRET_TOKEN;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps PATH and ordinary workflow vars', async () => {
+    const dir = TMP();
+    process.env.ZC_TEST_PLAIN_VAR = 'plain-value';
+    try {
+      const r = await runBash({
+        command: 'echo "path=${#PATH} plain=$ZC_TEST_PLAIN_VAR"; command -v sh >/dev/null && echo sh-found',
+        cwd: dir,
+        timeoutSec: 10,
+      });
+      expect(r.exitCode).toBe(0);
+      expect(r.fullOutput).toContain('plain=plain-value');
+      expect(r.fullOutput).toContain('sh-found');
+      expect(r.fullOutput).not.toMatch(/path=0 /);
+    } finally {
+      delete process.env.ZC_TEST_PLAIN_VAR;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('extraEnv wins over scrubbing for explicit caller-provided vars', async () => {
+    const dir = TMP();
+    const r = await runBash({
+      command: 'echo "key=${ZC_TEST_API_KEY:-<unset>}"',
+      cwd: dir,
+      timeoutSec: 10,
+      extraEnv: { ZC_TEST_API_KEY: 'explicit-value' },
+    });
+    rmSync(dir, { recursive: true, force: true });
+    expect(r.fullOutput).toContain('key=explicit-value');
+  });
+
+  it('honors the ZCLAUDIA_BASH_ENV_PASSTHROUGH opt-in knob', async () => {
+    const dir = TMP();
+    process.env.ZC_TEST_PASSTHROUGH_SECRET = 'passthrough-value';
+    process.env.ZCLAUDIA_BASH_ENV_PASSTHROUGH = 'ZC_TEST_PASSTHROUGH_SECRET';
+    try {
+      const r = await runBash({
+        command: 'echo "v=${ZC_TEST_PASSTHROUGH_SECRET:-<unset>}"',
+        cwd: dir,
+        timeoutSec: 10,
+      });
+      expect(r.fullOutput).toContain('v=passthrough-value');
+    } finally {
+      delete process.env.ZC_TEST_PASSTHROUGH_SECRET;
+      delete process.env.ZCLAUDIA_BASH_ENV_PASSTHROUGH;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

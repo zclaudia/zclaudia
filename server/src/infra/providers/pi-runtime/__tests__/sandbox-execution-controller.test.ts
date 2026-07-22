@@ -337,4 +337,31 @@ describe('runSandboxedWithEscalation', () => {
     expect(result.details.privilegeMode).toBe('unsandboxed');
     expect(result.details.unsandboxedApproved).toBe(true);
   });
+
+  it('threads criticalReason into the unsandboxed approval request (P0-4)', async () => {
+    const permissionCallback = vi.fn(async () => ({ behavior: 'deny' as const }));
+
+    await runSandboxedWithEscalation({
+      toolCallId: 'call-5',
+      toolName: 'Bash',
+      sourceText: 'rm -rf /',
+      allowedDomains: new Set(),
+      sandboxMode: 'unsandboxed',
+      privilegeReason: 'need host execution',
+      criticalReason: 'recursive delete of a root-level path',
+      operation: async () => ({ ok: false, sandboxed: true, outputText: 'unreachable' }),
+      unsandboxedOperation: async () => ({ ok: true, sandboxed: false, outputText: 'unreachable' }),
+      permissionCallback,
+    });
+
+    expect(permissionCallback).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolName: 'SandboxUnsandboxedAccess',
+        detail: expect.stringContaining('recursive delete of a root-level path'),
+        toolInput: expect.objectContaining({
+          criticalReason: 'recursive delete of a root-level path',
+        }),
+      })
+    );
+  });
 });

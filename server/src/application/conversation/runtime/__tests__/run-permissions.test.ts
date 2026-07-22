@@ -518,6 +518,41 @@ describe('createPermissionCallback strict plan mode', () => {
     expect(decision.message).toContain('Denied by strict Plan Mode');
   });
 
+  it.each(['mcp__fs__write_file', 'LoadExternalTool'])(
+    'denies external tool %s when plan mode is run-requested (not session-forced)',
+    async toolName => {
+      const input = createInput();
+      input.modeValue = 'plan'; // forcedPlanBySession stays false
+      const callback = createPermissionCallback(input as never);
+      const decision = await callback({
+        requestId: `req-${toolName}`,
+        toolName,
+        toolInput: {},
+        detail: toolName,
+      } as never);
+      expect(decision.behavior).toBe('deny');
+      expect(decision.message).toContain('Denied by strict Plan Mode');
+    }
+  );
+
+  it('does not widen the strict gate to builtin tools when plan mode is only run-requested', async () => {
+    const input = createInput();
+    input.modeValue = 'plan'; // forcedPlanBySession stays false
+    const callback = createPermissionCallback(input as never);
+    const result = await shortRace(
+      callback({
+        requestId: 'req-write-nonforced',
+        toolName: 'Write',
+        toolInput: {},
+        detail: 'write file',
+      } as never)
+    );
+    expect(wasStrictDenied()).toBe(false);
+    if (result !== 'pending') {
+      expect(result.message ?? '').not.toContain('Denied by strict Plan Mode');
+    }
+  });
+
   it.each(['EnterPlanMode', 'ExitPlanMode', 'ReadSymbol', 'AstGrep', 'Memory'])(
     'does not strict-deny read-only tool %s',
     async toolName => {

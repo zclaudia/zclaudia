@@ -44,6 +44,8 @@ export function buildSandboxUnsandboxedRequest(input: {
   toolName: 'Bash' | 'Eval';
   commandPreview: string;
   privilegeReason: string;
+  /** Set when the command also matched a critical-risk Bash pattern — the approver must see it. */
+  criticalReason?: string;
 }): PermissionRequest {
   return {
     requestId: input.requestId,
@@ -52,10 +54,14 @@ export function buildSandboxUnsandboxedRequest(input: {
       originalToolName: input.toolName,
       command: input.commandPreview,
       privilegeReason: input.privilegeReason,
+      ...(input.criticalReason ? { criticalReason: input.criticalReason } : {}),
     },
     detail:
       `The model is requesting host execution for this one ${input.toolName} call. ` +
-      `Reason: ${input.privilegeReason}. This does not prove the previous failure was caused by sandbox policy.`,
+      `Reason: ${input.privilegeReason}. This does not prove the previous failure was caused by sandbox policy.` +
+      (input.criticalReason
+        ? ` WARNING: this command also matched a critical-risk pattern (${input.criticalReason}).`
+        : ''),
     timeoutSeconds: 0,
     timeoutBehavior: 'deny',
   };

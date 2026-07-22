@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { buildAgentHooks, truncateContent, DEFAULT_OUTPUT_LIMIT_BYTES } from '../agent-hooks.js';
+import { PendingArgOverrides } from '../pending-arg-overrides.js';
 
 describe('truncateContent', () => {
   it('passes through when total size is under limit', () => {
@@ -150,7 +151,28 @@ describe('buildAgentHooks.beforeToolCall', () => {
     expect(permissionCallback.mock.calls[0][0].toolName).toBe('Read');
   });
 
-  it('returns args replacement when permissionCallback returns updatedInput', async () => {
+  it('records updatedInput into the per-run override store (pi ignores the `{ args }` return)', async () => {
+    // pi-agent-core honors only block/reason from BeforeToolCallResult, so the
+    // returned `{ args }` is forward-compat only; the real channel that carries
+    // the rewrite into tool execution is the shared PendingArgOverrides store,
+    // consumed by the execute wrapper buildTools installs.
+    const permissionCallback = vi
+      .fn()
+      .mockResolvedValue({ behavior: 'allow', updatedInput: { path: '/safer/path' } });
+    const argOverrides = new PendingArgOverrides();
+    const hooks = buildAgentHooks({ permissionCallback, argOverrides });
+    const result = await hooks.beforeToolCall!({
+      toolCall: fakeToolCall,
+      args: fakeToolCall.arguments,
+    } as any);
+    expect(result).toEqual({ args: { path: '/safer/path' } });
+    expect(permissionCallback.mock.calls[0][0].toolName).toBe('Read');
+    // Keyed by tool-call id; one-shot consume semantics live in the store.
+    expect(argOverrides.consume(fakeToolCall.id)).toEqual({ path: '/safer/path' });
+    expect(argOverrides.consume(fakeToolCall.id)).toBeUndefined();
+  });
+
+  it('does not record an override when no store is wired (no crash, `{ args }` still returned)', async () => {
     const permissionCallback = vi
       .fn()
       .mockResolvedValue({ behavior: 'allow', updatedInput: { path: '/safer/path' } });
@@ -160,7 +182,6 @@ describe('buildAgentHooks.beforeToolCall', () => {
       args: fakeToolCall.arguments,
     } as any);
     expect(result).toEqual({ args: { path: '/safer/path' } });
-    expect(permissionCallback.mock.calls[0][0].toolName).toBe('Read');
   });
 
   it('falls back to a default deny reason when callback gives no message', async () => {
@@ -496,6 +517,7 @@ describe('user hooks integration', () => {
       os.tmpdir(),
       `zc-hook-cap-${process.pid}-${Math.random().toString(36).slice(2)}.json`
     );
+    const argOverrides = new PendingArgOverrides();
     const hooks = buildAgentHooks({
       permissionCallback: vi.fn().mockResolvedValue({
         behavior: 'allow',
@@ -503,9 +525,16 @@ describe('user hooks integration', () => {
       }),
       userHooks: [{ event: 'PreToolUse', command: `cat - > "${capture}"` }],
       cwd: process.cwd(),
+      argOverrides,
     });
     const result = await hooks.beforeToolCall!(bashCall as any);
-    expect(result).toEqual({ args: { command: 'echo SECRETPASS | sudo -S x' } }); // updatedInput still applied to the TOOL
+    // `{ args }` is ignored by pi-agent-core; the rewrite reaches the TOOL via
+    // the override store consumed by the wrapped execute (see
+    // arg-override-passthrough.test.ts for the end-to-end proof).
+    expect(result).toEqual({ args: { command: 'echo SECRETPASS | sudo -S x' } });
+    expect(argOverrides.consume(bashCall.toolCall.id)).toEqual({
+      command: 'echo SECRETPASS | sudo -S x',
+    });
     const seen = fs.readFileSync(capture, 'utf8');
     expect(seen).toContain('git push'); // hook saw the original
     expect(seen).not.toContain('SECRETPASS'); // hook never saw the credential

@@ -3,6 +3,8 @@ import * as path from 'path';
 import { SandboxManager } from '@anthropic-ai/sandbox-runtime';
 import type { SandboxRuntimeConfig } from '@anthropic-ai/sandbox-runtime';
 
+import { scrubEnv } from './env-scrub.js';
+
 /** Expand a leading `~/` to an absolute home path (silent non-match = no protection; we don't rely on the lib's ~ handling). */
 function expandHome(p: string): string {
   return p.startsWith('~/') ? path.join(os.homedir(), p.slice(2)) : p;
@@ -159,8 +161,10 @@ export async function wrapCommand(command: string, opts: WrapOptions): Promise<W
       customConfig,
       opts.signal
     );
-    // env is already the full process.env — use as-is (spike-confirmed; do NOT merge).
-    return { argv: wrapped.argv, env: wrapped.env, sandboxed: true };
+    // The lib returns the full process.env (spike-confirmed; do NOT merge) —
+    // scrub secret-looking names before handing it to the sandboxed child so
+    // credentials are not exposed inside the sandbox's network allow-list.
+    return { argv: wrapped.argv, env: wrapped.env ? scrubEnv(wrapped.env) : wrapped.env, sandboxed: true };
   } catch (err) {
     console.warn('[sandbox] wrapCommand failed; degrading for this command:', err);
     return { sandboxed: false };

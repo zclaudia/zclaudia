@@ -42,11 +42,30 @@ describe('EnterPlanMode / ExitPlanMode builtins', () => {
     expect(res.content[0].text).toMatch(/next turn|read-only/i);
   });
 
-  it('ExitPlanMode (bare) clears planning status', async () => {
+  it('ExitPlanMode (bare) is rejected and keeps planning status', async () => {
     await tools().EnterPlanMode.execute('p1', {});
+    const spy = vi.spyOn(interactionDispatcher, 'dispatchAndWait');
     const res = await tools().ExitPlanMode.execute('p2', {});
+    expect(res.details.ok).toBe(false);
+    expect(res.details.error).toBe('plan_required');
+    expect(planStatus()).toBe('planning');
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('ExitPlanMode rejects whitespace-only plans', async () => {
+    await tools().EnterPlanMode.execute('p1', {});
+    const spy = vi.spyOn(interactionDispatcher, 'dispatchAndWait');
+    const res = await tools().ExitPlanMode.execute('p2', { plan: '   \n\t  ' });
+    expect(res.details.ok).toBe(false);
+    expect(res.details.error).toBe('plan_required');
+    expect(planStatus()).toBe('planning');
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('ExitPlanMode (bare) is a no-op when plan mode is not active', async () => {
+    const res = await tools().ExitPlanMode.execute('p1', {});
     expect(res.details.ok).toBe(true);
-    expect(res.details.wasActive).toBe(true);
+    expect(res.details.wasActive).toBe(false);
     expect(planStatus()).toBe(null);
   });
 

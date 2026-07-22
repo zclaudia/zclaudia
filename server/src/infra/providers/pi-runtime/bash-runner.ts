@@ -12,6 +12,8 @@ import {
 import * as os from 'os';
 import * as path from 'path';
 
+import { scrubEnv } from './env-scrub.js';
+
 export interface BashRunOptions {
   command: string;
   cwd: string;
@@ -24,7 +26,7 @@ export interface BashRunOptions {
   sandbox?: { argv: string[]; env: NodeJS.ProcessEnv };
   /** Write this to the child's stdin then close it. Default: stdin ignored. */
   stdin?: string;
-  /** Extra env vars merged over process.env (non-sandbox path only). */
+  /** Extra env vars merged over the scrubbed process.env (non-sandbox path only); explicit, so it always wins over scrubbing. */
   extraEnv?: Record<string, string>;
   /**
    * When set and the command is still running after this many ms, resolve early
@@ -252,7 +254,7 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
       const { shell, args } = resolveShell();
       child = spawn(shell, [...args, command], {
         cwd,
-        env: opts.extraEnv ? { ...process.env, ...opts.extraEnv } : process.env,
+        env: scrubEnv(process.env, opts.extraEnv),
         detached: process.platform !== 'win32',
         stdio: [stdinMode, 'pipe', 'pipe'],
         windowsHide: true,

@@ -80,12 +80,31 @@ describe('wrapCommand', () => {
     const r = await wrapCommand('echo hi', { workspaceRoot: '/ws' });
     expect(r.sandboxed).toBe(true);
     expect(r.argv?.[0]).toBe('/bin/bash');
-    expect(r.env).toEqual({ PATH: '/usr/bin' }); // used as-is, not merged with process.env
+    expect(r.env).toEqual({ PATH: '/usr/bin' }); // no secrets to scrub; not merged with process.env
     const cfg = wrapSpy.mock.calls[0][2] as any;
     expect(cfg.filesystem.allowWrite).toContain('/ws');
     expect(Array.isArray(cfg.filesystem.denyWrite)).toBe(true); // required field present
     expect(Array.isArray(cfg.filesystem.denyRead)).toBe(true);
     expect(cfg.network.allowedDomains).toEqual(DEFAULT_ALLOWED_DOMAINS);
+  });
+
+  it('scrubs secret-looking vars from the wrapped sandbox env (P0-3)', async () => {
+    mockAvailable();
+    vi.spyOn(sandboxRuntime.SandboxManager, 'wrapWithSandboxArgv').mockResolvedValue({
+      argv: ['/bin/bash', '-c', 'sandboxed echo'],
+      env: {
+        PATH: '/usr/bin',
+        https_proxy: 'http://127.0.0.1:15001', // sandbox proxy must survive
+        ANTHROPIC_API_KEY: 'sk-ant-secret',
+        AWS_SECRET_ACCESS_KEY: 'aws-secret',
+      },
+    } as any);
+    const r = await wrapCommand('echo hi', { workspaceRoot: '/ws' });
+    expect(r.sandboxed).toBe(true);
+    expect(r.env?.PATH).toBe('/usr/bin');
+    expect(r.env?.https_proxy).toBe('http://127.0.0.1:15001');
+    expect(r.env?.ANTHROPIC_API_KEY).toBeUndefined();
+    expect(r.env?.AWS_SECRET_ACCESS_KEY).toBeUndefined();
   });
 
   it('read-only mode: allowWrite excludes the workspace (tmp only)', async () => {

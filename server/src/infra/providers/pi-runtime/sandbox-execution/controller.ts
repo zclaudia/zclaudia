@@ -18,6 +18,11 @@ export interface SandboxEscalationInput {
   allowedDomains: ReadonlySet<string>;
   sandboxMode: SandboxPrivilegeMode;
   privilegeReason?: string;
+  /**
+   * When the command matched a critical-risk Bash pattern, carry the match
+   * reason into any unsandboxed approval request so the approver sees it.
+   */
+  criticalReason?: string;
   operation: (grants: SandboxGrant[]) => Promise<SandboxOperationResult>;
   unsandboxedOperation?: () => Promise<SandboxOperationResult>;
   permissionCallback?: PermissionCallback;
@@ -115,6 +120,7 @@ async function requestUnsandboxed(input: SandboxEscalationInput): Promise<Sandbo
       toolName: input.toolName,
       commandPreview: input.sourceText,
       privilegeReason: input.privilegeReason,
+      criticalReason: input.criticalReason,
     })
   );
   if (decision.behavior !== 'allow') {

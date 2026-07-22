@@ -268,7 +268,13 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
         resolve(decision);
       };
 
-      if (forcedPlanBySession && modeValue === 'plan') {
+      // Defense in depth (P0-6): external/MCP tools are never provably
+      // read-only, so they are denied in every plan-mode run — including runs
+      // where plan mode was requested per-run (modeValue === 'plan') without
+      // being forced by the session state.
+      const isExternalToolCall =
+        request.toolName.startsWith('mcp__') || request.toolName === 'LoadExternalTool';
+      if ((forcedPlanBySession || isExternalToolCall) && modeValue === 'plan') {
         // Single source of truth for what's read-only — shared READ_ONLY_TOOL_NAMES,
         // which already includes EnterPlanMode/ExitPlanMode/Memory/ReadSymbol/AstGrep.
         const normalizedTool = normalizeToolName(request.toolName);

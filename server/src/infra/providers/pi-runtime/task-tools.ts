@@ -78,6 +78,9 @@ export function createAgentTool(
         },
       },
       required: ['prompt'],
+      // Model-supplied keys outside this list are rejected by schema-aware
+      // providers; execute() additionally never reads them (see below).
+      additionalProperties: false,
     }),
     execute: async (toolCallId: string, params: unknown) => {
       const args = toolParams(toolCallId, params);
@@ -98,8 +101,11 @@ export function createAgentTool(
         metadata: {
           prompt: args.prompt,
           wait: Boolean(args.wait),
-          permissionOverride:
-            args.permission_override ?? args.permissionOverride ?? permissionOverride,
+          // Security (P0-2): never read permission_override/permissionOverride
+          // from model-supplied args — a prompt-injected model could otherwise
+          // mint a fully autonomous sub-agent (e.g. bash:'allow'). Only the
+          // parent-provided factory override may flow into the sub-agent policy.
+          permissionOverride,
           cwd,
           projectId,
           ...(args.isolation === 'worktree' ? { isolation: 'worktree' } : {}),

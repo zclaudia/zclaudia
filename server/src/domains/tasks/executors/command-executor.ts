@@ -4,6 +4,7 @@ import * as os from 'os';
 import * as path from 'path';
 import type { TaskRecord, TaskStatus } from '@zclaudia/shared/core/task';
 import { resolveShell, killProcessTree } from '../../../infra/providers/pi-runtime/bash-runner.js';
+import { scrubEnv } from '../../../infra/providers/pi-runtime/env-scrub.js';
 import * as sandbox from '../../../infra/providers/pi-runtime/sandbox.js';
 import {
   networkGrantToAllowedDomain,
@@ -108,7 +109,9 @@ export class CommandTaskExecutor implements TaskExecutor {
       const { shell, args } = resolveShell();
       const spawnFile = wrap.sandboxed ? wrap.argv![0] : shell;
       const spawnArgs = wrap.sandboxed ? wrap.argv!.slice(1) : [...args, command];
-      const spawnEnv = wrap.sandboxed ? wrap.env! : process.env;
+      // Sandbox env arrives already scrubbed by wrapCommand; the unsandboxed
+      // path scrubs here (same policy as the foreground bash-runner).
+      const spawnEnv = wrap.sandboxed ? wrap.env! : scrubEnv(process.env);
       child = spawn(spawnFile, spawnArgs, {
         cwd,
         env: spawnEnv,

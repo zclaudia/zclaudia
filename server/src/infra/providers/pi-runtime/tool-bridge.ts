@@ -3,6 +3,7 @@ import { ALL_TOOL_NAMES, normalizeToolName, type ToolName } from '@zclaudia/shar
 import { BUILTIN_TOOL_FACTORIES } from './tool-catalog.js';
 import { buildEffectiveToolOptions, type ToolBridgeOptions } from './tool-options.js';
 import { withToolExecutionObserver, withToolName } from './tool-execution-observer.js';
+import { withPendingArgOverrides } from './pending-arg-overrides.js';
 
 export { ALL_TOOL_NAMES, type ToolName };
 export type { ToolBridgeOptions } from './tool-options.js';
@@ -37,7 +38,14 @@ export function buildTools(cwd: string, options?: ToolBridgeOptions): AgentTool<
     const tool = override
       ? withToolName(override, name, override.label ?? name)
       : BUILTIN_TOOL_FACTORIES[name](cwd, effectiveOptions);
-    result.push(withToolExecutionObserver(tool, name, cwd, effectiveOptions.toolExecutionObserver));
+    // The arg-override substitution sits INSIDE the observer wrapper on
+    // purpose: observer events (telemetry, touched paths) should report the
+    // model-visible args, not permission rewrites that may embed decrypted
+    // credentials (sudo rewrite). Only the tool itself receives the rewrite.
+    const withOverrides = effectiveOptions.argOverrides
+      ? withPendingArgOverrides(tool, effectiveOptions.argOverrides)
+      : tool;
+    result.push(withToolExecutionObserver(withOverrides, name, cwd, effectiveOptions.toolExecutionObserver));
   }
 
   return result;

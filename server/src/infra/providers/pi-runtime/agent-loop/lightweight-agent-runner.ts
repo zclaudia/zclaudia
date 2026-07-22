@@ -14,6 +14,7 @@ import {
 import { LlmProfileRepository } from '../../../../domains/llm-profiles/repository.js';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import { buildAgentHooks } from '../agent-hooks.js';
+import { PendingArgOverrides } from '../pending-arg-overrides.js';
 import { buildModel } from '../build-model.js';
 import {
   AgentLoopTimeoutError,
@@ -105,6 +106,10 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
 
         return { behavior: 'allow' } as const;
       };
+      // One store per run: carries permission-approved updatedInput rewrites
+      // from the beforeToolCall hook into the wrapped tool executes (pi-agent-core
+      // drops `{ args }` from BeforeToolCallResult).
+      const argOverrides = new PendingArgOverrides();
       const tools = buildAgentLoopTools({
         cwd: request.cwd,
         toolsetId: request.toolset.id,
@@ -113,12 +118,14 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
         permissionCallback,
         sessionId: request.permissions?.toolSessionId,
         runId: request.owner.id,
+        argOverrides,
       });
       const hooks = buildAgentHooks({
         permissionCallback,
         userHooks: request.permissions?.userHooks,
         cwd: request.cwd,
         sessionId: resolvedContext.contextId,
+        argOverrides,
       });
 
       const renderedInput = renderInput(currentInput, resolvedContext.loadedEvents);

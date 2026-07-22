@@ -37,6 +37,7 @@ If a hard gate fails, the batch cannot be considered healthy until the failure i
 | 04    | `apps/desktop/` data and connection layer | Complete | [04-desktop-data.md](04-desktop-data.md)     |
 | 05    | `apps/desktop/` UI feature layer          | Complete | [05-desktop-ui.md](05-desktop-ui.md)         |
 | 06    | `e2e/` and `scripts/`                     | Complete | [06-e2e-scripts.md](06-e2e-scripts.md)       |
+| 07    | Agent tools (pi-runtime + agent-tools)    | Complete | [07-agent-tools.md](07-agent-tools.md)       |
 
 ## Persistent Findings
 

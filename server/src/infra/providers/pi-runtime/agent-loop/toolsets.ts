@@ -5,6 +5,7 @@ import type {
   AgentLoopPermissionMode,
 } from '../../../../domains/agent-loop/index.js';
 import { buildTools } from '../tool-bridge.js';
+import type { PendingArgOverrides } from '../pending-arg-overrides.js';
 
 const SANDBOX_PERMISSION_TOOLS = [
   'CriticalBashCommand',
@@ -101,6 +102,9 @@ export function buildAgentLoopTools(args: {
   permissionCallback?: AgentLoopPermissionCallback;
   sessionId?: string;
   runId?: string;
+  /** Per-run store shared with buildAgentHooks so permission-approved
+   *  updatedInput rewrites reach tool execution (pi drops `{ args }`). */
+  argOverrides?: PendingArgOverrides;
 }): AgentTool[] {
   const descriptor = getAgentLoopToolsetDescriptor(args.toolsetId);
   if (!descriptor) {
@@ -119,5 +123,6 @@ export function buildAgentLoopTools(args: {
     sessionId: args.sessionId,
     runId: args.runId,
     sandboxReadOnly: descriptor.sandboxReadOnly,
+    argOverrides: args.argOverrides,
   });
 }

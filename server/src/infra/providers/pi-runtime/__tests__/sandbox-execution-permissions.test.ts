@@ -43,4 +43,20 @@ describe('sandbox execution permission requests', () => {
       privilegeReason: 'Need to contact a local development server bound outside the sandbox.',
     });
   });
+
+  it('discloses a critical-pattern match in the unsandboxed request (P0-4)', () => {
+    const request = buildSandboxUnsandboxedRequest({
+      requestId: 'call-3:unsandboxed',
+      toolName: 'Bash',
+      commandPreview: 'rm -rf /',
+      privilegeReason: 'need host execution',
+      criticalReason: 'recursive delete of a root-level path',
+    });
+
+    expect(request.detail).toContain('critical-risk pattern');
+    expect(request.detail).toContain('recursive delete of a root-level path');
+    expect(request.toolInput).toMatchObject({
+      criticalReason: 'recursive delete of a root-level path',
+    });
+  });
 });

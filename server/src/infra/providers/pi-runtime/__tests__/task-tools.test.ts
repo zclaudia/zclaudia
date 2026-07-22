@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import Database from 'better-sqlite3';
 
+import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
 import * as taskTools from '../task-tools.js';
 import { createAgentTool, createMonitorTool, createTaskOutputTool } from '../task-tools.js';
 
@@ -61,5 +63,78 @@ describe('task bridge tools', () => {
       ok: false,
       code: 'invalid_tail_lines',
     });
+  });
+
+  it('Agent never forwards model-supplied permission overrides into task metadata (P0-2)', async () => {
+    const db = new Database(':memory:');
+    applyMigrations(db);
+    try {
+      const start = vi.fn(async (task: { id: string }) => ({
+        executorRef: { providerType: 'test', taskId: task.id },
+      }));
+      const executor = {
+        start,
+        wait: vi.fn(async () => ({ status: 'completed', result: {} })),
+        stop: vi.fn(async () => ({ status: 'stopped', result: {} })),
+      };
+      const parentOverride = { bash: 'ask' };
+      const tool = createAgentTool(
+        '/tmp',
+        'session-1',
+        'run-1',
+        db,
+        parentOverride as never,
+        executor as never
+      ) as any;
+
+      const res = await tool.execute('agent-sec-1', {
+        prompt: 'do things',
+        permission_override: { bash: 'allow' },
+        permissionOverride: { bash: 'allow' },
+      });
+
+      expect(JSON.parse(res.content[0].text)).toMatchObject({ ok: true });
+      expect(start).toHaveBeenCalledTimes(1);
+      const task = start.mock.calls[0][0] as { metadata: Record<string, unknown> };
+      // Only the parent-provided factory override reaches the sub-agent task;
+      // the model-supplied keys are ignored entirely.
+      expect(task.metadata.permissionOverride).toEqual(parentOverride);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('Agent drops model-supplied overrides when no parent override exists (P0-2)', async () => {
+    const db = new Database(':memory:');
+    applyMigrations(db);
+    try {
+      const start = vi.fn(async (task: { id: string }) => ({
+        executorRef: { providerType: 'test', taskId: task.id },
+      }));
+      const executor = {
+        start,
+        wait: vi.fn(async () => ({ status: 'completed', result: {} })),
+        stop: vi.fn(async () => ({ status: 'stopped', result: {} })),
+      };
+      const tool = createAgentTool(
+        '/tmp',
+        'session-1',
+        'run-1',
+        db,
+        undefined,
+        executor as never
+      ) as any;
+
+      const res = await tool.execute('agent-sec-2', {
+        prompt: 'do things',
+        permission_override: { bash: 'allow' },
+      });
+
+      expect(JSON.parse(res.content[0].text)).toMatchObject({ ok: true });
+      const task = start.mock.calls[0][0] as { metadata: Record<string, unknown> };
+      expect(task.metadata.permissionOverride).toBeUndefined();
+    } finally {
+      db.close();
+    }
   });
 });

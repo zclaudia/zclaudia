@@ -1,9 +1,11 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type { Database } from 'better-sqlite3';
 import { lookup } from 'dns/promises';
-import { isIP } from 'net';
+import type { LookupFunction } from 'net';
+import { Agent } from 'undici';
 
 import { getWebSearchProviderConfig } from '../../../domains/web-search/config.js';
+import { isPrivateOrReservedIp } from '../../../utils/ip-guard.js';
 import { extractPdfText } from './rich-read.js';
 import { htmlToMarkdown, stripHtmlToText, shouldExtractAsHtml } from './web-extract.js';
 import { errorResult, jsonResult, textResult, toolParams, truncateText } from './tool-common.js';
@@ -463,42 +465,37 @@ function createWebSearchProviders(db?: Database): WebSearchProvider[] {
   return providers;
 }
 
-function isPrivateIpAddress(address: string): boolean {
-  const version = isIP(address);
-  if (version === 0) return false;
-  if (version === 6) {
-    const lower = address.toLowerCase();
-    return (
-      lower === '::1' ||
-      lower === '::' ||
-      lower.startsWith('fc') ||
-      lower.startsWith('fd') ||
-      lower.startsWith('fe80:') ||
-      lower.startsWith('::ffff:127.') ||
-      lower.startsWith('::ffff:10.') ||
-      lower.startsWith('::ffff:192.168.') ||
-      /^::ffff:172\.(1[6-9]|2\d|3[01])\./.test(lower)
-    );
-  }
+interface ResolvedAddress {
+  address: string;
+  family: number;
+}
 
-  const parts = address.split('.').map(part => Number(part));
-  const [a, b] = parts;
-  return (
-    a === 10 ||
-    a === 127 ||
-    (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168) ||
-    (a === 100 && b >= 64 && b <= 127) ||
-    (a === 192 && b === 0) ||
-    a >= 224 ||
-    a === 0
-  );
+/**
+ * Build an undici dispatcher whose connect-time DNS lookup returns exactly the
+ * addresses that passed `validatePublicHttpUrl`. This closes the
+ * check-then-fetch TOCTOU (DNS rebinding): even if the attacker's DNS answer
+ * flips to a private IP between validation and connect, the socket can only
+ * ever reach the pre-validated public addresses. TLS SNI/cert validation is
+ * unaffected — only address resolution is pinned.
+ */
+function createPinnedDispatcher(addresses: ResolvedAddress[]): Agent {
+  const pinnedLookup: LookupFunction = (_hostname, options, callback) => {
+    if (options.all) {
+      callback(
+        null,
+        addresses.map(({ address, family }) => ({ address, family }))
+      );
+      return;
+    }
+    const first = addresses[0];
+    callback(null, first.address, first.family);
+  };
+  return new Agent({ connect: { lookup: pinnedLookup } });
 }
 
 async function validatePublicHttpUrl(
   rawUrl: string
-): Promise<{ ok: true; url: URL } | { ok: false; reason: string }> {
+): Promise<{ ok: true; url: URL; addresses: ResolvedAddress[] } | { ok: false; reason: string }> {
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);
@@ -514,20 +511,25 @@ async function validatePublicHttpUrl(
   if (hostname === 'localhost' || hostname.endsWith('.localhost')) {
     return { ok: false, reason: 'blocked_private_network' };
   }
-  if (isPrivateIpAddress(hostname)) {
+  if (isPrivateOrReservedIp(hostname)) {
     return { ok: false, reason: 'blocked_private_network' };
   }
 
+  let addresses: ResolvedAddress[];
   try {
-    const addresses = await lookup(hostname, { all: true, verbatim: true });
-    if (addresses.some(({ address }) => isPrivateIpAddress(address))) {
-      return { ok: false, reason: 'blocked_private_network' };
-    }
+    // URL hostnames keep the brackets for IPv6 literals; strip them for lookup.
+    addresses = await lookup(hostname.replace(/^\[|\]$/g, ''), { all: true, verbatim: true });
   } catch {
     return { ok: false, reason: 'dns_lookup_failed' };
   }
+  if (
+    addresses.length === 0 ||
+    addresses.some(({ address }) => isPrivateOrReservedIp(address))
+  ) {
+    return { ok: false, reason: 'blocked_private_network' };
+  }
 
-  return { ok: true, url: parsed };
+  return { ok: true, url: parsed, addresses };
 }
 
 interface FetchBodyResult {
@@ -655,6 +657,7 @@ async function fetchPublicHttpBody(
       };
     }
 
+    const dispatcher = createPinnedDispatcher(validation.addresses);
     const requestInit = {
       redirect: 'manual',
       cache: options.useCache ? 'default' : 'no-store',
@@ -665,55 +668,63 @@ async function fetchPublicHttpBody(
       },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     } as RequestInit & { cache?: 'default' | 'no-store' };
+    // Node's fetch accepts an undici dispatcher; typed separately because the
+    // global RequestInit type references a different undici-types version.
+    (requestInit as { dispatcher?: unknown }).dispatcher = dispatcher;
 
-    const response = await fetch(validation.url.toString(), requestInit);
+    try {
+      const response = await fetch(validation.url.toString(), requestInit);
 
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers?.get?.('location');
-      if (!location) {
-        const body = await readResponseBody(response, options.maxBytes);
-        return {
-          ok: true,
-          value: {
-            response,
-            finalUrl: validation.url.toString(),
-            redirects,
-            body: body.body,
-            bytesRead: body.bytesRead,
-            bodyTruncated: body.truncated,
-            ...(body.contentLength !== undefined ? { contentLength: body.contentLength } : {}),
-          },
-        };
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers?.get?.('location');
+        if (!location) {
+          const body = await readResponseBody(response, options.maxBytes);
+          return {
+            ok: true,
+            value: {
+              response,
+              finalUrl: validation.url.toString(),
+              redirects,
+              body: body.body,
+              bytesRead: body.bytesRead,
+              bodyTruncated: body.truncated,
+              ...(body.contentLength !== undefined ? { contentLength: body.contentLength } : {}),
+            },
+          };
+        }
+        if (redirectCount >= MAX_REDIRECTS) {
+          return {
+            ok: false,
+            code: 'too_many_redirects',
+            message: `WebFetch exceeded ${MAX_REDIRECTS} redirects`,
+            details: { url: validation.url.toString(), redirects },
+          };
+        }
+
+        const nextUrl = new URL(location, validation.url).toString();
+        redirects.push({ from: validation.url.toString(), to: nextUrl, status: response.status });
+        await response.body?.cancel();
+        currentUrl = nextUrl;
+        continue;
       }
-      if (redirectCount >= MAX_REDIRECTS) {
-        return {
-          ok: false,
-          code: 'too_many_redirects',
-          message: `WebFetch exceeded ${MAX_REDIRECTS} redirects`,
-          details: { url: validation.url.toString(), redirects },
-        };
-      }
 
-      const nextUrl = new URL(location, validation.url).toString();
-      redirects.push({ from: validation.url.toString(), to: nextUrl, status: response.status });
-      await response.body?.cancel();
-      currentUrl = nextUrl;
-      continue;
+      const body = await readResponseBody(response, options.maxBytes);
+      return {
+        ok: true,
+        value: {
+          response,
+          finalUrl: validation.url.toString(),
+          redirects,
+          body: body.body,
+          bytesRead: body.bytesRead,
+          bodyTruncated: body.truncated,
+          ...(body.contentLength !== undefined ? { contentLength: body.contentLength } : {}),
+        },
+      };
+    } finally {
+      // Body is fully read (or cancelled) by now; release the pinned agent.
+      await dispatcher.close().catch(() => undefined);
     }
-
-    const body = await readResponseBody(response, options.maxBytes);
-    return {
-      ok: true,
-      value: {
-        response,
-        finalUrl: validation.url.toString(),
-        redirects,
-        body: body.body,
-        bytesRead: body.bytesRead,
-        bodyTruncated: body.truncated,
-        ...(body.contentLength !== undefined ? { contentLength: body.contentLength } : {}),
-      },
-    };
   }
 
   return {

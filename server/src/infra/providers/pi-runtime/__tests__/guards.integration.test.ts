@@ -141,6 +141,41 @@ describe('critical Bash command guard (integration)', () => {
     expect(res.details.ok).toBe(true);
     expect(asked).toBe(0);
   });
+
+  it('refuses sandbox_mode:"unsandboxed" for critical commands even after approval (P0-4)', async () => {
+    const dir = makeWorkspace();
+    const res = await getTool(dir, 'Bash', {
+      permissionCallback: async () => ({ behavior: 'allow' }),
+    }).execute('b1', {
+      command: CRITICAL_BUT_HARMLESS,
+      sandbox_mode: 'unsandboxed',
+      privilege_reason: 'need host access',
+    });
+    const executed = existsSync(path.join(dir, 'ran.marker'));
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.error).toBe('sandbox_required_for_critical_command');
+    expect(res.details.reason).toBeDefined();
+    expect(executed).toBe(false);
+  });
+
+  it('still allows approved unsandboxed execution for non-critical commands', async () => {
+    const dir = makeWorkspace();
+    let request: any;
+    const res = await getTool(dir, 'Bash', {
+      permissionCallback: async (req: any) => {
+        request = req;
+        return { behavior: 'allow' };
+      },
+    }).execute('b1', {
+      command: 'echo host-run',
+      sandbox_mode: 'unsandboxed',
+      privilege_reason: 'test host execution',
+    });
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+    expect(res.details.sandboxed).toBe(false);
+    expect(request.toolName).toBe('SandboxUnsandboxedAccess');
+  });
 });
 
 describe('edit-after-summary / edit-after-range guard (Option B)', () => {
