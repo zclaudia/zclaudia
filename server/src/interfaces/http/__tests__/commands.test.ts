@@ -584,6 +584,19 @@ describe('POST /api/commands/execute — args + substitution', () => {
     expect(res.status).toBe(403);
   });
 
+  it('accepts an in-base file whose name starts with ".." (e.g. ..data.md)', async () => {
+    // Regression: the boundary check must only reject `..` itself or `..<sep>…`
+    // escapes, not legitimate in-base names that merely start with two dots.
+    const cmdPath = writeCustomCmd('..data', '# Dot Dot Data');
+    const res = await request(app).post('/api/commands/execute').send({
+      commandName: '/dotdot',
+      commandPath: cmdPath,
+      args: [],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.data.content).toBe('# Dot Dot Data');
+  });
+
   it('legacy: args path still works when no rawArgs provided (regression check)', async () => {
     const cmdPath = writeCustomCmd('legacy', '$ARGUMENTS done');
     const res = await request(app)

@@ -175,6 +175,25 @@ describe('skill-tools (pi-backed)', () => {
     ).toEqual(['always-on', 'frontend-review']);
   });
 
+  it('matches patterns for in-cwd files whose names start with ".."', async () => {
+    // Regression: `..data/x` inside cwd is not a `..` escape and must still match.
+    writeSkill(
+      WORKSPACE_SKILLS_DIR,
+      'dotdot-data',
+      'name: dotdot-data\ndescription: dotdot\npaths:\n  - ..data/**'
+    );
+    const env = createExecutionEnv(tmpRoot);
+    await loadAndCacheSkills(env);
+
+    expect(getEligibleDiscoveredSkills().map(skill => skill.id)).not.toContain('dotdot-data');
+
+    // A path that genuinely escapes cwd must not activate the skill.
+    expect(activateConditionalSkillsForPaths(['/elsewhere/..data/file.txt'], '/repo')).toEqual([]);
+
+    const activated = activateConditionalSkillsForPaths(['/repo/..data/file.txt'], '/repo');
+    expect(activated).toEqual(['dotdot-data']);
+  });
+
   it('keeps hook-triggered skills out of eligible catalog until a matching tool activates them', async () => {
     writeSkill(
       WORKSPACE_SKILLS_DIR,

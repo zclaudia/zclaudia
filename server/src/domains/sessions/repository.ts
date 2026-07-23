@@ -50,6 +50,14 @@ export class SessionRepository extends BaseRepository<
       .run(autoTitle, autoTitleMsgCount, sessionId);
   }
 
+  /** Monotonic per-session message version (migration 039); 0 when the session is missing. */
+  getMessageVersion(sessionId: string): number {
+    const row = this.db
+      .prepare('SELECT message_version as messageVersion FROM sessions WHERE id = ?')
+      .get(sessionId) as { messageVersion: number } | undefined;
+    return row?.messageVersion ?? 0;
+  }
+
   createQuery(data: Omit<Session, 'id' | 'createdAt' | 'updatedAt'>): {
     sql: string;
     params: any[];

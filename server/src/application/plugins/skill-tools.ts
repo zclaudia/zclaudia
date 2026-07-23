@@ -230,7 +230,14 @@ export function activateConditionalSkillsForPaths(filePaths: string[], cwd: stri
     if (!patterns?.length || activatedConditionalSkillIds.has(id)) continue;
     const matched = filePaths.some(filePath => {
       const relativePath = path.isAbsolute(filePath) ? path.relative(cwd, filePath) : filePath;
-      if (!relativePath || relativePath.startsWith('..') || path.isAbsolute(relativePath))
+      // Outside cwd only when the path escapes via `..`/`..<sep>…` — a file
+      // literally named `..data` inside cwd must still match patterns.
+      if (
+        !relativePath ||
+        relativePath === '..' ||
+        relativePath.startsWith('..' + path.sep) ||
+        path.isAbsolute(relativePath)
+      )
         return false;
       return patterns.some(pattern => minimatch(relativePath, pattern, { dot: true }));
     });

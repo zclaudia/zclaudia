@@ -220,7 +220,11 @@ export function createCommandsRoutes(deps?: CommandsRoutesDeps): Router {
 
       const isUnderBase = (base: string) => {
         const rel = path.relative(base, resolvedPath);
-        return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
+        // Boundary: `..data` is a legitimate in-base name; only `..` itself or
+        // `..<sep>…` escapes the base.
+        return (
+          rel !== '' && rel !== '..' && !rel.startsWith('..' + path.sep) && !path.isAbsolute(rel)
+        );
       };
 
       if (

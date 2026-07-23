@@ -12,6 +12,7 @@ import { extractAndIndexMetadata } from '../../infra/storage/metadata-extractor.
 import { findForegroundActiveRunIdForSession } from '../../utils/run-state.js';
 import { parsePersistedMessageMetadata } from '../../utils/persisted-message.js';
 import { SessionMessageRepository } from './message-repository.js';
+import { SessionRepository } from './repository.js';
 import { listCompactions, type SessionCompaction } from './compaction-tree-read.js';
 import { applyMessagePageBudget } from './message-page-budget.js';
 import type { RunPhase } from '../../application/conversation/runtime/active-run-phase.js';
@@ -51,6 +52,7 @@ export function mountMessageRoutes(
   activeRuns: ActiveRunsMap
 ): void {
   const repo = new SessionMessageRepository(db);
+  const sessionRepo = new SessionRepository(db);
 
   router.get('/:id/messages', (req: Request, res: Response) => {
     try {
@@ -138,9 +140,7 @@ export function mountMessageRoutes(
 
       const activeRunId = findForegroundActiveRunIdForSession(activeRuns, req.params.id);
       const activeRun = activeRunId ? { runId: activeRunId } : null;
-      const versionRow = db
-        .prepare('SELECT message_version as messageVersion FROM sessions WHERE id = ?')
-        .get(req.params.id) as { messageVersion: number } | undefined;
+      const messageVersion = sessionRepo.getMessageVersion(req.params.id);
 
       res.json({
         success: true,
@@ -152,7 +152,7 @@ export function mountMessageRoutes(
             oldestTimestamp,
             newestTimestamp,
             maxOffset,
-            messageVersion: versionRow?.messageVersion ?? 0,
+            messageVersion,
           },
           activeRun,
         },

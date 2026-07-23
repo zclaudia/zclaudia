@@ -248,4 +248,6 @@ Scope: 全部 agent 工具实现，覆盖两个位置：
 12. 新增环境变量：`ZCLAUDIA_SKILL_FORK_TIMEOUT_MS`（默认 10 分钟）。
 13. `noop-edit-guard.ts` 恢复为合法 UTF-8 文本（git/rg 不再当二进制）。
 
-**P2 已知遗留（设计层面，非缺陷）**：`lastPrivilegeKeyByKernelBase` 随会话数微增（无清扫，量级可忽略）；`removeSettledTaskFiles` 仅清理计算路径（自定义 `metadata.resultPath` 遗留行不清理，有意保守）；Glob 10k 流式上限时的 `total` 为下界（已在描述中钉住）；DNS 解析耗时不计入 WebFetch 90s 预算；`interfaces/http/commands.ts:223` 与 `application/plugins/skill-tools.ts:233` 存在同款 `..` 前缀误拒（agent-tools 范围外，建议后续同款修复）；`check:architecture` 预存失败（`domains/sessions/message-routes.ts` 裸 SQL，HEAD 即存在，与本报告范围无关）。
+**P2 已知遗留（设计层面，非缺陷）**：`lastPrivilegeKeyByKernelBase` 随会话数微增（无清扫，量级可忽略）；`removeSettledTaskFiles` 仅清理计算路径（自定义 `metadata.resultPath` 遗留行不清理，有意保守）；Glob 10k 流式上限时的 `total` 为下界（已在描述中钉住）；DNS 解析耗时不计入 WebFetch 90s 预算。
+
+**范围外跟进项 — 已修复（2026-07-23）**：~~`interfaces/http/commands.ts` 与 `application/plugins/skill-tools.ts` 的 `..` 前缀误拒~~ —— 两处边界判断已改为仅拒绝 `..` 本身与 `..<sep>…` 逃逸，`..data` 类合法名不再误拒，各补 1 个回归测试；~~`check:architecture` 预存失败（`domains/sessions/message-routes.ts` 裸 SQL）~~ —— `message_version` 查询已移入 `SessionRepository.getMessageVersion()`，路由改为注入调用，架构检查恢复全绿，补 2 个分支测试（有/无会话）。
