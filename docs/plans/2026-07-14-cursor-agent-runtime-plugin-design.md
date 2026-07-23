@@ -12,14 +12,14 @@ Migrate the Cursor (`cursor-agent`) integration from `my-claudia` into `zclaudia
 
 ## Decisions (locked)
 
-| Topic | Choice |
-|---|---|
-| Scope | Minimal viable (aligned with Claude phase 1): chat stream, resume, cancel |
-| Packaging | Direct `plugins/cursor` sibling to Claude (no server staging) |
-| MCP | Basic host `createToolBridge` + merge into `<cwd>/.cursor/mcp.json` |
-| Modes | `default`, `plan`, `ask` with `modeSwitchSessionPolicy: 'preserve'` |
-| Plan UX | Normalize `switchMode` / `createPlan` into `mode_transition` / `toolSemantic`; **defer** client-side plan decision card |
-| Deferred | Full image pipeline, background tasks, CLI jobs, OAuth hint rewriting, live smoke in CI |
+| Topic     | Choice                                                                                                                  |
+| --------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Scope     | Minimal viable (aligned with Claude phase 1): chat stream, resume, cancel                                               |
+| Packaging | Direct `plugins/cursor` sibling to Claude (no server staging)                                                           |
+| MCP       | Basic host `createToolBridge` + merge into `<cwd>/.cursor/mcp.json`                                                     |
+| Modes     | `default`, `plan`, `ask` with `modeSwitchSessionPolicy: 'preserve'`                                                     |
+| Plan UX   | Normalize `switchMode` / `createPlan` into `mode_transition` / `toolSemantic`; **defer** client-side plan decision card |
+| Deferred  | Full image pipeline, background tasks, CLI jobs, OAuth hint rewriting, live smoke in CI                                 |
 
 ## Architecture
 
@@ -47,11 +47,11 @@ Existing zclaudia conversation runtime
 
 Boundary table:
 
-| Layer | Owns |
-|---|---|
-| `AgentProfileConfig` | `runtimeType=cursor`, model, systemPrompt, cliPath |
-| Host | Adapter selection, abort orchestration, `sdk_session_id`, capabilities HTTP |
-| `plugins/cursor` | CLI spawn, stream parse, mode mapping, MCP file inject, process abort |
+| Layer                | Owns                                                                        |
+| -------------------- | --------------------------------------------------------------------------- |
+| `AgentProfileConfig` | `runtimeType=cursor`, model, systemPrompt, cliPath                          |
+| Host                 | Adapter selection, abort orchestration, `sdk_session_id`, capabilities HTTP |
+| `plugins/cursor`     | CLI spawn, stream parse, mode mapping, MCP file inject, process abort       |
 
 Cursor does not use `LlmProfileConfig` to call an HTTP API. `llmProfileId` may remain on the profile for schema/UI consistency; the adapter ignores it for execution.
 
@@ -61,15 +61,15 @@ Missing Cursor adapter must fail closed (existing host rule): never fall back to
 
 Package: `zclaudia/plugins/cursor` (`@zclaudia/plugin-cursor`), workspace member via existing `plugins/*`.
 
-| File | Responsibility |
-|---|---|
-| `plugin.json` | Declare `agentRuntimes[type=cursor]` (label, `hasCliPath`, model config kind, capabilities summary, PCP manifest, policy) and default profile `cursor-default` |
-| `src/main.ts` | `activate`: register `CursorAgentAdapter` with `createToolBridge` from context |
-| `src/adapter.ts` | `ExternalAgentAdapter`: `sessionModes` map, `run` / `abort` / `setSessionMode` / `getRunState` |
-| `src/runner.ts` | Port of my-claudia `cursor-sdk`: spawn, CLI flags, NDJSON→`ProviderRuntimeEvent`, plan-tool normalization, abort map |
-| `src/mcp-inject.ts` | Merge bridge entry into `.cursor/mcp.json` without clobbering user servers; same-name user entry wins |
-| `src/resolve-cli.ts` | Resolve explicit `cliPath` or `cursor-agent` on `PATH` |
-| `src/__tests__/*` | Unit tests for adapter, runner (mocked spawn), mcp-inject |
+| File                 | Responsibility                                                                                                                                                 |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `plugin.json`        | Declare `agentRuntimes[type=cursor]` (label, `hasCliPath`, model config kind, capabilities summary, PCP manifest, policy) and default profile `cursor-default` |
+| `src/main.ts`        | `activate`: register `CursorAgentAdapter` with `createToolBridge` from context                                                                                 |
+| `src/adapter.ts`     | `ExternalAgentAdapter`: `sessionModes` map, `run` / `abort` / `setSessionMode` / `getRunState`                                                                 |
+| `src/runner.ts`      | Port of my-claudia `cursor-sdk`: spawn, CLI flags, NDJSON→`ProviderRuntimeEvent`, plan-tool normalization, abort map                                           |
+| `src/mcp-inject.ts`  | Merge bridge entry into `.cursor/mcp.json` without clobbering user servers; same-name user entry wins                                                          |
+| `src/resolve-cli.ts` | Resolve explicit `cliPath` or `cursor-agent` on `PATH`                                                                                                         |
+| `src/__tests__/*`    | Unit tests for adapter, runner (mocked spawn), mcp-inject                                                                                                      |
 
 Host changes stay minimal: load/register plugin contributions; surface Cursor in profile runtime picker if contribution-driven UI already supports it. Do **not** place Cursor under `server/src/infra/providers/external-agents/cursor`.
 
@@ -109,19 +109,19 @@ Host changes stay minimal: load/register plugin contributions; surface Cursor in
 
 ## Error handling
 
-| Scenario | Behavior |
-|---|---|
-| Binary missing (`ENOENT`) | Yield `error` with install / `cliPath` guidance |
-| Other spawn failures | Yield `error` with message |
-| Non-JSON stdout lines `I:` / `E:` / `W:` | Yield as provider `error` |
-| Stderr CLI messages with no useful stdout | Surface collected `I:`/`E:`/`W:` as `error` |
-| Non-CLI JSON parse failures | Warn, skip line, continue stream |
-| Abort / kill | Clean maps; do not disguise abort as an unexplained crash |
-| `createToolBridge` returns null | Skip MCP inject; still run native Cursor |
-| Unreadable `.cursor/mcp.json` | Start from empty config for merge; on write failure, log and continue without bridge |
-| User MCP server same name as bridge | Do not overwrite user entry |
-| Runtime selected but adapter missing | Host fails closed (no zclaudia fallback) |
-| Unclosed think block at stream end | Emit closing marker so UI does not stick |
+| Scenario                                  | Behavior                                                                             |
+| ----------------------------------------- | ------------------------------------------------------------------------------------ |
+| Binary missing (`ENOENT`)                 | Yield `error` with install / `cliPath` guidance                                      |
+| Other spawn failures                      | Yield `error` with message                                                           |
+| Non-JSON stdout lines `I:` / `E:` / `W:`  | Yield as provider `error`                                                            |
+| Stderr CLI messages with no useful stdout | Surface collected `I:`/`E:`/`W:` as `error`                                          |
+| Non-CLI JSON parse failures               | Warn, skip line, continue stream                                                     |
+| Abort / kill                              | Clean maps; do not disguise abort as an unexplained crash                            |
+| `createToolBridge` returns null           | Skip MCP inject; still run native Cursor                                             |
+| Unreadable `.cursor/mcp.json`             | Start from empty config for merge; on write failure, log and continue without bridge |
+| User MCP server same name as bridge       | Do not overwrite user entry                                                          |
+| Runtime selected but adapter missing      | Host fails closed (no zclaudia fallback)                                             |
+| Unclosed think block at stream end        | Emit closing marker so UI does not stick                                             |
 
 Defer Cursor-specific auth / OAuth hint rewriting.
 
@@ -149,13 +149,13 @@ Create/select Cursor agent → one streaming chat turn → resume → cancel; mo
 
 ## Migration source map
 
-| my-claudia | zclaudia plugin |
-|---|---|
-| `cursor-adapter.ts` | `plugins/cursor/src/adapter.ts` |
-| `cursor-sdk.ts` (run + map + abort) | `plugins/cursor/src/runner.ts` |
-| MCP inject in `cursor-sdk.ts` | `plugins/cursor/src/mcp-inject.ts` + host `createToolBridge` |
-| `CURSOR_*` in `manifests.ts` | `plugin.json` contributes.manifest / policy |
-| CLI jobs / review adapters | Deferred |
+| my-claudia                          | zclaudia plugin                                              |
+| ----------------------------------- | ------------------------------------------------------------ |
+| `cursor-adapter.ts`                 | `plugins/cursor/src/adapter.ts`                              |
+| `cursor-sdk.ts` (run + map + abort) | `plugins/cursor/src/runner.ts`                               |
+| MCP inject in `cursor-sdk.ts`       | `plugins/cursor/src/mcp-inject.ts` + host `createToolBridge` |
+| `CURSOR_*` in `manifests.ts`        | `plugin.json` contributes.manifest / policy                  |
+| CLI jobs / review adapters          | Deferred                                                     |
 
 ## Non-goals
 

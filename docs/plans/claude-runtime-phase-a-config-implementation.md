@@ -24,6 +24,7 @@
 ### Task 1: Claude Config Loader
 
 **Files:**
+
 - Create: `server/src/infra/providers/external-agents/claude/config.ts`
 - Create: `server/src/infra/providers/external-agents/claude/__tests__/config.test.ts`
 
@@ -307,6 +308,7 @@ git commit -m "feat(runtime): load claude agent config"
 ### Task 2: Pass Config Through Claude Adapter And Runner
 
 **Files:**
+
 - Modify: `server/src/infra/providers/external-agents/claude/runner.ts`
 - Modify: `server/src/infra/providers/external-agents/claude/adapter.ts`
 - Modify: `server/src/infra/providers/__tests__/claude-agent-adapter.test.ts`
@@ -452,6 +454,7 @@ git commit -m "feat(runtime): pass claude config to agent sdk"
 ### Task 3: Smoke And Documentation Updates
 
 **Files:**
+
 - Modify: `server/scripts/smoke-claude-runtime.ts`
 - Modify: `docs/plans/claude-runtime-smoke-check.md`
 - Modify: `docs/plans/claude-runtime-completion.md`

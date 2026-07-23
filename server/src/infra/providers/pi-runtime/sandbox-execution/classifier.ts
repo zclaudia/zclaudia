@@ -131,10 +131,7 @@ function ordinaryFailure(input: SandboxFailureInput): boolean {
 export function classifySandboxFailure(
   input: SandboxFailureInput
 ): SandboxFailureClassificationResult {
-  const { candidateGrants, loopbackTargets } = splitTargets(
-    input.sourceText,
-    input.allowedDomains
-  );
+  const { candidateGrants, loopbackTargets } = splitTargets(input.sourceText, input.allowedDomains);
   const candidateTargets = candidateGrants.map(formatGrantForDisplay);
   const matchedSignals = input.sandboxed
     ? [...networkSignals(input.outputText), ...hostOnlySignals(input.outputText)]
@@ -146,9 +143,7 @@ export function classifySandboxFailure(
     matchedSignals,
     candidateTargets,
     missingSignals,
-    ...(detectedInternalProxyUrls.length
-      ? { internalProxyUrls: detectedInternalProxyUrls }
-      : {}),
+    ...(detectedInternalProxyUrls.length ? { internalProxyUrls: detectedInternalProxyUrls } : {}),
   };
 
   if (!input.sandboxed) {

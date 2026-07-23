@@ -74,14 +74,7 @@ function escapeXml(value) {
     .replaceAll("'", '&apos;');
 }
 
-export function renderLaunchAgentPlist({
-  label,
-  repoRoot,
-  nodeBin,
-  dataDir,
-  logDir,
-  port = 3100,
-}) {
+export function renderLaunchAgentPlist({ label, repoRoot, nodeBin, dataDir, logDir, port = 3100 }) {
   const parsedPort = parseServicePort(port);
 
   return `<?xml version="1.0" encoding="UTF-8"?>

@@ -67,7 +67,10 @@ describe('LlmProfileRepository', () => {
         created_at: 1,
         updated_at: 2,
       });
-      expect(result.recordStatus).toEqual({ completeness: 'ready', availability: { usable: true } });
+      expect(result.recordStatus).toEqual({
+        completeness: 'ready',
+        availability: { usable: true },
+      });
     });
 
     it('handles null values correctly', () => {

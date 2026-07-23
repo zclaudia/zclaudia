@@ -33,7 +33,8 @@ export class EmbeddedFacadeClient implements BackendFacade {
   private desiredSessionStreams = new Map<string, { backendId: string; sessionId: string }>();
 
   constructor(target: EmbeddedFacadeClientTarget) {
-    this.url = typeof target === 'number' ? `ws://localhost:${target}/ws/backend-facade` : target.url;
+    this.url =
+      typeof target === 'number' ? `ws://localhost:${target}/ws/backend-facade` : target.url;
   }
 
   // --------------------------------------------------------------------------

@@ -29,7 +29,7 @@
 
 ## P0-2 [x] Sandbox 分类器把 loopback 连接失败误判为 sandbox denial，引发提权雪崩
 
-> **已修复（2026-07-03）**：实证依据——同 session 中 id 401/440 是 sandboxed 状态下 curl 127.0.0.1 成功（exit 0），证明沙箱不拦 loopback 连接。修复：classifier.ts 新增 `isLoopbackHost`，loopback/unspecified 主机不再进入 candidateGrants；只引用 loopback 目标的失败直接分类 `not_sandbox_denial` 并提示"检查本地服务是否在监听"。loopback *bind* 被拒仍由 HOST_ONLY_FAILURE_PATTERNS 单独覆盖（不受影响）。注意：原有 classifier/controller 测试里有 4 个用例把 loopback 误判行为固化为预期，已改用外部域名表达原意。
+> **已修复（2026-07-03）**：实证依据——同 session 中 id 401/440 是 sandboxed 状态下 curl 127.0.0.1 成功（exit 0），证明沙箱不拦 loopback 连接。修复：classifier.ts 新增 `isLoopbackHost`，loopback/unspecified 主机不再进入 candidateGrants；只引用 loopback 目标的失败直接分类 `not_sandbox_denial` 并提示"检查本地服务是否在监听"。loopback _bind_ 被拒仍由 HOST_ONLY_FAILURE_PATTERNS 单独覆盖（不受影响）。注意：原有 classifier/controller 测试里有 4 个用例把 loopback 误判行为固化为预期，已改用外部域名表达原意。
 
 **症状**：`curl -s http://127.0.0.1:8000/health` exit 7（服务未启动，普通 connection refused）被分类为 `probable_sandbox_denial`。
 

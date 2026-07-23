@@ -48,7 +48,9 @@ export function ActionsMenu({
                   action.onSelect();
                 }}
                 className={`flex w-full px-3 py-1.5 text-left text-xs hover:bg-secondary disabled:pointer-events-none disabled:opacity-50 ${
-                  action.destructive ? 'text-destructive hover:bg-destructive/10' : 'text-foreground'
+                  action.destructive
+                    ? 'text-destructive hover:bg-destructive/10'
+                    : 'text-foreground'
                 }`}
               >
                 {action.label}

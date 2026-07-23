@@ -24,7 +24,13 @@ describe('ProfileHeader', () => {
   it('renders name/description as editable inputs and reports changes', () => {
     const onNameChange = vi.fn();
     const onDescriptionChange = vi.fn();
-    render(<ProfileHeader {...base} onNameChange={onNameChange} onDescriptionChange={onDescriptionChange} />);
+    render(
+      <ProfileHeader
+        {...base}
+        onNameChange={onNameChange}
+        onDescriptionChange={onDescriptionChange}
+      />
+    );
     const name = screen.getByPlaceholderText('e.g., Default Coding Agent') as HTMLInputElement;
     expect(name.value).toBe('Coding');
     fireEvent.change(name, { target: { value: 'Coding 2' } });

@@ -1,9 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import {
-  ENV_PASSTHROUGH_KNOB,
-  isSecretEnvName,
-  scrubEnv,
-} from '../env-scrub.js';
+import { ENV_PASSTHROUGH_KNOB, isSecretEnvName, scrubEnv } from '../env-scrub.js';
 
 describe('isSecretEnvName', () => {
   it('flags secret-looking names', () => {

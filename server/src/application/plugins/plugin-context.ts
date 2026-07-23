@@ -10,10 +10,7 @@ import type {
   WorkflowStepHandler,
 } from '@zclaudia/shared/plugin-types';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
-import type {
-  ExternalAgentAdapter,
-  ProviderToolBridgeRequest,
-} from '@zclaudia/shared/providers';
+import type { ExternalAgentAdapter, ProviderToolBridgeRequest } from '@zclaudia/shared/providers';
 import { pluginEvents, type EventData, type EventListener } from '../../infra/events/index.js';
 import { mcpClientManager } from '../../utils/mcp-client-manager.js';
 import { loadMcpServersFromDb } from '../../utils/mcp-config.js';

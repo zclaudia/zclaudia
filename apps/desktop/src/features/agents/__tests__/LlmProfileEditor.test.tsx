@@ -198,7 +198,7 @@ describe('LlmProfileEditor', () => {
 
       expect(
         screen.getByText(
-        'Header "Authorization" is reserved (managed by API key); remove it from Request Headers'
+          'Header "Authorization" is reserved (managed by API key); remove it from Request Headers'
         )
       ).toBeInTheDocument();
       expect(api.updateLlmProfileForBackend).not.toHaveBeenCalled();

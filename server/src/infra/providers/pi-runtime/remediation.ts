@@ -73,11 +73,20 @@ function sandboxExecutionHint(details: NonNullable<ToolDetails>): string | undef
     typeof details.recommendedNextStep === 'string' ? details.recommendedNextStep : undefined;
   switch (classification) {
     case 'confirmed_sandbox_denial':
-      return nextStep ?? 'This is a confirmed sandbox denial. Request the specific sandbox capability rather than switching to unsandboxed execution.';
+      return (
+        nextStep ??
+        'This is a confirmed sandbox denial. Request the specific sandbox capability rather than switching to unsandboxed execution.'
+      );
     case 'probable_sandbox_denial':
-      return nextStep ?? 'This may be a sandbox denial, but evidence is incomplete. Collect one more diagnostic signal before requesting escalation.';
+      return (
+        nextStep ??
+        'This may be a sandbox denial, but evidence is incomplete. Collect one more diagnostic signal before requesting escalation.'
+      );
     case 'ambiguous_failure':
-      return nextStep ?? 'Do not assume this failure is a permission issue. Inspect the command output and gather diagnostics before requesting sandbox escalation.';
+      return (
+        nextStep ??
+        'Do not assume this failure is a permission issue. Inspect the command output and gather diagnostics before requesting sandbox escalation.'
+      );
     default:
       return undefined;
   }

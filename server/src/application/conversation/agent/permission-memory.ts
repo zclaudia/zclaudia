@@ -142,10 +142,7 @@ export function persistSessionSandboxGrant(
   ).run(sessionId, `sandbox:${formatNetworkGrantKey(grant)}`, now, now);
 }
 
-export function loadSessionSandboxGrantKeys(
-  db: PermissionMemoryDb,
-  sessionId: string
-): string[] {
+export function loadSessionSandboxGrantKeys(db: PermissionMemoryDb, sessionId: string): string[] {
   try {
     const rows = db
       .prepare(

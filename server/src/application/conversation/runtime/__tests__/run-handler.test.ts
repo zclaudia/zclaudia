@@ -202,9 +202,9 @@ function createDb(): Database.Database {
     );
   `);
   createAgentProfilesTable(db);
-  const agentProfileColumns = db
-    .prepare(`PRAGMA table_info(agent_profiles)`)
-    .all() as Array<{ name: string }>;
+  const agentProfileColumns = db.prepare(`PRAGMA table_info(agent_profiles)`).all() as Array<{
+    name: string;
+  }>;
   if (!agentProfileColumns.some(column => column.name === 'runtime_type')) {
     db.exec(`ALTER TABLE agent_profiles ADD COLUMN runtime_type TEXT DEFAULT 'zclaudia'`);
   }
@@ -316,7 +316,8 @@ describe('ws/run-handler', () => {
     // runtimeType 'claude' persists rather than normalizing to zclaudia.
     // Imported lazily (like run-handler.js below) so the real registry module
     // graph loads after vi.mock hoisting completes.
-    const { registerClaudeTestRuntime } = await import('../../../../test/claude-runtime-fixture.js');
+    const { registerClaudeTestRuntime } =
+      await import('../../../../test/claude-runtime-fixture.js');
     registerClaudeTestRuntime();
   });
 

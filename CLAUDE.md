@@ -21,11 +21,11 @@ zclaudia/
 
 ## Key Ports & Environment Variables
 
-| Service  | Default Port | Port Env                         | Notes                               |
-| -------- | ------------ | -------------------------------- | ----------------------------------- |
+| Service  | Default Port | Port Env                         | Notes                                                                                            |
+| -------- | ------------ | -------------------------------- | ------------------------------------------------------------------------------------------------ |
 | Server   | 3100         | `PORT` (supports `0` for random) | `SERVER_HOST` defaults to `127.0.0.1`; use `ZCLAUDIA_ALLOW_LAN=1` only for explicit LAN exposure |
-| Gateway  | 3200         | `GATEWAY_PORT`                   |                                     |
-| Vite dev | 1420         | -                                | hardcoded, `strictPort: true`       |
+| Gateway  | 3200         | `GATEWAY_PORT`                   |                                                                                                  |
+| Vite dev | 1420         | -                                | hardcoded, `strictPort: true`                                                                    |
 
 | Env Var             | Used By         | Purpose                                           |
 | ------------------- | --------------- | ------------------------------------------------- |

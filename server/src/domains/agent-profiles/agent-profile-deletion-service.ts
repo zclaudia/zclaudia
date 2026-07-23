@@ -78,9 +78,7 @@ export class AgentProfileDeletionService {
             .run(fallbackAgentId, agentId);
         } else {
           this.db
-            .prepare(
-              'DELETE FROM sessions WHERE agent_profile_id = ? AND archived_at IS NOT NULL'
-            )
+            .prepare('DELETE FROM sessions WHERE agent_profile_id = ? AND archived_at IS NOT NULL')
             .run(agentId);
         }
         this.db.prepare('DELETE FROM agent_profiles WHERE id = ?').run(agentId);

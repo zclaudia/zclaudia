@@ -41,10 +41,7 @@ export function wrapExternalAgentAdapter(
     abort: ext.abort ? (sessionId, cwd) => ext.abort!(sessionId, cwd) : undefined,
     getRunState: ext.getRunState
       ? options =>
-          ext.getRunState!(toExternalAgentRunContext(options)) as unknown as Record<
-            string,
-            unknown
-          >
+          ext.getRunState!(toExternalAgentRunContext(options)) as unknown as Record<string, unknown>
       : undefined,
     setSessionMode: ext.setSessionMode
       ? (sessionId, mode) => ext.setSessionMode!(sessionId, mode)

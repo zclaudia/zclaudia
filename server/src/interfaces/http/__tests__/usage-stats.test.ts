@@ -270,7 +270,9 @@ describe('computeStreak', () => {
   });
 
   it('breaks on a gap and is zero when neither today nor yesterday is active', () => {
-    expect(computeStreak([localDateString(noonDaysAgo(1)), localDateString(noonDaysAgo(3))], today)).toBe(1);
+    expect(
+      computeStreak([localDateString(noonDaysAgo(1)), localDateString(noonDaysAgo(3))], today)
+    ).toBe(1);
     expect(computeStreak([localDateString(noonDaysAgo(2))], today)).toBe(0);
     expect(computeStreak([], today)).toBe(0);
   });

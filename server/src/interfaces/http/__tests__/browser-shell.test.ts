@@ -87,9 +87,7 @@ describe('browser shell static serving', () => {
 
     const res = await request(app).get('/api/health');
     expect(res.status).toBe(200);
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('Browser shell assets not found')
-    );
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('Browser shell assets not found'));
   });
 
   it('does not mount browser shell when LAN mode is enabled', async () => {

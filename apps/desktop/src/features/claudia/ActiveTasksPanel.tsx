@@ -27,8 +27,7 @@ function getStatusInfo(
   if (interrupted) return { label: 'Interrupted', dotClass: 'bg-destructive animate-pulse' };
   if (permissionRequired)
     return { label: 'Permission Required', dotClass: 'bg-warning animate-pulse' };
-  if (task.status === 'running')
-    return { label: 'Running', dotClass: 'bg-primary animate-pulse' };
+  if (task.status === 'running') return { label: 'Running', dotClass: 'bg-primary animate-pulse' };
   if (task.status === 'queued') return { label: 'Queued', dotClass: 'bg-muted-foreground' };
   return { label: 'Waiting', dotClass: 'bg-muted-foreground animate-pulse' };
 }

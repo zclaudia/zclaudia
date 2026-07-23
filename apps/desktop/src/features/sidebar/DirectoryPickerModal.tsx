@@ -125,7 +125,11 @@ export function DirectoryPickerModal({
               onClick={() => load(dir.path)}
               className="group flex w-full items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-secondary"
             >
-              <Folder size={16} strokeWidth={1.75} className="flex-shrink-0 text-muted-foreground" />
+              <Folder
+                size={16}
+                strokeWidth={1.75}
+                className="flex-shrink-0 text-muted-foreground"
+              />
               <span className="min-w-0 flex-1 truncate">{dir.name}</span>
               <ChevronRight
                 size={14}

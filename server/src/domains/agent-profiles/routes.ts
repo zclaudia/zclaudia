@@ -131,7 +131,10 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
       }
       const withStatus = {
         ...profile,
-        recordStatus: resolveAgentProfileRecordStatus(profile, llmRepo.findById(profile.llmProfileId)),
+        recordStatus: resolveAgentProfileRecordStatus(
+          profile,
+          llmRepo.findById(profile.llmProfileId)
+        ),
       };
       res.json({ success: true, data: withStatus } as ApiResponse<AgentProfileConfig>);
     } catch (error) {

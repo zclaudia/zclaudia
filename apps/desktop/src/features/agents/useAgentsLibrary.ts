@@ -85,7 +85,13 @@ export function buildLibraryItems(
     );
   if (wantKind('mcp-server'))
     eachBackend(sources.servers, (backendId, m) =>
-      out.push({ kind: 'mcp-server', backendId, id: m.id, title: m.name ?? m.id, recordStatus: m.recordStatus })
+      out.push({
+        kind: 'mcp-server',
+        backendId,
+        id: m.id,
+        title: m.name ?? m.id,
+        recordStatus: m.recordStatus,
+      })
     );
   if (wantKind('llm-profile'))
     eachBackend(sources.llmProfiles, (backendId, l) =>

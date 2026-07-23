@@ -6,17 +6,17 @@
 
 ## Health Score: 14/20 — Good
 
-| # | Dimension | Score | Δ vs 07-14 | Key finding |
-|---|-----------|-------|-----|-------------|
-| 1 | Accessibility | **3/4** | ▲ +1 | Primitive layer solid; shared `Modal` (+ bespoke dialogs) has no focus trap; toasts/thinking not announced |
-| 2 | Performance | **2/4** | ▼ −1 | Streaming hot path: full markdown re-parse + Prism re-tokenize per token; ResizeObserver thrash; loading-bar animates `width` |
-| 3 | Responsive | **3/4** | = | Structural responsive solid; several mobile touch targets < 44px |
-| 4 | Theming | **3/4** | = | Token system mature & dominant; raw-palette holdouts in supervision/local-pr/workflow-graph; one view mode-locked to light |
-| 5 | Anti-Patterns | **3/4** | = | PASS; 2 remaining side-stripe accents, 1 nested card, inconsistent uppercase eyebrows |
+| #   | Dimension     | Score   | Δ vs 07-14 | Key finding                                                                                                                   |
+| --- | ------------- | ------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Accessibility | **3/4** | ▲ +1       | Primitive layer solid; shared `Modal` (+ bespoke dialogs) has no focus trap; toasts/thinking not announced                    |
+| 2   | Performance   | **2/4** | ▼ −1       | Streaming hot path: full markdown re-parse + Prism re-tokenize per token; ResizeObserver thrash; loading-bar animates `width` |
+| 3   | Responsive    | **3/4** | =          | Structural responsive solid; several mobile touch targets < 44px                                                              |
+| 4   | Theming       | **3/4** | =          | Token system mature & dominant; raw-palette holdouts in supervision/local-pr/workflow-graph; one view mode-locked to light    |
+| 5   | Anti-Patterns | **3/4** | =          | PASS; 2 remaining side-stripe accents, 1 nested card, inconsistent uppercase eyebrows                                         |
 
 **Anti-pattern verdict: PASS (does not look AI-generated).** Absolute bans essentially held — no gradient text, no decorative glass, no bounce easing, no hero-metric template, no identical-card grids.
 
-> **Why the total is unchanged despite a11y improving:** the a11y fixes landed (▲), but this pass scanned *deeper* into secondary feature areas the first audit didn't reach (supervision, local-pr, openspec, meta-workflow, workflows). Those surfaced new Performance/Theming holdouts. The **core surfaces fixed on 07-14 remain excellent**; the new findings cluster in less-central panels.
+> **Why the total is unchanged despite a11y improving:** the a11y fixes landed (▲), but this pass scanned _deeper_ into secondary feature areas the first audit didn't reach (supervision, local-pr, openspec, meta-workflow, workflows). Those surfaced new Performance/Theming holdouts. The **core surfaces fixed on 07-14 remain excellent**; the new findings cluster in less-central panels.
 
 ---
 

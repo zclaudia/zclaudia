@@ -30,7 +30,9 @@ export function FilterChips({
             }`}
           >
             {c.online !== undefined && (
-              <span className={`h-1.5 w-1.5 rounded-full ${c.online ? 'bg-emerald-500' : 'bg-muted-foreground/50'}`} />
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${c.online ? 'bg-emerald-500' : 'bg-muted-foreground/50'}`}
+              />
             )}
             {c.label}
           </button>

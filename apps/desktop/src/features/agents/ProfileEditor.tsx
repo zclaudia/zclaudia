@@ -230,7 +230,6 @@ export function ProfileEditor({
   // pre-hydration form is never seen as a dirty edit.
   const [hydrated, setHydrated] = useState(false);
 
-
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
@@ -959,7 +958,6 @@ export function ProfileEditor({
                   )}
                 </EditorSection>
               )}
-
             </div>
           )}
 

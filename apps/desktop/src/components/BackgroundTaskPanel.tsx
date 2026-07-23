@@ -103,9 +103,7 @@ function TaskItem({
         {task.taskRootPid && (
           <PidBadge pid={task.taskRootPid} cliPid={task.cliPid} serverId={task.serverId} />
         )}
-        <span className="text-muted-foreground flex-shrink-0">
-          {formatTimeAgo(task.startedAt)}
-        </span>
+        <span className="text-muted-foreground flex-shrink-0">{formatTimeAgo(task.startedAt)}</span>
         {(task.summary || task.taskCommand) && (
           <span className="text-muted-foreground/40 flex-shrink-0">
             {expanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}

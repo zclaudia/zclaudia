@@ -70,28 +70,31 @@ can copy the same shape with smaller decisions.
    - Back provider command metadata with the same sources the runtime can execute.
 
 10. Add UI selection:
-   - Add the runtime to the Agent Profile editor once the adapter exists.
-   - Save `runtimeType` in create/update payloads.
-   - Hide or disable zclaudia-only controls until the runtime supports them.
+
+- Add the runtime to the Agent Profile editor once the adapter exists.
+- Save `runtimeType` in create/update payloads.
+- Hide or disable zclaudia-only controls until the runtime supports them.
 
 11. Verify:
-   - Runtime adapter tests.
-   - Provider-local config tests.
-   - Agent-plugin bridge tests.
-   - Registry tests.
-   - Agent profile repository/routes tests.
-   - Runtime handler/provider-launch/context tests.
-   - HTTP provider metadata tests.
-   - Provider slash command tests.
-   - ProfileEditor tests.
-   - `@zclaudia/shared`, `@zclaudia/server`, and `@zclaudia/desktop` builds.
+
+- Runtime adapter tests.
+- Provider-local config tests.
+- Agent-plugin bridge tests.
+- Registry tests.
+- Agent profile repository/routes tests.
+- Runtime handler/provider-launch/context tests.
+- HTTP provider metadata tests.
+- Provider slash command tests.
+- ProfileEditor tests.
+- `@zclaudia/shared`, `@zclaudia/server`, and `@zclaudia/desktop` builds.
 
 12. Add a runtime-local permission bridge before declaring `interaction.approval` supported.
 
 13. Add deterministic and opt-in live smoke coverage:
-   - The default smoke command should avoid network/auth/token requirements.
-   - The live smoke should verify config loading, resume, cancel, and any bridge path the runtime exposes.
-   - Keep live smoke out of normal CI unless credentials and cost boundaries are explicit.
+
+- The default smoke command should avoid network/auth/token requirements.
+- The live smoke should verify config loading, resume, cancel, and any bridge path the runtime exposes.
+- Keep live smoke out of normal CI unless credentials and cost boundaries are explicit.
 
 ## Runtime-Specific Notes
 

@@ -41,7 +41,13 @@ export function ModelsChart({ range }: { range: UsageStatsRange }) {
 
   const [expanded, setExpanded] = useState(false);
   const chart = useMemo(
-    () => (stats ? buildModelChart(stats.days, stats.models.map(m => m.model)) : null),
+    () =>
+      stats
+        ? buildModelChart(
+            stats.days,
+            stats.models.map(m => m.model)
+          )
+        : null,
     [stats]
   );
 

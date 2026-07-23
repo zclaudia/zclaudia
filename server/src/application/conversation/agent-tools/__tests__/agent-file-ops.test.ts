@@ -46,12 +46,24 @@ describe('agent-tools/agent_file_ops', () => {
   });
 
   function execute(args: Record<string, unknown>) {
-    return toolRegistry.execute('agent_file_ops', args, { sessionId: 'session-1' }, 'agent-assistant');
+    return toolRegistry.execute(
+      'agent_file_ops',
+      args,
+      { sessionId: 'session-1' },
+      'agent-assistant'
+    );
   }
 
   it('writes and reads a normal file inside the project', async () => {
-    const writeResult = await execute({ operation: 'write', path: 'notes/todo.txt', content: 'hello' });
-    expect(JSON.parse(writeResult)).toEqual({ success: true, path: path.join('notes', 'todo.txt') });
+    const writeResult = await execute({
+      operation: 'write',
+      path: 'notes/todo.txt',
+      content: 'hello',
+    });
+    expect(JSON.parse(writeResult)).toEqual({
+      success: true,
+      path: path.join('notes', 'todo.txt'),
+    });
     expect(await readFile(path.join(projectRoot, 'notes', 'todo.txt'), 'utf-8')).toBe('hello');
 
     const readResult = await execute({ operation: 'read', path: 'notes/todo.txt' });
@@ -88,7 +100,11 @@ describe('agent-tools/agent_file_ops', () => {
     await writeFile(path.join(projectRoot, 'real.txt'), 'real content');
     await symlink(path.join(projectRoot, 'real.txt'), path.join(projectRoot, 'alias-link'));
 
-    const writeResult = await execute({ operation: 'write', path: 'alias-link', content: 'changed' });
+    const writeResult = await execute({
+      operation: 'write',
+      path: 'alias-link',
+      content: 'changed',
+    });
     expect(JSON.parse(writeResult)).toEqual({ error: 'Path is outside the project directory' });
 
     const readResult = await execute({ operation: 'read', path: 'alias-link' });

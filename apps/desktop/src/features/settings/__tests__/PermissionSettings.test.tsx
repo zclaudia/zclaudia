@@ -117,7 +117,11 @@ describe('PermissionSettings', () => {
     await screen.findByText('Review provider');
 
     await waitFor(() => {
-      expect(mockGetProviderCapabilities).toHaveBeenCalledWith('prov-supported', undefined, 'local');
+      expect(mockGetProviderCapabilities).toHaveBeenCalledWith(
+        'prov-supported',
+        undefined,
+        'local'
+      );
       expect(mockGetProviderCapabilities).toHaveBeenCalledWith(
         'prov-unsupported',
         undefined,
@@ -150,7 +154,11 @@ describe('PermissionSettings', () => {
 
     await waitFor(() => {
       expect(mockListLlmProfilesForBackend).toHaveBeenCalledWith('local');
-      expect(mockGetProviderCapabilities).toHaveBeenCalledWith('prov-supported', undefined, 'local');
+      expect(mockGetProviderCapabilities).toHaveBeenCalledWith(
+        'prov-supported',
+        undefined,
+        'local'
+      );
     });
 
     fireEvent.click(findTriggerByText('Session default'));
@@ -172,7 +180,11 @@ describe('PermissionSettings', () => {
     await screen.findByText('Review provider');
 
     await waitFor(() => {
-      expect(mockGetProviderCapabilities).toHaveBeenCalledWith('prov-supported', undefined, 'local');
+      expect(mockGetProviderCapabilities).toHaveBeenCalledWith(
+        'prov-supported',
+        undefined,
+        'local'
+      );
       expect(mockListAllWorkflowsForBackend).toHaveBeenCalledWith('local');
     });
   });
@@ -188,7 +200,11 @@ describe('PermissionSettings', () => {
     await screen.findByText('Review provider');
 
     await waitFor(() => {
-      expect(mockGetProviderCapabilities).toHaveBeenCalledWith('prov-supported', undefined, 'local');
+      expect(mockGetProviderCapabilities).toHaveBeenCalledWith(
+        'prov-supported',
+        undefined,
+        'local'
+      );
     });
   });
 
@@ -279,6 +295,8 @@ describe('PermissionSettings', () => {
     // System permissions render above the agent permission settings
     const systemEl = screen.getByText('System permissions');
     const agentEl = screen.getByText('Auto-approve tools');
-    expect(systemEl.compareDocumentPosition(agentEl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      systemEl.compareDocumentPosition(agentEl) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
   });
 });

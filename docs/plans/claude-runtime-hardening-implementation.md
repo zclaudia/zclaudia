@@ -28,6 +28,7 @@
 ### Task 1: Claude Permission Bridge
 
 **Files:**
+
 - Create: `server/src/infra/providers/external-agents/claude/permissions.ts`
 - Modify: `server/src/infra/providers/external-agents/claude/runner.ts`
 - Modify: `server/src/infra/providers/external-agents/claude/adapter.ts`
@@ -256,6 +257,7 @@ git commit -m "feat(runtime): bridge claude tool permissions"
 ### Task 2: Claude SDK Event Mapping Hardening
 
 **Files:**
+
 - Modify: `server/src/infra/providers/external-agents/claude/runner.ts`
 - Test: `server/src/infra/providers/__tests__/claude-agent-adapter.test.ts`
 
@@ -376,6 +378,7 @@ git commit -m "test(runtime): harden claude sdk event mapping"
 ### Task 3: Opt-In Claude Live Smoke Harness
 
 **Files:**
+
 - Create: `server/scripts/smoke-claude-runtime.ts`
 - Modify: `server/package.json`
 - Create: `docs/plans/claude-runtime-smoke-check.md`
@@ -601,6 +604,7 @@ git commit -m "chore(runtime): add claude live smoke harness"
 ### Task 4: Profile Editor Runtime Hint
 
 **Files:**
+
 - Modify: `apps/desktop/src/features/agents/ProfileEditor.tsx`
 - Test: `apps/desktop/src/features/agents/__tests__/ProfileEditor.test.tsx`
 
@@ -619,7 +623,9 @@ it('shows Claude runtime limitations when Claude is selected', async () => {
   });
 
   expect(screen.getByText(/Claude Agent SDK/)).toBeInTheDocument();
-  expect(screen.getByText(/AI review and multimodal fallback are zclaudia-only/)).toBeInTheDocument();
+  expect(
+    screen.getByText(/AI review and multimodal fallback are zclaudia-only/)
+  ).toBeInTheDocument();
 });
 ```
 
@@ -638,12 +644,14 @@ Expected: FAIL because the hint is not rendered.
 In `apps/desktop/src/features/agents/ProfileEditor.tsx`, directly below the runtime `<select>`, add:
 
 ```tsx
-{formRuntimeType === 'claude' && (
-  <p className="mt-2 rounded-md border border-border bg-secondary/50 px-3 py-2 text-xs text-muted-foreground">
-    Claude uses the Claude Agent SDK runtime. AI review and multimodal fallback are zclaudia-only
-    in this phase.
-  </p>
-)}
+{
+  formRuntimeType === 'claude' && (
+    <p className="mt-2 rounded-md border border-border bg-secondary/50 px-3 py-2 text-xs text-muted-foreground">
+      Claude uses the Claude Agent SDK runtime. AI review and multimodal fallback are zclaudia-only
+      in this phase.
+    </p>
+  );
+}
 ```
 
 - [x] **Step 4: Run test and build**
@@ -669,6 +677,7 @@ git commit -m "feat(agents): explain claude runtime limitations"
 ### Task 5: Replication Checklist Update And Final Verification
 
 **Files:**
+
 - Modify: `docs/plans/agent-runtime-codex-cursor-replication.md`
 
 - [x] **Step 1: Update the checklist**

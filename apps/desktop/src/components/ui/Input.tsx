@@ -11,5 +11,5 @@ export const FIELD_CLASS =
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
   function Input({ className = '', ...props }, ref) {
     return <input ref={ref} className={`${FIELD_CLASS} ${className}`.trim()} {...props} />;
-  },
+  }
 );

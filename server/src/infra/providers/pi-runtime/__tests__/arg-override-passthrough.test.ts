@@ -48,7 +48,6 @@ function createStubBashTool(captured: CapturedCall[]): AgentTool {
       },
       required: ['command'],
       additionalProperties: false,
-       
     } as any,
     execute: async (toolCallId: string, params: unknown) => {
       captured.push({ toolCallId, params });
@@ -74,7 +73,6 @@ function buildBundle(options: {
   });
   const bash = tools.find(t => t.name === 'Bash')!;
   const hooks = buildAgentHooks({
-     
     permissionCallback: options.permissionCallback as any,
     argOverrides,
   });
@@ -90,9 +88,8 @@ async function runPiToolCallOrder(
   hooks: ReturnType<typeof buildAgentHooks>,
   toolCall: { id: string; name: string; arguments: Record<string, unknown> }
 ): Promise<'blocked' | 'executed'> {
-   
   const validatedArgs = validateToolArguments(tool, toolCall as any);
-   
+
   const beforeResult = await hooks.beforeToolCall!({ toolCall, args: validatedArgs } as any);
   if (beforeResult?.block) return 'blocked';
   await tool.execute(toolCall.id, validatedArgs);
@@ -180,13 +177,21 @@ describe('updatedInput end-to-end passthrough (P0-1 regression)', () => {
     // pi parallel mode awaits every prepareToolCall (→ beforeToolCall) before
     // executing; record order differs from execute order, so the store must be
     // keyed correctly. Drive both calls' hooks first, then execute in reverse.
-     
-    const argsA = validateToolArguments(bash, { id: 'A', name: 'Bash', arguments: { command: 'a' } } as any);
-     
-    const argsB = validateToolArguments(bash, { id: 'B', name: 'Bash', arguments: { command: 'b' } } as any);
-     
+
+    const argsA = validateToolArguments(bash, {
+      id: 'A',
+      name: 'Bash',
+      arguments: { command: 'a' },
+    } as any);
+
+    const argsB = validateToolArguments(bash, {
+      id: 'B',
+      name: 'Bash',
+      arguments: { command: 'b' },
+    } as any);
+
     await hooks.beforeToolCall!({ toolCall: { id: 'A', name: 'Bash' }, args: argsA } as any);
-     
+
     await hooks.beforeToolCall!({ toolCall: { id: 'B', name: 'Bash' }, args: argsB } as any);
 
     await bash.execute('B', argsB);
@@ -211,15 +216,16 @@ describe('updatedInput end-to-end passthrough (P0-1 regression)', () => {
       }),
     });
 
-     
     const validatedArgs = validateToolArguments(bash, {
       id: 'call-1',
       name: 'Bash',
       arguments: { command: 'sudo x' },
-       
     } as any);
-     
-    await hooks.beforeToolCall!({ toolCall: { id: 'call-1', name: 'Bash' }, args: validatedArgs } as any);
+
+    await hooks.beforeToolCall!({
+      toolCall: { id: 'call-1', name: 'Bash' },
+      args: validatedArgs,
+    } as any);
 
     // pi's executePreparedToolCall catches this throw and turns it into an
     // error tool result — the invalid rewrite never executes.
@@ -264,15 +270,17 @@ describe('updatedInput end-to-end passthrough (P0-1 regression)', () => {
       permissionCallback: (async () => ({
         behavior: 'allow',
         updatedInput: { pattern: 'alpha-*.txt' },
-         
       })) as any,
     });
     const glob = bundle.tools.find(t => t.name === 'Glob')!;
     const toolCall = { id: 'call-bundle', name: 'Glob', arguments: { pattern: 'nomatch-*.zzz' } };
-     
+
     const validatedArgs = validateToolArguments(glob, toolCall as any);
-     
-    const beforeResult = await bundle.hooks.beforeToolCall!({ toolCall, args: validatedArgs } as any);
+
+    const beforeResult = await bundle.hooks.beforeToolCall!({
+      toolCall,
+      args: validatedArgs,
+    } as any);
     expect(beforeResult?.block).toBeFalsy();
 
     const result = await glob.execute(toolCall.id, validatedArgs);

@@ -6,13 +6,13 @@
 
 ## Health Score: 14/20 — Good (address the weak dimension: Accessibility)
 
-| # | Dimension | Score | Key finding |
-|---|-----------|-------|-------------|
-| 1 | Accessibility | **2/4** | Form `<label>`s not associated with inputs; custom switches lack `role="switch"`; icon buttons rely on `title` only |
-| 2 | Performance | 3/4 | Universal `* {}` transition includes `box-shadow` — repaint cost in dense UI |
-| 3 | Responsive | 3/4 | Structural responsive is good; mobile drawer lacks focus trap |
-| 4 | Theming | 3/4 | Mature generated-token system, but localized hardcoded-color leaks |
-| 5 | Anti-Patterns | 3/4 | No major AI tells; only local side-stripes, bounce dots, nested cards |
+| #   | Dimension     | Score   | Key finding                                                                                                         |
+| --- | ------------- | ------- | ------------------------------------------------------------------------------------------------------------------- |
+| 1   | Accessibility | **2/4** | Form `<label>`s not associated with inputs; custom switches lack `role="switch"`; icon buttons rely on `title` only |
+| 2   | Performance   | 3/4     | Universal `* {}` transition includes `box-shadow` — repaint cost in dense UI                                        |
+| 3   | Responsive    | 3/4     | Structural responsive is good; mobile drawer lacks focus trap                                                       |
+| 4   | Theming       | 3/4     | Mature generated-token system, but localized hardcoded-color leaks                                                  |
+| 5   | Anti-Patterns | 3/4     | No major AI tells; only local side-stripes, bounce dots, nested cards                                               |
 
 **Anti-pattern verdict: PASS (does not look AI-generated).** Distinctive mature product UI, generated-token single source of truth. Tells are all localized.
 

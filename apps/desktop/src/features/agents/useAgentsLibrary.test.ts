@@ -9,8 +9,15 @@ const backends = [
 const draft = { completeness: 'draft', availability: { usable: true } } as const;
 
 const sources = {
-  profiles: new Map([['b1', [{ id: 'p1', name: 'Coding', isDefault: true, model: 'deepseek-v4-flash' }]]]),
-  skills: new Map([['b1', [{ id: 's1', name: 'web-search', description: 'Fan-out research', recordStatus: draft }]]]),
+  profiles: new Map([
+    ['b1', [{ id: 'p1', name: 'Coding', isDefault: true, model: 'deepseek-v4-flash' }]],
+  ]),
+  skills: new Map([
+    [
+      'b1',
+      [{ id: 's1', name: 'web-search', description: 'Fan-out research', recordStatus: draft }],
+    ],
+  ]),
   servers: new Map([['b2', [{ id: 'm1', name: 'filesystem' }]]]),
   llmProfiles: new Map([['b1', [{ id: 'l1', name: 'Local' }]]]),
 };
@@ -21,7 +28,10 @@ describe('buildLibraryItems', () => {
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({
       kind: 'profile',
-      backendId: 'b1', id: 'p1', title: 'Coding', status: 'Default',
+      backendId: 'b1',
+      id: 'p1',
+      title: 'Coding',
+      status: 'Default',
     });
   });
 

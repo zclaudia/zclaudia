@@ -164,7 +164,11 @@ export async function wrapCommand(command: string, opts: WrapOptions): Promise<W
     // The lib returns the full process.env (spike-confirmed; do NOT merge) —
     // scrub secret-looking names before handing it to the sandboxed child so
     // credentials are not exposed inside the sandbox's network allow-list.
-    return { argv: wrapped.argv, env: wrapped.env ? scrubEnv(wrapped.env) : wrapped.env, sandboxed: true };
+    return {
+      argv: wrapped.argv,
+      env: wrapped.env ? scrubEnv(wrapped.env) : wrapped.env,
+      sandboxed: true,
+    };
   } catch (err) {
     console.warn('[sandbox] wrapCommand failed; degrading for this command:', err);
     return { sandboxed: false };

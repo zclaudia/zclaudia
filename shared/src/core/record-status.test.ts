@@ -44,7 +44,10 @@ describe('isRecordRunnable', () => {
 
   it('is false for an unavailable record', () => {
     expect(
-      isRecordRunnable({ completeness: 'ready', availability: { usable: false, reason: 'no_model' } })
+      isRecordRunnable({
+        completeness: 'ready',
+        availability: { usable: false, reason: 'no_model' },
+      })
     ).toBe(false);
   });
 

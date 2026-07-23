@@ -201,9 +201,7 @@ export function renderSkillTokens(
         onMouseOver={() => interaction?.onTokenHover(seg.start)}
         onMouseOut={() => interaction?.onTokenHover(null)}
         style={
-          hovered
-            ? { backgroundColor: 'hsl(var(--secondary))', borderRadius: '4px' }
-            : undefined
+          hovered ? { backgroundColor: 'hsl(var(--secondary))', borderRadius: '4px' } : undefined
         }
       >
         <span

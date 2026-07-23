@@ -156,17 +156,15 @@ describe('runStore', () => {
   });
 
   it('ignores an identity-less late terminal event after run tracking was removed', () => {
-    useChatMessageStore
-      .getState()
-      .setMessages('s1', [
-        {
-          id: 'new-assistant',
-          sessionId: 's1',
-          role: 'assistant',
-          content: 'new run',
-          createdAt: 2,
-        },
-      ]);
+    useChatMessageStore.getState().setMessages('s1', [
+      {
+        id: 'new-assistant',
+        sessionId: 's1',
+        role: 'assistant',
+        content: 'new run',
+        createdAt: 2,
+      },
+    ]);
 
     useRunStore.getState().finalizeRunToMessage('old-run', {
       sessionId: 's1',

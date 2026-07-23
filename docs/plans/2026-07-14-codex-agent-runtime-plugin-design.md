@@ -13,16 +13,16 @@ Migrate the Codex integration from `my-claudia` into `zclaudia` as a first-class
 
 ## Decisions (locked)
 
-| Topic | Choice |
-|---|---|
-| Runtime path | **App Server** (`codex app-server --listen stdio://`) — matches my-claudia production registry |
-| Scope | **Phase 1 B**: chat stream, resume, cancel, MCP bridge, approval bridge, plan event normalization |
-| Packaging | Direct `plugins/codex` sibling to Claude/Cursor (no server staging) |
-| MCP | Host `createToolBridge` → merge into `$ZCLAUDIA_DATA_DIR/codex-config/.codex/config.toml` |
-| Modes | `default`, `plan`, `acceptEdits`, `bypassPermissions` with `modeSwitchSessionPolicy: 'preserve'` |
-| Plan UX | Normalize `EnterPlanMode` / `ExitPlanMode` → `mode_transition` / `toolSemantic`; defer client plan decision card |
-| Auth | Local `codex` CLI login only; do not wire zclaudia LLM OAuth into runtime execution |
-| Deferred | form/todo interaction UI, image attachments, DB/user MCP injection, CLI jobs, AI review, live smoke in CI, SDK rate-limit auto-retry |
+| Topic        | Choice                                                                                                                               |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Runtime path | **App Server** (`codex app-server --listen stdio://`) — matches my-claudia production registry                                       |
+| Scope        | **Phase 1 B**: chat stream, resume, cancel, MCP bridge, approval bridge, plan event normalization                                    |
+| Packaging    | Direct `plugins/codex` sibling to Claude/Cursor (no server staging)                                                                  |
+| MCP          | Host `createToolBridge` → merge into `$ZCLAUDIA_DATA_DIR/codex-config/.codex/config.toml`                                            |
+| Modes        | `default`, `plan`, `acceptEdits`, `bypassPermissions` with `modeSwitchSessionPolicy: 'preserve'`                                     |
+| Plan UX      | Normalize `EnterPlanMode` / `ExitPlanMode` → `mode_transition` / `toolSemantic`; defer client plan decision card                     |
+| Auth         | Local `codex` CLI login only; do not wire zclaudia LLM OAuth into runtime execution                                                  |
+| Deferred     | form/todo interaction UI, image attachments, DB/user MCP injection, CLI jobs, AI review, live smoke in CI, SDK rate-limit auto-retry |
 
 ## Architecture
 
@@ -63,11 +63,11 @@ Existing zclaudia conversation runtime
 
 Boundary table:
 
-| Layer | Owns |
-|---|---|
-| `AgentProfileConfig` | `runtimeType=codex`, model, systemPrompt, cliPath |
-| Host | Adapter selection, abort orchestration, `sdk_session_id`, capabilities HTTP, `createToolBridge` |
-| `plugins/codex` | App Server spawn, JSON-RPC, approval bridge, MCP TOML, mode mapping, event translation, process lifecycle |
+| Layer                | Owns                                                                                                      |
+| -------------------- | --------------------------------------------------------------------------------------------------------- |
+| `AgentProfileConfig` | `runtimeType=codex`, model, systemPrompt, cliPath                                                         |
+| Host                 | Adapter selection, abort orchestration, `sdk_session_id`, capabilities HTTP, `createToolBridge`           |
+| `plugins/codex`      | App Server spawn, JSON-RPC, approval bridge, MCP TOML, mode mapping, event translation, process lifecycle |
 
 Codex agent runtime does not call zclaudia LLM profile HTTP APIs. `llmProfileId` may remain on the profile for schema/UI consistency; the adapter ignores it for execution.
 
@@ -75,13 +75,13 @@ Missing Codex adapter must fail closed (existing host rule): never fall back to 
 
 ### vs my-claudia
 
-| Point | my-claudia | zclaudia plugin |
-|---|---|---|
-| Event types | `ClaudeMessage` | `ProviderRuntimeEvent` |
-| MCP bridge | `buildMcpBridgeEntry` + DB MCP | `createToolBridge` only (Phase 1) |
-| Config dir | `~/.my-claudia/codex-config` | `$ZCLAUDIA_DATA_DIR/codex-config` |
-| Session env | `CLAUDIA_SESSION_ID` | `ZCLAUDIA_SESSION_ID` (also accept legacy name in bridge) |
-| Process supervisor | `getGlobalProcessSupervisor()` | Direct spawn/kill in Phase 1 |
+| Point              | my-claudia                     | zclaudia plugin                                           |
+| ------------------ | ------------------------------ | --------------------------------------------------------- |
+| Event types        | `ClaudeMessage`                | `ProviderRuntimeEvent`                                    |
+| MCP bridge         | `buildMcpBridgeEntry` + DB MCP | `createToolBridge` only (Phase 1)                         |
+| Config dir         | `~/.my-claudia/codex-config`   | `$ZCLAUDIA_DATA_DIR/codex-config`                         |
+| Session env        | `CLAUDIA_SESSION_ID`           | `ZCLAUDIA_SESSION_ID` (also accept legacy name in bridge) |
+| Process supervisor | `getGlobalProcessSupervisor()` | Direct spawn/kill in Phase 1                              |
 
 ## Components
 
@@ -105,18 +105,18 @@ plugins/codex/
     └── __tests__/
 ```
 
-| File | Responsibility |
-|---|---|
-| `plugin.json` | Declare `agentRuntimes[type=codex]`, PCP manifest, policy (`escalateAlwaysTools: ['ExitPlanMode']`), default profile `codex-default` |
-| `src/main.ts` | `activate`: register `CodexAgentAdapter` with `createToolBridge` from context |
-| `src/adapter.ts` | `ExternalAgentAdapter`: session mode map, `run` / `abort` / `setSessionMode` / `getRunState` |
-| `src/runner.ts` | Client cache, thread start/resume, session recovery, turn orchestration, idle cleanup hooks |
-| `src/app-server-client.ts` | JSON-RPC process, `runTurn`, approval dispatch, interrupt |
-| `src/config.ts` | MCP TOML write, mode→`-c` args, env build, input prep, project trust |
-| `src/map-events.ts` | App Server items → `ProviderRuntimeEvent`; plan tool semantics |
-| `src/permissions.ts` | Approval → `PermissionRequest`; mode-based auto rules |
-| `src/tool-effects.ts` | Shell/file change effects for tool events |
-| `src/resolve-cli.ts` | Resolve explicit `cliPath` or `codex` on `PATH` |
+| File                       | Responsibility                                                                                                                       |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `plugin.json`              | Declare `agentRuntimes[type=codex]`, PCP manifest, policy (`escalateAlwaysTools: ['ExitPlanMode']`), default profile `codex-default` |
+| `src/main.ts`              | `activate`: register `CodexAgentAdapter` with `createToolBridge` from context                                                        |
+| `src/adapter.ts`           | `ExternalAgentAdapter`: session mode map, `run` / `abort` / `setSessionMode` / `getRunState`                                         |
+| `src/runner.ts`            | Client cache, thread start/resume, session recovery, turn orchestration, idle cleanup hooks                                          |
+| `src/app-server-client.ts` | JSON-RPC process, `runTurn`, approval dispatch, interrupt                                                                            |
+| `src/config.ts`            | MCP TOML write, mode→`-c` args, env build, input prep, project trust                                                                 |
+| `src/map-events.ts`        | App Server items → `ProviderRuntimeEvent`; plan tool semantics                                                                       |
+| `src/permissions.ts`       | Approval → `PermissionRequest`; mode-based auto rules                                                                                |
+| `src/tool-effects.ts`      | Shell/file change effects for tool events                                                                                            |
+| `src/resolve-cli.ts`       | Resolve explicit `cliPath` or `codex` on `PATH`                                                                                      |
 
 Host changes (minimal):
 
@@ -131,19 +131,19 @@ Do **not** place Codex under `server/src/infra/providers/external-agents/codex`.
 
 Capability claims (truthful):
 
-| Capability | Phase 1 |
-|---|---|
-| `chat.stream` | ✅ native |
-| `tool.call` | ✅ native |
-| `tool.inject` | ✅ bridged (MCP TOML) |
-| `interaction.approval` | ✅ bridged (`onPermission`) |
-| `permission.mode` | ✅ native |
-| `session.abort` | ✅ native |
-| plan normalization | ✅ `EnterPlanMode` / `ExitPlanMode` |
-| `interaction.form` | ❌ defer (decline empty) |
-| `interaction.todo` | ❌ defer |
-| `input.image` / `input.text_file` / `input.binary_file` | ❌ defer |
-| `session.steer` / `session.background_task` | ❌ defer |
+| Capability                                              | Phase 1                             |
+| ------------------------------------------------------- | ----------------------------------- |
+| `chat.stream`                                           | ✅ native                           |
+| `tool.call`                                             | ✅ native                           |
+| `tool.inject`                                           | ✅ bridged (MCP TOML)               |
+| `interaction.approval`                                  | ✅ bridged (`onPermission`)         |
+| `permission.mode`                                       | ✅ native                           |
+| `session.abort`                                         | ✅ native                           |
+| plan normalization                                      | ✅ `EnterPlanMode` / `ExitPlanMode` |
+| `interaction.form`                                      | ❌ defer (decline empty)            |
+| `interaction.todo`                                      | ❌ defer                            |
+| `input.image` / `input.text_file` / `input.binary_file` | ❌ defer                            |
+| `session.steer` / `session.background_task`             | ❌ defer                            |
 
 `permissionModeMap`:
 
@@ -184,25 +184,25 @@ HTTP capabilities (`CODEX_CAPABILITIES`): modes `default`, `plan`, `acceptEdits`
 
 ## Error handling
 
-| Scenario | Behavior |
-|---|---|
-| `codex` not found (`ENOENT`) | Yield `error` with install / `cliPath` guidance |
-| App-server process exit | Reject pending RPC; runTurn fails → error event |
-| JSON-RPC error response | Turn fails → error event |
-| `turn/failed` / `error` notification | `extractErrorMessage` → error event |
-| Resume failure | Log; fallback `startThread(cwd)` |
-| Resumed session corrupt | Detect `SESSION_RECOVERY_PATTERNS`; one fresh-thread retry + user-visible recovery notice |
-| Cwd-bound worktree, lost cwd record | Skip resume; `startThread` to avoid wrong checkout writes |
-| Approval callback throws | Decline; do not hang app-server |
-| No permission callback | Decline (fail closed) |
-| Plan mode writes | Auto decline |
-| `requestUserInput` / MCP elicitation | Empty/decline (Phase 1; avoid hang) |
-| Unknown server request | Log + empty `{}` response |
-| MCP config write failure | Warn; continue without bridge (or yield warning event) |
-| Trust config update failure | Warn only |
-| Abort / interrupt failure | Log only |
-| Auth / quota errors | Surface Codex CLI message as error; no OAuth hint rewriting |
-| Idle cleanup | 30 min idle + no active turns → destroy client; plugin `deactivate` destroys all |
+| Scenario                             | Behavior                                                                                  |
+| ------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `codex` not found (`ENOENT`)         | Yield `error` with install / `cliPath` guidance                                           |
+| App-server process exit              | Reject pending RPC; runTurn fails → error event                                           |
+| JSON-RPC error response              | Turn fails → error event                                                                  |
+| `turn/failed` / `error` notification | `extractErrorMessage` → error event                                                       |
+| Resume failure                       | Log; fallback `startThread(cwd)`                                                          |
+| Resumed session corrupt              | Detect `SESSION_RECOVERY_PATTERNS`; one fresh-thread retry + user-visible recovery notice |
+| Cwd-bound worktree, lost cwd record  | Skip resume; `startThread` to avoid wrong checkout writes                                 |
+| Approval callback throws             | Decline; do not hang app-server                                                           |
+| No permission callback               | Decline (fail closed)                                                                     |
+| Plan mode writes                     | Auto decline                                                                              |
+| `requestUserInput` / MCP elicitation | Empty/decline (Phase 1; avoid hang)                                                       |
+| Unknown server request               | Log + empty `{}` response                                                                 |
+| MCP config write failure             | Warn; continue without bridge (or yield warning event)                                    |
+| Trust config update failure          | Warn only                                                                                 |
+| Abort / interrupt failure            | Log only                                                                                  |
+| Auth / quota errors                  | Surface Codex CLI message as error; no OAuth hint rewriting                               |
+| Idle cleanup                         | 30 min idle + no active turns → destroy client; plugin `deactivate` destroys all          |
 
 Retry in Phase 1:
 
@@ -220,15 +220,15 @@ Env:
 
 ### Plugin unit tests (no network / no real CLI in default CI)
 
-| File | Coverage |
-|---|---|
-| `resolve-cli.test.ts` | cliPath priority; PATH lookup; not found |
-| `config.test.ts` | TOML generation; bridge merge; mode args; trust upsert; text input prep |
-| `permissions.test.ts` | plan→decline; bypass→accept; acceptEdits file auto-accept; default→callback |
-| `map-events.test.ts` | deltas; tools; MCP name normalization; Enter/ExitPlanMode semantics |
-| `app-server-client.test.ts` | Mock stdin/stdout JSON-RPC; approval flow; runTurn sequence; process exit |
-| `runner.test.ts` | Start vs resume; session recovery; bridge write; abort |
-| `adapter.test.ts` | createToolBridge plumbing; setSessionMode; abort cleanup; session id maps |
+| File                        | Coverage                                                                    |
+| --------------------------- | --------------------------------------------------------------------------- |
+| `resolve-cli.test.ts`       | cliPath priority; PATH lookup; not found                                    |
+| `config.test.ts`            | TOML generation; bridge merge; mode args; trust upsert; text input prep     |
+| `permissions.test.ts`       | plan→decline; bypass→accept; acceptEdits file auto-accept; default→callback |
+| `map-events.test.ts`        | deltas; tools; MCP name normalization; Enter/ExitPlanMode semantics         |
+| `app-server-client.test.ts` | Mock stdin/stdout JSON-RPC; approval flow; runTurn sequence; process exit   |
+| `runner.test.ts`            | Start vs resume; session recovery; bridge write; abort                      |
+| `adapter.test.ts`           | createToolBridge plumbing; setSessionMode; abort cleanup; session id maps   |
 
 ### Host tests
 
@@ -261,18 +261,18 @@ Live smoke (real `codex` + network + account); image attachment E2E; form/todo i
 
 ## Migration source map
 
-| my-claudia | zclaudia plugin |
-|---|---|
-| `codex-app-server-adapter.ts` | `plugins/codex/src/adapter.ts` |
-| `codex-app-server.ts` | `plugins/codex/src/runner.ts` |
-| `codex/codex-app-server-client.ts` | `plugins/codex/src/app-server-client.ts` + `map-events.ts` |
-| `codex/codex-config.ts` | `plugins/codex/src/config.ts` + `permissions.ts` |
-| approval logic in client | `plugins/codex/src/permissions.ts` |
-| `tool-effects.ts` patterns | `plugins/codex/src/tool-effects.ts` |
-| `CODEX_*` in `manifests.ts` | `plugin.json` contributes.manifest / policy |
-| `codex-adapter.ts` + `codex-sdk.ts` | **Not ported** (legacy SDK path) |
-| `loadMcpServersFromDb` | Deferred (Phase 1 bridge only) |
-| CLI jobs / review adapters | Deferred |
+| my-claudia                          | zclaudia plugin                                            |
+| ----------------------------------- | ---------------------------------------------------------- |
+| `codex-app-server-adapter.ts`       | `plugins/codex/src/adapter.ts`                             |
+| `codex-app-server.ts`               | `plugins/codex/src/runner.ts`                              |
+| `codex/codex-app-server-client.ts`  | `plugins/codex/src/app-server-client.ts` + `map-events.ts` |
+| `codex/codex-config.ts`             | `plugins/codex/src/config.ts` + `permissions.ts`           |
+| approval logic in client            | `plugins/codex/src/permissions.ts`                         |
+| `tool-effects.ts` patterns          | `plugins/codex/src/tool-effects.ts`                        |
+| `CODEX_*` in `manifests.ts`         | `plugin.json` contributes.manifest / policy                |
+| `codex-adapter.ts` + `codex-sdk.ts` | **Not ported** (legacy SDK path)                           |
+| `loadMcpServersFromDb`              | Deferred (Phase 1 bridge only)                             |
+| CLI jobs / review adapters          | Deferred                                                   |
 
 ## Non-goals
 

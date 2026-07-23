@@ -103,7 +103,12 @@ describe('MarkdownChildrenWithInlineIcons', () => {
     // England flag = U+1F3F4 + tag letters gbeng + cancel tag, built from
     // codepoints to avoid editors/shell stripping the invisible tag chars.
     const england = `${String.fromCodePoint(0x1f3f4)}${String.fromCodePoint(
-      0xe0067, 0xe0062, 0xe0065, 0xe006e, 0xe0067, 0xe007f
+      0xe0067,
+      0xe0062,
+      0xe0065,
+      0xe006e,
+      0xe0067,
+      0xe007f
     )}`;
     render(<MarkdownChildrenWithInlineIcons>{`flag ${england}`}</MarkdownChildrenWithInlineIcons>);
 

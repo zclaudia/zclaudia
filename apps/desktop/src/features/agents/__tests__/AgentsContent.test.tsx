@@ -454,9 +454,7 @@ describe('AgentsContent', () => {
     fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Delete agent' }));
 
-    await waitFor(() =>
-      expect(mockDeleteAgentProfileForBackend).toHaveBeenCalledWith('b1', 'ap1')
-    );
+    await waitFor(() => expect(mockDeleteAgentProfileForBackend).toHaveBeenCalledWith('b1', 'ap1'));
     expect(mockConfirm).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Delete profile?', destructive: true })
     );
@@ -1665,9 +1663,7 @@ describe('AgentsContent', () => {
     fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Delete provider' }));
 
-    await waitFor(() =>
-      expect(mockDeleteLlmProfileForBackend).toHaveBeenCalledWith('b1', 'lp1')
-    );
+    await waitFor(() => expect(mockDeleteLlmProfileForBackend).toHaveBeenCalledWith('b1', 'lp1'));
     expect(mockConfirm).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Delete provider?', destructive: true })
     );

@@ -114,9 +114,7 @@ describe('selectHomeSessions', () => {
   });
 
   it('caps recent at 10 but does not cap running', () => {
-    const many = Array.from({ length: 15 }, (_, i) =>
-      session(`s${i}`, { updatedAt: 1000 + i })
-    );
+    const many = Array.from({ length: 15 }, (_, i) => session(`s${i}`, { updatedAt: 1000 + i }));
     const result = selectHomeSessions(
       input({
         localSessions: many,
@@ -147,10 +145,7 @@ describe('selectHomeSessions', () => {
   it('carries lastMessageOffset through as messageCount when present', () => {
     const result = selectHomeSessions(
       input({
-        localSessions: [
-          session('a', { lastMessageOffset: 12 }),
-          session('b', { updatedAt: 500 }),
-        ],
+        localSessions: [session('a', { lastMessageOffset: 12 }), session('b', { updatedAt: 500 })],
       })
     );
     expect(result.recent.find(r => r.id === 'a')?.messageCount).toBe(12);

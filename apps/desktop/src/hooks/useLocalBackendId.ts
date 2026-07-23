@@ -18,7 +18,5 @@ export function useLocalBackendId(): string | null {
   const backends = useFacadeStore(s => s.backends);
 
   if (localBackendId) return localBackendId;
-  return (
-    backends.find(b => b.isThisInstance === true || b.channel === 'local')?.backendId ?? null
-  );
+  return backends.find(b => b.isThisInstance === true || b.channel === 'local')?.backendId ?? null;
 }

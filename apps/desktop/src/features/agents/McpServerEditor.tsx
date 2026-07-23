@@ -161,10 +161,7 @@ export function McpServerEditor({
   // endpoint. While invalid, edits are held (save-state shows "Not saved").
   const formValid = useMemo(
     () =>
-      Boolean(
-        formName.trim() &&
-          (formTransport === 'stdio' ? formCommand.trim() : formUrl.trim())
-      ),
+      Boolean(formName.trim() && (formTransport === 'stdio' ? formCommand.trim() : formUrl.trim())),
     [formName, formTransport, formCommand, formUrl]
   );
 

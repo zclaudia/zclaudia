@@ -96,13 +96,20 @@ export function selectHomeSessions(input: HomeSessionsInput): HomeSessions {
   for (const [backendId, sessions] of remoteSessions) {
     const isAlias = localAliasBackendIds.has(backendId);
     if (!isAlias && !isVisibleGatewayBackend(backendId)) continue;
-    const activeIds = isAlias ? localActiveIds : (activeSessionIdsByBackend.get(backendId) ?? new Set());
+    const activeIds = isAlias
+      ? localActiveIds
+      : (activeSessionIdsByBackend.get(backendId) ?? new Set());
     for (const session of sessions) {
       if (isAlias && seenLocalIds.has(session.id)) continue;
       if (isAlias) seenLocalIds.add(session.id);
       if (!includeSession(session, projectNames)) continue;
       rows.push(
-        toRow(session, isAlias ? LOCAL_BACKEND_KEY : backendId, activeIds.has(session.id), projectNames)
+        toRow(
+          session,
+          isAlias ? LOCAL_BACKEND_KEY : backendId,
+          activeIds.has(session.id),
+          projectNames
+        )
       );
     }
   }

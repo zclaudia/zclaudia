@@ -20,7 +20,10 @@ describe('EditorTabs', () => {
     render(<EditorTabs tabs={tabs} active="model" onChange={vi.fn()} />);
     expect(screen.getAllByRole('tab')).toHaveLength(3);
     expect(screen.getByRole('tab', { name: /Model/ })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('tab', { name: /Capabilities/ })).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByRole('tab', { name: /Capabilities/ })).toHaveAttribute(
+      'aria-selected',
+      'false'
+    );
   });
 
   it('shows a count when provided', () => {

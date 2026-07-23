@@ -140,7 +140,9 @@ describe('SidebarNav', () => {
         agentsMode={{ tab: 'profiles', onSelectTab: vi.fn(), onBack: vi.fn() }}
       />
     );
-    expect(screen.getByRole('button', { name: 'Agent Profiles' }).className).toContain('bg-secondary');
+    expect(screen.getByRole('button', { name: 'Agent Profiles' }).className).toContain(
+      'bg-secondary'
+    );
   });
 
   it('fires onSelectTab with "skills" when the Skills tab is clicked', () => {
@@ -242,7 +244,9 @@ describe('SidebarNav', () => {
         agentsMode={{ tab: 'providers', onSelectTab: vi.fn(), onBack: vi.fn() }}
       />
     );
-    expect(screen.getByRole('button', { name: 'LLM Providers' }).className).toContain('bg-secondary');
+    expect(screen.getByRole('button', { name: 'LLM Providers' }).className).toContain(
+      'bg-secondary'
+    );
     expect(screen.getByRole('button', { name: 'Agent Profiles' }).className).toContain(
       'text-muted-foreground'
     );

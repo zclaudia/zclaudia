@@ -20,7 +20,9 @@ describe('StatusChip', () => {
 
   it('shows "Disabled" (muted) for a disabled record', () => {
     render(
-      <StatusChip status={{ completeness: 'ready', availability: { usable: true }, disabled: true }} />
+      <StatusChip
+        status={{ completeness: 'ready', availability: { usable: true }, disabled: true }}
+      />
     );
     expect(screen.getByText('Disabled').className).toContain('text-muted-foreground');
   });
@@ -38,7 +40,10 @@ describe('StatusChip', () => {
   it('maps requirement_unmet to "Blocked"', () => {
     render(
       <StatusChip
-        status={{ completeness: 'ready', availability: { usable: false, reason: 'requirement_unmet' } }}
+        status={{
+          completeness: 'ready',
+          availability: { usable: false, reason: 'requirement_unmet' },
+        }}
       />
     );
     expect(screen.getByText('Blocked')).toBeInTheDocument();

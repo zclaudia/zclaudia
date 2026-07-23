@@ -9,7 +9,10 @@ describe('DetailHeader', () => {
       <DetailHeader
         crumb="Profiles"
         title="Coding"
-        badges={[{ label: 'This Device', online: true }, { label: 'Default', tone: 'accent' }]}
+        badges={[
+          { label: 'This Device', online: true },
+          { label: 'Default', tone: 'accent' },
+        ]}
         onBack={onBack}
       />
     );

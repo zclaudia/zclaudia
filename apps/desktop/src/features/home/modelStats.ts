@@ -58,9 +58,7 @@ export function buildModelChart(days: ModelUsageDay[], modelOrder: string[]): Mo
     const date = localDateString(ms);
     const models = byDate.get(date);
     const segments = models
-      ? modelOrder
-          .filter(m => (models[m] ?? 0) > 0)
-          .map(m => ({ model: m, value: models[m] }))
+      ? modelOrder.filter(m => (models[m] ?? 0) > 0).map(m => ({ model: m, value: models[m] }))
       : [];
     bars.push({
       date,

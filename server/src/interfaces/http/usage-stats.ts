@@ -83,10 +83,7 @@ const RANGE_MS: Record<Exclude<UsageStatsRange, 'all'>, number> = {
   '7d': 7 * DAY_MS,
 };
 
-export function computeUsageStats(
-  db: Database,
-  range: UsageStatsRange = 'all'
-): UsageStatsPayload {
+export function computeUsageStats(db: Database, range: UsageStatsRange = 'all'): UsageStatsPayload {
   const now = Date.now();
   const windowStartMs = range === 'all' ? 0 : now - RANGE_MS[range];
 
@@ -110,9 +107,7 @@ export function computeUsageStats(
     .prepare(ACTIVE_DAYS_SQL)
     .all(now - ACTIVE_DAYS_WINDOW_MS) as UsageActiveDay[];
   const windowedDays =
-    range === 'all'
-      ? activeDays
-      : activeDays.filter(d => d.date >= localDateString(windowStartMs));
+    range === 'all' ? activeDays : activeDays.filter(d => d.date >= localDateString(windowStartMs));
 
   const peakRow = db.prepare(PEAK_HOUR_SQL).get(windowStartMs) as
     | { hour: number; c: number }
@@ -166,8 +161,7 @@ export function computeModelStats(db: Database, range: UsageStatsRange = 'all'):
   // day series and the legend totals/shares — matching the Overview panel's
   // Active days / Longest streak semantics rather than the all-time token
   // cards. Revisit once model data older than 182 days exists (2027-01+).
-  const windowStartMs =
-    range === 'all' ? now - ACTIVE_DAYS_WINDOW_MS : now - RANGE_MS[range];
+  const windowStartMs = range === 'all' ? now - ACTIVE_DAYS_WINDOW_MS : now - RANGE_MS[range];
 
   const rows = db.prepare(MODEL_USAGE_SQL).all(windowStartMs) as Array<{
     date: string;
@@ -210,10 +204,7 @@ export function computeModelStats(db: Database, range: UsageStatsRange = 'all'):
   return { days, models, trackedSince: tracked.t ?? null, capturedAt: now };
 }
 
-export function createUsageStatsRoutes(
-  db: Database,
-  opts: { ttlMs?: number } = {}
-): Router {
+export function createUsageStatsRoutes(db: Database, opts: { ttlMs?: number } = {}): Router {
   const ttlMs = opts.ttlMs ?? 60_000;
   const router = Router();
   const cache = new Map<UsageStatsRange, { data: UsageStatsPayload; at: number }>();

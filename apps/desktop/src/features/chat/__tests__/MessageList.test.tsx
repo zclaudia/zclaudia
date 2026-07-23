@@ -474,7 +474,10 @@ describe('MessageList', () => {
       makeMessage({ id: 'msg-1', role: 'user', content: 'Hello', createdAt: now.getTime() }),
     ];
     render(<MessageList messages={messages} />);
-    const timeEl = screen.getByText('Hello').closest('[data-role]')?.querySelector('.text-xs.text-muted-foreground');
+    const timeEl = screen
+      .getByText('Hello')
+      .closest('[data-role]')
+      ?.querySelector('.text-xs.text-muted-foreground');
     expect(timeEl).toBeTruthy();
     expect(timeEl?.textContent).toBeTruthy();
   });
@@ -485,7 +488,10 @@ describe('MessageList', () => {
       makeMessage({ id: 'msg-1', role: 'assistant', content: 'Reply', createdAt: now.getTime() }),
     ];
     render(<MessageList messages={messages} />);
-    const timeEl = screen.getByText('Reply').closest('[data-role]')?.querySelector('.text-xs.text-muted-foreground');
+    const timeEl = screen
+      .getByText('Reply')
+      .closest('[data-role]')
+      ?.querySelector('.text-xs.text-muted-foreground');
     expect(timeEl).toBeTruthy();
   });
 

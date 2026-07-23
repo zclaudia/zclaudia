@@ -94,7 +94,12 @@ describe('interaction-dispatcher', () => {
     });
 
     await expect(
-      interactionDispatcher.dispatchAndWait('i-timeout', 'session-1', promptEvent('i-timeout', 'session-1'), 20)
+      interactionDispatcher.dispatchAndWait(
+        'i-timeout',
+        'session-1',
+        promptEvent('i-timeout', 'session-1'),
+        20
+      )
     ).resolves.toEqual({ error: 'User did not respond within timeout' });
 
     expect(sent).toContainEqual({
@@ -211,7 +216,12 @@ describe('interaction-dispatcher', () => {
     });
 
     await expect(
-      interactionDispatcher.dispatchAndWait('i-normal', 'session-1', promptEvent('i-normal', 'session-1'), 1000)
+      interactionDispatcher.dispatchAndWait(
+        'i-normal',
+        'session-1',
+        promptEvent('i-normal', 'session-1'),
+        1000
+      )
     ).resolves.toEqual({ approved: true });
 
     expect(sent.filter(e => e.type === 'interaction_resolved')).toEqual([]);

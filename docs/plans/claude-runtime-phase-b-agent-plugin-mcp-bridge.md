@@ -33,6 +33,7 @@
 ## Task 1: Standard Agent Plugin Tool Bridge Helper
 
 **Files:**
+
 - Create: `server/src/infra/providers/external-agents/agent-plugin/tool-bridge.ts`
 - Create: `server/src/infra/providers/external-agents/agent-plugin/__tests__/tool-bridge.test.ts`
 
@@ -123,10 +124,7 @@ Expected: FAIL because `server/src/infra/providers/external-agents/agent-plugin/
 Create `server/src/infra/providers/external-agents/agent-plugin/tool-bridge.ts`:
 
 ```ts
-import {
-  buildMcpBridgeEntry,
-  type McpBridgeServerEntry,
-} from '../../utils/mcp-bridge-launch.js';
+import { buildMcpBridgeEntry, type McpBridgeServerEntry } from '../../utils/mcp-bridge-launch.js';
 
 export const DEFAULT_AGENT_PLUGIN_BRIDGE_MCP_SERVER_NAME = 'claudia-plugins';
 
@@ -165,6 +163,7 @@ git commit -m "feat(runtime): add agent plugin tool bridge context"
 ## Task 2: Claude Translation And MCP Merge
 
 **Files:**
+
 - Modify: `server/src/infra/providers/external-agents/claude/adapter.ts`
 - Modify: `server/src/infra/providers/__tests__/claude-agent-adapter.test.ts`
 
@@ -349,6 +348,7 @@ git commit -m "feat(runtime): inject agent plugin bridge into claude"
 ## Task 3: Completion Docs And Verification
 
 **Files:**
+
 - Modify: `docs/plans/claude-runtime-completion.md`
 
 - [ ] **Step 1: Update completion doc**

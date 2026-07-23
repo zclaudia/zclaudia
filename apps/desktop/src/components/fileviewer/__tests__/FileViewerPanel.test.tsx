@@ -241,7 +241,9 @@ describe('FileViewerPanel', () => {
     mockFileViewerState.content = 'const x = 1;';
     mockFileViewerState.inFileSearchOpen = false;
     const { container } = render(<FileViewerActions />);
-    const findBtn = container.querySelector('button[aria-label="Find in file"]') as HTMLButtonElement;
+    const findBtn = container.querySelector(
+      'button[aria-label="Find in file"]'
+    ) as HTMLButtonElement;
     expect(findBtn).toBeInTheDocument();
     findBtn.click();
     expect(mockFileViewerState.setInFileSearchOpen).toHaveBeenCalledWith(true);
@@ -260,7 +262,9 @@ describe('FileViewerPanel', () => {
     mockFileViewerState.content = 'const x = 1;';
     mockFileViewerState.inFileSearchOpen = false;
     const { container } = render(<FileViewerActions />);
-    const findBtn = container.querySelector('button[aria-label="Find in file"]') as HTMLButtonElement;
+    const findBtn = container.querySelector(
+      'button[aria-label="Find in file"]'
+    ) as HTMLButtonElement;
     expect(findBtn).toBeInTheDocument();
     findBtn.click();
     expect(mockFileViewerState.setInFileSearchOpen).toHaveBeenCalledWith(true);
@@ -277,9 +281,7 @@ describe('FileViewerPanel', () => {
   it('highlights in-file search matches inside the rendered markdown', () => {
     // jsdom does not implement scrollIntoView; the hook swallows errors, but
     // stub it so the call is a clean no-op.
-    const spy = vi
-      .spyOn(Element.prototype, 'scrollIntoView')
-      .mockImplementation(() => undefined);
+    const spy = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => undefined);
     mockFileViewerState.filePath = 'docs/readme.md';
     mockFileViewerState.content = '# Title\n\nfind this text here and find again';
     mockFileViewerState.inFileSearchOpen = true;

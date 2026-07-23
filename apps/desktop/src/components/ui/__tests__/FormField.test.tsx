@@ -6,8 +6,8 @@ describe('FormField', () => {
   it('associates the label with the control', () => {
     render(
       <FormField label="Project name" required>
-        {(f) => <input {...f} />}
-      </FormField>,
+        {f => <input {...f} />}
+      </FormField>
     );
     const input = screen.getByLabelText(/project name/i);
     expect(input).toBeTruthy();
@@ -17,8 +17,8 @@ describe('FormField', () => {
   it('wires the error via aria-describedby + aria-invalid', () => {
     render(
       <FormField label="URL" error="Must be https">
-        {(f) => <input {...f} />}
-      </FormField>,
+        {f => <input {...f} />}
+      </FormField>
     );
     const input = screen.getByLabelText('URL');
     expect(input.getAttribute('aria-invalid')).toBe('true');
@@ -29,7 +29,7 @@ describe('FormField', () => {
   });
 
   it('omits error wiring when there is no error', () => {
-    render(<FormField label="Name">{(f) => <input {...f} />}</FormField>);
+    render(<FormField label="Name">{f => <input {...f} />}</FormField>);
     const input = screen.getByLabelText('Name');
     expect(input.getAttribute('aria-invalid')).toBeNull();
     expect(input.getAttribute('aria-describedby')).toBeNull();

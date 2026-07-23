@@ -305,34 +305,37 @@ export const MessageList = memo(function MessageList({
     [itemHeights]
   );
 
-  const setMeasuredRef = useCallback((index: number, element: HTMLDivElement | null) => {
-    const existing = observersRef.current.get(index);
-    if (existing) {
-      existing.disconnect();
-      observersRef.current.delete(index);
-    }
-
-    if (!element) return;
-
-    const updateHeight = (nextHeight: number) => {
-      if (!Number.isFinite(nextHeight) || nextHeight <= 0) return;
-      const prev = itemHeightsRef.current.get(index);
-      if (prev !== nextHeight) {
-        itemHeightsRef.current.set(index, nextHeight);
-        scheduleHeightFlush();
+  const setMeasuredRef = useCallback(
+    (index: number, element: HTMLDivElement | null) => {
+      const existing = observersRef.current.get(index);
+      if (existing) {
+        existing.disconnect();
+        observersRef.current.delete(index);
       }
-    };
 
-    updateHeight(Math.ceil(element.getBoundingClientRect().height));
+      if (!element) return;
 
-    const ro = new ResizeObserver(entries => {
-      for (const entry of entries) {
-        updateHeight(Math.ceil(entry.contentRect.height));
-      }
-    });
-    ro.observe(element);
-    observersRef.current.set(index, ro);
-  }, [scheduleHeightFlush]);
+      const updateHeight = (nextHeight: number) => {
+        if (!Number.isFinite(nextHeight) || nextHeight <= 0) return;
+        const prev = itemHeightsRef.current.get(index);
+        if (prev !== nextHeight) {
+          itemHeightsRef.current.set(index, nextHeight);
+          scheduleHeightFlush();
+        }
+      };
+
+      updateHeight(Math.ceil(element.getBoundingClientRect().height));
+
+      const ro = new ResizeObserver(entries => {
+        for (const entry of entries) {
+          updateHeight(Math.ceil(entry.contentRect.height));
+        }
+      });
+      ro.observe(element);
+      observersRef.current.set(index, ro);
+    },
+    [scheduleHeightFlush]
+  );
 
   // Cache one stable ref callback per index. React only invokes it when the
   // element at that position actually mounts/unmounts, not on every render.
@@ -1043,7 +1046,9 @@ const MessageItem = memo(function MessageItem({
           isStreaming={Boolean(streamingContentBlocks)}
         />
         <div className="mt-1 flex items-center gap-2 px-3">
-          <span className="text-xs text-muted-foreground">{formatMessageTimestamp(message.createdAt)}</span>
+          <span className="text-xs text-muted-foreground">
+            {formatMessageTimestamp(message.createdAt)}
+          </span>
           {messageActions && (
             <MessageActionsMenu
               treeEntryId={messageActions.treeEntryId}
@@ -1136,7 +1141,9 @@ const MessageItem = memo(function MessageItem({
           <AssistantContent content={mainContent} />
         )}
         <div className="mt-1 flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">{formatMessageTimestamp(message.createdAt)}</span>
+          <span className="text-xs text-muted-foreground">
+            {formatMessageTimestamp(message.createdAt)}
+          </span>
           {messageActions && (
             <MessageActionsMenu
               treeEntryId={messageActions.treeEntryId}

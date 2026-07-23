@@ -14,8 +14,7 @@ export function AboutSettings({ isOpen }: AboutSettingsProps) {
   const { embeddedServerPort } = useConnection();
   const localBackendExists = useFacadeStore(
     s =>
-      !!s.localBackendId ||
-      s.backends.some(b => b.isThisInstance === true || b.channel === 'local')
+      !!s.localBackendId || s.backends.some(b => b.isThisInstance === true || b.channel === 'local')
   );
 
   // SDK version check

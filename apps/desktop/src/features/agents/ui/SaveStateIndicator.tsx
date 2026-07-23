@@ -10,7 +10,10 @@ export function SaveStateIndicator({
 }) {
   if (status === 'saving') {
     return (
-      <span data-testid="save-state" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+      <span
+        data-testid="save-state"
+        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
+      >
         <Loader2 size={13} strokeWidth={1.75} className="animate-spin" />
         Saving…
       </span>
@@ -30,7 +33,10 @@ export function SaveStateIndicator({
   }
   if (status === 'failed') {
     return (
-      <span data-testid="save-state" className="inline-flex items-center gap-1.5 text-xs text-destructive">
+      <span
+        data-testid="save-state"
+        className="inline-flex items-center gap-1.5 text-xs text-destructive"
+      >
         <AlertCircle size={13} strokeWidth={1.75} />
         Save failed
         <button
@@ -44,7 +50,10 @@ export function SaveStateIndicator({
     );
   }
   return (
-    <span data-testid="save-state" className="inline-flex items-center gap-1.5 text-xs text-success">
+    <span
+      data-testid="save-state"
+      className="inline-flex items-center gap-1.5 text-xs text-success"
+    >
       <Check size={13} strokeWidth={1.75} />
       Saved
     </span>

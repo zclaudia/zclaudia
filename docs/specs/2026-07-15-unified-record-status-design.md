@@ -8,14 +8,15 @@
 
 The four record types each express "this thing isn't usable right now" a different way, and only partially:
 
-| Type | Completeness gate today | Availability signal today |
-|---|---|---|
+| Type  | Completeness gate today                     | Availability signal today                                                                |
+| ----- | ------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | Agent | create modal requires runtime + LLM + model | **global** `AgentReadiness { usable, reason }` + per-record `status: active \| readonly` |
-| LLM | server hard-rejects a model-less save (F2) | none persisted — only a live probe |
-| MCP | name + command/url required to create | runtime `status.state`: connected / failed / needs-auth / disabled |
-| Skill | content required to save | `eligible: false` → "Blocked" (os/bin/env unmet) |
+| LLM   | server hard-rejects a model-less save (F2)  | none persisted — only a live probe                                                       |
+| MCP   | name + command/url required to create       | runtime `status.state`: connected / failed / needs-auth / disabled                       |
+| Skill | content required to save                    | `eligible: false` → "Blocked" (os/bin/env unmet)                                         |
 
 Consequences:
+
 - No uniform way to say "exists but not finished" → the "new" flow is awkward (autosave silently commits the instant minimal fields become valid; abandoning before that persists nothing).
 - The "a dependency broke" case (e.g. an agent whose LLM profile went invalid) is only represented for agents, and only globally — other types hide or scatter it.
 
@@ -26,11 +27,14 @@ One **derived status** per record, computed from two independent facets:
 ```ts
 // shared/src/core/record-status.ts (new)
 export type RecordAvailabilityReason =
-  | 'no_llm_profile' | 'no_credential' | 'no_model'   // agent, llm
-  | 'llm_unavailable'                                  // agent (its LLM broke)
-  | 'unreachable'                                      // llm (endpoint/key rejected)
-  | 'needs_auth' | 'connect_failed'                    // mcp
-  | 'requirement_unmet';                               // skill (os/bin/env)
+  | 'no_llm_profile'
+  | 'no_credential'
+  | 'no_model' // agent, llm
+  | 'llm_unavailable' // agent (its LLM broke)
+  | 'unreachable' // llm (endpoint/key rejected)
+  | 'needs_auth'
+  | 'connect_failed' // mcp
+  | 'requirement_unmet'; // skill (os/bin/env)
 
 export interface RecordStatus {
   /** Intrinsic: are the record's OWN required fields present? */
@@ -43,7 +47,7 @@ export interface RecordStatus {
 ```
 
 **Single surfaced chip, priority-ordered:** `Draft` → `Unavailable: <reason>` → `Disabled` → `Ready`.
-One `<StatusChip>` component + one reason→copy/fix-action map, reused in every library card and editor header. This replaces `eligible`, `status.state`, and the global readiness gate as the *display* vocabulary (the underlying checks stay; they feed this).
+One `<StatusChip>` component + one reason→copy/fix-action map, reused in every library card and editor header. This replaces `eligible`, `status.state`, and the global readiness gate as the _display_ vocabulary (the underlying checks stay; they feed this).
 
 - **Completeness** is cheap and mostly derivable from persisted fields (see per-type table). Persisted as a `draft` flag where the record can exist incomplete (llm/mcp/agent).
 - **Availability** is computed at read time (dependencies fail at runtime; can't be prevented). Server returns it on the record DTO.
@@ -52,22 +56,24 @@ One `<StatusChip>` component + one reason→copy/fix-action map, reused in every
 
 > Reason semantics below match the shipped resolvers in `shared/src/core/record-status-resolvers.ts` (the source of truth): completeness = the record's own required fields; availability = a dependency/precondition. `unreachable` / `no_model` remain in the `RecordAvailabilityReason` vocabulary for future use (e.g. a persisted LLM probe) but no resolver emits them yet.
 
-| Type | `draft` when… | `unavailable(reason)` when… | New-flow |
-|---|---|---|---|
-| **LLM** | no model | no credential → `no_credential` | **instant blank draft** (server id, name "Untitled"); relax the client-side model-gate to persist drafts (server already persists them) |
-| **MCP** | no command (stdio) / no url (remote) | `needs_auth`, `connect_failed` | **instant blank draft** (server id) |
-| **Agent** | no LLM bound / no model | no binding → `no_llm_profile`; bound LLM unusable → `llm_unavailable` (the LLM profile itself surfaces its own `no_credential`/`no_model`) | **keep the create modal** (auto-binds default LLM+model → born `ready`); gains the chip afterward |
-| **Skill** | content empty/template-only | not eligible → `requirement_unmet` (os/bin/env) | **tiny ID-only prompt** → seed a draft `SKILL.md` from the template; `draft` until content is meaningful |
+| Type      | `draft` when…                        | `unavailable(reason)` when…                                                                                                                | New-flow                                                                                                                                |
+| --------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **LLM**   | no model                             | no credential → `no_credential`                                                                                                            | **instant blank draft** (server id, name "Untitled"); relax the client-side model-gate to persist drafts (server already persists them) |
+| **MCP**   | no command (stdio) / no url (remote) | `needs_auth`, `connect_failed`                                                                                                             | **instant blank draft** (server id)                                                                                                     |
+| **Agent** | no LLM bound / no model              | no binding → `no_llm_profile`; bound LLM unusable → `llm_unavailable` (the LLM profile itself surfaces its own `no_credential`/`no_model`) | **keep the create modal** (auto-binds default LLM+model → born `ready`); gains the chip afterward                                       |
+| **Skill** | content empty/template-only          | not eligible → `requirement_unmet` (os/bin/env)                                                                                            | **tiny ID-only prompt** → seed a draft `SKILL.md` from the template; `draft` until content is meaningful                                |
 
 Two constraints drove the new-flow column:
+
 1. **Skill is file-backed — the ID is the filename.** It cannot persist without an ID, so a minimal ID prompt is irreducible (decided: keep an ID-only prompt, not a full modal).
-2. **The agent modal produces a *usable* record** by auto-binding a default LLM+model; a blank agent draft would be born unusable. Decided: keep the agent modal; "instant draft" applies to LLM + MCP only.
+2. **The agent modal produces a _usable_ record** by auto-binding a default LLM+model; a blank agent draft would be born unusable. Decided: keep the agent modal; "instant draft" applies to LLM + MCP only.
 
 So the create surfaces become: **LLM/MCP = instant draft**, **Skill = ID prompt → draft**, **Agent = modal (unchanged)** — all four then share the status chip and edit-only autosave.
 
 ## Server / data changes
 
 > **Research corrections (2026-07-16, from the server map):**
+>
 > - The "LLM F2 model-less reject" is **client-only** (`apps/desktop/.../LlmProfileEditor.tsx:352`). The server (`server/src/domains/llm-profiles/routes.ts`) already persists model-less profiles — there is **no server reject to relax** for LLM; only the desktop create-flow (Phase 4) changes.
 > - **No DB migration is required to persist drafts.** Every required column is already nullable or empty-permissive: `llm_profiles.models` (nullable TEXT), `mcp_servers.command` (NOT NULL but the service writes `''`), `agent_profiles.llm_profile_id` (nullable since migration 036). So **completeness is derived on read**, not persisted — a migration is only needed if we later choose to store the flag.
 > - The only genuine **server-side** create gate to relax for drafts is **MCP** (`server/src/infra/services/mcp-server-service.ts:181` requires name + command/url; keep `name` for the UNIQUE identity). Agent's gate stays (the modal keeps agents complete).
@@ -81,7 +87,7 @@ So the create surfaces become: **LLM/MCP = instant draft**, **Skill = ID prompt 
 ## Runtime / readiness
 
 - **Draft or unavailable records are not runnable.** Session creation and agent resolution must skip/guard them (a draft agent, or a ready agent whose LLM is `unavailable`, cannot start a session — surface the reason + fix action instead of a hard failure).
-- The global `AgentReadiness` becomes a *rollup* of per-record availability ("is there ≥1 ready+usable agent") rather than the source of truth.
+- The global `AgentReadiness` becomes a _rollup_ of per-record availability ("is there ≥1 ready+usable agent") rather than the source of truth.
 
 ## Desktop UI
 

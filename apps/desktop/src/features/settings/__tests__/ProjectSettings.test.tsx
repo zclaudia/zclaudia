@@ -43,9 +43,7 @@ const mockProject = {
   agentPermissionOverride: null,
 };
 
-async function renderProjectSettings(
-  props: Partial<Parameters<typeof ProjectSettings>[0]> = {}
-) {
+async function renderProjectSettings(props: Partial<Parameters<typeof ProjectSettings>[0]> = {}) {
   let view!: ReturnType<typeof render>;
   await act(async () => {
     view = render(

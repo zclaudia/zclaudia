@@ -155,10 +155,7 @@ export function Select<T extends string = string>({
     if (!isOpen) return;
     const handleMouseDown = (e: MouseEvent) => {
       const target = e.target as Node;
-      if (
-        !containerRef.current?.contains(target) &&
-        !panelRef.current?.contains(target)
-      ) {
+      if (!containerRef.current?.contains(target) && !panelRef.current?.contains(target)) {
         setIsOpen(false);
       }
     };
@@ -231,7 +228,8 @@ export function Select<T extends string = string>({
       case 'Enter':
       case ' ':
         e.preventDefault();
-        if (activeIndex >= 0) handleSelect(options[activeIndex].value, options[activeIndex].disabled);
+        if (activeIndex >= 0)
+          handleSelect(options[activeIndex].value, options[activeIndex].disabled);
         break;
       case 'Tab':
         setIsOpen(false); // let focus proceed to the next control

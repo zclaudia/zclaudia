@@ -283,7 +283,6 @@ describe('sessionsStore', () => {
       expect(backend1![0].isActive).toBe(true);
       expect(backend2![0].isActive).toBe(true); // unchanged
     });
-
   });
 
   describe('setActiveSessionsForBackend', () => {
@@ -385,5 +384,4 @@ describe('sessionsStore', () => {
       expect(active?.has('s1')).toBe(false);
     });
   });
-
 });

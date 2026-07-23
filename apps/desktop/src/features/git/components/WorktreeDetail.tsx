@@ -115,7 +115,10 @@ export function WorktreeDetail({ projectId, worktree, onRefreshList }: WorktreeD
           className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
           title="Refresh"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${spinning ? 'animate-spin' : ''}`} strokeWidth={1.75} />
+          <RefreshCw
+            className={`w-3.5 h-3.5 ${spinning ? 'animate-spin' : ''}`}
+            strokeWidth={1.75}
+          />
         </button>
       </div>
 

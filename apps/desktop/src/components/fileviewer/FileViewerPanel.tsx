@@ -183,27 +183,23 @@ function CodeRow({
         {lineNumber}
       </span>
       <span style={{ flex: 1, minWidth: 0 }}>
-        {line.reduce<{
-          nodes: React.ReactNode[];
-          column: number;
-        }>(
-          (acc, token, key) => {
-            const tokenProps = getTokenProps({ token });
-            const text = String(tokenProps.children ?? '');
-            acc.nodes.push(
-              renderTokenWithMatches(
-                tokenProps,
-                matchRanges,
-                key,
-                activeMatchColumn,
-                acc.column
-              )
-            );
-            acc.column += text.length;
-            return acc;
-          },
-          { nodes: [], column: 0 }
-        ).nodes}
+        {
+          line.reduce<{
+            nodes: React.ReactNode[];
+            column: number;
+          }>(
+            (acc, token, key) => {
+              const tokenProps = getTokenProps({ token });
+              const text = String(tokenProps.children ?? '');
+              acc.nodes.push(
+                renderTokenWithMatches(tokenProps, matchRanges, key, activeMatchColumn, acc.column)
+              );
+              acc.column += text.length;
+              return acc;
+            },
+            { nodes: [], column: 0 }
+          ).nodes
+        }
       </span>
     </div>
   );

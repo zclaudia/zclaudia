@@ -53,7 +53,9 @@ export async function deleteAgentProfile(id: string): Promise<DeleteAgentProfile
       const data = response.data as { archived?: boolean; sessionCount?: number } | undefined;
       return { ok: true, archived: data?.archived, sessionCount: data?.sessionCount };
     }
-    const err = response.error as { code?: string; message?: string; sessionCount?: number } | undefined;
+    const err = response.error as
+      | { code?: string; message?: string; sessionCount?: number }
+      | undefined;
     return {
       ok: false,
       code: err?.code ?? 'UNKNOWN',

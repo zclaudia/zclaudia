@@ -4,10 +4,7 @@ import Database from 'better-sqlite3';
 import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
 import { TaskRepository } from '../../repository.js';
 import { TaskService } from '../../task-service.js';
-import {
-  reconcileUnresumableTasks,
-  SERVER_RESTARTED_REASON,
-} from '../reconcile-stale-tasks.js';
+import { reconcileUnresumableTasks, SERVER_RESTARTED_REASON } from '../reconcile-stale-tasks.js';
 
 let db: Database.Database;
 

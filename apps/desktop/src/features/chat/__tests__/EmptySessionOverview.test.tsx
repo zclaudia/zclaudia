@@ -53,7 +53,9 @@ beforeEach(() => {
 describe('EmptySessionSnapshot', () => {
   it('renders project name, branch, ahead marker, change count, and latest commit', () => {
     seedGit(dirtyStatus, [commit]);
-    render(<EmptySessionSnapshot projectId={PROJECT_ID} projectName="zclaudia" worktreePath={WT} />);
+    render(
+      <EmptySessionSnapshot projectId={PROJECT_ID} projectName="zclaudia" worktreePath={WT} />
+    );
     expect(screen.getByText('zclaudia')).toBeInTheDocument();
     expect(screen.getByText(/main/)).toBeInTheDocument();
     expect(screen.getByText(/↑2/)).toBeInTheDocument();
@@ -65,7 +67,9 @@ describe('EmptySessionSnapshot', () => {
 
   it('shows "Working tree clean" and no ahead/behind markers when clean', () => {
     seedGit(cleanStatus, [commit]);
-    render(<EmptySessionSnapshot projectId={PROJECT_ID} projectName="zclaudia" worktreePath={WT} />);
+    render(
+      <EmptySessionSnapshot projectId={PROJECT_ID} projectName="zclaudia" worktreePath={WT} />
+    );
     expect(screen.getByText(/Working tree clean/)).toBeInTheDocument();
     expect(screen.queryByText(/↑/)).not.toBeInTheDocument();
     expect(screen.queryByText(/↓/)).not.toBeInTheDocument();
@@ -80,7 +84,9 @@ describe('EmptySessionSnapshot', () => {
 
   it('renders status line without commit segment when log is empty', () => {
     seedGit(dirtyStatus, []);
-    render(<EmptySessionSnapshot projectId={PROJECT_ID} projectName="zclaudia" worktreePath={WT} />);
+    render(
+      <EmptySessionSnapshot projectId={PROJECT_ID} projectName="zclaudia" worktreePath={WT} />
+    );
     expect(screen.getByText(/3 uncommitted changes/)).toBeInTheDocument();
     expect(screen.queryByText('be5cc81d')).not.toBeInTheDocument();
   });
@@ -96,13 +102,19 @@ describe('EmptySessionSnapshot', () => {
       behind: 0,
     };
     seedGit(oneFileStatus, []);
-    render(<EmptySessionSnapshot projectId={PROJECT_ID} projectName="zclaudia" worktreePath={WT} />);
+    render(
+      <EmptySessionSnapshot projectId={PROJECT_ID} projectName="zclaudia" worktreePath={WT} />
+    );
     expect(screen.getByText(/1 uncommitted change(?!s)/)).toBeInTheDocument();
   });
 });
 
 describe('EmptySessionChips', () => {
-  const goalCommand: SlashCommand = { command: '/goal', description: 'Set a goal', source: 'local' };
+  const goalCommand: SlashCommand = {
+    command: '/goal',
+    description: 'Set a goal',
+    source: 'local',
+  };
 
   it('shows the review chip when dirty, and no explain fallback', () => {
     seedGit(dirtyStatus);

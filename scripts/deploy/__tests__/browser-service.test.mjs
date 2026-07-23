@@ -1,11 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import {
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import test from 'node:test';
@@ -120,7 +115,9 @@ test('macOS install loads env before rendering launch agent plist', () => {
   const macosInstall = script.match(/install_macos\(\) \{[\s\S]*?\n\}/)?.[0] ?? '';
 
   assert.notEqual(macosInstall, '');
-  assert.ok(macosInstall.indexOf('load_env_file') < macosInstall.indexOf('render-launch-agent.mjs'));
+  assert.ok(
+    macosInstall.indexOf('load_env_file') < macosInstall.indexOf('render-launch-agent.mjs')
+  );
 });
 
 test('linux service control avoids unconditional sudo', () => {
@@ -158,7 +155,10 @@ test('systemd unit runs server dist under the repository root', () => {
   assert.match(unit, /Description=ZClaudia Local Browser Shell/);
   assert.match(unit, /WorkingDirectory="\/opt\/zclaudia"/);
   assert.match(unit, /EnvironmentFile="\/home\/alice\/\.zclaudia\/browser\.env"/);
-  assert.match(unit, /ExecStart="\/usr\/bin\/env" SERVER_HOST=127\.0\.0\.1 "\/usr\/bin\/node" "\/opt\/zclaudia\/server\/dist\/index\.js"/);
+  assert.match(
+    unit,
+    /ExecStart="\/usr\/bin\/env" SERVER_HOST=127\.0\.0\.1 "\/usr\/bin\/node" "\/opt\/zclaudia\/server\/dist\/index\.js"/
+  );
 });
 
 test('systemd unit pins localhost even when env file is preserved', () => {

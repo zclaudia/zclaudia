@@ -147,7 +147,10 @@ class InteractionDispatcher {
     try {
       this.sendFn(sessionId, { type: 'interaction_resolved', interactionId, sessionId, reason });
     } catch (err) {
-      console.warn(`[InteractionDispatcher] Failed to broadcast resolution for ${interactionId}:`, err);
+      console.warn(
+        `[InteractionDispatcher] Failed to broadcast resolution for ${interactionId}:`,
+        err
+      );
     }
   }
 

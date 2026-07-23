@@ -92,9 +92,7 @@ export function ActiveChangeCard({
 
       {nextAction && (
         <div className="mt-3 rounded-md bg-secondary/50 px-3 py-2">
-          <div className={EYEBROW}>
-            Next Action
-          </div>
+          <div className={EYEBROW}>Next Action</div>
           <div className="mt-1 text-xs text-foreground">{nextAction.title}</div>
           <div className="mt-1 text-[11px] text-muted-foreground">{nextAction.description}</div>
         </div>

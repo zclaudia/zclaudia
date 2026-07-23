@@ -498,9 +498,7 @@ describe('files routes', () => {
         size: 0,
       } as fs.Stats);
 
-      const res = await request(app).get(
-        '/api/files/stat?projectRoot=/project&relativePath=src'
-      );
+      const res = await request(app).get('/api/files/stat?projectRoot=/project&relativePath=src');
 
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('INVALID_PATH');

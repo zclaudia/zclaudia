@@ -44,10 +44,15 @@ export function ItemCard({
         <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <Icon className="h-4 w-4" strokeWidth={1.75} />
         </span>
-        <Badge label={KIND_LABEL[item.kind]} tone={item.kind === 'profile' ? 'accent' : 'neutral'} />
+        <Badge
+          label={KIND_LABEL[item.kind]}
+          tone={item.kind === 'profile' ? 'accent' : 'neutral'}
+        />
       </div>
       <div className="text-sm font-medium text-foreground">{item.title}</div>
-      {item.subtitle && <div className="truncate text-xs text-muted-foreground">{item.subtitle}</div>}
+      {item.subtitle && (
+        <div className="truncate text-xs text-muted-foreground">{item.subtitle}</div>
+      )}
       {(showBackendBadge || item.status || item.recordStatus) && (
         <div className="mt-0.5 flex items-center gap-1.5">
           {showBackendBadge && <Badge label={backendName} online={backendOnline} />}

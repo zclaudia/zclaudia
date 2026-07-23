@@ -33,7 +33,11 @@ describe('requestSessionTitleGeneration', () => {
       enabledTools: ['read'],
       isDefault: true,
     }).id;
-    const projectId = new ProjectRepository(db).create({ name: 'p1', type: 'code', sortOrder: 0 }).id;
+    const projectId = new ProjectRepository(db).create({
+      name: 'p1',
+      type: 'code',
+      sortOrder: 0,
+    }).id;
 
     sessionId = 's1';
     db.prepare(
@@ -55,9 +59,9 @@ describe('requestSessionTitleGeneration', () => {
     requestSessionTitleGeneration({ db, sessionId, broadcast, generate });
     await flush();
 
-    const row = db
-      .prepare('SELECT auto_title FROM sessions WHERE id = ?')
-      .get(sessionId) as { auto_title: string };
+    const row = db.prepare('SELECT auto_title FROM sessions WHERE id = ?').get(sessionId) as {
+      auto_title: string;
+    };
     expect(row.auto_title).toBe('Project Overview');
     expect(broadcast).toHaveBeenCalledWith(
       expect.objectContaining({

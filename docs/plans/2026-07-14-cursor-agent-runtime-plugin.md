@@ -56,6 +56,7 @@
 ### Task 1: Scaffold Plugin Package And Manifest
 
 **Files:**
+
 - Create: `plugins/cursor/package.json`
 - Create: `plugins/cursor/tsconfig.json`
 - Create: `plugins/cursor/plugin.json`
@@ -63,6 +64,7 @@
 - Create: `plugins/cursor/src/adapter.ts` (stub exporting `CursorAgentAdapter` with empty `run`)
 
 **Interfaces:**
+
 - Consumes: `@zclaudia/shared/plugins` `PluginContext`; `@zclaudia/shared/providers` `ExternalAgentAdapter`
 - Produces: package `@zclaudia/plugin-cursor`; plugin id `com.zclaudia.cursor`; runtime type `cursor`; stub `CursorAgentAdapter`
 
@@ -114,7 +116,11 @@
         "label": "Cursor",
         "model": { "kind": "none", "multimodalFallback": false, "thinkingLevel": "auto" },
         "hasCliPath": true,
-        "capabilities": { "tools": "native-readonly", "providers": "external", "skills": "external" },
+        "capabilities": {
+          "tools": "native-readonly",
+          "providers": "external",
+          "skills": "external"
+        },
         "authNote": "Cursor uses the local cursor-agent CLI. MCP bridge tools are injected into .cursor/mcp.json for this project; Cursor-native MCP and skills stay outside zclaudia profile tools.",
         "manifest": {
           "id": "cursor",
@@ -124,19 +130,44 @@
           "providerType": "cursor",
           "runtime": "cli",
           "capabilities": [
-            { "id": "chat.stream", "supported": true, "mode": "native", "reliability": "best_effort" },
-            { "id": "tool.call", "supported": true, "mode": "native", "reliability": "best_effort" },
-            { "id": "tool.inject", "supported": true, "mode": "bridged", "reliability": "best_effort", "notes": "Via .cursor/mcp.json injection" },
+            {
+              "id": "chat.stream",
+              "supported": true,
+              "mode": "native",
+              "reliability": "best_effort"
+            },
+            {
+              "id": "tool.call",
+              "supported": true,
+              "mode": "native",
+              "reliability": "best_effort"
+            },
+            {
+              "id": "tool.inject",
+              "supported": true,
+              "mode": "bridged",
+              "reliability": "best_effort",
+              "notes": "Via .cursor/mcp.json injection"
+            },
             { "id": "interaction.form", "supported": false, "degradation": "fallback_to_text" },
             { "id": "interaction.approval", "supported": false, "degradation": "fallback_to_text" },
             { "id": "interaction.todo", "supported": false, "degradation": "fallback_to_text" },
             { "id": "input.image", "supported": false, "degradation": "fallback_to_notice" },
             { "id": "input.text_file", "supported": false, "degradation": "fallback_to_notice" },
             { "id": "input.binary_file", "supported": false, "degradation": "fallback_to_notice" },
-            { "id": "permission.mode", "supported": true, "mode": "native", "reliability": "strict" },
+            {
+              "id": "permission.mode",
+              "supported": true,
+              "mode": "native",
+              "reliability": "strict"
+            },
             { "id": "session.abort", "supported": true, "mode": "native", "reliability": "strict" },
             { "id": "session.steer", "supported": false, "degradation": "fallback_to_text" },
-            { "id": "session.background_task", "supported": false, "degradation": "fallback_to_text" }
+            {
+              "id": "session.background_task",
+              "supported": false,
+              "degradation": "fallback_to_text"
+            }
           ],
           "permissionModeMap": {
             "supervised": "default",
@@ -259,10 +290,12 @@ EOF
 ### Task 2: MCP Inject Helper
 
 **Files:**
+
 - Create: `plugins/cursor/src/mcp-inject.ts`
 - Test: `plugins/cursor/src/__tests__/mcp-inject.test.ts`
 
 **Interfaces:**
+
 - Consumes: Node `fs`/`path`; bridge `{ name: string; config: unknown }`
 - Produces: `injectCursorMcpBridge(cwd, bridge): { ok: true } | { ok: false; reason: string }`
 
@@ -425,10 +458,12 @@ EOF
 ### Task 3: Resolve cursor-agent On PATH
 
 **Files:**
+
 - Create: `plugins/cursor/src/resolve-cli.ts`
 - Test: `plugins/cursor/src/__tests__/resolve-cli.test.ts`
 
 **Interfaces:**
+
 - Consumes: `PATH` string + optional `exists` / `platform`
 - Produces: `resolveCursorCliFromPath(pathEnv, options?) => string | undefined`
 
@@ -460,11 +495,13 @@ git commit -m "feat(plugin-cursor): resolve cursor-agent from PATH"
 ### Task 4: Event Mapping And Tool Effects
 
 **Files:**
+
 - Create: `plugins/cursor/src/tool-effects.ts`
 - Create: `plugins/cursor/src/map-events.ts`
 - Test: `plugins/cursor/src/__tests__/map-events.test.ts`
 
 **Interfaces:**
+
 - Consumes: raw cursor NDJSON objects; `@zclaudia/shared` `ProviderRuntimeEvent`, `ToolSemantic`, `ToolEffect`
 - Produces:
   - `mapCursorEvent(event, inThinkBlock): { events: ProviderRuntimeEvent[]; inThinkBlock: boolean }`
@@ -484,9 +521,7 @@ describe('mapCursorEvent', () => {
       { type: 'system', subtype: 'init', session_id: 'sess-1', model: 'gpt' },
       false
     );
-    expect(events).toEqual([
-      expect.objectContaining({ type: 'init', sessionId: 'sess-1' }),
-    ]);
+    expect(events).toEqual([expect.objectContaining({ type: 'init', sessionId: 'sess-1' })]);
   });
 
   it('maps assistant text blocks', () => {
@@ -533,16 +568,15 @@ describe('mapCursorEvent', () => {
       false
     );
     expect(events.some(e => e.type === 'mode_transition')).toBe(true);
-    expect(
-      events.find(e => e.type === 'mode_transition')?.modeTransition
-    ).toMatchObject({ mode: 'plan', reason: 'enter', sourceToolUseId: 'sm-1' });
+    expect(events.find(e => e.type === 'mode_transition')?.modeTransition).toMatchObject({
+      mode: 'plan',
+      reason: 'enter',
+      sourceToolUseId: 'sm-1',
+    });
   });
 
   it('maps result errors to error events', () => {
-    const { events } = mapCursorEvent(
-      { type: 'result', subtype: 'error', result: 'boom' },
-      false
-    );
+    const { events } = mapCursorEvent({ type: 'result', subtype: 'error', result: 'boom' }, false);
     expect(events[0]).toMatchObject({ type: 'error', error: 'boom' });
   });
 });
@@ -564,7 +598,11 @@ export function makeShellEffect(command: string | undefined): ToolEffect | undef
 
 export function makeFileChangeEffect(files: FileChangeEffectFile[]): ToolEffect | undefined {
   const normalized = files
-    .map(f => ({ ...f, path: (f.path ?? '').trim(), changeKind: f.changeKind ?? ('unknown' as const) }))
+    .map(f => ({
+      ...f,
+      path: (f.path ?? '').trim(),
+      changeKind: f.changeKind ?? ('unknown' as const),
+    }))
     .filter(f => f.path);
   return normalized.length > 0 ? { kind: 'file_change', files: normalized } : undefined;
 }
@@ -610,10 +648,12 @@ EOF
 ### Task 5: Runner (Spawn, Stream, Abort)
 
 **Files:**
+
 - Create: `plugins/cursor/src/runner.ts`
 - Test: `plugins/cursor/src/__tests__/runner.test.ts`
 
 **Interfaces:**
+
 - Consumes: `mapCursorEvent`, `resolveCursorCliFromPath`, `injectCursorMcpBridge`
 - Produces:
   - `runCursor(input, options): AsyncGenerator<ProviderRuntimeEvent>`
@@ -662,14 +702,16 @@ describe('runCursor', () => {
   });
 
   it('spawns cursor-agent with stream-json, trust, and yolo in default mode', async () => {
-    spawnMock.mockReturnValueOnce(fakeProc([
-      JSON.stringify({ type: 'system', subtype: 'init', session_id: 's1' }),
-      JSON.stringify({
-        type: 'assistant',
-        message: { content: [{ type: 'text', text: 'hello' }] },
-      }),
-      JSON.stringify({ type: 'result', result: 'done' }),
-    ]));
+    spawnMock.mockReturnValueOnce(
+      fakeProc([
+        JSON.stringify({ type: 'system', subtype: 'init', session_id: 's1' }),
+        JSON.stringify({
+          type: 'assistant',
+          message: { content: [{ type: 'text', text: 'hello' }] },
+        }),
+        JSON.stringify({ type: 'result', result: 'done' }),
+      ])
+    );
 
     const events = [];
     for await (const e of runCursor('hi', { cwd: '/proj' })) events.push(e);
@@ -749,17 +791,15 @@ describe('runCursor', () => {
     });
     const events = [];
     for await (const e of runCursor('x', { cwd: '/proj' })) events.push(e);
-    expect(events.some(e => e.type === 'error' && String(e.error).includes('cursor-agent not found'))).toBe(
-      true
-    );
+    expect(
+      events.some(e => e.type === 'error' && String(e.error).includes('cursor-agent not found'))
+    ).toBe(true);
   });
 });
 
 describe('abortCursorSession', () => {
   it('kills the active process for a session id', async () => {
-    const proc = fakeProc([
-      JSON.stringify({ type: 'system', subtype: 'init', session_id: 's1' }),
-    ]);
+    const proc = fakeProc([JSON.stringify({ type: 'system', subtype: 'init', session_id: 's1' })]);
     // Keep stdout open so abort can race — or register process with sessionId option:
     spawnMock.mockReturnValueOnce(proc);
     const gen = runCursor('x', { cwd: '/proj', sessionId: 's1' });
@@ -806,10 +846,12 @@ EOF
 ### Task 6: Wire CursorAgentAdapter
 
 **Files:**
+
 - Modify: `plugins/cursor/src/adapter.ts`
 - Test: `plugins/cursor/src/__tests__/adapter.test.ts`
 
 **Interfaces:**
+
 - Consumes: `runCursor`, `abortCursorSession`, `ToolBridgeFactory`
 - Produces: full `ExternalAgentAdapter` behavior matching design data flow
 
@@ -871,10 +913,7 @@ describe('CursorAgentAdapter', () => {
     )) {
       /* drain */
     }
-    expect(runCursorMock).toHaveBeenCalledWith(
-      'hi',
-      expect.objectContaining({ mode: 'plan' })
-    );
+    expect(runCursorMock).toHaveBeenCalledWith('hi', expect.objectContaining({ mode: 'plan' }));
   });
 
   it('abort clears session mode and kills runner session', async () => {
@@ -890,10 +929,7 @@ describe('CursorAgentAdapter', () => {
     )) {
       /* drain */
     }
-    expect(runCursorMock).toHaveBeenCalledWith(
-      'hi',
-      expect.objectContaining({ mode: 'default' })
-    );
+    expect(runCursorMock).toHaveBeenCalledWith('hi', expect.objectContaining({ mode: 'default' }));
   });
 
   it('updates getRunState when onSessionId fires', async () => {
@@ -918,8 +954,7 @@ describe('CursorAgentAdapter', () => {
 ```ts
 // Inside CursorAgentAdapter.run:
 const sessionKey = context.claudiaSessionId ?? context.sessionId ?? '';
-const effectiveMode =
-  (sessionKey && this.sessionModes.get(sessionKey)) ?? context.mode;
+const effectiveMode = (sessionKey && this.sessionModes.get(sessionKey)) ?? context.mode;
 
 const bridge = await this.createToolBridge({
   serverPort: context.serverPort,
@@ -928,22 +963,23 @@ const bridge = await this.createToolBridge({
 
 const abortController = context.abortController ?? new AbortController();
 
-yield* runCursor(input, {
-  cwd: context.cwd,
-  sessionId: context.sessionId,
-  cliPath: context.cliPath,
-  env: context.env,
-  model: context.model,
-  mode: effectiveMode,
-  systemPrompt: context.systemPrompt,
-  serverPort: context.serverPort,
-  claudiaSessionId: context.claudiaSessionId,
-  abortController,
-  bridge,
-  onSessionId: id => {
-    this.runStates.set(context, { providerSessionId: id, providerCwd: context.cwd });
-  },
-});
+yield *
+  runCursor(input, {
+    cwd: context.cwd,
+    sessionId: context.sessionId,
+    cliPath: context.cliPath,
+    env: context.env,
+    model: context.model,
+    mode: effectiveMode,
+    systemPrompt: context.systemPrompt,
+    serverPort: context.serverPort,
+    claudiaSessionId: context.claudiaSessionId,
+    abortController,
+    bridge,
+    onSessionId: id => {
+      this.runStates.set(context, { providerSessionId: id, providerCwd: context.cwd });
+    },
+  });
 
 // abort:
 this.sessionModes.delete(sessionId);
@@ -974,11 +1010,13 @@ EOF
 ### Task 7: Host Capabilities And Commands For `cursor`
 
 **Files:**
+
 - Modify: `server/src/interfaces/http/provider-capabilities.ts`
 - Modify: `server/src/interfaces/http/provider-commands.ts`
 - Modify: `server/src/interfaces/http/__tests__/provider-capabilities.test.ts`
 
 **Interfaces:**
+
 - Consumes: existing `ProviderCapabilities` type
 - Produces: `GET /api/providers/type/cursor/capabilities` with modes `default`/`plan`/`ask`; commands route accepts `cursor`
 
@@ -1060,9 +1098,11 @@ EOF
 ### Task 8: Plugin Lifecycle Coverage
 
 **Files:**
+
 - Create: `server/src/application/plugins/__tests__/cursor-plugin-lifecycle.test.ts`
 
 **Interfaces:**
+
 - Consumes: `registerAgentRuntimeContributions`, `providerRegistry.registerPluginAdapter`, `PluginAgentProfileService`
 - Produces: proof that `cursor` contribution installs `cursor-default` and tears down cleanly
 
@@ -1128,20 +1168,20 @@ With desktop/dev stack and Cursor CLI installed:
 
 ## Spec Coverage Self-Review
 
-| Spec requirement | Task |
-|---|---|
-| `plugins/cursor` package + plugin.json + activate | 1 |
-| MCP merge into `.cursor/mcp.json`, no same-name clobber | 2, 5–6 |
-| Resolve `cursor-agent` / cliPath | 3, 5 |
-| NDJSON → events + switchMode/createPlan | 4–5 |
-| Spawn flags, resume, modes, systemPrompt prepend | 5 |
-| Adapter sessionModes, bridge, abort, getRunState | 6 |
-| HTTP modes default/plan/ask | 7 |
-| Commands type allowlist | 7 |
-| Contribution lifecycle | 8 |
-| Build + acceptance | 9 |
-| No server `external-agents/cursor` | Global + File Structure |
-| Deferrals (plan card, images, tasks, jobs) | Global Constraints |
+| Spec requirement                                        | Task                    |
+| ------------------------------------------------------- | ----------------------- |
+| `plugins/cursor` package + plugin.json + activate       | 1                       |
+| MCP merge into `.cursor/mcp.json`, no same-name clobber | 2, 5–6                  |
+| Resolve `cursor-agent` / cliPath                        | 3, 5                    |
+| NDJSON → events + switchMode/createPlan                 | 4–5                     |
+| Spawn flags, resume, modes, systemPrompt prepend        | 5                       |
+| Adapter sessionModes, bridge, abort, getRunState        | 6                       |
+| HTTP modes default/plan/ask                             | 7                       |
+| Commands type allowlist                                 | 7                       |
+| Contribution lifecycle                                  | 8                       |
+| Build + acceptance                                      | 9                       |
+| No server `external-agents/cursor`                      | Global + File Structure |
+| Deferrals (plan card, images, tasks, jobs)              | Global Constraints      |
 
 ## Placeholder / Consistency Check
 

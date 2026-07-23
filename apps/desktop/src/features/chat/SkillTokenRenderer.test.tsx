@@ -77,7 +77,7 @@ describe('splitSegments', () => {
     const inputs = ['/unknown /clear x', 'run /commit /clear', '/usr/bin /commit:x end'];
     for (const value of inputs) {
       const segments = splitSegments(value, commands, skills);
-      expect(segments.map((s) => s.text).join('')).toBe(value);
+      expect(segments.map(s => s.text).join('')).toBe(value);
       let offset = 0;
       for (const seg of segments) {
         expect(seg.start).toBe(offset);
@@ -124,9 +124,7 @@ describe('splitSegments', () => {
 
 describe('renderSkillTokens', () => {
   it('renders icon + colored name and keeps the full text', () => {
-    const { container } = render(
-      <div>{renderSkillTokens('/commit go', skills, commands)}</div>
-    );
+    const { container } = render(<div>{renderSkillTokens('/commit go', skills, commands)}</div>);
     // full textContent still equals the raw value (slash transparent but present)
     expect(container.textContent).toBe('/commit go');
     // skill icon present, no filled-pill <mark> anymore
@@ -135,16 +133,12 @@ describe('renderSkillTokens', () => {
   });
 
   it('uses the command icon for commands', () => {
-    const { container } = render(
-      <div>{renderSkillTokens('/clear', skills, commands)}</div>
-    );
+    const { container } = render(<div>{renderSkillTokens('/clear', skills, commands)}</div>);
     expect(container.querySelector('svg.lucide-square-slash')).not.toBeNull();
   });
 
   it('renders plain text with no icon when nothing matches', () => {
-    const { container } = render(
-      <div>{renderSkillTokens('just text', skills, commands)}</div>
-    );
+    const { container } = render(<div>{renderSkillTokens('just text', skills, commands)}</div>);
     expect(container.querySelector('svg')).toBeNull();
     expect(container.textContent).toBe('just text');
   });

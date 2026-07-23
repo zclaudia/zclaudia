@@ -32,7 +32,9 @@ describe('findContentMatches', () => {
 
   it('respects case sensitive flag', () => {
     expect(findContentMatches('Hello World', 'world', true)).toEqual([]);
-    expect(findContentMatches('Hello World', 'World', true)).toEqual([{ line: 1, start: 6, end: 11 }]);
+    expect(findContentMatches('Hello World', 'World', true)).toEqual([
+      { line: 1, start: 6, end: 11 },
+    ]);
   });
 
   it('escapes regex special characters in query', () => {
@@ -41,7 +43,9 @@ describe('findContentMatches', () => {
   });
 
   it('handles empty lines and trailing newline', () => {
-    expect(findContentMatches('first\n\nsecond', 'second')).toEqual([{ line: 3, start: 0, end: 6 }]);
+    expect(findContentMatches('first\n\nsecond', 'second')).toEqual([
+      { line: 3, start: 0, end: 6 },
+    ]);
   });
 });
 

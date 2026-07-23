@@ -4,8 +4,12 @@ import { ItemCard } from './ItemCard';
 import type { LibraryItem } from '../agents-types';
 
 const item: LibraryItem = {
-  kind: 'profile', backendId: 'b1', id: 'p1', title: 'Coding',
-  subtitle: 'deepseek-v4-flash', status: 'Default',
+  kind: 'profile',
+  backendId: 'b1',
+  id: 'p1',
+  title: 'Coding',
+  subtitle: 'deepseek-v4-flash',
+  status: 'Default',
 };
 
 describe('ItemCard', () => {

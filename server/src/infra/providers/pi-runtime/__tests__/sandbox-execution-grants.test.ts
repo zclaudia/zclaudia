@@ -10,9 +10,7 @@ describe('sandbox-execution grants', () => {
   it('extracts localhost targets with protocol and port from Bash commands', () => {
     expect(
       extractNetworkGrantCandidates('curl -s http://127.0.0.1:8000/health && echo done')
-    ).toEqual([
-      { type: 'network', protocol: 'http', host: '127.0.0.1', port: 8000 },
-    ]);
+    ).toEqual([{ type: 'network', protocol: 'http', host: '127.0.0.1', port: 8000 }]);
   });
 
   it('extracts fetch targets from Eval code', () => {

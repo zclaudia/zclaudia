@@ -110,9 +110,7 @@ describe('UsageStatsStrip', () => {
   it('refetches with the chosen range and keeps previous numbers while pending', async () => {
     getUsageStats.mockResolvedValueOnce(payload);
     let resolveSecond!: (v: unknown) => void;
-    getUsageStats.mockImplementationOnce(
-      () => new Promise(resolve => (resolveSecond = resolve))
-    );
+    getUsageStats.mockImplementationOnce(() => new Promise(resolve => (resolveSecond = resolve)));
     render(<UsageStatsStrip />);
     await waitFor(() => expect(screen.getByText('241')).toBeTruthy());
     fireEvent.click(screen.getByRole('button', { name: '7d' }));

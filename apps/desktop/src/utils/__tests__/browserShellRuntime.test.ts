@@ -25,7 +25,9 @@ describe('browserShellRuntime', () => {
 
     expect(isBrowserShellRuntime({ PROD: true })).toBe(true);
     expect(getBrowserShellBaseUrl({ PROD: true })).toBe('http://127.0.0.1:3100');
-    expect(getBrowserShellFacadeWsUrl({ PROD: true })).toBe('ws://127.0.0.1:3100/ws/backend-facade');
+    expect(getBrowserShellFacadeWsUrl({ PROD: true })).toBe(
+      'ws://127.0.0.1:3100/ws/backend-facade'
+    );
   });
 
   it('uses wss for https browser runtime', () => {
@@ -33,7 +35,9 @@ describe('browserShellRuntime', () => {
 
     expect(isBrowserShellRuntime({ PROD: true })).toBe(true);
     expect(getBrowserShellBaseUrl({ PROD: true })).toBe('https://127.0.0.1:3100');
-    expect(getBrowserShellFacadeWsUrl({ PROD: true })).toBe('wss://127.0.0.1:3100/ws/backend-facade');
+    expect(getBrowserShellFacadeWsUrl({ PROD: true })).toBe(
+      'wss://127.0.0.1:3100/ws/backend-facade'
+    );
   });
 
   it('does not activate for vite dev http pages', () => {

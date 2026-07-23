@@ -286,7 +286,9 @@ export function DashboardHome({
             <div className="text-2xl font-bold">{activePRs.length}</div>
             <div className="text-xs text-muted-foreground">active</div>
             {needsAttentionPRs.length > 0 && (
-              <div className="text-xs text-destructive">{needsAttentionPRs.length} needs attention</div>
+              <div className="text-xs text-destructive">
+                {needsAttentionPRs.length} needs attention
+              </div>
             )}
           </div>
         </button>
@@ -330,7 +332,9 @@ export function DashboardHome({
               worktree{worktrees.length === 1 ? '' : 's'}
             </div>
             {dirtyWorktrees.length > 0 && (
-              <div className={`text-xs ${GLYPH_ORANGE_TEXT}`}>{dirtyWorktrees.length} with changes</div>
+              <div className={`text-xs ${GLYPH_ORANGE_TEXT}`}>
+                {dirtyWorktrees.length} with changes
+              </div>
             )}
           </div>
         </button>

@@ -64,7 +64,7 @@ small capability hint so users understand the current Claude runtime limitations
 
 - Claude uses the Claude Agent SDK / Claude Code runtime.
 - zclaudia-only features such as multimodal fallback and AI review are not
-currently available for Claude runtime.
+  currently available for Claude runtime.
 
 No broad settings redesign is included.
 

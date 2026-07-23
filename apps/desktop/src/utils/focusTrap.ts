@@ -6,7 +6,7 @@ const FOCUSABLE_SELECTOR =
 /** Visible, tabbable elements inside `container`, in DOM order. */
 export function getFocusable(container: HTMLElement): HTMLElement[] {
   return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
-    (el) => el.getClientRects().length > 0
+    el => el.getClientRects().length > 0
   );
 }
 

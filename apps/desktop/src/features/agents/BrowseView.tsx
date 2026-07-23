@@ -37,18 +37,13 @@ export function BrowseView({
   onDeleteLlmProfile?: (item: LibraryItem) => void;
 }) {
   const [query, setQuery] = useState('');
-  const byName = useMemo(
-    () => new Map(backends.map(b => [b.backendId, b])),
-    [backends]
-  );
+  const byName = useMemo(() => new Map(backends.map(b => [b.backendId, b])), [backends]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return items;
     return items.filter(
-      i =>
-        i.title.toLowerCase().includes(q) ||
-        (i.subtitle ?? '').toLowerCase().includes(q)
+      i => i.title.toLowerCase().includes(q) || (i.subtitle ?? '').toLowerCase().includes(q)
     );
   }, [items, query]);
 

@@ -141,7 +141,7 @@ describe('context.agentRuntimes', () => {
     expect(broadcast).toHaveBeenLastCalledWith({ type: 'agent_runtimes_changed' });
   });
 
-  it('unregister(type) removes only that runtime, leaving the plugin\'s other runtimes', () => {
+  it("unregister(type) removes only that runtime, leaving the plugin's other runtimes", () => {
     vi.mocked(permissionManager.hasPermission).mockImplementation(
       (_pluginId: string, permission: string) => permission === 'provider.register'
     );

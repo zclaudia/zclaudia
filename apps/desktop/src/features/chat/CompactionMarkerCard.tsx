@@ -57,9 +57,7 @@ export function CompactionMarkerCard({ marker }: CompactionMarkerCardProps) {
         >
           {hasInstructions && (
             <div>
-              <div className={`${EYEBROW} mb-1`}>
-                Custom instructions
-              </div>
+              <div className={`${EYEBROW} mb-1`}>Custom instructions</div>
               <div className="px-2 py-1.5 rounded bg-background/60 italic text-foreground/90 whitespace-pre-wrap">
                 {marker.customInstructions}
               </div>
@@ -67,9 +65,7 @@ export function CompactionMarkerCard({ marker }: CompactionMarkerCardProps) {
           )}
 
           <div>
-            <div className={`${EYEBROW} mb-1`}>
-              Summary
-            </div>
+            <div className={`${EYEBROW} mb-1`}>Summary</div>
             <pre className="px-2 py-1.5 rounded bg-background/60 whitespace-pre-wrap break-words text-foreground/90 font-sans leading-relaxed">
               {marker.summary}
             </pre>
@@ -84,9 +80,7 @@ export function CompactionMarkerCard({ marker }: CompactionMarkerCardProps) {
               <div className="mt-2 space-y-2">
                 {hasReadFiles && (
                   <div>
-                    <div className={`${EYEBROW} mb-0.5`}>
-                      Read
-                    </div>
+                    <div className={`${EYEBROW} mb-0.5`}>Read</div>
                     <ul className="list-disc list-inside text-foreground/80">
                       {marker.readFiles.map(path => (
                         <li key={`r-${path}`} className="font-mono break-all">
@@ -98,9 +92,7 @@ export function CompactionMarkerCard({ marker }: CompactionMarkerCardProps) {
                 )}
                 {hasModifiedFiles && (
                   <div>
-                    <div className={`${EYEBROW} mb-0.5`}>
-                      Modified
-                    </div>
+                    <div className={`${EYEBROW} mb-0.5`}>Modified</div>
                     <ul className="list-disc list-inside text-foreground/80">
                       {marker.modifiedFiles.map(path => (
                         <li key={`m-${path}`} className="font-mono break-all">

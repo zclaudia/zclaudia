@@ -242,7 +242,14 @@ export function LlmProfileEditor({
       }
     }
     return true;
-  }, [formName, isCodexProvider, hasAtLeastOneModelEntry, formModels, formRequestHeaders, formCompat]);
+  }, [
+    formName,
+    isCodexProvider,
+    hasAtLeastOneModelEntry,
+    formModels,
+    formRequestHeaders,
+    formCompat,
+  ]);
 
   const autosaveSignature = useMemo(
     () =>
@@ -256,9 +263,10 @@ export function LlmProfileEditor({
         isDefault: formIsDefault,
         cacheRetention: formCacheRetention,
         cacheMarkers: formCacheMarkers,
-        models: formModels.map(
-          ({ rowUid, testStatus: _testStatus, ...model }) => ({ rowUid, ...model })
-        ),
+        models: formModels.map(({ rowUid, testStatus: _testStatus, ...model }) => ({
+          rowUid,
+          ...model,
+        })),
       }),
     [
       formName,
@@ -819,7 +827,9 @@ export function LlmProfileEditor({
                       aria-label="Compat JSON"
                       className={`${MONO_FIELD_CLASS} resize-y`}
                     />
-                    {formCompatError && <p className="text-xs text-destructive">{formCompatError}</p>}
+                    {formCompatError && (
+                      <p className="text-xs text-destructive">{formCompatError}</p>
+                    )}
                   </EditorSection>
                 </div>
               )}

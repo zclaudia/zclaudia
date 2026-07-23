@@ -155,9 +155,7 @@ export function LocalIssueDetailView({ issue, projectId, onDeleted }: LocalIssue
 
         {/* Description */}
         <section className="space-y-1.5">
-          <div className={EYEBROW}>
-            Description
-          </div>
+          <div className={EYEBROW}>Description</div>
           <div className="border border-border rounded-md bg-card px-3 py-2">
             {issue.description?.trim() ? (
               <IssueMarkdown content={issue.description} />
@@ -170,9 +168,7 @@ export function LocalIssueDetailView({ issue, projectId, onDeleted }: LocalIssue
         {/* Attachments */}
         {attachmentCount > 0 && (
           <section className="space-y-1.5">
-            <div className={EYEBROW}>
-              Attachments
-            </div>
+            <div className={EYEBROW}>Attachments</div>
             <AttachmentList
               items={attachments.items}
               onRemove={id => void attachments.remove(id)}

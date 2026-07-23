@@ -90,9 +90,7 @@ describe('funLine', () => {
     const a = funLine(40_000_000, '2026-07-04');
     const b = funLine(40_000_000, '2026-07-04');
     expect(a).toBe(b); // deterministic for the same day
-    const week = Array.from({ length: 7 }, (_, i) =>
-      funLine(40_000_000, `2026-07-0${i + 1}`)
-    );
+    const week = Array.from({ length: 7 }, (_, i) => funLine(40_000_000, `2026-07-0${i + 1}`));
     expect(new Set(week).size).toBeGreaterThan(1); // varies across days
   });
 

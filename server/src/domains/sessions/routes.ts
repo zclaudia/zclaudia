@@ -373,7 +373,8 @@ export function createSessionRoutes(
       db,
       sessionId: req.params.id,
       broadcast: msg => {
-        if (msg.type === 'sessions_updated') sessionEvents?.publishSessionEvent('updated', msg.session);
+        if (msg.type === 'sessions_updated')
+          sessionEvents?.publishSessionEvent('updated', msg.session);
       },
     });
     res.status(202).json({ success: true });

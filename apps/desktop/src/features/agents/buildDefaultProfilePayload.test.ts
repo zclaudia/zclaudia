@@ -38,7 +38,9 @@ describe('buildDefaultProfilePayload', () => {
       name: '  Coding  ',
       runtimeType: 'zclaudia',
       descriptor: llmDescriptor,
-      llmProfiles: [llm({ id: 'lp1', isDefault: true, models: [{ modelId: 'deepseek-v4-flash' }] })],
+      llmProfiles: [
+        llm({ id: 'lp1', isDefault: true, models: [{ modelId: 'deepseek-v4-flash' }] }),
+      ],
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;

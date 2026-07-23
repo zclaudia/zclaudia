@@ -9,8 +9,13 @@ const otherDesc: AgentRuntimeDescriptor = {
   hasCliPath: false,
   capabilities: { tools: 'native-readonly', providers: 'external', skills: 'external' },
   manifest: {
-    id: 'other', name: 'Other', version: '1.0.0', apiVersion: 'pcp/v1',
-    providerType: 'other', runtime: 'cli', capabilities: [],
+    id: 'other',
+    name: 'Other',
+    version: '1.0.0',
+    apiVersion: 'pcp/v1',
+    providerType: 'other',
+    runtime: 'cli',
+    capabilities: [],
   },
 };
 

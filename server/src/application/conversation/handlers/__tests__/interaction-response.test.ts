@@ -49,11 +49,14 @@ describe('handleInteractionResponse', () => {
     );
 
     await expect(pending).resolves.toEqual({ approved: true });
-    expect(broadcastRunMessage).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'session-1' }), {
-      type: 'interaction_resolved',
-      interactionId: 'i-live',
-      sessionId: 'session-1',
-    });
+    expect(broadcastRunMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: 'session-1' }),
+      {
+        type: 'interaction_resolved',
+        interactionId: 'i-live',
+        sessionId: 'session-1',
+      }
+    );
   });
 
   it('broadcasts interaction_resolved with reason stale when the interaction is unknown', () => {
@@ -68,11 +71,14 @@ describe('handleInteractionResponse', () => {
       clients
     );
 
-    expect(broadcastRunMessage).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'session-1' }), {
-      type: 'interaction_resolved',
-      interactionId: 'i-zombie',
-      sessionId: 'session-1',
-      reason: 'stale',
-    });
+    expect(broadcastRunMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: 'session-1' }),
+      {
+        type: 'interaction_resolved',
+        interactionId: 'i-zombie',
+        sessionId: 'session-1',
+        reason: 'stale',
+      }
+    );
   });
 });

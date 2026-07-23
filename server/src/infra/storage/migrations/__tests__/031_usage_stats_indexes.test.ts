@@ -35,9 +35,7 @@ describe('031_usage_stats_indexes', () => {
 
   it('token sum uses the expression index instead of JSON-parsing every row', () => {
     const db = migratedDb();
-    expect(planFor(db, ASSISTANT_TOKENS_SUM_SQL)).toContain(
-      'idx_messages_assistant_usage_tokens'
-    );
+    expect(planFor(db, ASSISTANT_TOKENS_SUM_SQL)).toContain('idx_messages_assistant_usage_tokens');
     db.close();
   });
 
@@ -51,7 +49,10 @@ describe('031_usage_stats_indexes', () => {
     // Index creation must cover rows inserted before the migration ran —
     // simulate by seeding on the pre-031 schema, then applying 031.
     const db = new Database(':memory:');
-    applyPendingMigrations(db, migrations.filter(m => m.name < '031'));
+    applyPendingMigrations(
+      db,
+      migrations.filter(m => m.name < '031')
+    );
     db.pragma('foreign_keys = OFF');
     const insert = db.prepare(
       'INSERT INTO messages (id, session_id, role, content, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'

@@ -44,7 +44,10 @@ function expandIPv6Groups(address: string): number[] | null {
   const tail = input.slice(lastColon + 1);
   if (tail.includes('.')) {
     const parts = tail.split('.').map(part => Number(part));
-    if (parts.length !== 4 || parts.some(part => !Number.isInteger(part) || part < 0 || part > 255)) {
+    if (
+      parts.length !== 4 ||
+      parts.some(part => !Number.isInteger(part) || part < 0 || part > 255)
+    ) {
       return null;
     }
     const hi = ((parts[0] << 8) | parts[1]).toString(16);

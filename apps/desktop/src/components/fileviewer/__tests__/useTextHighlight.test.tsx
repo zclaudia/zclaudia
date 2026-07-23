@@ -143,9 +143,7 @@ describe('useTextHighlight', () => {
 
   it('highlights all matches and marks the active one', () => {
     const rootRef: React.RefObject<HTMLDivElement | null> = { current: null };
-    render(
-      <HighlightBox rootRef={rootRef} query="foo" caseSensitive={false} activeIndex={1} />
-    );
+    render(<HighlightBox rootRef={rootRef} query="foo" caseSensitive={false} activeIndex={1} />);
 
     const marks = screen.getAllByText('foo');
     expect(marks).toHaveLength(2);

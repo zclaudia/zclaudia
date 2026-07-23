@@ -345,9 +345,7 @@ describe('Sidebar', () => {
 
   it('drops the hard border and floats the card on the background tone', () => {
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const outer = container
-      .querySelector('[data-testid="sidebar-card"]')
-      ?.parentElement;
+    const outer = container.querySelector('[data-testid="sidebar-card"]')?.parentElement;
     expect(outer?.className).toContain('bg-background');
     expect(outer?.className).toContain('p-1.5');
     expect(outer?.className).not.toContain('border-r');

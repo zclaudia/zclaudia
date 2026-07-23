@@ -81,9 +81,7 @@ export function TaskDetail({ task, onClose }: TaskDetailProps) {
         {/* Acceptance criteria */}
         {task.acceptanceCriteria.length > 0 && (
           <section>
-            <h4 className={`${EYEBROW} mb-1`}>
-              Acceptance Criteria
-            </h4>
+            <h4 className={`${EYEBROW} mb-1`}>Acceptance Criteria</h4>
             <ul className="space-y-1">
               {task.acceptanceCriteria.map((c, i) => (
                 <li key={i} className="flex items-start gap-2 text-sm">
@@ -155,9 +153,7 @@ export function TaskDetail({ task, onClose }: TaskDetailProps) {
         {/* Review notes */}
         {task.result?.reviewNotes && (
           <section>
-            <h4 className={`${EYEBROW} mb-1`}>
-              Review Notes
-            </h4>
+            <h4 className={`${EYEBROW} mb-1`}>Review Notes</h4>
             <div className="bg-warning/5 border border-warning/20 rounded-md p-3">
               <p className="text-sm whitespace-pre-wrap">{task.result.reviewNotes}</p>
             </div>

@@ -59,7 +59,9 @@ describe('NewSessionModal', () => {
 
   it('disables Create when disconnected', () => {
     setup({ isConnected: false });
-    expect((screen.getByRole('button', { name: 'Create' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Create' }) as HTMLButtonElement).disabled).toBe(
+      true
+    );
   });
 
   it('closes on Cancel', () => {

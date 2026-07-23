@@ -339,9 +339,14 @@ describe('ReadSymbol/EditSymbol', () => {
       file_path: 'worker.py',
       symbol: 'compute',
       expected_body_digest: read.details.bodyDigest,
-      new_body: ['def compute():', '    x = 10', '# section note', '    y = 20', '    return x + y', ''].join(
-        '\n'
-      ),
+      new_body: [
+        'def compute():',
+        '    x = 10',
+        '# section note',
+        '    y = 20',
+        '    return x + y',
+        '',
+      ].join('\n'),
     });
     const onDisk = readFileSync(file, 'utf8');
 
