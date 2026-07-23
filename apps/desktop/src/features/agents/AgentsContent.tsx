@@ -396,6 +396,14 @@ export function AgentsContent({
     if (!ok) return;
     const result = await deleteAgentProfileForBackend(item.backendId, item.id);
     if (result.ok) {
+      // Clear the selection if the deleted profile was open, then refresh.
+      if (
+        selection?.kind === 'profile' &&
+        selection.backendId === item.backendId &&
+        selection.id === item.id
+      ) {
+        selectAgentsItem(null);
+      }
       bumpAgentsRefresh();
       refreshProfileMetaIfActive(item.backendId);
       return;
@@ -506,6 +514,30 @@ export function AgentsContent({
           backendName={backendName}
           onSaved={handleSaved}
           onDeleted={handleDeleted}
+          headerActions={[
+            {
+              label: 'Set as default agent',
+              onSelect: () =>
+                void handleSetProfileDefault({
+                  kind: 'profile',
+                  backendId: editedBackendId,
+                  id: profile.id,
+                  title: profile.name ?? profile.id,
+                }),
+              disabled: profile.isDefault,
+            },
+            {
+              label: 'Delete agent',
+              onSelect: () =>
+                void handleDeleteProfile({
+                  kind: 'profile',
+                  backendId: editedBackendId,
+                  id: profile.id,
+                  title: profile.name ?? profile.id,
+                }),
+              destructive: true,
+            },
+          ]}
         />
       );
     }
@@ -679,9 +711,9 @@ export function AgentsContent({
         void syncLlmProfileMetaForBackend(editedBackendId);
       };
 
-      // Delete / set-default now live on the library card (handleDeleteLlmProfile
-      // / handleSetLlmProfileDefault); the editor renders its own ProfileHeader,
-      // matching the agent profile editor, so it no longer needs DetailShell.
+      // Delete / set-default are shared with the library card menu
+      // (handleDeleteLlmProfile / handleSetLlmProfileDefault) and surface in the
+      // editor's own ProfileHeader "⋯" menu (edit mode only).
       return (
         <LlmProfileEditor
           key={`${editedBackendId}:${selection.kind === 'llm-profile' ? selection.id : 'new'}`}
@@ -690,6 +722,34 @@ export function AgentsContent({
           profile={llmProfile}
           onBack={() => selectAgentsItem(null)}
           onSaved={handleSaved}
+          headerActions={
+            llmProfile
+              ? [
+                  {
+                    label: 'Set as default provider',
+                    onSelect: () =>
+                      void handleSetLlmProfileDefault({
+                        kind: 'llm-profile',
+                        backendId: editedBackendId,
+                        id: llmProfile.id,
+                        title: llmProfile.name ?? llmProfile.id,
+                      }),
+                    disabled: llmProfile.isDefault,
+                  },
+                  {
+                    label: 'Delete provider',
+                    onSelect: () =>
+                      void handleDeleteLlmProfile({
+                        kind: 'llm-profile',
+                        backendId: editedBackendId,
+                        id: llmProfile.id,
+                        title: llmProfile.name ?? llmProfile.id,
+                      }),
+                    destructive: true,
+                  },
+                ]
+              : undefined
+          }
         />
       );
     }

@@ -12,6 +12,9 @@ vi.mock('../../../services/api', () => ({
   deleteWorkspaceSkillForBackend: vi.fn(),
 }));
 
+const mockConfirm = vi.hoisted(() => vi.fn());
+vi.mock('../../../stores/confirmDialogStore', () => ({ confirm: mockConfirm }));
+
 function makeSkill(overrides: Partial<WorkspaceSkillInfo> = {}): WorkspaceSkillInfo {
   return {
     id: 'my-skill',
@@ -95,22 +98,40 @@ describe('SkillEditor', () => {
     expect(api.getWorkspaceSkillForBackend).not.toHaveBeenCalled();
   });
 
-  it('delete: first click arms confirmation, second click deletes and fires onDeleted', async () => {
+  it('delete: confirms via dialog from the header menu, then deletes and fires onDeleted', async () => {
+    mockConfirm.mockResolvedValue(true);
     const { onDeleted } = renderEditor(makeSkill());
     await screen.findByDisplayValue('# My Skill Instructions');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-    expect(api.deleteWorkspaceSkillForBackend).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete skill' }));
 
-    const confirmButton = await screen.findByRole('button', { name: 'Confirm delete' });
-    fireEvent.click(confirmButton);
-
+    await waitFor(() => {
+      expect(mockConfirm).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'Delete skill?', destructive: true })
+      );
+    });
     await waitFor(() => {
       expect(api.deleteWorkspaceSkillForBackend).toHaveBeenCalledWith('b1', 'my-skill');
     });
     await waitFor(() => {
       expect(onDeleted).toHaveBeenCalled();
     });
+  });
+
+  it('delete: cancelling the confirm dialog deletes nothing', async () => {
+    mockConfirm.mockResolvedValue(false);
+    const { onDeleted } = renderEditor(makeSkill());
+    await screen.findByDisplayValue('# My Skill Instructions');
+
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete skill' }));
+
+    await waitFor(() => {
+      expect(mockConfirm).toHaveBeenCalled();
+    });
+    expect(api.deleteWorkspaceSkillForBackend).not.toHaveBeenCalled();
+    expect(onDeleted).not.toHaveBeenCalled();
   });
 
   it('non-workspace skill: read-only info with no content fetch, no autosave, no delete', async () => {
@@ -122,7 +143,7 @@ describe('SkillEditor', () => {
     expect(api.getWorkspaceSkillForBackend).not.toHaveBeenCalled();
     // Read-only records don't surface the autosave indicator or a delete action.
     expect(screen.queryByTestId('save-state')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'More actions' })).toBeNull();
   });
 
   it('plugin skill: also read-only', async () => {

@@ -34,6 +34,7 @@ import type { EditorTab } from './ui/EditorTabs';
 import { useProfileAutosave } from './useProfileAutosave';
 import { ProfileHeader } from './ui/ProfileHeader';
 import type { DetailBadge } from './ui/DetailHeader';
+import type { ActionsMenuAction } from './ui/ActionsMenu';
 
 /**
  * Parent must remount this component per identity — key it by
@@ -49,6 +50,8 @@ export interface ProfileEditorProps {
   backendName?: string;
   onSaved: (saved: AgentProfileConfig) => void;
   onDeleted: () => void;
+  /** "⋯" menu entries for the header (set-default/delete live here). */
+  headerActions?: ActionsMenuAction[];
 }
 
 type ThinkingLevelOption = '' | ThinkingLevel;
@@ -188,6 +191,7 @@ export function ProfileEditor({
   onBack,
   backendName,
   onSaved,
+  headerActions,
 }: ProfileEditorProps) {
   const [llmProfiles, setLlmProfiles] = useState<LlmProfileConfig[]>([]);
   const [skillCatalog, setSkillCatalog] = useState<api.WorkspaceSkillInfo[]>([]);
@@ -747,6 +751,7 @@ export function ProfileEditor({
         onRetry={autosave.retry}
         disabled={isReadonly}
         recordStatus={profile.recordStatus}
+        actions={headerActions}
       />
       {isReadonly && (
         <div className="mx-4 my-2 rounded-lg border border-border/60 bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">

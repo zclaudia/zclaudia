@@ -24,6 +24,9 @@ vi.mock('../McpOAuthLoginModal', () => ({
   ),
 }));
 
+const mockConfirm = vi.hoisted(() => vi.fn());
+vi.mock('../../../stores/confirmDialogStore', () => ({ confirm: mockConfirm }));
+
 function makeServer(overrides: Partial<McpServerConfig> = {}): McpServerConfig {
   return {
     id: 's1',
@@ -169,21 +172,38 @@ describe('McpServerEditor', () => {
     });
   });
 
-  it('delete: first click arms confirmation, second click deletes and fires onDeleted', async () => {
+  it('delete: confirms via dialog from the header menu, then deletes and fires onDeleted', async () => {
+    mockConfirm.mockResolvedValue(true);
     const { onDeleted } = renderEditor(makeServer());
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-    expect(api.deleteMcpServerForBackend).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete server' }));
 
-    const confirmButton = await screen.findByRole('button', { name: 'Confirm delete' });
-    fireEvent.click(confirmButton);
-
+    await waitFor(() => {
+      expect(mockConfirm).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'Delete MCP server?', destructive: true })
+      );
+    });
     await waitFor(() => {
       expect(api.deleteMcpServerForBackend).toHaveBeenCalledWith('b1', 's1');
     });
     await waitFor(() => {
       expect(onDeleted).toHaveBeenCalled();
     });
+  });
+
+  it('delete: cancelling the confirm dialog deletes nothing', async () => {
+    mockConfirm.mockResolvedValue(false);
+    const { onDeleted } = renderEditor(makeServer());
+
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete server' }));
+
+    await waitFor(() => {
+      expect(mockConfirm).toHaveBeenCalled();
+    });
+    expect(api.deleteMcpServerForBackend).not.toHaveBeenCalled();
+    expect(onDeleted).not.toHaveBeenCalled();
   });
 
   it('connect fires connectMcpServerForBackend and onStatusChanged', async () => {

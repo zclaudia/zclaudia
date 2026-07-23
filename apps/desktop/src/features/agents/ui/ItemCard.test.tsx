@@ -25,6 +25,20 @@ describe('ItemCard', () => {
     expect(onOpen).toHaveBeenCalledTimes(1);
   });
 
+  it('hides the backend badge when showBackendBadge is false', () => {
+    render(
+      <ItemCard
+        item={item}
+        backendName="This Device"
+        backendOnline
+        showBackendBadge={false}
+        onOpen={() => {}}
+      />
+    );
+    expect(screen.queryByText('This Device')).not.toBeInTheDocument();
+    expect(screen.getByText('Default')).toBeInTheDocument();
+  });
+
   it('opens profile actions without opening the card', () => {
     const onOpen = vi.fn();
     const onSetDefault = vi.fn();

@@ -66,6 +66,23 @@ describe('ProfileHeader', () => {
     expect(screen.getByText('Default')).toBeInTheDocument();
   });
 
+  it('renders the actions menu and fires the selected action', () => {
+    const onDelete = vi.fn();
+    render(
+      <ProfileHeader
+        {...base}
+        actions={[
+          { label: 'Set as default agent', onSelect: vi.fn(), disabled: true },
+          { label: 'Delete agent', onSelect: onDelete, destructive: true },
+        ]}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    expect(screen.getByRole('menuitem', { name: 'Set as default agent' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete agent' }));
+    expect(onDelete).toHaveBeenCalledTimes(1);
+  });
+
   it('renders a StatusChip when recordStatus is provided', () => {
     render(
       <ProfileHeader

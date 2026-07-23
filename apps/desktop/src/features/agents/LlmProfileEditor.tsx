@@ -48,6 +48,7 @@ import { EditorTabs } from './ui/EditorTabs';
 import type { EditorTab } from './ui/EditorTabs';
 import { ProfileHeader } from './ui/ProfileHeader';
 import type { DetailBadge } from './ui/DetailHeader';
+import type { ActionsMenuAction } from './ui/ActionsMenu';
 import { useProfileAutosave } from './useProfileAutosave';
 import {
   draftsToEntries,
@@ -88,6 +89,8 @@ export interface LlmProfileEditorProps {
   backendName?: string;
   onBack: () => void;
   onSaved: (id: string) => void;
+  /** "⋯" menu entries for the header (set-default/delete live here). */
+  headerActions?: ActionsMenuAction[];
 }
 
 export function LlmProfileEditor({
@@ -96,6 +99,7 @@ export function LlmProfileEditor({
   backendName,
   onBack,
   onSaved,
+  headerActions,
 }: LlmProfileEditorProps) {
   // Form state — initialized from `profile` (keyed remount contract).
   const initialHasCompat = Boolean(profile?.compat && Object.keys(profile.compat).length > 0);
@@ -656,6 +660,7 @@ export function LlmProfileEditor({
         saveStatus={autosave.status}
         onRetry={autosave.retry}
         recordStatus={profile?.recordStatus}
+        actions={headerActions}
       />
       <div className="flex-1 overflow-y-auto p-4">
         <div className="mx-auto flex w-full max-w-[760px] flex-col gap-4 pb-4">

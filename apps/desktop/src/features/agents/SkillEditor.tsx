@@ -1,11 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import * as api from '../../services/api';
 import type { WorkspaceSkillInfo } from '../../services/api';
 import { EditorSection } from './ui/EditorSection';
 import { ProfileHeader } from './ui/ProfileHeader';
 import type { DetailBadge } from './ui/DetailHeader';
+import type { ActionsMenuAction } from './ui/ActionsMenu';
 import { useProfileAutosave } from './useProfileAutosave';
 import { FIELD_CLASS } from '../../components/ui/Input';
+import { confirm } from '../../stores/confirmDialogStore';
 
 /**
  * Backend-scoped skill editor.
@@ -58,25 +60,7 @@ export function SkillEditor({
   // Create mode form — the skill id lives in the header (ProfileHeader name).
   const [newSkillId, setNewSkillId] = useState('');
 
-  const [pendingDelete, setPendingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const deleteConfirmTimeoutRef = useRef<number | null>(null);
-
-  const clearDeleteConfirmation = () => {
-    if (deleteConfirmTimeoutRef.current !== null) {
-      window.clearTimeout(deleteConfirmTimeoutRef.current);
-      deleteConfirmTimeoutRef.current = null;
-    }
-    setPendingDelete(false);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (deleteConfirmTimeoutRef.current !== null) {
-        window.clearTimeout(deleteConfirmTimeoutRef.current);
-      }
-    };
-  }, []);
 
   // Edit mode (workspace skills only): load the SKILL.md content.
   useEffect(() => {
@@ -131,17 +115,14 @@ export function SkillEditor({
   const handleDelete = async () => {
     if (!skill || deleting) return;
 
-    if (!pendingDelete) {
-      clearDeleteConfirmation();
-      setPendingDelete(true);
-      deleteConfirmTimeoutRef.current = window.setTimeout(() => {
-        setPendingDelete(false);
-        deleteConfirmTimeoutRef.current = null;
-      }, 3000);
-      return;
-    }
+    const ok = await confirm({
+      title: 'Delete skill?',
+      message: `"${skill.name ?? skill.id}" will be permanently deleted.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
 
-    clearDeleteConfirmation();
     setDeleting(true);
     setError(null);
     try {
@@ -159,6 +140,18 @@ export function SkillEditor({
     ...(!isWorkspace ? [{ label: 'Read-only', tone: 'neutral' as const }] : []),
   ];
 
+  const headerActions: ActionsMenuAction[] | undefined =
+    !isCreate && isWorkspace
+      ? [
+          {
+            label: 'Delete skill',
+            onSelect: () => void handleDelete(),
+            destructive: true,
+            disabled: deleting,
+          },
+        ]
+      : undefined;
+
   return (
     <div className="flex h-full flex-col bg-background text-foreground">
       <ProfileHeader
@@ -174,6 +167,7 @@ export function SkillEditor({
         // The id is the record identity: editable only while creating.
         disabled={!isCreate}
         recordStatus={skill?.recordStatus}
+        actions={headerActions}
       />
 
       <div className="flex-1 overflow-y-auto p-4">
@@ -209,23 +203,6 @@ export function SkillEditor({
                   spellCheck={false}
                 />
               </EditorSection>
-
-              {!isCreate && (
-                <div className="flex justify-end">
-                  <button
-                    onClick={handleDelete}
-                    disabled={deleting}
-                    className={`rounded-md border px-3 py-1.5 text-sm transition-colors disabled:opacity-50 ${
-                      pendingDelete
-                        ? 'border-destructive/30 bg-destructive/15 text-destructive hover:bg-destructive/25'
-                        : 'border-border bg-background/70 text-destructive hover:bg-destructive/10'
-                    }`}
-                    title={pendingDelete ? 'Click again to confirm delete' : 'Delete'}
-                  >
-                    {deleting ? 'Deleting…' : pendingDelete ? 'Confirm delete' : 'Delete'}
-                  </button>
-                </div>
-              )}
             </>
           )}
         </div>

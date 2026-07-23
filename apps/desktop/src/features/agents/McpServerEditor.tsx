@@ -8,8 +8,9 @@
  * Matches the agent/LLM profile editor design language: it owns its own
  * full-height chrome (ProfileHeader breadcrumb + inline-editable name/description
  * + save indicator) and autosaves on change (no explicit Add/Save button),
- * laying fields out as EditorSection cards. Connection lifecycle actions
- * (connect/disconnect/refresh/oauth/toggle/delete) live in a Connection section.
+ * laying fields out as EditorSection cards. Delete lives in the header "⋯"
+ * menu; the other connection lifecycle actions (connect/disconnect/refresh/
+ * oauth/toggle) live in a Connection section.
  *
  * Parent must remount this component per identity — key it by
  * `${backendId}:${server?.id ?? 'new'}`. Form state initializes from the
@@ -21,7 +22,7 @@
  * and the expandable inventory browser (tools/resources/prompts details — deferred).
  */
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import {
   connectMcpServerForBackend,
   createMcpServerForBackend,
@@ -38,10 +39,12 @@ import { McpOAuthLoginModal } from './McpOAuthLoginModal';
 import { EditorSection, FieldLabel } from './ui/EditorSection';
 import { ProfileHeader } from './ui/ProfileHeader';
 import type { DetailBadge } from './ui/DetailHeader';
+import type { ActionsMenuAction } from './ui/ActionsMenu';
 import { useProfileAutosave } from './useProfileAutosave';
 import { FormField } from '../../components/ui/FormField';
 import { Input, FIELD_CLASS } from '../../components/ui/Input';
 import { Toggle } from '../../components/ui/Toggle';
+import { confirm } from '../../stores/confirmDialogStore';
 import type { McpServerConfig, McpServerStatus } from '@zclaudia/shared';
 import type {
   McpRiskAction,
@@ -149,28 +152,10 @@ export function McpServerEditor({
   const [oauthLogin, setOauthLogin] = useState<{ session: McpOAuthStartResult } | null>(null);
   const [startingOAuth, setStartingOAuth] = useState(false);
 
-  const [pendingDelete, setPendingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const deleteConfirmTimeoutRef = useRef<number | null>(null);
   // The persisted identity this editor targets — so a create-mode autosave
   // switches to updates on subsequent edits instead of creating a duplicate.
   const savedIdRef = useRef<string | null>(server?.id ?? null);
-
-  const clearDeleteConfirmation = () => {
-    if (deleteConfirmTimeoutRef.current !== null) {
-      window.clearTimeout(deleteConfirmTimeoutRef.current);
-      deleteConfirmTimeoutRef.current = null;
-    }
-    setPendingDelete(false);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (deleteConfirmTimeoutRef.current !== null) {
-        window.clearTimeout(deleteConfirmTimeoutRef.current);
-      }
-    };
-  }, []);
 
   // Whole-form validity gate for autosave: name + the transport's required
   // endpoint. While invalid, edits are held (save-state shows "Not saved").
@@ -389,17 +374,14 @@ export function McpServerEditor({
   const handleDelete = async () => {
     if (!server || deleting) return;
 
-    if (!pendingDelete) {
-      clearDeleteConfirmation();
-      setPendingDelete(true);
-      deleteConfirmTimeoutRef.current = window.setTimeout(() => {
-        setPendingDelete(false);
-        deleteConfirmTimeoutRef.current = null;
-      }, 3000);
-      return;
-    }
+    const ok = await confirm({
+      title: 'Delete MCP server?',
+      message: `"${server.name ?? server.id}" will be permanently deleted.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
 
-    clearDeleteConfirmation();
     setDeleting(true);
     setActionError(null);
     try {
@@ -540,19 +522,6 @@ export function McpServerEditor({
             onChange={() => void runAction(() => toggleMcpServerForBackend(backendId, current.id))}
             aria-label={current.enabled ? 'Disable' : 'Enable'}
           />
-          <button
-            type="button"
-            onClick={() => void handleDelete()}
-            disabled={deleting}
-            className={`rounded-md border px-2.5 py-1 text-xs transition-colors disabled:opacity-50 ${
-              pendingDelete
-                ? 'border-destructive/30 bg-destructive/15 text-destructive hover:bg-destructive/25'
-                : 'border-border bg-background/70 text-destructive hover:bg-destructive/10'
-            }`}
-            title={pendingDelete ? 'Click again to confirm delete' : 'Delete'}
-          >
-            {deleting ? 'Deleting…' : pendingDelete ? 'Confirm delete' : 'Delete'}
-          </button>
         </div>
       </div>
       {actionError && <p className="mt-2 text-xs text-destructive">{actionError}</p>}
@@ -563,6 +532,17 @@ export function McpServerEditor({
   // Connection section (full detail) — no separate header badge, to avoid a
   // duplicate "Disabled" label next to the chip.
   const headerBadges: DetailBadge[] = [...(backendName ? [{ label: backendName }] : [])];
+
+  const headerActions: ActionsMenuAction[] | undefined = server
+    ? [
+        {
+          label: 'Delete server',
+          onSelect: () => void handleDelete(),
+          destructive: true,
+          disabled: deleting,
+        },
+      ]
+    : undefined;
 
   return (
     <div className="flex h-full flex-col bg-background text-foreground">
@@ -579,6 +559,7 @@ export function McpServerEditor({
         saveStatus={autosave.status}
         onRetry={autosave.retry}
         recordStatus={server?.recordStatus}
+        actions={headerActions}
       />
       {saveError && <p className="px-4 pb-2 text-xs text-destructive">{saveError}</p>}
 

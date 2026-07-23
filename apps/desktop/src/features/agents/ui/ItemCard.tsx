@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import { BotMessageSquare, Lightbulb, Database, MoreHorizontal, Plug } from 'lucide-react';
+import { BotMessageSquare, Lightbulb, Database, Plug } from 'lucide-react';
 import type { LibraryItem, LibraryItemKind } from '../agents-types';
 import { Badge } from './Badge';
 import { StatusChip } from '../../../components/ui/StatusChip';
+import { ActionsMenu } from './ActionsMenu';
+import type { ActionsMenuAction } from './ActionsMenu';
 
 const KIND_ICON: Record<LibraryItemKind, typeof Plug> = {
   profile: BotMessageSquare,
@@ -18,28 +19,25 @@ const KIND_LABEL: Record<LibraryItemKind, string> = {
   'llm-profile': 'Provider',
 };
 
-export interface ItemCardAction {
-  label: string;
-  onSelect: () => void;
-  destructive?: boolean;
-  disabled?: boolean;
-}
+export type ItemCardAction = ActionsMenuAction;
 
 export function ItemCard({
   item,
   backendName,
   backendOnline,
+  showBackendBadge = true,
   onOpen,
   actions,
 }: {
   item: LibraryItem;
   backendName: string;
   backendOnline: boolean;
+  /** Set false when the surrounding view already groups cards by backend. */
+  showBackendBadge?: boolean;
   onOpen: () => void;
   actions?: ItemCardAction[];
 }) {
   const Icon = KIND_ICON[item.kind];
-  const [menuOpen, setMenuOpen] = useState(false);
   const content = (
     <>
       <div className="flex items-center justify-between">
@@ -50,11 +48,13 @@ export function ItemCard({
       </div>
       <div className="text-sm font-medium text-foreground">{item.title}</div>
       {item.subtitle && <div className="truncate text-xs text-muted-foreground">{item.subtitle}</div>}
-      <div className="mt-0.5 flex items-center gap-1.5">
-        <Badge label={backendName} online={backendOnline} />
-        {item.status && <Badge label={item.status} tone="accent" />}
-        {item.recordStatus && <StatusChip status={item.recordStatus} />}
-      </div>
+      {(showBackendBadge || item.status || item.recordStatus) && (
+        <div className="mt-0.5 flex items-center gap-1.5">
+          {showBackendBadge && <Badge label={backendName} online={backendOnline} />}
+          {item.status && <Badge label={item.status} tone="accent" />}
+          {item.recordStatus && <StatusChip status={item.recordStatus} />}
+        </div>
+      )}
     </>
   );
 
@@ -69,43 +69,7 @@ export function ItemCard({
         />
         <div className="pointer-events-none relative flex flex-col gap-2 p-3">{content}</div>
         <div className="absolute bottom-2.5 right-2.5 z-10">
-          <button
-            type="button"
-            aria-label="More actions"
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen(open => !open)}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"
-          >
-            <MoreHorizontal size={16} strokeWidth={1.75} />
-          </button>
-          {menuOpen && (
-            <>
-              <div className="fixed inset-0 z-[70]" onClick={() => setMenuOpen(false)} />
-              <div
-                role="menu"
-                className="absolute right-0 top-full z-[80] mt-1 min-w-48 overflow-hidden rounded-md border border-border bg-popover py-1 shadow-md"
-              >
-                {actions.map(action => (
-                  <button
-                    key={action.label}
-                    role="menuitem"
-                    type="button"
-                    disabled={action.disabled}
-                    onClick={() => {
-                      setMenuOpen(false);
-                      action.onSelect();
-                    }}
-                    className={`flex w-full px-3 py-1.5 text-left text-xs hover:bg-secondary disabled:pointer-events-none disabled:opacity-50 ${
-                      action.destructive ? 'text-destructive hover:bg-destructive/10' : 'text-foreground'
-                    }`}
-                  >
-                    {action.label}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
+          <ActionsMenu actions={actions} />
         </div>
       </div>
     );

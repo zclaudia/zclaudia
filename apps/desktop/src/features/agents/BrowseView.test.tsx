@@ -48,4 +48,35 @@ describe('BrowseView', () => {
     setup({ items: [] });
     expect(screen.getByText(/Nothing here yet|No items/i)).toBeInTheDocument();
   });
+
+  it('groups cards under backend headers when multiple backends exist', () => {
+    setup({
+      backends: [
+        { backendId: 'b1', name: 'This Device', online: true },
+        { backendId: 'b2', name: 'Remote Box', online: false },
+      ],
+      items: [
+        ...items,
+        { kind: 'profile', backendId: 'b2', id: 'p2', title: 'Reviewer', subtitle: 'gpt-6' },
+      ],
+    });
+    expect(screen.getByRole('heading', { name: 'This Device' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Remote Box' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Reviewer/ })).toBeInTheDocument();
+    // Cards no longer repeat the backend badge — the group header carries it.
+    expect(screen.getAllByText('This Device')).toHaveLength(2); // filter chip + group header
+  });
+
+  it('renders a flat list without headers when a single backend is filtered', () => {
+    setup({
+      backends: [
+        { backendId: 'b1', name: 'This Device', online: true },
+        { backendId: 'b2', name: 'Remote Box', online: true },
+      ],
+      backendFilter: 'b1',
+    });
+    expect(screen.queryByRole('heading', { name: 'This Device' })).not.toBeInTheDocument();
+    // The card keeps its own backend badge in flat mode.
+    expect(screen.getAllByText('This Device').length).toBeGreaterThan(1);
+  });
 });

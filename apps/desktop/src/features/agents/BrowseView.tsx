@@ -52,10 +52,81 @@ export function BrowseView({
     );
   }, [items, query]);
 
+  // Group cards by backend (This Device first — `backends` is already ordered)
+  // whenever more than one backend is in play and no single backend is picked.
+  const showGroups = backends.length > 1 && backendFilter === 'all';
+
+  const groups = useMemo(() => {
+    if (!showGroups) return null;
+    const byBackend = new Map<string, LibraryItem[]>();
+    for (const item of visible) {
+      const list = byBackend.get(item.backendId);
+      if (list) list.push(item);
+      else byBackend.set(item.backendId, [item]);
+    }
+    const ordered: { backend: AgentsBackend; items: LibraryItem[] }[] = [];
+    for (const b of backends) {
+      const list = byBackend.get(b.backendId);
+      if (list) ordered.push({ backend: b, items: list });
+    }
+    // Items from a backend missing from the list still get a group, at the end.
+    for (const [backendId, list] of byBackend) {
+      if (!byName.has(backendId)) {
+        ordered.push({ backend: { backendId, name: backendId, online: false }, items: list });
+      }
+    }
+    return ordered;
+  }, [showGroups, visible, backends, byName]);
+
   const chips = [
     { key: 'all', label: 'All' },
     ...backends.map(b => ({ key: b.backendId, label: b.name, online: b.online })),
   ];
+
+  const gridClass = 'grid auto-rows-min grid-cols-2 gap-3 lg:grid-cols-3';
+
+  const renderCard = (item: LibraryItem) => {
+    const b = byName.get(item.backendId);
+    return (
+      <ItemCard
+        key={`${item.backendId}:${item.kind}:${item.id}`}
+        item={item}
+        backendName={b?.name ?? item.backendId}
+        backendOnline={b?.online ?? false}
+        showBackendBadge={!showGroups}
+        onOpen={() => onOpen(item)}
+        actions={
+          item.kind === 'profile'
+            ? [
+                {
+                  label: 'Set as default agent',
+                  onSelect: () => onSetProfileDefault?.(item),
+                  disabled: item.isDefault,
+                },
+                {
+                  label: 'Delete agent',
+                  onSelect: () => onDeleteProfile?.(item),
+                  destructive: true,
+                },
+              ]
+            : item.kind === 'llm-profile'
+              ? [
+                  {
+                    label: 'Set as default provider',
+                    onSelect: () => onSetLlmProfileDefault?.(item),
+                    disabled: item.isDefault,
+                  },
+                  {
+                    label: 'Delete provider',
+                    onSelect: () => onDeleteLlmProfile?.(item),
+                    destructive: true,
+                  },
+                ]
+              : undefined
+        }
+      />
+    );
+  };
 
   return (
     <div className="flex h-full flex-col bg-background text-foreground">
@@ -94,50 +165,25 @@ export function BrowseView({
           <p className="text-sm">Nothing here yet</p>
           <p className="mt-1 text-xs opacity-60">Create one with New.</p>
         </div>
-      ) : (
-        <div className="grid flex-1 auto-rows-min grid-cols-2 gap-3 overflow-y-auto p-4 lg:grid-cols-3">
-          {visible.map(item => {
-            const b = byName.get(item.backendId);
-            return (
-              <ItemCard
-                key={`${item.backendId}:${item.kind}:${item.id}`}
-                item={item}
-                backendName={b?.name ?? item.backendId}
-                backendOnline={b?.online ?? false}
-                onOpen={() => onOpen(item)}
-                actions={
-                  item.kind === 'profile'
-                    ? [
-                        {
-                          label: 'Set as default agent',
-                          onSelect: () => onSetProfileDefault?.(item),
-                          disabled: item.isDefault,
-                        },
-                        {
-                          label: 'Delete agent',
-                          onSelect: () => onDeleteProfile?.(item),
-                          destructive: true,
-                        },
-                      ]
-                    : item.kind === 'llm-profile'
-                      ? [
-                          {
-                            label: 'Set as default provider',
-                            onSelect: () => onSetLlmProfileDefault?.(item),
-                            disabled: item.isDefault,
-                          },
-                          {
-                            label: 'Delete provider',
-                            onSelect: () => onDeleteLlmProfile?.(item),
-                            destructive: true,
-                          },
-                        ]
-                      : undefined
-                }
-              />
-            );
-          })}
+      ) : groups ? (
+        <div className="flex-1 space-y-5 overflow-y-auto p-4">
+          {groups.map(group => (
+            <section key={group.backend.backendId}>
+              <div className="mb-2 flex items-center gap-2 px-0.5">
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    group.backend.online ? 'bg-emerald-500' : 'bg-muted-foreground/50'
+                  }`}
+                />
+                <h3 className="text-xs font-medium text-muted-foreground">{group.backend.name}</h3>
+                <span className="text-[11px] text-muted-foreground/60">{group.items.length}</span>
+              </div>
+              <div className={gridClass}>{group.items.map(renderCard)}</div>
+            </section>
+          ))}
         </div>
+      ) : (
+        <div className={`flex-1 overflow-y-auto p-4 ${gridClass}`}>{visible.map(renderCard)}</div>
       )}
     </div>
   );
